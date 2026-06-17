@@ -1,15 +1,15 @@
 import { Layers, ArrowRight } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
-import { queueActions } from "@/lib/mock"
+import { useQueue } from "@/lib/live"
 import { PanelFrame } from "./PanelFrame"
 
 /**
- * Queue panel maquette — tool calls staged for an atomic flush (one cache break
+ * Queue panel — tool calls staged for an atomic flush (one cache break
  * instead of N). Shows the ordered queued actions with their index, tool,
  * intent, and a preview of the target, plus the flush/pause affordances.
- * Mirrors the real per-worker Queue panel; here in its active state.
  */
-export function QueuePanel({ panel }: { panel: ContextPanel }) {
+export function QueuePanel({ panel, agentId }: { panel: ContextPanel; agentId: string }) {
+  const { data: queueActions = [] } = useQueue(agentId)
   return (
     <PanelFrame
       icon={Layers}

@@ -1,16 +1,18 @@
 import { Radar } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
-import { radarAnchors, radarResults } from "@/lib/mock"
+import { useRadar } from "@/lib/live"
 import { PanelFrame, PanelSection, ImportanceDot } from "./PanelFrame"
 
 /**
- * Context Radar panel maquette — recency-weighted recall surfaced from the
+ * Context Radar panel — recency-weighted recall surfaced from the
  * logs. Anchor signals (the most recent task contexts) sit at the top; below,
  * scored results are ranked by relevance with a horizontal score meter, an
- * importance dot, and their timestamp. Mirrors the real radar's half-life
- * decay scoring.
+ * importance dot, and their timestamp.
  */
-export function RadarPanel({ panel }: { panel: ContextPanel }) {
+export function RadarPanel({ panel, agentId }: { panel: ContextPanel; agentId: string }) {
+  const { data: radarData } = useRadar(agentId)
+  const radarAnchors = radarData?.anchors ?? []
+  const radarResults = radarData?.results ?? []
   return (
     <PanelFrame
       icon={Radar}

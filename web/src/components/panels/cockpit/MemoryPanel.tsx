@@ -1,15 +1,16 @@
 import { Brain } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
-import { memoryCards } from "@/lib/mock"
+import { useMemory } from "@/lib/live"
 import { PanelFrame, ImportanceDot, Chip } from "./PanelFrame"
 
 /**
- * Memories panel maquette — long-term recall cards. Each card leads with its
+ * Memories panel — long-term recall cards. Each card leads with its
  * id and an importance dot, states its tl;dr, and tags itself with freeform
  * labels. Mirrors the real Memories panel which persists across the whole
  * conversation in memories.yaml.
  */
-export function MemoryPanel({ panel }: { panel: ContextPanel }) {
+export function MemoryPanel({ panel, agentId }: { panel: ContextPanel; agentId: string }) {
+  const { data: memoryCards = [] } = useMemory(agentId)
   return (
     <PanelFrame
       icon={Brain}

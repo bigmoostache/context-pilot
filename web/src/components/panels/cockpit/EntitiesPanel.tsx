@@ -1,15 +1,15 @@
 import { Database } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
-import { entityTables } from "@/lib/mock"
+import { useEntities } from "@/lib/live"
 import { PanelFrame } from "./PanelFrame"
 
 /**
- * Entities panel maquette — the structured SQLite domain database. One card per
+ * Entities panel — the structured SQLite domain database. One card per
  * table shows its name, row count, a compact column signature (PK first), and a
- * couple of sample rows in mono. Mirrors the real Entities panel the agent uses
- * for queryable structured knowledge.
+ * couple of sample rows in mono.
  */
-export function EntitiesPanel({ panel }: { panel: ContextPanel }) {
+export function EntitiesPanel({ panel, agentId }: { panel: ContextPanel; agentId: string }) {
+  const { data: entityTables = [] } = useEntities(agentId)
   const totalRows = entityTables.reduce((n, t) => n + t.rows, 0)
 
   return (

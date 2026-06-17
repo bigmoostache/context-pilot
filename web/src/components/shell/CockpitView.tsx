@@ -12,13 +12,13 @@ import { PanelPane } from "@/components/panels/cockpit/PanelPane"
  * pane, exactly where any panel maquette would appear. Selection is lifted here
  * so the rail drives the center pane, and the conversation is the default view.
  */
-export function CockpitView() {
+export function CockpitView({ agentId }: { agentId: string }) {
   const [selected, setSelected] = useState("conversation")
 
   return (
     <div className="flex min-h-0 flex-1">
-      <LeftRail selected={selected} onSelect={setSelected} />
-      <PanelPane panelId={selected} />
+      <LeftRail agentId={agentId} selected={selected} onSelect={setSelected} />
+      <PanelPane agentId={agentId} panelId={selected} />
     </div>
   )
 }

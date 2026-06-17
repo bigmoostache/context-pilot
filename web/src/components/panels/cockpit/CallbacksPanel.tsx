@@ -1,15 +1,15 @@
 import { Webhook } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
-import { callbackRows } from "@/lib/mock"
+import { useCallbacks } from "@/lib/live"
 import { PanelFrame } from "./PanelFrame"
 
 /**
- * Callbacks panel maquette — file-edit hooks that auto-fire on matching globs.
+ * Callbacks panel — file-edit hooks that auto-fire on matching globs.
  * Each row shows the id, name, the glob pattern, whether it blocks the edit
- * result, its timeout, scope, and working directory. Mirrors the real
- * Callbacks panel (here: the three Rust quality gates).
+ * result, its timeout, scope, and working directory.
  */
-export function CallbacksPanel({ panel }: { panel: ContextPanel }) {
+export function CallbacksPanel({ panel, agentId }: { panel: ContextPanel; agentId: string }) {
+  const { data: callbackRows = [] } = useCallbacks(agentId)
   return (
     <PanelFrame
       icon={Webhook}

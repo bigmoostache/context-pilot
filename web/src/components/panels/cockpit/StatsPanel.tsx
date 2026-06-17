@@ -1,6 +1,7 @@
 import { Gauge } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
-import { stats, tokenBudget, cacheStats, panels } from "@/lib/mock"
+import { stats, tokenBudget, cacheStats } from "@/lib/mock"
+import { usePanels } from "@/lib/live"
 import { fmtTokens, fmtCost, loadColor } from "@/lib/panelMeta"
 import { PanelFrame, PanelSection } from "./PanelFrame"
 
@@ -13,15 +14,14 @@ const ACCENT: Record<string, string> = {
 }
 
 /**
- * Statistics panel maquette — session vitals. A context-budget meter heads the
- * panel, followed by the headline stat rows (context / messages / indexed /
- * entities / memories / todos / cost) and a compact "context elements" table
- * showing each live panel's token weight as a mini bar. Mirrors the real
- * Statistics panel + sidebar cache economics.
+ * Statistics panel — session vitals. A context-budget meter heads the
+ * panel, followed by the headline stat rows and a compact "context elements"
+ * table showing each live panel's token weight as a mini bar.
  */
-export function StatsPanel({ panel }: { panel: ContextPanel }) {
+export function StatsPanel({ panel, agentId }: { panel: ContextPanel; agentId: string }) {
+  const { data: panels = [] } = usePanels(agentId)
   const usedRatio = tokenBudget.used / tokenBudget.budget
-  const maxTokens = Math.max(...panels.map((p) => p.tokens))
+  const maxTokens = panels.length > 0 ? Math.max(...panels.map((p) => p.tokens)) : 1
 
   return (
     <PanelFrame

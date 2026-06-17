@@ -1,6 +1,6 @@
 import { ListTodo, Circle, CircleDot, CheckCircle2 } from "lucide-react"
 import type { ContextPanel, TodoItem } from "@/lib/types"
-import { todoItems } from "@/lib/mock"
+import { useTodos } from "@/lib/live"
 import { PanelFrame } from "./PanelFrame"
 
 const STATUS_META: Record<TodoItem["status"], { icon: typeof Circle; color: string }> = {
@@ -10,14 +10,15 @@ const STATUS_META: Record<TodoItem["status"], { icon: typeof Circle; color: stri
 }
 
 /**
- * Todo List panel maquette — the agent's hierarchical task plan. Rows are
+ * Todo List panel — the agent's hierarchical task plan. Rows are
  * depth-indented; status drives a colored glyph (○ pending · ◉ in-progress ·
  * ✓ done) and strikes through completed items. A header progress bar reports
- * overall completion. Mirrors the real per-worker todo panel.
+ * overall completion.
  */
-export function TodoPanel({ panel }: { panel: ContextPanel }) {
+export function TodoPanel({ panel, agentId }: { panel: ContextPanel; agentId: string }) {
+  const { data: todoItems = [] } = useTodos(agentId)
   const done = todoItems.filter((t) => t.status === "done").length
-  const ratio = done / todoItems.length
+  const ratio = todoItems.length > 0 ? done / todoItems.length : 0
 
   return (
     <PanelFrame

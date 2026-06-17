@@ -1,6 +1,6 @@
 import { Activity } from "lucide-react"
 import type { ContextPanel, NotifKind } from "@/lib/types"
-import { spine } from "@/lib/mock"
+import { useSpine } from "@/lib/live"
 import { PanelFrame, PanelSection } from "./PanelFrame"
 
 const KIND_COLOR: Record<NotifKind, string> = {
@@ -10,12 +10,12 @@ const KIND_COLOR: Record<NotifKind, string> = {
 }
 
 /**
- * Spine panel maquette — the auto-continuation nerve. Lists notifications
+ * Spine panel — the auto-continuation nerve. Lists notifications
  * (user input, reload-resume, custom nudges) with a kind dot, id, time, and
  * processed state, plus the live guard-rail / auto-continuation config.
- * Mirrors the real Spine panel that drives the agent's heartbeat.
  */
-export function SpinePanel({ panel }: { panel: ContextPanel }) {
+export function SpinePanel({ panel, agentId }: { panel: ContextPanel; agentId: string }) {
+  const { data: spine = [] } = useSpine(agentId)
   return (
     <PanelFrame
       icon={Activity}

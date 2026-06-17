@@ -57,7 +57,7 @@ function App() {
               onCreateConsumed={() => setCreateAgent(false)}
             />
           ) : view === "cockpit" ? (
-            <CockpitView />
+            <CockpitView agentId={activeAgentId} />
           ) : view === "finder" ? (
             <Finder key={activeAgent.id} agent={activeAgent} />
           ) : (

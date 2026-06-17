@@ -2,7 +2,8 @@ import { MessageSquare } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { TokenBar } from "@/components/panels/TokenBar"
 import { Tip } from "@/components/ui/tip"
-import { panels, tokenBudget } from "@/lib/mock"
+import { tokenBudget } from "@/lib/mock"
+import { usePanels } from "@/lib/live"
 import { panelIcon, fmtTokens, loadColor } from "@/lib/panelMeta"
 import { cn } from "@/lib/utils"
 
@@ -15,12 +16,15 @@ import { cn } from "@/lib/utils"
  * panel drives the center PanelPane).
  */
 export function LeftRail({
+  agentId,
   selected,
   onSelect,
 }: {
+  agentId: string
   selected: string
   onSelect: (id: string) => void
 }) {
+  const { data: panels = [] } = usePanels(agentId)
   const usedRatio = tokenBudget.used / tokenBudget.budget
 
   return (

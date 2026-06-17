@@ -1,15 +1,16 @@
 import { FolderTree, Folder, FolderOpen, File } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
-import { treeRows } from "@/lib/mock"
+import { useTree } from "@/lib/live"
 import { PanelFrame } from "./PanelFrame"
 
 /**
- * Directory Tree panel maquette — the cartographer's annotated project tree.
+ * Directory Tree panel — the cartographer's annotated project tree.
  * Each row shows depth-indented name, a folder/file glyph, an optional token
  * size chip, and the cartographer description. A `[!]` marker flags files that
  * changed since their description was written (stale-doc signal).
  */
-export function TreePanel({ panel }: { panel: ContextPanel }) {
+export function TreePanel({ panel, agentId }: { panel: ContextPanel; agentId: string }) {
+  const { data: treeRows = [] } = useTree(agentId)
   return (
     <PanelFrame
       icon={FolderTree}

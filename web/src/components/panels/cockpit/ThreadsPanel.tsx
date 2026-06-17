@@ -1,6 +1,6 @@
 import { MessagesSquare } from "lucide-react"
 import type { ContextPanel, ThreadStatus } from "@/lib/types"
-import { threadDetails } from "@/lib/mock"
+import { useThreads } from "@/lib/live"
 import { PanelFrame } from "./PanelFrame"
 import { cn } from "@/lib/utils"
 
@@ -11,12 +11,12 @@ const STATUS_META: Record<ThreadStatus, { label: string; color: string }> = {
 }
 
 /**
- * Threads panel maquette — the parallel-discussion roster as the cockpit sees
+ * Threads panel — the parallel-discussion roster as the cockpit sees
  * it. Each row shows a status dot (Needs you / Active / Working), the thread
- * name, message count, last activity, and the latest message preview. Mirrors
- * the real fixed Threads panel that lists every thread the agent owns.
+ * name, message count, last activity, and the latest message preview.
  */
-export function ThreadsPanel({ panel }: { panel: ContextPanel }) {
+export function ThreadsPanel({ panel, agentId }: { panel: ContextPanel; agentId: string }) {
+  const { data: threadDetails = [] } = useThreads(agentId)
   return (
     <PanelFrame
       icon={MessagesSquare}

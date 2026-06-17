@@ -298,6 +298,10 @@
   path: ui/src/components/conversation/Conversation.tsx
   description: 'Center conversation surface: header strip (msg counts, streaming indicator), scrollable message list, input bar.'
   last_edited_ms: 0
+0b7e12a6bdeee0b5:
+  path: web/src/lib/types.ts
+  description: 'Maquette domain types. User (T30: name/email/initials/accent/managedByCompany/company/role for avatar menu + Profile modal). Agent, FsNode, Finder types, ThreadDetail+agentId, ThreadStatus (MY_TURN/ACTIVE/THEIR_TURN), ViewMode=fleet|cockpit|threads|finder, Library/Usage types. Cockpit panel maquette types (T16).'
+  last_edited_ms: 1781694654401
 0b9103ee30634685:
   path: docs/logs.md
   description: Logging system design
@@ -3074,6 +3078,10 @@
   path: src/llms/mod.rs
   description: LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging.
   last_edited_ms: 0
+8362044ebcf3c180:
+  path: web/src/components/threads/ThreadList.tsx
+  description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups: Needs you/Active/Working in parallel. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
+  last_edited_ms: 1781694654417
 837d71bc2422a4c4:
   path: src/state/persistence/boot.rs
   description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 2 parallel threads (Meilisearch + Console). Loads .env files (project + global).'
@@ -3210,6 +3218,10 @@
   path: .github/checks/rust_lints_compare.py
   description: Compares rustc lint defaults (from rust_lints_list.md) against Cargo.toml overrides. Outputs rust_lints_compared_list.md — hides forbid-level lints, shows remaining with emoji indicators.
   last_edited_ms: 1780610393062
+887277f8177b1064:
+  path: web/src/components/threads/NewThreadDialog.tsx
+  description: New Thread dialog — focused sheet asking only for a title; on submit the parent prepends a fresh MY_TURN thread. Base UI Dialog primitive.
+  last_edited_ms: 1781694654433
 8880be41bf6bd1bd:
   path: src/llms/prompt_tick_csv.rs
   description: Prompt tick CSV dumper. Writes prompt messages to .context-pilot/prompt_ticks/ CSV per tick. Rolling 20-file cleanup. Classifies text blocks (panel_header/timestamp/footer/seed/conversation). Uses cp_mod_utilities::time for timestamps.

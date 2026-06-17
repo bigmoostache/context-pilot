@@ -1,14 +1,14 @@
 import { NotebookPen } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
-import { scratchCells } from "@/lib/mock"
+import { useScratchpad } from "@/lib/live"
 import { PanelFrame } from "./PanelFrame"
 
 /**
- * Scratchpad panel maquette — ephemeral per-worker working cells (notes, plans,
- * snippets). Each cell shows its id, title, and a content preview. Mirrors the
- * real Scratchpad panel used as transient thinking space during a task.
+ * Scratchpad panel — ephemeral per-worker working cells (notes, plans,
+ * snippets). Each cell shows its id, title, and a content preview.
  */
-export function ScratchpadPanel({ panel }: { panel: ContextPanel }) {
+export function ScratchpadPanel({ panel, agentId }: { panel: ContextPanel; agentId: string }) {
+  const { data: scratchCells = [] } = useScratchpad(agentId)
   return (
     <PanelFrame
       icon={NotebookPen}

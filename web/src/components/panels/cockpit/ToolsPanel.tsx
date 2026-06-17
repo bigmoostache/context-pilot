@@ -1,15 +1,15 @@
 import { Wrench } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
-import { toolGroups } from "@/lib/mock"
+import { useTools } from "@/lib/live"
 import { PanelFrame } from "./PanelFrame"
 
 /**
- * Tools panel maquette — the enabled tool registry, grouped by category. Each
+ * Tools panel — the enabled tool registry, grouped by category. Each
  * row shows the tool name, a one-line description, and an enabled/disabled
- * status dot. Mirrors the real Tools panel that the agent consults to know its
- * own capabilities.
+ * status dot.
  */
-export function ToolsPanel({ panel }: { panel: ContextPanel }) {
+export function ToolsPanel({ panel, agentId }: { panel: ContextPanel; agentId: string }) {
+  const { data: toolGroups = [] } = useTools(agentId)
   const total = toolGroups.reduce((n, g) => n + g.tools.length, 0)
   const on = toolGroups.reduce((n, g) => n + g.tools.filter((t) => t.status === "on").length, 0)
 
