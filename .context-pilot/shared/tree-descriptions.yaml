@@ -318,6 +318,10 @@
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
   last_edited_ms: 0
+0da920e8196626fc:
+  path: crates/cp-orchestrator/tests/services_integration.rs
+  description: 'Phase 29 (X796) backend services integration suite (4 tests, green, ~0.1s). Drives MaterializedView+CostBreaker+StreamHub TOGETHER against a REAL cp-oplog via channel::Tailer (composition the inline unit tests'' crafted OpEntry literals can''t reach): (1) restart rebuild end-to-end I5+V9: OplogService.append_durable(heads+phase+rising cost)->shutdown->tail_all(Tailer.poll)->view.apply_batch->breaker.rebuild_from_view trips; (2) real segment-roll checkpoint folds to ground-truth head: spawn_with_segment_limit(64) forces rolls (leading authoritative Checkpoint), asserts >=1 Checkpoint rode stream + final head correct; (3) R2-17 reconcile: degraded hub subscriber''s authoritative snapshot = view heads folded from real oplog, mark_reconciled clears degraded+dropped; (4) fleet isolation: 2 agents 2 oplogs -> view 2 isolated projections, breaker trips only overspender, hub fans per-agent. helpers message/cost/token/tail_all. Top `use cp_mod_bridge/nix/serde/serde_json/tiny_http as _;`.'
+  last_edited_ms: 0
 0ddcc5184c2913d3:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
@@ -761,6 +765,10 @@
 2081231103220bef:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
+  last_edited_ms: 0
+209184f34f968226:
+  path: crates/cp-orchestrator/tests/supervisor_lifecycle.rs
+  description: 'Phase 28 (X795) backend supervisor lifecycle suite (4 tests, all green, ~15s). Black-box public-API + real OS processes, covering what supervisor/tests.rs unit tests can''t: (1) SIGTERM→grace→SIGKILL escalation vs `/bin/sh -c "trap '''' TERM; exec sleep 60"` (unit spawn_and_stop never walks escalation path); (2) multi-agent fleet spawn 3 → stop all → all pids ESRCH-gone (spawned children reaped, no zombie); (3) adopted FOREIGN process really signalled on stop (status.signal()==SIGTERM 15; supervisor signals but doesn''t reap what it didn''t spawn); (4) check_liveness routes spawned Exited (try_wait) + adopted Vanished (signal-0) in ONE pass. pid_present helper via nix kill(_,None)!=ESRCH. Top `use cp_mod_bridge/cp_oplog/serde/serde_json/tiny_http as _;`.'
   last_edited_ms: 0
 20dc7ba5f120fbaf:
   path: ui/src/components/finder/FinderPreview.tsx
@@ -4334,6 +4342,10 @@ ba4b46d00e37d261:
   path: ui/src/components/agents/PromptModal.tsx
   description: 'Prompts page modals. PromptModal: LARGE dialog (1180x90vh) — create (kind picker System/Skill/Command + name/desc) or view/edit (prefilled, built-in name lock, Delete). Body = WYSIWYG MarkdownEditor, remounts on isNew/item.id (not kind). ImportModal: import from Claude Code/Codex/Cursor/Windsurf/Aider/Continue, per-row Imported state. Shared Backdrop+Field.'
   last_edited_ms: 1781600078223
+ba9ad5938b7f9770:
+  path: crates/cp-orchestrator/tests/end_to_end.rs
+  description: 'Phase 30 (X797) end-to-end loopback capstone (3 tests, green ~0.06s). Real agent stack ↔ real backend transport over real sockets, no mocks. (1) capstone loop: agent thread = OplogService + Intake + UnixListener accept; client POST /command → AgentChannel::send (UDS) → Intake journal-then-ack → receipt cmd_id+dedup_token+rev:0+accepted; replay confirms durable; then SSE /stream tails the SAME oplog → CommandEffect re-emerges as delta with id=Some(0) (rev framing) + data carries dedup token = full loop closed; (2) spilled body hydrates over GET /…/body/{hash} byte-for-byte, malformed=400, absent=404; (3) soak: 25 SSE connect/disconnect cycles all 200+delta, server still healthy after (no FD/thread leak hang). serve_backend helper. Top `use nix/serde as _;`.'
+  last_edited_ms: 0
 bab9d0cd28f2d236:
   path: ui/src/lib/finderFs.ts
   description: Finder mock fs + helpers. buildRealm grafts one rich tree (src/modules nesting, docs, media/ w/ mp4+m4a, planning) onto an agent folder. tags/created/starred/media payloads + PEAKS waveform. findNode/pathChain/collectStarred/nodeSize/childCounts/fmtBytes/sortNodes.
@@ -5002,6 +5014,10 @@ d5c1024fa12376ed:
   path: crates/cp-base/src/state/data/model_helpers.rs
   description: 'ModelPricing trait: model selection, pricing, context budget, cleaning thresholds — impl for State + token_cost()'
   last_edited_ms: 0
+d5ccbeaca8272b86:
+  path: crates/cp-orchestrator/tests/transport_http.rs
+  description: 'Phase 30 (X797) transport surface over a real tiny_http server on an ephemeral port (4 tests, green ~2s). Harness(agent_id,n_msgs) seeds OplogWriter + Entry json + Backend.apply_batch, spawns serve_bound on 127.0.0.1:0. (1) REST /fleet+/agent/{id} carry rev envelope, unknown agent 404; (2) POST /ticket mints, /command malformed=400 + tripped-breaker fail-closed 503; (3) SSE ticket gate: no/bogus ticket=401, valid=200+delta, redeemed ticket single-use 401; (4) Last-Event-ID resume: only deltas rev>2 delivered, each delta.data carries serialized OpEntry. Top `use cp_mod_bridge/nix/serde as _;`.'
+  last_edited_ms: 0
 d5de5196647aeaa3:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme. --sidebar-w (240px, :root) = single source of truth for ALL primary sidebar widths (fleet/threads/cockpit/finder). Two palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Dungeon Forge'' = TUI D&D palette verbatim (#222220/#333331/#424240 charcoal / torch-orange #DA7659 primary+signal+your-turn / #B26245 dim accent / #C98F6B tan interactive / #F0F0F0 ink / ok #86BC6F / warn #E5C07B / danger #C85050). SF Pro chrome, IBM Plex Mono data. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker, modal-pop/backdrop-fade/opt-rise, finder-slider.'
@@ -5574,6 +5590,10 @@ f4e3bd6a1f8faf50:
   path: crates/cp-mod-prompt/Cargo.toml
   description: 'Prompt module crate deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml.'
   last_edited_ms: 0
+f502895e9e495ba8:
+  path: crates/cp-orchestrator/tests/registry_channel.rs
+  description: 'Phase 27 (X794) backend↔agent seam suite (4 tests, all green). Drives discovery+channel against real cp-mod-bridge artifacts: (1) real Boot→AgentRegistry Appeared+Live→idempotent quiet scan→drop→Disappeared; (2) Stale fires ONLY on Live→non-live transition, first-sight staleness rides Appeared (crafted Entry+Heartbeat); (3) body Store spill→OplogService MessageCreated→Tailer.poll→AgentChannel.hydrate integrity-verified + inlined body hydrate=None; (4) AgentChannel.send→real Intake.handle_connection over UnixListener (Accepted), resend same dedup_token Accepted but replay seen.len==1 (exactly-once). Top `use nix/serde/tiny_http as _;` for per-target unused-crate-dependencies.'
+  last_edited_ms: 0
 f5133aa5b3d54c43:
   path: crates/cp-orchestrator/src/transport/panels.rs
   description: 'Cockpit panel inspection: panel_list (fixed catalogue), memory+callbacks+tree (shared YAML→JSON), todos+spine+queue+scratchpad (worker modules), usage (worker cost snapshot), library (scan .context-pilot/{agents,skills,commands}/*.md frontmatter). parse_frontmatter helper. 1 test.'
@@ -5842,6 +5862,10 @@ ff702272b5c58ee7:
   path: ui/src/components/agents/PromptsPage.tsx
   description: Global prompt-library page (fleet 'Prompts'). Renders mock library[] (system/skills/commands) as cards with KIND_META icon/accent/blurb, filter tabs (all + per-kind w/ counts), kind sections in 'all' view. 'agent' kind labelled 'System' (overloaded word). Header has Import + New buttons. Card click / New / Import open PromptModal + ImportModal. Built-in badge only (no Active — meaningless at fleet altitude).
   last_edited_ms: 1781532643670
+ff972378b9c9624f:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 ffa4da3ef00da59b:
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
