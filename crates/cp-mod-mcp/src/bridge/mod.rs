@@ -66,8 +66,7 @@ impl McpModule {
             let mut entry = if let Some((command, args)) = spec.stdio() {
                 Self::connect_stdio(command, args)
             } else if let Some(url) = spec.url.as_deref() {
-                let token = spec.bearer_token.as_deref().unwrap_or("");
-                Self::connect_http(url, token)
+                Self::connect_url(url, spec.bearer_token.as_deref())
             } else {
                 McpServerEntry::failed("no 'command' or 'url' in spec")
             };
@@ -76,6 +75,20 @@ impl McpModule {
             entry.deny_tools.clone_from(&spec.deny_tools);
             let _prev = mcp.servers.insert(name, entry);
         }
+    }
+
+    /// Connect to a URL-based server, resolving the bearer token through a
+    /// three-tier cascade: explicit config → stored OAuth token → full OAuth
+    /// flow (opens browser). Only the third tier is blocking.
+    fn connect_url(url: &str, static_token: Option<&str>) -> McpServerEntry {
+        let token = match static_token {
+            Some(t) if !t.is_empty() => t.to_owned(),
+            _ => match crate::oauth::authorize(url) {
+                Ok(t) => t,
+                Err(e) => return McpServerEntry::failed(format!("OAuth: {e}")),
+            },
+        };
+        Self::connect_http(url, &token)
     }
 
     /// Spawn one stdio server, handshake, and fetch its tool list.
@@ -219,8 +232,7 @@ impl McpModule {
         let mut fresh = if let Some((cmd, args)) = spec.stdio() {
             Self::connect_stdio(cmd, args)
         } else if let Some(url) = spec.url.as_deref() {
-            let token = spec.bearer_token.as_deref().unwrap_or("");
-            Self::connect_http(url, token)
+            Self::connect_url(url, spec.bearer_token.as_deref())
         } else {
             return;
         };

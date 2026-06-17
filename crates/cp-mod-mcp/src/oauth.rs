@@ -170,6 +170,36 @@ fn urlencoded(s: &str) -> String {
     out
 }
 
+/// Percent-decode a URL query value (reverses `urlencoded` and standard
+/// percent-encoding). `+` is decoded as a space (form-encoding convention).
+fn urldecoded(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.bytes();
+    while let Some(b) = chars.next() {
+        match b {
+            b'+' => out.push(' '),
+            b'%' => {
+                let hi = chars.next().unwrap_or(b'0');
+                let lo = chars.next().unwrap_or(b'0');
+                let val = hex_nibble(hi).wrapping_shl(4) | hex_nibble(lo);
+                out.push(char::from(val));
+            }
+            _ => out.push(char::from(b)),
+        }
+    }
+    out
+}
+
+/// Single hex digit → 0–15.
+const fn hex_nibble(b: u8) -> u8 {
+    match b {
+        b'0'..=b'9' => b.wrapping_sub(b'0'),
+        b'a'..=b'f' => b.wrapping_sub(b'a').wrapping_add(10),
+        b'A'..=b'F' => b.wrapping_sub(b'A').wrapping_add(10),
+        _ => 0,
+    }
+}
+
 // ── Localhost Callback Listener ─────────────────────────────────────────────
 
 /// The authorization code and state returned by the OAuth callback.
@@ -265,12 +295,12 @@ pub fn wait_for_callback(listener: &TcpListener) -> Result<CallbackResult, McpEr
 
     let code = params
         .get("code")
-        .ok_or_else(|| McpError::Protocol("callback missing 'code' param".to_owned()))?
-        .to_string();
+        .ok_or_else(|| McpError::Protocol("callback missing 'code' param".to_owned()))?;
+    let code = urldecoded(code);
     let state = params
         .get("state")
-        .ok_or_else(|| McpError::Protocol("callback missing 'state' param".to_owned()))?
-        .to_string();
+        .ok_or_else(|| McpError::Protocol("callback missing 'state' param".to_owned()))?;
+    let state = urldecoded(state);
 
     Ok(CallbackResult { code, state })
 }
@@ -545,7 +575,7 @@ pub fn authorize(server_url: &str) -> Result<String, McpError> {
 
     // 4. Start callback listener.
     let (listener, port) = start_listener()?;
-    let redirect_uri = format!("http://localhost:{port}/callback");
+    let redirect_uri = format!("http://127.0.0.1:{port}/callback");
 
     // 5. Obtain a `client_id` (dynamic registration or stored).
     let client_id = resolve_client_id(&metadata, &redirect_uri, &key)?;
@@ -709,6 +739,14 @@ mod tests {
         assert_eq!(urlencoded("hello world"), "hello%20world");
         assert_eq!(urlencoded("a=b&c"), "a%3Db%26c");
         assert_eq!(urlencoded("https://x.com/path"), "https%3A%2F%2Fx.com%2Fpath");
+    }
+
+    #[test]
+    fn urldecoded_reverses_encoding() {
+        assert_eq!(urldecoded("hello%20world"), "hello world");
+        assert_eq!(urldecoded("a%3Db%26c"), "a=b&c");
+        assert_eq!(urldecoded("plain"), "plain");
+        assert_eq!(urldecoded("hello+world"), "hello world");
     }
 
     #[test]

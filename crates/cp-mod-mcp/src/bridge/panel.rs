@@ -37,7 +37,8 @@ impl McpPanel {
             for tool in &entry.tools {
                 let tool_id = super::tools::namespaced_id(&name, &tool.name);
                 let desc = tool.description.as_deref().unwrap_or("(no description)");
-                let _t = writeln!(out, "  - {tool_id}: {desc}");
+                let short = first_sentence(desc, 200);
+                let _t = writeln!(out, "  - {tool_id}: {short}");
             }
         }
         out.trim_end().to_string()
@@ -140,4 +141,34 @@ impl Panel for McpPanel {
     fn suicide(&self, _ctx: &cp_base::state::context::Entry, _state: &State) -> bool {
         false
     }
+}
+
+/// Extract the first sentence from a tool description, capped at `max` chars.
+/// Looks for the first newline or `. ` boundary. Appends `…` when truncated.
+/// Full descriptions are available in `tool-definitions` when a tool is enabled.
+fn first_sentence(desc: &str, max: usize) -> String {
+    let mut out = String::new();
+    let mut prev_was_period = false;
+    let mut count: usize = 0;
+
+    for ch in desc.chars() {
+        if count >= max {
+            out.push('…');
+            return out;
+        }
+        if ch == '\n' {
+            if !out.is_empty() && out.len() < desc.len() {
+                out.push('…');
+            }
+            return out;
+        }
+        // `. ` boundary — the period is already in `out`.
+        if prev_was_period && ch == ' ' {
+            return out;
+        }
+        out.push(ch);
+        prev_was_period = ch == '.';
+        count = count.saturating_add(1);
+    }
+    out
 }
