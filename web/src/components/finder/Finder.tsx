@@ -6,7 +6,37 @@ import type {
   FinderSortKey,
   FinderViewMode,
 } from "@/lib/types"
-import { buildRealm, fmtBytes, findNode, pathChain, sortNodes } from "@/lib/finderFs"
+import { fmtBytes, sortNodes } from "@/lib/finderFs"
+import { useFs } from "@/lib/live"
+
+/** Build breadcrumbs from a path relative to the agent's folder. */
+function buildCrumbs(
+  agentFolder: string,
+  agentName: string,
+  cwd: string,
+): FinderNode[] {
+  if (cwd === agentFolder)
+    return [{ name: agentName, path: agentFolder, kind: "folder", modified: "" }]
+  const rel = cwd.startsWith(agentFolder + "/")
+    ? cwd.slice(agentFolder.length + 1)
+    : ""
+  const parts = rel.split("/").filter(Boolean)
+  const crumbs: FinderNode[] = [
+    { name: agentName, path: agentFolder, kind: "folder", modified: "" },
+  ]
+  let cur = agentFolder
+  for (const part of parts) {
+    cur = `${cur}/${part}`
+    crumbs.push({ name: part, path: cur, kind: "folder", modified: "" })
+  }
+  return crumbs
+}
+
+/** Extract the last segment of a path as a human label. */
+function pathName(p: string): string {
+  const parts = p.split("/")
+  return parts[parts.length - 1] || p
+}
 import {
   FinderPathBar,
   FinderSidebar,
@@ -39,11 +69,14 @@ let tabSeq = 1
  * affordance. Design-only: transfers are decorative, the filesystem is mock.
  */
 export function Finder({ agent }: { agent: Agent }) {
-  const root = useMemo(() => buildRealm(agent.folder, agent.name), [agent])
+  const root: FinderNode = useMemo(
+    () => ({ name: agent.name, path: agent.folder, kind: "folder" as const, modified: "" }),
+    [agent],
+  )
   const surfaceRef = useRef<HTMLDivElement>(null)
 
   const [tabs, setTabs] = useState<Tab[]>(() => [
-    { id: "t0", cwd: root.path, label: root.name, kind: "folder", back: [], fwd: [] },
+    { id: "t0", cwd: agent.folder, label: agent.name, kind: "folder", back: [], fwd: [] },
   ])
   const [activeId, setActiveId] = useState("t0")
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -64,14 +97,19 @@ export function Finder({ agent }: { agent: Agent }) {
 
   const active = tabs.find((t) => t.id === activeId) ?? tabs[0]
   const cwd = active.cwd
-  const cwdNode = findNode(root, cwd) ?? root
-  const children = cwdNode.children ?? []
+
+  // Live directory listing for the current working directory
+  const { data: liveChildren } = useFs(agent.id, cwd)
+  const children = liveChildren ?? []
   const filtered = query
     ? children.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
     : children
   const sorted = sortNodes(filtered, sortKey, asc)
-  const crumbs = pathChain(root, cwd)
-  const previewNode = preview ?? (focusPath ? findNode(root, focusPath) : null)
+  const crumbs = useMemo(
+    () => buildCrumbs(agent.folder, agent.name, cwd),
+    [agent.folder, agent.name, cwd],
+  )
+  const previewNode = preview ?? (focusPath ? children.find((c) => c.path === focusPath) ?? null : null)
 
   const typeBuf = useRef("")
   const typeTimer = useRef<number | undefined>(undefined)
@@ -94,7 +132,7 @@ export function Finder({ agent }: { agent: Agent }) {
       cwd: path,
       kind: "folder",
       fileNode: undefined,
-      label: findNode(root, path)?.name ?? t.label,
+      label: pathName(path),
     }))
     setSelected(new Set())
     setAnchor(null)
@@ -104,13 +142,13 @@ export function Finder({ agent }: { agent: Agent }) {
   const back = () =>
     patchTab((t) =>
       t.back.length
-        ? { ...t, fwd: [t.cwd, ...t.fwd], cwd: t.back[t.back.length - 1], back: t.back.slice(0, -1), label: findNode(root, t.back[t.back.length - 1])?.name ?? t.label }
+        ? { ...t, fwd: [t.cwd, ...t.fwd], cwd: t.back[t.back.length - 1], back: t.back.slice(0, -1), label: pathName(t.back[t.back.length - 1]) }
         : t,
     )
   const forward = () =>
     patchTab((t) =>
       t.fwd.length
-        ? { ...t, back: [...t.back, t.cwd], cwd: t.fwd[0], fwd: t.fwd.slice(1), label: findNode(root, t.fwd[0])?.name ?? t.label }
+        ? { ...t, back: [...t.back, t.cwd], cwd: t.fwd[0], fwd: t.fwd.slice(1), label: pathName(t.fwd[0]) }
         : t,
     )
   const goUp = () => {
@@ -197,7 +235,7 @@ export function Finder({ agent }: { agent: Agent }) {
     } else if (e.key === "Enter") {
       e.preventDefault()
       if (focusPath) {
-        const n = findNode(root, focusPath)
+        const n = children.find((c) => c.path === focusPath)
         if (n) open(n)
       }
     } else if (e.key === "Backspace" || ((e.metaKey || e.ctrlKey) && e.key === "ArrowUp")) {
@@ -242,7 +280,7 @@ export function Finder({ agent }: { agent: Agent }) {
   // ── tabs ────────────────────────────────────────────────────────
   const newTab = () => {
     const id = `t${tabSeq++}`
-    setTabs((ts) => [...ts, { id, cwd: root.path, label: root.name, kind: "folder", back: [], fwd: [] }])
+    setTabs((ts) => [...ts, { id, cwd: agent.folder, label: agent.name, kind: "folder", back: [], fwd: [] }])
     setActiveId(id)
   }
   const closeTab = (id: string) => {
@@ -263,7 +301,7 @@ export function Finder({ agent }: { agent: Agent }) {
 
   // ── status bar figures ──────────────────────────────────────────
   const selSize = [...selected]
-    .map((p) => findNode(root, p))
+    .map((p) => children.find((c) => c.path === p))
     .reduce((sum, n) => sum + (n?.size ?? 0), 0)
 
   const viewProps = {
@@ -409,7 +447,10 @@ export function Finder({ agent }: { agent: Agent }) {
               )}
               {viewMode === "columns" && (
                 <ColumnsView
-                  panes={crumbs.map((c) => ({ path: c.path, nodes: c.children ?? [] }))}
+                  panes={crumbs.map((c, i) => ({
+                    path: c.path,
+                    nodes: i === crumbs.length - 1 ? sorted : (c.children ?? []),
+                  }))}
                   activePath={new Set(crumbs.map((c) => c.path))}
                   previewNode={previewNode}
                   {...viewProps}
@@ -470,7 +511,7 @@ export function Finder({ agent }: { agent: Agent }) {
           <div className="ants flex flex-col items-center gap-3 rounded-2xl bg-card/90 px-10 py-8 pop-shadow">
             <UploadCloud className="size-9 text-[var(--signal)]" />
             <span className="text-[14px] font-semibold text-foreground">Drop to upload</span>
-            <span className="text-[12px] text-muted-foreground">into {cwdNode.name}</span>
+            <span className="text-[12px] text-muted-foreground">into {pathName(cwd)}</span>
           </div>
         </div>
       )}
