@@ -226,6 +226,10 @@
   path: src/llms/claude_code_v2/mod.rs
   description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API (thinking/effort/context_management would work). Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6 (both 1M ctx). Reuses helpers + parse_sse_stream from claude_code_api_key.'
   last_edited_ms: 1781085484593
+0e20210eaecc516f:
+  path: crates/cp-mod-mcp/src/bridge/config.rs
+  description: '.mcp.json discovery + parsing. resolve(): project .context-pilot/shared/mcp.json → global ~/.context-pilot/mcp.json. Manifest{mcpServers: name→ServerSpec{command,args|url,bearer_token}}. ServerSpec::stdio() pair. bearer_token for static HTTP auth.'
+  last_edited_ms: 0
 0e3797b0710562ff:
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
@@ -293,6 +297,10 @@
 11789fe590617981:
   path: crates/cp-mod-spine/src/panel.rs
   description: 'Spine panel UI. Notifications rendered as Block::Table (ID/Time/Type/Content columns) with 60-char content truncation. Sections: Unprocessed, Blocked, Recent Processed. Config as KeyValue. Active Watchers list. Context: text format for LLM.'
+  last_edited_ms: 0
+117efcb20d422033:
+  path: .context-pilot/config.json
+  description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
   last_edited_ms: 0
 118f8cac3f61eaa9:
   path: crates/cp-mod-entities/src/sync.rs
@@ -665,6 +673,10 @@
 28535222aec6d878:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
+2868327ef95f351d:
+  path: crates/cp-mod-mcp/src/clients.rs
+  description: 'McpClient<T: Transport>: handshake (initialize + notifications/initialized), list_tools, call_tool(name, &Value). Caches ServerInfo. connect_stdio spawns SubprocessTransport; connect_http builds HttpTransport with url+bearer token. AnyClient enum (Stdio|Http) with delegating call_tool/list_tools/server_info. Request-id correlation, DEFAULT_TIMEOUT_MS=30s.'
   last_edited_ms: 0
 2886480e48a90922:
   path: crates/cp-mod-files/src/panel.rs
@@ -1153,6 +1165,10 @@
 44edddddbfd879d4:
   path: crates/cp-mod-prompt/src/skill_panel.rs
   description: Skill panel UI. Markdown-rendered content via cp_render::markdown::to_blocks(). Title/refresh/context methods. refresh() syncs cached_content for all loaded skills.
+  last_edited_ms: 0
+4575079ce400b65e:
+  path: crates/cp-mod-mcp/src/bridge/servers.rs
+  description: 'McpState{servers: HashMap<String, McpServerEntry>}. McpServerEntry{client: Option<Mutex<AnyClient>>, tools, status}. ConnStatus (Connected/Failed/Unsupported). connected/failed/unsupported constructors. get/get_mut + sorted_names helpers.'
   last_edited_ms: 0
 457797ff3549e45c:
   path: src/app/run/tools/pipeline.rs
@@ -2397,6 +2413,10 @@
 9dcfc8d8a49f3b58:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
+  last_edited_ms: 0
+9de1558fb0b4d26a:
+  path: crates/cp-mod-mcp/src/bridge/mod.rs
+  description: 'Host integration: McpModule (Module trait impl). init_state reads .mcp.json + connects servers into McpState. Dispatches stdio via connect_stdio (AnyClient::Stdio) and url via connect_http (AnyClient::Http) with bearer_token. execute_tool dispatches {server}__{tool} via split_id. Fixed MCP status panel (fixed_order=20).'
   last_edited_ms: 0
 9e202c919322b366:
   path: crates/cp-mod-brave/src/panel.rs

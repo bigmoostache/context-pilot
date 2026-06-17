@@ -47,6 +47,14 @@ pub struct ServerSpec {
     /// Omit for unauthenticated servers or when using OAuth.
     #[serde(default)]
     pub bearer_token: Option<String>,
+    /// Whitelist: only expose tools whose name appears in this list.
+    /// When set, `deny_tools` is ignored.
+    #[serde(default)]
+    pub allow_tools: Option<Vec<String>>,
+    /// Blacklist: hide tools whose name appears in this list.
+    /// Ignored when `allow_tools` is set.
+    #[serde(default)]
+    pub deny_tools: Option<Vec<String>>,
 }
 
 impl ServerSpec {

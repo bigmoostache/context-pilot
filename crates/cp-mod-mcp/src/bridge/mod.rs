@@ -23,7 +23,7 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ToolDefinition, ToolResult, ToolUse};
 
 use self::panel::{MCP_KIND, McpPanel};
-use self::servers::{McpServerEntry, McpState};
+use self::servers::{ConnStatus, McpServerEntry, McpState};
 
 use crate::clients::{AnyClient, McpClient};
 
@@ -43,7 +43,9 @@ impl McpModule {
         for name in mcp.sorted_names() {
             let Some(entry) = mcp.servers.get(&name) else { continue };
             for tool in &entry.tools {
-                defs.push(tools::tool_definition(&name, tool));
+                if entry.is_tool_exposed(&tool.name) {
+                    defs.push(tools::tool_definition(&name, tool));
+                }
             }
         }
         defs
@@ -61,7 +63,7 @@ impl McpModule {
         names.sort();
         for name in names {
             let Some(spec) = cfg.servers.get(&name) else { continue };
-            let entry = if let Some((command, args)) = spec.stdio() {
+            let mut entry = if let Some((command, args)) = spec.stdio() {
                 Self::connect_stdio(command, args)
             } else if let Some(url) = spec.url.as_deref() {
                 let token = spec.bearer_token.as_deref().unwrap_or("");
@@ -69,6 +71,9 @@ impl McpModule {
             } else {
                 McpServerEntry::failed("no 'command' or 'url' in spec")
             };
+            entry.spec = Some(spec.clone());
+            entry.allow_tools.clone_from(&spec.allow_tools);
+            entry.deny_tools.clone_from(&spec.deny_tools);
             let _prev = mcp.servers.insert(name, entry);
         }
     }
@@ -104,7 +109,10 @@ impl McpModule {
     }
 
     /// Route a `{server}__{tool}` call to its server and return the formatted result.
-    fn dispatch(tool: &ToolUse, state: &State) -> ToolResult {
+    ///
+    /// On transport failure, marks the server as [`ConnStatus::Failed`]. On the
+    /// next call to a failed server, attempts to reconnect using the stored spec.
+    fn dispatch(tool: &ToolUse, state: &mut State) -> ToolResult {
         let Some((server, tool_name)) = tools::split_id(&tool.name) else {
             return ToolResult::with_name(
                 tool.id.clone(),
@@ -115,45 +123,111 @@ impl McpModule {
         };
         let args = tools::strip_metadata(tool.input.clone());
 
-        let mcp = McpState::get(state);
-        let Some(entry) = mcp.servers.get(server) else {
-            return ToolResult::with_name(
-                tool.id.clone(),
-                format!("MCP server '{server}' is not registered"),
-                true,
-                tool.name.clone(),
-            );
-        };
-        let Some(client_lock) = entry.client.as_ref() else {
-            return ToolResult::with_name(
-                tool.id.clone(),
-                format!("MCP server '{server}' is not connected ({})", entry.status.label()),
-                true,
-                tool.name.clone(),
-            );
-        };
+        // Phase 1: auto-reconnect if the server previously failed.
+        Self::maybe_reconnect(server, state);
 
-        let outcome = match client_lock.lock() {
-            Ok(mut client) => client.call_tool(tool_name, &args),
-            Err(_poison) => {
+        // Phase 2: execute the call (borrows state immutably for the duration).
+        let (outcome, tools_changed) = {
+            let mcp = McpState::get(state);
+            let Some(entry) = mcp.servers.get(server) else {
                 return ToolResult::with_name(
                     tool.id.clone(),
-                    format!("MCP server '{server}' client lock poisoned"),
+                    format!("MCP server '{server}' is not registered"),
                     true,
                     tool.name.clone(),
                 );
+            };
+            let Some(client_lock) = entry.client.as_ref() else {
+                return ToolResult::with_name(
+                    tool.id.clone(),
+                    format!("MCP server '{server}' is not connected ({})", entry.status.label()),
+                    true,
+                    tool.name.clone(),
+                );
+            };
+            match client_lock.lock() {
+                Ok(mut client) => {
+                    let result = client.call_tool(tool_name, &args);
+                    let changed = client.take_tools_changed();
+                    (result, changed)
+                }
+                Err(_poison) => {
+                    return ToolResult::with_name(
+                        tool.id.clone(),
+                        format!("MCP server '{server}' client lock poisoned"),
+                        true,
+                        tool.name.clone(),
+                    );
+                }
             }
         };
 
-        match outcome {
+        // Phase 3: on transport error, mark the server as failed for next time.
+        let tool_result = match outcome {
             Ok(result) => tools::call_result_to_tool_result(tool.id.clone(), tool.name.clone(), &result),
-            Err(e) => ToolResult::with_name(
-                tool.id.clone(),
-                format!("MCP call '{}' failed: {e}", tool.name),
-                true,
-                tool.name.clone(),
-            ),
+            Err(e) => {
+                let error_msg = e.to_string();
+                let mcp = McpState::get_mut(state);
+                if let Some(entry) = mcp.servers.get_mut(server) {
+                    entry.status = ConnStatus::Failed(error_msg.clone());
+                    entry.client = None;
+                }
+                ToolResult::with_name(
+                    tool.id.clone(),
+                    format!("MCP call '{}' failed: {error_msg}", tool.name),
+                    true,
+                    tool.name.clone(),
+                )
+            }
+        };
+
+        // Phase 4: refresh tool list if the server signaled tools/list_changed.
+        if tools_changed {
+            let refreshed = {
+                let mcp = McpState::get(state);
+                mcp.servers
+                    .get(server)
+                    .and_then(|e| e.client.as_ref())
+                    .and_then(|lock| lock.lock().ok())
+                    .and_then(|mut client| client.list_tools().ok().map(<[_]>::to_vec))
+            };
+            if let Some(new_tools) = refreshed {
+                let mcp = McpState::get_mut(state);
+                if let Some(entry) = mcp.servers.get_mut(server) {
+                    entry.status = ConnStatus::Connected { tool_count: new_tools.len() };
+                    entry.tools = new_tools;
+                }
+            }
         }
+
+        tool_result
+    }
+
+    /// If the server is in [`ConnStatus::Failed`] and carries a spec, try to
+    /// reconnect. Replaces the entry in-place on success; on failure, updates
+    /// the error message.
+    fn maybe_reconnect(server: &str, state: &mut State) {
+        let mcp = McpState::get_mut(state);
+        let Some(entry) = mcp.servers.get(server) else { return };
+        if entry.status.is_connected() {
+            return;
+        }
+        let Some(spec) = entry.spec.clone() else { return };
+        let allow = entry.allow_tools.clone();
+        let deny = entry.deny_tools.clone();
+
+        let mut fresh = if let Some((cmd, args)) = spec.stdio() {
+            Self::connect_stdio(cmd, args)
+        } else if let Some(url) = spec.url.as_deref() {
+            let token = spec.bearer_token.as_deref().unwrap_or("");
+            Self::connect_http(url, token)
+        } else {
+            return;
+        };
+        fresh.spec = Some(spec);
+        fresh.allow_tools = allow;
+        fresh.deny_tools = deny;
+        let _prev = mcp.servers.insert(server.to_owned(), fresh);
     }
 }
 

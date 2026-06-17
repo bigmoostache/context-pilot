@@ -55,6 +55,13 @@ pub struct McpServerEntry {
     pub tools: Vec<Tool>,
     /// Connection outcome (drives the status panel).
     pub status: ConnStatus,
+    /// Original launch specification (used for auto-reconnect on failure).
+    pub spec: Option<crate::bridge::config::ServerSpec>,
+    /// Whitelist: only expose tools whose name appears in this list.
+    /// Takes precedence over `deny_tools`.
+    pub allow_tools: Option<Vec<String>>,
+    /// Blacklist: hide tools whose name appears in this list.
+    pub deny_tools: Option<Vec<String>>,
 }
 
 impl McpServerEntry {
@@ -62,19 +69,56 @@ impl McpServerEntry {
     #[must_use]
     pub const fn connected(client: AnyClient, tools: Vec<Tool>) -> Self {
         let status = ConnStatus::Connected { tool_count: tools.len() };
-        Self { client: Some(Mutex::new(client)), tools, status }
+        Self {
+            client: Some(Mutex::new(client)),
+            tools,
+            status,
+            spec: None,
+            allow_tools: None,
+            deny_tools: None,
+        }
     }
 
     /// A failed entry — no client, carries the error for display.
     #[must_use]
     pub fn failed<S: Into<String>>(error: S) -> Self {
-        Self { client: None, tools: Vec::new(), status: ConnStatus::Failed(error.into()) }
+        Self {
+            client: None,
+            tools: Vec::new(),
+            status: ConnStatus::Failed(error.into()),
+            spec: None,
+            allow_tools: None,
+            deny_tools: None,
+        }
     }
 
     /// An unsupported entry (e.g. a remote `url` server before Phase 3).
     #[must_use]
     pub fn unsupported<S: Into<String>>(reason: S) -> Self {
-        Self { client: None, tools: Vec::new(), status: ConnStatus::Unsupported(reason.into()) }
+        Self {
+            client: None,
+            tools: Vec::new(),
+            status: ConnStatus::Unsupported(reason.into()),
+            spec: None,
+            allow_tools: None,
+            deny_tools: None,
+        }
+    }
+
+    /// Whether the given tool name passes the allow/deny filter.
+    ///
+    /// If `allow_tools` is set, only names present in that list pass.
+    /// Otherwise, if `deny_tools` is set, names in that list are blocked.
+    /// If neither is set, all tools pass.
+    #[must_use]
+    pub fn is_tool_exposed(&self, tool_name: &str) -> bool {
+        if let Some(ref allow) = self.allow_tools {
+            return allow.iter().any(|a| a == tool_name);
+        }
+        if let Some(ref deny) = self.deny_tools {
+            return !deny.iter().any(|d| d == tool_name);
+        }
+        true
     }
 }
 

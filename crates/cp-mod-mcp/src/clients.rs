@@ -36,6 +36,9 @@ pub struct McpClient<T: Transport> {
     server_info: Option<ServerInfo>,
     /// Most recent `tools/list` snapshot.
     tools: Vec<Tool>,
+    /// Set when a `notifications/tools/list_changed` is received during a
+    /// request. The bridge checks and clears this after each call.
+    tools_changed: bool,
 }
 
 impl McpClient<SubprocessTransport> {
@@ -73,7 +76,7 @@ impl<T: Transport> McpClient<T> {
     /// Wrap an already-constructed transport (used by `connect_*` and tests).
     #[must_use]
     pub const fn with_transport(transport: T) -> Self {
-        Self { transport, next_id: 1, timeout_ms: DEFAULT_TIMEOUT_MS, server_info: None, tools: Vec::new() }
+        Self { transport, next_id: 1, timeout_ms: DEFAULT_TIMEOUT_MS, server_info: None, tools: Vec::new(), tools_changed: false }
     }
 
     /// Override the per-request timeout.
@@ -91,6 +94,12 @@ impl<T: Transport> McpClient<T> {
     #[must_use]
     pub fn tools(&self) -> &[Tool] {
         &self.tools
+    }
+
+    /// Returns and clears the `tools_changed` flag set when a
+    /// `notifications/tools/list_changed` was received during a request.
+    pub fn take_tools_changed(&mut self) -> bool {
+        std::mem::take(&mut self.tools_changed)
     }
 
     /// Run the `initialize` handshake and send `notifications/initialized`.
@@ -154,6 +163,9 @@ impl<T: Transport> McpClient<T> {
         loop {
             let msg: Incoming = self.transport.recv(self.timeout_ms)?;
             if !msg.is_response() {
+                if msg.method.as_deref() == Some("notifications/tools/list_changed") {
+                    self.tools_changed = true;
+                }
                 continue; // Server notification — not our reply.
             }
             if msg.id != Some(id) {
@@ -224,6 +236,14 @@ impl AnyClient {
         match self {
             Self::Stdio(client) => client.server_info(),
             Self::Http(client) => client.server_info(),
+        }
+    }
+
+    /// Returns and clears the `tools_changed` flag.
+    pub fn take_tools_changed(&mut self) -> bool {
+        match self {
+            Self::Stdio(client) => client.take_tools_changed(),
+            Self::Http(client) => client.take_tools_changed(),
         }
     }
 }
