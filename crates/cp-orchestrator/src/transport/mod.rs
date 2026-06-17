@@ -201,6 +201,7 @@ fn route_rest(
         (Method::Get, ["api", "fleet"]) => rest::fleet(state),
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
         (Method::Get, ["api", "agent", id, "body", hash]) => rest::body(state, id, hash),
+        (Method::Get, ["api", "agent", id, "threads"]) => rest::threads(state, id),
         (Method::Post, ["api", "agent", id, "command"]) => rest::command(state, id, body_bytes),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state),
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },

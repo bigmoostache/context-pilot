@@ -203,6 +203,106 @@ fn ack_status(status: &cp_wire::types::ack::Status) -> String {
     }
 }
 
+/// `GET /api/agent/{id}/threads` — thread list with full message logs.
+///
+/// Reads the agent's `config.json` (via [`StateReader`](crate::inspect::StateReader)),
+/// extracts `modules.threads.threads`, and reshapes each thread to the
+/// maquette `ThreadDetail` shape (camelCase, `agentId` injected, messages
+/// mapped to `log`).
+pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+    let entry = match resolve_entry(state, agent_id) {
+        Ok(e) => e,
+        Err(reply) => return reply,
+    };
+    let config = {
+        let Ok(mut b) = state.lock() else {
+            return HttpReply::error(500, "backend lock poisoned");
+        };
+        b.inspect_mut().read_config(std::path::Path::new(&entry.folder)).ok()
+    };
+    let Some(config) = config else {
+        return HttpReply::error(404, "agent state unavailable");
+    };
+    let empty_arr = serde_json::Value::Array(Vec::new());
+    let raw_threads = config
+        .get("modules")
+        .and_then(|m| m.get("threads"))
+        .and_then(|t| t.get("threads"))
+        .and_then(serde_json::Value::as_array)
+        .unwrap_or(&empty_arr.as_array().expect("empty vec is array"));
+
+    let details: Vec<serde_json::Value> = raw_threads
+        .iter()
+        .map(|t| reshape_thread(t, agent_id))
+        .collect();
+    HttpReply::ok(&details)
+}
+
+/// Reshape one raw thread from agent state to the maquette `ThreadDetail`
+/// shape: snake_case → camelCase, computed fields (`messageCount`, `unread`,
+/// `lastMessage`, `lastActivity`), and messages mapped to `log`.
+fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_json::Value {
+    let messages = raw.get("messages").and_then(serde_json::Value::as_array);
+    let msg_count = messages.map_or(0, Vec::len);
+    let unread = messages.map_or(0, |msgs| {
+        msgs.iter().filter(|m| m.get("acknowledged") == Some(&serde_json::Value::Bool(false))).count()
+    });
+    let last_msg = messages
+        .and_then(|msgs| msgs.last())
+        .and_then(|m| m.get("content"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("");
+    let last_activity = messages
+        .and_then(|msgs| msgs.last())
+        .and_then(|m| m.get("timestamp"))
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(0);
+
+    let log: Vec<serde_json::Value> = messages
+        .map(|msgs| msgs.iter().enumerate().map(|(i, m)| reshape_message(m, i)).collect())
+        .unwrap_or_default();
+
+    let status_str = match raw.get("status").and_then(serde_json::Value::as_str).unwrap_or("TheirTurn") {
+        "MyTurn" => "MY_TURN",
+        _ => "THEIR_TURN",
+    };
+
+    serde_json::json!({
+        "id": raw.get("id").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "name": raw.get("name").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "status": status_str,
+        "agentId": agent_id,
+        "lastMessage": last_msg,
+        "lastActivity": last_activity,
+        "messageCount": msg_count,
+        "unread": unread,
+        "log": log,
+    })
+}
+
+/// Reshape one thread message to the maquette `ThreadMsg` shape.
+fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
+    let role = match raw.get("author").and_then(serde_json::Value::as_str).unwrap_or("User") {
+        "Assistant" => "assistant",
+        _ => "user",
+    };
+    let mut msg = serde_json::json!({
+        "id": format!("msg_{index}"),
+        "role": role,
+        "content": raw.get("content").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "timestamp": raw.get("timestamp").and_then(serde_json::Value::as_u64).unwrap_or(0),
+    });
+    if let Some(fp) = raw.get("file_path").and_then(serde_json::Value::as_str) {
+        let _prev = msg.as_object_mut().expect("just built").insert("fileRef".to_owned(), serde_json::Value::String(fp.to_owned()));
+    }
+    if let Some(q) = raw.get("question") {
+        if !q.is_null() {
+            let _prev = msg.as_object_mut().expect("just built").insert("questions".to_owned(), serde_json::json!([q]));
+        }
+    }
+    msg
+}
+
 /// JSON-encode a string (with surrounding quotes and escaping).
 fn json_string(s: &str) -> String {
     serde_json::to_string(s).unwrap_or_else(|_| "\"\"".to_owned())
