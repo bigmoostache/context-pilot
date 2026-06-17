@@ -1,0 +1,209 @@
+//! Enriched **agent meta** endpoints — maquette-compatible `Agent` objects
+//! combining registry records, oplog-projected state, thread inspection, and
+//! git branch info.
+//!
+//! * [`agent_meta`] — one agent's enriched info (`GET /api/agent/{id}/meta`).
+//! * [`fleet_meta`] — all known agents as an enriched array
+//!   (`GET /api/fleet/meta`).
+
+use std::sync::Mutex;
+
+use cp_wire::types::registry::Entry;
+
+use super::rest::HttpReply;
+use super::Backend;
+
+/// `GET /api/agent/{id}/meta` — enriched agent info for the fleet/agent views.
+///
+/// Combines registry record (name, folder, model), oplog-projected state
+/// (phase, cost), thread inspection (count, any-MY_TURN → "needs-you"), and
+/// `git` branch. Returns a JSON object matching the maquette `Agent` shape.
+pub fn agent_meta(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+    let entry = match super::rest::resolve_entry(state, agent_id) {
+        Ok(e) => e,
+        Err(reply) => return reply,
+    };
+    let enriched = build_agent_meta(state, agent_id, &entry);
+    HttpReply::ok(&enriched)
+}
+
+/// `GET /api/fleet/meta` — enriched agent list for the fleet dashboard.
+///
+/// Returns an array of maquette-compatible `Agent` objects, one per known
+/// agent in the registry directory. Each is built the same way as the
+/// per-agent `/meta` endpoint.
+pub fn fleet_meta(state: &Mutex<Backend>) -> HttpReply {
+    let dir = {
+        let Ok(b) = state.lock() else {
+            return HttpReply::error(500, "backend lock poisoned");
+        };
+        b.agents_dir.clone()
+    };
+    let entries = match list_entries(&dir) {
+        Ok(e) => e,
+        Err(_) => return HttpReply::ok(&serde_json::json!([])),
+    };
+    let agents: Vec<serde_json::Value> = entries
+        .iter()
+        .map(|e| build_agent_meta(state, &e.id, e))
+        .collect();
+    HttpReply::ok(&agents)
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+
+/// Build the enriched agent JSON for one agent.
+fn build_agent_meta(
+    state: &Mutex<Backend>,
+    agent_id: &str,
+    entry: &Entry,
+) -> serde_json::Value {
+    let folder = &entry.folder;
+    let name = std::path::Path::new(folder)
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or(agent_id);
+
+    // Phase + cost from the materialized view (brief lock).
+    let (phase, cost_usd) = state.lock().map_or((None, 0.0), |b| {
+        b.view.get(agent_id).map_or((None, 0.0), |v| (v.phase, v.cost.cost_usd))
+    });
+
+    // Thread count + any-MY_TURN + last activity from config.json.
+    let (threads_count, has_my_turn, last_activity_ms, task) =
+        inspect_threads(state, folder);
+
+    let branch = git_branch(folder);
+
+    let status = derive_status(phase, has_my_turn);
+    let accent = derive_accent(&status);
+
+    serde_json::json!({
+        "id": agent_id,
+        "name": name,
+        "folder": folder,
+        "branch": branch,
+        "model": entry.model,
+        "status": status,
+        "costUsd": cost_usd,
+        "task": task,
+        "threads": threads_count,
+        "lastActivity": last_activity_ms,
+        "accent": accent,
+    })
+}
+
+/// Inspect an agent's threads from config.json for count, `MY_TURN` status,
+/// last activity, and current task (focused thread name).
+fn inspect_threads(
+    state: &Mutex<Backend>,
+    folder: &str,
+) -> (usize, bool, u64, String) {
+    let folder_path = std::path::Path::new(folder);
+    let config = {
+        let Ok(mut b) = state.lock() else {
+            return (0, false, 0, String::new());
+        };
+        b.inspect_mut().read_config(folder_path).ok()
+    };
+    let Some(config) = config else {
+        return (0, false, 0, String::new());
+    };
+    let empty_arr = Vec::new();
+    let threads = config
+        .get("modules")
+        .and_then(|m| m.get("threads"))
+        .and_then(|t| t.get("threads"))
+        .and_then(serde_json::Value::as_array)
+        .unwrap_or(&empty_arr);
+
+    let count = threads.len();
+    let has_my_turn = threads.iter().any(|t| {
+        t.get("status")
+            .and_then(serde_json::Value::as_str)
+            == Some("MyTurn")
+    });
+    let last_activity = threads
+        .iter()
+        .filter_map(|t| {
+            t.get("messages")
+                .and_then(serde_json::Value::as_array)
+                .and_then(|msgs| msgs.last())
+                .and_then(|m| m.get("timestamp"))
+                .and_then(serde_json::Value::as_u64)
+        })
+        .max()
+        .unwrap_or(0);
+
+    // Task = name of the first MY_TURN thread, or empty.
+    let task = threads
+        .iter()
+        .find(|t| {
+            t.get("status").and_then(serde_json::Value::as_str) == Some("MyTurn")
+        })
+        .and_then(|t| t.get("name"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("")
+        .to_owned();
+
+    (count, has_my_turn, last_activity, task)
+}
+
+/// Read the current git branch of an agent's working directory.
+///
+/// Returns an empty string if `git` is unavailable or the folder is not a
+/// repository — this is informational, never an error.
+fn git_branch(folder: &str) -> String {
+    std::process::Command::new("git")
+        .args(["-C", folder, "rev-parse", "--abbrev-ref", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                String::from_utf8(o.stdout).ok().map(|s| s.trim().to_owned())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default()
+}
+
+/// Derive the maquette `AgentStatus` from phase and thread state.
+fn derive_status(phase: Option<cp_wire::types::Phase>, has_my_turn: bool) -> String {
+    match phase {
+        Some(cp_wire::types::Phase::Streaming | cp_wire::types::Phase::Tooling) => {
+            "working".to_owned()
+        }
+        _ if has_my_turn => "needs-you".to_owned(),
+        _ => "idle".to_owned(),
+    }
+}
+
+/// Map a status string to the maquette accent token.
+fn derive_accent(status: &str) -> &'static str {
+    match status {
+        "working" => "ok",
+        "needs-you" => "signal",
+        _ => "interactive",
+    }
+}
+
+/// List all registry entries in a directory.
+fn list_entries(dir: &std::path::Path) -> std::io::Result<Vec<Entry>> {
+    let mut entries = Vec::new();
+    for item in std::fs::read_dir(dir)? {
+        let item = item?;
+        let path = item.path();
+        let name = item.file_name();
+        let Some(name) = name.to_str() else { continue };
+        if !name.ends_with(".json") || name.ends_with(".tmp") {
+            continue;
+        }
+        if let Ok(bytes) = std::fs::read(&path)
+            && let Ok(record) = serde_json::from_slice::<Entry>(&bytes)
+        {
+            entries.push(record);
+        }
+    }
+    Ok(entries)
+}

@@ -30,6 +30,7 @@
 //! | `POST` | `/api/ticket` | [`rest::mint_ticket`] |
 //! | `GET`  | `/api/stream?agent={id}&ticket={t}` | SSE (this module) |
 
+pub mod meta;
 pub mod panels;
 pub mod rest;
 pub mod sse;
@@ -201,7 +202,9 @@ fn route_rest(
     match (method, segments) {
         (Method::Get, ["api", "health"]) => rest::HttpReply { status: 200, body: "{\"status\":\"ok\"}".to_owned() },
         (Method::Get, ["api", "fleet"]) => rest::fleet(state),
+        (Method::Get, ["api", "fleet", "meta"]) => meta::fleet_meta(state),
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
+        (Method::Get, ["api", "agent", id, "meta"]) => meta::agent_meta(state, id),
         (Method::Get, ["api", "agent", id, "body", hash]) => rest::body(state, id, hash),
         (Method::Get, ["api", "agent", id, "threads"]) => rest::threads(state, id),
         (Method::Get, ["api", "agent", id, "panels"]) => panels::panel_list(state, id),
