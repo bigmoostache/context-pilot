@@ -666,6 +666,10 @@
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints.'
   last_edited_ms: 0
+1caba783be4ff804:
+  path: web/src/components/shell/StatusBar.tsx
+  description: 'Bottom status footer. Fleet mode: accepts agents prop for aggregates (count, threads, needs-you, spend). Agent mode: mock status/cacheStats/tokenBudget (deferred to P14).'
+  last_edited_ms: 1781694241344
 1cac1ab9f44615a7:
   path: crates/cp-base/Cargo.toml
   description: 'Base crate deps: crossterm, serde, serde_json, serde_yaml, sha2, chrono, log, parking_lot, typemap_rev, globset, syntect, tree-sitter, reqwest, tokio. No ratatui.'
@@ -778,6 +782,10 @@
   path: crates/cp-mod-search/src/tools.rs
   description: Search tool execution with flame!("search_exec"). Split keyword+semantic multi-search via MeiliClient. dedup_by_score() merges overlapping results. iso_to_ms() via cp_mod_utilities::time. File/log filters. Async via spawn_async_tool. DynPanel creation. Mandatory semantic_query param.
   last_edited_ms: 0
+21177f0cef593969:
+  path: web/src/components/agents/FleetDashboard.tsx
+  description: Fleet welcome dashboard. Accepts agents prop (live from useFleet). Agent cards with status/model/cost. Create/manage via AgentModal. NewAgentCard placeholder.
+  last_edited_ms: 1781694241313
 21189ab0b6811cba:
   path: crates/cp-mod-search/src/meili/mod.rs
   description: 'Meilisearch sub-module hub: bootstrap, client, download, overlay, server, tasks.'
@@ -1158,6 +1166,10 @@
   path: crates/cp-oplog/Cargo.toml
   description: 'cp-oplog crate manifest. deps: cp-wire (only). dev: tempfile. Workspace lints inherited. Tier-① WAL file I/O.'
   last_edited_ms: 1781619527681
+3178e33ee498dc89:
+  path: web/src/components/shell/AgentSwitcher.tsx
+  description: 'TopBar workspace switcher dropdown (1 agent=1 folder). Accepts agents prop. activeId optional: with agent shows name+folder; fleet altitude shows placeholder. Switch/New/Manage items.'
+  last_edited_ms: 1781694241298
 31e40cc8916cabd7:
   path: ui/src/components/threads/ThreadsView.tsx
   description: 'Threads view assembler, scoped to ACTIVE AGENT''s realm (filters threadDetails by agentId; keyed by agentId in App so local state reseeds per realm; EmptyRealm when none). Holds local thread state so maquette interactions genuinely work: search filters, New Thread prepends a MY_TURN thread, archive/restore toggles. 2-pane (ThreadList | ThreadConversation) + NewThreadDialog. Sidebar is ALWAYS OPEN — the collapse/expand edge rail was removed entirely (T23).'
@@ -1202,6 +1214,10 @@
   path: Cargo.lock
   description: Workspace lockfile
   last_edited_ms: 0
+33d652fe0c22f017:
+  path: web/src/components/agents/FleetShell.tsx
+  description: Fleet shell — sidebar-less Agents⇄Prompts toggle. Accepts agents prop, forwards to FleetDashboard. FLEET_MAX_W shared width constant.
+  last_edited_ms: 1781694241329
 33de1c508379ae28:
   path: crates/cp-mod-callback/src/tools.rs
   description: Callback tool dispatch. Routes upsert/open_editor/close_editor. Delegates upsert to tools_upsert.rs.
@@ -1246,6 +1262,10 @@
   path: crates/cp-console-server/src/cleanup.rs
   description: 'Process cleanup: reaper thread (30s grace), graceful shutdown (kill_all_sessions), signal handlers (SIGINT/SIGHUP), FD limit raising. Uses BTreeMap for ordered exit_times tracking.'
   last_edited_ms: 0
+357e1deca9d0e39e:
+  path: web/src/App.tsx
+  description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Uses useFleet() for live agents. Mounts AccountProvider + TooltipProvider. Passes agents to TopBar/FleetShell/StatusBar. openAgent switches agent→threads.
+  last_edited_ms: 1781694241267
 35e14e7c1aa44927:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A) + DARK ''Night Gold'' (#222831/#393E46/#FFD369/#EEEEEE: charcoal base, slate surfaces, golden-yellow accent, near-white text) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (agent dialog), finder-slider.'
@@ -5222,6 +5242,10 @@ e0967f55f964e135:
   path: Cargo.toml
   description: Workspace root. 22 crate members (incl cp-wire). Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny). openssl vendored.
   last_edited_ms: 1781615410305
+e0ab5f6fe8122b8e:
+  path: web/src/components/shell/TopBar.tsx
+  description: 'macOS title bar. Accepts agents prop for AgentSwitcher + activeAgent lookup. View switcher Threads·Finder·Cockpit. Right cluster: cost, Activity→StatsPopup, theme, agent config (AgentModal), UserMenu (Profile+Settings).'
+  last_edited_ms: 1781694241282
 e0c2ca859aee6bef:
   path: yamls/tools/logs.yaml
   description: Log tools YAML. log_create (entries with content+importance) + Close_conversation_history (panels array with panel_id + logs as simple strings). No tags, no memories.
