@@ -866,6 +866,10 @@
   path: docs/prompt-building.md
   description: How context/prompts are assembled for LLM calls
   last_edited_ms: 0
+241178c9f87df1e9:
+  path: web/src/components/agents/PromptsPage.tsx
+  description: Global prompt library — accepts optional agentId, uses useLibrary() with mockLibrary fallback. Cards for agents/skills/commands. Create/edit decorative.
+  last_edited_ms: 1781695982747
 248e127185acfb97:
   path: website/style.css
   description: Website stylesheet
@@ -1766,6 +1770,10 @@
   path: src/app/run/tools/queue_flush.rs
   description: Queue flush execution — dequeues and runs all queued tool calls. FlushedTool struct + execute_queue_flush(). save_flushed_tool_call_message() creates compact Tool_execution stubs. augment_remaining_history_panels() appends remaining panel info. Extracted from pipeline.rs for file-length limit.
   last_edited_ms: 0
+49cfd515bbe97d6d:
+  path: web/src/components/shell/StatusBar.tsx
+  description: 'Bottom status footer. Fleet mode: accepts agents prop for aggregates (count, threads, needs-you, spend). Agent mode: accepts activeAgent prop, derives phase from status, wires cost live. Cache bar (cacheStats/tokenBudget) still mock.'
+  last_edited_ms: 1781695982763
 49e0cd52dad75287:
   path: crates/cp-base/src/state/data/config.rs
   description: SidebarMode, Shared (config.json), WorkerState (per-worker), PanelData (panel persistence) — all serde structs
@@ -1834,6 +1842,10 @@
   path: crates/cp-orchestrator/src/main.rs
   description: 'Backend entry point (thin). Prints version+protocol+agents dir, exits (no runtime loop yet). use nix/serde/serde_json/cp_oplog/tiny_http as _ acknowledges lib-only deps; #[cfg(test)] use cp_mod_bridge as _ + tempfile as _ acknowledge dev-deps for the bin-test target''s per-target unused-crate-dependencies.'
   last_edited_ms: 1781650132105
+4d2106cb64b6d067:
+  path: web/src/components/shell/StatsPopup.tsx
+  description: Session 'vitals' popup — accepts agentId, uses usePanels()+useAgentMeta() for live token budget + cost. Budget/threshold hardcoded defaults. Portaled Dialog.
+  last_edited_ms: 1781695982732
 4d457b7ceca9acae:
   path: yamls/tools/search.yaml
   description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
@@ -2138,6 +2150,10 @@
   path: ui/src/components/panels/cockpit/StatsPanel.tsx
   description: 'Cockpit Statistics maquette: context-budget meter, session stat grid, cache-economics chips, per-panel token weight bars. Reads mock stats/tokenBudget/cacheStats/panels.'
   last_edited_ms: 1781600050397
+59c86228f2ff5076:
+  path: web/src/components/shell/TopBar.tsx
+  description: 'macOS title bar. Accepts agents prop for AgentSwitcher + activeAgent lookup. View switcher Threads·Finder·Cockpit. Right cluster: cost, Activity→StatsPopup(agentId), theme, agent config (AgentModal), UserMenu (Profile+Settings).'
+  last_edited_ms: 1781695982779
 5a31461824e01298:
   path: ui/src/lib/mock.ts
   description: 'Mock session data: panels, tokenBudget, messages, threads, threadDetails (5 full convos), agents (3 workspaces=folders), fileTree (nav-able fs with agent-badged folders), activeAgentId.'
@@ -2746,6 +2762,10 @@
   path: crates/cp-mod-entities/src/tools.rs
   description: 'SQL execution engine. execute() dispatches to execute_select/dml/ddl. execute_dml_stmts is row-aware: dispatches per-statement on prep.column_count()>0 so a DML batch can end in a plain SELECT (not just RETURNING) without rusqlite ''Execute returned results'' error. dry_run via SAVEPOINT+ROLLBACK. Parsing from crate::parse. request_path reads .sql. live/output_path routing. ≤150 lines AND ≤8000 bytes inline, bigger→entity_result panel. 200-row cap. 4 DML-dispatch regression tests.'
   last_edited_ms: 0
+73a0005c80f66a72:
+  path: web/src/components/agents/FleetShell.tsx
+  description: Fleet shell — sidebar-less Agents⇄Prompts toggle. Accepts agents prop, forwards to FleetDashboard. Passes agents[0]?.id to PromptsPage for live library. FLEET_MAX_W shared width constant.
+  last_edited_ms: 1781695982795
 73a5ef4ffe6b41f7:
   path: ui/src/components/shell/LeftRail.tsx
   description: 'Context navigator: token-budget meter, scrollable panel list (icon+name+token-bar+freeze/miss), cache economics footer (hit/miss/out + cost).'
@@ -3798,6 +3818,10 @@
   path: src/llms/cache/cache_optimizer_tests.rs
   description: Brute-force vs DP agreement tests, property tests (monotonicity, disjointness), edge cases, determinism
   last_edited_ms: 0
+9f678ca035b102a6:
+  path: web/src/App.tsx
+  description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Uses useFleet() for live agents. Mounts AccountProvider + TooltipProvider. Passes agents to TopBar/FleetShell/StatusBar. Passes activeAgent to StatusBar.
+  last_edited_ms: 1781695982811
 9f76facc7ed4b07d:
   path: crates/cp-mod-memory/src/storage.rs
   description: YAML-backed memory storage. FNV-1a keys via cp-mod-utilities. generate_yaml_key, ensure_yaml_key. populate/migrate via YamlSync.
