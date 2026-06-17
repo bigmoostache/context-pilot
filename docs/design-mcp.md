@@ -27,21 +27,32 @@ Transports:
 - **Streamable HTTP** — single endpoint, POST requests, responses optionally streamed via SSE. This is
   what Notion hosts. Requires **OAuth 2.1 + PKCE** for Notion's hosted server.
 
-## 3. The load-bearing question — dynamic tools ⭐
+## 3. The load-bearing question — dynamic tools ⭐ — ✅ VALIDATED (Phase 0)
 
 CP's built-in tools are **static** (declared in `yamls/tools/`, validated at compile time in
 `cp-base/src/lib.rs` tests). MCP tools are **dynamic** (discovered at runtime per server).
 
-**Hypothesis:** `modules/mod.rs::rebuild_tools()` already rebuilds the toolset at runtime (that's how
-`module_toggle` adds/removes tools). So the toolset is *not* frozen at compile time. The MCP module's
-`tool_definitions()` would return runtime-discovered tools, cached after connection.
+**Phase 0 findings (code-verified):**
 
-**Risk to validate in Phase 0 before any real code:** confirm that (a) `tool_definitions()` may return
-runtime data (not pure/static), and (b) nothing in the pre-flight / schema-validation pipeline rejects
-a tool whose schema wasn't known at compile time. If this fails, the whole architecture changes.
+1. **`tool_definitions(&self)` is stateless** — takes `&self`, not `&State` (the `Module` trait
+   contract: "all runtime state lives in `State`"). So it **cannot** carry runtime-discovered tools.
+   This was the real risk, and it's a constraint, not a blocker.
+2. **Injection point = `rebuild_tools(state)`** — it has `&mut State` and *already* manually injects a
+   runtime tool (`optimize_context` from the reverie). We mirror that: add a trait method
+   `dynamic_tool_definitions(&self, &State) -> Vec<ToolDefinition>` (default `vec![]`), called by
+   `rebuild_tools`; the MCP module overrides it to return tools read from `State`. Call `rebuild_tools`
+   after each server connection completes.
+3. **Pre-flight does NOT reject runtime tools** — schema validation runs against `state.tools` (the
+   schema *we* provide from MCP `inputSchema`); if a tool isn't in the list it's *skipped*, not
+   rejected. No compile-time gate.
+4. **⚠️ `intent` + `verb` are mandatory on every call** (pre-flight Phase 0.25). The MCP→CP tool
+   conversion MUST inject `intent` + `verb` params into every advertised MCP tool schema.
+5. **Dispatch works** — `execute_tool(&self, tool, &mut State)` has State access; route on the
+   `{server}__{tool}` namespace. The compile-time YAML test only covers built-in tools — MCP is out of
+   scope.
 
 MCP `inputSchema` is JSON Schema, which maps ~1:1 to the Anthropic `input_schema` CP already sends —
-conversion is a thin wrapper.
+conversion is a thin wrapper (+ the mandatory `intent`/`verb` injection).
 
 ## 4. Concurrency model
 
@@ -95,7 +106,7 @@ committed. Tool namespacing: CP tool name = `{server}__{tool}`; dispatch splits 
 | Phase | Deliverable | Risk |
 |-------|-------------|------|
 | **0** | Validate the dynamic-tools hypothesis (§3) in code. Sign-off on this doc. | low |
-| **1** | `protocol.rs` + stdio transport + `client.rs`. Handshake + `tools/list` + `tools/call` against an `npx` server. No auth. | med |
+| **1** | ✅ **DONE** — `protocol.rs` + stdio transport + `client.rs`. Handshake + `tools/list` + `tools/call`, verified by a self-contained Python mock MCP server (10 unit + 1 integration + 1 doctest). No auth. | med |
 | **2** | Dynamic tool registration: bridge into `rebuild_tools()`, dispatch, config loading, status panel. | **high ⭐** |
 | **3** | Streamable HTTP transport with a static bearer token. | med |
 | **4** | OAuth 2.1 + PKCE for Notion hosted (browser auth, localhost callback, token store + refresh). | **high** |
