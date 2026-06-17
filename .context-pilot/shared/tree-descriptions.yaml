@@ -470,6 +470,10 @@
   path: crates/cp-mod-memory/Cargo.toml
   description: 'Memory module deps: cp-base, cp-render, crossterm, serde, serde_json, cp-mod-utilities.'
   last_edited_ms: 1780565428702
+1c3761398826a262:
+  path: src/state/persistence/boot.rs
+  description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 2 parallel threads (Meilisearch + Console). Loads .env files (project + global).'
+  last_edited_ms: 0
 1c60356763e64307:
   path: crates/cp-mod-github/Cargo.toml
   description: 'GitHub module deps: cp-base, cp-render, crossterm, regex, sha2, serde_json, secrecy.'
@@ -518,6 +522,10 @@
   path: crates/cp-mod-ocr/Cargo.toml
   description: 'OCR module deps: cp-base, cp-render, serde_json, reqwest, cp-mod-utilities, log.'
   last_edited_ms: 1780565428719
+1ee9b09f20159c6e:
+  path: .context-pilot/config.json
+  description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
+  last_edited_ms: 0
 1f4fe238b1cbb5df:
   path: src/app/prompt_builder.rs
   description: 'Canonical prompt assembly with flame!("prompt_build"). 3 phases: panel injection (fake tool_use/result pairs) → conversation messages (tool pairing) → message alternation. Seed re-injection after panels.'
@@ -542,6 +550,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 0
+20b15242c2df5856:
+  path: .context-pilot/config.json
+  description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
+  last_edited_ms: 0
 210d0c5c4f54a2fc:
   path: crates/cp-mod-search/src/tools.rs
   description: Search tool execution with flame!("search_exec"). Split keyword+semantic multi-search via MeiliClient. dedup_by_score() merges overlapping results. iso_to_ms() via cp_mod_utilities::time. File/log filters. Async via spawn_async_tool. DynPanel creation. Mandatory semantic_query param.
@@ -558,6 +570,10 @@
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
   last_edited_ms: 1780565754910
+21abe18d6ccf3e6d:
+  path: .context-pilot/config.json
+  description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
+  last_edited_ms: 0
 22156ffc64429132:
   path: crates/cp-mod-mcp/src/lib.rs
   description: 'MCP crate entry. 6 modules: bridge, clients, errors, oauth, protocol, transport. Doctest shows connect_stdio→list_tools.'
@@ -1150,6 +1166,10 @@
   path: src/ui/ir/render_status_bar.rs
   description: Status bar IR adapter — renders StatusBar to ratatui line. Badges (streaming/tooling/ready/blocked), agent/skill cards, git branch, auto-continue, reverie, queue, think balance. Builder from state. Wall-clock spinner.
   last_edited_ms: 0
+43a20a80f9386be0:
+  path: .context-pilot/config.json
+  description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
+  last_edited_ms: 0
 44284c135428f1f1:
   path: crates/cp-render/src/lib.rs
   description: 'IR rendering crate. Semantic styling (not RGB). Block enum: Line/Empty/Header/Table/ProgressBar/Tree/Separator/KeyValue. Span with semantic+bold/italic/dimmed/reversed+optional RGB. pub mod markdown for shared parsing. Serializable for future web frontend.'
@@ -1350,6 +1370,10 @@
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams structs. post_json() generic helper. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
   last_edited_ms: 1780560368755
+52178a1bd43161af:
+  path: .context-pilot/config.json
+  description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
+  last_edited_ms: 0
 5261dadde0c0c36c:
   path: crates/cp-mod-search/src/meili/api.rs
   description: Meilisearch HTTP API client. MeiliClient with index CRUD, document ops, search/multi_search, facet_distribution, stats. SearchParams for query building. pub struct for cross-module use (entities sync).
@@ -2514,6 +2538,14 @@ a139f333bbc083aa:
   path: .github/checks/clippy_lints_list.md
   description: Expected clippy lints list for comparison
   last_edited_ms: 0
+a1506ad8a40a6109:
+  path: crates/cp-mod-mcp/src/bridge/panel.rs
+  description: 'McpPanel: fixed sidebar panel listing configured servers, their ConnStatus, and namespaced tools with descriptions (catalog for AI discovery). Header instructs to use tool_manage. Read-only (scroll only), no cache.'
+  last_edited_ms: 0
+a193e857a2a0eb75:
+  path: .context-pilot/config.json
+  description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
+  last_edited_ms: 0
 a24ca6a492b02678:
   path: src/llms/claude_code/mod.rs
   description: Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
@@ -2629,6 +2661,10 @@ aa4fb032325f6ff0:
 aa61792fb982b436:
   path: .github/workflows/code_length.yml
   description: 'CI: file/folder length enforcement'
+  last_edited_ms: 0
+aa85d0d5b5cb927b:
+  path: crates/cp-mod-mcp/src/bridge/mod.rs
+  description: 'Host integration: McpModule (Module trait impl). init_state reads .mcp.json + connects servers into McpState. 4-phase dispatch: maybe_reconnect → call+take_tools_changed → error→Failed+client=None → refresh tools on list_changed. overview_context_section() provides compact MCP catalog summary. Fixed MCP status panel (fixed_order=20).'
   last_edited_ms: 0
 aaf816cbdc5723aa:
   path: src/llms/cache/density.rs
@@ -2830,6 +2866,10 @@ b7c086f5a775402d:
   path: src/state/persistence/worker.rs
   description: 'Worker state persistence (states/ dir): load_worker() path helpers + JSON deserialize'
   last_edited_ms: 0
+b7e277cc09c4c3d4:
+  path: .context-pilot/config.json
+  description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
+  last_edited_ms: 0
 b8250e826f6a39b7:
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
@@ -2893,6 +2933,10 @@ bccd6076aebcf1e7:
 bd2f1faa83138934:
   path: crates/cp-mod-callback/src/panel.rs
   description: Callback panel. Table view of all definitions (ID/name/pattern/blocking/timeout/scope/success_msg/cwd). Editor sub-view shows script content for one callback. No Active column.
+  last_edited_ms: 0
+bd627b25df097823:
+  path: .context-pilot/config.json
+  description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
   last_edited_ms: 0
 bd662097808facee:
   path: src/infra/constants.rs
@@ -3394,6 +3438,10 @@ e42f22a6aaede223:
   path: crates/cp-mod-callback/src/tools_upsert.rs
   description: Callback upsert tool. Create/update/delete callback definitions. Script file management. Diff-based script editing (old_string/new_string). YAML sync on every mutation.
   last_edited_ms: 1780497937357
+e44464edd5ba0429:
+  path: crates/cp-mod-mcp/src/oauth.rs
+  description: OAuth 2.1 + PKCE flow for remote MCP servers. discover_metadata, generate_pkce, build_auth_url (AuthFlowParams struct), wait_for_callback (non-blocking poll loop), exchange_code, refresh_access_token, register_client (RFC 7591), store_token (mcp-tokens.json), authorize orchestrator. 6 unit tests.
+  last_edited_ms: 0
 e445bc97e31d455a:
   path: crates/cp-mod-callback/src/types.rs
   description: Callback types. CallbackDefinition (name, pattern, script, blocking, timeout, success_message, cwd, is_global). CallbackState (definitions, active_set, editor_open).
