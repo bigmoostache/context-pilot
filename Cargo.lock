@@ -351,6 +351,9 @@ dependencies = [
 name = "cp-mod-mcp"
 version = "0.1.0"
 dependencies = [
+ "cp-base",
+ "cp-render",
+ "crossterm",
  "serde",
  "serde_json",
 ]
@@ -2975,6 +2978,7 @@ dependencies = [
  "cp-mod-git",
  "cp-mod-github",
  "cp-mod-logs",
+ "cp-mod-mcp",
  "cp-mod-memory",
  "cp-mod-ocr",
  "cp-mod-prompt",

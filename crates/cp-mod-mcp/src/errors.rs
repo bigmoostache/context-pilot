@@ -1,8 +1,11 @@
 //! Error type for the MCP client.
 //!
-//! A self-contained enum (no `thiserror` dependency) implementing
-//! [`std::error::Error`], covering the failure modes of subprocess spawning,
-//! transport I/O, request timeouts, and server-reported JSON-RPC errors.
+//! A self-contained `Debug + Display` enum (no `thiserror` dependency) covering
+//! the failure modes of subprocess spawning, transport I/O, request timeouts,
+//! and server-reported JSON-RPC errors. It deliberately does NOT implement
+//! [`std::error::Error`] — nothing in the crate needs `dyn Error`, and the
+//! trait's defaulted methods (`provide`, etc.) cannot be satisfied on stable
+//! under the workspace's `missing_trait_methods` lint.
 
 use crate::protocol::RpcError;
 
@@ -33,5 +36,3 @@ impl core::fmt::Display for McpError {
         }
     }
 }
-
-impl std::error::Error for McpError {}

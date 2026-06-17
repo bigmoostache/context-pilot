@@ -7,9 +7,14 @@ use std::process::Command;
 
 // `serde` is pulled in transitively via `serde_json::json!`; mark it as used so
 // the `unused_crate_dependencies` lint (forbid) sees an explicit consumer.
+// `cp_base`, `cp_render`, `crossterm` are crate deps needed by the bridge layer
+// but unused by this client-only integration test — mark them used too.
 use serde as _;
+use cp_base as _;
+use cp_render as _;
+use crossterm as _;
 
-use cp_mod_mcp::McpClient;
+use cp_mod_mcp::clients::McpClient;
 
 /// Minimal MCP server: reads newline-delimited JSON-RPC requests on stdin and
 /// answers `initialize`, `tools/list`, and `tools/call`. Ignores notifications.
@@ -103,17 +108,17 @@ fn stdio_handshake_list_and_call() {
 
     // Tool invocation — echo round-trips its argument.
     let echo = client
-        .call_tool("echo", serde_json::json!({ "message": "hello mcp" }))
+        .call_tool("echo", &serde_json::json!({ "message": "hello mcp" }))
         .expect("call echo");
     assert!(!echo.is_error);
     assert_eq!(echo.text(), "hello mcp");
 
     // Tool invocation — ping.
-    let ping = client.call_tool("ping", serde_json::json!({})).expect("call ping");
+    let ping = client.call_tool("ping", &serde_json::json!({})).expect("call ping");
     assert_eq!(ping.text(), "pong");
 
     // Unknown tool surfaces as a server-side error flag, not a transport error.
-    let bad = client.call_tool("nope", serde_json::json!({})).expect("call unknown");
+    let bad = client.call_tool("nope", &serde_json::json!({})).expect("call unknown");
     assert!(bad.is_error);
 
     let _cleanup = std::fs::remove_file(&mock);

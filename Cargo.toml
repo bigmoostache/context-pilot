@@ -1075,6 +1075,7 @@ cp-mod-firecrawl = { path = "crates/cp-mod-firecrawl" }
 cp-mod-queue = { path = "crates/cp-mod-queue" }
 cp-mod-ocr = { path = "crates/cp-mod-ocr" }
 cp-mod-search = { path = "crates/cp-mod-search" }
+cp-mod-mcp = { path = "crates/cp-mod-mcp" }
 crossterm.workspace = true
 ratatui.workspace = true
 serde.workspace = true

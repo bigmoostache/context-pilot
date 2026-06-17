@@ -31,7 +31,7 @@ pub struct Request {
 impl Request {
     /// Build a request with the canonical `"2.0"` tag.
     #[must_use]
-    pub fn new(id: u64, method: impl Into<String>, params: Value) -> Self {
+    pub fn new<M: Into<String>>(id: u64, method: M, params: Value) -> Self {
         Self { jsonrpc: "2.0", id, method: method.into(), params }
     }
 }
@@ -51,7 +51,7 @@ pub struct Notification {
 impl Notification {
     /// Build a notification with the canonical `"2.0"` tag.
     #[must_use]
-    pub fn new(method: impl Into<String>, params: Value) -> Self {
+    pub fn new<M: Into<String>>(method: M, params: Value) -> Self {
         Self { jsonrpc: "2.0", method: method.into(), params }
     }
 }

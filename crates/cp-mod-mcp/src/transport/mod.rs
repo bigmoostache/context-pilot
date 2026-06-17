@@ -1,11 +1,12 @@
 //! Transport abstraction: how JSON-RPC frames travel to and from a server.
 //!
-//! Phase 1 ships [`stdio`] only. A future HTTP/SSE transport will implement the
-//! same [`Transport`] contract so [`crate::client`] stays transport-agnostic.
+//! Phase 1 ships [`pipe`] (stdio) only. A future HTTP/SSE transport will
+//! implement the same [`Transport`] contract so [`crate::clients`] stays
+//! transport-agnostic.
 
-pub mod stdio;
+pub mod pipe;
 
-use crate::error::McpError;
+use crate::errors::McpError;
 use crate::protocol::Incoming;
 
 /// A bidirectional JSON-RPC channel to a single MCP server.

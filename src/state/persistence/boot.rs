@@ -67,8 +67,11 @@ pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData,
         module.load_worker_data(worker_data, state);
     }
 
+    // Build the tool list through rebuild_tools so it includes the reverie's
+    // optimize_context AND any runtime-discovered tools (e.g. MCP server tools
+    // connected during module init). Plain active_tool_definitions would miss both.
     if state.tools.is_empty() {
-        state.tools = crate::modules::active_tool_definitions(&state.active_modules);
+        crate::modules::rebuild_tools(state);
     }
 
     cp_mod_github::types::GithubState::get_mut(state).github_token = std::env::var("GITHUB_TOKEN").ok();

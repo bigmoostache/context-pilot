@@ -99,6 +99,7 @@ pub trait Module: Send + Sync {
 
     /// Tool definitions provided by this module
     fn tool_definitions(&self) -> Vec<ToolDefinition>;
+
     /// Execute a tool. Returns None if this module doesn't own the tool.
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult>;
 

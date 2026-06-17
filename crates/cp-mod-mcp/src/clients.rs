@@ -7,13 +7,13 @@
 
 use serde_json::Value;
 
-use crate::error::McpError;
+use crate::errors::McpError;
 use crate::protocol::{
     CallToolResult, Incoming, InitializeParams, InitializeResult, ListToolsResult, Notification, Request, ServerInfo,
     Tool,
 };
 use crate::transport::Transport;
-use crate::transport::stdio::StdioTransport;
+use crate::transport::pipe::SubprocessTransport;
 
 /// Default per-request timeout. Generous enough for an `npx` server's cold start
 /// on the first `initialize`, tight enough to fail fast on a hung server.
@@ -37,14 +37,14 @@ pub struct McpClient<T: Transport> {
     tools: Vec<Tool>,
 }
 
-impl McpClient<StdioTransport> {
+impl McpClient<SubprocessTransport> {
     /// Spawn a stdio MCP server and perform the `initialize` handshake.
     ///
     /// # Errors
     ///
     /// Propagates spawn, transport, timeout, or protocol failures.
     pub fn connect_stdio(command: &str, args: &[String]) -> Result<Self, McpError> {
-        let transport = StdioTransport::spawn(command, args)?;
+        let transport = SubprocessTransport::spawn(command, args)?;
         let mut client = Self::with_transport(transport);
         let _handshake = client.initialize()?;
         Ok(client)
@@ -89,7 +89,7 @@ impl<T: Transport> McpClient<T> {
         let result_value = self.request("initialize", params)?;
         let result: InitializeResult = serde_json::from_value(result_value)
             .map_err(|e| McpError::Protocol(format!("decode initialize result: {e}")))?;
-        self.server_info = result.server_info.clone();
+        self.server_info.clone_from(&result.server_info);
 
         // Confirm readiness — fire-and-forget, no response expected.
         self.notify("notifications/initialized", Value::Null)?;
@@ -116,7 +116,7 @@ impl<T: Transport> McpClient<T> {
     ///
     /// Propagates transport/timeout/protocol failures. A server-side tool error
     /// surfaces via [`CallToolResult::is_error`], not as an `Err`.
-    pub fn call_tool(&mut self, name: &str, arguments: Value) -> Result<CallToolResult, McpError> {
+    pub fn call_tool(&mut self, name: &str, arguments: &Value) -> Result<CallToolResult, McpError> {
         let params = serde_json::json!({ "name": name, "arguments": arguments });
         let result_value = self.request("tools/call", params)?;
         serde_json::from_value(result_value).map_err(|e| McpError::Protocol(format!("decode tools/call: {e}")))

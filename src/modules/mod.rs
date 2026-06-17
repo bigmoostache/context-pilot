@@ -29,6 +29,7 @@ pub(crate) use cp_mod_firecrawl::FirecrawlModule;
 pub(crate) use cp_mod_git::GitModule;
 pub(crate) use cp_mod_github::GithubModule;
 pub(crate) use cp_mod_logs::LogsModule;
+pub(crate) use cp_mod_mcp::bridge::McpModule;
 pub(crate) use cp_mod_memory::MemoryModule;
 pub(crate) use cp_mod_ocr::OcrModule;
 pub(crate) use cp_mod_prompt::PromptModule;
@@ -131,6 +132,7 @@ pub(crate) fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(QueueModule),
         Box::new(SearchModule),
         Box::new(EntitiesModule),
+        Box::new(McpModule),
     ]
 }
 
@@ -370,7 +372,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
 }
 
 /// Rebuild the tools list from active modules and preserved `disabled_tools`.
-fn rebuild_tools(state: &mut State) {
+pub(crate) fn rebuild_tools(state: &mut State) {
     // Preserve currently disabled tool IDs
     let disabled: HashSet<String> = state.tools.iter().filter(|t| !t.enabled).map(|t| t.id.clone()).collect();
 
@@ -379,6 +381,13 @@ fn rebuild_tools(state: &mut State) {
 
     // Add the reverie's optimize_context tool (always available for main AI)
     tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
+
+    // Fold in runtime-discovered MCP server tools (mirrors the optimize_context
+    // injection above). MCP is the only source of dynamic tools, so we call it
+    // concretely rather than adding a polymorphic Module trait method.
+    if state.active_modules.contains("mcp") {
+        tools.extend(McpModule::dynamic_tool_definitions(state));
+    }
 
     // Re-apply disabled state
     for tool in &mut tools {
