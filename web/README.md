@@ -1,73 +1,82 @@
-# React + TypeScript + Vite
+# Context Pilot — Live Web Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript frontend for the Context Pilot orchestration backend.
+Renders real-time agent state: fleet overview, threads with live messaging,
+cockpit panels (memory, todos, spine, tree, etc.), and a confined file finder.
 
-Currently, two official plugins are available:
+## Architecture
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+Browser (web/)  ──REST──▶  Orchestrator (cp-orchestrator, :7878)  ──reads──▶  Agent state files
+                ◀──SSE───                                          ──UDS───▶  Agent bridge (TUI)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+- **REST** — read agent state (threads, panels, finder, meta) + submit commands
+- **SSE** — real-time oplog deltas + stream hints (token-by-token)
+- **Commands** — `SendMessage`, `CreateThread`, `ArchiveThread`, `Stop`, etc.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+The frozen design maquette lives in `../ui/` for visual comparison.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Quick start
+
+```bash
+# Full stack (backend + web + TUI with bridge)
+./web/run-stack.sh
+
+# Backend + web only (run TUI separately with CP_BRIDGE=1)
+./web/run-stack.sh --no-tui
 ```
+
+### Manual start
+
+```bash
+# 1. Backend
+cargo build --release -p cp-orchestrator
+./target/release/cp-orchestrator          # serves :7878
+
+# 2. Web dev server
+cd web && pnpm install && pnpm dev        # serves :5174
+
+# 3. TUI with bridge activation
+CP_BRIDGE=1 cargo run --release           # self-registers with backend
+```
+
+## Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `CP_ORCH_PORT` | `7878` | Orchestrator HTTP port |
+| `VITE_API_URL` | `http://localhost:7878` | Backend URL (web client) |
+| `CP_BRIDGE` | unset | Set to `1` to activate agent bridge in TUI |
+
+## Data flow
+
+The web client uses **two data channels**:
+
+1. **Inspection plane** (read-only) — backend reads the agent's `.context-pilot/`
+   tier-② state files and reshapes them to JSON. Zero agent writes, zero oplog bloat.
+2. **Orchestration plane** (durable) — oplog → SSE deltas for liveness, phase,
+   cost, stream hints, and command effects.
+
+## Key directories
+
+```
+web/src/lib/
+  api.ts      — Typed REST client (22 endpoints)
+  sse.ts      — Reconnecting SSE with Last-Event-ID replay
+  live.ts     — React hooks: useFleet, useThreads, usePanels, etc.
+                (fetch + SSE-invalidate + 5s poll backstop)
+
+web/src/components/
+  agents/     — Fleet dashboard, prompts library
+  threads/    — Thread list, conversation, composer (real commands)
+  panels/     — 13 cockpit panel components
+  finder/     — Confined file browser
+  shell/      — TopBar, StatusBar, LeftRail, Config, etc.
+```
+
+## Tech stack
+
+- React 19 + TypeScript + Vite 8
+- Tailwind CSS v4 + shadcn/ui (Base UI)
+- No async runtime — all data via fetch + EventSource

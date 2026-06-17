@@ -1006,6 +1006,10 @@
   path: ui/src/components/finder/FinderChrome.tsx
   description: 'Finder chrome. FinderTabs (kind FileIcon per tab), FinderToolbar (context-aware: folder tab = back/fwd/breadcrumb/icon-size slider[grid]/4-mode segmented/search/New-Folder/Upload/Download/path-bar+QuickLook toggles; FILE tab = Get Info/Download/Share; NavBtn/SegBtn/view-modes use <Tip>), FinderSidebar (Favorites/Locations FileIcon via Place leading prop + Tags/Recents), FinderPathBar (folder FileIcon). All folder/file glyphs are macOS FileIcon (T27); Place gained optional `leading` ReactNode.'
   last_edited_ms: 1781597468901
+297f4cda120c3e6e:
+  path: web/README.md
+  description: 'Web client documentation: architecture (REST+SSE two-plane), quick start (run-stack.sh), manual start, env vars, data flow (inspection+orchestration planes), key directories, tech stack.'
+  last_edited_ms: 1781698549906
 297ff0502006cc9d:
   path: crates/cp-mod-chat/src/lib.rs
   description: 'Chat module. 7 tools, 2 panels (dashboard+room). Depends on spine. init: bootstrap→Tuwunel server→Matrix client→sync loop→bridge recovery. Typing indicators via on_tool_progress. Bridge management for Telegram/Discord/Slack/GChat.'
@@ -5314,6 +5318,10 @@ d693aa680fbe23a5:
   path: src/modules/questions/mod.rs
   description: 'QuestionsModule: core, 2 tools (ask_user_question, Think), ThinkState persistence, on_tool_complete counter drift'
   last_edited_ms: 0
+d6d2923755b7f261:
+  path: web/run-stack.sh
+  description: 'Launch script for full Context Pilot live stack: orchestrator backend (:7878) + web dev server (:5174) + TUI with CP_BRIDGE=1. --no-tui flag for backend+web only. Health check, cleanup trap, env overrides.'
+  last_edited_ms: 1781698549890
 d6fe3bef04a79aab:
   path: ideas.md
   description: Brainstorming / feature ideas
