@@ -30,6 +30,7 @@
 //! | `POST` | `/api/ticket` | [`rest::mint_ticket`] |
 //! | `GET`  | `/api/stream?agent={id}&ticket={t}` | SSE (this module) |
 
+pub mod finder;
 pub mod meta;
 pub mod panels;
 pub mod rest;
@@ -215,6 +216,9 @@ fn route_rest(
         (Method::Get, ["api", "agent", id, "scratchpad"]) => panels::scratchpad(state, id, query),
         (Method::Get, ["api", "agent", id, "tree"]) => panels::tree(state, id),
         (Method::Get, ["api", "agent", id, "callbacks"]) => panels::callbacks(state, id),
+        (Method::Get, ["api", "agent", id, "fs"]) => finder::fs_list(state, id, query),
+        (Method::Get, ["api", "agent", id, "fs", "preview"]) => finder::fs_preview(state, id, query),
+        (Method::Get, ["api", "agent", id, "conversation"]) => finder::conversation(state, id),
         (Method::Post, ["api", "agent", id, "command"]) => rest::command(state, id, body_bytes),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state),
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },

@@ -154,6 +154,10 @@
   path: crates/cp-mod-bridge/Cargo.toml
   description: 'Bridge module deps: cp-base, cp-render, cp-wire, cp-oplog, nix 0.30 (fs, for Flock RAII), serde_json. dev: tempfile. Workspace lints.'
   last_edited_ms: 1781625056746
+0622a2fd58720750:
+  path: crates/cp-orchestrator/src/transport/meta.rs
+  description: Enriched agent meta endpoints. agent_meta (GET /api/agent/{id}/meta) + fleet_meta (GET /api/fleet/meta). Combines registry Entry + oplog AgentView (phase/cost) + thread inspection (count/MY_TURN/lastActivity) + git branch. Returns maquette-compatible Agent JSON shape. derive_status/derive_accent helpers.
+  last_edited_ms: 1781685557233
 064c633984a0d856:
   path: crates/cp-mod-queue/src/types.rs
   description: 'QueueState + QueuedToolCall types. Trap fields: trap_active, trap_panel_ids, trap_optional_ids. Methods: enqueue, remove_by_index, flush, clear, is_queue_tool.'
@@ -2274,6 +2278,10 @@
   path: src/ui/ir/render_sidebar_stats.rs
   description: Sidebar cache stats renderer — token table (hit/miss/out per row), format_cost closure ($K tier for ≥1000), total cost line, uncached count. Consumes CacheStats IR data.
   last_edited_ms: 1780907685228
+6295723cfc30d73a:
+  path: crates/cp-orchestrator/src/registry/channel.rs
+  description: Per-agent channel — backend's read/write handle. AgentChannel (from_entry/hydrate/send/send_with_retry) + Tailer (incremental gap-free oplog consumer, poll/seed/last_rev). Moved from top-level into registry/ submodule.
+  last_edited_ms: 1781685620787
 62ca35371b6fa7c3:
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
