@@ -926,10 +926,6 @@
   path: docs/talk/slides/2-4.html
   description: 'Slide: Feedbacks & Constraints with control theory (HOWs section)'
   last_edited_ms: 1781078806788
-280da00800be2873:
-  path: crates/cp-orchestrator/src/channel.rs
-  description: 'Phase 16 (X783): backend AgentChannel — per-agent read/write handle. Tailer{dir,last_index,last_rev}: incremental gap-free oplog poll primitive (no kernel watch, external driver), seed() skips known history, poll()->Vec<OpEntry> ascending rev. AgentChannel{socket_path,cap_token,bodies_dir}: from_entry(&Entry), hydrate(hash)->Option<Vec<u8>> (re-hashes+verifies integrity, NotFound=None=inline/GC''d), send(Command)->Ack (framed CommandFrame over UDS, ACK_READ_TIMEOUT 5s, half-close write, read_ack bounded MAX_ACK_BUFFER 64KB), send_with_retry(cmd,retries) on ConnectionRefused with RETRY_DELAY 100ms. 10 tests: 5 tailer (catchup, idempotent, segment-roll gap-free, seed skip, missing dir), 3 hydrate (verified, missing=None, corruption=Err), 2 send (echo-ack-server, connection-refused).'
-  last_edited_ms: 1781630135178
 28535222aec6d878:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -1566,6 +1562,10 @@
   path: dummy.txt
   description: Throwaway test file
   last_edited_ms: 0
+42061055928a897a:
+  path: crates/cp-orchestrator/src/transport/rest.rs
+  description: 'REST handlers: HttpReply, Envelope<T>{rev,data}, CommandReceipt. fleet/agent/mint_ticket/body/command/threads. resolve_entry reads <id>.json. Locks Backend briefly, never across blocking agent I/O. reshape_thread/reshape_message for maquette ThreadDetail. 8 tests.'
+  last_edited_ms: 1781686868222
 4208ddcb6c1fd9d1:
   path: src/ui/mod.rs
   description: Top-level render() with flame!("render"). IR frame build → sidebar + content panel + status bar + overlays (perf from IR, autocomplete from IR, config from IR, search index from IR). Autocomplete offset-aware for Threads mode (THREAD_LIST_WIDTH). No question form layout split.
@@ -1942,6 +1942,10 @@
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Thread input routing: handle_thread_input_submit. Thread creation: MAX_THREAD_NAME_LEN=200 cap. Paste sentinel expansion. /command replacement.'
   last_edited_ms: 1781448934651
+54d620a4dbde7ca0:
+  path: crates/cp-orchestrator/src/main.rs
+  description: Backend entry point. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval, creates Runtime, starts driver thread, serves HTTP (blocking). use as _ for lib-only deps.
+  last_edited_ms: 1781686868193
 54db368ac9a4efa9:
   path: ui/src/components/panels/cockpit/SpinePanel.tsx
   description: 'Cockpit Spine maquette: notification list (kind dot, id, time, processed state) + guard-rail/auto-continuation config rows. Reads mock spine.'
@@ -2281,7 +2285,7 @@
 6295723cfc30d73a:
   path: crates/cp-orchestrator/src/registry/channel.rs
   description: Per-agent channel — backend's read/write handle. AgentChannel (from_entry/hydrate/send/send_with_retry) + Tailer (incremental gap-free oplog consumer, poll/seed/last_rev). Moved from top-level into registry/ submodule.
-  last_edited_ms: 1781685620787
+  last_edited_ms: 1781686881931
 62ca35371b6fa7c3:
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
@@ -4222,6 +4226,10 @@ b6162eed9f57263f:
   path: crates/cp-mod-files/src/tools/mod.rs
   description: 'Tool submodule routing: diff, edit_file, file, write'
   last_edited_ms: 1780648757766
+b621877dc6de956c:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Phase 19/30 + P1-P7: transport hub. Backend shared state + serve/serve_bound + route_rest (22 routes) + handle_stream SSE. CORS headers on all responses + OPTIONS preflight 204. /api/health. stream_to_client uses into_writer() + per-event flush.'
+  last_edited_ms: 1781686868236
 b6256b5251aeb829:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
@@ -4694,6 +4702,10 @@ c9645ec8aebed109:
   path: crates/cp-mod-github/src/parse.rs
   description: GitHub API response parsing. sha256_hex uses FNV-1a for change detection. PR JSON parsing. Token redaction.
   last_edited_ms: 1780565428693
+c97409fabac9e757:
+  path: crates/cp-orchestrator/src/registry/mod.rs
+  description: 'AgentRegistry: poll-based scan-and-diff of agents dir. Events: Appeared/Disappeared/StatusChanged/Stale. Three-factor liveness verdict. reap_tmp for crash-orphan writes. 8 tests.'
+  last_edited_ms: 1781686868163
 c97c773bc3b5cd0b:
   path: ui/src/App.tsx
   description: App shell with view state (agents|threads|cockpit, default agents) + activeAgentId. TopBar drives view + agent switch. AgentsView/ThreadsView/cockpit dispatch. openAgent switches agent then -> threads.
@@ -5222,6 +5234,10 @@ e31c48c5949be594:
   path: crates/cp-console-server/src/protocol.rs
   description: JSON-line protocol types. Request (cmd/key/command/cwd/input/log_path). Response (ok/error/pid/status/exit_code/sessions). interpret_escapes() for \n/\t/\xHH.
   last_edited_ms: 0
+e401a7ccd895bd3b:
+  path: crates/cp-orchestrator/Cargo.toml
+  description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal) + serde + serde_json + serde_yaml + tiny_http (0.12, transport). dev: cp-mod-bridge (test-only) + tempfile. lib+bin. Workspace lints.'
+  last_edited_ms: 1781686868207
 e41498051393a608:
   path: crates/cp-wire/src/heartbeat.rs
   description: 'Phase 11 (X778): fixed 60-byte binary liveness record. Heartbeat{schema_version,timestamp_ms,sequence,pid,boot_id} + encode/decode (LE: ver4+ts8+seq8+pid4+boot_id32+crc4) + is_fresh(now,max_age, saturating) + matches_boot (pid-reuse defence). Error enum (renamed off HeartbeatError for module_name_repetitions). Manual u32/u64 to_le/from_le (little_endian_bytes forbids to_le_bytes). HEARTBEAT_LEN=60, DEFAULT_CADENCE=1s, DEFAULT_MAX_AGE=5s. I/O-free. 11 tests.'
@@ -5298,6 +5314,10 @@ e749a095816c4807:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
   last_edited_ms: 0
+e74deab2bf289b26:
+  path: crates/cp-orchestrator/src/transport/finder.rs
+  description: 'Finder endpoints: confined dir listing (GET /fs?path=), file preview (GET /fs/preview?path=, 256KB cap, binary reject), conversation (GET /conversation, messages/*.yaml sorted, cap 200). Path confinement via canonicalize+starts_with (rejects ../symlink/absolute). FinderKind from 60+ extensions. 5 new tests.'
+  last_edited_ms: 1781686757707
 e764dee9fb758b38:
   path: crates/cp-mod-entities/src/types.rs
   description: EntitiesState (db_path, dump_path, migrations_dir, schema_cache), SchemaCache, TableInfo, ColumnInfo, ForeignKeyInfo. get/get_mut helpers for State TypeMap access.
@@ -5554,6 +5574,10 @@ f4e3bd6a1f8faf50:
   path: crates/cp-mod-prompt/Cargo.toml
   description: 'Prompt module crate deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml.'
   last_edited_ms: 0
+f5133aa5b3d54c43:
+  path: crates/cp-orchestrator/src/transport/panels.rs
+  description: 'Cockpit panel inspection: panel_list (fixed catalogue), memory+callbacks+tree (shared YAML→JSON), todos+spine+queue+scratchpad (worker modules), usage (worker cost snapshot), library (scan .context-pilot/{agents,skills,commands}/*.md frontmatter). parse_frontmatter helper. 1 test.'
+  last_edited_ms: 1781686868178
 f51a2491e78e66d4:
   path: crates/cp-base/src/state/data/model_helpers.rs
   description: 'ModelPricing trait: model selection, pricing, context budget, cleaning thresholds — impl for State + token_cost()'
