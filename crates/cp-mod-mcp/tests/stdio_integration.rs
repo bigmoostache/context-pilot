@@ -13,6 +13,7 @@ use serde as _;
 use cp_base as _;
 use cp_render as _;
 use crossterm as _;
+use reqwest as _;
 
 use cp_mod_mcp::clients::McpClient;
 

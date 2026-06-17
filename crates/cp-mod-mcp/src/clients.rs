@@ -14,6 +14,7 @@ use crate::protocol::{
 };
 use crate::transport::Transport;
 use crate::transport::pipe::SubprocessTransport;
+use crate::transport::streamable::HttpTransport;
 
 /// Default per-request timeout. Generous enough for an `npx` server's cold start
 /// on the first `initialize`, tight enough to fail fast on a hung server.
@@ -45,6 +46,23 @@ impl McpClient<SubprocessTransport> {
     /// Propagates spawn, transport, timeout, or protocol failures.
     pub fn connect_stdio(command: &str, args: &[String]) -> Result<Self, McpError> {
         let transport = SubprocessTransport::spawn(command, args)?;
+        let mut client = Self::with_transport(transport);
+        let _handshake = client.initialize()?;
+        Ok(client)
+    }
+}
+
+impl McpClient<HttpTransport> {
+    /// Connect to a remote MCP server over Streamable HTTP and perform the
+    /// `initialize` handshake. Pass `token = ""` for an unauthenticated server;
+    /// otherwise it is sent as an `Authorization: Bearer` header.
+    ///
+    /// # Errors
+    ///
+    /// Propagates transport, timeout, or protocol failures (including a non-2xx
+    /// status such as `401 Unauthorized`).
+    pub fn connect_http(url: &str, token: &str) -> Result<Self, McpError> {
+        let transport = HttpTransport::new(url, token, DEFAULT_TIMEOUT_MS)?;
         let mut client = Self::with_transport(transport);
         let _handshake = client.initialize()?;
         Ok(client)

@@ -354,6 +354,7 @@ dependencies = [
  "cp-base",
  "cp-render",
  "crossterm",
+ "reqwest",
  "serde",
  "serde_json",
 ]
