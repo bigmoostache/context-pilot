@@ -14,6 +14,10 @@
   path: .github/workflows/rust.yml
   description: 'CI: fmt + clippy + build + test on ubuntu-latest. Pins Rust 1.93.0. Triggers on push/PR to master.'
   last_edited_ms: 0
+01fb2a1733ee2737:
+  path: crates/cp-mod-mcp/src/clients.rs
+  description: 'McpClient<T: Transport>: handshake (initialize + notifications/initialized), list_tools, call_tool(name, &Value). Caches ServerInfo. connect_stdio spawns SubprocessTransport; connect_http (Phase 3) builds HttpTransport with url+bearer token. Request-id correlation, DEFAULT_TIMEOUT_MS=30s.'
+  last_edited_ms: 1781681442867
 02229788bdef9209:
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
@@ -194,6 +198,10 @@
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
   last_edited_ms: 0
+0c0f81d7c2a2d00a:
+  path: crates/cp-mod-mcp/src/transport/mod.rs
+  description: 'Transport trait: send_line (write one JSON frame) + recv (next inbound msg or McpError::Timeout). Two impls: pipe (stdio subprocess) + streamable (HTTP/SSE). clients.rs stays transport-agnostic.'
+  last_edited_ms: 1781681442857
 0c1062675c923142:
   path: docs/callbacks.md
   description: Callback system design and usage
@@ -202,6 +210,10 @@
   path: crates/cp-mod-memory/src/storage.rs
   description: YAML-backed memory storage. FNV-1a keys via cp-mod-utilities. generate_yaml_key, ensure_yaml_key. populate/migrate via YamlSync.
   last_edited_ms: 1780565428690
+0cfd902ffe7c4aaf:
+  path: crates/cp-mod-mcp/src/transport/streamable.rs
+  description: 'HttpTransport: Streamable HTTP + SSE transport (Phase 3). Pull-based — send_line POSTs JSON-RPC to a single endpoint with optional static bearer token + Mcp-Session-Id echo, drains response into an inbox; recv pops buffered msgs. Handles 202/application/json/text-event-stream. parse_sse + parse_json_messages free fns (7 unit tests). Module named streamable.rs to dodge module_name_repetitions on HttpTransport. Long-lived server-push streams deferred to Phase 5.'
+  last_edited_ms: 1781681442848
 0d004cfda09fe1eb:
   path: crates/cp-mod-mcp/src/bridge/config.rs
   description: '.mcp.json discovery + parsing. resolve(): project .context-pilot/shared/mcp.json → global ~/.context-pilot/mcp.json. Manifest{mcpServers: name→ServerSpec{command,args|url}}. ServerSpec::stdio() pair. Phase 2 = stdio only; url flagged unsupported.'
@@ -1062,6 +1074,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+413463214ee6bf49:
+  path: .context-pilot/config.json
+  description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
+  last_edited_ms: 0
 418649fa3656f5e6:
   path: crates/cp-mod-memory/src/types.rs
   description: Memory types. MemoryItem (id, yaml_key, tl_dr, contents, importance, labels, open). Importance enum (Low/Medium/High/Critical). MemoryState (memories, next_id, open_ids).
@@ -1202,6 +1218,10 @@
   path: src/modules/conversation/panel.rs
   description: 'Conversation panel. Multi-level cache (full → per-message → input). Input hash includes selection anchor. Keybindings: Shift+Arrow selection, Ctrl/Alt+Arrow word jump, Ctrl+A select all, Ctrl+Backspace delete word. Enter send-on-empty-line logic.'
   last_edited_ms: 0
+4c954853589c6cf4:
+  path: crates/cp-mod-mcp/tests/stdio_integration.rs
+  description: E2E stdio test against a self-contained Python mock MCP server (offline, deterministic). handshake→tools/list→tools/call (echo round-trip, ping→pong, unknown→isError). Skips if python3 absent. Unused crate deps (cp_base/cp_render/crossterm/serde/reqwest) silenced via `use X as _;`.
+  last_edited_ms: 1781681442885
 4cc9e8806b7817f1:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -1357,6 +1377,10 @@
 563e6951986b9876:
   path: crates/cp-mod-search/src/meili/download.rs
   description: Meilisearch binary download. Pinned v1.13.3. Platform detection (macOS/Linux, amd64/aarch64). GitHub releases download to ~/.context-pilot/meilisearch/bin/. Skips if already present. 5-min timeout.
+  last_edited_ms: 0
+5640a059212cbf1e:
+  path: Cargo.lock
+  description: Workspace lockfile
   last_edited_ms: 0
 568015166ff3348a:
   path: crates/cp-mod-spine/src/types.rs
@@ -2162,6 +2186,10 @@
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
+9152c42e93bbe739:
+  path: crates/cp-mod-mcp/Cargo.toml
+  description: 'MCP client crate manifest. Deps: cp-base, cp-render, crossterm, serde, serde_json, reqwest (workspace, blocking+json — for Phase 3 HTTP transport).'
+  last_edited_ms: 1781681442876
 917b5bfdbe23cb9a:
   path: crates/cp-mod-firecrawl/src/panel.rs
   description: Firecrawl result panel. Same pattern as brave panel — static content in metadata, cache restore post-reload, pagination. FIRECRAWL_PANEL_TYPE constant.
