@@ -373,8 +373,11 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Rebuild the tools list from active modules and preserved `disabled_tools`.
 pub(crate) fn rebuild_tools(state: &mut State) {
-    // Preserve currently disabled tool IDs
+    // Preserve currently disabled AND explicitly enabled tool IDs.
+    // The disabled set catches native tools the user turned off.
+    // The enabled set catches MCP tools the user turned on (they start disabled).
     let disabled: HashSet<String> = state.tools.iter().filter(|t| !t.enabled).map(|t| t.id.clone()).collect();
+    let enabled: HashSet<String> = state.tools.iter().filter(|t| t.enabled).map(|t| t.id.clone()).collect();
 
     // Get fresh tool definitions from active modules
     let mut tools = active_tool_definitions(&state.active_modules);
@@ -389,11 +392,18 @@ pub(crate) fn rebuild_tools(state: &mut State) {
         tools.extend(McpModule::dynamic_tool_definitions(state));
     }
 
-    // Re-apply disabled state
+    // Re-apply user's enable/disable choices. `tool_manage` and `module_toggle`
+    // are immune — they must always stay enabled.
     for tool in &mut tools {
-        if tool.id != "tool_manage" && tool.id != "module_toggle" && disabled.contains(&tool.id) {
-            tool.enabled = false;
+        if tool.id == "tool_manage" || tool.id == "module_toggle" {
+            continue;
         }
+        if disabled.contains(&tool.id) {
+            tool.enabled = false;
+        } else if enabled.contains(&tool.id) {
+            tool.enabled = true;
+        }
+        // else: first-time tool — keep the module default
     }
 
     state.tools = tools;

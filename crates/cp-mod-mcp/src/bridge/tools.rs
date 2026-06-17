@@ -50,7 +50,7 @@ pub fn tool_definition(server: &str, tool: &Tool) -> ToolDefinition {
         short_desc: short,
         description,
         params,
-        enabled: true,
+        enabled: false,
         reverie_allowed: false,
         category: MCP_CATEGORY.to_string(),
     }

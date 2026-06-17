@@ -28,12 +28,16 @@ impl McpPanel {
             return "No MCP servers configured (.context-pilot/shared/mcp.json).".to_string();
         }
 
-        let mut out = String::new();
+        let mut out = String::from(
+            "MCP tools are disabled by default. Use tool_manage to enable the ones you need.\n\n",
+        );
         for name in mcp.sorted_names() {
             let Some(entry) = mcp.servers.get(&name) else { continue };
             let _r = writeln!(out, "{name}: {}", entry.status.label());
             for tool in &entry.tools {
-                let _t = writeln!(out, "  - {}{}{}", name, super::tools::NS_SEP, tool.name);
+                let tool_id = super::tools::namespaced_id(&name, &tool.name);
+                let desc = tool.description.as_deref().unwrap_or("(no description)");
+                let _t = writeln!(out, "  - {tool_id}: {desc}");
             }
         }
         out.trim_end().to_string()

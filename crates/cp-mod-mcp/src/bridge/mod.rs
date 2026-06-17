@@ -342,8 +342,32 @@ impl Module for McpModule {
         None
     }
 
-    fn overview_context_section(&self, _state: &State) -> Option<String> {
-        None
+    fn overview_context_section(&self, state: &State) -> Option<String> {
+        use std::fmt::Write as _;
+
+        let mcp = McpState::get(state);
+        if mcp.servers.is_empty() {
+            return None;
+        }
+
+        let mut parts = Vec::new();
+        for name in mcp.sorted_names() {
+            let Some(entry) = mcp.servers.get(&name) else { continue };
+            if entry.status.is_connected() {
+                parts.push(format!("{name} ({} tools)", entry.tools.len()));
+            } else {
+                parts.push(format!("{name} ({})", entry.status.label()));
+            }
+        }
+
+        let total = mcp.total_tools();
+        let mut out = String::new();
+        let _r = write!(
+            out,
+            "MCP servers: {}. {total} tools available but disabled — see MCP panel for catalog, use tool_manage to enable.",
+            parts.join(", "),
+        );
+        Some(out)
     }
 
     fn overview_render_sections(&self, _state: &State) -> Vec<(u8, Vec<cp_render::Block>)> {
