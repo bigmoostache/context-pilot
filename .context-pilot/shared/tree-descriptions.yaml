@@ -934,6 +934,10 @@
   path: src/app/events.rs
   description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
   last_edited_ms: 0
+2736252060aba893:
+  path: crates/cp-base/src/modules.rs
+  description: Module trait — pluggable functionality contract. init/save/load state, tool definitions/execution/pre-flight, panel creation, overview delegation, lifecycle hooks (on_user_message/stream_stop/stream_chunk/tool_progress/tool_complete), file watcher integration.
+  last_edited_ms: 1781697226587
 2740ec9f570da55e:
   path: crates/cp-base/src/ui/render_cache.rs
   description: 'MessageCache/InputCache/FullCache: IR block caching with content hashes for conversation panel perf'
@@ -5386,6 +5390,10 @@ e0c59a647adcab4b:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
   last_edited_ms: 0
+e12046b8a487c76a:
+  path: crates/cp-mod-bridge/src/lib.rs
+  description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1, binds tee.sock + spawns Tee publisher. on_stream_chunk publishes Token frames, on_stream_stop publishes PhaseHint(Idle). BridgeState{boot,tee,tee_seq} in TypeMap. setup_tee + publish_frame helpers. is_global=true, no tools/panels.'
+  last_edited_ms: 1781697226571
 e15b7f01809d3e02:
   path: ui/src/components/shell/LeftRail.tsx
   description: Cockpit context navigator (width = shared var(--sidebar-w)). Context-budget meter, then a first-class 'Conversation' nav button (MessageSquare, sentinel id 'conversation', with a <Tip> tooltip, triggerClassName='block' to stay full-width) ABOVE the 'Panels' label, then the scrollable panel list. Selection CONTROLLED via props (selected/onSelect), lifted to CockpitView.
@@ -5838,6 +5846,10 @@ f6930563c8606410:
   path: crates/cp-mod-todo/src/types.rs
   description: TodoStatus (Pending/InProgress/Done), TodoItem, TodoState with has_incomplete_todos() + incomplete_todos_summary()
   last_edited_ms: 0
+f6c892b08533ffb6:
+  path: src/app/run/streaming.rs
+  description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→on_stream_chunk hook (all modules)→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine.
+  last_edited_ms: 1781697226602
 f7207867229d3d86:
   path: crates/cp-mod-prompt/Cargo.toml
   description: 'Prompt module crate deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml.'
