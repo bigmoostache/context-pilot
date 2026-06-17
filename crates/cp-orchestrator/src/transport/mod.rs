@@ -216,6 +216,8 @@ fn route_rest(
         (Method::Get, ["api", "agent", id, "scratchpad"]) => panels::scratchpad(state, id, query),
         (Method::Get, ["api", "agent", id, "tree"]) => panels::tree(state, id),
         (Method::Get, ["api", "agent", id, "callbacks"]) => panels::callbacks(state, id),
+        (Method::Get, ["api", "agent", id, "usage"]) => panels::usage(state, id, query),
+        (Method::Get, ["api", "agent", id, "library"]) => panels::library(state, id),
         (Method::Get, ["api", "agent", id, "fs"]) => finder::fs_list(state, id, query),
         (Method::Get, ["api", "agent", id, "fs", "preview"]) => finder::fs_preview(state, id, query),
         (Method::Get, ["api", "agent", id, "conversation"]) => finder::conversation(state, id),

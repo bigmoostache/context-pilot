@@ -81,6 +81,112 @@ pub fn callbacks(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     read_shared_yaml(state, &folder, "callbacks.yaml")
 }
 
+/// `GET /api/agent/{id}/usage` — current session cost data from worker state.
+///
+/// Returns the cumulative token counts and cost from the agent's active
+/// worker. The web client can poll this to build a time series.
+pub fn usage(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
+    let folder = match agent_folder(state, agent_id) {
+        Ok(f) => f,
+        Err(reply) => return reply,
+    };
+    let folder_path = Path::new(&folder);
+
+    let Ok(mut backend) = state.lock() else {
+        return HttpReply::error(500, "backend lock poisoned");
+    };
+
+    let worker_id = extract_worker_param(query);
+    let wid = match worker_id {
+        Some(id) => id,
+        None => {
+            let workers = match backend.inspect_mut().list_workers(folder_path) {
+                Ok(w) => w,
+                Err(_) => return HttpReply::error(404, "cannot list workers"),
+            };
+            match workers.first() {
+                Some(w) => w.clone(),
+                None => return HttpReply::error(404, "no workers found"),
+            }
+        }
+    };
+
+    match backend.inspect_mut().read_worker(folder_path, &wid) {
+        Ok(ws) => {
+            let cost = ws.get("cost").cloned().unwrap_or(serde_json::Value::Null);
+            HttpReply::ok(&cost)
+        }
+        Err(_) => HttpReply::error(404, "worker state unavailable"),
+    }
+}
+
+/// `GET /api/agent/{id}/library` — prompt library items.
+///
+/// Scans the agent's `.context-pilot/{agents,skills,commands}/` directories
+/// for `.md` files with YAML frontmatter and returns them as `LibraryItem[]`.
+pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+    let folder = match agent_folder(state, agent_id) {
+        Ok(f) => f,
+        Err(reply) => return reply,
+    };
+    let cp_dir = Path::new(&folder).join(".context-pilot");
+    let mut items: Vec<serde_json::Value> = Vec::new();
+
+    for (kind, subdir) in [("agent", "agents"), ("skill", "skills"), ("command", "commands")] {
+        let dir = cp_dir.join(subdir);
+        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        for entry in entries {
+            let Ok(entry) = entry else { continue };
+            let path = entry.path();
+            if path.extension().and_then(std::ffi::OsStr::to_str) != Some("md") {
+                continue;
+            }
+            let Ok(content) = std::fs::read_to_string(&path) else { continue };
+            let (name, description) = parse_frontmatter(&content);
+            let id = path
+                .file_stem()
+                .and_then(std::ffi::OsStr::to_str)
+                .unwrap_or("")
+                .to_owned();
+            items.push(serde_json::json!({
+                "id": id,
+                "name": name,
+                "kind": kind,
+                "description": description,
+            }));
+        }
+    }
+
+    HttpReply::ok(&items)
+}
+
+/// Extract `name` and `description` from YAML frontmatter in a markdown file.
+///
+/// Frontmatter is delimited by `---` lines at the top. Returns empty strings
+/// if the file has no valid frontmatter.
+fn parse_frontmatter(content: &str) -> (String, String) {
+    let trimmed = content.trim_start();
+    if !trimmed.starts_with("---") {
+        return (String::new(), String::new());
+    }
+    let after_first = &trimmed[3..].trim_start_matches(['\r', '\n']);
+    let Some(end) = after_first.find("\n---") else {
+        return (String::new(), String::new());
+    };
+    let front = &after_first[..end];
+
+    let mut name = String::new();
+    let mut description = String::new();
+    for line in front.lines() {
+        if let Some(rest) = line.strip_prefix("name:") {
+            name = rest.trim().trim_matches('"').trim_matches('\'').to_owned();
+        } else if let Some(rest) = line.strip_prefix("description:") {
+            description = rest.trim().trim_matches('"').trim_matches('\'').to_owned();
+        }
+    }
+    (name, description)
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /// Resolve the agent's working directory from the registry record.
