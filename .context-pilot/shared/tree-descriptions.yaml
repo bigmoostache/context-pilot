@@ -3490,6 +3490,10 @@
   path: docs/talk/slides/2-1.html
   description: 'Learnings: Pot-Pourri — interactive feature explorer with 11 panel blocks'
   last_edited_ms: 0
+89e5427641e9ea44:
+  path: web/src/components/threads/ThreadList.tsx
+  description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups in order: User turn (THEIR_TURN/ACTIVE) FIRST, then Agent''s turn (MY_TURN) — reordered per T28. User-turn sorted by recency; Agent''s-turn sorted FOCUSED-FIRST then recency (T36, byFocusThenRecent — t.focused floats to top). Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
+  last_edited_ms: 1781786390770
 8a0e131be373167d:
   path: crates/cp-mod-utilities/Cargo.toml
   description: Zero external deps. Workspace lints.

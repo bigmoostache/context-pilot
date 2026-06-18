@@ -66,7 +66,20 @@ export function ThreadList({
   const byRecent = (a: ThreadDetail, b: ThreadDetail) =>
     (b.lastActivityMs ?? 0) - (a.lastActivityMs ?? 0)
 
-  const mine = visible.filter((t) => t.status === "MY_TURN").sort(byRecent)
+  /**
+   * Sort the "Agent's turn" group focused-first, then by recency (T36). The
+   * thread the agent is actively focused on (`focused_thread_id`, surfaced as
+   * `t.focused`) is the one most worth seeing at a glance, so it floats to the
+   * top of the section regardless of last-activity time.
+   */
+  const byFocusThenRecent = (a: ThreadDetail, b: ThreadDetail) => {
+    const fa = a.focused ? 1 : 0
+    const fb = b.focused ? 1 : 0
+    if (fa !== fb) return fb - fa
+    return byRecent(a, b)
+  }
+
+  const mine = visible.filter((t) => t.status === "MY_TURN").sort(byFocusThenRecent)
   const working = visible.filter((t) => t.status === "THEIR_TURN" || t.status === "ACTIVE").sort(byRecent)
   // agent-owned, actively-or-parallel working count (for the header pill)
   const workingCount = live.filter((t) => t.status !== "MY_TURN").length
