@@ -195,3 +195,43 @@ content-addressed body `Store`. This session **connected the muscles to the
 skeleton** — agent emission, read-from-view, SSE deltas, frontend apply — and
 proved the result live. The gap was wiring; the wiring is now done for the live
 path, with a short, named ledger of completeness items remaining.
+
+---
+
+## 7. Disk-read ledger (X864) — every backend read path justified
+
+> **Claim being proven.** *No endpoint rides disk for a live, high-churn path
+> that should be the view.* Every surviving `fs::read*` / `StateReader` call in
+> `cp-orchestrator` is one of: **discovery** (the registry — disk *is* its
+> truth), **designed cold-start hydration** (I5), **doc-sanctioned low-churn
+> inspection** (the "unmanaged read-only listing", mtime-memoized), the
+> **Finder file-manager feature** (a file browser by definition), the **durable
+> conversation reconcile** (live typing rides the stream plane), or the
+> **metrics rev-lag probe** (reading the oplog head is its whole point).
+>
+> Enumerated by grepping every `fs::read`/`read_dir`/`read_to_string` and every
+> `StateReader` method call across `crates/cp-orchestrator/src` (test sites
+> excluded). Each row cites file:line and its plane verdict.
+
+| # | Read site (file:line) | What it reads | Plane / verdict | Justification |
+|---|---|---|---|---|
+| 1 | `registry/mod.rs:211,247,262` | agent registry `<id>.json` records (scan-and-diff) | **Discovery** | The registry dir *is* the durable source of truth for which agents exist (§10); low-churn (changes only on agent boot/shutdown). |
+| 2 | `registry/mod.rs:239` | heartbeat file (60 B) | **Discovery / liveness** | Fixed-size liveness probe for the three-factor verdict; intrinsic to discovery. |
+| 3 | `registry/channel.rs:95` | one registry record | **Discovery** | `AgentChannel` construction from an `Entry`. |
+| 4 | `transport/mod.rs:442`, `rest/mod.rs:212` (`resolve_entry`) | `<id>.json` per request | **Discovery** | Resolves the agent's registry record (folder/paths/cap_token), *not* agent state; a tiny JSON read. Low-churn; could be memoized but is cheap. |
+| 5 | `inspect/meta.rs:210`, `inspect/metrics.rs:131` (`list_entries`) | `read_dir` of the agents dir + each record | **Discovery** | Fleet enumeration for `/fleet/meta` and `/metrics`. O(agents) per fleet poll — acceptable for realistic fleets; a dir-mtime memo is a noted future optimization. |
+| 6 | `channel.rs` `hydrate` / `Tailer` seed (reads the **oplog**) | bounded cold-start replay | **Cold-start hydration (I5)** ✅ | The *designed* path: hydrate the view once from the oplog at first-sight, then ride the tail. Restart cost bounded by agent count, not fleet disk. |
+| 7 | `rest/mod.rs` `fleet()` / `agent()` | — | **VIEW (live)** ✅ | Served from `backend.view`, never disk. |
+| 8 | `rest/mod.rs:275` `threads()` roster | `backend.view.get().roster` | **VIEW (live)** ✅ | The roster/status/archived/lastActivity come from the view. The `read_config` at `:263` hydrates only the per-thread **message log** (conversation bodies), merged by `overlay_roster` — a tier-② hydrate, not the live roster path. |
+| 9 | `inspect/meta.rs:109` (`inspect_threads`) | `config.json` (thread count / MY_TURN / task glance) | **Tier-② (memoized)** | Fleet-*card* enrichment glance, `read_config` mtime-memoized; the authoritative live roster rides the view via `/threads`. Phase/lifecycle/cost on `/meta` already come from the view. |
+| 10 | `inspect/panels.rs:105,134,143` (`read_shared`) | `shared/{memories,tree-descriptions,callbacks}.yaml` | **Tier-② inspection** ✅ | The doc's "unmanaged read-only listing" — genuinely low-churn state with no oplog delta to fold. mtime-memoized via `StateReader` `AgentCache`. |
+| 11 | `inspect/panels.rs:176,348` (`read_worker`) | `states/<wid>.json` (todos/spine/queue/scratchpad) | **Tier-② inspection** ✅ | Per-worker module data; low-churn; mtime-memoized. |
+| 12 | `inspect/panels.rs:30,42` (panel_list), `:199,206` (library) | `panels/*.json`, library `*.md` | **Tier-② inspection** ✅ | Panel inventory + behaviour library; low-churn listings. |
+| 13 | `inspect/finder.rs:227,253` (`conversation`) | `messages/*.yaml` | **Tier-② reconcile** ⚠️ | The **durable** conversation record. Live *typing* rides the stream plane (`useStreamingTokens`); this disk read is the lower-frequency reconcile (cold load + 5 s poll). **Noted future optimization:** serve from view `heads` + the `/body/{hash}` content store instead of re-reading message files. |
+| 14 | `inspect/finder.rs:50,83,191,304` (`fs_list`/`preview`/`download`) | the agent **realm filesystem** | **N-A — Finder feature** | This *is* a file manager; reading the realm is its purpose, not state inspection. |
+| 15 | `inspect/metrics.rs` `oplog_head_rev` | the oplog dir head `rev` | **Metrics probe (off-lock)** ✅ | The metrics endpoint exists to expose view-vs-oplog-head **lag**, so reading the head is intrinsic. Read *outside* the backend lock so it never blocks a command path. |
+
+**Verdict: ABIDES.** Zero accidental disk reads on a live path. The single row
+to keep an eye on is #13 (`/conversation`), with a documented stream-plane
+ownership of the live path and a named future optimization; everything else is
+exactly where the design doc's plane discipline puts it.

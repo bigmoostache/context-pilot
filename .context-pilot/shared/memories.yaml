@@ -236,37 +236,39 @@ f5d97b1e7a01c317:
   tl_dr: 'LATENCY/ALIGNMENT EPIC (T18/T120/X818): threads, phase/cost, messages, §7 streaming, Lifecycle, Checkpoint-roster, §19 observability (backend endpoints + frontend HealthBadge) SHIPPED. Remaining = band-aid cleanup + multi-agent soak/fault matrix (see contents).'
   contents: |-
     ## DONE
-    Threads proving ground: command→visible p50=14.3ms p99=32.6ms (was 349ms/'seconds'). Floor = durable journal-then-ack fsync (I11).
+    Threads proving ground: command->visible p50=14.3ms p99=32.6ms (was 349ms/'seconds'). Floor = durable journal-then-ack fsync (I11).
 
-    PHASE 2.3+2.4 (phase+cost) e16411b: emit_vitals @ src/app/run/threads/bridge.rs main-loop chokepoint. Best-effort PhaseTransition + CostAggregate on change.
+    PHASE 2.3+2.4 (phase+cost) e16411b: emit_vitals @ src/app/run/threads/bridge.rs main-loop chokepoint.
 
-    PHASE 2.2 (MessageCreated, X839) 05349b1: emit_messages @ src/app/run/threads/messages.rs, I13 body-store barrier, inline_body on wire. live.ts applyThreadDelta message_created.
+    PHASE 2.2 (MessageCreated, X839) 05349b1: emit_messages @ messages.rs, I13 body-store barrier, inline_body on wire.
 
-    PHASE 7 (§7 streaming) bfe5def: agent tags Token frames w/ message_id; TeeReader→StreamHub→SSE 'stream'; frontend useStreamingTokens rAF hook in live.ts + Conversation.tsx overlay. Proven SSE capture msg_id=A2224.
+    PHASE 7 (§7 streaming) bfe5def: agent tags Token frames w/ message_id; TeeReader->StreamHub->SSE 'stream'; useStreamingTokens rAF hook.
 
-    X842 Lifecycle ac7ba01: Boot::start_in Running, Boot::drop Stopping; meta.rs derive_status. I8 fully ABIDES.
+    X842 Lifecycle ac7ba01; X836b/X850 Checkpoint-carries-roster 703cec8; T123 emit_thread_status chokepoint b877b89.
 
-    X836b/X850 Checkpoint-carries-roster 703cec8: cp-wire snapshot.rs Snapshot.roster + RosterThread fold helpers (single source of truth). I3+I5 ABIDES.
+    T121 BREAKER-SURFACING 0f2b133 + frontend HealthBadge 1200af4 (FleetDashboard surfaces first non-nominal: breaker.tripped/stream.degraded/rev.lag>50).
 
-    T123 fix b877b89: emit_thread_status chokepoint (DURABLE ThreadStatusChanged on flip from any source) + removed sendCommand double-invalidate (push plane sole freshness).
+    §19 OBSERVABILITY X868 1195a52: transport/inspect/metrics.rs agent_metrics+fleet_metrics (breaker/stream/rev/phase/lifecycle); X866 latency table 1a0023d.
 
-    T121 BREAKER-SURFACING 0f2b133 (THIS BATCH): web/src/components/threads/ThreadsView.tsx — describeCommandError(verb,err) breaker-aware (503/'tripped'→actionable over-budget alert, else generic 'Could not…'); all 3 catch sites (send/create/archive) now flash a transient role=alert toast (6s, timer-ref unmount cleanup) instead of .catch(console.error). Closes the SILENT-SWALLOW hole the user hit. e2e web/e2e/breaker.spec.ts (page.route 503 intercept, asserts role=alert budget|breaker|blocked) GREEN. messages.spec DOM-bubble timeout 15s→25s (matches roster-log poll; full-suite flake was single-live-agent LOAD not logic — passes isolated 6.3s). 15 e2e total: breaker GREEN; full suite 14/15 (messages flakes ONLY under cumulative live-agent backlog = me being busy, NOT a regression — happy-path send unchanged, bubble comes from SSE delta not optimistic update).
+    BAND-AID CLEANUP X859 da9ae93 + X865: delta-covered hooks (useThreads/useAgentMeta) skip invalidate SSE sub; removed dead invalidation bus. Phase 6 (X825) fully closed.
 
-    ## REMAINING (T120 epic completeness/validation, not user-facing gaps)
-    - 2.6 Checkpoint EMIT cadence (X843): writer stamps checkpoints on roll, but agent doesn't yet emit periodic checkpoints mid-segment (every N entries / M secs). Machinery ready, needs trigger.
-    - Phase 8 demote mtime poll to pure backstop (X863); Phase 9 validation table (X866).
-    - §19 OBSERVABILITY SURFACE (X868): per-agent stream latency p50/p99, dropped/coalesced frames, rev lag, fsync latency, watch count, DURABLE CostBreaker state visible in cockpit (T121: breaker trip must be visible, not silent latch — frontend surfacing now done, backend metrics surface still TODO). Structured logs agent_id+cmd_id+rev.
-    - Phase 6 cleanup: remove invalidate band-aid per delta-covered resource (X859/X865).
-    - Multi-agent soak + V1–V12 fault matrix in CI (X869).
+    COCKPIT DERIVED-PANEL FIX 411b4e3 (LATEST): tools/radar/entities returned 404 (no backend route) -> 3 MOUNTED cockpit panels rendered misleading-blank. Architectural: these read derived/live state the read-only inspection plane CANNOT rebuild from tier-2 (tools catalog=compile-time module YAMLs in agent binary; radar=live half-life log ranking; entities=live SQLite, on-disk db 0 bytes). FIX: backend handlers in inspect/panels.rs return NORMAL EMPTY shape by design (200 []/{anchors:[],results:[]}) behind agent_folder guard (unknown id still 404s) + 3 routes in route_rest (now 27 routes); frontend InspectionUnavailable notice (role=note) in PanelFrame.tsx rendered by the 3 panels on empty. Real data = follow-up needing AGENT-emitted artifact. e2e web/e2e/cockpit.spec.ts (5): working panels (Memories/WIP) render real data no-notice; derived panels show notice; route contract 200-empty-vs-404. selectPanel scopes to LeftRail aside + NON-exact name (button a11y name = panel name + token count). cockpit 5/5 green; full e2e 23/24 (messages.spec = known single-live-agent LOAD flake, passes isolated, orthogonal).
 
-    Key code: emit_messages @ src/app/run/threads/messages.rs; emit_vitals+emit_roster_delta+emit_thread_status @ bridge.rs; MaterializedView roster @ services/materialized_view.rs; SSE producer run_stream @ transport/mod.rs (TAIL_REPOLL=5ms); live.ts applyThreadDelta+applyAgentDelta; ThreadsView describeCommandError. e2e harness web/e2e/ (15 tests). Latency probe /tmp/lat.py (agent f3a993c0ff357b41). Orchestrator P21 :7878 CP_COST_BUDGET=100000000.
+    ## REMAINING (T120 epic completeness/validation)
+    - X864 disk-read ledger (audit & justify every StateReader read path).
+    - X863 demote config.json mtime poll to pure backstop (mostly already true via Tailer + OplogWaiter).
+    - X867 gap-register FULL re-walk (flipped §19+I10+I8+I3/I5; remaining rows -> VALIDATED with attached proofs).
+    - X869 multi-agent soak + V1-V12 fault matrix in CI.
+    - X870 design-doc v8 decision-log + deploy tag.
+
+    Key code: emit_messages @ messages.rs; emit_vitals+emit_roster_delta+emit_thread_status @ bridge.rs; metrics @ transport/inspect/metrics.rs; derived-empty @ transport/inspect/panels.rs; live.ts applyThreadDelta+applyAgentDelta+useMetrics; ThreadsView describeCommandError; FleetDashboard HealthBadge. e2e web/e2e/ (24 tests: breaker,cockpit,cost,finder,messages,metrics,smoke,threads). Orchestrator P33 :7878 CP_COST_BUDGET=100000000. Live agent f3a993c0ff357b41. Run e2e: cd web && npx playwright test <spec> --reporter=line (stack must be UP: web :5175 + orchestrator :7878).
   importance: high
   labels:
   - latency
   - architecture
   - demaquetting
   - active
-  last_edited_ms: 1781819282456
+  last_edited_ms: 1781821054976
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium
