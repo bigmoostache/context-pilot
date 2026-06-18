@@ -232,6 +232,27 @@ efe78c079599d3d0:
   tl_dr: 'User workflow preference: when exploring/describing files, MUST follow strict order: open files → describe in tree → close files → iterate to next batch. Never close before describing.'
   importance: critical
   last_edited_ms: 0
+f5d97b1e7a01c317:
+  tl_dr: 'LATENCY ROOT CAUSE (T18/T31): frontend reads agent state from DISK, written by the debounced PersistenceWriter, gated on the main loop applying journaled commands. Fix = wire oplog→view→SSE push plane end-to-end. Plan in contents.'
+  contents: |-
+    Measured: command journaling ~54ms (fast); apply+visibility = seconds (worse when agent busy streaming — loop starves poll_bridge_commands). Backend read <10ms. The 3-layer invalidation was a band-aid.
+
+    ## Structural fix (orchestration plane wired) — PLAN OF RECORD
+    Leg 0 — kill agent-loop starvation: apply bridge commands promptly even mid-stream; append effect delta to oplog the instant the mutation applies.
+    Leg 1 — Backend serves reads from in-memory MaterializedView (exists, folded from oplog via Tailer/inotify), hydrated from disk once at cold start. Kills 295KB parse + disk dependency.
+    Leg 2 — Agent emits a durable oplog DELTA for every user-visible mutation (thread create/archive/restore, MessageCreated, phase, cost). Currently only command-effects + stream tokens journaled — the gap.
+    Leg 3 — Frontend applies SSE deltas to a normalized local cache (not invalidate→refetch). Delta carries payload → zero round-trip. Cold load = REST once.
+    Steady-state: mutation → oplog append (ms) → inotify → fold → SSE → client apply. Sub-50ms achievable.
+    SEQUENCE: threads first (proving ground) + latency instrumentation, then messages/cost/panels/streaming-phase.
+
+    Key code: poll_bridge_commands @ src/app/run/threads.rs:227; lifecycle.rs:136. apply_create_thread @ threads.rs:330. MaterializedView @ crates/cp-orchestrator/src/services/materialized_view.rs. SSE @ transport/sse.rs (emits dumb 'invalidate'). live.ts useLiveQuery does invalidate→refetch.
+  importance: critical
+  labels:
+  - latency
+  - architecture
+  - demaquetting
+  - active
+  last_edited_ms: 1781784124450
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium
