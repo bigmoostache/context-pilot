@@ -1082,6 +1082,10 @@
   path: ui/src/components/finder/FinderChrome.tsx
   description: 'Finder chrome. FinderTabs (kind FileIcon per tab), FinderToolbar (context-aware: folder tab = back/fwd/breadcrumb/icon-size slider[grid]/4-mode segmented/search/New-Folder/Upload/Download/path-bar+QuickLook toggles; FILE tab = Get Info/Download/Share; NavBtn/SegBtn/view-modes use <Tip>), FinderSidebar (Favorites/Locations FileIcon via Place leading prop + Tags/Recents), FinderPathBar (folder FileIcon). All folder/file glyphs are macOS FileIcon (T27); Place gained optional `leading` ReactNode.'
   last_edited_ms: 1781597468901
+29328eb7a0a9bc91:
+  path: web/src/components/ui/scroll-area.tsx
+  description: shadcn ScrollArea wrapper over Base UI scroll-area primitive (Root/Viewport/Scrollbar/Thumb/Corner). Vertical+horizontal orientations, focus-visible ring. Shared UI primitive.
+  last_edited_ms: 1781814025269
 297f4cda120c3e6e:
   path: web/README.md
   description: 'Web client documentation: architecture (REST+SSE two-plane), quick start (run-stack.sh), manual start, env vars, data flow (inspection+orchestration planes), key directories, tech stack.'
@@ -1298,6 +1302,10 @@
   path: crates/cp-mod-utilities/src/secret.rs
   description: Redacted newtype — Debug/Display print [REDACTED]. expose_secret() for access. Replaces secrecy crate.
   last_edited_ms: 1780565428680
+314a1113ea438288:
+  path: web/.gitignore
+  description: web/ gitignore. node_modules, dist, *.local, editor dirs, and Playwright e2e artifacts (test-results, playwright-report, .playwright) — transient run output, never committed.
+  last_edited_ms: 1781814025229
 31613082603214f2:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -2214,6 +2222,10 @@
   path: src/ui/search_overlay/display.rs
   description: 'Display column builders for the search index overlay. Converts SearchIndexOverlay IR data into ratatui Line sequences for the two-column layout (left: server/database/index/extensions, right: splitter/embeddings/tasks/recomputed/recent). Centered bordered popup.'
   last_edited_ms: 0
+53f725374ad67d0f:
+  path: crates/cp-orchestrator/src/registry/tee_reader.rs
+  description: 'TeeReader — backend consumer of an agent''s live stream plane (§7). One reader per agent (spawned on Appeared, stopped on Disappeared): connects <folder>/tee.sock, reads len+CRC framed StreamFrames, republishes each into the shared StreamHub for SSE fan-out. Lossy by design (tier-③): corrupt frame resyncs the buffer, absent socket retries, EOF (agent restart) reconnects. 3 tests (republish, absent-then-connect, corrupt-resync).'
+  last_edited_ms: 1781814025306
 549866596144eb9b:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
@@ -2290,6 +2302,10 @@
   path: crates/cp-mod-search/src/meili/download.rs
   description: Meilisearch binary download. Pinned v1.13.3. Platform detection (macOS/Linux, amd64/aarch64). GitHub releases download to ~/.context-pilot/meilisearch/bin/. Skips if already present. 5-min timeout.
   last_edited_ms: 0
+5643b4fc9254f2b1:
+  path: web/e2e/smoke.spec.ts
+  description: 'Phase 0 e2e smoke (4 tests): live pipe end-to-end. Orchestrator REST /api/fleet/meta returns the real agent; fleet dashboard renders the real agent card; Open→threads view; footer shows live cost. Agent id f3a993c0ff357b41, web :5175, API :7878.'
+  last_edited_ms: 1781814025119
 5664af275f4d4125:
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): ReplayState{rev_head,heads,seen}. fold_entry(&mut ReplayState,&entry) pub(crate): Checkpoint=authoritative clone_from(heads+seen), MessageCreated=set_thread_head, CommandEffect|SeenMark=seen.mark(token,rev), others no-op. replay() fast-path reads ONLY newest segment when it opens with a checkpoint (Snapshot-seeded); replay_full fallback for seg-0-only. Heads PartialEq order-sensitive. 10 tests incl seen-set V3 + fast==full.'
@@ -2434,6 +2450,14 @@
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
   last_edited_ms: 0
+5cbac6637983eeee:
+  path: web/src/components/finder/kind.tsx
+  description: 'Finder kind metadata (live web). kindMeta: FinderKind→{accent token, label}. kindTint/kindGradient color helpers. TAG_META: macOS finder tag colors. extOf(name). Note: full-color file/folder icons live in macIcons.tsx (FileIcon); this file is the non-icon accent/label metadata.'
+  last_edited_ms: 1781814025288
+5ccb785203371812:
+  path: web/e2e/cost.spec.ts
+  description: 'Phase 3 e2e cost (2 tests): fleet card + status footer dollar figures match backend /meta costUsd within $5 drift (live agent may spend mid-test). parseDollars helper. Proves cost rides the live CostAggregate→view→meta path, not the $5.41 mock.'
+  last_edited_ms: 1781814025156
 5d1e1686cb8c117b:
   path: ui/src/components/shell/ConfigPanel.tsx
   description: 'Shared settings body (macOS System-Settings: category rail + detail pane). variant=''dialog'' (DialogClose chrome) | ''inline'' (Save button). NO per-category title header (T20 — sidebar focus already names the page); dialog variant keeps only a slim close-only chrome bar. Categories: General/Usage & Cost/Providers/Search/DocAI/Web/Integrations. Usage renders <UsagePage/> full-bleed in a ''flex min-h-0 flex-1 flex-col overflow-hidden'' wrapper so UsagePage''s inner ScrollArea (flex-1/min-h-0) gets a flex parent and actually scrolls (T20 fix). Masked keys w/ reveal, Connected pills, toggles, default-model picker.'
@@ -2710,6 +2734,10 @@
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
   last_edited_ms: 0
+6717c9caacdb30d4:
+  path: web/e2e/threads.spec.ts
+  description: Phase 1 e2e threads CRUD (3 tests) over the live push plane. create→row appears live + roster confirms; archive→leaves live list, lands in Archived; restore→returns. Each test builds its own precondition via API command(); UI drives only the action under test; roster() cross-checks backend ground truth. afterAll archives all e2e- threads.
+  last_edited_ms: 1781814025138
 672a62d585033f7d:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
@@ -2938,6 +2966,10 @@
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
   last_edited_ms: 0
+6f12e261a283e84f:
+  path: web/package.json
+  description: 'Live web app (Vite 8 + React 19 + TS 6 + Tailwind v4 + Base UI + shadcn). Scripts: dev (vite :5175), build (tsc -b + vite build), lint, preview. @playwright/test for e2e. The live demaquetted app (sibling ui/ is the frozen maquette).'
+  last_edited_ms: 1781814025249
 6f1eddff8d2c7256:
   path: ui/src/lib/panelMeta.ts
   description: Panel icon map (lucide), accent vars, loadColor (token-load→color), fmtTokens/fmtCost formatters.
@@ -2982,6 +3014,10 @@
   path: .github/checks/check-lint-config.sh
   description: Lint integrity hash chain checker. Verifies protected files (Cargo.toml lint config, clippy.toml, CI scripts) haven't been tampered with. --update flag to recompute chain (requires password).
   last_edited_ms: 0
+710678ffb296a3d9:
+  path: crates/cp-oplog/src/service_tests.rs
+  description: 'Unit tests for service.rs (8): durability classification, monotonic durable appends survive reopen, best-effort accepted/dropped, drop-without-shutdown still flushes, mixed-workload replays, group-commit rolls segments, submit_durable_persists_without_awaiting_the_sync (I2 non-blocking-yet-durable), and v11_emit_burst_never_blocks_the_loop_on_fsync (V11/I2 keystone: 5k best-effort PhaseTransition burst — worst single emit <25ms + whole burst <2s proves emit latency is decoupled from fdatasync, since try_send is structurally non-blocking; then a durable barrier confirms the log stays intact+replayable). Split from service.rs for the 500-line limit; #[path]-included so `super` resolves to service.'
+  last_edited_ms: 1781814397942
 710bbcd6209fe4d9:
   path: ui/src/components/ui/dropdown-menu.tsx
   description: shadcn dropdown-menu (Base UI Menu). Items must be wrapped in DropdownMenuGroup. Used by AgentSwitcher.
@@ -3158,6 +3194,10 @@
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
   last_edited_ms: 1780585450698
+77178b5c24e8e22f:
+  path: crates/cp-oplog/src/service.rs
+  description: 'OplogService — off-loop group-commit thread + GAP2/I2 asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate=BestEffort, all else (incl 4 thread-roster mutations + Lifecycle + Unknown)=Durable. THREE submit paths: append_durable (blocks+awaits sync, returns rev — intake/I11 path), submit_durable (NON-blocking durable, detached ack — I2 main-loop path: enqueue now, group-commit+fdatasync off-loop, never dropped), append_best_effort (try_send drop-on-full — hot phase/cost). commit_loop drains batch, ONE fdatasync, releases acks. 341 lines (tests live in sibling service_tests.rs via #[cfg(test)] #[path] include).'
+  last_edited_ms: 1781814397964
 776ceb45b6277d6d:
   path: .github/workflows/rust.yml
   description: 'CI: fmt + clippy + build + test on ubuntu-latest. Pins Rust 1.93.0. Triggers on push/PR to master.'
@@ -3262,6 +3302,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+79efcc14f32181e8:
+  path: web/e2e/finder.spec.ts
+  description: Phase 4 e2e finder (4 tests) over the live inspection plane (/api/agent/{id}/fs). Root listing == backend /fs (count+names); folders carry live child counts; double-click navigates + breadcrumb/Backspace returns to root; all four view modes (grid/list/columns/gallery) render. fs() helper fetches backend listing for ground truth.
+  last_edited_ms: 1781814025174
 79f459acfca4f8c9:
   path: crates/cp-orchestrator/Cargo.toml
   description: 'Backend binary deps: cp-wire. Workspace lints.'
@@ -3786,6 +3830,10 @@
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN (width=var(--sidebar-w); collapse prop + edge-rail removed per T23). NO agent header. Working search <input> filters by name+last-preview. Groups: ''Needs you'' (MY_TURN, signal), ''Active'' (ACTIVE, green/ok, the one streaming), ''Working in parallel'' (THEIR_TURN). Per-row hover Archive/Restore action. Footer ''Archived (N)'' toggles a read-only archived view. New Thread button → onNewThread. Header pill counts agent-owned working threads.'
   last_edited_ms: 1781553182555
+8e87a29b6d8fbd30:
+  path: web/playwright.config.ts
+  description: Playwright e2e config — drives the LIVE stack (web :5175, orchestrator :7878, this agent's bridge). No webServer block (stack must be up). Serial (workers=1, fullyParallel=false) since tests mutate the single live agent's roster. No screenshots/video/trace (DOM/role/devtools assertions only). Headless Chromium.
+  last_edited_ms: 1781814025211
 8ea3ec8ee82d3fd0:
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Thread input routing: handle_thread_input_submit. Thread creation: MAX_THREAD_NAME_LEN=200 cap. Paste sentinel expansion. /command replacement.'
@@ -6098,6 +6146,10 @@ e8818705939ac67f:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.
   last_edited_ms: 0
+e89e1f125170586c:
+  path: web/e2e/messages.spec.ts
+  description: Phase 2 e2e message send (1 test) over the K7 push plane. Composer send→user bubble appears live + roster log grows. Asserts the user message only (agent reply is non-deterministic LLM). roster-log poll timeout 25s to absorb cumulative live-agent command backlog in the serial suite. afterAll archives e2e- threads.
+  last_edited_ms: 1781814025193
 e8a5bca5e649ea19:
   path: crates/cp-mod-chat/src/tools/mod.rs
   description: 'Chat tool dispatch with flame!("chat_dispatch"). Routes Chat_open/send/react/configure/search/create_room/invite. Open: resolve room, start server, backfill messages. Configure: filter params (n_messages, max_age, query).'

@@ -51,7 +51,7 @@ The baseline's sin ("plane B is the live path; plane A is inert") is **fixed**.
 | # | Invariant (doc) | Verdict | Evidence (file:line) | Remaining gap |
 |---|---|---|---|---|
 | **I1** | Single writer *process* per folder (flock) | **ABIDES** | `cp-mod-bridge/src/boot.rs` `acquire_lock` (+ bounded retry) | — |
-| **I2** | Main loop never fsyncs; dedicated oplog thread group-commits | **ABIDES** | `src/app/run/threads/bridge.rs:148` `emit_roster_delta`→`submit_durable` (non-blocking durable); `:186` `append_best_effort`; `messages.rs:156` `submit_durable`. Loop only enqueues. | V11 explicit "burst leaves tick time unchanged" test (X844) |
+| **I2** | Main loop never fsyncs; dedicated oplog thread group-commits | **ABIDES** ✅ | `src/app/run/threads/bridge.rs:148` `emit_roster_delta`→`submit_durable` (non-blocking durable); `:186` `append_best_effort`; `messages.rs:156` `submit_durable`. Loop only enqueues. **V11 proven**: `cp-oplog/src/service_tests.rs::v11_emit_burst_never_blocks_the_loop_on_fsync` (5k-emit burst, worst single emit `<25ms`, decoupled from `fdatasync`). | — |
 | **I3** | Snapshot = bounded heads + content-addressed bodies | **PARTIAL** | `materialized_view.rs` `AgentView{heads,roster}`; heads populated by `MessageCreated` | `Checkpoint`/`Snapshot` restores **heads only, not the roster** (`materialized_view.rs:108` note) — see I5 cold-restart gap |
 | **I5** | Tier ② is a lazily-rebuildable cache; live reads come from the view | **ABIDES** | `transport/rest/mod.rs:227` `/threads` served **roster-first from `backend.view`** (`overlay_roster` merges view roster onto disk log; view-only threads synthesised instantly); `/fleet`,`/agent` from view. Low-churn inspection reads (`panels.rs:1,4`, memory/todos/tree/…) stay tier-② **by the doc's documented allowance**. | cold-start view **roster** hydration (X850) so a backend restart after oplog compaction doesn't briefly under-report the roster |
 | **I8** | Command effects, rev, **phase, lifecycle, cost** are oplog appends | **ABIDES** ✅ | `bridge.rs:291/325/338` `ThreadCreated/Archived/Restored`; `:216/230` `PhaseTransition`/`CostAggregate`; `messages.rs:156` `MessageCreated`; **`boot.rs` `Boot::start_in` `Lifecycle::Running` + `Boot::drop` `Lifecycle::Stopping`** — all emitted on apply/lifecycle | — |
@@ -136,8 +136,15 @@ make abidance 99.9% rather than "the user's features work":
 5. **Band-aid cleanup (X859/X865)** — once each resource is fully delta-covered,
    remove its `invalidate` subscription + the `sendCommand` double-invalidate, so
    exactly one mechanism owns each resource's freshness.
-6. **Formal validation (X844/X866/X867/X869)** — the V11 no-fsync-on-loop test,
-   the before/after latency table, the flipped gap register with attached proofs,
+6. **Formal validation (X866/X867/X869; X844 — DONE ✅)** — the **V11
+   no-fsync-on-loop test is landed** (`cp-oplog/src/service_tests.rs::v11_emit_burst_never_blocks_the_loop_on_fsync`):
+   a 5 000-record best-effort `PhaseTransition` burst (the "phase transitions
+   during streaming" scenario the doc names) proves the worst single emit stays
+   `< 25 ms` and the whole burst `< 2 s` — emit latency is *decoupled* from
+   `fdatasync` latency, since `append_best_effort` is a `try_send` (structurally
+   non-blocking), and a trailing durable barrier confirms the log stays intact +
+   replayable. This validates the I2 execution-model keystone. Remaining: the
+   before/after latency table, the flipped gap register with attached proofs,
    and the multi-agent soak / V1–V12 fault matrix in CI.
 
 ---
