@@ -105,3 +105,31 @@ export function Chip({ children, accent }: { children: ReactNode; accent?: strin
     </span>
   )
 }
+
+/**
+ * Honest empty-state for a cockpit panel whose data the read-only web
+ * inspection plane cannot serve.
+ *
+ * A few panels (Tools, Context Radar, Entities) read state that lives only in
+ * the running agent — the tool catalog is compiled into the agent binary, the
+ * radar is a live half-life ranking, and the entity DB is an open SQLite
+ * connection. The backend reads agents' on-disk tier-② files; none of those
+ * three are reconstructable from disk, so their endpoints return an empty shape
+ * by design. Rather than render a blank list (which reads as "nothing exists"),
+ * the panel shows this explicit notice so the boundary is legible, not a bug.
+ */
+export function InspectionUnavailable({ reason }: { reason: string }) {
+  return (
+    <div
+      role="note"
+      className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-border px-6 py-10 text-center"
+    >
+      <span className="text-[12.5px] font-medium text-foreground/80">
+        Unavailable over the web inspection plane
+      </span>
+      <span className="max-w-sm text-[11.5px] leading-relaxed text-muted-foreground">
+        {reason}
+      </span>
+    </div>
+  )
+}

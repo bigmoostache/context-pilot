@@ -826,6 +826,10 @@
   path: crates/cp-base/src/state/data/mod.rs
   description: 'Re-exports: config (persistence structs), message (conversation types), model_helpers (pricing trait)'
   last_edited_ms: 0
+1e9d6e304c5cace8:
+  path: web/e2e/cockpit.spec.ts
+  description: 'Phase 10 e2e (5 tests): cockpit inspection panels over the live plane. Working panels (Memories, WIP/Todo) render real tier-② backend data with NO unavailable notice; derived panels (Configuration→Tools, Context Radar) show the honest role=note ''Unavailable over the web inspection plane''. 5th request-level test pins the backend contract: /tools /entities → 200 [], /radar → 200 {anchors:[],results:[]}, unknown agent → 404. selectPanel scopes to LeftRail aside + non-exact name (button a11y name = panel name + token count).'
+  last_edited_ms: 1781820973386
 1eb53215119fb714:
   path: crates/cp-mod-ocr/Cargo.toml
   description: 'OCR module deps: cp-base, cp-render, serde_json, reqwest, cp-mod-utilities, log.'
@@ -1934,6 +1938,10 @@
   path: crates/cp-mod-queue/src/lib.rs
   description: 'Queue module. 3 tools: pause/execute/undo. Fixed QUEUE panel. Not core. QueueState: active, queued_calls, next_index. Trap state (trap_active/panel_ids/optional_ids) persisted in save/load. Queue_execute handled in pipeline.rs (needs dispatch). Reverie-allowed.'
   last_edited_ms: 0
+45ad65beb043f337:
+  path: crates/cp-orchestrator/src/transport/inspect/panels.rs
+  description: 'Cockpit inspection-panel endpoints (in inspect/): memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list = tier-② disk reads reshaped to maquette JSON. PLUS tools/radar/entities = DERIVED-state endpoints that return their NORMAL EMPTY shape by design (200 [] / {anchors:[],results:[]}, NOT 404): the inspection plane structurally can''t rebuild them from tier-② files (tools catalog=compile-time module YAMLs in the agent binary; radar=live half-life log ranking; entities=open SQLite, on-disk db is 0 bytes) — agent_folder guard so an unknown id still 404s; frontend renders an honest ''unavailable over web inspection plane'' notice. Absolute crate::transport:: paths.'
+  last_edited_ms: 1781820973406
 45f26bd593f5eb21:
   path: crates/cp-mod-console/src/lib.rs
   description: 'Console module. 5 tools. Dynamic console panels. init: find/create Unix socket server. save/load: session reconnection + orphan cleanup. Leaks stdin on save to prevent EOF. Tool visualizer for colored output.'
@@ -3246,6 +3254,10 @@
   path: crates/cp-oplog/src/service.rs
   description: 'OplogService — off-loop group-commit thread + GAP2/I2 asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate=BestEffort, all else (incl 4 thread-roster mutations + Lifecycle + Unknown)=Durable. THREE submit paths: append_durable (blocks+awaits sync, returns rev — intake/I11 path), submit_durable (NON-blocking durable, detached ack — I2 main-loop path: enqueue now, group-commit+fdatasync off-loop, never dropped), append_best_effort (try_send drop-on-full — hot phase/cost). commit_loop drains batch, ONE fdatasync, releases acks. 341 lines (tests live in sibling service_tests.rs via #[cfg(test)] #[path] include).'
   last_edited_ms: 1781814397964
+7759c8bb16be483c:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Transport hub. Backend shared state + serve/serve_bound + route_rest (27 routes incl /api/metrics + /api/agent/{id}/metrics, and /tools /radar /entities → inspect::panels derived-empty endpoints) + handle_stream SSE. inspect/ groups read-view endpoints (meta/panels/finder/metrics). run_stream SSE producer: Tailer.poll→rev-numbered deltas, drains StreamHub, dirty→invalidate. TAIL_REPOLL=5ms re-poll cap. command→visible p50 14ms/p99 33ms.'
+  last_edited_ms: 1781820973426
 776ceb45b6277d6d:
   path: .github/workflows/rust.yml
   description: 'CI: fmt + clippy + build + test on ubuntu-latest. Pins Rust 1.93.0. Triggers on push/PR to master.'

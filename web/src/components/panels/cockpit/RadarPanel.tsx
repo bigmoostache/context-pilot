@@ -1,7 +1,7 @@
 import { Radar } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
 import { useRadar } from "@/lib/live"
-import { PanelFrame, PanelSection, ImportanceDot } from "./PanelFrame"
+import { PanelFrame, PanelSection, ImportanceDot, InspectionUnavailable } from "./PanelFrame"
 
 /**
  * Context Radar panel — recency-weighted recall surfaced from the
@@ -22,6 +22,10 @@ export function RadarPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
       cost={panel.costUsd}
       accent="var(--interactive)"
     >
+      {radarAnchors.length === 0 && radarResults.length === 0 ? (
+        <InspectionUnavailable reason="The Context Radar is a live half-life ranking the running agent computes over its logs; it isn't persisted as a consumable artifact. Surfacing it requires the agent to publish its radar — a tracked follow-up." />
+      ) : (
+        <>
       <PanelSection label="Anchors · live signals">
         <ul className="flex flex-col gap-1.5">
           {radarAnchors.map((a, i) => (
@@ -59,6 +63,8 @@ export function RadarPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
           ))}
         </ul>
       </PanelSection>
+        </>
+      )}
     </PanelFrame>
   )
 }

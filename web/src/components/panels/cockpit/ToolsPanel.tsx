@@ -1,7 +1,7 @@
 import { Wrench } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
 import { useTools } from "@/lib/live"
-import { PanelFrame } from "./PanelFrame"
+import { PanelFrame, InspectionUnavailable } from "./PanelFrame"
 
 /**
  * Tools panel — the enabled tool registry, grouped by category. Each
@@ -22,7 +22,10 @@ export function ToolsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
       cost={panel.costUsd}
     >
       <div className="flex flex-col gap-4">
-        {toolGroups.map((g) => (
+        {toolGroups.length === 0 ? (
+          <InspectionUnavailable reason="The tool catalog (categories and descriptions) is compiled into the agent binary, not stored in the agent's on-disk state. Surfacing it requires the agent to publish a tools manifest — a tracked follow-up." />
+        ) : (
+          toolGroups.map((g) => (
           <div key={g.category}>
             <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
               {g.category}
@@ -49,7 +52,8 @@ export function ToolsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
               ))}
             </ul>
           </div>
-        ))}
+          ))
+        )}
       </div>
     </PanelFrame>
   )

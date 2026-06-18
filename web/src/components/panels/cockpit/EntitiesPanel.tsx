@@ -1,7 +1,7 @@
 import { Database } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
 import { useEntities } from "@/lib/live"
-import { PanelFrame } from "./PanelFrame"
+import { PanelFrame, InspectionUnavailable } from "./PanelFrame"
 
 /**
  * Entities panel — the structured SQLite domain database. One card per
@@ -22,7 +22,10 @@ export function EntitiesPanel({ panel, agentId }: { panel: ContextPanel; agentId
       accent="var(--interactive)"
     >
       <div className="flex flex-col gap-3">
-        {entityTables.map((t) => (
+        {entityTables.length === 0 ? (
+          <InspectionUnavailable reason="The entity database is a live SQLite connection held open by the running agent (the on-disk file is a zero-byte handle); faithful table/row counts need that live connection. Surfacing it requires the agent to publish an entities summary — a tracked follow-up." />
+        ) : (
+          entityTables.map((t) => (
           <article key={t.name} className="overflow-hidden rounded-lg border border-border card-shadow">
             <header className="flex items-center gap-2 border-b border-border bg-card px-3 py-2">
               <Database className="size-3.5 text-[var(--interactive)]" />
@@ -44,7 +47,8 @@ export function EntitiesPanel({ panel, agentId }: { panel: ContextPanel; agentId
               </ul>
             </div>
           </article>
-        ))}
+          ))
+        )}
       </div>
     </PanelFrame>
   )

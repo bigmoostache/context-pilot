@@ -222,6 +222,57 @@ pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     HttpReply::ok(&items)
 }
 
+// ── Derived-state panels (NOT reconstructable from tier-② files) ────────
+//
+// `tools`, `radar`, and `entities` read state the read-only inspection plane
+// structurally cannot rebuild from an agent's on-disk tier-② files:
+//
+//   * **tools**  — the enabled-tool *catalog* (category + description) lives in
+//     the agent binary's compiled module YAMLs, not in any per-agent file. The
+//     orchestrator is a separate binary with no module registry, so it cannot
+//     name or describe the tools.
+//   * **radar**  — the Context Radar is a half-life ranking the *running* agent
+//     computes over its logs; it is not persisted as a consumable artifact.
+//   * **entities** — the entity DB is live SQLite (the on-disk `entities.db` is
+//     a zero-byte handle; the truth lives in the agent's open connection/WAL).
+//     Faithful row-counts/samples need a live connection the inspection plane
+//     does not (and must not concurrently) open.
+//
+// Each endpoint therefore returns its NORMAL EMPTY shape (a deliberate 200, not
+// a 404 that reads as a bug) — `[]` for the list panels, `{anchors,results}`
+// empty for radar. The frontend cockpit panels render an explicit
+// "unavailable over the web inspection plane" notice on the empty shape rather
+// than a misleading blank list. Serving real data here is a follow-up that
+// requires the AGENT to emit these into a readable artifact (e.g. a periodic
+// `shared/tools.json` / `radar.json` / `entities-summary.json`) — tracked
+// separately; this is the honest boundary, not fabricated data.
+
+/// `GET /api/agent/{id}/tools` — empty by design (see module note above).
+pub fn tools(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+    // Resolve the agent so an unknown id still 404s (a known agent simply has
+    // no inspection-plane tool catalog).
+    match agent_folder(state, agent_id) {
+        Ok(_) => HttpReply::ok(&serde_json::json!([])),
+        Err(reply) => reply,
+    }
+}
+
+/// `GET /api/agent/{id}/radar` — empty by design (see module note above).
+pub fn radar(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+    match agent_folder(state, agent_id) {
+        Ok(_) => HttpReply::ok(&serde_json::json!({ "anchors": [], "results": [] })),
+        Err(reply) => reply,
+    }
+}
+
+/// `GET /api/agent/{id}/entities` — empty by design (see module note above).
+pub fn entities(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+    match agent_folder(state, agent_id) {
+        Ok(_) => HttpReply::ok(&serde_json::json!([])),
+        Err(reply) => reply,
+    }
+}
+
 /// Extract `name` and `description` from YAML frontmatter in a markdown file.
 ///
 /// Frontmatter is delimited by `---` lines at the top. Returns empty strings
