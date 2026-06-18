@@ -65,3 +65,10 @@ requests.flow
 /jobs/
 benchmarks/terminal-bench/jobs/
 /sandbox/
+
+# Bridge runtime artifacts (written into the agent folder = project root when
+# the TUI runs with CP_BRIDGE=1). Never commit — they are per-run, per-machine.
+/oplog/
+/heartbeat
+/bridge.lock
+/stream.sock

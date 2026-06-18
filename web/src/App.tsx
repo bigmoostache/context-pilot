@@ -36,6 +36,15 @@ function App() {
 
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
 
+  // A persisted view of "threads"/"cockpit"/"finder" requires a live agent to
+  // render. If the fleet is still loading, or the stored agent id no longer
+  // matches any live agent (stale localStorage — e.g. the agent was removed),
+  // `activeAgent` is undefined and those views would crash on `activeAgent.id`.
+  // Fall back to the fleet view in that case (private windows never hit this
+  // because they start with empty localStorage → default "fleet").
+  const effectiveView: ViewMode =
+    view !== "fleet" && !activeAgent ? "fleet" : view
+
   // Open an agent → drop into its threads. Switching agent from the fleet
   // dashboard is the ONLY place an agent is chosen/managed.
   const openAgent = (id: string) => {
@@ -55,7 +64,7 @@ function App() {
         <TooltipProvider delay={350} closeDelay={80}>
         <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
           <TopBar
-            view={view}
+            view={effectiveView}
             onViewChange={setView}
             activeAgentId={activeAgentId}
             onSwitchAgent={setActiveAgentId}
@@ -63,22 +72,22 @@ function App() {
             agents={agents}
           />
 
-          {view === "fleet" ? (
+          {effectiveView === "fleet" ? (
             <FleetShell
               agents={agents}
               onOpenAgent={openAgent}
               openCreate={createAgent}
               onCreateConsumed={() => setCreateAgent(false)}
             />
-          ) : view === "cockpit" ? (
+          ) : effectiveView === "cockpit" ? (
             <CockpitView agentId={activeAgentId} />
-          ) : view === "finder" ? (
+          ) : effectiveView === "finder" ? (
             <Finder key={activeAgent.id} agent={activeAgent} />
           ) : (
             <ThreadsView key={activeAgentId} activeAgentId={activeAgentId} />
           )}
 
-          <StatusBar fleet={view === "fleet"} agents={agents} activeAgent={activeAgent} />
+          <StatusBar fleet={effectiveView === "fleet"} agents={agents} activeAgent={activeAgent} />
         </div>
         </TooltipProvider>
       </AccountProvider>
