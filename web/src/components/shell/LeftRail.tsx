@@ -2,7 +2,6 @@ import { MessageSquare } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { TokenBar } from "@/components/panels/TokenBar"
 import { Tip } from "@/components/ui/tip"
-import { tokenBudget } from "@/lib/mock"
 import { usePanels } from "@/lib/live"
 import { panelIcon, fmtTokens, loadColor } from "@/lib/panelMeta"
 import { cn } from "@/lib/utils"
@@ -27,7 +26,14 @@ export function LeftRail({
   const { data: panels = [] } = usePanels(agentId)
   // Threads panel is redundant in the cockpit — there's a dedicated Threads view
   const filteredPanels = panels.filter((p) => p.kind !== "threads")
-  const usedRatio = tokenBudget.used / tokenBudget.budget
+  // Live context-budget meter: the exact summed weight of the inspection panels
+  // the cockpit can see (same figure StatsPanel's "Panel context" reports), set
+  // against a reference model budget. This reflects how heavy the *visible
+  // panels* are — not the agent's private live context-window occupancy, which
+  // the read-only inspection plane cannot serve (surfaced honestly elsewhere).
+  const REF_BUDGET = 200_000
+  const usedTokens = panels.reduce((sum, p) => sum + p.tokens, 0)
+  const usedRatio = Math.min(1, usedTokens / REF_BUDGET)
 
   return (
     <aside className="rise flex w-[var(--sidebar-w)] shrink-0 flex-col border-r border-border bg-surface">
@@ -42,10 +48,10 @@ export function LeftRail({
             {(usedRatio * 100).toFixed(0)}%
           </span>
         </div>
-        <TokenBar value={tokenBudget.used} max={tokenBudget.budget} className="h-1.5" />
+        <TokenBar value={usedTokens} max={REF_BUDGET} className="h-1.5" />
         <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-muted-foreground">
-          <span>{fmtTokens(tokenBudget.used)}</span>
-          <span>of {fmtTokens(tokenBudget.budget)}</span>
+          <span>{fmtTokens(usedTokens)}</span>
+          <span>of {fmtTokens(REF_BUDGET)}</span>
         </div>
       </div>
 

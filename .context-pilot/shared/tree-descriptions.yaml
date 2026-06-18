@@ -186,10 +186,6 @@
   path: crates/cp-mod-bridge/Cargo.toml
   description: 'Bridge module deps: cp-base, cp-render, cp-wire, cp-oplog, nix 0.30 (fs, for Flock RAII), serde_json. dev: tempfile. Workspace lints.'
   last_edited_ms: 1781625056746
-0622a2fd58720750:
-  path: crates/cp-orchestrator/src/transport/meta.rs
-  description: Enriched agent meta endpoints. agent_meta (GET /api/agent/{id}/meta) + fleet_meta (GET /api/fleet/meta). Combines registry Entry + oplog AgentView (phase/cost) + thread inspection (count/MY_TURN/lastActivity) + git branch. Returns maquette-compatible Agent JSON shape. derive_status/derive_accent helpers.
-  last_edited_ms: 1781685557233
 064c633984a0d856:
   path: crates/cp-mod-queue/src/types.rs
   description: 'QueueState + QueuedToolCall types. Trap fields: trap_active, trap_panel_ids, trap_optional_ids. Methods: enqueue, remove_by_index, flush, clear, is_queue_tool.'
@@ -394,6 +390,10 @@
   path: crates/cp-wire/src/types/snapshot.rs
   description: 'Bounded replay snapshot: Snapshot{heads,seen}. Heads (per-thread/panel content hashes, O(threads+panels)) + SeenSet (dedup-tokens of durable command effects, evicted by acked-rev via evict_through, NEVER time — I4/R2-1). SeenSet.mark idempotent keeps first rev. Checkpoint carries Snapshot (both heads AND seen) so seen rebuild doesn''t fold from offset 0. Replaces old heads.rs (merged to keep types/ ≤ 8 files). 9 tests.'
   last_edited_ms: 1781620291993
+0e866044c537cc8c:
+  path: web/src/components/panels/cockpit/EntitiesPanel.tsx
+  description: Cockpit Entities panel. useEntities(agentId); one card per SQLite table w/ row count + sample rows. On empty, renders InspectionUnavailable notice (entity DB is an open SQLite connection; on-disk file is 0-byte handle).
+  last_edited_ms: 1781821687505
 0ef0bd81edb04193:
   path: crates/cp-base/src/config/yaml_sync.rs
   description: YamlSync engine. SyncEntry trait (yaml_key, last_edited_ms, set_last_edited_ms). Generic load/save/upsert/remove/populate/migrate/remove_where. BTreeMap-based, additive merge, latest-wins conflict resolution, .bak backup.
@@ -774,6 +774,10 @@
   path: crates/cp-base/Cargo.toml
   description: 'Base crate deps: crossterm, serde, serde_json, serde_yaml, sha2, chrono, log, parking_lot, typemap_rev, globset, syntect, tree-sitter, reqwest, tokio. No ratatui.'
   last_edited_ms: 1780497937359
+1cce641e37df47fa:
+  path: web/src/lib/live.ts
+  description: 'Live data hooks: useLiveQuery (fetch + SSE delta apply-in-place + poll backstop). applyThreadDelta/applyAgentDelta = push-plane reducers (thread roster + phase/cost vitals, monotonic-rev high-water guard). useThreads/useAgentMeta ride deltas; inspection hooks ride the backend `invalidate` SSE event → debounced refetch. useMetrics (4s poll) + useFleetMetrics (fleet token-economics, poll-only no agentId). useStreamingTokens = §7 rAF-batched live token buffer keyed by message_id. Single-mechanism freshness (X865): dead invalidateAgent bus removed; sendCommand does NOT invalidate.'
+  last_edited_ms: 1781822675714
 1d56292f7cfa0f19:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
@@ -930,10 +934,6 @@
   path: web/src/components/threads/ThreadsView.tsx
   description: Threads view assembler. Uses useThreads()+useFleet() live. handleArchive/Create/Send via sendCommand. Auto-selects first valid thread. EmptyRealm fallback. Keyed by agentId in App.
   last_edited_ms: 0
-221a714d723167e8:
-  path: crates/cp-orchestrator/src/transport/meta.rs
-  description: 'Enriched agent meta endpoints (agent_meta GET /api/agent/{id}/meta + fleet_meta). Combines registry Entry + view AgentView (phase/lifecycle/cost) + thread inspection (count/MY_TURN/lastActivity) + git branch → maquette Agent JSON. derive_status(phase,lifecycle,has_my_turn): a Stopping/Stopped lifecycle can never read ''working'' (authoritative oplog signal wins over stale phase) → idle/needs-you; else phase Streaming/Tooling→working, has_my_turn→needs-you, else idle. derive_accent maps status→token.'
-  last_edited_ms: 1781813916318
 222420220afa8c94:
   path: crates/cp-base/Cargo.toml
   description: 'Base crate deps: cp-render, cp-mod-utilities, ratatui, crossterm, serde, serde_json, serde_yaml, unicode-width, log.'
@@ -1254,6 +1254,10 @@
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. poll_bridge_commands runs every tick. X18 LATENCY: adaptive idle poll — 8ms streaming/dirty, 2ms when bridge_active (web UI connected, keeps command→apply latency ≤ a few ms), 50ms otherwise. Ownership checks. Render ~28fps. Thread helpers in run/threads.rs.'
   last_edited_ms: 0
+2ceb3abc2653b5c5:
+  path: web/src/components/agents/UsagePage.tsx
+  description: 'Cost & token Usage page — LIVE (no mock). useFleet + useFleetMetrics joined per agent: summary cards (total spend / input / output tokens), per-agent table (input/output tokens, spend, % budget, over-budget badge), $/tokens unit lens + agent filter. Honest role=note notice: month-by-month history + cache hit/miss split are NOT retained by the backend (oplog carries only cumulative-since-boot totals; hit/miss is private agent working-set, never journaled). Rewritten off the old usagePoints/USAGE_RATES mock.'
+  last_edited_ms: 1781822675633
 2d148b27781aaa02:
   path: crates/cp-mod-tree/src/lib.rs
   description: 'Tree module. 3 tools: filter/toggle/describe (with close_panel param). Fixed TREE panel (fixed_order=3). Watches open folders. Dir-event-only invalidation. Module data: filter+descriptions. Worker data: open_folders. @-path autocomplete.'
@@ -1306,6 +1310,10 @@
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules() (incl BridgeModule). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
   last_edited_ms: 1781617163175
+30186731e4e90e4f:
+  path: web/src/components/panels/cockpit/ToolsPanel.tsx
+  description: Cockpit Tools panel. useTools(agentId); groups by category w/ enabled dots. On empty (derived-state endpoint returns 200 []), renders InspectionUnavailable notice (tool catalog is compiled into agent binary, not on-disk).
+  last_edited_ms: 1781821687464
 304e122c2b347b38:
   path: crates/cp-orchestrator/src/lib.rs
   description: 'Phase 16 (X783): backend library root (split from main.rs for unit-testability). Declares channel + liveness + registry modules. Backend-only peer of cp-mod-bridge: bridge WRITES registry/heartbeat/oplog, backend READS/tails them across a fleet.'
@@ -2270,6 +2278,10 @@
   path: crates/cp-orchestrator/src/registry/tee_reader.rs
   description: 'TeeReader — backend consumer of an agent''s live stream plane (§7). One reader per agent (spawned on Appeared, stopped on Disappeared): connects <folder>/tee.sock, reads len+CRC framed StreamFrames, republishes each into the shared StreamHub for SSE fan-out. Lossy by design (tier-③): corrupt frame resyncs the buffer, absent socket retries, EOF (agent restart) reconnects. 3 tests (republish, absent-then-connect, corrupt-resync).'
   last_edited_ms: 1781814025306
+53fafc82665d864a:
+  path: web/src/components/panels/cockpit/RadarPanel.tsx
+  description: Cockpit Context Radar panel. useRadar(agentId); anchors + scored results w/ score meter. On empty ({anchors:[],results:[]}), renders InspectionUnavailable notice (radar is a live half-life log ranking the agent computes, not persisted).
+  last_edited_ms: 1781821687485
 549866596144eb9b:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
@@ -2318,6 +2330,10 @@
   path: test_file_to_describe.txt
   description: Version A of the test file
   last_edited_ms: 0
+55afdb4bba6751d6:
+  path: report/wiring-alignment-audit.md
+  description: 'Wiring alignment audit (X818). Re-audit 2026-06-18: orchestration push plane is the live path (command→visible p50~14ms). §0 verdict, §1 two planes, §2 invariant gap register (I1-I13/§7/§9/§18 ABIDES, §19 PARTIAL—latency histograms honest follow-up), §3 frontend feature wiring (e2e-proven), §4 measured latency table, §5 remaining ledger, §6 credit, §7 disk-read ledger (X864, ABIDES).'
+  last_edited_ms: 1781821687545
 55bac9fdc74b9130:
   path: crates/cp-mod-tree/src/panel.rs
   description: Tree panel. Background cache system for directory tree rendering. TreeCacheRequest data payload. Pagination. refresh_stale_from_yaml() call in apply_cache_update triggers second rebuild if descriptions changed.
@@ -3322,6 +3338,10 @@
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore, export API keys from .env to ~/.bashrc. Guards against running as root.'
   last_edited_ms: 0
+78e9918ec952ba76:
+  path: web/src/components/panels/cockpit/PanelFrame.tsx
+  description: 'Shared cockpit panel shell: accent icon + name + subtitle + token/cost chip header, scrolling body. Exports PanelFrame, PanelSection, ImportanceDot, Chip, and InspectionUnavailable (role=note honest empty-state for derived-state panels the read-only web inspection plane structurally can''t serve).'
+  last_edited_ms: 1781821687444
 78ec4d70f66e85f0:
   path: crates/cp-base/src/tools/mod.rs
   description: 'Tool system. ToolUse/ToolResult (display, tldr, preserves_tempo). ToolDefinition + ToolDefBuilder (schema in Rust, descriptions from YAML). ParamType recursive JSON Schema. build_api() generates LLM tool array. Sub-modules: pre_flight, async_exec, api_schema.'
@@ -3946,6 +3966,10 @@
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet mission-control shell — shown when no agent is focused. Owns fleetPage state, renders FleetSidebar + active page: agents (FleetDashboard) / prompts (PromptsPage) / usage (UsagePage) / settings (ConfigPanel variant=''inline''). App.tsx renders this at fleet altitude.'
   last_edited_ms: 1781531138831
+905c7c1b41efbed2:
+  path: web/src/lib/api.ts
+  description: REST client for the orchestration backend. Typed fetch wrappers per endpoint (fleet/meta, threads reshape, panels, memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities, fs/preview/download, conversation). fetchMetrics + fetchFleetMetrics → AgentMetrics{breaker,stream,rev,tokens?:{input,output},phase,lifecycle} (§19; tokens feeds live token-economics UI). sendCommand auto-wraps Kind in a full Command envelope; mintTicket for SSE.
+  last_edited_ms: 1781822675694
 90759f8bbe365234:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
@@ -4786,6 +4810,10 @@ b05803356f877031:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
+b0ef0be513a36e65:
+  path: crates/cp-orchestrator/src/runtime.rs
+  description: 'Runtime — env Config (port/agents_dir/budget/scan_interval) + driver loop with TWO decoupled cadences: slow scan_interval (2s) for registry scan + config.json mtime backstop (inspection-resource freshness signal → SSE invalidate; X863 comment precise) + tmp reap; fast TAIL_INTERVAL (100ms) for tail_all_agents (Tailer.poll → view.apply_batch → breaker.observe). serve() blocks on HTTP. Felt-latency path is oplog-tail-primary via the SSE producer''s OplogWaiter (inotify).'
+  last_edited_ms: 1781821687524
 b11c573c6ae6f649:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
@@ -5482,6 +5510,10 @@ c7ea61d3ceb784d8:
   path: crates/cp-base/src/modules.rs
   description: Module trait — pluggable functionality contract. init/save/load state, tool definitions/execution/pre-flight, panel creation, overview delegation, lifecycle hooks (on_user_message/stream_stop/tool_progress), file watcher integration.
   last_edited_ms: 0
+c7ef16465908e1c6:
+  path: web/src/components/shell/LeftRail.tsx
+  description: 'Cockpit context navigator. Context-budget meter now LIVE: sum(usePanels tokens) / REF_BUDGET (200k), same figure as StatsPanel''s Panel-context (honest visible-panel weight, not true context occupancy). tokenBudget mock removed. First-class Conversation nav button above the scrollable panel list; selection CONTROLLED via props.'
+  last_edited_ms: 1781822675674
 c7ff6fe4a8e17796:
   path: ui/src/components/shell/AgentSwitcher.tsx
   description: TopBar workspace switcher dropdown (1 agent=1 folder). Shows active agent+folder, lists agents with status dots, 'New agent / browse filesystem' opens Agents view. Uses shadcn dropdown-menu.
@@ -5582,6 +5614,10 @@ cbbef4219a1d03ee:
   path: src/ui/ir/render_sidebar.rs
   description: 'Sidebar ratatui renderer — render_sidebar_from_ir(). Normal mode: token bar box, fixed/dynamic entries with pagination, PR card, token stats. Collapsed mode: icon strip. Entry rendering: indicator+icon+shortcut+label+tokens. Token color gradient (grey→red).'
   last_edited_ms: 0
+cbe3798af576ea90:
+  path: crates/cp-orchestrator/src/transport/inspect/metrics.rs
+  description: '§19 observability metrics endpoints. agent_metrics (GET /api/agent/{id}/metrics) + fleet_metrics (GET /api/metrics) expose ALREADY-COLLECTED backend state: breaker {tripped,spendUsd,budgetUsd} (durable R2-8 latch made VISIBLE — T121), stream {subscribers,droppedFrames,degraded} (StreamHub.agent_stream_health), rev {view,oplogHead,lag} (view rev vs fresh cp_oplog::replay rev_head — lag~0 under live tail), tokens {input,output} (cumulative-since-boot, folded from CostAggregate into view.cost — feeds the live token-economics UI), phase+lifecycle. Lock held once for in-mem reads; oplog_head_rev read from disk OUTSIDE lock. Latency/fsync histograms deliberately NOT synthesised (need new instrumentation) — no fabricated metrics.'
+  last_edited_ms: 1781822652451
 cbeaa3dfd0701f21:
   path: src/llms/mod.rs
   description: LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging.
@@ -6846,6 +6882,10 @@ fe442c943f4c8e63:
   path: docs/talk/slides/0-1.html
   description: 'Slide: Where it all started — tilted screenshots + narcos meme'
   last_edited_ms: 1781078806882
+fe515544c5126b36:
+  path: web/src/components/panels/cockpit/StatsPanel.tsx
+  description: Statistics panel — LIVE (truthful). Session row = cumulative-since-boot input/output tokens (useMetrics.tokens) + spend (useAgentMeta costUsd); Panel-context meter = sum(usePanels tokens)/200k REF_BUDGET (labelled as visible-panel weight, NOT true context occupancy); Context-elements list = live panels. Cache-economics + live-context-size section = InspectionUnavailable notice (hit/miss split + true context-window occupancy are private agent state, never on the oplog). Mock imports removed.
+  last_edited_ms: 1781822675654
 fe8012896753e20c:
   path: clippy_compared_list.md
   description: Clippy lint comparison results

@@ -1,27 +1,42 @@
 import { Gauge } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
-import { stats, tokenBudget, cacheStats } from "@/lib/mock"
-import { usePanels } from "@/lib/live"
+import { useAgentMeta, useMetrics, usePanels } from "@/lib/live"
 import { fmtTokens, fmtCost, loadColor } from "@/lib/panelMeta"
-import { PanelFrame, PanelSection } from "./PanelFrame"
-
-const ACCENT: Record<string, string> = {
-  signal: "var(--signal)",
-  interactive: "var(--interactive)",
-  ok: "var(--ok)",
-  warn: "var(--warn)",
-  danger: "var(--danger)",
-}
+import { PanelFrame, PanelSection, InspectionUnavailable } from "./PanelFrame"
 
 /**
- * Statistics panel — session vitals. A context-budget meter heads the
- * panel, followed by the headline stat rows and a compact "context elements"
- * table showing each live panel's token weight as a mini bar.
+ * Statistics panel — session vitals, served from live backend state.
+ *
+ * Every figure here is a *truthful* read, never mock chrome:
+ *   - **Session** rows show the agent's cumulative-since-boot token totals
+ *     (`input`/`output`, folded from `CostAggregate` into the view and exposed
+ *     on `/metrics`) and total spend (`/meta` `costUsd`).
+ *   - **Panel context** is the exact sum of the live inspection-panel token
+ *     weights the cockpit can see (`/panels`) — labelled as such, *not* as the
+ *     agent's full context-window occupancy, which it deliberately is not.
+ *   - **Context elements** lists each live panel's weight as a mini bar.
+ *
+ * Two figures the read-only web inspection plane structurally *cannot* serve —
+ * the agent's live context-window occupancy (its private working-set size) and
+ * the cache hit/miss token split (tracked in the agent, never journaled to the
+ * oplog) — are surfaced as an honest unavailable notice rather than faked.
  */
 export function StatsPanel({ panel, agentId }: { panel: ContextPanel; agentId: string }) {
   const { data: panels = [] } = usePanels(agentId)
-  const usedRatio = tokenBudget.used / tokenBudget.budget
+  const { data: meta } = useAgentMeta(agentId)
+  const { data: metrics } = useMetrics(agentId)
+
+  // Panel context = exact sum of the inspection panels the cockpit can see.
+  const panelTokens = panels.reduce((sum, p) => sum + p.tokens, 0)
   const maxTokens = panels.length > 0 ? Math.max(...panels.map((p) => p.tokens)) : 1
+  // A sensible reference ceiling for the meter (the common model budget); the
+  // bar reflects how heavy the *visible panels* are, not a hard agent limit.
+  const REF_BUDGET = 200_000
+  const usedRatio = Math.min(1, panelTokens / REF_BUDGET)
+
+  const inTok = metrics?.tokens?.input ?? 0
+  const outTok = metrics?.tokens?.output ?? 0
+  const costUsd = meta?.costUsd ?? metrics?.breaker.spendUsd ?? 0
 
   return (
     <PanelFrame
@@ -31,10 +46,18 @@ export function StatsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
       tokens={panel.tokens}
       cost={panel.costUsd}
     >
-      <PanelSection label="Context budget">
+      <PanelSection label="Session (cumulative since boot)">
+        <div className="grid grid-cols-3 gap-2">
+          <Stat label="Input" value={fmtTokens(inTok)} color="var(--interactive)" />
+          <Stat label="Output" value={fmtTokens(outTok)} color="var(--ok)" />
+          <Stat label="Cost" value={fmtCost(costUsd)} color="var(--signal)" />
+        </div>
+      </PanelSection>
+
+      <PanelSection label="Panel context">
         <div className="mb-1.5 flex items-baseline justify-between">
           <span className="text-[12px] text-muted-foreground">
-            {fmtTokens(tokenBudget.used)} of {fmtTokens(tokenBudget.budget)}
+            {fmtTokens(panelTokens)} across {panels.length} panel{panels.length === 1 ? "" : "s"}
           </span>
           <span className="text-[12px] font-semibold tabular-nums" style={{ color: loadColor(usedRatio) }}>
             {(usedRatio * 100).toFixed(0)}%
@@ -45,31 +68,6 @@ export function StatsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
             className="h-full rounded-full fill-sweep"
             style={{ width: `${usedRatio * 100}%`, background: loadColor(usedRatio) }}
           />
-        </div>
-      </PanelSection>
-
-      <PanelSection label="Session">
-        <div className="grid grid-cols-2 gap-2">
-          {stats.map((s) => (
-            <div key={s.label} className="rounded-lg border border-border bg-card p-2.5 card-shadow">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/65">{s.label}</div>
-              <div
-                className="mt-0.5 text-[13px] font-semibold tabular-nums"
-                style={{ color: s.accent ? ACCENT[s.accent] : "var(--foreground)" }}
-              >
-                {s.value}
-              </div>
-            </div>
-          ))}
-        </div>
-      </PanelSection>
-
-      <PanelSection label="Cache economics">
-        <div className="flex gap-2 text-[11px]">
-          <CacheChip label="hit" value={fmtTokens(cacheStats.hit)} color="var(--ok)" />
-          <CacheChip label="miss" value={fmtTokens(cacheStats.miss)} color="var(--warn)" />
-          <CacheChip label="out" value={fmtTokens(cacheStats.out)} color="var(--interactive)" />
-          <CacheChip label="cost" value={fmtCost(cacheStats.costUsd)} color="var(--signal)" />
         </div>
       </PanelSection>
 
@@ -91,15 +89,19 @@ export function StatsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
           ))}
         </ul>
       </PanelSection>
+
+      <PanelSection label="Cache economics & live context size">
+        <InspectionUnavailable reason="The cache hit/miss token split and the agent's live context-window occupancy are private working-set state — they are never journaled to the oplog, so the read-only web inspection plane cannot serve them. Surfacing them truthfully needs a dedicated agent-emitted metric." />
+      </PanelSection>
     </PanelFrame>
   )
 }
 
-function CacheChip({ label, value, color }: { label: string; value: string; color: string }) {
+function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="flex-1 rounded-lg border border-border bg-card px-2 py-1.5 text-center card-shadow">
-      <div className="text-[9px] uppercase tracking-wide text-muted-foreground/60">{label}</div>
-      <div className="text-[12px] font-semibold tabular-nums" style={{ color }}>
+    <div className="rounded-lg border border-border bg-card p-2.5 card-shadow">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground/65">{label}</div>
+      <div className="mt-0.5 text-[13px] font-semibold tabular-nums" style={{ color }}>
         {value}
       </div>
     </div>

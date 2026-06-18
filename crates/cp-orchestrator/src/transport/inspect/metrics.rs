@@ -75,15 +75,26 @@ fn build_metrics(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde
         let spend = b.breaker.spend_of(agent_id).unwrap_or(0.0);
         let budget = b.breaker.budget();
         let (subs, dropped, degraded) = b.hub.agent_stream_health(agent_id);
-        let (view_rev, phase, lifecycle) = b
-            .view
-            .get(agent_id)
-            .map_or((0, None, None), |v| (v.rev, v.phase, v.lifecycle));
-        (tripped, spend, budget, subs, dropped, degraded, view_rev, phase, lifecycle)
+        let (view_rev, phase, lifecycle, in_tok, out_tok) = b.view.get(agent_id).map_or(
+            (0, None, None, 0, 0),
+            |v| (v.rev, v.phase, v.lifecycle, v.cost.input_tokens, v.cost.output_tokens),
+        );
+        (tripped, spend, budget, subs, dropped, degraded, view_rev, phase, lifecycle, in_tok, out_tok)
     });
 
-    let Some((tripped, spend, budget, subs, dropped, degraded, view_rev, phase, lifecycle)) =
-        snapshot
+    let Some((
+        tripped,
+        spend,
+        budget,
+        subs,
+        dropped,
+        degraded,
+        view_rev,
+        phase,
+        lifecycle,
+        in_tok,
+        out_tok,
+    )) = snapshot
     else {
         return serde_json::json!({ "id": agent_id, "error": "backend lock poisoned" });
     };
@@ -109,6 +120,10 @@ fn build_metrics(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde
             "view": view_rev,
             "oplogHead": oplog_head,
             "lag": rev_lag,
+        },
+        "tokens": {
+            "input": in_tok,
+            "output": out_tok,
         },
         "phase": phase,
         "lifecycle": lifecycle,

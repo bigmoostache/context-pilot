@@ -580,6 +580,18 @@ export function useMetrics(agentId: string): LiveQueryResult<api.AgentMetrics> {
   return useLiveQuery(`metrics:${agentId}`, fetcher, agentId, METRICS_POLL_MS, !!agentId)
 }
 
+/**
+ * Fleet-wide §19 metrics — one snapshot per known agent (`/api/metrics`).
+ *
+ * Fleet scope has no single agent to subscribe to, so this rides the metrics
+ * poll only (no SSE delta). It powers the Usage page's live per-agent cost +
+ * token totals, which are derived backend observations, not agent mutations.
+ */
+export function useFleetMetrics(): LiveQueryResult<api.AgentMetrics[]> {
+  const fetcher = useCallback(() => api.fetchFleetMetrics(), [])
+  return useLiveQuery("fleet-metrics", fetcher, undefined, METRICS_POLL_MS)
+}
+
 // ── Library (agent-scoped) ────────────────────────────────────────────
 
 export function useLibrary(agentId: string): LiveQueryResult<LibraryItem[]> {

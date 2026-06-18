@@ -305,12 +305,20 @@ export interface AgentMetrics {
   breaker: { tripped: boolean; spendUsd: number; budgetUsd: number }
   stream: { subscribers: number; droppedFrames: number; degraded: boolean }
   rev: { view: number; oplogHead: number | null; lag: number }
+  /** Cumulative-since-boot token totals folded from `CostAggregate`. */
+  tokens?: { input: number; output: number }
   phase?: string | null
   lifecycle?: string | null
 }
 
 export function fetchMetrics(agentId: string): Promise<AgentMetrics> {
   return request(`/api/agent/${agentId}/metrics`)
+}
+
+/** The §19 snapshot for every known agent (GET /api/metrics). Powers the fleet
+ *  Usage page's live per-agent cost + token totals. */
+export function fetchFleetMetrics(): Promise<AgentMetrics[]> {
+  return request("/api/metrics")
 }
 
 // ── Usage + Library ───────────────────────────────────────────────────
