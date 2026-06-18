@@ -94,7 +94,11 @@ test.describe("messages / send over the push plane", () => {
     await expect(composer).toHaveValue("", { timeout: 10_000 })
 
     // The user's message bubble appears in the conversation (push plane).
-    await expect(page.getByText(MSG, { exact: false }).first()).toBeVisible({ timeout: 15_000 })
+    // Generous timeout for the same reason the roster-log poll below is: the
+    // suite drives a single LIVE agent that may be backlogged by earlier specs'
+    // command preconditions, so the user-message apply (and its SSE delta) can
+    // trail the action.
+    await expect(page.getByText(MSG, { exact: false }).first()).toBeVisible({ timeout: 25_000 })
 
     // Ground truth: the backend roster's message log grew by at least one.
     // Generous timeout: the suite drives a single LIVE agent, so by this test

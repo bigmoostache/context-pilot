@@ -1,9 +1,28 @@
-import { useState, useCallback } from "react"
-import { FolderGit2 } from "lucide-react"
+import { useState, useCallback, useRef, useEffect } from "react"
+import { FolderGit2, AlertTriangle } from "lucide-react"
 import { ThreadList } from "./ThreadList"
 import { ThreadConversation } from "./ThreadConversation"
 import { NewThreadDialog } from "./NewThreadDialog"
 import { useThreads, useFleet, sendCommand } from "@/lib/live"
+
+/**
+ * Turn a rejected `sendCommand` into a human sentence for the notice toast.
+ *
+ * `api.request` throws `Error("<status> <path>: <body>")` on any non-2xx, so a
+ * tripped **CostBreaker** surfaces as a `503` whose body carries
+ * `{"status":"tripped"}` (design doc R2-8 / V9). That case gets a specific,
+ * actionable message — the silent-failure hole behind T121, where an
+ * over-budget send was swallowed by `.catch(console.error)` and the user saw
+ * nothing happen. Every other failure degrades to a generic, still-visible
+ * line so a command is *never* silently dropped again.
+ */
+function describeCommandError(verb: string, err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err)
+  if (msg.includes("503") || msg.toLowerCase().includes("tripped")) {
+    return "Send blocked — this agent is over its spend budget (cost breaker tripped). Raise the budget or stop the run, then try again."
+  }
+  return `Could not ${verb}: ${msg}`
+}
 
 /**
  * Thread-centered view — the conversation-first layout: thread list (left) |
@@ -34,6 +53,24 @@ export function ThreadsView({
   const [showArchived, setShowArchived] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
 
+  // Transient, breaker-aware failure notice. A command rejected by the backend
+  // (most importantly a tripped CostBreaker → 503) must be *visible*, never the
+  // old silent `.catch(console.error)` swallow (T121). One pending timer at a
+  // time; cleared on unmount so a late tick can't setState a dead component.
+  const [notice, setNotice] = useState<string | null>(null)
+  const noticeTimer = useRef<number | null>(null)
+  const flash = useCallback((msg: string) => {
+    if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
+    setNotice(msg)
+    noticeTimer.current = window.setTimeout(() => setNotice(null), 6000)
+  }, [])
+  useEffect(
+    () => () => {
+      if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
+    },
+    [],
+  )
+
   // Auto-select first non-archived thread if current selection is invalid
   const validSelection = threads.some((t) => t.id === selectedId)
   const effectiveSelectedId = validSelection
@@ -46,16 +83,19 @@ export function ThreadsView({
     const t = threads.find((th) => th.id === id)
     if (!t) return
     const kind = t.archived ? "restore_thread" : "archive_thread"
-    sendCommand(activeAgentId, { kind, thread_id: id }).catch(console.error)
-  }, [threads, activeAgentId])
+    const verb = t.archived ? "restore the thread" : "archive the thread"
+    sendCommand(activeAgentId, { kind, thread_id: id }).catch((e) =>
+      flash(describeCommandError(verb, e)),
+    )
+  }, [threads, activeAgentId, flash])
 
   const handleCreate = useCallback((title: string) => {
     sendCommand(activeAgentId, { kind: "create_thread", name: title.trim() || "Untitled thread" })
-      .catch(console.error)
+      .catch((e) => flash(describeCommandError("create the thread", e)))
     setNewOpen(false)
     setQuery("")
     setShowArchived(false)
-  }, [activeAgentId])
+  }, [activeAgentId, flash])
 
   const handleSend = useCallback((text: string) => {
     if (!effectiveSelectedId || !text.trim()) return
@@ -63,8 +103,8 @@ export function ThreadsView({
       kind: "send_message",
       thread_id: effectiveSelectedId,
       content: text.trim(),
-    }).catch(console.error)
-  }, [activeAgentId, effectiveSelectedId])
+    }).catch((e) => flash(describeCommandError("send your message", e)))
+  }, [activeAgentId, effectiveSelectedId, flash])
 
   if (!agent || threads.length === 0) {
     return <EmptyRealm agentName={agent?.name} />
@@ -87,6 +127,16 @@ export function ThreadsView({
       {thread && <ThreadConversation thread={thread} onSend={handleSend} />}
 
       <NewThreadDialog open={newOpen} onClose={() => setNewOpen(false)} onCreate={handleCreate} />
+
+      {notice && (
+        <div
+          role="alert"
+          className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-[var(--danger)]/40 bg-card px-4 py-2.5 text-[12.5px] text-foreground/90 card-shadow"
+        >
+          <AlertTriangle className="size-4 shrink-0 text-[var(--danger)]" />
+          <span>{notice}</span>
+        </div>
+      )}
     </div>
   )
 }

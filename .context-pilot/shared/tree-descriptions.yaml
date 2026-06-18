@@ -906,6 +906,10 @@
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
   last_edited_ms: 1780565754910
+21b5a0d10a4cb88f:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: Threads view assembler. Uses useThreads()+useFleet() live. handleArchive/Create/Send via sendCommand. Auto-selects first valid thread. EmptyRealm fallback. Keyed by agentId in App.
+  last_edited_ms: 0
 221a714d723167e8:
   path: crates/cp-orchestrator/src/transport/meta.rs
   description: 'Enriched agent meta endpoints (agent_meta GET /api/agent/{id}/meta + fleet_meta). Combines registry Entry + view AgentView (phase/lifecycle/cost) + thread inspection (count/MY_TURN/lastActivity) + git branch → maquette Agent JSON. derive_status(phase,lifecycle,has_my_turn): a Stopping/Stopped lifecycle can never read ''working'' (authoritative oplog signal wins over stale phase) → idle/needs-you; else phase Streaming/Tooling→working, has_my_turn→needs-you, else idle. derive_accent maps status→token.'
@@ -3742,6 +3746,10 @@
   path: yamls/tools/memory.yaml
   description: Memory tools YAML. memory_create (content, contents, importance, labels) + memory_update (id, content, contents, importance, labels, delete).
   last_edited_ms: 1780582405270
+8ac46f3f53f69dba:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Threads view assembler. Uses useThreads()+useFleet() live. handleArchive/Create/Send via sendCommand, each .catch wired to a breaker-aware flash notice (describeCommandError: a 503/tripped CostBreaker → actionable ''over budget'' alert, else generic ''Could not …'') rendered as a transient role=alert toast (6s, timer-ref cleaned on unmount) — closes the T121 silent-swallow hole where an over-budget send produced zero UI feedback. Auto-selects first valid thread. EmptyRealm fallback. Keyed by agentId in App.'
+  last_edited_ms: 1781816803484
 8adf9f8544d4d161:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
@@ -3842,6 +3850,10 @@
   path: docs/ted-talk.md
   description: Full talk script — 25min, 16 slides, speaker notes, Q&A reserve. 'Rebuilding my own Claude Code — The Whys, the Hows and the Wows'.
   last_edited_ms: 0
+8e4af0c3244bb326:
+  path: web/e2e/breaker.spec.ts
+  description: 'Phase 9 e2e (T121): tripped CostBreaker 503 on send is SURFACED in the UI, not swallowed. Creates a real thread via the un-routed request context, opens it, then page.route-intercepts **/command to return 503 {status:tripped} so only the UI-driven send hits it; asserts a visible role=alert containing budget|breaker|blocked. Separation of concerns: backend 503 production = rust transport_http.rs; this covers the frontend''s 503 surfacing (the untested layer) by mocking the backend boundary. Deterministic regardless of live budget. afterAll archives e2e-brk- threads.'
+  last_edited_ms: 1781816803465
 8e599736f055a92a:
   path: ui/src/lib/finderFs.ts
   description: Finder mock filesystem + helpers. buildRealm(folder,name) grafts one rich project tree onto an agent's folder (confined realm). findNode/pathChain DFS, fmtBytes, sortNodes (folders-first). Files carry preview payloads (code/sheet/slides/pdf/image/text).
@@ -5046,6 +5058,10 @@ bb05e2336216163a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
   last_edited_ms: 0
+bb226690c4c1eecf:
+  path: web/e2e/messages.spec.ts
+  description: Phase 2 e2e message send (1 test) over the K7 push plane. Composer send→user bubble appears live + roster log grows. Asserts the user message only (agent reply is non-deterministic LLM). Both the DOM-bubble visibility AND roster-log poll use a 25s timeout to absorb cumulative live-agent command backlog in the serial suite (single live agent shared across specs). afterAll archives e2e- threads.
+  last_edited_ms: 1781816803503
 bb8a674ef6c1a158:
   path: web/vite.config.ts
   description: 'Vite config: react + tailwind v4 plugins, @ alias to src. Dev server on port 5174.'
