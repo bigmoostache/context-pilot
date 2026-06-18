@@ -233,7 +233,7 @@ efe78c079599d3d0:
   importance: critical
   last_edited_ms: 0
 f5d97b1e7a01c317:
-  tl_dr: 'LATENCY/ALIGNMENT EPIC (T18/T120/X818): threads, phase/cost, messages, §7 streaming, Lifecycle, Checkpoint-carries-roster (X836b/X850) SHIPPED (cmd→visible ~14ms p50). Remaining = validation+completeness (see contents).'
+  tl_dr: 'LATENCY/ALIGNMENT EPIC (T18/T120/X818): threads, phase/cost, messages, §7 streaming, Lifecycle, Checkpoint-roster, §19 observability (backend endpoints + frontend HealthBadge) SHIPPED. Remaining = band-aid cleanup + multi-agent soak/fault matrix (see contents).'
   contents: |-
     ## DONE
     Threads proving ground: command→visible p50=14.3ms p99=32.6ms (was 349ms/'seconds'). Floor = durable journal-then-ack fsync (I11).
@@ -266,7 +266,7 @@ f5d97b1e7a01c317:
   - architecture
   - demaquetting
   - active
-  last_edited_ms: 1781816874279
+  last_edited_ms: 1781819282456
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium
