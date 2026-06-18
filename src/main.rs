@@ -129,16 +129,19 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
         let steps_widget = ratatui::widgets::Paragraph::new(step_lines);
         frame.render_widget(steps_widget, steps_area);
 
-        // Progress gauge — pure integer arithmetic to avoid float cast lints
+        // Progress gauge — pure integer arithmetic to avoid float cast lints.
+        // Reserve space for the " XX%" suffix so the bar + label fit in gauge_area.
         let pct = done_count.saturating_mul(100).checked_div(total).unwrap_or(0);
-        let gauge_width = gauge_area.width;
-        let filled_usize = done_count.saturating_mul(usize::from(gauge_width)).checked_div(total).unwrap_or(0);
-        let filled = u16::try_from(filled_usize).unwrap_or(gauge_width);
+        let pct_label = format!(" {pct}%");
+        let pct_width = u16::try_from(pct_label.len()).unwrap_or(5);
+        let bar_width = gauge_area.width.saturating_sub(pct_width);
+        let filled_usize = done_count.saturating_mul(usize::from(bar_width)).checked_div(total).unwrap_or(0);
+        let filled = u16::try_from(filled_usize).unwrap_or(bar_width);
         let mut gauge_bar = "█".repeat(filled_usize);
-        gauge_bar.push_str(&"░".repeat(usize::from(gauge_width.saturating_sub(filled))));
+        gauge_bar.push_str(&"░".repeat(usize::from(bar_width.saturating_sub(filled))));
         let gauge_line = Line::from(vec![
             Span::styled(gauge_bar, Style::default().fg(theme::accent())),
-            Span::raw(format!(" {pct}%")),
+            Span::raw(pct_label),
         ]);
         frame.render_widget(gauge_line, gauge_area);
     }));

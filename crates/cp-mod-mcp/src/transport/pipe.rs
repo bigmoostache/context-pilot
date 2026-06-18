@@ -34,7 +34,8 @@ pub struct SubprocessTransport {
 impl SubprocessTransport {
     /// Spawn `command` with `args` and wire up stdio framing.
     ///
-    /// stderr is inherited so server diagnostics surface in the host terminal.
+    /// stderr is suppressed (`/dev/null`) because the TUI owns the terminal —
+    /// any inherited stderr writes from the child corrupt the alternate screen.
     ///
     /// # Errors
     ///
@@ -45,7 +46,7 @@ impl SubprocessTransport {
             .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            .stderr(Stdio::null())
             .spawn()
             .map_err(|e| McpError::Spawn(format!("{command}: {e}")))?;
 
