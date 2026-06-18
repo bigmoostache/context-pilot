@@ -5602,6 +5602,10 @@ ca61d72fc90b435b:
   path: ui/src/components/agents/FleetDashboard.tsx
   description: Fleet welcome dashboard — mission control + agent create/manage entry. Centred on shared FLEET_MAX_W. Greeting, AgentCard grid (status badge + one-line task + model·cost; Open→threads, Manage→AgentModal), New-agent card. autoCreate prop (T21) opens AgentModal in create mode then calls onAutoCreateConsumed. AgentModal now lives in its own file (./AgentModal, T26) and is shared with the TopBar per-agent config button.
   last_edited_ms: 1781596446469
+ca8677b0a2f9bc35:
+  path: docs/design-orchestration-backend.md
+  description: 'Orchestration backend design doc. v7 three-tier durability model (oplog ① / untouched PersistenceWriter cache ② / lossy UDS stream ③) + I1-I13, K1-K9, R2-*, V1-V12 fault matrix. §22 v5 decision log. NEW §26 = v8 REALIZED-implementation decision log (X818 alignment epic): records what shipped vs designed — roster=oplog variants(OptA), read-plane-per-endpoint policy, derived-state 200-empty contract, roster-rides-checkpoint, §7 streaming end-to-end, symmetric Lifecycle, §19 metrics (histograms deferred non-load-bearing), single-mechanism freshness, v7 security subtraction; measured command→visible p50~14ms/p99 68ms; 10/12 V proven (V4/V8 external-CI); honest residual follow-ups.'
+  last_edited_ms: 1781824510755
 cad059175f38fce1:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: MAX_CONTENT_BYTES=100K, MAX_FILE_PATH_BYTES=1K, MAX_STORED_QUESTIONS=50 caps. execute_read: single-pass unack count+previews via inspect(). build_panel_content: MAX_PANEL_MESSAGES=50 cap. format_age helper.'

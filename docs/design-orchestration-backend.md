@@ -1005,3 +1005,123 @@ Until a row passes, its §20 entries are **"designed, test-pending,"** not ✅.
 append + crash-replay loop and pass **V1, V2, V10** against real `kill -9` and a
 simulated deadman re-exec. ~few hundred lines; it falsifies (or confirms) the
 load-bearing durability claim faster than any further revision.
+
+---
+
+## 26. Decision log — v8 (realized implementation: the X818 alignment epic)
+
+> **Status change.** v5–v7 were *design*. v8 records what the alignment epic
+> (`demaquetting` branch, todo X818) **actually built and validated**, so the
+> doc stays the single source of truth the wiring is measured against. Every
+> decision below is wired live and proven by a landed test or measurement;
+> cross-references point at the code and at `report/wiring-alignment-audit.md`
+> (the invariant-by-invariant scorecard). Nothing here retracts v7 — it is the
+> realization of v7's two planes.
+
+### 26.1 Realized decisions (design choice → what shipped)
+
+1. **Thread-roster representation = oplog `OpEntryKind` variants (Option A), not
+   content-addressed bodies.** `ThreadCreated` / `ThreadArchived` /
+   `ThreadRestored` / `ThreadStatusChanged` ride the oplog as first-class
+   internally-tagged variants, forward-compatible through the existing
+   `#[serde(other)] Unknown` arm (§18). Faithful to §16 (thread create/archive/
+   restore are oplog-journaled actions); minimal machinery. `cp-wire
+   types/oplog.rs` + `snapshot.rs` `RosterThread` (the single fold source: agent
+   replay and backend view fold call the same `fold_*` helpers, so a folded
+   roster is byte-identical to a checkpoint-restored one).
+
+2. **Read-plane-per-endpoint policy (the plane-discipline ruling).** Live,
+   high-churn reads (`/threads` roster, `/fleet`, `/agent`, phase, cost) are
+   served from the in-memory `MaterializedView` (Plane A), hydrated from tier-②
+   disk **once** at cold start (I5) and thereafter maintained purely by folding
+   the oplog tail. Genuinely low-churn inspection reads (memory, todos, tree,
+   callbacks, library, entities) **may** stay tier-② disk reads, mtime-memoized,
+   under the doc's "unmanaged read-only listing" allowance — each such read
+   carries a one-line justification (the §7 disk-read ledger in the audit
+   enumerates all 15). No endpoint rides disk for a live path by accident.
+
+3. **Derived state that the inspection plane structurally cannot rebuild
+   answers a deliberate 200-empty shape, never a 404.** Tools (compile-time
+   module YAMLs in the agent binary), Context Radar (a live half-life log
+   ranking the running agent computes), and Entities (an open SQLite connection
+   whose on-disk file is a 0-byte handle) cannot be reconstructed from tier-②
+   files. Their endpoints return the normal empty shape behind an agent-folder
+   guard (an unknown agent still 404s), and the frontend renders an explicit
+   *"unavailable over the web inspection plane"* notice. Honest boundary, no
+   fabricated data; real surfacing is a future agent-emitted artifact.
+
+4. **The roster rides the `Checkpoint` snapshot.** `Snapshot` carries
+   `heads + seen + roster` (`#[serde(default)]` for N-1 tolerance), so a backend
+   cold-restart **after oplog compaction** rebuilds the full thread list by
+   folding only the newest checkpoint-bearing segment, not from offset 0 (I3/I5).
+
+5. **§7 streaming is addressable end-to-end.** The agent tags every `Token`
+   frame with the active streaming `message_id`; the backend `TeeReader` (one
+   per agent, lossy by design) republishes frames into the `StreamHub` → SSE
+   `stream`; the frontend `useStreamingTokens` hook buffers per `message_id` and
+   flushes **once per `requestAnimationFrame`** (never `setState` per token — the
+   §7 mandatory contract). The durable `MessageCreated` oplog entry reconciles
+   the finalized message; the stream is latency, the oplog is truth (I10/K6).
+
+6. **`Lifecycle` is emitted symmetrically.** `Boot::start_in` journals a durable
+   `Lifecycle::Running` once every advertised resource is up; `Boot::drop`
+   journals `Lifecycle::Stopping` (the oplog commit thread drains + `fdatasync`s
+   it before joining). A `SIGKILL` falls back to flock-release + stale-heartbeat
+   detection — the intended best-effort-graceful contract. Status derivation
+   consults lifecycle so a stopping agent can never read "working" (I8).
+
+7. **§19 observability surfaces only state the backend genuinely holds.**
+   Read-only `/metrics` endpoints expose the durable breaker `{tripped, spend,
+   budget}`, stream `{subscribers, dropped, degraded}`, rev-lag `{view,
+   oplogHead, lag}`, and cumulative `tokens {input, output}` (folded from
+   `CostAggregate` into `view.cost`). A tripped breaker is now a **visible
+   cockpit pill**, not a silent latch (T121). The latency p50/p99 + fsync-latency
+   **histograms** are deliberately **deferred and not faked**: they need new
+   timestamped hot-path instrumentation and are explicitly non-load-bearing
+   (they would refine a percentile, not gate an invariant V11 + the latency
+   table already validate).
+
+8. **Single-mechanism freshness (band-aid removal).** Each delta-covered
+   resource owns its freshness purely through in-place SSE delta apply; the dead
+   `invalidate` bus and the `sendCommand` double-invalidate are gone.
+   Reducer-less inspection panels keep `invalidate` as their *sole* signal. Two
+   mechanisms never fight over one resource.
+
+9. **Security stays the v7 subtraction.** Filesystem perms (`0700`/`0600`) + a
+   presence-checked bearer `cap_token` for command authn (I9), plus the
+   single-use SSE upgrade ticket (I9b) re-justified as browser
+   confused-deputy / DNS-rebind defense. HMAC / nonce / rotation remain deferred
+   to the remote-transport seam (G7). No change.
+
+### 26.2 Measured outcome
+
+`command → visible` (POST `/command` → the matching rev-numbered roster delta on
+the SSE wire) measured **p50 ≈ 14 ms idle / 35 ms under live load, p99 68 ms,
+0/25 visible-misses** — down from the baseline's "seconds" (≤ 2 s `config.json`
+mtime poll). The durable journal-then-ack floor is p50 22 ms / p99 47 ms. The
+inversion that *was* the latency problem (frontend riding the disk/poll plane
+while the push plane sat inert) is corrected: the data is on the oplog, in the
+delta, the instant it changes.
+
+### 26.3 Validation status (fault matrix V1–V12)
+
+**10 of 12 V-rows are proven by a landed test.** V1 (real `SIGKILL` torn-tail),
+V2 (deadman exactly-once), V3 (dedup-after-outage), V5 (drop+reorder chaos →
+reconcile, `fleet_soak.rs`), V6 (auth), V7 (back-pressure), V9 (crash-loop
+breaker latch), V10 (gap-free under 16-agent concurrent load, `fleet_soak.rs`),
+V11 (no-fsync-on-loop), V12 (body-before-reference barrier). The remaining two —
+**V4** (fsync-fault FS-injection) and **V8** (literal 10k-agent OS soak) — are
+genuinely **external-CI** harnesses for invariants already validated by proxy
+(V4 rides V1's real-crash proof) and at-scale logic (V8 rides the N=16 isolation
+proof). Neither can be a localhost `cargo test` without contorting durability
+code or spawning 10k processes; both are documented honestly rather than faked.
+
+### 26.4 Honest residual follow-ups (non-load-bearing)
+
+- §19 latency/fsync **histograms** (need new instrumentation; refuse to fabricate).
+- `/conversation` reads `messages/*.yaml` for the durable record (live typing
+  rides the stream plane); future optimization = serve from view `heads` + the
+  `/body/{hash}` content store.
+- Multi-`tool_use` assistant messages render only the first tool card in the
+  cockpit (a fidelity nicety).
+- The literal V4 / V8 external-CI harnesses above.

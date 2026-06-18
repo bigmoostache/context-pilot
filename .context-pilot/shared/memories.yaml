@@ -233,7 +233,7 @@ efe78c079599d3d0:
   importance: critical
   last_edited_ms: 0
 f5d97b1e7a01c317:
-  tl_dr: 'LATENCY/ALIGNMENT EPIC (T18/T120/X818): threads, phase/cost, messages, §7 streaming, Lifecycle, Checkpoint-roster, §19 observability, cockpit derived-panels, token-economics all SHIPPED+LIVE. Remaining = X867 gap re-walk + X869 soak/fault-matrix + X870 doc/tag.'
+  tl_dr: 'ALIGNMENT EPIC (T18/T120/X818) COMPLETE: all sub-todos shipped+live incl X867 re-walk, X869 soak (10/12 V; V4/V8 external-CI), X870 §26 v8 decision-log. Only deploy TAG remains — propose to user. Commits+code in contents.'
   contents: |-
     ## DONE
     Threads proving ground: command->visible p50=14.3ms p99=32.6ms (was 349ms/'seconds'). Floor = durable journal-then-ack fsync (I11).
@@ -262,7 +262,7 @@ f5d97b1e7a01c317:
   - architecture
   - demaquetting
   - active
-  last_edited_ms: 1781822761907
+  last_edited_ms: 1781824468442
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium
