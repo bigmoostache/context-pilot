@@ -21,6 +21,7 @@ pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
         Action::ThreadArchiveStart => archive_start(state),
         Action::ThreadArchiveConfirm => archive_confirm(state),
         Action::ThreadArchiveCancel => archive_cancel(state),
+        Action::ThreadToggleArchivedView => toggle_archived_view(state),
         Action::ThreadQuestionUp => question_up(state),
         Action::ThreadQuestionDown => question_down(state),
         Action::ThreadQuestionLeft => question_left(state),
@@ -108,15 +109,17 @@ pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
 
 /// Navigate to the next thread (or wrap to first).
 fn select_next(state: &mut State) -> ActionResult {
-    let thread_count = ThreadsState::get(state).threads.len();
-    let total = thread_count.saturating_add(1);
+    let viewing_archived = FocusState::get(state).viewing_archived;
+    let visible_count = ThreadsState::get(state).visible_indices(viewing_archived).len();
+    // Active view has a trailing virtual "+ New Thread" entry; archived view does not.
+    let total = if viewing_archived { visible_count } else { visible_count.saturating_add(1) };
     let focus = FocusState::get_mut(state);
     focus.selected_thread_idx = if focus.selected_thread_idx >= total.saturating_sub(1) {
         0
     } else {
         focus.selected_thread_idx.saturating_add(1)
     };
-    if focus.selected_thread_idx < thread_count {
+    if focus.selected_thread_idx < visible_count {
         FocusState::mark_selected_read(state);
     }
     state.scroll_offset = 0.0;
@@ -127,15 +130,16 @@ fn select_next(state: &mut State) -> ActionResult {
 
 /// Navigate to the previous thread (or wrap to last).
 fn select_prev(state: &mut State) -> ActionResult {
-    let thread_count = ThreadsState::get(state).threads.len();
-    let total = thread_count.saturating_add(1);
+    let viewing_archived = FocusState::get(state).viewing_archived;
+    let visible_count = ThreadsState::get(state).visible_indices(viewing_archived).len();
+    let total = if viewing_archived { visible_count } else { visible_count.saturating_add(1) };
     let focus = FocusState::get_mut(state);
     focus.selected_thread_idx = if focus.selected_thread_idx == 0 {
         total.saturating_sub(1)
     } else {
         focus.selected_thread_idx.saturating_sub(1)
     };
-    if focus.selected_thread_idx < thread_count {
+    if focus.selected_thread_idx < visible_count {
         FocusState::mark_selected_read(state);
     }
     state.scroll_offset = 0.0;
@@ -167,49 +171,83 @@ fn create_cancel(state: &mut State) -> ActionResult {
 }
 
 /// Start thread archive — show confirmation prompt.
+///
+/// Guards on the *visible* list for the current view (active or archived),
+/// so the prompt only appears when there is actually a thread to act on.
 fn archive_start(state: &mut State) -> ActionResult {
-    let has_threads = !ThreadsState::get(state).threads.is_empty();
-    if has_threads {
+    let viewing_archived = FocusState::get(state).viewing_archived;
+    let has_visible = !ThreadsState::get(state).visible_indices(viewing_archived).is_empty();
+    if has_visible {
         FocusState::get_mut(state).confirming_archive = true;
         state.flags.ui.dirty = true;
     }
     ActionResult::Nothing
 }
 
-/// Confirm thread archive — remove the selected thread.
+/// Toggle between the active and archived thread lists (Ctrl+U).
 ///
-/// Cleans up all `FocusState` references to the archived thread:
+/// Resets the selection to the top of the newly-shown list and clears any
+/// pending archive confirmation, so the two views never share stale state.
+fn toggle_archived_view(state: &mut State) -> ActionResult {
+    let focus = FocusState::get_mut(state);
+    focus.viewing_archived = !focus.viewing_archived;
+    focus.selected_thread_idx = 0;
+    focus.confirming_archive = false;
+    state.scroll_offset = 0.0;
+    state.flags.stream.user_scrolled = false;
+    state.flags.ui.dirty = true;
+    ActionResult::Nothing
+}
+
+/// Confirm thread archive (active view) or restore (archived view).
+///
+/// `selected_thread_idx` is a position into the *visible* slice
+/// ([`ThreadsState::visible_indices`]) — the active threads in the normal
+/// view, the archived ones in the archived view. We resolve it to a real
+/// storage index, then **soft-delete** (set `archived = true`) or **restore**
+/// (`archived = false`) instead of removing the thread, so it is retained in
+/// state and the web frontend can still display it.
+///
+/// Cleans up all `FocusState` references to a thread being archived:
 /// focused ID, last-read count, `MY_TURN` notification debounce.
 fn archive_confirm(state: &mut State) -> ActionResult {
-    let focus = FocusState::get_mut(state);
-    focus.confirming_archive = false;
-    let selected_idx = focus.selected_thread_idx;
+    let focus = FocusState::get(state);
+    let viewing_archived = focus.viewing_archived;
+    let selected_pos = focus.selected_thread_idx;
+    FocusState::get_mut(state).confirming_archive = false;
 
-    // Capture the archived thread's ID for focus cleanup.
-    let archived_id = ThreadsState::get(state).threads.get(selected_idx).map(|t| t.id.clone());
+    // Resolve the visible position to a real storage index.
+    let visible = ThreadsState::get(state).visible_indices(viewing_archived);
+    let Some(&real_idx) = visible.get(selected_pos) else {
+        state.flags.ui.dirty = true;
+        return ActionResult::Nothing;
+    };
 
-    let threads_state = ThreadsState::get_mut(state);
-    if selected_idx < threads_state.threads.len() {
-        let _removed = threads_state.threads.remove(selected_idx);
-    }
+    // Toggle the archived flag (archive in active view, restore in archived view).
+    let toggled_id = {
+        let ts = ThreadsState::get_mut(state);
+        ts.threads.get_mut(real_idx).map(|t| {
+            t.archived = !viewing_archived;
+            t.id.clone()
+        })
+    };
 
-    let len = ThreadsState::get(state).threads.len();
+    // Clamp selection to the new visible-list length for the current view.
+    let new_visible_len = ThreadsState::get(state).visible_indices(viewing_archived).len();
     let focus_after = FocusState::get_mut(state);
-    if len == 0 {
-        focus_after.selected_thread_idx = 0;
-    } else if focus_after.selected_thread_idx >= len {
-        focus_after.selected_thread_idx = len.saturating_sub(1);
+    if focus_after.selected_thread_idx >= new_visible_len {
+        focus_after.selected_thread_idx = new_visible_len.saturating_sub(1);
     }
 
-    // Clean up all references to the archived thread.
-    if let Some(ref aid) = archived_id {
-        if focus_after.focused_thread_id.as_deref() == Some(aid) {
+    // Clean up focus references to a thread leaving the active list (archive only).
+    if !viewing_archived && let Some(aid) = toggled_id {
+        if focus_after.focused_thread_id.as_deref() == Some(&aid) {
             focus_after.focused_thread_id = None;
             focus_after.dangling_remaining = 0;
             focus_after.escalation_level = 0;
         }
-        let _prev = focus_after.last_read_count.remove(aid);
-        if focus_after.notified_my_turn_id.as_deref() == Some(aid) {
+        let _prev = focus_after.last_read_count.remove(&aid);
+        if focus_after.notified_my_turn_id.as_deref() == Some(&aid) {
             focus_after.notified_my_turn_id = None;
         }
     }

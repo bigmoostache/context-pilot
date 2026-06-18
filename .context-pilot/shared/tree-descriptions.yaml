@@ -78,10 +78,6 @@
   path: crates/cp-mod-search/src/meili/bootstrap.rs
   description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config, project path hashing via FNV-1a, initial metrics population.'
   last_edited_ms: 0
-03710ad5b23fd8f3:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Threads view: Tab/BackTab for thread nav (Up/Down freed for scroll). Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
-  last_edited_ms: 1781378041144
 03a944323757e175:
   path: crates/cp-base/src/config/mod.rs
   description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations. ConsoleGuardrails: git/gh only. Sub-modules: constants, global, llm_types, yaml_sync, behavioral, accessors.'
@@ -138,6 +134,10 @@
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread input composer. MY_TURN: real textarea with onSend (Enter=submit, Shift+Enter=newline). Non-MY_TURN: working spinner (ACTIVE green vs THEIR_TURN signal).'
   last_edited_ms: 1781694593910
+050fc180b0f4e75f:
+  path: src/ui/threads_view/mod.rs
+  description: Threads view layout + list rendering. Renders over visible_indices(viewing_archived) filtered list; virtual '+ New Thread' only in active view; ARCHIVED header tag + empty-state hint in archived view; view-aware help/confirm hints (Ctrl+A arch/restore, Ctrl+U toggle). maybe_activate_thread_question resolves selection via visible list.
+  last_edited_ms: 1781786109391
 05111fe0c29e9f23:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
@@ -246,6 +246,10 @@
   path: crates/cp-render/src/overlay_ir.rs
   description: Search index overlay IR types (Ctrl+I). SearchIndexOverlay, SearchServer, SearchIndex, SearchExtension, SearchSplitter, SearchEmbeddings, SearchTask, SearchRecomputed, SearchRecentFile.
   last_edited_ms: 0
+0922221deb4837df:
+  path: src/app/run/threads.rs
+  description: 'Thread helpers for main loop. maybe_inject_auto_read + check_my_turn_threads + maybe_inject_auto_read all SKIP archived threads (LLM-invisible). Bridge command polling: poll_bridge_commands + accept_commands + apply_command (SendMessage/CreateThread/Archive/Restore/Stop/Interrupt via K7).'
+  last_edited_ms: 1781786109374
 094971202a4be7cb:
   path: src/llms/claude_code_api_key/streaming.rs
   description: 'parse_sse_stream(): SSE event loop with verbose error diagnostics, log_sse_error() to .context-pilot/errors/'
@@ -262,6 +266,10 @@
   path: crates/cp-base/src/config/models.rs
   description: Per-provider model enums (Anthropic, Grok, Groq, DeepSeek, MiniMax, ClaudeCodeV2) with ModelInfo impls. Pricing, context windows, API names, display names.
   last_edited_ms: 1781447352999
+099ca512c027dbba:
+  path: src/app/events/models.rs
+  description: 'Config-overlay model selection dispatch. pub(super) dispatch_primary_model + dispatch_secondary_model const fns: provider + letter-index (a/b/c/d→0-3) → Action::ConfigSelect*Model. Extracted from events/mod.rs for the 500-line structure limit.'
+  last_edited_ms: 1781786109308
 09bc3296ceb89b76:
   path: src/ui/ir/mod.rs
   description: IR-to-ratatui adapter. semantic_to_style (pub(crate)) + ir_span_to_ratatui (with reversed support). blocks_to_lines converts IR Block vec to ratatui Lines. Table/ProgressBar/Tree/KeyValue renderers. build_frame + build_active_panel frame assembly.
@@ -726,10 +734,6 @@
   path: crates/cp-base/Cargo.toml
   description: 'Base crate deps: crossterm, serde, serde_json, serde_yaml, sha2, chrono, log, parking_lot, typemap_rev, globset, syntect, tree-sitter, reqwest, tokio. No ratatui.'
   last_edited_ms: 1780497937359
-1ccf8274fc20a003:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
-  last_edited_ms: 0
 1d56292f7cfa0f19:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
@@ -974,10 +978,6 @@
   path: src/app/reverie/trigger.rs
   description: check_threshold_trigger() (auto-fire cleaner on token breach), start_manual_reverie() (per-agent guards)
   last_edited_ms: 0
-26d72bccb4448f6b:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
-  last_edited_ms: 0
 2736252060aba893:
   path: crates/cp-base/src/modules.rs
   description: Module trait — pluggable functionality contract. init/save/load state, tool definitions/execution/pre-flight, panel creation, overview delegation, lifecycle hooks (on_user_message/stream_stop/stream_chunk/tool_progress/tool_complete), file watcher integration.
@@ -1002,6 +1002,10 @@
   path: crates/cp-mod-spine/Cargo.toml
   description: 'Spine module deps: cp-base, cp-render, cp-mod-utilities, crossterm, serde, serde_json.'
   last_edited_ms: 0
+27de052b3e6f6387:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: Thread tool handlers. execute_send/execute_read/build_panel_content. Archived threads filtered out of LLM-facing context (build_panel_content + execute_read summaries) so archived threads are invisible to the model. MAX caps on content/file-path/questions/panel-messages.
+  last_edited_ms: 1781786109341
 27e02466fb70db0f:
   path: crates/cp-wire/src/framing.rs
   description: 'Oplog record framing: len(4B LE)+CRC32C(4B LE)+JSON payload. encode_raw/decode_raw + encode_entry/decode_entry. Manual u32_to_le (const)/u32_from_le (non-const: From not const-stable). FrameError enum (no std::error::Error — dodges missing_trait_methods). All buffer access via .get() (indexing_slicing forbid). 15 tests.'
@@ -1277,10 +1281,6 @@
 3279dfee597f2c60:
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
-  last_edited_ms: 0
-32ecc2eaab5be1b3:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
   last_edited_ms: 0
 3319ed35d08f46b9:
   path: crates/cp-mod-tree/src/storage.rs
@@ -1738,6 +1738,10 @@
   path: docs/design-matrix-module.md
   description: 'Matrix/Chat module design: Tuwunel homeserver, mautrix bridges, 8 tools, 2 panels, sync architecture, 50 design decisions'
   last_edited_ms: 0
+431c08b08541d647:
+  path: crates/cp-base/src/state/actions.rs
+  description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
+  last_edited_ms: 0
 4327a9d0488d4ae9:
   path: CODE_OF_CONDUCT.md
   description: Code of conduct
@@ -1746,10 +1750,6 @@
   path: ui/src/components/threads/ThreadsView.tsx
   description: Threads view assembler, scoped to ACTIVE AGENT's realm (filters threadDetails by agentId, EmptyRealm when none). 2-pane (collapsible ThreadList | ThreadConversation). Owns collapsed state; floating PanelLeft Button re-opens the rail when collapsed. onOpenCockpit bridges to panel view.
   last_edited_ms: 1781531986889
-43532538c41614da:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Threads view: Tab/BackTab for thread nav (Up/Down freed for scroll). Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
-  last_edited_ms: 0
 437b9a6fbb5c551a:
   path: src/ui/ir/render_status_bar.rs
   description: Status bar IR adapter — renders StatusBar to ratatui line. Badges (streaming/tooling/ready/blocked), agent/skill cards, git branch, auto-continue, reverie, queue, think balance. Builder from state. Wall-clock spinner.
@@ -2082,10 +2082,6 @@
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks. Phase 2 SKIPS the threads module while the history-cleanup trap is active (QueueState.trap_active) — otherwise threads focus enforcement blocks Close_conversation_history and deadlocks the two traps.'
   last_edited_ms: 1781525989192
-51f4a0f6e82fbf3d:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
-  last_edited_ms: 0
 520bd83b42d1d2d7:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams structs. post_json() generic helper. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
@@ -2706,10 +2702,6 @@
   path: crates/cp-oplog/src/error.rs
   description: 'OplogError{Io,Frame} + Display + From<io::Error>/From<FrameError> + OplogResult alias. Extracted from append.rs (folder-size: append.rs hit 501 lines). Deliberately NO std::error::Error impl (dodges missing_trait_methods on unstable provide()).'
   last_edited_ms: 1781623192148
-6afe0e875956a37f:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
-  last_edited_ms: 0
 6b337c67d5dc532a:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny, 45 allow across clippy/rust lints). openssl vendored for cross-compilation.
@@ -3374,6 +3366,10 @@
   path: crates/cp-render/src/lib.rs
   description: 'IR rendering crate. Semantic styling (not RGB). Block enum: Line/Empty/Header/Table/ProgressBar/Tree/Separator/KeyValue. Span with semantic+bold/italic/dimmed/reversed+optional RGB. pub mod markdown for shared parsing. Serializable for future web frontend.'
   last_edited_ms: 0
+85f2d2b01e78365b:
+  path: src/app/actions/threads.rs
+  description: Thread action handlers. Archive = SOFT-DELETE (archived=true) not remove; restore clears flag. archive_confirm is view-aware (archive in active view, restore in archived view). toggle_archived_view flips FocusState.viewing_archived. Select/archive_start resolve selection through visible_indices. Question form → MY_TURN + spine notification.
+  last_edited_ms: 1781786109358
 8620fd4094c9381f:
   path: src/app/run/mod.rs
   description: 'Sub-module declarations. 6 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), tools (execution pipeline), watchers (file/GH).'
@@ -3506,10 +3502,6 @@
   path: yamls/tools/memory.yaml
   description: Memory tools YAML. memory_create (content, contents, importance, labels) + memory_update (id, content, contents, importance, labels, delete).
   last_edited_ms: 1780582405270
-8aaeb88c9940beb7:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
-  last_edited_ms: 0
 8adf9f8544d4d161:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
@@ -3530,6 +3522,10 @@
   path: .github/checks/lint-config.chain
   description: Cryptographic hash chain protecting 12 critical lint/config files
   last_edited_ms: 0
+8b59e50385c1b936:
+  path: crates/cp-mod-threads/src/types.rs
+  description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage, Thread (with archived:bool), ThreadQuestionForm. ThreadsState + FocusState (with viewing_archived flag). visible_indices(archived) maps a view to real storage indices; has_my_turn filters archived; mark_selected_read resolves selection through visible list.'
+  last_edited_ms: 1781786109325
 8ba9c57e812408bc:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
@@ -3541,10 +3537,6 @@
 8bbb544a5eb52d65:
   path: src/modules/questions/mod.rs
   description: 'QuestionsModule: core, 1 tool (Think only). ThinkState persistence, on_tool_complete counter drift. No ask_user_question tool. Uses core.yaml for tool texts.'
-  last_edited_ms: 0
-8be8066eb5d159fe:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
   last_edited_ms: 0
 8c0867d815410d9d:
   path: docs/console-server.md
@@ -3614,10 +3606,6 @@
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN (width=var(--sidebar-w); collapse prop + edge-rail removed per T23). NO agent header. Working search <input> filters by name+last-preview. Groups: ''Needs you'' (MY_TURN, signal), ''Active'' (ACTIVE, green/ok, the one streaming), ''Working in parallel'' (THEIR_TURN). Per-row hover Archive/Restore action. Footer ''Archived (N)'' toggles a read-only archived view. New Thread button → onNewThread. Header pill counts agent-owned working threads.'
   last_edited_ms: 1781553182555
-8e86d7d94bccc5c8:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Threads view: Tab/BackTab for thread nav (Up/Down freed for scroll). Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
-  last_edited_ms: 0
 8ea3ec8ee82d3fd0:
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Thread input routing: handle_thread_input_submit. Thread creation: MAX_THREAD_NAME_LEN=200 cap. Paste sentinel expansion. /command replacement.'
@@ -3766,10 +3754,6 @@
   path: crates/cp-oplog/tests/crash_replay.rs
   description: 'Phase 9 (X776) MILESTONE M0 crash-replay harness. Unix-only (#![cfg(unix)]). Self-re-exec pattern: env-gated #[test] crash_child_entrypoint re-runs the test binary as a child via current_exe(); parent/child handshake through a fdatasync''d marker file (libtest stdout is noisy). V1 v1_real_sigkill_leaves_a_clean_replayable_oplog: child spams durable MessageCreated appends, parent kill()s (real SIGKILL), fresh process replay() never errors + every announced-durable rev survives + torn tail truncated (announce-after-durable K9 across real crash). V2 v2_journalled_command_is_exactly_once_after_deadman_reexec: child journals CommandEffect then dies, fresh process recovers seen-set token, duplicate SeenMark delivery folds to no-op (exactly-once across process boundary). V12 v12_barrier_is_pending_the_body_store: asserts body_gc_eligible rule, explicit placeholder until body store lands Phase 14. 4 tests green.'
   last_edited_ms: 1781623644158
-948c434731a78dc5:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
-  last_edited_ms: 0
 94a5320bb61a1ca6:
   path: src/app/actions/threads.rs
   description: 'Thread action handlers. Dispatches Thread* action variants (select/create/archive/question navigation). Question form: cursor movement, toggle selection, Enter submit (YAML answers with escaped other_text -> ThreadMessage -> MY_TURN + spine notification), dismiss, char/backspace for Other field.'
@@ -4017,10 +4001,6 @@
 9efd30caaa25c138:
   path: CHANGELOG.md
   description: Release changelog
-  last_edited_ms: 0
-9f146f41165c2753:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
   last_edited_ms: 0
 9f4a2e56b8f9925a:
   path: clippy.toml
@@ -4902,10 +4882,6 @@ c16f14c57e1a7e0c:
   path: ui/src/components/shell/AgentSwitcher.tsx
   description: 'TopBar workspace switcher dropdown (1 agent=1 folder). activeId optional: with an agent shows name+folder; at fleet altitude shows neutral ''Select an agent'' placeholder. Items wrapped in DropdownMenuGroup (Base UI fix). ''New agent…'' → onNewAgent (fleet agents page + create dialog, T21); ''Manage agents (fleet)'' → onFleet. Switch agent inline.'
   last_edited_ms: 1781545852624
-c1830c18dbdec18a:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Threads view: Tab/BackTab for thread nav (Up/Down freed for scroll). Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
-  last_edited_ms: 0
 c192ef13584f001b:
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (max_cost is burst/stream-based), coucou (timer/datetime scheduling).'
@@ -4937,6 +4913,10 @@ c2d3bc4f0fcb2a16:
 c2e8ce0b2cd68b7c:
   path: src/ui/ir/mod.rs
   description: IR-to-ratatui adapter. semantic_to_style (pub(crate)) + ir_span_to_ratatui (with reversed support). blocks_to_lines converts IR Block vec to ratatui Lines. Table/ProgressBar/Tree/KeyValue renderers. build_frame + build_active_panel frame assembly.
+  last_edited_ms: 0
+c2f863461b1f2295:
+  path: src/app/actions/mod.rs
+  description: Central action dispatch (Elm/Redux-style). CycleViewMode resets scroll_offset + user_scrolled. Thread actions extracted to threads.rs.
   last_edited_ms: 0
 c338519b09352739:
   path: crates/cp-mod-files/src/lib.rs
@@ -5358,10 +5338,6 @@ d2d0808774f88ec3:
   path: run.sh
   description: Development run script
   last_edited_ms: 0
-d2eda9a634d5c36d:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
-  last_edited_ms: 0
 d2eef20869d99ca6:
   path: crates/cp-mod-logs/src/panel.rs
   description: Logs panel. Tree-structured display with summaries. format_timestamp() via cp_mod_utilities::time::epoch_ms_to_local_ymd_hms. IR block rendering with expand/collapse. Context provider for LLM.
@@ -5382,6 +5358,10 @@ d3757733b7f060a3:
   path: src/ui/ir/render_status_bar.rs
   description: Status bar IR adapter — renders StatusBar to ratatui line. Badges (streaming/tooling/ready/blocked), agent/skill cards, git branch, auto-continue, reverie, queue, think balance. Builder from state. Wall-clock spinner.
   last_edited_ms: 0
+d37c6dbe3fb3d6bb:
+  path: src/app/events/mod.rs
+  description: 'handle_event() event router. Global Ctrl shortcuts first: in Threads view Ctrl+A = archive (active) / restore-confirm (archived), Ctrl+U = ThreadToggleArchivedView. dispatch_primary/secondary_model thin wrappers → models::. Explicit KeyCode match arms (no _ wildcard per lint).'
+  last_edited_ms: 1781786109291
 d3a1971541577d59:
   path: crates/cp-base/src/lib.rs
   description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (20 tool + 6 config YAML files) with #[expect(clippy::panic)].'
@@ -5417,10 +5397,6 @@ d484653c157e056a:
 d486285ed7025782:
   path: src/app/actions/helpers.rs
   description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.
-  last_edited_ms: 0
-d48f46df7a190e21:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
   last_edited_ms: 0
 d495c60011ecdbf4:
   path: src/llms/mod.rs
@@ -6393,10 +6369,6 @@ ff702272b5c58ee7:
 ff972378b9c9624f:
   path: Cargo.lock
   description: Workspace lockfile
-  last_edited_ms: 0
-ffa4da3ef00da59b:
-  path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
   last_edited_ms: 0
 ffd10c656a62b649:
   path: ui/src/index.css

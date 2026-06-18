@@ -30,11 +30,16 @@ pub(crate) const THREAD_LIST_WIDTH: u16 = 28;
 pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let threads_state = ThreadsState::get(state);
     let focus_state = FocusState::get(state);
+    let viewing_archived = focus_state.viewing_archived;
 
-    // Clamp selected index — allow one past end for virtual "New Thread" entry
-    let total_entries = threads_state.threads.len().saturating_add(1);
+    // The visible list is the subset matching the current view. The active
+    // view has a trailing virtual "+ New Thread" entry; the archived view
+    // does not.
+    let visible = threads_state.visible_indices(viewing_archived);
+    let show_new = !viewing_archived;
+    let total_entries = visible.len().saturating_add(usize::from(show_new));
     let selected_idx = focus_state.selected_thread_idx.min(total_entries.saturating_sub(1));
-    let on_virtual_new = selected_idx >= threads_state.threads.len();
+    let on_virtual_new = show_new && selected_idx >= visible.len();
 
     // Two-pane layout: thread list | message area
     if area.width > THREAD_LIST_WIDTH.saturating_add(20) {
@@ -49,8 +54,8 @@ pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &State, area: Re
         render_thread_list(frame, state, list_area);
         if on_virtual_new {
             render_new_thread_prompt(frame, state, msg_area);
-        } else {
-            messages::render_message_area_with_input(frame, state, selected_idx, msg_area);
+        } else if let Some(&real_idx) = visible.get(selected_idx) {
+            messages::render_message_area_with_input(frame, state, real_idx, msg_area);
         }
     } else {
         // Narrow terminal — show thread list only
@@ -65,7 +70,10 @@ pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &State, area: Re
 fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let ts = ThreadsState::get(state);
     let focus = FocusState::get(state);
-    let total_entries = ts.threads.len().saturating_add(1); // +1 for virtual entry
+    let viewing_archived = focus.viewing_archived;
+    let visible = ts.visible_indices(viewing_archived);
+    let show_new = !viewing_archived; // virtual "+ New Thread" only in the active view
+    let total_entries = visible.len().saturating_add(usize::from(show_new));
     let selected = focus.selected_thread_idx.min(total_entries.saturating_sub(1));
     let confirming = focus.confirming_archive;
 
@@ -84,30 +92,45 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let mut selected_line_start: Option<usize> = None;
     let mut selected_line_end: Option<usize> = None;
 
-    // Virtual "+ New Thread" entry — rendered first, 2-line format like real threads
-    let on_virtual = selected >= ts.threads.len();
-    let new_sem = if on_virtual { Semantic::Accent } else { Semantic::Muted };
-    if on_virtual {
-        selected_line_start = Some(ir_blocks.len());
-    }
-    // Line 1: indicator + dot + typed name (or placeholder)
-    let new_name = if on_virtual && !state.input.is_empty() {
-        truncate_str(&state.input, inner.width.saturating_sub(6).into())
-    } else {
-        "New Thread".to_owned()
-    };
-    ir_blocks.push(IrBlock::Line(vec![
-        S::styled("  ".to_owned(), new_sem),
-        S::styled("● ".to_owned(), new_sem),
-        S::styled(new_name, new_sem),
-    ]));
-    // Line 2: badge
-    ir_blocks.push(IrBlock::Line(vec![S::new("  ".to_owned()), S::styled("[NEW THREAD]".to_owned(), new_sem)]));
-    if on_virtual {
-        selected_line_end = Some(ir_blocks.len());
+    // Header tag when viewing the archived list, so the mode is unmistakable.
+    if viewing_archived {
+        ir_blocks.push(IrBlock::Line(vec![
+            S::styled("  ".to_owned(), Semantic::Muted),
+            S::styled("⌗ ARCHIVED".to_owned(), Semantic::AccentDim),
+        ]));
+        ir_blocks.push(IrBlock::Empty);
     }
 
-    for (i, thread) in ts.threads.iter().enumerate() {
+    // Virtual "+ New Thread" entry — active view only, 2-line format.
+    let on_virtual = show_new && selected >= visible.len();
+    if show_new {
+        let new_sem = if on_virtual { Semantic::Accent } else { Semantic::Muted };
+        if on_virtual {
+            selected_line_start = Some(ir_blocks.len());
+        }
+        // Line 1: indicator + dot + typed name (or placeholder)
+        let new_name = if on_virtual && !state.input.is_empty() {
+            truncate_str(&state.input, inner.width.saturating_sub(6).into())
+        } else {
+            "New Thread".to_owned()
+        };
+        ir_blocks.push(IrBlock::Line(vec![
+            S::styled("  ".to_owned(), new_sem),
+            S::styled("● ".to_owned(), new_sem),
+            S::styled(new_name, new_sem),
+        ]));
+        // Line 2: badge
+        ir_blocks.push(IrBlock::Line(vec![S::new("  ".to_owned()), S::styled("[NEW THREAD]".to_owned(), new_sem)]));
+        if on_virtual {
+            selected_line_end = Some(ir_blocks.len());
+        }
+    }
+
+    // `i` is the position in the visible slice; `real` indexes `ts.threads`.
+    for (i, &real) in visible.iter().enumerate() {
+        let Some(thread) = ts.threads.get(real) else {
+            continue;
+        };
         let is_selected = i == selected;
 
         // Unread detection: messages beyond last-read count
@@ -161,6 +184,11 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         }
     }
 
+    // Empty-state hint when the archived list has nothing in it.
+    if viewing_archived && visible.is_empty() {
+        ir_blocks.push(IrBlock::Line(vec![S::muted("  (no archived threads)".to_owned())]));
+    }
+
     // Pad to push help hints to the bottom
     let content_lines = ir_blocks.len();
     let help_y = inner.height.saturating_sub(1).to_usize();
@@ -172,15 +200,29 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
 
     // Help / confirmation hint
     if confirming {
+        let (verb, key_sem) = if viewing_archived {
+            (" Restore? ", Semantic::KeyHint)
+        } else {
+            (" Archive? ", Semantic::KeyHint)
+        };
         ir_blocks.push(IrBlock::Line(vec![
-            S::warning(" Archive? ".to_owned()),
-            S::styled("y".to_owned(), Semantic::KeyHint),
+            S::warning(verb.to_owned()),
+            S::styled("y".to_owned(), key_sem),
             S::muted("/any to cancel".to_owned()),
+        ]));
+    } else if viewing_archived {
+        ir_blocks.push(IrBlock::Line(vec![
+            S::styled(" Ctrl+A".to_owned(), Semantic::KeyHint),
+            S::muted(" restore  ".to_owned()),
+            S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
+            S::muted(" active".to_owned()),
         ]));
     } else {
         ir_blocks.push(IrBlock::Line(vec![
             S::styled(" Ctrl+A".to_owned(), Semantic::KeyHint),
-            S::muted(" del  ".to_owned()),
+            S::muted(" arch  ".to_owned()),
+            S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
+            S::muted(" arch'd  ".to_owned()),
             S::styled("Ctrl+V".to_owned(), Semantic::KeyHint),
             S::muted(" back".to_owned()),
         ]));
@@ -249,9 +291,9 @@ pub(crate) fn maybe_activate_thread_question(state: &mut State) {
     let (should_clear, init_data) = {
         let ts = ThreadsState::get(state);
         let focus = FocusState::get(state);
-        let selected = focus.selected_thread_idx.min(ts.threads.len().saturating_sub(1));
+        let visible = ts.visible_indices(focus.viewing_archived);
 
-        let Some(thread) = ts.threads.get(selected) else {
+        let Some(thread) = visible.get(focus.selected_thread_idx).and_then(|&i| ts.threads.get(i)) else {
             return;
         };
 

@@ -447,6 +447,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         | Action::ThreadArchiveStart
         | Action::ThreadArchiveConfirm
         | Action::ThreadArchiveCancel
+        | Action::ThreadToggleArchivedView
         | Action::ThreadQuestionUp
         | Action::ThreadQuestionDown
         | Action::ThreadQuestionLeft

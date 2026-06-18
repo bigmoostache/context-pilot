@@ -182,6 +182,9 @@ pub enum Action {
     ThreadArchiveConfirm,
     /// Cancel thread archive — dismisses the confirmation.
     ThreadArchiveCancel,
+    /// Toggle between the active and archived thread lists in the
+    /// thread-centered view (Ctrl+U). Resets selection to the top.
+    ThreadToggleArchivedView,
     /// Move cursor up in thread question form.
     ThreadQuestionUp,
     /// Move cursor down in thread question form.

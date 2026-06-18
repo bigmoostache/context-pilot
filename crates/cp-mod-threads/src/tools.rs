@@ -127,9 +127,9 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     let thread_name = target_thread.name.clone();
     let thread_status = target_thread.status;
 
-    // Per-thread unacknowledged counts
+    // Per-thread unacknowledged counts (archived threads are LLM-invisible, T9)
     let mut thread_summaries: Vec<String> = Vec::new();
-    for t in &ts.threads {
+    for t in ts.threads.iter().filter(|t| !t.archived) {
         let unack = t.messages.iter().filter(|m| !m.acknowledged).count();
         let marker = if t.id == tid { " ← focused" } else { "" };
         thread_summaries.push(format!(
@@ -263,7 +263,10 @@ fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String 
     let ts = ThreadsState::get(state);
     let mut output = String::from("=== Threads ===\n");
 
-    for t in &ts.threads {
+    // Archived threads are invisible to the LLM (T9): only active threads
+    // appear in the context the model reads. The web frontend still lists
+    // archived threads (inspection plane) behind its own toggle.
+    for t in ts.threads.iter().filter(|t| !t.archived) {
         let unack = t.messages.iter().filter(|m| !m.acknowledged).count();
         let focus_marker = if t.id == focused_tid { " ★" } else { "" };
         _ = writeln!(

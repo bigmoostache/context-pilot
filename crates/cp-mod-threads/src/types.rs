@@ -144,10 +144,33 @@ impl ThreadsState {
         state.ext_mut::<Self>()
     }
 
-    /// Returns true if any thread is in `MyTurn` status.
+    /// Returns true if any *non-archived* thread is in `MyTurn` status.
+    ///
+    /// Archived threads are invisible to the LLM (T9): they never trigger
+    /// `MY_TURN` idle nudges, never appear in context. Restoring a thread
+    /// makes it count again.
     #[must_use]
     pub fn has_my_turn_threads(&self) -> bool {
-        self.threads.iter().any(|t| t.status == ThreadStatus::MyTurn)
+        self.threads.iter().any(|t| !t.archived && t.status == ThreadStatus::MyTurn)
+    }
+
+    /// Indices into [`Self::threads`] of the threads whose `archived` flag
+    /// matches `archived`, in storage order.
+    ///
+    /// The TUI thread-centered view shows one subset at a time — the active
+    /// list (`archived = false`) or the archived list (`archived = true`,
+    /// toggled by Ctrl+U). Selection (`selected_thread_idx`) is a position
+    /// **into this filtered slice**, resolved back to a real index here so a
+    /// soft-deleted thread keeps its place in storage without polluting the
+    /// visible list.
+    #[must_use]
+    pub fn visible_indices(&self, archived: bool) -> Vec<usize> {
+        self.threads
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| t.archived == archived)
+            .map(|(i, _)| i)
+            .collect()
     }
 }
 
@@ -179,6 +202,13 @@ pub struct FocusState {
     /// Set by pressing 'a' in Threads view, cleared on 'y' (confirm) or any other key.
     #[serde(default)]
     pub confirming_archive: bool,
+    /// When true, the TUI thread-centered view shows the *archived* threads
+    /// instead of the active ones (toggled by Ctrl+U). Selection indexes into
+    /// the matching filtered slice ([`ThreadsState::visible_indices`]); the
+    /// virtual "+ New Thread" entry only appears in the active (non-archived)
+    /// view.
+    #[serde(default)]
+    pub viewing_archived: bool,
     /// Per-thread last-read message count, keyed by thread ID.
     /// Used for unread indicators — a thread is "unread" when
     /// `messages.len() > last_read_count[thread_id]`.
@@ -213,6 +243,7 @@ impl FocusState {
             selected_thread_idx: 0,
             creating_thread: false,
             confirming_archive: false,
+            viewing_archived: false,
             last_read_count: std::collections::BTreeMap::new(),
             notified_my_turn_id: None,
             active_question: None,
@@ -240,11 +271,18 @@ impl FocusState {
 
     /// Mark the currently selected thread as fully read.
     /// Updates `last_read_count` to the thread's current message count.
+    ///
+    /// `selected_thread_idx` is a position into the visible slice for the
+    /// current view, so it is resolved through [`ThreadsState::visible_indices`]
+    /// to the real storage index before marking.
     pub fn mark_selected_read(state: &mut State) {
         let threads = ThreadsState::get(state);
         let focus = Self::get(state);
-        let idx = focus.selected_thread_idx.min(threads.threads.len().saturating_sub(1));
-        if let Some(thread) = threads.threads.get(idx) {
+        let visible = threads.visible_indices(focus.viewing_archived);
+        let Some(&real_idx) = visible.get(focus.selected_thread_idx) else {
+            return;
+        };
+        if let Some(thread) = threads.threads.get(real_idx) {
             let tid = thread.id.clone();
             let count = thread.messages.len();
             let _prev = Self::get_mut(state).last_read_count.insert(tid, count);

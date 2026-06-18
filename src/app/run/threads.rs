@@ -54,10 +54,13 @@ pub(super) fn maybe_inject_auto_read(app: &mut App) {
     let ts = ThreadsState::get(&app.state);
 
     // Prefer the thread the notification is about; fall back to any MY_TURN.
+    // Archived threads are LLM-invisible (T9) and never auto-read.
     let my_turn = candidate_ids
         .iter()
-        .find_map(|tid| ts.threads.iter().find(|t| t.id == *tid && t.status == ThreadStatus::MyTurn))
-        .or_else(|| ts.threads.iter().find(|t| t.status == ThreadStatus::MyTurn));
+        .find_map(|tid| {
+            ts.threads.iter().find(|t| t.id == *tid && !t.archived && t.status == ThreadStatus::MyTurn)
+        })
+        .or_else(|| ts.threads.iter().find(|t| !t.archived && t.status == ThreadStatus::MyTurn));
 
     let Some(thread) = my_turn else {
         return;
@@ -145,7 +148,8 @@ pub(super) fn check_my_turn_threads(app: &mut App) {
     }
 
     let threads = ThreadsState::get(&app.state);
-    let my_turn = threads.threads.iter().find(|t| t.status == ThreadStatus::MyTurn);
+    // Archived threads are invisible to the LLM (T9) — they never nudge.
+    let my_turn = threads.threads.iter().find(|t| !t.archived && t.status == ThreadStatus::MyTurn);
 
     let Some(thread) = my_turn else {
         // No MY_TURN threads — clear debounce.
