@@ -247,6 +247,28 @@ export function fetchPreview(agentId: string, path: string): Promise<string> {
   return request(`/api/agent/${agentId}/fs/preview?path=${encodeURIComponent(path)}`)
 }
 
+/** Trigger a browser download for a file in the agent's realm. */
+export async function downloadFile(agentId: string, path: string): Promise<void> {
+  const res = await fetch(
+    `${BASE}/api/agent/${agentId}/fs/download?path=${encodeURIComponent(path)}`,
+  )
+  if (!res.ok) {
+    const body = await res.text().catch(() => res.statusText)
+    throw new Error(`${res.status}: ${body}`)
+  }
+  const blob = await res.blob()
+  const filename =
+    res.headers
+      .get("Content-Disposition")
+      ?.match(/filename="?([^"]+)"?/)?.[1] ?? path.split("/").pop() ?? "download"
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export interface ConversationMsg {
   uid: string
   role: string

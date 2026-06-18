@@ -482,6 +482,10 @@
   path: src/ui/help/palette.rs
   description: 'Command palette state + IR adapter. CommandPalette struct (state methods: open/close/filter/select). to_ir() builds PaletteOverlay. render_command_palette_from_ir() adapter renders from IR. 19 theme:: calls in adapter only.'
   last_edited_ms: 0
+13d64209b193a95c:
+  path: web/src/lib/api.ts
+  description: 'Typed REST client for all 22 backend endpoints. Base URL from VITE_API_URL env (default localhost:7878). Fleet, agent meta, threads (with RawThread→ThreadDetail transform: status mapping, formatAge timestamps, content→text/role→author/timestamp→ts message field mapping), panels (13 kinds), finder, usage, library, commands, ticket mint. Transforms 7 panel responses from raw module state dicts to maquette array shapes. Memory IDs assigned sequentially as M1/M2 etc.'
+  last_edited_ms: 0
 13fd308c36b41576:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
@@ -1457,6 +1461,10 @@
 39e1ed7a3ddf9eba:
   path: src/llms/oai_providers/openai_compat.rs
   description: Shared OpenAI-compat message builder for Grok/Groq/DeepSeek. OaiMessage/OaiToolCall types. build_messages() with pre-assembled or raw paths. Tool pairing. Panel injection as fake tool calls.
+  last_edited_ms: 0
+39ed29c021969202:
+  path: crates/cp-orchestrator/src/transport/finder.rs
+  description: 'Finder endpoints: confined dir listing (GET /fs?path=), file preview (GET /fs/preview?path=, 256KB cap, binary reject), conversation (GET /conversation, messages/*.yaml sorted, cap 200). Path confinement via canonicalize+starts_with (rejects ../symlink/absolute). FinderKind from 60+ extensions. 5 new tests.'
   last_edited_ms: 0
 39f140275594437f:
   path: crates/cp-mod-threads/src/types.rs
@@ -3206,6 +3214,10 @@
   path: crates/cp-mod-search/src/indexer.rs
   description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. 3s poll interval PollWatcher.
   last_edited_ms: 0
+80b766b68d019a72:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Phase 19/30 + P1-P7: transport hub. Backend shared state + serve/serve_bound + route_rest (22 routes) + handle_stream SSE. CORS headers on all responses + OPTIONS preflight 204. /api/health. stream_to_client uses into_writer() + per-event flush. Invalidation: dirty_agents set, mark_dirty/take_dirty for SSE invalidate events.'
+  last_edited_ms: 0
 80c19c2cf49274b0:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
@@ -4006,6 +4018,10 @@
   path: crates/cp-mod-search/Cargo.toml
   description: 'Search module deps: cp-base, cp-mod-logs, cp-render, crossterm, serde, serde_json, sha2, reqwest, notify, tree-sitter (9 langs), chrono, serde_yaml, log.'
   last_edited_ms: 1780563847632
+9fb712668d3556d5:
+  path: web/src/lib/live.ts
+  description: 'Generic useLiveQuery hook (fetch + SSE-invalidate + 5s poll backstop + 200ms debounce). 17 typed wrapper hooks: useFleet, useAgentMeta, useThreads, usePanels, useMemory, useTodos, useSpine, useQueue, useScratchpad, useTree, useCallbacks, useTools, useRadar, useEntities, useFs, useConversation, useLibrary. Re-exports sendCommand/mintTicket.'
+  last_edited_ms: 0
 9fdaa7ab4fe93023:
   path: test.md
   description: Scratch test file
@@ -4378,6 +4394,10 @@ af63a1c3cc1bf35d:
   path: crates/cp-orchestrator/Cargo.toml
   description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal, kill signal-0 pid-liveness) + serde + serde_json + tiny_http (0.12, transport). dev: cp-mod-bridge (test-only seam validation, never a runtime dep) + tempfile. lib+bin package. Workspace lints.'
   last_edited_ms: 1781650132119
+af6dd95d8269c492:
+  path: web/src/components/finder/Finder.tsx
+  description: Per-agent Finder file manager (confined to agent realm). Uses useFs(agentId, relCwd) for live directory listings — converts absolute cwd to relative path for the backend API. Tabs+history+nav+selection+drag-drop+statusbar. buildCrumbs/pathName helpers. Four view modes (grid/list/columns/gallery), keyboard control, marquee selection.
+  last_edited_ms: 0
 afd5f6a171e03b31:
   path: website/docs/keyboard.html
   description: 'Docs: keyboard shortcuts reference'

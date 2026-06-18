@@ -196,6 +196,14 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
         return;
     }
 
+    // File download — returns raw bytes, not JSON.
+    if method == Method::Get {
+        if let ["api", "agent", id, "fs", "download"] = segments.as_slice() {
+            handle_download(request, state, id, &query);
+            return;
+        }
+    }
+
     // Read the body up-front (only POST routes consume it). The mutable borrow
     // ends here, before the request is moved into the response.
     let body_bytes = if method == Method::Post { read_body(&mut request) } else { Vec::new() };
@@ -406,14 +414,35 @@ fn cleanup(state: &Arc<Mutex<Backend>>, agent_id: &str, sub_id: Option<u64>) {
     }
 }
 
+/// Serve a raw file download with `Content-Disposition: attachment`.
+fn handle_download(request: Request, state: &Arc<Mutex<Backend>>, id: &str, query: &str) {
+    match finder::fs_download(state, id, query) {
+        Ok((bytes, filename)) => {
+            let mut response = Response::from_data(bytes).with_status_code(200);
+            if let Ok(h) = Header::from_bytes(
+                &b"Content-Disposition"[..],
+                format!("attachment; filename=\"{filename}\"").as_bytes(),
+            ) {
+                response = response.with_header(h);
+            }
+            if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], &b"application/octet-stream"[..]) {
+                response = response.with_header(h);
+            }
+            for header in cors_headers() {
+                response = response.with_header(header);
+            }
+            let _sent = request.respond(response);
+        }
+        Err(reply) => respond_json(request, &reply),
+    }
+}
+
 /// Load an agent's registry record from the backend's agents directory.
 fn load_entry(state: &Arc<Mutex<Backend>>, id: &str) -> Option<Entry> {
     let dir = state.lock().ok()?.agents_dir.clone();
     let raw = std::fs::read(dir.join(format!("{id}.json"))).ok()?;
     serde_json::from_slice::<Entry>(&raw).ok()
 }
-
-
 
 /// CORS response headers permitting the Vite dev server (or any origin) to
 /// call the backend. Tighten to a specific origin in production if needed.
@@ -427,8 +456,6 @@ fn cors_headers() -> Vec<Header> {
     .filter_map(Result::ok)
     .collect()
 }
-
-
 
 /// Respond with a JSON [`HttpReply`](rest::HttpReply), including CORS headers.
 fn respond_json(request: Request, reply: &rest::HttpReply) {

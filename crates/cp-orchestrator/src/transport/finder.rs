@@ -14,6 +14,49 @@ use std::sync::Mutex;
 use super::rest::HttpReply;
 use super::Backend;
 
+/// Maximum file size for downloads (10 MiB).
+const MAX_DOWNLOAD_BYTES: u64 = 10 * 1024 * 1024;
+
+/// `GET /api/agent/{id}/fs/download?path=` — raw file download.
+///
+/// Returns the file's raw bytes with `Content-Disposition: attachment` so the
+/// browser triggers a save-as dialog. Confined to the agent's folder, capped
+/// at [`MAX_DOWNLOAD_BYTES`].
+///
+/// Returns `Ok((bytes, filename))` on success, `Err(HttpReply)` on error.
+pub fn fs_download(
+    state: &Mutex<Backend>,
+    agent_id: &str,
+    query: &str,
+) -> Result<(Vec<u8>, String), HttpReply> {
+    let folder = agent_folder(state, agent_id)?;
+    let relative = match extract_param(query, "path") {
+        Some(p) if !p.is_empty() => p,
+        _ => return Err(HttpReply::error(400, "missing path parameter")),
+    };
+    let target = match confined_path(&folder, &relative) {
+        Some(p) => p,
+        None => return Err(HttpReply::error(403, "path outside agent realm")),
+    };
+    if !target.is_file() {
+        return Err(HttpReply::error(404, "file not found"));
+    }
+
+    let meta = std::fs::metadata(&target).map_err(|_| HttpReply::error(404, "file not found"))?;
+    if meta.len() > MAX_DOWNLOAD_BYTES {
+        return Err(HttpReply::error(413, "file too large for download"));
+    }
+
+    let bytes = std::fs::read(&target).map_err(|_| HttpReply::error(502, "read failed"))?;
+    let filename = target
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("download")
+        .to_owned();
+
+    Ok((bytes, filename))
+}
+
 /// Maximum file size returned by the preview endpoint (256 KiB).
 const MAX_PREVIEW_BYTES: u64 = 256 * 1024;
 

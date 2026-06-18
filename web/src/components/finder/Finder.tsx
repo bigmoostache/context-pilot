@@ -7,7 +7,7 @@ import type {
   FinderViewMode,
 } from "@/lib/types"
 import { fmtBytes, sortNodes } from "@/lib/finderFs"
-import { useFs } from "@/lib/live"
+import { downloadFile, useFs } from "@/lib/live"
 
 /** Build breadcrumbs from a path relative to the agent's folder. */
 function buildCrumbs(
@@ -376,20 +376,33 @@ export function Finder({ agent }: { agent: Agent }) {
         onQuery={setQuery}
         onNewFolder={() => flash("New Folder created")}
         onUpload={() => flash("Choose files to upload…")}
-        onDownload={() =>
-          flash(
-            selected.size
-              ? `Downloading ${selected.size} item(s)…`
-              : "Select files to download.",
-          )
-        }
+        onDownload={() => {
+          if (!selected.size) {
+            flash("Select files to download.")
+            return
+          }
+          const files = [...selected]
+            .map((p) => children.find((c) => c.path === p))
+            .filter((n) => n && n.kind !== "folder")
+          if (files.length === 0) {
+            flash("Select files (not folders) to download.")
+            return
+          }
+          for (const node of files) {
+            if (node) downloadFile(agent.id, node.path).catch(() => flash(`Failed to download ${node.name}`))
+          }
+          flash(`Downloading ${files.length} file(s)…`)
+        }}
         onTogglePreview={() => setPreviewOpen((o) => !o)}
         onTogglePathBar={() => setPathBarOpen((o) => !o)}
         fileActive={!!active.fileNode}
         onFileGetInfo={() => active.fileNode && setInfo(active.fileNode)}
-        onFileDownload={() =>
-          flash(`Downloading ${active.fileNode?.name ?? "file"}…`)
-        }
+        onFileDownload={() => {
+          if (active.fileNode) {
+            downloadFile(agent.id, active.fileNode.path).catch(() => flash("Download failed"))
+            flash(`Downloading ${active.fileNode.name}…`)
+          }
+        }}
         onFileShare={() => flash(`Share ${active.fileNode?.name ?? "file"}…`)}
       />
 

@@ -264,6 +264,7 @@ export function useLibrary(agentId: string): LiveQueryResult<LibraryItem[]> {
 // ── Commands (imperative, not hooks) ──────────────────────────────────
 
 export { mintTicket } from "./api"
+export { downloadFile } from "./api"
 
 /**
  * Send a command to an agent, then automatically invalidate all live
