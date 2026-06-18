@@ -402,6 +402,10 @@
   path: src/llms/oai_providers/mod.rs
   description: 'Module declarations: deepseek, grok, groq, openai_compat, openai_streaming.'
   last_edited_ms: 0
+10899fbf2b6216c0:
+  path: src/app/run/threads.rs
+  description: 'Thread-related helpers for the main event loop. maybe_inject_auto_read (synthetic Read on auto-continuation), check_my_turn_threads (idle MY_TURN detection + spine notification), extract_thread_ids (parse thread IDs from notification content). Bridge command polling: poll_bridge_commands + accept_commands (non-blocking accept, 500ms read timeout) + apply_command dispatch (SendMessage/CreateThread/Archive/Restore/Stop/Interrupt via K7 path). Free functions taking &mut App.'
+  last_edited_ms: 0
 10929e2d7defe9c1:
   path: rustfmt.toml
   description: Rust formatting config
@@ -1778,6 +1782,10 @@
   path: crates/cp-mod-callback/src/tools.rs
   description: Callback tool dispatch with flame!("cb_dispatch"). Routes upsert/toggle/open_editor/close_editor. Delegates upsert to tools_upsert.rs.
   last_edited_ms: 1780497937352
+4645ec2e22f0111d:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: 'Thread tool handlers. execute_send: MAX_CONTENT_BYTES=100K, MAX_FILE_PATH_BYTES=1K, MAX_STORED_QUESTIONS=50 caps. execute_read: single-pass unack count+previews via inspect(). build_panel_content: MAX_PANEL_MESSAGES=50 cap. format_age helper.'
+  last_edited_ms: 0
 4751cc31255d89ce:
   path: chain.sh
   description: Hash chain update/verify script (password-protected)
@@ -2778,6 +2786,10 @@
   path: ui/src/lib/panelMeta.ts
   description: Panel icon map (lucide), accent vars, loadColor (token-load→color), fmtTokens/fmtCost formatters.
   last_edited_ms: 0
+6fc57bd55b3f3466:
+  path: src/app/actions/input.rs
+  description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Thread input routing: handle_thread_input_submit. Thread creation: MAX_THREAD_NAME_LEN=200 cap. Paste sentinel expansion. /command replacement.'
+  last_edited_ms: 0
 6fd3adfcd1ec6cc1:
   path: src/ui/search_overlay/text.rs
   description: Plain-text export of Ctrl+I overlay for clipboard copy. Includes process CPU%/RAM stats for Meilisearch.
@@ -3213,6 +3225,10 @@
 82aa468001ce0d70:
   path: crates/cp-mod-search/src/panel.rs
   description: Search result panel + YAML formatter. format_results() groups file chunks by path, includes log entries. visualize_search_output() for conversation view highlighting. Same metadata persistence pattern. No tags.
+  last_edited_ms: 0
+82d56e6e7ecb79d2:
+  path: yamls/tools/threads.yaml
+  description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
   last_edited_ms: 0
 82f9cca2ef6c5801:
   path: crates/cp-wire/src/types/command.rs
@@ -4686,6 +4702,10 @@ bd7caed81d967b3b:
   path: crates/cp-mod-git/src/lib.rs
   description: 'Git module. 1 tool: git_execute. refresh_git_status() for overview (branch + numstat). Watches .git/ paths. watcher_immediate_refresh=false to prevent feedback. overview_context_section renders changes table.'
   last_edited_ms: 0
+bdb821c68ede0ffb:
+  path: web/src/components/agents/AgentModal.tsx
+  description: 'Agent create/manage dialog. MODELS + MODEL_META (rich picker). slugify(name) derives realm folder. AgentModalMode: create or manage{agent}. onFlash optional (fleet supplies, TopBar omits). submit() decorative (no API call).'
+  last_edited_ms: 1781775130157
 bddf74016a26a659:
   path: src/llms/cache/cache_engine.rs
   description: Cache breakpoint engine. Hash chain (acc_hash = sha256(block + prev)). Tracks alive BPs via hash match. Places beacon at frontier+20. Runs DP optimizer for 3 additional BPs (4 total). 5-min TTL matching Anthropic.
@@ -6198,6 +6218,10 @@ feeba821ce42dd7e:
   path: crates/cp-base/src/config/yaml_sync.rs
   description: YamlSync engine. SyncEntry trait (yaml_key, last_edited_ms, set_last_edited_ms). Generic load/save/upsert/remove/populate/migrate/remove_where. BTreeMap-based, additive merge, latest-wins conflict resolution, .bak backup.
   last_edited_ms: 1780497937366
+fefb63ecae3e8db4:
+  path: crates/cp-mod-threads/src/lib.rs
+  description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, count positive. Send to a THEIR_TURN thread is ALLOWED (status stays THEIR_TURN) — no block. Focus enforcement with dangling/escalation. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
+  last_edited_ms: 0
 ff334ba4f3a157e6:
   path: crates/cp-wire/src/types/registry.rs
   description: 'Entry: agent registration record (id, folder, pid, boot_id, cap_token, paths, status) + AgentStatus.'
