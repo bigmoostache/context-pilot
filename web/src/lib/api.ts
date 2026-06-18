@@ -35,11 +35,7 @@ import type {
   LibraryItem,
 } from "./types"
 
-export interface FleetResponse {
-  agents: Agent[]
-}
-
-export function fetchFleet(): Promise<FleetResponse> {
+export function fetchFleet(): Promise<Agent[]> {
   return request("/api/fleet/meta")
 }
 
