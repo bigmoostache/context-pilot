@@ -3074,6 +3074,10 @@
   path: crates/cp-mod-memory/Cargo.toml
   description: 'Memory module deps: cp-base, cp-render, crossterm, serde, serde_json, cp-mod-utilities.'
   last_edited_ms: 0
+7872e64c324a13b5:
+  path: crates/cp-wire/src/types/oplog.rs
+  description: 'OpEntry (schema_version,rev,timestamp_ms) + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated, ThreadCreated{thread_id,name,status:ThreadTurn,timestamp_ms}, ThreadArchived{thread_id}, ThreadRestored{thread_id}, ThreadStatusChanged{thread_id,status}, Lifecycle, CostAggregate, Checkpoint{snapshot}, Unknown catch-all. Roster variants (Phase 1.1) carry enough to materialise a roster entry without disk read; msg_count+last_activity DERIVED by folding MessageCreated. Framed payload (len+CRC). round-trip + tolerant-decode + roster-round-trip + stable-tag tests.'
+  last_edited_ms: 1781787267804
 7893c6f6ee3ced9a:
   path: src/llms/cache/cache_optimizer.rs
   description: 'Exact two-level DP optimizer. Minimizes expected recompute cost. Phase 1: per-super-block split DP. Phase 2: knapsack across super-blocks. O(N²·K) time. Prefix sums for O(1) block_cost. Backtracks for positions.'
@@ -3106,6 +3110,10 @@
   path: src/ui/help/mod.rs
   description: Re-exports CommandPalette, config_overlay module
   last_edited_ms: 0
+79bf65e8f8e43a82:
+  path: crates/cp-oplog/src/replay.rs
+  description: 'Oplog replay (GAP1/I5): Recovered{rev_head,heads,seen}. fold_entry: Checkpoint=authoritative clone_from, MessageCreated=set_thread_head, CommandEffect|SeenMark=seen.mark, others (incl 4 thread-roster variants) no-op — agent replay rebuilds only heads+seen; roster is recovered by tier-② load + folded by the BACKEND MaterializedView, not agent replay. Fast-path reads only newest checkpoint-bearing segment. 10 tests.'
+  last_edited_ms: 1781787267839
 79d027b0ce254972:
   path: crates/cp-base/src/state/mod.rs
   description: 'Sub-module hub: actions, autocomplete, context, data, flags, runtime (State struct), watchers. Inline reverie module with Session struct (kind, agent, messages, tool_call_count).'
@@ -3150,6 +3158,10 @@
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
   last_edited_ms: 0
+7c6348e9a357189c:
+  path: crates/cp-orchestrator/src/services/materialized_view.rs
+  description: 'Phase 18: MaterializedView in-mem fleet projection folded from OpEntry (one AgentView per agent). AgentView{rev,heads,phase,lifecycle,cost}.apply: Checkpoint=authoritative heads reset, MessageCreated=set_thread_head, Phase/Lifecycle/Cost=latest-wins, CommandEffect/SeenMark/4-thread-roster-variants/Unknown=inert (roster projection not yet a field on AgentView — lands with X835 view-fold). 7 tests.'
+  last_edited_ms: 1781787267872
 7c8d1c712f95c232:
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
@@ -4110,6 +4122,10 @@ a24ca6a492b02678:
   path: src/llms/claude_code/mod.rs
   description: Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
   last_edited_ms: 1780565754920
+a2ab866cbb42292d:
+  path: crates/cp-wire/src/types/mod.rs
+  description: 'ContentHash (SHA-256, Copy, hex serde: of/to_hex/from_hex). Phase enum (Idle/Streaming/Tooling), LifecycleState (Starting/Running/Stopping/Stopped), ThreadTurn (MyTurn/TheirTurn/Unknown, snake_case) — wire mirror of threads ThreadStatus, defined here (not imported from cp-mod-threads) to keep layering one-directional. Declares+re-exports ack/body/command/oplog/registry/snapshot/stream. SHA-256 vector + round-trip + ThreadTurn tolerant-decode tests.'
+  last_edited_ms: 1781787267822
 a332cc8b0055c3a8:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. Declares sql/ + panels/ submodules with re-exports. Depends on search.
@@ -6250,6 +6266,10 @@ fad776c4dfccb118:
   path: docs/design-entities.md
   description: Entities module design doc. SQLite entity DB, entity_sql tool, auto-migrations, schema dump/restore, Meilisearch sync, fuzzy error enrichment. Fully implemented.
   last_edited_ms: 1780592402510
+fae88340a69a0bd9:
+  path: crates/cp-oplog/src/service.rs
+  description: 'Phase 8 (X775) GAP2: OplogService off-loop group-commit + asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate=BestEffort, all else (incl 4 thread-roster mutations — user-visible state, must not be lost — + Unknown conservative)=Durable. append_durable blocks+awaits sync; append_best_effort try_send drop-on-full. commit_loop drains batch, ONE fdatasync, releases acks. 6 tests.'
+  last_edited_ms: 1781787267855
 fb00c83eb8aa781c:
   path: src/app/actions/streaming.rs
   description: 'Streaming action handlers: AppendChars (typewriter), StreamDone (token accounting, cache correction), StreamError (logging, truncation). Per-stream/total/tick token accumulation in apply_token_usage().'

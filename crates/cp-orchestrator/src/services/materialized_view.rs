@@ -91,8 +91,16 @@ impl AgentView {
                     cost_usd: *cost_usd,
                 };
             }
+            // Thread-roster deltas are part of the wire protocol but the
+            // roster projection is not yet a field on `AgentView` (it lands
+            // with the view-fold work). They advance `rev` but are otherwise
+            // inert here for now.
             OpEntryKind::CommandEffect { .. }
             | OpEntryKind::SeenMark { .. }
+            | OpEntryKind::ThreadCreated { .. }
+            | OpEntryKind::ThreadArchived { .. }
+            | OpEntryKind::ThreadRestored { .. }
+            | OpEntryKind::ThreadStatusChanged { .. }
             | OpEntryKind::Unknown => {}
         }
     }

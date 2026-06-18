@@ -172,6 +172,28 @@ pub enum LifecycleState {
     Stopped,
 }
 
+/// Whose turn it is on a thread — the wire mirror of the threads module's
+/// `ThreadStatus`.
+///
+/// Carried by [`OpEntryKind::ThreadCreated`](oplog::OpEntryKind::ThreadCreated)
+/// and [`ThreadStatusChanged`](oplog::OpEntryKind::ThreadStatusChanged) so the
+/// backend's materialized roster knows, without a disk read, whether a thread
+/// is waiting on the human (`MyTurn`) or owned by the agent (`TheirTurn`).
+/// Defined here in the I/O-free protocol crate rather than imported from
+/// `cp-mod-threads` to keep the layering one-directional (modules depend on the
+/// wire, never the reverse).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ThreadTurn {
+    /// The thread is waiting on the human — it needs a user response.
+    MyTurn,
+    /// The agent owns the thread (working it / will respond).
+    TheirTurn,
+    /// A turn value from a newer protocol version (N-1 forward-compat).
+    #[serde(other)]
+    Unknown,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,5 +275,24 @@ mod tests {
             let back: LifecycleState = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(state, back);
         }
+    }
+
+    #[test]
+    fn thread_turn_round_trip() {
+        for turn in [ThreadTurn::MyTurn, ThreadTurn::TheirTurn] {
+            let json = serde_json::to_string(&turn).expect("serialize");
+            let back: ThreadTurn = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(turn, back);
+        }
+        // snake_case wire spelling is stable (the frontend depends on it).
+        assert_eq!(serde_json::to_string(&ThreadTurn::MyTurn).expect("ser"), "\"my_turn\"");
+        assert_eq!(serde_json::to_string(&ThreadTurn::TheirTurn).expect("ser"), "\"their_turn\"");
+    }
+
+    #[test]
+    fn thread_turn_unknown_is_tolerant() {
+        // An N-1 receiver folds a future turn value to Unknown rather than failing.
+        let back: ThreadTurn = serde_json::from_str("\"some_future_turn\"").expect("tolerant decode");
+        assert_eq!(back, ThreadTurn::Unknown);
     }
 }

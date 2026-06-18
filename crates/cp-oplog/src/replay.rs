@@ -68,9 +68,17 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
         OpEntryKind::CommandEffect { dedup_token, .. } | OpEntryKind::SeenMark { dedup_token } => {
             state.seen.mark(dedup_token, entry.rev);
         }
+        // Thread-roster mutations are recovered by the agent's tier-② state
+        // load, not by oplog replay (which rebuilds only heads + seen for the
+        // agent's own durability recovery). The *backend* folds these into its
+        // MaterializedView roster; here they carry no heads/seen state.
         OpEntryKind::PhaseTransition { .. }
         | OpEntryKind::Lifecycle { .. }
         | OpEntryKind::CostAggregate { .. }
+        | OpEntryKind::ThreadCreated { .. }
+        | OpEntryKind::ThreadArchived { .. }
+        | OpEntryKind::ThreadRestored { .. }
+        | OpEntryKind::ThreadStatusChanged { .. }
         | OpEntryKind::Unknown => {}
     }
 }

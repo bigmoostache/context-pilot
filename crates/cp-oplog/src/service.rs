@@ -100,6 +100,10 @@ impl Durability {
             OpEntryKind::CommandEffect { .. }
             | OpEntryKind::SeenMark { .. }
             | OpEntryKind::MessageCreated { .. }
+            | OpEntryKind::ThreadCreated { .. }
+            | OpEntryKind::ThreadArchived { .. }
+            | OpEntryKind::ThreadRestored { .. }
+            | OpEntryKind::ThreadStatusChanged { .. }
             | OpEntryKind::Lifecycle { .. }
             | OpEntryKind::Checkpoint { .. }
             | OpEntryKind::Unknown => Self::Durable,

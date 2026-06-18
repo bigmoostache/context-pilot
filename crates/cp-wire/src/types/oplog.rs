@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::snapshot::Snapshot;
-use super::{ContentHash, LifecycleState, Phase};
+use super::{ContentHash, LifecycleState, Phase, ThreadTurn};
 
 /// A single oplog record.
 ///
@@ -72,6 +72,52 @@ pub enum OpEntryKind {
         message_id: String,
         /// Content-addressed hash of the message body (I3/I13).
         head: ContentHash,
+    },
+
+    /// A new thread was opened.
+    ///
+    /// Carries enough to materialise the roster entry without a disk read: the
+    /// roster is the lightweight per-thread metadata the `/threads` endpoint
+    /// serves from the in-memory view (design doc §16 lists thread
+    /// create/archive/restore as oplog-journaled actions; I8). Message count
+    /// and last-activity are *derived* by folding subsequent
+    /// [`MessageCreated`](Self::MessageCreated) entries — they are not repeated
+    /// here.
+    #[serde(rename = "thread_created")]
+    ThreadCreated {
+        /// Identifier of the new thread (e.g. `"T7"`).
+        thread_id: String,
+        /// User-chosen thread label.
+        name: String,
+        /// Initial turn ownership at creation.
+        status: ThreadTurn,
+        /// Wall-clock creation time (epoch ms) — seeds the roster's
+        /// last-activity until the first message lands.
+        timestamp_ms: u64,
+    },
+
+    /// A thread was archived (soft-delete — hidden from the active list, kept
+    /// for restore).
+    #[serde(rename = "thread_archived")]
+    ThreadArchived {
+        /// The archived thread.
+        thread_id: String,
+    },
+
+    /// A previously-archived thread was restored to the active list.
+    #[serde(rename = "thread_restored")]
+    ThreadRestored {
+        /// The restored thread.
+        thread_id: String,
+    },
+
+    /// A thread's turn ownership changed (`MyTurn` ↔ `TheirTurn`).
+    #[serde(rename = "thread_status_changed")]
+    ThreadStatusChanged {
+        /// The affected thread.
+        thread_id: String,
+        /// The thread's new turn ownership.
+        status: ThreadTurn,
     },
 
     /// Agent lifecycle state changed (boot, shutdown, etc.).
@@ -151,5 +197,42 @@ mod tests {
         }"#;
         let entry: OpEntry = serde_json::from_str(json).expect("tolerant decode");
         assert_eq!(entry.kind, OpEntryKind::Unknown);
+    }
+
+    #[test]
+    fn thread_roster_kinds_round_trip() {
+        let kinds = [
+            OpEntryKind::ThreadCreated {
+                thread_id: "T7".into(),
+                name: "Refactor the cache engine".into(),
+                status: ThreadTurn::MyTurn,
+                timestamp_ms: 1_718_000_002_000,
+            },
+            OpEntryKind::ThreadArchived { thread_id: "T7".into() },
+            OpEntryKind::ThreadRestored { thread_id: "T7".into() },
+            OpEntryKind::ThreadStatusChanged {
+                thread_id: "T7".into(),
+                status: ThreadTurn::TheirTurn,
+            },
+        ];
+        for kind in kinds {
+            let entry = OpEntry { schema_version: 1, rev: 1, timestamp_ms: 0, kind: kind.clone() };
+            let json = serde_json::to_string(&entry).expect("serialize");
+            let back: OpEntry = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(entry, back);
+        }
+    }
+
+    #[test]
+    fn thread_created_wire_tag_is_stable() {
+        // The internally-tagged discriminant is part of the wire contract.
+        let entry = OpEntry {
+            schema_version: 1,
+            rev: 3,
+            timestamp_ms: 0,
+            kind: OpEntryKind::ThreadArchived { thread_id: "T1".into() },
+        };
+        let json = serde_json::to_string(&entry).expect("serialize");
+        assert!(json.contains("\"kind\":\"thread_archived\""), "stable tag: {json}");
     }
 }
