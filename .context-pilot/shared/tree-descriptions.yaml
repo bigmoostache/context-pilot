@@ -1858,6 +1858,10 @@
   path: crates/cp-wire/src/types/snapshot.rs
   description: 'Bounded replay snapshot: Snapshot{heads,seen}. Heads (per-thread/panel content hashes, O(threads+panels)) + SeenSet (dedup-tokens of durable command effects, evicted by acked-rev via evict_through, NEVER time — I4/R2-1). SeenSet.mark idempotent keeps first rev. Checkpoint carries Snapshot (both heads AND seen) so seen rebuild doesn''t fold from offset 0. Replaces old heads.rs (merged to keep types/ ≤ 8 files). 9 tests.'
   last_edited_ms: 0
+49743315fcd05fc7:
+  path: web/src/components/shell/StatusBar.tsx
+  description: 'Bottom status footer. Fleet mode: accepts agents prop for aggregates (count, threads, needs-you, spend). Agent mode: accepts activeAgent prop, derives phase from status, wires cost live. Cache bar (cacheStats/tokenBudget) still mock.'
+  last_edited_ms: 0
 49b8bf07f497e29e:
   path: src/app/run/tools/queue_flush.rs
   description: Queue flush execution — dequeues and runs all queued tool calls. FlushedTool struct + execute_queue_flush(). save_flushed_tool_call_message() creates compact Tool_execution stubs. augment_remaining_history_panels() appends remaining panel info. Extracted from pipeline.rs for file-length limit.
@@ -6118,6 +6122,10 @@ f6cf045b29e5dc0b:
   path: web/src/lib/live.ts
   description: 'Generic useLiveQuery hook (fetch + SSE-invalidate + 5s poll backstop + 200ms debounce). 17 typed wrapper hooks: useFleet, useAgentMeta, useThreads, usePanels, useMemory, useTodos, useSpine, useQueue, useScratchpad, useTree, useCallbacks, useTools, useRadar, useEntities, useFs, useConversation, useLibrary. Re-exports sendCommand/mintTicket.'
   last_edited_ms: 1781774255503
+f71f4c062406bbd2:
+  path: crates/cp-orchestrator/src/transport/panels.rs
+  description: 'Cockpit panel inspection: panel_list (fixed catalogue), memory+callbacks+tree (shared YAML→JSON), todos+spine+queue+scratchpad (worker modules), usage (worker cost snapshot), library (scan .context-pilot/{agents,skills,commands}/*.md frontmatter). parse_frontmatter helper. 1 test.'
+  last_edited_ms: 0
 f7207867229d3d86:
   path: crates/cp-mod-prompt/Cargo.toml
   description: 'Prompt module crate deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml.'

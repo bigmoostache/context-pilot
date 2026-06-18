@@ -1,5 +1,5 @@
 import { Boxes, MessagesSquare, Wallet } from "lucide-react"
-import { cacheStats, tokenBudget } from "@/lib/mock"
+import { usePanels } from "@/lib/live"
 import { fmtCost, fmtTokens } from "@/lib/panelMeta"
 import type { Agent, StreamPhase } from "@/lib/types"
 
@@ -62,6 +62,17 @@ function AgentStatus({ agent }: { agent?: Agent }) {
   const phase: StreamPhase = agent?.status === "working" ? "streaming" : agent?.status === "needs-you" ? "ready" : "ready"
   const p = phaseMeta[phase]
   const costUsd = agent?.costUsd ?? 0
+
+  // Live context window stats from real panel data
+  const { data: panels = [] } = usePanels(agent?.id ?? "")
+  const budget = 200_000
+  const totalTokens = panels.reduce((s, p) => s + (p.tokens ?? 0), 0)
+  // Panels that have never missed a cache cycle are "hits"
+  const hitTokens = panels
+    .filter((p) => p.cached)
+    .reduce((s, p) => s + (p.tokens ?? 0), 0)
+  const missTokens = totalTokens - hitTokens
+
   return (
     <footer className="vibrancy flex h-8 shrink-0 items-center gap-3 border-t border-border px-4 text-[12px]">
       <span className="flex items-center gap-1.5">
@@ -70,7 +81,7 @@ function AgentStatus({ agent }: { agent?: Agent }) {
       </span>
 
       <span className="ml-auto flex items-center gap-3">
-        <ContextBar hit={cacheStats.hit} miss={cacheStats.miss} budget={tokenBudget.budget} />
+        <ContextBar hit={hitTokens} miss={missTokens} budget={budget} />
         <span className="h-3.5 w-px bg-border" />
         <span className="tabular-nums text-muted-foreground">{fmtCost(costUsd)}</span>
       </span>

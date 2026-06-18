@@ -15,23 +15,85 @@ use std::sync::Mutex;
 use super::rest::HttpReply;
 use super::Backend;
 
-/// `GET /api/agent/{id}/panels` — list of inspectable cockpit panel types.
+/// `GET /api/agent/{id}/panels` — live context panel list read from the
+/// agent's `panels/` directory.
 ///
-/// Returns a fixed catalogue of panel kinds the frontend can query, not the
-/// runtime context list (which is ephemeral). Each entry names the endpoint
-/// path the frontend should hit for that panel's data.
-pub fn panel_list(_state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let panels = serde_json::json!([
-        { "id": "memory",     "name": "Memories",   "kind": "memory",     "endpoint": format!("/api/agent/{agent_id}/memory") },
-        { "id": "todos",      "name": "Todos",      "kind": "todo",       "endpoint": format!("/api/agent/{agent_id}/todos") },
-        { "id": "spine",      "name": "Spine",      "kind": "spine",      "endpoint": format!("/api/agent/{agent_id}/spine") },
-        { "id": "queue",      "name": "Queue",      "kind": "queue",      "endpoint": format!("/api/agent/{agent_id}/queue") },
-        { "id": "scratchpad", "name": "Scratchpad",  "kind": "scratchpad", "endpoint": format!("/api/agent/{agent_id}/scratchpad") },
-        { "id": "tree",       "name": "Tree",       "kind": "tree",       "endpoint": format!("/api/agent/{agent_id}/tree") },
-        { "id": "callbacks",  "name": "Callbacks",  "kind": "callback",   "endpoint": format!("/api/agent/{agent_id}/callbacks") },
-        { "id": "threads",    "name": "Threads",    "kind": "threads",    "endpoint": format!("/api/agent/{agent_id}/threads") },
-    ]);
+/// Each panel file (`panels/<uid>.json`) is parsed and reshaped to the
+/// maquette [`ContextPanel`] format with real `tokens`, `misses`, and
+/// `kind`. Returns an empty array when the panels directory is absent.
+pub fn panel_list(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+    let folder = match agent_folder(state, agent_id) {
+        Ok(f) => f,
+        Err(reply) => return reply,
+    };
+    let panels_dir = Path::new(&folder).join(".context-pilot").join("panels");
+    let entries = match std::fs::read_dir(&panels_dir) {
+        Ok(rd) => rd,
+        Err(_) => return HttpReply::ok(&serde_json::json!([])),
+    };
+
+    let mut panels: Vec<serde_json::Value> = Vec::new();
+    for entry in entries {
+        let Ok(entry) = entry else { continue };
+        let path = entry.path();
+        if path.extension().and_then(std::ffi::OsStr::to_str) != Some("json") {
+            continue;
+        }
+        let Ok(raw) = std::fs::read(&path) else { continue };
+        let Ok(val): Result<serde_json::Value, _> = serde_json::from_slice(&raw) else {
+            continue;
+        };
+        let uid = val.get("uid").and_then(serde_json::Value::as_str).unwrap_or("");
+        let name = val.get("name").and_then(serde_json::Value::as_str).unwrap_or("");
+        let tokens = val.get("token_count").and_then(serde_json::Value::as_u64).unwrap_or(0);
+        let misses = val.get("total_cache_misses").and_then(serde_json::Value::as_u64).unwrap_or(0);
+        let panel_type = val.get("panel_type").and_then(serde_json::Value::as_str).unwrap_or("");
+        let kind = map_panel_kind(panel_type);
+
+        panels.push(serde_json::json!({
+            "id": uid,
+            "kind": kind,
+            "name": name,
+            "tokens": tokens,
+            "costUsd": 0,
+            "cached": misses == 0 && tokens > 0,
+            "frozen": null,
+            "misses": misses,
+            "fixed": false,
+        }));
+    }
+
+    // Sort by tokens descending for a meaningful default order.
+    panels.sort_by(|a, b| {
+        let at = a.get("tokens").and_then(serde_json::Value::as_u64).unwrap_or(0);
+        let bt = b.get("tokens").and_then(serde_json::Value::as_u64).unwrap_or(0);
+        bt.cmp(&at)
+    });
+
     HttpReply::ok(&panels)
+}
+
+/// Map an agent panel_type string to the maquette PanelKind.
+fn map_panel_kind(panel_type: &str) -> &'static str {
+    match panel_type {
+        "file" => "file",
+        "console" => "console",
+        "git_result" => "git",
+        "conversation" | "conversation_history" => "threads",
+        "search_result" => "search",
+        "entity_result" => "entities",
+        "memory" => "memory",
+        "todo" => "todo",
+        "spine" => "spine",
+        "queue" => "queue",
+        "scratchpad" => "scratchpad",
+        "tree" => "tree",
+        "callback" => "callback",
+        "tools" => "tools",
+        "context_radar" => "radar",
+        "stats" => "stats",
+        _ => "file",
+    }
 }
 
 /// `GET /api/agent/{id}/memory` — memory items from `shared/memories.yaml`.
