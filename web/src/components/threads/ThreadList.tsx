@@ -62,8 +62,12 @@ export function ThreadList({
   // search applies to whichever set is on screen
   const visible = (showArchived ? archived : live).filter(matches)
 
-  const mine = visible.filter((t) => t.status === "MY_TURN")
-  const working = visible.filter((t) => t.status === "THEIR_TURN" || t.status === "ACTIVE")
+  /** Sort threads by most recent activity first. */
+  const byRecent = (a: ThreadDetail, b: ThreadDetail) =>
+    (b.lastActivityMs ?? 0) - (a.lastActivityMs ?? 0)
+
+  const mine = visible.filter((t) => t.status === "MY_TURN").sort(byRecent)
+  const working = visible.filter((t) => t.status === "THEIR_TURN" || t.status === "ACTIVE").sort(byRecent)
   // agent-owned, actively-or-parallel working count (for the header pill)
   const workingCount = live.filter((t) => t.status !== "MY_TURN").length
 
@@ -154,12 +158,12 @@ export function ThreadList({
 
             {!showArchived && (
               <>
-                {mine.length > 0 && <Group label="Needs you" count={mine.length} />}
+                {mine.length > 0 && <Group label="Agent's turn" count={mine.length} />}
                 {mine.map((t) => (
                   <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} />
                 ))}
 
-                {working.length > 0 && <Group label="Working in parallel" count={working.length} />}
+                {working.length > 0 && <Group label="User turn" count={working.length} />}
                 {working.map((t) => (
                   <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} />
                 ))}

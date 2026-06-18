@@ -319,6 +319,8 @@ export interface ThreadDetail {
   agent: string
   createdAt: string
   lastActivity: string
+  /** epoch-ms of the most recent message — used for sort-by-recency */
+  lastActivityMs: number
   unread: number
   /** archived threads are hidden from the main list, viewable on demand */
   archived?: boolean

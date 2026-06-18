@@ -109,6 +109,7 @@ export function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
       agent: t.agent ?? agentId,
       createdAt: t.createdAt ?? (typeof t.lastActivity === "number" ? new Date(t.lastActivity).toISOString() : t.lastActivity),
       lastActivity: typeof t.lastActivity === "number" ? formatAge(t.lastActivity) : t.lastActivity,
+      lastActivityMs: typeof t.lastActivity === "number" ? t.lastActivity : 0,
       unread: t.unread ?? 0,
       archived: t.archived ?? false,
       focused: focusedId != null && t.id === focusedId,

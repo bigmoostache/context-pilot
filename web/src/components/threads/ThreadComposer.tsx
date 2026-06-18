@@ -3,9 +3,9 @@ import { ArrowUp, Paperclip, Loader2 } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 
 /**
- * Thread composer. When the thread isn't MY_TURN the agent owns it — either
- * actively streaming (ACTIVE) or working it in parallel (THEIR_TURN) — so the
- * composer shows a subdued "working" state instead of an active prompt.
+ * Thread composer — always active, regardless of turn status. When the thread
+ * isn't MY_TURN a subtle "working" hint appears above the input so the user
+ * knows the agent is active, but can still send a message at any time.
  */
 export function ThreadComposer({
   status,
@@ -17,24 +17,8 @@ export function ThreadComposer({
   const [text, setText] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  if (status !== "MY_TURN") {
-    const active = status === "ACTIVE"
-    return (
-      <div className="shrink-0 px-5 pb-4 pt-2">
-        <div className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-muted/40 px-3 py-3 text-[12.5px] text-muted-foreground">
-          <Loader2
-            className="size-4 animate-spin"
-            style={{ color: active ? "var(--ok)" : "var(--signal)" }}
-          />
-          <span>
-            {active
-              ? "The agent is streaming this thread right now…"
-              : "The agent is working this thread — it'll hand back when it needs you."}
-          </span>
-        </div>
-      </div>
-    )
-  }
+  const isWorking = status !== "MY_TURN"
+  const isActive = status === "ACTIVE"
 
   const canSend = text.trim().length > 0
 
@@ -54,6 +38,19 @@ export function ThreadComposer({
 
   return (
     <div className="shrink-0 px-5 pb-4 pt-2">
+      {isWorking && (
+        <div className="mb-2 flex items-center justify-center gap-2 rounded-xl bg-muted/40 px-3 py-1.5 text-[11.5px] text-muted-foreground">
+          <Loader2
+            className="size-3.5 animate-spin"
+            style={{ color: isActive ? "var(--ok)" : "var(--signal)" }}
+          />
+          <span>
+            {isActive
+              ? "Agent is streaming…"
+              : "Agent is working this thread…"}
+          </span>
+        </div>
+      )}
       <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2.5 card-shadow focus-within:border-[var(--signal)]/60">
         <button className="mb-0.5 text-muted-foreground/60 transition-colors hover:text-[var(--interactive)]">
           <Paperclip className="size-4" />
