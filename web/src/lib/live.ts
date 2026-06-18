@@ -574,6 +574,23 @@ export function useStreamingTokens(agentId: string): LiveTokens {
   return tokens
 }
 
+// ── Metrics (§19 observability — agent-scoped) ────────────────────────
+//
+// Health vitals (durable cost-breaker state, stream health, view-vs-oplog rev
+// lag) are NOT delta-covered — there is no oplog entry whose folding yields
+// "rev lag" or "subscriber count" (they are derived backend observations, not
+// agent mutations). So this hook rides a short poll (no `applyDelta` reducer):
+// a tripped breaker or a degraded stream surfaces within one poll interval,
+// which is ample for a health indicator. Kept brisk (METRICS_POLL_MS) so a
+// breaker trip the user just caused becomes visible promptly (T121).
+
+const METRICS_POLL_MS = 4_000
+
+export function useMetrics(agentId: string): LiveQueryResult<api.AgentMetrics> {
+  const fetcher = useCallback(() => api.fetchMetrics(agentId), [agentId])
+  return useLiveQuery(`metrics:${agentId}`, fetcher, agentId, METRICS_POLL_MS, !!agentId)
+}
+
 // ── Library (agent-scoped) ────────────────────────────────────────────
 
 export function useLibrary(agentId: string): LiveQueryResult<LibraryItem[]> {

@@ -34,6 +34,10 @@
   path: docs/design-orchestration-backend.md
   description: 'Orchestration backend design doc, v5 (branch maquette) — CODE-GROUNDED rewrite. Keystone: THREE durability tiers, not two — ① bridge-owned append-only fsync''d OPLOG (authoritative: command effects, rev, seen-marks, phase, lifecycle, cost; O(1) append, never coalesced) + ② existing UNTOUCHED PersistenceWriter as a best-effort coalesced reconstructible state cache + ③ lossy UDS stream plane (live tokens + latency hints). 12 invariants I1-I12: I8 oplog-as-truth (writer.rs NOT modified — honors constraint #7 for real), I11 journal-to-oplog-then-ack (''accepted''=durable, survives deadman re-exec), I12 single inotify watch per agent (no fleet-scale watch exhaustion), I2 fsync confined to oplog (not every state write), I3 content-addressed bodies + bounded heads (not O(S²) manifest enumeration), I4 dedup by semantic token evicted by ack-rev. Command injection via the existing user-message entry (actions/input.rs), NOT the autonomy spine (engine.rs check_spine guards would stall external commands — K7). §24 maps every invariant→real file/function→additive-vs-core change type. §25 fault-injection acceptance matrix (V1-V10). §20 register folds round-3 K1-K9 + round-2 R2. Resolves the round-3 critique that v4 was authored against an imagined persistence layer. Companion: architecture-adversarial-analysis.md. NOT implemented (discussion).'
   last_edited_ms: 1781608697546
+01b07fbd200b15e6:
+  path: web/e2e/metrics.spec.ts
+  description: '§19 e2e (X868/T121): the fleet HealthBadge surfaces backend health. page.route-intercepts **/api/agent/*/metrics to force each non-nominal condition; asserts the matching role=status pill renders (tripped→''Over budget'', degraded→''Stream degraded'', lag 300→''Projection lagging'') + a nominal snapshot shows NO pill. Deterministic regardless of live budget. Backend metrics production stays covered by rust transport tests; this is the frontend surfacing layer. 4 tests.'
+  last_edited_ms: 1781819235263
 01bfbf5b9ab05a09:
   path: crates/cp-wire/Cargo.toml
   description: Wire protocol crate manifest. No deps yet (I/O-free). Workspace lints inherited.
@@ -858,6 +862,10 @@
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints.'
   last_edited_ms: 0
+1ffad7efc1fcdff6:
+  path: web/src/components/agents/FleetDashboard.tsx
+  description: 'Fleet welcome dashboard (live). Accepts agents prop (useFleet). Agent cards: status pill + §19 HealthBadge (polls useMetrics → surfaces FIRST non-nominal condition as a coloured role=status pill: breaker.tripped→red ''Over budget'', stream.degraded→amber ''Stream degraded'', rev.lag>REV_LAG_WARN(50)→amber ''Projection lagging''; nominal/unloaded→renders nothing so healthy cards stay clean) — makes a tripped breaker VISIBLE not a silent latch (T121). model + cost. Create/manage via AgentModal.'
+  last_edited_ms: 1781819235283
 2019931c3e04db95:
   path: crates/cp-orchestrator/tests/transport_http.rs
   description: Phase 30 transport surface tests over a real tiny_http server (4 tests). ticket_mint_and_command_status_codes now asserts a tripped breaker blocks a cost-incurring send_message (503) but NOT a control-plane stop (≠503, reaches delivery). REST rev-envelope+404, SSE ticket gate single-use, Last-Event-ID replay.
@@ -1314,6 +1322,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor. Selection-aware InputChar/Delete/InsertText/PasteText. 9 cursor/selection action dispatches.'
   last_edited_ms: 0
+30b7489e3f2a6ec4:
+  path: web/src/lib/live.ts
+  description: 'Live data hooks: useLiveQuery (fetch + SSE delta apply-in-place + poll backstop). applyThreadDelta/applyAgentDelta = push-plane reducers (thread roster + phase/cost vitals, monotonic-rev high-water guard). useThreads/useAgentMeta ride deltas; useMetrics rides a brisk 4s poll (METRICS_POLL_MS — health vitals aren''t delta-covered). useStreamingTokens = §7 rAF-batched live token buffer keyed by message_id. sendCommand deliberately does NOT invalidate (push plane is sole freshness — T123 flicker fix).'
+  last_edited_ms: 1781819235324
 30ccc9d6b72a4b76:
   path: crates/cp-mod-firecrawl/src/tools.rs
   description: Firecrawl tool dispatch with flame!("firecrawl_scrape"), flame!("firecrawl_search"), flame!("firecrawl_map"). All async via spawn_async_tool. DynPanel creation.
@@ -5366,6 +5378,10 @@ c5b9a1c1444e3f7a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
   last_edited_ms: 0
+c5e5bbc1e5714db2:
+  path: web/src/lib/api.ts
+  description: REST client for the orchestration backend. Typed fetch wrappers per endpoint (fleet/meta, threads reshape My/TheirTurn→MY_/THEIR_TURN, panels, memory, todos, spine, queue, scratchpad, tree, callbacks, tools, radar, entities, fs, preview, download, conversation). fetchMetrics→AgentMetrics{breaker,stream,rev,phase,lifecycle} (§19). sendCommand auto-wraps Kind in a full Command envelope (schema_version/id/seq/dedup_token). mintTicket for SSE.
+  last_edited_ms: 1781819235304
 c605ffa985571748:
   path: src/ui/threads_view/messages.rs
   description: 'Thread message area: right pane of Threads view. Message display (reuses conversation IR renderer), input area with separator, question form overlay. thread_message_to_message() conversion. format_questions_markdown() for embedded questions. calculate_input_height() with 50% cap.'

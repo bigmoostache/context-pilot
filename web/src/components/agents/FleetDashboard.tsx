@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import {
+  AlertTriangle,
   Bot,
   FolderGit2,
   FolderPlus,
@@ -8,6 +9,7 @@ import {
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { accentVar, fmtCost } from "@/lib/panelMeta"
+import { useMetrics } from "@/lib/live"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { FLEET_MAX_W } from "./FleetShell"
@@ -138,6 +140,10 @@ function AgentCard({
         </span>
       </div>
 
+      {/* §19 health — a tripped breaker / degraded stream / lagging projection
+          surfaces here so it is VISIBLE, never a silent backend latch (T121). */}
+      <HealthBadge agentId={agent.id} />
+
       {/* one-line summary of what the agent is doing */}
       <p className="line-clamp-2 min-h-[2.4em] text-[12px] leading-snug text-foreground/70">
         {agent.task}
@@ -170,6 +176,50 @@ function AgentCard({
         </button>
       </div>
     </div>
+  )
+}
+
+/** Rev-lag threshold above which the projection is flagged as falling behind.
+ *  Under the live 5ms tail the lag is 0–1; a sustained lag this high means the
+ *  backend view is no longer tracking the oplog head (a real health signal). */
+const REV_LAG_WARN = 50
+
+/**
+ * §19 health badge for an agent card. Polls `/api/agent/{id}/metrics` and
+ * surfaces the *first* non-nominal condition as a coloured pill — so a tripped
+ * cost-breaker, a degraded stream, or a lagging projection is **visible at a
+ * glance** on the fleet board rather than a silent backend latch (T121). When
+ * everything is nominal (or metrics haven't loaded) it renders nothing, keeping
+ * healthy cards uncluttered.
+ */
+function HealthBadge({ agentId }: { agentId: string }) {
+  const { data } = useMetrics(agentId)
+  if (!data) return null
+
+  const { breaker, stream, rev } = data
+  const condition = breaker.tripped
+    ? { label: "Over budget", tone: "var(--danger)", title: `Cost breaker tripped — spent $${breaker.spendUsd.toFixed(2)} of $${breaker.budgetUsd.toFixed(2)} budget. Sends are blocked until the budget is raised or the run is stopped.` }
+    : stream.degraded
+      ? { label: "Stream degraded", tone: "var(--warn)", title: `Live token stream dropped ${stream.droppedFrames} frame(s) — a slow consumer is being shed (the durable record is unaffected).` }
+      : rev.lag > REV_LAG_WARN
+        ? { label: "Projection lagging", tone: "var(--warn)", title: `Backend view is ${rev.lag} revs behind the oplog head (view ${rev.view} / head ${rev.oplogHead ?? "?"}). The projection is falling behind the durable log.` }
+        : null
+
+  if (!condition) return null
+
+  return (
+    <span
+      role="status"
+      title={condition.title}
+      className="inline-flex w-fit items-center gap-1.5 rounded-md px-2 py-0.5 text-[10.5px] font-medium"
+      style={{
+        background: `color-mix(in oklab, ${condition.tone} 14%, transparent)`,
+        color: condition.tone,
+      }}
+    >
+      <AlertTriangle className="size-3" />
+      {condition.label}
+    </span>
   )
 }
 

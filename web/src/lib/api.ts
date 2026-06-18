@@ -293,6 +293,26 @@ export function fetchConversation(agentId: string): Promise<ConversationMsg[]> {
   return request(`/api/agent/${agentId}/conversation`)
 }
 
+// ── Metrics (§19 observability) ───────────────────────────────────────
+
+/** The §19 observability snapshot for one agent (GET /api/agent/{id}/metrics).
+ *
+ * Mirrors the backend `build_metrics` JSON: durable cost-breaker state, stream
+ * health, and the view-vs-oplog rev lag — the figures that let the cockpit
+ * *show* a tripped breaker or a lagging projection instead of inferring it. */
+export interface AgentMetrics {
+  id: string
+  breaker: { tripped: boolean; spendUsd: number; budgetUsd: number }
+  stream: { subscribers: number; droppedFrames: number; degraded: boolean }
+  rev: { view: number; oplogHead: number | null; lag: number }
+  phase?: string | null
+  lifecycle?: string | null
+}
+
+export function fetchMetrics(agentId: string): Promise<AgentMetrics> {
+  return request(`/api/agent/${agentId}/metrics`)
+}
+
 // ── Usage + Library ───────────────────────────────────────────────────
 
 export function fetchUsage(agentId: string): Promise<Record<string, unknown>> {
