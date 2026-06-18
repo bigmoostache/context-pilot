@@ -49,6 +49,13 @@ interface OpEntryKind {
   /** ThreadTurn — snake_case "my_turn" / "their_turn". */
   status?: string
   timestamp_ms?: number
+  /** Phase — snake_case "idle" / "streaming" / "tooling" (phase_transition). */
+  phase?: string
+  /** Cumulative spend in USD since boot (cost_aggregate). */
+  cost_usd?: number
+  /** Cumulative input/output tokens since boot (cost_aggregate). */
+  input_tokens?: number
+  output_tokens?: number
 }
 
 /** Map a wire ThreadTurn to the web ThreadStatus (MY_TURN = agent's turn). */
@@ -124,6 +131,45 @@ function applyThreadDelta(
     }
     default:
       return prev // phase / cost / lifecycle / command_effect → irrelevant to threads
+  }
+}
+
+/**
+ * Apply one oplog `delta` to the live agent meta (Leg 2 / push plane — phase &
+ * cost vitals). Returns a NEW `Agent` when the delta moves a live vital, the
+ * SAME reference when the delta is irrelevant to agent meta (e.g. a thread
+ * delta reaching this hook — no work), or `null` when it can't be applied
+ * confidently so the caller refetches ground truth.
+ *
+ * Phase maps to the maquette `status`/`accent` the fleet dot renders:
+ *   - `streaming` / `tooling` → `working` (the felt "agent is busy" state),
+ *     applied instantly with the matching `ok` accent;
+ *   - `idle` → refetch, because idle resolves to either `needs-you` or `idle`
+ *     depending on whether any thread is `MY_TURN` — a fact the phase delta
+ *     alone does not carry, but the backend's `derive_status` does. A ~few-ms
+ *     refetch at the *end* of work is imperceptible, and keeps the dot correct.
+ *
+ * Cost is cumulative-since-boot (latest-wins), so the figure is set directly.
+ */
+function applyAgentDelta(prev: Agent | undefined, entry: OpEntry): Agent | null {
+  if (!prev) return null // not loaded yet → cold refetch
+  const k = entry.kind
+  switch (k.kind) {
+    case "phase_transition": {
+      if (k.phase === "streaming" || k.phase === "tooling") {
+        if (prev.status === "working") return prev // already working — no churn
+        return { ...prev, status: "working", accent: "ok" }
+      }
+      // idle → needs-you vs idle is a backend decision (has_my_turn) → refetch
+      return null
+    }
+    case "cost_aggregate": {
+      if (typeof k.cost_usd !== "number") return prev
+      if (prev.costUsd === k.cost_usd) return prev
+      return { ...prev, costUsd: k.cost_usd }
+    }
+    default:
+      return prev // thread / lifecycle / command_effect → irrelevant to meta
   }
 }
 
@@ -314,7 +360,10 @@ export function useFleet(): LiveQueryResult<Agent[]> {
 
 export function useAgentMeta(agentId: string): LiveQueryResult<Agent> {
   const fetcher = useCallback(() => api.fetchAgentMeta(agentId), [agentId])
-  return useLiveQuery(`agent:${agentId}`, fetcher, agentId, DEFAULT_POLL_MS, !!agentId)
+  // Push plane: apply phase + cost vitals deltas in-place (sub-50ms, zero
+  // refetch); a phase→idle (status may flip to needs-you) falls back to a
+  // ground-truth refetch via the reducer returning null.
+  return useLiveQuery(`agent:${agentId}`, fetcher, agentId, DEFAULT_POLL_MS, !!agentId, applyAgentDelta)
 }
 
 export function useThreads(agentId: string): LiveQueryResult<ThreadDetail[]> {

@@ -42,7 +42,7 @@ pub mod tee;
 /// Not serializable — [`Boot`] holds OS resources (folder lock, stream socket,
 /// oplog commit thread, heartbeat beacon) that are created fresh each session.
 /// `save_module_data` / `load_module_data` return `Null`.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct BridgeState {
     /// The held boot resources, or `None` when the bridge is OFF or boot failed.
     pub boot: Option<Boot>,
@@ -58,6 +58,15 @@ pub struct BridgeState {
 
     /// Per-stream monotonic frame sequence counter for gap detection.
     pub tee_seq: u64,
+
+    /// Last [`Phase`](cp_wire::types::Phase) emitted to the oplog, so the
+    /// main-loop vitals chokepoint emits a `PhaseTransition` only on an actual
+    /// transition (not every tick). `None` until the first emission.
+    pub last_phase: Option<cp_wire::types::Phase>,
+
+    /// Last cumulative spend (USD) emitted as a `CostAggregate`, so a
+    /// `CostAggregate` is emitted only when the dollar total moves.
+    pub last_cost_usd: f64,
 }
 
 /// Agent-side orchestration bridge module.
@@ -99,7 +108,7 @@ impl Module for BridgeModule {
     fn init_state(&self, state: &mut State) {
         let active = std::env::var("CP_BRIDGE").as_deref() == Ok("1");
         if !active {
-            state.set_ext(BridgeState { boot: None, tee: None, intake: None, tee_seq: 0 });
+            state.set_ext(BridgeState::default());
             return;
         }
 
@@ -107,7 +116,7 @@ impl Module for BridgeModule {
             Ok(f) => f,
             Err(e) => {
                 log::error!("bridge: cannot determine working directory: {e}");
-                state.set_ext(BridgeState { boot: None, tee: None, intake: None, tee_seq: 0 });
+                state.set_ext(BridgeState::default());
                 return;
             }
         };
@@ -155,11 +164,16 @@ impl Module for BridgeModule {
                     }
                 };
 
-                state.set_ext(BridgeState { boot: Some(boot), tee, intake, tee_seq: 0 });
+                state.set_ext(BridgeState {
+                    boot: Some(boot),
+                    tee,
+                    intake,
+                    ..Default::default()
+                });
             }
             Err(e) => {
                 log::error!("bridge: boot failed: {e:?}");
-                state.set_ext(BridgeState { boot: None, tee: None, intake: None, tee_seq: 0 });
+                state.set_ext(BridgeState::default());
             }
         }
     }
@@ -349,10 +363,12 @@ mod tests {
 
     #[test]
     fn bridge_state_default_is_none() {
-        let bs = BridgeState { boot: None, tee: None, intake: None, tee_seq: 0 };
+        let bs = BridgeState::default();
         assert!(bs.boot.is_none());
         assert!(bs.tee.is_none());
         assert!(bs.intake.is_none());
         assert_eq!(bs.tee_seq, 0);
+        assert_eq!(bs.last_phase, None);
+        assert!((bs.last_cost_usd - 0.0).abs() < f64::EPSILON);
     }
 }

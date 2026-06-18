@@ -1,225 +1,40 @@
-//! Thread-related helpers for the main event loop.
+//! Bridge command intake + live-state emission for the main event loop.
 //!
-//! Extracted from `lifecycle.rs` to keep it under the 500-line limit.
-//! Contains auto-Read injection, `MY_TURN` thread detection, and
-//! thread ID extraction from notification content.
+//! Two responsibilities, both gated on the orchestration bridge being ON:
+//!
+//! 1. **Command intake (K7 path).** [`poll_bridge_commands`] accepts inbound
+//!    commands from the backend over the bridge socket and applies them on the
+//!    main loop — `SendMessage`/`CreateThread`/`ArchiveThread`/`RestoreThread`
+//!    enter the agent exactly as local user input would, and `Stop`/`Interrupt`
+//!    mirror the Esc key.
+//! 2. **Live-state emission (Leg 0 keystone).** The instant a mutation applies,
+//!    a rev-numbered oplog delta is appended so the backend's in-memory view —
+//!    and thus the web frontend — learns of it in milliseconds instead of
+//!    waiting on the debounced tier-② disk write. Thread-roster deltas ride the
+//!    non-blocking *durable* path ([`emit_roster_delta`]); the disposable,
+//!    self-healing live vitals (phase + cost) ride the *best-effort* path
+//!    ([`emit_vitals`]).
+//!
+//! Extracted from the parent `threads` module so each file stays under the
+//! 500-line limit.
+
+use std::time::Duration;
+
+use cp_base::state::runtime::State;
+use cp_mod_bridge::BridgeState;
+use cp_mod_spine::types::SpineState;
+use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
+use cp_wire::types::command::{Command, Kind as CommandKind};
+use cp_wire::types::oplog::OpEntryKind;
+use cp_wire::types::{Phase, ThreadTurn};
 
 use crate::app::App;
 use crate::app::panels::now_ms;
-use cp_base::state::data::message::{MsgKind, MsgStatus, ToolResultRecord, ToolUseRecord};
-use cp_base::tools::ToolUse;
-use cp_mod_bridge::BridgeState;
-use cp_mod_spine::types::{NotificationType, SpineState};
-use cp_mod_threads::types::{
-    FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState,
-};
-use cp_wire::types::command::{Command, Kind as CommandKind};
-use cp_wire::types::oplog::OpEntryKind;
-use cp_wire::types::ThreadTurn;
-
-/// Inject a synthetic `Read` tool call when auto-continuation fires
-/// for a thread notification while the AI is unfocused.
-///
-/// The Read is 100% deterministic in this scenario — the AI would
-/// always call it anyway. Injecting it saves a full round-trip:
-/// the AI starts streaming with focus already set and thread content
-/// visible, so it can immediately `Send` its response.
-///
-/// Thread selection priority:
-/// 1. Extract thread IDs from the synthetic message (notification content)
-///    and pick the first one that's still `MY_TURN`.
-/// 2. Fall back to any `MY_TURN` thread if no notification thread ID matches.
-///
-/// Modifies the message list by popping the empty streaming-target
-/// assistant message, inserting the Read `tool_use` + `tool_result` pair,
-/// then pushing a new empty assistant for streaming.
-pub(super) fn maybe_inject_auto_read(app: &mut App) {
-    // Only inject when unfocused + a MY_TURN thread exists.
-    let fs = FocusState::get(&app.state);
-    if fs.focused_thread_id.is_some() {
-        return;
-    }
-
-    // Extract thread IDs from the synthetic message that triggered this
-    // continuation. The synthetic is the second-to-last message (before
-    // the empty assistant streaming target pushed by `apply_continuation`).
-    let candidate_ids: Vec<String> = app
-        .state
-        .messages
-        .len()
-        .checked_sub(2)
-        .and_then(|idx| app.state.messages.get(idx))
-        .filter(|m| m.role == "user" && m.content.starts_with("/* Auto-continuation:"))
-        .map(|m| extract_thread_ids(&m.content))
-        .unwrap_or_default();
-
-    let ts = ThreadsState::get(&app.state);
-
-    // Prefer the thread the notification is about; fall back to any MY_TURN.
-    // Archived threads are LLM-invisible (T9) and never auto-read.
-    let my_turn = candidate_ids
-        .iter()
-        .find_map(|tid| {
-            ts.threads.iter().find(|t| t.id == *tid && !t.archived && t.status == ThreadStatus::MyTurn)
-        })
-        .or_else(|| ts.threads.iter().find(|t| !t.archived && t.status == ThreadStatus::MyTurn));
-
-    let Some(thread) = my_turn else {
-        return;
-    };
-    let tid = thread.id.clone();
-
-    // Pop the empty assistant (streaming target) — we'll push a fresh
-    // one after the injected Read messages.
-    let Some(streaming_target) = app.state.messages.pop() else {
-        return;
-    };
-
-    // Build a synthetic ToolUse for Read.
-    let tool_use_id = format!("auto_read_{tid}");
-    let input = serde_json::json!({
-        "thread_id": tid,
-        "intent": "Focus on thread",
-        "verb": "Reading",
-    });
-
-    let tool_use = ToolUse { id: tool_use_id.clone(), name: "Read".into(), input: input.clone() };
-
-    // Execute Read — this sets focus and returns formatted messages.
-    let result = cp_mod_threads::tools::execute_read(&tool_use, &mut app.state);
-
-    // Create assistant message carrying the tool_use record.
-    let tool_call_msg = crate::state::Message {
-        id: format!("T{}", app.state.next_tool_id),
-        uid: Some(format!("UID_{}_T", app.state.global_next_uid)),
-        role: "assistant".into(),
-        content: String::new(),
-        msg_type: MsgKind::ToolCall,
-        status: MsgStatus::Full,
-        tool_uses: vec![ToolUseRecord { id: tool_use_id.clone(), name: "Read".into(), input }],
-        tool_results: vec![],
-        input_tokens: 0,
-        content_token_count: 0,
-        timestamp_ms: now_ms(),
-    };
-    app.state.next_tool_id = app.state.next_tool_id.saturating_add(1);
-    app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
-
-    // Create tool_result message (user role).
-    let result_msg = crate::state::Message {
-        id: format!("R{}", app.state.next_result_id),
-        uid: Some(format!("UID_{}_R", app.state.global_next_uid)),
-        role: "user".into(),
-        content: String::new(),
-        msg_type: MsgKind::ToolResult,
-        status: MsgStatus::Full,
-        tool_uses: vec![],
-        tool_results: vec![ToolResultRecord {
-            tool_use_id,
-            content: result.content,
-            display: None,
-            tldr: None,
-            is_error: result.is_error,
-            tool_name: "Read".into(),
-        }],
-        input_tokens: 0,
-        content_token_count: 0,
-        timestamp_ms: now_ms(),
-    };
-    app.state.next_result_id = app.state.next_result_id.saturating_add(1);
-    app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
-
-    // Persist both injected messages.
-    app.save_message_async(&tool_call_msg);
-    app.save_message_async(&result_msg);
-
-    // Push: tool_call → tool_result → streaming target.
-    app.state.messages.push(tool_call_msg);
-    app.state.messages.push(result_msg);
-    app.state.messages.push(streaming_target);
-}
-
-/// Notify when idle and a thread has `MY_TURN` status.
-///
-/// Debounced via `FocusState::notified_my_turn_id` — fires once per
-/// thread transition to `MY_TURN`, cleared when the AI sends a reply
-/// (which sets `THEIR_TURN`).
-pub(super) fn check_my_turn_threads(app: &mut App) {
-    if app.state.flags.stream.phase.is_streaming() {
-        return;
-    }
-
-    let threads = ThreadsState::get(&app.state);
-    // Archived threads are invisible to the LLM (T9) — they never nudge.
-    let my_turn = threads.threads.iter().find(|t| !t.archived && t.status == ThreadStatus::MyTurn);
-
-    let Some(thread) = my_turn else {
-        // No MY_TURN threads — clear debounce.
-        FocusState::get_mut(&mut app.state).notified_my_turn_id = None;
-        return;
-    };
-
-    let tid = thread.id.clone();
-    let tname = thread.name.clone();
-
-    // Debounce: already notified about this exact thread.
-    // Re-fire only when the previous notification was consumed (processed)
-    // but the AI still hasn't addressed the thread — creating a persistent
-    // nudge loop until the thread is actually handled.
-    if FocusState::get(&app.state).notified_my_turn_id.as_deref() == Some(&tid) {
-        let has_unprocessed =
-            SpineState::get(&app.state).notifications.iter().any(|n| !n.is_processed() && n.source == "my_turn_thread");
-        if has_unprocessed {
-            return; // Previous nudge still pending — don't spam
-        }
-        // Previous nudge consumed but thread still MY_TURN — clear debounce to re-fire
-    }
-
-    FocusState::get_mut(&mut app.state).notified_my_turn_id = Some(tid.clone());
-
-    let content = format!(
-        "Thread \"{tname}\" ({tid}) is MY_TURN — it has user input awaiting your response.\n\
-         Use Read(thread_id=\"{tid}\") to see the conversation and respond.",
-    );
-    let _r = SpineState::create_notification(
-        &mut app.state,
-        NotificationType::Custom,
-        "my_turn_thread".to_string(),
-        content,
-    );
-}
-
-/// Extract thread IDs from notification content embedded in a synthetic message.
-///
-/// Looks for `thread_id="T..."` patterns (produced by thread input routing
-/// and `check_my_turn_threads`). Returns all matches in order so the caller
-/// can pick the first one that's still `MY_TURN`.
-fn extract_thread_ids(content: &str) -> Vec<String> {
-    let marker = "thread_id=\"";
-    let mut ids = Vec::new();
-    let mut search_from: usize = 0;
-    while let Some(pos) = content.get(search_from..).and_then(|s| s.find(marker)) {
-        let Some(start) = search_from.checked_add(pos).and_then(|v| v.checked_add(marker.len())) else {
-            break;
-        };
-        if let Some(end_offset) = content.get(start..).and_then(|s| s.find('"')) {
-            if let Some(id_str) = start.checked_add(end_offset).and_then(|end| content.get(start..end)) {
-                ids.push(id_str.to_string());
-            }
-            search_from = start.saturating_add(end_offset).saturating_add(1);
-        } else {
-            break;
-        }
-    }
-    ids
-}
 
 // ═══════════════════════════════════════════════════════════════════════
 // Bridge command polling — accepts inbound commands from the backend and
 // applies them on the main loop (K7 path).
 // ═══════════════════════════════════════════════════════════════════════
-
-use std::time::Duration;
 
 /// Maximum time the main loop will wait for a single command connection to
 /// finish reading.  A wedged commander is dropped after this window.
@@ -231,7 +46,7 @@ const READ_TIMEOUT: Duration = Duration::from_millis(500);
 /// cadence: when a web UI is connected through the bridge, the loop services
 /// the command socket every couple of ms so a web command applies in single-
 /// digit ms; otherwise it idles slowly to save CPU.
-pub(super) fn bridge_active(state: &cp_base::state::runtime::State) -> bool {
+pub(in crate::app::run) fn bridge_active(state: &State) -> bool {
     state.get_ext::<BridgeState>().is_some_and(|bs| bs.boot.is_some())
 }
 
@@ -243,7 +58,7 @@ pub(super) fn bridge_active(state: &cp_base::state::runtime::State) -> bool {
 /// commands applies in the same tick instead of trickling in one-per-tick
 /// (design doc Phase 3.1). Safe to call every tick: returns immediately when
 /// the bridge is OFF, the listener is absent, or no connection is pending.
-pub(super) fn poll_bridge_commands(app: &mut App) {
+pub(in crate::app::run) fn poll_bridge_commands(app: &mut App) {
     let mut budget = DRAIN_BUDGET;
     while budget > 0 {
         budget = budget.saturating_sub(1);
@@ -268,7 +83,7 @@ const DRAIN_BUDGET: u32 = 64;
 /// Returns `Some(cmds)` when a connection was handled, even if it yielded no
 /// accepted commands (an errored connection still counts, so draining
 /// continues to the next pending one).
-fn accept_commands(state: &mut cp_base::state::runtime::State) -> Option<Vec<Command>> {
+fn accept_commands(state: &mut State) -> Option<Vec<Command>> {
     let bs = state.ext_mut::<BridgeState>();
 
     // Split borrows: &boot (for listener + oplog) and &mut intake.
@@ -330,11 +145,90 @@ fn apply_command(app: &mut App, cmd: Command) {
 /// never dropped (a created/archived thread cannot be silently lost).
 ///
 /// [`submit_durable`]: cp_oplog::service::Service::submit_durable
-fn emit_roster_delta(state: &cp_base::state::runtime::State, kind: OpEntryKind) {
+fn emit_roster_delta(state: &State, kind: OpEntryKind) {
     if let Some(bs) = state.get_ext::<BridgeState>()
         && let Some(boot) = bs.boot.as_ref()
     {
         boot.oplog().submit_durable(kind);
+    }
+}
+
+// ── Live-vitals emission: phase + cost (Phase 2.3/2.4 — design doc I8/§15) ─
+
+/// Map the agent's internal [`StreamPhase`] to the wire [`Phase`] observers see.
+///
+/// The internal machine distinguishes *receiving tokens* from *executing tools*
+/// (both are "streaming" locally); the wire exposes that distinction directly so
+/// the UI can render `streaming` vs `tooling` vs `idle`.
+///
+/// [`StreamPhase`]: cp_base::state::flags::StreamPhase
+const fn wire_phase(phase: cp_base::state::flags::StreamPhase) -> Phase {
+    use cp_base::state::flags::StreamPhase;
+    match phase {
+        StreamPhase::Receiving => Phase::Streaming,
+        StreamPhase::ExecutingTools => Phase::Tooling,
+        StreamPhase::Idle => Phase::Idle,
+    }
+}
+
+/// Append `kind` to the oplog via the **best-effort** path (drop-on-full, never
+/// blocks the loop). No-op when the bridge is OFF.
+///
+/// Used for the disposable, self-healing live-vitals records
+/// ([`PhaseTransition`](OpEntryKind::PhaseTransition) /
+/// [`CostAggregate`](OpEntryKind::CostAggregate)): a lost intermediate phase is
+/// reconstructed on replay and a dropped cost sample re-aggregates, so unlike
+/// the roster deltas these must never stall the main loop for durability (I2).
+fn emit_best_effort(state: &State, kind: OpEntryKind) {
+    if let Some(bs) = state.get_ext::<BridgeState>()
+        && let Some(boot) = bs.boot.as_ref()
+    {
+        let _outcome = boot.oplog().append_best_effort(kind);
+    }
+}
+
+/// Emit a [`PhaseTransition`](OpEntryKind::PhaseTransition) and/or
+/// [`CostAggregate`](OpEntryKind::CostAggregate) the instant either changes, so
+/// the backend view (and the web UI) reflect live LLM vitals in milliseconds.
+///
+/// Called every main-loop tick — the **single chokepoint** for vitals emission
+/// (in contrast to scattering across stream hooks): it reads the authoritative
+/// in-memory state, compares against the last-emitted value held in
+/// [`BridgeState`], and emits **only on change**, so an idle loop and an
+/// unchanged-cost stream add zero oplog traffic. Both records are best-effort
+/// (I2): emission can never block or stall a tick.
+///
+/// No-op when the bridge is OFF (the `bridge_active` guard short-circuits).
+pub(in crate::app::run) fn emit_vitals(app: &mut App) {
+    use cp_base::cast::Safe as _;
+
+    if !bridge_active(&app.state) {
+        return;
+    }
+
+    // Phase — emit on transition only.
+    let phase = wire_phase(app.state.flags.stream.phase);
+    let phase_changed = app
+        .state
+        .get_ext::<BridgeState>()
+        .is_some_and(|bs| bs.last_phase != Some(phase));
+    if phase_changed {
+        emit_best_effort(&app.state, OpEntryKind::PhaseTransition { phase });
+        app.state.ext_mut::<BridgeState>().last_phase = Some(phase);
+    }
+
+    // Cost — cumulative-since-boot; emit when the dollar total moves.
+    let cost_usd = app.state.cost_hit_usd + app.state.cost_miss_usd + app.state.cost_output_usd;
+    let cost_changed = app
+        .state
+        .get_ext::<BridgeState>()
+        .is_some_and(|bs| (bs.last_cost_usd - cost_usd).abs() > f64::EPSILON);
+    if cost_changed {
+        let input_tokens =
+            app.state.cache_hit_tokens.to_u64().saturating_add(app.state.cache_miss_tokens.to_u64());
+        let output_tokens = app.state.total_output_tokens.to_u64();
+        emit_best_effort(&app.state, OpEntryKind::CostAggregate { input_tokens, output_tokens, cost_usd });
+        app.state.ext_mut::<BridgeState>().last_cost_usd = cost_usd;
     }
 }
 
@@ -346,11 +240,7 @@ fn emit_roster_delta(state: &cp_base::state::runtime::State, kind: OpEntryKind) 
 /// This is the **K7 path**: commands enter the agent through the same
 /// mechanism as local user input — a `ThreadMessage(User)` on the thread,
 /// a `MyTurn` status flip, and a spine notification.
-fn apply_send_message(
-    state: &mut cp_base::state::runtime::State,
-    thread_id: &str,
-    content: &str,
-) {
+fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
     let threads_state = ThreadsState::get_mut(state);
     let Some(thread) = threads_state.threads.iter_mut().find(|t| t.id == thread_id) else {
         log::warn!("bridge: SendMessage for unknown thread {thread_id}");
@@ -382,7 +272,7 @@ fn apply_send_message(
 // ── CreateThread ────────────────────────────────────────────────────────
 
 /// Create a new thread with the given name.
-fn apply_create_thread(state: &mut cp_base::state::runtime::State, name: &str) {
+fn apply_create_thread(state: &mut State, name: &str) {
     let ts = ThreadsState::get_mut(state);
     let id = format!("T{}", ts.next_id);
     ts.next_id = ts.next_id.saturating_add(1);
@@ -412,7 +302,7 @@ fn apply_create_thread(state: &mut cp_base::state::runtime::State, name: &str) {
 // ── ArchiveThread ───────────────────────────────────────────────────────
 
 /// Mark the thread as archived (soft-delete).
-fn apply_archive_thread(state: &mut cp_base::state::runtime::State, thread_id: &str) {
+fn apply_archive_thread(state: &mut State, thread_id: &str) {
     let ts = ThreadsState::get_mut(state);
     let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) else {
         log::warn!("bridge: ArchiveThread for unknown thread {thread_id}");
@@ -441,10 +331,7 @@ fn apply_archive_thread(state: &mut cp_base::state::runtime::State, thread_id: &
 // ── RestoreThread ───────────────────────────────────────────────────────
 
 /// Restore an archived thread (clear the soft-delete flag).
-fn apply_restore_thread(
-    state: &mut cp_base::state::runtime::State,
-    thread_id: &str,
-) {
+fn apply_restore_thread(state: &mut State, thread_id: &str) {
     let ts = ThreadsState::get_mut(state);
     if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) {
         thread.archived = false;
@@ -459,7 +346,7 @@ fn apply_restore_thread(
 // ── Stop / Interrupt ────────────────────────────────────────────────────
 
 /// Stop the current stream (mirrors the Esc-key `StopStreaming` action).
-fn apply_stop(state: &mut cp_base::state::runtime::State) {
+fn apply_stop(state: &mut State) {
     use cp_base::state::flags::StreamPhase;
 
     if state.flags.stream.phase.is_streaming() {
@@ -469,9 +356,7 @@ fn apply_stop(state: &mut cp_base::state::runtime::State) {
             .iter_mut()
             .find(|c| c.context_type.as_str() == cp_base::state::context::Kind::CONVERSATION)
         {
-            ctx.token_count = ctx
-                .token_count
-                .saturating_sub(state.streaming_estimated_tokens);
+            ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
         }
         state.streaming_estimated_tokens = 0;
         if let Some(msg) = state.messages.last_mut()
