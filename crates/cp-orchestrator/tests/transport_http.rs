@@ -170,12 +170,21 @@ fn ticket_mint_and_command_status_codes() {
     let bad = common::post_json(&h.addr, "/api/agent/agent-b/command", b"{not json");
     assert_eq!(bad.status, 400, "a malformed command is a real 400");
 
-    // Trip the breaker, then a well-formed command is fail-closed with 503.
+    // Trip the breaker. A cost-incurring `send_message` is then fail-closed
+    // with 503 (the breaker gates new spending).
     h.state.lock().expect("lock").breaker_mut().observe("agent-b", 99.0);
-    let cmd = br#"{"schema_version":1,"id":"c1","seq":1,"dedup_token":"d1","kind":{"kind":"stop"}}"#;
-    let tripped = common::post_json(&h.addr, "/api/agent/agent-b/command", cmd);
-    assert_eq!(tripped.status, 503, "a tripped breaker blocks the command (fail-closed)");
+    let costly = br#"{"schema_version":1,"id":"c1","seq":1,"dedup_token":"d1","kind":{"kind":"send_message","thread_id":"T1","content":"hi"}}"#;
+    let tripped = common::post_json(&h.addr, "/api/agent/agent-b/command", costly);
+    assert_eq!(tripped.status, 503, "a tripped breaker blocks a cost-incurring command (fail-closed)");
     assert!(tripped.body.contains("tripped"));
+
+    // A control-plane command costs nothing, so the tripped breaker must NOT
+    // refuse it — the user has to be able to halt/manage a runaway agent. It
+    // sails past the breaker gate and only then reaches command delivery (the
+    // agent socket is absent in this harness ⇒ 502, never 503).
+    let control = br#"{"schema_version":1,"id":"c2","seq":1,"dedup_token":"d2","kind":{"kind":"stop"}}"#;
+    let allowed = common::post_json(&h.addr, "/api/agent/agent-b/command", control);
+    assert_ne!(allowed.status, 503, "a tripped breaker must not block control-plane commands");
 }
 
 // ── 3. the SSE ticket gate is required and single-use ───────────────────────

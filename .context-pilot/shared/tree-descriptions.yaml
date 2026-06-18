@@ -826,6 +826,10 @@
   path: yamls/tools/search.yaml
   description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
   last_edited_ms: 0
+1f6eda4655fcfc5f:
+  path: crates/cp-orchestrator/src/registry/channel.rs
+  description: Per-agent channel — backend read/write handle. AgentChannel (from_entry/hydrate/send/send_with_retry) + read_ack. Tailer moved to sibling tailer.rs (split for 500-line limit) and re-exported here via `pub use crate::registry::tailer::Tailer` so channel::Tailer stays valid for all call sites. 320 lines.
+  last_edited_ms: 1781807510405
 1fb10ea87409018b:
   path: crates/cp-wire/src/types/mod.rs
   description: 'ContentHash (SHA-256, Copy, custom hex serde). NEW Phase14: ContentHash::of(&[u8])->SHA-256 (sha2 dep) is the canonical content address (vs FNV folder naming); to_hex(self) self-by-value (wrong_self_convention on Copy). Serialize reuses to_hex. Phase (Idle/Streaming/Tooling), LifecycleState. Re-exports submodules. Known-vector SHA-256 tests.'
@@ -834,6 +838,10 @@
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints.'
   last_edited_ms: 0
+2019931c3e04db95:
+  path: crates/cp-orchestrator/tests/transport_http.rs
+  description: Phase 30 transport surface tests over a real tiny_http server (4 tests). ticket_mint_and_command_status_codes now asserts a tripped breaker blocks a cost-incurring send_message (503) but NOT a control-plane stop (≠503, reaches delivery). REST rev-envelope+404, SSE ticket gate single-use, Last-Event-ID replay.
+  last_edited_ms: 1781807510464
 201ad691e285a4b8:
   path: crates/cp-mod-spine/src/types.rs
   description: 'Notification/SpineState/SpineConfig types. NotificationType (UserMessage/ReloadResume/Custom), NotificationStatus (Unprocessed/Blocked/Processed). SpineConfig: guard rail limits + runtime tracking. SpineState: create/mark/delete/unblock notifications. mark_all_unprocessed_as_processed() for continuation consumption.'
@@ -2986,6 +2994,10 @@
   path: ui/src/lib/types.ts
   description: 'Maquette domain types: ContextPanel, ChatMessage/ToolCall, Thread (summary), SpineNotif, StatRow, StatusModel, PanelKind. Thread-view types: ViewMode, ThreadQuestion, ThreadMsg, ThreadDetail (full conversation log).'
   last_edited_ms: 1781459201208
+7221452fcd2bb4c3:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: REST resource handlers. command() breaker check now GATED on matches!(command.kind, Kind::SendMessage{..}) — only cost-incurring SendMessage is fail-closed 503 when the breaker is tripped; control-plane CreateThread/Archive/Restore/Stop/Interrupt bypass the breaker (cost nothing + user needs them to recover from overspend). Imports {Command, Kind}. fleet/agent/threads serve from view; body hydrate; mint_ticket; resolve_entry.
+  last_edited_ms: 1781807510434
 724b961e89a4a1d9:
   path: crates/cp-mod-callback/src/types.rs
   description: Callback types. CallbackDefinition (name, pattern, script, blocking, timeout, success_message, cwd, is_global). CallbackState (definitions, editor_open). No active_set — all callbacks always active.
@@ -4498,6 +4510,10 @@ acb71d8973be7b96:
   path: crates/cp-orchestrator/src/supervisor/tests.rs
   description: 'Phase 17 supervisor unit tests (9): allow-list accept/reject + symlink/.. canonicalization, spawn_and_stop, dup-id reject, restart yields new pid + kills old, check_liveness reaps exited spawned child (Exited), adopt_and_detect_vanish (reaps external zombie first — unreaped zombie answers kill(pid,0) alive, so must wait() before probe), stop_not_found. use super::* globs parent imports (edition 2024). Entry built with real schema (boot_id/cap_token=String, oplog_path, model/protocol_version/binary_version/started_at_ms).'
   last_edited_ms: 1781645571152
+acc3faefa78f1085:
+  path: crates/cp-orchestrator/src/registry/mod.rs
+  description: 'AgentRegistry: poll-based scan-and-diff of agents dir. Events: Appeared/Disappeared/StatusChanged/Stale. Three-factor liveness verdict. reap_tmp for crash-orphan writes. 8 tests.'
+  last_edited_ms: 0
 acde3d0765ea24ec:
   path: crates/cp-mod-tree/src/tools.rs
   description: Tree tools with flame!(). compute_file_hash uses FNV-1a. Toggle/describe/filter. @-autocomplete via list_dir_entries.
@@ -5002,6 +5018,10 @@ be2b7aefcbf49547:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
   last_edited_ms: 0
+be33c4fd6fb67328:
+  path: crates/cp-orchestrator/src/registry/tailer.rs
+  description: Tailer — backend's incremental, gap-free oplog consumer (poll/seed/last_rev). Split out of channel.rs for the 500-line limit; re-exported from channel.rs to keep the stable channel::Tailer path. 203 lines, 5 tests.
+  last_edited_ms: 1781807510373
 be5cb31393a75d26:
   path: crates/cp-base/src/panels.rs
   description: Panel trait + caching infra. hash_content uses FNV-1a via cp-mod-utilities. Freeze system. time_arith. paginate_content.

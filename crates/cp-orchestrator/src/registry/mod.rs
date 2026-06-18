@@ -38,6 +38,7 @@ use cp_wire::types::registry::{AgentStatus, Entry};
 
 pub mod channel;
 pub mod liveness;
+pub mod tailer;
 
 use self::liveness::{verdict, Liveness};
 
