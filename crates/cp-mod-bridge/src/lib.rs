@@ -90,6 +90,22 @@ pub struct BridgeState {
     /// only messages created after boot become deltas (the cold backlog is
     /// served from tier-② disk on the frontend's initial load).
     pub msg_memo_seeded: bool,
+
+    /// Last per-thread turn-status emitted as a `ThreadStatusChanged` delta,
+    /// keyed by thread id. The status chokepoint diffs each thread's live
+    /// status against this memo every tick and emits only on an actual flip
+    /// (the same observe-on-change discipline as the message and vitals
+    /// chokepoints), so a `MyTurn`↔`TheirTurn` transition from *any* source —
+    /// a web `SendMessage`, the agent's `Send` tool, a TUI reply, the agent
+    /// finishing a turn — reaches the backend view (and the web roster) in
+    /// milliseconds, not on the next disk flush.
+    pub thread_statuses: std::collections::HashMap<String, cp_wire::types::ThreadTurn>,
+
+    /// Whether [`thread_statuses`](Self::thread_statuses) has been seeded from
+    /// the threads present at boot. Until it is, the first chokepoint pass
+    /// records existing statuses **without** emitting, so a (re)started agent
+    /// does not replay every thread's status as a spurious "change".
+    pub status_memo_seeded: bool,
 }
 
 /// Agent-side orchestration bridge module.
@@ -430,5 +446,7 @@ mod tests {
         assert!(bs.store.is_none());
         assert!(bs.thread_msg_counts.is_empty());
         assert!(!bs.msg_memo_seeded);
+        assert!(bs.thread_statuses.is_empty());
+        assert!(!bs.status_memo_seeded);
     }
 }

@@ -232,6 +232,88 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
     }
 }
 
+// ── Thread status emission (Phase 1.4 status_changed — design doc I8) ─────
+
+/// Map the agent's [`ThreadStatus`] to the wire [`ThreadTurn`] observers see.
+///
+/// The mapping is **identity by name** — `MyTurn → MyTurn`, `TheirTurn →
+/// TheirTurn` — matching the disk-plane reshape
+/// (`transport/rest/thread_shape.rs`), so a status served from a tier-② disk
+/// read and one carried by a live delta resolve to the *same* web bucket. (The
+/// wire enum's own doc comments describe the human-centric reading; the data
+/// convention actually in use across both planes is identity-by-name, and this
+/// helper is the single place that conversion lives.)
+const fn wire_turn(status: ThreadStatus) -> ThreadTurn {
+    match status {
+        ThreadStatus::MyTurn => ThreadTurn::MyTurn,
+        ThreadStatus::TheirTurn => ThreadTurn::TheirTurn,
+    }
+}
+
+/// Emit a [`ThreadStatusChanged`](OpEntryKind::ThreadStatusChanged) the instant
+/// any thread's turn-status flips, so the backend view (and the web roster)
+/// move the thread to the right bucket in milliseconds instead of waiting on
+/// the debounced tier-② disk write.
+///
+/// Like [`emit_messages`](super::messages::emit_messages), this is a main-loop
+/// **observe-on-change chokepoint**: it diffs each thread's live status against
+/// the per-thread snapshot held in [`BridgeState`] and emits **only on an
+/// actual flip**, so it captures a transition from *every* source — a web
+/// `SendMessage`, the agent's `Send` tool, a TUI reply, the agent finishing a
+/// turn — with one uniform path rather than an emit call scattered at each
+/// mutation site. A status flip is user-visible roster state, so it rides the
+/// **durable** (never-dropped, never-loop-blocking) path
+/// ([`emit_roster_delta`]).
+///
+/// The first pass after boot **seeds** the snapshot without emitting, so a
+/// (re)started agent does not replay every thread's status as a spurious
+/// change (the cold roster rides the frontend's initial tier-② load).
+///
+/// No-op when the bridge is OFF.
+pub(in crate::app::run) fn emit_thread_status(app: &mut App) {
+    if !bridge_active(&app.state) {
+        return;
+    }
+
+    // First pass: snapshot existing statuses without emitting.
+    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.status_memo_seeded);
+    if !seeded {
+        let statuses: Vec<(String, ThreadTurn)> = ThreadsState::get(&app.state)
+            .threads
+            .iter()
+            .map(|t| (t.id.clone(), wire_turn(t.status)))
+            .collect();
+        let bs = app.state.ext_mut::<BridgeState>();
+        for (id, turn) in statuses {
+            let _prev = bs.thread_statuses.insert(id, turn);
+        }
+        bs.status_memo_seeded = true;
+        return;
+    }
+
+    // Diff live statuses against the memo; collect the flips (owned, so the
+    // borrows end before we emit + update the memo below).
+    let changed: Vec<(String, ThreadTurn)> = {
+        let ts = ThreadsState::get(&app.state);
+        let memo = &app.state.ext::<BridgeState>().thread_statuses;
+        ts.threads
+            .iter()
+            .filter_map(|t| {
+                let turn = wire_turn(t.status);
+                (memo.get(&t.id).copied() != Some(turn)).then(|| (t.id.clone(), turn))
+            })
+            .collect()
+    };
+
+    for (thread_id, status) in changed {
+        emit_roster_delta(
+            &app.state,
+            OpEntryKind::ThreadStatusChanged { thread_id: thread_id.clone(), status },
+        );
+        let _prev = app.state.ext_mut::<BridgeState>().thread_statuses.insert(thread_id, status);
+    }
+}
+
 // ── SendMessage (K7) ────────────────────────────────────────────────────
 
 /// Inject a user message into the given thread and create a spine
@@ -287,13 +369,21 @@ fn apply_create_thread(state: &mut State, name: &str) {
     });
 
     // Emit the durable roster delta so the backend view reflects the new
-    // thread in ms (Leg 0 keystone) — new threads start on the user's turn.
+    // thread in ms (Leg 0 keystone) — a fresh, empty thread is the user's turn
+    // (they must type the first message). Routed through `wire_turn` so the
+    // emitted status matches what the status chokepoint would emit, and the
+    // status memo is primed to this value so creating then immediately sending
+    // a message produces exactly one follow-up `ThreadStatusChanged`.
+    let created_turn = wire_turn(ThreadStatus::TheirTurn);
     emit_roster_delta(state, OpEntryKind::ThreadCreated {
         thread_id: id.clone(),
         name: name.to_owned(),
-        status: ThreadTurn::TheirTurn,
+        status: created_turn,
         timestamp_ms: now_ms(),
     });
+    if let Some(bs) = state.get_ext_mut::<BridgeState>() {
+        let _prev = bs.thread_statuses.insert(id.clone(), created_turn);
+    }
 
     state.flags.ui.dirty = true;
     log::info!("bridge: created thread {id} \"{name}\"");

@@ -402,6 +402,10 @@
   path: src/llms/cache/prompt_tick_csv.rs
   description: 'Prompt tick CSV dumper for cache debugging. Writes every assembled-prompt message to .context-pilot/prompt_ticks/ each tick (datetime-named). Rolling deletion keeps 20 most recent. Columns: hash, role, type, context, tokens, acc/rev_acc tokens, preview. classify_text_context() tags panel headers/timestamps/footers/seed/conversation blocks. Moved from src/llms/ to cache/ for folder-size limit.'
   last_edited_ms: 1781084621779
+0ffa99ce4f777ea7:
+  path: web/src/lib/live.ts
+  description: 'Live data layer: SWR-style useLiveQuery (REST fetch + SSE delta apply + 5s poll backstop) + per-resource hooks (useFleet/useAgent/useThreads/useConversation/useStreamingTokens/useLibrary). applyThreadDelta folds oplog deltas in-place (thread_created/archived/restored/status_changed roster + message_created appends from inline_body JSON with dedup); applyAgentDelta folds phase/cost vitals. sendCommand now returns the receipt WITHOUT any invalidate/refetch — the push plane (SSE deltas, ~14ms) is the sole freshness mechanism; the old immediate+300ms invalidateAgent pair was removed because it refetched stale tier-② disk and clobbered the just-applied delta (T123 flicker fix). useStreamingTokens = §7 rAF token buffer.'
+  last_edited_ms: 1781816081144
 0ffe6ba25445c03a:
   path: src/ui/ir/render_status_bar.rs
   description: Status bar IR adapter — renders StatusBar to ratatui line. Badges (streaming/tooling/ready/blocked), agent/skill cards, git branch, auto-continue, reverie, queue, think balance. Builder from state. Wall-clock spinner. No QUESTIONING badge (PendingForm removed).
@@ -510,6 +514,10 @@
   path: src/ui/help/palette.rs
   description: 'Command palette state + IR adapter. CommandPalette struct (state methods: open/close/filter/select). to_ir() builds PaletteOverlay. render_command_palette_from_ir() adapter renders from IR. 19 theme:: calls in adapter only.'
   last_edited_ms: 0
+13a6e2027a31c565:
+  path: src/app/run/threads/bridge.rs
+  description: 'Bridge command intake + live-state emission (gated bridge-ON). poll_bridge_commands drains ALL pending commands/tick (Leg 3); apply_command routes SendMessage(K7)/CreateThread/Archive/Restore/Stop. emit_roster_delta = non-blocking DURABLE oplog append on thread mutation (Leg 0). emit_vitals = main-loop CHOKEPOINT: best-effort PhaseTransition (on transition) + CostAggregate (on $ change), emits only on change, never fsyncs the loop (I2). emit_thread_status = observe-on-change chokepoint: diffs each thread''s wire_turn(status) vs BridgeState.thread_statuses memo (seeded no-emit first pass), emits DURABLE ThreadStatusChanged on a flip from ANY source (web SendMessage / Send tool / TUI reply / turn-finish) — fixes T123 (a sent message''s MY_TURN flip never reaching the web roster). wire_phase maps StreamPhase→wire Phase; wire_turn maps ThreadStatus→ThreadTurn IDENTITY-by-name (matches disk reshape + roster_status_value, single conversion site); apply_create_thread routes status through wire_turn + primes the status memo.'
+  last_edited_ms: 1781816071221
 13d64209b193a95c:
   path: web/src/lib/api.ts
   description: 'Typed REST client for all 22 backend endpoints. Base URL from VITE_API_URL env (default localhost:7878). Fleet, agent meta, threads (with RawThread→ThreadDetail transform: status mapping, formatAge timestamps, content→text/role→author/timestamp→ts message field mapping), panels (13 kinds), finder, usage, library, commands, ticket mint. Transforms 7 panel responses from raw module state dicts to maquette array shapes. Memory IDs assigned sequentially as M1/M2 etc.'
@@ -2974,6 +2982,10 @@
   path: web/package.json
   description: 'Live web app (Vite 8 + React 19 + TS 6 + Tailwind v4 + Base UI + shadcn). Scripts: dev (vite :5175), build (tsc -b + vite build), lint, preview. @playwright/test for e2e. The live demaquetted app (sibling ui/ is the frozen maquette).'
   last_edited_ms: 1781814025249
+6f15f7b2970db193:
+  path: src/app/run/threads/mod.rs
+  description: 'Thread helpers for main loop: maybe_inject_auto_read (synthetic Read on auto-continuation), check_my_turn_threads (idle MY_TURN nudge, debounced), extract_thread_ids. Re-exports bridge::{bridge_active,emit_vitals,poll_bridge_commands} + messages::emit_messages. Split from threads.rs (500-line limit); intake+vitals emit in bridge.rs, message emit in messages.rs.'
+  last_edited_ms: 0
 6f1eddff8d2c7256:
   path: ui/src/lib/panelMeta.ts
   description: Panel icon map (lucide), accent vars, loadColor (token-load→color), fmtTokens/fmtCost formatters.
@@ -6246,6 +6258,10 @@ ec28737efa4930e9:
   path: .gitignore
   description: Git ignore rules
   last_edited_ms: 0
+ec349e54e8554b2b:
+  path: crates/cp-mod-bridge/src/lib.rs
+  description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1 (Boot emits Lifecycle::Running). on_stream_chunk→Token frames (tagged state.messages.last().id for §7 live-typing), on_stream_stop→PhaseHint(Idle). BridgeState{boot,tee,intake,tee_seq,last_phase,last_cost_usd,store,thread_msg_counts,msg_memo_seeded,thread_statuses,status_memo_seeded}: msg_memo + status_memo are the observe-on-change baselines for the emit_messages / emit_thread_status main-loop chokepoints (seeded no-emit at boot so a restart doesn''t replay backlog/status as spurious deltas). is_global, no tools/panels.'
+  last_edited_ms: 1781816071240
 ec35e41e73d1b8fc:
   path: crates/cp-mod-tree/src/panel.rs
   description: Tree panel. Background cache system for directory tree rendering. TreeCacheRequest data payload. Pagination. refresh_stale_from_yaml() call in apply_cache_update triggers second rebuild if descriptions changed.
@@ -6610,6 +6626,10 @@ f9624475fd1e00ba:
   path: crates/cp-orchestrator/src/lib.rs
   description: 'Phase 15 (X782): backend library root (split from main.rs for unit-testability). Declares liveness + registry modules. Backend-only peer of cp-mod-bridge: bridge WRITES registry/heartbeat/oplog, backend READS/tails them across a fleet.'
   last_edited_ms: 1781629188001
+f9a106e852ea82de:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop with flame!("loop"). Input-first (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. poll_bridge_commands runs every tick. X18 LATENCY: adaptive idle poll — 8ms streaming/dirty, 2ms when bridge_active (web UI connected, keeps command→apply latency ≤ a few ms), 50ms otherwise. Ownership checks. Render ~28fps. Thread helpers in run/threads.rs.'
+  last_edited_ms: 0
 f9a59893086fbabb:
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view. Agent realm header (name+folder) + ''M working in parallel'' pulsing pill. Grouped: ''Needs you''=MY_TURN / ''Working in parallel''=THEIR_TURN. Each row: status dot, name, preview, time, unread. New Thread + search.'

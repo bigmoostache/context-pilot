@@ -587,19 +587,27 @@ export { mintTicket } from "./api"
 export { downloadFile } from "./api"
 
 /**
- * Send a command to an agent, then automatically invalidate all live
- * queries for that agent so the UI reflects the change immediately.
+ * Send a command to an agent and return its receipt.
  *
- * Two invalidation rounds: one immediate (may catch synchronously-
- * processed commands) and one after 300ms (waits for the agent's
- * PersistenceWriter 50ms debounce + disk flush + backend mtime cache).
+ * Deliberately does **not** invalidate/refetch afterwards. Every
+ * command-driven mutation is now covered by the push plane — the backend
+ * journals an oplog delta the instant the agent applies the command
+ * (`SendMessage` → `MessageCreated` + `ThreadStatusChanged`,
+ * `CreateThread`/`ArchiveThread`/`RestoreThread` → the matching roster delta),
+ * which arrives over SSE in ~14 ms and is applied in-place by
+ * `applyThreadDelta`/`applyAgentDelta` (zero refetch). The old
+ * immediate-plus-300ms `invalidateAgent` pair *fought* that delta: it refetched
+ * `/threads` from the tier-② disk cache before the agent's debounced flush had
+ * landed, so the stale snapshot clobbered the freshly-applied delta and the
+ * just-sent message visibly flickered out then back in (T123).
+ *
+ * Single-mechanism discipline (design doc §8.5 / X859): the push plane is the
+ * sole freshness mechanism for these resources; the 5 s poll in `useLiveQuery`
+ * remains only as a documented last-resort backstop for an un-covered edge.
  */
 export async function sendCommand(
   agentId: string,
   kind: Record<string, unknown>,
 ): Promise<api.CommandReceipt> {
-  const receipt = await api.sendCommand(agentId, kind)
-  invalidateAgent(agentId)
-  setTimeout(() => invalidateAgent(agentId), 300)
-  return receipt
+  return api.sendCommand(agentId, kind)
 }
