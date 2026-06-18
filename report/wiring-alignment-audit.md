@@ -88,9 +88,34 @@ breaking go-up; normalised to absolute paths (`Finder.tsx` `toAbs`, `26d6f3c`).
 
 ## 4. Measured proof (the "why it's now fast")
 
-- Command **journaling**: ~14 ms p50 / ~33 ms p99 *to visible in the browser*
-  (measured this session via the latency probe, agent `f3a993c0ff357b41`), down
-  from the baseline's "seconds". Floor = the durable journal-then-ack fsync (I11).
+### 4.1 Before/after latency table (X866)
+
+`command → visible` is `POST /command → the matching rev-numbered roster delta
+arrives on the SSE wire` (the instant `applyThreadDelta` paints it; the
+frontend store update is an in-place sub-ms reducer, never a refetch). Measured
+with `/tmp/lat.py` (25× `create_thread`, agent `f3a993c0ff357b41`).
+
+| Path | BEFORE (disk/poll plane) | AFTER (push plane) |
+|---|---|---|
+| thread create → **visible** | ~seconds (≤ 2 s `config.json` mtime poll backstop; debounced 50 ms disk coalescing) | **p50 35 ms · p99 68 ms** (under live load) / p50 ~14 ms (agent idle) |
+| durable **ack** (journal-then-ack) | — (no journal existed) | p50 22 ms · p99 47 ms |
+| visible **misses** (> 2 s) | common (poll-bounded) | **0 / 25** |
+
+Two AFTER columns because the figure is honest about contention: **35 ms p50 /
+68 ms p99 is measured while the agent is actively `streaming`+`tooling`** (the
+metrics endpoint read `phase: streaming`, rev lag 0–1 during the run), i.e. the
+main loop is contending with a live LLM stream + tool execution. The ~14 ms p50
+is the same path with the agent idle. The deployment claim is the **under-load**
+number: even mid-stream, a web command is visible in **< 70 ms p99 with zero
+misses** — versus a baseline where a created thread could sit invisible until the
+next ~2 s mtime poll. An intermediate epoch (before the `TAIL_REPOLL=5ms`
+FSEvents-coalescing fix) measured p50 111 ms, bounded by the old 100 ms
+`TAIL_INTERVAL`; the 5 ms re-poll cap removed that floor.
+
+### 4.2 Path breakdown
+
+- Command **journaling**: down from the baseline's "seconds". Floor = the
+  durable journal-then-ack fsync (I11).
 - Path: `agent applies → submit_durable enqueue (no loop fsync) → oplog group-commit
   off-loop → backend Tailer.poll (≤TAIL_REPOLL 5ms) → MaterializedView fold → SSE
   delta → frontend applyDelta (zero refetch)`.
