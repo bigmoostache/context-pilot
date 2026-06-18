@@ -331,9 +331,10 @@ function useLiveQuery<T>(
   }, [key, enabled])
 
   // SSE subscription — `delta` events APPLY in-place when a reducer is given
-  // (the push plane), otherwise fall back to a debounced refetch. `invalidate`
-  // events always refetch (transitional safety net until every resource is
-  // fully delta-covered — design doc Phase 8.5).
+  // (the push plane), otherwise fall back to a debounced refetch. The
+  // `invalidate` event is subscribed ONLY by reducer-less (inspection) hooks,
+  // for which it is the sole live freshness signal; a delta-covered hook skips
+  // it (single-mechanism discipline, X859 — see below).
   useEffect(() => {
     if (!agentId || !enabled) return
     const client = getOrCreateSseClient(agentId)
@@ -357,8 +358,20 @@ function useLiveQuery<T>(
       // Same reference = acknowledged-but-irrelevant → no state churn.
       if (next !== dataRef.current && mountedRef.current) setData(next)
     })
-    const unsubInvalidate = client.subscribe("invalidate", () => debouncedRefetch())
-    return () => { unsubDelta(); unsubInvalidate() }
+    // Single-mechanism discipline (X859): a resource WITH a delta reducer is
+    // delta-covered — it owns its freshness through in-place `delta` apply
+    // (plus the poll backstop + SSE reconnect replay-by-rev for gaps), so it
+    // must NOT also ride the tier-② `invalidate` event: that redundant refetch
+    // re-reads the disk cache and races the push-plane delta it duplicates.
+    // Only inspection resources (no reducer, no oplog delta to fold) keep the
+    // `invalidate` subscription as their sole live freshness signal.
+    const unsubInvalidate = applyDeltaRef.current
+      ? undefined
+      : client.subscribe("invalidate", () => debouncedRefetch())
+    return () => {
+      unsubDelta()
+      unsubInvalidate?.()
+    }
   }, [agentId, debouncedRefetch, enabled])
 
   // Poll backstop
