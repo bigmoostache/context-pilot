@@ -30,9 +30,7 @@
 //! | `POST` | `/api/ticket` | [`rest::mint_ticket`] |
 //! | `GET`  | `/api/stream?agent={id}&ticket={t}` | SSE (this module) |
 
-pub mod finder;
-pub mod meta;
-pub mod panels;
+pub mod inspect;
 mod query;
 pub mod rest;
 pub mod sse;
@@ -250,24 +248,26 @@ fn route_rest(
     match (method, segments) {
         (Method::Get, ["api", "health"]) => rest::HttpReply { status: 200, body: "{\"status\":\"ok\"}".to_owned() },
         (Method::Get, ["api", "fleet"]) => rest::fleet(state),
-        (Method::Get, ["api", "fleet", "meta"]) => meta::fleet_meta(state),
+        (Method::Get, ["api", "fleet", "meta"]) => inspect::meta::fleet_meta(state),
+        (Method::Get, ["api", "metrics"]) => inspect::metrics::fleet_metrics(state),
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
-        (Method::Get, ["api", "agent", id, "meta"]) => meta::agent_meta(state, id),
+        (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent_meta(state, id),
+        (Method::Get, ["api", "agent", id, "metrics"]) => inspect::metrics::agent_metrics(state, id),
         (Method::Get, ["api", "agent", id, "body", hash]) => rest::body(state, id, hash),
         (Method::Get, ["api", "agent", id, "threads"]) => rest::threads(state, id),
-        (Method::Get, ["api", "agent", id, "panels"]) => panels::panel_list(state, id),
-        (Method::Get, ["api", "agent", id, "memory"]) => panels::memory(state, id),
-        (Method::Get, ["api", "agent", id, "todos"]) => panels::todos(state, id, query),
-        (Method::Get, ["api", "agent", id, "spine"]) => panels::spine(state, id, query),
-        (Method::Get, ["api", "agent", id, "queue"]) => panels::queue(state, id, query),
-        (Method::Get, ["api", "agent", id, "scratchpad"]) => panels::scratchpad(state, id, query),
-        (Method::Get, ["api", "agent", id, "tree"]) => panels::tree(state, id),
-        (Method::Get, ["api", "agent", id, "callbacks"]) => panels::callbacks(state, id),
-        (Method::Get, ["api", "agent", id, "usage"]) => panels::usage(state, id, query),
-        (Method::Get, ["api", "agent", id, "library"]) => panels::library(state, id),
-        (Method::Get, ["api", "agent", id, "fs"]) => finder::fs_list(state, id, query),
-        (Method::Get, ["api", "agent", id, "fs", "preview"]) => finder::fs_preview(state, id, query),
-        (Method::Get, ["api", "agent", id, "conversation"]) => finder::conversation(state, id),
+        (Method::Get, ["api", "agent", id, "panels"]) => inspect::panels::panel_list(state, id),
+        (Method::Get, ["api", "agent", id, "memory"]) => inspect::panels::memory(state, id),
+        (Method::Get, ["api", "agent", id, "todos"]) => inspect::panels::todos(state, id, query),
+        (Method::Get, ["api", "agent", id, "spine"]) => inspect::panels::spine(state, id, query),
+        (Method::Get, ["api", "agent", id, "queue"]) => inspect::panels::queue(state, id, query),
+        (Method::Get, ["api", "agent", id, "scratchpad"]) => inspect::panels::scratchpad(state, id, query),
+        (Method::Get, ["api", "agent", id, "tree"]) => inspect::panels::tree(state, id),
+        (Method::Get, ["api", "agent", id, "callbacks"]) => inspect::panels::callbacks(state, id),
+        (Method::Get, ["api", "agent", id, "usage"]) => inspect::panels::usage(state, id, query),
+        (Method::Get, ["api", "agent", id, "library"]) => inspect::panels::library(state, id),
+        (Method::Get, ["api", "agent", id, "fs"]) => inspect::finder::fs_list(state, id, query),
+        (Method::Get, ["api", "agent", id, "fs", "preview"]) => inspect::finder::fs_preview(state, id, query),
+        (Method::Get, ["api", "agent", id, "conversation"]) => inspect::finder::conversation(state, id),
         (Method::Post, ["api", "agent", id, "command"]) => rest::command(state, id, body_bytes),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state),
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },
@@ -412,7 +412,7 @@ fn cleanup(state: &Arc<Mutex<Backend>>, agent_id: &str, sub_id: Option<u64>) {
 
 /// Serve a raw file download with `Content-Disposition: attachment`.
 fn handle_download(request: Request, state: &Arc<Mutex<Backend>>, id: &str, query: &str) {
-    match finder::fs_download(state, id, query) {
+    match inspect::finder::fs_download(state, id, query) {
         Ok((bytes, filename)) => {
             let mut response = Response::from_data(bytes).with_status_code(200);
             if let Ok(h) = Header::from_bytes(

@@ -246,22 +246,27 @@ f5d97b1e7a01c317:
 
     X842 Lifecycle ac7ba01: Boot::start_in Running, Boot::drop Stopping; meta.rs derive_status. I8 fully ABIDES.
 
-    X836b/X850 Checkpoint-carries-roster (THIS BATCH): cp-wire snapshot.rs Snapshot.roster:Vec<RosterThread> (#[serde(default)] N-1) + RosterThread fold helpers (fold_created via ThreadCreation<'src> carrier struct — keeps arg count ≤4 clippy; fold_archived/fold_status/fold_message) = SINGLE SOURCE OF TRUTH for roster fold. cp-orchestrator RosterEntry := pub type alias of RosterThread. append.rs snapshot() carries roster. replay.rs Recovered.roster + fold_entry folds 4 ThreadX variants + MessageCreated activity + Checkpoint clone_from roster. materialized_view.rs apply Checkpoint clone_from snapshot.roster; tests extracted to sibling materialized_view_tests.rs (#[cfg(test)] #[path] include; 500-line limit). I3+I5 now ABIDES. Audit P16 updated, ledger item 2 DONE. All 3 CB callbacks green; cp-wire/cp-oplog/cp-orchestrator test suites green.
+    X836b/X850 Checkpoint-carries-roster 703cec8: cp-wire snapshot.rs Snapshot.roster + RosterThread fold helpers (single source of truth). I3+I5 ABIDES.
 
-    ## REMAINING
-    - 2.6 Checkpoint EMIT cadence (X843): writer can stamp checkpoints on roll, but agent doesn't yet emit periodic checkpoints during a long-lived segment (every N entries / M secs). Roster-in-snapshot machinery is ready; just needs the trigger.
-    - Phase 8 demote mtime poll to pure backstop (X863); Phase 9 validation table (X866) + §19 observability (X868)
-    - Phase 6 cleanup: remove invalidate band-aid per delta-covered resource (X859/X865)
-    - SEPARATE BUG T114: FIXED b0b2df3 (breaker gates only SendMessage).
+    T123 fix b877b89: emit_thread_status chokepoint (DURABLE ThreadStatusChanged on flip from any source) + removed sendCommand double-invalidate (push plane sole freshness).
 
-    Key code: emit_messages @ src/app/run/threads/messages.rs; emit_vitals+emit_roster_delta @ bridge.rs; MaterializedView roster @ services/materialized_view.rs; SSE producer run_stream @ transport/mod.rs (TAIL_REPOLL=5ms); live.ts applyThreadDelta+applyAgentDelta. Latency probe /tmp/lat.py (agent f3a993c0ff357b41).
+    T121 BREAKER-SURFACING 0f2b133 (THIS BATCH): web/src/components/threads/ThreadsView.tsx — describeCommandError(verb,err) breaker-aware (503/'tripped'→actionable over-budget alert, else generic 'Could not…'); all 3 catch sites (send/create/archive) now flash a transient role=alert toast (6s, timer-ref unmount cleanup) instead of .catch(console.error). Closes the SILENT-SWALLOW hole the user hit. e2e web/e2e/breaker.spec.ts (page.route 503 intercept, asserts role=alert budget|breaker|blocked) GREEN. messages.spec DOM-bubble timeout 15s→25s (matches roster-log poll; full-suite flake was single-live-agent LOAD not logic — passes isolated 6.3s). 15 e2e total: breaker GREEN; full suite 14/15 (messages flakes ONLY under cumulative live-agent backlog = me being busy, NOT a regression — happy-path send unchanged, bubble comes from SSE delta not optimistic update).
+
+    ## REMAINING (T120 epic completeness/validation, not user-facing gaps)
+    - 2.6 Checkpoint EMIT cadence (X843): writer stamps checkpoints on roll, but agent doesn't yet emit periodic checkpoints mid-segment (every N entries / M secs). Machinery ready, needs trigger.
+    - Phase 8 demote mtime poll to pure backstop (X863); Phase 9 validation table (X866).
+    - §19 OBSERVABILITY SURFACE (X868): per-agent stream latency p50/p99, dropped/coalesced frames, rev lag, fsync latency, watch count, DURABLE CostBreaker state visible in cockpit (T121: breaker trip must be visible, not silent latch — frontend surfacing now done, backend metrics surface still TODO). Structured logs agent_id+cmd_id+rev.
+    - Phase 6 cleanup: remove invalidate band-aid per delta-covered resource (X859/X865).
+    - Multi-agent soak + V1–V12 fault matrix in CI (X869).
+
+    Key code: emit_messages @ src/app/run/threads/messages.rs; emit_vitals+emit_roster_delta+emit_thread_status @ bridge.rs; MaterializedView roster @ services/materialized_view.rs; SSE producer run_stream @ transport/mod.rs (TAIL_REPOLL=5ms); live.ts applyThreadDelta+applyAgentDelta; ThreadsView describeCommandError. e2e harness web/e2e/ (15 tests). Latency probe /tmp/lat.py (agent f3a993c0ff357b41). Orchestrator P21 :7878 CP_COST_BUDGET=100000000.
   importance: high
   labels:
   - latency
   - architecture
   - demaquetting
   - active
-  last_edited_ms: 1781815305549
+  last_edited_ms: 1781816874279
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium

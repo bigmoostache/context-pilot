@@ -150,6 +150,10 @@
   path: ui/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: selected thread''s full conversation. toChatMessage() maps ThreadMsg→ChatMessage to reuse cockpit Message renderer. Renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'
   last_edited_ms: 1781459201150
+0523cb0b2b4f3455:
+  path: crates/cp-orchestrator/src/transport/inspect/metrics.rs
+  description: '§19 observability metrics endpoints. agent_metrics (GET /api/agent/{id}/metrics) + fleet_metrics (GET /api/metrics) expose ALREADY-COLLECTED backend state: breaker {tripped,spendUsd,budgetUsd} (durable R2-8 latch made VISIBLE — T121), stream {subscribers,droppedFrames,degraded} (StreamHub.agent_stream_health), rev {view,oplogHead,lag} (view rev vs fresh cp_oplog::replay rev_head — lag~0 under live tail), phase+lifecycle. Lock held once for in-mem reads; oplog_head_rev read from disk OUTSIDE lock. Latency/fsync histograms deliberately NOT synthesised (need new instrumentation) — no fabricated metrics. Proven live: agent f3a993c0 rev lag 0-1, 1 subscriber, 0 dropped.'
+  last_edited_ms: 1781817532335
 053accd087ac049f:
   path: crates/cp-mod-firecrawl/src/crawl.rs
   description: Recursive site crawling — firecrawl_crawl tool. flame!("firecrawl_crawl"). Start async crawl job + poll loop (5s interval, 60 max polls, 310s timeout). write_crawl_output writes combined markdown to disk. No panel created.
@@ -750,6 +754,10 @@
   path: crates/cp-mod-github/Cargo.toml
   description: 'GitHub module deps: cp-base, cp-render, crossterm, regex, sha2, serde_json, secrecy.'
   last_edited_ms: 1780563847621
+1c8d8348b90b658d:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Transport hub. Backend shared state + serve/serve_bound + route_rest (now 24 routes incl /api/metrics + /api/agent/{id}/metrics via inspect::metrics) + handle_stream SSE. inspect/ groups the read-view endpoints (meta/panels/finder/metrics). run_stream SSE producer: Tailer.poll→rev-numbered deltas, drains StreamHub, dirty→invalidate. TAIL_REPOLL=5ms re-poll cap (FSEvents coalescing floor fix). Yielded command→visible p50 14ms/p99 33ms.'
+  last_edited_ms: 1781817532428
 1ca2e8434c046d42:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints.'
@@ -1650,6 +1658,10 @@
   path: web/src/lib/api.ts
   description: Typed REST client for all 22 backend endpoints. Base URL from VITE_API_URL env (default localhost:7878). Fleet, agent meta, threads, panels (13 kinds), finder, usage, library, commands, ticket mint. Transforms 7 panel responses (memory/todos/spine/queue/scratchpad/tree/callbacks) from raw module state dicts to maquette array shapes.
   last_edited_ms: 1781774710443
+3db50fe69f7d422d:
+  path: crates/cp-orchestrator/src/services/stream_hub.rs
+  description: 'Phase 18: StreamHub — per-agent stream fan-out to N bounded subscribers (R2-17). Subscriber{id,buffer:VecDeque<Frame>,capacity,degraded,dropped}: admit() evicts OLDEST on full + sets degraded + bumps dropped; cap 0 drops all. agent_stream_health(id)->(subscribers,total_dropped,any_degraded) aggregate accessor for §19 metrics. publish/drain/subscribe/unsubscribe/mark_reconciled. Single-owner lock-free. 9 tests.'
+  last_edited_ms: 1781817532409
 3db99c7fa34b728d:
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
@@ -3146,6 +3158,10 @@
   path: crates/cp-mod-firecrawl/src/lib.rs
   description: 'Firecrawl module. 4 tools: scrape/search/map/crawl. Dynamic firecrawl_result panels. No state. pub(crate) mod crawl. Nested object params (location). Simple dispatch pattern.'
   last_edited_ms: 0
+74be16a3f3edebcf:
+  path: crates/cp-orchestrator/src/transport/inspect/mod.rs
+  description: 'inspect/ hub: groups the read-only JSON view endpoints (meta, panels, finder, metrics) under one module to keep transport/ within the 8-entry folder limit. Submodules reach Backend/HttpReply via absolute crate:: paths.'
+  last_edited_ms: 1781817532317
 74ca866d078e2418:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
@@ -4074,6 +4090,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: 'Cockpit header strip: app mark, view switcher (Threads/Cockpit segmented control), project breadcrumb, branch chip, global cost, status dot.'
   last_edited_ms: 0
+964090fcb8a0d8a7:
+  path: crates/cp-orchestrator/src/transport/inspect/finder.rs
+  description: 'Per-agent Finder file-manager endpoints (moved into inspect/): fs_list/fs_preview/fs_download/conversation, confined to the agent realm. Absolute crate::transport:: paths after the move.'
+  last_edited_ms: 1781817532372
 965292c5106e02e5:
   path: crates/cp-render/src/frame.rs
   description: Frame-level IR types. Frame (sidebar/active_panel/status_bar/conversation/overlays), Sidebar (entries/token_bar/stats/pr_card/help), StatusBar (badge/agent/skills/git/auto_continue/reverie/queue/think), PanelContent (title/blocks).
@@ -4898,6 +4918,10 @@ b5605bee566a2c94:
   path: .github/workflows/build.yml
   description: 'Cross-platform build workflow. 4-target matrix: linux-x86_64 (native), linux-aarch64 (cross), macos-x86_64 (macos-13), macos-aarch64 (macos-latest). Pins Rust 1.93.0. Builds tui + cp-console-server. 30-day artifact retention.'
   last_edited_ms: 0
+b590f6c0c96ea8d5:
+  path: crates/cp-orchestrator/src/transport/inspect/meta.rs
+  description: 'Enriched agent meta endpoints (moved into inspect/). agent_meta (GET /api/agent/{id}/meta) + fleet_meta (GET /api/fleet/meta) build maquette Agent JSON: registry record + view (phase/lifecycle/cost) + threads inspect (count/MY_TURN/lastActivity/task) + git branch. derive_status: Stopping/Stopped lifecycle can never read ''working'' (I8 authoritative). Uses absolute crate::transport:: paths after the inspect/ move.'
+  last_edited_ms: 1781817532353
 b5adb721af1f1f41:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Thread methods extracted to run/threads.rs.'
@@ -6634,6 +6658,10 @@ f92c5bde1453df0b:
   path: ui/src/components/finder/GetInfo.tsx
   description: 'Get Info modal — macOS dossier sheet: large macOS <FileIcon> (T27), name, kind/size/dates, tags, dimensions/duration/pages, ''where'' path. Esc/Done close. Decorative.'
   last_edited_ms: 1781600078235
+f93b1f30d75e6783:
+  path: crates/cp-orchestrator/src/transport/inspect/panels.rs
+  description: 'Cockpit inspection-panel endpoints (moved into inspect/): memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list — tier-② disk reads reshaped to maquette JSON. Absolute crate::transport:: paths after the move.'
+  last_edited_ms: 1781817532391
 f957bf9c5e2d5a99:
   path: src/infra/api.rs
   description: Thin re-export of llms::{StreamEvent, StreamParams, start_streaming}. Backward-compat shim.

@@ -11,8 +11,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use super::rest::HttpReply;
-use super::Backend;
+use crate::transport::rest::HttpReply;
+use crate::transport::Backend;
 
 /// Maximum file size for downloads (10 MiB).
 const MAX_DOWNLOAD_BYTES: u64 = 10 * 1024 * 1024;
@@ -264,7 +264,7 @@ pub fn conversation(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
 
 /// Resolve the agent's working directory from the registry record.
 fn agent_folder(state: &Mutex<Backend>, agent_id: &str) -> Result<String, HttpReply> {
-    let entry = super::rest::resolve_entry(state, agent_id)?;
+    let entry = crate::transport::rest::resolve_entry(state, agent_id)?;
     Ok(entry.folder)
 }
 

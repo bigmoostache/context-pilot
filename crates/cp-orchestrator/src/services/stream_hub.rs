@@ -205,6 +205,24 @@ impl StreamHub {
         self.agents.get(agent_id).map_or(0, Vec::len)
     }
 
+    /// Aggregate stream health for `agent_id` (design doc §19 observability):
+    /// `(subscriber_count, total_dropped_frames, any_degraded)`.
+    ///
+    /// Sums the per-subscriber dropped counters and ORs their degraded flags so
+    /// a metrics surface can report whether *any* consumer of this agent's
+    /// stream has lost frames (the signal that a reconcile is owed) without
+    /// walking subscribers itself. Returns `(0, 0, false)` for an agent with no
+    /// subscribers.
+    #[must_use]
+    pub fn agent_stream_health(&self, agent_id: &str) -> (usize, u64, bool) {
+        match self.agents.get(agent_id) {
+            None => (0, 0, false),
+            Some(subs) => subs.iter().fold((0, 0, false), |(n, dropped, degraded), s| {
+                (n + 1, dropped.saturating_add(s.dropped_count()), degraded || s.is_degraded())
+            }),
+        }
+    }
+
     /// Mutable subscriber lookup (private helper).
     fn subscriber_mut(&mut self, agent_id: &str, sub_id: u64) -> Option<&mut Subscriber> {
         self.agents.get_mut(agent_id)?.iter_mut().find(|s| s.id == sub_id)

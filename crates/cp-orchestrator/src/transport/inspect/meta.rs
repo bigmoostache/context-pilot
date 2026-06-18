@@ -10,8 +10,8 @@ use std::sync::Mutex;
 
 use cp_wire::types::registry::Entry;
 
-use super::rest::HttpReply;
-use super::Backend;
+use crate::transport::rest::HttpReply;
+use crate::transport::Backend;
 
 /// `GET /api/agent/{id}/meta` — enriched agent info for the fleet/agent views.
 ///
@@ -19,7 +19,7 @@ use super::Backend;
 /// (phase, cost), thread inspection (count, any-MY_TURN → "needs-you"), and
 /// `git` branch. Returns a JSON object matching the maquette `Agent` shape.
 pub fn agent_meta(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let entry = match super::rest::resolve_entry(state, agent_id) {
+    let entry = match crate::transport::rest::resolve_entry(state, agent_id) {
         Ok(e) => e,
         Err(reply) => return reply,
     };

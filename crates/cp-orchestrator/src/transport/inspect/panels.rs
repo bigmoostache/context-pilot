@@ -12,8 +12,8 @@
 use std::path::Path;
 use std::sync::Mutex;
 
-use super::rest::HttpReply;
-use super::Backend;
+use crate::transport::rest::HttpReply;
+use crate::transport::Backend;
 
 /// `GET /api/agent/{id}/panels` — live context panel list read from the
 /// agent's `panels/` directory.
@@ -253,7 +253,7 @@ fn parse_frontmatter(content: &str) -> (String, String) {
 
 /// Resolve the agent's working directory from the registry record.
 fn agent_folder(state: &Mutex<Backend>, agent_id: &str) -> Result<String, HttpReply> {
-    let entry = super::rest::resolve_entry(state, agent_id)?;
+    let entry = crate::transport::rest::resolve_entry(state, agent_id)?;
     Ok(entry.folder)
 }
 
