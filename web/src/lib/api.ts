@@ -270,11 +270,23 @@ export async function downloadFile(agentId: string, path: string): Promise<void>
   URL.revokeObjectURL(url)
 }
 
+/** One raw conversation message from `/api/agent/{id}/conversation`.
+ *
+ * `id` is the agent's stable `Message::id` — the SAME id the durable
+ * `MessageCreated` oplog entry and the ephemeral stream `Token` frame's
+ * `message_id` carry — so a live token buffer can be correlated with its
+ * durable message. `uid` is the on-disk file id (distinct, not used for
+ * stream correlation). */
 export interface ConversationMsg {
+  id: string
   uid: string
   role: string
   content: string
   timestamp_ms: number
+  /** "text" | "tool_call" | "tool_result" (others tolerated). */
+  message_type?: string
+  tool_uses?: Array<{ id?: string; name?: string; input?: Record<string, unknown> }>
+  tool_results?: Array<{ tool_name?: string; content?: string; is_error?: boolean }>
 }
 
 export function fetchConversation(agentId: string): Promise<ConversationMsg[]> {

@@ -492,6 +492,88 @@ export function useConversation(agentId: string): LiveQueryResult<api.Conversati
   return useLiveQuery(`conversation:${agentId}`, fetcher, agentId, DEFAULT_POLL_MS, !!agentId)
 }
 
+// ── Live token streaming (§7 stream plane) ────────────────────────────
+//
+// The durable conversation (`useConversation`) is the authoritative record,
+// but it only updates once a message is flushed to disk. While the assistant
+// is *typing*, the only source of the in-progress text is the ephemeral stream
+// plane: the agent tees `Token` frames → backend `StreamHub` → SSE `stream`
+// event. This hook consumes that channel and exposes a live, per-message text
+// buffer for the conversation view to paint in real time.
+//
+// **§7 mandatory contract — rAF batching.** Tokens can arrive dozens of times
+// per second; calling `setState` per token would thrash React. Instead each
+// token is appended to a mutable ref buffer and a single state snapshot is
+// flushed once per `requestAnimationFrame`. State updates are therefore capped
+// at the display refresh rate (~60fps) no matter how fast tokens stream.
+//
+// The returned map is keyed by `message_id` (= the agent's `Message::id`, the
+// same id the durable `MessageCreated`/conversation entry carries), so the
+// view can correlate a live buffer with its durable message and reconcile
+// (stop overriding) once the durable text catches up.
+
+/** Per-message accumulated streaming text, keyed by `message_id`. */
+export type LiveTokens = Record<string, string>
+
+export function useStreamingTokens(agentId: string): LiveTokens {
+  const [tokens, setTokens] = useState<LiveTokens>({})
+  // Accumulation buffer — mutated synchronously on every token, snapshotted
+  // into React state once per animation frame (never per token).
+  const bufRef = useRef<LiveTokens>({})
+  const dirtyRef = useRef(false)
+  const rafRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!agentId) return
+    // Reset buffers when the agent changes (a new realm = a new stream).
+    bufRef.current = {}
+    dirtyRef.current = false
+    setTokens({})
+
+    const client = getOrCreateSseClient(agentId)
+
+    const flush = () => {
+      rafRef.current = null
+      if (!dirtyRef.current) return
+      dirtyRef.current = false
+      setTokens({ ...bufRef.current }) // one snapshot per frame
+    }
+    const schedule = () => {
+      if (rafRef.current != null) return
+      rafRef.current = requestAnimationFrame(flush)
+    }
+
+    const unsub = client.subscribe("stream", (event) => {
+      let frame: {
+        message_id?: string
+        kind?: { kind?: string; text?: string }
+      }
+      try {
+        frame = JSON.parse(event.data)
+      } catch {
+        return
+      }
+      // Internally-tagged wire enum: Token → {"kind":"token","text":"…"}.
+      if (frame.kind?.kind !== "token") return
+      const id = frame.message_id
+      if (!id) return
+      bufRef.current[id] = (bufRef.current[id] ?? "") + (frame.kind.text ?? "")
+      dirtyRef.current = true
+      schedule()
+    })
+
+    return () => {
+      unsub()
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+      bufRef.current = {}
+      dirtyRef.current = false
+    }
+  }, [agentId])
+
+  return tokens
+}
+
 // ── Library (agent-scoped) ────────────────────────────────────────────
 
 export function useLibrary(agentId: string): LiveQueryResult<LibraryItem[]> {

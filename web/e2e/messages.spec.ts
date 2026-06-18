@@ -97,8 +97,11 @@ test.describe("messages / send over the push plane", () => {
     await expect(page.getByText(MSG, { exact: false }).first()).toBeVisible({ timeout: 15_000 })
 
     // Ground truth: the backend roster's message log grew by at least one.
+    // Generous timeout: the suite drives a single LIVE agent, so by this test
+    // its bridge command queue may carry backlog from earlier specs — the
+    // user-message apply (and thus the log bump) can trail the DOM bubble.
     await expect
-      .poll(async () => logLen(page.request, id), { timeout: 15_000 })
+      .poll(async () => logLen(page.request, id), { timeout: 25_000 })
       .toBeGreaterThan(before)
   })
 

@@ -25,7 +25,7 @@ import { ScratchpadPanel } from "./ScratchpadPanel"
  */
 export function PanelPane({ agentId, panelId }: { agentId: string; panelId: string }) {
   const { data: panels = [] } = usePanels(agentId)
-  if (panelId === "conversation") return <Conversation />
+  if (panelId === "conversation") return <Conversation agentId={agentId} />
   const panel = panels.find((p) => p.id === panelId) ?? panels[0]
   if (!panel) return <EmptyState />
   return renderPanel(panel, agentId)

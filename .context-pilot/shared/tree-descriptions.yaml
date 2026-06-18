@@ -2258,6 +2258,10 @@
   path: crates/cp-mod-tree/src/panel.rs
   description: Tree panel. Background cache system for directory tree rendering. TreeCacheRequest data payload. Pagination. refresh_stale_from_yaml() call in apply_cache_update triggers second rebuild if descriptions changed.
   last_edited_ms: 0
+55da288f9bfbd293:
+  path: crates/cp-mod-bridge/src/lib.rs
+  description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1, binds tee.sock + spawns Tee, creates Intake from oplog replay, opens content-addressed body Store under oplog dir, sets command listener non-blocking. on_stream_chunk→Token frames, on_stream_stop→PhaseHint(Idle). BridgeState{boot,tee,intake,tee_seq,last_phase,last_cost_usd,store,thread_msg_counts,msg_memo_seeded} in TypeMap — last_phase/last_cost_usd memo the vitals chokepoint; store+thread_msg_counts+msg_memo_seeded back the message-emit chokepoint (I13 body staging + per-thread observe-on-change diff, seeded no-emit at boot to skip backlog replay). is_global, no tools/panels.'
+  last_edited_ms: 0
 55e6e0e392e93954:
   path: crates/cp-mod-bridge/tests/boot_heartbeat.rs
   description: 'Phase 25 (X792): cp-mod-bridge boot+heartbeat integration suite (4 tests, FIRST tests/ dir for this crate). Discovery contract viewed AS THE BACKEND SEES IT — reads artifacts back through cp_wire exactly like Phase 15 registry+liveness. a_booted_agent_is_fully_discoverable (registry <id>.json round-trips to valid Entry: protocol_version=PROTOCOL_VERSION, status=Starting, cap_token 64hex, boot_id 32hex; all advertised paths oplog/socket/heartbeat EXIST on disk; heartbeat file decodes to fresh beat whose matches_boot(entry.boot_id)+pid agree = cross-artifact tie inline tests don''t make). two_folders_boot_independently_into_one_fleet (folder A+B both alive simultaneously in one agents_dir → distinct id/cap_token/boot_id, both records coexist+round-trip, both beats fresh+bound = lock is per-folder not global, fleet precondition). rebooting_a_folder_keeps_its_id_but_mints_a_fresh_identity (drop boot1, boot2 same folder → SAME folder_id deterministic but DIFFERENT boot_id+cap_token = restart-identity/pid-reuse defence at boot layer). a_real_beat_drives_the_freshness_and_boot_match_verdict (beacon-produced beat: is_fresh(now,DEFAULT_MAX_AGE)=true, is_fresh(ts+60s,10ms)=false age-driven, matches_boot self=true/other=false). is_fresh(now_ms:u64,max_age_ms:u64) takes MILLIS not Duration → DEFAULT_MAX_AGE.as_millis() try_from. Per-target unused-crate-dependencies: `use cp_base/cp_render/cp_oplog/nix as _;` (bridge deps not directly named); names cp_mod_bridge+cp_wire+serde_json(from_str)+tempfile. 44 cp-mod-bridge tests green (40 inline + 4 integration).'
@@ -2621,6 +2625,10 @@
 6418d8f702b9149f:
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
+  last_edited_ms: 0
+64763506158c3657:
+  path: crates/cp-orchestrator/src/runtime.rs
+  description: 'Runtime — env-driven Config (port/agents_dir/budget/scan_interval) + Runtime (shared Backend + config). start_driver() spawns bg driver_loop with TWO decoupled cadences: slow scan_interval (2s default, CP_SCAN_INTERVAL_MS) for registry scan + tier-② config.json mtime backstop + tmp reap; fast TAIL_INTERVAL (100ms) inner loop for tail_all_agents (per-agent Tailer.poll → MaterializedView.apply_batch fold → CostBreaker.observe), so a durable oplog delta reaches the view in ~100ms not ~2s (step toward inotify-primary I12/§8.1). serve() blocks on HTTP transport. 1 test.'
   last_edited_ms: 0
 650a0ba5c8a439e2:
   path: ui/src/components/threads/ThreadDetailRail.tsx
@@ -4178,6 +4186,10 @@
   path: CHANGELOG.md
   description: Release changelog
   last_edited_ms: 0
+9f25040a076276e9:
+  path: web/src/components/finder/Finder.tsx
+  description: Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. Tabs+history+nav+selection+drag-drop+statusbar+marquee. PinnedFolder type + loadPins/pinsKey localStorage helpers (key cp-finder-pins:<agentId>); pins state persisted via useEffect; addPin/removePin. ColumnsView called with live-Miller props (agentId/agentFolder/chain/currentNodes/onNavigate). FinderSidebar + ContextMenu wired with onPin/onUnpin. Four view modes, keyboard control.
+  last_edited_ms: 0
 9f4a2e56b8f9925a:
   path: clippy.toml
   description: 'Clippy configuration: lint levels, type complexity threshold'
@@ -4638,6 +4650,10 @@ b15c976b1b6f7804:
   path: src/llms/claude_code/debug.rs
   description: 'Debug helpers: dump_last_request (writes API request JSON to disk) + StreamErrorContext/build_stream_read_error (verbose stream failure diagnostics).'
   last_edited_ms: 0
+b17f325ab3529f6d:
+  path: web/src/lib/api.ts
+  description: Typed REST client for all 22 backend endpoints. Fleet, agent meta, threads (RawThread→ThreadDetail transform), panels, finder, usage, library, ticket mint. ConversationMsg now carries id (= Message.id, the stream Token frame's message_id correlation key, distinct from on-disk uid) + message_type/tool_uses/tool_results for faithful cockpit conversation rendering.
+  last_edited_ms: 1781812786769
 b18c7caa4f869853:
   path: ui/src/components/finder/FinderViews.tsx
   description: 'Finder main-area views. GridView/ListView/ColumnsView/GalleryView render macOS <FileIcon kind ext size/> (T27). Grid (icon-size slider + finder-pop stagger + TagDots + focus ring), List (zebra + sortable headers + tags), Columns (Miller + metadata preview pane), Gallery (hero + filmstrip). Grid + List buttons carry data-finder-item + data-path for marquee hit-testing (T32). TagDots export. ViewHandlers: onClick(node,{additive,range})/onOpen/onContext.'
@@ -5062,6 +5078,10 @@ bf721ed9cc1a06a3:
   path: crates/cp-mod-prompt/src/lib.rs
   description: 'Prompt library module. 3 tools: Behaviour_create, agent_load, skill_load. 2 panels: Library (fixed) + Skill (dynamic). Core, global. Edit pre-flight validates YAML frontmatter on prompt .md files. is_prompt_file() with canonicalize() for abs/rel path matching.'
   last_edited_ms: 0
+bfa166d86fa01300:
+  path: web/src/lib/live.ts
+  description: 'Live data hooks: fetch + SSE-delta-apply + poll backstop. useLiveQuery generic with applyDelta reducer + rev high-water guard. applyThreadDelta folds thread_created/archived/restored/status_changed + message_created. applyAgentDelta folds phase_transition + cost_aggregate. useStreamingTokens(agentId) (§7 stream plane): subscribes SSE ''stream'', parses StreamFrame, accumulates Token text into a per-message_id ref buffer flushed ONCE per requestAnimationFrame (never setState per token — §7 mandatory), keyed by message_id (= Message.id). invalidateAgent bus + sendCommand double-invalidate.'
+  last_edited_ms: 1781812786747
 bfe86519072f84a5:
   path: crates/cp-wire/src/types/ack.rs
   description: 'Command Ack: cmd_id + AckStatus (Accepted/Rejected) + optional rev. Journal-then-ack (I11).'
@@ -5162,6 +5182,10 @@ c40782194df37336:
   path: ui/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Mounts <AccountProvider> (T30 shared managed-account state) + <TooltipProvider delay=350 closeDelay=80> around the shell. Fleet → FleetShell (Agents⇄Prompts). Cockpit → CockpitView. threads/finder per-agent (Finder keyed by agent.id). openAgent switches agent→threads. newAgent() sets view=fleet + createAgent flag → FleetShell openCreate.
   last_edited_ms: 1781599152974
+c42065b68b84aa34:
+  path: crates/cp-orchestrator/src/registry/mod.rs
+  description: 'AgentRegistry: poll-based scan-and-diff of agents dir. Events: Appeared/Disappeared/StatusChanged/Stale. Three-factor liveness verdict. reap_tmp for crash-orphan writes. 8 tests.'
+  last_edited_ms: 0
 c420a45f730117d1:
   path: crates/cp-mod-entities/src/panel.rs
   description: Fixed Entities panel. Live schema + sample data context for LLM. Empty-state onboarding guide with quick-start SQL. IR blocks with Accent/Code/Muted styling. Migration count display. EntityResultPanel for large query results (dynamic, metadata-persisted). max_freezes=2.
@@ -5226,6 +5250,10 @@ c62233b3861945b4:
   path: crates/cp-base/src/state/watchers.rs
   description: 'Watcher trait + WatcherRegistry. WatcherResult: description, panel_id, tool_use_id, close_panel, create_panel (DeferredPanel for console), create_dyn_panel (DynPanel for generic panels), kill_session, preserves_tempo. ChannelWatcher: polls Mutex<Receiver<WatcherResult>> for async tool results. ASYNC_ERROR_PREFIX + DYN_PANEL_ID_PLACEHOLDER constants.'
   last_edited_ms: 0
+c6286a7aead1da63:
+  path: web/src/components/panels/cockpit/PanelPane.tsx
+  description: Cockpit panel router. Accepts agentId, uses usePanels() for lookup. Routes to 11 panel components by kind, each receiving agentId. 'conversation' sentinel renders <Conversation agentId={agentId}/> (live §7 token streaming). EmptyState fallback.
+  last_edited_ms: 1781812786790
 c64acbf2bfbf9d41:
   path: crates/cp-mod-callback/src/panel.rs
   description: Callback panel. Table view of all definitions (name/pattern/blocking/timeout/active/scope/success_msg/cwd). Editor sub-view shows script content for one callback.
@@ -5453,6 +5481,10 @@ cdbafcc2b17c4fc5:
 cdfc00c9108b22e2:
   path: crates/cp-base/src/tools/pre_flight.rs
   description: 'Verdict: blocking errors + non-blocking warnings + activate_queue flag, builder pattern, format_errors()'
+  last_edited_ms: 0
+ce122582d572ecd3:
+  path: report/wiring-alignment-audit.md
+  description: 'Wiring alignment audit (X818 Phase 0.1): invariant-by-invariant gap register implementation⇄design-orchestration-backend.md. Verdicts ABIDES/PARTIAL/VIOLATES per I1-I13/§7/§9/§19. Diagnoses the disk/poll vs oplog-push plane inversion = the latency root cause.'
   last_edited_ms: 0
 ce41457001145d47:
   path: src/app/run/reverie.rs
@@ -6030,6 +6062,10 @@ e764dee9fb758b38:
   path: crates/cp-mod-entities/src/types.rs
   description: EntitiesState (db_path, dump_path, migrations_dir, schema_cache), SchemaCache, TableInfo, ColumnInfo, ForeignKeyInfo. get/get_mut helpers for State TypeMap access.
   last_edited_ms: 1780585450727
+e7915d49cba9d5d0:
+  path: web/src/components/conversation/Conversation.tsx
+  description: 'Cockpit conversation surface — LIVE (§7). useConversation(agentId) for the durable record + useStreamingTokens(agentId) for the ephemeral stream plane, overlaid: buildMessages maps durable msgs→ChatMessage (text user/assistant; tool_call→tool card from tool_uses[0]; tool_result folded/skipped) then shows the longer of (live buffer, durable text) + blinking cursor while the live buffer leads, and synthesises a trailing assistant bubble for a streaming turn not yet flushed. Reconciles (live stops leading) once durable text catches up. Accepts agentId prop.'
+  last_edited_ms: 1781812786723
 e82421db0781e690:
   path: yamls/tools/files.yaml
   description: 'File tools YAML. 3 tools: Open (path string/array), Edit (file_path, old_string, new_string), Write (file_path, contents, skip_callbacks).'

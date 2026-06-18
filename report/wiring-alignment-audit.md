@@ -27,10 +27,12 @@ agent's oplog the instant it applies, folded by the backend `MaterializedView`,
 pushed as a rev-numbered SSE delta, and applied in-place by the frontend store —
 **command→visible p50 ≈ 14 ms** (measured this session, down from "seconds"). The
 tier-② disk files are back in their designed role as a disposable cold-start
-cache. The inversion that *was* the latency problem is corrected. What remains is
-**completeness, not architecture**: live *token* streaming (§7), carrying the
-roster inside checkpoints (cold-restart-after-compaction), a `Lifecycle` emit,
-and the §19 observability surface.
+cache. The inversion that *was* the latency problem is corrected. Live *token*
+streaming (§7) is now **live end-to-end** (agent-tagged frames → TeeReader →
+StreamHub → SSE → rAF frontend consumer, proven with real data). What remains is
+**completeness, not architecture**: carrying the roster inside checkpoints
+(cold-restart-after-compaction), a `Lifecycle` emit, and the §19 observability
+surface.
 
 ---
 
@@ -58,7 +60,7 @@ The baseline's sin ("plane B is the live path; plane A is inert") is **fixed**.
 | **I11** | "Accepted" = durable (journal-then-ack) | **ABIDES** | `cp-mod-bridge/src/command.rs` `handle_frame` (append_durable before ack) | — |
 | **I12** | One inotify watch per agent on the oplog; 2–3s poll is a backstop | **ABIDES** | `transport/mod.rs:394` `OplogWaiter.wait(TAIL_REPOLL)` — inotify/FSEvents primary, `:71` `TAIL_REPOLL=5ms` tight backstop; `runtime.rs` mtime scan demoted to a dirty→`invalidate` backstop for inspection resources only | (the `invalidate` backstop is the documented transitional fallback — removed per-resource in X859) |
 | **I13** | Body-before-reference barrier; immutable content-addressed body store | **ABIDES** | `messages.rs` `emit_one_message`: `store.put(body)` (I13 barrier — inline small / spill+fdatasync large) **before** `submit_durable(MessageCreated)`; `cp-mod-bridge/src/body.rs` `Store` | — |
-| **§7** | Stream plane: SPSC tee → publisher thread; rAF token batching mandatory | **PARTIAL** 🟠 | **stream plane now plumbed + addressable end-to-end**: agent publishes `Token` frames (`cp-mod-bridge/src/tee.rs`) **tagged with the active streaming `message_id`** (`lib.rs` `publish_frame` reads `state.messages.last().id` — the assistant message being built — so a token routes to its bubble and reconciles against the durable `MessageCreated`, which references the same `Message::id`); backend `TeeReader` (`registry/tee_reader.rs`) connects each agent's `tee.sock` → `hub.publish` → `run_stream` drains the hub → SSE `stream` event; `StreamHub` fans out | ONE step remains: **frontend rAF consumer** — a `useStreamingTokens(agentId)` hook subscribing SSE `stream`, accumulating `Token` text into a per-`message_id` buffer flushed once/`requestAnimationFrame` (never `setState` per token), rendering the live-typing bubble, reconciled against the durable `MessageCreated`. Prereq: the cockpit `Conversation.tsx` surface (still mock-stubbed, not wired to `useConversation`) must be demaquetted live first, and `ConversationMsg` must surface `id` (= `Message.id`) alongside `uid` for correlation. (X861) |
+| **§7** | Stream plane: SPSC tee → publisher thread; rAF token batching mandatory | **ABIDES** ✅ | **end-to-end live** — agent publishes `Token` frames (`cp-mod-bridge/src/tee.rs`) **tagged with the active streaming `message_id`** (`lib.rs` `publish_frame` reads `state.messages.last().id`); backend `TeeReader` (`registry/tee_reader.rs`) connects each agent's `tee.sock` → `hub.publish` → `run_stream` drains the hub → SSE `stream`; `StreamHub` fans out; **frontend `useStreamingTokens(agentId)`** (`web/src/lib/live.ts`) subscribes SSE `stream`, accumulates `Token` text into a per-`message_id` buffer flushed **once per `requestAnimationFrame`** (never `setState` per token — §7 mandatory contract honoured), and `Conversation.tsx` overlays the live buffer onto the durable conversation (`useConversation`), reconciling per message: shows the longer of (live buffer, durable text) + a blinking cursor while the buffer leads, synthesises a trailing bubble for a streaming turn not yet flushed. **Proven with real data**: a raw SSE capture against the live agent carried token frames tagged `message_id="A2224"` with the exact streaming text (agent→TeeReader→hub→SSE). `ConversationMsg.id` surfaced (= `Message.id`) for correlation. | — (multi-`tool_use` messages render only the first tool card — minor cockpit-fidelity note, not load-bearing) |
 | **§9** | SSE carries rev-numbered, replayable, gap-free deltas; client applies | **ABIDES** | `transport/mod.rs:346` `SseMessage::delta(entry.rev, data)` per `OpEntry`; `web/src/lib/live.ts` `applyThreadDelta`/`applyAgentDelta` apply in-place with a monotonic-rev high-water guard | `invalidate` fallback still present for inspection resources (cleanup X859) |
 | **§18** | schema_version + N-1 compat + Unknown tolerance | **ABIDES** | `cp-wire` all types `schema_version`'d, `#[serde(other)] Unknown`; roster variants added with tolerant-decode tests | — |
 | **§19** | Observability: latency p50/p99, dropped frames, rev lag, fsync latency, watch count | **VIOLATES** 🟠 | no metrics surface exists | stand up the §19 surface (X868) |
@@ -104,20 +106,17 @@ The four enumerated frontend features are **done and e2e-verified**. The
 following are **alignment-completeness** items — the deeper X818 invariants that
 make abidance 99.9% rather than "the user's features work":
 
-1. **§7 live token streaming (Phase 7, biggest)** — phase is live; the stream
-   plane is now **plumbed + addressable end-to-end**: the agent publishes `Token`
-   frames **tagged with the active streaming `message_id`** (the assistant
-   message being built), the `TeeReader` republishes them into the `StreamHub`,
-   and `run_stream` emits them as SSE `stream` events. One step remains to make
-   assistant *tokens* paint live:
-     - **frontend rAF consumer** — a `useStreamingTokens(agentId)` hook
-       subscribes the SSE `stream` channel, accumulates `Token` text into a
-       per-`message_id` buffer flushed once per `requestAnimationFrame` (never
-       `setState` per token), renders the live-typing bubble, and reconciles
-       against the durable `MessageCreated`. Prerequisite: the cockpit
-       `Conversation.tsx` surface (still mock-stubbed) must be wired live to
-       `useConversation`, and `ConversationMsg` must surface `id` (= `Message.id`)
-       for token↔message correlation.
+1. **§7 live token streaming (Phase 7) — DONE ✅** — the stream plane is now
+   live end-to-end. The agent publishes `Token` frames tagged with the active
+   streaming `message_id`; the `TeeReader` republishes them into the
+   `StreamHub`; `run_stream` emits them as SSE `stream` events; and the frontend
+   `useStreamingTokens(agentId)` hook accumulates them into a per-`message_id`
+   buffer flushed **once per `requestAnimationFrame`** (never `setState` per
+   token), which `Conversation.tsx` overlays onto the durable conversation,
+   reconciling against the flushed message. Proven with a real SSE capture
+   (token frames tagged `message_id="A2224"` carrying the live streaming text).
+   Residual: multi-`tool_use` assistant messages render only their first tool
+   card (a cockpit-fidelity nicety, not load-bearing).
 2. **Checkpoint carries the roster (I3/I5, X850/X836b)** — a backend restart
    *after oplog compaction* rebuilds heads from the checkpoint but not the roster
    (briefly under-reports threads until the next disk flush / replay). Carry the
