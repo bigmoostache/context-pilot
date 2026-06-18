@@ -154,6 +154,9 @@ impl Module for BridgeModule {
                     folder.display(),
                 );
 
+
+
+
                 // Bind a dedicated tee socket for live token streaming
                 // (separate from the command socket in Boot).
                 let tee = match setup_tee(boot.entry()) {

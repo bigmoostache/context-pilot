@@ -44,7 +44,9 @@ use nix::fcntl::{Flock, FlockArg};
 
 use cp_oplog::service::Service as OplogService;
 use cp_wire::heartbeat::DEFAULT_CADENCE;
+use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::registry::{AgentStatus, Entry};
+use cp_wire::types::LifecycleState;
 use cp_wire::PROTOCOL_VERSION;
 
 use crate::error::{Error, BootResult};
@@ -173,6 +175,14 @@ impl Boot {
         )
         .map_err(|e| Error::io(format!("start heartbeat {}", entry.heartbeat_path), e))?;
 
+        // Authoritative "operational" signal on the oplog (I8): now that every
+        // advertised resource exists, journal a durable `Lifecycle::Running` so
+        // the backend's view folds an authoritative liveness fact rather than
+        // inferring it from the heartbeat. Non-blocking durable (group-committed
+        // off-loop, never fsyncs an interactive path). Symmetric with the
+        // `Lifecycle::Stopping` emitted on `Drop`.
+        oplog.submit_durable(OpEntryKind::Lifecycle { state: LifecycleState::Running });
+
         Ok(Self {
             _lock: lock,
             oplog,
@@ -218,7 +228,22 @@ impl Boot {
 impl Drop for Boot {
     /// Remove the discovery record and socket file so the backend sees a clean
     /// disappearance. The lock and oplog thread release via their own `Drop`.
+    ///
+    /// Before tearing down, append a durable [`Lifecycle::Stopping`] delta so the
+    /// backend's view records an *authoritative* graceful shutdown (I8) rather
+    /// than inferring it from the heartbeat going stale. The append is the
+    /// non-blocking durable path; the `oplog` field drops *after* this body, and
+    /// its commit thread drains every queued job before joining
+    /// (`Service::drop`), so the Stopping record is `fdatasync`'d before exit.
+    /// On a hard kill (`SIGKILL`) this body never runs — the backend then falls
+    /// back to liveness (flock release + stale heartbeat), which is the
+    /// intended best-effort-graceful contract.
+    ///
+    /// [`Lifecycle::Stopping`]: cp_wire::types::LifecycleState::Stopping
     fn drop(&mut self) {
+        self.oplog
+            .submit_durable(OpEntryKind::Lifecycle { state: LifecycleState::Stopping });
+
         let registry = registry::path(&self.agents_dir, &self.entry.id);
         let _registry_removed = fs::remove_file(&registry);
         let _socket_removed = fs::remove_file(&self.socket_path);
@@ -418,6 +443,47 @@ mod tests {
         assert!(
             acquired.is_ok(),
             "the contender must win the lock once the holder releases, got {acquired:?}",
+        );
+    }
+
+    /// Read every cleanly-decoded oplog entry across all segments in `dir`.
+    fn read_all_entries(dir: &Path) -> Vec<cp_wire::types::oplog::OpEntry> {
+        let mut out = Vec::new();
+        for idx in cp_oplog::segment::indices(dir).unwrap_or_default() {
+            if let Ok(scan) = cp_oplog::segment::read(&cp_oplog::segment::path(dir, idx)) {
+                out.extend(scan.entries);
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn lifecycle_running_on_boot_and_stopping_on_drop() {
+        let folder = tempdir().expect("folder");
+        let agents = tempdir().expect("agents");
+        let oplog_dir = fs::canonicalize(folder.path()).expect("canon").join(OPLOG_DIR);
+
+        // Boot emits Lifecycle::Running; dropping it emits Lifecycle::Stopping.
+        // The drop joins the oplog commit thread, draining + fsyncing both
+        // records before it returns, so reading after the drop is race-free.
+        let booted = boot(folder.path(), agents.path()).expect("boot");
+        drop(booted);
+
+        let lifecycles: Vec<LifecycleState> = read_all_entries(&oplog_dir)
+            .iter()
+            .filter_map(|e| match &e.kind {
+                OpEntryKind::Lifecycle { state } => Some(*state),
+                _ => None,
+            })
+            .collect();
+
+        assert!(
+            lifecycles.contains(&LifecycleState::Running),
+            "Lifecycle::Running must be journaled at boot, got {lifecycles:?}",
+        );
+        assert!(
+            lifecycles.contains(&LifecycleState::Stopping),
+            "Lifecycle::Stopping must be journaled on graceful drop, got {lifecycles:?}",
         );
     }
 }

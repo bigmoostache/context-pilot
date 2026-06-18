@@ -122,6 +122,10 @@
   path: crates/cp-base/src/config/accessors.rs
   description: Theme state (AtomicU8 index), color/icon/char accessors, library + prompt template getters
   last_edited_ms: 0
+04ceb3250d900377:
+  path: crates/cp-mod-bridge/src/boot.rs
+  description: 'Boot — agent boot sequence + held resources. start_in: flock bridge.lock (bounded retry) → OplogService::spawn → bind stream.sock → mint cap_token/boot_id → write registry <id>.json → start heartbeat Beacon → submit_durable(Lifecycle::Running) (I8 authoritative liveness, off-loop fdatasync). Drop submit_durable(Lifecycle::Stopping) BEFORE fs cleanup (oplog field drops after body → commit thread drains+fsyncs it before join; SIGKILL skips → backend falls back to flock/heartbeat liveness). Symmetric Running/Stopping lifecycle. 8 tests incl lifecycle_running_on_boot_and_stopping_on_drop (reads oplog segments back via cp_oplog::segment::indices/read).'
+  last_edited_ms: 1781813916282
 04d83706bc6aa70b:
   path: crates/cp-mod-ocr/src/tools.rs
   description: OCR tool dispatch. flame!("ocr_exec"). Validates params, spawns background thread for Datalab API, registers OcrWatcher (non-blocking). Returns immediately with spine notification on completion.
@@ -894,6 +898,10 @@
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
   last_edited_ms: 1780565754910
+221a714d723167e8:
+  path: crates/cp-orchestrator/src/transport/meta.rs
+  description: 'Enriched agent meta endpoints (agent_meta GET /api/agent/{id}/meta + fleet_meta). Combines registry Entry + view AgentView (phase/lifecycle/cost) + thread inspection (count/MY_TURN/lastActivity) + git branch → maquette Agent JSON. derive_status(phase,lifecycle,has_my_turn): a Stopping/Stopped lifecycle can never read ''working'' (authoritative oplog signal wins over stale phase) → idle/needs-you; else phase Streaming/Tooling→working, has_my_turn→needs-you, else idle. derive_accent maps status→token.'
+  last_edited_ms: 1781813916318
 222420220afa8c94:
   path: crates/cp-base/Cargo.toml
   description: 'Base crate deps: cp-render, cp-mod-utilities, ratatui, crossterm, serde, serde_json, serde_yaml, unicode-width, log.'
@@ -3378,6 +3386,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor. Selection-aware InputChar/Delete/InsertText/PasteText. 9 cursor/selection action dispatches.'
   last_edited_ms: 0
+803d8b7cbcd25627:
+  path: crates/cp-mod-bridge/src/lib.rs
+  description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1 (Boot itself now emits Lifecycle::Running — not lib.rs), binds tee.sock + spawns Tee, creates Intake from oplog replay, opens content-addressed body Store. on_stream_chunk→Token frames (tagged with state.messages.last().id for §7 live-typing correlation), on_stream_stop→PhaseHint(Idle). BridgeState{boot,tee,intake,tee_seq,last_phase,last_cost_usd,store,thread_msg_counts,msg_memo_seeded}. is_global, no tools/panels.'
+  last_edited_ms: 1781813916300
 808105a6e4c4e570:
   path: ui/src/components/ui/dialog.tsx
   description: shadcn-style Dialog on Base UI primitive. Portals to document.body (escapes ancestor backdrop-filter/transform containing blocks that trap position:fixed — the ConfigModal half-off-screen bug). Focus-trap, scroll-lock, Esc, backdrop fade + modal-pop spring. Exports Dialog/Trigger/Close/Content/Backdrop/Title/Description.
@@ -4250,6 +4262,10 @@ a0a473d4d16966f9:
   path: ui/src/components/threads/ThreadComposer.tsx
   description: 'Thread input composer. MY_TURN: active prompt w/ attach + send + caret. Non-MY_TURN shows a subdued working spinner — ACTIVE (green/ok, ''streaming this thread right now'') vs THEIR_TURN (signal, ''working it in parallel''). Design-only.'
   last_edited_ms: 1781543836100
+a0f4cef7d77b23b6:
+  path: report/wiring-alignment-audit.md
+  description: 'Wiring alignment audit (X818 Phase 0.1): invariant-by-invariant gap register implementation⇄design-orchestration-backend.md. Verdicts ABIDES/PARTIAL/VIOLATES per I1-I13/§7/§9/§19. Diagnoses the disk/poll vs oplog-push plane inversion = the latency root cause.'
+  last_edited_ms: 0
 a0fb74e7facad335:
   path: src/ui/help/config_overlay.rs
   description: Config overlay adapter — renders ConfigOverlay IR to ratatui. Centered bordered popup. Provider/model/toggle sections consume IR data. No direct State access.

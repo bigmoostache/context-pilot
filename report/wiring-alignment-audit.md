@@ -31,8 +31,7 @@ cache. The inversion that *was* the latency problem is corrected. Live *token*
 streaming (§7) is now **live end-to-end** (agent-tagged frames → TeeReader →
 StreamHub → SSE → rAF frontend consumer, proven with real data). What remains is
 **completeness, not architecture**: carrying the roster inside checkpoints
-(cold-restart-after-compaction), a `Lifecycle` emit, and the §19 observability
-surface.
+(cold-restart-after-compaction) and the §19 observability surface.
 
 ---
 
@@ -55,7 +54,7 @@ The baseline's sin ("plane B is the live path; plane A is inert") is **fixed**.
 | **I2** | Main loop never fsyncs; dedicated oplog thread group-commits | **ABIDES** | `src/app/run/threads/bridge.rs:148` `emit_roster_delta`→`submit_durable` (non-blocking durable); `:186` `append_best_effort`; `messages.rs:156` `submit_durable`. Loop only enqueues. | V11 explicit "burst leaves tick time unchanged" test (X844) |
 | **I3** | Snapshot = bounded heads + content-addressed bodies | **PARTIAL** | `materialized_view.rs` `AgentView{heads,roster}`; heads populated by `MessageCreated` | `Checkpoint`/`Snapshot` restores **heads only, not the roster** (`materialized_view.rs:108` note) — see I5 cold-restart gap |
 | **I5** | Tier ② is a lazily-rebuildable cache; live reads come from the view | **ABIDES** | `transport/rest/mod.rs:227` `/threads` served **roster-first from `backend.view`** (`overlay_roster` merges view roster onto disk log; view-only threads synthesised instantly); `/fleet`,`/agent` from view. Low-churn inspection reads (`panels.rs:1,4`, memory/todos/tree/…) stay tier-② **by the doc's documented allowance**. | cold-start view **roster** hydration (X850) so a backend restart after oplog compaction doesn't briefly under-report the roster |
-| **I8** | Command effects, rev, **phase, lifecycle, cost** are oplog appends | **PARTIAL** | `bridge.rs:291/325/338` `ThreadCreated/Archived/Restored`; `:216/230` `PhaseTransition`/`CostAggregate`; `messages.rs:156` `MessageCreated` — all emitted on apply | only **`Lifecycle`** (boot/shutdown state) is not yet emitted (X842) — everything else ABIDES |
+| **I8** | Command effects, rev, **phase, lifecycle, cost** are oplog appends | **ABIDES** ✅ | `bridge.rs:291/325/338` `ThreadCreated/Archived/Restored`; `:216/230` `PhaseTransition`/`CostAggregate`; `messages.rs:156` `MessageCreated`; **`boot.rs` `Boot::start_in` `Lifecycle::Running` + `Boot::drop` `Lifecycle::Stopping`** — all emitted on apply/lifecycle | — |
 | **I10** | Durable "message created" in oplog; stream `MessageStart` is a hint | **PARTIAL** | durable side ABIDES: `messages.rs` `emit_messages` → `MessageCreated` + I13 body store; frontend `live.ts` `applyThreadDelta` `message_created` appends to the log | the **stream-hint side** (live token paint) is not yet consumed by the frontend (§7 / Phase 7) |
 | **I11** | "Accepted" = durable (journal-then-ack) | **ABIDES** | `cp-mod-bridge/src/command.rs` `handle_frame` (append_durable before ack) | — |
 | **I12** | One inotify watch per agent on the oplog; 2–3s poll is a backstop | **ABIDES** | `transport/mod.rs:394` `OplogWaiter.wait(TAIL_REPOLL)` — inotify/FSEvents primary, `:71` `TAIL_REPOLL=5ms` tight backstop; `runtime.rs` mtime scan demoted to a dirty→`invalidate` backstop for inspection resources only | (the `invalidate` backstop is the documented transitional fallback — removed per-resource in X859) |
@@ -121,9 +120,16 @@ make abidance 99.9% rather than "the user's features work":
    *after oplog compaction* rebuilds heads from the checkpoint but not the roster
    (briefly under-reports threads until the next disk flush / replay). Carry the
    roster inside `Snapshot`.
-3. **`Lifecycle` emit (I8, X842)** — emit `Lifecycle{Running}` on boot and
-   `Stopping/Stopped` on graceful shutdown so the fleet view shows accurate
-   lifecycle without liveness guessing.
+3. **`Lifecycle` emit (I8, X842) — DONE ✅** — `Boot::start_in` journals a
+   durable `Lifecycle::Running` once every advertised resource is up, and
+   `Boot::drop` journals `Lifecycle::Stopping` before teardown (the oplog commit
+   thread drains + `fdatasync`s it before joining, so a graceful shutdown is
+   durably recorded; a `SIGKILL` falls back to liveness — the intended
+   best-effort-graceful contract). The backend already folds `Lifecycle`
+   latest-wins into the view; `meta.rs::derive_status` now consults it so a
+   `Stopping`/`Stopped` agent can never read "working". I8 is now fully ABIDES
+   (every oplog-journaled fact the doc lists is emitted). Proven by
+   `boot.rs::lifecycle_running_on_boot_and_stopping_on_drop`.
 4. **§19 observability surface (X868)** — per-agent stream latency p50/p99,
    dropped/coalesced frames, rev lag (view vs oplog head), fsync latency, watch
    count, durable breaker state; structured logs keyed `agent_id+cmd_id+rev`.

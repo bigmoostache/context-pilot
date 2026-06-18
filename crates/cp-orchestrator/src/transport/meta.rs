@@ -64,9 +64,11 @@ fn build_agent_meta(
         .and_then(std::ffi::OsStr::to_str)
         .unwrap_or(agent_id);
 
-    // Phase + cost from the materialized view (brief lock).
-    let (phase, cost_usd) = state.lock().map_or((None, 0.0), |b| {
-        b.view.get(agent_id).map_or((None, 0.0), |v| (v.phase, v.cost.cost_usd))
+    // Phase + lifecycle + cost from the materialized view (brief lock).
+    let (phase, lifecycle, cost_usd) = state.lock().map_or((None, None, 0.0), |b| {
+        b.view
+            .get(agent_id)
+            .map_or((None, None, 0.0), |v| (v.phase, v.lifecycle, v.cost.cost_usd))
     });
 
     // Thread count + any-MY_TURN + last activity from config.json.
@@ -75,7 +77,7 @@ fn build_agent_meta(
 
     let branch = git_branch(folder);
 
-    let status = derive_status(phase, has_my_turn);
+    let status = derive_status(phase, lifecycle, has_my_turn);
     let accent = derive_accent(&status);
 
     serde_json::json!({
@@ -168,8 +170,22 @@ fn git_branch(folder: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Derive the maquette `AgentStatus` from phase and thread state.
-fn derive_status(phase: Option<cp_wire::types::Phase>, has_my_turn: bool) -> String {
+/// Derive the maquette `AgentStatus` from lifecycle, phase, and thread state.
+///
+/// An agent that has emitted a graceful-shutdown lifecycle (`Stopping`/
+/// `Stopped`, I8) can never be "working": the authoritative oplog signal wins
+/// over a stale phase that a torn shutdown might have left behind. Otherwise
+/// the live `phase` decides "working", falling back to "needs-you" (any
+/// MY_TURN thread) or "idle".
+fn derive_status(
+    phase: Option<cp_wire::types::Phase>,
+    lifecycle: Option<cp_wire::types::LifecycleState>,
+    has_my_turn: bool,
+) -> String {
+    use cp_wire::types::LifecycleState;
+    if matches!(lifecycle, Some(LifecycleState::Stopping | LifecycleState::Stopped)) {
+        return if has_my_turn { "needs-you".to_owned() } else { "idle".to_owned() };
+    }
     match phase {
         Some(cp_wire::types::Phase::Streaming | cp_wire::types::Phase::Tooling) => {
             "working".to_owned()
