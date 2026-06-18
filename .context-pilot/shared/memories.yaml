@@ -233,34 +233,36 @@ efe78c079599d3d0:
   importance: critical
   last_edited_ms: 0
 f5d97b1e7a01c317:
-  tl_dr: LATENCY EPIC (T18/X818) — threads (194bab0) + phase/cost (this commit) SHIPPED. command→visible 349ms→14ms p50. Plan + remaining in contents.
+  tl_dr: LATENCY EPIC (T18/X818) — threads (194bab0) + phase/cost (e16411b) + MESSAGES (this commit, Phase 2.2 X839) SHIPPED. command→visible 349ms→14ms p50. Plan + remaining in contents.
   contents: |-
-    ## DONE (committed 194bab0 + this commit)
-    Threads proving ground: command→visible (thread_created delta on SSE) p50=14.3ms p99=32.6ms (was 349ms; originally 'seconds'). ACK p50=12.4ms. Floor = durable journal-then-ack fsync (I11).
+    ## DONE
+    Threads proving ground: command→visible p50=14.3ms p99=32.6ms (was 349ms/'seconds'). Floor = durable journal-then-ack fsync (I11).
 
-    PHASE 2.3+2.4+6 (phase+cost) SHIPPED this batch:
-    - Backend emit: emit_vitals @ src/app/run/threads/bridge.rs = main-loop CHOKEPOINT after poll_bridge_commands (lifecycle.rs). Best-effort PhaseTransition on transition + CostAggregate on $ change. Reads authoritative state, memoizes last_phase/last_cost_usd in BridgeState, emits ONLY on change. Never fsyncs loop (I2 — append_best_effort). wire_phase maps StreamPhase→wire Phase.
-    - threads.rs (492 lines) SPLIT into threads/mod.rs (loop helpers) + threads/bridge.rs (intake+emit) for 500-line + 8-entry-folder limits. mod.rs re-exports bridge::{bridge_active,emit_vitals,poll_bridge_commands}.
-    - BridgeState gained last_phase+last_cost_usd; derived Default.
-    - Frontend: live.ts applyAgentDelta (phase streaming|tooling→{status:working,accent:ok}; idle→null refetch since needs-you/idle is backend derive_status decision; cost_aggregate→set costUsd). Wired useAgentMeta. useFleet stays poll (no agentId→no SSE subscription).
+    PHASE 2.3+2.4 (phase+cost) e16411b: emit_vitals @ src/app/run/threads/bridge.rs = main-loop chokepoint after poll_bridge_commands (lifecycle.rs). Best-effort PhaseTransition + CostAggregate on change. BridgeState memoizes last_phase/last_cost_usd.
 
-    Three fixes from 194bab0: (1) SSE OplogWaiter (notify watcher, transport/sse.rs). (2) macOS FSEvents ~350ms coalescing was THE floor → TAIL_REPOLL=5ms caps waiter.wait; inotify stays instant on Linux (I12). (3) lifecycle.rs adaptive idle poll 2ms bridge_active + drain-all-per-tick (Leg 3).
+    PHASE 2.2 (MessageCreated, X839) SHIPPED this batch:
+    - Wire: cp-wire oplog.rs MessageCreated gained inline_body:Option<String> (serde default+skip_if none). ~14 struct-literal call sites across cp-oplog+cp-orchestrator got inline_body:None (python sweep /tmp/fix_inline.py inserts after head: line); plus framing.rs/framing_integrity.rs/protocol.rs/tee_intake_body.rs. 5 cp-orchestrator test targets needed `use notify as _;` (per-target unused-crate-dependencies forbid; notify pulled via OplogWaiter in sse.rs).
+    - Agent emit: NEW src/app/run/threads/messages.rs emit_messages chokepoint. Observe-on-change: diffs each thread.messages.len() vs BridgeState.thread_msg_counts; msg_memo_seeded=false first pass seeds counts WITHOUT emitting (restarted agent doesn't replay backlog). build_pending→JSON body{id,author,text,ts,question,fileRef}; emit_one_message: store.put(body) I13 barrier (Inline small=embed in delta, Spilled large=durable file first) → submit_durable(MessageCreated{thread_id,message_id,head,inline_body Some-if-Inline-else-None}). Wired in lifecycle.rs after emit_vitals. Captures ALL message sources (Send tool / TUI reply / web K7 SendMessage) via one uniform main-loop path — NOT scattered across finalize_stream+K7.
+    - BridgeState (cp-mod-bridge lib.rs) gained store:Option<Store>+thread_msg_counts:HashMap<String,usize>+msg_memo_seeded:bool; Store::open(entry().oplog_path) at boot.
+    - Frontend: live.ts applyThreadDelta message_created case → JSON.parse(inline_body), append ThreadMsg to thread.log (dedup by msg id, ISO ts from epoch ms, author user|assistant, questions from raw.question, fileRef), bump lastActivity; no inline_body (spilled)→null refetch. OpEntryKind iface extended (message_id/head/inline_body).
+    - MaterializedView MessageCreated fold ALREADY bumps roster msg_count/last_activity + set_thread_head — no backend view change needed.
+    All green: cargo build (bin) + cargo test cp-wire/cp-oplog/cp-mod-bridge/cp-orchestrator (22 result lines 0 failed) + tsc clean.
 
     ## REMAINING
-    - 2.2 MessageCreated emit + I13 body store (finalize_stream + K7 user msg) — DEFERRED: body-on-wire design fork (inline ThreadMessageAppended vs content-addressed head+hydrate; dual emit sites). Next big batch.
-    - 2.5 Lifecycle emit; 2.6 Checkpoint snapshots (I5)
+    - 2.5 Lifecycle emit; 2.6 Checkpoint snapshots (I5) + carry roster in snapshot (X836b/X850)
     - Phase 7 streaming tokens via StreamHub→SSE 'stream'→rAF batch
     - Phase 8 demote mtime poll to pure backstop; Phase 9 validation table + §19 observability
     - Phase 6 cleanup: remove invalidate band-aid per delta-covered resource
+    - SEPARATE BUG T114: agent cost $381>$100 trips CostBreaker → POST /command 503 for ALL kinds. Fix rest/mod.rs command handler to breaker-check only cost-incurring SendMessage; exempt CreateThread/Archive/Restore/Stop/InterruptStream.
 
-    Key code: emit_vitals + emit_roster_delta @ src/app/run/threads/bridge.rs (submit_durable/append_best_effort, bridge-OFF no-op). MaterializedView roster @ services/materialized_view.rs. SSE producer run_stream @ transport/mod.rs (TAIL_REPOLL=5ms). OplogWaiter @ transport/sse.rs. live.ts applyThreadDelta+applyAgentDelta. Latency probe: /tmp/lat.py (agent f3a993c0ff357b41).
+    Key code: emit_messages @ src/app/run/threads/messages.rs; emit_vitals+emit_roster_delta @ bridge.rs; MaterializedView roster @ services/materialized_view.rs; SSE producer run_stream @ transport/mod.rs (TAIL_REPOLL=5ms); live.ts applyThreadDelta+applyAgentDelta. Latency probe /tmp/lat.py (agent f3a993c0ff357b41).
   importance: high
   labels:
   - latency
   - architecture
   - demaquetting
   - active
-  last_edited_ms: 1781794356575
+  last_edited_ms: 1781796530218
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium

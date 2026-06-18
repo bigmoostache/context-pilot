@@ -26,6 +26,7 @@
 // named directly; acknowledge them for the per-target `unused-crate-dependencies`
 // lint.
 use nix as _;
+use notify as _;
 use serde as _;
 use serde_yaml as _;
 use tiny_http as _;
@@ -209,6 +210,7 @@ fn the_tailer_picks_up_a_spilled_body_the_channel_then_hydrates() {
                 thread_id: "T1".to_owned(),
                 message_id: "m1".to_owned(),
                 head: spilled.hash(),
+                inline_body: None,
             })
             .expect("journal head");
         oplog.shutdown().expect("shutdown");

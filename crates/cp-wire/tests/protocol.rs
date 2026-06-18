@@ -55,6 +55,7 @@ fn every_opentry_kind_round_trips() {
             thread_id: "T7".to_owned(),
             message_id: "m-7".to_owned(),
             head: ContentHash::of(b"the message body"),
+            inline_body: None,
         },
         OpEntryKind::Lifecycle { state: LifecycleState::Stopping },
         OpEntryKind::CostAggregate {

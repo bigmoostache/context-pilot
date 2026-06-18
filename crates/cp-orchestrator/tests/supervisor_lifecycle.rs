@@ -22,6 +22,7 @@
 // them for the per-target `unused-crate-dependencies` lint.
 use cp_mod_bridge as _;
 use cp_oplog as _;
+use notify as _;
 use serde as _;
 use serde_yaml as _;
 use serde_json as _;

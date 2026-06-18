@@ -72,6 +72,21 @@ pub enum OpEntryKind {
         message_id: String,
         /// Content-addressed hash of the message body (I3/I13).
         head: ContentHash,
+        /// The message body, embedded **inline** when it is small enough to
+        /// ride this entry's own `fdatasync` (the common chat case — I13's
+        /// inline-small path). The bytes are UTF-8 JSON describing the message
+        /// (author, text, timestamp, optional question/file-ref), so an
+        /// observer renders the bubble with **zero hydration round-trip**.
+        ///
+        /// `None` when the body was large enough to **spill** to the
+        /// content-addressed body store instead; an observer then hydrates it
+        /// by [`head`](Self::MessageCreated::head) over `/body/{hash}`.
+        ///
+        /// `#[serde(default)]` keeps the field optional on the wire: an N-1
+        /// reader that predates it simply sees `None` (spilled-style hydrate),
+        /// and it is omitted entirely for spilled bodies.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        inline_body: Option<String>,
     },
 
     /// A new thread was opened.
@@ -180,11 +195,48 @@ mod tests {
                 thread_id: "T5".into(),
                 message_id: "msg-abc".into(),
                 head: hash,
+                inline_body: None,
             },
         };
         let json = serde_json::to_string(&entry).expect("serialize");
         let back: OpEntry = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(entry, back);
+    }
+
+    #[test]
+    fn message_created_inline_body_round_trips_and_omits_when_none() {
+        let hash = ContentHash::new([0x07; 32]);
+        // Inlined body survives the round-trip verbatim.
+        let inlined = OpEntry {
+            schema_version: 1,
+            rev: 7,
+            timestamp_ms: 0,
+            kind: OpEntryKind::MessageCreated {
+                thread_id: "T1".into(),
+                message_id: "T1-m0".into(),
+                head: hash,
+                inline_body: Some(r#"{"author":"user","text":"hi"}"#.into()),
+            },
+        };
+        let json = serde_json::to_string(&inlined).expect("serialize");
+        assert!(json.contains("inline_body"), "inline body present on the wire: {json}");
+        assert_eq!(serde_json::from_str::<OpEntry>(&json).expect("deserialize"), inlined);
+
+        // A spilled (None) body is omitted from the wire entirely.
+        let spilled = OpEntry {
+            schema_version: 1,
+            rev: 8,
+            timestamp_ms: 0,
+            kind: OpEntryKind::MessageCreated {
+                thread_id: "T1".into(),
+                message_id: "T1-m1".into(),
+                head: hash,
+                inline_body: None,
+            },
+        };
+        let json = serde_json::to_string(&spilled).expect("serialize");
+        assert!(!json.contains("inline_body"), "spilled body omits the field: {json}");
+        assert_eq!(serde_json::from_str::<OpEntry>(&json).expect("deserialize"), spilled);
     }
 
     #[test]

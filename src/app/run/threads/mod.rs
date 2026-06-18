@@ -7,7 +7,9 @@
 //! outgrown the 500-line limit).
 
 mod bridge;
+mod messages;
 pub(super) use bridge::{bridge_active, emit_vitals, poll_bridge_commands};
+pub(super) use messages::emit_messages;
 
 use crate::app::App;
 use crate::app::panels::now_ms;

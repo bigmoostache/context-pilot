@@ -105,6 +105,7 @@ fn child_spam(dir: &Path) -> ! {
             thread_id: "T1".to_owned(),
             message_id: format!("m{byte}"),
             head: cp_wire::types::ContentHash::new([byte; 32]),
+            inline_body: None,
         };
         let rev = writer.append(kind).unwrap_or_else(|e| panic!("child append: {e}"));
         append_marker(dir, &format!("DURABLE {rev}"));

@@ -202,6 +202,7 @@ fn the_i13_barrier_and_orphan_gc_hold_across_a_real_journal() {
                 thread_id: "T1".to_owned(),
                 message_id: "m1".to_owned(),
                 head: referenced.hash(),
+                inline_body: None,
             })
             .expect("journal the reference");
         oplog.shutdown().expect("shutdown");

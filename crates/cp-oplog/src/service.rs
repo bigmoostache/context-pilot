@@ -348,6 +348,7 @@ mod tests {
             thread_id: thread.to_owned(),
             message_id: format!("m{byte}"),
             head: ContentHash::new([byte; 32]),
+            inline_body: None,
         }
     }
 

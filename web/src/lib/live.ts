@@ -56,6 +56,13 @@ interface OpEntryKind {
   /** Cumulative input/output tokens since boot (cost_aggregate). */
   input_tokens?: number
   output_tokens?: number
+  /** Stable message id, e.g. "T7-m3" (message_created). */
+  message_id?: string
+  /** Content-addressed body hash, hex (message_created). */
+  head?: string
+  /** UTF-8 JSON message body, inlined when small (message_created). Absent
+   *  when the body spilled to the content-addressed store (hydrate by head). */
+  inline_body?: string
 }
 
 /** Map a wire ThreadTurn to the web ThreadStatus (MY_TURN = agent's turn). */
@@ -121,11 +128,50 @@ function applyThreadDelta(
       )
     }
     case "message_created": {
-      if (!prev.some((t) => t.id === k.thread_id)) return null
+      const thread = prev.find((t) => t.id === k.thread_id)
+      if (!thread) return null // unknown thread → cold refetch
       const ts = entry.timestamp_ms ?? Date.now()
+      // A spilled (large) body has no inline payload — fall back to a refetch
+      // that hydrates the full log from the view/disk (rare for chat).
+      if (!k.inline_body) {
+        return prev.map((t) =>
+          t.id === k.thread_id ? { ...t, lastActivityMs: ts, lastActivity: ago(ts) } : t,
+        )
+      }
+      let raw: {
+        id?: string
+        author?: string
+        text?: string | null
+        ts?: number
+        question?: unknown
+        fileRef?: string | null
+      }
+      try {
+        raw = JSON.parse(k.inline_body)
+      } catch {
+        return null // malformed body → ground-truth refetch
+      }
+      const msgId = raw.id ?? k.message_id ?? `${k.thread_id}-${thread.log.length}`
+      if (thread.log.some((m) => m.id === msgId)) return prev // dedup (idempotent)
+      const msgTs = typeof raw.ts === "number" ? raw.ts : ts
+      const appended: ThreadDetail["log"][number] = {
+        id: msgId,
+        author: raw.author === "user" ? "user" : "assistant",
+        text: raw.text ?? undefined,
+        ts: new Date(msgTs).toISOString(),
+        questions: raw.question
+          ? (raw.question as ThreadDetail["log"][number]["questions"])
+          : undefined,
+        fileRef: raw.fileRef ?? undefined,
+      }
       return prev.map((t) =>
         t.id === k.thread_id
-          ? { ...t, lastActivityMs: ts, lastActivity: ago(ts) }
+          ? {
+              ...t,
+              log: [...t.log, appended],
+              lastActivityMs: ts,
+              lastActivity: ago(ts),
+            }
           : t,
       )
     }

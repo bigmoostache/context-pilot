@@ -25,6 +25,7 @@ use cp_base::tools::{ToolDefinition, ToolResult, ToolUse};
 
 use cp_wire::types::stream::{Frame as StreamFrame, Kind as StreamKind};
 
+use crate::body::Store;
 use crate::boot::Boot;
 use crate::command::Intake;
 use crate::tee::Tee;
@@ -67,6 +68,28 @@ pub struct BridgeState {
     /// Last cumulative spend (USD) emitted as a `CostAggregate`, so a
     /// `CostAggregate` is emitted only when the dollar total moves.
     pub last_cost_usd: f64,
+
+    /// Content-addressed body store for thread-message bodies (I13). `None`
+    /// when the bridge is OFF or the store could not be opened. The main-loop
+    /// message chokepoint writes each new message's body here (inline-small /
+    /// spill-large, durable) **before** referencing it from a `MessageCreated`
+    /// oplog delta.
+    pub store: Option<Store>,
+
+    /// Per-thread count of messages already emitted as `MessageCreated`
+    /// deltas, keyed by thread id. The message chokepoint diffs the live
+    /// thread message vectors against this memo each tick and emits only the
+    /// newly-appended messages (the same observe-on-change discipline as the
+    /// phase/cost vitals).
+    pub thread_msg_counts: std::collections::HashMap<String, usize>,
+
+    /// Whether [`thread_msg_counts`](Self::thread_msg_counts) has been seeded
+    /// from the threads already present at boot. Until it is, the first
+    /// chokepoint pass records existing message counts **without** emitting, so
+    /// a (re)started agent does not replay its entire backlog onto the oplog —
+    /// only messages created after boot become deltas (the cold backlog is
+    /// served from tier-② disk on the frontend's initial load).
+    pub msg_memo_seeded: bool,
 }
 
 /// Agent-side orchestration bridge module.
@@ -164,10 +187,23 @@ impl Module for BridgeModule {
                     }
                 };
 
+                // Open the content-addressed body store under the oplog dir,
+                // so the message chokepoint can durably stage bodies before
+                // referencing them (I13). A failure here only disables live
+                // message deltas (the disk path still carries the messages).
+                let store = match Store::open(std::path::Path::new(&boot.entry().oplog_path)) {
+                    Ok(s) => Some(s),
+                    Err(e) => {
+                        log::error!("bridge: body store open failed: {e:?}");
+                        None
+                    }
+                };
+
                 state.set_ext(BridgeState {
                     boot: Some(boot),
                     tee,
                     intake,
+                    store,
                     ..Default::default()
                 });
             }
@@ -370,5 +406,8 @@ mod tests {
         assert_eq!(bs.tee_seq, 0);
         assert_eq!(bs.last_phase, None);
         assert!((bs.last_cost_usd - 0.0).abs() < f64::EPSILON);
+        assert!(bs.store.is_none());
+        assert!(bs.thread_msg_counts.is_empty());
+        assert!(!bs.msg_memo_seeded);
     }
 }

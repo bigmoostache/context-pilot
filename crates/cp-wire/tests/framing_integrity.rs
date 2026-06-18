@@ -38,6 +38,7 @@ fn rich_entry(rev: u64) -> OpEntry {
             thread_id: format!("T{rev}"),
             message_id: format!("m{rev}-body"),
             head: ContentHash::new([tag; 32]),
+            inline_body: None,
         },
     }
 }

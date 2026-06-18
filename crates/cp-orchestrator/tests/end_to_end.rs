@@ -36,6 +36,7 @@ mod common;
 // Linked into this integration-test target but not named directly; acknowledge
 // them for the per-target `unused-crate-dependencies` lint.
 use nix as _;
+use notify as _;
 use serde as _;
 use serde_yaml as _;
 
@@ -116,6 +117,7 @@ fn message_entry(byte: u8) -> OpEntryKind {
         thread_id: "T1".to_owned(),
         message_id: format!("m{byte}"),
         head: ContentHash::new([byte; 32]),
+        inline_body: None,
     }
 }
 
