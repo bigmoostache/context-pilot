@@ -14,6 +14,8 @@ use cp_mod_threads::types::{
     FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState,
 };
 use cp_wire::types::command::{Command, Kind as CommandKind};
+use cp_wire::types::oplog::OpEntryKind;
+use cp_wire::types::ThreadTurn;
 
 /// Inject a synthetic `Read` tool call when auto-continuation fires
 /// for a thread notification while the AI is unfocused.
@@ -287,6 +289,27 @@ fn apply_command(app: &mut App, cmd: Command) {
     }
 }
 
+// ── Roster delta emission (Leg 0 keystone — design doc I8/I10) ───────────
+
+/// Append a thread-roster oplog delta the instant a mutation applies, so the
+/// backend's in-memory view (and thus the web frontend) learns of it in
+/// milliseconds instead of waiting on the debounced tier-② disk write.
+///
+/// No-op when the bridge is OFF (no `BridgeState.boot`). Uses the **non-blocking
+/// durable** path ([`submit_durable`](cp_oplog::service::Service::submit_durable)):
+/// the record is group-committed + `fdatasync`'d off-loop by the oplog thread,
+/// so the main loop never blocks on a sync (design doc I2) yet the delta is
+/// never dropped (a created/archived thread cannot be silently lost).
+///
+/// [`submit_durable`]: cp_oplog::service::Service::submit_durable
+fn emit_roster_delta(state: &cp_base::state::runtime::State, kind: OpEntryKind) {
+    if let Some(bs) = state.get_ext::<BridgeState>()
+        && let Some(boot) = bs.boot.as_ref()
+    {
+        boot.oplog().submit_durable(kind);
+    }
+}
+
 // ── SendMessage (K7) ────────────────────────────────────────────────────
 
 /// Inject a user message into the given thread and create a spine
@@ -345,6 +368,15 @@ fn apply_create_thread(state: &mut cp_base::state::runtime::State, name: &str) {
         archived: false,
     });
 
+    // Emit the durable roster delta so the backend view reflects the new
+    // thread in ms (Leg 0 keystone) — new threads start on the user's turn.
+    emit_roster_delta(state, OpEntryKind::ThreadCreated {
+        thread_id: id.clone(),
+        name: name.to_owned(),
+        status: ThreadTurn::TheirTurn,
+        timestamp_ms: now_ms(),
+    });
+
     state.flags.ui.dirty = true;
     log::info!("bridge: created thread {id} \"{name}\"");
 }
@@ -372,6 +404,8 @@ fn apply_archive_thread(state: &mut cp_base::state::runtime::State, thread_id: &
         focus.notified_my_turn_id = None;
     }
 
+    emit_roster_delta(state, OpEntryKind::ThreadArchived { thread_id: thread_id.to_owned() });
+
     state.flags.ui.dirty = true;
     log::info!("bridge: archived thread {thread_id}");
 }
@@ -386,6 +420,7 @@ fn apply_restore_thread(
     let ts = ThreadsState::get_mut(state);
     if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) {
         thread.archived = false;
+        emit_roster_delta(state, OpEntryKind::ThreadRestored { thread_id: thread_id.to_owned() });
         state.flags.ui.dirty = true;
         log::info!("bridge: restored thread {thread_id}");
     } else {

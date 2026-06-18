@@ -211,6 +211,32 @@ impl Service {
         }
     }
 
+    /// Submit a durability-gated record **without awaiting** its `fdatasync`.
+    ///
+    /// This is the I2 main-loop path: the record is enqueued for the commit
+    /// thread, which group-commits and `fdatasync`s it **off-loop** — so it is
+    /// just as durable as [`append_durable`](Self::append_durable), but the
+    /// caller never blocks on the sync. It is *not* dropped under pressure like
+    /// [`append_best_effort`](Self::append_best_effort): a full queue applies
+    /// correct backpressure (the bounded `send` blocks only until the commit
+    /// thread drains space), never silent loss. Use this for user-visible state
+    /// mutations the main loop emits (thread roster, message heads) where losing
+    /// the record would corrupt the view but blocking on each sync would violate
+    /// the never-fsync-on-the-loop rule (design doc I2).
+    ///
+    /// The post-sync `rev` is discarded (the ack channel is detached); a caller
+    /// that needs the durable `rev` must use [`append_durable`](Self::append_durable)
+    /// instead. A stopped service is silently ignored — emission is advisory,
+    /// never fatal to the agent.
+    pub fn submit_durable(&self, kind: OpEntryKind) {
+        // Detached ack: the commit thread still group-commits + fsyncs this
+        // record durably; we simply drop the reply so the caller never waits.
+        // `ack.send` on the commit side already tolerates a dropped receiver,
+        // and a stopped service (send error) is benign for advisory emission.
+        let (ack_tx, _ack_rx) = sync_channel::<DurableAck>(1);
+        let _ignored = self.tx.send(Job::Durable { kind, ack: ack_tx });
+    }
+
     /// Submit a best-effort record. Never blocks and never awaits durability;
     /// returns [`BestEffortOutcome::Dropped`] if the queue is full.
     #[must_use]
@@ -437,5 +463,26 @@ mod tests {
         let state = replay(dir.path()).expect("replay");
         assert_eq!(state.rev_head, Some(last));
         assert!(state.seen.contains("only"));
+    }
+
+    #[test]
+    fn submit_durable_persists_without_awaiting_the_sync() {
+        // The I2 main-loop path: submit_durable enqueues a durable record and
+        // returns immediately (no ack wait). After a clean shutdown drains the
+        // queue, the record must be durably present — proving "non-blocking"
+        // did not mean "best-effort/droppable".
+        let dir = tempdir().expect("tempdir");
+        {
+            let service = Service::spawn(dir.path()).expect("spawn");
+            service.submit_durable(effect("fire-and-forget"));
+            service.submit_durable(msg("T1", 0x44));
+            // shutdown drains + flushes the in-flight batch before joining.
+            service.shutdown().expect("shutdown");
+        }
+        let state = replay(dir.path()).expect("replay");
+        assert!(state.seen.contains("fire-and-forget"), "detached-ack record is still durable");
+        let mut expected = cp_wire::types::snapshot::Heads::default();
+        expected.set_thread_head("T1", ContentHash::new([0x44; 32]));
+        assert_eq!(state.heads, expected, "submitted head folded after off-loop commit");
     }
 }
