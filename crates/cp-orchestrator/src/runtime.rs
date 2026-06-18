@@ -36,6 +36,7 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use crate::channel::Tailer;
+use crate::registry::tee_reader::TeeReader;
 use crate::registry::{AgentRegistry, Event};
 use crate::transport::Backend;
 
@@ -164,6 +165,10 @@ impl Runtime {
 fn driver_loop(backend: Arc<Mutex<Backend>>, agents_dir: PathBuf, interval: Duration) {
     let mut registry = AgentRegistry::new(agents_dir);
     let mut tailers: HashMap<String, Tailer> = HashMap::new();
+    // Per-agent live stream-plane readers (connect each agent's tee.sock and
+    // republish its token frames into the hub). Keyed by agent id; spawned on
+    // Appeared, dropped (→ stop+join) on Disappeared.
+    let mut tee_readers: HashMap<String, TeeReader> = HashMap::new();
     // Per-agent folder paths, seeded from Appeared events.
     let mut agent_folders: HashMap<String, PathBuf> = HashMap::new();
     // Per-agent last-seen config.json mtime, for change detection.
@@ -178,7 +183,7 @@ fn driver_loop(backend: Arc<Mutex<Backend>>, agents_dir: PathBuf, interval: Dura
 
         // 1. Registry scan — discover/lose agents.
         if let Ok(events) = registry.scan() {
-            process_registry_events(&events, &backend, &mut tailers, &mut agent_folders);
+            process_registry_events(&events, &backend, &mut tailers, &mut tee_readers, &mut agent_folders);
 
             // Clean up mtime entries for disappeared agents.
             for event in &events {
@@ -213,6 +218,7 @@ fn process_registry_events(
     events: &[Event],
     backend: &Arc<Mutex<Backend>>,
     tailers: &mut HashMap<String, Tailer>,
+    tee_readers: &mut HashMap<String, TeeReader>,
     agent_folders: &mut HashMap<String, PathBuf>,
 ) {
     for event in events {
@@ -220,10 +226,20 @@ fn process_registry_events(
             Event::Appeared(entry) => {
                 let oplog_dir = PathBuf::from(&entry.oplog_path);
                 let _previous = tailers.insert(entry.id.clone(), Tailer::new(oplog_dir));
-                let _prev = agent_folders.insert(entry.id.clone(), PathBuf::from(&entry.folder));
+                let folder = PathBuf::from(&entry.folder);
+                // Spawn the live stream reader for this agent's tee socket so
+                // its token frames fan out through the hub to SSE subscribers.
+                let reader = TeeReader::spawn(entry.id.clone(), &folder, Arc::clone(backend));
+                if let Some(old) = tee_readers.insert(entry.id.clone(), reader) {
+                    old.stop();
+                }
+                let _prev = agent_folders.insert(entry.id.clone(), folder);
             }
             Event::Disappeared(id) => {
                 let _removed = tailers.remove(id);
+                if let Some(reader) = tee_readers.remove(id) {
+                    reader.stop();
+                }
                 let _removed = agent_folders.remove(id);
                 if let Ok(mut b) = backend.lock() {
                     let _removed = b.view_mut().remove(id);
