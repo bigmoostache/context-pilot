@@ -1,24 +1,29 @@
 //! Bounded replay snapshot — the full recoverable state folded from the oplog.
 //!
-//! Replaying the oplog reconstructs two bounded structures and nothing else:
+//! Replaying the oplog reconstructs a small, bounded set of structures:
 //!
 //! * [`Heads`] — per-thread and per-panel content hashes (the latest state of
 //!   each, **O(threads + panels)** rather than O(total-files); design doc I3,
-//!   resolves K3); and
+//!   resolves K3);
 //! * [`SeenSet`] — the dedup-tokens of command effects that are durable but not
 //!   yet acknowledged-and-evicted, which makes command application
-//!   **exactly-once** across a replay (design doc I4).
+//!   **exactly-once** across a replay (design doc I4); and
+//! * a [`RosterThread`] list — the bounded thread roster (one entry per live
+//!   thread) so the backend can render the thread list after oplog
+//!   **compaction** without folding the roster deltas from offset 0 (design
+//!   doc I5 / §16).
 //!
-//! A [`Snapshot`] bundles both. It is what a `Checkpoint` oplog record carries
-//! as the first record of every rolled segment, so recovery reads only the
-//! newest segment instead of folding the whole log (design doc I5 / GAP 1).
-//! Both structures must be in the checkpoint: if only [`Heads`] were
-//! snapshotted, rebuilding the [`SeenSet`] would have to fold from offset 0 —
-//! re-introducing the unbounded replay the checkpoint exists to prevent.
+//! A [`Snapshot`] bundles all three. It is what a `Checkpoint` oplog record
+//! carries as the first record of every rolled segment, so recovery reads only
+//! the newest segment instead of folding the whole log (design doc I5 / GAP 1).
+//! Both [`Heads`] and [`SeenSet`] must be in the checkpoint: if only [`Heads`]
+//! were snapshotted, rebuilding the [`SeenSet`] would have to fold from offset
+//! 0 — re-introducing the unbounded replay the checkpoint exists to prevent;
+//! the [`RosterThread`] list extends that same guarantee to the thread list.
 
 use serde::{Deserialize, Serialize};
 
-use super::ContentHash;
+use super::{ContentHash, ThreadTurn};
 
 /// Wire-schema revision stamped onto freshly-constructed snapshot structures.
 const SNAPSHOT_SCHEMA_VERSION: u32 = 1;
@@ -34,6 +39,121 @@ pub struct Snapshot {
 
     /// Dedup-tokens of durable, not-yet-evicted command effects.
     pub seen: SeenSet,
+
+    /// The thread roster as of this `rev` — one entry per live thread (design
+    /// doc §16 journals thread create/archive/restore; carrying it in the
+    /// checkpoint is what lets a backend rebuild the thread list after oplog
+    /// **compaction** without folding from offset 0, design doc I5).
+    ///
+    /// Additive + `serde(default)`: a checkpoint written by an older agent
+    /// (before the roster was snapshotted) decodes to an empty roster, and an
+    /// older backend reading a newer checkpoint ignores the field — N-1
+    /// compatible in both directions (design doc §18).
+    #[serde(default)]
+    pub roster: Vec<RosterThread>,
+}
+
+/// One thread's snapshotted roster entry — the lightweight per-thread metadata
+/// needed to render a thread list (name, turn, archived, activity, count)
+/// without hydrating any message body.
+///
+/// Folded from the thread-roster oplog deltas
+/// ([`ThreadCreated`](super::oplog::OpEntryKind::ThreadCreated) and friends),
+/// with `msg_count`/`last_activity_ms` accumulated from each subsequent
+/// [`MessageCreated`](super::oplog::OpEntryKind::MessageCreated). The backend's
+/// materialized view uses this struct directly as its roster element, so the
+/// checkpoint-restored roster and the live-folded roster are the same type.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RosterThread {
+    /// Thread identifier (e.g. `"T7"`).
+    pub thread_id: String,
+
+    /// User-chosen thread label.
+    pub name: String,
+
+    /// Current turn ownership.
+    pub status: ThreadTurn,
+
+    /// Whether the thread is archived (soft-deleted: hidden from the active
+    /// list but restorable).
+    pub archived: bool,
+
+    /// Epoch-ms of the latest activity — creation time, then bumped by each
+    /// message.
+    pub last_activity_ms: u64,
+
+    /// Number of messages folded into this thread so far.
+    pub msg_count: u32,
+}
+
+/// The facts a `ThreadCreated` oplog delta carries — the borrowed payload of
+/// [`RosterThread::fold_created`].
+///
+/// A named carrier (rather than four loose arguments) keeps the fold signature
+/// small and mirrors the
+/// [`ThreadCreated`](super::oplog::OpEntryKind::ThreadCreated) variant the
+/// caller match-binds: both the agent's replay fold and the backend's live
+/// fold construct one inline from the same fields, so the two paths stay
+/// identical.
+#[derive(Clone, Copy, Debug)]
+pub struct ThreadCreation<'src> {
+    /// Thread identifier (e.g. `"T7"`).
+    pub thread_id: &'src str,
+
+    /// User-chosen thread label.
+    pub name: &'src str,
+
+    /// Turn ownership at creation.
+    pub status: ThreadTurn,
+
+    /// Epoch-ms the thread was created (seeds `last_activity_ms`).
+    pub timestamp_ms: u64,
+}
+
+impl RosterThread {
+    /// Apply a `ThreadCreated` to a roster, **insert-or-update** so a duplicate
+    /// delivery or a replay folds idempotently (a re-seen creation refreshes
+    /// name/status and clears `archived`, never duplicates the entry).
+    pub fn fold_created(roster: &mut Vec<Self>, created: ThreadCreation<'_>) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == created.thread_id) {
+            created.name.clone_into(&mut existing.name);
+            existing.status = created.status;
+            existing.archived = false;
+        } else {
+            roster.push(Self {
+                thread_id: created.thread_id.to_owned(),
+                name: created.name.to_owned(),
+                status: created.status,
+                archived: false,
+                last_activity_ms: created.timestamp_ms,
+                msg_count: 0,
+            });
+        }
+    }
+
+    /// Set the `archived` flag for `thread_id`, if present (a no-op otherwise).
+    pub fn fold_archived(roster: &mut [Self], thread_id: &str, archived: bool) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
+            existing.archived = archived;
+        }
+    }
+
+    /// Set the turn `status` for `thread_id`, if present (a no-op otherwise).
+    pub fn fold_status(roster: &mut [Self], thread_id: &str, status: ThreadTurn) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
+            existing.status = status;
+        }
+    }
+
+    /// Record a message in `thread_id`: bump its count and advance its activity
+    /// timestamp (a no-op if the thread is not in the roster — e.g. a message
+    /// folded before its creation delta was seen).
+    pub fn fold_message(roster: &mut [Self], thread_id: &str, timestamp_ms: u64) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
+            existing.msg_count = existing.msg_count.saturating_add(1);
+            existing.last_activity_ms = timestamp_ms;
+        }
+    }
 }
 
 // ── Heads ────────────────────────────────────────────────────────────────
@@ -268,5 +388,68 @@ mod tests {
         let json = serde_json::to_string(&snapshot).expect("serialize");
         let back: Snapshot = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(snapshot, back);
+    }
+
+    #[test]
+    fn snapshot_round_trip_with_roster() {
+        let mut snapshot = Snapshot::default();
+        snapshot.heads.set_thread_head("T1", ContentHash::new([0x33; 32]));
+        snapshot.seen.mark("cmd-x", 5);
+        snapshot.roster.push(RosterThread {
+            thread_id: "T1".into(),
+            name: "Plan".into(),
+            status: ThreadTurn::MyTurn,
+            archived: false,
+            last_activity_ms: 1_700,
+            msg_count: 3,
+        });
+        let json = serde_json::to_string(&snapshot).expect("serialize");
+        let back: Snapshot = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(snapshot, back);
+    }
+
+    #[test]
+    fn snapshot_without_roster_field_decodes_to_empty() {
+        // N-1: a checkpoint serialised by an older agent (no `roster` key) must
+        // decode with an empty roster rather than failing.
+        let legacy = r#"{
+            "heads": {"schema_version": 1, "threads": [], "panels": []},
+            "seen": {"schema_version": 1, "entries": []}
+        }"#;
+        let snapshot: Snapshot = serde_json::from_str(legacy).expect("tolerant decode");
+        assert!(snapshot.roster.is_empty(), "missing roster field defaults to empty");
+    }
+
+    #[test]
+    fn roster_fold_helpers_insert_update_and_accumulate() {
+        let mut roster: Vec<RosterThread> = Vec::new();
+        RosterThread::fold_created(
+            &mut roster,
+            ThreadCreation { thread_id: "T1", name: "Plan", status: ThreadTurn::TheirTurn, timestamp_ms: 100 },
+        );
+        assert_eq!(roster.len(), 1);
+        // A re-seen creation refreshes, never duplicates.
+        RosterThread::fold_created(
+            &mut roster,
+            ThreadCreation { thread_id: "T1", name: "Plan v2", status: ThreadTurn::MyTurn, timestamp_ms: 100 },
+        );
+        assert_eq!(roster.len(), 1, "duplicate creation folds idempotently");
+        assert_eq!(roster[0].name, "Plan v2");
+        assert_eq!(roster[0].status, ThreadTurn::MyTurn);
+
+        RosterThread::fold_message(&mut roster, "T1", 250);
+        RosterThread::fold_message(&mut roster, "T1", 400);
+        assert_eq!(roster[0].msg_count, 2);
+        assert_eq!(roster[0].last_activity_ms, 400, "activity tracks the latest message");
+
+        RosterThread::fold_archived(&mut roster, "T1", true);
+        assert!(roster[0].archived);
+        RosterThread::fold_archived(&mut roster, "T1", false);
+        assert!(!roster[0].archived);
+
+        // Folds for an unknown thread are no-ops, never a panic.
+        RosterThread::fold_message(&mut roster, "T-absent", 999);
+        RosterThread::fold_status(&mut roster, "T-absent", ThreadTurn::MyTurn);
+        assert_eq!(roster.len(), 1);
     }
 }

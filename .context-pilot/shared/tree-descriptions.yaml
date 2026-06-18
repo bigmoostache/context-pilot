@@ -2842,6 +2842,10 @@
   path: crates/cp-oplog/src/error.rs
   description: 'OplogError{Io,Frame} + Display + From<io::Error>/From<FrameError> + OplogResult alias. Extracted from append.rs (folder-size: append.rs hit 501 lines). Deliberately NO std::error::Error impl (dodges missing_trait_methods on unstable provide()).'
   last_edited_ms: 1781623192148
+6b048f2f5d4a57a4:
+  path: report/wiring-alignment-audit.md
+  description: 'Wiring alignment audit (X818 Phase 0.1): invariant-by-invariant gap register implementation⇄design-orchestration-backend.md. Verdicts ABIDES/PARTIAL/VIOLATES per I1-I13/§7/§9/§19. Diagnoses the disk/poll vs oplog-push plane inversion = the latency root cause.'
+  last_edited_ms: 0
 6b337c67d5dc532a:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny, 45 allow across clippy/rust lints). openssl vendored for cross-compilation.
@@ -3802,6 +3806,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: 'macOS title bar. App mark (Home)→fleet. At fleet altitude ''Mission control'' caption (switcher hidden); inside an agent: AgentSwitcher + per-agent segmented switcher Threads·Cockpit·Finder + cost (git branch chip removed — general-user UI). Far-right: Activity button (StatsPopup) + ThemeToggle + Settings gear (ConfigModal). Both modals always-mounted, controlled open.'
   last_edited_ms: 1781530040363
+8de5004b2cda2e81:
+  path: crates/cp-wire/src/types/snapshot.rs
+  description: 'Bounded replay snapshot: Snapshot{heads,seen,roster}. Heads (per-thread/panel content hashes) + SeenSet (dedup-tokens, evicted by acked-rev) + roster:Vec<RosterThread> (#[serde(default)] for N-1 tolerance). RosterThread{thread_id,name,status:ThreadTurn,archived,last_activity_ms,msg_count} = the live thread list + fold helpers (fold_created via ThreadCreation<''src> carrier struct to keep arg count ≤4, fold_archived/fold_status/fold_message) = single source of truth for the roster fold (agent replay + backend view fold both call them, so a folded roster == a checkpoint-restored roster). Checkpoint carries the whole Snapshot so heads+seen+roster rebuild without folding from offset 0. Replaces old heads.rs. Tests: round-trip, with-roster, tolerant-decode-without-roster, fold-helpers, ThreadCreation idempotent re-fold.'
+  last_edited_ms: 1781815284403
 8dfe4ccc082be2d1:
   path: crates/cp-base/src/ui/mod.rs
   description: 'Shared UI helpers for panel rendering. Align enum + TextCell + render_table_text() (plain-text for LLM context). Tree output parsing helpers (find_size_pattern, find_children_pattern). Sub-modules: question_form, render_cache.'
@@ -4614,6 +4622,10 @@ ad68ded86b688df6:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
   last_edited_ms: 0
+ad9470f62fadf09b:
+  path: crates/cp-oplog/src/replay.rs
+  description: 'Oplog replay (GAP1/I5): Recovered{rev_head,heads,seen,roster}. fold_entry: Checkpoint=authoritative clone_from heads+seen+roster, MessageCreated=set_thread_head + RosterThread::fold_message, ThreadCreated/Archived/Restored/StatusChanged=RosterThread fold helpers (roster rebuilt from deltas), CommandEffect|SeenMark=seen.mark, others no-op. Fast-path reads only newest checkpoint-bearing segment; roster survives compaction because the checkpoint Snapshot carries it. Tests incl replay_rebuilds_roster_from_thread_deltas + roster_survives_compaction_via_checkpoint.'
+  last_edited_ms: 1781815284423
 adbbf21a2f610f3e:
   path: ui/src/components/finder/FinderChrome.tsx
   description: Finder chrome. FinderTabs (strip + new/close; each tab shows a kind icon — folder/pdf/code/… colored by kindMeta accent; FinderTab interface carries kind:FinderKind). FinderToolbar (back/fwd, overflow breadcrumb, icon-size slider [grid], 4-mode segmented control w/ sliding indicator, search, New Folder/Upload/Download, path-bar + QuickLook toggles). FinderSidebar (Favorites via collectStarred / Locations / Tags / Recents + confined-realm note). FinderPathBar (bottom).
@@ -4690,6 +4702,10 @@ afe95a8892aed75d:
   path: ui/src/lib/types.ts
   description: 'Maquette domain types. Agent (incl task summary), FsNode (legacy). Finder: FinderKind (+audio/video/binary), FinderTag, FinderNode (+tags/created/starred/media/preview payloads), Sheet/SlidePreview, FinderViewMode=grid|list|columns|gallery, FinderSortKey. ThreadDetail+agentId. ViewMode=fleet|cockpit|threads|finder.'
   last_edited_ms: 1781519105500
+b00fde25b44162bd:
+  path: crates/cp-oplog/src/append.rs
+  description: 'OplogWriter: single-writer append-only log + running ReplayState fold (heads+seen+roster). open() seeds via replay. append(kind)=append_buffered+sync (announce-after-durable K9). append_buffered=frame+write_all+fold, NO sync (group-commit primitive). sync()=single fdatasync (I2 group-commit point). roll() fdatasyncs old segment BEFORE switching, stamps leading Checkpoint(Snapshot) on new seg (GAP1) — snapshot() now carries heads+seen+roster so a compacted log still rebuilds the thread roster. checkpoint()/heads()/seen()/snapshot() public.'
+  last_edited_ms: 1781815284442
 b01e8f34019e0129:
   path: src/ui/perf/overlay.rs
   description: Performance overlay adapter — renders PerfOverlay IR to ratatui. Consumes pre-built IR snapshot (FPS, CPU/RAM, FDs/rlimit, Meili stats, budget bars, sparkline, op table). Uses semantic_to_style() for all styling. No direct State access.
@@ -4850,6 +4866,10 @@ b53adc676ed7e654:
   path: web/src/components/panels/cockpit/CallbacksPanel.tsx
   description: Callbacks panel — uses useCallbacks(agentId) for live edit hooks. Pattern/blocking/timeout/scope per callback.
   last_edited_ms: 1781695333932
+b55df2e75435c5c1:
+  path: crates/cp-orchestrator/src/services/materialized_view_tests.rs
+  description: 'Unit tests for materialized_view.rs (the fleet projection fold). Split from materialized_view.rs to respect the 500-line limit; #[path]-included so `super` resolves to the materialized_view module. Covers roster create/archive/restore cycle, idempotent ThreadCreated fold on replay, MessageCreated bumps roster count+activity, checkpoint_restores_roster_wholesale, and roster-survives-compaction-via-checkpoint-then-folds-tail.'
+  last_edited_ms: 1781815284365
 b5605bee566a2c94:
   path: .github/workflows/build.yml
   description: 'Cross-platform build workflow. 4-target matrix: linux-x86_64 (native), linux-aarch64 (cross), macos-x86_64 (macos-13), macos-aarch64 (macos-latest). Pins Rust 1.93.0. Builds tui + cp-console-server. 30-day artifact retention.'
@@ -6430,6 +6450,10 @@ f443597431fc2e8e:
   path: src/llms/minimax/mod.rs
   description: MiniMax provider — Anthropic-compatible API via Token Plan. SSE streaming identical to Anthropic protocol. MINIMAX_API_KEY auth.
   last_edited_ms: 0
+f4b138aa30ba5ba5:
+  path: crates/cp-orchestrator/src/services/materialized_view.rs
+  description: 'Phase 18 + X835/X836b: MaterializedView in-mem fleet projection folded from OpEntry (one AgentView per agent). AgentView{rev,heads,roster,phase,lifecycle,cost}. RosterEntry = cp_wire RosterThread (shared type). apply: Checkpoint=authoritative heads AND roster reset wholesale (clone_from snapshot.heads/roster — roster now rides the snapshot, closing the cold-restart-after-compaction gap), MessageCreated=set_thread_head + bump roster msg_count/last_activity, ThreadCreated=RosterThread::fold_created (insert-or-update idempotent via ThreadCreation carrier), ThreadArchived/Restored=fold_archived toggle, ThreadStatusChanged=fold_status, Phase/Lifecycle/Cost=latest-wins, CommandEffect/SeenMark/Unknown=inert. Tests live in sibling materialized_view_tests.rs (#[cfg(test)] #[path] include, 500-line limit). 206 lines.'
+  last_edited_ms: 1781815284384
 f4bcf2a916e01a82:
   path: crates/cp-mod-spine/src/engine.rs
   description: 'Spine engine — check_spine() with flame!("check_spine") evaluates auto-continuation. Bypass hierarchy: (1) is_streaming, (2) user_stopped (absolute hard stop), (3) error backoff, (4) unprocessed check, (5) double-synthetic guard, (6) guard rails. Marks all consumed notifications as processed before firing. apply_continuation() creates synthetic messages.'

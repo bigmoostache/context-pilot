@@ -325,11 +325,15 @@ impl OplogWriter {
         &self.state.seen
     }
 
-    /// A clone of the full recoverable snapshot (heads + seen-set), as written
-    /// into a checkpoint record.
+    /// A clone of the full recoverable snapshot (heads + seen-set + roster), as
+    /// written into a checkpoint record.
     #[must_use]
     pub fn snapshot(&self) -> Snapshot {
-        Snapshot { heads: self.state.heads.clone(), seen: self.state.seen.clone() }
+        Snapshot {
+            heads: self.state.heads.clone(),
+            seen: self.state.seen.clone(),
+            roster: self.state.roster.clone(),
+        }
     }
 }
 

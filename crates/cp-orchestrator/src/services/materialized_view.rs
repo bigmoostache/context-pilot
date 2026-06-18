@@ -20,8 +20,19 @@
 use std::collections::HashMap;
 
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
-use cp_wire::types::snapshot::Heads;
-use cp_wire::types::{LifecycleState, Phase, ThreadTurn};
+use cp_wire::types::snapshot::{Heads, RosterThread};
+use cp_wire::types::{LifecycleState, Phase};
+
+/// One thread's roster entry — the lightweight per-thread metadata the
+/// `/threads` endpoint serves directly from the view, with no tier-② disk read
+/// (design doc §16 journals thread create/archive/restore; I5 keeps live reads
+/// off disk).
+///
+/// This is [`cp_wire::types::snapshot::RosterThread`] — the *same* type the
+/// checkpoint carries — so a roster rebuilt by folding live deltas and one
+/// restored wholesale from a checkpoint are byte-identical, and the
+/// checkpoint-restore is a plain clone (see [`AgentView::apply`]).
+pub type RosterEntry = RosterThread;
 
 /// The latest cumulative cost figures reported by an agent.
 ///
@@ -35,35 +46,6 @@ pub struct CostSnapshot {
     pub output_tokens: u64,
     /// Cumulative spend in USD since the agent booted.
     pub cost_usd: f64,
-}
-
-/// One thread's roster entry — the lightweight per-thread metadata the
-/// `/threads` endpoint serves directly from the view, with no tier-② disk read
-/// (design doc §16 journals thread create/archive/restore; I5 keeps live reads
-/// off disk).
-///
-/// Folded live from the thread-roster oplog deltas
-/// ([`ThreadCreated`](OpEntryKind::ThreadCreated) and friends); `msg_count` and
-/// `last_activity_ms` then accumulate from each subsequent
-/// [`MessageCreated`](OpEntryKind::MessageCreated) in the thread, so the roster
-/// alone can render the thread list (name, turn, archived, activity) without
-/// hydrating message bodies.
-#[derive(Clone, Debug, PartialEq, serde::Serialize)]
-pub struct RosterEntry {
-    /// Thread identifier (e.g. `"T7"`).
-    pub thread_id: String,
-    /// User-chosen thread label.
-    pub name: String,
-    /// Current turn ownership.
-    pub status: ThreadTurn,
-    /// Whether the thread is archived (soft-deleted, hidden from the active
-    /// list but restorable).
-    pub archived: bool,
-    /// Epoch-ms of the latest activity — creation time, then bumped by each
-    /// message.
-    pub last_activity_ms: u64,
-    /// Number of messages folded into this thread so far.
-    pub msg_count: u32,
 }
 
 /// One agent's current projected state.
@@ -96,65 +78,48 @@ pub struct AgentView {
 impl AgentView {
     /// Fold one oplog entry into this view, advancing `rev`.
     ///
-    /// A [`Checkpoint`](OpEntryKind::Checkpoint) replaces the heads wholesale
-    /// (authoritative reset, the mechanism behind count-bounded restart); a
-    /// [`MessageCreated`](OpEntryKind::MessageCreated) updates a single thread
-    /// head and bumps that thread's roster activity; the thread-roster deltas
-    /// (`ThreadCreated`/`Archived`/`Restored`/`StatusChanged`) maintain the
-    /// roster idempotently; phase, lifecycle, and cost are latest-wins.
+    /// A [`Checkpoint`](OpEntryKind::Checkpoint) replaces the heads **and the
+    /// roster** wholesale (authoritative reset, the mechanism behind
+    /// count-bounded restart — a backend that cold-starts after oplog
+    /// compaction rebuilds the thread list from the checkpoint, not from the
+    /// original deltas); a [`MessageCreated`](OpEntryKind::MessageCreated)
+    /// updates a single thread head and bumps that thread's roster activity;
+    /// the thread-roster deltas (`ThreadCreated`/`Archived`/`Restored`/
+    /// `StatusChanged`) maintain the roster idempotently via the shared
+    /// [`RosterThread`] fold helpers (so this fold and the agent's replay fold
+    /// stay identical); phase, lifecycle, and cost are latest-wins.
     /// Durability-only records (`CommandEffect`, `SeenMark`) and forward-compat
     /// `Unknown` variants do not affect the projected state.
-    ///
-    /// Note: a `Checkpoint` currently restores only heads — the roster is
-    /// rebuilt by folding the live delta tail, which is correct for a
-    /// continuously-running backend. Carrying the roster inside the snapshot
-    /// (so a cold restart after oplog compaction rebuilds it without the
-    /// original deltas) is the remaining I5 refinement, tracked separately.
     pub fn apply(&mut self, entry: &OpEntry) {
         self.rev = self.rev.max(entry.rev);
         match &entry.kind {
             OpEntryKind::Checkpoint { snapshot } => {
                 self.heads = snapshot.heads.clone();
+                self.roster.clone_from(&snapshot.roster);
             }
             OpEntryKind::MessageCreated { thread_id, head, .. } => {
                 self.heads.set_thread_head(thread_id, *head);
-                if let Some(e) = self.roster.iter_mut().find(|e| &e.thread_id == thread_id) {
-                    e.msg_count = e.msg_count.saturating_add(1);
-                    e.last_activity_ms = entry.timestamp_ms;
-                }
+                RosterThread::fold_message(&mut self.roster, thread_id, entry.timestamp_ms);
             }
             OpEntryKind::ThreadCreated { thread_id, name, status, timestamp_ms } => {
-                // Insert-or-update so a duplicate delivery or a replay folds
-                // idempotently (a re-seen creation refreshes, never duplicates).
-                if let Some(e) = self.roster.iter_mut().find(|e| &e.thread_id == thread_id) {
-                    e.name = name.clone();
-                    e.status = *status;
-                    e.archived = false;
-                } else {
-                    self.roster.push(RosterEntry {
-                        thread_id: thread_id.clone(),
-                        name: name.clone(),
+                RosterThread::fold_created(
+                    &mut self.roster,
+                    cp_wire::types::snapshot::ThreadCreation {
+                        thread_id,
+                        name,
                         status: *status,
-                        archived: false,
-                        last_activity_ms: *timestamp_ms,
-                        msg_count: 0,
-                    });
-                }
+                        timestamp_ms: *timestamp_ms,
+                    },
+                );
             }
             OpEntryKind::ThreadArchived { thread_id } => {
-                if let Some(e) = self.roster.iter_mut().find(|e| &e.thread_id == thread_id) {
-                    e.archived = true;
-                }
+                RosterThread::fold_archived(&mut self.roster, thread_id, true);
             }
             OpEntryKind::ThreadRestored { thread_id } => {
-                if let Some(e) = self.roster.iter_mut().find(|e| &e.thread_id == thread_id) {
-                    e.archived = false;
-                }
+                RosterThread::fold_archived(&mut self.roster, thread_id, false);
             }
             OpEntryKind::ThreadStatusChanged { thread_id, status } => {
-                if let Some(e) = self.roster.iter_mut().find(|e| &e.thread_id == thread_id) {
-                    e.status = *status;
-                }
+                RosterThread::fold_status(&mut self.roster, thread_id, *status);
             }
             OpEntryKind::PhaseTransition { phase } => {
                 self.phase = Some(*phase);
@@ -245,232 +210,5 @@ impl MaterializedView {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use cp_wire::types::snapshot::Snapshot;
-    use cp_wire::types::ContentHash;
-
-    /// Build an [`OpEntry`] with the given rev and kind.
-    fn entry(rev: u64, kind: OpEntryKind) -> OpEntry {
-        OpEntry { schema_version: 1, rev, timestamp_ms: 0, kind }
-    }
-
-    fn message(thread: &str, byte: u8) -> OpEntryKind {
-        OpEntryKind::MessageCreated {
-            thread_id: thread.to_owned(),
-            message_id: format!("m{byte}"),
-            head: ContentHash::new([byte; 32]),
-            inline_body: None,
-        }
-    }
-
-    #[test]
-    fn message_created_sets_thread_head() {
-        let mut view = MaterializedView::new();
-        view.apply("a1", &entry(0, message("T1", 0x11)));
-
-        let agent = view.get("a1").expect("agent present");
-        assert_eq!(agent.rev, 0);
-        let head = agent
-            .heads
-            .threads
-            .iter()
-            .find(|h| h.thread_id == "T1")
-            .expect("thread head present");
-        assert_eq!(head.last_message_hash, ContentHash::new([0x11; 32]));
-    }
-
-    #[test]
-    fn checkpoint_resets_heads_authoritatively() {
-        let mut view = MaterializedView::new();
-        // Stale head folded first.
-        view.apply("a1", &entry(0, message("T1", 0x11)));
-
-        // A checkpoint carrying a different head set must replace, not merge.
-        let mut snapshot = Snapshot::default();
-        snapshot.heads.set_thread_head("T2", ContentHash::new([0x22; 32]));
-        view.apply("a1", &entry(5, OpEntryKind::Checkpoint { snapshot }));
-
-        let agent = view.get("a1").expect("agent present");
-        assert_eq!(agent.rev, 5);
-        assert!(
-            agent.heads.threads.iter().all(|h| h.thread_id != "T1"),
-            "checkpoint must drop the pre-checkpoint head",
-        );
-        assert_eq!(agent.heads.threads.len(), 1);
-        assert_eq!(agent.heads.threads.first().expect("T2").thread_id, "T2");
-    }
-
-    #[test]
-    fn phase_and_lifecycle_are_latest_wins() {
-        let mut view = MaterializedView::new();
-        view.apply("a1", &entry(0, OpEntryKind::PhaseTransition { phase: Phase::Streaming }));
-        view.apply("a1", &entry(1, OpEntryKind::PhaseTransition { phase: Phase::Tooling }));
-        view.apply("a1", &entry(2, OpEntryKind::Lifecycle { state: LifecycleState::Running }));
-
-        let agent = view.get("a1").expect("agent present");
-        assert_eq!(agent.phase, Some(Phase::Tooling));
-        assert_eq!(agent.lifecycle, Some(LifecycleState::Running));
-    }
-
-    #[test]
-    fn cost_aggregate_is_latest_not_summed() {
-        let mut view = MaterializedView::new();
-        view.apply(
-            "a1",
-            &entry(0, OpEntryKind::CostAggregate { input_tokens: 100, output_tokens: 10, cost_usd: 1.0 }),
-        );
-        view.apply(
-            "a1",
-            &entry(1, OpEntryKind::CostAggregate { input_tokens: 250, output_tokens: 30, cost_usd: 2.5 }),
-        );
-
-        let agent = view.get("a1").expect("agent present");
-        // Cumulative-since-boot ⇒ latest wins, never 350/40/3.5.
-        assert_eq!(agent.cost.input_tokens, 250);
-        assert_eq!(agent.cost.output_tokens, 30);
-        assert!((agent.cost.cost_usd - 2.5).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn apply_batch_folds_in_order_and_tracks_max_rev() {
-        let mut view = MaterializedView::new();
-        let batch = [
-            entry(3, message("T1", 0x01)),
-            entry(7, message("T1", 0x02)),
-            entry(9, OpEntryKind::PhaseTransition { phase: Phase::Idle }),
-        ];
-        view.apply_batch("a1", &batch);
-
-        let agent = view.get("a1").expect("agent present");
-        assert_eq!(agent.rev, 9, "rev tracks the maximum folded");
-        assert_eq!(
-            agent.heads.threads.first().expect("T1").last_message_hash,
-            ContentHash::new([0x02; 32]),
-            "later message overwrites the earlier head",
-        );
-        assert_eq!(agent.phase, Some(Phase::Idle));
-    }
-
-    #[test]
-    fn durability_only_and_unknown_entries_are_inert() {
-        let mut view = MaterializedView::new();
-        view.apply(
-            "a1",
-            &entry(0, OpEntryKind::CommandEffect { cmd_id: "c".into(), dedup_token: "d".into() }),
-        );
-        view.apply("a1", &entry(1, OpEntryKind::SeenMark { dedup_token: "d".into() }));
-        view.apply("a1", &entry(2, OpEntryKind::Unknown));
-
-        let agent = view.get("a1").expect("agent present");
-        assert_eq!(agent.rev, 2, "rev still advances");
-        assert!(agent.heads.threads.is_empty());
-        assert_eq!(agent.phase, None);
-        assert_eq!(agent.lifecycle, None);
-        assert_eq!(agent.cost, CostSnapshot::default());
-    }
-
-    #[test]
-    fn roster_create_archive_restore_cycle() {
-        let mut view = MaterializedView::new();
-        view.apply(
-            "a1",
-            &entry(
-                0,
-                OpEntryKind::ThreadCreated {
-                    thread_id: "T1".into(),
-                    name: "Refactor cache".into(),
-                    status: ThreadTurn::TheirTurn,
-                    timestamp_ms: 1_000,
-                },
-            ),
-        );
-        let agent = view.get("a1").expect("agent present");
-        let e = agent.roster.first().expect("roster entry");
-        assert_eq!(e.thread_id, "T1");
-        assert_eq!(e.name, "Refactor cache");
-        assert_eq!(e.status, ThreadTurn::TheirTurn);
-        assert!(!e.archived);
-        assert_eq!(e.last_activity_ms, 1_000);
-        assert_eq!(e.msg_count, 0);
-
-        view.apply("a1", &entry(1, OpEntryKind::ThreadArchived { thread_id: "T1".into() }));
-        assert!(view.get("a1").expect("a").roster.first().expect("e").archived);
-
-        view.apply("a1", &entry(2, OpEntryKind::ThreadRestored { thread_id: "T1".into() }));
-        assert!(!view.get("a1").expect("a").roster.first().expect("e").archived);
-
-        view.apply(
-            "a1",
-            &entry(
-                3,
-                OpEntryKind::ThreadStatusChanged {
-                    thread_id: "T1".into(),
-                    status: ThreadTurn::MyTurn,
-                },
-            ),
-        );
-        assert_eq!(
-            view.get("a1").expect("a").roster.first().expect("e").status,
-            ThreadTurn::MyTurn,
-        );
-    }
-
-    #[test]
-    fn thread_created_folds_idempotently_on_replay() {
-        let mut view = MaterializedView::new();
-        let created = OpEntryKind::ThreadCreated {
-            thread_id: "T1".into(),
-            name: "Plan".into(),
-            status: ThreadTurn::MyTurn,
-            timestamp_ms: 5,
-        };
-        view.apply("a1", &entry(0, created.clone()));
-        view.apply("a1", &entry(0, created)); // duplicate delivery / replay
-        assert_eq!(
-            view.get("a1").expect("agent").roster.len(),
-            1,
-            "a re-seen creation must refresh, never duplicate",
-        );
-    }
-
-    #[test]
-    fn message_created_bumps_roster_count_and_activity() {
-        let mut view = MaterializedView::new();
-        view.apply(
-            "a1",
-            &entry(
-                0,
-                OpEntryKind::ThreadCreated {
-                    thread_id: "T1".into(),
-                    name: "Chat".into(),
-                    status: ThreadTurn::MyTurn,
-                    timestamp_ms: 100,
-                },
-            ),
-        );
-        // Two messages land; each bumps count + activity.
-        let mut m1 = entry(1, message("T1", 0x01));
-        m1.timestamp_ms = 200;
-        let mut m2 = entry(2, message("T1", 0x02));
-        m2.timestamp_ms = 350;
-        view.apply("a1", &m1);
-        view.apply("a1", &m2);
-
-        let e = view.get("a1").expect("agent").roster.first().expect("entry");
-        assert_eq!(e.msg_count, 2);
-        assert_eq!(e.last_activity_ms, 350, "activity tracks the latest message");
-    }
-
-    #[test]
-    fn remove_drops_agent() {
-        let mut view = MaterializedView::new();
-        view.apply("a1", &entry(0, message("T1", 0x11)));
-        assert_eq!(view.len(), 1);
-
-        let removed = view.remove("a1");
-        assert!(removed.is_some());
-        assert!(view.is_empty());
-        assert!(view.get("a1").is_none());
-    }
-}
+#[path = "materialized_view_tests.rs"]
+mod tests;

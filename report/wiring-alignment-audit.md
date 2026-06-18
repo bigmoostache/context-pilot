@@ -52,8 +52,8 @@ The baseline's sin ("plane B is the live path; plane A is inert") is **fixed**.
 |---|---|---|---|---|
 | **I1** | Single writer *process* per folder (flock) | **ABIDES** | `cp-mod-bridge/src/boot.rs` `acquire_lock` (+ bounded retry) | — |
 | **I2** | Main loop never fsyncs; dedicated oplog thread group-commits | **ABIDES** ✅ | `src/app/run/threads/bridge.rs:148` `emit_roster_delta`→`submit_durable` (non-blocking durable); `:186` `append_best_effort`; `messages.rs:156` `submit_durable`. Loop only enqueues. **V11 proven**: `cp-oplog/src/service_tests.rs::v11_emit_burst_never_blocks_the_loop_on_fsync` (5k-emit burst, worst single emit `<25ms`, decoupled from `fdatasync`). | — |
-| **I3** | Snapshot = bounded heads + content-addressed bodies | **PARTIAL** | `materialized_view.rs` `AgentView{heads,roster}`; heads populated by `MessageCreated` | `Checkpoint`/`Snapshot` restores **heads only, not the roster** (`materialized_view.rs:108` note) — see I5 cold-restart gap |
-| **I5** | Tier ② is a lazily-rebuildable cache; live reads come from the view | **ABIDES** | `transport/rest/mod.rs:227` `/threads` served **roster-first from `backend.view`** (`overlay_roster` merges view roster onto disk log; view-only threads synthesised instantly); `/fleet`,`/agent` from view. Low-churn inspection reads (`panels.rs:1,4`, memory/todos/tree/…) stay tier-② **by the doc's documented allowance**. | cold-start view **roster** hydration (X850) so a backend restart after oplog compaction doesn't briefly under-report the roster |
+| **I3** | Snapshot = bounded heads + content-addressed bodies | **ABIDES** ✅ | `materialized_view.rs` `AgentView{heads,roster}`; heads populated by `MessageCreated`; `Checkpoint`/`Snapshot` now carry the **roster** too (`cp-wire snapshot.rs` `Snapshot.roster`), restored wholesale on fold (`materialized_view.rs` `apply` Checkpoint `clone_from snapshot.roster`; `cp-oplog replay.rs` `fold_entry` Checkpoint `clone_from roster`) | — |
+| **I5** | Tier ② is a lazily-rebuildable cache; live reads come from the view | **ABIDES** | `transport/rest/mod.rs:227` `/threads` served **roster-first from `backend.view`** (`overlay_roster` merges view roster onto disk log; view-only threads synthesised instantly); `/fleet`,`/agent` from view. Low-churn inspection reads (`panels.rs:1,4`, memory/todos/tree/…) stay tier-② **by the doc's documented allowance**. Cold-restart-after-compaction now bounded: the `Checkpoint` snapshot carries the **roster** (`cp-wire snapshot.rs`), so a backend that restarts after oplog compaction rebuilds the thread list by folding only the newest checkpoint-bearing segment (`replay.rs` `roster_survives_compaction_via_checkpoint`), not from offset 0. | — |
 | **I8** | Command effects, rev, **phase, lifecycle, cost** are oplog appends | **ABIDES** ✅ | `bridge.rs:291/325/338` `ThreadCreated/Archived/Restored`; `:216/230` `PhaseTransition`/`CostAggregate`; `messages.rs:156` `MessageCreated`; **`boot.rs` `Boot::start_in` `Lifecycle::Running` + `Boot::drop` `Lifecycle::Stopping`** — all emitted on apply/lifecycle | — |
 | **I10** | Durable "message created" in oplog; stream `MessageStart` is a hint | **PARTIAL** | durable side ABIDES: `messages.rs` `emit_messages` → `MessageCreated` + I13 body store; frontend `live.ts` `applyThreadDelta` `message_created` appends to the log | the **stream-hint side** (live token paint) is not yet consumed by the frontend (§7 / Phase 7) |
 | **I11** | "Accepted" = durable (journal-then-ack) | **ABIDES** | `cp-mod-bridge/src/command.rs` `handle_frame` (append_durable before ack) | — |
@@ -116,10 +116,22 @@ make abidance 99.9% rather than "the user's features work":
    (token frames tagged `message_id="A2224"` carrying the live streaming text).
    Residual: multi-`tool_use` assistant messages render only their first tool
    card (a cockpit-fidelity nicety, not load-bearing).
-2. **Checkpoint carries the roster (I3/I5, X850/X836b)** — a backend restart
-   *after oplog compaction* rebuilds heads from the checkpoint but not the roster
-   (briefly under-reports threads until the next disk flush / replay). Carry the
-   roster inside `Snapshot`.
+2. **Checkpoint carries the roster (I3/I5, X850/X836b) — DONE ✅** — the
+   `Snapshot` a `Checkpoint` record carries now includes the thread **roster**
+   (`cp-wire snapshot.rs` `Snapshot.roster: Vec<RosterThread>`, `#[serde(default)]`
+   for N-1 tolerance). The writer stamps it into every rolled segment's leading
+   checkpoint (`cp-oplog append.rs` `OplogWriter::snapshot`), agent replay folds
+   + restores it wholesale (`replay.rs` `fold_entry` Checkpoint `clone_from
+   roster`), and the backend `MaterializedView::apply` does the same
+   (`clone_from snapshot.roster`). A single shared `RosterThread` type with
+   `fold_created`/`fold_archived`/`fold_status`/`fold_message` helpers is the
+   single source of truth, so a roster rebuilt by folding live deltas and one
+   restored from a checkpoint are byte-identical. Proven by
+   `replay.rs::roster_survives_compaction_via_checkpoint` (the early thread
+   survives several segment rolls via the checkpoint roster, fast-path == full
+   replay) and `materialized_view_tests.rs::checkpoint_restores_roster_wholesale`.
+   A backend cold-start after oplog compaction no longer under-reports the
+   thread list.
 3. **`Lifecycle` emit (I8, X842) — DONE ✅** — `Boot::start_in` journals a
    durable `Lifecycle::Running` once every advertised resource is up, and
    `Boot::drop` journals `Lifecycle::Stopping` before teardown (the oplog commit

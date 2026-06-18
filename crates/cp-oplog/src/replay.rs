@@ -25,14 +25,14 @@
 //! applies.
 
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
-use cp_wire::types::snapshot::{Heads, SeenSet};
+use cp_wire::types::snapshot::{Heads, RosterThread, SeenSet};
 
 use crate::error::OplogResult;
 use crate::segment;
 use std::path::Path;
 
 /// The recovered state of an oplog: its highest durable `rev` and the bounded
-/// snapshot (heads + seen-set) as of that `rev`.
+/// snapshot (heads + seen-set + roster) as of that `rev`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Recovered {
     /// The highest durable `rev` in the log, or `None` if the log is empty.
@@ -44,14 +44,25 @@ pub struct Recovered {
 
     /// The dedup-tokens of durable command effects as of `rev_head` (I4).
     pub seen: SeenSet,
+
+    /// The thread roster as of `rev_head` — one entry per live thread, folded
+    /// from the thread-roster deltas so the writer can stamp it into each
+    /// segment's leading checkpoint (design doc I5 / §16). The agent does not
+    /// read this for its own recovery (it reloads threads from tier-② state);
+    /// it exists so the **backend** can rebuild the roster from a checkpoint
+    /// after oplog compaction, exactly as it rebuilds heads.
+    pub roster: Vec<RosterThread>,
 }
 
 /// Fold one entry into a running [`Recovered`].
 ///
 /// A `Checkpoint` is **authoritative**: it replaces the running snapshot
-/// wholesale (it is a full snapshot, not a delta). A `MessageCreated` advances
-/// its thread's head. A `CommandEffect` or `SeenMark` marks its dedup token as
-/// seen at this entry's `rev` (I4). The remaining variants carry no recoverable
+/// wholesale (heads, seen-set, and roster — it is a full snapshot, not a
+/// delta). A `MessageCreated` advances its thread's head and bumps that
+/// thread's roster activity. The thread-roster deltas
+/// (`ThreadCreated`/`Archived`/`Restored`/`StatusChanged`) maintain the roster
+/// idempotently. A `CommandEffect` or `SeenMark` marks its dedup token as seen
+/// at this entry's `rev` (I4). The remaining variants carry no recoverable
 /// state and are no-ops here.
 ///
 /// The `rev` is taken from `entry`, so the seen-set records the exact `rev` at
@@ -61,24 +72,40 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
         OpEntryKind::Checkpoint { snapshot } => {
             state.heads.clone_from(&snapshot.heads);
             state.seen.clone_from(&snapshot.seen);
+            state.roster.clone_from(&snapshot.roster);
         }
         OpEntryKind::MessageCreated { thread_id, head, .. } => {
             state.heads.set_thread_head(thread_id, *head);
+            RosterThread::fold_message(&mut state.roster, thread_id, entry.timestamp_ms);
         }
         OpEntryKind::CommandEffect { dedup_token, .. } | OpEntryKind::SeenMark { dedup_token } => {
             state.seen.mark(dedup_token, entry.rev);
         }
-        // Thread-roster mutations are recovered by the agent's tier-② state
-        // load, not by oplog replay (which rebuilds only heads + seen for the
-        // agent's own durability recovery). The *backend* folds these into its
-        // MaterializedView roster; here they carry no heads/seen state.
+        OpEntryKind::ThreadCreated { thread_id, name, status, timestamp_ms } => {
+            RosterThread::fold_created(
+                &mut state.roster,
+                cp_wire::types::snapshot::ThreadCreation {
+                    thread_id,
+                    name,
+                    status: *status,
+                    timestamp_ms: *timestamp_ms,
+                },
+            );
+        }
+        OpEntryKind::ThreadArchived { thread_id } => {
+            RosterThread::fold_archived(&mut state.roster, thread_id, true);
+        }
+        OpEntryKind::ThreadRestored { thread_id } => {
+            RosterThread::fold_archived(&mut state.roster, thread_id, false);
+        }
+        OpEntryKind::ThreadStatusChanged { thread_id, status } => {
+            RosterThread::fold_status(&mut state.roster, thread_id, *status);
+        }
+        // Phase, lifecycle, and cost carry no head/seen/roster state; an
+        // `Unknown` variant from a newer schema is ignored (forward-compat).
         OpEntryKind::PhaseTransition { .. }
         | OpEntryKind::Lifecycle { .. }
         | OpEntryKind::CostAggregate { .. }
-        | OpEntryKind::ThreadCreated { .. }
-        | OpEntryKind::ThreadArchived { .. }
-        | OpEntryKind::ThreadRestored { .. }
-        | OpEntryKind::ThreadStatusChanged { .. }
         | OpEntryKind::Unknown => {}
     }
 }
@@ -121,6 +148,7 @@ fn replay_fast(dir: &Path, indices: &[u64]) -> OplogResult<Option<Recovered>> {
                 rev_head: Some(first.rev),
                 heads: snapshot.heads.clone(),
                 seen: snapshot.seen.clone(),
+                roster: snapshot.roster.clone(),
             };
             for entry in scan.entries.iter().skip(1) {
                 fold_entry(&mut state, entry);
@@ -291,6 +319,61 @@ mod tests {
         assert!(state.seen.contains("tok-a"), "first command's token is seen");
         assert!(state.seen.contains("tok-b"), "second command's token is seen");
         assert_eq!(state.seen.len(), 2, "duplicate delivery added no extra entry");
+    }
+
+    #[test]
+    fn replay_rebuilds_roster_from_thread_deltas() {
+        let dir = tempdir().expect("tempdir");
+        let mut writer = OplogWriter::open(dir.path()).expect("open");
+        let _c = writer
+            .append(OpEntryKind::ThreadCreated {
+                thread_id: "T1".to_owned(),
+                name: "Plan".to_owned(),
+                status: cp_wire::types::ThreadTurn::TheirTurn,
+                timestamp_ms: 100,
+            })
+            .expect("create");
+        let _m = writer.append(msg("T1", 0x01)).expect("message");
+        let _a = writer.append(OpEntryKind::ThreadArchived { thread_id: "T1".to_owned() }).expect("archive");
+
+        let state = replay(dir.path()).expect("replay");
+        assert_eq!(state.roster.len(), 1);
+        let e = state.roster.first().expect("entry");
+        assert_eq!(e.thread_id, "T1");
+        assert_eq!(e.name, "Plan");
+        assert_eq!(e.msg_count, 1, "the message bumped the count");
+        assert!(e.archived, "the archive delta folded");
+    }
+
+    #[test]
+    fn roster_survives_compaction_via_checkpoint() {
+        // The roster, like heads and the seen-set, must be recoverable by
+        // reading only the newest checkpoint-bearing segment after rolls — the
+        // backend's cold-restart-after-compaction guarantee (I5).
+        let dir = tempdir().expect("tempdir");
+        let mut writer = OplogWriter::open_with_segment_limit(dir.path(), 16).expect("open");
+        let _c = writer
+            .append(OpEntryKind::ThreadCreated {
+                thread_id: "T-early".to_owned(),
+                name: "Early".to_owned(),
+                status: cp_wire::types::ThreadTurn::MyTurn,
+                timestamp_ms: 1,
+            })
+            .expect("create");
+        // Force several rolls so the roster is carried only by a checkpoint.
+        for byte in 0..8u8 {
+            let _r = writer.append(msg("T-other", byte)).expect("append");
+        }
+        let indices = segment::indices(dir.path()).expect("indices");
+        assert!(indices.len() > 1, "tiny limit must have rolled");
+
+        let fast = replay(dir.path()).expect("fast");
+        let full = replay_full(dir.path(), &indices).expect("full");
+        assert_eq!(fast, full, "fast path (checkpoint-seeded) equals full replay");
+        assert!(
+            fast.roster.iter().any(|e| e.thread_id == "T-early"),
+            "the early thread survives via the checkpoint roster",
+        );
     }
 
     #[test]
