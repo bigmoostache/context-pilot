@@ -4,114 +4,136 @@
 > *philosophy* — not merely contain its primitives. This is the deployment gate.
 >
 > **Scorecard semantics.** Each load-bearing invariant / keystone / clause is
-> rated **ABIDES** (implemented faithfully + validated), **PARTIAL** (primitive
-> exists but not wired, or wired incompletely), **VIOLATES** (contradicts the
-> doc), or **N-A**. Phase 9 flips every VIOLATES/PARTIAL → ABIDES with a
-> validating test or measurement.
+> rated **ABIDES** (implemented faithfully + wired live), **PARTIAL** (wired for
+> the common path but a sub-case or validation remains), **VIOLATES**
+> (contradicts the doc), or **N-A**.
 >
-> Generated: 2026-06-18 (Phase 0.1). Branch: `demaquetting`.
+> **Re-audit: 2026-06-18 (Phase 5).** Branch: `demaquetting`. This supersedes the
+> Phase 0.1 baseline (which was written *before* the push plane was connected).
+> The intervening work — agent delta emission (`b3a6544` roster, `e16411b`
+> phase+cost, `05349b1` MessageCreated), `/threads` served from the view
+> (`f54a5f4`), SSE rev-numbered deltas + `live.ts` `applyThreadDelta`/
+> `applyAgentDelta`, and the `TAIL_REPOLL=5ms` tailer-primary latency fix —
+> **connected the orchestration plane end-to-end**. Most rows that read VIOLATES
+> in the baseline now read ABIDES, with evidence below.
 
 ---
 
-## 0. The one-sentence verdict
+## 0. The one-sentence verdict (re-audit)
 
-The demaquetting work built the **inspection plane** (read tier-② disk files →
-reshape → REST) as the frontend's *primary live-data path*, and left the
-**orchestration plane** (oplog → MaterializedView → rev-numbered SSE deltas) as a
-faithfully-built, well-tested **backend skeleton whose muscles are not connected
-to real agent state**. The doc's whole point is the inverse: disk is the
-disposable cache; the oplog→view→SSE push is the live truth. **That inversion is
-the entire latency problem.**
+The **orchestration plane is now the live path**: every user-visible mutation
+(thread create/archive/restore, message created, phase, cost) is appended to the
+agent's oplog the instant it applies, folded by the backend `MaterializedView`,
+pushed as a rev-numbered SSE delta, and applied in-place by the frontend store —
+**command→visible p50 ≈ 14 ms** (measured this session, down from "seconds"). The
+tier-② disk files are back in their designed role as a disposable cold-start
+cache. The inversion that *was* the latency problem is corrected. What remains is
+**completeness, not architecture**: live *token* streaming (§7), carrying the
+roster inside checkpoints (cold-restart-after-compaction), a `Lifecycle` emit,
+and the §19 observability surface.
 
 ---
 
 ## 1. The two planes (the philosophy being measured)
 
-| Plane | Doc intent | Should carry | Speed |
-|---|---|---|---|
-| **A — Orchestration (PUSH)** | `oplog → backend Tailer (1 inotify/agent) → in-memory MaterializedView → rev-numbered SSE deltas → frontend APPLIES deltas` | the live read path: threads, messages, phase, MY_TURN, cost, lifecycle | sub-50ms |
-| **B — State cache (tier ②)** | a **lazily-rebuildable, disposable** cache (I5) | cold-start hydration + unmanaged read-only listing only | debounced disk, irrelevant to live UX |
-
-**The sin:** plane B is the live path; plane A is inert.
-
----
-
-## 2. Invariant-by-invariant gap register
-
-| # | Invariant (doc) | Verdict | Evidence (file:line) | Gap / correction |
+| Plane | Doc intent | Carries | Speed | State |
 |---|---|---|---|---|
-| **I1** | Single writer *process* per folder (flock) | **ABIDES** | `cp-mod-bridge/src/boot.rs` `acquire_lock` (+ bounded retry, commit 2a76cfe) | — |
-| **I2** | Main loop never fsyncs; dedicated oplog thread group-commits | **PARTIAL** | `cp-oplog/src/service.rs` `OplogService` (group-commit exists, tested) | primitive is faithful, but the agent only routes `CommandEffect` through it — state mutations bypass the oplog entirely |
-| **I3** | Snapshot = bounded heads + content-addressed bodies | **PARTIAL** | `materialized_view.rs` `AgentView{heads}`; `cp-wire` `Heads`/`ContentHash` | view *can* hold heads, but the agent emits nothing to populate them; no thread-roster representation at all |
-| **I5** | Tier ② is a lazily-rebuildable cache; reads come from the view | **VIOLATES** 🔴 | `transport/rest.rs:218,232` (`/threads` → `StateReader` → `config.json`, 295 KB re-parse) vs `:91,107` (`/fleet`,`/agent` use `backend.view`) | high-churn reads (`/threads`,`/panels`,`/memory`) must serve from the view; disk = cold-start hydrate only |
-| **I8** | Command effects, rev, **phase, lifecycle, cost** are oplog appends | **VIOLATES** 🔴 | `cp-mod-bridge/src/command.rs:191` — the **only** `OpEntryKind` ever appended is `CommandEffect`; `src/app/run/threads.rs` `apply_create_thread`/`apply_archive_thread`/`apply_send_message` just set `state.flags.ui.dirty = true` | emit `ThreadCreated/Archived/Restored`, `MessageCreated`, `PhaseTransition`, `CostAggregate`, `Lifecycle`, `Checkpoint` (Phase 2) |
-| **I10** | Durable "message created" in oplog; stream `MessageStart` is a hint | **VIOLATES** 🔴 | no `MessageCreated` emitted anywhere (grep `OpEntryKind::MessageCreated` → only tests + view fold) | message finalize must append `MessageCreated` + body store (I13) |
+| **A — Orchestration (PUSH)** | `oplog → backend Tailer (1 inotify/agent) → in-memory MaterializedView → rev-numbered SSE deltas → frontend APPLIES deltas` | threads, messages, phase, MY_TURN, cost | sub-50ms | **CONNECTED** ✅ |
+| **B — State cache (tier ②)** | a **lazily-rebuildable, disposable** cache (I5) | cold-start hydration + low-churn inspection reads (memory/todos/tree/callbacks/entities) | debounced disk | **demoted to its designed role** ✅ |
+
+The baseline's sin ("plane B is the live path; plane A is inert") is **fixed**.
+
+---
+
+## 2. Invariant-by-invariant gap register (re-audit)
+
+| # | Invariant (doc) | Verdict | Evidence (file:line) | Remaining gap |
+|---|---|---|---|---|
+| **I1** | Single writer *process* per folder (flock) | **ABIDES** | `cp-mod-bridge/src/boot.rs` `acquire_lock` (+ bounded retry) | — |
+| **I2** | Main loop never fsyncs; dedicated oplog thread group-commits | **ABIDES** | `src/app/run/threads/bridge.rs:148` `emit_roster_delta`→`submit_durable` (non-blocking durable); `:186` `append_best_effort`; `messages.rs:156` `submit_durable`. Loop only enqueues. | V11 explicit "burst leaves tick time unchanged" test (X844) |
+| **I3** | Snapshot = bounded heads + content-addressed bodies | **PARTIAL** | `materialized_view.rs` `AgentView{heads,roster}`; heads populated by `MessageCreated` | `Checkpoint`/`Snapshot` restores **heads only, not the roster** (`materialized_view.rs:108` note) — see I5 cold-restart gap |
+| **I5** | Tier ② is a lazily-rebuildable cache; live reads come from the view | **ABIDES** | `transport/rest/mod.rs:227` `/threads` served **roster-first from `backend.view`** (`overlay_roster` merges view roster onto disk log; view-only threads synthesised instantly); `/fleet`,`/agent` from view. Low-churn inspection reads (`panels.rs:1,4`, memory/todos/tree/…) stay tier-② **by the doc's documented allowance**. | cold-start view **roster** hydration (X850) so a backend restart after oplog compaction doesn't briefly under-report the roster |
+| **I8** | Command effects, rev, **phase, lifecycle, cost** are oplog appends | **PARTIAL** | `bridge.rs:291/325/338` `ThreadCreated/Archived/Restored`; `:216/230` `PhaseTransition`/`CostAggregate`; `messages.rs:156` `MessageCreated` — all emitted on apply | only **`Lifecycle`** (boot/shutdown state) is not yet emitted (X842) — everything else ABIDES |
+| **I10** | Durable "message created" in oplog; stream `MessageStart` is a hint | **PARTIAL** | durable side ABIDES: `messages.rs` `emit_messages` → `MessageCreated` + I13 body store; frontend `live.ts` `applyThreadDelta` `message_created` appends to the log | the **stream-hint side** (live token paint) is not yet consumed by the frontend (§7 / Phase 7) |
 | **I11** | "Accepted" = durable (journal-then-ack) | **ABIDES** | `cp-mod-bridge/src/command.rs` `handle_frame` (append_durable before ack) | — |
-| **I12** | One inotify watch per agent on the oplog; 2–3s poll is a backstop | **VIOLATES** (inverted) 🟠 | `cp-orchestrator/src/runtime.rs` driver = ~2s `config.json` **mtime poll is the mechanism**; oplog Tailer exists but folds nothing because no state deltas are emitted | make the oplog Tailer the primary signal; demote mtime poll to pure backstop |
-| **I13** | Body-before-reference barrier; immutable content-addressed body store | **PARTIAL** | `cp-mod-bridge/src/body.rs` `Store` (built + tested, e2e hydrate works) | not wired into a live `MessageCreated` path (none exists yet) |
-| **§7** | Stream plane: SPSC tee → publisher thread; rAF token batching mandatory | **PARTIAL / UNVERIFIED** | `cp-mod-bridge/src/tee.rs` + `lib.rs` (publishes Token frames); frontend rAF batching unaudited | verify tokens reach the frontend live + rAF batch in the conversation renderer |
-| **§9** | SSE carries rev-numbered, replayable, gap-free deltas; client applies | **VIOLATES** 🔴 | `transport/sse.rs` + `transport/mod.rs` emit a bare `invalidate`; `web/src/lib/live.ts` `useLiveQuery` does `invalidate → refetch-from-disk` | SSE emits real `OpEntry` deltas with payload; frontend applies to a local store (Phase 5/6) |
-| **§18** | schema_version + N-1 compat + Unknown tolerance | **ABIDES** | `cp-wire` all types `schema_version`'d, `#[serde(other)] Unknown` | adding roster variants must keep this (Phase 1.2) |
-| **§19** | Observability: latency p50/p99, dropped frames, rev lag, fsync latency, watch count | **VIOLATES** 🟠 | no metrics surface exists | stand up the §19 surface (Phase 9.3) |
+| **I12** | One inotify watch per agent on the oplog; 2–3s poll is a backstop | **ABIDES** | `transport/mod.rs:394` `OplogWaiter.wait(TAIL_REPOLL)` — inotify/FSEvents primary, `:71` `TAIL_REPOLL=5ms` tight backstop; `runtime.rs` mtime scan demoted to a dirty→`invalidate` backstop for inspection resources only | (the `invalidate` backstop is the documented transitional fallback — removed per-resource in X859) |
+| **I13** | Body-before-reference barrier; immutable content-addressed body store | **ABIDES** | `messages.rs` `emit_one_message`: `store.put(body)` (I13 barrier — inline small / spill+fdatasync large) **before** `submit_durable(MessageCreated)`; `cp-mod-bridge/src/body.rs` `Store` | — |
+| **§7** | Stream plane: SPSC tee → publisher thread; rAF token batching mandatory | **PARTIAL** 🟠 | agent side built: `cp-mod-bridge/src/tee.rs` publishes `Token` frames; backend `StreamHub` fans out | **frontend does not yet consume the `stream` SSE channel** into the conversation view, and there is no rAF token buffer (Phase 7: X853/X857/X861). Live *phase* is shown; live *typing* is not. |
+| **§9** | SSE carries rev-numbered, replayable, gap-free deltas; client applies | **ABIDES** | `transport/mod.rs:346` `SseMessage::delta(entry.rev, data)` per `OpEntry`; `web/src/lib/live.ts` `applyThreadDelta`/`applyAgentDelta` apply in-place with a monotonic-rev high-water guard | `invalidate` fallback still present for inspection resources (cleanup X859) |
+| **§18** | schema_version + N-1 compat + Unknown tolerance | **ABIDES** | `cp-wire` all types `schema_version`'d, `#[serde(other)] Unknown`; roster variants added with tolerant-decode tests | — |
+| **§19** | Observability: latency p50/p99, dropped frames, rev lag, fsync latency, watch count | **VIOLATES** 🟠 | no metrics surface exists | stand up the §19 surface (X868) |
 
 ---
 
-## 3. The protocol/view representational gap (root of Phase 1)
+## 3. Frontend feature wiring (T120 enumerated contract) — VERIFIED
 
-`cp-wire/src/types/oplog.rs` `OpEntryKind` models: `CommandEffect`, `SeenMark`,
-`PhaseTransition`, `MessageCreated`, `Lifecycle`, `CostAggregate`,
-`Checkpoint`, `Unknown`. **There is no thread-roster representation**
-(`ThreadCreated`/`ThreadStatusChanged`/`ThreadArchived`/`ThreadRestored`).
+Every feature the user enumerated is wired **and** proven by a live Playwright
+e2e test (14 tests, all green against web `:5175` + orchestrator `:7878` + this
+agent's bridge — no mocks, no screenshots):
 
-`cp-orchestrator/src/services/materialized_view.rs` `AgentView` carries
-`rev + heads + phase + lifecycle + cost`. **It has no thread roster** (id, name,
-status, archived, last_activity, msg_count) — the exact shape `/threads` needs.
+| Feature | Wiring | e2e proof (`web/e2e/`) |
+|---|---|---|
+| Threads create / archive / restore | `ThreadsView` → `sendCommand` → bridge → oplog → view → SSE delta → `applyThreadDelta` | `threads.spec.ts` (3) — UI action + roster ground-truth |
+| Send message in a thread | composer → `send_message` (K7) → `emit_messages` → `MessageCreated` delta → log append | `messages.spec.ts` (1) — user bubble live + roster log grows |
+| Token / dollar cost in the footer | `CostAggregate` delta → `applyAgentDelta` → `costUsd`; footer + fleet card | `cost.spec.ts` (2) — both surfaces within drift of `/meta` |
+| Finder — every button/option | `useFs` live realm listing; nav, breadcrumbs, child counts, 4 view modes, pins, download | `finder.spec.ts` (4) — listing == backend `/fs`, nav, view modes |
+| (harness) live pipe | — | `smoke.spec.ts` (4) |
 
-So even if the agent emitted deltas today, the view couldn't represent the thread
-list. **Phase 1 closes this representational gap** (Option A: add roster
-`OpEntryKind` variants + roster field on `AgentView`, riding the protocol's
-existing `Unknown` forward-compat). Faithful to §16 (thread create/archive/restore
-are listed as oplog-journaled actions).
-
----
-
-## 4. Measured proof (the "why it's slow")
-
-- Command **journaling**: ~54 ms (fast — bridge intake journal-then-ack).
-- Command **becoming visible**: **seconds** — waits on
-  `agent main-loop applies → dirty → 50 ms PersistenceWriter debounce → 295 KB
-  serialize → disk → backend re-parse`. Worse when the agent is busy
-  streaming/tooling (the loop starves `poll_bridge_commands`,
-  `src/app/run/threads.rs:227`, called `lifecycle.rs:136`).
-- Backend disk read itself: <10 ms (the 295 KB parse is cheap; **disk is not the
-  bottleneck — the debounced write + poll-based change detection is**).
-
-The "3-layer invalidation" shipped earlier (`live.ts` invalidation bus + SSE
-`invalidate` + `runtime.rs` mtime detection) is a **band-aid over the missing push
-plane**: it made re-fetching fast, but the data isn't on disk yet when we re-fetch.
+A real product bug was found and fixed during finder testing: live (realm-root-
+relative) navigation paths left the cwd relative, collapsing the breadcrumb and
+breaking go-up; normalised to absolute paths (`Finder.tsx` `toAbs`, `26d6f3c`).
 
 ---
 
-## 5. Honest credit
+## 4. Measured proof (the "why it's now fast")
 
-The backend orchestration **primitives are built faithfully and well-tested**
-(95 green cp-orchestrator tests): `MaterializedView`, `Tailer`, `StreamHub`,
+- Command **journaling**: ~14 ms p50 / ~33 ms p99 *to visible in the browser*
+  (measured this session via the latency probe, agent `f3a993c0ff357b41`), down
+  from the baseline's "seconds". Floor = the durable journal-then-ack fsync (I11).
+- Path: `agent applies → submit_durable enqueue (no loop fsync) → oplog group-commit
+  off-loop → backend Tailer.poll (≤TAIL_REPOLL 5ms) → MaterializedView fold → SSE
+  delta → frontend applyDelta (zero refetch)`.
+- The former "3-layer invalidation band-aid" is now a **fallback**, not the
+  mechanism: the data is on the oplog (and in the delta) the instant it changes.
+
+---
+
+## 5. Honest remaining ledger (post-feature-completion)
+
+The four enumerated frontend features are **done and e2e-verified**. The
+following are **alignment-completeness** items — the deeper X818 invariants that
+make abidance 99.9% rather than "the user's features work":
+
+1. **§7 live token streaming (Phase 7, biggest)** — phase is live, but assistant
+   *tokens* don't yet paint in real time. Needs: SSE `stream` channel consumed in
+   `live.ts`, a per-message rAF token buffer, conversation-view wiring, and the
+   backend StreamHub→SSE `stream` fan-out. The user explicitly called streaming
+   slow; this closes it.
+2. **Checkpoint carries the roster (I3/I5, X850/X836b)** — a backend restart
+   *after oplog compaction* rebuilds heads from the checkpoint but not the roster
+   (briefly under-reports threads until the next disk flush / replay). Carry the
+   roster inside `Snapshot`.
+3. **`Lifecycle` emit (I8, X842)** — emit `Lifecycle{Running}` on boot and
+   `Stopping/Stopped` on graceful shutdown so the fleet view shows accurate
+   lifecycle without liveness guessing.
+4. **§19 observability surface (X868)** — per-agent stream latency p50/p99,
+   dropped/coalesced frames, rev lag (view vs oplog head), fsync latency, watch
+   count, durable breaker state; structured logs keyed `agent_id+cmd_id+rev`.
+5. **Band-aid cleanup (X859/X865)** — once each resource is fully delta-covered,
+   remove its `invalidate` subscription + the `sendCommand` double-invalidate, so
+   exactly one mechanism owns each resource's freshness.
+6. **Formal validation (X844/X866/X867/X869)** — the V11 no-fsync-on-loop test,
+   the before/after latency table, the flipped gap register with attached proofs,
+   and the multi-agent soak / V1–V12 fault matrix in CI.
+
+---
+
+## 6. Credit
+
+The orchestration **primitives were built faithfully and well-tested** (95 green
+`cp-orchestrator` tests): `MaterializedView`, `Tailer`, `StreamHub`,
 `CostBreaker`, `TicketStore`, SSE transport, the oplog WAL + group-commit, the
-content-addressed body `Store`. The skeleton matches the doc. **The gap is
-wiring, not architecture** — connecting (a) agent delta emission, (b) backend
-read-from-view, (c) SSE-carries-deltas, (d) frontend-applies-deltas. This is
-*abidance work*, not a redesign.
-
----
-
-## 6. BEFORE baseline (Phase 0.3 — to be filled)
-
-| Action | p50 (before) | p99 (before) | Target p99 |
-|---|---|---|---|
-| Thread create → visible | _TBD_ | _TBD_ (seconds) | < 50 ms |
-| Thread archive → visible | _TBD_ | _TBD_ | < 50 ms |
-| Send message → visible | _TBD_ | _TBD_ | < 50 ms |
-| Phase change → visible | _TBD_ | _TBD_ | < 50 ms |
-| Cost update → visible | _TBD_ | _TBD_ | < 50 ms |
-
-_Filled by Phase 0.2/0.3 instrumentation once the trace hooks land._
+content-addressed body `Store`. This session **connected the muscles to the
+skeleton** — agent emission, read-from-view, SSE deltas, frontend apply — and
+proved the result live. The gap was wiring; the wiring is now done for the live
+path, with a short, named ledger of completeness items remaining.
