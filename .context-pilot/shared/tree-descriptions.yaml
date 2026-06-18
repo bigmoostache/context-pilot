@@ -4518,6 +4518,10 @@ b303c82afde350e5:
   path: ui/src/components/shell/ConfigModal.tsx
   description: 'Settings modal (macOS System-Settings style): category rail (General/Model Providers/Search & Embeddings/Document AI/Web & Scraping/Integrations) + detail pane. Surfaces all CP config params — provider keys (Anthropic, Claude Code OAuth, Grok, Groq, DeepSeek, MiniMax), Voyage, Meilisearch status, Datalab, Brave, Firecrawl, GitHub — plus default-model picker + autonomy toggles. Masked keys w/ reveal, Connected/Not-set pills, opt-rise stagger, modal-pop/backdrop-fade motion. Design-only. Opened from TopBar gear.'
   last_edited_ms: 1781520371459
+b312b74011e0e0e8:
+  path: crates/cp-orchestrator/src/runtime.rs
+  description: 'Runtime — env-driven Config (port/agents_dir/budget/scan_interval) + Runtime (shared Backend + config). start_driver() spawns bg driver_loop with TWO decoupled cadences: slow scan_interval (2s default, CP_SCAN_INTERVAL_MS) for registry scan + tier-② config.json mtime backstop + tmp reap; fast TAIL_INTERVAL (100ms) inner loop for tail_all_agents (per-agent Tailer.poll → MaterializedView.apply_batch fold → CostBreaker.observe), so a durable oplog delta reaches the view in ~100ms not ~2s (step toward inotify-primary I12/§8.1). serve() blocks on HTTP transport. 1 test.'
+  last_edited_ms: 1781789414090
 b336c882172fe193:
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups in order: User turn (THEIR_TURN/ACTIVE) FIRST, then Agent''s turn (MY_TURN) — reordered per T28. Sorted by lastActivityMs descending within each group. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
