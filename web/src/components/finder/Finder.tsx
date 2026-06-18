@@ -98,8 +98,15 @@ export function Finder({ agent }: { agent: Agent }) {
   const active = tabs.find((t) => t.id === activeId) ?? tabs[0]
   const cwd = active.cwd
 
-  // Live directory listing for the current working directory
-  const { data: liveChildren } = useFs(agent.id, cwd)
+  // Live directory listing for the current working directory.
+  // The API expects a RELATIVE path (confined_path rejects absolute), so
+  // strip the agent's folder prefix before calling useFs.
+  const relCwd = cwd.startsWith(agent.folder + "/")
+    ? cwd.slice(agent.folder.length + 1)
+    : cwd === agent.folder
+      ? ""
+      : cwd
+  const { data: liveChildren } = useFs(agent.id, relCwd)
   const children = liveChildren ?? []
   const filtered = query
     ? children.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))

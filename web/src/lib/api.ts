@@ -58,31 +58,89 @@ export function fetchPanels(agentId: string): Promise<ContextPanel[]> {
 }
 
 export function fetchMemory(agentId: string): Promise<MemoryCard[]> {
-  return request(`/api/agent/${agentId}/memory`)
+  return request<Record<string, Record<string, unknown>>>(`/api/agent/${agentId}/memory`).then((raw) => {
+    if (Array.isArray(raw)) return raw as unknown as MemoryCard[]
+    return Object.entries(raw).map(([id, m]) => ({
+      id,
+      tldr: (m.tl_dr ?? "") as string,
+      importance: (m.importance ?? "medium") as MemoryCard["importance"],
+      labels: (m.labels ?? []) as string[],
+    }))
+  })
 }
 
 export function fetchTodos(agentId: string): Promise<TodoItem[]> {
-  return request(`/api/agent/${agentId}/todos`)
+  return request<Record<string, unknown>>(`/api/agent/${agentId}/todos`).then((raw) => {
+    if (Array.isArray(raw)) return raw as TodoItem[]
+    const todos = (raw.todos ?? []) as Array<Record<string, unknown>>
+    return todos.map((t) => ({
+      id: t.id as string,
+      name: t.name as string,
+      status: (t.status ?? "pending") as TodoItem["status"],
+      depth: (t.depth as number) ?? 0,
+    }))
+  })
 }
 
 export function fetchSpine(agentId: string): Promise<SpineNotif[]> {
-  return request(`/api/agent/${agentId}/spine`)
+  return request<Record<string, unknown>>(`/api/agent/${agentId}/spine`).then((raw) => {
+    if (Array.isArray(raw)) return raw as SpineNotif[]
+    const notifs = (raw.notifications ?? []) as Array<Record<string, unknown>>
+    return notifs.map((n) => ({
+      id: n.id as string,
+      kind: (n.notification_type ?? "custom") as SpineNotif["kind"],
+      time: n.timestamp_ms ? new Date(n.timestamp_ms as number).toISOString() : "",
+      text: (n.content ?? "") as string,
+      processed: n.status === "processed",
+    }))
+  })
 }
 
 export function fetchQueue(agentId: string): Promise<QueueAction[]> {
-  return request(`/api/agent/${agentId}/queue`)
+  return request<Record<string, unknown>>(`/api/agent/${agentId}/queue`).then((raw) => {
+    if (Array.isArray(raw)) return raw as QueueAction[]
+    return (raw.queued_calls ?? []) as QueueAction[]
+  })
 }
 
 export function fetchScratchpad(agentId: string): Promise<ScratchCell[]> {
-  return request(`/api/agent/${agentId}/scratchpad`)
+  return request<Record<string, unknown>>(`/api/agent/${agentId}/scratchpad`).then((raw) => {
+    if (Array.isArray(raw)) return raw as ScratchCell[]
+    const cells = (raw.scratchpad_cells ?? []) as Array<Record<string, unknown>>
+    return cells.map((c) => ({
+      id: (c.id ?? "") as string,
+      title: (c.title ?? "") as string,
+      preview: ((c.content ?? "") as string).slice(0, 200),
+    }))
+  })
 }
 
 export function fetchTree(agentId: string): Promise<TreeRow[]> {
-  return request(`/api/agent/${agentId}/tree`)
+  return request<Record<string, Record<string, unknown>>>(`/api/agent/${agentId}/tree`).then((raw) => {
+    if (Array.isArray(raw)) return raw as unknown as TreeRow[]
+    return Object.values(raw).map((t) => ({
+      depth: 0,
+      name: ((t.path as string) ?? "").split("/").pop() ?? "",
+      kind: "file" as const,
+      desc: (t.description ?? "") as string,
+      changed: !!t.changed,
+    }))
+  })
 }
 
 export function fetchCallbacks(agentId: string): Promise<CallbackRow[]> {
-  return request(`/api/agent/${agentId}/callbacks`)
+  return request<Record<string, Record<string, unknown>>>(`/api/agent/${agentId}/callbacks`).then((raw) => {
+    if (Array.isArray(raw)) return raw as unknown as CallbackRow[]
+    return Object.entries(raw).map(([id, c]) => ({
+      id,
+      name: (c.name ?? id) as string,
+      pattern: (c.pattern ?? "") as string,
+      blocking: !!c.blocking,
+      timeout: c.timeout ? `${c.timeout}s` : "",
+      scope: c.is_global ? "global" : "local",
+      cwd: (c.cwd ?? "") as string,
+    }))
+  })
 }
 
 export function fetchTools(agentId: string): Promise<ToolGroup[]> {
