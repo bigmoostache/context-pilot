@@ -5486,6 +5486,10 @@ c83e02c82f575734:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+c84cb8628be87568:
+  path: web/src/lib/live.ts
+  description: 'Live data hooks: useLiveQuery (fetch + SSE delta apply-in-place + poll backstop). applyThreadDelta/applyAgentDelta = push-plane reducers (thread roster + phase/cost vitals, monotonic-rev high-water guard). useThreads/useAgentMeta ride deltas; inspection hooks (memory/todos/tree/…) ride the backend `invalidate` SSE event → debounced refetch; useMetrics rides a brisk 4s poll (METRICS_POLL_MS — health vitals aren''t delta-covered). useStreamingTokens = §7 rAF-batched live token buffer keyed by message_id. Single-mechanism freshness (X865): the dead invalidateAgent in-process bus was REMOVED (no caller after T123); sendCommand deliberately does NOT invalidate (push plane is sole freshness).'
+  last_edited_ms: 1781819664308
 c86dc838c1db1edf:
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1, binds tee.sock + spawns Tee publisher, creates Intake from oplog replay, sets command listener non-blocking. on_stream_chunk publishes Token frames, on_stream_stop publishes PhaseHint(Idle). BridgeState{boot,tee,intake,tee_seq} in TypeMap. setup_tee + publish_frame helpers. is_global=true, no tools/panels.'

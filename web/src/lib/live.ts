@@ -219,39 +219,22 @@ function applyAgentDelta(prev: Agent | undefined, entry: OpEntry): Agent | null 
   }
 }
 
-// ── Invalidation bus ──────────────────────────────────────────────────
+// ── Freshness model (single-mechanism discipline — design doc §8.5 / X865) ─
 //
-// Structural solution for real-time state propagation. When agent state
-// changes (command sent, TUI mutation, SSE delta), `invalidateAgent(id)`
-// fires and every live hook for that agent immediately refetches from
-// the server. NOT optimistic updating — the refetch returns the server's
-// ground truth from the inspection plane (tier-② files).
-
-type InvalidateFn = () => void
-const invalidators = new Map<string, Set<InvalidateFn>>()
-
-function registerInvalidator(agentId: string, fn: InvalidateFn): () => void {
-  let set = invalidators.get(agentId)
-  if (!set) { set = new Set(); invalidators.set(agentId, set) }
-  set.add(fn)
-  return () => { set!.delete(fn); if (set!.size === 0) invalidators.delete(agentId) }
-}
-
-/**
- * Force all live queries for an agent to refetch immediately.
- * Also invalidates fleet queries (agent status/thread counts may change).
- *
- * This is the **single entry point** for state invalidation — called by:
- * - `sendCommand()` after a command is accepted (web-initiated mutations)
- * - SSE `invalidate` events from the backend (TUI-initiated mutations)
- * - Manual `refetch()` from any hook consumer
- */
-export function invalidateAgent(agentId: string) {
-  invalidators.get(agentId)?.forEach((fn) => fn())
-  // Fleet hooks register with key "" — always invalidate them too
-  // (agent status, thread counts, cost may have changed)
-  if (agentId !== "") invalidators.get("")?.forEach((fn) => fn())
-}
+// Each resource has exactly ONE owner of its freshness:
+//   • Delta-covered resources (threads, agent phase/cost) ride the push plane —
+//     SSE `delta` events APPLIED in-place by a reducer (`applyThreadDelta` /
+//     `applyAgentDelta`), zero refetch.
+//   • Inspection resources (memory, todos, tree, callbacks, entities, …) have
+//     no oplog delta to fold, so they ride the backend's `invalidate` SSE event
+//     (emitted by the tier-② mtime backstop) → a debounced refetch.
+//   • The 5 s poll is a last-resort safety net for both.
+//
+// A prior `invalidateAgent` bus (an in-process pub/sub that force-refetched
+// every hook on any mutation) was REMOVED here: nothing called it after the
+// `sendCommand` double-invalidate was cut (T123), and a bus that refetches the
+// tier-② disk cache *fought* the push-plane delta it raced. One mechanism per
+// resource, no two ever fighting.
 
 // ── Generic live query ────────────────────────────────────────────────
 
@@ -376,13 +359,6 @@ function useLiveQuery<T>(
     })
     const unsubInvalidate = client.subscribe("invalidate", () => debouncedRefetch())
     return () => { unsubDelta(); unsubInvalidate() }
-  }, [agentId, debouncedRefetch, enabled])
-
-  // Invalidation bus — `invalidateAgent(id)` triggers immediate refetch
-  useEffect(() => {
-    if (!enabled) return
-    const effectiveId = agentId ?? ""
-    return registerInvalidator(effectiveId, debouncedRefetch)
   }, [agentId, debouncedRefetch, enabled])
 
   // Poll backstop
@@ -613,7 +589,7 @@ export { downloadFile } from "./api"
  * `CreateThread`/`ArchiveThread`/`RestoreThread` → the matching roster delta),
  * which arrives over SSE in ~14 ms and is applied in-place by
  * `applyThreadDelta`/`applyAgentDelta` (zero refetch). The old
- * immediate-plus-300ms `invalidateAgent` pair *fought* that delta: it refetched
+ * immediate-plus-300ms refetch pair *fought* that delta: it refetched
  * `/threads` from the tier-② disk cache before the agent's debounced flush had
  * landed, so the stale snapshot clobbered the freshly-applied delta and the
  * just-sent message visibly flickered out then back in (T123).
