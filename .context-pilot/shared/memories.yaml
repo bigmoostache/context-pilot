@@ -233,7 +233,7 @@ efe78c079599d3d0:
   importance: critical
   last_edited_ms: 0
 f5d97b1e7a01c317:
-  tl_dr: LATENCY EPIC (T18/X818) — threads (194bab0) + phase/cost (e16411b) + MESSAGES (this commit, Phase 2.2 X839) SHIPPED. command→visible 349ms→14ms p50. Plan + remaining in contents.
+  tl_dr: 'LATENCY EPIC (T18/X818): threads+phase/cost+messages SHIPPED (command→visible 349ms→14ms p50). T114 breaker-exemption FIXED (b0b2df3). T115 = same cause on send_message (correct 503) + friendly web error toast. Details in contents.'
   contents: |-
     ## DONE
     Threads proving ground: command→visible p50=14.3ms p99=32.6ms (was 349ms/'seconds'). Floor = durable journal-then-ack fsync (I11).
@@ -262,7 +262,7 @@ f5d97b1e7a01c317:
   - architecture
   - demaquetting
   - active
-  last_edited_ms: 1781796530218
+  last_edited_ms: 1781807753056
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium
