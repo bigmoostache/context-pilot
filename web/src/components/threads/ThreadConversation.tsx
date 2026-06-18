@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
 import { QuestionForm } from "./QuestionForm"
@@ -31,6 +32,15 @@ export function ThreadConversation({
   thread: ThreadDetail
   onSend?: (text: string) => void
 }) {
+  // Pin the conversation to the latest message: scroll to the bottom whenever
+  // a thread is opened (id change) or a new message lands (log grows), so the
+  // freshest exchange is always in view — matching the TUI, which keeps the
+  // conversation pinned to the bottom.
+  const bottomRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "end" })
+  }, [thread.id, thread.log.length])
+
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-background">
       {/* messages */}
@@ -61,11 +71,13 @@ export function ThreadConversation({
               )}
             </div>
           ))}
+          {/* scroll anchor — keeps the latest message in view */}
+          <div ref={bottomRef} />
         </div>
       </ScrollArea>
 
       <div className="mx-auto w-full max-w-[720px]">
-        <ThreadComposer status={thread.status} onSend={onSend} />
+        <ThreadComposer key={thread.id} status={thread.status} onSend={onSend} />
       </div>
     </main>
   )

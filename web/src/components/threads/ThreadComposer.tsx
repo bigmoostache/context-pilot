@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ArrowUp, Paperclip, Loader2 } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 
@@ -20,6 +20,21 @@ export function ThreadComposer({
   const [text, setText] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  /**
+   * Grow the textarea to fit its content, just like the TUI input area which
+   * expands line-by-line as you type. Driven by JS (measure `scrollHeight`)
+   * rather than the experimental `field-sizing` CSS so it works in every
+   * browser. Capped at `MAX_H` px, beyond which it scrolls internally.
+   */
+  const MAX_H = 200
+  const autoResize = () => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${Math.min(el.scrollHeight, MAX_H)}px`
+  }
+  useEffect(autoResize, [text])
+
   const isWorking = status === "MY_TURN" || status === "ACTIVE"
   const isActive = status === "ACTIVE"
 
@@ -29,7 +44,13 @@ export function ThreadComposer({
     if (!canSend || !onSend) return
     onSend(text)
     setText("")
-    textareaRef.current?.focus()
+    // Collapse back to a single row after sending (matches the TUI clearing
+    // its input), then refocus for the next message.
+    requestAnimationFrame(() => {
+      const el = textareaRef.current
+      if (el) el.style.height = "auto"
+      el?.focus()
+    })
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -60,13 +81,13 @@ export function ThreadComposer({
         </button>
         <textarea
           ref={textareaRef}
+          autoFocus
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Reply to this thread…"
           rows={1}
           className="max-h-[200px] min-h-[24px] flex-1 resize-none bg-transparent text-[13.5px] leading-relaxed text-foreground/90 placeholder:text-muted-foreground/60 outline-none"
-          style={{ fieldSizing: "content" } as React.CSSProperties}
         />
         <button
           onClick={handleSubmit}
