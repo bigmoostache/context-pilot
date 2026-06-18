@@ -225,42 +225,70 @@ use std::time::Duration;
 /// finish reading.  A wedged commander is dropped after this window.
 const READ_TIMEOUT: Duration = Duration::from_millis(500);
 
-/// Poll the bridge listener for an inbound command connection and apply any
-/// accepted commands.
+/// Whether the orchestration bridge is active (booted) for this agent.
 ///
-/// Safe to call every tick: returns immediately when the bridge is OFF, the
-/// listener is absent, or no connection is pending.
+/// Cheap `TypeMap` lookup used by the main loop to decide its idle poll
+/// cadence: when a web UI is connected through the bridge, the loop services
+/// the command socket every couple of ms so a web command applies in single-
+/// digit ms; otherwise it idles slowly to save CPU.
+pub(super) fn bridge_active(state: &cp_base::state::runtime::State) -> bool {
+    state.get_ext::<BridgeState>().is_some_and(|bs| bs.boot.is_some())
+}
+
+/// Poll the bridge listener for inbound command connections and apply every
+/// accepted command.
+///
+/// Drains **all** currently-pending connections each tick (bounded by
+/// [`DRAIN_BUDGET`]) rather than one per loop iteration, so a burst of web
+/// commands applies in the same tick instead of trickling in one-per-tick
+/// (design doc Phase 3.1). Safe to call every tick: returns immediately when
+/// the bridge is OFF, the listener is absent, or no connection is pending.
 pub(super) fn poll_bridge_commands(app: &mut App) {
-    let commands = accept_commands(&mut app.state);
-    for cmd in commands {
-        apply_command(app, cmd);
+    let mut budget = DRAIN_BUDGET;
+    while budget > 0 {
+        budget = budget.saturating_sub(1);
+        let Some(commands) = accept_commands(&mut app.state) else {
+            break; // no pending connection — done draining this tick.
+        };
+        for cmd in commands {
+            apply_command(app, cmd);
+        }
     }
 }
 
-/// Try to accept one connection and process it through the command intake.
+/// Upper bound on connections drained per tick — guards the drain loop against
+/// a misbehaving flood while still clearing any realistic command burst.
+const DRAIN_BUDGET: u32 = 64;
+
+/// Try to accept one pending connection and process it through the command
+/// intake.
 ///
-/// Returns the (possibly empty) list of freshly-accepted [`Command`]s.
-fn accept_commands(state: &mut cp_base::state::runtime::State) -> Vec<Command> {
+/// Returns `None` when no connection is pending (the bridge is OFF, the
+/// listener is absent, or `accept` would block) — the signal to stop draining.
+/// Returns `Some(cmds)` when a connection was handled, even if it yielded no
+/// accepted commands (an errored connection still counts, so draining
+/// continues to the next pending one).
+fn accept_commands(state: &mut cp_base::state::runtime::State) -> Option<Vec<Command>> {
     let bs = state.ext_mut::<BridgeState>();
 
     // Split borrows: &boot (for listener + oplog) and &mut intake.
     let (Some(boot), Some(intake)) = (&bs.boot, &mut bs.intake) else {
-        return Vec::new();
+        return None;
     };
 
-    // Non-blocking accept — returns WouldBlock when no connection is pending.
+    // Non-blocking accept — WouldBlock means no connection is pending.
     let Ok((mut stream, _addr)) = boot.listener().accept() else {
-        return Vec::new();
+        return None;
     };
 
     // Bound how long we wait for the commander to finish writing.
     let _ignored = stream.set_read_timeout(Some(READ_TIMEOUT));
 
     match intake.handle_connection(boot.oplog(), &mut stream) {
-        Ok(cmds) => cmds,
+        Ok(cmds) => Some(cmds),
         Err(e) => {
             log::error!("bridge: command intake error: {e:?}");
-            Vec::new()
+            Some(Vec::new())
         }
     }
 }

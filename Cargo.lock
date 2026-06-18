@@ -524,6 +524,7 @@ dependencies = [
  "cp-oplog",
  "cp-wire",
  "nix 0.30.1",
+ "notify",
  "serde",
  "serde_json",
  "serde_yaml",

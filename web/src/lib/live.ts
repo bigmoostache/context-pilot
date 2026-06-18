@@ -29,6 +29,104 @@ import type {
   FinderNode,
 } from "./types"
 
+// ── Oplog delta shape (the push plane payload) ────────────────────────
+//
+// One rev-numbered oplog entry as carried by an SSE `delta` event. Mirrors
+// cp-wire `OpEntry` — an internally-tagged `kind` discriminant plus rev. We
+// only need a structural subset here (the thread-roster + message kinds);
+// every other kind is acknowledged and ignored by the reducers below.
+
+interface OpEntry {
+  rev: number
+  timestamp_ms?: number
+  kind: OpEntryKind
+}
+
+interface OpEntryKind {
+  kind: string
+  thread_id?: string
+  name?: string
+  /** ThreadTurn — snake_case "my_turn" / "their_turn". */
+  status?: string
+  timestamp_ms?: number
+}
+
+/** Map a wire ThreadTurn to the web ThreadStatus (MY_TURN = agent's turn). */
+function turnToStatus(turn: string | undefined): ThreadDetail["status"] {
+  return turn === "my_turn" ? "MY_TURN" : "THEIR_TURN"
+}
+
+/** Compact relative-time label (mirrors api.ts formatAge for synthesized rows). */
+function ago(epochMs: number): string {
+  const s = Math.max(0, Math.floor((Date.now() - epochMs) / 1000))
+  if (s < 5) return "just now"
+  if (s < 60) return `${s}s ago`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
+
+/**
+ * Apply one oplog `delta` to the live thread list (Leg 2 / push plane). Returns
+ * a NEW list when the delta mutates the roster, the SAME list reference when the
+ * delta is irrelevant to threads (cost/phase/etc. — no refetch), or `null` when
+ * it can't be applied confidently (unknown id) so the caller refetches.
+ */
+function applyThreadDelta(
+  prev: ThreadDetail[] | undefined,
+  entry: OpEntry,
+): ThreadDetail[] | null {
+  if (!prev) return null // not loaded yet → cold refetch
+  const k = entry.kind
+  switch (k.kind) {
+    case "thread_created": {
+      if (!k.thread_id) return prev
+      if (prev.some((t) => t.id === k.thread_id)) return prev // already present (idempotent)
+      const ts = k.timestamp_ms ?? entry.timestamp_ms ?? Date.now()
+      const created: ThreadDetail = {
+        id: k.thread_id,
+        name: k.name ?? "Untitled thread",
+        status: turnToStatus(k.status),
+        agentId: "",
+        agent: "",
+        createdAt: new Date(ts).toISOString(),
+        lastActivity: ago(ts),
+        lastActivityMs: ts,
+        unread: 0,
+        archived: false,
+        focused: false,
+        log: [],
+      }
+      return [created, ...prev]
+    }
+    case "thread_archived":
+    case "thread_restored": {
+      const archived = k.kind === "thread_archived"
+      if (!prev.some((t) => t.id === k.thread_id)) return null
+      return prev.map((t) => (t.id === k.thread_id ? { ...t, archived } : t))
+    }
+    case "thread_status_changed": {
+      if (!prev.some((t) => t.id === k.thread_id)) return null
+      return prev.map((t) =>
+        t.id === k.thread_id ? { ...t, status: turnToStatus(k.status) } : t,
+      )
+    }
+    case "message_created": {
+      if (!prev.some((t) => t.id === k.thread_id)) return null
+      const ts = entry.timestamp_ms ?? Date.now()
+      return prev.map((t) =>
+        t.id === k.thread_id
+          ? { ...t, lastActivityMs: ts, lastActivity: ago(ts) }
+          : t,
+      )
+    }
+    default:
+      return prev // phase / cost / lifecycle / command_effect → irrelevant to threads
+  }
+}
+
 // ── Invalidation bus ──────────────────────────────────────────────────
 //
 // Structural solution for real-time state propagation. When agent state
@@ -83,6 +181,15 @@ const DEBOUNCE_MS = 200
  * @param agentId  If provided, subscribe to SSE deltas for this agent.
  * @param pollMs   Poll interval in ms (0 to disable).
  * @param enabled  When false, skip fetching/polling/SSE (default true).
+ * @param applyDelta  Optional reducer that APPLIES an oplog `delta` to the
+ *   current data in-place (the push plane — design doc §9 / Leg 2). It receives
+ *   the previous data and the decoded `OpEntry`, and returns:
+ *     - a **new value** → applied immediately (zero refetch, zero debounce);
+ *     - the **same reference** (prev) → delta acknowledged but irrelevant to
+ *       this resource (e.g. a cost delta reaching the threads hook) — no work;
+ *     - **null/undefined** → "can't apply, fall back to a refetch" (e.g. an
+ *       archive for an id we don't have yet, or data not loaded).
+ *   When omitted, every `delta` falls back to a debounced refetch (legacy).
  */
 function useLiveQuery<T>(
   key: string,
@@ -90,12 +197,23 @@ function useLiveQuery<T>(
   agentId?: string,
   pollMs = DEFAULT_POLL_MS,
   enabled = true,
+  applyDelta?: (prev: T | undefined, entry: OpEntry) => T | null | undefined,
 ): LiveQueryResult<T> {
   const [data, setData] = useState<T | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const mountedRef = useRef(true)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Highest oplog rev already applied — guards against double-applying a delta
+  // on SSE reconnect-replay (delivery is rev-ordered, so a simple high-water
+  // mark is sufficient; design doc §6.1 monotonic-rev guard).
+  const lastRevRef = useRef(-1)
+  // Keep the latest data in a ref so the SSE delta handler can read the current
+  // value without re-subscribing on every data change.
+  const dataRef = useRef<T | undefined>(undefined)
+  dataRef.current = data
+  const applyDeltaRef = useRef(applyDelta)
+  applyDeltaRef.current = applyDelta
 
   const doFetch = useCallback(() => {
     fetcher()
@@ -129,6 +247,7 @@ function useLiveQuery<T>(
     setLoading(true)
     setError(null)
     setData(undefined)
+    lastRevRef.current = -1
     if (enabled) doFetch()
     return () => {
       mountedRef.current = false
@@ -136,11 +255,33 @@ function useLiveQuery<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, enabled])
 
-  // SSE subscription — delta events AND invalidate events both trigger refetch
+  // SSE subscription — `delta` events APPLY in-place when a reducer is given
+  // (the push plane), otherwise fall back to a debounced refetch. `invalidate`
+  // events always refetch (transitional safety net until every resource is
+  // fully delta-covered — design doc Phase 8.5).
   useEffect(() => {
     if (!agentId || !enabled) return
     const client = getOrCreateSseClient(agentId)
-    const unsubDelta = client.subscribe("delta", () => debouncedRefetch())
+    const unsubDelta = client.subscribe("delta", (event) => {
+      const reducer = applyDeltaRef.current
+      if (!reducer) return debouncedRefetch()
+      let entry: OpEntry
+      try {
+        entry = JSON.parse(event.data) as OpEntry
+      } catch {
+        return debouncedRefetch()
+      }
+      // Rev-ordered delivery → high-water guard drops only true replay dupes.
+      if (typeof entry.rev === "number" && entry.rev <= lastRevRef.current) return
+      const next = reducer(dataRef.current, entry)
+      if (next === null || next === undefined) {
+        // Reducer can't apply (e.g. unknown id, or not loaded) → ground-truth refetch.
+        return debouncedRefetch()
+      }
+      if (typeof entry.rev === "number") lastRevRef.current = entry.rev
+      // Same reference = acknowledged-but-irrelevant → no state churn.
+      if (next !== dataRef.current && mountedRef.current) setData(next)
+    })
     const unsubInvalidate = client.subscribe("invalidate", () => debouncedRefetch())
     return () => { unsubDelta(); unsubInvalidate() }
   }, [agentId, debouncedRefetch, enabled])
@@ -178,7 +319,9 @@ export function useAgentMeta(agentId: string): LiveQueryResult<Agent> {
 
 export function useThreads(agentId: string): LiveQueryResult<ThreadDetail[]> {
   const fetcher = useCallback(() => api.fetchThreads(agentId), [agentId])
-  return useLiveQuery(`threads:${agentId}`, fetcher, agentId, DEFAULT_POLL_MS, !!agentId)
+  // Push plane: apply thread-roster deltas in-place (sub-50ms, zero refetch);
+  // anything the reducer can't apply falls back to a refetch from the view.
+  return useLiveQuery(`threads:${agentId}`, fetcher, agentId, DEFAULT_POLL_MS, !!agentId, applyThreadDelta)
 }
 
 export function usePanels(agentId: string): LiveQueryResult<ContextPanel[]> {

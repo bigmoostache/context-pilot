@@ -20,8 +20,79 @@
 //! supplies the wire encoding ([`SseMessage::encode`]), the blocking reader
 //! ([`SseBody`]), and the channel that joins them ([`channel`]).
 
-use std::io::{self, Read};
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::io::{self, Read, Write};
+use std::path::Path;
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::time::Duration;
+
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use tiny_http::Request;
+
+/// Blocks an SSE producer until its agent's oplog changes — the event-driven
+/// replacement for a fixed poll sleep (design doc I12: the inotify watch is the
+/// primary change signal, a timer is only a backstop).
+///
+/// A [`RecommendedWatcher`] (kqueue on macOS, inotify on Linux) watches the
+/// agent's oplog directory; every filesystem event is coalesced into a single
+/// "something changed" wakeup delivered over an internal channel. [`wait`] parks
+/// the producer thread on that channel until either an event arrives (typically
+/// 1–5 ms after the agent's append) or a backstop timeout elapses — so a delta
+/// reaches the browser in single-digit milliseconds rather than one poll period.
+///
+/// [`wait`]: OplogWaiter::wait
+pub struct OplogWaiter {
+    /// Receives a unit token per coalesced filesystem-event batch.
+    rx: Receiver<()>,
+    /// The live watcher; dropping it unregisters the OS watch.
+    _watcher: RecommendedWatcher,
+}
+
+impl std::fmt::Debug for OplogWaiter {
+    /// Hand-written because [`RecommendedWatcher`] is not `Debug`; the watcher
+    /// holds only an OS handle with no useful printable state.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OplogWaiter").finish_non_exhaustive()
+    }
+}
+
+impl OplogWaiter {
+    /// Watch `oplog_dir` for changes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the OS watch cannot be established (e.g. the
+    /// directory does not exist or the per-process watch limit is exhausted),
+    /// letting the caller fall back to a pure poll loop.
+    pub fn new(oplog_dir: &Path) -> notify::Result<Self> {
+        let (tx, rx) = mpsc::channel();
+        let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+            // Any event (create/modify/append) is just a wakeup; the caller
+            // re-polls the oplog tail to read whatever actually changed. A
+            // closed receiver (producer gone) makes the send fail harmlessly.
+            if res.is_ok() {
+                let _sent = tx.send(());
+            }
+        })?;
+        watcher.watch(oplog_dir, RecursiveMode::NonRecursive)?;
+        Ok(Self { rx, _watcher: watcher })
+    }
+
+    /// Park until the oplog changes or `timeout` elapses, then drain any
+    /// burst of coalesced events so the next call blocks afresh.
+    ///
+    /// Returns regardless of cause: the caller re-polls its tailer either way,
+    /// so a spurious wakeup is harmless and a missed event is caught by the
+    /// next timeout (the backstop).
+    pub fn wait(&self, timeout: Duration) {
+        match self.rx.recv_timeout(timeout) {
+            Ok(()) | Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => return,
+        }
+        // Coalesce a burst: drain everything already queued so one wakeup
+        // serves the whole batch the next tail-poll will read.
+        while self.rx.try_recv().is_ok() {}
+    }
+}
 
 /// One Server-Sent Event: an optional `rev` id, an event name, and a data
 /// payload (typically a single line of JSON).
@@ -185,6 +256,48 @@ impl SseSink {
 pub fn channel() -> (SseSink, SseBody) {
     let (tx, rx) = mpsc::channel();
     (SseSink { tx }, SseBody::new(rx))
+}
+
+/// Stream an SSE body to the client, flushing **after every event**.
+///
+/// tiny_http's `Response`/`respond` path copies the whole body through a 1 KiB
+/// `BufWriter` and only flushes when that buffer fills or the response *ends* —
+/// fatal for an unbounded event stream, where small events would sit unsent in
+/// the buffer forever. So we take the raw connection writer, emit the status
+/// line and SSE headers ourselves, then copy each chunk the producer yields and
+/// **flush immediately**, so every event reaches the browser the instant it is
+/// produced. The loop ends when the producer finishes (EOF) or the client
+/// disconnects (a write error), at which point dropping `body` signals the
+/// producer thread to stop.
+pub fn stream_to_client(request: Request, mut body: SseBody) {
+    let mut writer = request.into_writer();
+    let preamble = concat!(
+        "HTTP/1.1 200 OK\r\n",
+        "Content-Type: text/event-stream\r\n",
+        "Cache-Control: no-cache\r\n",
+        "Connection: keep-alive\r\n",
+        "Access-Control-Allow-Origin: *\r\n",
+        "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n",
+        "Access-Control-Allow-Headers: Content-Type, Last-Event-ID\r\n",
+        "\r\n",
+    );
+    if writer.write_all(preamble.as_bytes()).and_then(|()| writer.flush()).is_err() {
+        return;
+    }
+
+    let mut buf = [0u8; 4096];
+    loop {
+        match body.read(&mut buf) {
+            Ok(0) => break, // producer finished — clean end of stream.
+            Ok(n) => {
+                let Some(chunk) = buf.get(..n) else { break };
+                if writer.write_all(chunk).and_then(|()| writer.flush()).is_err() {
+                    break; // client disconnected.
+                }
+            }
+            Err(_) => break,
+        }
+    }
 }
 
 #[cfg(test)]

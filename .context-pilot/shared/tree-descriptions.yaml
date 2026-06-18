@@ -1126,6 +1126,10 @@
   path: crates/cp-mod-typst/src/tools_execute.rs
   description: Typst tool. flame!("typst_exec"). Unified gateway for compile/init/fonts/query/update/watch/unwatch/watchlist. Entry type creation for font/query results.
   last_edited_ms: 0
+2b82353c4b32a9ac:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop with flame!("loop"). Input-first (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. poll_bridge_commands runs every tick. X18 LATENCY: adaptive idle poll — 8ms streaming/dirty, 2ms when bridge_active (web UI connected, keeps command→apply latency ≤ a few ms), 50ms otherwise. Ownership checks. Render ~28fps. Thread helpers in run/threads.rs.'
+  last_edited_ms: 1781793072106
 2b9114b337b0e896:
   path: src/ui/ir/render_sidebar.rs
   description: 'Sidebar ratatui renderer — render_sidebar_from_ir(). Normal mode: token bar box, fixed/dynamic entries with pagination, PR card, token stats. Collapsed mode: icon strip. Entry rendering: indicator+icon+shortcut+label+tokens. Token color gradient (grey→red).'
@@ -1414,6 +1418,10 @@
   path: crates/cp-wire/src/types/mod.rs
   description: ContentHash (SHA-256, custom hex serde, Copy), Phase (Idle/Streaming/Tooling), LifecycleState (Starting/Running/Stopping/Stopped). Re-exports all submodule types.
   last_edited_ms: 1781616040201
+3782de87616f8620:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Phase 19/30 + P1-P7: transport hub. Backend shared state + serve/serve_bound + route_rest (22 routes) + handle_stream SSE. CORS headers on all responses + OPTIONS preflight 204. /api/health. stream_to_client uses into_writer() + per-event flush. Invalidation: dirty_agents set, mark_dirty/take_dirty for SSE invalidate events.'
+  last_edited_ms: 0
 37c090f619a600a6:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -1506,6 +1514,10 @@
   path: yamls/tools/firecrawl.yaml
   description: 'Firecrawl tools YAML. 4 tools: firecrawl_scrape (single URL), firecrawl_search (search+scrape), firecrawl_map (URL discovery), firecrawl_crawl (recursive crawl to file).'
   last_edited_ms: 1780560886866
+3a64a36115de0521:
+  path: crates/cp-orchestrator/src/transport/sse.rs
+  description: 'SSE plumbing. SseMessage{id:Option<rev>,event,data}.encode()→id:/event:/data: lines. delta(rev)/stream/resync/invalidate constructors. SseBody: blocking Read fed by mpsc, Ok(0) EOF when senders dropped. SseSink.send/keep_alive (Err=client gone). channel() pairs them. OplogWaiter (X18 latency): notify RecommendedWatcher (kqueue/inotify) on oplog dir, wait(timeout) parks on mpsc coalescing bursts — wakes the SSE producer the instant the agent appends (sub-ms Linux). Manual Debug impl (RecommendedWatcher not Debug). stream_to_client: raw into_writer() + per-event flush (tiny_http BufWriter would never flush an unbounded stream). Reconnect-replay-by-rev native via Last-Event-ID.'
+  last_edited_ms: 1781793072072
 3ad7669c71770a9d:
   path: src/modules/overview/mod.rs
   description: 'Overview module. Core/global. Close_panel pre-flight: warns (not errors) for stale [!] or missing tree descriptions. pub(crate) has_pending_tree_describe() helper. tool_manage, panel_goto_page pre-flights. save/load module+worker data. Visualizer extracted to visualizers.rs.'
@@ -2802,6 +2814,10 @@
   path: src/modules/overview/context.rs
   description: estimate_tool_definitions_tokens(), generate_context_content() — plain-text LLM context (usage, sorted panels, stats)
   last_edited_ms: 0
+6df95754afa1e802:
+  path: crates/cp-orchestrator/src/main.rs
+  description: Backend entry point. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval, creates Runtime, starts driver thread, serves HTTP (blocking). use as _ for lib-only deps.
+  last_edited_ms: 0
 6e24dccd02a3fdf0:
   path: crates/cp-mod-console/Cargo.toml
   description: 'Console module deps: cp-base, cp-render, crossterm, serde, serde_json, regex.'
@@ -2838,6 +2854,10 @@
   path: ui/src/lib/panelMeta.ts
   description: Panel icon map (lucide), accent vars, loadColor (token-load→color), fmtTokens/fmtCost formatters.
   last_edited_ms: 1781458541269
+6f446c16f612135a:
+  path: src/app/run/threads.rs
+  description: 'Thread helpers for main loop. maybe_inject_auto_read + check_my_turn_threads SKIP archived threads (LLM-invisible). Bridge command polling: poll_bridge_commands + accept_commands + apply_command (SendMessage/CreateThread/Archive/Restore/Stop/Interrupt via K7). Leg 0 keystone (X838): emit_roster_delta(state,kind) helper appends ThreadCreated/ThreadArchived/ThreadRestored via bridge OplogService.submit_durable the instant apply_create/archive/restore mutates ThreadsState — non-blocking durable (I2), no-op bridge-OFF, so the backend view learns of roster changes in ms not on the disk-debounce.'
+  last_edited_ms: 0
 6f745b9289574be9:
   path: ui/src/components/panels/cockpit/EntitiesPanel.tsx
   description: 'Cockpit Entities maquette: per-table cards (name, row count, column signature, sample rows in mono). Reads mock entityTables.'
@@ -3506,6 +3526,10 @@
   path: src/ui/mod.rs
   description: Top-level render() with flame!("render"). IR frame build → sidebar + content panel + status bar + overlays (perf from IR, autocomplete from IR, config from IR, search index from IR). All overlays consume IR data.
   last_edited_ms: 0
+8906891de7486c08:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Transport hub. Backend shared state + serve/serve_bound + route_rest (22 routes) + handle_stream SSE. CORS + OPTIONS 204. run_stream SSE producer: Tailer.poll→rev-numbered delta events for every OpEntry, drains StreamHub frames, dirty→invalidate. X18 LATENCY FIX: TAIL_REPOLL=5ms caps the OplogWaiter.wait timeout so the tailer re-polls every 5ms regardless of OS event latency (macOS FSEvents coalesces ~350ms — was the visible-latency floor); waiter still wakes sub-ms on Linux inotify (I12 ''inotify primary, tight poll backstop''). KEEPALIVE_INTERVAL=10s gated on Instant so the 5ms loop doesn''t spam keepalive comments. Yielded command→visible p50 14ms / p99 33ms (from 349ms).'
+  last_edited_ms: 1781793072089
 892ee51e57d935dd:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
@@ -3898,6 +3922,10 @@
   path: src/ui/mod.rs
   description: Top-level render() with flame!("render"). IR frame build → sidebar + content panel + status bar + overlays (perf from IR, autocomplete from IR, config from IR, search index from IR). Autocomplete offset-aware for Threads mode (THREAD_LIST_WIDTH). All overlays consume IR data.
   last_edited_ms: 0
+98a988c644494695:
+  path: web/src/lib/live.ts
+  description: 'Live-data hooks: fetch + SSE-delta-apply + poll backstop. useLiveQuery generic: initial fetch, SSE ''delta'' APPLIED in-place via optional applyDelta reducer (the push plane — zero refetch), rev high-water guard (lastRevRef) drops replay dupes, falls back to debounced refetch when reducer returns null (unknown id / not loaded); ''invalidate'' still refetches (transitional). applyThreadDelta reducer: thread_created (synth log-less ThreadDetail) / archived / restored / status_changed / message_created (bump activity). useThreads wired with it → sub-50ms felt thread roster updates. Other hooks (panels/memory/todos/…) still debounce-refetch. sendCommand double-invalidates (immediate+300ms) as a safety net.'
+  last_edited_ms: 1781793072123
 98ab1d3ab25330c0:
   path: yamls/prompts.yaml
   description: Panel display messages (header/timestamp/footer) + context threshold notification
@@ -4133,6 +4161,10 @@ a17d304c5a64b3ef:
 a184b233199279b2:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
+  last_edited_ms: 0
+a20374514cb825df:
+  path: Cargo.lock
+  description: Workspace lockfile
   last_edited_ms: 0
 a24ca6a492b02678:
   path: src/llms/claude_code/mod.rs
@@ -6238,6 +6270,10 @@ f7d9bcc6b3edfae1:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, 50-row inline cap, RETURNING support.
   last_edited_ms: 1780585450710
+f7f064afffc51318:
+  path: crates/cp-orchestrator/Cargo.toml
+  description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal) + serde + serde_json + serde_yaml + tiny_http (0.12, transport). dev: cp-mod-bridge (test-only) + tempfile. lib+bin. Workspace lints.'
+  last_edited_ms: 0
 f80737b7b24222fa:
   path: ui/src/components/shell/CockpitView.tsx
   description: 'Cockpit (panel-centered) view assembler. TWO columns: LeftRail (controlled selection) | PanelPane (the selected surface, flex-1 star). The conversation is NO LONGER a docked side column — it''s treated as just another panel (T24): default selected id = "conversation", which PanelPane renders as the full Conversation surface. Lifts the rail''s selected-panel state.'

@@ -17,6 +17,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
 tiny_http = "0.12"
+# Filesystem event watcher (kqueue/inotify) — wakes the SSE producer the instant
+# an agent appends to its oplog, so a delta reaches the browser in single-digit
+# ms instead of waiting on a poll tick (design doc I12: inotify primary).
+notify = { workspace = true }
 
 [dev-dependencies]
 # Test-only: the integration suite boots a real agent and drives its command

@@ -11,6 +11,7 @@ use cp_orchestrator::runtime::{Config, Runtime};
 // dev-dependencies linked into the bin-test target.
 use cp_oplog as _;
 use nix as _;
+use notify as _;
 use serde as _;
 use serde_json as _;
 use serde_yaml as _;

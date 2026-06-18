@@ -206,9 +206,15 @@ impl App {
                 self.last_render_ms = current_ms;
             }
 
-            // Adaptive poll: sleep longer when idle, shorter when actively streaming
+            // Adaptive poll: sleep longer when idle, shorter when actively
+            // streaming or when the orchestration bridge is connected (a web
+            // UI is driving commands and expects sub-10ms apply latency, so we
+            // service the bridge socket every couple of ms instead of every
+            // 50ms — only while bridge-active, to keep idle CPU low otherwise).
             let poll_ms = if self.state.flags.stream.phase.is_streaming() || self.state.flags.ui.dirty {
                 EVENT_POLL_MS // 8ms — responsive during streaming/active updates
+            } else if super::threads::bridge_active(&self.state) {
+                2 // bridge-active idle — keep web command→apply latency ≤ a few ms
             } else {
                 50 // 50ms when idle — still responsive for typing, much less CPU
             };
