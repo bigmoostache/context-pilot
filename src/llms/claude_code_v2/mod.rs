@@ -135,7 +135,7 @@ impl ClaudeCodeV2Client {
             .as_ref()
             .ok_or_else(|| LlmError::Auth("Claude Code OAuth token not found or expired. Run 'claude login'".into()))?;
 
-        let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
+        let client = crate::llms::build_sse_client()?;
 
         // System prompt
         let system_text =
@@ -209,26 +209,27 @@ impl ClaudeCodeV2Client {
         helpers::dump_last_request(&request.worker_id, &api_request);
 
         // Build and send request with V2 headers
-        let response = client
-            .post(ENDPOINT)
-            .header("accept", "text/event-stream")
-            .header("authorization", format!("Bearer {}", access_token.expose_secret()))
-            .header("anthropic-version", API_VERSION)
-            .header("anthropic-beta", BETA_HEADER)
-            .header("anthropic-dangerous-direct-browser-access", "true")
-            .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.170 (external, sdk-cli)")
-            .header("x-app", "cli")
-            .header("x-stainless-arch", "x64")
-            .header("x-stainless-lang", "js")
-            .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.94.0")
-            .header("x-stainless-retry-count", "0")
-            .header("x-stainless-runtime", "node")
-            .header("x-stainless-runtime-version", "v24.3.0")
-            .header("x-stainless-timeout", "600")
-            .json(&api_request)
-            .send()?;
+        let response = crate::llms::send_with_header_timeout(
+            client
+                .post(ENDPOINT)
+                .header("accept", "text/event-stream")
+                .header("authorization", format!("Bearer {}", access_token.expose_secret()))
+                .header("anthropic-version", API_VERSION)
+                .header("anthropic-beta", BETA_HEADER)
+                .header("anthropic-dangerous-direct-browser-access", "true")
+                .header("content-type", "application/json")
+                .header("user-agent", "claude-cli/2.1.170 (external, sdk-cli)")
+                .header("x-app", "cli")
+                .header("x-stainless-arch", "x64")
+                .header("x-stainless-lang", "js")
+                .header("x-stainless-os", "Linux")
+                .header("x-stainless-package-version", "0.94.0")
+                .header("x-stainless-retry-count", "0")
+                .header("x-stainless-runtime", "node")
+                .header("x-stainless-runtime-version", "v24.3.0")
+                .header("x-stainless-timeout", "600")
+                .json(&api_request),
+        )?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();

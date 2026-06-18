@@ -101,7 +101,7 @@ impl LlmClient for DeepSeekClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
         let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("DEEPSEEK_API_KEY not set".into()))?;
 
-        let client = Client::new();
+        let client = crate::llms::build_sse_client()?;
         // V4 models use thinking mode by default — reasoning_content is always relevant
         let is_reasoner = true;
 
@@ -158,12 +158,13 @@ impl LlmClient for DeepSeekClient {
 
         super::openai_streaming::dump_request(&request.worker_id, "deepseek", &api_request);
 
-        let response = client
-            .post(DEEPSEEK_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
-            .header("Content-Type", "application/json")
-            .json(&api_request)
-            .send()?;
+        let response = crate::llms::send_with_header_timeout(
+            client
+                .post(DEEPSEEK_API_ENDPOINT)
+                .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
+                .header("Content-Type", "application/json")
+                .json(&api_request),
+        )?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();

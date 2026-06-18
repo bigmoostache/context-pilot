@@ -209,7 +209,7 @@ impl ClaudeCodeClient {
             .as_ref()
             .ok_or_else(|| LlmError::Auth("Claude Code OAuth token not found or expired. Run 'claude login'".into()))?;
 
-        let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
+        let client = crate::llms::build_sse_client()?;
 
         // Handle cleaner mode or custom system prompt
         let system_text =
@@ -274,25 +274,26 @@ impl ClaudeCodeClient {
         // Always dump last request for debugging (overwritten each call)
         debug::dump_last_request(&request.worker_id, &api_request);
 
-        let response = client
-            .post(CLAUDE_CODE_ENDPOINT)
-            .header("accept", "text/event-stream")
-            .header("authorization", format!("Bearer {}", access_token.expose_secret()))
-            .header("anthropic-version", API_VERSION)
-            .header("anthropic-beta", OAUTH_BETA_HEADER)
-            .header("anthropic-dangerous-direct-browser-access", "true")
-            .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
-            .header("x-app", "cli")
-            .header("x-stainless-arch", "x64")
-            .header("x-stainless-lang", "js")
-            .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
-            .header("x-stainless-retry-count", "0")
-            .header("x-stainless-runtime", "node")
-            .header("x-stainless-runtime-version", "v24.3.0")
-            .json(&api_request)
-            .send()?;
+        let response = crate::llms::send_with_header_timeout(
+            client
+                .post(CLAUDE_CODE_ENDPOINT)
+                .header("accept", "text/event-stream")
+                .header("authorization", format!("Bearer {}", access_token.expose_secret()))
+                .header("anthropic-version", API_VERSION)
+                .header("anthropic-beta", OAUTH_BETA_HEADER)
+                .header("anthropic-dangerous-direct-browser-access", "true")
+                .header("content-type", "application/json")
+                .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+                .header("x-app", "cli")
+                .header("x-stainless-arch", "x64")
+                .header("x-stainless-lang", "js")
+                .header("x-stainless-os", "Linux")
+                .header("x-stainless-package-version", "0.70.0")
+                .header("x-stainless-retry-count", "0")
+                .header("x-stainless-runtime", "node")
+                .header("x-stainless-runtime-version", "v24.3.0")
+                .json(&api_request),
+        )?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();

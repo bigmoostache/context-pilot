@@ -88,6 +88,16 @@ pub(super) fn process_stream_events(app: &mut App, rx: &Receiver<StreamEvent>) {
                 if will_retry {
                     app.state.api_retry_count = app.state.api_retry_count.saturating_add(1);
                     app.pending_retry_error = Some(e);
+                    // Show retry feedback — visible until handle_retry clears it next tick.
+                    let next_attempt = app.state.api_retry_count.saturating_add(1);
+                    let total_attempts = MAX_API_RETRIES.saturating_add(1);
+                    if let Some(msg) = app.state.messages.last_mut()
+                        && msg.role == "assistant"
+                    {
+                        msg.content = format!(
+                            "⏳ API error — retrying (attempt {next_attempt}/{total_attempts})…"
+                        );
+                    }
                 } else {
                     // Max retries reached, show error
                     app.state.api_retry_count = 0;
@@ -108,7 +118,9 @@ pub(super) fn handle_retry(app: &mut App, tx: &Sender<StreamEvent>) {
     if let Some(_error) = app.pending_retry_error.take() {
         // Still streaming, retry the request
         if app.state.flags.stream.phase.is_streaming() {
-            // Clear any partial assistant message content before retrying
+            // Clear partial content before prompt assembly — the retry feedback
+            // message (set in the error handler) must not leak into the LLM prompt
+            // or get prepended to the new streaming response.
             if let Some(msg) = app.state.messages.last_mut()
                 && msg.role == "assistant"
             {

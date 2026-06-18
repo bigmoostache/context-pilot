@@ -59,7 +59,7 @@ impl LlmClient for MiniMaxClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
         let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("MINIMAX_API_KEY not set".into()))?;
 
-        let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
+        let client = crate::llms::build_sse_client()?;
 
         // Use pre-assembled API messages from prompt_builder
         let include_tool_uses = request.tool_results.is_some();
@@ -115,13 +115,14 @@ impl LlmClient for MiniMaxClient {
             let _r2 = std::fs::write(&path, serde_json::to_string_pretty(&api_request).unwrap_or_default());
         }
 
-        let response = client
-            .post(MINIMAX_ENDPOINT)
-            .header("x-api-key", api_key.expose_secret())
-            .header("anthropic-version", MINIMAX_API_VERSION)
-            .header("content-type", "application/json")
-            .json(&api_request)
-            .send()?;
+        let response = crate::llms::send_with_header_timeout(
+            client
+                .post(MINIMAX_ENDPOINT)
+                .header("x-api-key", api_key.expose_secret())
+                .header("anthropic-version", MINIMAX_API_VERSION)
+                .header("content-type", "application/json")
+                .json(&api_request),
+        )?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();

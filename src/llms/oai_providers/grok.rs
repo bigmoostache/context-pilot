@@ -62,7 +62,7 @@ impl LlmClient for GrokClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
         let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("XAI_API_KEY not set".into()))?;
 
-        let client = Client::new();
+        let client = crate::llms::build_sse_client()?;
 
         // Collect pending tool result IDs
         let pending_tool_ids: Vec<String> = request
@@ -112,12 +112,13 @@ impl LlmClient for GrokClient {
 
         super::openai_streaming::dump_request(&request.worker_id, "grok", &api_request);
 
-        let response = client
-            .post(GROK_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
-            .header("Content-Type", "application/json")
-            .json(&api_request)
-            .send()?;
+        let response = crate::llms::send_with_header_timeout(
+            client
+                .post(GROK_API_ENDPOINT)
+                .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
+                .header("Content-Type", "application/json")
+                .json(&api_request),
+        )?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();

@@ -153,7 +153,7 @@ impl LlmClient for ClaudeCodeApiKeyClient {
         let api_key =
             self.api_key.as_ref().ok_or_else(|| LlmError::Auth("ANTHROPIC_API_KEY not found in environment".into()))?;
 
-        let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
+        let client = crate::llms::build_sse_client()?;
 
         // Handle cleaner mode or custom system prompt
         let system_text =
@@ -215,10 +215,10 @@ impl LlmClient for ClaudeCodeApiKeyClient {
 
         dump_last_request(&request.worker_id, &api_request);
 
-        let response =
+        let response = crate::llms::send_with_header_timeout(
             apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), api_key.expose_secret(), "text/event-stream")
-                .json(&api_request)
-                .send()?;
+                .json(&api_request),
+        )?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();

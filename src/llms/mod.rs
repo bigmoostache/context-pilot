@@ -15,6 +15,7 @@ pub(crate) mod minimax;
 pub(crate) mod oai_providers;
 
 use std::sync::mpsc::Sender;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -23,6 +24,13 @@ use crate::app::panels::ContextItem;
 use crate::infra::tools::ToolDefinition;
 use crate::infra::tools::ToolResult;
 use crate::state::Message;
+
+/// Maximum time to wait for TCP connection + TLS handshake (covers DNS + connect).
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Maximum time to wait for response headers after sending the request body.
+/// Guards against overloaded servers that accept the connection but never reply.
+const HEADER_TIMEOUT: Duration = Duration::from_secs(60);
 
 // Re-export LLM types from cp-base so that `crate::llms::LlmProvider` etc. work
 pub(crate) use cp_base::config::llm_types::{ApiCheckResult, LlmProvider, ModelInfo, StreamEvent};
@@ -86,6 +94,49 @@ pub(crate) fn get_client(provider: LlmProvider) -> Box<dyn LlmClient> {
         LlmProvider::DeepSeek => Box::new(deepseek::DeepSeekClient::new()),
         LlmProvider::MiniMax => Box::new(minimax::MiniMaxClient::new()),
         LlmProvider::ClaudeCodeV2 => Box::new(claude_code_v2::ClaudeCodeV2Client::new()),
+    }
+}
+
+/// Build a `reqwest` blocking client with SSE-appropriate timeouts.
+///
+/// Sets a `connect_timeout` (30 s) so unreachable servers fail fast, but keeps
+/// the overall read timeout at `None` because legitimate SSE streams can last
+/// many minutes during long model responses.
+pub(crate) fn build_sse_client() -> Result<reqwest::blocking::Client, error::LlmError> {
+    reqwest::blocking::Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(None)
+        .build()
+        .map_err(|e| error::LlmError::Network(e.to_string()))
+}
+
+/// Send a request with a header-timeout guard.
+///
+/// Spawns the blocking `.send()` on a helper thread and waits up to
+/// [`HEADER_TIMEOUT`] for a response. If the server accepts the TCP
+/// connection but never sends response headers (typical during overload),
+/// this returns `LlmError::Network` instead of blocking forever.
+///
+/// On timeout the helper thread is detached — it will eventually
+/// terminate when the underlying TCP connection closes or times out at the
+/// OS level.  This is acceptable: at most one orphan thread per failed
+/// stream attempt, and they park in a blocking `read` with no CPU cost.
+pub(crate) fn send_with_header_timeout(
+    builder: reqwest::blocking::RequestBuilder,
+) -> Result<reqwest::blocking::Response, error::LlmError> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let _handle = std::thread::spawn(move || {
+        let _r = tx.send(builder.send());
+    });
+
+    match rx.recv_timeout(HEADER_TIMEOUT) {
+        Ok(Ok(resp)) => Ok(resp),
+        Ok(Err(e)) => Err(error::LlmError::Network(e.to_string())),
+        Err(_timeout) => Err(error::LlmError::Network(format!(
+            "Request timed out after {}s waiting for response headers. \
+             The API server may be overloaded or unreachable.",
+            HEADER_TIMEOUT.as_secs()
+        ))),
     }
 }
 
