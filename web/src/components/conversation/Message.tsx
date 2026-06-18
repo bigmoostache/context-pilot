@@ -1,6 +1,6 @@
 import { ChevronDown, Terminal, User } from "lucide-react"
 import type { ChatMessage } from "@/lib/types"
-import { renderInline } from "@/lib/inline"
+import { Markdown } from "@/lib/markdown"
 import { cn } from "@/lib/utils"
 
 export function Message({ msg }: { msg: ChatMessage }) {
@@ -13,7 +13,7 @@ function UserMessage({ msg }: { msg: ChatMessage }) {
   return (
     <div className="rise flex flex-col items-end gap-1 py-2">
       <div className="max-w-[78%] rounded-2xl rounded-br-md bg-[var(--signal)] px-3.5 py-2 text-[13px] leading-relaxed text-[var(--primary-foreground)] card-shadow">
-        {renderInline(msg.text ?? "")}
+        <Markdown text={msg.text ?? ""} variant="onAccent" />
       </div>
       <span className="flex items-center gap-1 pr-1 text-[10px] text-muted-foreground/60">
         <User className="size-2.5" />
@@ -34,7 +34,7 @@ function AssistantMessage({ msg }: { msg: ChatMessage }) {
         <span className="text-[10px] text-muted-foreground/60">{msg.ts}</span>
       </div>
       <div className="max-w-[88%] pl-7 text-[13.5px] leading-relaxed text-foreground/90">
-        {renderInline(msg.text ?? "")}
+        <Markdown text={msg.text ?? ""} />
         {msg.streaming && (
           <span className="cursor-blink ml-0.5 inline-block h-3.5 w-[7px] translate-y-0.5 bg-[var(--signal)]" />
         )}

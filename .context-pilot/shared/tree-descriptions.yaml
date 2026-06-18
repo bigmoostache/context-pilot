@@ -4398,6 +4398,10 @@ ae31931415268f77:
   path: crates/cp-mod-prompt/src/library_panel.rs
   description: 'LibraryPanel: renders agent/skill/command tables, prompt editor view'
   last_edited_ms: 0
+ae4fe58f63185b1c:
+  path: web/src/lib/markdown.tsx
+  description: 'Full GFM markdown renderer for chat/thread messages (T38). <Markdown text variant?> wraps react-markdown 10 + remark-gfm (tables, task lists, strikethrough, autolinks); owns only presentation via a components() map keyed to theme tokens — graded headings, themed lists/blockquotes/hr, scroll-wrapped bordered tables, inline-code chip + fenced <pre> block (code always wears the chip, pre neutralises it on its >code child since rm10 dropped the `inline` flag), GFM task-list checkboxes. Two variants: default (page bg) and onAccent (user signal bubble — currentColor ink + translucent-white chrome). No rehype-raw → XSS-safe. memo''d on text+variant.'
+  last_edited_ms: 1781791228038
 ae66bdee643a5c9c:
   path: ui/src/components/agents/FleetDashboard.tsx
   description: Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Greeting, aggregate stat strip, AgentCard grid (status badge Working/Needs input/Standby + one-line task summary + branch·model·cost, Open→agent threads, Manage→modal), New-agent card, create/manage/archive modal. No folder path or thread pills on cards. Thread stats only in the top aggregate strip via threadDetails.
@@ -4422,6 +4426,10 @@ af2359efd17eff41:
   path: src/modules/overview/visualizers.rs
   description: 'Tool result visualizers for core tools. visualize_core_output: colors closed panel names, highlights enabled/disabled status, shows module activation changes.'
   last_edited_ms: 1781447353073
+af26e548a1aa56d4:
+  path: web/src/components/conversation/Message.tsx
+  description: Thread/conversation message renderer. AssistantMessage + UserMessage now render text via <Markdown> (lib/markdown.tsx) instead of the minimal renderInline — assistant=default variant, user=onAccent variant (legible on the signal bubble). ToolMessage = collapsible card (header name/intent, mono params, pre result, danger border on error). Streaming blink cursor preserved on assistant.
+  last_edited_ms: 1781791228058
 af3dcb89932c06f9:
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
