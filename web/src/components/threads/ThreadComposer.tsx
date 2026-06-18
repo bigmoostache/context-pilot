@@ -53,8 +53,13 @@ export function ThreadComposer({
     })
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Enter sends, Shift+Enter inserts a newline — matching the TUI input.
+    // `isComposing` guards an in-flight IME/dead-key composition (e.g. accents,
+    // CJK candidates): committing the composition with Enter must NOT fire a
+    // send. We read it off the native event because React's synthetic event
+    // doesn't surface `isComposing`.
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       handleSubmit()
     }
