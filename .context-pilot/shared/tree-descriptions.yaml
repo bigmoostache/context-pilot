@@ -2322,6 +2322,10 @@
   path: ui/src/components/finder/Finder.tsx
   description: Top-level Finder orchestrator. buildRealm(agent) memo, heterogeneous tabs (folder tabs w/ per-tab back/fwd history + file tabs showing one file via FinderPreview variant='full'); double-click file→openInNewTab (reuses tab for same path), double-click folder→navigate; navigating on a file tab converts it back to folder tab. Passes fileActive + file-action handlers (Get Info/Download/Share) to FinderToolbar. Keyboard nav (arrows/Enter/Backspace/Space QuickLook/⌘A/⌘I/type-ahead), additive+range selection, right-click ContextMenu, Get Info modal, 4 view modes, icon-size slider, path bar, drag-drop overlay, status bar, toast.
   last_edited_ms: 1781531576338
+5c242bc41fabbaf1:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread input composer. JS auto-resize (scrollHeight, cap 200px), autoFocus + key={thread.id} remount, submit resets height+refocuses. Enter=submit/Shift+Enter=newline with isComposing guard (IME/dead-key). Agent-busy hint above input is FOCUS-AWARE (T39): focused thread → active spinner (''Agent is streaming…'' ACTIVE / ''Agent is working this thread…'' its turn); agent''s-turn-but-NOT-focused → static Clock ''Agent will pick up this thread soon.'' (queued); THEIR_TURN (user''s turn) → no banner. focused prop rides ThreadDetail.focused.'
+  last_edited_ms: 1781791495612
 5c51c5888f0b7fc9:
   path: run.sh
   description: Development run script
@@ -3002,6 +3006,10 @@
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
+75944f31fc6b013d:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: selected thread''s full conversation + composer. Header-less. Auto-scrolls to bottom on thread.id change + log growth (bottomRef+scrollIntoView). toChatMessage maps ThreadMsg→ChatMessage for the shared Message renderer; renders embedded QuestionForm (onSubmit→onSend) + fileRef chips. Passes status+focused+onSend to ThreadComposer (keyed by thread.id).'
+  last_edited_ms: 1781791495633
 75b59f8061f1ae4e:
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks.'
