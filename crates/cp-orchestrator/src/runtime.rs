@@ -193,10 +193,17 @@ fn driver_loop(backend: Arc<Mutex<Backend>>, agents_dir: PathBuf, interval: Dura
             }
         }
 
-        // 2. Detect tier-② state changes by checking config.json mtime — a
-        //    pure backstop for a missed oplog signal (the live path is the
-        //    fast tail below). Marks the agent dirty so SSE producers emit an
-        //    `invalidate` on their next sweep.
+        // 2. Detect tier-② INSPECTION-resource changes by checking config.json
+        //    mtime, and mark the agent dirty so the SSE producer emits an
+        //    `invalidate`. This is the freshness signal for the resources that
+        //    have NO oplog delta to ride — memory / tree / callbacks (design
+        //    doc's "unmanaged read-only listing"). The delta-covered resources
+        //    (threads roster, phase, cost) ride the fast oplog tail below + SSE
+        //    rev-deltas and deliberately IGNORE `invalidate` (X859), so this
+        //    slow mtime scan is never on their live path — it is the coarse
+        //    backstop the design doc reserves it as (I12: oplog tail primary,
+        //    ~2s poll a backstop), and the inspection-resource freshness
+        //    mechanism, nothing more.
         check_config_mtimes(&backend, &agent_folders, &mut config_mtimes);
 
         // 3. Reap stale *.tmp registry writes (crash-orphans).
