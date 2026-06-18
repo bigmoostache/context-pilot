@@ -14,11 +14,25 @@ import "./App.css"
 
 function App() {
   const { data: agents = [] } = useFleet()
-  const [view, setView] = useState<ViewMode>("fleet")
-  const [activeAgentId, setActiveAgentId] = useState("")
+  const [view, setViewRaw] = useState<ViewMode>(
+    () => (localStorage.getItem("cp-view") as ViewMode) ?? "fleet",
+  )
+  const [activeAgentId, setActiveAgentIdRaw] = useState(
+    () => localStorage.getItem("cp-agent") ?? "",
+  )
   // One-shot request to pop the "create agent" dialog on the fleet dashboard
   // (raised by the workspace switcher's "New agent" entry).
   const [createAgent, setCreateAgent] = useState(false)
+
+  // Persist view + agent selection across reloads.
+  const setView = (v: ViewMode) => {
+    setViewRaw(v)
+    localStorage.setItem("cp-view", v)
+  }
+  const setActiveAgentId = (id: string) => {
+    setActiveAgentIdRaw(id)
+    localStorage.setItem("cp-agent", id)
+  }
 
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
 
