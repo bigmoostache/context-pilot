@@ -21,7 +21,13 @@
 //! | `CP_ORCH_PORT` | `7878` | HTTP listen port |
 //! | `CP_AGENTS_DIR` | `~/.context-pilot/agents` | Registry directory |
 //! | `CP_COST_BUDGET` | `100.0` | Per-agent cost budget (USD) |
-//! | `CP_SCAN_INTERVAL_MS` | `2000` | Registry + oplog poll cadence (ms) |
+//! | `CP_SCAN_INTERVAL_MS` | `2000` | Registry-discovery + tier-② mtime poll cadence (ms) |
+//!
+//! The oplog tail (the live state-fold that feeds the view) runs on a
+//! much tighter [`TAIL_INTERVAL`] inner cadence, decoupled from the slow
+//! registry scan, so a fresh oplog entry reaches the view within ~100 ms
+//! rather than the scan interval (a step toward the inotify-primary signal
+//! of design doc I12 / §8.1).
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -41,6 +47,16 @@ const DEFAULT_BUDGET: f64 = 100.0;
 
 /// Default registry + oplog poll interval.
 const DEFAULT_SCAN_INTERVAL: Duration = Duration::from_millis(2000);
+
+/// Fast inner cadence for folding each agent's oplog tail into the view.
+///
+/// Decoupled from the (slower) registry scan so a newly-appended oplog entry
+/// — a created/archived thread, a phase change, a cost update — reaches the
+/// materialized view within roughly this interval instead of waiting on the
+/// registry-scan cadence. This is a poll-based stand-in for the design doc's
+/// inotify-primary change signal (I12 / §8.1); the registry scan and the
+/// tier-② mtime backstop deliberately stay on the slower interval.
+const TAIL_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Parsed runtime configuration, sourced from environment variables.
 #[derive(Debug)]
@@ -138,6 +154,13 @@ impl Runtime {
 
 /// The driver loop: registry scan → per-agent oplog tail → fold into shared
 /// backend state. Runs forever on its own thread.
+///
+/// Two cadences, deliberately decoupled (design doc I12 / §8.1): the
+/// **registry scan** + tier-② mtime backstop + tmp reap run once per slow
+/// `interval`; the **oplog tail** — the live state-fold that feeds the view —
+/// runs every [`TAIL_INTERVAL`] in a tight inner loop, so a freshly-appended
+/// entry becomes visible in the view within ~100 ms rather than the (much
+/// longer) registry-scan cadence.
 fn driver_loop(backend: Arc<Mutex<Backend>>, agents_dir: PathBuf, interval: Duration) {
     let mut registry = AgentRegistry::new(agents_dir);
     let mut tailers: HashMap<String, Tailer> = HashMap::new();
@@ -146,7 +169,13 @@ fn driver_loop(backend: Arc<Mutex<Backend>>, agents_dir: PathBuf, interval: Dura
     // Per-agent last-seen config.json mtime, for change detection.
     let mut config_mtimes: HashMap<String, SystemTime> = HashMap::new();
 
+    // How many fast tail ticks fit in one slow scan interval (at least one).
+    let tail_ticks =
+        u64::try_from(interval.as_millis() / TAIL_INTERVAL.as_millis()).unwrap_or(1).max(1);
+
     loop {
+        // ── Slow cadence: discovery + tier-② backstop + crash-orphan reap ──
+
         // 1. Registry scan — discover/lose agents.
         if let Ok(events) = registry.scan() {
             process_registry_events(&events, &backend, &mut tailers, &mut agent_folders);
@@ -159,18 +188,23 @@ fn driver_loop(backend: Arc<Mutex<Backend>>, agents_dir: PathBuf, interval: Dura
             }
         }
 
-        // 2. Tail every known agent's oplog and fold into the view.
-        tail_all_agents(&backend, &mut tailers);
-
-        // 3. Detect tier-② state changes by checking config.json mtime.
-        //    When a change is found, mark the agent dirty so SSE producers
-        //    emit an `invalidate` event on their next sweep (~200ms).
+        // 2. Detect tier-② state changes by checking config.json mtime — a
+        //    pure backstop for a missed oplog signal (the live path is the
+        //    fast tail below). Marks the agent dirty so SSE producers emit an
+        //    `invalidate` on their next sweep.
         check_config_mtimes(&backend, &agent_folders, &mut config_mtimes);
 
-        // 4. Reap stale *.tmp registry writes (crash-orphans).
+        // 3. Reap stale *.tmp registry writes (crash-orphans).
         let _reaped = registry.reap_tmp(crate::registry::DEFAULT_TMP_GRACE);
 
-        thread::sleep(interval);
+        // ── Fast cadence: fold every agent's oplog tail into the view ──
+        //
+        // Spin the tail on the tight inner interval until the next slow scan
+        // is due, so durable deltas reach the view in ~TAIL_INTERVAL.
+        for _ in 0..tail_ticks {
+            tail_all_agents(&backend, &mut tailers);
+            thread::sleep(TAIL_INTERVAL);
+        }
     }
 }
 
