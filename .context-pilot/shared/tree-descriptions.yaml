@@ -5434,6 +5434,10 @@ d495c60011ecdbf4:
   path: src/llms/mod.rs
   description: 'LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging. Re-exports split: llm_types (traits) + models (enums).'
   last_edited_ms: 0
+d4a167de5fe88ff3:
+  path: crates/cp-orchestrator/src/services/materialized_view.rs
+  description: 'Phase 18 + X835/X836a: MaterializedView in-mem fleet projection folded from OpEntry (one AgentView per agent). AgentView{rev,heads,roster,phase,lifecycle,cost}. RosterEntry{thread_id,name,status:ThreadTurn,archived,last_activity_ms,msg_count} = the live thread list /threads serves from view (no disk). apply: Checkpoint=authoritative heads reset (roster NOT yet in snapshot — cold-restart-after-compaction gap tracked for X836b/X850), MessageCreated=set_thread_head + bump roster msg_count/last_activity, ThreadCreated=insert-or-update idempotent, ThreadArchived/Restored=toggle archived, ThreadStatusChanged=set status, Phase/Lifecycle/Cost=latest-wins, CommandEffect/SeenMark/Unknown=inert. 93 lib tests incl roster_create_archive_restore_cycle + thread_created_folds_idempotently_on_replay + message_created_bumps_roster_count_and_activity.'
+  last_edited_ms: 1781788332021
 d4b5d84f9128b7ac:
   path: web/src/lib/inline.tsx
   description: 'Minimal inline renderer for **bold**, `code`, line breaks — typesets assistant/user prose without a markdown dep. Inline `code` chip is theme-aware (bg-muted + faint foreground border + interactive accent text) so it reads in BOTH light and dark palettes (T23 fix: was a hardcoded near-black oklch bg, unreadable in light mode).'

@@ -21,7 +21,7 @@ use std::collections::HashMap;
 
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
 use cp_wire::types::snapshot::Heads;
-use cp_wire::types::{LifecycleState, Phase};
+use cp_wire::types::{LifecycleState, Phase, ThreadTurn};
 
 /// The latest cumulative cost figures reported by an agent.
 ///
@@ -37,6 +37,35 @@ pub struct CostSnapshot {
     pub cost_usd: f64,
 }
 
+/// One thread's roster entry — the lightweight per-thread metadata the
+/// `/threads` endpoint serves directly from the view, with no tier-② disk read
+/// (design doc §16 journals thread create/archive/restore; I5 keeps live reads
+/// off disk).
+///
+/// Folded live from the thread-roster oplog deltas
+/// ([`ThreadCreated`](OpEntryKind::ThreadCreated) and friends); `msg_count` and
+/// `last_activity_ms` then accumulate from each subsequent
+/// [`MessageCreated`](OpEntryKind::MessageCreated) in the thread, so the roster
+/// alone can render the thread list (name, turn, archived, activity) without
+/// hydrating message bodies.
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+pub struct RosterEntry {
+    /// Thread identifier (e.g. `"T7"`).
+    pub thread_id: String,
+    /// User-chosen thread label.
+    pub name: String,
+    /// Current turn ownership.
+    pub status: ThreadTurn,
+    /// Whether the thread is archived (soft-deleted, hidden from the active
+    /// list but restorable).
+    pub archived: bool,
+    /// Epoch-ms of the latest activity — creation time, then bumped by each
+    /// message.
+    pub last_activity_ms: u64,
+    /// Number of messages folded into this thread so far.
+    pub msg_count: u32,
+}
+
 /// One agent's current projected state.
 ///
 /// Folded from the agent's [`OpEntry`] stream; every field reflects the most
@@ -49,6 +78,10 @@ pub struct AgentView {
 
     /// Per-thread / per-panel content heads as of `rev`.
     pub heads: Heads,
+
+    /// Thread roster — the live list `/threads` serves from (folded from the
+    /// thread-roster deltas; design doc I5).
+    pub roster: Vec<RosterEntry>,
 
     /// Most recent execution phase, or `None` before any phase transition.
     pub phase: Option<Phase>,
@@ -66,9 +99,17 @@ impl AgentView {
     /// A [`Checkpoint`](OpEntryKind::Checkpoint) replaces the heads wholesale
     /// (authoritative reset, the mechanism behind count-bounded restart); a
     /// [`MessageCreated`](OpEntryKind::MessageCreated) updates a single thread
-    /// head; phase, lifecycle, and cost are latest-wins. Durability-only
-    /// records (`CommandEffect`, `SeenMark`) and forward-compat `Unknown`
-    /// variants do not affect the projected state.
+    /// head and bumps that thread's roster activity; the thread-roster deltas
+    /// (`ThreadCreated`/`Archived`/`Restored`/`StatusChanged`) maintain the
+    /// roster idempotently; phase, lifecycle, and cost are latest-wins.
+    /// Durability-only records (`CommandEffect`, `SeenMark`) and forward-compat
+    /// `Unknown` variants do not affect the projected state.
+    ///
+    /// Note: a `Checkpoint` currently restores only heads — the roster is
+    /// rebuilt by folding the live delta tail, which is correct for a
+    /// continuously-running backend. Carrying the roster inside the snapshot
+    /// (so a cold restart after oplog compaction rebuilds it without the
+    /// original deltas) is the remaining I5 refinement, tracked separately.
     pub fn apply(&mut self, entry: &OpEntry) {
         self.rev = self.rev.max(entry.rev);
         match &entry.kind {
@@ -77,6 +118,43 @@ impl AgentView {
             }
             OpEntryKind::MessageCreated { thread_id, head, .. } => {
                 self.heads.set_thread_head(thread_id, *head);
+                if let Some(e) = self.roster.iter_mut().find(|e| &e.thread_id == thread_id) {
+                    e.msg_count = e.msg_count.saturating_add(1);
+                    e.last_activity_ms = entry.timestamp_ms;
+                }
+            }
+            OpEntryKind::ThreadCreated { thread_id, name, status, timestamp_ms } => {
+                // Insert-or-update so a duplicate delivery or a replay folds
+                // idempotently (a re-seen creation refreshes, never duplicates).
+                if let Some(e) = self.roster.iter_mut().find(|e| &e.thread_id == thread_id) {
+                    e.name = name.clone();
+                    e.status = *status;
+                    e.archived = false;
+                } else {
+                    self.roster.push(RosterEntry {
+                        thread_id: thread_id.clone(),
+                        name: name.clone(),
+                        status: *status,
+                        archived: false,
+                        last_activity_ms: *timestamp_ms,
+                        msg_count: 0,
+                    });
+                }
+            }
+            OpEntryKind::ThreadArchived { thread_id } => {
+                if let Some(e) = self.roster.iter_mut().find(|e| &e.thread_id == thread_id) {
+                    e.archived = true;
+                }
+            }
+            OpEntryKind::ThreadRestored { thread_id } => {
+                if let Some(e) = self.roster.iter_mut().find(|e| &e.thread_id == thread_id) {
+                    e.archived = false;
+                }
+            }
+            OpEntryKind::ThreadStatusChanged { thread_id, status } => {
+                if let Some(e) = self.roster.iter_mut().find(|e| &e.thread_id == thread_id) {
+                    e.status = *status;
+                }
             }
             OpEntryKind::PhaseTransition { phase } => {
                 self.phase = Some(*phase);
@@ -91,16 +169,10 @@ impl AgentView {
                     cost_usd: *cost_usd,
                 };
             }
-            // Thread-roster deltas are part of the wire protocol but the
-            // roster projection is not yet a field on `AgentView` (it lands
-            // with the view-fold work). They advance `rev` but are otherwise
-            // inert here for now.
+            // Durability-only records and forward-compat unknowns do not
+            // affect the projected state.
             OpEntryKind::CommandEffect { .. }
             | OpEntryKind::SeenMark { .. }
-            | OpEntryKind::ThreadCreated { .. }
-            | OpEntryKind::ThreadArchived { .. }
-            | OpEntryKind::ThreadRestored { .. }
-            | OpEntryKind::ThreadStatusChanged { .. }
             | OpEntryKind::Unknown => {}
         }
     }
@@ -295,6 +367,98 @@ mod tests {
         assert_eq!(agent.phase, None);
         assert_eq!(agent.lifecycle, None);
         assert_eq!(agent.cost, CostSnapshot::default());
+    }
+
+    #[test]
+    fn roster_create_archive_restore_cycle() {
+        let mut view = MaterializedView::new();
+        view.apply(
+            "a1",
+            &entry(
+                0,
+                OpEntryKind::ThreadCreated {
+                    thread_id: "T1".into(),
+                    name: "Refactor cache".into(),
+                    status: ThreadTurn::TheirTurn,
+                    timestamp_ms: 1_000,
+                },
+            ),
+        );
+        let agent = view.get("a1").expect("agent present");
+        let e = agent.roster.first().expect("roster entry");
+        assert_eq!(e.thread_id, "T1");
+        assert_eq!(e.name, "Refactor cache");
+        assert_eq!(e.status, ThreadTurn::TheirTurn);
+        assert!(!e.archived);
+        assert_eq!(e.last_activity_ms, 1_000);
+        assert_eq!(e.msg_count, 0);
+
+        view.apply("a1", &entry(1, OpEntryKind::ThreadArchived { thread_id: "T1".into() }));
+        assert!(view.get("a1").expect("a").roster.first().expect("e").archived);
+
+        view.apply("a1", &entry(2, OpEntryKind::ThreadRestored { thread_id: "T1".into() }));
+        assert!(!view.get("a1").expect("a").roster.first().expect("e").archived);
+
+        view.apply(
+            "a1",
+            &entry(
+                3,
+                OpEntryKind::ThreadStatusChanged {
+                    thread_id: "T1".into(),
+                    status: ThreadTurn::MyTurn,
+                },
+            ),
+        );
+        assert_eq!(
+            view.get("a1").expect("a").roster.first().expect("e").status,
+            ThreadTurn::MyTurn,
+        );
+    }
+
+    #[test]
+    fn thread_created_folds_idempotently_on_replay() {
+        let mut view = MaterializedView::new();
+        let created = OpEntryKind::ThreadCreated {
+            thread_id: "T1".into(),
+            name: "Plan".into(),
+            status: ThreadTurn::MyTurn,
+            timestamp_ms: 5,
+        };
+        view.apply("a1", &entry(0, created.clone()));
+        view.apply("a1", &entry(0, created)); // duplicate delivery / replay
+        assert_eq!(
+            view.get("a1").expect("agent").roster.len(),
+            1,
+            "a re-seen creation must refresh, never duplicate",
+        );
+    }
+
+    #[test]
+    fn message_created_bumps_roster_count_and_activity() {
+        let mut view = MaterializedView::new();
+        view.apply(
+            "a1",
+            &entry(
+                0,
+                OpEntryKind::ThreadCreated {
+                    thread_id: "T1".into(),
+                    name: "Chat".into(),
+                    status: ThreadTurn::MyTurn,
+                    timestamp_ms: 100,
+                },
+            ),
+        );
+        // Two messages land; each bumps count + activity.
+        let mut m1 = entry(1, message("T1", 0x01));
+        m1.timestamp_ms = 200;
+        let mut m2 = entry(2, message("T1", 0x02));
+        m2.timestamp_ms = 350;
+        view.apply("a1", &m1);
+        view.apply("a1", &m2);
+
+        let e = view.get("a1").expect("agent").roster.first().expect("entry");
+        assert_eq!(e.msg_count, 2);
+        assert_eq!(e.last_activity_ms, 350, "activity tracks the latest message");
     }
 
     #[test]
