@@ -146,12 +146,25 @@ fn create_user_notification(state: &mut State, user_id: &str, content_preview: &
 /// When `creating_thread` is active, creates a new thread with the
 /// input text as the thread name instead.
 fn handle_thread_input_submit(state: &mut State) -> ActionResult {
-    // Virtual "New Thread" entry: selected past the end of real threads
-    let selected_idx = FocusState::get(state).selected_thread_idx;
-    let thread_count = ThreadsState::get(state).threads.len();
-    if selected_idx >= thread_count {
+    // `selected_thread_idx` indexes into the VISIBLE (view-filtered) thread
+    // slice, not the raw storage vec — resolve it through `visible_indices`
+    // for the current view (T9 archive refactor). The virtual "+ New Thread"
+    // entry lives only in the active (non-archived) view, positioned just past
+    // the last visible thread; comparing against the raw thread count would
+    // mis-route the New-Thread row as a message into another thread whenever
+    // any thread is archived.
+    let (selected_idx, viewing_archived) = {
+        let focus = FocusState::get(state);
+        (focus.selected_thread_idx, focus.viewing_archived)
+    };
+    let visible = ThreadsState::get(state).visible_indices(viewing_archived);
+    if !viewing_archived && selected_idx >= visible.len() {
         return handle_thread_create(state);
     }
+    // Map the visible-list position back to a real storage index.
+    let Some(&real_idx) = visible.get(selected_idx) else {
+        return ActionResult::Nothing;
+    };
 
     let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
     let content = replace_commands(&state.input, &commands);
@@ -167,10 +180,10 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
     // Record to persistent prompt history
     record_prompt_history(&content);
 
-    // Find the selected thread
+    // Find the selected thread (real storage index resolved above)
     let threads_state = ThreadsState::get_mut(state);
 
-    let Some(thread) = threads_state.threads.get_mut(selected_idx) else {
+    let Some(thread) = threads_state.threads.get_mut(real_idx) else {
         return ActionResult::Nothing;
     };
 
@@ -240,8 +253,10 @@ fn handle_thread_create(state: &mut State) -> ActionResult {
     };
     threads_state.threads.push(thread);
 
-    // Select the newly created thread (last in list)
-    let new_idx = ThreadsState::get(state).threads.len().saturating_sub(1);
+    // Select the newly created thread — it is the last entry of the active
+    // (non-archived) visible slice, so the stored selection is a VISIBLE-list
+    // position (consistent with `handle_thread_input_submit`), not a raw index.
+    let new_idx = ThreadsState::get(state).visible_indices(false).len().saturating_sub(1);
     FocusState::get_mut(state).selected_thread_idx = new_idx;
     state.flags.ui.dirty = true;
 
