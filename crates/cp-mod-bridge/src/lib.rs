@@ -346,7 +346,25 @@ fn setup_tee(entry: &cp_wire::types::registry::Entry) -> std::io::Result<Tee> {
 /// Build a [`StreamFrame`] from the given `kind` and publish it to the tee.
 ///
 /// Silently returns if the bridge is OFF or the tee is absent.
+///
+/// The frame is tagged with the **active streaming message's id** — the id of
+/// the last message in the conversation, which is precisely the assistant
+/// message being built while tokens stream (the streaming pipeline appends each
+/// chunk to `state.messages.last_mut()`). Carrying that id lets the frontend
+/// route live `Token` frames to the right conversation bubble and reconcile the
+/// streamed text against the durable `MessageCreated` entry (which references
+/// the same `Message::id`). `thread_id` stays empty: main-loop streaming is the
+/// agent's own conversation, not a thread reply (thread replies go through the
+/// `Send` tool, not the token stream).
 fn publish_frame(state: &mut State, kind: StreamKind) {
+    // Read the active streaming message id BEFORE the mutable `ext_mut` borrow
+    // (a short clone, negligible against the LLM/network cost of a chunk).
+    let message_id = state
+        .messages
+        .last()
+        .map(|m| m.id.clone())
+        .unwrap_or_default();
+
     let bs = state.ext_mut::<BridgeState>();
 
     let active = bs.tee.is_some() && bs.boot.is_some();
@@ -368,7 +386,7 @@ fn publish_frame(state: &mut State, kind: StreamKind) {
         agent_id,
         worker_id: String::new(),
         thread_id: String::new(),
-        message_id: String::new(),
+        message_id,
         seq,
         kind,
     };
