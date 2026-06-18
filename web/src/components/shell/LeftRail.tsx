@@ -25,6 +25,8 @@ export function LeftRail({
   onSelect: (id: string) => void
 }) {
   const { data: panels = [] } = usePanels(agentId)
+  // Threads panel is redundant in the cockpit — there's a dedicated Threads view
+  const filteredPanels = panels.filter((p) => p.kind !== "threads")
   const usedRatio = tokenBudget.used / tokenBudget.budget
 
   return (
@@ -83,7 +85,7 @@ export function LeftRail({
       {/* panel list */}
       <ScrollArea className="min-h-0 flex-1">
         <ul className="px-2 pb-3">
-          {panels.map((p) => {
+          {filteredPanels.map((p) => {
             const Icon = panelIcon[p.kind]
             const sel = selected === p.id
             return (

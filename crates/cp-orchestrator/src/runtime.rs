@@ -27,7 +27,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use crate::channel::Tailer;
 use crate::registry::{AgentRegistry, Event};
@@ -141,17 +141,33 @@ impl Runtime {
 fn driver_loop(backend: Arc<Mutex<Backend>>, agents_dir: PathBuf, interval: Duration) {
     let mut registry = AgentRegistry::new(agents_dir);
     let mut tailers: HashMap<String, Tailer> = HashMap::new();
+    // Per-agent folder paths, seeded from Appeared events.
+    let mut agent_folders: HashMap<String, PathBuf> = HashMap::new();
+    // Per-agent last-seen config.json mtime, for change detection.
+    let mut config_mtimes: HashMap<String, SystemTime> = HashMap::new();
 
     loop {
         // 1. Registry scan — discover/lose agents.
         if let Ok(events) = registry.scan() {
-            process_registry_events(&events, &backend, &mut tailers);
+            process_registry_events(&events, &backend, &mut tailers, &mut agent_folders);
+
+            // Clean up mtime entries for disappeared agents.
+            for event in &events {
+                if let Event::Disappeared(id) = event {
+                    let _removed = config_mtimes.remove(id);
+                }
+            }
         }
 
         // 2. Tail every known agent's oplog and fold into the view.
         tail_all_agents(&backend, &mut tailers);
 
-        // 3. Reap stale *.tmp registry writes (crash-orphans).
+        // 3. Detect tier-② state changes by checking config.json mtime.
+        //    When a change is found, mark the agent dirty so SSE producers
+        //    emit an `invalidate` event on their next sweep (~200ms).
+        check_config_mtimes(&backend, &agent_folders, &mut config_mtimes);
+
+        // 4. Reap stale *.tmp registry writes (crash-orphans).
         let _reaped = registry.reap_tmp(crate::registry::DEFAULT_TMP_GRACE);
 
         thread::sleep(interval);
@@ -163,15 +179,18 @@ fn process_registry_events(
     events: &[Event],
     backend: &Arc<Mutex<Backend>>,
     tailers: &mut HashMap<String, Tailer>,
+    agent_folders: &mut HashMap<String, PathBuf>,
 ) {
     for event in events {
         match event {
             Event::Appeared(entry) => {
                 let oplog_dir = PathBuf::from(&entry.oplog_path);
                 let _previous = tailers.insert(entry.id.clone(), Tailer::new(oplog_dir));
+                let _prev = agent_folders.insert(entry.id.clone(), PathBuf::from(&entry.folder));
             }
             Event::Disappeared(id) => {
                 let _removed = tailers.remove(id);
+                let _removed = agent_folders.remove(id);
                 if let Ok(mut b) = backend.lock() {
                     let _removed = b.view_mut().remove(id);
                 }
@@ -204,6 +223,40 @@ fn tail_all_agents(backend: &Arc<Mutex<Backend>>, tailers: &mut HashMap<String, 
             let cost = b.view.get(id).map(|v| v.cost.cost_usd);
             if let Some(cost_usd) = cost {
                 b.breaker_mut().observe(id, cost_usd);
+            }
+        }
+    }
+}
+
+/// Subdirectory the agent stores its persistence files in.
+const CP_DIR: &str = ".context-pilot";
+/// The global shared configuration file.
+const CONFIG_FILE: &str = "config.json";
+
+/// Check each known agent's `config.json` mtime and mark dirty when it changes.
+///
+/// A single `stat` call per agent (~1µs) gates whether any work happens.
+/// When the mtime differs from the last observation, the agent is marked dirty
+/// in the shared [`Backend`] so that SSE producers emit an `invalidate` event,
+/// prompting connected frontends to refetch tier-② data immediately.
+fn check_config_mtimes(
+    backend: &Arc<Mutex<Backend>>,
+    agent_folders: &HashMap<String, PathBuf>,
+    mtimes: &mut HashMap<String, SystemTime>,
+) {
+    for (id, folder) in agent_folders {
+        let config_path = folder.join(CP_DIR).join(CONFIG_FILE);
+        let current = match std::fs::metadata(&config_path).and_then(|m| m.modified()) {
+            Ok(mt) => mt,
+            Err(_) => continue,
+        };
+
+        let changed = mtimes.get(id).map_or(false, |prev| *prev != current);
+        let _prev = mtimes.insert(id.clone(), current);
+
+        if changed {
+            if let Ok(mut b) = backend.lock() {
+                b.mark_dirty(id);
             }
         }
     }

@@ -15,7 +15,7 @@ import { mintTicket } from "./api"
 
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:7878"
 
-export type SseEventType = "delta" | "stream" | "resync" | "error"
+export type SseEventType = "delta" | "stream" | "resync" | "invalidate" | "error"
 
 export interface SseEvent {
   type: SseEventType
@@ -85,7 +85,7 @@ function createSseClient(agentId: string): SseClient {
       }
 
       // Named events from the backend
-      for (const type of ["delta", "stream", "resync"] as const) {
+      for (const type of ["delta", "stream", "resync", "invalidate"] as const) {
         es.addEventListener(type, (e: MessageEvent) => {
           if (e.lastEventId) lastEventId = e.lastEventId
           emit({ type, id: e.lastEventId || undefined, data: e.data })

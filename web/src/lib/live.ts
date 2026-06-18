@@ -29,6 +29,40 @@ import type {
   FinderNode,
 } from "./types"
 
+// ── Invalidation bus ──────────────────────────────────────────────────
+//
+// Structural solution for real-time state propagation. When agent state
+// changes (command sent, TUI mutation, SSE delta), `invalidateAgent(id)`
+// fires and every live hook for that agent immediately refetches from
+// the server. NOT optimistic updating — the refetch returns the server's
+// ground truth from the inspection plane (tier-② files).
+
+type InvalidateFn = () => void
+const invalidators = new Map<string, Set<InvalidateFn>>()
+
+function registerInvalidator(agentId: string, fn: InvalidateFn): () => void {
+  let set = invalidators.get(agentId)
+  if (!set) { set = new Set(); invalidators.set(agentId, set) }
+  set.add(fn)
+  return () => { set!.delete(fn); if (set!.size === 0) invalidators.delete(agentId) }
+}
+
+/**
+ * Force all live queries for an agent to refetch immediately.
+ * Also invalidates fleet queries (agent status/thread counts may change).
+ *
+ * This is the **single entry point** for state invalidation — called by:
+ * - `sendCommand()` after a command is accepted (web-initiated mutations)
+ * - SSE `invalidate` events from the backend (TUI-initiated mutations)
+ * - Manual `refetch()` from any hook consumer
+ */
+export function invalidateAgent(agentId: string) {
+  invalidators.get(agentId)?.forEach((fn) => fn())
+  // Fleet hooks register with key "" — always invalidate them too
+  // (agent status, thread counts, cost may have changed)
+  if (agentId !== "") invalidators.get("")?.forEach((fn) => fn())
+}
+
 // ── Generic live query ────────────────────────────────────────────────
 
 interface LiveQueryResult<T> {
@@ -102,12 +136,20 @@ function useLiveQuery<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, enabled])
 
-  // SSE subscription
+  // SSE subscription — delta events AND invalidate events both trigger refetch
   useEffect(() => {
     if (!agentId || !enabled) return
     const client = getOrCreateSseClient(agentId)
-    const unsub = client.subscribe("delta", () => debouncedRefetch())
-    return unsub
+    const unsubDelta = client.subscribe("delta", () => debouncedRefetch())
+    const unsubInvalidate = client.subscribe("invalidate", () => debouncedRefetch())
+    return () => { unsubDelta(); unsubInvalidate() }
+  }, [agentId, debouncedRefetch, enabled])
+
+  // Invalidation bus — `invalidateAgent(id)` triggers immediate refetch
+  useEffect(() => {
+    if (!enabled) return
+    const effectiveId = agentId ?? ""
+    return registerInvalidator(effectiveId, debouncedRefetch)
   }, [agentId, debouncedRefetch, enabled])
 
   // Poll backstop
@@ -221,4 +263,22 @@ export function useLibrary(agentId: string): LiveQueryResult<LibraryItem[]> {
 
 // ── Commands (imperative, not hooks) ──────────────────────────────────
 
-export { sendCommand, mintTicket } from "./api"
+export { mintTicket } from "./api"
+
+/**
+ * Send a command to an agent, then automatically invalidate all live
+ * queries for that agent so the UI reflects the change immediately.
+ *
+ * Two invalidation rounds: one immediate (may catch synchronously-
+ * processed commands) and one after 300ms (waits for the agent's
+ * PersistenceWriter 50ms debounce + disk flush + backend mtime cache).
+ */
+export async function sendCommand(
+  agentId: string,
+  kind: Record<string, unknown>,
+): Promise<api.CommandReceipt> {
+  const receipt = await api.sendCommand(agentId, kind)
+  invalidateAgent(agentId)
+  setTimeout(() => invalidateAgent(agentId), 300)
+  return receipt
+}

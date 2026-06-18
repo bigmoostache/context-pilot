@@ -57,6 +57,15 @@ impl SseMessage {
         Self { id: None, event: "resync".to_owned(), data: "{}".to_owned() }
     }
 
+    /// Build an `invalidate` event telling the client that agent state has
+    /// changed and all cached data should be refetched from the inspection
+    /// plane. Emitted when the backend detects a tier-② file mutation
+    /// (config.json mtime change) or after a command is accepted.
+    #[must_use]
+    pub fn invalidate() -> Self {
+        Self { id: None, event: "invalidate".to_owned(), data: "{}".to_owned() }
+    }
+
     /// Encode to the SSE wire format: an optional `id:` line, an `event:`
     /// line, one `data:` line per line of payload, terminated by a blank line.
     #[must_use]

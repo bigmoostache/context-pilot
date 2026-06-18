@@ -169,12 +169,19 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
     };
     let dedup_token = command.dedup_token.clone();
     match AgentChannel::from_entry(&entry).send(command) {
-        Ok(ack) => HttpReply::ok(&CommandReceipt {
-            cmd_id: ack.cmd_id,
-            dedup_token,
-            rev: ack.rev,
-            status: ack_status(&ack.status),
-        }),
+        Ok(ack) => {
+            // Mark state dirty so SSE producers emit an `invalidate` event,
+            // prompting connected frontends to refetch tier-② data.
+            if let Ok(mut b) = state.lock() {
+                b.mark_dirty(id);
+            }
+            HttpReply::ok(&CommandReceipt {
+                cmd_id: ack.cmd_id,
+                dedup_token,
+                rev: ack.rev,
+                status: ack_status(&ack.status),
+            })
+        }
         Err(_) => HttpReply::error(502, "agent unreachable"),
     }
 }
@@ -214,11 +221,32 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         Ok(e) => e,
         Err(reply) => return reply,
     };
-    let config = {
+    let folder = std::path::Path::new(&entry.folder);
+    let (config, focused_thread_id) = {
         let Ok(mut b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
-        b.inspect_mut().read_config(std::path::Path::new(&entry.folder)).ok()
+        let reader = b.inspect_mut();
+        let cfg = reader.read_config(folder).ok();
+
+        // Read focused_thread_id from the first worker's FocusState.
+        let focused = reader
+            .list_workers(folder)
+            .unwrap_or_default()
+            .into_iter()
+            .find_map(|wid| {
+                reader
+                    .read_worker(folder, &wid)
+                    .ok()
+                    .and_then(|w| {
+                        w.get("modules")
+                            .and_then(|m| m.get("threads_worker"))
+                            .and_then(|tw| tw.get("focused_thread_id"))
+                            .and_then(serde_json::Value::as_str)
+                            .map(String::from)
+                    })
+            });
+        (cfg, focused)
     };
     let Some(config) = config else {
         return HttpReply::error(404, "agent state unavailable");
@@ -235,7 +263,12 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         .iter()
         .map(|t| reshape_thread(t, agent_id))
         .collect();
-    HttpReply::ok(&details)
+
+    // Wrap with focused_thread_id so the frontend can highlight it.
+    HttpReply::ok(&serde_json::json!({
+        "focusedThreadId": focused_thread_id,
+        "threads": details,
+    }))
 }
 
 /// Reshape one raw thread from agent state to the maquette `ThreadDetail`
@@ -276,6 +309,7 @@ fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_json::Value 
         "lastActivity": last_activity,
         "messageCount": msg_count,
         "unread": unread,
+        "archived": raw.get("archived").and_then(serde_json::Value::as_bool).unwrap_or(false),
         "log": log,
     })
 }

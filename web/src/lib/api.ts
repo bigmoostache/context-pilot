@@ -47,8 +47,82 @@ export function fetchAgentMeta(agentId: string): Promise<Agent> {
 
 // ── Threads ───────────────────────────────────────────────────────────
 
+/** Format an epoch-ms timestamp as a relative age string ("just now", "3m ago", etc). */
+function formatAge(epochMs: number): string {
+  const delta = Date.now() - epochMs
+  if (delta < 60_000) return "just now"
+  const mins = Math.floor(delta / 60_000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return `${days}d ago`
+}
+
+/** Raw message shape from the backend (differs from maquette ThreadMsg). */
+interface RawMsg {
+  id: string
+  role: string
+  content?: string
+  timestamp?: number
+  text?: string
+  author?: string
+  ts?: string
+  tool?: unknown
+  questions?: unknown
+  fileRef?: string
+}
+
+/** Raw thread shape from the backend. */
+interface RawThread {
+  id: string
+  name: string
+  status: string
+  agentId: string
+  lastActivity: number | string
+  lastMessage?: string
+  messageCount?: number
+  unread?: number
+  archived?: boolean
+  log?: RawMsg[]
+  // maquette fields (pass through if present)
+  agent?: string
+  createdAt?: string
+}
+
+/** Wrapper shape from the backend threads endpoint. */
+interface ThreadsResponse {
+  focusedThreadId: string | null
+  threads: RawThread[]
+}
+
 export function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
-  return request(`/api/agent/${agentId}/threads`)
+  return request<ThreadsResponse | RawThread[]>(`/api/agent/${agentId}/threads`).then((raw) => {
+    // Handle both wrapper shape { focusedThreadId, threads } and legacy array
+    const focusedId = Array.isArray(raw) ? null : raw.focusedThreadId
+    const list: RawThread[] = Array.isArray(raw) ? raw : (raw.threads ?? [])
+    return list.map((t) => ({
+      id: t.id,
+      name: t.name,
+      status: (t.status === "MyTurn" ? "MY_TURN" : t.status === "TheirTurn" ? "THEIR_TURN" : t.status) as ThreadDetail["status"],
+      agentId: t.agentId ?? agentId,
+      agent: t.agent ?? agentId,
+      createdAt: t.createdAt ?? (typeof t.lastActivity === "number" ? new Date(t.lastActivity).toISOString() : t.lastActivity),
+      lastActivity: typeof t.lastActivity === "number" ? formatAge(t.lastActivity) : t.lastActivity,
+      unread: t.unread ?? 0,
+      archived: t.archived ?? false,
+      focused: focusedId != null && t.id === focusedId,
+      log: (t.log ?? []).map((m) => ({
+        id: m.id,
+        author: (m.author ?? m.role ?? "user") as "user" | "assistant",
+        text: m.text ?? m.content,
+        ts: m.ts ?? (m.timestamp ? new Date(m.timestamp).toISOString() : ""),
+        tool: m.tool as ThreadDetail["log"][number]["tool"],
+        questions: m.questions as ThreadDetail["log"][number]["questions"],
+        fileRef: m.fileRef,
+      })),
+    }))
+  })
 }
 
 // ── Panels ────────────────────────────────────────────────────────────
@@ -60,8 +134,8 @@ export function fetchPanels(agentId: string): Promise<ContextPanel[]> {
 export function fetchMemory(agentId: string): Promise<MemoryCard[]> {
   return request<Record<string, Record<string, unknown>>>(`/api/agent/${agentId}/memory`).then((raw) => {
     if (Array.isArray(raw)) return raw as unknown as MemoryCard[]
-    return Object.entries(raw).map(([id, m]) => ({
-      id,
+    return Object.entries(raw).map(([_id, m], i) => ({
+      id: `M${i + 1}`,
       tldr: (m.tl_dr ?? "") as string,
       importance: (m.importance ?? "medium") as MemoryCard["importance"],
       labels: (m.labels ?? []) as string[],

@@ -7,7 +7,6 @@ import { TreePanel } from "./TreePanel"
 import { MemoryPanel } from "./MemoryPanel"
 import { RadarPanel } from "./RadarPanel"
 import { TodoPanel } from "./TodoPanel"
-import { ThreadsPanel } from "./ThreadsPanel"
 import { StatsPanel } from "./StatsPanel"
 import { ToolsPanel } from "./ToolsPanel"
 import { EntitiesPanel } from "./EntitiesPanel"
@@ -50,8 +49,6 @@ function renderPanel(panel: ContextPanel, agentId: string) {
       return <RadarPanel panel={panel} agentId={agentId} />
     case "todo":
       return <TodoPanel panel={panel} agentId={agentId} />
-    case "threads":
-      return <ThreadsPanel panel={panel} agentId={agentId} />
     case "stats":
       return <StatsPanel panel={panel} agentId={agentId} />
     case "tools":

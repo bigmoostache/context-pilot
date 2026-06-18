@@ -63,8 +63,7 @@ export function ThreadList({
   const visible = (showArchived ? archived : live).filter(matches)
 
   const mine = visible.filter((t) => t.status === "MY_TURN")
-  const active = visible.filter((t) => t.status === "ACTIVE")
-  const working = visible.filter((t) => t.status === "THEIR_TURN")
+  const working = visible.filter((t) => t.status === "THEIR_TURN" || t.status === "ACTIVE")
   // agent-owned, actively-or-parallel working count (for the header pill)
   const workingCount = live.filter((t) => t.status !== "MY_TURN").length
 
@@ -160,11 +159,6 @@ export function ThreadList({
                   <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} />
                 ))}
 
-                {active.length > 0 && <Group label="Active" count={active.length} accent="var(--ok)" />}
-                {active.map((t) => (
-                  <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} />
-                ))}
-
                 {working.length > 0 && <Group label="Working in parallel" count={working.length} />}
                 {working.map((t) => (
                   <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} />
@@ -223,13 +217,16 @@ function ThreadRow({
   archived?: boolean
 }) {
   const preview = previewOf(t)
+  const isFocused = !archived && t.focused
   const dot =
-    t.status === "MY_TURN"
-      ? "var(--signal)"
-      : t.status === "ACTIVE"
-        ? "var(--ok)"
-        : "var(--muted-foreground)"
-  const pulse = t.status === "MY_TURN" || t.status === "ACTIVE"
+    isFocused
+      ? "var(--ok)"
+      : t.status === "MY_TURN"
+        ? "var(--signal)"
+        : t.status === "ACTIVE"
+          ? "var(--ok)"
+          : "var(--muted-foreground)"
+  const pulse = isFocused || t.status === "MY_TURN" || t.status === "ACTIVE"
 
   return (
     <div
@@ -245,6 +242,14 @@ function ThreadRow({
             style={{ background: archived ? "var(--muted-foreground)" : dot }}
           />
           <span className="truncate text-[13px] font-medium text-foreground/90">{t.name}</span>
+          {isFocused && (
+            <span
+              className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide"
+              style={{ background: "color-mix(in oklab, var(--ok) 18%, transparent)", color: "var(--ok)" }}
+            >
+              focused
+            </span>
+          )}
           <span className="ml-auto shrink-0 pr-5 text-[10.5px] tabular-nums text-muted-foreground/50">
             {t.lastActivity}
           </span>

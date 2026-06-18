@@ -33,10 +33,12 @@
 pub mod finder;
 pub mod meta;
 pub mod panels;
+mod query;
 pub mod rest;
 pub mod sse;
 pub mod ticket;
 
+use std::collections::HashSet;
 use std::io::{Read as _, Write as _};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -52,6 +54,7 @@ use crate::channel::Tailer;
 use crate::inspect::StateReader;
 use crate::services::{CostBreaker, MaterializedView, StreamHub};
 use ticket::TicketStore;
+use query::QueryParams;
 
 /// Poll interval for the SSE producer between oplog/stream sweeps.
 const STREAM_POLL: Duration = Duration::from_millis(200);
@@ -83,6 +86,9 @@ pub struct Backend {
     pub(crate) inspect: StateReader,
     /// Directory of agent registry records (`<id>.json`).
     pub(crate) agents_dir: PathBuf,
+    /// Agents whose tier-② state has changed since the last SSE sweep.
+    /// SSE producers drain this per-agent to emit `invalidate` events.
+    pub(crate) dirty_agents: HashSet<String>,
 }
 
 impl Backend {
@@ -96,6 +102,7 @@ impl Backend {
             tickets: TicketStore::new(),
             inspect: StateReader::new(),
             agents_dir,
+            dirty_agents: HashSet::new(),
         }
     }
 
@@ -119,10 +126,22 @@ impl Backend {
         &mut self.inspect
     }
 
+    /// Mark an agent's state as dirty — SSE producers will emit an
+    /// `invalidate` event on the next sweep.
+    pub fn mark_dirty(&mut self, agent_id: &str) {
+        let _new = self.dirty_agents.insert(agent_id.to_owned());
+    }
+
+    /// Check and clear the dirty flag for an agent. Returns `true` if the
+    /// agent was dirty (the caller should emit an `invalidate` SSE event).
+    pub fn take_dirty(&mut self, agent_id: &str) -> bool {
+        self.dirty_agents.remove(agent_id)
+    }
+
     /// Construct a backend from explicit services — used by tests.
     #[cfg(test)]
     pub(crate) fn for_test(agents_dir: PathBuf, view: MaterializedView, breaker: CostBreaker) -> Self {
-        Self { view, breaker, hub: StreamHub::new(DEFAULT_SUB_CAPACITY), tickets: TicketStore::new(), inspect: StateReader::new(), agents_dir }
+        Self { view, breaker, hub: StreamHub::new(DEFAULT_SUB_CAPACITY), tickets: TicketStore::new(), inspect: StateReader::new(), agents_dir, dirty_agents: HashSet::new() }
     }
 }
 
@@ -356,6 +375,16 @@ fn run_stream(sink: &sse::SseSink, state: &Arc<Mutex<Backend>>, agent_id: &str, 
             }
         }
 
+        // Tier-② state change — the driver loop or a command handler flagged
+        // this agent's inspection-plane data as stale. Push an `invalidate`
+        // event so connected frontends refetch immediately.
+        {
+            let is_dirty = state.lock().ok().map_or(false, |mut b| b.take_dirty(agent_id));
+            if is_dirty && sink.send(&sse::SseMessage::invalidate()).is_err() {
+                return cleanup(state, agent_id, sub_id);
+            }
+        }
+
         // Keep-alive doubles as a disconnect probe.
         if sink.keep_alive().is_err() {
             return cleanup(state, agent_id, sub_id);
@@ -430,33 +459,6 @@ fn split_url(url: &str) -> (String, String) {
     }
 }
 
-/// A parsed query string (`k=v&k2=v2`).
-struct QueryParams {
-    /// Decoded key/value pairs.
-    pairs: Vec<(String, String)>,
-}
-
-impl QueryParams {
-    /// Parse a raw query string. Values are taken verbatim (no percent-decode;
-    /// ticket tokens and agent ids are hex/identifier-safe).
-    fn parse(query: &str) -> Self {
-        let pairs = query
-            .split('&')
-            .filter(|s| !s.is_empty())
-            .map(|pair| match pair.split_once('=') {
-                Some((k, v)) => (k.to_owned(), v.to_owned()),
-                None => (pair.to_owned(), String::new()),
-            })
-            .collect();
-        Self { pairs }
-    }
-
-    /// Look up the first value for `key`.
-    fn get(&self, key: &str) -> Option<&str> {
-        self.pairs.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -465,20 +467,5 @@ mod tests {
     fn split_url_separates_path_and_query() {
         assert_eq!(split_url("/api/stream?agent=a1&ticket=x"), ("/api/stream".to_owned(), "agent=a1&ticket=x".to_owned()));
         assert_eq!(split_url("/api/fleet"), ("/api/fleet".to_owned(), String::new()));
-    }
-
-    #[test]
-    fn query_params_parse_and_lookup() {
-        let q = QueryParams::parse("agent=a1&ticket=deadbeef&last_rev=5");
-        assert_eq!(q.get("agent"), Some("a1"));
-        assert_eq!(q.get("ticket"), Some("deadbeef"));
-        assert_eq!(q.get("last_rev"), Some("5"));
-        assert_eq!(q.get("missing"), None);
-    }
-
-    #[test]
-    fn query_params_handle_empty() {
-        let q = QueryParams::parse("");
-        assert_eq!(q.get("agent"), None);
     }
 }

@@ -272,7 +272,7 @@ fn apply_command(app: &mut App, cmd: Command) {
             apply_archive_thread(&mut app.state, &thread_id);
         }
         CommandKind::RestoreThread { thread_id } => {
-            apply_restore_thread(&app.state, &thread_id);
+            apply_restore_thread(&mut app.state, &thread_id);
         }
         CommandKind::Stop | CommandKind::InterruptStream => {
             apply_stop(&mut app.state);
@@ -338,6 +338,7 @@ fn apply_create_thread(state: &mut cp_base::state::runtime::State, name: &str) {
         status: ThreadStatus::TheirTurn,
         messages: vec![],
         created_at: now_ms(),
+        archived: false,
     });
 
     state.flags.ui.dirty = true;
@@ -346,50 +347,46 @@ fn apply_create_thread(state: &mut cp_base::state::runtime::State, name: &str) {
 
 // ── ArchiveThread ───────────────────────────────────────────────────────
 
-/// Remove the thread from the active list (archive = remove from state).
+/// Mark the thread as archived (soft-delete).
 fn apply_archive_thread(state: &mut cp_base::state::runtime::State, thread_id: &str) {
     let ts = ThreadsState::get_mut(state);
-    let before = ts.threads.len();
-    ts.threads.retain(|t| t.id != thread_id);
-    let removed = ts.threads.len() < before;
-
-    if removed {
-        // Clean up focus references (mirrors archive_confirm in threads.rs).
-        let focus = FocusState::get_mut(state);
-        if focus.focused_thread_id.as_deref() == Some(thread_id) {
-            focus.focused_thread_id = None;
-            focus.dangling_remaining = 0;
-            focus.escalation_level = 0;
-        }
-        let _prev = focus.last_read_count.remove(thread_id);
-        if focus.notified_my_turn_id.as_deref() == Some(thread_id) {
-            focus.notified_my_turn_id = None;
-        }
-        // Clamp selection index.
-        let len = ThreadsState::get(state).threads.len();
-        let focus_clamp = FocusState::get_mut(state);
-        if focus_clamp.selected_thread_idx >= len && len > 0 {
-            focus_clamp.selected_thread_idx = len.saturating_sub(1);
-        }
-        state.flags.ui.dirty = true;
-        log::info!("bridge: archived thread {thread_id}");
-    } else {
+    let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) else {
         log::warn!("bridge: ArchiveThread for unknown thread {thread_id}");
+        return;
+    };
+    thread.archived = true;
+
+    // Clean up focus references (mirrors archive_confirm in threads.rs).
+    let focus = FocusState::get_mut(state);
+    if focus.focused_thread_id.as_deref() == Some(thread_id) {
+        focus.focused_thread_id = None;
+        focus.dangling_remaining = 0;
+        focus.escalation_level = 0;
     }
+    let _prev = focus.last_read_count.remove(thread_id);
+    if focus.notified_my_turn_id.as_deref() == Some(thread_id) {
+        focus.notified_my_turn_id = None;
+    }
+
+    state.flags.ui.dirty = true;
+    log::info!("bridge: archived thread {thread_id}");
 }
 
 // ── RestoreThread ───────────────────────────────────────────────────────
 
-/// Restore is a no-op in the current model (archived threads are removed,
-/// not hidden).  Log a warning so the backend caller knows.
+/// Restore an archived thread (clear the soft-delete flag).
 fn apply_restore_thread(
-    _state: &cp_base::state::runtime::State,
+    state: &mut cp_base::state::runtime::State,
     thread_id: &str,
 ) {
-    log::warn!(
-        "bridge: RestoreThread({thread_id}) is a no-op — \
-         archived threads are removed, not hidden",
-    );
+    let ts = ThreadsState::get_mut(state);
+    if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) {
+        thread.archived = false;
+        state.flags.ui.dirty = true;
+        log::info!("bridge: restored thread {thread_id}");
+    } else {
+        log::warn!("bridge: RestoreThread for unknown thread {thread_id}");
+    }
 }
 
 // ── Stop / Interrupt ────────────────────────────────────────────────────

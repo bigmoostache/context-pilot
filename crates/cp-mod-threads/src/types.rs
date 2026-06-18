@@ -90,6 +90,10 @@ pub struct Thread {
     pub messages: Vec<ThreadMessage>,
     /// Creation timestamp (epoch ms).
     pub created_at: u64,
+    /// Soft-delete flag — archived threads are hidden from the active list
+    /// but retained in state so the web frontend can display and restore them.
+    #[serde(default)]
+    pub archived: bool,
 }
 
 // =============================================================================
