@@ -40,8 +40,12 @@ function parseSegments(line: string): ReactNode[] {
           "code",
           {
             key: k++,
+            // Theme-aware chip: `bg-muted` adapts (light beige in the light
+            // palette, warm-grey in dark) instead of a hardcoded near-black
+            // oklch that was unreadable in light mode (T23). Faint border gives
+            // it definition on both backgrounds; the interactive accent stays.
             className:
-              "rounded-[2px] bg-[oklch(0.24_0.006_75)] px-1 py-px font-mono text-[0.82em] text-[var(--interactive)]",
+              "rounded-[3px] border border-foreground/10 bg-muted px-1 py-px font-mono text-[0.82em] text-[var(--interactive)]",
           },
           tok.slice(1, -1),
         ),

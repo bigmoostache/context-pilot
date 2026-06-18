@@ -5426,6 +5426,10 @@ d495c60011ecdbf4:
   path: src/llms/mod.rs
   description: 'LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging. Re-exports split: llm_types (traits) + models (enums).'
   last_edited_ms: 0
+d4b5d84f9128b7ac:
+  path: web/src/lib/inline.tsx
+  description: 'Minimal inline renderer for **bold**, `code`, line breaks — typesets assistant/user prose without a markdown dep. Inline `code` chip is theme-aware (bg-muted + faint foreground border + interactive accent text) so it reads in BOTH light and dark palettes (T23 fix: was a hardcoded near-black oklch bg, unreadable in light mode).'
+  last_edited_ms: 1781783752553
 d4bbdd0fa2570002:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
