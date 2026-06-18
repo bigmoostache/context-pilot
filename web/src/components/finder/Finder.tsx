@@ -162,7 +162,16 @@ export function Finder({ agent }: { agent: Agent }) {
     window.setTimeout(() => setToast(null), 2200)
   }
 
-  const navigate = (path: string) => {
+  // The backend lists paths RELATIVE to the realm root (e.g. "crates",
+  // "crates/cp-base"); breadcrumbs and `relCwd` expect an absolute,
+  // agent.folder-rooted cwd. Normalise every navigation target to absolute so
+  // a folder reached by clicking a live listing keeps a valid crumb trail
+  // (and Backspace/go-up works). Crumb/sidebar targets are already absolute.
+  const toAbs = (p: string) =>
+    p === agent.folder || p.startsWith(agent.folder + "/") ? p : `${agent.folder}/${p}`
+
+  const navigate = (rawPath: string) => {
+    const path = toAbs(rawPath)
     if (path === cwd && !active.fileNode) return
     patchTab((t) => ({
       ...t,
