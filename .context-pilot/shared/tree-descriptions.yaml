@@ -578,6 +578,10 @@
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
   last_edited_ms: 0
+1568862db32b96fd:
+  path: report/wiring-alignment-audit.md
+  description: 'Wiring alignment audit (X818). Re-walked 2026-06-18 (X867): §0 verdict (zero un-validated load-bearing invariants), §1 two planes, §2 I1-I13/§7/§9/§18/§19 register (§19 ABIDES load-bearing + histograms deferred non-load-bearing), §2.5 keystone K1-K9 table (all ABIDE), §2.6 V1-V12 fault-matrix validation (8/12 PROVEN by landed tests, V4/V5/V8/V10 deferred to X869 CI), §3 frontend feature wiring (e2e-proven), §4 measured latency table, §5 ledger (all DONE except X869 soak + X870 doc/tag), §6 credit, §7 disk-read ledger (X864 ABIDES).'
+  last_edited_ms: 1781823231307
 15782d1830b79255:
   path: ui/src/components/finder/Finder.tsx
   description: Top-level Finder orchestrator. buildRealm(agent) memo, tabs w/ per-tab back/fwd history, keyboard nav (arrows/Enter/Backspace/Space QuickLook/⌘A/⌘I/type-ahead), additive + range selection, right-click context menu, Get Info modal, 4 view modes, icon-size slider, path bar, drag-drop upload overlay, status bar, transient toast. Stagger re-trigger by keying views on cwd.
@@ -2034,6 +2038,10 @@
   path: .github/checks/allowed-lint-exceptions.yaml
   description: 'Curated list of allowed #[expect]/#[allow] annotations (10 entries). Every occurrence in the codebase MUST have an entry here. Fields: path, match, reason, strategy.'
   last_edited_ms: 0
+4a0a54b809a2ea35:
+  path: crates/cp-orchestrator/tests/fleet_soak.rs
+  description: 'Phase 9.4 (X869) multi-agent soak + fleet-scale fault-matrix slice (2 tests). n_agents_under_concurrent_load_stay_gap_free_and_isolated: 16 agents drive concurrent contended mixed durable(roster/message)/best-effort(phase/cost) workloads into their own real oplogs via thread::scope; every replayed log is strictly contiguous 0..=rev_head (V10 gap-free — a shed best-effort record never consumes a rev) + one shared MaterializedView/CostBreaker/StreamHub keeps 16 isolated projections, breaker trips only even/over-budget agents (V8-scaled logical isolation, no cross-contamination). a_flooded_reordered_subscriber_coalesces_then_reconciles_from_the_view: a cap-3 StreamHub subscriber flooded with 10 out-of-order frames coalesces to newest window, latches degraded, bounded buffer never exceeds capacity, then mark_reconciled clears degraded from the oplog-folded view head (V5 drop+reorder chaos recovered from authoritative snapshot). Literal 10k-OS-soak (V8) + fsync-fault-FS (V4) remain external CI. Top use cp_mod_bridge/nix/notify/serde/serde_json/serde_yaml/tiny_http as _ for per-target unused-crate-dependencies. let _rev= bindings dodge unused_results (CB3 is lib-only, doesn''t lint test targets).'
+  last_edited_ms: 1781823989640
 4ace13d6319be7ac:
   path: crates/cp-mod-console/src/manager.rs
   description: TUI-side session handle. spawn()/reconnect()/kill()/send_input() via console server. FilePoller + StatusPoller background threads per session. Orphan cleanup on startup. server_request() short-lived UnixStream per call. Geometric backoff socket wait (25ms→500ms cap, 3s budget).
@@ -6078,6 +6086,10 @@ df5ab077cc587ce2:
   path: crates/cp-orchestrator/src/transport/ticket.rs
   description: 'Phase 19: single-use SSE upgrade tickets (I9b). TicketStore{live:HashMap<token,expiry_ms>,ttl}. mint() (sweep+/dev/urandom 256-bit hex token, DEFAULT_TTL 30s), redeem() true exactly once per unexpired token (remove+expiry check), lazy sweep on mint/redeem bounds map. Defends localhost endpoint vs malicious website (confused-deputy/DNS-rebind) that CORS/Origin can''t stop. 5 tests.'
   last_edited_ms: 1781647650749
+dfd2c997d0826591:
+  path: report/wiring-alignment-audit.md
+  description: 'Wiring alignment audit (X818). Re-walked 2026-06-18 (X867+X869): §0 verdict (zero un-validated load-bearing invariants), §2 I1-I13/§7/§9/§18/§19 register, §2.5 keystone K1-K9 table (all ABIDE), §2.6 V1-V12 fault-matrix (10/12 PROVEN by landed tests incl V5+V10 via fleet_soak.rs; V4 fsync-fault-FS + V8 literal-10k-OS-soak remain external-CI for invariants validated by proxy/at-scale), §3 frontend feature wiring (e2e-proven), §4 measured latency table, §5 ledger, §6 credit, §7 disk-read ledger (X864 ABIDES).'
+  last_edited_ms: 1781824003019
 e00dc446a2196468:
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.

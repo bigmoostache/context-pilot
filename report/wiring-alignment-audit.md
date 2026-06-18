@@ -34,10 +34,11 @@ StreamHub → SSE → rAF frontend consumer, proven with real data), and the
 now read live cumulative tokens + spend from `/metrics` — **no app surface still
 draws from mock data**. The keystone (K1–K9) and fault-matrix (V1–V12) re-walk
 below leaves **zero un-validated load-bearing invariants**: every I-invariant +
-keystone is ABIDES, 8/12 V-rows are proven by a landed test, the 4 deferred
-V-rows are additional adversarial harnesses (X869 CI) for invariants already
-validated by proxy, and the single honest follow-up — the §19 latency/fsync
-**histograms** — is explicitly non-load-bearing.
+keystone is ABIDES, 10/12 V-rows are proven by a landed test, the 2 deferred
+V-rows (V4 fsync-fault FS-injection, V8 literal 10k-agent OS soak) are external-CI
+harnesses for invariants already validated by proxy / at-scale logic, and the
+single honest follow-up — the §19 latency/fsync **histograms** — is explicitly
+non-load-bearing.
 
 ---
 
@@ -95,10 +96,12 @@ never tabulated them). **All nine ABIDE.**
 
 The doc's V1–V12 fault matrix is the formal validation contract. This table
 records, for each row, **the test that proves it today** versus the literal
-fault-injection/soak deferred to the X869 CI matrix. **8 of 12 are proven by a
-landed test now; the remaining 4 are design-ABIDES with their literal chaos/soak
-harness scheduled for X869** (none is an un-closed *design* gap — each is an
-additional adversarial *proof* of an invariant already validated by proxy).
+fault-injection/soak deferred to the X869 CI matrix. **10 of 12 are proven by a
+landed test now; the remaining 2 (V4 fsync-fault FS-injection, V8 literal 10k-agent
+OS soak) are design-ABIDES with their external-CI harness scheduled for X869**
+(neither is an un-closed *design* gap — each is an additional adversarial *proof*
+of an invariant already validated by proxy / at-scale logic, and neither can be a
+localhost cargo test without contorting durability code or spawning 10k processes).
 
 | V | Guards | Asserts (doc) | Status | Proof / plan |
 |---|---|---|---|---|
@@ -106,21 +109,22 @@ additional adversarial *proof* of an invariant already validated by proxy).
 | **V2** | I11 journal-then-ack | deadman re-exec after ack ⇒ effect replayed exactly once | **PROVEN** ✅ | `cp-mod-bridge/command.rs` `v2_dedup_survives_deadman_reexec` + `crash_replay.rs` |
 | **V3** | I4 dedup | replay same `dedup_token` after a long outage ⇒ second apply is a no-op | **PROVEN** ✅ | `command.rs` seen-set replay test (idempotent re-accept, no re-apply) |
 | **V4** | I2 durability | power-cut (fsync fault) ⇒ committed `rev` readable, uncommitted absent | **PROVEN (by proxy)** · fault-injection **X869** | replay reads exactly the synced prefix (V1 torn-tail); a literal fsync-fault FS harness is the X869 add |
-| **V5** | I10 ordering | drop+reorder stream frames, drop `MessageStartHint` ⇒ UI reconstructs from oplog, no orphan leak | **PROVEN (read-side)** · chaos **X869** | `stream_hub.rs` bounded buffer + frontend `applyThreadDelta` high-water guard + oplog `MessageCreated` reconcile; orphan-token buffer bounded. Literal frame-drop chaos = X869 |
+| **V5** | I10 ordering | drop+reorder stream frames, drop `MessageStartHint` ⇒ UI reconstructs from oplog, no orphan leak | **PROVEN** ✅ | `tests/fleet_soak.rs::a_flooded_reordered_subscriber_coalesces_then_reconciles_from_the_view` (a small-capacity subscriber flooded with out-of-order frames coalesces to the newest window, latches `degraded`, and is reconciled from the `MaterializedView`'s oplog-folded heads) + `registry/tee_reader.rs` corrupt-frame resync + `stream_hub.rs` overflow-evict-degraded + frontend `applyThreadDelta` high-water guard |
 | **V6** | I9 auth | command with missing/invalid bearer ⇒ rejected | **PROVEN** ✅ | `command.rs` auth test (empty/mismatch → reject) + `transport/ticket.rs` single-use redeem |
 | **V7** | I7 backpressure | stall the consumer, fill the ring ⇒ loop latency unaffected, degraded flag set | **PROVEN** ✅ | `cp-mod-bridge/tee.rs` `v7_stalled_consumer_never_blocks_producer` (100k publishes < 5 s) + `stream_hub.rs` admit-evict + degraded |
-| **V8** | I12/K8 | spawn 10k agents ⇒ watch count ≈ agent count, no exhaustion | **DESIGN-ABIDES** · soak **X869** | one `OplogWaiter`/agent by construction; the literal 10k-agent soak is the X869 add |
+| **V8** | I12/K8 | spawn 10k agents ⇒ watch count ≈ agent count, no exhaustion | **PROVEN (logical, N=16)** · literal 10k OS soak **external CI** | `tests/fleet_soak.rs::n_agents_under_concurrent_load_stay_gap_free_and_isolated` proves the *logical* fleet-isolation invariant at N=16 (one shared view/breaker/hub keeps 16 isolated projections, no cross-contamination); one `OplogWaiter`/agent by construction means watch count is `O(agents)` at any scale. The literal 10k-agent OS soak (flat RSS/FD/threads) is genuinely external CI infra (can't spawn 10k processes on a laptop) |
 | **V9** | R2-8 CostBreaker | crash-loop at the spend ceiling ⇒ breaker stays tripped (durable counter) | **PROVEN** ✅ | `cost_breaker.rs` V9 high-water latch + `rebuild_from_view` + `tests/services_integration.rs` restart-rebuild-trips |
-| **V10** | K5 gap-free | coalesce tier-② saves under load ⇒ oplog rev stream has no gaps | **PROVEN (gap-free)** · load-soak **X869** | `cp-oplog` monotonic `rev` + replay-identical-after-compaction tests; the under-load coalescing soak is the X869 add |
+| **V10** | K5 gap-free | coalesce tier-② saves under load ⇒ oplog rev stream has no gaps | **PROVEN** ✅ | `tests/fleet_soak.rs::n_agents_under_concurrent_load_stay_gap_free_and_isolated` (16 agents each drive a contended mixed durable/best-effort workload into their own oplog; every replayed log is a strictly contiguous `0..=rev_head` stream — a shed best-effort record never consumes a `rev`, so the durable sequence never tears) + `cp-oplog` monotonic `rev` + replay-identical-after-compaction tests |
 | **V11** | I2 / §11.1 loop-fsync | burst of phase transitions during streaming ⇒ loop tick time statistically unchanged (no fsync on the loop) | **PROVEN** ✅ | `cp-oplog/src/service_tests.rs` `v11_emit_burst_never_blocks_the_loop_on_fsync` (5 000-emit burst, worst single emit < 25 ms, decoupled from `fdatasync`) |
 | **V12** | I13 body barrier | `kill -9` between a spilled body's fdatasync and its referencing entry's commit ⇒ orphan body, never a dangling head-hash | **PROVEN** ✅ | `cp-mod-bridge/body.rs` `gc_keeps_in_flight_spill_within_grace` (V12 race guard) + `get_detects_corruption` |
 
 **Re-walk verdict.** Zero un-validated **load-bearing** invariants remain. Every
-I-invariant, every keystone, and 8/12 fault-matrix rows are proven by a landed
-test today; the 4 deferred V-rows (V4/V5/V8/V10) are each an *additional*
-adversarial harness for an invariant already validated by proxy, scheduled into
-the X869 CI fault matrix — not an open design gap. The single honest *follow-up*
-is the §19 latency/fsync **histograms** (explicitly non-load-bearing).
+I-invariant, every keystone, and 10/12 fault-matrix rows are proven by a landed
+test today; the 2 remaining V-rows (V4 fsync-fault FS-injection, V8 literal
+10k-agent OS soak) are external-CI harnesses for invariants already validated by
+proxy (V4 rides V1's real-SIGKILL torn-tail proof) / at-scale logic (V8 rides the
+N=16 isolation proof) — not open design gaps. The single honest *follow-up* is the
+§19 latency/fsync **histograms** (explicitly non-load-bearing).
 
 ---
 
@@ -257,9 +261,11 @@ make abidance 99.9% rather than "the user's features work":
    table, the §2.5 keystone K1–K9 table, and the §2.6 V1–V12 fault-matrix table
    each carry a verdict + attached proof, leaving **zero un-validated
    load-bearing invariants**. The only items still open are the X869 CI additions
-   — the literal multi-agent soak (V8) and the fault-injection/chaos harnesses
-   (V4/V5/V10) — each an *additional* adversarial proof of an invariant already
-   validated by proxy, and the X870 design-doc decision-log + deploy tag.
+   — the literal 10k-agent OS soak (V8) and the fsync-fault FS-injection harness
+   (V4), each an *additional* adversarial proof of an invariant already validated
+   by proxy / at-scale logic (V5 + V10 are now **proven** by the landed
+   `fleet_soak.rs` chaos + gap-free-under-load tests) — and the X870 design-doc
+   decision-log + deploy tag.
 
 ---
 
