@@ -26,6 +26,9 @@ use super::Backend;
 use crate::channel::AgentChannel;
 use crate::services::Verdict;
 
+mod thread_shape;
+use thread_shape::{overlay_roster, reshape_thread};
+
 /// A transport-agnostic reply: an HTTP status and a JSON body.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HttpReply {
@@ -213,19 +216,38 @@ fn ack_status(status: &cp_wire::types::ack::Status) -> String {
     }
 }
 
-/// `GET /api/agent/{id}/threads` — thread list with full message logs.
+/// `GET /api/agent/{id}/threads` — the thread list, served roster-first.
 ///
-/// Reads the agent's `config.json` (via [`StateReader`](crate::inspect::StateReader)),
-/// extracts `modules.threads.threads`, and reshapes each thread to the
-/// maquette `ThreadDetail` shape (camelCase, `agentId` injected, messages
-/// mapped to `log`).
+/// The thread **roster** (which threads exist, their turn status, archived
+/// flag, and last activity) comes from the in-memory
+/// [`MaterializedView`](crate::services::MaterializedView) — folded live from
+/// the agent's oplog, so a just-created/archived/restored thread is reflected
+/// in milliseconds, never waiting on the debounced tier-② disk write (design
+/// doc I5: live reads ride the view, not disk).
+///
+/// The per-thread **message log** is hydrated best-effort from the agent's
+/// `config.json` (via [`StateReader`](crate::inspect::StateReader)): the view
+/// roster carries message *counts* but not bodies, and the conversation log is
+/// only needed once a thread is opened. The two are merged by thread id:
+///
+/// * a thread present in both — disk supplies its `log`, the view supplies the
+///   fresher `status` / `archived` / `lastActivity` (the disk copy may lag);
+/// * a thread only in the view (created after the last disk flush) — synthesised
+///   from the roster alone with an empty log (it gains its log on the next disk
+///   flush, and later via live `MessageCreated` deltas);
+/// * a thread only on disk (created before roster journaling began) — kept
+///   verbatim from disk.
+///
+/// This makes thread *appearance* instant (the user's latency complaint) while
+/// keeping conversations intact during the migration to a fully delta-driven
+/// read path.
 pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let entry = match resolve_entry(state, agent_id) {
         Ok(e) => e,
         Err(reply) => return reply,
     };
     let folder = std::path::Path::new(&entry.folder);
-    let (config, focused_thread_id) = {
+    let (config, focused_thread_id, roster) = {
         let Ok(mut b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
@@ -249,95 +271,34 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
                             .map(String::from)
                     })
             });
-        (cfg, focused)
+        // The `reader` borrow ends with `cfg`/`focused` (both owned); now read
+        // the live roster from the view under the same lock.
+        let roster = b.view.get(agent_id).map(|v| v.roster.clone()).unwrap_or_default();
+        (cfg, focused, roster)
     };
-    let Some(config) = config else {
-        return HttpReply::error(404, "agent state unavailable");
-    };
+
+    // Disk threads (full logs). Absent config is tolerated: the view roster
+    // alone can still render newly-created threads.
     let empty_arr = serde_json::Value::Array(Vec::new());
     let raw_threads = config
-        .get("modules")
+        .as_ref()
+        .and_then(|c| c.get("modules"))
         .and_then(|m| m.get("threads"))
         .and_then(|t| t.get("threads"))
         .and_then(serde_json::Value::as_array)
-        .unwrap_or(&empty_arr.as_array().expect("empty vec is array"));
+        .unwrap_or_else(|| empty_arr.as_array().expect("empty vec is array"));
 
-    let details: Vec<serde_json::Value> = raw_threads
-        .iter()
-        .map(|t| reshape_thread(t, agent_id))
-        .collect();
+    let mut details: Vec<serde_json::Value> =
+        raw_threads.iter().map(|t| reshape_thread(t, agent_id)).collect();
 
-    // Wrap with focused_thread_id so the frontend can highlight it.
+    // Overlay the view's fresher roster onto matching disk threads, then append
+    // any view-only threads the disk has not yet flushed.
+    overlay_roster(&mut details, &roster, agent_id);
+
     HttpReply::ok(&serde_json::json!({
         "focusedThreadId": focused_thread_id,
         "threads": details,
     }))
-}
-
-/// Reshape one raw thread from agent state to the maquette `ThreadDetail`
-/// shape: snake_case → camelCase, computed fields (`messageCount`, `unread`,
-/// `lastMessage`, `lastActivity`), and messages mapped to `log`.
-fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_json::Value {
-    let messages = raw.get("messages").and_then(serde_json::Value::as_array);
-    let msg_count = messages.map_or(0, Vec::len);
-    let unread = messages.map_or(0, |msgs| {
-        msgs.iter().filter(|m| m.get("acknowledged") == Some(&serde_json::Value::Bool(false))).count()
-    });
-    let last_msg = messages
-        .and_then(|msgs| msgs.last())
-        .and_then(|m| m.get("content"))
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("");
-    let last_activity = messages
-        .and_then(|msgs| msgs.last())
-        .and_then(|m| m.get("timestamp"))
-        .and_then(serde_json::Value::as_u64)
-        .unwrap_or(0);
-
-    let log: Vec<serde_json::Value> = messages
-        .map(|msgs| msgs.iter().enumerate().map(|(i, m)| reshape_message(m, i)).collect())
-        .unwrap_or_default();
-
-    let status_str = match raw.get("status").and_then(serde_json::Value::as_str).unwrap_or("TheirTurn") {
-        "MyTurn" => "MY_TURN",
-        _ => "THEIR_TURN",
-    };
-
-    serde_json::json!({
-        "id": raw.get("id").and_then(serde_json::Value::as_str).unwrap_or(""),
-        "name": raw.get("name").and_then(serde_json::Value::as_str).unwrap_or(""),
-        "status": status_str,
-        "agentId": agent_id,
-        "lastMessage": last_msg,
-        "lastActivity": last_activity,
-        "messageCount": msg_count,
-        "unread": unread,
-        "archived": raw.get("archived").and_then(serde_json::Value::as_bool).unwrap_or(false),
-        "log": log,
-    })
-}
-
-/// Reshape one thread message to the maquette `ThreadMsg` shape.
-fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
-    let role = match raw.get("author").and_then(serde_json::Value::as_str).unwrap_or("User") {
-        "Assistant" => "assistant",
-        _ => "user",
-    };
-    let mut msg = serde_json::json!({
-        "id": format!("msg_{index}"),
-        "role": role,
-        "content": raw.get("content").and_then(serde_json::Value::as_str).unwrap_or(""),
-        "timestamp": raw.get("timestamp").and_then(serde_json::Value::as_u64).unwrap_or(0),
-    });
-    if let Some(fp) = raw.get("file_path").and_then(serde_json::Value::as_str) {
-        let _prev = msg.as_object_mut().expect("just built").insert("fileRef".to_owned(), serde_json::Value::String(fp.to_owned()));
-    }
-    if let Some(q) = raw.get("question") {
-        if !q.is_null() {
-            let _prev = msg.as_object_mut().expect("just built").insert("questions".to_owned(), serde_json::json!([q]));
-        }
-    }
-    msg
 }
 
 /// JSON-encode a string (with surrounding quotes and escaping).
