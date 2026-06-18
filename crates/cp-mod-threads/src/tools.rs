@@ -7,6 +7,7 @@ use std::fmt::Write as _;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use cp_base::cast::Safe as _;
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -48,6 +49,14 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
 
+    // Default true: agent keeps its turn (progress update). Set false to
+    // hand the thread back to the user (delivery complete).
+    let still_my_turn = tool
+        .input
+        .get("still_my_turn")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(true);
+
     let msg = ThreadMessage {
         author: ThreadAuthor::Assistant,
         content: markdown,
@@ -71,17 +80,19 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         (name, truncated)
     };
 
-    // Mutate thread state: push message + set THEIR_TURN.
+    // Mutate thread state: push message + conditionally flip status.
     {
         let ts = ThreadsState::get_mut(state);
         if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == tid) {
             thread.messages.push(msg);
-            thread.status = ThreadStatus::TheirTurn;
+            if !still_my_turn {
+                thread.status = ThreadStatus::TheirTurn;
+            }
         }
     }
 
-    // Clear focus + start dangling phase.
-    {
+    // Clear focus + start dangling phase only when handing the thread back.
+    if !still_my_turn {
         let fs = FocusState::get_mut(state);
         fs.focused_thread_id = None;
         fs.dangling_remaining = 5;
@@ -90,7 +101,9 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         fs.notified_my_turn_id = None;
     }
 
-    let mut result = ToolResult::new(tool.id.clone(), format!("Sent to {tid} \"{thread_name}\": {msg_preview}"), false);
+    let suffix = if still_my_turn { " (still your turn)" } else { "" };
+    let mut result =
+        ToolResult::new(tool.id.clone(), format!("Sent to {tid} \"{thread_name}\": {msg_preview}{suffix}"), false);
     result.preserves_tempo = true;
     result
 }
@@ -175,7 +188,7 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     // so this is a one-shot force-refresh. (u8::MAX is also the sanctioned
     // "not frozen" sentinel — the sidebar freeze indicator excludes it.)
     for ctx in &mut state.context {
-        if ctx.context_type.as_str() == cp_base::state::context::Kind::THREADS {
+        if ctx.context_type.as_str() == Kind::THREADS {
             ctx.cache_deprecated = true;
             ctx.freeze_count = u8::MAX;
             break;
@@ -183,6 +196,33 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // --- Phase 5: Build lightweight tool result ---
+
+    // Find the Threads panel display ID so the result can point the LLM
+    // at the exact panel that was just force-refreshed.
+    let threads_panel_id = state
+        .context
+        .iter()
+        .find(|c| c.context_type.as_str() == Kind::THREADS)
+        .map_or_else(|| "??".to_string(), |c| c.id.clone());
+
+    // Preview of the most recent message in the focused thread.
+    let last_msg_preview = ThreadsState::get(state)
+        .threads
+        .iter()
+        .find(|t| t.id == tid)
+        .and_then(|t| t.messages.last())
+        .and_then(|m| m.content.as_deref())
+        .map_or_else(
+            || "[no messages]".to_string(),
+            |c| {
+                if c.len() > 80 {
+                    format!("{}…", c.get(..c.floor_char_boundary(77)).unwrap_or(""))
+                } else {
+                    c.to_string()
+                }
+            },
+        );
+
     let mut result_lines = vec![
         format!("Thread {tid} \"{thread_name}\" [{thread_status}] — now focused.\n"),
         "Unacknowledged messages:".to_string(),
@@ -195,7 +235,11 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     } else {
         result_lines.push(format!("\nNo new messages in {tid}."));
     }
-    result_lines.push("\nFull conversation in Threads panel.".to_string());
+
+    result_lines.push(format!(
+        "\n⟳ The Threads panel ({threads_panel_id}) has been FORCE-REFRESHED and now \
+         contains the MOST RECENT conversation for {tid}. Last message: \"{last_msg_preview}\""
+    ));
 
     let mut result = ToolResult::new(tool.id.clone(), result_lines.join("\n"), false);
     // Read must NOT preserve tempo. Preserving it keeps state.tempo = true, which

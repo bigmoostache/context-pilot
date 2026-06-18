@@ -11,6 +11,7 @@ tools:
       markdown: "Markdown text content for the message"
       file_path: "File path to attach as a reference"
       questions: "Array of question objects to embed in the message (Phase 7)"
+      still_my_turn: "If true (default), the thread stays yours after sending — use for progress updates. Set false when you're done and want to hand the thread back to the user (flips to THEIR_TURN)."
 
   Read:
     description: |

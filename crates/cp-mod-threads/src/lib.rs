@@ -120,6 +120,7 @@ impl Module for ThreadsModule {
                 .param("markdown", ParamType::String, false)
                 .param("file_path", ParamType::String, false)
                 .param_array("questions", ParamType::Object(vec![]), false)
+                .param("still_my_turn", ParamType::Boolean, false)
                 .build(),
             ToolDefinition::from_yaml("Read", t)
                 .short_desc("Read thread messages")

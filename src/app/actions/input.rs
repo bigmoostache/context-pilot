@@ -174,12 +174,10 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
         return ActionResult::Nothing;
     };
 
-    let thread_name = thread.name.clone();
-
     // Create a user message in the thread
     let msg = ThreadMessage {
         author: ThreadAuthor::User,
-        content: Some(content.clone()),
+        content: Some(content),
         file_path: None,
         question: None,
         timestamp: crate::app::panels::now_ms(),
@@ -188,25 +186,9 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
     thread.messages.push(msg);
     thread.status = ThreadStatus::MyTurn;
 
-    // Build notification content: message preview + thread name + Read invitation
-    let thread_id = thread.id.clone();
-    let msg_preview = if content.len() > 120 {
-        format!("{}...", content.get(..content.floor_char_boundary(120)).unwrap_or(""))
-    } else {
-        content
-    };
-    let notification_content = format!(
-        "New message in thread \"{thread_name}\" ({thread_id}): {msg_preview}\nUse Read(thread_id=\"{thread_id}\") to see the conversation.",
-    );
-
-    // Create a Custom notification — informational only, does NOT trigger main conversation streaming.
-    // The spine idle+MY_TURN detection will prompt the AI to attend to the thread.
-    let _r = SpineState::create_notification(
-        state,
-        NotificationType::Custom,
-        "thread_input".to_string(),
-        notification_content,
-    );
+    // NO instant spine notification here — the idle MY_TURN detection
+    // (`check_my_turn_threads`) fires when the agent finishes its current
+    // work, avoiding mid-task distraction.  Auto-continuation picks it up.
 
     // Notify all modules
     for module in all_modules() {

@@ -302,8 +302,6 @@ fn apply_send_message(
         return;
     };
 
-    let thread_name = thread.name.clone();
-
     thread.messages.push(ThreadMessage {
         author: ThreadAuthor::User,
         content: Some(content.to_owned()),
@@ -314,27 +312,9 @@ fn apply_send_message(
     });
     thread.status = ThreadStatus::MyTurn;
 
-    // Spine notification — mirrors handle_thread_input_submit in input.rs.
-    let msg_preview = if content.len() > 120 {
-        let mut s = content
-            .get(..content.floor_char_boundary(120))
-            .unwrap_or("")
-            .to_owned();
-        s.push_str("...");
-        s
-    } else {
-        content.to_owned()
-    };
-    let body = format!(
-        "New message in thread \"{thread_name}\" ({thread_id}): {msg_preview}\n\
-         Use Read(thread_id=\"{thread_id}\") to see the conversation.",
-    );
-    let _r = SpineState::create_notification(
-        state,
-        NotificationType::Custom,
-        "bridge_command".to_owned(),
-        body,
-    );
+    // NO instant spine notification — the idle MY_TURN detection
+    // (`check_my_turn_threads`) handles it when the agent finishes its
+    // current work, avoiding mid-task distraction.
 
     for module in crate::modules::all_modules() {
         module.on_user_message(state);
