@@ -3,9 +3,12 @@ import { ArrowUp, Paperclip, Loader2 } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 
 /**
- * Thread composer — always active, regardless of turn status. When the thread
- * isn't MY_TURN a subtle "working" hint appears above the input so the user
- * knows the agent is active, but can still send a message at any time.
+ * Thread composer — always active, regardless of turn status. The "working"
+ * hint above the input appears when it is the **agent's turn** (`MY_TURN`, the
+ * agent owes a response) or the agent is actively streaming (`ACTIVE`) — i.e.
+ * exactly when the agent is busy on this thread. On the user's turn
+ * (`THEIR_TURN`) no hint shows; the composer is just ready for the next reply.
+ * The textarea is always usable so a message can be sent at any time.
  */
 export function ThreadComposer({
   status,
@@ -17,7 +20,7 @@ export function ThreadComposer({
   const [text, setText] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const isWorking = status !== "MY_TURN"
+  const isWorking = status === "MY_TURN" || status === "ACTIVE"
   const isActive = status === "ACTIVE"
 
   const canSend = text.trim().length > 0

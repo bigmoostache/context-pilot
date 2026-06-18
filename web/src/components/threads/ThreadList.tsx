@@ -158,13 +158,13 @@ export function ThreadList({
 
             {!showArchived && (
               <>
-                {mine.length > 0 && <Group label="Agent's turn" count={mine.length} />}
-                {mine.map((t) => (
+                {working.length > 0 && <Group label="User turn" count={working.length} />}
+                {working.map((t) => (
                   <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} />
                 ))}
 
-                {working.length > 0 && <Group label="User turn" count={working.length} />}
-                {working.map((t) => (
+                {mine.length > 0 && <Group label="Agent's turn" count={mine.length} />}
+                {mine.map((t) => (
                   <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} />
                 ))}
               </>

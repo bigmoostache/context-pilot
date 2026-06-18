@@ -66,6 +66,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+02d8802643f1f70d:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread input composer. Textarea always visible/usable. Working hint above input shows on AGENT''S TURN — MY_TURN (''Agent is working this thread…'', signal) or ACTIVE (''Agent is streaming…'', green/ok); THEIR_TURN (user turn) shows NO hint, just a ready composer (T28 fix: hint was previously inverted onto THEIR_TURN). onSend callback, Enter=submit, Shift+Enter=newline.'
+  last_edited_ms: 1781783492002
 02f82c18ae41dda5:
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
@@ -746,6 +750,10 @@
   path: src/modules/overview/tools_blocks.rs
   description: Tools-only IR block builder. tools_blocks() renders grouped tool table with category descriptions, enable/disable status. No agents/skills/commands (those live in Library only).
   last_edited_ms: 0
+1e416d647c039ab0:
+  path: .gitignore
+  description: Git ignore rules
+  last_edited_ms: 0
 1e4b2765708a88de:
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
@@ -1370,6 +1378,10 @@
   path: crates/cp-orchestrator/tests/services_integration.rs
   description: 'Phase 29 (X796) backend services integration suite (4 tests, green, ~0.1s). Drives MaterializedView+CostBreaker+StreamHub TOGETHER against a REAL cp-oplog via channel::Tailer (composition the inline unit tests'' crafted OpEntry literals can''t reach): (1) restart rebuild end-to-end I5+V9: OplogService.append_durable(heads+phase+rising cost)->shutdown->tail_all(Tailer.poll)->view.apply_batch->breaker.rebuild_from_view trips; (2) real segment-roll checkpoint folds to ground-truth head: spawn_with_segment_limit(64) forces rolls (leading authoritative Checkpoint), asserts >=1 Checkpoint rode stream + final head correct; (3) R2-17 reconcile: degraded hub subscriber''s authoritative snapshot = view heads folded from real oplog, mark_reconciled clears degraded+dropped; (4) fleet isolation: 2 agents 2 oplogs -> view 2 isolated projections, breaker trips only overspender, hub fans per-agent. helpers message/cost/token/tail_all. Top `use cp_mod_bridge/nix/serde/serde_json/tiny_http as _;`.'
   last_edited_ms: 1781650676137
+36927571593ea5a9:
+  path: crates/cp-mod-bridge/src/boot.rs
+  description: 'Phase 10 (X777): Boot — agent boot sequence + held resources. start_in(folder,agents_dir,model): (1) flock <folder>/bridge.lock EXCLUSIVE|NONBLOCK FIRST (single-process gate I1/D2) with BOUNDED RETRY (25 attempts × 80ms ≈ 2s) on EAGAIN/EWOULDBLOCK so a reload''s replacement process wins the lock once the outgoing process finishes exiting (defeats zombie-on-reload bridge-OFF); persistent owner → AlreadyRunning; non-contention errno → Io immediately; (2) OplogService::spawn(oplog dir); (3) bind stream.sock (unlink stale first); (4) mint cap_token+boot_id; (5) write registry <id>.json LAST. Drop removes registry+socket; lock+oplog release via own Drop. H5 FD-inherit deferred (CLOEXEC kept). 7 tests incl acquire_lock_retries_until_holder_releases (race: holder releases mid-retry → contender wins).'
+  last_edited_ms: 1781783491985
 369db6de4104aa84:
   path: crates/cp-orchestrator/src/registry.rs
   description: 'Phase 15 (X782): AgentRegistry — fleet discovery via poll-based scan-and-diff (NOT kernel watch; agents appear/vanish rarely). scan()->Vec<Event>{Appeared(Entry),Disappeared(id),StatusChanged(id,status),Stale(id,Liveness)} reads ~/.context-pilot/agents/*.json, applies liveness verdict, diffs vs prior pass (known:HashMap<id,Snapshot{entry,liveness}>). Stale fires only on Live→non-live transition (first-sight staleness rides Appeared). reap_tmp(grace) deletes *.tmp older than DEFAULT_TMP_GRACE(60s) — GAP3 grace rule applied to registry writes. read_records skips *.tmp+unparseable (half-written/foreign non-fatal). read_heartbeat=None on absent/torn/wrong-len. default_agents_dir=$HOME/.context-pilot/agents. 7 tests. let _previous=fresh.insert (unused_results).'
@@ -4494,6 +4506,10 @@ b303c82afde350e5:
   path: ui/src/components/shell/ConfigModal.tsx
   description: 'Settings modal (macOS System-Settings style): category rail (General/Model Providers/Search & Embeddings/Document AI/Web & Scraping/Integrations) + detail pane. Surfaces all CP config params — provider keys (Anthropic, Claude Code OAuth, Grok, Groq, DeepSeek, MiniMax), Voyage, Meilisearch status, Datalab, Brave, Firecrawl, GitHub — plus default-model picker + autonomy toggles. Masked keys w/ reveal, Connected/Not-set pills, opt-rise stagger, modal-pop/backdrop-fade motion. Design-only. Opened from TopBar gear.'
   last_edited_ms: 1781520371459
+b336c882172fe193:
+  path: web/src/components/threads/ThreadList.tsx
+  description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups in order: User turn (THEIR_TURN/ACTIVE) FIRST, then Agent''s turn (MY_TURN) — reordered per T28. Sorted by lastActivityMs descending within each group. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
+  last_edited_ms: 1781783492018
 b3831f3e391cdcc6:
   path: crates/cp-mod-scratchpad/src/lib.rs
   description: 'Scratchpad module. 3 tools: create_cell/edit_cell/wipe. Fixed SCRATCHPAD panel. Per-worker cells. Visualizer: colored create/update/delete. fixed_order=8.'

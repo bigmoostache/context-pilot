@@ -8,8 +8,10 @@
 //! 1. **Folder lock** — an exclusive, non-blocking `flock` on `<folder>/bridge.lock`.
 //!    A second instance in the same folder fails here with
 //!    [`Error::AlreadyRunning`] (single-process exclusion, design doc I1/D2).
-//!    The lock is held for the lifetime of the [`Boot`] and released on
-//!    drop.
+//!    Contention is retried briefly (~2s) so a reload's replacement process can
+//!    win the lock once the outgoing process finishes exiting, rather than
+//!    booting bridge-OFF and leaving the agent unreachable. The lock is held
+//!    for the lifetime of the [`Boot`] and released on drop.
 //! 2. **Oplog** — open (creating if absent) the agent's durable log via
 //!    [`OplogService`], which also spawns the off-loop group-commit thread.
 //! 3. **Stream socket** — bind `<folder>/stream.sock` (unlinking a stale socket
@@ -223,14 +225,35 @@ impl Drop for Boot {
     }
 }
 
-/// Open `<folder>/bridge.lock` and take an exclusive, non-blocking `flock`.
+/// How many times [`acquire_lock`] re-attempts a contended `flock` before
+/// giving up and declaring the folder already owned.
+const LOCK_RETRY_ATTEMPTS: u32 = 25;
+
+/// Pause between contended `flock` attempts. `ATTEMPTS × BACKOFF` (~2s) is the
+/// total grace window — comfortably longer than a clean process shutdown.
+const LOCK_RETRY_BACKOFF: std::time::Duration = std::time::Duration::from_millis(80);
+
+/// Open `<folder>/bridge.lock` and take an exclusive `flock`, retrying briefly
+/// on contention.
 ///
-/// A held lock from another live instance turns the `flock` attempt into
-/// `EAGAIN`/`EWOULDBLOCK`, which becomes [`Error::AlreadyRunning`]; any
-/// other error is a genuine I/O fault.
+/// The OS releases an `flock` the instant its holder dies (even on `SIGKILL`),
+/// so contention means a process is *still alive* holding it. During a reload
+/// the supervisor can spawn the replacement before the outgoing process has
+/// finished exiting — a genuine instance, but a transient one. A plain
+/// non-blocking lock would lose that race and boot the bridge OFF, leaving the
+/// agent unreachable until the next manual restart.
+///
+/// So we retry the non-blocking lock up to [`LOCK_RETRY_ATTEMPTS`] times with a
+/// [`LOCK_RETRY_BACKOFF`] pause (~2s total). A *blocking* lock is deliberately
+/// avoided: were the previous process to hang forever, it would wedge boot
+/// indefinitely — the bounded retry waits out the common case, then refuses
+/// cleanly with [`Error::AlreadyRunning`] for a truly persistent owner.
+///
+/// Any non-contention `flock` error is a genuine I/O fault and is returned
+/// immediately without retry.
 fn acquire_lock(folder: &Path) -> BootResult<Flock<File>> {
     let lock_path = folder.join(LOCK_FILE);
-    let file = OpenOptions::new()
+    let mut file = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
@@ -238,13 +261,27 @@ fn acquire_lock(folder: &Path) -> BootResult<Flock<File>> {
         .open(&lock_path)
         .map_err(|e| Error::io(format!("open lock {}", lock_path.display()), e))?;
 
-    Flock::lock(file, FlockArg::LockExclusiveNonblock).map_err(|(_file, errno)| {
-        if errno == Errno::EAGAIN || errno == Errno::EWOULDBLOCK {
-            Error::AlreadyRunning { folder: folder.to_string_lossy().into_owned() }
-        } else {
-            Error::io(format!("flock {}", lock_path.display()), errno.into())
+    let mut attempt: u32 = 0;
+    loop {
+        match Flock::lock(file, FlockArg::LockExclusiveNonblock) {
+            Ok(lock) => return Ok(lock),
+            // `Flock::lock` hands the `File` back on failure so we can re-try.
+            Err((returned, errno)) => {
+                let contended = errno == Errno::EAGAIN || errno == Errno::EWOULDBLOCK;
+                if contended && attempt < LOCK_RETRY_ATTEMPTS {
+                    attempt = attempt.saturating_add(1);
+                    std::thread::sleep(LOCK_RETRY_BACKOFF);
+                    file = returned;
+                    continue;
+                }
+                return Err(if contended {
+                    Error::AlreadyRunning { folder: folder.to_string_lossy().into_owned() }
+                } else {
+                    Error::io(format!("flock {}", lock_path.display()), errno.into())
+                });
+            }
         }
-    })
+    }
 }
 
 /// Flatten an [`Error`](cp_oplog::error::Error) into an [`io::Error`]
@@ -341,5 +378,46 @@ mod tests {
 
         let booted = boot(folder.path(), agents.path());
         assert!(booted.is_ok(), "a stale socket must be unlinked and rebound, got {booted:?}");
+    }
+
+    #[test]
+    fn acquire_lock_retries_until_holder_releases() {
+        use std::sync::mpsc;
+        use std::time::Duration;
+
+        let folder = tempdir().expect("folder");
+        let canonical = fs::canonicalize(folder.path()).expect("canonicalise");
+
+        // A holder thread grabs the lock, signals that it holds it, then waits
+        // a beat (shorter than the retry budget) and releases — modelling the
+        // outgoing process of a reload finishing its shutdown.
+        let (held_tx, held_rx) = mpsc::channel::<()>();
+        let (release_tx, release_rx) = mpsc::channel::<()>();
+        let holder_path = canonical.clone();
+        let holder = std::thread::spawn(move || {
+            let lock = acquire_lock(&holder_path).expect("holder acquires");
+            held_tx.send(()).expect("signal held");
+            // Hold until told to release, then drop the lock.
+            let _ = release_rx.recv();
+            drop(lock);
+        });
+
+        held_rx.recv().expect("holder signalled");
+
+        // While the holder still owns the lock, a contender starts retrying.
+        let contender_path = canonical.clone();
+        let contender = std::thread::spawn(move || acquire_lock(&contender_path));
+
+        // Let the contender spin on contention for a couple of cycles, then
+        // release the holder — well within the ~2s retry budget.
+        std::thread::sleep(Duration::from_millis(200));
+        release_tx.send(()).expect("trigger release");
+
+        let acquired = contender.join().expect("contender thread");
+        holder.join().expect("holder thread");
+        assert!(
+            acquired.is_ok(),
+            "the contender must win the lock once the holder releases, got {acquired:?}",
+        );
     }
 }
