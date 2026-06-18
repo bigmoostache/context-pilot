@@ -1,10 +1,28 @@
-import type { MouseEvent as ReactMouseEvent } from "react"
+import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from "react"
 import { ChevronRight } from "lucide-react"
 import type { FinderNode, FinderSortKey, FinderTag } from "@/lib/types"
-import { childCounts, fmtBytes, sortNodes } from "@/lib/finderFs"
+import { fmtBytes, sortNodes } from "@/lib/finderFs"
+import { useFs } from "@/lib/live"
 import { extOf, kindMeta, kindTint, TAG_META } from "./kind"
 import { FileIcon } from "./macIcons"
 import { cn } from "@/lib/utils"
+
+/** MIME used when dragging a folder out of a view onto the sidebar to pin it. */
+export const FOLDER_DRAG_MIME = "application/x-cp-folder"
+
+/** Begin dragging a folder so it can be dropped on the sidebar Pinned zone. */
+function startFolderDrag(e: ReactDragEvent, n: FinderNode) {
+  if (n.kind !== "folder") return
+  e.dataTransfer.setData(FOLDER_DRAG_MIME, JSON.stringify({ name: n.name, path: n.path }))
+  e.dataTransfer.effectAllowed = "copy"
+}
+
+/** Strip the agent-folder prefix to get the backend-relative path for `useFs`. */
+function relOf(agentFolder: string, abs: string): string {
+  if (abs === agentFolder) return ""
+  if (abs.startsWith(agentFolder + "/")) return abs.slice(agentFolder.length + 1)
+  return abs
+}
 
 export interface ViewHandlers {
   selected: Set<string>
@@ -36,6 +54,17 @@ const mods = (e: ReactMouseEvent) => ({
   range: e.shiftKey,
 })
 
+/**
+ * Human "N items" label for a folder. Uses the backend-supplied direct child
+ * `count` (live data); falls back to a populated `children` array (mock realm)
+ * so both the live app and the maquette render a real number, never "0 items"
+ * for a non-empty folder.
+ */
+function itemCount(n: FinderNode): string {
+  const c = n.count ?? n.children?.length ?? 0
+  return `${c} ${c === 1 ? "item" : "items"}`
+}
+
 // ── Grid (icon) view ──────────────────────────────────────────────
 export function GridView({
   nodes,
@@ -57,6 +86,8 @@ export function GridView({
             title={n.name}
             data-finder-item=""
             data-path={n.path}
+            draggable={n.kind === "folder"}
+            onDragStart={(e) => startFolderDrag(e, n)}
             onClick={(e) => h.onClick(n, mods(e))}
             onDoubleClick={() => h.onOpen(n)}
             onContextMenu={(e) => h.onContext(e, n)}
@@ -79,7 +110,7 @@ export function GridView({
               {n.name}
             </span>
             <span className="flex items-center gap-1 text-[10px] tabular-nums text-muted-foreground/60">
-              {n.kind === "folder" ? `${n.children?.length ?? 0} items` : fmtBytes(n.size)}
+              {n.kind === "folder" ? itemCount(n) : fmtBytes(n.size)}
             </span>
             <TagDots tags={n.tags} />
           </button>
@@ -119,6 +150,8 @@ export function ListView({
             key={n.path}
             data-finder-item=""
             data-path={n.path}
+            draggable={n.kind === "folder"}
+            onDragStart={(e) => startFolderDrag(e, n)}
             onClick={(e) => h.onClick(n, mods(e))}
             onDoubleClick={() => h.onOpen(n)}
             onContextMenu={(e) => h.onContext(e, n)}
@@ -138,7 +171,7 @@ export function ListView({
             </span>
             <span className="truncate text-muted-foreground">{M.label}</span>
             <span className="tabular-nums text-muted-foreground">
-              {n.kind === "folder" ? "—" : fmtBytes(n.size)}
+              {n.kind === "folder" ? itemCount(n) : fmtBytes(n.size)}
             </span>
             <span className="truncate text-muted-foreground" title={n.created ? `Created ${n.created}` : undefined}>
               {n.modified}
@@ -175,53 +208,49 @@ function Head({
 }
 
 // ── Columns (Miller) view ─────────────────────────────────────────
+/**
+ * Miller-columns browser over LIVE data. One column per ancestor in the path
+ * chain (root → cwd): each column lists that folder's children, with the child
+ * that leads to the next column highlighted, so the whole traversed hierarchy
+ * is visible at once (the point of column view) — not just the current folder.
+ *
+ * Every ancestor column fetches its own children via `useFs`; the deepest
+ * column reuses the already-fetched + filtered + sorted `currentNodes`. A
+ * trailing pane previews the selected file. Clicking a folder in any column
+ * navigates into it (truncating the chain past that point).
+ */
 export function ColumnsView({
-  panes,
-  activePath,
+  agentId,
+  agentFolder,
+  chain,
+  currentNodes,
   previewNode,
+  onNavigate,
   ...h
 }: ViewHandlers & {
-  panes: { path: string; nodes: FinderNode[] }[]
-  activePath: Set<string>
+  agentId: string
+  agentFolder: string
+  /** absolute paths from realm root down to the current working directory */
+  chain: string[]
+  /** the current dir's already-filtered+sorted nodes (deepest column) */
+  currentNodes: FinderNode[]
   previewNode: FinderNode | null
+  onNavigate: (path: string) => void
 }) {
   const showPreviewPane = previewNode && previewNode.kind !== "folder"
   return (
     <div className="flex h-full min-w-0 overflow-x-auto">
-      {panes.map((pane) => (
-        <div
-          key={pane.path}
-          className="flex w-[218px] shrink-0 flex-col overflow-y-auto border-r border-border py-1"
-        >
-          {sortNodes(pane.nodes, "name", true).map((n) => {
-            const onTrail = activePath.has(n.path)
-            const sel = h.selected.has(n.path)
-            return (
-              <button
-                key={n.path}
-                onClick={(e) => {
-                  h.onClick(n, mods(e))
-                  if (n.kind === "folder") h.onOpen(n)
-                }}
-                onDoubleClick={() => h.onOpen(n)}
-                onContextMenu={(e) => h.onContext(e, n)}
-                className={cn(
-                  "mx-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors",
-                  onTrail || sel
-                    ? "bg-[var(--signal)]/14 text-foreground"
-                    : "text-foreground/80 hover:bg-muted/45",
-                )}
-              >
-                <FileIcon kind={n.kind} ext={extOf(n.name)} size={17} className="shrink-0" />
-                <span className="min-w-0 flex-1 truncate font-medium">{n.name}</span>
-                <TagDots tags={n.tags} />
-                {n.kind === "folder" && (
-                  <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/50" />
-                )}
-              </button>
-            )
-          })}
-        </div>
+      {chain.map((path, i) => (
+        <MillerColumn
+          key={path}
+          agentId={agentId}
+          agentFolder={agentFolder}
+          path={path}
+          nextPath={chain[i + 1]}
+          nodes={i === chain.length - 1 ? currentNodes : undefined}
+          onNavigate={onNavigate}
+          {...h}
+        />
       ))}
 
       {showPreviewPane && previewNode && (
@@ -236,6 +265,68 @@ export function ColumnsView({
           </dl>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * One Miller column = the listing of a single folder in the path chain. Ancestor
+ * columns fetch their own children live; the deepest column receives the current
+ * dir's nodes directly (so search/sort already applied). The row whose path is
+ * `nextPath` (the traversed child) is highlighted as "on trail".
+ */
+function MillerColumn({
+  agentId,
+  agentFolder,
+  path,
+  nextPath,
+  nodes: provided,
+  onNavigate,
+  ...h
+}: ViewHandlers & {
+  agentId: string
+  agentFolder: string
+  path: string
+  nextPath?: string
+  /** present for the deepest column (current dir) — skips the fetch */
+  nodes?: FinderNode[]
+  onNavigate: (path: string) => void
+}) {
+  // Hook is always called (rules of hooks); its data is ignored when `provided`.
+  const { data } = useFs(agentId, relOf(agentFolder, path))
+  const nodes = sortNodes(provided ?? data ?? [], "name", true)
+  return (
+    <div className="flex w-[218px] shrink-0 flex-col overflow-y-auto border-r border-border py-1">
+      {nodes.map((n) => {
+        const onTrail = n.path === nextPath
+        const sel = h.selected.has(n.path)
+        return (
+          <button
+            key={n.path}
+            draggable={n.kind === "folder"}
+            onDragStart={(e) => startFolderDrag(e, n)}
+            onClick={(e) => {
+              h.onClick(n, mods(e))
+              if (n.kind === "folder") onNavigate(n.path)
+            }}
+            onDoubleClick={() => h.onOpen(n)}
+            onContextMenu={(e) => h.onContext(e, n)}
+            className={cn(
+              "mx-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors",
+              onTrail || sel
+                ? "bg-[var(--signal)]/14 text-foreground"
+                : "text-foreground/80 hover:bg-muted/45",
+            )}
+          >
+            <FileIcon kind={n.kind} ext={extOf(n.name)} size={17} className="shrink-0" />
+            <span className="min-w-0 flex-1 truncate font-medium">{n.name}</span>
+            <TagDots tags={n.tags} />
+            {n.kind === "folder" && (
+              <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/50" />
+            )}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -298,7 +389,6 @@ export function GalleryView({
 
 function Hero({ node }: { node: FinderNode }) {
   const M = kindMeta[node.kind]
-  const counts = childCounts(node)
   return (
     <div className="ql-pop flex max-h-full max-w-[560px] flex-col items-center gap-4">
       {node.image ? (
@@ -314,7 +404,7 @@ function Hero({ node }: { node: FinderNode }) {
         <TagDots tags={node.tags} />
         <span className="text-[12px] tabular-nums text-muted-foreground">
           {node.kind === "folder"
-            ? `${counts.folders} folders · ${counts.files} files`
+            ? itemCount(node)
             : `${M.label} · ${fmtBytes(node.size)}`}
           {node.media ? ` · ${node.media.duration}` : ""}
           {node.image ? ` · ${node.image.w}×${node.image.h}` : ""}

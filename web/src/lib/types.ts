@@ -197,6 +197,8 @@ export interface FinderNode {
   kind: FinderKind
   /** size in bytes (files only) */
   size?: number
+  /** direct (non-hidden) child count — folders only, supplied by the backend */
+  count?: number
   /** human relative modified time, e.g. "2d ago" */
   modified: string
   /** human relative created time */
@@ -319,8 +321,8 @@ export interface ThreadDetail {
   agent: string
   createdAt: string
   lastActivity: string
-  /** epoch-ms of the most recent message — used for sort-by-recency */
-  lastActivityMs: number
+  /** epoch-ms of the most recent message — used for sort-by-recency (live data) */
+  lastActivityMs?: number
   unread: number
   /** archived threads are hidden from the main list, viewable on demand */
   archived?: boolean

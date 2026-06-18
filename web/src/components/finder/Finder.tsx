@@ -58,6 +58,24 @@ interface Tab extends FinderTab {
   fileNode?: FinderNode
 }
 
+/** A folder the user has pinned to the sidebar (persisted in localStorage). */
+export interface PinnedFolder {
+  name: string
+  path: string
+}
+
+const pinsKey = (agentId: string) => `cp-finder-pins:${agentId}`
+
+/** Load an agent's pinned folders from localStorage (best-effort). */
+function loadPins(agentId: string): PinnedFolder[] {
+  try {
+    const raw = localStorage.getItem(pinsKey(agentId))
+    return raw ? (JSON.parse(raw) as PinnedFolder[]) : []
+  } catch {
+    return []
+  }
+}
+
 let tabSeq = 1
 
 /**
@@ -94,6 +112,20 @@ export function Finder({ agent }: { agent: Agent }) {
   const [menu, setMenu] = useState<MenuPos | null>(null)
   const [info, setInfo] = useState<FinderNode | null>(null)
   const [pathBarOpen, setPathBarOpen] = useState(false)
+  const [pins, setPins] = useState<PinnedFolder[]>(() => loadPins(agent.id))
+
+  // Persist pins per-agent whenever they change.
+  useEffect(() => {
+    try {
+      localStorage.setItem(pinsKey(agent.id), JSON.stringify(pins))
+    } catch {
+      /* storage full / unavailable — pins stay in-session only */
+    }
+  }, [pins, agent.id])
+
+  const addPin = (p: PinnedFolder) =>
+    setPins((cur) => (cur.some((x) => x.path === p.path) ? cur : [...cur, p]))
+  const removePin = (path: string) => setPins((cur) => cur.filter((x) => x.path !== path))
 
   const active = tabs.find((t) => t.id === activeId) ?? tabs[0]
   const cwd = active.cwd
@@ -411,7 +443,18 @@ export function Finder({ agent }: { agent: Agent }) {
             On a file tab the main area is a full-bleed QuickLook of one file,
             so the explorer sidebar is irrelevant — hide it entirely. */}
         {!active.fileNode && (
-          <FinderSidebar root={root} cwd={cwd} onNavigate={navigate} onOpen={open} />
+          <FinderSidebar
+            root={root}
+            cwd={cwd}
+            pins={pins}
+            onNavigate={navigate}
+            onOpen={open}
+            onPin={(p) => {
+              addPin(p)
+              flash(`Pinned ${p.name}`)
+            }}
+            onUnpin={removePin}
+          />
         )}
 
         {active.fileNode ? (
@@ -467,12 +510,12 @@ export function Finder({ agent }: { agent: Agent }) {
               )}
               {viewMode === "columns" && (
                 <ColumnsView
-                  panes={crumbs.map((c, i) => ({
-                    path: c.path,
-                    nodes: i === crumbs.length - 1 ? sorted : (c.children ?? []),
-                  }))}
-                  activePath={new Set(crumbs.map((c) => c.path))}
+                  agentId={agent.id}
+                  agentFolder={agent.folder}
+                  chain={crumbs.map((c) => c.path)}
+                  currentNodes={sorted}
                   previewNode={previewNode}
+                  onNavigate={navigate}
                   {...viewProps}
                 />
               )}
@@ -519,6 +562,10 @@ export function Finder({ agent }: { agent: Agent }) {
           onClose={() => setMenu(null)}
           onAction={(label) => flash(label)}
           onGetInfo={(n) => setInfo(n)}
+          onPin={(n) => {
+            addPin({ name: n.name, path: n.path })
+            flash(`Pinned ${n.name}`)
+          }}
         />
       )}
 

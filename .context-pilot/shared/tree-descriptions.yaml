@@ -750,6 +750,10 @@
   path: crates/cp-base/src/lib.rs
   description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (20 tool + 6 config YAML files) with #[expect(clippy::panic)].'
   last_edited_ms: 0
+1dbaa40443f3af7f:
+  path: web/src/components/finder/Finder.tsx
+  description: Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. Tabs+history+nav+selection+drag-drop+statusbar+marquee. PinnedFolder type + loadPins/pinsKey localStorage helpers (key cp-finder-pins:<agentId>); pins state persisted via useEffect; addPin/removePin. ColumnsView called with live-Miller props (agentId/agentFolder/chain/currentNodes/onNavigate). FinderSidebar + ContextMenu wired with onPin/onUnpin. Four view modes, keyboard control.
+  last_edited_ms: 1781795177834
 1dbea38df5d6be2f:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation, threads. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread actions extracted to threads.rs.'
@@ -774,6 +778,10 @@
   path: yamls/tools/search.yaml
   description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
   last_edited_ms: 0
+1e829d9769d0f9f9:
+  path: web/src/components/finder/FinderViews.tsx
+  description: 'Finder view modes: grid/list/columns(Miller)/gallery. itemCount() uses backend count (folder child counts) with children fallback. Folder rows draggable (startFolderDrag, FOLDER_DRAG_MIME export) to pin via sidebar. ColumnsView REWRITTEN for live data: one MillerColumn per ancestor in the path chain, each useFs-fetches its own children; deepest column reuses currentNodes; nextPath highlight; folder-click navigates (truncates chain). relOf strips agent-folder prefix for useFs.'
+  last_edited_ms: 1781795177798
 1e836ec4e394617a:
   path: src/ui/helpers.rs
   description: 'Shared UI helpers: truncate_string, format_number, format_time_ago, wrap_text, count_wrapped_lines. Braille spinner (wall-clock-time-based, 10fps). IR-aware syntax highlighting (syntect, LRU cache, do_highlight_ir). TypewriterBuffer for streaming animation.'
@@ -1374,6 +1382,10 @@
   path: ui/src/components/panels/cockpit/QueuePanel.tsx
   description: 'Cockpit Queue maquette: staged tool calls (index, tool, intent, target preview) + Execute/Pause affordances, active state. Reads mock queueActions.'
   last_edited_ms: 1781600050456
+3619a30b203a6289:
+  path: web/src/lib/types.ts
+  description: Maquette domain types. FinderNode gained count?:number (backend folder child count). ThreadDetail.lastActivityMs now optional (mock fallback lacks it; sort tolerates undefined via ?? 0). User/Agent/Finder/Thread/Library/Usage/cockpit types.
+  last_edited_ms: 1781795177871
 3626ade6e9ad38d4:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -2106,6 +2118,10 @@
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks. Phase 2 SKIPS the threads module while the history-cleanup trap is active (QueueState.trap_active) — otherwise threads focus enforcement blocks Close_conversation_history and deadlocks the two traps.'
   last_edited_ms: 1781525989192
+51e6840ca62b4442:
+  path: web/src/components/finder/ContextMenu.tsx
+  description: Finder right-click context menu (macOS-style action sheet, decorative actions flash toast). onPin optional prop adds a folder-only 'Pin to Sidebar' item (Pin icon). Open/Get Info/Rename/Duplicate/Download + tag swatches + Move to Trash. On-screen clamping.
+  last_edited_ms: 1781795177816
 520bd83b42d1d2d7:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams structs. post_json() generic helper. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
@@ -3398,6 +3414,10 @@
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
   last_edited_ms: 0
+8450887d84aa9bc0:
+  path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
+  description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape.'
+  last_edited_ms: 1781794520491
 847041f59a0204d5:
   path: crates/cp-base/src/config/llm_types.rs
   description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends), per-provider model enums with pricing/context windows
@@ -3862,6 +3882,10 @@
   path: ui/src/components/threads/ThreadComposer.tsx
   description: 'Thread input composer. MY_TURN: active prompt w/ attach + send + key hints. THEIR_TURN: subdued ''agent is working'' spinner state. Design-only.'
   last_edited_ms: 0
+957ea091e48b4f22:
+  path: web/src/components/finder/FinderChrome.tsx
+  description: 'Finder chrome: tab strip, main toolbar (nav/crumbs/view-switch/search/icon-size slider), left sidebar, path bar. FinderSidebar REWRITTEN (T37): Favorites + Locations + Pinned only — Tags/Recents/Confined-realm-notice removed. Pinned section is a drag-drop target (FOLDER_DRAG_MIME) + per-pin hover Unpin (X); empty-state dashed hint. Place icon prop retyped to LucideIcon. NavBtn/SegBtn helpers.'
+  last_edited_ms: 1781795177853
 9585095c96a77cfa:
   path: src/llms/mod.rs
   description: 'LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging. Re-exports split: llm_types (traits) + models (enums).'
@@ -4598,6 +4622,10 @@ b3831f3e391cdcc6:
   path: crates/cp-mod-scratchpad/src/lib.rs
   description: 'Scratchpad module. 3 tools: create_cell/edit_cell/wipe. Fixed SCRATCHPAD panel. Per-worker cells. Visualizer: colored create/update/delete. fixed_order=8.'
   last_edited_ms: 0
+b38e818dc3e673f0:
+  path: report/wiring-alignment-audit.md
+  description: 'Wiring alignment audit (X818 Phase 0.1): invariant-by-invariant gap register implementation⇄design-orchestration-backend.md. Verdicts ABIDES/PARTIAL/VIOLATES per I1-I13/§7/§9/§19. Diagnoses the disk/poll vs oplog-push plane inversion = the latency root cause.'
+  last_edited_ms: 1781794520508
 b3b3c4b448be7ce9:
   path: docs/talk/slides/3-0.html
   description: 'Sub-TOC: WOWs section — left numeral, right slide list'
@@ -4886,6 +4914,10 @@ bd2f1faa83138934:
   path: crates/cp-mod-callback/src/panel.rs
   description: Callback panel. Table view of all definitions (ID/name/pattern/blocking/timeout/scope/success_msg/cwd). Editor sub-view shows script content for one callback. No Active column.
   last_edited_ms: 0
+bd5339d9623987fd:
+  path: crates/cp-orchestrator/src/transport/finder.rs
+  description: 'Finder endpoints: confined dir listing (GET /fs?path=) now annotates folder nodes with count (count_visible_children helper, non-hidden direct children, best-effort), file preview (256KB cap, binary reject), conversation, download. Path confinement via canonicalize+starts_with.'
+  last_edited_ms: 1781795177888
 bd662097808facee:
   path: src/infra/constants.rs
   description: API/layout/loop/persistence constants + theme color accessors (from YAML themes) + card design tokens (card_text, card_agent_bg, card_reverie_bg, card_queue_bg, card_think_bg) + icons + prompts.
@@ -5162,6 +5194,10 @@ c7955307dfbd2f16:
   path: crates/cp-mod-bridge/tests/tee_intake_body.rs
   description: 'Phase 26 (X793): cp-mod-bridge tee+intake+body integration suite (4 tests, second tests/ target). Cross-component properties the inline tests can''t show: (1) a_command_round_trips...across_reexec — framed command over UnixStream::pair → Intake::handle_connection journals via live OplogService, acked; tear down + respawn + redeliver SAME dedup → applied.is_empty (exactly-once across deadman re-exec), replay seen.len==1. (2) one_connection_applies_distinct_and_dedups — 3 frames (dt-a,dt-b,dt-a) one connection → applied.len==2, 3 Accepted acks, seen.len==2. (3) the_i13_barrier_and_orphan_gc_hold_across_a_real_journal — Store::open_with_threshold(4): orphan body spills durably + integrity-checked but never journalled (crash-in-gap), replay heads empty; referenced body journalled via OplogService.append_durable(MessageCreated{head}), replay heads→live HashSet<ContentHash>, store.gc(&live,Duration::ZERO) reclaims the 1 orphan keeps referenced (replay-heads-driven GC = how agent reclaims). (4) the_tee_streams_an_ordered_multi_frame_burst — Tee over real UnixListener, observer reads 16 frames back via framing::decode_raw in seq order. HANG FIX: handle_connection blocks on read-until-EOF; shutdown(Shutdown::Write) on a socketpair end did NOT reliably propagate EOF to the peer → tests #1/#2 hung >60s. Fix: read_acks(stream,expected:usize) reads exactly N acks then drop(client) → EOF → server returns (mirrors the proven inline handle_connection pattern; NEVER rely on shutdown(Write)→peer-EOF for UnixStream::pair). NAMES cp_mod_bridge+cp_wire+cp_oplog+serde_json+tempfile; `use cp_base/cp_render/nix as _;` (Stored import dropped — only methods used). 48 cp-mod-bridge green (40 inline+4 boot_heartbeat+4 tee_intake_body).'
   last_edited_ms: 1781649627288
+c7c68b03bad4ec4d:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: REST resource handlers (request/response half of transport). HttpReply/Envelope/CommandReceipt. fleet+agent serve from backend.view; threads() serves roster from backend.view (live) merged with disk message logs via thread_shape::{overlay_roster,reshape_thread}; body hydrate; command (fail-closed breaker check, mark_dirty after send); mint_ticket; resolve_entry.
+  last_edited_ms: 1781794520474
 c7d014dda0e55831:
   path: crates/cp-wire/Cargo.toml
   description: 'Wire protocol crate manifest. deps: crc32c, serde, serde_json (I/O-free). Workspace lints inherited.'

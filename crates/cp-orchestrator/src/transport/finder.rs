@@ -127,6 +127,16 @@ pub fn fs_list(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply
                 .as_object_mut()
                 .expect("just built")
                 .insert("size".to_owned(), serde_json::json!(meta.len()));
+        } else if meta.is_dir() {
+            // Direct (non-hidden) child count, so every view can render
+            // "N items" on a folder without a second round-trip. Mirrors the
+            // hidden-file skip below, so the count matches what a listing of
+            // this folder would actually show.
+            let count = count_visible_children(&entry.path());
+            let _prev = node
+                .as_object_mut()
+                .expect("just built")
+                .insert("count".to_owned(), serde_json::json!(count));
         }
 
         nodes.push(node);
@@ -282,6 +292,25 @@ fn confined_path(root: &str, relative: &str) -> Option<PathBuf> {
     } else {
         None
     }
+}
+
+/// Count the non-hidden direct children of a directory.
+///
+/// Used to annotate folder nodes with an item count for the Finder views.
+/// Returns `0` on any I/O error (unreadable dir) — a best-effort hint, never
+/// an error surface. Skips dotfiles to match [`fs_list`]'s own filtering, so
+/// the count equals what opening the folder would display.
+fn count_visible_children(dir: &Path) -> usize {
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    rd.filter_map(Result::ok)
+        .filter(|e| {
+            e.file_name()
+                .to_str()
+                .is_some_and(|n| !n.starts_with('.'))
+        })
+        .count()
 }
 
 /// Infer a `FinderKind` string from a filename's extension.

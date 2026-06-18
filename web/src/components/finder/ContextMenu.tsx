@@ -5,6 +5,7 @@ import {
   FolderOpen,
   Info,
   PencilLine,
+  Pin,
   Tag,
   Trash2,
 } from "lucide-react"
@@ -26,11 +27,14 @@ export function ContextMenu({
   onClose,
   onAction,
   onGetInfo,
+  onPin,
 }: {
   pos: MenuPos
   onClose: () => void
   onAction: (label: string) => void
   onGetInfo: (node: FinderNode) => void
+  /** pin a folder to the sidebar (folders only) */
+  onPin?: (node: FinderNode) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -99,6 +103,19 @@ export function ContextMenu({
         <span className="flex-1">Get Info</span>
         <span className="text-[10.5px] tabular-nums text-muted-foreground/50">⌘I</span>
       </button>
+
+      {isFolder && onPin && (
+        <button
+          onClick={() => {
+            onPin(pos.node)
+            onClose()
+          }}
+          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
+        >
+          <Pin className="size-3.5 shrink-0 opacity-80" />
+          <span className="flex-1">Pin to Sidebar</span>
+        </button>
+      )}
 
       <Separator />
 

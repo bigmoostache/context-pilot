@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   ArrowRight,
   ChevronRight,
-  Clock,
   Columns3,
   Download,
   FolderPlus,
@@ -12,19 +11,23 @@ import {
   Maximize2,
   MoreHorizontal,
   PanelBottom,
+  Pin,
   Search,
   Share2,
   Sidebar as SidebarIcon,
-  Star,
   Upload,
   X,
 } from "lucide-react"
-import type { FinderKind, FinderNode, FinderTag, FinderViewMode } from "@/lib/types"
+import type { FinderKind, FinderNode, FinderViewMode } from "@/lib/types"
 import { collectStarred } from "@/lib/finderFs"
-import { extOf, kindMeta, TAG_META } from "./kind"
+import { extOf, kindMeta } from "./kind"
 import { FileIcon } from "./macIcons"
+import { FOLDER_DRAG_MIME } from "./FinderViews"
+import type { PinnedFolder } from "./Finder"
 import { Tip } from "@/components/ui/tip"
 import { cn } from "@/lib/utils"
+import { useState } from "react"
+import type { LucideIcon } from "lucide-react"
 
 // Per-view-mode tooltip copy — the segmented control's icons aren't obvious.
 const VIEW_TIP: Record<FinderViewMode, { title: string; body: string }> = {
@@ -346,22 +349,32 @@ function SegBtn({
   )
 }
 
-// ── Left sidebar: favorites / locations / tags ────────────────────
-const SIDEBAR_TAGS: FinderTag[] = ["red", "orange", "green", "blue", "purple"]
-
+// ── Left sidebar: favorites / locations / pinned ──────────────────
 export function FinderSidebar({
   root,
   cwd,
+  pins,
   onNavigate,
   onOpen,
+  onPin,
+  onUnpin,
 }: {
   root: FinderNode
   cwd: string
+  pins: PinnedFolder[]
   onNavigate: (path: string) => void
   onOpen: (node: FinderNode) => void
+  /** pin a folder dropped onto / right-clicked into the sidebar */
+  onPin: (p: PinnedFolder) => void
+  /** remove a pinned folder */
+  onUnpin: (path: string) => void
 }) {
   const topFolders = (root.children ?? []).filter((c) => c.kind === "folder")
   const starred = collectStarred(root)
+  const [dropActive, setDropActive] = useState(false)
+
+  const acceptsFolder = (e: React.DragEvent) =>
+    e.dataTransfer.types.includes(FOLDER_DRAG_MIME)
 
   return (
     <aside className="flex w-[var(--sidebar-w)] shrink-0 flex-col gap-3.5 overflow-y-auto border-r border-border bg-surface px-2.5 py-3">
@@ -400,29 +413,62 @@ export function FinderSidebar({
         ))}
       </Group>
 
-      <Group label="Tags">
-        {SIDEBAR_TAGS.map((t) => (
-          <button
-            key={t}
-            className="flex items-center gap-2.5 rounded-md py-1.5 pl-2 pr-2 text-left text-[12.5px] text-foreground/75 transition-colors hover:bg-muted/60"
-          >
-            <span
-              className="size-2.5 shrink-0 rounded-full ring-1 ring-inset ring-black/10"
-              style={{ background: TAG_META[t].color }}
+      {/* Pinned — a drag-and-drop target (drop a folder, or right-click → Pin). */}
+      <div
+        onDragOver={(e) => {
+          if (acceptsFolder(e)) {
+            e.preventDefault()
+            if (!dropActive) setDropActive(true)
+          }
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget === e.target) setDropActive(false)
+        }}
+        onDrop={(e) => {
+          if (!acceptsFolder(e)) return
+          e.preventDefault()
+          setDropActive(false)
+          const raw = e.dataTransfer.getData(FOLDER_DRAG_MIME)
+          if (!raw) return
+          try {
+            const p = JSON.parse(raw) as PinnedFolder
+            if (p.path) onPin({ name: p.name, path: p.path })
+          } catch {
+            /* malformed drag payload — ignore */
+          }
+        }}
+        className={cn(
+          "flex flex-col gap-0.5 rounded-lg transition-colors",
+          dropActive && "bg-[var(--signal)]/10 ring-1 ring-inset ring-[var(--signal)]/45",
+        )}
+      >
+        <span className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+          Pinned
+        </span>
+        {pins.map((p) => (
+          <div key={p.path} className="group/pin relative flex items-center">
+            <Place
+              leading={<FileIcon kind="folder" size={16} />}
+              label={p.name}
+              active={cwd === p.path}
+              accent="var(--warn)"
+              onClick={() => onNavigate(p.path)}
             />
-            {TAG_META[t].label}
-          </button>
+            <button
+              title="Unpin"
+              onClick={() => onUnpin(p.path)}
+              className="absolute right-1.5 flex size-4 items-center justify-center rounded text-muted-foreground/50 opacity-0 transition-opacity hover:text-foreground group-hover/pin:opacity-100"
+            >
+              <X className="size-3" />
+            </button>
+          </div>
         ))}
-      </Group>
-
-      <Group label="Recents">
-        <Place icon={Star} label="Starred" accent="var(--interactive)" muted />
-        <Place icon={Clock} label="Last 7 days" accent="var(--muted-foreground)" muted />
-      </Group>
-
-      <div className="mt-auto rounded-lg border border-dashed border-border px-2.5 py-2 text-[10.5px] leading-relaxed text-muted-foreground/60">
-        <span className="flex items-center gap-1 font-medium text-muted-foreground/80">🔒 Confined realm</span>
-        This Finder can't navigate above the agent's folder.
+        {pins.length === 0 && (
+          <div className="mx-1 flex items-center gap-1.5 rounded-md border border-dashed border-border px-2.5 py-2 text-[10.5px] leading-relaxed text-muted-foreground/55">
+            <Pin className="size-3 shrink-0" />
+            Drag a folder here — or right-click a folder → Pin — to keep it handy.
+          </div>
+        )}
       </div>
     </aside>
   )
@@ -449,7 +495,7 @@ function Place({
   muted,
   onClick,
 }: {
-  icon?: typeof Star
+  icon?: LucideIcon
   /** custom leading element (e.g. a macOS FileIcon); overrides `icon` */
   leading?: React.ReactNode
   label: string
