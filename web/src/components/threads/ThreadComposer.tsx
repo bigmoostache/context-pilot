@@ -1,20 +1,29 @@
 import { useEffect, useRef, useState } from "react"
-import { ArrowUp, Paperclip, Loader2 } from "lucide-react"
+import { ArrowUp, Paperclip, Loader2, Clock } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 
 /**
- * Thread composer — always active, regardless of turn status. The "working"
- * hint above the input appears when it is the **agent's turn** (`MY_TURN`, the
- * agent owes a response) or the agent is actively streaming (`ACTIVE`) — i.e.
- * exactly when the agent is busy on this thread. On the user's turn
- * (`THEIR_TURN`) no hint shows; the composer is just ready for the next reply.
- * The textarea is always usable so a message can be sent at any time.
+ * Thread composer — always active, regardless of turn status. The hint above
+ * the input reflects what the agent is doing with *this* thread when it is the
+ * agent's turn (`MY_TURN` / `ACTIVE`):
+ *
+ * - **Focused** (the one thread the agent is on right now) → an active spinner:
+ *   "Agent is streaming…" while `ACTIVE`, else "Agent is working this thread…".
+ * - **Not focused** (the agent owes this thread a response but is busy on
+ *   another) → a static clock: "Agent will pick up this thread soon." — it's
+ *   queued, not being worked this instant.
+ *
+ * On the user's turn (`THEIR_TURN`) no hint shows. The textarea is always
+ * usable so a message can be sent at any time.
  */
 export function ThreadComposer({
   status,
+  focused = false,
   onSend,
 }: {
   status: ThreadStatus
+  /** true when this is the single thread the agent is currently focused on */
+  focused?: boolean
   onSend?: (text: string) => void
 }) {
   const [text, setText] = useState("")
@@ -35,8 +44,19 @@ export function ThreadComposer({
   }
   useEffect(autoResize, [text])
 
-  const isWorking = status === "MY_TURN" || status === "ACTIVE"
-  const isActive = status === "ACTIVE"
+  const userTurn = status === "THEIR_TURN"
+  const streaming = status === "ACTIVE"
+  // The agent owes a response on this thread (its turn, or actively streaming).
+  const agentBusy = !userTurn
+  // Only the FOCUSED thread is being worked right now; any other agent-turn
+  // thread is queued and will be picked up soon (T39).
+  const banner = !agentBusy
+    ? null
+    : streaming
+      ? { working: true, color: "var(--ok)", text: "Agent is streaming…" }
+      : focused
+        ? { working: true, color: "var(--signal)", text: "Agent is working this thread…" }
+        : { working: false, color: undefined, text: "Agent will pick up this thread soon." }
 
   const canSend = text.trim().length > 0
 
@@ -67,17 +87,14 @@ export function ThreadComposer({
 
   return (
     <div className="shrink-0 px-5 pb-4 pt-2">
-      {isWorking && (
+      {banner && (
         <div className="mb-2 flex items-center justify-center gap-2 rounded-xl bg-muted/40 px-3 py-1.5 text-[11.5px] text-muted-foreground">
-          <Loader2
-            className="size-3.5 animate-spin"
-            style={{ color: isActive ? "var(--ok)" : "var(--signal)" }}
-          />
-          <span>
-            {isActive
-              ? "Agent is streaming…"
-              : "Agent is working this thread…"}
-          </span>
+          {banner.working ? (
+            <Loader2 className="size-3.5 animate-spin" style={{ color: banner.color }} />
+          ) : (
+            <Clock className="size-3.5" />
+          )}
+          <span>{banner.text}</span>
         </div>
       )}
       <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2.5 card-shadow focus-within:border-[var(--signal)]/60">

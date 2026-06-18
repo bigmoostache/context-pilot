@@ -77,7 +77,7 @@ export function ThreadConversation({
       </ScrollArea>
 
       <div className="mx-auto w-full max-w-[720px]">
-        <ThreadComposer key={thread.id} status={thread.status} onSend={onSend} />
+        <ThreadComposer key={thread.id} status={thread.status} focused={thread.focused} onSend={onSend} />
       </div>
     </main>
   )
