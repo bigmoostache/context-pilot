@@ -336,6 +336,7 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
         question: None,
         timestamp: now_ms(),
         acknowledged: false,
+        auto: false,
     });
     thread.status = ThreadStatus::MyTurn;
 

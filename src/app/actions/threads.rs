@@ -336,6 +336,7 @@ fn question_enter(state: &mut State) -> ActionResult {
                     question: None,
                     timestamp: crate::app::panels::now_ms(),
                     acknowledged: false,
+                    auto: false,
                 });
                 thread.status = cp_mod_threads::types::ThreadStatus::MyTurn;
             }
