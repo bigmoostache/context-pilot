@@ -93,6 +93,7 @@ export const qk = {
   fs: (id: string, path: string) => ["fs", id, path] as const,
   fsPreview: (id: string, path: string) => ["fs-preview", id, path] as const,
   fsSheet: (id: string, path: string) => ["fs-sheet", id, path] as const,
+  fsDescriptions: (id: string) => ["fs-descriptions", id] as const,
 } as const
 
 /** The two delta-covered cache families — they must NEVER be invalidated (the

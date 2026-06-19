@@ -208,6 +208,20 @@ export function useFs(
 }
 
 /**
+ * The agent's tree descriptions as a `{ path: description }` map, fetched once
+ * per agent for the Finder's per-node info badge. Descriptions change rarely
+ * (only when the agent runs its tree-describe tool), so there is no SSE bridge
+ * and the backstop poll is disabled (`pollMs: 0`) — a fresh value lands on the
+ * next Finder mount / agent switch, which is plenty for a static hint.
+ */
+export function useFsDescriptions(agentId: string): LiveQueryResult<Record<string, string>> {
+  return useLive(qk.fsDescriptions(agentId), () => api.fetchDescriptions(agentId), {
+    enabled: !!agentId,
+    pollMs: 0,
+  })
+}
+
+/**
  * Live file-content preview for the Finder Quick Look pane. Fetches a file's
  * text via the backend preview endpoint (first 256 KiB, binary rejected with a
  * 415 → surfaced as a query error so the caller renders the no-preview state).

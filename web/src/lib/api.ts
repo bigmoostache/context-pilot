@@ -331,6 +331,14 @@ export function fetchFs(agentId: string, path = ""): Promise<FinderNode[]> {
   return request(`/api/agent/${agentId}/fs${q}`)
 }
 
+/** The agent's tree descriptions, as a flat `{ realmRelativePath: description }`
+ *  map (`GET /api/agent/{id}/fs/descriptions`). Powers the Finder's per-node
+ *  info badge: a node shows the ⓘ affordance exactly when its `path` is a key
+ *  here. An agent with no descriptions yields `{}` (never an error). */
+export function fetchDescriptions(agentId: string): Promise<Record<string, string>> {
+  return request(`/api/agent/${agentId}/fs/descriptions`)
+}
+
 /** A file content preview from `GET /api/agent/{id}/fs/preview?path=`.
  *
  * The backend returns the first 256 KiB of a text file (`truncated` flags the

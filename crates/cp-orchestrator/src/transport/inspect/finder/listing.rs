@@ -8,6 +8,52 @@ use crate::transport::Backend;
 
 use super::support::{agent_folder, confined_path, count_visible_children, extract_param, infer_kind};
 
+/// `GET /api/agent/{id}/fs/descriptions` — the agent's tree descriptions.
+///
+/// Reads the agent's `tree` module persistence
+/// (`<folder>/.context-pilot/shared/tree-descriptions.yaml`) and returns a flat
+/// JSON object mapping each described **realm-relative path** to its description
+/// text — exactly the keys the Finder lists, so a node can show an info badge
+/// when (and only when) the agent has written a description for it.
+///
+/// The on-disk file is a [`YamlSync`](cp-base) map keyed by an opaque per-entry
+/// hash, each value carrying `{ path, description, last_edited_ms }`; this
+/// flattens it to `{ path: description }`. A missing or unparseable file yields
+/// an empty object (a realm with no descriptions is the normal case, never an
+/// error). The agent id is still resolved so an unknown agent is a `404`.
+pub fn fs_descriptions(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+    let folder = match agent_folder(state, agent_id) {
+        Ok(f) => f,
+        Err(reply) => return reply,
+    };
+    let path = PathBuf::from(&folder)
+        .join(".context-pilot")
+        .join("shared")
+        .join("tree-descriptions.yaml");
+
+    let Ok(raw) = std::fs::read(&path) else {
+        return HttpReply::ok(&serde_json::json!({}));
+    };
+    let Ok(doc): Result<serde_yaml::Value, _> = serde_yaml::from_slice(&raw) else {
+        return HttpReply::ok(&serde_json::json!({}));
+    };
+
+    let mut map = serde_json::Map::new();
+    if let Some(entries) = doc.as_mapping() {
+        for value in entries.values() {
+            let path = value.get("path").and_then(serde_yaml::Value::as_str);
+            let desc = value.get("description").and_then(serde_yaml::Value::as_str);
+            if let (Some(p), Some(d)) = (path, desc) {
+                if !p.is_empty() && !d.is_empty() {
+                    let _prev = map.insert(p.to_owned(), serde_json::Value::String(d.to_owned()));
+                }
+            }
+        }
+    }
+
+    HttpReply::ok(&serde_json::Value::Object(map))
+}
+
 /// Maximum file size returned by the preview endpoint (256 KiB).
 const MAX_PREVIEW_BYTES: u64 = 256 * 1024;
 

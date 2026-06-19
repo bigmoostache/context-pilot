@@ -287,6 +287,7 @@ fn route_rest(
         (Method::Get, ["api", "agent", id, "fs"]) => inspect::finder::fs_list(state, id, query),
         (Method::Get, ["api", "agent", id, "fs", "preview"]) => inspect::finder::fs_preview(state, id, query),
         (Method::Get, ["api", "agent", id, "fs", "sheet"]) => inspect::finder::fs_sheet(state, id, query),
+        (Method::Get, ["api", "agent", id, "fs", "descriptions"]) => inspect::finder::fs_descriptions(state, id),
         (Method::Get, ["api", "agent", id, "conversation"]) => inspect::finder::conversation(state, id),
         (Method::Post, ["api", "agent", id, "command"]) => rest::command(state, id, body_bytes),
         (Method::Post, ["api", "agent", id, "fs", "upload"]) => inspect::finder::fs_upload(state, id, query, body_bytes),

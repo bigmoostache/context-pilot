@@ -7,7 +7,7 @@ import type {
   FinderViewMode,
 } from "@/lib/types"
 import { fmtBytes, sortNodes } from "@/lib/finderFs"
-import { downloadFile, useCreateFolder, useFs, useMoveItems, useRenameItem, useTrashItems, useUploadFiles } from "@/lib/live"
+import { downloadFile, useCreateFolder, useFs, useFsDescriptions, useMoveItems, useRenameItem, useTrashItems, useUploadFiles } from "@/lib/live"
 import { useQueryClient } from "@tanstack/react-query"
 import { qk } from "@/lib/sync"
 
@@ -166,6 +166,10 @@ export function Finder({ agent }: { agent: Agent }) {
       : cwd
   const { data: liveChildren } = useFs(agent.id, relCwd)
   const children = liveChildren ?? []
+  // The agent's tree descriptions (realm-relative path → text), for the per-node
+  // info badge. One fetch per agent (rarely changes); a node shows the ⓘ badge
+  // exactly when its path is described.
+  const { data: descriptions } = useFsDescriptions(agent.id)
   const filtered = query
     ? children.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
     : children
@@ -665,6 +669,7 @@ export function Finder({ agent }: { agent: Agent }) {
     renamingPath,
     onRenameCommit: commitRename,
     onRenameCancel: cancelRename,
+    descriptions,
   }
 
   // ── box (marquee) selection ─────────────────────────────────────

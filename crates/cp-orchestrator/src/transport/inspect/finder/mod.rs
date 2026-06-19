@@ -5,7 +5,8 @@
 //! Split across cohesive sub-modules (kept under the 500-line file budget, and
 //! room for the preview-format endpoints that keep landing here):
 //!
-//! * [`listing`] — read views: `fs_list`, `fs_preview`, `conversation`.
+//! * [`listing`] — read views: `fs_list`, `fs_preview`, `fs_descriptions`,
+//!   `conversation`.
 //! * [`sheet`] — spreadsheet → table JSON (`fs_sheet`, CSV/TSV/xlsx/xls/ods).
 //! * [`mutate`] — writes: `fs_upload`, `fs_write`, `fs_mkdir`, `fs_rename`,
 //!   `fs_move`, `fs_trash`.
@@ -24,6 +25,6 @@ mod sheet;
 pub(super) mod support;
 
 pub use download::{fs_download, fs_raw};
-pub use listing::{conversation, fs_list, fs_preview};
+pub use listing::{conversation, fs_descriptions, fs_list, fs_preview};
 pub use mutate::{fs_mkdir, fs_move, fs_rename, fs_trash, fs_upload, fs_write};
 pub use sheet::fs_sheet;

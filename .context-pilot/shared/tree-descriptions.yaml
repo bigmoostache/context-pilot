@@ -2346,6 +2346,10 @@
   path: ui/src/components/shell/ProfileModal.tsx
   description: 'Profile modal (T30) — opened from the avatar menu, on the portaled Base-UI Dialog primitive. Editable display-name + email (email locks when company-managed), large AvatarMark + camera change-badge, and an Account section that switches on managedByCompany: ManagedAccount org callout (locked, SSO) vs PersonalAccount self-service rows (password/billing/delete). A design-only Switch previews both states. All decorative.'
   last_edited_ms: 1781596817744
+4ed07f7796ebdc80:
+  path: web/package.json
+  description: 'Frontend deps: @base-ui/react 1.5, @tanstack/react-query 5.101, react 19.2, react-markdown 10 + remark-gfm, highlight.js 11.11, tailwindcss 4.3, shadcn 4.11, vite 8, playwright. scripts: dev/build(tsc -b && vite build)/lint/preview.'
+  last_edited_ms: 1781905919471
 4ede68cb38534c4d:
   path: src/llms/claude_code_api_key/mod.rs
   description: Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
@@ -2630,6 +2634,10 @@
   path: crates/cp-base/src/cast.rs
   description: 'Safe trait: saturating numeric casts for all int/float types, macro-driven impls, replaces raw `as` casts'
   last_edited_ms: 0
+5730a4905add5122:
+  path: web/src/index.css
+  description: Tailwind v4 + tw-animate. Two palettes (:root Cream light / .dark Dungeon Forge) as CSS token blocks; semantic tokens (signal/ok/warn/danger/surface). Finder micro-motion keyframes (finder-pop/ql-pop/menu-pop/ants/checker), modal-pop, highlight.js .hljs-* theme mapped to tokens (T280).
+  last_edited_ms: 1781905919370
 574464bbe01f907c:
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
@@ -3742,6 +3750,10 @@
   path: src/app/run/threads.rs
   description: 'Thread-related helpers for the main event loop. maybe_inject_auto_read (synthetic Read on auto-continuation), check_my_turn_threads (idle MY_TURN detection + spine notification), extract_thread_ids (parse thread IDs from notification content). Bridge command polling: poll_bridge_commands + accept_commands (non-blocking accept, 500ms read timeout) + apply_command dispatch (SendMessage/CreateThread/Archive/Restore/Stop/Interrupt via K7 path). Free functions taking &mut App.'
   last_edited_ms: 0
+7cf7f4cedd4667c6:
+  path: web/src/components/ui/dialog.tsx
+  description: shadcn-style Dialog on Base UI Dialog primitive. Portaled into document.body (escapes vibrancy/backdrop-filter containing blocks), focus trap + scroll-lock + Esc. Exports Dialog/Trigger/Close/Content/Backdrop/Title/Description; modal-pop animation, data-[ending-style] close anim.
+  last_edited_ms: 1781905919423
 7cfd2cfc2f568cf9:
   path: src/llms/cache/density.rs
   description: 'Divergence density distributions. Production: ConversationTailDensity (zeros out assistant blocks, quadratic on user-side panels + last user turn). Test-only: Uniform, Quadratic, PowerLaw, Empirical.'
@@ -4330,6 +4342,10 @@
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
+908a2bcfec13bc4b:
+  path: web/src/components/finder/ContextMenu.tsx
+  description: 'Finder right-click menu, two variants on pos.node presence. ITEM menu: Open, Pin (folders), Rename, Duplicate, Download, tag swatches, Move to Trash. EMPTY-SPACE menu (T279): New Folder, Upload, Select All, Toggle Quick Look, Refresh. On-screen clamping; closes on outside-click/Esc.'
+  last_edited_ms: 1781905919447
 90a2a7ed22882e65:
   path: ui/src/components/conversation/InputBar.tsx
   description: 'Mock input bar: blinking caret, key hints (send/cycle-view/file). Non-functional (design only).'
@@ -5042,6 +5058,10 @@ a91032af6edb5c3b:
   path: test_file_to_describe.txt
   description: Version B of the test file
   last_edited_ms: 0
+a92dc0d2a7dda185:
+  path: web/src/components/finder/codeHighlight.ts
+  description: Finder code-preview syntax highlighting (T280). highlight.js common bundle + 7 curated extras (scala/elixir/erlang/haskell/ocaml/dart/fsharp). EXT_LANG ext→lang map; highlightCode(code,filename)→{html,language} resolves by ext else auto-detect, never throws (degrades to escaped text).
+  last_edited_ms: 1781905919396
 a9945ad52fca5540:
   path: crates/cp-base/src/config/constants.rs
   description: Layout/timing constants. SIDEBAR_HELP_HEIGHT=10 (9 help hints + separator). MAX_SIDEBAR_LABEL_LEN, INPUT_RESERVE, TEMPO_*, token thresholds, typing indicator timing.

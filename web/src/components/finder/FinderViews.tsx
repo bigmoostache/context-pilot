@@ -6,6 +6,7 @@ import { fmtBytes, sortNodes } from "@/lib/finderFs"
 import { useFs } from "@/lib/live"
 import { extOf, kindMeta, kindTint, TAG_META } from "./kind"
 import { FileIcon } from "./macIcons"
+import { InfoBadge } from "./InfoBadge"
 import { cn } from "@/lib/utils"
 
 /** MIME used when dragging a folder out of a view onto the sidebar to pin it. */
@@ -111,6 +112,10 @@ export interface ViewHandlers {
   onRenameCommit?: (node: FinderNode, newName: string) => void
   /** abandon the in-progress rename (Esc). */
   onRenameCancel?: () => void
+  /** realm-relative path → tree-description map (the agent's tree-describe
+   *  output). A node whose `path` is a key shows an info badge revealing the
+   *  description on hover/click. Absent when the realm has no descriptions. */
+  descriptions?: Record<string, string>
 }
 
 /**
@@ -228,7 +233,7 @@ export function GridView({
             onContextMenu={(e) => h.onContext(e, n)}
             style={{ animationDelay: `${Math.min(i, 18) * 22}ms` }}
             className={cn(
-              "finder-pop group flex flex-col items-center gap-1.5 rounded-xl border p-2.5 text-center transition-[background,border,transform] duration-150",
+              "finder-pop group relative flex flex-col items-center gap-1.5 rounded-xl border p-2.5 text-center transition-[background,border,transform] duration-150",
               sel
                 ? "border-[var(--signal)]/55 bg-[var(--signal)]/10 card-shadow"
                 : "border-transparent hover:border-border hover:bg-muted/45",
@@ -236,6 +241,11 @@ export function GridView({
               dropOver && "border-[var(--signal)] bg-[var(--signal)]/15 ring-2 ring-[var(--signal)]/60",
             )}
           >
+            {h.descriptions?.[n.path] && (
+              <span className="absolute right-1 top-1 z-[1]">
+                <InfoBadge description={h.descriptions[n.path]} />
+              </span>
+            )}
             <FileIcon
               kind={n.kind}
               ext={extOf(n.name)}
@@ -326,6 +336,7 @@ export function ListView({
                 <span className="truncate font-medium">{n.name}</span>
               )}
               <TagDots tags={n.tags} className="shrink-0" />
+              {h.descriptions?.[n.path] && <InfoBadge description={h.descriptions[n.path]} />}
             </span>
             <span className="truncate text-muted-foreground">{M.label}</span>
             <span className="tabular-nums text-muted-foreground">
@@ -497,6 +508,7 @@ function MillerColumn({
               <span className="min-w-0 flex-1 truncate font-medium">{n.name}</span>
             )}
             <TagDots tags={n.tags} />
+            {h.descriptions?.[n.path] && <InfoBadge description={h.descriptions[n.path]} />}
             {n.kind === "folder" && (
               <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/50" />
             )}
