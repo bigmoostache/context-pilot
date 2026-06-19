@@ -722,6 +722,10 @@
   path: crates/cp-mod-bridge/tests/boot_heartbeat.rs
   description: 'Phase 25 (X792): cp-mod-bridge boot+heartbeat integration suite (4 tests, FIRST tests/ dir for this crate). Discovery contract viewed AS THE BACKEND SEES IT — reads artifacts back through cp_wire exactly like Phase 15 registry+liveness. a_booted_agent_is_fully_discoverable (registry <id>.json round-trips to valid Entry: protocol_version=PROTOCOL_VERSION, status=Starting, cap_token 64hex, boot_id 32hex; all advertised paths oplog/socket/heartbeat EXIST on disk; heartbeat file decodes to fresh beat whose matches_boot(entry.boot_id)+pid agree = cross-artifact tie inline tests don''t make). two_folders_boot_independently_into_one_fleet (folder A+B both alive simultaneously in one agents_dir → distinct id/cap_token/boot_id, both records coexist+round-trip, both beats fresh+bound = lock is per-folder not global, fleet precondition). rebooting_a_folder_keeps_its_id_but_mints_a_fresh_identity (drop boot1, boot2 same folder → SAME folder_id deterministic but DIFFERENT boot_id+cap_token = restart-identity/pid-reuse defence at boot layer). a_real_beat_drives_the_freshness_and_boot_match_verdict (beacon-produced beat: is_fresh(now,DEFAULT_MAX_AGE)=true, is_fresh(ts+60s,10ms)=false age-driven, matches_boot self=true/other=false). is_fresh(now_ms:u64,max_age_ms:u64) takes MILLIS not Duration → DEFAULT_MAX_AGE.as_millis() try_from. Per-target unused-crate-dependencies: `use cp_base/cp_render/cp_oplog/nix as _;` (bridge deps not directly named); names cp_mod_bridge+cp_wire+serde_json(from_str)+tempfile. 44 cp-mod-bridge tests green (40 inline + 4 integration).'
   last_edited_ms: 1781649010174
+18a7fc26e1396d89:
+  path: web/src/components/ui/sheet.tsx
+  description: 'shadcn Sheet (drawer) on Base UI Dialog. Side-anchored (top/right/bottom/left) slide-in Popup, portaled, with backdrop + slide/fade animations via data-[side]/data-[starting|ending]-style classes. T288: SheetContent gained showOverlay?:boolean (default true) to skip the dimming backdrop for a NON-MODAL sheet whose background must stay interactive (Finder Quick Look — clicking another file updates the preview instead of dismissing). showCloseButton toggles the built-in X. GOTCHA: to override the base data-[side=right]:w-3/4 / sm:max-w-sm width you must use the SAME data-[side=right]: variant prefix (tailwind-merge only collapses same-prefix classes).'
+  last_edited_ms: 1781908494810
 18b7589d4b40304b:
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks.'
@@ -4126,6 +4130,10 @@
   path: yamls/tools/threads.yaml
   description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
   last_edited_ms: 0
+888eb5d4e1f02b3d:
+  path: web/src/components/ui/popover.tsx
+  description: shadcn-style Popover on Base UI's Popover primitive. Popup PORTALED into document.body (escapes overflow-clipping ancestors), focus mgmt + outside-click/Esc dismiss + aria for free. Root accepts openOnHover (+delay) so a trigger opens on hover (the Finder info badge pattern). PopoverContent positioned via Positioner (default top-center, sideOffset 6) with tw-animate data-open/data-closed motion.
+  last_edited_ms: 1781908494761
 88c3cb1cd35df948:
   path: src/ui/mod.rs
   description: Top-level render() with flame!("render"). IR frame build → sidebar + content panel + status bar + overlays (perf from IR, autocomplete from IR, config from IR, search index from IR). All overlays consume IR data.
@@ -4606,6 +4614,10 @@
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.
   last_edited_ms: 0
+990c54d5571a1a67:
+  path: web/e2e/t288_probe.spec.ts
+  description: 'T288 regression: real-browser Quick Look drawer geometry probe. Boots live web (:5175, localStorage cp-agent/cp-view), opens QL via file-row click + Space, asserts the right-side Sheet drawer is flush-right (x+w==viewport, no overflow), 420px wide, header h-12=48px (matches toolbar). Screenshots /tmp/t288-drawer.png. Proved the off-screen + header-height fixes (da1d4fd) actually render — caught that tailwind-merge variant-prefix reasoning needs visual confirmation.'
+  last_edited_ms: 1781909000160
 99495bd81ffd5f7e:
   path: crates/cp-mod-ocr/src/lib.rs
   description: 'OCR module. 1 tool: ocr. Datalab API integration. Non-blocking: returns immediately, fires spine notification on completion. Global, non-core.'
@@ -7146,6 +7158,10 @@ eeb8ddd22c31de65:
   path: crates/cp-base/src/state/watchers.rs
   description: 'Watcher trait + WatcherRegistry. WatcherResult: description, panel_id, tool_use_id, close_panel, create_panel (DeferredPanel for console), create_dyn_panel (DynPanel for generic panels), kill_session, preserves_tempo. ChannelWatcher: polls Mutex<Receiver<WatcherResult>> for async tool results. ASYNC_ERROR_PREFIX + DYN_PANEL_ID_PLACEHOLDER constants.'
   last_edited_ms: 0
+eec3c55348ffe829:
+  path: web/src/components/finder/InfoBadge.tsx
+  description: Finder per-node info badge (T289) — a small ⓘ shown on a file/folder that has a tree description; hover (delay 120) or click opens a Popover with the description. PopoverTrigger render={<span/>} so it nests inside a row/cell <button> without button-in-button; stopPropagation on click/dblclick/pointerdown so the badge never selects/opens/drags the node. max-w-340px.
+  last_edited_ms: 1781908494786
 ef0729aa90244126:
   path: crates/cp-oplog/tests/crash_replay.rs
   description: 'Phase 9 (X776) MILESTONE M0 crash-replay harness. Unix-only (#![cfg(unix)]). Self-re-exec pattern: env-gated #[test] crash_child_entrypoint re-runs the test binary as a child via current_exe(); parent/child handshake through a fdatasync''d marker file (libtest stdout is noisy). V1 v1_real_sigkill_leaves_a_clean_replayable_oplog: child spams durable MessageCreated appends, parent kill()s (real SIGKILL), fresh process replay() never errors + every announced-durable rev survives + torn tail truncated (announce-after-durable K9 across real crash). V2 v2_journalled_command_is_exactly_once_after_deadman_reexec: child journals CommandEffect then dies, fresh process recovers seen-set token, duplicate SeenMark delivery folds to no-op (exactly-once across process boundary). V12 v12_barrier_is_pending_the_body_store: asserts body_gc_eligible rule, explicit placeholder until body store lands Phase 14. 4 tests green.'

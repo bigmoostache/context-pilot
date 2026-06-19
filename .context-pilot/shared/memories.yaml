@@ -66,11 +66,13 @@
   - fixed
   last_edited_ms: 1781884032338
 24b54123d1af9131:
-  tl_dr: T288 Finder Quick Look → shadcn Sheet drawer SHIPPED 6f5c12a pushed (frontend-only, build green).
+  tl_dr: T288 Finder Quick Look → shadcn Sheet drawer SHIPPED + REAL-BROWSER VERIFIED. Off-screen + header-height fixes proven in live Chromium via web/e2e/t288_probe.spec.ts.
   contents: |-
-    Replaced the non-reflowing overlay with a Base UI Sheet anchored right; NON-MODAL (modal=false + showOverlay=false + disablePointerDismissal) so clicking another file behind updates the live preview instead of dismissing. Esc + FinderPreview's own X close it. Fixed-positioned → never reflows grid, so click/double-click/slow-rename gestures stay stable. Gated grid+list only (columns has its Miller preview pane, gallery has hero). sheet.tsx gained showOverlay?:boolean (default true) to skip the dimming backdrop. No orchestrator restart / system_reload (dev :5175 hot-reloads). Shipped 6f5c12a.
+    Replaced the non-reflowing overlay with a Base UI Sheet anchored right; NON-MODAL (modal=false + showOverlay=false + disablePointerDismissal) so clicking another file behind updates the live preview instead of dismissing. Esc + FinderPreview's own X close it. Fixed-positioned → never reflows grid. Gated grid+list only. Shipped 6f5c12a.
 
-    FOLLOW-UP fix 64907e4 (two complaints): (1) drawer part off-screen RIGHT — my width override `w-[420px]`/`sm:max-w-[420px]` had a DIFFERENT tailwind variant prefix than the base SheetContent's `data-[side=right]:w-3/4` + `data-[side=right]:sm:max-w-sm`, so tailwind-merge kept BOTH and the base won, capping the Popup ~384px while the nested FinderPreview pane (aside w-[420px] shrink-0) stayed 420 → overflowed past the viewport right edge. FIX: re-express width with the SAME `data-[side=right]:` modifier (`data-[side=right]:w-[420px]` + `:max-w-[420px]` + `:sm:max-w-[420px]`) so merge cleanly replaces the base width classes → clean 420 flush-right. GENERAL LESSON: tailwind-merge only collapses classes that share the same variant-prefix; to override a `data-[x]:`-prefixed base class you must use the same prefix. (2) Quick Look pane header was h-11 (44px) vs Finder toolbar + app TopBar both h-12 (48px) → bumped to h-12 to line up.
+    FOLLOW-UP fix da1d4fd (two complaints): (1) drawer part off-screen RIGHT — width override `w-[420px]` used a DIFFERENT tailwind variant prefix than the base SheetContent's `data-[side=right]:w-3/4` + `:sm:max-w-sm`, so tailwind-merge kept BOTH and the base won (~384px) while the nested FinderPreview pane (w-[420px] shrink-0) overflowed past the viewport right edge. FIX: re-express width with the SAME `data-[side=right]:` modifier so merge cleanly REPLACES the base width → clean 420 flush-right. LESSON: tailwind-merge only collapses classes that share the same variant-prefix. (2) QL pane header was h-11 (44px) vs toolbar+TopBar h-12 (48px) → bumped to h-12.
+
+    REAL-BROWSER VERIFICATION (after user demanded I test, not reason): web/e2e/t288_probe.spec.ts boots the live web app (:5175, addInitScript localStorage cp-agent=f3a99 + cp-view=finder), navigates Finder, clicks a real file row by data-path (data-kind doesn't exist on rows — only data-finder-item + data-path), presses Space to open Quick Look ([data-slot=sheet-content][data-side=right]), measures boundingBox + screenshots /tmp/t288-drawer.png. PASS: viewport 1280, drawer x=860 w=420 rightEdge=1280 (FLUSH, overflowsRight=false), qlHeaderHeight=48. Probe committed as a regression artifact. GOTCHA: don't trust tailwind-merge variant-prefix reasoning — render it.
   importance: medium
   labels:
   - T288
@@ -78,7 +80,7 @@
   - quick-look
   - sheet
   - shipped
-  last_edited_ms: 1781907701768
+  last_edited_ms: 1781908985325
 251f7f7fd6eee822:
   tl_dr: 'T279 follow-up SHIPPED (e833835): New Folder now inline-names a placeholder before creating (macOS-style), instead of auto-creating ''untitled folder''.'
   contents: |-
@@ -490,6 +492,36 @@
   tl_dr: 'Cryptographic hash chain protects 12 critical files (Cargo.toml lint sections, clippy.toml, rustfmt.toml, CI scripts, lint exceptions YAML, deploy scripts). Password: Totordu1789. Updates via chain.sh --update.'
   importance: critical
   last_edited_ms: 0
+7ce2474519516610:
+  tl_dr: 'LIVE BUG (active): web send → 502 ''agent unreachable'' on f3a993c0ff357b41 (=context-pilot, the primary live agent). Bridge boot lost flock race on fast relaunch → orchestration plane inert all session. RCA + fix in contents.'
+  contents: |-
+    ## 502 'agent unreachable' — bridge Boot lost the flock race (RCA, ACTIVE)
+
+    User hit POST /api/agent/f3a993c0ff357b41/command → 502 from the web composer.
+
+    ### Evidence gathered (live)
+    - f3a993c0ff357b41 = name 'context-pilot', folder /Users/guillaume/context-pilot — THE primary live agent (261 threads, $1369 cost). The user chats with it via web.
+    - Live TUI = pid 61029, target/release/tui, started 00:20:46, CP_BRIDGE=1 IS set (ps eww).
+    - BUT its bridge is INERT: oplog last append 00:15 (before 61029 booted); a healthy bridge emits Lifecycle::Running on boot → none. heartbeat frozen ~8min, still carries OLD dead pid 96326 (heartbeat pid bytes 0x00017846=96326). Registry record f3a99.json still points at dead pid 96326. stream.sock + tee.sock present (Jun 18) but lsof shows NO listener. bridge.lock has no holder now.
+
+    ### Root cause
+    When the TUI relaunched at 00:20:46, the previous instance (pid 96326) was still dying and holding the exclusive flock on <folder>/bridge.lock. cp-mod-bridge boot.rs acquire_lock does a non-blocking exclusive Flock with only ATTEMPTS×BACKOFF ≈2s retry, then returns Error::AlreadyRunning. The new process lost that ~2s race → AlreadyRunning → BridgeModule::init_state SWALLOWED the error → TUI ran with bridge OFF the whole session. So: reads work (inspection plane reads config.json/messages off disk → dashboard/threads/replies all display), but sends 502 (no live command socket bound). boot.rs:140 already unlink-before-binds the socket, so stale sockets are NOT the cause — it's purely the flock race.
+
+    ### Immediate fix (operational, user must do — agent can't restart itself)
+    Quit + relaunch the context-pilot TUI now that 96326 is dead and the lock is free. Fresh boot grabs the flock, rebinds sockets, re-registers under live pid, beats heartbeat → sends work. No manual cleanup needed (boot self-unlinks stale sockets).
+
+    ### Hardening follow-up (code, cp-mod-bridge boot.rs — proposed to user in T288, awaiting go-ahead)
+    (a) Surface bridge-boot FAILURE loudly (log/banner) — currently silent, user only learns via 502. (b) Longer / repeated retry on AlreadyRunning so a fast relaunch (new TUI starting while old releases the lock) can't silently leave the orchestration plane dead. Touches a TUI crate → rebuild + user relaunch to pick up; doesn't unblock the current session.
+  importance: high
+  labels:
+  - bridge
+  - '502'
+  - flock
+  - boot
+  - orchestration
+  - active
+  - bug
+  last_edited_ms: 1781908469866
 803fa2aac4f0489a:
   tl_dr: NEVER commit or push .context-pilot/shared/entities/ files (entities.db, schema.sql, migrations/). These are local-only. Added to .gitignore.
   importance: critical
