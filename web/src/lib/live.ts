@@ -229,6 +229,27 @@ export function useFsPreview(
   })
 }
 
+/**
+ * Live spreadsheet preview for the Finder Quick Look pane. Fetches a
+ * `csv`/`tsv`/`xlsx`/`xls`/`ods` file parsed to tables via the backend sheet
+ * endpoint (bounded row/col/sheet caps; a non-spreadsheet → 415 → surfaced as a
+ * query error so the caller renders the no-preview state).
+ *
+ * `enabled` gates the fetch to spreadsheet selections. Like {@link useFsPreview}
+ * it is not a delta-covered resource and a Quick Look is a point-in-time read,
+ * so there is no SSE bridge and the backstop poll is disabled (`pollMs: 0`).
+ */
+export function useFsSheet(
+  agentId: string,
+  path: string,
+  enabled: boolean,
+): LiveQueryResult<api.SheetData> {
+  return useLive(qk.fsSheet(agentId, path), () => api.fetchSheet(agentId, path), {
+    enabled: enabled && !!agentId && !!path,
+    pollMs: 0,
+  })
+}
+
 export function useConversation(agentId: string): LiveQueryResult<api.ConversationMsg[]> {
   return useLive(qk.conversation(agentId), () => api.fetchConversation(agentId), {
     agentId,

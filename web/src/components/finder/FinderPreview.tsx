@@ -2,7 +2,7 @@ import { useMemo, useState } from "react"
 import { Check, Copy, Download, Pause, Pencil, Play, Save, Share2, X } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { fmtBytes } from "@/lib/finderFs"
-import { useFsPreview, useWriteFile } from "@/lib/live"
+import { useFsPreview, useFsSheet, useWriteFile } from "@/lib/live"
 import { rawUrl } from "@/lib/api"
 import { highlightCode } from "./codeHighlight"
 import { Markdown } from "@/lib/markdown"
@@ -108,6 +108,7 @@ function Body({ node, agentId }: { node: FinderNode; agentId?: string }) {
   // content. Folders/binary/media files keep the no-preview state.
   if (agentId && node.kind === "image") return <LiveImagePreview agentId={agentId} node={node} />
   if (agentId && node.kind === "pdf") return <LivePdfPreview agentId={agentId} node={node} />
+  if (agentId && node.kind === "sheet") return <LiveSheetPreview agentId={agentId} node={node} />
   if (agentId && TEXT_KINDS.has(node.kind)) return <LivePreview agentId={agentId} node={node} />
   return <Generic node={node} />
 }
@@ -230,6 +231,103 @@ function LivePdfPreview({ agentId, node }: { agentId: string; node: FinderNode }
           </a>
         </div>
       </object>
+    </div>
+  )
+}
+
+// ── live spreadsheet (csv / xlsx / ods → table) ───────────────────
+/**
+ * Render a LIVE spreadsheet as a table from the backend's `/fs/sheet` endpoint
+ * (CSV/TSV parsed with quote handling, xlsx/xls/ods via calamine). Multi-sheet
+ * workbooks get a tab switcher; each sheet treats its first row as a sticky
+ * header and zebra-stripes the body, with a left row-number gutter and
+ * horizontal scroll for wide sheets. A clipped (capped) payload shows a note;
+ * an unparseable file or read fault falls back to the no-preview state.
+ */
+function LiveSheetPreview({ agentId, node }: { agentId: string; node: FinderNode }) {
+  const { data, loading, error } = useFsSheet(agentId, node.path, true)
+  const [active, setActive] = useState(0)
+  if (loading) return <PreviewStatus label="Loading spreadsheet…" />
+  if (error || !data || data.sheets.length === 0) return <Generic node={node} />
+
+  const sheet = data.sheets[Math.min(active, data.sheets.length - 1)]
+  const rows = sheet?.rows ?? []
+  // First row = header (mirrors how a spreadsheet shows row 1); the rest are
+  // data rows. An empty sheet shows just the note.
+  const header = rows[0] ?? []
+  const body = rows.slice(1)
+  // Pad every row to the widest so ragged rows (the backend doesn't square the
+  // grid) stay column-aligned.
+  const cols = rows.reduce((m, r) => Math.max(m, r.length), 0)
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="flex flex-col overflow-hidden rounded-lg border border-border card-shadow">
+        <div className="overflow-auto">
+          <table className="w-full border-collapse text-[11px]">
+            <thead className="sticky top-0">
+              <tr>
+                <th className="w-9 border border-border bg-muted/70 px-1 py-1 text-center text-[10px] text-muted-foreground/50">
+                  #
+                </th>
+                {Array.from({ length: cols }, (_, c) => (
+                  <th
+                    key={c}
+                    className="border border-border bg-[var(--ok)]/10 px-2 py-1.5 text-left font-semibold text-foreground/85"
+                  >
+                    {header[c] ?? ""}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {body.map((row, r) => (
+                <tr key={r} className={cn(r % 2 === 1 && "bg-muted/20", "hover:bg-[var(--signal)]/8")}>
+                  <td className="border border-border bg-muted/50 px-1 py-1 text-center text-[10px] text-muted-foreground/50">
+                    {r + 2}
+                  </td>
+                  {Array.from({ length: cols }, (_, c) => (
+                    <td
+                      key={c}
+                      className={cn(
+                        "border border-border px-2 py-1 tabular-nums text-foreground/80",
+                        c === 0 && "font-medium",
+                      )}
+                    >
+                      {row[c] ?? ""}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* sheet tabs — only for a multi-sheet workbook */}
+        {data.sheets.length > 1 && (
+          <div className="flex items-center gap-1 overflow-x-auto border-t border-border bg-muted/40 px-2 py-1">
+            {data.sheets.map((s, i) => (
+              <button
+                key={s.name + i}
+                onClick={() => setActive(i)}
+                className={cn(
+                  "shrink-0 rounded-t-md px-2.5 py-0.5 text-[10.5px] transition-colors",
+                  i === active
+                    ? "border-x border-t border-border bg-card font-medium text-foreground/80"
+                    : "text-muted-foreground/60 hover:text-foreground/80",
+                )}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {data.truncated && (
+        <p className="text-[10.5px] italic text-muted-foreground/60">
+          Preview clipped — large sheet capped at 1000 rows × 50 columns.
+        </p>
+      )}
     </div>
   )
 }

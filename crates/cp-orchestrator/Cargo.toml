@@ -27,6 +27,12 @@ notify = { workspace = true }
 # openpty / controlling-tty / setsid dance in a safe API, so no `unsafe` is
 # written here (the workspace forbids it).
 portable-pty = "0.9"
+# Spreadsheet parsing for the Finder table preview (T282): calamine reads the
+# binary workbook formats (xlsx/xls/xlsb/ods) and `csv` the delimited-text ones
+# (csv/tsv) with proper quote handling. Both feed the `/fs/sheet` endpoint that
+# renders any spreadsheet as a table.
+calamine = "0.26"
+csv = "1"
 
 [dev-dependencies]
 # Test-only: the integration suite boots a real agent and drives its command

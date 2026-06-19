@@ -147,6 +147,41 @@
   - overlay
   - shipped
   last_edited_ms: 1781893072019
+2935b8ab8e5d70d1:
+  tl_dr: T282 CSV/Excel/table Finder preview SHIPPED end-to-end (backend calamine+csv /fs/sheet + frontend table).
+  contents: |-
+    ## T282 — CSV/Excel/table support in Finder preview SHIPPED
+
+    User: 'Add csv, excel, table support in finder overview.' — render spreadsheet files as tables in the Finder Quick Look.
+
+    ### Backend (cp-orchestrator inspect/finder/sheet.rs — NEW)
+    fs_sheet(state,id,query): GET /api/agent/{id}/fs/sheet?path=. Confine path (403), is_file (404), missing param (400). By extension: csv→parse_delimited(b','), tsv→parse_delimited(b'\t') via the `csv` crate ReaderBuilder (has_headers(false), flexible(true) — proper quote + embedded-newline handling, NOT naive split); xlsx/xls/xlsb/ods/xlsm→parse_workbook via calamine open_workbook_auto (one sheet per tab, range.rows()). Unsupported ext→415, unparseable→415. Returns {sheets:[{name,rows:[[cell]]}],truncated}. Every cell stringified via cell_to_string (Data::Float integral→no .0 tail, Int/Bool/DateTime/Error variants). Bounded MAX_ROWS=1000 × MAX_COLS=50 × MAX_SHEETS=20; csv read-capped MAX_CSV_BYTES=8MiB (read_capped via file.take). truncated=true when any cap clips.
+
+    Deps added to cp-orchestrator/Cargo.toml: calamine 0.26 + csv 1. GOTCHA (cost me 2 build cycles): unused-crate-dependencies is forbid PER-TARGET. sheet.rs lives in the LIB; the BIN (main.rs) doesn't reference calamine/csv → bin target failed 'extern crate unused'. FIX: add `use calamine as _;` + `use csv as _;` to main.rs's as-underscore block (alongside the existing portable_pty/nix/etc). rust-check (CB3) is LIB-ONLY so it passed while the bin build failed — always run `cargo build -p cp-orchestrator` (full, incl bin) before declaring backend green.
+
+    Wiring: mod.rs declares `mod sheet;` + `pub use sheet::fs_sheet;`. Route in transport/mod.rs route_rest: (Get, [api,agent,id,fs,sheet])→fs_sheet (returns JSON via HttpReply, so it goes through route_rest like fs_list/fs_preview — NOT intercepted-before-route_rest like fs/raw + fs/download which return raw bytes). finder/ folder now 6 entries (listing/sheet/mutate/download/support/mod) — under the 8 cap.
+
+    ### Frontend
+    - api.ts: SheetData{sheets:{name,rows:string[][]}[],truncated} + fetchSheet(agentId,path) (throws on 415).
+    - sync.ts: qk.fsSheet(id,path)=['fs-sheet',id,path].
+    - live.ts: useFsSheet(agentId,path,enabled)=useLive over fetchSheet, pollMs:0 (point-in-time read, no SSE bridge), enabled gated.
+    - FinderPreview.tsx: Body() adds `if (agentId && node.kind==='sheet') return <LiveSheetPreview>` BEFORE the TEXT_KINDS branch (after image/pdf). LiveSheetPreview: useFsSheet → sticky-header table (rows[0]=header, ok-tinted), body=rows.slice(1) zebra + hover, left row-number gutter (#, r+2), cols=max(row.length) pads ragged rows, multi-sheet tab switcher (useState active), truncated note. loading→PreviewStatus, error/empty→Generic.
+
+    ### Proven LIVE (orchestrator debug :7878 fresh fs_sheet binary, agent 834eb459c7b064db ~/code/test):
+    CSV with quoted comma 'hello, world'→kept as ONE cell (quote handling works); XLSX 2 sheets (First/Second), integral float 4.5→'4.5', int→'1', bool→'true'; ../../../etc/passwd→403; a .txt→415; missing param→400. Fixtures (cp-sheet-test.csv via printf, .xlsx via python openpyxl) cleaned.
+
+    cargo build -p cp-orchestrator (P51) + web npm run build (P58) both exit 0; rust-check+lint passed (folder-sizes 'failure' = ./oplog/bodies gitignored runtime artifact, unrelated). Orchestrator RESTARTED (killed :7878 via lsof, relaunched debug CP_COST_BUDGET=100000000, console P55) since running binary predated the sheet route. No TUI crate changed → no system_reload.
+
+    GOTCHA reused: NEVER run git via console_easy_bash (blocked on 'git' substring) — use git_execute. Untracked NOT-mine never commit: .cp-trash/, report/blog-context-pilot-legal.html, report/parse_xlsx.py. Cargo.lock IS mine (calamine/csv tree) — stage it.
+  importance: medium
+  labels:
+  - T282
+  - finder
+  - csv
+  - excel
+  - calamine
+  - shipped
+  last_edited_ms: 1781896354527
 2b8f81e3109727b7:
   tl_dr: 'T271 cold-connect off-by-one FIXED + shipped: empty-oplog SSE subscriber now receives the agent''s first append (rev 0). Details in contents.'
   contents: |-

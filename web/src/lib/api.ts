@@ -350,6 +350,26 @@ export function fetchFsPreview(agentId: string, path: string): Promise<FsPreview
   return request(`/api/agent/${agentId}/fs/preview?path=${encodeURIComponent(path)}`)
 }
 
+/** A spreadsheet parsed to tables by `GET /api/agent/{id}/fs/sheet?path=`.
+ *
+ * Every `csv`/`tsv`/`xlsx`/`xls`/`xlsb`/`ods` file collapses to the same shape:
+ * a list of named sheets, each a grid of stringified cells (numbers/dates are
+ * stringified server-side for display). `truncated` flags that a row/column/
+ * sheet cap clipped the data so the UI can show a "preview clipped" note. A
+ * non-spreadsheet file throws (415), which the Finder renders as the
+ * no-preview state. */
+export interface SheetData {
+  sheets: { name: string; rows: string[][] }[]
+  truncated: boolean
+}
+
+/** Fetch a spreadsheet's contents as tables for the Finder Quick Look pane.
+ *  Throws on a non-spreadsheet / unparseable file (415) — callers fall back to
+ *  the no-preview state. */
+export function fetchSheet(agentId: string, path: string): Promise<SheetData> {
+  return request(`/api/agent/${agentId}/fs/sheet?path=${encodeURIComponent(path)}`)
+}
+
 /** Result of a file write (`POST /fs/write`). */
 export interface WriteResult {
   written: number

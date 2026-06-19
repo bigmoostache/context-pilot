@@ -506,6 +506,10 @@
   path: src/infra/config.rs
   description: 'Re-exports: active_theme/set_active_theme, LIBRARY/PROMPTS/THEME_ORDER/normalize_icon from cp_base::config'
   last_edited_ms: 0
+115222b4ede95ac8:
+  path: web/src/components/finder/FinderPreview.tsx
+  description: 'QuickLook preview pane — kind-aware. T272 live .md/code/json/doc fetch via useFsPreview. X906 live markdown via EditableMarkdown (view⇄WYSIWYG-edit, Save→fs/write). T281/T286 live image (<img>)+PDF (<object>) via rawUrl→/fs/raw. T282 live spreadsheet (csv/xlsx/ods) via LiveSheetPreview→useFsSheet→/fs/sheet: sticky-header table (first row=header), zebra rows, row-number gutter, multi-sheet tab switcher, truncated note. Mock path unchanged. agentId prop threads the realm.'
+  last_edited_ms: 1781896321244
 1168c31964f51dce:
   path: web/src/lib/sync.ts
   description: 'SSE→QueryClient delta bridge (push plane, Leg 2 frontend). ensureSync(agentId): one idempotent per-agent subscription. `delta` events → parse rev-numbered OpEntry → fold into [''threads'',id]+[''agent'',id] via setQueryData FUNCTIONAL updater (applyThreadDelta/applyAgentDelta), rev high-water guard drops replay dupes; null verdict → invalidate that key. `invalidate` → invalidate the agent''s INSPECTION caches only (DELTA_COVERED exempt). `resync` → refresh everything. Owns OpEntry/OpEntryKind types, qk query-key registry, mergeThreadLogs non-destructive poll reconcile. Kills T123 burst-clobber structurally. T254 double-render fix: applyThreadDelta message_created derives msgId=msg_${thread.log.length} (append position == disk reshape index) so the delta id matches the backstop-poll disk id and mergeThreadLogs collapses the two planes to ONE bubble (was {thread}-m{n}, mismatched, rendered twice).'
@@ -2786,6 +2790,10 @@
   path: ui/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard — landing surface of the Agents view. Greeting header + aggregate stat strip (agents/threads/working/waiting) + AgentCard grid (per-agent: status, branch, model, thread pills working/waiting, cost, Open/Manage) + New-agent card. Thread stats derived from threadDetails by agentId.'
   last_edited_ms: 1781515390685
+5e2b3cd85196f47f:
+  path: web/src/lib/api.ts
+  description: 'REST client for orchestration backend. Typed fetch wrappers: fleet/agent/threads/panels/fs (list/preview/sheet[T282 CSV/xlsx→table]/write/upload/mkdir/rename/move/trash/download) + rawUrl (/fs/raw inline-serve)/conversation/metrics/vitals/create/restart/retire. sendCommand wraps Kind in Command envelope; mintTicket for SSE.'
+  last_edited_ms: 1781896321271
 5e3b31db34f5f676:
   path: .github/checks/lint-config.chain
   description: 'Hash chain for protected lint configuration files. Each entry: prev_hash:content_hash:chain_hash. Verified by check-lint-config.sh. Currently 15 entries.'
@@ -3394,6 +3402,10 @@
   path: crates/cp-oplog/tests/service_group_commit.rs
   description: 'Phase 24 (X791): cp-oplog group-commit Service public-API suite (5 tests). Properties that emerge only under concurrency/pressure (GAP2/I2): durability_of_is_exhaustive_over_every_kind (all 8 OpEntryKind discriminants: PhaseTransition+CostAggregate=BestEffort, CommandEffect+SeenMark+MessageCreated+Lifecycle+Checkpoint{Snapshot::default}+Unknown=Durable); concurrent_durable_submitters_get_unique_contiguous_revs (Arc<Service>, 8 threads x 50 append_durable, default limit=no rolls=no checkpoint revs → revs exactly 0..400 contiguous no dup/gap proving single commit thread is sole serialised rev-assigner; replay rev_head=399 + seen.len=400; flush via drop(service) Arc→0→Drop joins+syncs); best_effort_floods_drop_without_ever_blocking (200k phase try_sends ≫ 1024 queue cap → <5s never-block + dropped>0 deterministic under any real fdatasync latency + submitted>0 + post-flood durable append survives replay); a_large_final_batch_is_flushed_on_shutdown (30 durable then shutdown drains+syncs, rev_head+T1 head durable); interleaved_durable_and_best_effort_preserves_every_durable_record (phase between each durable pair, all 20 tokens + final head survive, seen.len==tokens). Service is Send+Sync (SyncSender+JoinHandle). shutdown consumes self (no double-shutdown by type). NO append-with-capacity hook so deterministic queue-full saturation only via flood≫cap.'
   last_edited_ms: 0
+72fc31657e6fec83:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/sheet.rs
+  description: 'Finder spreadsheet→table JSON (T282): fs_sheet (GET /fs/sheet?path=). csv/tsv via the `csv` reader (quote+embedded-newline aware); xlsx/xls/xlsb/ods/xlsm via calamine open_workbook_auto. Both collapse to {sheets:[{name,rows:[[cell]]}],truncated}, every cell stringified (cell_to_string: integral floats lose the .0 tail). Bounded MAX_ROWS=1000 × MAX_COLS=50 × MAX_SHEETS=20; csv read-capped 8MiB. Confined via support:: (escape 403, non-file 404, unsupported/unparseable 415, missing param 400).'
+  last_edited_ms: 1781896321103
 73100eaca3b55ec3:
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: selected thread''s full conversation + composer. Header-less. toChatMessage maps ThreadMsg→ChatMessage. Passes onSend to ThreadComposer + QuestionForm.'
@@ -4326,6 +4338,10 @@
   path: crates/cp-mod-github/src/lib.rs
   description: 'GitHub module. 1 tool: gh_execute. Dynamic github_result panels. Depends on git module. classify sub-module for read-only vs mutating. Tool visualizer for PR/issue status coloring.'
   last_edited_ms: 0
+91446f0cf9b2aa5e:
+  path: web/src/lib/live.ts
+  description: Live data hooks = thin TanStack Query wrappers over queryClient + ensureSync SSE push. useFs/useFsPreview/useFsSheet(T282 spreadsheet→table, pollMs:0)/useThreads(merge-non-destructive)/useUploadFiles/useWriteFile(X906)/useMoveItems/useRenameItem/useTrashItems/useCreateFolder mutations. useStreamingTokens rAF-batched.
+  last_edited_ms: 1781896321299
 917b5bfdbe23cb9a:
   path: crates/cp-mod-firecrawl/src/panel.rs
   description: Firecrawl result panel. Same pattern as brave panel — static content in metadata, cache restore post-reload, pagination. FIRECRAWL_PANEL_TYPE constant.
@@ -5390,6 +5406,10 @@ b50ea3c27f18e975:
   path: crates/cp-orchestrator/tests/supervisor_lifecycle.rs
   description: 'Phase 28 (X795) backend supervisor lifecycle suite (4 tests, all green, ~15s). Black-box public-API + real OS processes, covering what supervisor/tests.rs unit tests can''t: (1) SIGTERM→grace→SIGKILL escalation vs `/bin/sh -c "trap '''' TERM; exec sleep 60"` (unit spawn_and_stop never walks escalation path); (2) multi-agent fleet spawn 3 → stop all → all pids ESRCH-gone (spawned children reaped, no zombie); (3) adopted FOREIGN process really signalled on stop (status.signal()==SIGTERM 15; supervisor signals but doesn''t reap what it didn''t spawn); (4) check_liveness routes spawned Exited (try_wait) + adopted Vanished (signal-0) in ONE pass. pid_present helper via nix kill(_,None)!=ESRCH. Top `use cp_mod_bridge/cp_oplog/serde/serde_json/tiny_http as _;`.'
   last_edited_ms: 0
+b51575ce38c26f98:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/mod.rs
+  description: 'Finder module hub: re-exports fs_list/fs_preview/conversation (listing), fs_sheet (sheet — CSV/xlsx→table, T282), fs_upload/write/mkdir/rename/move/trash (mutate), fs_download + fs_raw (download — fs_raw is the inline image/PDF raw-serve, T281/T286). Submodules: listing/sheet/mutate/download/support.'
+  last_edited_ms: 1781896321134
 b5268aca7b513ca5:
   path: ui/src/components/panels/cockpit/PanelPane.tsx
   description: Cockpit panel router. Given the selected id, renders its bespoke maquette by kind (the center star). Special id "conversation" short-circuits to the full <Conversation/> surface — conversation is just another panel (T24). Unknown kinds → graceful placeholder in PanelFrame.
@@ -5854,10 +5874,18 @@ c2f863461b1f2295:
   path: src/app/actions/mod.rs
   description: Central action dispatch (Elm/Redux-style). CycleViewMode resets scroll_offset + user_scrolled. Thread actions extracted to threads.rs.
   last_edited_ms: 0
+c3334a35bc779913:
+  path: crates/cp-orchestrator/src/main.rs
+  description: 'Backend entry point. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + X896 new-agent realm root + agent binary, creates Runtime, starts driver thread, serves HTTP (blocking). `use <crate> as _` block acknowledges lib-only deps in the bin target (per-target unused-crate-dependencies forbid): incl portable_pty, calamine, csv (T282 sheet parsing — used only by the lib finder/sheet.rs, not main).'
+  last_edited_ms: 1781896321192
 c338519b09352739:
   path: crates/cp-mod-files/src/lib.rs
   description: 'Files module. Core/global. 3 tools: Open, Edit, Write. Pre-flight: queue auto-activate, old_string match against both disk and virtual (post-queue) content via build_virtual_content(). 4-way matrix: disk✓/virtual✓→OK, disk✓/virtual✗→ERROR, disk✗/virtual✓→OK, disk✗/virtual✗→ERROR.'
   last_edited_ms: 0
+c36f538911736530:
+  path: web/src/lib/sync.ts
+  description: 'SSE→QueryClient delta bridge (push plane). ensureSync(agentId): one idempotent per-agent subscription. delta→fold into [''threads'',id]+[''agent'',id] via setQueryData functional updater, rev high-water guard; null→invalidate. qk query-key registry incl qk.fsPreview + qk.fsSheet (T282 Finder spreadsheet cache key). applyThreadDelta folds thread_created/archived/restored/status_changed/focus_changed/message_created. mergeThreadLogs non-destructive poll reconcile.'
+  last_edited_ms: 1781896321330
 c38efa785cbc3000:
   path: crates/cp-mod-brave/src/types.rs
   description: 'Brave API serde types: BraveSearchResponse (web/rich results), LLMContextResponse (grounding items)'
@@ -5994,6 +6022,10 @@ c6851a14a7a1ecb2:
   path: src/app/actions/helpers.rs
   description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.
   last_edited_ms: 0
+c6980419a55cfedc:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl fs preview/sheet (CSV/xlsx table, T282)/upload/write(X906 editor save-back)/mkdir/rename/move/trash, retire/unretire/restart, fleet create, vitals, metrics. GET fs/download (attachment) + fs/raw (handle_raw: inline, image+PDF previews) intercepted before route_rest. handle_stream = SSE.'
+  last_edited_ms: 1781896321164
 c699ff50b290652f:
   path: .github/workflows/pages.yml
   description: 'CI: GitHub Pages deployment for website'
@@ -7118,6 +7150,10 @@ f20eb801fafd5941:
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet shell — mission-control workspace shown when no agent is focused. NO sidebar (T18): single page with a top segmented [Agents | Prompts] toggle (full-bleed divider, control centred to shared FLEET_MAX_W·px-8 so it aligns with the page heading below). Exports FLEET_MAX_W (max-w-[960px]) — single source of truth shared by both sub-pages. Renders FleetDashboard or PromptsPage full-bleed. Usage moved into Settings dialog; Settings via TopBar gear. Prop: onOpenAgent.'
   last_edited_ms: 1781545320174
+f212eee88adf98ea:
+  path: crates/cp-orchestrator/Cargo.toml
+  description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal) + serde + serde_json + serde_yaml + tiny_http (0.12) + notify (oplog inotify) + portable-pty 0.9 (X896 safe pty) + calamine 0.26 & csv 1 (T282 Finder spreadsheet→table preview). dev: cp-mod-bridge + tempfile. lib+bin. Workspace lints.'
+  last_edited_ms: 1781896321218
 f2416d7f3fc53dce:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams/CrawlParams structs. post_json() + get_json() generic helpers. start_crawl() + poll_crawl() for async crawl jobs. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
