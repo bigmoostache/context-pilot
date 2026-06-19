@@ -331,7 +331,22 @@ export function fetchFs(agentId: string, path = ""): Promise<FinderNode[]> {
   return request(`/api/agent/${agentId}/fs${q}`)
 }
 
-export function fetchPreview(agentId: string, path: string): Promise<string> {
+/** A file content preview from `GET /api/agent/{id}/fs/preview?path=`.
+ *
+ * The backend returns the first 256 KiB of a text file (`truncated` flags the
+ * cap) and rejects binary content with a 415 — so a thrown `fetchFsPreview`
+ * means "no text preview for this file", which the Finder renders as the plain
+ * "No preview available" state. */
+export interface FsPreview {
+  content: string
+  size: number
+  truncated: boolean
+}
+
+/** Fetch a file's text content for the Finder Quick Look pane. Throws on a
+ *  binary file (415) or read fault — callers fall back to the no-preview
+ *  state. */
+export function fetchFsPreview(agentId: string, path: string): Promise<FsPreview> {
   return request(`/api/agent/${agentId}/fs/preview?path=${encodeURIComponent(path)}`)
 }
 

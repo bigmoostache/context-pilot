@@ -301,6 +301,22 @@
   - documentation
   - style
   last_edited_ms: 0
+95e43eaf220f0458:
+  tl_dr: T272 Markdown Finder preview (.md) SHIPPED — live Finder now renders .md/code/json/doc previews. Details in contents.
+  contents: |-
+    Live Finder /fs nodes carry NO inline .text (mock-only); every live .md/code/json/doc file fell through FinderPreview Body() to Generic 'No preview available'.
+
+    FIX: LivePreview child in FinderPreview fetches content via new useFsPreview(agentId,path,enabled) hook (live.ts, pollMs:0 no SSE) → api.fetchFsPreview → GET /api/agent/{id}/fs/preview (256KiB cap, 415 binary→Generic fallback); markdown renders through rich GFM <Markdown> (lib/markdown.tsx), others preformatted TextPreview (mono for code/json). TEXT_KINDS={markdown,code,json,doc} gates the fetch; folders/binary/media keep no-preview. Replaced mistyped+unused fetchPreview(Promise<string>) with fetchFsPreview→FsPreview{content,size,truncated}. qk.fsPreview key in sync.ts. Both FinderPreview usages in Finder.tsx (QuickLook side pane + full file-tab) pass agentId={agent.id}. Dropped the tiny hand-rolled renderMarkdown/inline helpers. truncated→TruncatedNote footer.
+
+    Proven live: GET /fs/preview?path=tedx.md → 791B markdown content untruncated. web npm run build green (exit 0). Dev :5175 hot-reloads; NO TUI/backend crate changed → no system_reload, no orchestrator restart.
+  importance: medium
+  labels:
+  - T272
+  - finder
+  - markdown
+  - preview
+  - shipped
+  last_edited_ms: 1781885667471
 a074780e7fbba07b:
   tl_dr: T274 'big messages don't go through from the web UI' FIXED. Real root cause was an inherited-non-blocking socket bug, plus two genuine 1MiB caps. Details in contents.
   contents: |-

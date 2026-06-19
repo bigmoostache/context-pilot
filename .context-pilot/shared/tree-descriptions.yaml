@@ -730,6 +730,10 @@
   path: crates/cp-mod-search/src/types.rs
   description: Core types + config constants. SearchPersistData (with recompute tracking + task_signals ring buffer), SearchState (with SharedRadarCache Arc<Mutex>), Chunk, SearchResult (no tags), SearchMetrics, SearchOverlayInfo (with meili_cpu_pct/meili_memory_bytes), MeiliLiveStats (with meili_cpu_ticks for delta), IndexerCmd, WatcherHandle. logs_index_settings without tags.
   last_edited_ms: 0
+195cdd5f9da5f087:
+  path: web/src/lib/sync.ts
+  description: 'SSE→QueryClient delta bridge (push plane). ensureSync(agentId): one idempotent per-agent subscription. delta→fold into [''threads'',id]+[''agent'',id] via setQueryData functional updater (applyThreadDelta/applyAgentDelta), rev high-water guard; null→invalidate. qk query-key registry incl qk.fsPreview (T272 Finder live preview cache key). applyThreadDelta folds thread_created/archived/restored/status_changed/focus_changed/message_created (msgId=msg_${log.length} → dedup vs disk poll). mergeThreadLogs non-destructive poll reconcile. Kills T123 burst-clobber + T254 double-render structurally.'
+  last_edited_ms: 1781885646421
 198b5504d5c247d5:
   path: crates/cp-orchestrator/src/supervisor/mod.rs
   description: 'Phase 17 (X784) AgentSupervisor process manager + X896 pty spawn + restart support. new(allow_list) canonicalizes eagerly; validate_binary realpath-checks vs allow_list (R2-15). spawn(id,bin,folder,args)->pid: Command process_group(0), stdio null. spawn_pty(id,bin,folder,env)->pid: dup-check, validate, canonicalize folder, delegate to proc::spawn_pty_proc (cp TUI needs a real tty). is_supervised(key)->bool query. stop: SIGTERM→poll→SIGKILL→reap. restart=snapshot+stop+spawn. adopt=record live no-spawn (D7). check_liveness()->Vec<Event>. kill_pid(pid:u32) FREE fn: best-effort SIGTERM→grace→SIGKILL for an ARBITRARY (externally-launched) pid with no child handle to reap — used by the /restart route. Error::Pty variant. Proc/Supervised/spawn helper in sibling proc.rs.'
@@ -750,6 +754,10 @@
   path: crates/cp-mod-entities/src/types.rs
   description: EntitiesState (db_path, dump_path, migrations_dir, schema_cache), SchemaCache, TableInfo, ColumnInfo, ForeignKeyInfo. get/get_mut helpers for State TypeMap access.
   last_edited_ms: 0
+1a0b57d8c5da3345:
+  path: web/src/lib/live.ts
+  description: 'Live data hooks — thin TanStack Query wrappers over the shared queryClient. useLive() wraps useQuery into legacy LiveQueryResult + ensureSync(agentId) for SSE push. T272: useFsPreview(agentId,path,enabled)→FsPreview, pollMs:0 (point-in-time read, no SSE bridge, gated to text-previewable selections). Delta-covered (threads/agent) ride sync.ts folds; inspection hooks ride invalidate→refetch. useThreads merges non-destructively. useStreamingTokens rAF-batched. useCreateAgent/useRestartAgent/useRetireAgent/useUnretireAgent mutations.'
+  last_edited_ms: 1781885646344
 1a466916cb115fd5:
   path: crates/cp-mod-search/src/radar.rs
   description: Context Radar with flame!("radar_refresh") and flame!("radar_push_signal"). Adaptive log-count-based decay scoring, Meilisearch log queries via background thread. Recent logs (10) deterministic + semantic top 40.
@@ -1934,6 +1942,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+4133649e1221acab:
+  path: web/src/components/finder/FinderPreview.tsx
+  description: 'QuickLook preview pane — kind-aware (code/sheet/slides/pdf/image/audio/video/markdown/text/folder). T272: live .md/code/json/doc files (whose backend /fs nodes carry NO inline .text) now render via a LivePreview child that fetches content through useFsPreview (GET /fs/preview, 256KiB cap, 415 on binary→Generic no-preview fallback); markdown goes through the rich GFM <Markdown> (lib/markdown.tsx), the rest a preformatted block. TEXT_KINDS set gates which kinds fetch. truncated→TruncatedNote. Mock path (inline node.text) unchanged. The tiny hand-rolled renderMarkdown was dropped. Enriched Meta footer (Kind/Size/Dimensions/Duration/Pages/Created/Modified/Tags/Where). agentId prop threads the realm; omit for mock.'
+  last_edited_ms: 1781885646158
 41357190a18004a8:
   path: web/src/components/panels/cockpit/TodoPanel.tsx
   description: Todo List panel — uses useTodos(agentId) for live task plan. Depth-indented, status-colored glyphs, progress bar.
@@ -4290,6 +4302,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+924649f4d669e07b:
+  path: web/src/components/finder/Finder.tsx
+  description: Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. Both FinderPreview usages (QuickLook side pane + full file-tab) now pass agentId={agent.id} so live text files fetch their preview content (T272). Tabs+history+nav+selection+drag-drop+statusbar+marquee. PinnedFolder localStorage. ContextMenu wired onOpen/onDownload/onTag/onPin. Quick Look CLOSED by default; opens on single-click of a file.
+  last_edited_ms: 1781885646219
 924745f383db86e2:
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
@@ -4302,6 +4318,10 @@
   path: crates/cp-mod-tree/Cargo.toml
   description: 'Tree module deps: cp-base, cp-render, crossterm, serde, serde_json, ignore, cp-mod-utilities.'
   last_edited_ms: 1780565428699
+926e71e36f9ff44d:
+  path: web/src/lib/api.ts
+  description: 'REST client for the orchestration backend. Typed fetch wrappers per endpoint. T272: fetchFsPreview(agentId,path)→FsPreview{content,size,truncated} (replaced the mistyped/unused fetchPreview that claimed Promise<string>) for the Finder live file preview; throws on binary(415)/read-fault. fetchMetrics/fetchFleetMetrics→AgentMetrics. fetchVitals→Vital[]. createAgent/restartAgent/retire/unretire. sendCommand auto-wraps Kind in a Command envelope; mintTicket for SSE.'
+  last_edited_ms: 1781885646283
 92e26c73ac8da140:
   path: ui/src/components/shell/AgentSwitcher.tsx
   description: TopBar workspace switcher dropdown (1 agent=1 folder). Items wrapped in DropdownMenuGroup (fixes Base UI MenuGroupContext error). Active agent+folder, agent list with status dots, New-agent/Manage actions open Agents view.
@@ -5658,6 +5678,10 @@ bfe86519072f84a5:
   path: crates/cp-wire/src/types/ack.rs
   description: 'Command Ack: cmd_id + AckStatus (Accepted/Rejected) + optional rev. Journal-then-ack (I11).'
   last_edited_ms: 1781616040276
+bfe9a6a3b1b653bb:
+  path: web/src/components/shell/ConfigModal.tsx
+  description: Settings dialog wrapping shared ConfigPanel in a portaled Base UI Dialog (TopBar gear entry). Portal renders into document.body to escape the TopBar .vibrancy backdrop-filter containing block (the prior 'half off-screen' fixed-overlay bug) + brings focus trap/scroll-lock/Esc. Fleet dashboard renders ConfigPanel inline instead; two entry points share one body.
+  last_edited_ms: 1781885516055
 c008e19f49f44419:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Phase 19: transport hub. Backend{view,breaker,hub,tickets,agents_dir} under Arc<Mutex>. serve(addr,state) = tiny_http acceptor, thread-per-request. route_rest dispatches GET /api/fleet|/agent/{id}|/agent/{id}/body/{hash}, POST /agent/{id}/command|/ticket. handle_stream: GET /api/stream?agent&ticket — redeem single-use ticket, spawn run_stream producer (Tailer.seed(last_rev) replay + gap→resync + hub frame drain + keepalive disconnect-probe, unsubscribe on exit). MAX_BODY 1MiB, STREAM_POLL 200ms. QueryParams + Last-Event-ID parsing. read_body binds _read; respond binds _sent (let-underscore-drop).'

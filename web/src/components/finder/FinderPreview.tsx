@@ -2,6 +2,8 @@ import { useState } from "react"
 import { Check, Copy, Download, Pause, Play, Share2, X } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { fmtBytes } from "@/lib/finderFs"
+import { useFsPreview } from "@/lib/live"
+import { Markdown } from "@/lib/markdown"
 import { extOf, kindMeta, TAG_META } from "./kind"
 import { FileIcon } from "./macIcons"
 import { TagDots } from "./FinderViews"
@@ -16,11 +18,15 @@ export function FinderPreview({
   node,
   onClose,
   variant = "pane",
+  agentId,
 }: {
   node: FinderNode | null
   onClose: () => void
   /** "pane" = the 420px QuickLook side rail; "full" = a file tab's main area */
   variant?: "pane" | "full"
+  /** agent realm the file lives in — enables live content fetch for files
+   *  whose preview payload isn't inlined (the live Finder). Omit for the mock. */
+  agentId?: string
 }) {
   const full = variant === "full"
   return (
@@ -50,7 +56,7 @@ export function FinderPreview({
       ) : (
         <div key={node.path} className="ql-pop flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-auto p-4">
-            <Body node={node} />
+            <Body node={node} agentId={agentId} />
           </div>
           {!full && <Meta node={node} />}
         </div>
@@ -79,7 +85,11 @@ function IconBtn({
   )
 }
 
-function Body({ node }: { node: FinderNode }) {
+/** File kinds whose content is plain text and can be fetched + rendered live
+ *  (markdown gets the rich GFM renderer; the rest a preformatted block). */
+const TEXT_KINDS = new Set<FinderNode["kind"]>(["markdown", "code", "json", "doc"])
+
+function Body({ node, agentId }: { node: FinderNode; agentId?: string }) {
   if (node.kind === "folder") return <FolderPreview node={node} />
   if (node.code) return <CodePreview lang={node.code.lang} lines={node.code.lines} />
   if (node.sheet) return <SheetPreview sheet={node.sheet} />
@@ -90,7 +100,34 @@ function Body({ node }: { node: FinderNode }) {
   if (node.media?.kind === "video") return <VideoPreview media={node.media} />
   if (node.kind === "markdown" && node.text) return <MarkdownPreview text={node.text} />
   if (node.text) return <TextPreview kind={node.kind} text={node.text} />
+  // No inlined payload (the live Finder): fetch the file's text from the
+  // backend and render it. Folders/binary/media files keep the no-preview state.
+  if (agentId && TEXT_KINDS.has(node.kind)) return <LivePreview agentId={agentId} node={node} />
   return <Generic node={node} />
+}
+
+/**
+ * Fetch a live file's text content and render it: markdown through the rich GFM
+ * renderer, everything else as a preformatted block. While loading shows a quiet
+ * placeholder; a binary file (415) or read fault resolves the fetch as an error,
+ * which falls back to the honest "No preview available" state.
+ */
+function LivePreview({ agentId, node }: { agentId: string; node: FinderNode }) {
+  const { data, loading, error } = useFsPreview(agentId, node.path, true)
+  if (loading) return <PreviewStatus label="Loading preview…" />
+  if (error || !data) return <Generic node={node} />
+  if (node.kind === "markdown")
+    return <MarkdownPreview text={data.content} truncated={data.truncated} />
+  return <TextPreview kind={node.kind} text={data.content} truncated={data.truncated} />
+}
+
+/** A centered, muted status line shown while a live preview loads. */
+function PreviewStatus({ label }: { label: string }) {
+  return (
+    <div className="flex flex-1 items-center justify-center py-12">
+      <span className="text-[12.5px] text-muted-foreground/70">{label}</span>
+    </div>
+  )
 }
 
 // ── code ──────────────────────────────────────────────────────────
@@ -383,74 +420,35 @@ function VideoPreview({ media }: { media: NonNullable<FinderNode["media"]> }) {
 }
 
 // ── markdown (rendered) ───────────────────────────────────────────
-function MarkdownPreview({ text }: { text: string }) {
+function MarkdownPreview({ text, truncated }: { text: string; truncated?: boolean }) {
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card p-4 card-shadow">
-      <div className="flex flex-col gap-1.5">{renderMarkdown(text)}</div>
+      <Markdown text={text} className="text-[12.5px] text-foreground/85" />
+      {truncated && <TruncatedNote />}
     </div>
   )
 }
 
-/** Tiny markdown renderer — headings, bullets, fences, inline code/bold. */
-function renderMarkdown(text: string) {
-  const out: React.ReactNode[] = []
-  let fence: string[] | null = null
-  const flushFence = (key: string) => {
-    if (!fence) return
-    const body = fence.join("\n")
-    out.push(
-      <pre key={key} className="my-1 overflow-x-auto rounded-md bg-muted/60 px-2.5 py-1.5 font-mono text-[10.5px] text-foreground/80">
-        {body}
-      </pre>,
-    )
-    fence = null
-  }
-  const lines = text.split("\n")
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    if (line.trim().startsWith("```")) {
-      if (fence) flushFence(`f${i}`)
-      else fence = []
-      continue
-    }
-    if (fence) {
-      fence.push(line)
-      continue
-    }
-    if (line.startsWith("## ")) {
-      out.push(<h3 key={i} className="mt-2 text-[14px] font-bold text-foreground">{line.slice(3)}</h3>)
-    } else if (line.startsWith("# ")) {
-      out.push(<h2 key={i} className="text-[17px] font-bold tracking-tight text-foreground">{line.slice(2)}</h2>)
-    } else if (line.startsWith("- ")) {
-      out.push(
-        <div key={i} className="flex items-start gap-2 text-[12px] text-foreground/85">
-          <span className="mt-1.5 size-1 shrink-0 rounded-full bg-[var(--signal)]" />
-          <span>{inline(line.slice(2))}</span>
-        </div>,
-      )
-    } else if (line.trim() === "") {
-      out.push(<div key={i} className="h-1.5" />)
-    } else {
-      out.push(<p key={i} className="text-[12px] leading-relaxed text-foreground/80">{inline(line)}</p>)
-    }
-  }
-  flushFence("f-end")
-  return out
-}
-
-function inline(s: string) {
-  return s.split(/(\*\*[^*]+\*\*|`[^`]+`)/).map((tok, i) => {
-    if (tok.startsWith("**") && tok.endsWith("**"))
-      return <strong key={i} className="font-semibold text-foreground">{tok.slice(2, -2)}</strong>
-    if (tok.startsWith("`") && tok.endsWith("`"))
-      return <code key={i} className="rounded bg-muted px-1 font-mono text-[11px] text-[var(--signal)]">{tok.slice(1, -1)}</code>
-    return <span key={i}>{tok}</span>
-  })
+/** A subtle footer noting the backend capped the preview at 256 KiB. */
+function TruncatedNote() {
+  return (
+    <p className="mt-3 border-t border-border pt-2 text-[10.5px] italic text-muted-foreground/60">
+      Preview truncated — file exceeds 256 KiB.
+    </p>
+  )
 }
 
 // ── text / json ───────────────────────────────────────────────────
-function TextPreview({ kind, text }: { kind: FinderNode["kind"]; text: string }) {
-  const mono = kind === "json"
+function TextPreview({
+  kind,
+  text,
+  truncated,
+}: {
+  kind: FinderNode["kind"]
+  text: string
+  truncated?: boolean
+}) {
+  const mono = kind === "json" || kind === "code"
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card p-3.5 card-shadow">
       <pre
@@ -461,6 +459,7 @@ function TextPreview({ kind, text }: { kind: FinderNode["kind"]; text: string })
       >
         {text}
       </pre>
+      {truncated && <TruncatedNote />}
     </div>
   )
 }

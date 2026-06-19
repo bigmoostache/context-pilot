@@ -463,6 +463,7 @@ export function Finder({ agent }: { agent: Agent }) {
           <FinderPreview
             node={active.fileNode}
             variant="full"
+            agentId={agent.id}
             onClose={() => closeTab(active.id)}
           />
         ) : (
@@ -528,6 +529,7 @@ export function Finder({ agent }: { agent: Agent }) {
             {previewOpen && (
               <FinderPreview
                 node={previewNode}
+                agentId={agent.id}
                 onClose={() => setPreviewOpen(false)}
               />
             )}

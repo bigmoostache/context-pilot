@@ -207,6 +207,28 @@ export function useFs(
   })
 }
 
+/**
+ * Live file-content preview for the Finder Quick Look pane. Fetches a file's
+ * text via the backend preview endpoint (first 256 KiB, binary rejected with a
+ * 415 → surfaced as a query error so the caller renders the no-preview state).
+ *
+ * `enabled` gates the fetch to text-previewable selections — folders and binary
+ * files never hit the endpoint. No SSE bridge: file content is not a
+ * delta-covered resource, and a Quick Look preview is a point-in-time read; the
+ * backstop poll is disabled (`pollMs: 0`) since the content only matters while
+ * the file is selected.
+ */
+export function useFsPreview(
+  agentId: string,
+  path: string,
+  enabled: boolean,
+): LiveQueryResult<api.FsPreview> {
+  return useLive(qk.fsPreview(agentId, path), () => api.fetchFsPreview(agentId, path), {
+    enabled: enabled && !!agentId && !!path,
+    pollMs: 0,
+  })
+}
+
 export function useConversation(agentId: string): LiveQueryResult<api.ConversationMsg[]> {
   return useLive(qk.conversation(agentId), () => api.fetchConversation(agentId), {
     agentId,
