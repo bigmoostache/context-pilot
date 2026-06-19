@@ -77,6 +77,15 @@ pub enum Kind {
     #[serde(rename = "stop")]
     Stop,
 
+    /// Change agent LLM configuration (provider + model).
+    #[serde(rename = "configure")]
+    Configure {
+        /// LLM provider serde name (e.g. `"anthropic"`, `"claudecodev2"`).
+        provider: String,
+        /// Model serde name within that provider (e.g. `"claude-opus45"`).
+        model: String,
+    },
+
     /// Catch-all for variants added in a newer protocol version.
     ///
     /// An N-1 receiver deserialises any unrecognised `"kind"` tag here
@@ -170,5 +179,22 @@ mod tests {
         }"#;
         let cmd: Command = serde_json::from_str(json).expect("ignore unknown fields");
         assert_eq!(cmd.kind, Kind::Stop);
+    }
+
+    #[test]
+    fn configure_round_trip() {
+        let cmd = Command {
+            schema_version: 1,
+            id: "cmd-004".into(),
+            seq: 5,
+            dedup_token: "cfg-1".into(),
+            kind: Kind::Configure {
+                provider: "anthropic".into(),
+                model: "claude-opus45".into(),
+            },
+        };
+        let json = serde_json::to_string(&cmd).expect("serialize");
+        let back: Command = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(cmd, back);
     }
 }

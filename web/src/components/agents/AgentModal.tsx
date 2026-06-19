@@ -1,20 +1,18 @@
 import { useEffect, useRef, useState } from "react"
 import {
   Archive,
-  Bot,
-  Check,
   CornerDownLeft,
   FolderGit2,
-  Gauge,
   Loader2,
   Settings2,
   Sparkles,
   Wand2,
   X,
-  Zap,
 } from "lucide-react"
 import type { Agent } from "@/lib/types"
-import { useCreateAgent } from "@/lib/live"
+import { useCreateAgent, sendCommand } from "@/lib/live"
+import { PROVIDERS, defaultModel, findModel, resolveFromApiName } from "@/lib/models"
+import { ModelPicker } from "./ModelPicker"
 import { cn } from "@/lib/utils"
 
 /**
@@ -31,18 +29,6 @@ import { cn } from "@/lib/utils"
  * `.vibrancy` header (never a descendant) so it anchors to the viewport and
  * escapes the header's backdrop-filter containing block.
  */
-
-export const MODELS = ["claude-opus-4-8", "claude-sonnet-4-6", "claude-fable-5"]
-
-/** Per-model descriptor for the rich picker — surfaces existing info, no new behaviour. */
-export const MODEL_META: Record<
-  string,
-  { tier: string; blurb: string; price: string; icon: typeof Zap }
-> = {
-  "claude-opus-4-8": { tier: "Most capable", blurb: "Deep reasoning & long tasks", price: "$5 · 200K", icon: Sparkles },
-  "claude-sonnet-4-6": { tier: "Balanced", blurb: "Fast, 1M-token context", price: "$3 · 1M", icon: Gauge },
-  "claude-fable-5": { tier: "Creative", blurb: "Expressive, vivid prose", price: "$10 · 400K", icon: Zap },
-}
 
 /** Derive the realm folder name from the agent name (replaces the folder picker). */
 export function slugify(name: string): string {
@@ -70,7 +56,18 @@ export function AgentModal({
   const isManage = modal.mode === "manage"
   const agent = isManage ? modal.agent : undefined
   const [name, setName] = useState(agent?.name ?? "")
-  const [model, setModel] = useState(agent?.model ?? MODELS[0])
+
+  // Provider + model — resolve from the agent's current api model name (manage)
+  // or fall back to persisted global defaults → registry defaults (create).
+  const resolved = isManage && agent?.model ? resolveFromApiName(agent.model) : undefined
+  const createDefault = (() => {
+    if (isManage) return { p: resolved?.provider.id ?? PROVIDERS[0].id, m: resolved?.model.id ?? (defaultModel(PROVIDERS[0].id)?.id ?? PROVIDERS[0].models[0].id) }
+    const lsP = localStorage.getItem("cp-default-provider") ?? PROVIDERS[0].id
+    const lsM = localStorage.getItem("cp-default-model") ?? (defaultModel(lsP)?.id ?? PROVIDERS[0].models[0].id)
+    return { p: lsP, m: lsM }
+  })()
+  const [provId, setProvId] = useState(createDefault.p)
+  const [modelId, setModelId] = useState(createDefault.m)
   const nameRef = useRef<HTMLInputElement>(null)
 
   // Realm folder: in create mode it's derived live from the name (no picker);
@@ -79,21 +76,29 @@ export function AgentModal({
 
   const createAgent = useCreateAgent()
   const [error, setError] = useState<string | null>(null)
-  const pending = createAgent.isPending
+  const [saving, setSaving] = useState(false)
+  const pending = createAgent.isPending || saving
   const canSubmit = (isManage || name.trim().length > 0) && !pending
 
   const submit = () => {
     if (!canSubmit) return
-    if (isManage) {
-      // Manage mode stays cosmetic for now (rename/model/archive are not yet
-      // backend-wired — T148 covers creation only).
-      onFlash?.(`Saved changes to ${name || agent?.name}`)
-      onClose()
+    if (isManage && agent) {
+      setSaving(true)
+      setError(null)
+      sendCommand(agent.id, { kind: "configure", provider: provId, model: modelId })
+        .then(() => {
+          onFlash?.(`Model updated to ${findModel(provId, modelId)?.displayName ?? modelId}`)
+          onClose()
+        })
+        .catch((e: unknown) => {
+          setError(e instanceof Error ? e.message : "Failed to update model")
+        })
+        .finally(() => setSaving(false))
       return
     }
     setError(null)
     createAgent.mutate(
-      { name: name.trim(), model },
+      { name: name.trim(), model: findModel(provId, modelId)?.apiName },
       {
         onSuccess: (receipt) => {
           onFlash?.(`Spawning “${slugify(name)}” in ${receipt.folder}`)
@@ -121,7 +126,7 @@ export function AgentModal({
       window.removeEventListener("keydown", onKey)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, model, isManage])
+  }, [name, provId, modelId, isManage])
 
   return (
     <div
@@ -200,64 +205,16 @@ export function AgentModal({
             </div>
           </div>
 
-          {/* model — rich selectable cards instead of plain chips */}
+          {/* provider + model — two-level picker like the TUI's Ctrl+H */}
           <div className="flex flex-col gap-2">
             <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
-              Model
+              Provider &amp; Model
             </span>
-            <div className="flex flex-col gap-2">
-              {MODELS.map((m, i) => {
-                const meta = MODEL_META[m]
-                const Icon = meta?.icon ?? Bot
-                const active = m === model
-                return (
-                  <button
-                    key={m}
-                    onClick={() => setModel(m)}
-                    style={{ animationDelay: `${i * 45}ms` }}
-                    className={cn(
-                      "opt-rise group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all",
-                      active
-                        ? "border-[var(--interactive)] bg-[var(--interactive)]/[0.07] ring-2 ring-[var(--interactive)]/15"
-                        : "border-border bg-card hover:border-[var(--interactive)]/40 hover:bg-muted/30",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors",
-                        active
-                          ? "bg-[var(--interactive)]/15 text-[var(--interactive)]"
-                          : "bg-muted/60 text-muted-foreground/70",
-                      )}
-                    >
-                      <Icon className="size-4" />
-                    </span>
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="flex items-center gap-2">
-                        <span className="font-mono text-[12.5px] font-medium text-foreground/90">{m}</span>
-                        <span className="rounded bg-muted/70 px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          {meta?.tier}
-                        </span>
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">{meta?.blurb}</span>
-                    </div>
-                    <span className="shrink-0 font-mono text-[10.5px] tabular-nums text-muted-foreground/65">
-                      {meta?.price}
-                    </span>
-                    <span
-                      className={cn(
-                        "flex size-5 shrink-0 items-center justify-center rounded-full border transition-all",
-                        active
-                          ? "border-[var(--interactive)] bg-[var(--interactive)] text-[var(--primary-foreground)]"
-                          : "border-border text-transparent",
-                      )}
-                    >
-                      <Check className="size-3" strokeWidth={3} />
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
+            <ModelPicker
+              provider={provId}
+              model={modelId}
+              onChange={(p, m) => { setProvId(p); setModelId(m) }}
+            />
           </div>
         </div>
 
@@ -303,7 +260,7 @@ export function AgentModal({
             ) : (
               <Sparkles className="size-4" />
             )}
-            {pending ? "Creating…" : isManage ? "Save changes" : "Create agent"}
+            {pending ? (saving ? "Saving…" : "Creating…") : isManage ? "Save changes" : "Create agent"}
             <kbd className="ml-1 hidden items-center gap-0.5 rounded bg-black/15 px-1 py-px font-mono text-[9.5px] opacity-80 sm:flex">
               <CornerDownLeft className="size-2.5" />⌘
             </kbd>

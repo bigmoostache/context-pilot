@@ -7,6 +7,10 @@
 //! `SendMessage`/`CreateThread`/`ArchiveThread`/`RestoreThread`/`Stop` — entered
 //! exactly as local user input would be (the K7 path).
 
+use cp_base::config::llm_types::LlmProvider;
+use cp_base::config::models::{
+    AnthropicModel, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, MiniMaxModel,
+};
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
 use cp_mod_spine::types::SpineState;
@@ -36,6 +40,9 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
         }
         CommandKind::Stop | CommandKind::InterruptStream => {
             apply_stop(&mut app.state);
+        }
+        CommandKind::Configure { provider, model } => {
+            apply_configure(&mut app.state, &provider, &model);
         }
         CommandKind::Unknown => {
             log::warn!("bridge: ignoring unknown command {}", cmd.id);
@@ -194,4 +201,56 @@ fn apply_stop(state: &mut State) {
     for module in crate::modules::all_modules() {
         module.on_stream_stop(state);
     }
+}
+
+// ── Configure (LLM provider + model) ───────────────────────────────────
+
+/// Apply a provider+model change from the web frontend.
+///
+/// Both strings use the serde names from [`LlmProvider`] (lowercase) and
+/// the per-provider model enums (kebab-case). Invalid names are logged and
+/// ignored — the agent keeps its current config.
+fn apply_configure(state: &mut State, provider_str: &str, model_str: &str) {
+    let provider_val = serde_json::Value::String(provider_str.to_owned());
+    let Ok(provider) = serde_json::from_value::<LlmProvider>(provider_val) else {
+        log::warn!("bridge: Configure unknown provider \"{provider_str}\"");
+        return;
+    };
+
+    let model_val = serde_json::Value::String(model_str.to_owned());
+    let model_ok = match provider {
+        LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+            serde_json::from_value::<AnthropicModel>(model_val)
+                .map(|m| state.anthropic_model = m)
+                .is_ok()
+        }
+        LlmProvider::ClaudeCodeV2 => serde_json::from_value::<ClaudeCodeV2Model>(model_val)
+            .map(|m| state.claude_code_v2_model = m)
+            .is_ok(),
+        LlmProvider::Grok => serde_json::from_value::<GrokModel>(model_val)
+            .map(|m| state.grok_model = m)
+            .is_ok(),
+        LlmProvider::Groq => serde_json::from_value::<GroqModel>(model_val)
+            .map(|m| state.groq_model = m)
+            .is_ok(),
+        LlmProvider::DeepSeek => serde_json::from_value::<DeepSeekModel>(model_val)
+            .map(|m| state.deepseek_model = m)
+            .is_ok(),
+        LlmProvider::MiniMax => serde_json::from_value::<MiniMaxModel>(model_val)
+            .map(|m| state.minimax_model = m)
+            .is_ok(),
+    };
+
+    if !model_ok {
+        log::warn!(
+            "bridge: Configure unknown model \"{model_str}\" for provider \"{provider_str}\""
+        );
+        return;
+    }
+
+    state.llm_provider = provider;
+    state.flags.ui.dirty = true;
+    log::info!(
+        "bridge: configured provider={provider_str} model={model_str}"
+    );
 }

@@ -3,6 +3,7 @@ import {
   Bot,
   Building2,
   Check,
+  CheckCircle2,
   Coins,
   Cpu,
   Database,
@@ -13,8 +14,10 @@ import {
   Globe,
   KeyRound,
   Boxes,
+  Loader2,
   Lock,
   Search,
+  Send,
   Sliders,
   Sparkles,
   X,
@@ -22,8 +25,28 @@ import {
 } from "lucide-react"
 import { DialogClose } from "@/components/ui/dialog"
 import { UsagePage } from "@/components/agents/UsagePage"
+import { ModelPicker } from "@/components/agents/ModelPicker"
+import { PROVIDERS, defaultModel as getDefaultModel, findModel } from "@/lib/models"
+import { useFleet, sendCommand } from "@/lib/live"
 import { useAccount } from "@/lib/account"
 import { cn } from "@/lib/utils"
+
+// ── localStorage keys for global defaults ─────────────────────────────
+const LS_DEFAULT_PROVIDER = "cp-default-provider"
+const LS_DEFAULT_MODEL = "cp-default-model"
+
+/** Read the persisted default provider+model, with registry fallbacks. */
+function readDefaults(): { provider: string; model: string } {
+  const p = localStorage.getItem(LS_DEFAULT_PROVIDER) ?? PROVIDERS[0].id
+  const m = localStorage.getItem(LS_DEFAULT_MODEL) ?? (getDefaultModel(p)?.id ?? PROVIDERS[0].models[0].id)
+  return { provider: p, model: m }
+}
+
+/** Persist the default provider+model to localStorage. */
+function writeDefaults(provider: string, model: string) {
+  localStorage.setItem(LS_DEFAULT_PROVIDER, provider)
+  localStorage.setItem(LS_DEFAULT_MODEL, model)
+}
 
 /**
  * Context Pilot settings surface — a macOS System-Settings-style layout with a
@@ -231,54 +254,74 @@ function ManagedKeysNotice({ company }: { company: string }) {
 }
 
 function GeneralPane() {
-  const MODELS = [
-    { id: "claude-opus-4-8", tier: "Most capable", price: "$5 · 200K", icon: Sparkles },
-    { id: "claude-sonnet-4-6", tier: "Balanced", price: "$3 · 1M", icon: Gauge },
-    { id: "claude-fable-5", tier: "Creative", price: "$10 · 400K", icon: Zap },
-  ]
-  const [model, setModel] = useState(MODELS[0].id)
+  const defaults = readDefaults()
+  const [provId, setProvId] = useState(defaults.provider)
+  const [modelId, setModelId] = useState(defaults.model)
+
+  const fleet = useFleet()
+  const [applying, setApplying] = useState(false)
+  const [applyResult, setApplyResult] = useState<string | null>(null)
+
+  const handleChange = (p: string, m: string) => {
+    setProvId(p)
+    setModelId(m)
+    writeDefaults(p, m)
+    setApplyResult(null) // clear stale result when selection changes
+  }
+
+  const applyToAll = async () => {
+    const agents = fleet.data ?? []
+    if (agents.length === 0) return
+    setApplying(true)
+    setApplyResult(null)
+    let ok = 0
+    let fail = 0
+    for (const a of agents) {
+      try {
+        await sendCommand(a.id, { kind: "configure", provider: provId, model: modelId })
+        ok++
+      } catch {
+        fail++
+      }
+    }
+    setApplying(false)
+    const label = findModel(provId, modelId)?.displayName ?? modelId
+    setApplyResult(
+      fail === 0
+        ? `Applied ${label} to ${ok} agent${ok === 1 ? "" : "s"}`
+        : `Applied to ${ok}, failed ${fail}`,
+    )
+  }
+
   return (
     <Stack>
       <FieldGroup label="Default model" hint="Used for new agents unless overridden">
-        <div className="flex flex-col gap-2">
-          {MODELS.map((m, i) => {
-            const on = m.id === model
-            return (
-              <button
-                key={m.id}
-                onClick={() => setModel(m.id)}
-                style={{ animationDelay: `${i * 45}ms` }}
-                className={cn(
-                  "opt-rise flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all",
-                  on
-                    ? "border-[var(--interactive)] bg-[var(--interactive)]/[0.07] ring-2 ring-[var(--interactive)]/15"
-                    : "border-border bg-card hover:border-[var(--interactive)]/40 hover:bg-muted/30",
-                )}
-              >
-                <span
-                  className={cn(
-                    "flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors",
-                    on ? "bg-[var(--interactive)]/15 text-[var(--interactive)]" : "bg-muted/60 text-muted-foreground/70",
-                  )}
-                >
-                  <m.icon className="size-4" />
-                </span>
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="font-mono text-[12.5px] font-medium text-foreground/90">{m.id}</span>
-                  <span className="text-[11px] text-muted-foreground">{m.tier}</span>
-                </div>
-                <span className="shrink-0 font-mono text-[10.5px] tabular-nums text-muted-foreground/65">{m.price}</span>
-                <span
-                  className={cn(
-                    "flex size-5 shrink-0 items-center justify-center rounded-full border transition-all",
-                    on ? "border-[var(--interactive)] bg-[var(--interactive)] text-[var(--primary-foreground)]" : "border-border text-transparent",
-                  )}
-                >
-                  <Check className="size-3" strokeWidth={3} />
-                </span>
-              </button>
-            )
-          })}
+        <ModelPicker provider={provId} model={modelId} onChange={handleChange} />
+        {/* Apply to all existing agents */}
+        <div className="mt-1 flex items-center gap-2">
+          <button
+            onClick={() => void applyToAll()}
+            disabled={applying || !fleet.data?.length}
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12px] font-medium transition-all",
+              applying
+                ? "cursor-wait border-border bg-muted text-muted-foreground"
+                : "border-[var(--interactive)]/30 bg-[var(--interactive)]/[0.06] text-[var(--interactive)] hover:bg-[var(--interactive)]/[0.12]",
+            )}
+          >
+            {applying ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Send className="size-3.5" />
+            )}
+            {applying ? "Applying…" : "Apply to all existing agents"}
+          </button>
+          {applyResult && (
+            <span className="flex items-center gap-1 text-[11px] text-[var(--ok)]">
+              <CheckCircle2 className="size-3.5" />
+              {applyResult}
+            </span>
+          )}
         </div>
       </FieldGroup>
 

@@ -466,6 +466,10 @@
   path: crates/cp-mod-queue/src/lib.rs
   description: 'Queue module. 3 tools: pause/execute/undo. Fixed QUEUE panel. Not core. QueueState: active, queued_calls, next_index. Trap state (trap_active/panel_ids/optional_ids) persisted in save/load. Queue_execute handled in pipeline.rs (needs dispatch). Reverie-allowed.'
   last_edited_ms: 0
+10bfb637527a6ed4:
+  path: web/src/components/agents/AgentModal.tsx
+  description: 'Agent create/manage dialog. MODELS + MODEL_META (rich picker). slugify(name) derives realm folder. AgentModalMode: create or manage{agent}. X896: create-mode submit() now LIVE — useCreateAgent() mutation (POST /api/fleet/create), pending spinner ''Creating…'', inline role=alert error banner, onSuccess flash+close. Manage mode stays cosmetic (rename/archive not backend-wired). Shared by TopBar + FleetDashboard.'
+  last_edited_ms: 0
 111109570cbe01e9:
   path: src/state/persistence/boot.rs
   description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 3 parallel threads. Loads .env files (project + global).'
@@ -654,6 +658,10 @@
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
   last_edited_ms: 0
+171360bcd64a4a48:
+  path: web/sse_latency.py
+  description: SSE latency probe — measures end-to-end TUI→SSE delay by comparing ThreadMessage.timestamp (epoch ms) with wall-clock arrival time for each message_created delta.
+  last_edited_ms: 1781876739551
 1742d19afe63d2ac:
   path: src/app/run/tools/checks.rs
   description: 'Post-tool non-blocking polls: panel readiness (5s timeout), deferred sleep timer, question form resolution. Each resumes streaming pipeline when condition met.'
@@ -810,6 +818,10 @@
   path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
   description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape.'
   last_edited_ms: 0
+1d86e099813fc80e:
+  path: web/src/components/finder/GetInfo.tsx
+  description: macOS-style 'Get Info' inspector modal for Finder nodes. Large kind icon, name, kind/size/dates, tags, dimensions/duration, 'where' path. Esc-to-close. Currently unused after T265 removal of Get Info from Finder.
+  last_edited_ms: 1781877377336
 1d9f8b14df8b4372:
   path: crates/cp-base/src/lib.rs
   description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (20 tool + 6 config YAML files) with #[expect(clippy::panic)].'
@@ -1670,6 +1682,10 @@
   path: website/docs/modules.html
   description: 'Docs: module system guide'
   last_edited_ms: 0
+3a03d427b29d549e:
+  path: web/src/components/finder/FinderPreview.tsx
+  description: 'QuickLook preview pane — kind-aware (code/sheet/slides/pdf/image/audio/video/markdown/text/folder). Enriched Meta footer: Kind, Size/Contains, Dimensions, Duration, Pages, Created, Modified, Tags, Where path. No Get Info button or onGetInfo prop.'
+  last_edited_ms: 1781875562712
 3a1a5897bc4a2ee9:
   path: .github/workflows/build.yml
   description: 'Cross-platform build workflow. 4-target matrix: linux-x86_64 (native), linux-aarch64 (cross), macos-x86_64 (macos-13), macos-aarch64 (macos-latest). Pins Rust 1.93.0. Builds tui + cp-console-server. 30-day artifact retention.'
@@ -1738,6 +1754,10 @@
   path: crates/cp-orchestrator/src/lib.rs
   description: 'Phase 16 (X783): backend library root (split from main.rs for unit-testability). Declares channel + liveness + registry modules. Backend-only peer of cp-mod-bridge: bridge WRITES registry/heartbeat/oplog, backend READS/tails them across a fleet.'
   last_edited_ms: 1781630135192
+3d3d40f549d551f5:
+  path: crates/cp-wire/src/types/command.rs
+  description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, InterruptStream, Stop, Unknown).
+  last_edited_ms: 0
 3d84408dcdded638:
   path: web/src/lib/api.ts
   description: Typed REST client for all 22 backend endpoints. Base URL from VITE_API_URL env (default localhost:7878). Fleet, agent meta, threads, panels (13 kinds), finder, usage, library, commands, ticket mint. Transforms 7 panel responses (memory/todos/spine/queue/scratchpad/tree/callbacks) from raw module state dicts to maquette array shapes.
@@ -2602,6 +2622,10 @@
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
   last_edited_ms: 0
+5cb80c56d4233ba0:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 5cbac6637983eeee:
   path: web/src/components/finder/kind.tsx
   description: 'Finder kind metadata (live web). kindMeta: FinderKind→{accent token, label}. kindTint/kindGradient color helpers. TAG_META: macOS finder tag colors. extOf(name). Note: full-color file/folder icons live in macIcons.tsx (FileIcon); this file is the non-icon accent/label metadata.'
@@ -3286,6 +3310,10 @@
   path: crates/cp-mod-bridge/src/tee.rs
   description: 'Phase 12 (X779) MILESTONE M1: agent-side stream tee. Tee::publish(frame)->Outcome{Published,Dropped} = ONE non-blocking try_send into a bounded mpsc::sync_channel (unsafe forbidden → no hand-rolled lock-free ring; producer-never-blocks contract preserved). Ring-full → O(1) drop + degraded flag + dropped counter (P3 observability). Dedicated Publisher thread owns receiver + UnixListener: non-blocking accept (≤1 observer), drain frame, serialize JSON + framing::encode_raw (len+CRC, same as oplog), non-blocking UDS write with bounded backoff (MAX_WRITE_ATTEMPTS×WRITE_BACKOFF ~5ms then drop+degraded; broken pipe → drop observer). No observer → discard (late observer sees live frames not backlog). RAII Drop stops+joins. NOT yet wired into Boot — socket ownership (bidirectional? stream-out + command-in) deferred to Phase 13. 5 tests incl V7 stalled-consumer-never-blocks-producer (100k publishes <5s despite wedged reader).'
   last_edited_ms: 1781626840261
+7460163bfbf7d3e4:
+  path: web/src/components/finder/ContextMenu.tsx
+  description: 'Finder right-click context menu (macOS-style). Actions: Open (folder nav / Quick Look), Pin to Sidebar (folders), Rename, Duplicate, Download (real downloadFile), tag swatches (real onTag), Move to Trash. onOpen/onDownload/onTag callback props for wired actions. On-screen clamping.'
+  last_edited_ms: 1781875562737
 748367d53cf70c66:
   path: crates/cp-base/Cargo.lock
   description: Foundation crate lockfile
@@ -3498,6 +3526,10 @@
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
   last_edited_ms: 0
+7a34c617a616611e:
+  path: web/src/lib/models.ts
+  description: 'LLM provider+model registry — web counterpart of TUI Ctrl+H. PROVIDERS array: 6 providers (ClaudeCodeV2, Anthropic, Grok, Groq, DeepSeek, MiniMax) each with ModelDef[] (id/apiName/displayName/contextWindow/pricing/badge/icon). IDs match exact serde kebab-case names for wire compat. Helpers: priceTag, findProvider, findModel, defaultModel, resolveFromApiName.'
+  last_edited_ms: 1781877377308
 7a3d3e9e1ea6a348:
   path: ui/src/components/agents/FleetSidebar.tsx
   description: Mission-control left nav rail (fleet dashboard). FleetPage type = agents|prompts|usage|settings. NO identity header (lives in TopBar). NO in-rail collapse button — collapse is driven by the border rail FleetShell renders on the right edge. 4 nav items (icon+label+hint, active=card-shadow). collapsed prop animates aside width 212→0 (fixed-width inner shell). page/onSelect/collapsed props.
@@ -3834,6 +3866,10 @@
   path: crates/cp-mod-console/Cargo.toml
   description: 'Console module deps: cp-base, cp-render, crossterm, serde, serde_json, regex.'
   last_edited_ms: 1780563847609
+878f5e48c6c0c4ae:
+  path: web/src/components/finder/Finder.tsx
+  description: Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. Tabs+history+nav+selection+drag-drop+statusbar+marquee. PinnedFolder type + loadPins/pinsKey localStorage helpers. ContextMenu wired with onOpen/onDownload/onTag/onPin. No GetInfo state/import/rendering. Quick Look panel CLOSED by default; opens on single-click of a file.
+  last_edited_ms: 1781875562759
 8796111d7a31faae:
   path: Cargo.toml
   description: Workspace root. 22 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
@@ -4386,6 +4422,10 @@
   path: ui/src/components/shell/ConfigPanel.tsx
   description: 'Shared settings body (macOS System-Settings: category rail + detail pane). NO identity header on the rail (detail-pane header names the active category). variant=''dialog'' (DialogClose chrome, used by ConfigModal/TopBar gear) | ''inline'' (fills page, Save button, used by fleet Settings page). Categories: General/Providers/Search/DocAI/Web/Integrations. Masked keys w/ reveal, Connected pills, toggles, default-model picker.'
   last_edited_ms: 1781532231574
+9b5f4d071f757f89:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: selected thread''s full conversation + composer. Header-less, auto-scrolls to bottom on thread.id/log growth. X887: segmentLog() folds consecutive auto:true traces into runs, rendered by AutoRun as a 3-column CSS grid (verb · tool · intent) with colored columns (--interactive verb, foreground/70 tool, muted intent); parseAutoLine() splits the marker format. Normal messages keep bubble chrome. Renders embedded QuestionForm + fileRef chips. Passes status+focused+onSend to ThreadComposer.'
+  last_edited_ms: 1781876994626
 9bb5142dd0e6600d:
   path: src/llms/oai_providers/groq.rs
   description: Groq client. OpenAI-compatible with built-in tools (browser_search, code_interpreter) for GPT-OSS models. GROQ_API_KEY auth.
@@ -4418,6 +4458,10 @@
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: all Module trait methods implemented (stubs). is_global=true, no tools, no panels. cp-wire dep for future oplog/stream types.'
   last_edited_ms: 1781617086592
+9d08a42769027d02:
+  path: src/app/run/threads/commands.rs
+  description: Bridge command APPLICATION (K7 mutation half), split from bridge.rs for the 500-line limit. apply_command dispatches SendMessage(inject user msg + MyTurn flip + on_user_message)/CreateThread(+emit_roster_delta ThreadCreated + prime status memo)/ArchiveThread(soft-delete + focus cleanup + emit ThreadArchived)/RestoreThread(emit ThreadRestored)/Stop|Interrupt(mirror Esc StopStreaming). Imports emit_roster_delta + wire_turn (pub(super)) from bridge.
+  last_edited_ms: 0
 9d0e6a9adda50aaa:
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet mission-control shell. Owns fleetPage + collapsed state. Renders FleetSidebar + a clickable border RAIL (shadcn Sidebar pattern): thin full-height hit area at x=SIDEBAR_W(212), tracks width, sits at x=0 when collapsed, brightens to interactive on hover — click toggles collapse (no buttons). Active page: agents/prompts/usage/settings(ConfigPanel inline).'
@@ -5298,6 +5342,10 @@ ba9ad5938b7f9770:
   path: crates/cp-orchestrator/tests/end_to_end.rs
   description: 'Phase 30 (X797) end-to-end loopback capstone (3 tests, green ~0.06s). Real agent stack ↔ real backend transport over real sockets, no mocks. (1) capstone loop: agent thread = OplogService + Intake + UnixListener accept; client POST /command → AgentChannel::send (UDS) → Intake journal-then-ack → receipt cmd_id+dedup_token+rev:0+accepted; replay confirms durable; then SSE /stream tails the SAME oplog → CommandEffect re-emerges as delta with id=Some(0) (rev framing) + data carries dedup token = full loop closed; (2) spilled body hydrates over GET /…/body/{hash} byte-for-byte, malformed=400, absent=404; (3) soak: 25 SSE connect/disconnect cycles all 200+delta, server still healthy after (no FD/thread leak hang). serve_backend helper. Top `use nix/serde as _;`.'
   last_edited_ms: 0
+ba9dfa7e8b3f443f:
+  path: web/src/components/finder/FinderChrome.tsx
+  description: 'Finder chrome: tab strip, main toolbar (nav/crumbs/view-switch/search/icon-size slider), left sidebar, path bar. FinderSidebar: Favorites + Locations + Pinned (drag-drop target). No Get Info / Maximize2 / onFileGetInfo. File-active toolbar: Download + Share only.'
+  last_edited_ms: 1781875562782
 bab9d0cd28f2d236:
   path: ui/src/lib/finderFs.ts
   description: Finder mock fs + helpers. buildRealm grafts one rich tree (src/modules nesting, docs, media/ w/ mp4+m4a, planning) onto an agent folder. tags/created/starred/media payloads + PEAKS waveform. findNode/pathChain/collectStarred/nodeSize/childCounts/fmtBytes/sortNodes.
@@ -6442,6 +6490,10 @@ e511d6e0566f4f01:
   path: src/modules/overview/tools/close_context.rs
   description: 'Close_panel execution. Partial close: valid panels close, undescribed/stale-description file panels are skipped (not blocked). Module on_close_context hooks. Output: closed/skipped/not_found/errors sections.'
   last_edited_ms: 0
+e566b5261513df72:
+  path: web/sse_listen.py
+  description: SSE listener debug script — prints all deltas with wall-clock timestamps for TUI→frontend latency correlation.
+  last_edited_ms: 1781876739528
 e56f8813070bbbb5:
   path: ui/src/components/conversation/Message.tsx
   description: 'Message renderer: UserMessage (right-aligned bubble), AssistantMessage (signal-badged prose + streaming caret), ToolMessage (collapsible tool card w/ params + result).'
