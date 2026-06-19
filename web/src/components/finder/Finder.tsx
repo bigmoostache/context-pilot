@@ -7,7 +7,7 @@ import type {
   FinderViewMode,
 } from "@/lib/types"
 import { fmtBytes, sortNodes } from "@/lib/finderFs"
-import { downloadFile, useCreateFolder, useFs, useMoveItems, useUploadFiles } from "@/lib/live"
+import { downloadFile, useCreateFolder, useFs, useMoveItems, useRenameItem, useUploadFiles } from "@/lib/live"
 import { useQueryClient } from "@tanstack/react-query"
 import { qk } from "@/lib/sync"
 
@@ -97,6 +97,7 @@ export function Finder({ agent }: { agent: Agent }) {
   const upload = useUploadFiles(agent.id)
   const move = useMoveItems(agent.id)
   const mkdir = useCreateFolder(agent.id)
+  const rename = useRenameItem(agent.id)
   const qc = useQueryClient()
 
   const [tabs, setTabs] = useState<Tab[]>(() => [
@@ -116,6 +117,7 @@ export function Finder({ agent }: { agent: Agent }) {
   const [dragging, setDragging] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [menu, setMenu] = useState<MenuPos | null>(null)
+  const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [pathBarOpen, setPathBarOpen] = useState(false)
   const [pins, setPins] = useState<PinnedFolder[]>(() => loadPins(agent.id))
 
@@ -286,6 +288,27 @@ export function Finder({ agent }: { agent: Agent }) {
     setSelected(new Set())
   }
 
+  // Begin inline-renaming an entry (context menu Rename, or Enter on a focused
+  // item). Switches the matching name cell to an editable field.
+  const startRename = (node: FinderNode) => setRenamingPath(node.path)
+
+  // Commit an inline rename. A blank or unchanged name is a silent cancel (the
+  // field commits on blur even when untouched). Otherwise call the backend; on
+  // success the fs listing refetches and the entry reappears renamed.
+  const commitRename = (node: FinderNode, raw: string) => {
+    setRenamingPath(null)
+    const name = raw.trim()
+    if (!name || name === node.name) return
+    rename.mutate(
+      { path: node.path, name },
+      {
+        onSuccess: () => flash(`Renamed to “${name}”.`),
+        onError: (err) =>
+          flash(err instanceof Error ? err.message : "Rename failed"),
+      },
+    )
+  }
+
   // The backend lists paths RELATIVE to the realm root (e.g. "crates",
   // "crates/cp-base"); breadcrumbs and `relCwd` expect an absolute,
   // agent.folder-rooted cwd. Normalise every navigation target to absolute so
@@ -417,6 +440,16 @@ export function Finder({ agent }: { agent: Agent }) {
       focusAt(idx < 0 ? 0 : idx - 1)
     } else if (e.key === "Enter") {
       e.preventDefault()
+      // macOS Finder convention: Enter renames the focused entry (double-click
+      // opens it). Begins the inline editor on the current selection.
+      if (focusPath) {
+        const n = children.find((c) => c.path === focusPath)
+        if (n) startRename(n)
+      }
+    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "o") {
+      // …and Cmd/Ctrl+O opens, preserving a keyboard path to open now that
+      // Enter is bound to rename.
+      e.preventDefault()
       if (focusPath) {
         const n = children.find((c) => c.path === focusPath)
         if (n) open(n)
@@ -490,6 +523,9 @@ export function Finder({ agent }: { agent: Agent }) {
     onOpen: open,
     onContext: openContext,
     onMove: moveItemsInto,
+    renamingPath,
+    onRenameCommit: commitRename,
+    onRenameCancel: () => setRenamingPath(null),
   }
 
   // ── box (marquee) selection ─────────────────────────────────────
@@ -710,6 +746,7 @@ export function Finder({ agent }: { agent: Agent }) {
             addPin({ name: n.name, path: n.path })
             flash(`Pinned ${n.name}`)
           }}
+          onRenameStart={startRename}
           onNewFolder={newFolder}
           onUpload={() => fileInputRef.current?.click()}
           onSelectAll={() => setSelected(new Set(sorted.map((n) => n.path)))}

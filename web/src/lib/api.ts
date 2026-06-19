@@ -383,6 +383,27 @@ export function createFolder(agentId: string, dir: string, name: string): Promis
   return request(`/api/agent/${agentId}/fs/mkdir?${q}`, { method: "POST" })
 }
 
+/** Result of a rename (`POST /fs/rename`). */
+export interface RenameResult {
+  /** the entry's new realm-relative path */
+  renamed: string
+}
+
+/** Rename a single file or folder, keeping it in the same parent directory.
+ *  `path` is the entry's realm-relative path, `newName` the bare new name (no
+ *  path separators). Powers the Finder's inline rename. The backend confines
+ *  the source, bare-name-guards `newName`, treats an unchanged name as a no-op,
+ *  and refuses to clobber a different existing entry (409). Returns the new
+ *  realm-relative path. */
+export function renameItem(
+  agentId: string,
+  path: string,
+  newName: string,
+): Promise<RenameResult> {
+  const q = `path=${encodeURIComponent(path)}&name=${encodeURIComponent(newName)}`
+  return request(`/api/agent/${agentId}/fs/rename?${q}`, { method: "POST" })
+}
+
 /** Result of a move (`POST /fs/move`). */
 export interface MoveResult {
   moved: number

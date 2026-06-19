@@ -2122,6 +2122,10 @@
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: MAX_CONTENT_BYTES=100K, MAX_FILE_PATH_BYTES=1K, MAX_STORED_QUESTIONS=50 caps. execute_read: single-pass unack count+previews via inspect(). build_panel_content: MAX_PANEL_MESSAGES=50 cap. format_age helper.'
   last_edited_ms: 0
+467bcbd595956e42:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/listing.rs
+  description: 'Finder read views (split from finder.rs): fs_list (confined dir listing, folders-first sort, hidden skipped, per-folder count via count_visible_children, size on files), fs_preview (first 256KiB text, 415 on binary null-byte sniff, {content,size,truncated}), conversation (messages/*.yaml newest 200). Uses support:: helpers.'
+  last_edited_ms: 1781889348282
 4751cc31255d89ce:
   path: chain.sh
   description: Hash chain update/verify script (password-protected)
@@ -2874,10 +2878,6 @@
   path: website/docs/docs.css
   description: 'Docs: documentation stylesheet'
   last_edited_ms: 0
-625a2c5065c04058:
-  path: crates/cp-orchestrator/src/transport/inspect/finder.rs
-  description: 'Per-agent Finder file-manager endpoints (in inspect/): fs_list/fs_preview/fs_upload/fs_download/conversation, confined to the agent realm. fs_upload (POST /fs/upload?path={dir}&name={file}, T273): writes the raw-bytes body as one file into the confined dir; name must be a bare component (rejects ''/'',''\\'',''\0'',''.'',''..'' → 400) so the write can''t escape; dir confined via confined_path (403 on escape, 404 if absent); returns {written,path}. One file per request — the Finder fires N concurrent POSTs, sidestepping multipart. fs_download serves FILES as raw bytes (cap 10MiB) AND FOLDERS as a zip via system `zip -r -q` into /tmp (cap 100MiB, temp removed via drop(remove_file)). Absolute crate::transport:: paths.'
-  last_edited_ms: 1781887097487
 625cf1ad506f9875:
   path: src/modules/overview/tools/close_context.rs
   description: 'Close_panel execution. Partial close: valid panels close, undescribed/stale-description file panels are skipped (not blocked). Module on_close_context hooks. Output: closed/skipped/not_found/errors sections.'
@@ -3798,6 +3798,10 @@
   path: crates/cp-console-server/Cargo.toml
   description: 'Console server deps: serde, serde_json, nix (process), signal-hook, rlimit.'
   last_edited_ms: 1780563847604
+8122fb51941198c3:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/download.rs
+  description: 'Finder file/folder download (split from finder.rs). fs_download: files as raw bytes (10MiB cap, Content-Disposition attachment), folders zipped to /tmp via system `zip -r -q` (100MiB cap) then cleaned up. Confined to realm via support::confined_path.'
+  last_edited_ms: 1781889348203
 814ded7661832a83:
   path: ui/src/lib/types.ts
   description: Maquette domain types. Agent (id/name/folder/branch/model/status/cost/threads/accent), FsNode (fs tree), ThreadDetail with agentId (thread belongs to one agent realm). ViewMode=agents|cockpit|threads.
@@ -3822,10 +3826,6 @@
   path: src/modules/conversation_history/mod.rs
   description: 'Conversation history module. Core/global. Dynamic panels for frozen history chunks. on_close_context redirects to Close_conversation_history tool. Sub-modules: panel, trap.'
   last_edited_ms: 0
-824fc056de9d3d84:
-  path: crates/cp-orchestrator/src/transport/inspect/finder.rs
-  description: 'Per-agent Finder file-manager endpoints (in inspect/): fs_list/fs_preview/fs_upload/fs_move/fs_download/conversation, confined to the agent realm. fs_upload (POST /fs/upload?path&name, T273): raw-bytes body → one file, bare-name guard, returns {written,path}. fs_move (POST /fs/move {items[],dest}, T275): rename each realm-relative item into dest dir; confines both sides; guards = already-there→skip (200 moved:0), collision→409 (never clobbers), folder-into-own-descendant→409; returns {moved,skipped}. Powers the Finder''s internal drag-and-drop. fs_download serves FILES raw (10MiB cap) AND FOLDERS as zip via `zip -r -q` (100MiB cap). Absolute crate::transport:: paths.'
-  last_edited_ms: 1781887805050
 8251aca4fb98413d:
   path: ui/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: selected thread''s full conversation. toChatMessage() maps ThreadMsg→ChatMessage to reuse cockpit Message renderer. Renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'
@@ -4298,10 +4298,6 @@
   path: .github/checks/protected-files.yaml
   description: Protected files list for hash chain verification
   last_edited_ms: 0
-91a2d1db5a364cc3:
-  path: crates/cp-orchestrator/src/transport/inspect/finder.rs
-  description: 'Per-agent Finder file-manager endpoints (in inspect/): fs_list/fs_preview/fs_download/conversation, confined to the agent realm. fs_download serves FILES as raw bytes (cap MAX_DOWNLOAD_BYTES 10MiB) AND FOLDERS as a zip: zip_and_download shells out to system `zip -r -q` into /tmp, returns {dirname}.zip (cap MAX_ZIP_BYTES 100MiB), temp archive removed via drop(remove_file) on every path (let-underscore-on-destructor is a forbidden lint). Absolute crate::transport:: paths.'
-  last_edited_ms: 1781878570964
 91a635a674cb2681:
   path: crates/cp-mod-tree/src/storage.rs
   description: YAML-backed persistent storage for tree descriptions. Delegates YAML I/O to YamlSync engine. Content-hash keys (SHA-256 of path+content). populate_from_yaml fills gaps, refresh_stale_from_yaml swaps on branch switch.
@@ -4454,10 +4450,6 @@
   path: ui/src/components/shell/TopBar.tsx
   description: 'Cockpit header strip: app mark, view switcher (Threads/Cockpit segmented control), project breadcrumb, branch chip, global cost, status dot.'
   last_edited_ms: 0
-964090fcb8a0d8a7:
-  path: crates/cp-orchestrator/src/transport/inspect/finder.rs
-  description: 'Per-agent Finder file-manager endpoints (moved into inspect/): fs_list/fs_preview/fs_download/conversation, confined to the agent realm. Absolute crate::transport:: paths after the move.'
-  last_edited_ms: 1781817532372
 965292c5106e02e5:
   path: crates/cp-render/src/frame.rs
   description: Frame-level IR types. Frame (sidebar/active_panel/status_bar/conversation/overlays), Sidebar (entries/token_bar/stats/pr_card/help), StatusBar (badge/agent/skills/git/auto_continue/reverie/queue/think), PanelContent (title/blocks).
@@ -4550,10 +4542,6 @@
   path: src/modules/conversation_history/trap.rs
   description: History cleanup trap. check_and_trigger_trap() activates when ≥3 history panels on Queue_execute. trap_blocks_tool() blocks all except Close_conversation_history and Think. would_defuse_trap() projects remaining after queued closes. force_deactivate_trap() for auto-flush path. maybe_deactivate_trap() lifts when <3 remain. Shared project_remaining_panels() helper.
   last_edited_ms: 0
-9a27b25261012b5a:
-  path: crates/cp-orchestrator/src/transport/inspect/finder.rs
-  description: 'Per-agent Finder file-manager endpoints (in inspect/): fs_list/fs_preview/fs_upload/fs_mkdir/fs_move/fs_download/conversation, confined to the agent realm. fs_upload (POST /fs/upload?path&name, T273): raw-bytes body → one file, bare-name guard, returns {written,path}. fs_mkdir (POST /fs/mkdir?path&name, T279): create one folder in a confined parent dir, bare-name guard, exists→409, returns {created}; powers the Finder New Folder action (toolbar + empty-space context menu). fs_move (POST /fs/move {items[],dest}, T275): rename each realm-relative item into dest dir; confines both sides; guards = already-there→skip (200 moved:0), collision→409 (never clobbers), folder-into-own-descendant→409; returns {moved,skipped}. fs_download serves FILES raw (10MiB cap) AND FOLDERS as zip via `zip -r -q` (100MiB cap). Absolute crate::transport:: paths.'
-  last_edited_ms: 1781888527607
 9a2da07aae0bb6d6:
   path: src/modules/overview/tools/manage_tools.rs
   description: 'tool_manage execute: enable/disable tools, MANAGE_TOOLS_ID + panel_goto_page protection, partial success'
@@ -6410,6 +6398,10 @@ d693aa680fbe23a5:
   path: src/modules/questions/mod.rs
   description: 'QuestionsModule: core, 2 tools (ask_user_question, Think), ThinkState persistence, on_tool_complete counter drift'
   last_edited_ms: 0
+d694781ff4514603:
+  path: web/src/components/finder/FinderChrome.tsx
+  description: 'Finder chrome: tab strip, main toolbar (nav/crumbs/view-switch/search/icon-size slider), left sidebar, path bar. FinderSidebar: Favorites + Locations + Pinned (drag-drop target, T276 full-width pinned rows via flex-col wrapper + self-centering Unpin). File-active toolbar: Download + Share only.'
+  last_edited_ms: 1781889348374
 d6d2923755b7f261:
   path: web/run-stack.sh
   description: 'Launch script for full Context Pilot live stack: orchestrator backend (:7878) + web dev server (:5174) + TUI with CP_BRIDGE=1. --no-tui flag for backend+web only. Health check, cleanup trap, env overrides.'

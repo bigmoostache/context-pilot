@@ -41,6 +41,7 @@ export function ContextMenu({
   onSelectAll,
   onTogglePreview,
   onRefresh,
+  onRenameStart,
 }: {
   pos: MenuPos
   onClose: () => void
@@ -53,6 +54,8 @@ export function ContextMenu({
   onTag: (node: FinderNode, tag: FinderTag) => void
   /** pin a folder to the sidebar (folders only) */
   onPin?: (node: FinderNode) => void
+  /** begin inline-renaming a node (item menu) */
+  onRenameStart: (node: FinderNode) => void
   /** create a new folder in the current directory (empty-space menu) */
   onNewFolder: () => void
   /** open the file picker to upload into the current directory (empty-space menu) */
@@ -198,7 +201,16 @@ export function ContextMenu({
 
           <Separator />
 
-          <Item icon={PencilLine} label="Rename" />
+          <button
+            onClick={() => {
+              onRenameStart(node)
+              onClose()
+            }}
+            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
+          >
+            <PencilLine className="size-3.5 shrink-0 opacity-80" />
+            <span className="flex-1">Rename</span>
+          </button>
           <Item icon={Copy} label="Duplicate" shortcut="⌘D" />
           <button
             onClick={() => {

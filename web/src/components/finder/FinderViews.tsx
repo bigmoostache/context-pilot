@@ -1,5 +1,5 @@
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from "react"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ChevronRight } from "lucide-react"
 import type { FinderNode, FinderSortKey, FinderTag } from "@/lib/types"
 import { fmtBytes, sortNodes } from "@/lib/finderFs"
@@ -103,6 +103,65 @@ export interface ViewHandlers {
   /** Move the given realm-relative paths into the destination folder (internal
    *  drag-and-drop). Absent in views that don't support drop targets. */
   onMove?: (paths: string[], destFolder: FinderNode) => void
+  /** path of the entry currently being inline-renamed (its name cell renders an
+   *  editable field instead of a label). Null when nothing is being renamed. */
+  renamingPath?: string | null
+  /** commit a rename to `newName` (Enter / blur). Trim + no-op handling lives in
+   *  the parent; an empty/unchanged name should be treated as a cancel there. */
+  onRenameCommit?: (node: FinderNode, newName: string) => void
+  /** abandon the in-progress rename (Esc). */
+  onRenameCancel?: () => void
+}
+
+/**
+ * Inline rename field — a macOS-style editable name cell. Mounts focused with the
+ * basename (sans extension) pre-selected, commits on Enter or blur, cancels on
+ * Esc. Keydown is stopped from bubbling so the Finder surface's own key handler
+ * (arrows / type-ahead / Enter-to-rename) never fires while the user types.
+ */
+function RenameInput({
+  node,
+  onCommit,
+  onCancel,
+}: {
+  node: FinderNode
+  onCommit: (newName: string) => void
+  onCancel: () => void
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  // Select the basename (everything before the last dot) on mount, like Finder —
+  // so a quick retype keeps the extension. A dotfile / extensionless name selects
+  // whole.
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.focus()
+    const dot = node.name.lastIndexOf(".")
+    el.setSelectionRange(0, dot > 0 ? dot : node.name.length)
+  }, [node.name])
+
+  return (
+    <input
+      ref={ref}
+      type="text"
+      defaultValue={node.name}
+      spellCheck={false}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation()
+        if (e.key === "Enter") {
+          e.preventDefault()
+          onCommit((e.target as HTMLInputElement).value)
+        } else if (e.key === "Escape") {
+          e.preventDefault()
+          onCancel()
+        }
+      }}
+      onBlur={(e) => onCommit(e.target.value)}
+      className="min-w-0 flex-1 rounded-[4px] border border-[var(--signal)] bg-background px-1 py-px text-[12px] text-foreground outline-none ring-2 ring-[var(--signal)]/40"
+    />
+  )
 }
 
 /** Colored macOS finder tag dots. */
@@ -183,9 +242,19 @@ export function GridView({
               size={iconSize}
               className="transition-transform duration-150 group-hover:scale-[1.06] group-active:scale-95"
             />
-            <span className="line-clamp-2 w-full px-0.5 text-[11.5px] font-medium leading-tight text-foreground/85">
-              {n.name}
-            </span>
+            {h.renamingPath === n.path && h.onRenameCommit && h.onRenameCancel ? (
+              <span className="flex w-full px-0.5" onClick={(e) => e.stopPropagation()}>
+                <RenameInput
+                  node={n}
+                  onCommit={(name) => h.onRenameCommit?.(n, name)}
+                  onCancel={() => h.onRenameCancel?.()}
+                />
+              </span>
+            ) : (
+              <span className="line-clamp-2 w-full px-0.5 text-[11.5px] font-medium leading-tight text-foreground/85">
+                {n.name}
+              </span>
+            )}
             <span className="flex items-center gap-1 text-[10px] tabular-nums text-muted-foreground/60">
               {n.kind === "folder" ? itemCount(n) : fmtBytes(n.size)}
             </span>
@@ -247,7 +316,15 @@ export function ListView({
           >
             <span className="flex min-w-0 items-center gap-2">
               <FileIcon kind={n.kind} ext={extOf(n.name)} size={17} className="shrink-0" />
-              <span className="truncate font-medium">{n.name}</span>
+              {h.renamingPath === n.path && h.onRenameCommit && h.onRenameCancel ? (
+                <RenameInput
+                  node={n}
+                  onCommit={(name) => h.onRenameCommit?.(n, name)}
+                  onCancel={() => h.onRenameCancel?.()}
+                />
+              ) : (
+                <span className="truncate font-medium">{n.name}</span>
+              )}
               <TagDots tags={n.tags} className="shrink-0" />
             </span>
             <span className="truncate text-muted-foreground">{M.label}</span>
@@ -404,7 +481,15 @@ function MillerColumn({
             )}
           >
             <FileIcon kind={n.kind} ext={extOf(n.name)} size={17} className="shrink-0" />
-            <span className="min-w-0 flex-1 truncate font-medium">{n.name}</span>
+            {h.renamingPath === n.path && h.onRenameCommit && h.onRenameCancel ? (
+              <RenameInput
+                node={n}
+                onCommit={(name) => h.onRenameCommit?.(n, name)}
+                onCancel={() => h.onRenameCancel?.()}
+              />
+            ) : (
+              <span className="min-w-0 flex-1 truncate font-medium">{n.name}</span>
+            )}
             <TagDots tags={n.tags} />
             {n.kind === "folder" && (
               <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/50" />

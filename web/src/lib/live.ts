@@ -451,6 +451,23 @@ export function useMoveItems(agentId: string) {
   })
 }
 
+/**
+ * Mutation to rename one entry in place (the Finder's inline rename). Not a
+ * delta-covered resource → a `useMutation`. On success the WHOLE `fs` query
+ * family for the agent is invalidated so the renamed entry surfaces under its
+ * new name at once (the containing directory's listing changed).
+ */
+export function useRenameItem(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ path, name }: { path: string; name: string }) =>
+      api.renameItem(agentId, path, name),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["fs", agentId] })
+    },
+  })
+}
+
 export function useCreateAgent() {
   const client = useQueryClient()
   return useMutation({
