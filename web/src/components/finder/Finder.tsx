@@ -101,7 +101,7 @@ export function Finder({ agent }: { agent: Agent }) {
   const [anchor, setAnchor] = useState<string | null>(null)
   const [focusPath, setFocusPath] = useState<string | null>(null)
   const [preview, setPreview] = useState<FinderNode | null>(null)
-  const [previewOpen, setPreviewOpen] = useState(true)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [viewMode, setViewMode] = useState<FinderViewMode>("grid")
   const [iconSize, setIconSize] = useState(52)
   const [query, setQuery] = useState("")
