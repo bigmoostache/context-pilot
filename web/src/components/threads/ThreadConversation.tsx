@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { Fragment, useEffect, useRef } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
 import { QuestionForm } from "./QuestionForm"
@@ -17,10 +17,17 @@ function toChatMessage(m: ThreadMsg): ChatMessage {
   }
 }
 
-/** Strip the leading auto-trace marker (`/⁠* auto *⁠/ `) from text for display. */
-function autoLine(m: ThreadMsg): string {
-  const t = m.text ?? ""
-  return t.startsWith("/* auto */ ") ? t.slice("/* auto */ ".length) : t
+/** Parse an auto-trace message into its three columns: verb, tool, intent. */
+function parseAutoLine(m: ThreadMsg): { verb: string; tool: string; intent: string } {
+  const raw = m.text ?? ""
+  const t = raw.startsWith("/* auto */ ") ? raw.slice("/* auto */ ".length) : raw
+  const dotIdx = t.indexOf(" · ")
+  if (dotIdx < 0) return { verb: t, tool: "", intent: "" }
+  const verb = t.slice(0, dotIdx)
+  const rest = t.slice(dotIdx + 3)
+  const dashIdx = rest.indexOf(" — ")
+  if (dashIdx < 0) return { verb, tool: rest, intent: "" }
+  return { verb, tool: rest.slice(0, dashIdx), intent: rest.slice(dashIdx + 3) }
 }
 
 /**
@@ -52,10 +59,10 @@ function segmentLog(log: ThreadMsg[]): Segment[] {
 }
 
 /**
- * A collapsed run of auto tool-activity traces. Renders a quiet, dim summary
- * ("⚙ N tool actions") that expands to the individual `{verb · tool — intent}`
- * lines — so a human watching the thread can audit the agent's live work
- * without it drowning the real conversation.
+ * A collapsed run of auto tool-activity traces, rendered as an aligned
+ * three-column grid (verb · tool · intent) so the agent's live work is easy to
+ * scan at a glance. Verbs and tool names carry distinct accent colours from the
+ * app palette; intents are dimmed context.
  */
 function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
   const n = msgs.length
@@ -65,12 +72,17 @@ function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
         <span className="text-muted-foreground/60 transition-transform group-open/auto:rotate-90">▸</span>
         <span>⚙ {n} tool action{n === 1 ? "" : "s"}</span>
       </summary>
-      <div className="mt-1 flex flex-col gap-0.5 border-l border-border/60 pl-3">
-        {msgs.map((m) => (
-          <span key={m.id} className="font-mono text-[11px] text-muted-foreground/75">
-            {autoLine(m)}
-          </span>
-        ))}
+      <div className="mt-1 grid grid-cols-[auto_auto_1fr] gap-x-3 gap-y-0.5 border-l border-border/60 pl-3 font-mono text-[11px]">
+        {msgs.map((m) => {
+          const { verb, tool, intent } = parseAutoLine(m)
+          return (
+            <Fragment key={m.id}>
+              <span className="text-[var(--interactive)]">{verb}</span>
+              <span className="text-foreground/70">{tool}</span>
+              <span className="truncate text-muted-foreground/55">{intent}</span>
+            </Fragment>
+          )
+        })}
       </div>
     </details>
   )
