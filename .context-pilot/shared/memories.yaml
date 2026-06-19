@@ -542,6 +542,16 @@ bc38d2fd0bcf015a:
   - gotcha
   - bridge
   last_edited_ms: 1781649648561
+c65939700e3a0971:
+  tl_dr: 'T283 follow-up SHIPPED (283682d): slow-click-to-rename now works in grid + Miller columns, not just list. Single click no longer auto-opens Quick Look pane (was reflowing the grid out from under the slow 2nd click).'
+  importance: medium
+  labels:
+  - T283
+  - finder
+  - rename
+  - click
+  - shipped
+  last_edited_ms: 1781891921629
 caf6de1cb65ac661:
   tl_dr: 'DEMAQUETTING (final frontend-wiring sequence, branch ''demaquetting''): wire live frontend↔backend, keep ui/ maquette FROZEN as reference, build live app in sibling web/ dir. Full plan in contents.'
   contents: |-
