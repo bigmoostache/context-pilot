@@ -404,6 +404,36 @@ a074780e7fbba07b:
   - non-blocking
   - fixed
   last_edited_ms: 1781884750645
+b2db48bd88ac9c11:
+  tl_dr: 'T283 Finder inline rename SHIPPED end-to-end (4dd6b94): macOS-style inline edit + backend fs_rename. finder.rs split into finder/ module.'
+  contents: |-
+    ## T283 — Finder inline rename SHIPPED (commit 4dd6b94 pushed)
+
+    User: "Rename feature does not work — (1) make it work (2) inline UI/UX people are used to." The rename was fully unwired: only a decorative ContextMenu <Item label=Rename/>.
+
+    ### Backend (already built earlier this session, proven live)
+    POST /api/agent/{id}/fs/rename?path={item}&name={newname} in inspect/finder/mutate.rs: confine src to realm, bare-name guard (no /\\\0 . ..), same-name → no-op 200, dest exists → 409 (never clobber), std::fs::rename else 502. Returns {renamed: relpath}. rel_sibling() replaces the last path segment. Route wired in transport/mod.rs route_rest. Proven live (834eb ~/code/test): rename 200, same-name 200 no-op, bad-name 400, missing 403.
+
+    finder.rs hit 742 lines (>500 cap) after this endpoint → SPLIT into finder/ dir: mod.rs (re-exports), listing.rs (fs_list/fs_preview/conversation), mutate.rs (fs_upload/fs_mkdir/fs_rename/fs_move + is_bare_name/rel_child/rel_sibling), download.rs (fs_download/zip), support.rs (agent_folder/confined_path/count_visible_children/infer_kind/extract_param/percent_decode + tests). All file<500 + folder caps ok.
+
+    ### Frontend (this turn)
+    - api.ts: renameItem(agentId,path,newName)→RenameResult{renamed} (POST query params).
+    - live.ts: useRenameItem(agentId)=useMutation, onSuccess invalidate ['fs',agentId] (whole family — containing dir's listing changed).
+    - FinderViews.tsx: RenameInput component (controlled <input>, defaultValue=node.name, useEffect focuses + setSelectionRange(0, lastDot>0?lastDot:len) to pre-select basename sans ext; Enter→commit, Esc→cancel, blur→commit; onKeyDown stopPropagation so Finder surface key handler doesn't hijack). ViewHandlers gained renamingPath?/onRenameCommit?/onRenameCancel?. Rendered in grid + list + Miller views (gallery skipped — rename there is unusual). Imports useEffect+useRef added.
+    - ContextMenu.tsx: onRenameStart(node) prop; Rename <Item> (was decorative) → real <button> calling onRenameStart+onClose.
+    - Finder.tsx: renamingPath state, useRenameItem, startRename(node)=setRenamingPath(node.path), commitRename(node,raw)=trim+no-op-if-blank-or-unchanged else rename.mutate w/ flash toasts. viewProps passes renamingPath/onRenameCommit/onRenameCancel. ContextMenu onRenameStart=startRename. KEYBOARD: Enter now starts rename (macOS convention; was open); Cmd/Ctrl+O preserves keyboard open. Double-click still opens.
+
+    ### Validation
+    Web build green (tsc -b && vite build exit 0). Backend was proven live earlier. Frontend-only this turn → dev :5175 hot-reloads, NO orchestrator restart, NO system_reload. Committed+pushed 4dd6b94 (13 files, incl finder split + tree-descriptions). Stray untracked benchmarks/ + report/ files deliberately excluded (not mine).
+
+    Backlog (all MY_TURN Finder): T280 code-preview syntax highlight (frontend-only), T281 PDF rendering (needs raw inline-serve endpoint), T282 CSV/Excel tables (CSV easy/text; xlsx needs parser), T272 follow-up X906 WYSIWYG md editor (needs fs_write endpoint + editor UI).
+  importance: medium
+  labels:
+  - T283
+  - finder
+  - rename
+  - shipped
+  last_edited_ms: 1781889952826
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   contents: |-
