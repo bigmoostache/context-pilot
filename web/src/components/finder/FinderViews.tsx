@@ -473,7 +473,13 @@ function MillerColumn({
             onDoubleClick={() => h.onOpen(n)}
             onContextMenu={(e) => h.onContext(e, n)}
             className={cn(
-              "mx-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors",
+              // `select-none` is load-bearing here: unlike grid/list (whose
+              // <main> carries select-none via the marquee), the columns view
+              // has none, so a native press-drag on a row's text would start a
+              // TEXT selection instead of an element drag — the drag never
+              // fires and the move silently fails (T287). Suppressing text
+              // selection lets `draggable` initiate the element drag reliably.
+              "mx-1 flex select-none items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors",
               onTrail || sel
                 ? "bg-[var(--signal)]/14 text-foreground"
                 : "text-foreground/80 hover:bg-muted/45",
