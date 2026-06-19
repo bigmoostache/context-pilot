@@ -1098,6 +1098,10 @@
   path: web/src/components/agents/PromptsPage.tsx
   description: Global prompt library — accepts optional agentId, uses useLibrary() with mockLibrary fallback. Cards for agents/skills/commands. Create/edit decorative.
   last_edited_ms: 1781695982747
+2476ca2a1423a6c7:
+  path: web/src/components/finder/FinderPreview.tsx
+  description: 'QuickLook preview pane — kind-aware. T272 live .md/code/json/doc fetch via useFsPreview. X906 live markdown via EditableMarkdown (view⇄WYSIWYG-edit, Save→fs/write). T281/T286 live image (<img>)+PDF (<object>) via rawUrl→/fs/raw; LivePdfPreview root is h-full (fills the definite-height scroll container) + object flex-1 min-h-0 so the PDF viewer claims ALL available pane/tab height (T281 follow-up — flex-1 alone failed since the scroll parent is a plain block, not a flex column). T282 live spreadsheet (csv/xlsx/ods) via LiveSheetPreview→useFsSheet→/fs/sheet: sticky-header table (first row=header), zebra rows, row-number gutter, multi-sheet tab switcher, truncated note. Mock path unchanged. agentId prop threads the realm.'
+  last_edited_ms: 0
 248e127185acfb97:
   path: website/style.css
   description: Website stylesheet
@@ -2634,6 +2638,10 @@
   path: crates/cp-base/src/cast.rs
   description: 'Safe trait: saturating numeric casts for all int/float types, macro-driven impls, replaces raw `as` casts'
   last_edited_ms: 0
+572c353b034464be:
+  path: web/src/lib/live.ts
+  description: Live data hooks = thin TanStack Query wrappers over queryClient + ensureSync SSE push. useFs/useFsPreview/useFsSheet(T282 spreadsheet→table, pollMs:0)/useThreads(merge-non-destructive)/useUploadFiles/useWriteFile(X906)/useMoveItems/useRenameItem/useTrashItems/useCreateFolder mutations. useStreamingTokens rAF-batched.
+  last_edited_ms: 0
 5730a4905add5122:
   path: web/src/index.css
   description: Tailwind v4 + tw-animate. Two palettes (:root Cream light / .dark Dungeon Forge) as CSS token blocks; semantic tokens (signal/ok/warn/danger/surface). Finder micro-motion keyframes (finder-pop/ql-pop/menu-pop/ants/checker), modal-pop, highlight.js .hljs-* theme mapped to tokens (T280).
@@ -3594,6 +3602,10 @@
   path: web/src/lib/mock.ts
   description: Mock session data for the maquette. Panels, tokenBudget, messages, threads, threadDetails, agents, fileTree, library, usagePoints+USAGE_RATES, cockpit panel data, currentUser. Partially superseded by live hooks — still used as fallback for UsagePage, StatusBar cache bar, PromptsPage.
   last_edited_ms: 1781696062524
+780df92c8c9eccb3:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 782b15ad724cdaf8:
   path: .github/workflows/codeql.yml
   description: 'CI: CodeQL security analysis'
@@ -4942,6 +4954,10 @@ a4a82c99e057af5e:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
   last_edited_ms: 0
+a51cb92eff54acdf:
+  path: web/src/lib/sync.ts
+  description: 'SSE→QueryClient delta bridge (push plane). ensureSync(agentId): one idempotent per-agent subscription. delta→fold into [''threads'',id]+[''agent'',id] via setQueryData functional updater, rev high-water guard; null→invalidate. qk query-key registry incl qk.fsPreview + qk.fsSheet (T282 Finder spreadsheet cache key). applyThreadDelta folds thread_created/archived/restored/status_changed/focus_changed/message_created. mergeThreadLogs non-destructive poll reconcile.'
+  last_edited_ms: 0
 a545d42a6129fd6e:
   path: crates/cp-orchestrator/tests/supervisor_lifecycle.rs
   description: 'Phase 28 (X795) backend supervisor lifecycle suite (4 tests, all green, ~15s). Black-box public-API + real OS processes, covering what supervisor/tests.rs unit tests can''t: (1) SIGTERM→grace→SIGKILL escalation vs `/bin/sh -c "trap '''' TERM; exec sleep 60"` (unit spawn_and_stop never walks escalation path); (2) multi-agent fleet spawn 3 → stop all → all pids ESRCH-gone (spawned children reaped, no zombie); (3) adopted FOREIGN process really signalled on stop (status.signal()==SIGTERM 15; supervisor signals but doesn''t reap what it didn''t spawn); (4) check_liveness routes spawned Exited (try_wait) + adopted Vanished (signal-0) in ONE pass. pid_present helper via nix kill(_,None)!=ESRCH. Top `use cp_mod_bridge/cp_oplog/serde/serde_json/tiny_http as _;`.'
@@ -5042,6 +5058,10 @@ a89593dca254bf7d:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Phase 19/30: transport hub. Backend{view,breaker,hub,tickets,agents_dir} under Arc<Mutex>. serve(addr,state)/serve_bound(server,state) (split so tests bind 127.0.0.1:0 + read server_addr before serving) = tiny_http acceptor, thread-per-request. route_rest dispatches GET /api/fleet|/agent/{id}|/agent/{id}/body/{hash}, POST /agent/{id}/command|/ticket. handle_stream: GET /api/stream?agent&ticket — redeem single-use ticket, spawn run_stream producer (Tailer.seed(last_rev) replay + gap→resync + hub drain + keepalive probe, unsubscribe on exit). stream_to_client: SSE delivered via request.into_writer() + manual HTTP preamble + flush-after-every-event (tiny_http 0.12 respond() buffers body through a 1KiB BufWriter flushed only after raw_print returns = fatal for unbounded SSE — small events stuck forever; into_writer+per-event flush fixes it). MAX_BODY 1MiB, STREAM_POLL 200ms. QueryParams + Last-Event-ID parsing.'
   last_edited_ms: 1781679569056
+a8971e7eeba4f12c:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/mod.rs
+  description: 'Finder module hub: re-exports fs_list/fs_preview/conversation (listing), fs_sheet (sheet — CSV/xlsx→table, T282), fs_upload/write/mkdir/rename/move/trash (mutate), fs_download + fs_raw (download — fs_raw is the inline image/PDF raw-serve, T281/T286). Submodules: listing/sheet/mutate/download/support.'
+  last_edited_ms: 0
 a8d34b34101ad428:
   path: web/src/components/threads/ThreadList.tsx
   description: Threads left rail. flattenMarkdown() one-line row preview (T284). previewOf skips auto traces. Groups User-turn/Agent's-turn, archived view sorted recent-first. Per-row Archive/Restore.
@@ -5842,6 +5862,10 @@ c0aeea6c744c259a:
   path: ui/src/components/shell/TopBar.tsx
   description: 'macOS title bar. App mark (Home)->fleet. ALWAYS renders / + AgentSwitcher: inside an agent it shows the workspace + per-agent segmented switcher Threads·Cockpit·Finder + cost; at fleet altitude passes activeId undefined (placeholder switcher) and picking an agent enters it (->threads). Far-right: Activity->StatsPopup (hidden at fleet) + ThemeToggle + Settings gear->ConfigModal. Both modals always-mounted, controlled open. Git branch chip removed.'
   last_edited_ms: 1781533125751
+c0cf6028fc03a31a:
+  path: web/src/lib/api.ts
+  description: 'REST client for orchestration backend. Typed fetch wrappers: fleet/agent/threads/panels/fs (list/preview/sheet[T282 CSV/xlsx→table]/write/upload/mkdir/rename/move/trash/download) + rawUrl (/fs/raw inline-serve)/conversation/metrics/vitals/create/restart/retire. sendCommand wraps Kind in Command envelope; mintTicket for SSE.'
+  last_edited_ms: 0
 c128c6c1a8afa6e1:
   path: crates/cp-mod-search/src/meili/bootstrap.rs
   description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config, project path hashing via FNV-1a, initial metrics population.'
@@ -5897,6 +5921,10 @@ c2e8ce0b2cd68b7c:
 c2f863461b1f2295:
   path: src/app/actions/mod.rs
   description: Central action dispatch (Elm/Redux-style). CycleViewMode resets scroll_offset + user_scrolled. Thread actions extracted to threads.rs.
+  last_edited_ms: 0
+c2f9723803542d2a:
+  path: web/src/components/finder/Finder.tsx
+  description: 'Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) live listings. T273 upload (toolbar+drag-drop via useUploadFiles→uploadFiles). T275 internal drag-and-drop (useMoveItems→moveItemsInto). T275 follow-up — EXTERNAL-drag upload overlay lifecycle is now WINDOW-level + robust: a useEffect binds window dragover/drop/dragleave/dragend once; dragover (Files only) raises the overlay + refreshes a heartbeat ts; explicit drop / dragleave-to-outside (relatedTarget null) / dragend clear it; and a 100ms watchdog clears it when no dragover arrived for 250ms — so a silent CANCEL (Esc / release outside, which fires no drop) no longer leaves the overlay stuck blurry. uploadRef holds the latest uploadFiles closure so listeners bind once without going stale. The old element-level onDragOver/onDragLeave/onDrop were removed (window owns the lifecycle; internal MOVE_MIME drags carry no Files so never raise the overlay). T279 empty-space context menu: openEmptyContext on the content <main>; openContext (item) stopPropagation; newFolder() auto-names collision-free then useCreateFolder mutate (toolbar+menu wired); Refresh invalidates qk.fs via useQueryClient. cmd/ctrl+shift multiselect + useMarquee. Both FinderPreview usages pass agentId (T272). Quick Look CLOSED by default.'
   last_edited_ms: 0
 c3334a35bc779913:
   path: crates/cp-orchestrator/src/main.rs
@@ -6097,6 +6125,10 @@ c7ff6fe4a8e17796:
 c80cf4a36c945d80:
   path: crates/cp-mod-spine/src/lib.rs
   description: Spine module. Auto-continuation, notifications (10 processed kept), guard rails, coucou timers. Manages WatcherRegistry. on_user_message resets counters. on_stream_stop prevents re-launch.
+  last_edited_ms: 0
+c8259a170addb048:
+  path: web/src/components/finder/FinderViews.tsx
+  description: 'Finder view modes: grid/list/columns(Miller)/gallery. T275 internal drag-and-drop: MOVE_MIME (''application/x-cp-move'') carries {paths} of the dragged selection; startItemDrag makes EVERY row draggable (drags whole multi-select if the row is selected, else just it; a lone folder also sets FOLDER_DRAG_MIME for sidebar pinning). folderDropProps = reusable drop-target handlers on FOLDER rows (grid/list/Miller): highlight on hover, can''t-drop-onto-self guard, onDrop→onMove(paths,folder). isMoveDrag/readMovePayload helpers. ViewHandlers gained onMove?. Per-view dragOver useState drives the drop highlight. itemCount() uses backend count. ColumnsView = live Miller (per-ancestor useFs). relOf strips agent-folder prefix.'
   last_edited_ms: 0
 c834a61ebb6faa99:
   path: ui/src/components/agents/PromptsPage.tsx
@@ -6505,6 +6537,10 @@ d4f447c4551668d1:
 d590cc293c1de44e:
   path: crates/cp-wire/tests/protocol.rs
   description: 'Phase 21 (X788): cp-wire protocol coverage at public-API boundary. Every OpEntryKind variant JSON round-trip incl Checkpoint{Snapshot} (the inline tests skip CommandEffect/SeenMark/Lifecycle/CostAggregate/Checkpoint), checkpoint-carries-faithful-snapshot (GAP1 fast-replay reseed integrity), accepts() N-1 window sweep 0..PV+4, ContentHash to_hex/from_hex bijection + uppercase-accepted + malformed-rejected-never-panic, SeenSet evict_through retires exactly acked tokens + rev_of preserved, Heads upsert last-write-wins-per-thread (I3 bounded). serde_json used directly; crc32c/serde/sha2 acked as _. 7 tests.'
+  last_edited_ms: 0
+d591f238e58e899a:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/listing.rs
+  description: 'Finder read views (split from finder.rs): fs_list (confined dir listing, folders-first sort, hidden skipped, per-folder count via count_visible_children, size on files), fs_preview (first 256KiB text, 415 on binary null-byte sniff, {content,size,truncated}), conversation (messages/*.yaml newest 200). Uses support:: helpers.'
   last_edited_ms: 0
 d5c1024fa12376ed:
   path: crates/cp-base/src/state/data/model_helpers.rs
@@ -6930,6 +6966,10 @@ e8400426f9791225:
   path: docs/talk/slides/1-3.html
   description: 'Slide: What I''d Add — Context/Feedback/LLM-X (WHYs section)'
   last_edited_ms: 1781078806808
+e87069d5cdf1636a:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl fs preview/sheet (CSV/xlsx table, T282)/upload/write(X906 editor save-back)/mkdir/rename/move/trash, retire/unretire/restart, fleet create, vitals, metrics. GET fs/download (attachment) + fs/raw (handle_raw: inline, image+PDF previews) intercepted before route_rest. handle_stream = SSE.'
+  last_edited_ms: 0
 e8740d926f5b34f9:
   path: src/state/cache.rs
   description: 'CachePool: 6-worker thread pool for non-blocking panel cache refresh, LazyLock global, process_cache_request() API'

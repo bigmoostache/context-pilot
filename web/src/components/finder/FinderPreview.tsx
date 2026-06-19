@@ -40,7 +40,7 @@ export function FinderPreview({
       )}
     >
       {!full && (
-        <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
+        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
           <span className="text-[12px] font-semibold text-muted-foreground">Quick Look</span>
           <div className="ml-auto flex items-center gap-1">
             {node && node.kind !== "folder" && (

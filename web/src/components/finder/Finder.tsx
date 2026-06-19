@@ -865,7 +865,14 @@ export function Finder({ agent }: { agent: Agent }) {
                 side="right"
                 showCloseButton={false}
                 showOverlay={false}
-                className="w-[420px] max-w-[420px] border-l border-border p-0 sm:max-w-[420px]"
+                // Width is set with the SAME `data-[side=right]:` modifier the
+                // base SheetContent uses for its `w-3/4` + `sm:max-w-sm`, so
+                // tailwind-merge cleanly REPLACES them (a plain `w-[420px]` has a
+                // different variant prefix, so merge keeps BOTH and the base
+                // `w-3/4`/`max-w-sm` win — capping the drawer NARROWER than the
+                // 420px FinderPreview pane inside it, which then overflowed past
+                // the right viewport edge: the "part off-screen on the right").
+                className="border-l border-border p-0 data-[side=right]:w-[420px] data-[side=right]:max-w-[420px] data-[side=right]:sm:max-w-[420px]"
               >
                 <FinderPreview
                   node={previewNode}

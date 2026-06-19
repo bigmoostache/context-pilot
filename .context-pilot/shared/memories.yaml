@@ -65,6 +65,20 @@
   - provider
   - fixed
   last_edited_ms: 1781884032338
+24b54123d1af9131:
+  tl_dr: T288 Finder Quick Look → shadcn Sheet drawer SHIPPED 6f5c12a pushed (frontend-only, build green).
+  contents: |-
+    Replaced the non-reflowing overlay with a Base UI Sheet anchored right; NON-MODAL (modal=false + showOverlay=false + disablePointerDismissal) so clicking another file behind updates the live preview instead of dismissing. Esc + FinderPreview's own X close it. Fixed-positioned → never reflows grid, so click/double-click/slow-rename gestures stay stable. Gated grid+list only (columns has its Miller preview pane, gallery has hero). sheet.tsx gained showOverlay?:boolean (default true) to skip the dimming backdrop. No orchestrator restart / system_reload (dev :5175 hot-reloads). Shipped 6f5c12a.
+
+    FOLLOW-UP fix 64907e4 (two complaints): (1) drawer part off-screen RIGHT — my width override `w-[420px]`/`sm:max-w-[420px]` had a DIFFERENT tailwind variant prefix than the base SheetContent's `data-[side=right]:w-3/4` + `data-[side=right]:sm:max-w-sm`, so tailwind-merge kept BOTH and the base won, capping the Popup ~384px while the nested FinderPreview pane (aside w-[420px] shrink-0) stayed 420 → overflowed past the viewport right edge. FIX: re-express width with the SAME `data-[side=right]:` modifier (`data-[side=right]:w-[420px]` + `:max-w-[420px]` + `:sm:max-w-[420px]`) so merge cleanly replaces the base width classes → clean 420 flush-right. GENERAL LESSON: tailwind-merge only collapses classes that share the same variant-prefix; to override a `data-[x]:`-prefixed base class you must use the same prefix. (2) Quick Look pane header was h-11 (44px) vs Finder toolbar + app TopBar both h-12 (48px) → bumped to h-12 to line up.
+  importance: medium
+  labels:
+  - T288
+  - finder
+  - quick-look
+  - sheet
+  - shipped
+  last_edited_ms: 1781907701768
 251f7f7fd6eee822:
   tl_dr: 'T279 follow-up SHIPPED (e833835): New Folder now inline-names a placeholder before creating (macOS-style), instead of auto-creating ''untitled folder''.'
   contents: |-
