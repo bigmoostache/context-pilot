@@ -442,12 +442,15 @@ export function FinderSidebar({
           Pinned
         </span>
         {pins.map((p) => (
-          // `relative` (not `flex`) so the Place button stretches full-width
-          // exactly like a Locations row — a flex parent would shrink it to its
-          // text width, the source of the "pinned looks different" mismatch.
-          // The Unpin button is absolutely positioned, so it never needed the
-          // flex centering; it self-centers via top-1/2 + -translate-y-1/2.
-          <div key={p.path} className="group/pin relative">
+          // `flex flex-col` so the single Place child STRETCHES to full width
+          // (flex-col's default align-items:stretch), exactly like a Locations
+          // row — those stretch only because their parent Group is also a
+          // flex-col. A plain block/`relative` parent leaves the <button> at
+          // its intrinsic (text) width, which was the real "pinned looks
+          // different" mismatch. `relative` is kept (alongside flex) so the
+          // absolute Unpin button still anchors to the row; it self-centers via
+          // top-1/2 + -translate-y-1/2.
+          <div key={p.path} className="group/pin relative flex flex-col">
             <Place
               leading={<FileIcon kind="folder" size={16} />}
               label={p.name}
