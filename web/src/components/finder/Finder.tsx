@@ -49,6 +49,7 @@ import {
 import { ColumnsView, GalleryView, GridView, ListView } from "./FinderViews"
 import { FinderPreview } from "./FinderPreview"
 import { ContextMenu, type MenuPos } from "./ContextMenu"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { useMarquee } from "./useMarquee"
 import { cn } from "@/lib/utils"
 
@@ -843,22 +844,36 @@ export function Finder({ agent }: { agent: Agent }) {
               )}
             </main>
 
-            {/* Quick Look — a NON-REFLOWING overlay anchored to the right of the
-                content. It floats ABOVE the items (it does not shrink the
-                content area), so opening it never reflows the grid and the
-                click/double-click/slow-rename gestures stay stable. Only grid &
-                list use it: columns has its own trailing Miller preview pane and
-                gallery shows the selected item as a hero, so an overlay there
-                would double up. */}
-            {previewOpen && (viewMode === "grid" || viewMode === "list") && (
-              <div className="absolute inset-y-0 right-0 z-20 flex pop-shadow">
+            {/* Quick Look — a shadcn Sheet drawer anchored to the right edge.
+                It is NON-MODAL (modal={false}) with no backdrop (showOverlay
+                false) and pointer-dismissal disabled, so clicking another file
+                behind it never closes it — it just updates the live preview
+                (previewNode tracks the selection). Esc and the pane's own Close
+                X dismiss it. Fixed-positioned, so it never reflows the grid.
+                Only grid & list use it: columns has its own trailing Miller
+                preview pane and gallery shows the selected item as a hero, so a
+                drawer there would double up. */}
+            <Sheet
+              open={previewOpen && (viewMode === "grid" || viewMode === "list")}
+              onOpenChange={(o) => {
+                if (!o) setPreviewOpen(false)
+              }}
+              modal={false}
+              disablePointerDismissal
+            >
+              <SheetContent
+                side="right"
+                showCloseButton={false}
+                showOverlay={false}
+                className="w-[420px] max-w-[420px] border-l border-border p-0 sm:max-w-[420px]"
+              >
                 <FinderPreview
                   node={previewNode}
                   agentId={agent.id}
                   onClose={() => setPreviewOpen(false)}
                 />
-              </div>
-            )}
+              </SheetContent>
+            </Sheet>
           </div>
         )}
       </div>
