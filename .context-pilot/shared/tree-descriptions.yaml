@@ -4762,6 +4762,10 @@ aeee549fd5ab07f2:
   path: crates/cp-mod-firecrawl/src/types.rs
   description: Firecrawl response types. ScrapeResponse/Data/Metadata, SearchResponse/SearchResult (polymorphic data field), MapResponse/MapLink, CrawlStartResponse/CrawlStatusResponse/CrawlPageData. All Serialize+Deserialize.
   last_edited_ms: 0
+af13794d333a0e9f:
+  path: web/repro_t123_flicker.py
+  description: 'T123 flicker deterministic repro (no browser). Sends a marked message, models the TWO setData sources the threads hook consumes: SSE delta append (fast push plane ~42ms) vs 5s REST poll of /threads (log sourced from lagging tier-② config.json). REPLACE model (old buggy hook: poll wholesale-replaces) reproduces the FULL appear→disappear→reappear flicker (proven: appear 354ms, disappear 557ms, reappear 13200ms after disk flush). MERGE model (shipped mergeThreadLogs reconciler: poll merges-by-id, never drops a delta-applied msg) stays STABLE. Run: python3 repro_t123_flicker.py [AGENT_ID] [THREAD_ID].'
+  last_edited_ms: 1781854345396
 af14c600c0042c99:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'

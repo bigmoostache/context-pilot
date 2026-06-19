@@ -219,6 +219,50 @@ function applyAgentDelta(prev: Agent | undefined, entry: OpEntry): Agent | null 
   }
 }
 
+// ── Poll reconciliation (non-destructive backstop) ───────────────────
+//
+// The 5 s poll backstop refetches `/threads`, whose per-thread `log` is
+// sourced from the tier-② disk cache (config.json) that the agent flushes on a
+// debounce. A just-sent message rides the FAST push plane (a `message_created`
+// delta applied in ~14–60 ms), but the disk cache lags that flush by anywhere
+// from tens of ms to seconds. If the poll *replaced* the thread list wholesale
+// (plain `setData(pollResult)`), a poll firing inside that lag window would
+// serve a stale log WITHOUT the message and erase the delta-applied bubble —
+// the exact "appears → disappears → reappears" flicker (T123, reproduced in
+// `repro_t123_flicker.py`).
+//
+// The fix enforces single-mechanism ownership (design doc §8.5 / X859) on the
+// poll path: the push plane OWNS message + thread *presence*; the disk poll is
+// a non-destructive backstop that may only converge state UPWARD — refresh
+// metadata and add history it knows about, but never DROP a message (or a
+// freshly-created thread) the delta plane already applied. `mergeThreadLogs`
+// reconciles a poll result against the current state by id: every message the
+// local state has that the poll lacks is preserved, and delta-created threads
+// not yet on disk are kept. Once the disk flush lands, the poll's log already
+// contains the message (deduped by id) and the two planes agree — no flicker.
+function mergeThreadLogs(
+  prev: ThreadDetail[] | undefined,
+  next: ThreadDetail[],
+): ThreadDetail[] {
+  if (!prev) return next // cold load — nothing to preserve yet
+  const prevById = new Map(prev.map((t) => [t.id, t]))
+  const merged = next.map((t) => {
+    const p = prevById.get(t.id)
+    if (!p || p.log.length === 0) return t
+    const haveIds = new Set(t.log.map((m) => m.id))
+    const extra = p.log.filter((m) => !haveIds.has(m.id))
+    // Append any locally-known (delta-applied) messages the disk snapshot is
+    // still missing — they are the newest, so they belong at the tail.
+    return extra.length ? { ...t, log: [...t.log, ...extra] } : t
+  })
+  // Keep delta-created threads the disk-sourced snapshot hasn't caught up to
+  // yet (same flicker class for a just-created thread). They dedupe in on a
+  // later poll once the agent flushes them.
+  const nextIds = new Set(next.map((t) => t.id))
+  const missing = prev.filter((t) => !nextIds.has(t.id))
+  return missing.length ? [...missing, ...merged] : merged
+}
+
 // ── Freshness model (single-mechanism discipline — design doc §8.5 / X865) ─
 //
 // Each resource has exactly ONE owner of its freshness:
@@ -265,6 +309,13 @@ const DEBOUNCE_MS = 200
  *     - **null/undefined** → "can't apply, fall back to a refetch" (e.g. an
  *       archive for an id we don't have yet, or data not loaded).
  *   When omitted, every `delta` falls back to a debounced refetch (legacy).
+ * @param reconcile  Optional merge applied to every fetch result (cold load,
+ *   poll backstop, debounced refetch) BEFORE it becomes state:
+ *   `setData(reconcile(prev, next))`. Lets a resource make its poll
+ *   NON-DESTRUCTIVE — converging state upward instead of replacing it
+ *   wholesale — so a stale disk-sourced snapshot can never erase a message the
+ *   push plane already applied (design doc §8.5 / T123). When omitted, a fetch
+ *   replaces the data wholesale (legacy).
  */
 function useLiveQuery<T>(
   key: string,
@@ -273,6 +324,7 @@ function useLiveQuery<T>(
   pollMs = DEFAULT_POLL_MS,
   enabled = true,
   applyDelta?: (prev: T | undefined, entry: OpEntry) => T | null | undefined,
+  reconcile?: (prev: T | undefined, next: T) => T,
 ): LiveQueryResult<T> {
   const [data, setData] = useState<T | undefined>(undefined)
   const [loading, setLoading] = useState(true)
@@ -289,12 +341,18 @@ function useLiveQuery<T>(
   dataRef.current = data
   const applyDeltaRef = useRef(applyDelta)
   applyDeltaRef.current = applyDelta
+  const reconcileRef = useRef(reconcile)
+  reconcileRef.current = reconcile
 
   const doFetch = useCallback(() => {
     fetcher()
       .then((result) => {
         if (mountedRef.current) {
-          setData(result)
+          // Non-destructive merge when a reconciler is given (the poll/cold
+          // load converges state upward), else wholesale replace (legacy).
+          setData((prev) =>
+            reconcileRef.current ? reconcileRef.current(prev, result) : result,
+          )
           setError(null)
           setLoading(false)
         }
@@ -404,8 +462,17 @@ export function useAgentMeta(agentId: string): LiveQueryResult<Agent> {
 export function useThreads(agentId: string): LiveQueryResult<ThreadDetail[]> {
   const fetcher = useCallback(() => api.fetchThreads(agentId), [agentId])
   // Push plane: apply thread-roster deltas in-place (sub-50ms, zero refetch);
-  // anything the reducer can't apply falls back to a refetch from the view.
-  return useLiveQuery(`threads:${agentId}`, fetcher, agentId, DEFAULT_POLL_MS, !!agentId, applyThreadDelta)
+  // the poll backstop reconciles NON-DESTRUCTIVELY (mergeThreadLogs) so a stale
+  // disk-sourced snapshot can never drop a delta-applied message/thread (T123).
+  return useLiveQuery(
+    `threads:${agentId}`,
+    fetcher,
+    agentId,
+    DEFAULT_POLL_MS,
+    !!agentId,
+    applyThreadDelta,
+    mergeThreadLogs,
+  )
 }
 
 export function usePanels(agentId: string): LiveQueryResult<ContextPanel[]> {

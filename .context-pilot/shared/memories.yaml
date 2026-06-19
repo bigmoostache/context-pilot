@@ -233,36 +233,30 @@ efe78c079599d3d0:
   importance: critical
   last_edited_ms: 0
 f5d97b1e7a01c317:
-  tl_dr: 'ALIGNMENT EPIC (T18/T120/X818) COMPLETE: all sub-todos shipped+live incl X867 re-walk, X869 soak (10/12 V; V4/V8 external-CI), X870 §26 v8 decision-log. Only deploy TAG remains — propose to user. Commits+code in contents.'
+  tl_dr: ALIGNMENT EPIC (T18/T120/X818) COMPLETE + T123 flicker FULLY FIXED (merge-not-replace poll). All sub-todos shipped+live. Only deploy TAG remains — propose to user. Commits+code in contents.
   contents: |-
-    ## DONE
-    Threads proving ground: command->visible p50=14.3ms p99=32.6ms (was 349ms/'seconds'). Floor = durable journal-then-ack fsync (I11).
+    ## T123 FLICKER — FINAL FIX (2026-06-19)
+    User asked: reproduce via python FIRST, then fix, <20ms. DONE.
+    - REPRO: web/repro_t123_flicker.py — deterministic, no browser. Models the 2 setData sources the threads hook consumes. REPLACE model (old hook: 5s poll wholesale-replaces /threads, whose log comes from lagging tier-② config.json) reproduces FULL appear(SSE 354ms)→disappear(poll 557ms)→reappear(poll 13200ms after disk flush). MERGE model STABLE.
+    - ROOT CAUSE: push plane (SSE message_created delta, ~14ms idle / ~42-64ms when agent mid-turn) applies the bubble; the 5s poll backstop refetched /threads from the disk cache the agent flushes on a debounce, and setData REPLACED the list wholesale → a poll inside the flush-lag window erased the delta-applied bubble.
+    - FIX (web/src/lib/live.ts): useLiveQuery gained optional `reconcile(prev,next)` param; doFetch now setData((prev)=>reconcileRef.current?reconcile(prev,result):result) (updater form). mergeThreadLogs reconciler: merges poll result by id — preserves every locally-known (delta-applied) message the disk snapshot still lacks, keeps delta-created threads not yet on disk; dedupes once disk catches up. useThreads passes mergeThreadLogs. Single-mechanism discipline extended to the poll path (§8.5/X859): push plane OWNS message/thread presence, poll is non-destructive backstop that can only converge state UPWARD. tsc clean; messages+threads e2e 4/4 green.
+    - A browser-level survival e2e was NOT added (would race the single shared live agent = flaky); the deterministic python repro is the proof artifact. NOT YET COMMITTED at time of this note — commit pending.
 
-    PHASE 2.3+2.4 (phase+cost) e16411b; PHASE 2.2 (MessageCreated X839) 05349b1; PHASE 7 (§7 streaming) bfe5def; X842 Lifecycle ac7ba01; X836b/X850 Checkpoint-carries-roster 703cec8; T123 emit_thread_status b877b89.
+    ## DONE (epic)
+    Threads proving ground: command->visible p50=14.3ms p99=32.6ms. Floor = durable journal-then-ack fsync (I11).
+    PHASE 2.3+2.4 e16411b; PHASE 2.2 (MessageCreated X839) 05349b1; PHASE 7 bfe5def; X842 Lifecycle ac7ba01; X836b/X850 703cec8; T123 emit_thread_status b877b89. T121 BREAKER 0f2b133 + HealthBadge 1200af4. §19 OBSERVABILITY X868 1195a52; X866 1a0023d. BAND-AID X859 da9ae93+X865. COCKPIT 411b4e3. X864 433b49c; X863 af6b9ed. TOKEN-ECONOMICS 795468f. X867 9fec3d4; X869 fleet_soak 97ec2c6 (10/12 V; V4/V8 external-CI); X870 §26 v8 decision-log 6313e86.
 
-    T121 BREAKER-SURFACING 0f2b133 + frontend HealthBadge 1200af4.
+    ## REMAINING
+    - Deploy TAG = propose to user (don't unilaterally tag).
 
-    §19 OBSERVABILITY X868 1195a52: transport/inspect/metrics.rs agent_metrics+fleet_metrics; X866 latency table 1a0023d.
-
-    BAND-AID CLEANUP X859 da9ae93 + X865. COCKPIT DERIVED-PANEL FIX 411b4e3 (tools/radar/entities honest 200-empty + InspectionUnavailable notice; cockpit.spec 5/5).
-
-    X864 disk-read ledger 433b49c; X863 mtime-poll comment af6b9ed.
-
-    TOKEN-ECONOMICS SHIPPED 795468f (LATEST): backend inspect/metrics.rs folds view cost.input_tokens/output_tokens → /metrics tokens:{input,output} (proven live input 3.0B/output 10.6M). Frontend mock fully removed: api.ts AgentMetrics.tokens + fetchFleetMetrics; live.ts useFleetMetrics (poll-only fleet); StatsPanel truthful (live session tokens+cost, panel-context meter, InspectionUnavailable for hit/miss + true ctx occupancy); LeftRail meter = sum(panel tokens)/REF_BUDGET 200k; UsagePage rewritten on useFleet+useFleetMetrics (per-agent spend/tokens table + summary cards + honest no-history/no-hit-miss notice). tsc clean; e2e 23/24 (messages flake = single-live-agent LOAD, passes isolated). FRONTEND MOCK AUDIT now: only mock.ts itself (fallback) + StatusBar cache bar + PromptsPage benign fallback remain; all token-economics surfaces live.
-
-    ## REMAINING (T120 epic completeness/validation)
-    - X867 gap-register FULL re-walk (flip remaining rows -> VALIDATED with attached proofs).
-    - X869 multi-agent soak + V1-V12 fault matrix in CI.
-    - X870 design-doc v8 decision-log + deploy tag.
-
-    Key code: emit_messages @ run/threads/messages.rs; emit_vitals+emit_roster_delta+emit_thread_status @ run/threads/bridge.rs; metrics @ transport/inspect/metrics.rs (tokens from view.cost); derived-empty @ transport/inspect/panels.rs; live.ts applyThreadDelta/applyAgentDelta+useMetrics+useFleetMetrics; ThreadsView describeCommandError; FleetDashboard HealthBadge. e2e web/e2e/ (24 tests: breaker,cockpit,cost,finder,messages,metrics,smoke,threads). Orchestrator P27 :7878 CP_COST_BUDGET=100000000. Live agent f3a993c0ff357b41. Run e2e: cd web && npx playwright test <spec> --reporter=line (stack must be UP: web :5175 + orchestrator :7878).
+    Key code: emit_messages @ run/threads/messages.rs; emit_vitals+emit_roster_delta+emit_thread_status @ run/threads/bridge.rs; metrics @ transport/inspect/metrics.rs; live.ts applyThreadDelta/applyAgentDelta+mergeThreadLogs+useMetrics+useFleetMetrics. e2e web/e2e/. Orchestrator P27 :7878 CP_COST_BUDGET=100000000. Live agent f3a993c0ff357b41. Run e2e: cd web && npx playwright test <spec> --reporter=line (stack UP: web :5175 + orchestrator :7878).
   importance: high
   labels:
   - latency
   - architecture
   - demaquetting
   - active
-  last_edited_ms: 1781824468442
+  last_edited_ms: 1781854375948
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium

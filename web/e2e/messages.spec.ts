@@ -109,6 +109,17 @@ test.describe("messages / send over the push plane", () => {
       .toBeGreaterThan(before)
   })
 
+  // NOTE — the T123 "no flicker" regression (a just-sent message must SURVIVE a
+  // poll cycle, never appear→disappear→reappear) is proven DETERMINISTICALLY by
+  // `web/repro_t123_flicker.py`, which drives the exact data layer the hook
+  // consumes and asserts the MERGE model (the shipped `mergeThreadLogs`
+  // reconciler) never drops a delta-applied message — while showing the old
+  // REPLACE model reproducing the full flicker. A browser-level survival test
+  // was deliberately NOT added here: it would have to send a fresh message and
+  // then hold across a 5 s poll, racing the SINGLE shared live agent this suite
+  // drives (which is also serving the human's own session), making it flaky for
+  // a property already deterministically nailed by the repro.
+
   test.afterAll(async ({ request }) => {
     for (const t of await rawThreads(request)) {
       if (t.name.startsWith("e2e-") && !t.archived) {
