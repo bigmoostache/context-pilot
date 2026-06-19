@@ -1346,6 +1346,10 @@
   path: crates/cp-mod-firecrawl/src/tools.rs
   description: Firecrawl tool dispatch with flame!("firecrawl_scrape"), flame!("firecrawl_search"), flame!("firecrawl_map"). All async via spawn_async_tool. DynPanel creation.
   last_edited_ms: 0
+30fe17a8be053845:
+  path: demo/report-france/styles.css
+  description: 'France report styles.css copy (fixed: per-section page breaks + 16mm body margins, full-bleed cover/TOC). Never hand-edit; design lives here.'
+  last_edited_ms: 1781860834406
 314623cb270425ba:
   path: crates/cp-mod-utilities/src/secret.rs
   description: Redacted newtype — Debug/Display print [REDACTED]. expose_secret() for access. Replaces secrecy crate.
@@ -1690,6 +1694,10 @@
   path: web/src/lib/api.ts
   description: Typed REST client for all 22 backend endpoints. Base URL from VITE_API_URL env (default localhost:7878). Fleet, agent meta, threads, panels (13 kinds), finder, usage, library, commands, ticket mint. Transforms 7 panel responses (memory/todos/spine/queue/scratchpad/tree/callbacks) from raw module state dicts to maquette array shapes.
   last_edited_ms: 1781774710443
+3da03a369c997301:
+  path: demo/report-france/index.html
+  description: Dummy pre-flight France report (delivered T236). Placeholder content, validates pipeline. Real reports go in sibling report-<country>/ folders.
+  last_edited_ms: 1781859633629
 3db50fe69f7d422d:
   path: crates/cp-orchestrator/src/services/stream_hub.rs
   description: 'Phase 18: StreamHub — per-agent stream fan-out to N bounded subscribers (R2-17). Subscriber{id,buffer:VecDeque<Frame>,capacity,degraded,dropped}: admit() evicts OLDEST on full + sets degraded + bumps dropped; cap 0 drops all. agent_stream_health(id)->(subscribers,total_dropped,any_degraded) aggregate accessor for §19 metrics. publish/drain/subscribe/unsubscribe/mark_reconciled. Single-owner lock-free. 9 tests.'
@@ -1754,6 +1762,10 @@
   path: ui/src/components/shell/ProfileModal.tsx
   description: 'Profile modal (T30) — opened from the avatar menu, on the portaled Base-UI Dialog primitive. Reads {user, managed, setManaged} from the shared account context (useAccount). Editable display-name + email (email locks when company-managed), large AvatarMark + camera change-badge. Account section switches on managed: ManagedAccount org callout (locked, SSO) vs PersonalAccount self-service rows. An AccountTypeSwitch (Company/Personal segmented control) in the Account header flips the shared managed flag — updating both this modal AND the Settings key-lock so you can compare states. All decorative.'
   last_edited_ms: 1781599152950
+3f66488ad96374cc:
+  path: web/src/lib/sync.ts
+  description: 'SSE→QueryClient delta bridge (push plane, Leg 2 frontend). ensureSync(agentId): one idempotent per-agent subscription. `delta` events → parse rev-numbered OpEntry → fold into [''threads'',id]+[''agent'',id] via setQueryData FUNCTIONAL updater (applyThreadDelta/applyAgentDelta), rev high-water guard drops replay dupes; null verdict → invalidate that key. `invalidate` → invalidate the agent''s INSPECTION caches only (DELTA_COVERED exempt). `resync` → refresh everything. Owns OpEntry/OpEntryKind types, qk query-key registry, mergeThreadLogs non-destructive poll reconcile. Kills T123 burst-clobber structurally.'
+  last_edited_ms: 1781863885453
 3f984ba8c7d26471:
   path: crates/cp-mod-todo/src/lib.rs
   description: 'Todo module. 3 tools: create/update/move. Fixed TODO panel (fixed_order=0, top priority). Nested object params with parent_id nesting. overview shows X/Y done. Drives spine auto-continuation.'
@@ -1994,6 +2006,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+48645187e9619a1e:
+  path: web/src/lib/live.ts
+  description: Live data hooks — thin TanStack Query (useQuery) wrappers over the shared queryClient. The hand-rolled useLiveQuery engine is GONE (T123). useLive() wraps useQuery into the legacy LiveQueryResult{data,loading,error,refetch} shape (consumers untouched) + calls ensureSync(agentId) to guarantee the SSE push-plane bridge is running. Delta-covered (threads/agent) ride sync.ts folds; inspection hooks ride invalidate→refetch; refetchInterval=BACKSTOP_POLL_MS last-resort. useThreads queryFn merges non-destructively via mergeThreadLogs against getQueryData (poll can't clobber a delta-applied msg). useStreamingTokens = rAF-batched §7 token buffer (clear deferred to rAF, no sync setState). useMetrics/useFleetMetrics brisk poll (§19, not delta-covered). sendCommand/mintTicket/downloadFile passthrough.
+  last_edited_ms: 1781863885473
 486607bef23378be:
   path: ui/tsconfig.json
   description: TS project references root (app + node).
@@ -4710,6 +4726,10 @@ ac9e6f95da3b14e4:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
+aca71ba6a6dfbaf5:
+  path: .gitignore
+  description: Git ignore rules
+  last_edited_ms: 0
 acb71d8973be7b96:
   path: crates/cp-orchestrator/src/supervisor/tests.rs
   description: 'Phase 17 supervisor unit tests (9): allow-list accept/reject + symlink/.. canonicalization, spawn_and_stop, dup-id reject, restart yields new pid + kills old, check_liveness reaps exited spawned child (Exited), adopt_and_detect_vanish (reaps external zombie first — unreaped zombie answers kill(pid,0) alive, so must wait() before probe), stop_not_found. use super::* globs parent imports (edition 2024). Entry built with real schema (boot_id/cap_token=String, oplog_path, model/protocol_version/binary_version/started_at_ms).'
@@ -4906,6 +4926,10 @@ b2692d69f7a93563:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 1780592402527
+b2783b3948678143:
+  path: web/src/lib/queryClient.ts
+  description: The single TanStack QueryClient (replaces the bespoke useLiveQuery cache). staleTime Infinity + refetchOnFocus/Mount/Reconnect OFF — the SSE push plane (setQueryData in sync.ts) owns freshness; the per-hook refetchInterval (BACKSTOP_POLL_MS=15s) is the only time-based refresh. Structural sharing makes the T123 delta-burst-clobber structurally impossible.
+  last_edited_ms: 1781863885432
 b303c82afde350e5:
   path: ui/src/components/shell/ConfigModal.tsx
   description: 'Settings modal (macOS System-Settings style): category rail (General/Model Providers/Search & Embeddings/Document AI/Web & Scraping/Integrations) + detail pane. Surfaces all CP config params — provider keys (Anthropic, Claude Code OAuth, Grok, Groq, DeepSeek, MiniMax), Voyage, Meilisearch status, Datalab, Brave, Firecrawl, GitHub — plus default-model picker + autonomy toggles. Masked keys w/ reveal, Connected/Not-set pills, opt-rise stagger, modal-pop/backdrop-fade motion. Design-only. Opened from TopBar gear.'
@@ -5922,6 +5946,10 @@ d4f0917617a195e1:
   path: docs/design-logs-panel.md
   description: Context Radar design doc. Think tool task_context → Meilisearch logs semantic search → adaptive decay scoring → YAML panel. 20 signals, 30 results, half-life self-adjusts. Implemented in cp-mod-search/src/radar.rs.
   last_edited_ms: 1780582405247
+d4f30f5e1ea5e146:
+  path: demo/example.html
+  description: 'Canonical MISA report reference (Azerbaijan). Full structure: cover (5 stacked groups) + 3-level TOC + body (Part1 Country Profile, Part2 Opportunities w/ 5 sectors, Appendix). Reuse markup verbatim, swap content + country flag.'
+  last_edited_ms: 1781859633609
 d4f447c4551668d1:
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
@@ -6610,6 +6638,10 @@ f3a95a7b2fca8def:
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1, binds tee.sock + spawns Tee, creates Intake from oplog replay, opens content-addressed body Store under oplog dir, sets command listener non-blocking. on_stream_chunk→Token frames, on_stream_stop→PhaseHint(Idle). BridgeState{boot,tee,intake,tee_seq,last_phase,last_cost_usd,store,thread_msg_counts,msg_memo_seeded} in TypeMap — last_phase/last_cost_usd memo the vitals chokepoint; store+thread_msg_counts+msg_memo_seeded back the message-emit chokepoint (I13 body staging + per-thread observe-on-change diff, seeded no-emit at boot to skip backlog replay). is_global, no tools/panels.'
   last_edited_ms: 1781796503292
+f3e69efe71987a54:
+  path: web/package.json
+  description: 'Live web app (Vite 8 + React 19 + TS 6 + Tailwind v4 + Base UI + shadcn). Scripts: dev (vite :5175), build (tsc -b + vite build), lint, preview. @playwright/test for e2e. The live demaquetted app (sibling ui/ is the frozen maquette).'
+  last_edited_ms: 0
 f4073f6d2cafea84:
   path: crates/cp-base/Cargo.toml
   description: 'Base crate deps: cp-render, cp-mod-utilities, ratatui, crossterm, serde, serde_json, serde_yaml, unicode-width, log.'
@@ -6618,6 +6650,10 @@ f443597431fc2e8e:
   path: src/llms/minimax/mod.rs
   description: MiniMax provider — Anthropic-compatible API via Token Plan. SSE streaming identical to Anthropic protocol. MINIMAX_API_KEY auth.
   last_edited_ms: 0
+f4536a4a1ca3c32c:
+  path: demo/report-france/export_pdf.py
+  description: France report PDF exporter (Playwright, A4, CSS-owned margins). Copied per-report from SKILL template.
+  last_edited_ms: 1781860834384
 f4b138aa30ba5ba5:
   path: crates/cp-orchestrator/src/services/materialized_view.rs
   description: 'Phase 18 + X835/X836b: MaterializedView in-mem fleet projection folded from OpEntry (one AgentView per agent). AgentView{rev,heads,roster,phase,lifecycle,cost}. RosterEntry = cp_wire RosterThread (shared type). apply: Checkpoint=authoritative heads AND roster reset wholesale (clone_from snapshot.heads/roster — roster now rides the snapshot, closing the cold-restart-after-compaction gap), MessageCreated=set_thread_head + bump roster msg_count/last_activity, ThreadCreated=RosterThread::fold_created (insert-or-update idempotent via ThreadCreation carrier), ThreadArchived/Restored=fold_archived toggle, ThreadStatusChanged=fold_status, Phase/Lifecycle/Cost=latest-wins, CommandEffect/SeenMark/Unknown=inert. Tests live in sibling materialized_view_tests.rs (#[cfg(test)] #[path] include, 500-line limit). 206 lines.'
