@@ -101,11 +101,12 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
         OpEntryKind::ThreadStatusChanged { thread_id, status } => {
             RosterThread::fold_status(&mut state.roster, thread_id, *status);
         }
-        // Phase, lifecycle, and cost carry no head/seen/roster state; an
+        // Phase, lifecycle, cost, and focus carry no head/seen/roster state; an
         // `Unknown` variant from a newer schema is ignored (forward-compat).
         OpEntryKind::PhaseTransition { .. }
         | OpEntryKind::Lifecycle { .. }
         | OpEntryKind::CostAggregate { .. }
+        | OpEntryKind::ThreadFocusChanged { .. }
         | OpEntryKind::Unknown => {}
     }
 }

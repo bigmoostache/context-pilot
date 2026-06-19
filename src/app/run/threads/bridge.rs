@@ -22,14 +22,12 @@ use std::time::Duration;
 
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
-use cp_mod_spine::types::SpineState;
-use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
-use cp_wire::types::command::{Command, Kind as CommandKind};
+use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
+use cp_wire::types::command::Command;
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::{Phase, ThreadTurn};
 
 use crate::app::App;
-use crate::app::panels::now_ms;
 
 // ═══════════════════════════════════════════════════════════════════════
 // Bridge command polling — accepts inbound commands from the backend and
@@ -66,7 +64,7 @@ pub(in crate::app::run) fn poll_bridge_commands(app: &mut App) {
             break; // no pending connection — done draining this tick.
         };
         for cmd in commands {
-            apply_command(app, cmd);
+            super::commands::apply_command(app, cmd);
         }
     }
 }
@@ -108,30 +106,6 @@ fn accept_commands(state: &mut State) -> Option<Vec<Command>> {
     }
 }
 
-/// Dispatch a single accepted command to the appropriate agent action.
-fn apply_command(app: &mut App, cmd: Command) {
-    match cmd.kind {
-        CommandKind::SendMessage { thread_id, content } => {
-            apply_send_message(&mut app.state, &thread_id, &content);
-        }
-        CommandKind::CreateThread { name } => {
-            apply_create_thread(&mut app.state, &name);
-        }
-        CommandKind::ArchiveThread { thread_id } => {
-            apply_archive_thread(&mut app.state, &thread_id);
-        }
-        CommandKind::RestoreThread { thread_id } => {
-            apply_restore_thread(&mut app.state, &thread_id);
-        }
-        CommandKind::Stop | CommandKind::InterruptStream => {
-            apply_stop(&mut app.state);
-        }
-        CommandKind::Unknown => {
-            log::warn!("bridge: ignoring unknown command {}", cmd.id);
-        }
-    }
-}
-
 // ── Roster delta emission (Leg 0 keystone — design doc I8/I10) ───────────
 
 /// Append a thread-roster oplog delta the instant a mutation applies, so the
@@ -145,7 +119,7 @@ fn apply_command(app: &mut App, cmd: Command) {
 /// never dropped (a created/archived thread cannot be silently lost).
 ///
 /// [`submit_durable`]: cp_oplog::service::Service::submit_durable
-fn emit_roster_delta(state: &State, kind: OpEntryKind) {
+pub(super) fn emit_roster_delta(state: &State, kind: OpEntryKind) {
     if let Some(bs) = state.get_ext::<BridgeState>()
         && let Some(boot) = bs.boot.as_ref()
     {
@@ -243,7 +217,7 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
 /// wire enum's own doc comments describe the human-centric reading; the data
 /// convention actually in use across both planes is identity-by-name, and this
 /// helper is the single place that conversion lives.)
-const fn wire_turn(status: ThreadStatus) -> ThreadTurn {
+pub(super) const fn wire_turn(status: ThreadStatus) -> ThreadTurn {
     match status {
         ThreadStatus::MyTurn => ThreadTurn::MyTurn,
         ThreadStatus::TheirTurn => ThreadTurn::TheirTurn,
@@ -314,155 +288,52 @@ pub(in crate::app::run) fn emit_thread_status(app: &mut App) {
     }
 }
 
-// ── SendMessage (K7) ────────────────────────────────────────────────────
+// ── Thread focus emission (focused-thread highlight — design doc I8) ──────
 
-/// Inject a user message into the given thread and create a spine
-/// notification so the agent attends to it.
+/// Emit a [`ThreadFocusChanged`](OpEntryKind::ThreadFocusChanged) the instant
+/// the agent's focused thread changes, so the backend view (and the web UI's
+/// focused-thread highlight) reflect it in milliseconds instead of waiting on
+/// the debounced tier-② disk write plus the frontend's backstop poll.
 ///
-/// This is the **K7 path**: commands enter the agent through the same
-/// mechanism as local user input — a `ThreadMessage(User)` on the thread,
-/// a `MyTurn` status flip, and a spine notification.
-fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
-    let threads_state = ThreadsState::get_mut(state);
-    let Some(thread) = threads_state.threads.iter_mut().find(|t| t.id == thread_id) else {
-        log::warn!("bridge: SendMessage for unknown thread {thread_id}");
+/// Like [`emit_thread_status`] this is a main-loop **observe-on-change
+/// chokepoint**: it diffs the live [`FocusState::focused_thread_id`] against the
+/// snapshot held in [`BridgeState::last_focus`] and emits **only on an actual
+/// change**, so it captures focus from *every* source with one uniform path —
+/// the idle `MY_TURN` auto-`Read` ([`maybe_inject_auto_read`](super::maybe_inject_auto_read)),
+/// a manual `Read`, or focus release on archive / a finished turn — rather than
+/// an emit call scattered at each focus-mutation site.
+///
+/// Focus is ephemeral, disposable UI state (the same class as phase), so it
+/// rides the **best-effort** path ([`emit_best_effort`]): a dropped focus delta
+/// self-heals from the agent's tier-② `FocusState` on the next `/threads` read
+/// and is superseded by the next focus change.
+///
+/// The first pass after boot **seeds** the snapshot without emitting, so a
+/// (re)started agent does not replay its current focus as a spurious change
+/// (the cold focus rides the frontend's initial tier-② load).
+///
+/// No-op when the bridge is OFF.
+pub(in crate::app::run) fn emit_thread_focus(app: &mut App) {
+    if !bridge_active(&app.state) {
         return;
-    };
-
-    thread.messages.push(ThreadMessage {
-        author: ThreadAuthor::User,
-        content: Some(content.to_owned()),
-        file_path: None,
-        question: None,
-        timestamp: now_ms(),
-        acknowledged: false,
-        auto: false,
-    });
-    thread.status = ThreadStatus::MyTurn;
-
-    // NO instant spine notification — the idle MY_TURN detection
-    // (`check_my_turn_threads`) handles it when the agent finishes its
-    // current work, avoiding mid-task distraction.
-
-    for module in crate::modules::all_modules() {
-        module.on_user_message(state);
     }
 
-    state.flags.ui.dirty = true;
-    log::info!("bridge: applied SendMessage on thread {thread_id}");
-}
+    let focused = FocusState::get(&app.state).focused_thread_id.clone();
 
-// ── CreateThread ────────────────────────────────────────────────────────
-
-/// Create a new thread with the given name.
-fn apply_create_thread(state: &mut State, name: &str) {
-    let ts = ThreadsState::get_mut(state);
-    let id = format!("T{}", ts.next_id);
-    ts.next_id = ts.next_id.saturating_add(1);
-
-    ts.threads.push(cp_mod_threads::types::Thread {
-        id: id.clone(),
-        name: name.to_owned(),
-        status: ThreadStatus::TheirTurn,
-        messages: vec![],
-        created_at: now_ms(),
-        archived: false,
-    });
-
-    // Emit the durable roster delta so the backend view reflects the new
-    // thread in ms (Leg 0 keystone) — a fresh, empty thread is the user's turn
-    // (they must type the first message). Routed through `wire_turn` so the
-    // emitted status matches what the status chokepoint would emit, and the
-    // status memo is primed to this value so creating then immediately sending
-    // a message produces exactly one follow-up `ThreadStatusChanged`.
-    let created_turn = wire_turn(ThreadStatus::TheirTurn);
-    emit_roster_delta(state, OpEntryKind::ThreadCreated {
-        thread_id: id.clone(),
-        name: name.to_owned(),
-        status: created_turn,
-        timestamp_ms: now_ms(),
-    });
-    if let Some(bs) = state.get_ext_mut::<BridgeState>() {
-        let _prev = bs.thread_statuses.insert(id.clone(), created_turn);
-    }
-
-    state.flags.ui.dirty = true;
-    log::info!("bridge: created thread {id} \"{name}\"");
-}
-
-// ── ArchiveThread ───────────────────────────────────────────────────────
-
-/// Mark the thread as archived (soft-delete).
-fn apply_archive_thread(state: &mut State, thread_id: &str) {
-    let ts = ThreadsState::get_mut(state);
-    let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) else {
-        log::warn!("bridge: ArchiveThread for unknown thread {thread_id}");
+    // First pass: snapshot the existing focus without emitting.
+    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.focus_memo_seeded);
+    if !seeded {
+        let bs = app.state.ext_mut::<BridgeState>();
+        bs.last_focus = focused;
+        bs.focus_memo_seeded = true;
         return;
-    };
-    thread.archived = true;
-
-    // Clean up focus references (mirrors archive_confirm in threads.rs).
-    let focus = FocusState::get_mut(state);
-    if focus.focused_thread_id.as_deref() == Some(thread_id) {
-        focus.focused_thread_id = None;
-        focus.dangling_remaining = 0;
-        focus.escalation_level = 0;
-    }
-    let _prev = focus.last_read_count.remove(thread_id);
-    if focus.notified_my_turn_id.as_deref() == Some(thread_id) {
-        focus.notified_my_turn_id = None;
     }
 
-    emit_roster_delta(state, OpEntryKind::ThreadArchived { thread_id: thread_id.to_owned() });
-
-    state.flags.ui.dirty = true;
-    log::info!("bridge: archived thread {thread_id}");
-}
-
-// ── RestoreThread ───────────────────────────────────────────────────────
-
-/// Restore an archived thread (clear the soft-delete flag).
-fn apply_restore_thread(state: &mut State, thread_id: &str) {
-    let ts = ThreadsState::get_mut(state);
-    if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) {
-        thread.archived = false;
-        emit_roster_delta(state, OpEntryKind::ThreadRestored { thread_id: thread_id.to_owned() });
-        state.flags.ui.dirty = true;
-        log::info!("bridge: restored thread {thread_id}");
-    } else {
-        log::warn!("bridge: RestoreThread for unknown thread {thread_id}");
-    }
-}
-
-// ── Stop / Interrupt ────────────────────────────────────────────────────
-
-/// Stop the current stream (mirrors the Esc-key `StopStreaming` action).
-fn apply_stop(state: &mut State) {
-    use cp_base::state::flags::StreamPhase;
-
-    if state.flags.stream.phase.is_streaming() {
-        state.flags.stream.phase.transition(StreamPhase::Idle);
-        if let Some(ctx) = state
-            .context
-            .iter_mut()
-            .find(|c| c.context_type.as_str() == cp_base::state::context::Kind::CONVERSATION)
-        {
-            ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
-        }
-        state.streaming_estimated_tokens = 0;
-        if let Some(msg) = state.messages.last_mut()
-            && msg.role == "assistant" && !msg.content.is_empty()
-        {
-            msg.content.push_str("\n[Stopped]");
-        }
-        // Prevent spine from immediately relaunching.
-        SpineState::get_mut(state).config.user_stopped = true;
-        state.flags.ui.dirty = true;
-        log::info!("bridge: stopped streaming");
-    }
-
-    // Notify modules (stream stop hooks).
-    for module in crate::modules::all_modules() {
-        module.on_stream_stop(state);
+    // Emit only on an actual change.
+    let changed =
+        app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_focus != focused);
+    if changed {
+        emit_best_effort(&app.state, OpEntryKind::ThreadFocusChanged { thread_id: focused.clone() });
+        app.state.ext_mut::<BridgeState>().last_focus = focused;
     }
 }

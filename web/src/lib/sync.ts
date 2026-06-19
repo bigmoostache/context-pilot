@@ -164,6 +164,17 @@ export function applyThreadDelta(
         t.id === k.thread_id ? { ...t, status: turnToStatus(k.status) } : t,
       )
     }
+    case "thread_focus_changed": {
+      // Focus moved to k.thread_id (or was released when undefined). Set the
+      // focused flag on the matching thread and clear it everywhere else, so
+      // the UI's focused-thread highlight tracks the agent in real time instead
+      // of waiting on the disk-fed backstop poll. A no-op fold (same flags)
+      // returns the SAME refs via map, which structural sharing collapses.
+      return prev.map((t) => {
+        const focused = t.id === k.thread_id
+        return t.focused === focused ? t : { ...t, focused }
+      })
+    }
     case "message_created": {
       const thread = prev.find((t) => t.id === k.thread_id)
       if (!thread) return null // unknown thread → hydrate

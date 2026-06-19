@@ -280,8 +280,18 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
                     })
             });
         // The `reader` borrow ends with `cfg`/`focused` (both owned); now read
-        // the live roster from the view under the same lock.
-        let roster = b.view.get(agent_id).map(|v| v.roster.clone()).unwrap_or_default();
+        // the live roster + focused thread from the view under the same lock.
+        // The view's focus (push-fed via `ThreadFocusChanged`) is the fresher
+        // authority; fall back to the disk `FocusState` only when the view has
+        // none yet (a backend cold start before the agent's first focus
+        // emission — design doc I5: live reads ride the view, disk is the
+        // bounded backstop).
+        let (roster, view_focus) = b
+            .view
+            .get(agent_id)
+            .map(|v| (v.roster.clone(), v.focused_thread_id.clone()))
+            .unwrap_or_default();
+        let focused = view_focus.or(focused);
         (cfg, focused, roster)
     };
 

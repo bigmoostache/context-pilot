@@ -281,33 +281,37 @@ f33586bc454696a9:
   - shipped
   last_edited_ms: 1781866612741
 f5d97b1e7a01c317:
-  tl_dr: ALIGNMENT EPIC (T18/T120/X818) COMPLETE + T123 send-flicker FIXED + T254 double-render FIXED. STATE MGMT migrated to TanStack Query (607cce4). Double-render fix shipped c5bc2fc. Details in contents.
+  tl_dr: ALIGNMENT EPIC (T18/T120/X818) COMPLETE + T123 send-flicker FIXED + T254 double-render FIXED + FOCUS-PUSH FIXED. STATE MGMT migrated to TanStack Query (607cce4). Details in contents.
   contents: |-
+    ## FOCUS-PUSH (T254, focused-thread highlight lag) FIXED 2026-06-19
+    User: when idle + a thread becomes MY_TURN, the agent auto-focuses it instantly (idle MY_TURN detection → check_my_turn_threads → auto-continuation → maybe_inject_auto_read → execute_read sets FocusState.focused_thread_id), yet the web UI's focused-thread highlight only updated after several seconds.
+
+    ROOT CAUSE: focus was served ONLY from disk. /threads read focusedThreadId from the per-worker FocusState file (tier-2, debounced flush); the threads cache is DELTA_COVERED → exempt from invalidate → refetches only on the 15s backstop poll. NO push delta for focus existed. Double lag = disk-flush debounce + 15s poll.
+
+    FIX (focus rides the push plane, consistent with phase/status): (1) cp-wire OpEntryKind::ThreadFocusChanged{thread_id:Option<String>} — best-effort (Durability::of), NOT checkpoint-carried, self-heals. (2) AgentView.focused_thread_id folded latest-wins (materialized_view.rs). (3) emit_thread_focus observe-on-change chokepoint in bridge.rs (diff FocusState.focused_thread_id vs BridgeState.last_focus memo, seeded no-emit first pass), wired in lifecycle.rs after emit_thread_status, best-effort emit. BridgeState gained last_focus + focus_memo_seeded. (4) /threads handler prefers view.focused_thread_id over disk, falls back to disk on cold start (rest/mod.rs). (5) sync.ts applyThreadDelta folds thread_focus_changed → set focused flag on matching thread, clear elsewhere. cp-oplog replay.rs + service.rs add the variant (inert fold / best-effort class). REFACTOR: bridge.rs hit 518 lines after the chokepoint → extracted the 5 apply_* command fns + apply_command into NEW sibling src/app/run/threads/commands.rs (emit_roster_delta + wire_turn made pub(super)). Builds: cargo release exit 0, cp-orchestrator exit 0, tsc exit 0, rust-check/folder-sizes/lint all green. GOTCHA REUSED: orchestrator restart required (rebuilt debug, killed :7878 via lsof, restarted CP_COST_BUDGET=100000000) since the running binary predated the focus view field; reload TUI for the chokepoint.
+
     ## TANSTACK QUERY MIGRATION (T254 / X879, commit 607cce4 pushed 2026-06-19)
     User (N4833): 'everything is bugged as fuck' — replace hand-rolled live.ts state mgmt with TanStack Query, professional fix for the T123 send-flicker bug CLASS.
 
     SHIPPED — web/ now uses @tanstack/react-query v5.101:
-    - web/src/lib/queryClient.ts (NEW): one QueryClient. staleTime Infinity; refetchOnFocus/Mount/Reconnect OFF (push plane owns freshness). BACKSTOP_POLL_MS=15s per-hook refetchInterval = last-resort only. Structural sharing makes T123 delta-burst-clobber structurally impossible.
-    - web/src/lib/sync.ts (NEW): per-agent SSE->cache bridge. ensureSync(agentId) = one idempotent subscription/agent (never torn down). `delta` -> parse rev OpEntry -> fold into ['threads',id]+['agent',id] via setQueryData FUNCTIONAL updater (applyThreadDelta/applyAgentDelta moved here), rev high-water guard (Map<agentId,number>) drops replay dupes, null verdict -> invalidate that key. `invalidate` -> invalidateQueries predicate targeting agent's INSPECTION caches only (DELTA_COVERED={threads,agent} exempt). `resync` -> refresh all. Owns OpEntry/OpEntryKind types, qk{} query-key registry, mergeThreadLogs (non-destructive poll reconcile preserved).
-    - web/src/lib/live.ts (REWRITE): every hook = thin useLive() wrapper over useQuery, returns legacy LiveQueryResult{data,loading,error,refetch} so ALL ~24 consumers untouched. useLive calls ensureSync(agentId) in useEffect. useThreads queryFn merges non-destructively: mergeThreadLogs(getQueryData(prev), await fetchThreads()) so backstop poll can't clobber a delta-applied msg. useStreamingTokens = rAF-batched §7 token buffer carried over (clear deferred to rAF via dirty+schedule, NOT sync setState — fixed react-hooks/set-state-in-effect lint). useMetrics/useFleetMetrics brisk 4s poll (§19, not delta-covered). sendCommand/mintTicket/downloadFile passthrough; sendCommand does NOT invalidate (push plane sole freshness).
-    - web/src/main.tsx: QueryClientProvider mounted.
+    - web/src/lib/queryClient.ts: one QueryClient. staleTime Infinity; refetchOnFocus/Mount/Reconnect OFF (push plane owns freshness). BACKSTOP_POLL_MS=15s.
+    - web/src/lib/sync.ts: per-agent SSE->cache bridge. ensureSync(agentId). delta -> fold via setQueryData FUNCTIONAL updater, rev high-water guard. Owns OpEntry/OpEntryKind, qk, mergeThreadLogs. T254 double-render fix: msgId=msg_${thread.log.length}. NOW also folds thread_focus_changed.
+    - web/src/lib/live.ts: every hook = thin useLive() over useQuery, legacy signatures preserved.
+    - web/src/main.tsx: QueryClientProvider.
 
-    VERIFIED: tsc -b + vite build clean (exit 0). Changed files lint-clean (pre-existing lint errors remain in api.ts/finderFs.ts/theme.tsx — NOT mine, not touched). Real-browser e2e 5/5 green: flicker_probe (bubble PRESENT @126ms, NO flicker, stays) + messages.spec + threads.spec (create/archive/restore). Staged ONLY migration files; left macIcons.tsx (prior unrelated dirty change) out of the commit.
-
-    ## T123 SEND-FLICKER — prior root cause (now structurally killed by TanStack)
-    Root cause was value-form setData(reducer(staleRef)) burst clobber (message_created + thread_status_changed in one sync SSE macrotask, 2nd overwrote 1st). Prior fixes: 8d130be (functional-updater fold), b877b89, 5959f70, mergeThreadLogs. The TanStack migration makes the functional-fold the STRUCTURAL default (setQueryData always folds onto freshest committed value).
+    ## X887 AUTO TOOL-ACTIVITY — see M66. Stale-orchestrator second-wave gotcha logged.
 
     ## DONE (epic) — command->visible p50=14.3ms p99=32.6ms. Floor = durable journal-then-ack fsync (I11).
     ## REMAINING: Deploy TAG = propose to user. T148 (agent creation, see M65) deferred-to-last.
 
-    Stack: orchestrator P54 :7878 CP_COST_BUDGET=100000000. Live agent f3a993c0ff357b41. web dev :5175. e2e: cd web && npx playwright test <spec> --reporter=line (stack: web :5175 + orchestrator :7878). NOTE: e2e may show a transient exit -1 if run mid-HMR or interrupted by thread-focus; rerun gives clean 5/5 + FINAL_EXIT:0.
+    Stack: orchestrator :7878 CP_COST_BUDGET=100000000. Live agent f3a993c0ff357b41. web dev :5175. e2e: cd web && npx playwright test <spec> --reporter=line.
   importance: high
   labels:
   - latency
   - architecture
   - demaquetting
   - active
-  last_edited_ms: 1781865048806
+  last_edited_ms: 1781869261787
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium

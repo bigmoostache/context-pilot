@@ -106,6 +106,22 @@ pub struct BridgeState {
     /// records existing statuses **without** emitting, so a (re)started agent
     /// does not replay every thread's status as a spurious "change".
     pub status_memo_seeded: bool,
+
+    /// Last focused-thread id emitted as a `ThreadFocusChanged` delta. The
+    /// focus chokepoint diffs the live `FocusState.focused_thread_id` against
+    /// this memo every tick and emits only on an actual change (the same
+    /// observe-on-change discipline as the status/message/vitals chokepoints),
+    /// so the agent focusing a thread — from *any* source (an idle `MY_TURN`
+    /// auto-`Read`, a manual `Read`, focus release on archive/`Send`) — reaches
+    /// the backend view (and the web UI's focused-thread highlight) in
+    /// milliseconds, not on the next debounced disk flush + poll.
+    pub last_focus: Option<String>,
+
+    /// Whether [`last_focus`](Self::last_focus) has been seeded from the focus
+    /// state present at boot. Until it is, the first chokepoint pass records
+    /// the existing focus **without** emitting, so a (re)started agent does not
+    /// replay its focus as a spurious "change".
+    pub focus_memo_seeded: bool,
 }
 
 /// Agent-side orchestration bridge module.
@@ -448,5 +464,7 @@ mod tests {
         assert!(!bs.msg_memo_seeded);
         assert!(bs.thread_statuses.is_empty());
         assert!(!bs.status_memo_seeded);
+        assert!(bs.last_focus.is_none());
+        assert!(!bs.focus_memo_seeded);
     }
 }

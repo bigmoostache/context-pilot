@@ -65,6 +65,15 @@ pub struct AgentView {
     /// thread-roster deltas; design doc I5).
     pub roster: Vec<RosterEntry>,
 
+    /// The thread the agent is currently *focused* on (actively working), or
+    /// `None` when focus is released. Folded latest-wins from
+    /// [`ThreadFocusChanged`](OpEntryKind::ThreadFocusChanged) — ephemeral,
+    /// disposable UI state (like [`phase`](Self::phase)): it is **not** carried
+    /// in a checkpoint, so after a backend cold start it is `None` until the
+    /// agent emits its next focus change (the `/threads` handler falls back to
+    /// the agent's tier-② `FocusState` to cover that window).
+    pub focused_thread_id: Option<String>,
+
     /// Most recent execution phase, or `None` before any phase transition.
     pub phase: Option<Phase>,
 
@@ -87,7 +96,7 @@ impl AgentView {
     /// the thread-roster deltas (`ThreadCreated`/`Archived`/`Restored`/
     /// `StatusChanged`) maintain the roster idempotently via the shared
     /// [`RosterThread`] fold helpers (so this fold and the agent's replay fold
-    /// stay identical); phase, lifecycle, and cost are latest-wins.
+    /// stay identical); phase, lifecycle, cost, and focus are latest-wins.
     /// Durability-only records (`CommandEffect`, `SeenMark`) and forward-compat
     /// `Unknown` variants do not affect the projected state.
     pub fn apply(&mut self, entry: &OpEntry) {
@@ -120,6 +129,9 @@ impl AgentView {
             }
             OpEntryKind::ThreadStatusChanged { thread_id, status } => {
                 RosterThread::fold_status(&mut self.roster, thread_id, *status);
+            }
+            OpEntryKind::ThreadFocusChanged { thread_id } => {
+                self.focused_thread_id.clone_from(thread_id);
             }
             OpEntryKind::PhaseTransition { phase } => {
                 self.phase = Some(*phase);

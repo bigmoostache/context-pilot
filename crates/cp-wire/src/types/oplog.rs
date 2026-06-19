@@ -135,6 +135,23 @@ pub enum OpEntryKind {
         status: ThreadTurn,
     },
 
+    /// The agent's *focused* thread changed — which thread it is actively
+    /// working right now (the UI highlights it). This is ephemeral, disposable
+    /// UI state in the same class as [`PhaseTransition`](Self::PhaseTransition):
+    /// it rides the **best-effort** durability path
+    /// ([`Durability::of`](../../../cp_oplog/service/enum.Durability.html#method.of)),
+    /// is **not** carried in a [`Checkpoint`](Self::Checkpoint) snapshot, and
+    /// self-heals — a dropped or post-restart-missing focus is re-served from
+    /// the agent's tier-② `FocusState` on the next disk read and re-emitted on
+    /// the next focus change.
+    #[serde(rename = "thread_focus_changed")]
+    ThreadFocusChanged {
+        /// The newly-focused thread, or `None` when focus was released (the
+        /// agent is no longer actively working any single thread).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        thread_id: Option<String>,
+    },
+
     /// Agent lifecycle state changed (boot, shutdown, etc.).
     #[serde(rename = "lifecycle")]
     Lifecycle {
