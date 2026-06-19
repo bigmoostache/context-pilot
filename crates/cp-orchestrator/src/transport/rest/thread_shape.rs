@@ -131,6 +131,7 @@ fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
         "role": role,
         "content": raw.get("content").and_then(serde_json::Value::as_str).unwrap_or(""),
         "timestamp": raw.get("timestamp").and_then(serde_json::Value::as_u64).unwrap_or(0),
+        "auto": raw.get("auto").and_then(serde_json::Value::as_bool).unwrap_or(false),
     });
     if let Some(fp) = raw.get("file_path").and_then(serde_json::Value::as_str) {
         let _prev = msg

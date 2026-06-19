@@ -64,6 +64,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         question,
         timestamp: now,
         acknowledged: true,
+        auto: false,
     };
 
     // Build result message before mutating — need thread name.
@@ -292,20 +293,29 @@ fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String 
         if thread.messages.is_empty() {
             _ = writeln!(output, "(no messages)");
         } else {
-            let total = thread.messages.len();
-            let skip = total.saturating_sub(MAX_PANEL_MESSAGES);
-            if skip > 0 {
-                _ = writeln!(output, "\n({skip} older message(s) omitted)");
-            }
-            for msg in thread.messages.iter().skip(skip) {
-                let age = format_age(now_ms, msg.timestamp);
-                let content = msg.content.as_deref().unwrap_or("[no text]");
-                _ = writeln!(output, "\n[{author}] {age}:\n{content}", author = msg.author);
-                if let Some(fp) = &msg.file_path {
-                    _ = writeln!(output, "  📎 {fp}");
+            // Auto tool-activity traces are hidden from the AI's own context —
+            // the model should never re-read its own action log (token bloat +
+            // self-referential loop risk). They remain visible (collapsed) in
+            // the web UI / TUI for the human.
+            let visible: Vec<&ThreadMessage> = thread.messages.iter().filter(|m| !m.auto).collect();
+            if visible.is_empty() {
+                _ = writeln!(output, "(no messages)");
+            } else {
+                let total = visible.len();
+                let skip = total.saturating_sub(MAX_PANEL_MESSAGES);
+                if skip > 0 {
+                    _ = writeln!(output, "\n({skip} older message(s) omitted)");
                 }
-                if msg.question.is_some() {
-                    _ = writeln!(output, "  ❓ [questions attached]");
+                for msg in visible.iter().skip(skip) {
+                    let age = format_age(now_ms, msg.timestamp);
+                    let content = msg.content.as_deref().unwrap_or("[no text]");
+                    _ = writeln!(output, "\n[{author}] {age}:\n{content}", author = msg.author);
+                    if let Some(fp) = &msg.file_path {
+                        _ = writeln!(output, "  📎 {fp}");
+                    }
+                    if msg.question.is_some() {
+                        _ = writeln!(output, "  ❓ [questions attached]");
+                    }
                 }
             }
         }

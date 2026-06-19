@@ -22,7 +22,16 @@ interface ThreadListProps {
 
 /** Last-message preview text for a thread row + search matching. */
 function previewOf(t: ThreadDetail): string {
-  const last = t.log[t.log.length - 1]
+  // Auto tool-activity traces are collapsed noise — never surface one as the
+  // row preview; show the last real message instead.
+  let last: ThreadDetail["log"][number] | undefined
+  for (let i = t.log.length - 1; i >= 0; i--) {
+    const m = t.log[i]
+    if (m && !m.auto) {
+      last = m
+      break
+    }
+  }
   if (!last) return ""
   return last.text ?? (last.tool ? `⛭ ${last.tool.name}` : last.questions ? "asked a question" : "")
 }

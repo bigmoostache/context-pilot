@@ -71,6 +71,7 @@ interface RawMsg {
   tool?: unknown
   questions?: unknown
   fileRef?: string
+  auto?: boolean
 }
 
 /** Raw thread shape from the backend. */
@@ -121,6 +122,7 @@ export function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
         tool: m.tool as ThreadDetail["log"][number]["tool"],
         questions: m.questions as ThreadDetail["log"][number]["questions"],
         fileRef: m.fileRef,
+        auto: m.auto,
       })),
     }))
   })

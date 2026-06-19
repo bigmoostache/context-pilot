@@ -254,6 +254,8 @@ export interface ThreadMsg {
   /** an attached file reference */
   fileRef?: string
   streaming?: boolean
+  /** true → an auto tool-activity trace (collapsed into a run in the UI) */
+  auto?: boolean
 }
 
 // ── Global prompt library (Prompts page) ─────────────────────────

@@ -101,9 +101,19 @@ fn render_thread_messages(frame: &mut Frame<'_>, state: &State, thread: &cp_mod_
 
     let opts = MessageBlockOpts { viewport_width: area.width, is_streaming: false, dev_mode: false };
 
-    // Convert ThreadMessages → Messages → IR blocks → ratatui Lines
+    // Convert ThreadMessages → Messages → IR blocks → ratatui Lines.
+    //
+    // Auto tool-activity traces (`msg.auto`) are NOT rendered as full message
+    // bubbles — that would drown the real conversation in a wall of one-line
+    // tool breadcrumbs. Instead each collapses to a single dim line (marker
+    // stripped, ⚙-prefixed), so a run of consecutive traces stacks into a
+    // quiet, scannable block while normal messages keep their bubble chrome.
     let mut all_blocks: Vec<cp_render::Block> = Vec::new();
     for msg in &thread.messages {
+        if msg.auto {
+            all_blocks.push(IrBlock::Line(vec![S::muted(format!("⚙ {}", auto_line(msg))).dim()]));
+            continue;
+        }
         let conv_msg = thread_message_to_message(msg);
         let msg_blocks = render_message_blocks(&conv_msg, &opts);
         all_blocks.extend(msg_blocks);
@@ -168,6 +178,15 @@ fn render_thread_input(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let lines = ir::blocks_to_lines(&input_blocks);
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, input_area);
+}
+
+/// Strip the leading auto-trace marker from an auto message's content for the
+/// compact dim line (the structured `auto` flag already identifies the trace,
+/// so the inline `/⁠* auto *⁠/` marker is redundant in the rendered line).
+fn auto_line(msg: &cp_mod_threads::types::ThreadMessage) -> String {
+    const MARKER: &str = "/* auto */ ";
+    let content = msg.content.as_deref().unwrap_or("");
+    content.strip_prefix(MARKER).unwrap_or(content).to_owned()
 }
 
 /// Convert a `ThreadMessage` to a `Message` for the conversation IR renderer.

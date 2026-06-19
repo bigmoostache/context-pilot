@@ -67,6 +67,9 @@ pub(crate) fn execute_queue_flush(
 /// "Queued as #N" message), this saves a lightweight `Tool_execution` stub with
 /// just the tool name, queue position, and parameter byte-size.
 pub(crate) fn save_flushed_tool_call_message(app: &mut App, tool: &cp_base::tools::ToolUse, queue_index: usize) {
+    // Leave an auto tool-activity trace in the focused thread (no-op unfocused).
+    crate::app::run::threads::maybe_append_tool_activity(&mut app.state, tool);
+
     let tool_id = format!("T{}", app.state.next_tool_id);
     let tool_global_uid = format!("UID_{}_T", app.state.global_next_uid);
     app.state.next_tool_id = app.state.next_tool_id.saturating_add(1);

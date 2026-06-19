@@ -75,6 +75,16 @@ pub struct ThreadMessage {
     /// start unacknowledged and become acknowledged when `Read` is called.
     #[serde(default = "default_true")]
     pub acknowledged: bool,
+    /// True when this is an auto-generated **tool-activity trace** — a
+    /// lightweight `{verb · tool — intent}` line appended on every tool call
+    /// while the AI is focused on the thread (see the tool pipeline). Auto
+    /// messages are *hidden from the AI's own context* (skipped in
+    /// [`build_panel_content`](crate::tools)) so the model never re-reads its
+    /// own action log, and are rendered as a **collapsible group** in the web
+    /// UI and TUI rather than as normal bubbles. They never change a thread's
+    /// turn/focus. Defaults to `false` (back-compat with pre-feature data).
+    #[serde(default)]
+    pub auto: bool,
 }
 
 /// A parallel discussion/work topic thread.

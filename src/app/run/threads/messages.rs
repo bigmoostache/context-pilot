@@ -123,6 +123,7 @@ fn build_pending(thread_id: &str, msg: &ThreadMessage, idx: usize) -> PendingMes
         "ts": msg.timestamp,
         "question": msg.question,
         "fileRef": msg.file_path,
+        "auto": msg.auto,
     })
     .to_string();
     PendingMessage { thread_id: thread_id.to_owned(), message_id, index: idx, body }

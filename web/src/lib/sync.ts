@@ -182,6 +182,7 @@ export function applyThreadDelta(
         ts?: number
         question?: unknown
         fileRef?: string | null
+        auto?: boolean
       }
       try {
         raw = JSON.parse(k.inline_body)
@@ -207,6 +208,7 @@ export function applyThreadDelta(
           ? (raw.question as ThreadDetail["log"][number]["questions"])
           : undefined,
         fileRef: raw.fileRef ?? undefined,
+        auto: raw.auto ?? undefined,
       }
       return prev.map((t) =>
         t.id === k.thread_id

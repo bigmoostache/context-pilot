@@ -263,8 +263,33 @@ efe78c079599d3d0:
   tl_dr: 'User workflow preference: when exploring/describing files, MUST follow strict order: open files → describe in tree → close files → iterate to next batch. Never close before describing.'
   importance: critical
   last_edited_ms: 0
+f33586bc454696a9:
+  tl_dr: X887 AUTO TOOL-ACTIVITY COMPLETE + shipped. When agent focused on a thread, every tool call appends an auto:true thread message (no turn/focus change); hidden from AI context, collapsed in web+TUI. Details in contents.
+  contents: |-
+    ## X887 — auto tool-activity → focused thread (SHIPPED on demaquetting)
+
+    When AI focused on a thread, EVERY tool call appends a regular thread message {verb · tool — intent} marked auto:true, WITHOUT switching turn/focus. No focus = nothing. AI hides them from context; UI renders collapsed (consecutive runs).
+
+    ### Implementation (8 subtasks X888–X895, all done)
+    - **X888 schema**: cp-mod-threads/types.rs ThreadMessage.auto: bool (#[serde(default)]). 4 construction sites set auto:false (tools.rs execute_send, bridge.rs apply_send_message, input.rs handle_thread_input_submit, actions/threads.rs question_enter).
+    - **X889 hook**: src/app/run/threads/mod.rs maybe_append_tool_activity(state,&ToolUse) — pub(in crate::app::run), focus-gated via FocusState.focused_thread_id; skips Send/Read; content '/* auto */ {verb} · {tool} — {intent}'; author=Assistant, acknowledged=true, auto=true; NO status/focus change, NO spine notif. Called from pipeline.rs save_tool_call_message + queue_flush.rs save_flushed_tool_call_message.
+    - **X890 context-skip**: cp-mod-threads/tools.rs build_panel_content filters .filter(|m| !m.auto) (visible Vec, skip/total on non-auto count) so AI never re-reads its own action log.
+    - **X891 emit**: run/threads/messages.rs build_pending JSON adds auto:msg.auto; sync.ts applyThreadDelta parses raw.auto; types.ts ThreadMsg.auto?; api.ts RawMsg.auto? + fetchThreads passes auto.
+    - **X892 reshape**: thread_shape.rs reshape_message adds auto from raw.get('auto').as_bool().unwrap_or(false) — disk plane carries auto, positional msg_{index} ids stay aligned across planes.
+    - **X893 web render**: ThreadConversation.tsx segmentLog() folds consecutive auto into runs, AutoRun (<details> '⚙ N tool actions'), autoLine() strips marker. ThreadList.tsx previewOf skips auto.
+    - **X894 TUI render**: ui/threads_view/messages.rs renders auto msgs as a single dim '⚙ {line}' IR line (auto_line() strips marker) not a bubble.
+
+    ### Validation
+    cargo build --release exit 0; web npm run build exit 0; rust-check/lint/folder all passed; messages.spec e2e green (8.6s). FOLLOW-UP: no dedicated auto-activity e2e (deterministic agent-focus timing hard); render is pure & build-clean.
+  importance: high
+  labels:
+  - X887
+  - threads
+  - auto-activity
+  - shipped
+  last_edited_ms: 1781866612741
 f5d97b1e7a01c317:
-  tl_dr: ALIGNMENT EPIC (T18/T120/X818) COMPLETE + T123 send-flicker FIXED. STATE MGMT now migrated to TanStack Query (commit 607cce4, T254). Details in contents.
+  tl_dr: ALIGNMENT EPIC (T18/T120/X818) COMPLETE + T123 send-flicker FIXED + T254 double-render FIXED. STATE MGMT migrated to TanStack Query (607cce4). Double-render fix shipped c5bc2fc. Details in contents.
   contents: |-
     ## TANSTACK QUERY MIGRATION (T254 / X879, commit 607cce4 pushed 2026-06-19)
     User (N4833): 'everything is bugged as fuck' — replace hand-rolled live.ts state mgmt with TanStack Query, professional fix for the T123 send-flicker bug CLASS.
@@ -290,7 +315,7 @@ f5d97b1e7a01c317:
   - architecture
   - demaquetting
   - active
-  last_edited_ms: 1781863954439
+  last_edited_ms: 1781865048806
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium
