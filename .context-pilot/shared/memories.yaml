@@ -198,6 +198,35 @@
   - move
   - shipped
   last_edited_ms: 1781887832323
+36c12fdf139f413b:
+  tl_dr: 'T280 SHIPPED (473b8af): live code-file Finder previews now have real per-language syntax highlighting via highlight.js (pnpm, not npm).'
+  contents: |-
+    ## T280 — code syntax highlighting in Finder preview SHIPPED (473b8af)
+
+    User: add code-file previews with good per-language color syntax highlighting, all main languages, in the Finder code-file preview.
+
+    ### Implementation (frontend-only)
+    - **pnpm add highlight.js** (11.11.1). CRITICAL GOTCHA: web/ is a PNPM project (node_modules/.pnpm store + pnpm-lock.yaml). `npm install` CRASHES with 'Cannot read properties of null (reading matches)' in @npmcli/arborist dedupe because it trips over pnpm symlinks. ALWAYS use `pnpm add` in web/ (npm run <script> still works fine — it just runs vite).
+    - **web/src/components/finder/codeHighlight.ts**: imports `highlight.js/lib/common` (≈37 mainstream langs auto-registered) + registers 7 curated extras the common bundle omits (scala/elixir/erlang/haskell/ocaml/dart/fsharp). EXT_LANG map (rs→rust, ts/tsx→typescript, py→python, …). highlightCode(code,filename)→{html,language}: resolve lang by ext → hljs.highlight(lang, ignoreIllegals) else highlightAuto; never throws (catch→escaped plaintext). hljs escapes input → safe to inject.
+    - **FinderPreview.tsx**: LivePreview code branch now renders new HighlightedCode component (was plain TextPreview). HighlightedCode: useMemo highlightCode → split html on '\n' (hljs never leaves a tag open across newlines → per-line fragments self-contained + safe) → macOS chrome (traffic lights + lang label + Copy) + per-line gutter numbers via dangerouslySetInnerHTML. truncated→TruncatedNote. Imported useMemo.
+    - **index.css**: .hljs-* theme block mapping token classes to app CSS tokens (comments→muted italic, keyword→--signal, string→--ok, number/literal→--interactive, title/type/attr→--warn, deletion→--danger) so colors track BOTH light+dark palettes, no hard-coded hex.
+
+    Mock CodePreview (node.code.lines decorative tint()) left untouched — only the LIVE path (what the user sees) upgraded.
+
+    Bundle grew 837KB→1009KB (gzip 246→304). Acceptable for a dev tool; chunk-size warning pre-existed.
+
+    web build green (tsc+vite exit 0). Frontend-only → dev :5175 hot-reloads, NO orchestrator restart / system_reload. Committed+pushed 473b8af (5 files +288).
+
+    Backlog (open MY_TURN Finder): T281 PDF rendering (needs raw inline-serve endpoint), T282 CSV/Excel tables (CSV easy/text, xlsx needs parser), T286 image previews (shares inline-serve w/ T281), X906 WYSIWYG md editor (needs fs_write endpoint).
+  importance: medium
+  labels:
+  - T280
+  - finder
+  - syntax-highlight
+  - highlightjs
+  - pnpm
+  - shipped
+  last_edited_ms: 1781893517635
 3d36396d2a618055:
   tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
   importance: critical
