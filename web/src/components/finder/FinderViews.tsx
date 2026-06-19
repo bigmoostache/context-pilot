@@ -465,8 +465,62 @@ function MillerColumn({
   const { data } = useFs(agentId, relOf(agentFolder, path))
   const nodes = sortNodes(provided ?? data ?? [], "name", true)
   const [dragOver, setDragOver] = useState<string | null>(null)
+  // Whether a move-drag is hovering the column's BODY (its background / a file
+  // row), as opposed to a folder row inside it (which owns its own highlight via
+  // `dragOver`). A body drop moves the dragged items into THIS column's folder.
+  const [bodyOver, setBodyOver] = useState(false)
+
+  // The column's own folder, as a destination for a body drop. Synthetic node —
+  // `onMove` only reads `.path`/`.name`.
+  const columnFolder: FinderNode = {
+    name: path.split("/").pop() || path,
+    path,
+    kind: "folder",
+    modified: "",
+  }
+
+  // Drop-target handlers for the column BODY: a move-drag that lands outside any
+  // folder row (the folder rows `stopPropagation` their own drop, so those never
+  // reach here) moves the dragged items into this column's folder. Highlight is
+  // suppressed while a folder row is hovered (`dragOver !== null`) so the two
+  // never light up at once. A no-op when `onMove` is absent or the drag isn't an
+  // internal move.
+  const columnDropProps = h.onMove
+    ? {
+        onDragOver: (e: ReactDragEvent) => {
+          if (!isMoveDrag(e)) return
+          const dragged = readMovePayload(e)
+          if (dragged?.includes(path)) return // can't drop the folder into itself
+          e.preventDefault()
+          e.dataTransfer.dropEffect = "move"
+          if (!bodyOver) setBodyOver(true)
+        },
+        onDragLeave: (e: ReactDragEvent) => {
+          // Only clear when the cursor actually leaves the whole column, not when
+          // it moves onto a child row.
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setBodyOver(false)
+          }
+        },
+        onDrop: (e: ReactDragEvent) => {
+          if (!isMoveDrag(e)) return
+          e.preventDefault()
+          setBodyOver(false)
+          const dragged = readMovePayload(e)
+          if (dragged && !dragged.includes(path)) h.onMove?.(dragged, columnFolder)
+        },
+      }
+    : {}
+
+  const showBodyOver = bodyOver && dragOver === null
   return (
-    <div className="flex w-[218px] shrink-0 flex-col overflow-y-auto border-r border-border py-1">
+    <div
+      {...columnDropProps}
+      className={cn(
+        "flex w-[218px] shrink-0 flex-col overflow-y-auto border-r border-border py-1",
+        showBodyOver && "bg-[var(--signal)]/8 ring-1 ring-inset ring-[var(--signal)]/40",
+      )}
+    >
       {nodes.map((n) => {
         const onTrail = n.path === nextPath
         const sel = h.selected.has(n.path)

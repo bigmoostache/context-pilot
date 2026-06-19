@@ -795,6 +795,38 @@ db16d1afe23ab01d:
   - mkdir
   - shipped
   last_edited_ms: 1781888554542
+df70428e5de94c2d:
+  tl_dr: 'T289 Finder per-node info badge SHIPPED 269037f: a file/folder with a tree description shows a ⓘ badge; hover/click opens a popover with the description.'
+  contents: |-
+    ## T289 — Finder info badge from tree descriptions SHIPPED (269037f pushed)
+
+    User: files/folders that have a tree description should show a classic ⓘ info button; hover/click opens a box (most-adapted shadcn component) with the description.
+
+    ### Backend (cp-orchestrator inspect/finder/listing.rs)
+    fs_descriptions(state,id): GET /api/agent/{id}/fs/descriptions. Reads <folder>/.context-pilot/shared/tree-descriptions.yaml (a YamlSync map keyed by opaque FNV hash, each value {path, description, last_edited_ms}), flattens to a flat {realm-relative path: description} JSON map (skips empty path/desc). Missing/unparseable file → {} (a realm with no descriptions is normal, never an error). Unknown agent → 404 (agent_folder guard). Re-exported finder/mod.rs (pub use listing::{...,fs_descriptions,...}); routed transport/mod.rs route_rest (Get fs/descriptions). Returns JSON via HttpReply so it rides route_rest like fs_list/fs_preview.
+
+    ### Frontend
+    - api.ts fetchDescriptions(agentId)->Record<string,string> (GET /fs/descriptions).
+    - sync.ts qk.fsDescriptions(id)=['fs-descriptions',id].
+    - live.ts useFsDescriptions(agentId)=useLive over fetchDescriptions, pollMs:0 (descriptions change rarely — only when the agent runs tree-describe; no SSE bridge, fresh value lands on next Finder mount / agent switch). enabled gated.
+    - NEW web/src/components/ui/popover.tsx: shadcn-style wrapper over Base UI Popover (@base-ui/react/popover — note the project aliases @base-ui-components/react to @base-ui/react). Portaled into document.body (escapes the scrolling Finder's clip/containing-block), Positioner side=top sideOffset=6 align=center, Popup with tw-animate data-open/data-closed classes. Pick<Positioner.Props,'align'|'side'|'sideOffset'> merged into PopoverContent props.
+    - NEW web/src/components/finder/InfoBadge.tsx: lucide Info ⓘ. GOTCHA: openOnHover + delay live on the Popover **Trigger**, NOT the Root, in this Base UI version (PopoverTriggerProps has openOnHover/delay/closeDelay; PopoverRootProps does not — first build errored 'openOnHover does not exist on Props<unknown>'). PopoverTrigger render={<span/>} renders the trigger as a span so it nests inside the row/cell <button> without invalid button-in-button DOM (a span is valid inside a button). stopPropagation on click/doubleClick/pointerDown so interacting with the badge never selects/opens/drags the node. max-w-340px.
+    - FinderViews.tsx: ViewHandlers gains descriptions?:Record<string,string>. Badge rendered when h.descriptions?.[n.path]: grid = absolute right-1 top-1 z-[1] over the (now relative) cell button; list = inline after the name TagDots; Miller = after TagDots before chevron.
+    - Finder.tsx: useFsDescriptions(agent.id) → descriptions, passed into viewProps.
+
+    ### Validation
+    web npm run build green (tsc+vite exit 0). Backend fs_descriptions built+routed earlier this session (cargo build -p cp-orchestrator exit 0). Frontend-only commit half → dev :5175 hot-reloads, NO orchestrator restart / system_reload needed (backend route was already live on the running binary from the earlier backend build+restart this session). Committed+pushed 269037f (11 files).
+
+    ### NEXT: T288 (Finder Quick Look → shadcn Sheet drawer on the right). ui/sheet.tsx EXISTS (Base UI Dialog right-side drawer, unused elsewhere → safe to extend). Plan: replace the current non-reflowing overlay in Finder.tsx (absolute inset-y-0 right-0 z-20, gated grid+list) with Sheet; modal={false} + skip backdrop to preserve live-select-updates-preview; SheetContent ~420px; hide Sheet default close (FinderPreview has own onClose X); keep grid+list gating.
+  importance: medium
+  labels:
+  - T289
+  - finder
+  - info-badge
+  - popover
+  - tree-descriptions
+  - shipped
+  last_edited_ms: 1781906201240
 e8c59432f236b48d:
   tl_dr: 'T287 SHIPPED (dffb806): Miller-columns native drag-and-drop fixed via select-none on the row buttons.'
   contents: |-
