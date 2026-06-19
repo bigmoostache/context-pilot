@@ -3902,6 +3902,10 @@
   path: crates/cp-mod-callback/src/storage.rs
   description: YAML-backed persistent storage for callback definitions. Keyed by name (BTreeMap alphabetical). upsert/remove/populate/migrate functions. Script file read/write helpers (strip_script_header, write_script_file). cleanup_old_hash_keys migration.
   last_edited_ms: 0
+881227d40a480aba:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Frontend transport — REST + SSE over tiny_http (blocking, thread-per-conn). Backend shared state (view/breaker/hub/tickets/inspect/agents_dir/dirty_agents + supervisor:AgentSupervisor + agents_root + agent_binary) under one Mutex; Backend::new 4-arg, seeds supervisor allow-list from agent_binary. route_rest dispatches all /api routes incl POST /api/fleet/create→rest::create_agent + POST /api/agent/{id}/restart. handle_download serves file/folder-zip via inspect::finder::fs_download. cors_headers() sets Access-Control-Expose-Headers: Content-Disposition so cross-origin fetch() can read the server filename (else a folder zip saves as ''src'' not ''src.zip'' — T265). handle_stream redeems ticket then stream::run_stream.'
+  last_edited_ms: 1781879404642
 88210e31318f85b7:
   path: crates/cp-base/src/tools/api_schema.rs
   description: LLM API schema builder. build_api() generates JSON tool array. inject_global_params() adds compulsory intent/verb to every tool schema.

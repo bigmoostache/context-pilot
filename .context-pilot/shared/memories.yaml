@@ -275,7 +275,7 @@ f33586bc454696a9:
   - shipped
   last_edited_ms: 1781866612741
 f5d97b1e7a01c317:
-  tl_dr: ALIGNMENT EPIC (T18/T120/X818) COMPLETE + T123 send-flicker FIXED + T254 double-render FIXED + FOCUS-PUSH FIXED. STATE MGMT migrated to TanStack Query (607cce4). Details in contents.
+  tl_dr: ALIGNMENT EPIC (T18/T120/X818) COMPLETE + T123 send-flicker FIXED + T254 double-render FIXED + FOCUS-PUSH FIXED + T268 SSE-reconnect-gap FIXED. STATE MGMT migrated to TanStack Query. Details in contents.
   contents: |-
     ## FOCUS-PUSH (T254, focused-thread highlight lag) FIXED 2026-06-19
     User: when idle + a thread becomes MY_TURN, the agent auto-focuses it instantly (idle MY_TURN detection → check_my_turn_threads → auto-continuation → maybe_inject_auto_read → execute_read sets FocusState.focused_thread_id), yet the web UI's focused-thread highlight only updated after several seconds.
@@ -305,7 +305,7 @@ f5d97b1e7a01c317:
   - architecture
   - demaquetting
   - active
-  last_edited_ms: 1781869261787
+  last_edited_ms: 1781879240526
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium

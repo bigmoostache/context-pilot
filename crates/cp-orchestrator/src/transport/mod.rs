@@ -351,6 +351,12 @@ fn cors_headers() -> Vec<Header> {
         Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]),
         Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET, POST, OPTIONS"[..]),
         Header::from_bytes(&b"Access-Control-Allow-Headers"[..], &b"Content-Type, Last-Event-ID"[..]),
+        // Expose Content-Disposition so cross-origin fetch() (web dev server →
+        // backend) can read the server-chosen download filename. Without this,
+        // the header is hidden by CORS and the client falls back to the URL's
+        // last path segment — a folder download then saves as "src" instead of
+        // the "src.zip" the backend actually sends.
+        Header::from_bytes(&b"Access-Control-Expose-Headers"[..], &b"Content-Disposition"[..]),
     ]
     .into_iter()
     .filter_map(Result::ok)
