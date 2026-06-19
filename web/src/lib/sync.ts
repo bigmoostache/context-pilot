@@ -188,7 +188,14 @@ export function applyThreadDelta(
       } catch {
         return null // malformed → ground-truth hydrate
       }
-      const msgId = raw.id ?? k.message_id ?? `${k.thread_id}-${thread.log.length}`
+      // CRITICAL: id MUST match the disk-poll id so the backstop poll dedups
+      // this message instead of rendering it twice. The backend `/threads`
+      // reshape ids each message positionally as `msg_{index}` (thread_shape.rs
+      // reshape_message). The delta folds the message at the end of the log, so
+      // its disk index == the current log length. Deriving the id from that
+      // position — NOT from raw.id (`{thread}-m{n}`) or k.message_id — keeps the
+      // two planes' ids identical, so mergeThreadLogs collapses them to one.
+      const msgId = `msg_${thread.log.length}`
       if (thread.log.some((m) => m.id === msgId)) return prev // dedup
       const msgTs = typeof raw.ts === "number" ? raw.ts : ts
       const appended: ThreadDetail["log"][number] = {

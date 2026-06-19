@@ -98,7 +98,23 @@ test.describe("messages / send over the push plane", () => {
     // suite drives a single LIVE agent that may be backlogged by earlier specs'
     // command preconditions, so the user-message apply (and its SSE delta) can
     // trail the action.
-    await expect(page.getByText(MSG, { exact: false }).first()).toBeVisible({ timeout: 25_000 })
+    // Scope to the conversation viewport (`<main>`): the left ThreadList row
+    // ALSO renders the thread's last-message preview, so a page-wide text query
+    // would legitimately match twice (preview + bubble) and tell us nothing
+    // about the conversation double-render we actually care about.
+    const conversation = page.getByRole("main")
+    await expect(conversation.getByText(MSG, { exact: false }).first()).toBeVisible({ timeout: 25_000 })
+
+    // No double-render: in the conversation the message must appear EXACTLY
+    // ONCE, not twice. This guards the regression where the delta plane and the
+    // backstop poll ided the same message differently (delta `{thread}-m{n}` vs
+    // disk `msg_{n}`), so mergeThreadLogs could not dedup them and BOTH bubbles
+    // rendered. With the delta id derived from the append position (`msg_{n}`,
+    // matching the disk reshape) the two planes' ids agree and collapse to one.
+    // Hold past the backstop poll so a late disk-sourced copy can't re-double.
+    await expect
+      .poll(async () => conversation.getByText(MSG, { exact: false }).count(), { timeout: 20_000 })
+      .toBe(1)
 
     // Ground truth: the backend roster's message log grew by at least one.
     // Generous timeout: the suite drives a single LIVE agent, so by this test
