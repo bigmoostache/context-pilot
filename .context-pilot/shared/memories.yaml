@@ -632,6 +632,33 @@ db16d1afe23ab01d:
   - mkdir
   - shipped
   last_edited_ms: 1781888554542
+e8c59432f236b48d:
+  tl_dr: 'T287 SHIPPED (dffb806): Miller-columns native drag-and-drop fixed via select-none on the row buttons.'
+  contents: |-
+    ## T287 — Miller columns native DnD SHIPPED (dffb806 pushed)
+
+    User: drag-and-drop file/folder from folder to folder in COLUMNS view doesn't work (works in grid/list). Except can't drop a folder into its own child (they already know the descendant guard).
+
+    ### Root cause (native-drag-START, not the drop path)
+    A NATIVE press-drag only initiates an element drag if the press doesn't first begin a TEXT selection. Grid/list suppress text selection on their content area (<main> carries `select-none` while the marquee is enabled). The columns view has NO marquee, so its <main> never got `select-none` — pressing on a Miller row's text started a text selection instead of an element drag, so `dragstart` never fired and nothing moved. The drop-target wiring (folderDropProps + onMove via {...viewProps}→ColumnsView→MillerColumn) was already correct and identical to grid/list.
+
+    ### How I isolated it
+    Wrote web/e2e/t287_probe.spec.ts: a deterministic synthetic-DnD e2e that dispatches dragstart→dragenter→dragover→drop across ONE shared DataTransfer (carrying MOVE_MIME) on the actual rendered columns-view buttons, then asserts the backend /fs listing reflects the move. It PASSED (dragme.txt landed in t287/destdir) — proving onMove→moveItems→backend fs_move works end-to-end. Since synthetic events bypass drag-START, the pass localized the real failure to drag INITIATION, i.e. the missing select-none. Probe boots straight into the target agent via addInitScript localStorage cp-agent/cp-view (deterministic vs clicking the first fleet 'Open' card). Test layout built in ~/code/test: t287/srcdir/dragme.txt + t287/destdir.
+
+    ### Fix
+    Added `select-none` to the MillerColumn draggable row <button> className (FinderViews.tsx) so a press reliably starts the element drag, matching grid/list. Frontend-only.
+
+    web build green; dev :5175 hot-reloads, NO orchestrator restart / system_reload. Committed+pushed dffb806 (FinderViews.tsx + t287_probe.spec.ts). The probe is kept as a regression test.
+
+    NEXT open MY_TURN Finder: T280 code-preview syntax highlight (frontend-only), T281 PDF rendering (needs raw inline-serve endpoint), T282 CSV/Excel tables, T286 image previews (shares raw inline-serve with T281), X906 WYSIWYG md editor (needs fs_write endpoint).
+  importance: medium
+  labels:
+  - T287
+  - finder
+  - drag-drop
+  - columns
+  - shipped
+  last_edited_ms: 1781892532541
 efe78c079599d3d0:
   tl_dr: 'User workflow preference: when exploring/describing files, MUST follow strict order: open files → describe in tree → close files → iterate to next batch. Never close before describing.'
   importance: critical
