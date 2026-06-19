@@ -63,8 +63,12 @@ const ACK_SCHEMA_VERSION: u32 = 1;
 
 /// Largest accumulated read (per connection) before a frame is abandoned as
 /// junk — bounds memory against a peer that sends an endless un-decodable
-/// stream. 1 MiB is far beyond any real command frame.
-const MAX_CONNECTION_BUFFER: usize = 1024 * 1024;
+/// stream. 32 MiB comfortably fits any realistic command frame (a `SendMessage`
+/// carries the full message text); the old 1 MiB cap rejected a large paste,
+/// contributing to the "big messages don't go through" symptom (T274). Kept in
+/// lockstep with the backend transport's `MAX_BODY` (the other cap on the same
+/// path).
+const MAX_CONNECTION_BUFFER: usize = 32 * 1024 * 1024;
 
 /// Read-chunk size for [`Intake::handle_connection`].
 const READ_CHUNK: usize = 4096;

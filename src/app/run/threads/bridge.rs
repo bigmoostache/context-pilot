@@ -109,6 +109,19 @@ fn accept_commands(state: &mut State) -> Option<Vec<Command>> {
         return None;
     };
 
+    // The accepted stream INHERITS the listener's non-blocking flag on macOS
+    // (and Linux without `accept4`). Left non-blocking, `handle_connection`'s
+    // read loop hits a transient `WouldBlock` the instant the socket buffer
+    // momentarily drains mid-frame and treats it as fatal — so any command
+    // larger than the kernel's AF_UNIX socket buffer (~8 KiB) closes the
+    // connection before it is fully read, surfacing to the backend as a
+    // `BrokenPipe`/`502 agent unreachable` (the "big messages don't go through"
+    // bug, T274). Forcing the stream back to BLOCKING makes the per-read
+    // timeout below the real wedge-guard: each read blocks (up to the timeout)
+    // for the next chunk instead of erroring on a normal in-flight gap, so a
+    // multi-MiB frame streams in correctly.
+    let _set_blocking = stream.set_nonblocking(false);
+
     // Bound how long we wait for the commander to finish writing.
     let _ignored = stream.set_read_timeout(Some(READ_TIMEOUT));
 

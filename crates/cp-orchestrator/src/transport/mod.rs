@@ -58,9 +58,16 @@ use query::QueryParams;
 /// Default per-agent SSE subscriber buffer capacity.
 const DEFAULT_SUB_CAPACITY: usize = 256;
 
-/// Maximum request body size accepted on a POST route (1 MiB) — bounds memory
-/// against a client that sends an endless stream.
-const MAX_BODY: u64 = 1024 * 1024;
+/// Maximum request body size accepted on a POST route (32 MiB) — bounds memory
+/// against a client that sends an endless stream, while comfortably fitting any
+/// realistic chat message. A `SendMessage` command's body is the message text
+/// wrapped in a small JSON envelope; the old 1 MiB cap silently truncated a
+/// large paste (e.g. a big log or file), turning it into invalid JSON that the
+/// command handler then rejected with `400` — the "big messages don't go
+/// through" symptom (T274). 32 MiB allows ~32M characters, effectively no limit
+/// for text, yet still a finite DoS guard. Kept in lockstep with the agent
+/// intake's `MAX_CONNECTION_BUFFER` (the other cap on the same path).
+const MAX_BODY: u64 = 32 * 1024 * 1024;
 
 /// Shared backend state read by transport handlers and written by the runtime
 /// loop.

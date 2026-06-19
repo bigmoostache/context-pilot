@@ -270,6 +270,33 @@
   - documentation
   - style
   last_edited_ms: 0
+a074780e7fbba07b:
+  tl_dr: T274 'big messages don't go through from the web UI' FIXED. Real root cause was an inherited-non-blocking socket bug, plus two genuine 1MiB caps. Details in contents.
+  contents: |-
+    ## T274 — big messages from the web UI 502/400 — FIXED
+
+    User: big messages don't go through when sent from the frontend; remove the size limit.
+
+    ### THREE caps on the curl→backend→agent send path, all bit a >1MiB message:
+    1. **transport/mod.rs MAX_BODY** (1→32 MiB): backend POST body read is `.take(MAX_BODY)`; a >1MiB body was silently TRUNCATED → invalid JSON → 400 'malformed command'.
+    2. **cp-mod-bridge/src/command.rs MAX_CONNECTION_BUFFER** (1→32 MiB): agent intake accumulates the framed command; a >1MiB frame overflowed → reject.
+    3. **THE REAL BLOCKER — src/app/run/threads/bridge.rs accept_commands**: the accepted UnixStream INHERITS the listener's non-blocking flag (macOS, and Linux without accept4). The bridge sets the LISTENER non-blocking for its per-tick non-blocking accept; the accepted stream came back non-blocking too. handle_connection's read loop then hit a transient `WouldBlock` the instant the AF_UNIX socket buffer (~8KiB on macOS) drained mid-frame, and treated it as fatal → closed the connection → backend `write_all` got BrokenPipe → 502 'agent unreachable'. FIX: `stream.set_nonblocking(false)` on the accepted stream BEFORE set_read_timeout, so the 500ms per-read timeout becomes the real wedge-guard and a multi-MiB frame streams in correctly.
+
+    ### Diagnosis method (the win): a standalone python probe (/tmp/probe_big.py) connected directly to the agent stream.sock with a valid CRC32C-framed command, bisecting by size: 4KB OK, 64KB+ BrokenPipe at ~0.3ms. The near-instant break (not a 500ms timeout) + the ~8KB threshold = socket-buffer + non-blocking-EAGAIN, not our app caps. Software CRC32C (Castagnoli, poly 0x82F63B78) in python since zlib.crc32 is the wrong polynomial.
+
+    ### Proven LIVE end-to-end after fix: probe 64KB/2MiB/5MiB all Accepted (rev 184/186) in single-digit ms; full curl→orchestrator path POST 2MiB + 5MiB both HTTP 200 accepted (rev 188/190). Before: 2MiB → 502.
+
+    ### GOTCHAS reused: orchestrator restart required after backend change (killed :7878 via lsof, relaunched debug CP_COST_BUDGET=100000000, console P23). Agent restart via POST /restart respawns on target/release/tui — must rebuild release BEFORE restart; agent status field can lag at 'starting' even when stream.sock is present + process Ss+ (intake is actually ready). The verification injected several multi-MiB messages into the test agent (834eb ~/code/test) thread T1 — harmless junk in a throwaway realm, left as-is (no delete-message command).
+
+    Stack: orchestrator :7878 console P23. Test agent 834eb459c7b064db.
+  importance: high
+  labels:
+  - T274
+  - bridge
+  - socket
+  - non-blocking
+  - fixed
+  last_edited_ms: 1781884750645
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   contents: |-
