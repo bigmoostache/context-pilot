@@ -426,6 +426,25 @@ export function moveItems(
   })
 }
 
+/** Result of a trash (`POST /fs/trash`). */
+export interface TrashResult {
+  trashed: number
+  skipped: number
+}
+
+/** Move one or more realm-relative entries to the realm's hidden trash folder
+ *  (the Finder's right-click "Move to Trash"). Reversible — the backend moves
+ *  each entry into a hidden `.cp-trash/` dir at the realm root rather than
+ *  destroying it (collisions get a timestamp suffix). The backend confines
+ *  every source and skips anything already in the trash. */
+export function trashItems(agentId: string, items: string[]): Promise<TrashResult> {
+  return request(`/api/agent/${agentId}/fs/trash`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  })
+}
+
 /** Trigger a browser download for a file in the agent's realm. */
 export async function downloadFile(agentId: string, path: string): Promise<void> {
   const res = await fetch(

@@ -288,6 +288,7 @@ fn route_rest(
         (Method::Post, ["api", "agent", id, "fs", "mkdir"]) => inspect::finder::fs_mkdir(state, id, query),
         (Method::Post, ["api", "agent", id, "fs", "rename"]) => inspect::finder::fs_rename(state, id, query),
         (Method::Post, ["api", "agent", id, "fs", "move"]) => inspect::finder::fs_move(state, id, body_bytes),
+        (Method::Post, ["api", "agent", id, "fs", "trash"]) => inspect::finder::fs_trash(state, id, body_bytes),
         (Method::Post, ["api", "agent", id, "restart"]) => rest::restart_agent(state, id),
         (Method::Post, ["api", "agent", id, "retire"]) => rest::retire_agent(state, id),
         (Method::Post, ["api", "agent", id, "unretire"]) => rest::unretire_agent(state, id),

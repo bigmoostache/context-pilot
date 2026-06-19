@@ -7,7 +7,7 @@ import type {
   FinderViewMode,
 } from "@/lib/types"
 import { fmtBytes, sortNodes } from "@/lib/finderFs"
-import { downloadFile, useCreateFolder, useFs, useMoveItems, useRenameItem, useUploadFiles } from "@/lib/live"
+import { downloadFile, useCreateFolder, useFs, useMoveItems, useRenameItem, useTrashItems, useUploadFiles } from "@/lib/live"
 import { useQueryClient } from "@tanstack/react-query"
 import { qk } from "@/lib/sync"
 
@@ -112,6 +112,7 @@ export function Finder({ agent }: { agent: Agent }) {
   const move = useMoveItems(agent.id)
   const mkdir = useCreateFolder(agent.id)
   const rename = useRenameItem(agent.id)
+  const trash = useTrashItems(agent.id)
   const qc = useQueryClient()
 
   const [tabs, setTabs] = useState<Tab[]>(() => [
@@ -323,6 +324,28 @@ export function Finder({ agent }: { agent: Agent }) {
   // Begin inline-renaming an entry (context menu Rename, or Enter on a focused
   // item). Switches the matching name cell to an editable field.
   const startRename = (node: FinderNode) => setRenamingPath(node.path)
+
+  // Move entries to the realm trash (right-click "Move to Trash" / ⌘⌫). If the
+  // triggering node is part of the current multi-select, the WHOLE selection is
+  // trashed; otherwise just that node. Trashed entries move into a hidden
+  // .cp-trash/ the listing never shows, so they simply vanish from view.
+  const trashPaths = (paths: string[]) => {
+    if (paths.length === 0) return
+    flash(`Moving ${paths.length} item${paths.length === 1 ? "" : "s"} to Trash…`)
+    trash.mutate(
+      { items: paths },
+      {
+        onSuccess: ({ trashed }) =>
+          flash(`Moved ${trashed} item${trashed === 1 ? "" : "s"} to Trash.`),
+        onError: (err) => flash(err instanceof Error ? err.message : "Move to Trash failed"),
+      },
+    )
+    setSelected(new Set())
+    setFocusPath(null)
+  }
+  // Trash a node, expanding to the whole selection when the node is selected.
+  const trashNode = (node: FinderNode) =>
+    trashPaths(selected.has(node.path) && selected.size > 0 ? [...selected] : [node.path])
 
   // Commit an inline edit. The sentinel placeholder routes to mkdir (CREATE the
   // pending New Folder); any other node routes to rename. A blank or unchanged
@@ -542,6 +565,15 @@ export function Finder({ agent }: { agent: Agent }) {
         const n = children.find((c) => c.path === focusPath)
         if (n) open(n)
       }
+    } else if ((e.metaKey || e.ctrlKey) && e.key === "Backspace") {
+      // ⌘⌫ — move the current selection to Trash.
+      e.preventDefault()
+      const paths = selected.size
+        ? [...selected]
+        : focusPath
+          ? [focusPath]
+          : []
+      if (paths.length) trashPaths(paths)
     } else if (e.key === "Backspace" || ((e.metaKey || e.ctrlKey) && e.key === "ArrowUp")) {
       e.preventDefault()
       goUp()
@@ -838,6 +870,7 @@ export function Finder({ agent }: { agent: Agent }) {
             flash(`Pinned ${n.name}`)
           }}
           onRenameStart={startRename}
+          onTrash={trashNode}
           onNewFolder={newFolder}
           onUpload={() => fileInputRef.current?.click()}
           onSelectAll={() => setSelected(new Set(sorted.map((n) => n.path)))}

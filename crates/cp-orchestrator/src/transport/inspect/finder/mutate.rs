@@ -244,6 +244,93 @@ pub fn fs_move(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply
     HttpReply::ok(&serde_json::json!({ "moved": moved, "skipped": skipped }))
 }
 
+/// Name of the per-realm trash directory. A dotfile, so the listing's
+/// hidden-file filter keeps trashed entries out of every Finder view (a
+/// "Move to Trash" that vanishes from sight, like the OS trash) while staying
+/// inside the realm so the move never crosses the confinement boundary.
+const TRASH_DIR: &str = ".cp-trash";
+
+/// `POST /api/agent/{id}/fs/trash` — move one or more entries to the realm trash.
+///
+/// Body is JSON `{ "items": ["rel/a", "rel/b"] }`: each entry is a realm-relative
+/// file/folder path. Powers the Finder's right-click "Move to Trash". Rather than
+/// destroy data, each item is moved into a hidden [`TRASH_DIR`] at the realm root
+/// (created on first use) — reversible, and invisible to the listing because the
+/// directory is a dotfile.
+///
+/// Every source is confined to the agent realm (no `..`/symlink/absolute escape).
+/// Guards, per item:
+/// * **the trash dir itself** (or anything already inside it) → skipped, so a
+///   stray re-trash is a harmless no-op rather than a self-nesting move.
+/// * **name already taken in the trash** → the entry is suffixed with a
+///   millisecond timestamp (`name.1718…`) so a second file of the same name
+///   never clobbers an earlier casualty.
+///
+/// Returns `{ trashed, skipped }`. A single failing item aborts with the matching
+/// error status (partial moves already applied are not rolled back — the listing
+/// refresh shows the truth).
+pub fn fs_trash(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply {
+    let folder = match agent_folder(state, agent_id) {
+        Ok(f) => f,
+        Err(reply) => return reply,
+    };
+
+    let parsed: serde_json::Value = match serde_json::from_slice(body) {
+        Ok(v) => v,
+        Err(_) => return HttpReply::error(400, "malformed trash request"),
+    };
+    let items: Vec<String> = parsed
+        .get("items")
+        .and_then(serde_json::Value::as_array)
+        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect())
+        .unwrap_or_default();
+    if items.is_empty() {
+        return HttpReply::error(400, "no items to trash");
+    }
+
+    // The trash dir lives at the realm root; create it on first use.
+    let Some(root) = confined_path(&folder, "") else {
+        return HttpReply::error(403, "realm root unresolved");
+    };
+    let trash = root.join(TRASH_DIR);
+    if !trash.is_dir() && std::fs::create_dir(&trash).is_err() {
+        return HttpReply::error(502, "could not create trash directory");
+    }
+
+    let mut trashed = 0_usize;
+    let mut skipped = 0_usize;
+    for item in &items {
+        let src = match confined_path(&folder, item) {
+            Some(p) => p,
+            None => return HttpReply::error(403, "source outside agent realm"),
+        };
+        // Never trash the trash itself, nor anything already inside it.
+        if src == trash || src.starts_with(&trash) {
+            skipped += 1;
+            continue;
+        }
+        let Some(base) = src.file_name() else {
+            return HttpReply::error(400, "invalid source path");
+        };
+
+        // Collision-free destination: suffix with a ms timestamp if taken.
+        let mut dest = trash.join(base);
+        if dest.exists() {
+            let stamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_millis());
+            let name = base.to_string_lossy();
+            dest = trash.join(format!("{name}.{stamp}"));
+        }
+        if std::fs::rename(&src, &dest).is_err() {
+            return HttpReply::error(502, "trash failed");
+        }
+        trashed += 1;
+    }
+
+    HttpReply::ok(&serde_json::json!({ "trashed": trashed, "skipped": skipped }))
+}
+
 // ── Shared write helpers ────────────────────────────────────────────────
 
 /// True when `name` is a safe bare path component — no separators, no `\0`, and

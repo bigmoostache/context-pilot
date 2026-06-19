@@ -35,6 +35,7 @@ export function ContextMenu({
   onOpen,
   onDownload,
   onTag,
+  onTrash,
   onPin,
   onNewFolder,
   onUpload,
@@ -52,6 +53,8 @@ export function ContextMenu({
   onDownload: (node: FinderNode) => void
   /** Toggle a tag on a node. */
   onTag: (node: FinderNode, tag: FinderTag) => void
+  /** move a node to the realm trash (item menu) */
+  onTrash: (node: FinderNode) => void
   /** pin a folder to the sidebar (folders only) */
   onPin?: (node: FinderNode) => void
   /** begin inline-renaming a node (item menu) */
@@ -246,7 +249,17 @@ export function ContextMenu({
 
           <Separator />
 
-          <Item icon={Trash2} label="Move to Trash" danger shortcut="⌘⌫" />
+          <button
+            onClick={() => {
+              onTrash(node)
+              onClose()
+            }}
+            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/12"
+          >
+            <Trash2 className="size-3.5 shrink-0 opacity-80" />
+            <span className="flex-1">Move to Trash</span>
+            <span className="text-[10.5px] tabular-nums text-muted-foreground/50">⌘⌫</span>
+          </button>
         </>
       )}
     </div>

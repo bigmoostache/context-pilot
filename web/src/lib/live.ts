@@ -468,6 +468,23 @@ export function useRenameItem(agentId: string) {
   })
 }
 
+/**
+ * Mutation to move one or more entries to the realm trash (the Finder's
+ * right-click "Move to Trash"). Not a delta-covered resource → a `useMutation`.
+ * On success the WHOLE `fs` query family for the agent is invalidated so the
+ * trashed entries vanish from the current listing at once (they move into a
+ * hidden `.cp-trash/` the listing never shows).
+ */
+export function useTrashItems(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ items }: { items: string[] }) => api.trashItems(agentId, items),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["fs", agentId] })
+    },
+  })
+}
+
 export function useCreateAgent() {
   const client = useQueryClient()
   return useMutation({
