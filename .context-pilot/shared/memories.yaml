@@ -7,28 +7,34 @@
   importance: high
   last_edited_ms: 0
 23e49e14df1636cf:
-  tl_dr: 'T262 model-picker bugs FIXED: added Claude Code OAuth V1 + API Key providers to web; surface authoritative provider from backend meta. Details in contents.'
+  tl_dr: 'T262 model-picker FULLY fixed: web shows all 8 providers; provider surfaced authoritatively from backend meta; AND provider+model selection now PERSISTS across reload (the Ctrl+R revert bug). Details in contents.'
   contents: |-
-    ## T262 model-picker two bugs — FIXED
+    ## T262 model-picker bugs — ALL FIXED
 
-    **Bug 2 (Claude Code OAuth V1 missing):** web/src/lib/models.ts PROVIDERS now has 8 (added `claudecode` "Claude Code (OAuth)" + `claudecodeapikey` "Claude Code (API Key)"), each sharing the AnthropicModel roster (claude-opus45/sonnet45/haiku45, api claude-opus-4-6/sonnet-4-5-…/haiku-4-5-…) — mirrors TUI builder.rs build_models where Anthropic|ClaudeCode|ClaudeCodeApiKey all use AnthropicModel. Icons ShieldCheck/KeyRound. Fixes BOTH dialogs (manage modal + ConfigPanel global) since both render the shared PROVIDERS via ModelPicker.
+    **Bug 2 (Claude Code OAuth V1 missing):** web/src/lib/models.ts PROVIDERS now has 8 (added `claudecode` "Claude Code (OAuth)" + `claudecodeapikey` "Claude Code (API Key)"), each sharing AnthropicModel roster. Mirrors TUI builder.rs.
 
-    **Bug 1 (claudecodev2 agent shows Anthropic):** root cause = frontend guessed provider from model api-name, but anthropic-family providers share api names. FIX surfaces the authoritative provider:
-    - backend meta.rs: new read_provider() reads config.json modules.core.llm_provider; build_agent_meta adds "provider" to the JSON.
-    - types.ts: Agent.provider?: string.
-    - models.ts: resolveSelection(providerId, apiName) — prefers explicit provider (findProvider) then picks model by api name within it (else provider default), degrades to resolveFromApiName when no provider id.
-    - AgentModal.tsx: resolved = resolveSelection(agent.provider, agent.model).
+    **Bug 1 (claudecodev2 agent shows Anthropic):** backend meta.rs read_provider() reads config.json modules.core.llm_provider; build_agent_meta adds "provider"; types.ts Agent.provider?; models.ts resolveSelection(providerId, apiName) prefers explicit provider; AgentModal uses it.
 
-    Backend apply_configure (run/threads/commands.rs) already mapped Anthropic|ClaudeCode|ClaudeCodeApiKey→anthropic_model, ClaudeCodeV2→claude_code_v2_model — no change needed. Configure command sends model.id (serde kebab id like claude-opus45), which apply_configure deserializes correctly.
+    **Bug 3 (PROVIDER+MODEL REVERTS AFTER Ctrl+R) — the persistence bug, FIXED:**
+    User story: change provider (e.g. minimax) in manage modal → Apply → Ctrl+R reload → reopen → reverted to original. REPRODUCED LIVE (834eb test agent): Configure accepted at rev but config.json modules.core.llm_provider STAYED claudecodev2 even after 3s.
 
-    PROVEN LIVE: context-pilot agent /meta provider=claudecodev2 model=claude-opus-4-6 → resolveSelection picks V2 tab (model api not in V2 roster → falls back to V2 default Opus 4.8), no longer mislabels as Anthropic. cargo build -p cp-orchestrator + npm run build green; orchestrator restarted debug :7878 CP_COST_BUDGET=100000000 console P40.
+    ROOT CAUSE (two layers):
+    1. **No save after bridge command.** apply_configure (src/app/run/threads/commands.rs) sets state.llm_provider + per-provider model enum + flags.ui.dirty, but the background loop's poll_bridge_commands→apply_command NEVER called save_state. Thread create/archive survive reload only because they ride oplog→view; provider is read from config.json (read_provider) which was never rewritten after Configure. FIX: src/app/run/threads/bridge.rs poll_bridge_commands tracks applied_any and calls app.save_state_async() after the drain loop (save_state_async is pub(super) in src/app/run/input.rs:55, reachable from descendant bridge.rs). config.json mtime now changes after Configure — proven. This is load-bearing ONLY for config-only mutations with no oplog delta (chiefly Configure); roster mutations get a disk-backstop promptness bonus.
+    2. **minimax_model + claude_code_v2_model were never in core save/load.** src/modules/overview/mod.rs OverviewModule (id='core') save_module_data/load_module_data serialized anthropic/grok/groq/deepseek models but NOT minimax_model or claude_code_v2_model (newer providers) nor their secondary variants. So even with the save firing, a MiniMax/ClaudeCodeV2 MODEL pick reverted to default on reload. FIX: added minimax_model, claude_code_v2_model, secondary_minimax_model, secondary_claude_code_v2_model to BOTH save (serde_json::json!) and load (data.get + from_value) blocks.
+
+    GOTCHAS surfaced this session:
+    - FileLogger (src/main.rs:157) only logs targets starting with `cp_base` — so log::info! in the `tui` crate (apply_configure) is FILTERED OUT. Don't rely on state-machine.log for bridge command tracing.
+    - Configure intake "accepted" (rev) = journal-then-ack succeeded; it is NOT proof apply_configure's mutation succeeded. apply_configure early-returns silently if provider OR model fails to deserialize. minimax_model is #[serde(rename_all=kebab-case)] → M27 serializes to "m27" (web models.ts id is "m27", matches). My earlier manual curl used stale "minimax-m2" → early-returned (test artifact, not the bug).
+    - Restart-on-rebuild: an already-running process keeps the OLD code even after cargo rebuilds the binary file in place. MUST restart the agent (POST /restart → new pid) to pick up a fix; confirm pid CHANGES.
+
+    PROVEN LIVE end-to-end: restart 834eb on new binary → Configure minimax/m27 → config.json llm_provider=minimax (persists) → /meta provider=minimax (modal lands on MiniMax tab after reload). Configure claudecodev2/claude-fable5 → claude_code_v2_model=claude-fable5 (persists). Restored agent to claudecodev2/claude-opus48 clean. cargo build --release green; rust-check + lint-integrity green (folder-sizes 'failure' = ./oplog/bodies runtime artifact, gitignored, unrelated).
   importance: medium
   labels:
   - T262
   - model-picker
   - provider
   - fixed
-  last_edited_ms: 1781880783775
+  last_edited_ms: 1781884032338
 3d36396d2a618055:
   tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
   importance: critical

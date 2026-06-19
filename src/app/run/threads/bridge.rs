@@ -56,8 +56,19 @@ pub(in crate::app::run) fn bridge_active(state: &State) -> bool {
 /// commands applies in the same tick instead of trickling in one-per-tick
 /// (design doc Phase 3.1). Safe to call every tick: returns immediately when
 /// the bridge is OFF, the listener is absent, or no connection is pending.
+///
+/// When at least one command applied, the agent's tier-② state is persisted
+/// (`save_state_async`). This is load-bearing for commands whose effect lives
+/// **only** in config.json and has no oplog-delta representation — chiefly
+/// `Configure` (LLM provider + model): without a save, the change exists only
+/// in memory and is lost on the next reload, which is read back from
+/// config.json via `/meta` (the "provider reverts after Ctrl+R" bug). Roster
+/// mutations already ride the oplog→view for live reads, so the save is a
+/// promptness bonus for their disk backstop, never a correctness dependency.
+/// The write is async + click-frequency, so it never burdens the loop.
 pub(in crate::app::run) fn poll_bridge_commands(app: &mut App) {
     let mut budget = DRAIN_BUDGET;
+    let mut applied_any = false;
     while budget > 0 {
         budget = budget.saturating_sub(1);
         let Some(commands) = accept_commands(&mut app.state) else {
@@ -65,7 +76,11 @@ pub(in crate::app::run) fn poll_bridge_commands(app: &mut App) {
         };
         for cmd in commands {
             super::commands::apply_command(app, cmd);
+            applied_any = true;
         }
+    }
+    if applied_any {
+        app.save_state_async();
     }
 }
 

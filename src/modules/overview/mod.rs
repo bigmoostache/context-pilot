@@ -71,11 +71,15 @@ impl Module for OverviewModule {
             "grok_model": state.grok_model,
             "groq_model": state.groq_model,
             "deepseek_model": state.deepseek_model,
+            "minimax_model": state.minimax_model,
+            "claude_code_v2_model": state.claude_code_v2_model,
             "secondary_provider": state.secondary_provider,
             "secondary_anthropic_model": state.secondary_anthropic_model,
             "secondary_grok_model": state.secondary_grok_model,
             "secondary_groq_model": state.secondary_groq_model,
             "secondary_deepseek_model": state.secondary_deepseek_model,
+            "secondary_minimax_model": state.secondary_minimax_model,
+            "secondary_claude_code_v2_model": state.secondary_claude_code_v2_model,
             "reverie_enabled": state.flags.config.reverie_enabled,
             "cleaning_threshold": state.cleaning_threshold,
             "context_budget": state.context_budget,
@@ -129,6 +133,16 @@ impl Module for OverviewModule {
         {
             state.deepseek_model = m;
         }
+        if let Some(v) = data.get("minimax_model")
+            && let Ok(m) = serde_json::from_value(v.clone())
+        {
+            state.minimax_model = m;
+        }
+        if let Some(v) = data.get("claude_code_v2_model")
+            && let Ok(m) = serde_json::from_value(v.clone())
+        {
+            state.claude_code_v2_model = m;
+        }
         if let Some(v) = data.get("secondary_provider")
             && let Ok(p) = serde_json::from_value(v.clone())
         {
@@ -153,6 +167,16 @@ impl Module for OverviewModule {
             && let Ok(m) = serde_json::from_value(v.clone())
         {
             state.secondary_deepseek_model = m;
+        }
+        if let Some(v) = data.get("secondary_minimax_model")
+            && let Ok(m) = serde_json::from_value(v.clone())
+        {
+            state.secondary_minimax_model = m;
+        }
+        if let Some(v) = data.get("secondary_claude_code_v2_model")
+            && let Ok(m) = serde_json::from_value(v.clone())
+        {
+            state.secondary_claude_code_v2_model = m;
         }
         if let Some(v) = data.get("reverie_enabled").and_then(serde_json::Value::as_bool) {
             state.flags.config.reverie_enabled = v;

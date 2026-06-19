@@ -1826,6 +1826,10 @@
   path: docs/rust-static-analysis-tools.md
   description: 'Comprehensive listing of Rust static analysis tools, modeled after Holzmann''s classic C tools page. Covers: compiler (rustc/clippy), commercial (CodeQL/Semgrep/Coverity/Klocwork/SonarQube/TrustInSoft), academic (Miri/Rudra/MIRAI/MirChecker/lockbud/Yuga), formal verification (Kani/Prusti/Verus/Creusot/Flux/Aeneas/hax), theory (RustBelt/Stacked Borrows), fuzzing (cargo-fuzz/bolero/proptest/loom), supply chain (cargo-audit/deny/geiger/vet/crev), CI pipeline recommendations, textbooks.'
   last_edited_ms: 0
+3f07cca3d8f73cbd:
+  path: src/app/run/threads/bridge.rs
+  description: 'Bridge command intake + live-state emission (gated bridge-ON). poll_bridge_commands drains ALL pending commands/tick (Leg 3) → super::commands::apply_command, then calls app.save_state_async() when ≥1 command applied — LOAD-BEARING for config-only mutations with NO oplog-delta representation (chiefly Configure: LLM provider+model), which would otherwise live only in memory and revert on reload (the ''provider reverts after Ctrl+R'' bug, T262). Roster mutations ride oplog→view so the save is just a disk-backstop promptness bonus there. emit_roster_delta (pub(super)) = non-blocking DURABLE oplog append on thread mutation. emit_vitals = chokepoint: best-effort PhaseTransition + CostAggregate, on-change only, never fsyncs loop (I2). emit_thread_status = observe-on-change chokepoint diffing wire_turn(status) vs thread_statuses memo → DURABLE ThreadStatusChanged on flip. emit_thread_focus = observe-on-change chokepoint diffing FocusState.focused_thread_id vs BridgeState.last_focus memo (seeded no-emit first pass) → BEST-EFFORT ThreadFocusChanged on change (ephemeral UI state like phase; self-heals from disk FocusState). wire_turn (pub(super)) ThreadStatus→ThreadTurn identity-by-name. Command APPLICATION extracted to sibling commands.rs.'
+  last_edited_ms: 1781884002385
 3f0f9924f0ea6586:
   path: crates/cp-base/src/config/llm_types.rs
   description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends), per-provider model enums with pricing/context windows
@@ -4014,6 +4018,10 @@
   path: crates/cp-mod-utilities/src/time.rs
   description: Timestamp formatting/parsing. Hinnant civil_from_days, date +%z cached offset. RFC 3339, epoch conversions, local time. decompose_epoch_secs returns Local struct. Replaces chrono crate.
   last_edited_ms: 0
+8b363c97bebea9c4:
+  path: src/modules/overview/mod.rs
+  description: OverviewModule (id='core', is_global) — owns the Statistics + Tools panels, core system tools (Close_panel/system_reload/tool_manage/panel_goto_page/module_toggle), and the GLOBAL config persistence in config.json modules.core. save_module_data/load_module_data serialize active_modules, dev_mode, llm_provider + EVERY provider's model enum (anthropic/grok/groq/deepseek/minimax/claude_code_v2 + secondary variants — minimax_model & claude_code_v2_model added in T262 so a MiniMax/Claude-Code-V2 model selection no longer reverts to default on reload), reverie/cleaning/budget, token+cost counters, disabled_tools. Close_panel pre-flight warns on stale [!]/missing tree descriptions. has_pending_tree_describe helper. Visualizers in visualizers.rs.
+  last_edited_ms: 1781884002408
 8b3dfa4c050eabaf:
   path: .github/checks/lint-config.chain
   description: Cryptographic hash chain protecting 12 critical lint/config files
