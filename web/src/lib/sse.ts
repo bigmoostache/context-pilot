@@ -77,7 +77,14 @@ function createSseClient(agentId: string): SseClient {
     try {
       const ticket = await mintTicket()
       let url = `${BASE}/api/stream?agent=${encodeURIComponent(agentId)}&ticket=${encodeURIComponent(ticket)}`
-      if (lastEventId) url += `&last_event_id=${encodeURIComponent(lastEventId)}`
+      // Resume from the last seen rev. The backend reads the `last_rev` QUERY
+      // param (not `last_event_id`): we disable EventSource's native
+      // auto-reconnect, so the `Last-Event-ID` *header* is never sent — the
+      // query param is the only resume channel. A name mismatch here makes
+      // every reconnect a cold connect that re-seeds at the oplog HEAD, silently
+      // dropping any deltas emitted during the disconnect window (they then only
+      // surface on the slow 15s backstop poll — the T268 5-10s delay).
+      if (lastEventId) url += `&last_rev=${encodeURIComponent(lastEventId)}`
       es = new EventSource(url)
 
       es.onopen = () => {

@@ -24,31 +24,19 @@
 4ac980654a7acaf1:
   tl_dr: 'T148/T262 SHIPPED: agent creation wired end-to-end (PTY spawn via portable-pty + TanStack useMutation). Proven live. Details in contents.'
   contents: |-
-    ## T148/T262 — agent creation SHIPPED (X896, on demaquetting)
+    ## T148/T262 — agent creation SHIPPED (X896) + agent RESTART SHIPPED (a96960a)
 
-    User (T262='Creating a new agent', =T148): 'wire it. do it PROPERLY. using tanstack and the correct design infra'. DONE end-to-end, proven live (curl POST → 202 spawning → real TUI booted on pty STAT Ss+ → self-registered ad7ab4c → appeared in /api/fleet/meta as idle agent 'create-smoke-test'). Smoke-test agent torn down after.
+    ### RESTART (revive stale-binary agents) — commit a96960a pushed 2026-06-19
+    User (main loop N4994): editing the test agent's config from the cockpit returned 502 'agent unreachable' — its running binary predated the Configure command handler. Wanted a reload/restart button.
 
-    ### Backend (cp-orchestrator)
-    - Cargo.toml: portable-pty="0.9" (unsafe forbidden workspace-wide → safe pty crate, NOT nix::openpty). main.rs needs `use portable_pty as _;` (per-target unused-crate-deps, bin doesn't reference it directly).
-    - supervisor/proc.rs (NEW, 140L): Proc enum {Std(Child), Pty{child:Box<dyn portable_pty::Child+Send+Sync>, _master:Box<dyn MasterPty+Send>}, Adopted} + Supervised struct + manual Debug + spawn_pty_proc(binary,folder,env)->(Proc,u32): native_pty_system().openpty(40x120) → CommandBuilder(cwd + inherit std::env::vars() + layer env overrides) → slave.spawn_command → drop(slave) → detached thread drains master. Split out of mod.rs for 500-line budget.
-    - supervisor/mod.rs: spawn_pty method (dup-check, validate_binary allow-list, canonicalize folder, call proc::spawn_pty_proc, insert Supervised). Error::Pty{detail} variant. stop/check_liveness handle Proc::Pty (child.wait/try_wait, exit_code u32→i32).
-    - runtime.rs Config: agents_root (CP_AGENTS_ROOT, default ~/code), agent_binary (CP_AGENT_BINARY, default <cwd>/target/release/tui — cp bin name is 'tui').
-    - transport/mod.rs Backend: +supervisor:AgentSupervisor (allow-list seeded from agent_binary) +agents_root +agent_binary. Backend::new is now 4-arg. Needs `use crate::supervisor::AgentSupervisor;`.
-    - transport/rest/create.rs (NEW, 140L): create_agent(state, body) — parse {name, folder?, model?(ignored)}, slugify(name) mirrors web modal, folder=agents_root/slug (or explicit), mkdir -p, spawn_pty(key=folder, binary, folder, env=[CP_BRIDGE=1, CP_AGENTS_DIR]) → 202 {status:spawning,folder,pid}. Route POST /api/fleet/create in route_rest. Split out of rest/mod.rs for budget.
+    Backend: POST /api/agent/{id}/restart → rest/restart.rs restart_agent(state,id): resolve registry entry→folder+pid; supervisor::kill_pid(pid) FREE fn (SIGTERM→STOP_GRACE→SIGKILL, lock-free, works on EXTERNALLY-launched agents the supervisor never owned — no child handle to reap); if was_supervised, stop(key) to drop stale record; spawn_pty on the SAME folder (env CP_BRIDGE=1+CP_AGENTS_DIR) → re-registers under SAME id (id derived from folder). 202 {status:restarting,folder,pid}. Added supervisor.is_supervised(key)->bool. Route in transport/mod.rs route_rest. mod.rs re-exports restart_agent. All locked sections brief; kill (up to 5s grace) runs lock-free.
 
-    ### Frontend (web)
-    - api.ts: createAgent({name,folder?,model?})->CreateAgentReceipt POST /api/fleet/create.
-    - live.ts: useCreateAgent() = useMutation, onSuccess invalidate qk.fleet() immediately + setTimeout 1500ms & 3500ms (agent self-registers ~1-2s, fleet backstop poll is 15s).
-    - AgentModal.tsx: submit() create-mode → createAgent.mutate (pending spinner 'Creating…', inline role=alert error banner, onSuccess flash+close). Manage mode stays cosmetic (rename/archive NOT backend-wired — out of scope). Modal shared by TopBar + FleetDashboard so both get it.
+    Frontend: api.restartAgent(id)->RestartReceipt POST. live.ts useRestartAgent()=useMutation, onSuccess invalidate qk.fleet() + setTimeout 2s & 4s (respawn self-registers ~2-3s). AgentModal manage footer: Restart button (RefreshCw, animate-spin while pending, disabled on pending), calls restartAgent.mutate(agent.id) → onFlash + onClose; onError sets inline error banner.
 
-    ### Gotchas reused
-    - unsafe_code=forbid workspace-wide → portable-pty (not hand-rolled openpty).
-    - cp TUI = target/release/tui (bin name 'tui').
-    - Orchestrator restart REQUIRED after backend change (kill :7878 via lsof, relaunch CP_COST_BUDGET=100000000 ./target/debug/cp-orchestrator).
-    - Spawned agent inherits orchestrator env (API keys) + CP_BRIDGE=1 + CP_AGENTS_DIR → self-registers to ~/.context-pilot/agents → fleet scan discovers.
-    - folder-sizes: supervisor/mod.rs + rest/mod.rs hit >500 after additions → extracted proc.rs + create.rs.
+    Proven LIVE: test agent 834eb459c7b064db (folder ~/code/test) — Configure 502 → POST /restart 202 (new pid 65877, Ss+ on pty) → same id re-registered → Configure 200 accepted rev:40. cargo+tsc green, orchestrator restarted (debug, :7878, CP_COST_BUDGET=100000000, console P35).
 
-    NOT done (deliberate, v1): model picker cosmetic (no --model CLI flag on tui); manage-mode rename/archive cosmetic; no dedicated playwright e2e for create (spawns a real heavy TUI — validated via curl instead).
+    ### Agent creation (X896) — unchanged, see below.
+    User (T262='Creating a new agent', =T148): 'wire it. do it PROPERLY. using tanstack and the correct design infra'. DONE end-to-end, proven live. portable-pty 0.9 (unsafe forbidden). create.rs + proc.rs split for 500-line budget. supervisor.spawn_pty. runtime Config agents_root(CP_AGENTS_ROOT ~/code)+agent_binary(CP_AGENT_BINARY target/release/tui). Backend::new 4-arg. api.createAgent + useCreateAgent. Orchestrator restart REQUIRED after any backend change (kill :7878 via lsof, relaunch). NOT done v1: model picker cosmetic on create (tui has no --model flag), manage rename/archive cosmetic.
   importance: medium
   labels:
   - T148
@@ -57,7 +45,7 @@
   - backend
   - pending
   - plan
-  last_edited_ms: 1781873398138
+  last_edited_ms: 1781879016382
 5623177cb0b0ed7d:
   tl_dr: 'MULTI-WORKER (subworkers branch): N equal workers in one Rust loop. Decisions + arch in contents.'
   contents: |-

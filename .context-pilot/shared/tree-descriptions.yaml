@@ -6130,6 +6130,10 @@ d3f82c22b0de608b:
   path: crates/cp-wire/tests/framing_integrity.rs
   description: 'Phase 21 (X788): exhaustive framing integrity suite — the V1 torn-tail property at byte granularity. Truncate at EVERY offset (clean-prefix-only, never fabricated frame), single-byte-flip at every offset (detected-or-byte-identical, never silent-different), payload-region corruption always CrcMismatch, trailing garbage doesn''t corrupt first decode, sub-header buffers Incomplete-never-panic, oversized len-prefix rejected-not-allocated, zero-length payload round-trips. Lib-only deps acked via use crc32c/serde/serde_json/sha2 as _ (per-target unused-crate-dependencies). 8 tests.'
   last_edited_ms: 1781648169011
+d4527968c406c423:
+  path: web/sse_reconnect_probe.py
+  description: 'T268 reconnect-replay probe (deterministic, no browser). Connects the SSE stream twice with ?last_event_id=<rev> vs ?last_rev=<rev> and counts deltas with id>rev replayed in the first 2s (= immediate gap replay). Proves the resume param-name bug: last_event_id→0 replayed (cold seed at head, deltas lost→15s poll→5-10s delay); last_rev→N replayed (gap recovered). Per-read socket timeout (0.4s) ends the idle window. Run: python3 sse_reconnect_probe.py [AGENT_ID].'
+  last_edited_ms: 1781879216304
 d45b12e52c9d6ca6:
   path: ui/src/components/conversation/Conversation.tsx
   description: 'Center conversation surface: header strip (msg counts, streaming indicator), scrollable message list, input bar.'
@@ -6778,6 +6782,10 @@ ef88c139f0bdac2b:
   path: yamls/tools/threads.yaml
   description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
   last_edited_ms: 0
+f0084294a9bef3c2:
+  path: web/src/lib/sse.ts
+  description: 'Reconnecting SSE client. Singleton per-agent via getOrCreateSseClient(). EventSource to /api/stream with ticket auth. RESUME via the `last_rev` QUERY param (T268 fix): native EventSource auto-reconnect is disabled (es.close() in onerror + manual scheduleReconnect), so the Last-Event-ID HEADER is never sent — the query param is the ONLY resume channel, and the backend reads `last_rev`. The old `last_event_id` name mismatch made every reconnect a cold seed at oplog HEAD, dropping deltas emitted during the disconnect window (they surfaced only on the 15s backstop poll = the 5-10s TUI→frontend delay). lastEventId captured from each event''s e.lastEventId. Exponential backoff with jitter. Named events: delta/stream/resync/invalidate.'
+  last_edited_ms: 1781879216325
 f0295daf8bbd04ee:
   path: Cargo.toml
   description: Workspace root. 25 crate members (incl cp-wire/cp-oplog/cp-mod-bridge/cp-orchestrator). Binary 'tui'. Edition 2024. Strict lint config (980 forbid, 21 deny). openssl vendored.
