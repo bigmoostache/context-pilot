@@ -407,14 +407,30 @@ function useLiveQuery<T>(
       }
       // Rev-ordered delivery → high-water guard drops only true replay dupes.
       if (typeof entry.rev === "number" && entry.rev <= lastRevRef.current) return
-      const next = reducer(dataRef.current, entry)
-      if (next === null || next === undefined) {
-        // Reducer can't apply (e.g. unknown id, or not loaded) → ground-truth refetch.
+      // Decide apply-vs-refetch against the latest snapshot we can see. A
+      // `null`/`undefined` verdict means the reducer can't fold this delta
+      // confidently (e.g. an id we don't have yet) → ground-truth refetch.
+      const preview = reducer(dataRef.current, entry)
+      if (preview === null || preview === undefined) {
         return debouncedRefetch()
       }
       if (typeof entry.rev === "number") lastRevRef.current = entry.rev
-      // Same reference = acknowledged-but-irrelevant → no state churn.
-      if (next !== dataRef.current && mountedRef.current) setData(next)
+      if (!mountedRef.current) return
+      // Apply via the FUNCTIONAL updater so each delta folds onto the FRESHEST
+      // committed state — not a `dataRef` snapshot. This is load-bearing: a
+      // single send emits a burst (`message_created` + `thread_status_changed`)
+      // delivered in one synchronous SSE macrotask, BEFORE React re-renders and
+      // refreshes `dataRef`. With value-form `setData(reducer(dataRef, …))`,
+      // both reducers read the SAME stale base and the second `setData`
+      // overwrites the first — silently dropping the appended message (the
+      // T123 "appears then vanishes for ~10 s until the disk poll" flicker).
+      // Folding on `prev` makes the status delta apply on top of the message
+      // append instead of clobbering it. A reducer that can't fold onto the
+      // freshest `prev` returns `prev` unchanged; the poll backstop reconciles.
+      setData((prev) => {
+        const folded = reducer(prev, entry)
+        return folded === null || folded === undefined ? prev : folded
+      })
     })
     // Single-mechanism discipline (X859): a resource WITH a delta reducer is
     // delta-covered — it owns its freshness through in-place `delta` apply

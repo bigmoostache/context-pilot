@@ -34,6 +34,7 @@ pub mod inspect;
 mod query;
 pub mod rest;
 pub mod sse;
+mod stream;
 pub mod ticket;
 
 use std::collections::HashSet;
@@ -41,41 +42,17 @@ use std::io::Read as _;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+
 
 use tiny_http::{Header, Method, Request, Response, Server};
 
 use cp_wire::types::registry::Entry;
-use cp_wire::types::stream::Frame;
 
-use crate::channel::Tailer;
+
 use crate::inspect::StateReader;
 use crate::services::{CostBreaker, MaterializedView, StreamHub};
 use ticket::TicketStore;
 use query::QueryParams;
-
-/// Tight tail re-poll cadence for the SSE producer.
-///
-/// The [`OplogWaiter`](sse::OplogWaiter) wakes the producer the instant the
-/// agent appends — single-digit ms on Linux (inotify) — but macOS FSEvents
-/// coalesces filesystem notifications with a ~300 ms latency window, which
-/// would otherwise floor visible latency at hundreds of ms. Capping the wait at
-/// this tight value makes the producer re-poll its tailer every few ms
-/// regardless of the OS event latency, so a durable delta reaches the browser
-/// within ~`TAIL_REPOLL` even on macOS. On Linux the waiter still returns early
-/// on the inotify event (sub-ms), so this is purely a backstop there — the
-/// design doc's "inotify primary, poll backstop" contract (I12/§8.1), just with
-/// a backstop tight enough to be acceptable on every platform.
-const TAIL_REPOLL: Duration = Duration::from_millis(5);
-
-/// How often the SSE producer emits a keep-alive comment.
-///
-/// Decoupled from [`TAIL_REPOLL`] so the tight re-poll loop does not spam the
-/// client with hundreds of keep-alive comments per second. The keep-alive
-/// doubles as the idle disconnect probe; on a fully idle stream a dropped
-/// connection is detected within this interval (a busy stream is detected
-/// immediately by the failing delta/frame write).
-const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(10);
 
 /// Default per-agent SSE subscriber buffer capacity.
 const DEFAULT_SUB_CAPACITY: usize = 256;
@@ -308,109 +285,9 @@ fn handle_stream(request: Request, state: &Arc<Mutex<Backend>>, query: &str) {
     let producer_state = Arc::clone(state);
     let agent = agent_id.to_owned();
     let oplog_dir = PathBuf::from(&entry.oplog_path);
-    let _producer = thread::spawn(move || run_stream(&sink, &producer_state, &agent, &oplog_dir, last_rev));
+    let _producer = thread::spawn(move || stream::run_stream(&sink, &producer_state, &agent, &oplog_dir, last_rev));
 
     sse::stream_to_client(request, body);
-}
-
-/// The SSE producer loop: replay-from-`rev`, then live oplog + stream tail.
-///
-/// Runs until a `send` fails (the client disconnected, dropping the body
-/// reader). Unsubscribes its stream-hub slot on exit.
-fn run_stream(sink: &sse::SseSink, state: &Arc<Mutex<Backend>>, agent_id: &str, oplog_dir: &PathBuf, last_rev: Option<u64>) {
-    let mut tailer = Tailer::new(oplog_dir.clone());
-    if let Some(rev) = last_rev {
-        tailer.seed(rev);
-    }
-    // Event-driven wakeup on oplog appends (design doc I12). If the watch can't
-    // be established, `waiter` is None and the loop degrades to a pure backstop
-    // poll at STREAM_BACKSTOP — correct, just less snappy.
-    let waiter = sse::OplogWaiter::new(oplog_dir).ok();
-    let sub_id = state.lock().ok().map(|mut b| b.hub.subscribe(agent_id));
-    let mut gap_checked = last_rev.is_none();
-    let mut last_keepalive = std::time::Instant::now();
-
-    loop {
-        // Oplog deltas (durable, rev-numbered).
-        match tailer.poll() {
-            Ok(entries) => {
-                if !gap_checked {
-                    if let (Some(want), Some(first)) = (last_rev, entries.first()) {
-                        // The oldest replayable entry skips past the client's
-                        // last rev ⇒ a gap the oplog can't cover ⇒ resync.
-                        if first.rev > want.saturating_add(1) && sink.send(&sse::SseMessage::resync()).is_err() {
-                            break;
-                        }
-                    }
-                    gap_checked = true;
-                }
-                for entry in &entries {
-                    let data = serde_json::to_string(entry).unwrap_or_default();
-                    if sink.send(&sse::SseMessage::delta(entry.rev, data)).is_err() {
-                        return cleanup(state, agent_id, sub_id);
-                    }
-                }
-            }
-            Err(_) => {
-                if sink.send(&sse::SseMessage::resync()).is_err() {
-                    return cleanup(state, agent_id, sub_id);
-                }
-            }
-        }
-
-        // Ephemeral stream frames (best-effort hints).
-        if let Some(sub) = sub_id {
-            let frames = drain_frames(state, agent_id, sub);
-            for frame in &frames {
-                let data = serde_json::to_string(frame).unwrap_or_default();
-                if sink.send(&sse::SseMessage::stream(data)).is_err() {
-                    return cleanup(state, agent_id, sub_id);
-                }
-            }
-        }
-
-        // Tier-② state change — the driver loop or a command handler flagged
-        // this agent's inspection-plane data as stale. Push an `invalidate`
-        // event so connected frontends refetch immediately.
-        {
-            let is_dirty = state.lock().ok().map_or(false, |mut b| b.take_dirty(agent_id));
-            if is_dirty && sink.send(&sse::SseMessage::invalidate()).is_err() {
-                return cleanup(state, agent_id, sub_id);
-            }
-        }
-
-        // Keep-alive doubles as a disconnect probe, but only on a slow cadence
-        // so the tight tail re-poll below does not flood the client with
-        // comments. A busy stream is already disconnect-probed by its failing
-        // delta/frame writes above.
-        if last_keepalive.elapsed() >= KEEPALIVE_INTERVAL {
-            if sink.keep_alive().is_err() {
-                return cleanup(state, agent_id, sub_id);
-            }
-            last_keepalive = std::time::Instant::now();
-        }
-        // Park until the agent appends to its oplog (woken in sub-ms on Linux
-        // inotify) or the tight backstop elapses — so a delta surfaces within
-        // ~TAIL_REPOLL even on macOS, where FSEvents notification latency is
-        // far higher than the target.
-        match &waiter {
-            Some(w) => w.wait(TAIL_REPOLL),
-            None => thread::sleep(TAIL_REPOLL),
-        }
-    }
-    cleanup(state, agent_id, sub_id);
-}
-
-/// Drain an agent's stream-hub subscriber buffer under a brief lock.
-fn drain_frames(state: &Arc<Mutex<Backend>>, agent_id: &str, sub: u64) -> Vec<Frame> {
-    state.lock().ok().and_then(|mut b| b.hub.drain(agent_id, sub)).unwrap_or_default()
-}
-
-/// Release the stream-hub subscriber on producer exit.
-fn cleanup(state: &Arc<Mutex<Backend>>, agent_id: &str, sub_id: Option<u64>) {
-    if let (Ok(mut backend), Some(sub)) = (state.lock(), sub_id) {
-        let _removed = backend.hub.unsubscribe(agent_id, sub);
-    }
 }
 
 /// Serve a raw file download with `Content-Disposition: attachment`.
