@@ -79,6 +79,12 @@ function loadPins(agentId: string): PinnedFolder[] {
 
 let tabSeq = 1
 
+/** Sentinel `path` for the not-yet-created "New Folder" placeholder row. A NUL
+ *  byte can never appear in a real realm path, so this never collides with a
+ *  live entry; the inline editor keys off it to route a commit to mkdir (create)
+ *  instead of rename. */
+const NEW_FOLDER_SENTINEL = "\u0000__cp_new_folder__"
+
 /**
  * Finder — a per-agent file manager confined to the agent's realm. Tabs +
  * history navigation, four view modes (grid / list / Miller columns / gallery),
@@ -118,6 +124,10 @@ export function Finder({ agent }: { agent: Agent }) {
   const [toast, setToast] = useState<string | null>(null)
   const [menu, setMenu] = useState<MenuPos | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
+  // When non-null, a "New Folder" is being named inline: a placeholder folder
+  // row is shown (with this default name pre-selected) and the real mkdir only
+  // fires when the user commits the name. Null = not creating.
+  const [pendingFolderName, setPendingFolderName] = useState<string | null>(null)
   const [pathBarOpen, setPathBarOpen] = useState(false)
   const [pins, setPins] = useState<PinnedFolder[]>(() => loadPins(agent.id))
 
@@ -151,6 +161,19 @@ export function Finder({ agent }: { agent: Agent }) {
     ? children.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
     : children
   const sorted = sortNodes(filtered, sortKey, asc)
+  // While naming a New Folder, prepend an inline-editable placeholder row (a
+  // synthetic folder at the sentinel path) so the user names it IN PLACE before
+  // it's created. Folders sort first anyway, so the top is a natural spot.
+  const displayNodes = useMemo<FinderNode[]>(
+    () =>
+      pendingFolderName != null
+        ? [
+            { name: pendingFolderName, path: NEW_FOLDER_SENTINEL, kind: "folder", modified: "", count: 0 },
+            ...sorted,
+          ]
+        : sorted,
+    [pendingFolderName, sorted],
+  )
   const crumbs = useMemo(
     () => buildCrumbs(agent.folder, agent.name, cwd),
     [agent.folder, agent.name, cwd],
@@ -246,23 +269,20 @@ export function Finder({ agent }: { agent: Agent }) {
     }
   }, [])
 
-  // Create a new folder in the current directory. macOS-style: auto-name
-  // "untitled folder" (then " 2", " 3", …) avoiding collisions with the live
-  // listing, create it via the backend, and surface it. Used by both the
-  // toolbar New Folder button and the empty-space context menu.
+  // Begin creating a folder the macOS way: insert an inline-editable placeholder
+  // row with a collision-free default name pre-selected. The real mkdir only
+  // fires when the user COMMITS the name (commitRename's sentinel branch); Esc
+  // or a blank name abandons it without touching disk. Used by both the toolbar
+  // New Folder button and the empty-space context menu.
   const newFolder = () => {
     const existing = new Set(children.map((c) => c.name.toLowerCase()))
     let name = "untitled folder"
     for (let i = 2; existing.has(name.toLowerCase()); i++) name = `untitled folder ${i}`
-    flash("Creating folder…")
-    mkdir.mutate(
-      { dir: relCwd, name },
-      {
-        onSuccess: () => flash(`Created “${name}”.`),
-        onError: (err) =>
-          flash(err instanceof Error ? err.message : "Could not create folder"),
-      },
-    )
+    setPendingFolderName(name)
+    setRenamingPath(NEW_FOLDER_SENTINEL)
+    // Gallery has no inline name field — fall back to grid so the placeholder is
+    // actually editable.
+    if (viewMode === "gallery") setViewMode("grid")
   }
 
   // Move dragged entries (realm-relative paths) into a destination folder — the
@@ -292,12 +312,30 @@ export function Finder({ agent }: { agent: Agent }) {
   // item). Switches the matching name cell to an editable field.
   const startRename = (node: FinderNode) => setRenamingPath(node.path)
 
-  // Commit an inline rename. A blank or unchanged name is a silent cancel (the
-  // field commits on blur even when untouched). Otherwise call the backend; on
-  // success the fs listing refetches and the entry reappears renamed.
+  // Commit an inline edit. The sentinel placeholder routes to mkdir (CREATE the
+  // pending New Folder); any other node routes to rename. A blank or unchanged
+  // name is a silent cancel (the field commits on blur even when untouched).
   const commitRename = (node: FinderNode, raw: string) => {
     setRenamingPath(null)
     const name = raw.trim()
+
+    // ── New Folder: the sentinel placeholder → real create on commit ──
+    if (node.path === NEW_FOLDER_SENTINEL) {
+      setPendingFolderName(null)
+      if (!name) return // abandoned (empty) → no folder created
+      flash("Creating folder…")
+      mkdir.mutate(
+        { dir: relCwd, name },
+        {
+          onSuccess: () => flash(`Created “${name}”.`),
+          onError: (err) =>
+            flash(err instanceof Error ? err.message : "Could not create folder"),
+        },
+      )
+      return
+    }
+
+    // ── Rename an existing entry ──
     if (!name || name === node.name) return
     rename.mutate(
       { path: node.path, name },
@@ -307,6 +345,13 @@ export function Finder({ agent }: { agent: Agent }) {
           flash(err instanceof Error ? err.message : "Rename failed"),
       },
     )
+  }
+
+  // Abandon any in-progress inline edit (Esc): a pending New Folder is dropped
+  // (never created), an in-progress rename is left untouched.
+  const cancelRename = () => {
+    setRenamingPath(null)
+    setPendingFolderName(null)
   }
 
   // The backend lists paths RELATIVE to the realm root (e.g. "crates",
@@ -525,7 +570,7 @@ export function Finder({ agent }: { agent: Agent }) {
     onMove: moveItemsInto,
     renamingPath,
     onRenameCommit: commitRename,
-    onRenameCancel: () => setRenamingPath(null),
+    onRenameCancel: cancelRename,
   }
 
   // ── box (marquee) selection ─────────────────────────────────────
@@ -671,12 +716,12 @@ export function Finder({ agent }: { agent: Agent }) {
                 />
               )}
               {viewMode === "grid" && (
-                <GridView key={cwd} nodes={sorted} iconSize={iconSize} {...viewProps} />
+                <GridView key={cwd} nodes={displayNodes} iconSize={iconSize} {...viewProps} />
               )}
               {viewMode === "list" && (
                 <ListView
                   key={cwd}
-                  nodes={sorted}
+                  nodes={displayNodes}
                   sortKey={sortKey}
                   asc={asc}
                   onSort={onSort}
@@ -688,7 +733,7 @@ export function Finder({ agent }: { agent: Agent }) {
                   agentId={agent.id}
                   agentFolder={agent.folder}
                   chain={crumbs.map((c) => c.path)}
-                  currentNodes={sorted}
+                  currentNodes={displayNodes}
                   previewNode={previewNode}
                   onNavigate={navigate}
                   {...viewProps}
