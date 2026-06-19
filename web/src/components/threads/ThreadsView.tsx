@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react"
-import { FolderGit2, AlertTriangle } from "lucide-react"
+import { FolderGit2, AlertTriangle, Plus } from "lucide-react"
 import { ThreadList } from "./ThreadList"
 import { ThreadConversation } from "./ThreadConversation"
 import { NewThreadDialog } from "./NewThreadDialog"
@@ -106,8 +106,12 @@ export function ThreadsView({
     }).catch((e) => flash(describeCommandError("send your message", e)))
   }, [activeAgentId, effectiveSelectedId, flash])
 
-  if (!agent || threads.length === 0) {
-    return <EmptyRealm agentName={agent?.name} />
+  // Only bail to a bare empty state when there is genuinely no agent. A fresh
+  // agent that simply has zero threads MUST still render the sidebar — that is
+  // where the "New Thread" button lives — otherwise the realm is a dead end
+  // with no way to create the first thread (the sidebar would never show up).
+  if (!agent) {
+    return <EmptyRealm agentName={undefined} />
   }
 
   return (
@@ -124,7 +128,14 @@ export function ThreadsView({
         onNewThread={() => setNewOpen(true)}
       />
 
-      {thread && <ThreadConversation thread={thread} onSend={handleSend} />}
+      {/* The conversation pane shows the selected thread, or — for a realm with
+          no thread selected/created yet — a hint pointing at the sidebar's New
+          Thread button so an empty realm is never a dead end. */}
+      {thread ? (
+        <ThreadConversation thread={thread} onSend={handleSend} />
+      ) : (
+        <EmptyRealm agentName={agent.name} onNewThread={() => setNewOpen(true)} />
+      )}
 
       <NewThreadDialog open={newOpen} onClose={() => setNewOpen(false)} onCreate={handleCreate} />
 
@@ -141,8 +152,11 @@ export function ThreadsView({
   )
 }
 
-/** Shown when the active agent's realm holds no threads yet. */
-function EmptyRealm({ agentName }: { agentName?: string }) {
+/** Shown in the conversation pane when no thread is selected — either the
+ *  realm is empty, or nothing is picked yet. When `onNewThread` is supplied it
+ *  offers a primary action so an empty realm can bootstrap its first thread
+ *  without hunting for the sidebar button. */
+function EmptyRealm({ agentName, onNewThread }: { agentName?: string; onNewThread?: () => void }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-background text-center">
       <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground/60">
@@ -158,6 +172,15 @@ function EmptyRealm({ agentName }: { agentName?: string }) {
           "Select an agent to see its threads."
         )}
       </p>
+      {onNewThread && (
+        <button
+          onClick={onNewThread}
+          className="flex items-center gap-2 rounded-lg bg-[var(--signal)] px-3.5 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105"
+        >
+          <Plus className="size-4" />
+          New Thread
+        </button>
+      )}
     </div>
   )
 }

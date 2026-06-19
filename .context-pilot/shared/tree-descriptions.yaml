@@ -5986,6 +5986,10 @@ d24d5105e0077023:
   path: crates/cp-mod-callback/src/tools_upsert.rs
   description: Callback upsert tool. Create/update/delete callback definitions. Script file management. Diff-based script editing (old_string/new_string). YAML sync on every mutation.
   last_edited_ms: 0
+d27e18884929af8f:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: Threads view assembler. Uses useThreads()+useFleet() live. handleArchive/Create/Send via sendCommand, each .catch wired to a breaker-aware flash notice (describeCommandError). Auto-selects first valid thread. SIDEBAR ALWAYS RENDERS once an agent is resolved — the early-return only bails for !agent ("Select an agent"); a fresh ZERO-thread realm still shows ThreadList (its New Thread button is the ONLY create affordance) + a center EmptyRealm with its own New Thread button, fixing the dead-end where a new agent's threads view showed no sidebar and no way to create the first thread. Keyed by agentId in App.
+  last_edited_ms: 1781873991094
 d29264e579275bb3:
   path: crates/cp-mod-utilities/src/time.rs
   description: Timestamp formatting/parsing. Hinnant civil_from_days, date +%z cached offset. RFC 3339, epoch conversions, local time. decompose_epoch_secs returns Local struct. Replaces chrono crate.
