@@ -90,6 +90,35 @@
   - inline
   - shipped
   last_edited_ms: 1781890368426
+27550421d3d18b61:
+  tl_dr: 'T285 SHIPPED (5046851): Finder ''Move to Trash'' right-click now wired — reversible realm trash via hidden .cp-trash/.'
+  contents: |-
+    ## T285 — wire Move to Trash SHIPPED (5046851 pushed)
+
+    User: the 'Move to Trash' right-click option was not wired (decorative — generic menu Item → onAction toast).
+
+    ### Backend (cp-orchestrator inspect/finder/mutate.rs)
+    fs_trash(state,id,body): POST /api/agent/{id}/fs/trash, JSON {items:[rel,...]}. Each confined source MOVED into hidden TRASH_DIR='.cp-trash' at realm root (create_dir on first use). Reversible + invisible (dotfile → listing's hidden-file filter skips it). Guards: src==trash or src.starts_with(trash)→skip (no self-nesting); collision in trash → suffix with ms timestamp (name.{stamp}); confine escape→403; empty items→400; bad source→400; rename fail→502. Returns {trashed,skipped}. Route in transport/mod.rs route_rest (Post fs/trash); re-exported finder/mod.rs; mutate doc updated. mutate.rs was 277→~365 lines (under 500 cap, finder/ folder 5 entries).
+
+    ### Frontend
+    - api.ts: trashItems(agentId,items)->TrashResult{trashed,skipped} (JSON POST).
+    - live.ts: useTrashItems(agentId)=useMutation, onSuccess invalidate ['fs',agentId] family.
+    - ContextMenu.tsx: onTrash(node) prop (added to type + destructure); the 'Move to Trash' row is now a real <button>→onTrash+onClose (was decorative <Item>). 'Duplicate' still uses Item helper so it stays used.
+    - Finder.tsx: useTrashItems→trash; trashPaths(paths) flash+mutate+clear selection/focus; trashNode(node) expands to whole multi-select if node∈selected. onTrash={trashNode} on ContextMenu. KEYBOARD: Cmd/Ctrl+Backspace branch (BEFORE the plain-Backspace=goUp branch so it wins) trashes selection (or focusPath); plain Backspace still goUp. Matches the ⌘⌫ shortcut the menu advertises.
+
+    ### Proven LIVE (orchestrator debug :7878 fresh binary, agent 834eb459c7b064db ~/code/test):
+    trash file → 200 {trashed:1} (gone from root, in .cp-trash); empty items → 400; ../escape → 403; re-trash a .cp-trash entry → {skipped:1,trashed:0}; same-name collision → second file suffixed name.{ms-stamp}. Artifacts cleaned.
+
+    cargo build -p cp-orchestrator + web npm run build both green; rust-check+lint passed (folder-sizes 'failure' = ./oplog/bodies runtime artifact, gitignored, unrelated). Orchestrator RESTARTED (killed :7878 via lsof, relaunched debug CP_COST_BUDGET=100000000, console P36) since running binary predated the trash route. No TUI crate changed → no system_reload.
+
+    NEXT (open MY_TURN Finder): T287 columns-view drag-drop (user says DnD doesn't work in Miller columns — needs investigation; folderDropProps IS spread on MillerColumn so suspect deeper), T286 image previews + T281 PDF (share a raw inline-serve endpoint), T280 code syntax highlight, T282 CSV/Excel, X906 WYSIWYG md editor.
+  importance: medium
+  labels:
+  - T285
+  - finder
+  - trash
+  - shipped
+  last_edited_ms: 1781891609822
 2b8f81e3109727b7:
   tl_dr: 'T271 cold-connect off-by-one FIXED + shipped: empty-oplog SSE subscriber now receives the agent''s first append (rev 0). Details in contents.'
   contents: |-
