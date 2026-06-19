@@ -9,6 +9,7 @@
 //! * [`panels`] — cockpit inspection panels (memory, todos, tree, …).
 //! * [`finder`] — the per-agent file manager (`/fs`, preview, download).
 //! * [`metrics`] — the §19 observability snapshot (breaker, stream, rev lag).
+//! * [`vitals`] — on-demand service-connectivity probes (`/vitals`).
 //!
 //! Each submodule reaches the shared [`Backend`](crate::transport::Backend) and
 //! [`HttpReply`](crate::transport::rest::HttpReply) via absolute `crate::`
@@ -18,3 +19,4 @@ pub mod finder;
 pub mod meta;
 pub mod metrics;
 pub mod panels;
+pub mod vitals;

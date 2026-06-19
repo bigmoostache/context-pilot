@@ -252,6 +252,7 @@ fn route_rest(
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
         (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent_meta(state, id),
         (Method::Get, ["api", "agent", id, "metrics"]) => inspect::metrics::agent_metrics(state, id),
+        (Method::Get, ["api", "agent", id, "vitals"]) => inspect::vitals::agent_vitals(state, id),
         (Method::Get, ["api", "agent", id, "body", hash]) => rest::body(state, id, hash),
         (Method::Get, ["api", "agent", id, "threads"]) => rest::threads(state, id),
         (Method::Get, ["api", "agent", id, "panels"]) => inspect::panels::panel_list(state, id),

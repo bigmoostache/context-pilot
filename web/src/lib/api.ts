@@ -361,6 +361,33 @@ export function fetchMetrics(agentId: string): Promise<AgentMetrics> {
   return request(`/api/agent/${agentId}/metrics`)
 }
 
+// ── Vitals (on-demand service-connectivity probes) ────────────────────
+
+/** One service-connectivity probe result from `GET /api/agent/{id}/vitals`.
+ *
+ * `status` is honest: `"ok"` reachable, `"error"` present-but-failing,
+ * `"unavailable"` when the backend genuinely cannot perform the check from
+ * where it sits (mirrors the inspection plane's derived-state contract).
+ * `category` groups the rows (orchestrator / agent / llm / service / infra,
+ * plus `frontend` for the two rows the client adds itself). */
+export interface Vital {
+  name: string
+  category: string
+  status: "ok" | "error" | "unavailable"
+  latencyMs?: number | null
+  detail?: string
+}
+
+/** Run the agent's live service-connectivity checks on demand (the cockpit's
+ *  "Check Vitals" button). The backend probes everything it can reach —
+ *  orchestrator self, agent heartbeat + loop status, the picked LLM provider +
+ *  Voyage/Datalab/Brave/Firecrawl reachability, Meilisearch, console server —
+ *  and the caller prepends the two checks only the browser can observe (its own
+ *  liveness + the round-trip latency of this very request). */
+export function fetchVitals(agentId: string): Promise<Vital[]> {
+  return request(`/api/agent/${agentId}/vitals`)
+}
+
 /** The §19 snapshot for every known agent (GET /api/metrics). Powers the fleet
  *  Usage page's live per-agent cost + token totals. */
 export function fetchFleetMetrics(): Promise<AgentMetrics[]> {

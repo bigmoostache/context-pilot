@@ -92,6 +92,31 @@
   - documentation
   - quality
   last_edited_ms: 0
+70dd7401ce4b7e73:
+  tl_dr: 'T269 Check Vitals SHIPPED: GET /api/agent/{id}/vitals on-demand service-connectivity probe + StatsPopup button. Proven live. Details in contents.'
+  contents: |-
+    ## T269 Check Vitals — SHIPPED
+
+    Backend `inspect/vitals.rs` `agent_vitals(state,id)` runs REAL probes, never fabricates green:
+    - Orchestrator self (ok, serving)
+    - Agent main-loop CONNECTION: fs::read(entry.heartbeat_path) + Heartbeat::decode + is_fresh(now,DEFAULT_MAX_AGE) + matches_boot(entry.boot_id). stale→error, no file→unavailable, boot mismatch→error.
+    - Agent loop STATUS: folded view phase·lifecycle; lifecycle stopping/stopped→error else ok.
+    - Meilisearch: TCP 127.0.0.1:<port> from ~/.context-pilot/meilisearch/port file; no file→unavailable.
+    - Console server: UnixStream::connect <folder>/.context-pilot/console/server.sock; no sock→unavailable.
+    - 5 remotes via key-independent TCP connect :443 (3s timeout): LLM provider (from config.json modules.core.llm_provider map: grok→api.x.ai, groq→api.groq.com, deepseek→api.deepseek.com, minimax→api.minimax.io, _→api.anthropic.com incl claudecode*), Voyage api.voyageai.com, Datalab www.datalab.to, Brave api.search.brave.com, Firecrawl api.firecrawl.dev.
+
+    Remotes run CONCURRENT: thread-per-probe → mpsc, collected under COLLECT_DEADLINE 6s (PROBE_TIMEOUT 3s each) so a wedged DNS can't hang the endpoint; missing slot filled as timeout-unavailable. Returns JSON array {name,category,status:ok|error|unavailable,latencyMs?,detail}. Unknown agent→404. Route in transport/mod.rs route_rest; declared inspect/mod.rs.
+
+    Frontend: api.ts `Vital` type + `fetchVitals(agentId)`. StatsPopup.tsx Check Vitals button (Stethoscope/Loader2 spinner) + status table (colored dot --ok green / --danger red / --muted-foreground grey + name + honest detail + latency badge). On-demand (NOT a polling hook): local useState vitals/checking/vitalsErr. Prepends 2 browser-only rows: Frontend self ok + Frontend→Orchestrator round-trip ms (performance.now around the fetch). So table shows all 12 services.
+
+    PROVEN LIVE: curl /vitals → 200, all 10 backend rows ok (agent f3a99 heartbeat 416ms fresh, status streaming·running, meili 127.0.0.1:49286, console socket connected, anthropic 11ms / voyage 11 / datalab 24 / brave 28 / firecrawl 107ms reachable); unknown agent → 404. cargo build -p cp-orchestrator + npm run build both green; orchestrator restarted debug :7878 CP_COST_BUDGET=100000000 console P35. No TUI crate changed → no system_reload needed.
+  importance: medium
+  labels:
+  - T269
+  - vitals
+  - connectivity
+  - shipped
+  last_edited_ms: 1781880408107
 711abc0a918906ba:
   tl_dr: 'BANNED: #[expect] and #[allow] lint suppressions. Always refactor the code instead. Register unavoidable exceptions in .github/checks/.'
   contents: Zero suppressions is the goal. Refactor the CODE to eliminate the lint, not suppress it. If one is truly unavoidable, it MUST be registered in .github/checks/ lint exception registry. This is the captain's strongest code quality preference.
