@@ -8,7 +8,6 @@ import {
   GalleryHorizontalEnd,
   LayoutGrid,
   List as ListIcon,
-  Maximize2,
   MoreHorizontal,
   PanelBottom,
   Pin,
@@ -130,7 +129,6 @@ export function FinderToolbar({
   onTogglePreview,
   onTogglePathBar,
   fileActive,
-  onFileGetInfo,
   onFileDownload,
   onFileShare,
 }: {
@@ -155,7 +153,6 @@ export function FinderToolbar({
   onTogglePathBar: () => void
   /** true when the active tab is a single file (not a folder) */
   fileActive: boolean
-  onFileGetInfo: () => void
   onFileDownload: () => void
   onFileShare: () => void
 }) {
@@ -271,7 +268,6 @@ export function FinderToolbar({
 
       {fileActive ? (
         <>
-          <NavBtn icon={Maximize2} onClick={onFileGetInfo} title="Get Info" />
           <NavBtn icon={Download} onClick={onFileDownload} title="Download" />
           <NavBtn icon={Share2} onClick={onFileShare} title="Share" />
         </>

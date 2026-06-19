@@ -3802,6 +3802,10 @@
   path: ui/src/App.tsx
   description: 'Cockpit shell: TopBar / (LeftRail + Conversation + RightInspector) / StatusBar flex layout.'
   last_edited_ms: 1781458541241
+86c917c95f9ba795:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: Threads view assembler. Uses useThreads()+useFleet() live. handleArchive/Create/Send via sendCommand, each .catch wired to a breaker-aware flash notice (describeCommandError). Auto-selects newly created threads (pendingSelect ref + ID-set diff on useThreads update). Deselects the current thread on archive so the fallback picks the next available. SIDEBAR ALWAYS RENDERS once an agent is resolved — the early-return only bails for !agent ("Select an agent"); a fresh ZERO-thread realm still shows ThreadList (its New Thread button is the ONLY create affordance) + a center EmptyRealm with its own New Thread button, fixing the dead-end where a new agent's threads view showed no sidebar and no way to create the first thread. Keyed by agentId in App.
+  last_edited_ms: 1781874930161
 86e430b56e1c2543:
   path: crates/cp-orchestrator/src/liveness.rs
   description: 'Phase 15: per-agent liveness verdict (§10). Liveness enum{Live,StalePid,StaleHeartbeat,BootIdMismatch}+is_live(). verdict(entry,Option<&Heartbeat>,now_ms,max_age) pure, cheapest-first: !pid_alive→StalePid, no hb→StaleHeartbeat, !matches_boot→BootIdMismatch (pid-reuse defence), !is_fresh→StaleHeartbeat, else Live. pid_alive via nix kill(pid,None) signal-0 (Ok|EPERM=alive). 5 exhaustive verdict-matrix tests, no process spawning.'
@@ -5806,6 +5810,10 @@ cbbef4219a1d03ee:
   path: src/ui/ir/render_sidebar.rs
   description: 'Sidebar ratatui renderer — render_sidebar_from_ir(). Normal mode: token bar box, fixed/dynamic entries with pagination, PR card, token stats. Collapsed mode: icon strip. Entry rendering: indicator+icon+shortcut+label+tokens. Token color gradient (grey→red).'
   last_edited_ms: 0
+cbd2c8d917fc2247:
+  path: web/src/components/finder/Finder.tsx
+  description: Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. Tabs+history+nav+selection+drag-drop+statusbar+marquee. PinnedFolder type + loadPins/pinsKey localStorage helpers (key cp-finder-pins:<agentId>); pins state persisted via useEffect; addPin/removePin. ColumnsView called with live-Miller props (agentId/agentFolder/chain/currentNodes/onNavigate). FinderSidebar + ContextMenu wired with onPin/onUnpin. Four view modes, keyboard control. Quick Look panel CLOSED by default; opens on single-click of a file (select handler), not on double-click.
+  last_edited_ms: 1781875092481
 cbe3798af576ea90:
   path: crates/cp-orchestrator/src/transport/inspect/metrics.rs
   description: '§19 observability metrics endpoints. agent_metrics + fleet_metrics build per-agent snapshot: durable cost-breaker state (tripped/spend/budget), stream health (subs/dropped/degraded), view-vs-oplog rev lag (oplog_head_rev read fresh outside the lock), phase+lifecycle. Only figures the backend genuinely holds — latency histograms deliberately not synthesised.'

@@ -47,7 +47,6 @@ import {
 import { ColumnsView, GalleryView, GridView, ListView } from "./FinderViews"
 import { FinderPreview } from "./FinderPreview"
 import { ContextMenu, type MenuPos } from "./ContextMenu"
-import { GetInfo } from "./GetInfo"
 import { useMarquee } from "./useMarquee"
 import { cn } from "@/lib/utils"
 
@@ -110,7 +109,6 @@ export function Finder({ agent }: { agent: Agent }) {
   const [dragging, setDragging] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [menu, setMenu] = useState<MenuPos | null>(null)
-  const [info, setInfo] = useState<FinderNode | null>(null)
   const [pathBarOpen, setPathBarOpen] = useState(false)
   const [pins, setPins] = useState<PinnedFolder[]>(() => loadPins(agent.id))
 
@@ -295,12 +293,8 @@ export function Finder({ agent }: { agent: Agent }) {
     } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
       e.preventDefault()
       setSelected(new Set(sorted.map((n) => n.path)))
-    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "i") {
-      e.preventDefault()
-      if (previewNode) setInfo(previewNode)
     } else if (e.key === "Escape") {
       if (menu) setMenu(null)
-      else if (info) setInfo(null)
       else {
         setSelected(new Set())
         setFocusPath(null)
@@ -437,7 +431,6 @@ export function Finder({ agent }: { agent: Agent }) {
         onTogglePreview={() => setPreviewOpen((o) => !o)}
         onTogglePathBar={() => setPathBarOpen((o) => !o)}
         fileActive={!!active.fileNode}
-        onFileGetInfo={() => active.fileNode && setInfo(active.fileNode)}
         onFileDownload={() => {
           if (active.fileNode) {
             downloadFile(agent.id, active.fileNode.path).catch(() => flash("Download failed"))
@@ -470,7 +463,6 @@ export function Finder({ agent }: { agent: Agent }) {
           <FinderPreview
             node={active.fileNode}
             variant="full"
-            onGetInfo={(n) => setInfo(n)}
             onClose={() => closeTab(active.id)}
           />
         ) : (
@@ -536,7 +528,6 @@ export function Finder({ agent }: { agent: Agent }) {
             {previewOpen && (
               <FinderPreview
                 node={previewNode}
-                onGetInfo={(n) => setInfo(n)}
                 onClose={() => setPreviewOpen(false)}
               />
             )}
@@ -570,16 +561,18 @@ export function Finder({ agent }: { agent: Agent }) {
           pos={menu}
           onClose={() => setMenu(null)}
           onAction={(label) => flash(label)}
-          onGetInfo={(n) => setInfo(n)}
+          onOpen={open}
+          onDownload={(n) => {
+            downloadFile(agent.id, n.path).catch(() => flash(`Failed to download ${n.name}`))
+            flash(`Downloading ${n.name}…`)
+          }}
+          onTag={(_n, tag) => flash(`Tagged as ${tag}`)}
           onPin={(n) => {
             addPin({ name: n.name, path: n.path })
             flash(`Pinned ${n.name}`)
           }}
         />
       )}
-
-      {/* get info */}
-      {info && <GetInfo node={info} onClose={() => setInfo(null)} />}
 
       {/* drag-drop overlay */}
       {dragging && (

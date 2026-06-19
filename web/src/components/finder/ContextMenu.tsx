@@ -3,13 +3,12 @@ import {
   Copy,
   Download,
   FolderOpen,
-  Info,
   PencilLine,
   Pin,
   Tag,
   Trash2,
 } from "lucide-react"
-import type { FinderNode } from "@/lib/types"
+import type { FinderNode, FinderTag } from "@/lib/types"
 import { TAG_META } from "./kind"
 
 export interface MenuPos {
@@ -26,13 +25,20 @@ export function ContextMenu({
   pos,
   onClose,
   onAction,
-  onGetInfo,
+  onOpen,
+  onDownload,
+  onTag,
   onPin,
 }: {
   pos: MenuPos
   onClose: () => void
   onAction: (label: string) => void
-  onGetInfo: (node: FinderNode) => void
+  /** Open a file (Quick Look) or navigate a folder. */
+  onOpen: (node: FinderNode) => void
+  /** Trigger a real file download. */
+  onDownload: (node: FinderNode) => void
+  /** Toggle a tag on a node. */
+  onTag: (node: FinderNode, tag: FinderTag) => void
   /** pin a folder to the sidebar (folders only) */
   onPin?: (node: FinderNode) => void
 }) {
@@ -62,7 +68,7 @@ export function ContextMenu({
     danger,
     shortcut,
   }: {
-    icon: typeof Info
+    icon: typeof Copy
     label: string
     danger?: boolean
     shortcut?: string
@@ -91,17 +97,16 @@ export function ContextMenu({
       className="menu-pop fixed z-50 w-[214px] rounded-xl border border-border bg-popover/95 p-1.5 backdrop-blur-xl pop-shadow"
       style={{ left, top }}
     >
-      <Item icon={FolderOpen} label={isFolder ? "Open" : "Open Quick Look"} shortcut={isFolder ? "↵" : "Space"} />
       <button
         onClick={() => {
-          onGetInfo(pos.node)
+          onOpen(pos.node)
           onClose()
         }}
         className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
       >
-        <Info className="size-3.5 shrink-0 opacity-80" />
-        <span className="flex-1">Get Info</span>
-        <span className="text-[10.5px] tabular-nums text-muted-foreground/50">⌘I</span>
+        <FolderOpen className="size-3.5 shrink-0 opacity-80" />
+        <span className="flex-1">{isFolder ? "Open" : "Open Quick Look"}</span>
+        <span className="text-[10.5px] tabular-nums text-muted-foreground/50">{isFolder ? "↵" : "Space"}</span>
       </button>
 
       {isFolder && onPin && (
@@ -121,7 +126,16 @@ export function ContextMenu({
 
       <Item icon={PencilLine} label="Rename" />
       <Item icon={Copy} label="Duplicate" shortcut="⌘D" />
-      <Item icon={Download} label="Download" />
+      <button
+        onClick={() => {
+          onDownload(pos.node)
+          onClose()
+        }}
+        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
+      >
+        <Download className="size-3.5 shrink-0 opacity-80" />
+        <span className="flex-1">Download</span>
+      </button>
 
       <Separator />
 
@@ -134,7 +148,7 @@ export function ContextMenu({
               key={key}
               title={t.label}
               onClick={() => {
-                onAction(`Tagged ${t.label}`)
+                onTag(pos.node, key as FinderTag)
                 onClose()
               }}
               className="size-3.5 rounded-full ring-1 ring-inset ring-black/10 transition-transform hover:scale-125"

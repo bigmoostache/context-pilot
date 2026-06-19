@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Check, Copy, Download, Maximize2, Pause, Play, Share2, X } from "lucide-react"
+import { Check, Copy, Download, Pause, Play, Share2, X } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { fmtBytes } from "@/lib/finderFs"
 import { extOf, kindMeta, TAG_META } from "./kind"
@@ -14,12 +14,10 @@ import { cn } from "@/lib/utils"
  */
 export function FinderPreview({
   node,
-  onGetInfo,
   onClose,
   variant = "pane",
 }: {
   node: FinderNode | null
-  onGetInfo: (node: FinderNode) => void
   onClose: () => void
   /** "pane" = the 420px QuickLook side rail; "full" = a file tab's main area */
   variant?: "pane" | "full"
@@ -38,7 +36,6 @@ export function FinderPreview({
           <div className="ml-auto flex items-center gap-1">
             {node && node.kind !== "folder" && (
               <>
-                <IconBtn icon={Maximize2} title="Open" onClick={() => node && onGetInfo(node)} />
                 <IconBtn icon={Download} title="Download" />
                 <IconBtn icon={Share2} title="Share" />
               </>
@@ -55,7 +52,7 @@ export function FinderPreview({
           <div className="min-h-0 flex-1 overflow-auto p-4">
             <Body node={node} />
           </div>
-          {!full && <Meta node={node} onGetInfo={onGetInfo} />}
+          {!full && <Meta node={node} />}
         </div>
       )}
     </aside>
@@ -506,7 +503,12 @@ function Generic({ node }: { node: FinderNode }) {
 }
 
 // ── metadata footer ───────────────────────────────────────────────
-function Meta({ node, onGetInfo }: { node: FinderNode; onGetInfo: (n: FinderNode) => void }) {
+function Meta({ node }: { node: FinderNode }) {
+  const isFolder = node.kind === "folder"
+  const kids = node.children ?? []
+  const folders = kids.filter((k) => k.kind === "folder").length
+  const files = kids.length - folders
+
   return (
     <div className="shrink-0 border-t border-border bg-card/60 px-4 py-3">
       <div className="mb-2 flex items-center gap-2">
@@ -516,27 +518,30 @@ function Meta({ node, onGetInfo }: { node: FinderNode; onGetInfo: (n: FinderNode
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
         <Row k="Kind" v={kindMeta[node.kind].label} />
-        <Row k="Size" v={fmtBytes(node.size)} />
+        {isFolder ? (
+          <Row k="Contains" v={`${folders} folder${folders === 1 ? "" : "s"}, ${files} file${files === 1 ? "" : "s"}`} />
+        ) : (
+          <Row k="Size" v={fmtBytes(node.size)} />
+        )}
+        {node.image && <Row k="Dimensions" v={`${node.image.w} × ${node.image.h}`} />}
+        {node.media && <Row k="Duration" v={node.media.duration} />}
+        {node.pdf && <Row k="Pages" v={`${node.pdf.pages}`} />}
+        {node.created && <Row k="Created" v={node.created} />}
         <Row k="Modified" v={node.modified} />
         {node.tags && node.tags.length > 0 && (
           <Row k="Tags" v={node.tags.map((t) => TAG_META[t].label).join(", ")} />
         )}
+        <Row k="Where" v={node.path} mono />
       </dl>
-      <button
-        onClick={() => onGetInfo(node)}
-        className="mt-2.5 w-full rounded-lg border border-border bg-muted/40 py-1.5 text-[11.5px] font-medium text-foreground/75 transition-colors hover:border-[var(--signal)]/50 hover:text-foreground"
-      >
-        Get Info
-      </button>
     </div>
   )
 }
 
-function Row({ k, v }: { k: string; v: string }) {
+function Row({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
   return (
     <>
       <dt className="text-muted-foreground">{k}</dt>
-      <dd className="truncate text-right text-foreground/80">{v}</dd>
+      <dd className={"min-w-0 truncate text-right text-foreground/80 " + (mono ? "font-mono text-[10px]" : "")}>{v}</dd>
     </>
   )
 }
