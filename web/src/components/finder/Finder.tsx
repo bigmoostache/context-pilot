@@ -7,7 +7,9 @@ import type {
   FinderViewMode,
 } from "@/lib/types"
 import { fmtBytes, sortNodes } from "@/lib/finderFs"
-import { downloadFile, useFs, useMoveItems, useUploadFiles } from "@/lib/live"
+import { downloadFile, useCreateFolder, useFs, useMoveItems, useUploadFiles } from "@/lib/live"
+import { useQueryClient } from "@tanstack/react-query"
+import { qk } from "@/lib/sync"
 
 /** Build breadcrumbs from a path relative to the agent's folder. */
 function buildCrumbs(
@@ -94,6 +96,8 @@ export function Finder({ agent }: { agent: Agent }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const upload = useUploadFiles(agent.id)
   const move = useMoveItems(agent.id)
+  const mkdir = useCreateFolder(agent.id)
+  const qc = useQueryClient()
 
   const [tabs, setTabs] = useState<Tab[]>(() => [
     { id: "t0", cwd: agent.folder, label: agent.name, kind: "folder", back: [], fwd: [] },
@@ -175,6 +179,25 @@ export function Finder({ agent }: { agent: Agent }) {
           flash(`Uploaded ${count} file${count === 1 ? "" : "s"}.`),
         onError: (err) =>
           flash(err instanceof Error ? err.message : "Upload failed"),
+      },
+    )
+  }
+
+  // Create a new folder in the current directory. macOS-style: auto-name
+  // "untitled folder" (then " 2", " 3", …) avoiding collisions with the live
+  // listing, create it via the backend, and surface it. Used by both the
+  // toolbar New Folder button and the empty-space context menu.
+  const newFolder = () => {
+    const existing = new Set(children.map((c) => c.name.toLowerCase()))
+    let name = "untitled folder"
+    for (let i = 2; existing.has(name.toLowerCase()); i++) name = `untitled folder ${i}`
+    flash("Creating folder…")
+    mkdir.mutate(
+      { dir: relCwd, name },
+      {
+        onSuccess: () => flash(`Created “${name}”.`),
+        onError: (err) =>
+          flash(err instanceof Error ? err.message : "Could not create folder"),
       },
     )
   }
@@ -290,6 +313,9 @@ export function Finder({ agent }: { agent: Agent }) {
 
   const openContext = (e: React.MouseEvent, node: FinderNode) => {
     e.preventDefault()
+    // Stop the event reaching the content-area handler below, so a right-click
+    // ON an item shows the item menu (not the empty-space menu).
+    e.stopPropagation()
     if (!selected.has(node.path)) {
       setSelected(new Set([node.path]))
       setAnchor(node.path)
@@ -297,6 +323,14 @@ export function Finder({ agent }: { agent: Agent }) {
     setFocusPath(node.path)
     setPreview(node)
     setMenu({ x: e.clientX, y: e.clientY, node })
+  }
+
+  // Right-click on the empty content area (not an item) → the realm-level menu
+  // (New Folder, Upload, Select All, …). Item handlers stopPropagation, so this
+  // only fires for background / gap / padding clicks.
+  const openEmptyContext = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setMenu({ x: e.clientX, y: e.clientY })
   }
 
   // ── keyboard control ────────────────────────────────────────────
@@ -467,7 +501,7 @@ export function Finder({ agent }: { agent: Agent }) {
         onViewMode={setViewMode}
         onIconSize={setIconSize}
         onQuery={setQuery}
-        onNewFolder={() => flash("New Folder created")}
+        onNewFolder={newFolder}
         onUpload={() => fileInputRef.current?.click()}
         onDownload={() => {
           if (!selected.size) {
@@ -529,6 +563,7 @@ export function Finder({ agent }: { agent: Agent }) {
             <main
               ref={mainRef}
               {...marquee.handlers}
+              onContextMenu={openEmptyContext}
               onClick={(e) => {
                 if (marquee.didDrag()) return
                 if (e.currentTarget === e.target) {
@@ -630,6 +665,14 @@ export function Finder({ agent }: { agent: Agent }) {
           onPin={(n) => {
             addPin({ name: n.name, path: n.path })
             flash(`Pinned ${n.name}`)
+          }}
+          onNewFolder={newFolder}
+          onUpload={() => fileInputRef.current?.click()}
+          onSelectAll={() => setSelected(new Set(sorted.map((n) => n.path)))}
+          onTogglePreview={() => setPreviewOpen((o) => !o)}
+          onRefresh={() => {
+            void qc.invalidateQueries({ queryKey: qk.fs(agent.id, relCwd) })
+            flash("Refreshed")
           }}
         />
       )}

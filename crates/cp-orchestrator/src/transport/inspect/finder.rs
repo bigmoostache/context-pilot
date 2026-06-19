@@ -367,6 +367,59 @@ pub fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8
     }))
 }
 
+/// `POST /api/agent/{id}/fs/mkdir?path={dir}&name={name}` — create a folder.
+///
+/// Creates a single new directory `name` inside the confined directory `path`
+/// (empty = realm root). Powers the Finder's "New Folder" action (toolbar +
+/// empty-space context menu). Takes no body.
+///
+/// The parent directory is confined to the agent realm (no `..`/symlink/absolute
+/// escape) and must already exist; `name` must be a bare component (no path
+/// separators, not `.`/`..`) so the new folder can never land outside the realm.
+/// An already-existing entry with that name is a `409` (never silently reused).
+/// Returns `{ created }` — the realm-relative path of the new folder.
+pub fn fs_mkdir(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
+    let folder = match agent_folder(state, agent_id) {
+        Ok(f) => f,
+        Err(reply) => return reply,
+    };
+    let relative_dir = extract_param(query, "path").unwrap_or_default();
+    let name = match extract_param(query, "name") {
+        Some(n) if !n.is_empty() => n,
+        _ => return HttpReply::error(400, "missing name parameter"),
+    };
+
+    // The new folder's name must be a bare component — a separator or `..` would
+    // let it escape the confined parent directory.
+    if name.contains('/') || name.contains('\\') || name.contains('\0') || name == "." || name == ".."
+    {
+        return HttpReply::error(400, "invalid folder name");
+    }
+
+    let dir = match confined_path(&folder, &relative_dir) {
+        Some(p) => p,
+        None => return HttpReply::error(403, "path outside agent realm"),
+    };
+    if !dir.is_dir() {
+        return HttpReply::error(404, "parent directory not found");
+    }
+
+    let dest = dir.join(&name);
+    if dest.exists() {
+        return HttpReply::error(409, "an entry with that name already exists");
+    }
+    if std::fs::create_dir(&dest).is_err() {
+        return HttpReply::error(502, "create failed");
+    }
+
+    let rel_path = if relative_dir.is_empty() {
+        name.clone()
+    } else {
+        format!("{relative_dir}/{name}")
+    };
+    HttpReply::ok(&serde_json::json!({ "created": rel_path }))
+}
+
 /// `POST /api/agent/{id}/fs/move` — move one or more entries into a directory.
 ///
 /// Body is JSON `{ "items": ["rel/a", "rel/b"], "dest": "rel/dir" }`: each

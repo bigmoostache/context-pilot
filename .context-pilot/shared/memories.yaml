@@ -468,6 +468,36 @@ ceac945d9376fcf2:
   - feature-completion
   - sequence
   last_edited_ms: 1780648683027
+db16d1afe23ab01d:
+  tl_dr: 'T279 Finder empty-space context menu SHIPPED: right-click the content background opens a realm-level menu (New Folder, Upload, Select All, Toggle Quick Look, Refresh) + real fs_mkdir backend. New Folder now actually creates.'
+  contents: |-
+    ## T279 — Finder empty-space (content-area) context menu SHIPPED
+
+    User ask: right-click anywhere in the Finder content area (not just on a file) should open a custom menu with Upload, New Folder, among others.
+
+    ### Backend (cp-orchestrator inspect/finder.rs)
+    fs_mkdir(state,id,query): POST /api/agent/{id}/fs/mkdir?path={dir}&name={name} (no body). Confine parent dir (403 escape, 404 not-a-dir); bare-name guard reject /,\,\0,.,.. →400; missing name→400; dest exists→409 (never reuse); create_dir else 502. Returns {created: relpath}. Route in transport/mod.rs route_rest (Post fs/mkdir). Mirrors fs_upload's query-param + name-guard style.
+
+    ### Frontend
+    - api.ts createFolder(agentId,dir,name)->MkdirResult{created} (POST query params).
+    - live.ts useCreateFolder(agentId)=useMutation, onSuccess invalidate qk.fs(agentId,dir).
+    - ContextMenu.tsx: MenuPos.node made OPTIONAL. Component branches on node presence: present→existing ITEM menu; absent→EMPTY-SPACE menu (New Folder/Upload…/Select All/Toggle Quick Look/Refresh) via new required props onNewFolder/onUpload/onSelectAll/onTogglePreview/onRefresh + EmptyItem row helper. Added lucide icons CheckSquare/FolderPlus/PanelRight/RefreshCw/Upload.
+    - Finder.tsx: openEmptyContext(e)=setMenu({x,y}) wired to the content <main> onContextMenu; openContext (item) gained e.stopPropagation() so an item right-click shows the item menu, not the empty one (item handler doesn't stop bubbling otherwise → main would overwrite with empty menu). newFolder() computes a collision-free 'untitled folder'(+ 2,3…) from the live `children` listing then mkdir.mutate with flash toasts; BOTH the toolbar New Folder button and the menu New Folder wired to it (toolbar was a decorative flash stub before). Refresh action invalidates qk.fs via useQueryClient (imported @tanstack/react-query + qk from lib/sync). Select All = setSelected(all sorted paths). Toggle Quick Look = setPreviewOpen toggle.
+
+    ### Proven LIVE (orchestrator debug :7878 fresh binary, test agent 834eb459c7b064db ~/code/test):
+    mkdir root 200 {created:cp-mkdir-test} (on disk); duplicate 409; bad name ../escape 400; missing name 400; nested path=cp-mkdir-test&name=sub 200 (on disk); escape dir path=.. 403. Cleaned.
+
+    cargo build -p cp-orchestrator + web npm run build both green; rust-check+lint passed (folder-sizes 'failure' = ./oplog/bodies runtime artifact, gitignored, unrelated). Orchestrator RESTARTED (killed :7878 via lsof, relaunched debug CP_COST_BUDGET=100000000, console P44) since running binary predated the mkdir route. No TUI crate changed → no system_reload. Empty-space context UX is pure+build-clean; backend proven.
+
+    Backlog after T279: T272 follow-up X906 (WYSIWYG markdown editor in Finder preview — needs a write endpoint + editor UI).
+  importance: medium
+  labels:
+  - T279
+  - finder
+  - context-menu
+  - mkdir
+  - shipped
+  last_edited_ms: 1781888554542
 efe78c079599d3d0:
   tl_dr: 'User workflow preference: when exploring/describing files, MUST follow strict order: open files → describe in tree → close files → iterate to next batch. Never close before describing.'
   importance: critical

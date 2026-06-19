@@ -418,6 +418,23 @@ export function useUploadFiles(agentId: string) {
 }
 
 /**
+ * Mutation to create a new folder inside a realm directory (the Finder's
+ * "New Folder" action). Not a delta-covered resource → a `useMutation`. On
+ * success the destination directory's `useFs` listing is invalidated so the
+ * new folder appears at once.
+ */
+export function useCreateFolder(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ dir, name }: { dir: string; name: string }) =>
+      api.createFolder(agentId, dir, name),
+    onSuccess: (_res, { dir }) => {
+      void client.invalidateQueries({ queryKey: qk.fs(agentId, dir) })
+    },
+  })
+}
+
+/**
  * Mutation to move one or more entries into a realm directory (the Finder's
  * internal drag-and-drop). Not a delta-covered resource → a `useMutation`. On
  * success the WHOLE `fs` query family for the agent is invalidated (both the

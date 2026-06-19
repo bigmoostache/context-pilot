@@ -368,6 +368,21 @@ export function uploadFile(agentId: string, dir: string, file: File): Promise<Up
   })
 }
 
+/** Result of a folder creation (`POST /fs/mkdir`). */
+export interface MkdirResult {
+  created: string
+}
+
+/** Create a new folder `name` inside a realm directory (`dir`, "" = realm
+ *  root). Powers the Finder's "New Folder" action (toolbar + empty-space
+ *  context menu). The backend confines the parent dir, rejects a non-bare name
+ *  or an already-existing entry (409), and returns the new folder's
+ *  realm-relative path. */
+export function createFolder(agentId: string, dir: string, name: string): Promise<MkdirResult> {
+  const q = `path=${encodeURIComponent(dir)}&name=${encodeURIComponent(name)}`
+  return request(`/api/agent/${agentId}/fs/mkdir?${q}`, { method: "POST" })
+}
+
 /** Result of a move (`POST /fs/move`). */
 export interface MoveResult {
   moved: number
