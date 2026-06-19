@@ -79,6 +79,14 @@ function loadPins(agentId: string): PinnedFolder[] {
 
 let tabSeq = 1
 
+/** Single-click settle window (ms). A click defers its layout-affecting side
+ *  effects (open the Quick Look pane, or arm slow-click-to-rename) by this much
+ *  so a *double*-click can cancel them first — the first click of a double no
+ *  longer opens the preview pane and reflows the grid out from under the second
+ *  click. Shorter than a typical OS double-click threshold so a deliberate
+ *  single click still feels responsive. */
+const CLICK_SETTLE_MS = 250
+
 /** Sentinel `path` for the not-yet-created "New Folder" placeholder row. A NUL
  *  byte can never appear in a real realm path, so this never collides with a
  *  live entry; the inline editor keys off it to route a commit to mkdir (create)
@@ -182,6 +190,10 @@ export function Finder({ agent }: { agent: Agent }) {
 
   const typeBuf = useRef("")
   const typeTimer = useRef<number | undefined>(undefined)
+  // Pending single-click settle timer (see CLICK_SETTLE_MS). Cleared by a
+  // double-click / open / navigate so those win over the deferred single-click
+  // effect.
+  const clickTimer = useRef<number | undefined>(undefined)
 
   // ── mutators ────────────────────────────────────────────────────
   const patchTab = (fn: (t: Tab) => Tab) =>
@@ -363,6 +375,7 @@ export function Finder({ agent }: { agent: Agent }) {
     p === agent.folder || p.startsWith(agent.folder + "/") ? p : `${agent.folder}/${p}`
 
   const navigate = (rawPath: string) => {
+    window.clearTimeout(clickTimer.current)
     const path = toAbs(rawPath)
     if (path === cwd && !active.fileNode) return
     patchTab((t) => ({
@@ -395,6 +408,9 @@ export function Finder({ agent }: { agent: Agent }) {
     if (crumbs.length > 1) navigate(crumbs[crumbs.length - 2].path)
   }
 
+  // Apply selection + focus + preview-target for a node. INSTANT and
+  // reflow-free (it never opens the Quick Look pane), so selection feedback is
+  // immediate while the layout-affecting open is deferred to onRowClick's timer.
   const select = (node: FinderNode, { additive, range }: { additive: boolean; range: boolean }) => {
     if (range && anchor) {
       const ai = sorted.findIndex((n) => n.path === anchor)
@@ -417,7 +433,31 @@ export function Finder({ agent }: { agent: Agent }) {
     }
     setFocusPath(node.path)
     setPreview(node)
-    if (!previewOpen && node.kind !== "folder") setPreviewOpen(true)
+  }
+
+  // Row click with macOS-style settle semantics. Selection feedback is instant;
+  // the two layout-/mode-affecting effects are DEFERRED by CLICK_SETTLE_MS so a
+  // double-click (open) or a fast re-click can pre-empt them:
+  //   • a click on an already-sole-selected, inline-capable item arms
+  //     slow-click-to-rename (the macOS second-click gesture);
+  //   • otherwise a file click opens the Quick Look pane (only the first open
+  //     reflows — once open, selection updates it instantly with no defer).
+  // A modifier (range/additive) click only selects: never rename, never auto-open.
+  const onRowClick = (node: FinderNode, m: { additive: boolean; range: boolean }) => {
+    const wasSole =
+      !m.additive &&
+      !m.range &&
+      selected.size === 1 &&
+      selected.has(node.path) &&
+      focusPath === node.path
+    select(node, m)
+    window.clearTimeout(clickTimer.current)
+    if (m.additive || m.range) return
+    const inlineCapable = viewMode !== "gallery"
+    clickTimer.current = window.setTimeout(() => {
+      if (wasSole && inlineCapable) startRename(node)
+      else if (!wasSole && node.kind !== "folder" && !previewOpen) setPreviewOpen(true)
+    }, CLICK_SETTLE_MS)
   }
 
   /** Open a file in its own tab (reuse an existing tab for the same file). */
@@ -436,6 +476,9 @@ export function Finder({ agent }: { agent: Agent }) {
   }
 
   const open = (node: FinderNode) => {
+    // A double-click / explicit open must pre-empt the deferred single-click
+    // effect (no stray preview-open or rename after the item is opened).
+    window.clearTimeout(clickTimer.current)
     if (node.kind === "folder") navigate(node.path)
     else openInNewTab(node)
   }
@@ -534,6 +577,9 @@ export function Finder({ agent }: { agent: Agent }) {
     surfaceRef.current?.focus()
   }, [])
 
+  // Cancel any pending single-click settle timer on unmount.
+  useEffect(() => () => window.clearTimeout(clickTimer.current), [])
+
   // ── tabs ────────────────────────────────────────────────────────
   const newTab = () => {
     const id = `t${tabSeq++}`
@@ -564,7 +610,7 @@ export function Finder({ agent }: { agent: Agent }) {
   const viewProps = {
     selected,
     focusPath,
-    onClick: select,
+    onClick: onRowClick,
     onOpen: open,
     onContext: openContext,
     onMove: moveItemsInto,
