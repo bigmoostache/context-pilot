@@ -6714,6 +6714,10 @@ e589cf82e3ae867c:
   path: ui/src/components/ui/table.tsx
   description: shadcn-style table primitives (Table/Header/Body/Footer/Row/Head/Cell/Caption) — semantic HTML table + Tailwind, no deps. Used by UsagePage monthly breakdown.
   last_edited_ms: 1781534744506
+e5bd662a617a816f:
+  path: README.md
+  description: 'Project README — global ARCHITECTURE overview (rewritten from the old philosophy/marketing copy, T278). 10 sections + ASCII topology diagram: system overview (5 surfaces), the agent TUI (main loop/modules/panels/LLM providers/tier-② persistence), three-tier durability + push-vs-inspection planes, the orchestrator (registry/services/supervisor/transport routes), the bridge (CP_BRIDGE=1 boot sequence), the web frontend (TanStack Query + SSE push), sidecars (console server, Meilisearch, SQLite entities), the cp-wire protocol types, repo layout, engineering constraints (500-line/8-entry caps, lints, hash chain) + flame telemetry.'
+  last_edited_ms: 1781888109336
 e5e547cda3e3fcfc:
   path: ui/src/lib/mock.ts
   description: 'Mock session data: panels, tokenBudget, messages, threads, threadDetails (6 convos w/ agentId, incl ACTIVE + archived), agents (3 workspaces), fileTree, library, usagePoints+USAGE_RATES. Cockpit panel maquette data (T16): treeRows, memoryCards, radarAnchors/radarResults, todoItems, entityTables, toolGroups, callbackRows, queueActions, scratchCells.'
