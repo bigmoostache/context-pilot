@@ -25,7 +25,10 @@ impl McpPanel {
 
         let mcp = McpState::get(state);
         if mcp.servers.is_empty() {
-            return "No MCP servers configured (.context-pilot/shared/mcp.json).".to_string();
+            return "No MCP servers configured.\n\
+                    Sources: ~/.context-pilot/mcp.json (global), \
+                    .context-pilot/shared/mcp.json (project)."
+                .to_string();
         }
 
         let mut out = String::from(

@@ -1,7 +1,12 @@
-//! `.mcp.json` discovery and parsing.
+//! `.mcp.json` discovery, parsing, and merge.
 //!
-//! Server list lives in `.context-pilot/shared/mcp.json` (per-project, shareable),
-//! falling back to `~/.context-pilot/mcp.json` (global). De-facto format:
+//! Two config layers are merged (global base + local override):
+//!
+//! 1. **Global** — `~/.context-pilot/mcp.json`  (user-wide defaults)
+//! 2. **Local**  — `.context-pilot/shared/mcp.json` (per-project overrides)
+//!
+//! Servers with the same key in the local file replace the global entry.
+//! Both files are optional; an empty manifest is used when neither exists.
 //!
 //! ```json
 //! {
@@ -65,28 +70,62 @@ impl ServerSpec {
     }
 }
 
-/// Locate the active MCP config file: project first, then global.
-/// Returns `None` if neither exists.
-#[must_use]
-pub fn resolve() -> Option<PathBuf> {
-    let project = PathBuf::from(PROJECT_CONFIG);
-    if project.is_file() {
-        return Some(project);
-    }
+/// Global user-wide config: `~/.context-pilot/mcp.json`.
+fn global_path() -> Option<PathBuf> {
     let home = std::env::var("HOME").ok()?;
-    let global = PathBuf::from(home).join(".context-pilot").join("mcp.json");
-    global.is_file().then_some(global)
+    let path = PathBuf::from(home).join(".context-pilot").join("mcp.json");
+    path.is_file().then_some(path)
 }
 
-/// Load and parse the MCP config, or `Ok(default/empty)` when no file exists.
+/// Project-local config: `.context-pilot/shared/mcp.json`.
+fn project_path() -> Option<PathBuf> {
+    let path = PathBuf::from(PROJECT_CONFIG);
+    path.is_file().then_some(path)
+}
+
+/// Parse a single config file into a [`Manifest`].
+fn load_file(path: &std::path::Path) -> Result<Manifest, String> {
+    let raw =
+        std::fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()))?;
+    serde_json::from_str(&raw).map_err(|e| format!("parse {}: {e}", path.display()))
+}
+
+/// Load and merge MCP config from both layers.
+///
+/// Global (`~/.context-pilot/mcp.json`) provides the base set of servers.
+/// Project-local (`.context-pilot/shared/mcp.json`) overrides or extends it —
+/// servers with the same key replace the global entry entirely.
+///
+/// Returns `Ok(empty)` when neither file exists.
 ///
 /// # Errors
 ///
 /// Returns a human-readable message on read or JSON-parse failure.
 pub fn load() -> Result<Manifest, String> {
-    let Some(path) = resolve() else {
-        return Ok(Manifest::default());
-    };
-    let raw = std::fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
-    serde_json::from_str(&raw).map_err(|e| format!("parse {}: {e}", path.display()))
+    let mut servers = HashMap::new();
+
+    // Layer 1: global (base)
+    if let Some(path) = global_path() {
+        servers.extend(load_file(&path)?.servers);
+    }
+
+    // Layer 2: project-local (override)
+    if let Some(path) = project_path() {
+        servers.extend(load_file(&path)?.servers);
+    }
+
+    Ok(Manifest { servers })
+}
+
+/// Config sources that are currently present on disk — for diagnostics.
+#[must_use]
+pub fn active_sources() -> Vec<PathBuf> {
+    let mut sources = Vec::new();
+    if let Some(p) = global_path() {
+        sources.push(p);
+    }
+    if let Some(p) = project_path() {
+        sources.push(p);
+    }
+    sources
 }
