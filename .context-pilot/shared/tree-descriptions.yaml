@@ -718,6 +718,10 @@
   path: crates/cp-mod-search/src/types.rs
   description: Core types + config constants. SearchPersistData (with recompute tracking + task_signals ring buffer), SearchState (with SharedRadarCache Arc<Mutex>), Chunk, SearchResult (no tags), SearchMetrics, SearchOverlayInfo (with meili_cpu_pct/meili_memory_bytes), MeiliLiveStats (with meili_cpu_ticks for delta), IndexerCmd, WatcherHandle. logs_index_settings without tags.
   last_edited_ms: 0
+198b5504d5c247d5:
+  path: crates/cp-orchestrator/src/supervisor/mod.rs
+  description: 'Phase 17 (X784) AgentSupervisor process manager + X896 pty spawn + restart support. new(allow_list) canonicalizes eagerly; validate_binary realpath-checks vs allow_list (R2-15). spawn(id,bin,folder,args)->pid: Command process_group(0), stdio null. spawn_pty(id,bin,folder,env)->pid: dup-check, validate, canonicalize folder, delegate to proc::spawn_pty_proc (cp TUI needs a real tty). is_supervised(key)->bool query. stop: SIGTERM→poll→SIGKILL→reap. restart=snapshot+stop+spawn. adopt=record live no-spawn (D7). check_liveness()->Vec<Event>. kill_pid(pid:u32) FREE fn: best-effort SIGTERM→grace→SIGKILL for an ARBITRARY (externally-launched) pid with no child handle to reap — used by the /restart route. Error::Pty variant. Proc/Supervised/spawn helper in sibling proc.rs.'
+  last_edited_ms: 1781878967926
 19e704d277ed2de0:
   path: .gitignore
   description: Gitignore. Excludes target/, .context-pilot/* (with !shared/ negation), .claude/, test artifacts, slides build artifacts (node_modules, package files, PDF output).
@@ -4166,6 +4170,10 @@
   path: .github/checks/protected-files.yaml
   description: Protected files list for hash chain verification
   last_edited_ms: 0
+91a2d1db5a364cc3:
+  path: crates/cp-orchestrator/src/transport/inspect/finder.rs
+  description: 'Per-agent Finder file-manager endpoints (in inspect/): fs_list/fs_preview/fs_download/conversation, confined to the agent realm. fs_download serves FILES as raw bytes (cap MAX_DOWNLOAD_BYTES 10MiB) AND FOLDERS as a zip: zip_and_download shells out to system `zip -r -q` into /tmp, returns {dirname}.zip (cap MAX_ZIP_BYTES 100MiB), temp archive removed via drop(remove_file) on every path (let-underscore-on-destructor is a forbidden lint). Absolute crate::transport:: paths.'
+  last_edited_ms: 1781878570964
 91a635a674cb2681:
   path: crates/cp-mod-tree/src/storage.rs
   description: YAML-backed persistent storage for tree descriptions. Delegates YAML I/O to YamlSync engine. Content-hash keys (SHA-256 of path+content). populate_from_yaml fills gaps, refresh_stale_from_yaml swaps on branch switch.
@@ -4930,6 +4938,10 @@ adcf8b60551469d3:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
   last_edited_ms: 1780562263886
+ae206df0560a302e:
+  path: web/src/components/agents/AgentModal.tsx
+  description: 'Agent create/manage dialog. ModelPicker (provider+model, like TUI Ctrl+H), slugify(name) derives realm folder. X896: create-mode submit() LIVE via useCreateAgent (POST /api/fleet/create). Manage-mode submit() sends Configure command (provider+model). NEW Restart button (manage footer, RefreshCw icon, spins while pending): useRestartAgent → POST /api/agent/{id}/restart, kills+respawns the agent from the current binary — fixes a stale agent that rejects commands with 502 ''agent unreachable''. Shared by TopBar + FleetDashboard.'
+  last_edited_ms: 1781878967946
 ae2d4174f5fe2c4d:
   path: Cargo.lock
   description: Workspace lockfile
@@ -5362,6 +5374,10 @@ bb226690c4c1eecf:
   path: web/e2e/messages.spec.ts
   description: Phase 2 e2e message send (1 test) over the K7 push plane. Composer send→user bubble appears live + roster log grows. Asserts the user message only (agent reply is non-deterministic LLM). Both the DOM-bubble visibility AND roster-log poll use a 25s timeout to absorb cumulative live-agent command backlog in the serial suite (single live agent shared across specs). afterAll archives e2e- threads.
   last_edited_ms: 1781816803503
+bb62232b74d6db8c:
+  path: crates/cp-orchestrator/src/transport/rest/restart.rs
+  description: 'POST /api/agent/{id}/restart handler. restart_agent(state,id): resolve registry entry → folder+pid, supervisor::kill_pid(pid) lock-free (SIGTERM→grace→SIGKILL; works on EXTERNALLY-launched agents the supervisor never owned), drop any stale supervised record (stop, ignore NotFound), then spawn_pty on the SAME folder (env CP_BRIDGE=1 + CP_AGENTS_DIR) → re-registers under the SAME id (id derived from folder). 202 {status:restarting,folder,pid}. Motivating case: a stale-binary agent rejecting commands with 502 ''agent unreachable'' (e.g. predates the Configure cmd). Proven live: 834eb test agent 502→restart→Configure 200.'
+  last_edited_ms: 1781878967905
 bb8a674ef6c1a158:
   path: web/vite.config.ts
   description: 'Vite config: react + tailwind v4 plugins, @ alias to src. Dev server on port 5174.'

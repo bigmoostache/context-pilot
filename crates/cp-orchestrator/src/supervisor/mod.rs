@@ -161,6 +161,11 @@ impl AgentSupervisor {
         self.known.is_empty()
     }
 
+    /// Whether an agent with this key is currently supervised.
+    pub fn is_supervised(&self, agent_id: &str) -> bool {
+        self.known.contains_key(agent_id)
+    }
+
     // ── Allow-list gate ─────────────────────────────────────────────
 
     /// Validate a binary path against the allow-list.
@@ -445,4 +450,25 @@ pub(crate) fn pid_alive(pid: Pid) -> bool {
         signal::kill(pid, None),
         Ok(()) | Err(nix::errno::Errno::EPERM)
     )
+}
+
+/// Best-effort terminate an **arbitrary** pid (SIGTERM → grace → SIGKILL).
+///
+/// Unlike [`AgentSupervisor::stop`], this targets a process the supervisor
+/// never spawned — an externally-launched agent (e.g. a `cp` TUI started by
+/// hand) that must be restarted to pick up a new binary. There is no child
+/// handle to reap, so it only signals. ESRCH (already dead) is treated as
+/// success. Blocks up to [`STOP_GRACE`]; call it with no lock held.
+pub fn kill_pid(pid: u32) {
+    let raw = Pid::from_raw(i32::try_from(pid).unwrap_or(i32::MAX));
+    let _sent = send_signal(raw, Signal::SIGTERM);
+
+    let deadline = Instant::now() + STOP_GRACE;
+    while pid_alive(raw) && Instant::now() < deadline {
+        thread::sleep(POLL_INTERVAL);
+    }
+
+    if pid_alive(raw) {
+        let _sent = send_signal(raw, Signal::SIGKILL);
+    }
 }

@@ -65,6 +65,24 @@ export function createAgent(body: {
   })
 }
 
+/** Receipt from `POST /api/agent/{id}/restart` — a 202 "restarting"
+ *  acknowledgement. The agent's old process is killed and a fresh one is
+ *  spawned on the same realm folder (so it re-registers under the same id);
+ *  it re-appears in the fleet within a scan tick once it has booted. */
+export interface RestartReceipt {
+  status: string
+  folder: string
+  pid: number
+}
+
+/** Restart an agent: kill its (possibly stale) running process and respawn it
+ *  from the backend's current `cp` binary on the same realm folder. Used when
+ *  an agent's running binary predates a command the cockpit wants to send and
+ *  its bridge rejects it with `502 agent unreachable`. */
+export function restartAgent(agentId: string): Promise<RestartReceipt> {
+  return request(`/api/agent/${agentId}/restart`, { method: "POST" })
+}
+
 // ── Agent meta ────────────────────────────────────────────────────────
 
 export function fetchAgentMeta(agentId: string): Promise<Agent> {

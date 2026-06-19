@@ -377,6 +377,28 @@ export function useCreateAgent() {
 }
 
 /**
+ * Mutation to restart an agent (kill its stale process + respawn from the
+ * current binary). Like {@link useCreateAgent}, the respawn is async: the agent
+ * re-registers under the same id within ~2-3s, so we nudge the fleet query to
+ * refetch immediately and again shortly after, surfacing the back-to-life agent
+ * well before the slow backstop poll.
+ */
+export function useRestartAgent() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (agentId: string) => api.restartAgent(agentId),
+    onSuccess: () => {
+      const refetchFleet = () => {
+        void client.invalidateQueries({ queryKey: qk.fleet() })
+      }
+      refetchFleet()
+      window.setTimeout(refetchFleet, 2000)
+      window.setTimeout(refetchFleet, 4000)
+    },
+  })
+}
+
+/**
  * Send a command to an agent and return its receipt.
  *
  * Deliberately does **not** invalidate/refetch afterwards. Every

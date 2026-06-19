@@ -4,13 +4,14 @@ import {
   CornerDownLeft,
   FolderGit2,
   Loader2,
+  RefreshCw,
   Settings2,
   Sparkles,
   Wand2,
   X,
 } from "lucide-react"
 import type { Agent } from "@/lib/types"
-import { useCreateAgent, sendCommand } from "@/lib/live"
+import { useCreateAgent, useRestartAgent, sendCommand } from "@/lib/live"
 import { PROVIDERS, defaultModel, findModel, resolveFromApiName } from "@/lib/models"
 import { ModelPicker } from "./ModelPicker"
 import { cn } from "@/lib/utils"
@@ -75,10 +76,27 @@ export function AgentModal({
   const realm = isManage ? (agent?.folder ?? "") : `~/code/${slugify(name)}`
 
   const createAgent = useCreateAgent()
+  const restartAgent = useRestartAgent()
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const pending = createAgent.isPending || saving
+  const pending = createAgent.isPending || saving || restartAgent.isPending
   const canSubmit = (isManage || name.trim().length > 0) && !pending
+
+  /** Restart a (possibly stale-binary) agent so a fresh process can accept
+   *  commands the old binary rejected with `502 agent unreachable`. */
+  const restart = () => {
+    if (!agent || restartAgent.isPending) return
+    setError(null)
+    restartAgent.mutate(agent.id, {
+      onSuccess: () => {
+        onFlash?.(`Restarting ${agent.name} — it will reconnect in a moment`)
+        onClose()
+      },
+      onError: (e) => {
+        setError(e instanceof Error ? e.message : "Could not restart the agent.")
+      },
+    })
+  }
 
   const submit = () => {
     if (!canSubmit) return
@@ -241,6 +259,19 @@ export function AgentModal({
             >
               <Archive className="size-3.5" />
               Archive
+            </button>
+          )}
+          {isManage && (
+            <button
+              onClick={restart}
+              disabled={pending}
+              title="Kill and respawn the agent's process from the current binary — fixes a stale agent that rejects commands with 'agent unreachable'."
+              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-medium text-foreground/80 transition-colors hover:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw
+                className={cn("size-3.5", restartAgent.isPending && "animate-spin")}
+              />
+              Restart
             </button>
           )}
           <button
