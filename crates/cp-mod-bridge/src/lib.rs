@@ -122,6 +122,20 @@ pub struct BridgeState {
     /// the existing focus **without** emitting, so a (re)started agent does not
     /// replay its focus as a spurious "change".
     pub focus_memo_seeded: bool,
+
+    /// The bridge is **pending recovery**: `CP_BRIDGE=1` was set but
+    /// [`Boot::start`] failed (most commonly an `AlreadyRunning` `flock` race
+    /// against a still-dying predecessor on a fast relaunch). Rather than give
+    /// up for the whole session — leaving the agent silently unreachable to web
+    /// sends — the main loop periodically retries boot via
+    /// [`try_recover`](crate::try_recover) until it succeeds. `false` once the
+    /// bridge is live (or when the bridge is OFF entirely).
+    pub pending: bool,
+
+    /// The model name to advertise when a pending boot finally succeeds,
+    /// captured at the failed startup attempt (the model is fixed for the
+    /// session). Only meaningful while [`pending`](Self::pending) is `true`.
+    pub pending_model: String,
 }
 
 /// Agent-side orchestration bridge module.
@@ -179,72 +193,23 @@ impl Module for BridgeModule {
         let model = state.current_model();
 
         match Boot::start(&folder, &model) {
-            Ok(boot) => {
-                log::info!(
-                    "bridge: activated for {} ({})",
-                    boot.id(),
-                    folder.display(),
-                );
-
-
-
-
-                // Bind a dedicated tee socket for live token streaming
-                // (separate from the command socket in Boot).
-                let tee = match setup_tee(boot.entry()) {
-                    Ok(t) => {
-                        log::info!("bridge: stream tee ready");
-                        Some(t)
-                    }
-                    Err(e) => {
-                        log::error!("bridge: tee setup failed: {e}");
-                        None
-                    }
-                };
-
-                // Set the command listener to non-blocking so the main-loop
-                // poll never stalls when no commander is connected.
-                let _nb = boot.listener().set_nonblocking(true);
-
-                // Seed the command intake from the oplog replay (populates
-                // the SeenSet for dedup across deadman re-exec).
-                let intake = match Intake::new(
-                    std::path::Path::new(&boot.entry().oplog_path),
-                    boot.cap_token().to_owned(),
-                ) {
-                    Ok(i) => {
-                        log::info!("bridge: command intake ready");
-                        Some(i)
-                    }
-                    Err(e) => {
-                        log::error!("bridge: intake setup failed: {e:?}");
-                        None
-                    }
-                };
-
-                // Open the content-addressed body store under the oplog dir,
-                // so the message chokepoint can durably stage bodies before
-                // referencing them (I13). A failure here only disables live
-                // message deltas (the disk path still carries the messages).
-                let store = match Store::open(std::path::Path::new(&boot.entry().oplog_path)) {
-                    Ok(s) => Some(s),
-                    Err(e) => {
-                        log::error!("bridge: body store open failed: {e:?}");
-                        None
-                    }
-                };
-
+            Ok(boot) => activate(boot, state),
+            Err(e) => {
+                // Boot failed — most often an `AlreadyRunning` `flock` race on a
+                // fast relaunch (the dying predecessor still holds the lock).
+                // Instead of running inert for the whole session (silent web
+                // 502s until a manual relaunch), enter a PENDING state: the main
+                // loop re-attempts boot every couple of seconds via
+                // [`try_recover`], so the bridge self-heals the moment the lock
+                // frees. Loud `error!` (best-effort — the file logger may filter
+                // a non-`cp_base` target; the recovery loop is the real safety
+                // net, not the log).
+                log::error!("bridge: boot failed ({e:?}); entering recovery — will retry until the lock frees");
                 state.set_ext(BridgeState {
-                    boot: Some(boot),
-                    tee,
-                    intake,
-                    store,
+                    pending: true,
+                    pending_model: model,
                     ..Default::default()
                 });
-            }
-            Err(e) => {
-                log::error!("bridge: boot failed: {e:?}");
-                state.set_ext(BridgeState::default());
             }
         }
     }
@@ -378,6 +343,117 @@ fn setup_tee(entry: &cp_wire::types::registry::Entry) -> std::io::Result<Tee> {
     Ok(Tee::spawn(listener))
 }
 
+/// Assemble the live [`BridgeState`] around a freshly-booted [`Boot`] and store
+/// it on `state`.
+///
+/// Binds the stream tee, sets the command listener non-blocking, seeds the
+/// command intake (dedup `SeenSet` from oplog replay), and opens the
+/// content-addressed body store — then installs the fully-live `BridgeState`.
+/// Each auxiliary resource degrades independently to `None` on failure (a
+/// missing tee/intake/store only disables that live surface; the durable disk
+/// path still carries the data).
+///
+/// Called from both the startup [`init_state`](BridgeModule::init_state) Ok-path
+/// and the background [`try_recover`] success-path, so a mid-session recovery
+/// brings the bridge up identically to a clean boot. The fresh `BridgeState`
+/// resets the observe-on-change memos (`*_memo_seeded = false`), so a recovered
+/// bridge re-seeds without replaying its entire message/status backlog onto the
+/// oplog.
+fn activate(boot: Boot, state: &mut State) {
+    log::info!("bridge: activated for {} ({})", boot.id(), boot.entry().folder);
+
+    // Bind a dedicated tee socket for live token streaming (separate from the
+    // command socket in Boot).
+    let tee = match setup_tee(boot.entry()) {
+        Ok(t) => Some(t),
+        Err(e) => {
+            log::error!("bridge: tee setup failed: {e}");
+            None
+        }
+    };
+
+    // Set the command listener to non-blocking so the main-loop poll never
+    // stalls when no commander is connected.
+    let _nb = boot.listener().set_nonblocking(true);
+
+    // Seed the command intake from the oplog replay (populates the SeenSet for
+    // dedup across deadman re-exec).
+    let intake = match Intake::new(
+        std::path::Path::new(&boot.entry().oplog_path),
+        boot.cap_token().to_owned(),
+    ) {
+        Ok(i) => Some(i),
+        Err(e) => {
+            log::error!("bridge: intake setup failed: {e:?}");
+            None
+        }
+    };
+
+    // Open the content-addressed body store under the oplog dir, so the message
+    // chokepoint can durably stage bodies before referencing them (I13).
+    let store = match Store::open(std::path::Path::new(&boot.entry().oplog_path)) {
+        Ok(s) => Some(s),
+        Err(e) => {
+            log::error!("bridge: body store open failed: {e:?}");
+            None
+        }
+    };
+
+    state.set_ext(BridgeState {
+        boot: Some(boot),
+        tee,
+        intake,
+        store,
+        ..Default::default()
+    });
+}
+
+/// Background bridge-boot recovery — the self-healing half of the
+/// inert-bridge fix.
+///
+/// A no-op unless the bridge is in the [`pending`](BridgeState::pending) state
+/// (i.e. `CP_BRIDGE=1` but the startup boot failed, typically an
+/// `AlreadyRunning` `flock` race on a fast relaunch). When pending, it makes a
+/// single **fail-fast, non-blocking** boot attempt via [`Boot::try_start`]: on
+/// success the bridge comes up live mid-session (sockets bound, registry
+/// rewritten, heartbeat beating — web sends start working within the
+/// orchestrator's next scan); on failure (the predecessor still holds the lock)
+/// it stays pending for the next retry tick.
+///
+/// The fail-fast attempt is essential: it must never sleep out the ~2s lock
+/// retry window, because this runs **on the main loop thread** — a blocking
+/// attempt would stutter the UI. The caller throttles invocation (every couple
+/// of seconds); when not pending, the cost is a single `bool` check.
+pub fn try_recover(state: &mut State) {
+    let pending = state.get_ext::<BridgeState>().is_some_and(|bs| bs.pending);
+    if !pending {
+        return;
+    }
+
+    let model = state
+        .get_ext::<BridgeState>()
+        .map(|bs| bs.pending_model.clone())
+        .unwrap_or_default();
+
+    let Ok(folder) = std::env::current_dir() else {
+        // Can't determine the folder this tick; stay pending and retry later.
+        return;
+    };
+
+    match Boot::try_start(&folder, &model) {
+        Ok(boot) => {
+            log::error!(
+                "bridge: RECOVERED — orchestration plane is live again ({})",
+                folder.display(),
+            );
+            activate(boot, state);
+        }
+        // Still contended (predecessor not yet dead) — remain pending, the next
+        // retry tick will try again. Logged at debug to avoid spamming.
+        Err(e) => log::debug!("bridge: recovery attempt deferred: {e:?}"),
+    }
+}
+
 /// Build a [`StreamFrame`] from the given `kind` and publish it to the tee.
 ///
 /// Silently returns if the bridge is OFF or the tee is absent.
@@ -466,5 +542,7 @@ mod tests {
         assert!(!bs.status_memo_seeded);
         assert!(bs.last_focus.is_none());
         assert!(!bs.focus_memo_seeded);
+        assert!(!bs.pending);
+        assert!(bs.pending_model.is_empty());
     }
 }

@@ -71,6 +71,10 @@ pub(crate) struct App {
     pub last_spinner_ms: u64,
     /// Last gh watcher sync time
     pub last_gh_sync_ms: u64,
+    /// Last bridge-recovery retry time — throttles the periodic
+    /// `cp_mod_bridge::try_recover` attempt that self-heals a bridge whose boot
+    /// lost the `flock` race on a fast relaunch (no-op once the bridge is live).
+    pub last_bridge_recover_ms: u64,
     /// Last Matrix sync drain time — for periodic idle-time event polling
     pub last_chat_drain_ms: u64,
     /// Channel for API check results

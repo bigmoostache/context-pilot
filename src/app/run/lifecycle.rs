@@ -154,6 +154,16 @@ impl App {
                 self.last_gh_sync_ms = current_ms;
                 super::watchers::sync_gh_watches(self);
             }
+            // Bridge self-heal: if CP_BRIDGE=1 but boot lost the flock race on a
+            // fast relaunch, the bridge sits PENDING and the agent is silently
+            // unreachable to web sends. Retry boot every ~2s — a fail-fast,
+            // non-blocking attempt that becomes a no-op the instant the bridge
+            // is live (or was never pending). Self-heals the moment the dying
+            // predecessor frees the lock, with no manual relaunch.
+            if current_ms.saturating_sub(self.last_bridge_recover_ms) >= 2_000 {
+                self.last_bridge_recover_ms = current_ms;
+                cp_mod_bridge::try_recover(&mut self.state);
+            }
             // Drain Matrix sync events periodically (every 2s) so chat notifications
             // fire even while idle — without this, drain_sync_events() only runs
             // inside prepare_stream_context() which never happens when idle.

@@ -493,25 +493,23 @@
   importance: critical
   last_edited_ms: 0
 7ce2474519516610:
-  tl_dr: 'LIVE BUG (active): web send → 502 ''agent unreachable'' on f3a993c0ff357b41 (=context-pilot, the primary live agent). Bridge boot lost flock race on fast relaunch → orchestration plane inert all session. RCA + fix in contents.'
+  tl_dr: '502 ''agent unreachable'' (bridge boot lost flock race on fast relaunch) NOW SELF-HEALS: bridge enters PENDING on boot-fail + main loop retries Boot::try_start every 2s (fail-fast) until lock frees. Shipped. Details in contents.'
   contents: |-
-    ## 502 'agent unreachable' — bridge Boot lost the flock race (RCA, ACTIVE)
+    ## 502 'agent unreachable' — RCA + AUTO-RECOVERY SHIPPED
 
-    User hit POST /api/agent/f3a993c0ff357b41/command → 502 from the web composer.
+    ### The bug
+    User hit POST /command → 502 from web composer. Root: when the TUI relaunches fast, the new process's bridge Boot::start tries an exclusive flock on <folder>/bridge.lock while the dying predecessor still holds it; acquire_lock retried only ~2s then returned Error::AlreadyRunning; BridgeModule::init_state SWALLOWED the error → bridge ran INERT the whole session. Reads work (inspection plane reads config.json off disk → dashboard/threads/replies display), but sends 502 (no live command socket bound on stream.sock). boot.rs already unlink-before-binds sockets, so stale sockets are NOT the cause — purely the flock race.
 
-    ### Evidence gathered (live)
-    - f3a993c0ff357b41 = name 'context-pilot', folder /Users/guillaume/context-pilot — THE primary live agent (261 threads, $1369 cost). The user chats with it via web.
-    - Live TUI = pid 61029, target/release/tui, started 00:20:46, CP_BRIDGE=1 IS set (ps eww).
-    - BUT its bridge is INERT: oplog last append 00:15 (before 61029 booted); a healthy bridge emits Lifecycle::Running on boot → none. heartbeat frozen ~8min, still carries OLD dead pid 96326 (heartbeat pid bytes 0x00017846=96326). Registry record f3a99.json still points at dead pid 96326. stream.sock + tee.sock present (Jun 18) but lsof shows NO listener. bridge.lock has no holder now.
+    ### Fix shipped (auto-recovery / 'durcir')
+    cp-mod-bridge boot.rs: acquire_lock(path, max_retries) — max_retries>0 = patient (sleep between attempts, normal boot); 0 = fail-fast single non-blocking flock. start()=patient, new try_start()=fail-fast, start_inner shared body.
+    cp-mod-bridge lib.rs: BridgeState gained pending:bool + pending_model:String. Extracted activate(boot,state) free fn (tee/intake/store assembly) shared by init_state Ok-path AND recovery. init_state Err-arm now sets pending=true (+ loud error! log) instead of swallowing. New pub fn try_recover(state): no-op unless pending; else ONE fail-fast Boot::try_start; on Ok → activate() + loud RECOVERED log; on Err → stays pending for next tick.
+    Main loop: App.last_bridge_recover_ms field (mod.rs + init input.rs); lifecycle.rs calls cp_mod_bridge::try_recover(&mut self.state) throttled every 2s. Runs ON the main loop thread → fail-fast (no 2s sleep) = never stalls the loop. Self-heals the instant the predecessor frees the lock, zero manual relaunch.
 
-    ### Root cause
-    When the TUI relaunched at 00:20:46, the previous instance (pid 96326) was still dying and holding the exclusive flock on <folder>/bridge.lock. cp-mod-bridge boot.rs acquire_lock does a non-blocking exclusive Flock with only ATTEMPTS×BACKOFF ≈2s retry, then returns Error::AlreadyRunning. The new process lost that ~2s race → AlreadyRunning → BridgeModule::init_state SWALLOWED the error → TUI ran with bridge OFF the whole session. So: reads work (inspection plane reads config.json/messages off disk → dashboard/threads/replies all display), but sends 502 (no live command socket bound). boot.rs:140 already unlink-before-binds the socket, so stale sockets are NOT the cause — it's purely the flock race.
+    ### Validation
+    cargo build --release green; cp-mod-bridge 44 lib + 8 integration tests green (incl new try_start_fails_fast_when_locked_then_recovers_when_freed: fail-fast refuses under contention in < one backoff, succeeds once lock freed). rust-check/lint green (folder-sizes = gitignored oplog/bodies, unrelated). TUI reloaded. NO orchestrator restart needed (TUI-crate-only change).
 
-    ### Immediate fix (operational, user must do — agent can't restart itself)
-    Quit + relaunch the context-pilot TUI now that 96326 is dead and the lock is free. Fresh boot grabs the flock, rebinds sockets, re-registers under live pid, beats heartbeat → sends work. No manual cleanup needed (boot self-unlinks stale sockets).
-
-    ### Hardening follow-up (code, cp-mod-bridge boot.rs — proposed to user in T288, awaiting go-ahead)
-    (a) Surface bridge-boot FAILURE loudly (log/banner) — currently silent, user only learns via 502. (b) Longer / repeated retry on AlreadyRunning so a fast relaunch (new TUI starting while old releases the lock) can't silently leave the orchestration plane dead. Touches a TUI crate → rebuild + user relaunch to pick up; doesn't unblock the current session.
+    ### Client-deployment honesty (answered in T290)
+    The flock race is PRIMARILY our dev quit→relaunch pattern, but it CAN bite a client deploy on crash+respawn (systemd/launchd auto-restart), OS process bounce, or any fast supervisor relaunch. Auto-recovery makes it a non-issue either way. The original 'loud TUI banner' half is now lower-value (self-heals in ≤2s) — implemented as a loud log, not a banner.
   importance: high
   labels:
   - bridge
@@ -521,7 +519,7 @@
   - orchestration
   - active
   - bug
-  last_edited_ms: 1781908469866
+  last_edited_ms: 1781911016079
 803fa2aac4f0489a:
   tl_dr: NEVER commit or push .context-pilot/shared/entities/ files (entities.db, schema.sql, migrations/). These are local-only. Added to .gitignore.
   importance: critical

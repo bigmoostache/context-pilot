@@ -1806,6 +1806,10 @@
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
   last_edited_ms: 0
+3bccbe311e0ae7fe:
+  path: src/app/run/input.rs
+  description: App::new() constructor (inits timers incl last_bridge_recover_ms), save_state/message_async(), handle_autocomplete/palette events.
+  last_edited_ms: 1781910990520
 3be65075d5ed2f8b:
   path: crates/cp-mod-firecrawl/src/tools.rs
   description: 'Firecrawl tool dispatch with flame!("firecrawl_scrape"), flame!("firecrawl_search"), flame!("firecrawl_map"). Crawl delegated to crate::crawl. All async via spawn_async_tool. DynPanel creation with DYN_PANEL_ID_PLACEHOLDER. Shared helpers: get_client, err_result, PANEL_WARNING, timeout/poll constants.'
@@ -3606,6 +3610,10 @@
   path: web/src/lib/mock.ts
   description: Mock session data for the maquette. Panels, tokenBudget, messages, threads, threadDetails, agents, fileTree, library, usagePoints+USAGE_RATES, cockpit panel data, currentUser. Partially superseded by live hooks — still used as fallback for UsagePage, StatusBar cache bar, PromptsPage.
   last_edited_ms: 1781696062524
+77e7aa51db79b2ca:
+  path: crates/cp-mod-bridge/src/boot.rs
+  description: 'Boot — agent boot sequence + held resources. start_in flock bridge.lock (bounded retry) → OplogService::spawn → bind stream.sock → mint cap_token/boot_id → write registry → heartbeat Beacon → submit_durable(Lifecycle::Running). acquire_lock(path,max_retries): max_retries>0 = patient (sleep LOCK_RETRY_BACKOFF between attempts, the normal boot path); 0 = fail-fast single non-blocking flock (try_start, the background recovery path that must never sleep on the main loop). start_inner(folder,agents,model,retries) shared body; start()=patient, try_start()=fail-fast. Drop submit_durable(Stopping) before fs cleanup. Tests incl stale_socket_is_replaced + try_start_fails_fast_when_locked_then_recovers_when_freed (fail-fast refuses under contention in < one backoff, succeeds once lock freed).'
+  last_edited_ms: 1781910990147
 780df92c8c9eccb3:
   path: Cargo.lock
   description: Workspace lockfile
@@ -5458,6 +5466,10 @@ b4d042a53b65c218:
   path: crates/cp-mod-entities/src/format.rs
   description: SQL result formatting utilities. query_to_markdown (shared by tools.rs and result_panel.rs), format_cell, format_markdown_table, extract_table_name. MAX_RESULT_ROWS=200 cap.
   last_edited_ms: 1780608591309
+b5097cec173b09f7:
+  path: crates/cp-mod-bridge/src/lib.rs
+  description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1; on Boot FAILURE (flock race) enters PENDING (pending+pending_model) instead of swallowing → background try_recover self-heals. activate(boot,state) free fn assembles live BridgeState (tee/intake/store) — shared by init_state Ok-path AND recovery success-path. try_recover(state): no-op unless pending; else single fail-fast Boot::try_start; on Ok activate()+loud RECOVERED log; on Err stays pending for next retry tick (called every ~2s from lifecycle.rs, runs on main loop → fail-fast = never stalls). BridgeState gained pending:bool + pending_model:String. on_stream_chunk→Token, on_stream_stop→PhaseHint(Idle). is_global, no tools/panels.'
+  last_edited_ms: 1781910990253
 b50ea3c27f18e975:
   path: crates/cp-orchestrator/tests/supervisor_lifecycle.rs
   description: 'Phase 28 (X795) backend supervisor lifecycle suite (4 tests, all green, ~15s). Black-box public-API + real OS processes, covering what supervisor/tests.rs unit tests can''t: (1) SIGTERM→grace→SIGKILL escalation vs `/bin/sh -c "trap '''' TERM; exec sleep 60"` (unit spawn_and_stop never walks escalation path); (2) multi-agent fleet spawn 3 → stop all → all pids ESRCH-gone (spawned children reaped, no zombie); (3) adopted FOREIGN process really signalled on stop (status.signal()==SIGTERM 15; supervisor signals but doesn''t reap what it didn''t spawn); (4) check_liveness routes spawned Exited (try_wait) + adopted Vanished (signal-0) in ONE pass. pid_present helper via nix kill(_,None)!=ESRCH. Top `use cp_mod_bridge/cp_oplog/serde/serde_json/tiny_http as _;`.'
@@ -6954,6 +6966,10 @@ e71ccc8acc032f2c:
   path: ui/src/components/shell/ConfigModal.tsx
   description: 'Settings modal (macOS System-Settings style) on the portaled Dialog primitive (fixes the vibrancy-trapped fixed-overlay bug). Category rail (General/Model Providers/Search & Embeddings/Document AI/Web & Scraping/Integrations) + detail pane. All CP config: provider keys, Voyage, Meili status, Datalab, Brave, Firecrawl, GitHub, default-model picker, autonomy toggles. Masked keys w/ reveal, Connected/Not-set pills, opt-rise/modal-pop motion. Controlled open/onClose from TopBar gear. Design-only.'
   last_edited_ms: 1781524763682
+e725e57ad00357d4:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop with flame!("loop"). Input-first (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. poll_bridge_commands every tick. cp_mod_bridge::try_recover throttled ~2s = bridge self-heal (re-attempts boot if it lost the flock race on a fast relaunch, no-op once live). X18 adaptive idle poll (8ms streaming/dirty, 2ms bridge_active, 50ms otherwise). Render ~28fps.'
+  last_edited_ms: 1781910990436
 e749a095816c4807:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
@@ -7358,6 +7374,10 @@ f57e1e7fa5e8d8c5:
   path: crates/cp-mod-ocr/src/client.rs
   description: Datalab OCR API client. Multipart upload, exponential backoff polling, disk cache keyed by FNV-1a hash of file bytes + mode.
   last_edited_ms: 1780565428713
+f59fd0d6353947f8:
+  path: src/app/mod.rs
+  description: 'App struct — top-level container. Fields: State, TypewriterBuffer, pending tools/done, cache_tx, file/gh watchers, timers (incl last_bridge_recover_ms throttling the periodic cp_mod_bridge::try_recover self-heal), PersistenceWriter, reverie_streams. Sub-modules: actions, context, events, panels, prompt_builder, reverie, run.'
+  last_edited_ms: 1781910990335
 f5c068f0c1248c19:
   path: src/infra/gh_watcher.rs
   description: 'Re-export: cp_mod_github::watcher::Watcher as GhWatcher'

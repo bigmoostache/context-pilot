@@ -113,6 +113,27 @@ impl Boot {
         Self::start_in(folder, &agents_dir, model)
     }
 
+    /// Attempt a boot with a **single, non-blocking** lock acquisition — no
+    /// retry-on-contention wait.
+    ///
+    /// Used by the main-loop background *recovery* path: if the bridge boot
+    /// failed at startup (e.g. a relaunch lost the `flock` race to a still-dying
+    /// predecessor), the loop re-attempts boot periodically. Each attempt must
+    /// return *immediately* so it never stalls the loop — so on contention this
+    /// fails fast with [`Error::AlreadyRunning`] rather than sleeping out the
+    /// ~2s retry window. The next retry tick tries again; once the predecessor
+    /// finally dies and frees the lock, an attempt wins and the bridge comes up
+    /// live mid-session.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::AlreadyRunning`] immediately if the folder lock is contended,
+    /// or [`Error::Io`] for any filesystem failure.
+    pub fn try_start(folder: &Path, model: &str) -> BootResult<Self> {
+        let agents_dir = registry::default_agents_dir()?;
+        Self::start_inner(folder, &agents_dir, model, 0)
+    }
+
     /// Boot the bridge writing the registry into an explicit `agents_dir`
     /// (tests point this at a tempdir so they never touch the real home).
     ///
@@ -120,6 +141,22 @@ impl Boot {
     ///
     /// As [`start`](Self::start).
     pub fn start_in(folder: &Path, agents_dir: &Path, model: &str) -> BootResult<Self> {
+        Self::start_inner(folder, agents_dir, model, LOCK_RETRY_ATTEMPTS)
+    }
+
+    /// Shared boot body. `lock_attempts` is the number of *additional* contended
+    /// `flock` retries: [`LOCK_RETRY_ATTEMPTS`] for the patient startup path, `0`
+    /// for the fail-fast [`try_start`](Self::try_start) recovery path.
+    ///
+    /// # Errors
+    ///
+    /// As [`start`](Self::start).
+    fn start_inner(
+        folder: &Path,
+        agents_dir: &Path,
+        model: &str,
+        lock_attempts: u32,
+    ) -> BootResult<Self> {
         // The folder must exist before we can canonicalise + lock it.
         fs::create_dir_all(folder)
             .map_err(|e| Error::io(format!("create agent folder {}", folder.display()), e))?;
@@ -128,7 +165,7 @@ impl Boot {
         let id = folder_id(&canonical.to_string_lossy());
 
         // 1. The single-process gate — must come first.
-        let lock = acquire_lock(&canonical)?;
+        let lock = acquire_lock(&canonical, lock_attempts)?;
 
         // 2. Oplog (opens/creates the dir, spawns the commit thread).
         let oplog_path = canonical.join(OPLOG_DIR);
@@ -268,15 +305,18 @@ const LOCK_RETRY_BACKOFF: std::time::Duration = std::time::Duration::from_millis
 /// non-blocking lock would lose that race and boot the bridge OFF, leaving the
 /// agent unreachable until the next manual restart.
 ///
-/// So we retry the non-blocking lock up to [`LOCK_RETRY_ATTEMPTS`] times with a
-/// [`LOCK_RETRY_BACKOFF`] pause (~2s total). A *blocking* lock is deliberately
-/// avoided: were the previous process to hang forever, it would wedge boot
-/// indefinitely — the bounded retry waits out the common case, then refuses
-/// cleanly with [`Error::AlreadyRunning`] for a truly persistent owner.
+/// So we retry the non-blocking lock up to `max_retries` times with a
+/// [`LOCK_RETRY_BACKOFF`] pause between attempts. The patient startup path
+/// passes [`LOCK_RETRY_ATTEMPTS`] (~2s total); the fail-fast background
+/// recovery path passes `0` (a single attempt, no sleep) so it never stalls the
+/// main loop. A *blocking* lock is deliberately avoided: were the previous
+/// process to hang forever, it would wedge boot indefinitely — the bounded
+/// retry waits out the common case, then refuses cleanly with
+/// [`Error::AlreadyRunning`] for a truly persistent owner.
 ///
 /// Any non-contention `flock` error is a genuine I/O fault and is returned
 /// immediately without retry.
-fn acquire_lock(folder: &Path) -> BootResult<Flock<File>> {
+fn acquire_lock(folder: &Path, max_retries: u32) -> BootResult<Flock<File>> {
     let lock_path = folder.join(LOCK_FILE);
     let mut file = OpenOptions::new()
         .read(true)
@@ -293,7 +333,7 @@ fn acquire_lock(folder: &Path) -> BootResult<Flock<File>> {
             // `Flock::lock` hands the `File` back on failure so we can re-try.
             Err((returned, errno)) => {
                 let contended = errno == Errno::EAGAIN || errno == Errno::EWOULDBLOCK;
-                if contended && attempt < LOCK_RETRY_ATTEMPTS {
+                if contended && attempt < max_retries {
                     attempt = attempt.saturating_add(1);
                     std::thread::sleep(LOCK_RETRY_BACKOFF);
                     file = returned;
@@ -406,6 +446,39 @@ mod tests {
     }
 
     #[test]
+    fn try_start_fails_fast_when_locked_then_recovers_when_freed() {
+        use std::time::Instant;
+
+        let folder = tempdir().expect("folder");
+        let agents = tempdir().expect("agents");
+
+        // A patient boot holds the lock.
+        let first = boot(folder.path(), agents.path()).expect("first boot");
+
+        // A fail-fast `try_start` against the same folder must refuse
+        // *immediately* (no ~2s retry wait) with `AlreadyRunning` — this is the
+        // background recovery path that must never stall the main loop.
+        let started = Instant::now();
+        let contended = Boot::start_inner(folder.path(), agents.path(), "test-model", 0);
+        let elapsed = started.elapsed();
+        assert!(
+            matches!(contended, Err(Error::AlreadyRunning { .. })),
+            "a contended fail-fast attempt must refuse, got {contended:?}",
+        );
+        assert!(
+            elapsed < LOCK_RETRY_BACKOFF,
+            "fail-fast must return well under one backoff ({elapsed:?}), not sleep out the retry window",
+        );
+
+        // Once the holder releases the lock, the next fail-fast attempt wins —
+        // modelling the bridge recovering mid-session after a dying predecessor
+        // finally frees the lock.
+        drop(first);
+        let recovered = Boot::start_inner(folder.path(), agents.path(), "test-model", 0);
+        assert!(recovered.is_ok(), "fail-fast must succeed once the lock is free, got {recovered:?}");
+    }
+
+    #[test]
     fn acquire_lock_retries_until_holder_releases() {
         use std::sync::mpsc;
         use std::time::Duration;
@@ -420,7 +493,7 @@ mod tests {
         let (release_tx, release_rx) = mpsc::channel::<()>();
         let holder_path = canonical.clone();
         let holder = std::thread::spawn(move || {
-            let lock = acquire_lock(&holder_path).expect("holder acquires");
+            let lock = acquire_lock(&holder_path, LOCK_RETRY_ATTEMPTS).expect("holder acquires");
             held_tx.send(()).expect("signal held");
             // Hold until told to release, then drop the lock.
             let _ = release_rx.recv();
@@ -431,7 +504,7 @@ mod tests {
 
         // While the holder still owns the lock, a contender starts retrying.
         let contender_path = canonical.clone();
-        let contender = std::thread::spawn(move || acquire_lock(&contender_path));
+        let contender = std::thread::spawn(move || acquire_lock(&contender_path, LOCK_RETRY_ATTEMPTS));
 
         // Let the contender spin on contention for a couple of cycles, then
         // release the holder — well within the ~2s retry budget.
