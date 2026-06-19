@@ -458,14 +458,21 @@ export function Finder({ agent }: { agent: Agent }) {
     setPreview(node)
   }
 
-  // Row click with macOS-style settle semantics. Selection feedback is instant;
-  // the two layout-/mode-affecting effects are DEFERRED by CLICK_SETTLE_MS so a
-  // double-click (open) or a fast re-click can pre-empt them:
-  //   • a click on an already-sole-selected, inline-capable item arms
-  //     slow-click-to-rename (the macOS second-click gesture);
-  //   • otherwise a file click opens the Quick Look pane (only the first open
-  //     reflows — once open, selection updates it instantly with no defer).
-  // A modifier (range/additive) click only selects: never rename, never auto-open.
+  // Row click with macOS-style settle semantics. Selection feedback is INSTANT
+  // (and never reflows the layout); the only deferred effect is the macOS
+  // slow-second-click-to-rename gesture, armed by CLICK_SETTLE_MS so a real
+  // double-click (open) can pre-empt it.
+  //
+  // A single click deliberately does NOT open the Quick Look pane. Auto-opening
+  // it on click was the source of the "my item moves under my second click" bug
+  // in GRID view: the pane opens to the side, the auto-fill grid reflows, and
+  // the item shifts before a slow second click (>CLICK_SETTLE_MS) can land on it
+  // — so slow-click-rename only ever worked in list view (rows don't move
+  // vertically when the pane opens). With the auto-open removed, the gesture
+  // works identically across grid / list / columns, and there's no reflow under
+  // the cursor at all. Quick Look still opens via Space or the toolbar toggle,
+  // and once open it tracks the selection live (select() updates `preview`), so
+  // nothing is lost. A modifier (range/additive) click only selects.
   const onRowClick = (node: FinderNode, m: { additive: boolean; range: boolean }) => {
     const wasSole =
       !m.additive &&
@@ -477,10 +484,8 @@ export function Finder({ agent }: { agent: Agent }) {
     window.clearTimeout(clickTimer.current)
     if (m.additive || m.range) return
     const inlineCapable = viewMode !== "gallery"
-    clickTimer.current = window.setTimeout(() => {
-      if (wasSole && inlineCapable) startRename(node)
-      else if (!wasSole && node.kind !== "folder" && !previewOpen) setPreviewOpen(true)
-    }, CLICK_SETTLE_MS)
+    if (!wasSole || !inlineCapable) return
+    clickTimer.current = window.setTimeout(() => startRename(node), CLICK_SETTLE_MS)
   }
 
   /** Open a file in its own tab (reuse an existing tab for the same file). */
