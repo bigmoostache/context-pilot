@@ -1022,6 +1022,10 @@
   path: crates/cp-base/src/tools/async_exec.rs
   description: Async tool execution — spawn_async_tool() runs blocking I/O on worker thread. ToolOutput struct (content, is_error, create_panel, preserves_tempo). BLOCKING_TOOL_SENTINEL constant. ChannelWatcher registration. Error encoding via ASYNC_ERROR_PREFIX in description.
   last_edited_ms: 0
+2287bfc08417ed83:
+  path: web/src/components/threads/ThreadList.tsx
+  description: 'Left rail of threads view — ALWAYS OPEN. Search filters by name+last-preview. Groups: User turn (THEIR_TURN/ACTIVE) then Agent''s turn (MY_TURN, focused-first via byFocusThenRecent). Archived view (toggle) now sorts latest-active-first via byRecent (T277) — lastActivityMs derived frontend-side from the backend''s epoch-ms lastActivity. X887: previewOf skips auto:true traces (backward loop to last non-auto msg). Per-row hover Archive/Restore; New Thread.'
+  last_edited_ms: 1781885799037
 228e44baea044fe4:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)

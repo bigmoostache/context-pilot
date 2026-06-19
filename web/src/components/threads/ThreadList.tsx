@@ -193,7 +193,8 @@ export function ThreadList({
             )}
 
             {showArchived &&
-              visible.map((t) => (
+              // Latest-archived first (T277) — most recently active on top.
+              [...visible].sort(byRecent).map((t) => (
                 <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} archived />
               ))}
           </div>
