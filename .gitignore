@@ -72,3 +72,4 @@ benchmarks/terminal-bench/jobs/
 /heartbeat
 /bridge.lock
 /stream.sock
+demo/

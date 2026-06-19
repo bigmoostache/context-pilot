@@ -1522,6 +1522,10 @@
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Phase 19/30 + P1-P7: transport hub. Backend shared state + serve/serve_bound + route_rest (22 routes) + handle_stream SSE. CORS headers on all responses + OPTIONS preflight 204. /api/health. stream_to_client uses into_writer() + per-event flush. Invalidation: dirty_agents set, mark_dirty/take_dirty for SSE invalidate events.'
   last_edited_ms: 0
+37885dcda33a389e:
+  path: web/e2e/flicker_probe.spec.ts
+  description: 'T123 REAL-BROWSER flicker probe. Drives the actual web hook (applyThreadDelta + mergeThreadLogs + 5s poll) in real Chromium against live web :5175, sends a message, samples bubble visibility every 120ms, prints a PRESENT/ABSENT timeline + verdict. The faithful reproduction that caught the burst-clobber (before: first paint 9.8s; after fix: ~130ms and stays). Committed regression artifact.'
+  last_edited_ms: 1781858556183
 37c090f619a600a6:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -1854,6 +1858,10 @@
   path: src/ui/mod.rs
   description: Top-level render() with flame!("render"). IR frame build → sidebar + content panel + status bar + overlays (perf from IR, autocomplete from IR, config from IR, search index from IR). Autocomplete offset-aware for Threads mode (THREAD_LIST_WIDTH). No question form layout split.
   last_edited_ms: 1781391612117
+423c61d39cc75f66:
+  path: web/e2e/messages.spec.ts
+  description: Phase 2 e2e message send (1 test) over the K7 push plane. Composer send→user bubble appears live + roster log grows. Asserts the user message only (agent reply is non-deterministic LLM). 25s timeouts absorb single-live-agent backlog in the serial suite. The T123 no-flicker survival property is proven by repro_t123_flicker.py + flicker_probe.spec.ts (real-browser), not here. afterAll archives e2e- threads.
+  last_edited_ms: 1781858556240
 423eaee96ba995c5:
   path: src/app/run/threads/messages.rs
   description: 'Phase 2.2 (X839): live thread-message emission for the main loop. emit_messages = observe-on-change chokepoint diffing each thread''s message vector vs BridgeState.thread_msg_counts (seeded no-emit on first pass so a restarted agent doesn''t replay backlog). build_pending → JSON body {id,author,text,ts,question,fileRef}; emit_one_message stages body in content-addressed Store (I13 barrier: small=Inline rides delta, large=Spilled durable file) BEFORE submit_durable(MessageCreated{thread_id,message_id,head,inline_body}). No-op bridge-OFF. Captures messages from every source (Send tool / TUI reply / web SendMessage) via one uniform path.'
@@ -2042,6 +2050,10 @@
   path: crates/cp-orchestrator/tests/fleet_soak.rs
   description: 'Phase 9.4 (X869) multi-agent soak + fleet-scale fault-matrix slice (2 tests). n_agents_under_concurrent_load_stay_gap_free_and_isolated: 16 agents drive concurrent contended mixed durable(roster/message)/best-effort(phase/cost) workloads into their own real oplogs via thread::scope; every replayed log is strictly contiguous 0..=rev_head (V10 gap-free — a shed best-effort record never consumes a rev) + one shared MaterializedView/CostBreaker/StreamHub keeps 16 isolated projections, breaker trips only even/over-budget agents (V8-scaled logical isolation, no cross-contamination). a_flooded_reordered_subscriber_coalesces_then_reconciles_from_the_view: a cap-3 StreamHub subscriber flooded with 10 out-of-order frames coalesces to newest window, latches degraded, bounded buffer never exceeds capacity, then mark_reconciled clears degraded from the oplog-folded view head (V5 drop+reorder chaos recovered from authoritative snapshot). Literal 10k-OS-soak (V8) + fsync-fault-FS (V4) remain external CI. Top use cp_mod_bridge/nix/notify/serde/serde_json/serde_yaml/tiny_http as _ for per-target unused-crate-dependencies. let _rev= bindings dodge unused_results (CB3 is lib-only, doesn''t lint test targets).'
   last_edited_ms: 1781823989640
+4a6d37edf9ad2993:
+  path: web/src/lib/live.ts
+  description: 'Live data hooks: useLiveQuery (fetch + SSE delta apply-in-place + poll backstop). applyThreadDelta/applyAgentDelta = push-plane reducers. CRITICAL (T123 fix): SSE deltas applied via FUNCTIONAL updater setData(prev=>reducer(prev,entry)) so a same-macrotask delta burst (message_created + thread_status_changed on a send) folds onto the freshest state instead of the 2nd setData clobbering the 1st off a stale dataRef snapshot. rev high-water guard + null→debouncedRefetch via a preview. mergeThreadLogs = non-destructive poll backstop. useMetrics/useFleetMetrics, useStreamingTokens (rAF-batched §7).'
+  last_edited_ms: 1781858556221
 4ace13d6319be7ac:
   path: crates/cp-mod-console/src/manager.rs
   description: TUI-side session handle. spawn()/reconnect()/kill()/send_input() via console server. FilePoller + StatusPoller background threads per session. Orphan cleanup on startup. server_request() short-lived UnixStream per call. Geometric backoff socket wait (25ms→500ms cap, 3s budget).
@@ -2230,6 +2242,10 @@
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams structs. post_json() generic helper. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
   last_edited_ms: 1780560368755
+524ebae9b37bd103:
+  path: crates/cp-orchestrator/src/transport/stream.rs
+  description: 'SSE producer loop (run_stream), extracted from transport/mod.rs to stay under the line budget. Tails one agent''s oplog (rev-numbered durable deltas) + stream-hub frames, pushes both down the SSE sink until disconnect. T123 cold-connect fix: a fresh subscriber (no Last-Event-ID) seeds the Tailer at the oplog HEAD (oplog_head_rev) so it rides only the live tail instead of replaying the whole history; reconnect seeds at last-seen rev for gap replay. TAIL_REPOLL=5ms backstop (macOS FSEvents), KEEPALIVE=10s.'
+  last_edited_ms: 1781858556202
 5261dadde0c0c36c:
   path: crates/cp-mod-search/src/meili/api.rs
   description: Meilisearch HTTP API client. MeiliClient with index CRUD, document ops, search/multi_search, facet_distribution, stats. SearchParams for query building. pub struct for cross-module use (entities sync).
@@ -3538,6 +3554,10 @@
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
   last_edited_ms: 1781354328636
+80d494637a19cec6:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Frontend transport — REST + SSE over tiny_http (blocking, thread-per-connection). Backend shared state (view/breaker/hub/tickets/inspect/agents_dir/dirty_agents) under one Mutex. route_rest dispatches all /api routes; handle_stream redeems a single-use ticket then spawns stream::run_stream. serve/serve_bound acceptor. NOTE (T148): no create-agent route; AgentSupervisor not wired into Runtime.'
+  last_edited_ms: 1781858556259
 80d5cefd79765ed5:
   path: docs/genai-france-vibe.md
   description: GenAI France 2026 conference analysis — lineup, vibe, talk positioning, title naming patterns.
@@ -4984,8 +5004,8 @@ b5605bee566a2c94:
   last_edited_ms: 0
 b590f6c0c96ea8d5:
   path: crates/cp-orchestrator/src/transport/inspect/meta.rs
-  description: 'Enriched agent meta endpoints (moved into inspect/). agent_meta (GET /api/agent/{id}/meta) + fleet_meta (GET /api/fleet/meta) build maquette Agent JSON: registry record + view (phase/lifecycle/cost) + threads inspect (count/MY_TURN/lastActivity/task) + git branch. derive_status: Stopping/Stopped lifecycle can never read ''working'' (I8 authoritative). Uses absolute crate::transport:: paths after the inspect/ move.'
-  last_edited_ms: 1781817532353
+  description: 'Enriched agent-meta endpoints. agent_meta + fleet_meta build maquette Agent objects: registry record + view phase/lifecycle/cost + thread inspection (count, any-MY_TURN, last activity, task) + git branch. derive_status maps phase/lifecycle/has_my_turn → working/needs-you/idle.'
+  last_edited_ms: 1781858603062
 b5adb721af1f1f41:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Thread methods extracted to run/threads.rs.'
@@ -5632,8 +5652,8 @@ cbbef4219a1d03ee:
   last_edited_ms: 0
 cbe3798af576ea90:
   path: crates/cp-orchestrator/src/transport/inspect/metrics.rs
-  description: '§19 observability metrics endpoints. agent_metrics (GET /api/agent/{id}/metrics) + fleet_metrics (GET /api/metrics) expose ALREADY-COLLECTED backend state: breaker {tripped,spendUsd,budgetUsd} (durable R2-8 latch made VISIBLE — T121), stream {subscribers,droppedFrames,degraded} (StreamHub.agent_stream_health), rev {view,oplogHead,lag} (view rev vs fresh cp_oplog::replay rev_head — lag~0 under live tail), tokens {input,output} (cumulative-since-boot, folded from CostAggregate into view.cost — feeds the live token-economics UI), phase+lifecycle. Lock held once for in-mem reads; oplog_head_rev read from disk OUTSIDE lock. Latency/fsync histograms deliberately NOT synthesised (need new instrumentation) — no fabricated metrics.'
-  last_edited_ms: 1781822652451
+  description: '§19 observability metrics endpoints. agent_metrics + fleet_metrics build per-agent snapshot: durable cost-breaker state (tripped/spend/budget), stream health (subs/dropped/degraded), view-vs-oplog rev lag (oplog_head_rev read fresh outside the lock), phase+lifecycle. Only figures the backend genuinely holds — latency histograms deliberately not synthesised.'
+  last_edited_ms: 1781858603043
 cbeaa3dfd0701f21:
   path: src/llms/mod.rs
   description: LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging.
@@ -5774,6 +5794,10 @@ d165a994ae75f945:
   path: crates/cp-mod-utilities/src/hash.rs
   description: FNV-1a 128-bit content hashing. compute(bytes) and compute_str(str) return 32-char hex. Replaces sha2 crate.
   last_edited_ms: 0
+d18def4b79e96906:
+  path: web/sse_capture.py
+  description: 'T123 backend SSE probe. Mints a ticket, opens the SSE stream, sends a user message, prints every delta frame with send-relative latency — isolates the backend push plane from the frontend. Proved message_created rides the wire at 34-52ms with inline_body+text, so any slow paint is a frontend apply defect (it was: the burst-clobber, now fixed).'
+  last_edited_ms: 1781858556164
 d1a7efa0007771ee:
   path: src/llms/cache/mod.rs
   description: 'Module declarations: cache_engine, cache_optimizer, density.'
