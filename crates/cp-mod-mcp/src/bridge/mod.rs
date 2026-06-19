@@ -9,6 +9,8 @@
 
 /// `.mcp.json` discovery and parsing.
 pub mod config;
+/// Form selector enums for the MCP setup overlay (server type, auth mode, scope).
+pub mod form_enums;
 /// MCP status panel.
 pub mod panel;
 /// Live host state: connected servers, tools, status.

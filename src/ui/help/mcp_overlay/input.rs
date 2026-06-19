@@ -8,8 +8,9 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use cp_mod_mcp::bridge::config::ServerSpec;
 use cp_mod_mcp::bridge::servers::McpState;
 use cp_mod_mcp::bridge::setup::{
-    AuthMode, FormField, McpSetupState, Mode, Scope, ServerType,
+    FormField, McpSetupState, Mode,
 };
+use cp_mod_mcp::bridge::form_enums::{AuthMode, Scope, ServerType};
 use cp_mod_mcp::bridge::McpModule;
 
 use crate::modules::rebuild_tools;
@@ -161,12 +162,28 @@ fn handle_form(key: KeyEvent, state: &mut State) -> bool {
             handle_form_char(c, state);
             true
         }
+        KeyCode::Left => {
+            handle_form_left(state);
+            true
+        }
+        KeyCode::Right => {
+            handle_form_right(state);
+            true
+        }
+        KeyCode::Home => {
+            if let Some(form) = &mut McpSetupState::get_mut(state).form {
+                form.move_cursor_home();
+            }
+            true
+        }
+        KeyCode::End => {
+            if let Some(form) = &mut McpSetupState::get_mut(state).form {
+                form.move_cursor_end();
+            }
+            true
+        }
         // Consume all keys when form is open
-        KeyCode::Left
-        | KeyCode::Right
-        | KeyCode::Home
-        | KeyCode::End
-        | KeyCode::PageUp
+        KeyCode::PageUp
         | KeyCode::PageDown
         | KeyCode::BackTab
         | KeyCode::Delete
@@ -198,26 +215,65 @@ fn handle_form_char(c: char, state: &mut State) {
 
 /// Cycle the focused selector field (server type, auth mode, scope).
 fn handle_selector_cycle(state: &mut State) {
+    handle_selector_cycle_dir(state, true);
+}
+
+/// Cycle the focused selector field in a given direction.
+///
+/// `forward`: `true` = next, `false` = previous.
+fn handle_selector_cycle_dir(state: &mut State, forward: bool) {
     let setup = McpSetupState::get_mut(state);
     let Some(form) = &mut setup.form else { return };
     let Some(field) = form.field_at(form.focused_field) else { return };
     match field {
         FormField::ServerType => {
-            form.server_type = form.server_type.next();
+            form.server_type = if forward { form.server_type.next() } else { form.server_type.prev() };
             form.clamp_focus();
         }
         FormField::AuthMode => {
-            form.auth_mode = form.auth_mode.next();
+            form.auth_mode = if forward { form.auth_mode.next() } else { form.auth_mode.prev() };
             form.clamp_focus();
         }
         FormField::Scope => {
-            form.scope = form.scope.next();
+            form.scope = if forward { form.scope.next() } else { form.scope.prev() };
         }
         FormField::Name
         | FormField::Command
         | FormField::Args
         | FormField::Url
         | FormField::BearerToken => {} // text fields: space cycles nothing
+    }
+}
+
+/// Handle Left arrow in the form: cursor left for text, cycle prev for selectors.
+fn handle_form_left(state: &mut State) {
+    let is_text = {
+        let setup = McpSetupState::get(state);
+        let Some(form) = &setup.form else { return };
+        form.field_at(form.focused_field).is_some_and(FormField::is_text)
+    };
+    if is_text {
+        if let Some(form) = &mut McpSetupState::get_mut(state).form {
+            form.move_cursor_left();
+        }
+    } else {
+        handle_selector_cycle_dir(state, false);
+    }
+}
+
+/// Handle Right arrow in the form: cursor right for text, cycle next for selectors.
+fn handle_form_right(state: &mut State) {
+    let is_text = {
+        let setup = McpSetupState::get(state);
+        let Some(form) = &setup.form else { return };
+        form.field_at(form.focused_field).is_some_and(FormField::is_text)
+    };
+    if is_text {
+        if let Some(form) = &mut McpSetupState::get_mut(state).form {
+            form.move_cursor_right();
+        }
+    } else {
+        handle_selector_cycle_dir(state, true);
     }
 }
 

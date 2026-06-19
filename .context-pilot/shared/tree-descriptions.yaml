@@ -86,6 +86,10 @@
   path: crates/cp-mod-typst/src/lib.rs
   description: 'Typst module. 1 tool: typst_execute. Embedded compiler (no external binary). Depends on core+callback. catch-all watchlist callback recompiles affected docs. Seeds shared templates. @preview/ package support.'
   last_edited_ms: 0
+055dd578c8aba207:
+  path: src/ui/help/mcp_overlay/input.rs
+  description: 'MCP overlay input handler: handle_mcp_overlay_input(key, state)->bool. List/form/delete/oauth modes. Left/Right cursor nav + selector cycling. Calls McpModule API + rebuild_tools.'
+  last_edited_ms: 1781887007518
 0594bb6183026335:
   path: docs/talk/slides/0-2.html
   description: 'Slide: Where it is now — single screenshot'
@@ -254,6 +258,10 @@
   path: crates/cp-mod-search/src/meili/bootstrap.rs
   description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config, project path hashing, initial metrics population from Meilisearch facets.'
   last_edited_ms: 0
+0e73409d7420651e:
+  path: src/ui/help/mcp_overlay.rs
+  description: 'MCP setup overlay renderer: render_mcp_setup_overlay(), server list, add-form with positional cursor, selectors. Uses McpSetupOverlay IR.'
+  last_edited_ms: 1781887007507
 0eba287e35f187e9:
   path: crates/cp-mod-mcp/src/protocol.rs
   description: JSON-RPC 2.0 + MCP wire types (pure serialization, no I/O). Request/Notification/Incoming/RpcError, InitializeParams/ClientInfo/ServerInfo/InitializeResult, Tool/ListToolsResult, ContentBlock/CallToolResult (text() concatenates text blocks). PROTOCOL_VERSION 2024-11-05. 10 unit tests.
@@ -465,6 +473,10 @@
 191c44b43f0fad42:
   path: crates/cp-mod-github/src/cache_invalidation.rs
   description: 'Cache invalidation: 15 regex rules with backreferences for issues/PRs/releases/labels/repo/API, find_invalidations()'
+  last_edited_ms: 0
+19206098bb75c91d:
+  path: src/ui/help/mcp_overlay/builder.rs
+  description: 'Builder: State→McpSetupOverlay IR. Reads McpState+McpSetupState, builds server list with scope detection, form IR.'
   last_edited_ms: 0
 193ade609d357d84:
   path: .github/checks/lint-config.chain
@@ -782,6 +794,10 @@
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Thread input routing: handle_thread_input_submit. Thread creation: MAX_THREAD_NAME_LEN=200 cap. Paste sentinel expansion. /command replacement.'
   last_edited_ms: 0
+2a72ab9744df3943:
+  path: crates/cp-mod-mcp/src/bridge/form_enums.rs
+  description: 'Form selector enums: ServerType, AuthMode, Scope with next()/prev()/label() cycle methods. Extracted from setup.rs.'
+  last_edited_ms: 1781887007484
 2a731fc321763d96:
   path: crates/cp-mod-mcp/src/transport/pipe.rs
   description: 'SubprocessTransport: spawns a child via stdio, newline-delimited JSON-RPC framing. send_line writes stdin, recv reads stdout with timeout. Drop kills the child. stderr suppressed (Stdio::null) to avoid TUI corruption.'
@@ -1762,6 +1778,10 @@
   path: src/ui/search_overlay/display.rs
   description: 'Display column builders for the search index overlay. Converts SearchIndexOverlay IR data into ratatui Line sequences for the two-column layout (left: server/database/index/extensions, right: splitter/embeddings/tasks/recomputed/recent). Centered bordered popup.'
   last_edited_ms: 0
+6174f723a347a65e:
+  path: crates/cp-render/src/mcp_overlay_ir.rs
+  description: 'MCP overlay IR: McpSetupOverlay, McpSetupServer, McpSetupMode, McpSetupFormIR, McpFormField, ServerType/AuthMode/Scope enums with label() methods'
+  last_edited_ms: 0
 6192121729fa4dc7:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search. Dynamic entity_result panels.
@@ -1781,6 +1801,10 @@
 61bf78700b3d4a0d:
   path: crates/cp-mod-brave/src/api.rs
   description: Brave Search HTTP client. BraveClient with retry (3 attempts, 1s delay on 5xx). SearchParams + LLMContextParams structs. Rich callback fetching. Custom URL encoding. 10s request timeout.
+  last_edited_ms: 0
+61d6aa2bcb0a1701:
+  path: crates/cp-mod-mcp/src/bridge/mod.rs
+  description: 'McpModule: connect_all/stdio/http/url, dispatch tool calls, maybe_reconnect. add_and_connect/remove_and_disconnect/force_reconnect API.'
   last_edited_ms: 0
 6243fb33364b1a75:
   path: src/llms/cache/cache_engine.rs
@@ -2994,6 +3018,10 @@ ad68ded86b688df6:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
   last_edited_ms: 0
+ad8d379115d799f8:
+  path: crates/cp-mod-mcp/src/bridge/setup.rs
+  description: 'MCP setup overlay state: McpSetupState (ext map), Mode, Form (with cursor_pos + movement methods), FormField enum. Enums in form_enums.rs.'
+  last_edited_ms: 1781887007495
 adcf8b60551469d3:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'

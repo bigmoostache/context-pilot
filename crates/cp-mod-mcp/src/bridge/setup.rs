@@ -7,6 +7,8 @@
 
 use cp_base::state::runtime::State;
 
+use super::form_enums::{AuthMode, Scope, ServerType};
+
 // ── Top-level overlay state ─────────────────────────────────────────────────
 
 /// Mutable state for the MCP setup overlay, stored as a `State` extension.
@@ -284,6 +286,29 @@ impl Form {
         }
     }
 
+    /// Move the cursor one character left in the focused text field.
+    pub const fn move_cursor_left(&mut self) {
+        self.cursor_pos = self.cursor_pos.saturating_sub(1);
+    }
+
+    /// Move the cursor one character right in the focused text field.
+    pub fn move_cursor_right(&mut self) {
+        let len = self.current_text_len();
+        if self.cursor_pos < len {
+            self.cursor_pos = self.cursor_pos.saturating_add(1);
+        }
+    }
+
+    /// Move the cursor to the start of the focused text field.
+    pub const fn move_cursor_home(&mut self) {
+        self.cursor_pos = 0;
+    }
+
+    /// Move the cursor to the end of the focused text field.
+    pub fn move_cursor_end(&mut self) {
+        self.cursor_pos = self.current_text_len();
+    }
+
     /// Length (in chars) of the currently focused text field, or 0 for selectors.
     fn current_text_len(&self) -> usize {
         self.focused_text().map_or(0, |t| t.chars().count())
@@ -378,94 +403,6 @@ impl FormField {
 }
 
 // ── Enums ───────────────────────────────────────────────────────────────────
-
-/// Server type for the form.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ServerType {
-    /// Local stdio server (command + args).
-    Stdio,
-    /// Remote HTTP/SSE server (url).
-    Http,
-}
-
-impl ServerType {
-    /// Cycle to the next variant (for selector toggle).
-    #[must_use]
-    pub const fn next(self) -> Self {
-        match self {
-            Self::Stdio => Self::Http,
-            Self::Http => Self::Stdio,
-        }
-    }
-
-    /// Display label.
-    #[must_use]
-    pub const fn label(self) -> &'static str {
-        match self {
-            Self::Stdio => "stdio",
-            Self::Http => "http",
-        }
-    }
-}
-
-/// Authentication mode for the form.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AuthMode {
-    /// No authentication.
-    None,
-    /// Static bearer token.
-    Bearer,
-    /// OAuth 2.1 + PKCE browser flow.
-    OAuth,
-}
-
-impl AuthMode {
-    /// Cycle to the next variant.
-    #[must_use]
-    pub const fn next(self) -> Self {
-        match self {
-            Self::None => Self::Bearer,
-            Self::Bearer => Self::OAuth,
-            Self::OAuth => Self::None,
-        }
-    }
-
-    /// Display label.
-    #[must_use]
-    pub const fn label(self) -> &'static str {
-        match self {
-            Self::None => "none",
-            Self::Bearer => "bearer",
-            Self::OAuth => "oauth",
-        }
-    }
-}
-
-/// Config scope for the form.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Scope {
-    /// User-wide: `~/.context-pilot/mcp.json`.
-    Global,
-    /// Per-project: `.context-pilot/shared/mcp.json`.
-    Project,
-}
-
-impl Scope {
-    /// Cycle to the next variant.
-    #[must_use]
-    pub const fn next(self) -> Self {
-        match self {
-            Self::Global => Self::Project,
-            Self::Project => Self::Global,
-        }
-    }
-
-    /// Display label.
-    #[must_use]
-    pub const fn label(self) -> &'static str {
-        match self {
-            Self::Global => "global (~/.context-pilot/mcp.json)",
-            Self::Project => "project (.context-pilot/shared/mcp.json)",
-        }
-    }
-}
+//
+// `ServerType`, `AuthMode`, and `Scope` live in [`super::form_enums`] —
+// re-imported at the top of this file for convenience.

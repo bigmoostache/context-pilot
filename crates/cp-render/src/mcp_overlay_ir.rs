@@ -103,6 +103,8 @@ pub struct McpFormField {
     pub focused: bool,
     /// Whether this field is visible (some fields hide based on server type).
     pub visible: bool,
+    /// Cursor position (character index) within the value. Only meaningful when focused.
+    pub cursor_pos: usize,
 }
 
 /// Server type selection state.

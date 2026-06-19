@@ -139,7 +139,8 @@ pub(crate) fn build_mcp_setup_overlay(state: &State) -> McpSetupOverlay {
 fn build_form_ir(
     form: &cp_mod_mcp::bridge::setup::Form,
 ) -> McpFormIR {
-    use cp_mod_mcp::bridge::setup::{FormField, AuthMode, Scope, ServerType};
+    use cp_mod_mcp::bridge::form_enums::{AuthMode, Scope, ServerType};
+    use cp_mod_mcp::bridge::setup::FormField;
 
     let visible_fields = form.visible_fields();
     let field_count = visible_fields.len();
@@ -209,5 +210,6 @@ fn build_field_ir(
         placeholder: field.placeholder().unwrap_or("").to_string(),
         focused: is_focused,
         visible: is_visible,
+        cursor_pos: if is_focused { form.cursor_pos } else { 0 },
     }
 }

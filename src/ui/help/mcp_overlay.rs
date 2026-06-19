@@ -239,7 +239,7 @@ fn render_add_form<'line>(lines: &mut Vec<Line<'line>>, form: &'line McpFormIR, 
     lines.push(Line::from(""));
 }
 
-/// Render a text input field.
+/// Render a text input field with cursor at the correct position.
 fn render_text_field<'line>(lines: &mut Vec<Line<'line>>, field: &'line cp_render::mcp_overlay_ir::McpFormField) {
     if !field.visible {
         return;
@@ -259,21 +259,39 @@ fn render_text_field<'line>(lines: &mut Vec<Line<'line>>, field: &'line cp_rende
         )
     };
 
-    let display_value = if field.value.is_empty() {
-        Span::styled(&field.placeholder, Style::default().fg(theme::text_muted()))
-    } else {
-        Span::styled(&field.value, value_style)
-    };
-
-    let cursor = if field.focused { "▏" } else { "" };
-
-    lines.push(Line::from(vec![
+    let mut spans = vec![
         Span::styled(format!("  {:<14}", format!("{}:", field.label)), label_style),
         Span::styled("[", bracket_l),
-        display_value,
-        Span::styled(cursor, Style::default().fg(theme::accent())),
-        Span::styled("]", bracket_r),
-    ]));
+    ];
+
+    if field.focused {
+        if field.value.is_empty() {
+            // Focused + empty: cursor then placeholder hint.
+            spans.push(Span::styled("▏", Style::default().fg(theme::accent())));
+            spans.push(Span::styled(&field.placeholder, Style::default().fg(theme::text_muted())));
+        } else {
+            // Focused + non-empty: split at cursor, render cursor between halves.
+            let char_count = field.value.chars().count();
+            let pos = field.cursor_pos.min(char_count);
+            let before: String = field.value.chars().take(pos).collect();
+            let after: String = field.value.chars().skip(pos).collect();
+            if !before.is_empty() {
+                spans.push(Span::styled(before, value_style));
+            }
+            spans.push(Span::styled("▏", Style::default().fg(theme::accent())));
+            if !after.is_empty() {
+                spans.push(Span::styled(after, value_style));
+            }
+        }
+    } else if field.value.is_empty() {
+        spans.push(Span::styled(&field.placeholder, Style::default().fg(theme::text_muted())));
+    } else {
+        spans.push(Span::styled(&field.value, value_style));
+    }
+
+    spans.push(Span::styled("]", bracket_r));
+
+    lines.push(Line::from(spans));
 }
 
 /// Render a selector field (cycle with Space).
