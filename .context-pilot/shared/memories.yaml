@@ -156,6 +156,35 @@
   - lints
   - forbidden
   last_edited_ms: 0
+4a9b6f446872f244:
+  tl_dr: 'T283 follow-up SHIPPED (3e37818): slow-click-to-rename + debounced single-click in Finder. First click of a double no longer opens preview/reflows grid.'
+  contents: |-
+    ## T283 follow-up — slow-click rename + debounced single-click SHIPPED (3e37818)
+
+    User (after first rename ship): wanted (1) the macOS slow-second-click-to-rename gesture, and (2) debounced single-click — the first click of an intended double-click was opening the Quick Look pane, reflowing the grid, so the item moved out from under the second click.
+
+    ### Fix (frontend-only, Finder.tsx)
+    - CLICK_SETTLE_MS = 250 (single-click settle window; shorter than OS double-click threshold for responsiveness).
+    - clickTimer ref (number|undefined).
+    - select() STRIPPED of its auto-open line (`if (!previewOpen && kind!==folder) setPreviewOpen(true)`). select() now = pure selection + focus + setPreview, INSTANT, no reflow.
+    - NEW onRowClick(node, m): captures wasSole BEFORE select (selected.size===1 && has(node.path) && focusPath===node.path && !additive && !range); calls select() instantly; clears clickTimer; returns early on modifier clicks; else arms a CLICK_SETTLE_MS timer whose callback: wasSole && inlineCapable(viewMode!==gallery) → startRename(node); else !wasSole && file && !previewOpen → setPreviewOpen(true).
+    - open() + navigate() both clearTimeout(clickTimer) at the top so double-click/open/nav pre-empt the deferred single-click effect.
+    - viewProps.onClick = onRowClick (was select).
+    - cleanup useEffect clears clickTimer on unmount.
+
+    Mechanism: fast 2nd click → browser dblclick → open() clears timer → no rename/no preview-open. Slow 2nd click on already-selected item → no dblclick → timer fires → startRename. First click of a double → timer pending → cancelled by dblclick before the 250ms preview-open fires → no reflow.
+
+    Web build green (tsc+vite exit 0). Frontend-only → dev :5175 hot-reloads, NO orchestrator restart, NO system_reload. Committed+pushed 3e37818 (1 file, +48/-2).
+
+    Backlog (all MY_TURN Finder): T280 code-preview syntax highlight, T281 PDF rendering (needs raw inline-serve endpoint), T282 CSV/Excel tables, T272 follow-up X906 WYSIWYG md editor (needs fs_write endpoint), T284 thread sidebar, T285 Finder, T286 image previews — last 3 unread, not yet triaged.
+  importance: medium
+  labels:
+  - T283
+  - finder
+  - rename
+  - click
+  - shipped
+  last_edited_ms: 1781890699192
 4ac980654a7acaf1:
   tl_dr: 'T148/T262 SHIPPED: agent creation wired end-to-end (PTY spawn via portable-pty + TanStack useMutation). Proven live. Details in contents.'
   contents: |-
