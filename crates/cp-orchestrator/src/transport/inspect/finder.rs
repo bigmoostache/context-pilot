@@ -313,6 +313,60 @@ pub fn conversation(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     HttpReply::ok(&messages)
 }
 
+/// `POST /api/agent/{id}/fs/upload?path={dir}&name={file}` — upload one file.
+///
+/// The request body is the file's raw bytes (the transport caps it at
+/// `MAX_BODY`); `path` is the confined destination directory (empty = realm
+/// root) and `name` is the bare destination filename. One file per request —
+/// the Finder fires N concurrent uploads for a multi-file selection, sidestepping
+/// multipart parsing entirely.
+///
+/// The destination directory is confined to the agent realm (no `..`/symlink
+/// escape) and must already exist; `name` must be a bare filename (no path
+/// separators, not `.`/`..`) so the write can never land outside the realm.
+/// Returns `{ written, path }` (bytes written + the realm-relative path).
+pub fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
+    let folder = match agent_folder(state, agent_id) {
+        Ok(f) => f,
+        Err(reply) => return reply,
+    };
+    let relative_dir = extract_param(query, "path").unwrap_or_default();
+    let name = match extract_param(query, "name") {
+        Some(n) if !n.is_empty() => n,
+        _ => return HttpReply::error(400, "missing name parameter"),
+    };
+
+    // The filename must be a bare component — a separator or `..` would let the
+    // write escape the confined directory.
+    if name.contains('/') || name.contains('\\') || name.contains('\0') || name == "." || name == ".."
+    {
+        return HttpReply::error(400, "invalid file name");
+    }
+
+    let dir = match confined_path(&folder, &relative_dir) {
+        Some(p) => p,
+        None => return HttpReply::error(403, "path outside agent realm"),
+    };
+    if !dir.is_dir() {
+        return HttpReply::error(404, "destination directory not found");
+    }
+
+    let dest = dir.join(&name);
+    if std::fs::write(&dest, body).is_err() {
+        return HttpReply::error(502, "write failed");
+    }
+
+    let rel_path = if relative_dir.is_empty() {
+        name.clone()
+    } else {
+        format!("{relative_dir}/{name}")
+    };
+    HttpReply::ok(&serde_json::json!({
+        "written": body.len(),
+        "path": rel_path,
+    }))
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /// Resolve the agent's working directory from the registry record.

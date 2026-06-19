@@ -380,6 +380,43 @@ export { downloadFile } from "./api"
  * surfaces on the dashboard the moment it self-registers (the spawn is async —
  * the receipt only confirms the launch).
  */
+// ── Finder upload (TanStack mutation) ─────────────────────────────────
+//
+// Uploading files is a set of one-shot POSTs (one per file — the backend takes
+// raw bytes + a filename, sidestepping multipart). It is not a delta-covered
+// resource, so it rides a `useMutation`. On success the current directory's
+// listing query is invalidated so the new files appear immediately.
+
+/** Max upload size per file (32 MiB) — matches the backend transport's
+ *  `MAX_BODY`; a larger body would be silently truncated server-side, so we
+ *  reject it client-side with a clear message instead. */
+export const MAX_UPLOAD_BYTES = 32 * 1024 * 1024
+
+/**
+ * Mutation to upload one or more files into a realm directory. Files are sent
+ * concurrently (one POST each); any over {@link MAX_UPLOAD_BYTES} are rejected
+ * before sending. On success the destination directory's `useFs` listing is
+ * invalidated so the uploads surface at once.
+ */
+export function useUploadFiles(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ dir, files }: { dir: string; files: File[] }) => {
+      const tooBig = files.filter((f) => f.size > MAX_UPLOAD_BYTES)
+      if (tooBig.length > 0) {
+        throw new Error(
+          `${tooBig.map((f) => f.name).join(", ")} exceeds the 32 MB upload limit`,
+        )
+      }
+      await Promise.all(files.map((f) => api.uploadFile(agentId, dir, f)))
+      return { count: files.length, dir }
+    },
+    onSuccess: ({ dir }) => {
+      void client.invalidateQueries({ queryKey: qk.fs(agentId, dir) })
+    },
+  })
+}
+
 export function useCreateAgent() {
   const client = useQueryClient()
   return useMutation({

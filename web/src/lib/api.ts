@@ -350,6 +350,24 @@ export function fetchFsPreview(agentId: string, path: string): Promise<FsPreview
   return request(`/api/agent/${agentId}/fs/preview?path=${encodeURIComponent(path)}`)
 }
 
+/** Result of a single-file upload (`POST /fs/upload`). */
+export interface UploadResult {
+  written: number
+  path: string
+}
+
+/** Upload one file into a directory of the agent's realm. The body is the
+ *  file's raw bytes; `dir` is the realm-relative destination directory (""
+ *  = root). The Finder calls this once per selected file. Throws on a
+ *  rejected name / confinement violation / write fault. */
+export function uploadFile(agentId: string, dir: string, file: File): Promise<UploadResult> {
+  const q = `path=${encodeURIComponent(dir)}&name=${encodeURIComponent(file.name)}`
+  return request(`/api/agent/${agentId}/fs/upload?${q}`, {
+    method: "POST",
+    body: file,
+  })
+}
+
 /** Trigger a browser download for a file in the agent's realm. */
 export async function downloadFile(agentId: string, path: string): Promise<void> {
   const res = await fetch(

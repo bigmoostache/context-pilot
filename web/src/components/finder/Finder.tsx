@@ -7,7 +7,7 @@ import type {
   FinderViewMode,
 } from "@/lib/types"
 import { fmtBytes, sortNodes } from "@/lib/finderFs"
-import { downloadFile, useFs } from "@/lib/live"
+import { downloadFile, useFs, useUploadFiles } from "@/lib/live"
 
 /** Build breadcrumbs from a path relative to the agent's folder. */
 function buildCrumbs(
@@ -91,6 +91,8 @@ export function Finder({ agent }: { agent: Agent }) {
     [agent],
   )
   const surfaceRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const upload = useUploadFiles(agent.id)
 
   const [tabs, setTabs] = useState<Tab[]>(() => [
     { id: "t0", cwd: agent.folder, label: agent.name, kind: "folder", back: [], fwd: [] },
@@ -158,6 +160,22 @@ export function Finder({ agent }: { agent: Agent }) {
   const flash = (msg: string) => {
     setToast(msg)
     window.setTimeout(() => setToast(null), 2200)
+  }
+
+  // Upload a set of files into the current directory, then surface them. Used by
+  // both the toolbar Upload button (via the hidden file input) and drag-drop.
+  const uploadFiles = (files: File[]) => {
+    if (files.length === 0) return
+    flash(`Uploading ${files.length} file${files.length === 1 ? "" : "s"}…`)
+    upload.mutate(
+      { dir: relCwd, files },
+      {
+        onSuccess: ({ count }) =>
+          flash(`Uploaded ${count} file${count === 1 ? "" : "s"}.`),
+        onError: (err) =>
+          flash(err instanceof Error ? err.message : "Upload failed"),
+      },
+    )
   }
 
   // The backend lists paths RELATIVE to the realm root (e.g. "crates",
@@ -384,9 +402,19 @@ export function Finder({ agent }: { agent: Agent }) {
       onDrop={(e) => {
         e.preventDefault()
         setDragging(false)
-        flash("Uploading 3 files to this folder…")
+        uploadFiles(Array.from(e.dataTransfer.files))
       }}
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        hidden
+        onChange={(e) => {
+          uploadFiles(Array.from(e.target.files ?? []))
+          e.target.value = "" // allow re-selecting the same file
+        }}
+      />
       <FinderTabs
         tabs={tabs}
         active={activeId}
@@ -410,7 +438,7 @@ export function Finder({ agent }: { agent: Agent }) {
         onIconSize={setIconSize}
         onQuery={setQuery}
         onNewFolder={() => flash("New Folder created")}
-        onUpload={() => flash("Choose files to upload…")}
+        onUpload={() => fileInputRef.current?.click()}
         onDownload={() => {
           if (!selected.size) {
             flash("Select files to download.")

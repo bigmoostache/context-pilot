@@ -2650,6 +2650,10 @@
   path: .github/checks/rust_lints_list.md
   description: Expected rustc lints list for comparison
   last_edited_ms: 0
+5aaa88d96961812a:
+  path: web/src/components/finder/Finder.tsx
+  description: 'Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. T273: toolbar Upload button + drag-drop both wired to real uploads via a hidden multi-file <input> + useUploadFiles(agent.id) mutation → uploadFiles(files) POSTs each into relCwd then invalidates the listing (toast progress/result). Both FinderPreview usages pass agentId for live text previews (T272). Tabs+history+nav+selection+drag-drop+statusbar+marquee. PinnedFolder localStorage. ContextMenu wired onOpen/onDownload/onTag/onPin. Quick Look CLOSED by default; opens on single-click of a file.'
+  last_edited_ms: 1781887097591
 5ad145bbfc6acacb:
   path: .github/checks/clippy_compare.py
   description: Compares clippy lint defaults (from clippy_lints_list.md) against Cargo.toml overrides. Outputs clippy_compared_list.md — hides forbid-level lints, shows remaining with emoji indicators.
@@ -2858,6 +2862,10 @@
   path: website/docs/docs.css
   description: 'Docs: documentation stylesheet'
   last_edited_ms: 0
+625a2c5065c04058:
+  path: crates/cp-orchestrator/src/transport/inspect/finder.rs
+  description: 'Per-agent Finder file-manager endpoints (in inspect/): fs_list/fs_preview/fs_upload/fs_download/conversation, confined to the agent realm. fs_upload (POST /fs/upload?path={dir}&name={file}, T273): writes the raw-bytes body as one file into the confined dir; name must be a bare component (rejects ''/'',''\\'',''\0'',''.'',''..'' → 400) so the write can''t escape; dir confined via confined_path (403 on escape, 404 if absent); returns {written,path}. One file per request — the Finder fires N concurrent POSTs, sidestepping multipart. fs_download serves FILES as raw bytes (cap 10MiB) AND FOLDERS as a zip via system `zip -r -q` into /tmp (cap 100MiB, temp removed via drop(remove_file)). Absolute crate::transport:: paths.'
+  last_edited_ms: 1781887097487
 625cf1ad506f9875:
   path: src/modules/overview/tools/close_context.rs
   description: 'Close_panel execution. Partial close: valid panels close, undescribed/stale-description file panels are skipped (not blocked). Module on_close_context hooks. Output: closed/skipped/not_found/errors sections.'

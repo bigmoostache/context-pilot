@@ -1,3 +1,33 @@
+09311a7f1d8c490f:
+  tl_dr: 'T273 Finder upload SHIPPED: toolbar Upload button + drag-drop wired to a system file picker, uploads one-or-many files into the current Finder dir of the agent realm.'
+  contents: |-
+    ## T273 — wire Finder upload button (+ drag-drop) SHIPPED
+
+    User: the lucide-upload toolbar button should open a system window to pick one/multiple files to upload.
+
+    ### Design: one-file-per-request raw-bytes (NO multipart)
+    tiny_http has no multipart parser. Instead: POST /api/agent/{id}/fs/upload?path={dir}&name={file}, body = the file's raw bytes. Frontend fires N concurrent POSTs (Promise.all) for a multi-file selection. MAX_BODY (32MiB, T274) caps each.
+
+    ### Backend
+    - inspect/finder.rs fs_upload(state,id,query,body): agent_folder; dir=extract_param('path') (empty=root); name=extract_param('name') required (400 if missing). name must be bare — reject '/','\\','\0','.','..' → 400 'invalid file name'. dir=confined_path(folder,reldir) (403 'path outside agent realm' on None — also covers nonexistent dir since canonicalize fails) + must is_dir (404). std::fs::write(dir.join(name), body) (502 on err). Returns {written:body.len(), path:relpath}.
+    - transport/mod.rs route_rest: (Post, ['api','agent',id,'fs','upload']) => inspect::finder::fs_upload(state,id,query,body_bytes). body already read up-front by read_body for POST.
+
+    ### Frontend
+    - api.ts uploadFile(agentId,dir,file:File)->UploadResult{written,path}: fetch POST body=file (File is a Blob; raw bytes), query path+name encoded.
+    - live.ts useUploadFiles(agentId)=useMutation: pre-reject files > MAX_UPLOAD_BYTES (32MiB, exported), Promise.all(uploadFile), onSuccess invalidateQueries qk.fs(agentId,dir).
+    - Finder.tsx: fileInputRef + hidden <input type=file multiple onChange> (resets value after so same file re-selectable); uploadFiles(files) helper uses upload.mutate({dir:relCwd,files}) with flash toasts (Uploading…/Uploaded N/error). onUpload (toolbar button via FinderChrome NavBtn) → fileInputRef.click(). Drop handler now uploadFiles(Array.from(e.dataTransfer.files)) (was a 'Uploading 3 files…' stub).
+
+    ### Proven LIVE (orchestrator debug :7878 fresh binary, test agent 834eb459c7b064db ~/code/test):
+    POST upload cp-upload-test.txt → 200 {written:43}; appears in /fs listing + on disk; name='../escape.txt' → 400; missing name → 400; nonexistent dir → 403. Test artifact cleaned.
+
+    cargo build -p cp-orchestrator + web npm run build both green; rust-check+lint passed (folder-sizes 'failure' = ./oplog/bodies runtime artifact, gitignored, unrelated). Orchestrator RESTARTED (killed :7878 via lsof, relaunched debug CP_COST_BUDGET=100000000, console P25) since the running binary predated the upload route. No TUI crate changed → no system_reload.
+  importance: medium
+  labels:
+  - T273
+  - finder
+  - upload
+  - shipped
+  last_edited_ms: 1781887117730
 13a1d96ff4a4e7d0:
   tl_dr: 'Context Pilot is a Rust TUI AI coding assistant (~15K LOC) built with Ratatui+Crossterm. Workspace has 18 module crates + 1 main binary. Branch: reverie-context-optimizer with +209 lines in src/app/reverie/tools.rs'
   importance: high
