@@ -350,6 +350,25 @@ export function fetchFsPreview(agentId: string, path: string): Promise<FsPreview
   return request(`/api/agent/${agentId}/fs/preview?path=${encodeURIComponent(path)}`)
 }
 
+/** Result of a file write (`POST /fs/write`). */
+export interface WriteResult {
+  written: number
+  path: string
+}
+
+/** Overwrite an existing realm file's contents (the Finder's in-place editor —
+ *  e.g. saving the WYSIWYG markdown editor back to its `.md`). `path` is the
+ *  file's realm-relative path; `content` is the new full text, sent as the raw
+ *  request body. The backend confines the path and requires an existing regular
+ *  file (escaping/absent → 403, directory → 400), so a save can only ever
+ *  overwrite the file being edited. Throws on any non-2xx. */
+export function writeFile(agentId: string, path: string, content: string): Promise<WriteResult> {
+  return request(`/api/agent/${agentId}/fs/write?path=${encodeURIComponent(path)}`, {
+    method: "POST",
+    body: content,
+  })
+}
+
 /** Result of a single-file upload (`POST /fs/upload`). */
 export interface UploadResult {
   written: number

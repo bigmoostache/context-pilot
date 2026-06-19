@@ -289,6 +289,7 @@ fn route_rest(
         (Method::Get, ["api", "agent", id, "conversation"]) => inspect::finder::conversation(state, id),
         (Method::Post, ["api", "agent", id, "command"]) => rest::command(state, id, body_bytes),
         (Method::Post, ["api", "agent", id, "fs", "upload"]) => inspect::finder::fs_upload(state, id, query, body_bytes),
+        (Method::Post, ["api", "agent", id, "fs", "write"]) => inspect::finder::fs_write(state, id, query, body_bytes),
         (Method::Post, ["api", "agent", id, "fs", "mkdir"]) => inspect::finder::fs_mkdir(state, id, query),
         (Method::Post, ["api", "agent", id, "fs", "rename"]) => inspect::finder::fs_rename(state, id, query),
         (Method::Post, ["api", "agent", id, "fs", "move"]) => inspect::finder::fs_move(state, id, body_bytes),

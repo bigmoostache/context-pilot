@@ -6,8 +6,8 @@
 //! room for the preview-format endpoints that keep landing here):
 //!
 //! * [`listing`] — read views: `fs_list`, `fs_preview`, `conversation`.
-//! * [`mutate`] — writes: `fs_upload`, `fs_mkdir`, `fs_rename`, `fs_move`,
-//!   `fs_trash`.
+//! * [`mutate`] — writes: `fs_upload`, `fs_write`, `fs_mkdir`, `fs_rename`,
+//!   `fs_move`, `fs_trash`.
 //! * [`download`] — raw file / zipped-folder download (`fs_download`) and the
 //!   inline raw-serve (`fs_raw`, image/PDF previews).
 //! * [`support`] — shared helpers (path confinement, kind inference, query
@@ -23,4 +23,4 @@ pub(super) mod support;
 
 pub use download::{fs_download, fs_raw};
 pub use listing::{conversation, fs_list, fs_preview};
-pub use mutate::{fs_mkdir, fs_move, fs_rename, fs_trash, fs_upload};
+pub use mutate::{fs_mkdir, fs_move, fs_rename, fs_trash, fs_upload, fs_write};

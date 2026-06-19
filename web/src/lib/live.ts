@@ -423,6 +423,25 @@ export function useUploadFiles(agentId: string) {
  * success the destination directory's `useFs` listing is invalidated so the
  * new folder appears at once.
  */
+/**
+ * Mutation to overwrite an existing realm file (the Finder's in-place editor —
+ * e.g. saving the WYSIWYG markdown editor back to its `.md`). Not a delta-covered
+ * resource → a `useMutation`. On success the file's `useFsPreview` cache is
+ * invalidated so a re-open shows the saved content, and the containing
+ * directory's `useFs` listing is invalidated so its size/mtime refresh.
+ */
+export function useWriteFile(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ path, content }: { path: string; content: string }) =>
+      api.writeFile(agentId, path, content),
+    onSuccess: (_res, { path }) => {
+      void client.invalidateQueries({ queryKey: qk.fsPreview(agentId, path) })
+      void client.invalidateQueries({ queryKey: ["fs", agentId] })
+    },
+  })
+}
+
 export function useCreateFolder(agentId: string) {
   const client = useQueryClient()
   return useMutation({

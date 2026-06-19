@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react"
-import { Check, Copy, Download, Pause, Play, Share2, X } from "lucide-react"
+import { Check, Copy, Download, Pause, Pencil, Play, Save, Share2, X } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { fmtBytes } from "@/lib/finderFs"
-import { useFsPreview } from "@/lib/live"
+import { useFsPreview, useWriteFile } from "@/lib/live"
 import { rawUrl } from "@/lib/api"
 import { highlightCode } from "./codeHighlight"
 import { Markdown } from "@/lib/markdown"
+import { MarkdownEditor } from "@/components/agents/MarkdownEditor"
 import { extOf, kindMeta, TAG_META } from "./kind"
 import { FileIcon } from "./macIcons"
 import { TagDots } from "./FinderViews"
@@ -122,7 +123,14 @@ function LivePreview({ agentId, node }: { agentId: string; node: FinderNode }) {
   if (loading) return <PreviewStatus label="Loading preview…" />
   if (error || !data) return <Generic node={node} />
   if (node.kind === "markdown")
-    return <MarkdownPreview text={data.content} truncated={data.truncated} />
+    return (
+      <EditableMarkdown
+        agentId={agentId}
+        path={node.path}
+        content={data.content}
+        truncated={data.truncated}
+      />
+    )
   if (node.kind === "code")
     return <HighlightedCode name={node.name} code={data.content} truncated={data.truncated} />
   return <TextPreview kind={node.kind} text={data.content} truncated={data.truncated} />
@@ -590,6 +598,107 @@ function MarkdownPreview({ text, truncated }: { text: string; truncated?: boolea
     <div className="overflow-hidden rounded-lg border border-border bg-card p-4 card-shadow">
       <Markdown text={text} className="text-[12.5px] text-foreground/85" />
       {truncated && <TruncatedNote />}
+    </div>
+  )
+}
+
+/**
+ * A LIVE markdown file with a view ⇄ WYSIWYG-edit toggle (X906). View mode shows
+ * the rendered markdown plus an Edit affordance; edit mode swaps in the
+ * {@link MarkdownEditor} (a contentEditable WYSIWYG surface) seeded with the
+ * file's text and reports its serialized markdown on every keystroke. Save
+ * writes the draft back to the file via `fs/write`, then re-renders the saved
+ * content; Cancel discards.
+ *
+ * Editing is disabled for a TRUNCATED preview: the backend caps the preview at
+ * 256 KiB, so the editor would only hold the head of the file — saving it would
+ * silently drop the tail. Such files stay read-only with an explanatory note.
+ */
+function EditableMarkdown({
+  agentId,
+  path,
+  content,
+  truncated,
+}: {
+  agentId: string
+  path: string
+  content: string
+  truncated?: boolean
+}) {
+  const [editing, setEditing] = useState(false)
+  // Draft markdown serialized live from the editor; seeded with the file text so
+  // a Save with no edits is a harmless no-op write of the same content.
+  const [draft, setDraft] = useState(content)
+  const write = useWriteFile(agentId)
+  const [err, setErr] = useState<string | null>(null)
+
+  if (!editing) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-end">
+          {truncated ? (
+            <span className="text-[10.5px] italic text-muted-foreground/60">
+              Editing disabled — file exceeds the 256 KiB preview cap.
+            </span>
+          ) : (
+            <button
+              onClick={() => {
+                setDraft(content)
+                setErr(null)
+                setEditing(true)
+              }}
+              className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[11.5px] text-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <Pencil className="size-3" />
+              Edit
+            </button>
+          )}
+        </div>
+        <MarkdownPreview text={content} truncated={truncated} />
+      </div>
+    )
+  }
+
+  const save = () => {
+    setErr(null)
+    write.mutate(
+      { path, content: draft },
+      {
+        onSuccess: () => setEditing(false),
+        onError: (e) => setErr(e instanceof Error ? e.message : "Save failed"),
+      },
+    )
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <span className="text-[11.5px] font-medium text-muted-foreground">Editing — Markdown</span>
+        {err && <span className="truncate text-[11px] text-[var(--danger)]">{err}</span>}
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            onClick={() => setEditing(false)}
+            disabled={write.isPending}
+            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+          >
+            <X className="size-3" />
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={write.isPending}
+            className="flex items-center gap-1.5 rounded-md bg-[var(--signal)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105 disabled:opacity-60"
+          >
+            <Save className="size-3" />
+            {write.isPending ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+      <MarkdownEditor
+        initialMarkdown={content}
+        onChange={setDraft}
+        className="min-h-[280px]"
+      />
     </div>
   )
 }

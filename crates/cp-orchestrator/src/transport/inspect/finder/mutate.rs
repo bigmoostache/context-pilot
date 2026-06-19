@@ -56,6 +56,52 @@ pub fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8
     }))
 }
 
+/// `POST /api/agent/{id}/fs/write?path={file}` — overwrite a file's contents.
+///
+/// The request body is the file's new contents (the transport caps it at
+/// `MAX_BODY`); `path` is the confined realm-relative path of an **existing**
+/// file. Powers the Finder's in-place editor (e.g. the WYSIWYG markdown editor),
+/// which saves edits back to the file the user is viewing.
+///
+/// The target is confined to the agent realm and must already exist as a
+/// regular file. Confinement canonicalizes the full path, so an escaping **or**
+/// nonexistent path resolves to nothing and is rejected with `403` (a vanished
+/// path that still canonicalizes but isn't a regular file falls through to the
+/// `404`); a directory target is a `400`. A save can therefore only ever
+/// overwrite the existing file being edited — never create a stray entry or
+/// clobber a folder. Returns `{ written, path }` (bytes written + the
+/// realm-relative path).
+pub fn fs_write(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8]) -> HttpReply {
+    let folder = match agent_folder(state, agent_id) {
+        Ok(f) => f,
+        Err(reply) => return reply,
+    };
+    let relative = match extract_param(query, "path") {
+        Some(p) if !p.is_empty() => p,
+        _ => return HttpReply::error(400, "missing path parameter"),
+    };
+
+    let target = match confined_path(&folder, &relative) {
+        Some(p) => p,
+        None => return HttpReply::error(403, "path outside agent realm"),
+    };
+    if target.is_dir() {
+        return HttpReply::error(400, "cannot write over a directory");
+    }
+    if !target.is_file() {
+        return HttpReply::error(404, "file not found");
+    }
+
+    if std::fs::write(&target, body).is_err() {
+        return HttpReply::error(502, "write failed");
+    }
+
+    HttpReply::ok(&serde_json::json!({
+        "written": body.len(),
+        "path": relative,
+    }))
+}
+
 /// `POST /api/agent/{id}/fs/mkdir?path={dir}&name={name}` — create a folder.
 ///
 /// Creates a single new directory `name` inside the confined directory `path`

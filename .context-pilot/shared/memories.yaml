@@ -505,6 +505,34 @@
   - ui
   - design
   last_edited_ms: 1781679603055
+888541fd0894bcea:
+  tl_dr: X906 (T272 follow-up) WYSIWYG markdown editor in Finder preview SHIPPED end-to-end.
+  contents: |-
+    ## X906 — WYSIWYG markdown editor in Finder preview SHIPPED
+
+    User (T272 last msg): 'WYSIWYG editor please' — edit .md files in the Finder Quick Look and save back.
+
+    ### Backend (cp-orchestrator inspect/finder/mutate.rs)
+    fs_write(state,id,query,body): POST /api/agent/{id}/fs/write?path={file}, body = new full file text. Confine path; is_dir→400; !is_file→404; std::fs::write else 502. Returns {written,path}. NOTE: confined_path canonicalizes the FULL path, so a nonexistent/escaping path → None → 403 (the 404 branch is for a vanished-but-canonicalizes non-regular file). Edit use-case (existing .md) works. Route in transport/mod.rs route_rest (Post fs/write); re-export finder/mod.rs. Doc corrected to match 403-on-absent reality. Proven live (834eb ~/code/test): write existing 200 {written:23} on disk; ../escape 403; missing file 403; dir target 400; missing param 400.
+
+    ### Frontend
+    - api.ts: writeFile(agentId,path,content)→WriteResult{written,path} (POST raw body).
+    - live.ts: useWriteFile(agentId)=useMutation, onSuccess invalidate qk.fsPreview(agentId,path) + ['fs',agentId] family.
+    - MarkdownEditor.tsx (components/agents, was a prompt-library maquette): added optional onChange?(md). emit() serializes the contentEditable DOM→markdown via NEW htmlToMarkdown (inverse of mdToHtml: walks block nodes h1/h2/h3/p/blockquote/pre/ul/ol/li + inline strong|b/em|i/code/del|s|strike/a/br; unknown→inline text; blocks joined by blank line). Fired from exec() (toolbar) + onInput (typing). No onChange = unchanged maquette.
+    - FinderPreview.tsx: live markdown branch now routes through NEW EditableMarkdown(agentId,path,content,truncated): view mode = MarkdownPreview + Edit pencil; edit mode = MarkdownEditor seeded with content (onChange=setDraft) + Save/Cancel bar. Save→useWriteFile.mutate→onSuccess exit edit (fsPreview invalidated re-renders saved content). TRUNCATED files read-only (256KiB preview cap — saving the head would drop the tail) with an explanatory note. Imported MarkdownEditor + useWriteFile + Pencil/Save/X icons.
+
+    ### Validation
+    cargo build -p cp-orchestrator + web npm run build both green; rust-check+lint passed (folder-sizes 'failure' = ./oplog/bodies gitignored runtime artifact, unrelated). Orchestrator restarted on fs_write binary (P43 :7878). htmlToMarkdown is pure client logic (build-clean, bounded tag set) — no headless e2e. Frontend rides dev :5175 hot-reload.
+
+    GOTCHA reused: NEVER run git via console_easy_bash (blocked on 'git' substring) — use git_execute. Untracked NOT-mine never commit: .cp-trash/, report/blog-context-pilot-legal.html, report/parse_xlsx.py.
+  importance: medium
+  labels:
+  - X906
+  - T272
+  - finder
+  - markdown-editor
+  - shipped
+  last_edited_ms: 1781895429944
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical

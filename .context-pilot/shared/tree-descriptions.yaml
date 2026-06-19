@@ -90,6 +90,10 @@
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
   last_edited_ms: 1780498401099
+033610530c3bec8d:
+  path: web/src/components/finder/FinderPreview.tsx
+  description: 'QuickLook preview pane — kind-aware. T272 live .md/code/json/doc fetch via useFsPreview. X906: live markdown routes through EditableMarkdown (view⇄WYSIWYG-edit toggle: Edit pencil → MarkdownEditor seeded with content, Save→useWriteFile/fs-write→invalidate fsPreview, Cancel discards; truncated files read-only — saving the head would drop the tail). T281/T286 live image (<img>)+PDF (<object>) via rawUrl→/fs/raw. Mock path unchanged. agentId prop threads the realm.'
+  last_edited_ms: 1781895403774
 0336fe4051999342:
   path: crates/cp-mod-search/src/meili/bootstrap.rs
   description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config, project path hashing via FNV-1a, initial metrics population.'
@@ -906,6 +910,10 @@
   path: src/ui/helpers.rs
   description: 'Shared UI helpers: truncate_string, format_number, format_time_ago, wrap_text, count_wrapped_lines. Braille spinner (wall-clock-time-based, 10fps). IR-aware syntax highlighting (syntect, LRU cache, do_highlight_ir). TypewriterBuffer for streaming animation.'
   last_edited_ms: 0
+1e936465ea11cd8f:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/mutate.rs
+  description: 'Finder writes: fs_upload/fs_write (X906 overwrite an existing confined file — markdown editor save-back)/fs_mkdir/fs_rename/fs_move/fs_trash (T285 hidden .cp-trash). All confined, never clobber. is_bare_name/rel_child/rel_sibling helpers.'
+  last_edited_ms: 1781895403703
 1e9b3126938a7f78:
   path: crates/cp-base/src/panels.rs
   description: Panel trait + caching infra. hash_content uses FNV-1a via cp-mod-utilities. Freeze system. time_arith. paginate_content.
@@ -2134,6 +2142,10 @@
   path: crates/cp-mod-console/src/lib.rs
   description: 'Console module. 5 tools. Dynamic console panels. init: find/create Unix socket server. save/load: session reconnection + orphan cleanup. Leaks stdin on save to prevent EOF. Tool visualizer for colored output.'
   last_edited_ms: 0
+45ffa6e3f93db5d2:
+  path: web/src/components/agents/MarkdownEditor.tsx
+  description: 'WYSIWYG markdown editor (contentEditable + execCommand toolbar: bold/italic/strike/h1/h2/quote/code/lists/link). Seeds via mdToHtml on mount (uncontrolled, caret-safe). X906: optional onChange(md) fires htmlToMarkdown (DOM→markdown, inverse of mdToHtml; bounded tag set + degrade) on every edit so a host (FinderPreview EditableMarkdown) can save back. No onChange = pure prompt-library maquette.'
+  last_edited_ms: 1781895403678
 462da74f3732a8cd:
   path: crates/cp-mod-callback/src/tools.rs
   description: Callback tool dispatch with flame!("cb_dispatch"). Routes upsert/toggle/open_editor/close_editor. Delegates upsert to tools_upsert.rs.
@@ -2258,6 +2270,10 @@
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet mission-control shell. Owns fleetPage + collapsed state, renders collapsible FleetSidebar (floating PanelLeft re-open when collapsed) + active page: agents (FleetDashboard) / prompts (PromptsPage) / usage (UsagePage) / settings (ConfigPanel variant=''inline''). App.tsx renders this at fleet altitude.'
   last_edited_ms: 1781532231563
+4ba857dbcaefec1b:
+  path: web/src/lib/live.ts
+  description: Live data hooks = thin TanStack Query wrappers over queryClient + ensureSync SSE push. useFs/useFsPreview/useThreads(merge-non-destructive)/useUploadFiles/useWriteFile(X906 md editor save→invalidate fsPreview+fs)/useMoveItems/useRenameItem/useTrashItems/useCreateFolder mutations. useStreamingTokens rAF-batched.
+  last_edited_ms: 1781895403826
 4bb896637366abe2:
   path: crates/cp-mod-spine/src/guard_rail.rs
   description: 'Guard rail implementations: MaxOutputTokens, MaxCost (stream/burst-based), MaxDuration, MaxMessages, MaxAutoRetries. GuardRailStopLogic trait. all_guard_rails() static list.'
@@ -4802,6 +4818,10 @@ a1512abb4714af7d:
   path: web/src/components/shell/StatsPopup.tsx
   description: 'Session ''vitals'' popup (portaled Dialog) — accepts agentId, uses usePanels()+useAgentMeta() for live token budget + cost. T269 WIDE REDESIGN: w-[760px] (was 360px), two-band sheet — top band = context-budget meter + 3 figure chips (Context/Panels/Cost) side by side; bottom band = Service vitals as a CATEGORY-GROUPED 2-column compact grid (groupByCategory preserves first-seen order, humanize() Title-Cases the backend''s category tag into a section label) so a dozen services read as a scannable board not a long stack. Healthy rows stay quiet (colored dot + latency only); only error/unavailable raise a loud status chip (VitalRow), and a header summary badge shows ''all healthy'' / ''N issues'' + ''X of Y reachable''. Hosts the on-demand (never polling) Check Vitals action: fetchVitals(agentId) → prepends 2 browser-observed rows (Frontend self ok + Frontend→Orchestrator round-trip ms via performance.now) → renders grouped grid. Local useState (vitals/checking/vitalsErr); Stethoscope/Loader2 button (Check Vitals → Re-check after first run); dashed empty-state placeholder before first check. statusColor: ok=--ok / error=--danger / unavailable=--muted-foreground.'
   last_edited_ms: 1781884993321
+a158e8ce335583f8:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/mod.rs
+  description: 'Finder module hub: re-exports fs_list/fs_preview/conversation (listing), fs_upload/write/mkdir/rename/move/trash (mutate), fs_download + fs_raw (download — fs_raw is the inline image/PDF raw-serve, T281/T286). Submodules: listing/mutate/download/support.'
+  last_edited_ms: 1781895403726
 a16eceb1554ebe70:
   path: web/src/components/agents/ModelPicker.tsx
   description: Shared two-level LLM provider+model picker — web counterpart of TUI Ctrl+H. Provider rail (pills) above model cards for active provider. Used by AgentModal (manage) and ConfigPanel (defaults). Shared registry from models.ts.
@@ -5070,6 +5090,10 @@ ac9e6f95da3b14e4:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
+aca5ba505b4480b7:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl fs upload/write (X906 editor save-back)/mkdir/rename/move/trash, retire/unretire/restart, fleet create, vitals, metrics. GET fs/download (attachment) + fs/raw (handle_raw: inline, image+PDF previews) intercepted before route_rest. handle_stream = SSE.'
+  last_edited_ms: 1781895403750
 aca71ba6a6dfbaf5:
   path: .gitignore
   description: Git ignore rules
@@ -5730,6 +5754,10 @@ bfa166d86fa01300:
   path: web/src/lib/live.ts
   description: 'Live data hooks: fetch + SSE-delta-apply + poll backstop. useLiveQuery generic with applyDelta reducer + rev high-water guard. applyThreadDelta folds thread_created/archived/restored/status_changed + message_created. applyAgentDelta folds phase_transition + cost_aggregate. useStreamingTokens(agentId) (§7 stream plane): subscribes SSE ''stream'', parses StreamFrame, accumulates Token text into a per-message_id ref buffer flushed ONCE per requestAnimationFrame (never setState per token — §7 mandatory), keyed by message_id (= Message.id). invalidateAgent bus + sendCommand double-invalidate.'
   last_edited_ms: 1781812786747
+bfc6a20f4c0f3188:
+  path: web/src/lib/api.ts
+  description: 'REST client for orchestration backend. Typed fetch wrappers: fleet/agent/threads/panels/fs (list/preview/write[X906 editor save-back]/upload/mkdir/rename/move/trash/download) + rawUrl (/fs/raw inline-serve for image+PDF previews)/conversation/metrics/vitals/create/restart/retire. sendCommand wraps Kind in Command envelope; mintTicket for SSE.'
+  last_edited_ms: 1781895403798
 bfcfb7ebe6b769b1:
   path: crates/cp-orchestrator/src/transport/rest/retire.rs
   description: 'POST /api/agent/{id}/retire + /unretire (T271). retire_agent: resolve entry, snapshot RetiredRecord (provider via meta::read_provider BEFORE kill), supervisor::kill_pid(pid) lock-free, kill_console_server via <folder>/.context-pilot/console/server.pid (it survives TUI restarts by design), drop stale supervised record, retired.retire+persist -> 200. unretire_agent: retired.unretire (404 if absent) + spawn_pty same folder (respawn -> same id) -> 202. NOT a folder delete. Proven live: 834eb retire->409 same-path->unretire respawn(pid)->404 unknown.'

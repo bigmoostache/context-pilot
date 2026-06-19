@@ -22,17 +22,22 @@ import { cn } from "@/lib/utils"
  * browser's rich-text commands, so what you type is what you see.
  *
  * The initial markdown is converted to HTML once on mount; thereafter the
- * surface is uncontrolled (so the caret never jumps). Nothing is persisted —
- * this is a maquette.
+ * surface is uncontrolled (so the caret never jumps). When `onChange` is
+ * supplied, every edit serializes the live DOM back to markdown (the inverse of
+ * the seeding `mdToHtml`) and reports it, so a host can save the result. With no
+ * `onChange` the surface is a pure design-only maquette (the prompt library).
  */
 export function MarkdownEditor({
   initialMarkdown,
   placeholder,
   className,
+  onChange,
 }: {
   initialMarkdown: string
   placeholder?: string
   className?: string
+  /** Fired with the current markdown after every edit (enables save-back). */
+  onChange?: (markdown: string) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [, force] = useState(0)
@@ -47,10 +52,18 @@ export function MarkdownEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Serialize the live DOM back to markdown and report it (when a host wants to
+  // save). Cheap (a read-only walk of a small doc) and never touches the DOM, so
+  // the caret is safe to call after any edit.
+  const emit = () => {
+    if (onChange && ref.current) onChange(htmlToMarkdown(ref.current))
+  }
+
   const exec = (cmd: string, arg?: string) => {
     ref.current?.focus()
     document.execCommand(cmd, false, arg)
     force((n) => n + 1)
+    emit()
   }
 
   const block = (tag: string) => exec("formatBlock", tag)
@@ -122,7 +135,10 @@ export function MarkdownEditor({
           contentEditable
           suppressContentEditableWarning
           spellCheck={false}
-          onInput={() => setEmpty(ref.current?.textContent?.trim().length === 0)}
+          onInput={() => {
+            setEmpty(ref.current?.textContent?.trim().length === 0)
+            emit()
+          }}
           onKeyUp={() => force((n) => n + 1)}
           onMouseUp={() => force((n) => n + 1)}
           className={cn(
@@ -252,4 +268,104 @@ function inline(s: string): string {
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+}
+
+/**
+ * Serialize the editable surface's DOM back to markdown — the inverse of
+ * {@link mdToHtml}. The tag set is bounded by what the toolbar + seeding produce
+ * (h1/h2, p, blockquote, pre, ul/ol/li, and the inline strong·em·code·link·del),
+ * so a focused walk covers every case; an unrecognized element degrades to its
+ * inline text. Block elements are separated by a blank line so the result
+ * re-parses cleanly. `execCommand` emits either semantic (`<strong>`) or
+ * presentational (`<b>`) tags depending on the browser — both are handled.
+ */
+function htmlToMarkdown(root: HTMLElement): string {
+  const blocks: string[] = []
+  for (const node of Array.from(root.childNodes)) {
+    const md = serializeBlock(node)
+    if (md.trim().length > 0) blocks.push(md)
+  }
+  return blocks.join("\n\n").replace(/\n{3,}/g, "\n\n").trim() + "\n"
+}
+
+/** Serialize one top-level (block) node to its markdown line(s). */
+function serializeBlock(node: ChildNode): string {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
+  if (!(node instanceof HTMLElement)) return ""
+
+  const tag = node.tagName.toLowerCase()
+  switch (tag) {
+    case "h1":
+      return `# ${serializeInline(node)}`
+    case "h2":
+      return `## ${serializeInline(node)}`
+    case "h3":
+      return `### ${serializeInline(node)}`
+    case "blockquote":
+      return serializeInline(node)
+        .split("\n")
+        .map((l) => `> ${l}`)
+        .join("\n")
+    case "pre":
+      return `\`\`\`\n${node.textContent ?? ""}\n\`\`\``
+    case "ul":
+      return listItems(node).map((li) => `- ${serializeInline(li)}`).join("\n")
+    case "ol":
+      return listItems(node).map((li, i) => `${i + 1}. ${serializeInline(li)}`).join("\n")
+    case "br":
+      return ""
+    default:
+      // p / div / unknown block → its inline content as a paragraph.
+      return serializeInline(node)
+  }
+}
+
+/** The `<li>` children of a list element. */
+function listItems(list: HTMLElement): HTMLElement[] {
+  return Array.from(list.children).filter(
+    (c): c is HTMLElement => c instanceof HTMLElement && c.tagName.toLowerCase() === "li",
+  )
+}
+
+/** Serialize an element's inline content (recursively) to markdown. */
+function serializeInline(el: Node): string {
+  let out = ""
+  for (const node of Array.from(el.childNodes)) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      out += node.textContent ?? ""
+      continue
+    }
+    if (!(node instanceof HTMLElement)) continue
+    const tag = node.tagName.toLowerCase()
+    const inner = serializeInline(node)
+    switch (tag) {
+      case "strong":
+      case "b":
+        out += `**${inner}**`
+        break
+      case "em":
+      case "i":
+        out += `*${inner}*`
+        break
+      case "code":
+        out += `\`${inner}\``
+        break
+      case "del":
+      case "s":
+      case "strike":
+        out += `~~${inner}~~`
+        break
+      case "a": {
+        const href = node.getAttribute("href") ?? ""
+        out += href ? `[${inner}](${href})` : inner
+        break
+      }
+      case "br":
+        out += "\n"
+        break
+      default:
+        out += inner
+    }
+  }
+  return out
 }
