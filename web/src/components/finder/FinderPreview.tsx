@@ -1,8 +1,9 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Check, Copy, Download, Pause, Play, Share2, X } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { fmtBytes } from "@/lib/finderFs"
 import { useFsPreview } from "@/lib/live"
+import { highlightCode } from "./codeHighlight"
 import { Markdown } from "@/lib/markdown"
 import { extOf, kindMeta, TAG_META } from "./kind"
 import { FileIcon } from "./macIcons"
@@ -118,6 +119,8 @@ function LivePreview({ agentId, node }: { agentId: string; node: FinderNode }) {
   if (error || !data) return <Generic node={node} />
   if (node.kind === "markdown")
     return <MarkdownPreview text={data.content} truncated={data.truncated} />
+  if (node.kind === "code")
+    return <HighlightedCode name={node.name} code={data.content} truncated={data.truncated} />
   return <TextPreview kind={node.kind} text={data.content} truncated={data.truncated} />
 }
 
@@ -184,6 +187,75 @@ function tint(line: string) {
     if (/^\d+$/.test(tok)) return <span key={i} style={{ color: "var(--interactive)" }}>{tok}</span>
     return <span key={i}>{tok}</span>
   })
+}
+
+// ── highlighted code (live files) ─────────────────────────────────
+/**
+ * Real syntax-highlighted code preview for a LIVE file. Resolves the language
+ * from the filename, highlights via highlight.js (see codeHighlight.ts), and
+ * lays the result out with the macOS code-window chrome: traffic lights, a
+ * language label, a copy button, and per-line gutter numbers.
+ *
+ * The highlighted HTML is split on newlines so each source line keeps its own
+ * gutter number while still carrying its highlight spans. highlight.js never
+ * leaves a tag open across a newline, so splitting the rendered HTML on `\n`
+ * yields self-contained per-line fragments that are safe to inject.
+ */
+function HighlightedCode({
+  name,
+  code,
+  truncated,
+}: {
+  name: string
+  code: string
+  truncated?: boolean
+}) {
+  const { html, language } = useMemo(() => highlightCode(code, name), [code, name])
+  const lines = useMemo(() => html.split("\n"), [html])
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard?.writeText(code).catch(() => {})
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1400)
+  }
+  return (
+    <div className="overflow-hidden rounded-lg border border-border bg-card card-shadow">
+      <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-1.5">
+        <span className="flex gap-1.5">
+          <span className="size-2.5 rounded-full bg-[#ff5f57]" />
+          <span className="size-2.5 rounded-full bg-[#febc2e]" />
+          <span className="size-2.5 rounded-full bg-[#28c840]" />
+        </span>
+        <span className="ml-1 font-mono text-[10.5px] uppercase tracking-wide text-muted-foreground">
+          {language}
+        </span>
+        <button
+          onClick={copy}
+          className="ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] text-muted-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
+        >
+          {copied ? <Check className="size-3 text-[var(--ok)]" /> : <Copy className="size-3" />}
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <pre className="hljs overflow-x-auto bg-transparent px-3 py-2.5 font-mono text-[11px] leading-relaxed">
+        {lines.map((line, i) => (
+          <div key={i} className="flex gap-3 rounded hover:bg-[var(--signal)]/6">
+            <span className="w-7 shrink-0 select-none text-right text-muted-foreground/35">{i + 1}</span>
+            <code
+              className="min-w-0 whitespace-pre"
+              // highlight.js escapes the source; the markup is class-tagged spans only.
+              dangerouslySetInnerHTML={{ __html: line || "\u200b" }}
+            />
+          </div>
+        ))}
+      </pre>
+      {truncated && (
+        <div className="px-3 pb-2">
+          <TruncatedNote />
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── spreadsheet ───────────────────────────────────────────────────

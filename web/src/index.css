@@ -404,3 +404,64 @@
   border: 2px solid var(--card);
   cursor: pointer;
 }
+
+/*
+  ── highlight.js theme (Finder code previews, T280) ──────────────────────
+  Maps highlight.js token classes onto the app's semantic tokens so code
+  colouring tracks BOTH palettes (no hard-coded hex). Kept deliberately small
+  and legible — comments dim, keywords on the torch/clay signal, strings green,
+  numbers/literals the interactive accent, types/titles the warn amber.
+*/
+.hljs {
+  color: color-mix(in oklab, var(--foreground) 90%, transparent);
+}
+.hljs-comment,
+.hljs-quote {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-meta,
+.hljs-doctag {
+  color: var(--signal);
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+  color: var(--ok);
+}
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-link {
+  color: var(--interactive);
+}
+.hljs-title,
+.hljs-class .hljs-title,
+.hljs-type,
+.hljs-attr,
+.hljs-attribute,
+.hljs-name,
+.hljs-section,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: var(--warn);
+}
+.hljs-params,
+.hljs-property {
+  color: color-mix(in oklab, var(--foreground) 80%, transparent);
+}
+.hljs-deletion {
+  color: var(--danger);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
+}
