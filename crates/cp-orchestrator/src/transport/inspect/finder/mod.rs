@@ -8,7 +8,8 @@
 //! * [`listing`] — read views: `fs_list`, `fs_preview`, `conversation`.
 //! * [`mutate`] — writes: `fs_upload`, `fs_mkdir`, `fs_rename`, `fs_move`,
 //!   `fs_trash`.
-//! * [`download`] — raw file / zipped-folder download.
+//! * [`download`] — raw file / zipped-folder download (`fs_download`) and the
+//!   inline raw-serve (`fs_raw`, image/PDF previews).
 //! * [`support`] — shared helpers (path confinement, kind inference, query
 //!   parsing) + the unit tests.
 //!
@@ -20,6 +21,6 @@ mod listing;
 mod mutate;
 pub(super) mod support;
 
-pub use download::fs_download;
+pub use download::{fs_download, fs_raw};
 pub use listing::{conversation, fs_list, fs_preview};
 pub use mutate::{fs_mkdir, fs_move, fs_rename, fs_trash, fs_upload};

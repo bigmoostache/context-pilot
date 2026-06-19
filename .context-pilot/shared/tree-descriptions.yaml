@@ -982,6 +982,10 @@
   path: ui/src/components/ui/tip.tsx
   description: App-wide tooltip wrapper (T25). <Tip title body side triggerClassName>. Built on Base-UI tooltip primitive — portals to document.body (escapes .vibrancy containing block), owns popup+arrow via --popover token (theme-correct light/dark), title(bold)+optional body line. triggerClassName forwards to the wrapper span (e.g. 'block' for full-width children). Shared TooltipProvider (App root, delay 350/close 80) governs delay.
   last_edited_ms: 1781594050191
+2073f3ce9972bcb6:
+  path: web/src/components/finder/FinderPreview.tsx
+  description: 'QuickLook preview pane — kind-aware. T272: live .md/code/json/doc fetch via useFsPreview→LivePreview (markdown=GFM Markdown, code=HighlightedCode hljs, else preformatted). T281/T286: live image+PDF render straight from the backend inline raw-serve (rawUrl→/fs/raw) — LiveImagePreview (<img>, onLoad captures natural dims, onError→Generic fallback, checker backing + zoom) and LivePdfPreview (<object type=application/pdf> with an ''Open PDF in new tab'' fallback child). Body() routes live image/pdf BEFORE the TEXT_KINDS fetch when agentId is present. Mock path (inline node.text/image/pdf) unchanged. Enriched Meta footer; agentId prop threads the realm.'
+  last_edited_ms: 1781894241203
 2081231103220bef:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
@@ -1310,6 +1314,10 @@
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
   last_edited_ms: 0
+2bc616364f760550:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/download.rs
+  description: 'Finder file/folder download + inline raw-serve (split from finder.rs). fs_download: files as raw bytes (10MiB cap, Content-Disposition attachment), folders zipped to /tmp via system `zip -r -q` (100MiB cap) then cleaned up. fs_raw (T281/T286): serves a file''s raw bytes INLINE (Content-Type inferred via content_type_for for images+PDF, Content-Disposition: inline, 10MiB cap) so the browser renders image/PDF previews directly via <img>/<object>. Confined to realm via support::confined_path.'
+  last_edited_ms: 1781894241150
 2bf5098fb04b790a:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
@@ -1846,6 +1854,10 @@
   path: crates/cp-mod-prompt/src/lib.rs
   description: 'Prompt library module. 3 tools: Behaviour_create, agent_load, skill_load. 2 panels: Library (fixed) + Skill (dynamic). Core, global. Edit pre-flight validates YAML frontmatter on prompt .md files. is_prompt_file() with canonicalize() for abs/rel path matching.'
   last_edited_ms: 0
+3e764e13ac745777:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/mod.rs
+  description: 'Finder module hub: re-exports fs_list/fs_preview/conversation (listing), fs_upload/mkdir/rename/move/trash (mutate), fs_download + fs_raw (download — fs_raw is the inline image/PDF raw-serve, T281/T286). Submodules: listing/mutate/download/support.'
+  last_edited_ms: 1781894241175
 3ea42e434ffe36bb:
   path: crates/cp-mod-callback/Cargo.toml
   description: 'Callback module deps: cp-base, cp-render, cp-mod-console, crossterm, serde, serde_json, globset, sha2.'
@@ -5030,6 +5042,10 @@ aa88d97c8df48765:
   path: crates/cp-mod-spine/src/coucou.rs
   description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper. MIN_RECURRENCE_MS=60s floor for custom recurrence.
   last_edited_ms: 0
+aaebf3202a462574:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl fs upload/mkdir/rename/move/trash, retire/unretire/restart, fleet create, vitals, metrics. GET fs/download (attachment) + fs/raw (handle_raw: inline Content-Type/Disposition, image+PDF previews T281/T286) intercepted before route_rest as raw-byte responses. handle_stream = SSE.'
+  last_edited_ms: 1781894253987
 aaf816cbdc5723aa:
   path: src/llms/cache/density.rs
   description: 'Divergence density distributions. Production: ConversationTailDensity (zeros out assistant blocks, quadratic on user-side panels + last user turn). Test-only: Uniform, Quadratic, PowerLaw, Empirical.'
@@ -6190,6 +6206,10 @@ cea9094e8b06f613:
   path: crates/cp-mod-bridge/src/boot.rs
   description: 'Phase 10 (X777): Boot — agent boot sequence + held resources. start_in(folder,agents_dir,model): (1) flock <folder>/bridge.lock EXCLUSIVE|NONBLOCK FIRST (single-process gate I1/D2, EAGAIN→AlreadyRunning); (2) OplogService::spawn(oplog dir); (3) bind stream.sock (unlink stale first); (4) mint cap_token+boot_id; (5) write registry <id>.json LAST (atomic, after all resources). Drop removes registry+socket; lock+oplog release via own Drop. H5 FD-inherit deferred (CLOEXEC kept). 6 tests: all-resources, second-boot-refuses, lock-released-on-drop, registry-removed, stale-socket-replaced.'
   last_edited_ms: 0
+cebf78550438f7e7:
+  path: web/src/lib/api.ts
+  description: 'REST client for orchestration backend. Typed fetch wrappers: fleet/agent/threads/panels/fs (list/preview/upload/mkdir/rename/move/trash/download) + rawUrl (builds the /fs/raw inline-serve URL for <img>/<object> image+PDF previews, T281/T286)/conversation/metrics/vitals/create/restart/retire. sendCommand wraps Kind in Command envelope; mintTicket for SSE.'
+  last_edited_ms: 1781894241230
 cee0067c856dd433:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Cream Noir'', the SYMMETRIC LIGHTNESS-MIRROR of Cream (#1C1815 espresso bg / #2B2620 surface / #CF8A7D lifted clay-rose / #F3EBDD cream fg; warm hue + clay-rose primary + teal accent preserved) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (agent dialog), finder-slider.'

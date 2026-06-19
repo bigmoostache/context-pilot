@@ -3,6 +3,7 @@ import { Check, Copy, Download, Pause, Play, Share2, X } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { fmtBytes } from "@/lib/finderFs"
 import { useFsPreview } from "@/lib/live"
+import { rawUrl } from "@/lib/api"
 import { highlightCode } from "./codeHighlight"
 import { Markdown } from "@/lib/markdown"
 import { extOf, kindMeta, TAG_META } from "./kind"
@@ -101,8 +102,11 @@ function Body({ node, agentId }: { node: FinderNode; agentId?: string }) {
   if (node.media?.kind === "video") return <VideoPreview media={node.media} />
   if (node.kind === "markdown" && node.text) return <MarkdownPreview text={node.text} />
   if (node.text) return <TextPreview kind={node.kind} text={node.text} />
-  // No inlined payload (the live Finder): fetch the file's text from the
-  // backend and render it. Folders/binary/media files keep the no-preview state.
+  // No inlined payload (the live Finder): images and PDFs render straight from
+  // the backend's inline raw-serve endpoint; text-like kinds fetch their
+  // content. Folders/binary/media files keep the no-preview state.
+  if (agentId && node.kind === "image") return <LiveImagePreview agentId={agentId} node={node} />
+  if (agentId && node.kind === "pdf") return <LivePdfPreview agentId={agentId} node={node} />
   if (agentId && TEXT_KINDS.has(node.kind)) return <LivePreview agentId={agentId} node={node} />
   return <Generic node={node} />
 }
@@ -129,6 +133,95 @@ function PreviewStatus({ label }: { label: string }) {
   return (
     <div className="flex flex-1 items-center justify-center py-12">
       <span className="text-[12.5px] text-muted-foreground/70">{label}</span>
+    </div>
+  )
+}
+
+// ── live image (real bytes) ───────────────────────────────────────
+/**
+ * Render a LIVE image straight from the backend's inline raw-serve endpoint
+ * (`/fs/raw`). The `<img>` loads the real bytes; `onLoad` captures the natural
+ * pixel dimensions for the footer, and a failed load (oversized / unreadable /
+ * decode error) flips to the honest no-preview fallback. A checkerboard backing
+ * shows transparency, and a zoom control mirrors the mock image preview.
+ */
+function LiveImagePreview({ agentId, node }: { agentId: string; node: FinderNode }) {
+  const [zoom, setZoom] = useState(100)
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null)
+  const [failed, setFailed] = useState(false)
+  const src = useMemo(() => rawUrl(agentId, node.path), [agentId, node.path])
+  if (failed) return <Generic node={node} />
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="checker overflow-hidden rounded-lg border border-border">
+        <div className="flex items-center justify-center p-4">
+          <img
+            src={src}
+            alt={node.name}
+            onLoad={(e) =>
+              setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
+            }
+            onError={() => setFailed(true)}
+            className="max-h-[420px] max-w-full rounded-md object-contain card-shadow transition-transform"
+            style={{ transform: `scale(${zoom / 100})` }}
+          />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-[11px] text-muted-foreground">
+          {dims ? `${dims.w} × ${dims.h}` : "—"}
+        </span>
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            onClick={() => setZoom((z) => Math.max(25, z - 25))}
+            className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            −
+          </button>
+          <span className="w-9 text-center text-[11px] tabular-nums text-muted-foreground">{zoom}%</span>
+          <button
+            onClick={() => setZoom((z) => Math.min(400, z + 25))}
+            className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            +
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── live PDF (real bytes) ─────────────────────────────────────────
+/**
+ * Render a LIVE PDF inline via the browser's native viewer, pointed at the
+ * backend's inline raw-serve endpoint (`/fs/raw`). `<object>` embeds the PDF;
+ * its child is the fallback the browser shows when it can't render PDFs inline
+ * (or the file failed to load) — a link that opens the raw bytes in a new tab.
+ */
+function LivePdfPreview({ agentId, node }: { agentId: string; node: FinderNode }) {
+  const src = useMemo(() => rawUrl(agentId, node.path), [agentId, node.path])
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <object
+        data={src}
+        type="application/pdf"
+        className="min-h-[480px] w-full flex-1 rounded-lg border border-border bg-card card-shadow"
+      >
+        <div className="flex flex-col items-center gap-3 py-10 text-center">
+          <FileIcon kind="pdf" size={64} />
+          <span className="text-[12.5px] text-muted-foreground">
+            Inline PDF preview isn’t available here.
+          </span>
+          <a
+            href={src}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-md bg-[var(--signal)] px-3 py-1.5 text-[12px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105"
+          >
+            Open PDF in new tab
+          </a>
+        </div>
+      </object>
     </div>
   )
 }

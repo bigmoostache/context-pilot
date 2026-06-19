@@ -445,6 +445,16 @@ export function trashItems(agentId: string, items: string[]): Promise<TrashResul
   })
 }
 
+/** Build the URL that serves a realm file's raw bytes **inline** (no download
+ *  prompt) — `GET /api/agent/{id}/fs/raw?path=`. Point an `<img src>` or
+ *  `<object data>` at it to render the file in place (image & PDF Finder
+ *  previews). The backend infers the `Content-Type` and caps the file at
+ *  10 MiB; an oversized or unreadable file yields a non-2xx the tag renders as
+ *  a broken element, which the preview components surface as a fallback. */
+export function rawUrl(agentId: string, path: string): string {
+  return `${BASE}/api/agent/${agentId}/fs/raw?path=${encodeURIComponent(path)}`
+}
+
 /** Trigger a browser download for a file in the agent's realm. */
 export async function downloadFile(agentId: string, path: string): Promise<void> {
   const res = await fetch(

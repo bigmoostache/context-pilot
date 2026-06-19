@@ -528,6 +528,38 @@
   - preview
   - shipped
   last_edited_ms: 1781885667471
+9ce91c5181530a87:
+  tl_dr: T281 (PDF) + T286 (image) Finder previews SHIPPED via ONE backend inline raw-serve endpoint + frontend <img>/<object>. Details in contents.
+  contents: |-
+    ## T281 PDF + T286 image Finder previews — SHIPPED (one endpoint powers both)
+
+    User asks: render PDFs (T281) and images (T286) in the Finder Quick Look. Live /fs nodes carry NO inline payload, so both fell through to Generic 'No preview available'.
+
+    ### Backend (cp-orchestrator transport/inspect/finder/download.rs)
+    fs_raw(state,id,query): GET /api/agent/{id}/fs/raw?path= — serves a file's raw bytes INLINE. Unlike fs_download (Content-Disposition: attachment), this infers Content-Type via content_type_for(name) (png/jpg/jpeg/gif/svg/webp/bmp/ico/tiff/avif/heic + pdf; else application/octet-stream) and sets Content-Disposition: inline, so the browser renders directly. Confined via support::confined_path (403 escape), is_file (404), 10MiB cap (MAX_DOWNLOAD_BYTES, 413), missing path 400. Returns (bytes, content_type).
+    Wiring: handle_raw in transport/mod.rs (mirrors handle_download — raw Response::from_data + Content-Type + Content-Disposition: inline + CORS), intercepted in handle() BEFORE route_rest under `if method==Get { if let ["api","agent",id,"fs","raw"] }` (raw bytes, not JSON). Re-exported finder/mod.rs `pub use download::{fs_download, fs_raw}`.
+
+    ### Frontend
+    - api.ts rawUrl(agentId,path)->string: builds `${BASE}/api/agent/${id}/fs/raw?path=...` for direct <img src>/<object data> use (NOT a fetch — the tag loads it).
+    - FinderPreview.tsx Body(): when agentId present and no inline payload, routes `node.kind==='image'`->LiveImagePreview, `node.kind==='pdf'`->LivePdfPreview, BEFORE the TEXT_KINDS fetch branch. LiveImagePreview: <img src=rawUrl> with checker backing + zoom (25-400%), onLoad captures naturalWidth/Height for the dims footer, onError->Generic fallback. LivePdfPreview: <object data=rawUrl type=application/pdf> (browser native viewer) with a fallback child (icon + 'Open PDF in new tab' link to the raw URL) shown when the browser can't inline-render. Mock path (inline node.image/node.pdf) unchanged.
+
+    ### Proven LIVE (orchestrator debug :7878 fresh binary, agent 834eb459c7b064db ~/code/test):
+    minimal test.pdf -> 200 Content-Type application/pdf, Content-Disposition inline; 1x1 test.png -> 200 image/png inline, byte-identical via curl|cmp; ../../../etc/passwd -> 403; missing path -> 400. Artifacts cleaned.
+
+    cargo build -p cp-orchestrator + web npm run build both green; rust-check+lint passed (folder-sizes 'failure' = ./oplog/bodies runtime artifact, gitignored, unrelated). Orchestrator RESTARTED (killed :7878 via lsof, relaunched debug CP_COST_BUDGET=100000000, console P34) since running binary predated the raw route. No TUI crate changed -> no system_reload.
+
+    GOTCHA this session: a destructive queued Edit cut load_entry's body in transport/mod.rs (rust-check briefly raced/passed stale); caught via sed inspection, restored body + added handle_raw in one repair edit. Lesson: verify file region after a risky queued Edit, don't trust a single CB pass.
+
+    Backlog (open MY_TURN Finder): T282 CSV/Excel tables (CSV easy/text; xlsx needs a parser), X906 WYSIWYG md editor (needs fs_write endpoint + editor UI). T272 (106 msgs) likely stale/resolved — verify before more work.
+  importance: medium
+  labels:
+  - T281
+  - T286
+  - finder
+  - preview
+  - raw-serve
+  - shipped
+  last_edited_ms: 1781894284016
 a074780e7fbba07b:
   tl_dr: T274 'big messages don't go through from the web UI' FIXED. Real root cause was an inherited-non-blocking socket bug, plus two genuine 1MiB caps. Details in contents.
   contents: |-

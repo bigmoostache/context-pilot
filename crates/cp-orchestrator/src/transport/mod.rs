@@ -230,6 +230,10 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
             handle_download(request, state, id, &query);
             return;
         }
+        if let ["api", "agent", id, "fs", "raw"] = segments.as_slice() {
+            handle_raw(request, state, id, &query);
+            return;
+        }
     }
 
     // Read the body up-front (only POST routes consume it). The mutable borrow
@@ -346,6 +350,28 @@ fn handle_download(request: Request, state: &Arc<Mutex<Backend>>, id: &str, quer
                 response = response.with_header(h);
             }
             if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], &b"application/octet-stream"[..]) {
+                response = response.with_header(h);
+            }
+            for header in cors_headers() {
+                response = response.with_header(header);
+            }
+            let _sent = request.respond(response);
+        }
+        Err(reply) => respond_json(request, &reply),
+    }
+}
+
+/// Serve a file's raw bytes **inline** (Content-Type inferred, no attachment),
+/// so the browser renders it directly — powers the Finder's image (T286) and
+/// PDF (T281) in-pane previews.
+fn handle_raw(request: Request, state: &Arc<Mutex<Backend>>, id: &str, query: &str) {
+    match inspect::finder::fs_raw(state, id, query) {
+        Ok((bytes, ctype)) => {
+            let mut response = Response::from_data(bytes).with_status_code(200);
+            if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], ctype.as_bytes()) {
+                response = response.with_header(h);
+            }
+            if let Ok(h) = Header::from_bytes(&b"Content-Disposition"[..], &b"inline"[..]) {
                 response = response.with_header(h);
             }
             for header in cors_headers() {
