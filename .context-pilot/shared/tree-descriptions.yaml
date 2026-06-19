@@ -282,6 +282,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+096316ac6b98d164:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/mutate.rs
+  description: 'Finder writes: fs_upload/fs_mkdir/fs_rename/fs_move/fs_trash (T285 hidden .cp-trash). All confined, never clobber. is_bare_name/rel_child/rel_sibling helpers.'
+  last_edited_ms: 1781892894784
 0979aeb287e6bdc9:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -870,6 +874,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation, threads. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread actions extracted to threads.rs.'
   last_edited_ms: 1781447353339
+1ddc94d41346da48:
+  path: web/src/lib/api.ts
+  description: 'REST client for orchestration backend. Typed fetch wrappers: fleet/agent/threads/panels/fs (list/preview/upload/mkdir/rename/move/trash/download)/conversation/metrics/vitals/create/restart/retire. sendCommand wraps Kind in Command envelope; mintTicket for SSE.'
+  last_edited_ms: 1781892894901
 1e0df9189377d812:
   path: yamls/tools/tree.yaml
   description: Tree tools YAML. tree_filter (gitignore patterns), tree_toggle (open/close/toggle folders), tree_describe (path+description+delete+close_panel params).
@@ -4966,6 +4974,10 @@ a89593dca254bf7d:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Phase 19/30: transport hub. Backend{view,breaker,hub,tickets,agents_dir} under Arc<Mutex>. serve(addr,state)/serve_bound(server,state) (split so tests bind 127.0.0.1:0 + read server_addr before serving) = tiny_http acceptor, thread-per-request. route_rest dispatches GET /api/fleet|/agent/{id}|/agent/{id}/body/{hash}, POST /agent/{id}/command|/ticket. handle_stream: GET /api/stream?agent&ticket — redeem single-use ticket, spawn run_stream producer (Tailer.seed(last_rev) replay + gap→resync + hub drain + keepalive probe, unsubscribe on exit). stream_to_client: SSE delivered via request.into_writer() + manual HTTP preamble + flush-after-every-event (tiny_http 0.12 respond() buffers body through a 1KiB BufWriter flushed only after raw_print returns = fatal for unbounded SSE — small events stuck forever; into_writer+per-event flush fixes it). MAX_BODY 1MiB, STREAM_POLL 200ms. QueryParams + Last-Event-ID parsing.'
   last_edited_ms: 1781679569056
+a8d34b34101ad428:
+  path: web/src/components/threads/ThreadList.tsx
+  description: Threads left rail. flattenMarkdown() one-line row preview (T284). previewOf skips auto traces. Groups User-turn/Agent's-turn, archived view sorted recent-first. Per-row Archive/Restore.
+  last_edited_ms: 1781892894878
 a8ee523e02ccb580:
   path: src/llms/claude_code_api_key/check.rs
   description: 'Placeholder: check methods merged into mod.rs to avoid multiple_inherent_impl lint'
@@ -5726,6 +5738,10 @@ c04dce1a2fe7aa72:
   path: crates/cp-oplog/tests/service_group_commit.rs
   description: 'Phase 24 (X791): cp-oplog group-commit Service public-API suite (5 tests). Properties that emerge only under concurrency/pressure (GAP2/I2): durability_of_is_exhaustive_over_every_kind (all 8 OpEntryKind discriminants: PhaseTransition+CostAggregate=BestEffort, CommandEffect+SeenMark+MessageCreated+Lifecycle+Checkpoint{Snapshot::default}+Unknown=Durable); concurrent_durable_submitters_get_unique_contiguous_revs (Arc<Service>, 8 threads x 50 append_durable, default limit=no rolls=no checkpoint revs → revs exactly 0..400 contiguous no dup/gap proving single commit thread is sole serialised rev-assigner; replay rev_head=399 + seen.len=400; flush via drop(service) Arc→0→Drop joins+syncs); best_effort_floods_drop_without_ever_blocking (200k phase try_sends ≫ 1024 queue cap → <5s never-block + dropped>0 deterministic under any real fdatasync latency + submitted>0 + post-flood durable append survives replay); a_large_final_batch_is_flushed_on_shutdown (30 durable then shutdown drains+syncs, rev_head+T1 head durable); interleaved_durable_and_best_effort_preserves_every_durable_record (phase between each durable pair, all 20 tokens + final head survive, seen.len==tokens). Service is Send+Sync (SyncSender+JoinHandle). shutdown consumes self (no double-shutdown by type). NO append-with-capacity hook so deterministic queue-full saturation only via flood≫cap.'
   last_edited_ms: 1781648807776
+c05cfb30ec6be543:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/support.rs
+  description: 'Finder shared helpers: agent_folder, confined_path (realm jail), count_visible_children, infer_kind, extract_param, percent_decode + unit tests.'
+  last_edited_ms: 1781892894762
 c07395815ca8865e:
   path: crates/cp-mod-firecrawl/Cargo.toml
   description: 'Firecrawl module deps: cp-base, cp-render, crossterm, reqwest, serde, serde_json, serde_yaml.'
@@ -5902,6 +5918,10 @@ c64acbf2bfbf9d41:
   path: crates/cp-mod-callback/src/panel.rs
   description: Callback panel. Table view of all definitions (name/pattern/blocking/timeout/active/scope/success_msg/cwd). Editor sub-view shows script content for one callback.
   last_edited_ms: 1780497937354
+c64bb384398cae82:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/mod.rs
+  description: 'Finder module hub: re-exports fs_list/fs_preview/conversation (listing), fs_upload/mkdir/rename/move/trash (mutate), fs_download (download). Submodules: listing/mutate/download/support.'
+  last_edited_ms: 1781892894807
 c655a8256e761cef:
   path: web/src/components/shell/ConfigPanel.tsx
   description: 'Context Pilot settings surface — macOS System-Settings-style layout. General pane: ModelPicker for default provider+model (localStorage persisted) + ''Apply to all existing agents'' button (dispatches Configure to every fleet agent). Provider keys, Search, DocAI, Web, Integrations panes. Company-managed accounts lock key fields. Shared by ConfigModal (dialog) and FleetShell (inline).'
@@ -6054,6 +6074,10 @@ ca8677b0a2f9bc35:
   path: docs/design-orchestration-backend.md
   description: 'Orchestration backend design doc. v7 three-tier durability model (oplog ① / untouched PersistenceWriter cache ② / lossy UDS stream ③) + I1-I13, K1-K9, R2-*, V1-V12 fault matrix. §22 v5 decision log. NEW §26 = v8 REALIZED-implementation decision log (X818 alignment epic): records what shipped vs designed — roster=oplog variants(OptA), read-plane-per-endpoint policy, derived-state 200-empty contract, roster-rides-checkpoint, §7 streaming end-to-end, symmetric Lifecycle, §19 metrics (histograms deferred non-load-bearing), single-mechanism freshness, v7 security subtraction; measured command→visible p50~14ms/p99 68ms; 10/12 V proven (V4/V8 external-CI); honest residual follow-ups.'
   last_edited_ms: 1781824510755
+cac0a856bef6f89e:
+  path: web/src/lib/live.ts
+  description: Live data hooks = thin TanStack Query wrappers over queryClient + ensureSync SSE push. useFs/useFsPreview/useThreads(merge-non-destructive)/useUploadFiles/useMoveItems/useRenameItem/useTrashItems/useCreateFolder mutations. useStreamingTokens rAF-batched.
+  last_edited_ms: 1781892894924
 cad059175f38fce1:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: MAX_CONTENT_BYTES=100K, MAX_FILE_PATH_BYTES=1K, MAX_STORED_QUESTIONS=50 caps. execute_read: single-pass unack count+previews via inspect(). build_panel_content: MAX_PANEL_MESSAGES=50 cap. format_age helper.'
@@ -6442,6 +6466,10 @@ d8a1e3373d20cf65:
   path: ui/src/lib/types.ts
   description: 'Maquette domain types. Agent (incl task summary), FsNode (legacy). Finder: FinderKind (+audio/video/binary), FinderTag, FinderNode (+tags/created/starred/media/preview payloads), Sheet/SlidePreview, FinderViewMode=grid|list|columns|gallery, FinderSortKey. ThreadDetail+agentId. ViewMode=fleet|cockpit|threads|finder.'
   last_edited_ms: 0
+d8c40a18ed60bb7d:
+  path: web/e2e/t287_probe.spec.ts
+  description: 'T287 regression: synthetic-DnD e2e — dispatches dragstart→drop with shared DataTransfer(MOVE_MIME) on Miller-column rows, asserts backend /fs reflects move. Proved drop wiring works (failure was native drag-START).'
+  last_edited_ms: 1781892894829
 d8f43c4c8cae6abd:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
@@ -7050,6 +7078,10 @@ f25c2de2cd9f7542:
   path: ui/src/lib/types.ts
   description: 'Maquette domain types. Agent, FsNode, Finder types, ThreadDetail+agentId, ThreadStatus (MY_TURN/ACTIVE/THEIR_TURN), ViewMode=fleet|cockpit|threads|finder, Library/Usage types. Cockpit panel maquette types (T16): Importance, MemoryCard, RadarAnchor, RadarResult, TodoItem, EntityTable, ToolRow/ToolGroup, CallbackRow, QueueAction, ScratchCell, TreeRow.'
   last_edited_ms: 1781544549067
+f25f3b9d89612a17:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl fs upload/mkdir/rename/move/trash, retire/unretire/restart, fleet create, vitals, metrics. handle_download serves file/zip.
+  last_edited_ms: 1781892894857
 f2750957712b6508:
   path: src/ui/help/config_overlay/budget_bars.rs
   description: Budget bars adapter for config overlay. Renders ConfigBudgetBar IR entries as filled/empty block bars with semantic colors. 24-cell bar width.

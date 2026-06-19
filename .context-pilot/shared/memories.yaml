@@ -119,6 +119,34 @@
   - trash
   - shipped
   last_edited_ms: 1781891609822
+27b181cff4ccd912:
+  tl_dr: 'T283 follow-up SHIPPED (0f3bdeb): single-click Quick Look restored as a NON-REFLOWING overlay — reconciles click-to-preview + double-click-open + slow-rename in all views.'
+  contents: |-
+    ## T283 — restore click-to-preview as non-reflowing overlay (0f3bdeb pushed)
+
+    User: 'It is now impossible to open the side rapid view of a file?' — after 283682d removed single-click auto-open (to fix grid/columns slow-rename, since an in-flow pane reflowed the auto-fill grid and moved the item out from under the second click).
+
+    ### Root insight
+    The whole click/double-click/slow-rename conflict was IRREDUCIBLE with a REFLOWING side pane: any space the pane takes reflows the auto-fill grid → the item moves between clicks. Removing the pane killed click-to-preview. The fix is to make the pane NOT reflow.
+
+    ### Fix (frontend-only, Finder.tsx)
+    1. **onRowClick** restored to two deferred (CLICK_SETTLE_MS=250) branches: re-click a sole-selected item → startRename (slow-rename); first click of a fresh item → setPreviewOpen(true) (open Quick Look). Modifier clicks only select. open()/navigate() clear the timer so double-click/open pre-empts.
+    2. **Quick Look pane is now a NON-REFLOWING OVERLAY**: the content region wraps `<main>` + the pane in a `relative flex min-w-0 flex-1` container; the pane renders as `absolute inset-y-0 right-0 z-20 flex pop-shadow` (was an in-flow flex sibling that shrank main). `<main>` keeps full width → opening the pane never reflows grid/list/columns → items never move → double-click-open AND slow-rename both stay stable in EVERY view, while click-to-preview returns.
+    3. **Overlay gated to grid + list only** (`previewOpen && (viewMode==='grid'||viewMode==='list')`): columns has its own trailing Miller inline preview pane (shows file preview on select via previewNode) and gallery shows the selected item as a hero, so a floating overlay there would double up.
+
+    Cost: the opaque 420px overlay covers the rightmost sliver of grid/list content while open (acceptable for a 'rapid view'; close via Space/X/eye toggle). FinderPreview untouched (its `pane` variant aside w-[420px] stretches inside the absolute wrapper via default flex align-stretch).
+
+    web build green (tsc+vite exit 0). Frontend-only → dev :5175 hot-reloads, NO orchestrator restart / system_reload. Committed+pushed 0f3bdeb (Finder.tsx, +43/-23).
+
+    Backlog (open MY_TURN Finder): T280 code-preview syntax highlight (frontend-only), T281 PDF rendering (needs raw inline-serve endpoint), T282 CSV/Excel tables, T286 image previews (shares inline-serve w/ T281), X906 WYSIWYG md editor (needs fs_write endpoint).
+  importance: medium
+  labels:
+  - T283
+  - finder
+  - quick-look
+  - overlay
+  - shipped
+  last_edited_ms: 1781893072019
 2b8f81e3109727b7:
   tl_dr: 'T271 cold-connect off-by-one FIXED + shipped: empty-oplog SSE subscriber now receives the agent''s first append (rev 0). Details in contents.'
   contents: |-
