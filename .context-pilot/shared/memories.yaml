@@ -35,6 +35,27 @@
   - provider
   - fixed
   last_edited_ms: 1781884032338
+2b8f81e3109727b7:
+  tl_dr: 'T271 cold-connect off-by-one FIXED + shipped: empty-oplog SSE subscriber now receives the agent''s first append (rev 0). Details in contents.'
+  contents: |-
+    ## T271 follow-up — empty-oplog cold-connect off-by-one FIXED
+
+    The latent bug flagged in M69/X870: in crates/cp-orchestrator/src/transport/stream.rs, a cold-connecting SSE subscriber (no Last-Event-ID) seeds the Tailer at the oplog HEAD so it rides only the live tail (T123, avoids replaying long history). oplog_head_rev returned u64 via `replay().rev_head.unwrap_or(0)`. On an EMPTY log rev_head is None -> unwrap_or(0) -> tailer.seed(0). seed is an EXCLUSIVE lower bound (poll drops entry.rev <= last_rev), so seed(0) drops the agent's very first append at rev 0 — it surfaced only on the slow 15s backstop poll. Rare: fresh agent + subscriber connects before the first append.
+
+    FIX (3-line logic): oplog_head_rev now returns Option<u64> (drop unwrap_or(0)). Cold-connect match: Some(rev)=>seed(rev); None branch seeds the head only `if let Some(head)=oplog_head_rev()`, else leaves the tailer UNSEEDED (last_rev=None) which delivers from rev 0 onward. No backlog to replay on an empty log, so unseeded is both correct + cheap. Non-empty path (the T123 head-seed) unchanged.
+
+    2 regression unit tests added in stream.rs #[cfg(test)] (use cp_oplog::append::OplogWriter + cp_wire OpEntryKind::PhaseTransition/Phase): cold_connect_on_empty_oplog_delivers_first_append (empty -> no seed -> poll sees rev 0) + cold_connect_on_nonempty_oplog_skips_backlog (rev 0 backlog -> seed(head) -> first poll empty -> append rev 1 delivered live).
+
+    Shipped: cargo build -p cp-orchestrator + lib tests green (the 2 new pass; the lone parallel failure registry::tee_reader::corrupt_prefix_resyncs is a PRE-EXISTING flaky socket-timing test, green in isolation, unrelated). Orchestrator restarted on the fixed debug binary :7878 (console P18, killed old via lsof). No TUI crate changed -> no system_reload. Committed+pushed on demaquetting.
+  importance: medium
+  labels:
+  - T271
+  - sse
+  - oplog
+  - cold-connect
+  - off-by-one
+  - fixed
+  last_edited_ms: 1781885279186
 3d36396d2a618055:
   tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
   importance: critical

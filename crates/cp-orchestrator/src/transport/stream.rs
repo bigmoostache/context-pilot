@@ -72,7 +72,20 @@ pub(crate) fn run_stream(
     //     delta sub-ms instead of gated behind a full-history drain.
     match last_rev {
         Some(rev) => tailer.seed(rev),
-        None => tailer.seed(oplog_head_rev(oplog_dir)),
+        // COLD CONNECT: seed at the CURRENT head so the subscriber rides the
+        // live tail (skips the history it just loaded over REST — T123). But an
+        // EMPTY oplog has NO head: `oplog_head_rev` returns `None`, and seeding
+        // a bogus `0` would tell the tailer "deliver only rev > 0" — silently
+        // DROPPING the agent's very first append at rev 0, which then surfaces
+        // only on the slow backstop poll (T271 off-by-one). So when the log is
+        // empty we leave the tailer UNSEEDED (`last_rev = None`), which delivers
+        // from rev 0 onward — there is no backlog to replay on an empty log, so
+        // this is both correct and cheap.
+        None => {
+            if let Some(head) = oplog_head_rev(oplog_dir) {
+                tailer.seed(head);
+            }
+        }
     }
     // Event-driven wakeup on oplog appends (design doc I12). If the watch can't
     // be established, `waiter` is None and the loop degrades to a pure backstop
@@ -167,12 +180,82 @@ fn cleanup(state: &Arc<Mutex<Backend>>, agent_id: &str, sub_id: Option<u64>) {
 
 /// Read an agent oplog's current head `rev` for cold-connect SSE seeding.
 ///
-/// Returns `0` when the oplog is absent or unreadable — a fresh log whose first
-/// real append is `rev 0`, so seeding at `0` (exclusive) still delivers it.
+/// Returns `None` when the oplog has no entries yet (or is absent/unreadable) —
+/// the caller MUST then leave the tailer unseeded so the agent's first append
+/// (`rev 0`) is delivered on the live tail, rather than seeding `0` (which is an
+/// exclusive lower bound and would silently drop `rev 0`, the T271 off-by-one).
+/// On a non-empty log it returns `Some(head)`.
+///
 /// Uses [`cp_oplog::replay`]'s bounded checkpoint fast-path: it reads only the
 /// newest checkpoint-bearing segment to recover the head rev, so this is a cheap
 /// read even for a long-lived log — it does NOT parse the whole history (which
 /// is exactly the cost we are avoiding by not replaying it to the subscriber).
-fn oplog_head_rev(oplog_dir: &std::path::Path) -> u64 {
-    cp_oplog::replay::replay(oplog_dir).ok().and_then(|r| r.rev_head).unwrap_or(0)
+fn oplog_head_rev(oplog_dir: &std::path::Path) -> Option<u64> {
+    cp_oplog::replay::replay(oplog_dir).ok().and_then(|r| r.rev_head)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cp_wire::types::oplog::OpEntryKind;
+    use cp_wire::types::Phase;
+
+    /// The keystone T271 regression: a subscriber cold-connecting to an EMPTY
+    /// oplog must receive the agent's very first append (`rev 0`). The bug was
+    /// `oplog_head_rev` returning `0` for an empty log, which seeded the tailer
+    /// at `0` (exclusive) and silently dropped `rev 0`. The fix leaves the
+    /// tailer unseeded on an empty log, so `rev 0` rides the live tail.
+    #[test]
+    fn cold_connect_on_empty_oplog_delivers_first_append() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let oplog = dir.path().to_path_buf();
+
+        // Empty log ⇒ no head ⇒ the cold-connect path must NOT seed.
+        assert!(oplog_head_rev(&oplog).is_none(), "empty oplog has no head");
+        let mut tailer = Tailer::new(oplog.clone());
+        if let Some(head) = oplog_head_rev(&oplog) {
+            tailer.seed(head);
+        }
+
+        // The agent now appends its first entry (rev 0).
+        let mut writer = cp_oplog::append::OplogWriter::open(&oplog).expect("open oplog");
+        let _rev = writer
+            .append(OpEntryKind::PhaseTransition { phase: Phase::Streaming })
+            .expect("append");
+
+        // The cold subscriber must see rev 0 on the live tail.
+        let got = tailer.poll().expect("poll");
+        assert_eq!(got.len(), 1, "first append delivered");
+        assert_eq!(got[0].rev, 0, "rev 0 is not dropped");
+    }
+
+    /// The contrast case the T123 head-seed exists for: a subscriber cold-
+    /// connecting to a NON-empty log seeds at the head and receives only
+    /// FUTURE appends (it already loaded current state over REST), never a
+    /// replay of the backlog.
+    #[test]
+    fn cold_connect_on_nonempty_oplog_skips_backlog() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let oplog = dir.path().to_path_buf();
+
+        // Pre-existing backlog: one entry at rev 0.
+        let mut writer = cp_oplog::append::OplogWriter::open(&oplog).expect("open oplog");
+        let _rev0 = writer
+            .append(OpEntryKind::PhaseTransition { phase: Phase::Streaming })
+            .expect("append rev 0");
+
+        // Cold connect now seeds at the head (Some), skipping the backlog.
+        let head = oplog_head_rev(&oplog).expect("non-empty log has a head");
+        let mut tailer = Tailer::new(oplog.clone());
+        tailer.seed(head);
+        assert!(tailer.poll().expect("poll").is_empty(), "backlog is not replayed");
+
+        // A future append is delivered live.
+        let _rev1 = writer
+            .append(OpEntryKind::PhaseTransition { phase: Phase::Idle })
+            .expect("append rev 1");
+        let got = tailer.poll().expect("poll");
+        assert_eq!(got.len(), 1, "future append delivered");
+        assert_eq!(got[0].rev, 1, "only the post-seed rev arrives");
+    }
 }
