@@ -6,6 +6,7 @@ import {
   CornerDownLeft,
   FolderGit2,
   Gauge,
+  Loader2,
   Settings2,
   Sparkles,
   Wand2,
@@ -13,6 +14,7 @@ import {
   Zap,
 } from "lucide-react"
 import type { Agent } from "@/lib/types"
+import { useCreateAgent } from "@/lib/live"
 import { cn } from "@/lib/utils"
 
 /**
@@ -74,16 +76,36 @@ export function AgentModal({
   // Realm folder: in create mode it's derived live from the name (no picker);
   // in manage mode it's the agent's fixed, read-only realm.
   const realm = isManage ? (agent?.folder ?? "") : `~/code/${slugify(name)}`
-  const canSubmit = isManage || name.trim().length > 0
+
+  const createAgent = useCreateAgent()
+  const [error, setError] = useState<string | null>(null)
+  const pending = createAgent.isPending
+  const canSubmit = (isManage || name.trim().length > 0) && !pending
 
   const submit = () => {
     if (!canSubmit) return
-    onFlash?.(
-      isManage
-        ? `Saved changes to ${name || agent?.name}`
-        : `Created “${slugify(name)}” in ${realm}`,
+    if (isManage) {
+      // Manage mode stays cosmetic for now (rename/model/archive are not yet
+      // backend-wired — T148 covers creation only).
+      onFlash?.(`Saved changes to ${name || agent?.name}`)
+      onClose()
+      return
+    }
+    setError(null)
+    createAgent.mutate(
+      { name: name.trim(), model },
+      {
+        onSuccess: (receipt) => {
+          onFlash?.(`Spawning “${slugify(name)}” in ${receipt.folder}`)
+          onClose()
+        },
+        onError: (e) => {
+          setError(
+            e instanceof Error ? e.message : "Could not create the agent. Please try again.",
+          )
+        },
+      },
     )
-    onClose()
   }
 
   // Ergonomy: autofocus the name, Esc closes, ⌘/Ctrl+Enter submits.
@@ -239,6 +261,17 @@ export function AgentModal({
           </div>
         </div>
 
+        {/* create error — surfaced inline so a spawn failure isn't silent */}
+        {error && (
+          <div
+            role="alert"
+            className="mx-6 mb-1 flex items-start gap-2 rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-3 py-2 text-[11.5px] leading-snug text-[var(--danger)]"
+          >
+            <X className="mt-px size-3.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
         {/* footer actions */}
         <div className="flex items-center gap-2 border-t border-border/70 bg-muted/25 px-6 py-4">
           {isManage && (
@@ -263,8 +296,14 @@ export function AgentModal({
                 : "cursor-not-allowed bg-muted text-muted-foreground/60",
             )}
           >
-            {isManage ? <Settings2 className="size-4" /> : <Sparkles className="size-4" />}
-            {isManage ? "Save changes" : "Create agent"}
+            {pending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : isManage ? (
+              <Settings2 className="size-4" />
+            ) : (
+              <Sparkles className="size-4" />
+            )}
+            {pending ? "Creating…" : isManage ? "Save changes" : "Create agent"}
             <kbd className="ml-1 hidden items-center gap-0.5 rounded bg-black/15 px-1 py-px font-mono text-[9.5px] opacity-80 sm:flex">
               <CornerDownLeft className="size-2.5" />⌘
             </kbd>

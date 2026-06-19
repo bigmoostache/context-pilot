@@ -18,7 +18,7 @@
 // hook so the push plane is guaranteed running whenever data is observed.
 
 import { useEffect } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { BACKSTOP_POLL_MS } from "./queryClient"
 import { ensureSync, mergeThreadLogs, qk } from "./sync"
 import { getOrCreateSseClient } from "./sse"
@@ -341,6 +341,40 @@ export function useLibrary(agentId: string): LiveQueryResult<LibraryItem[]> {
 
 export { mintTicket } from "./api"
 export { downloadFile } from "./api"
+
+// ── Create agent (TanStack mutation) ──────────────────────────────────
+//
+// Creating an agent is a one-shot POST, not a delta-covered resource, so it
+// rides a `useMutation` rather than the SSE push plane. The backend spawns the
+// `cp` TUI on a pty and returns a 202 "spawning" receipt; the agent then
+// self-registers and the orchestrator's registry scan discovers it within a
+// second or two. We therefore invalidate the fleet query immediately AND on a
+// short delay so the new card appears as soon as the agent boots, without
+// waiting on the slow (15s) fleet backstop poll.
+
+/**
+ * Mutation to create a new agent. On success it nudges the fleet query to
+ * refetch immediately and again shortly after, so the freshly-spawned agent
+ * surfaces on the dashboard the moment it self-registers (the spawn is async —
+ * the receipt only confirms the launch).
+ */
+export function useCreateAgent() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { name: string; folder?: string; model?: string }) =>
+      api.createAgent(body),
+    onSuccess: () => {
+      const refetchFleet = () => {
+        void client.invalidateQueries({ queryKey: qk.fleet() })
+      }
+      refetchFleet()
+      // The agent self-registers in ~1-2s after the pty spawn; re-poll a couple
+      // of times to catch it well before the 15s backstop.
+      window.setTimeout(refetchFleet, 1500)
+      window.setTimeout(refetchFleet, 3500)
+    },
+  })
+}
 
 /**
  * Send a command to an agent and return its receipt.

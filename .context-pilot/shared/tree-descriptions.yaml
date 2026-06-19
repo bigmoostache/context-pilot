@@ -30,6 +30,10 @@
   path: src/llms/claude_code/stream_types.rs
   description: 'SSE stream types: StreamContentBlock, StreamDelta, StreamMessage, StreamUsage deserialization structs'
   last_edited_ms: 0
+012577697da42de2:
+  path: web/src/lib/api.ts
+  description: REST client for the orchestration backend. Typed fetch wrappers per endpoint (fleet/meta, X896 createAgent POST /api/fleet/create→CreateAgentReceipt{status,folder,pid}, threads reshape, panels, memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities, fs/preview/download, conversation). fetchMetrics + fetchFleetMetrics → AgentMetrics{breaker,stream,rev,tokens?,phase,lifecycle}. sendCommand auto-wraps Kind in a full Command envelope; mintTicket for SSE.
+  last_edited_ms: 1781873459922
 014e3215ba1c1c02:
   path: docs/design-orchestration-backend.md
   description: 'Orchestration backend design doc, v5 (branch maquette) — CODE-GROUNDED rewrite. Keystone: THREE durability tiers, not two — ① bridge-owned append-only fsync''d OPLOG (authoritative: command effects, rev, seen-marks, phase, lifecycle, cost; O(1) append, never coalesced) + ② existing UNTOUCHED PersistenceWriter as a best-effort coalesced reconstructible state cache + ③ lossy UDS stream plane (live tokens + latency hints). 12 invariants I1-I12: I8 oplog-as-truth (writer.rs NOT modified — honors constraint #7 for real), I11 journal-to-oplog-then-ack (''accepted''=durable, survives deadman re-exec), I12 single inotify watch per agent (no fleet-scale watch exhaustion), I2 fsync confined to oplog (not every state write), I3 content-addressed bodies + bounded heads (not O(S²) manifest enumeration), I4 dedup by semantic token evicted by ack-rev. Command injection via the existing user-message entry (actions/input.rs), NOT the autonomy spine (engine.rs check_spine guards would stall external commands — K7). §24 maps every invariant→real file/function→additive-vs-core change type. §25 fault-injection acceptance matrix (V1-V10). §20 register folds round-3 K1-K9 + round-2 R2. Resolves the round-3 critique that v4 was authored against an imagined persistence layer. Companion: architecture-adversarial-analysis.md. NOT implemented (discussion).'
@@ -866,6 +870,10 @@
   path: ui/src/components/shell/StatusBar.tsx
   description: 'Bottom status bar: phase badge (READY/STREAMING/TOOLING/BLOCKED), agent/skill chips, git/queue/think, reverie/auto, cost.'
   last_edited_ms: 0
+1f0531e23b9fbbeb:
+  path: crates/cp-orchestrator/src/runtime.rs
+  description: 'Runtime — env Config (port/agents_dir/budget/scan_interval + X896 agents_root[CP_AGENTS_ROOT ~/code] + agent_binary[CP_AGENT_BINARY <cwd>/target/release/tui]) + driver loop with TWO decoupled cadences: slow scan_interval (2s) registry scan + config.json mtime backstop + tmp reap; fast TAIL_INTERVAL (100ms) tail_all_agents (Tailer.poll→view.apply_batch→breaker.observe). Runtime::new builds Backend with the 4-arg new. serve() blocks on HTTP.'
+  last_edited_ms: 1781873424858
 1f22019f5a6e5ddb:
   path: src/app/run/tools/checks.rs
   description: 'Post-tool non-blocking polls: panel readiness (5s timeout), deferred sleep timer. Each resumes streaming pipeline when condition met. Imports has_dirty_panels from streaming.rs.'
@@ -1158,6 +1166,10 @@
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet mission-control shell. Owns fleetPage + collapsed state. Renders FleetSidebar + clickable border RAIL (shadcn Sidebar pattern): thin full-height hit area at x=var(--sidebar-w), x=0 collapsed, brightens to interactive on hover — click toggles collapse (no buttons). Active page: agents/prompts/usage/settings(ConfigPanel inline).'
   last_edited_ms: 1781533961635
+2a1cf19a07176143:
+  path: crates/cp-orchestrator/src/supervisor/mod.rs
+  description: 'Phase 17 (X784) AgentSupervisor process manager + X896 pty spawn. new(allow_list) canonicalizes eagerly; validate_binary realpath-checks vs allow_list (R2-15). spawn(id,bin,folder,args)->pid: Command process_group(0), stdio null. spawn_pty(id,bin,folder,env)->pid: dup-check, validate_binary, canonicalize folder, delegate to proc::spawn_pty_proc, insert Supervised (the cp TUI needs a real tty). stop: SIGTERM→poll→SIGKILL→reap (Proc::Std/Pty child.wait). restart=snapshot+stop+spawn. adopt=record live no-spawn (D7). check_liveness()->Vec<Event>: Std/Pty try_wait reap (Exited), Adopted pid_alive (Vanished). Error::Pty{detail} variant. Proc/Supervised/spawn helper live in sibling proc.rs.'
+  last_edited_ms: 1781873424818
 2a3a7eb61dfc4e9a:
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Thread input routing: handle_thread_input_submit. Thread creation: MAX_THREAD_NAME_LEN=200 cap. Paste sentinel expansion. /command replacement.'
@@ -1322,6 +1334,10 @@
   path: docs/design-meilisearch.md
   description: Meilisearch integration design doc. 9 decision rounds, architecture diagram, data model (files+logs indexes), module design, indexer thread, splitter chain, OCR pipeline, implementation plan (6 phases). Fully implemented — see docs/search-module.md.
   last_edited_ms: 1780582405227
+2f03fa05636d62a3:
+  path: web/src/lib/live.ts
+  description: 'Live data hooks — thin TanStack Query wrappers over the shared queryClient. useLive() wraps useQuery into legacy LiveQueryResult shape + ensureSync(agentId) for the SSE push plane. Delta-covered (threads/agent) ride sync.ts folds; inspection hooks ride invalidate→refetch; refetchInterval=BACKSTOP_POLL_MS. useThreads merges non-destructively via mergeThreadLogs. useStreamingTokens = rAF-batched §7 token buffer. useMetrics/useFleetMetrics brisk poll. X896: useCreateAgent() = useMutation(api.createAgent), onSuccess invalidate qk.fleet() immediately + setTimeout 1.5s & 3.5s (agent self-registers ~1-2s before the 15s backstop). sendCommand/mintTicket/downloadFile passthrough.'
+  last_edited_ms: 1781873459942
 2f549657a1b2300b:
   path: src/app/actions/cursor.rs
   description: Cursor movement, text editing, selection management, command expansion. Selection helpers (delete/clear/extend). Sentinel detection + skip. Single-char and word movement with selection variants. handle_command_expansion, handle_input_backspace, handle_delete_word_left.
@@ -1530,6 +1546,10 @@
   path: src/infra/profiler.rs
   description: RAII ProfileGuard macro (profile!) for perf.log (>5ms). log_tool_time() appends ALL tool executions to .context-pilot/logs/tool-times.log — local datetime, elapsed ms, tool name(s).
   last_edited_ms: 0
+36e33b37912e609f:
+  path: crates/cp-orchestrator/Cargo.toml
+  description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal) + serde + serde_json + serde_yaml + tiny_http (0.12) + notify (oplog inotify) + portable-pty 0.9 (X896: safe pty for spawning the cp TUI agent, since unsafe is forbidden workspace-wide). dev: cp-mod-bridge + tempfile. lib+bin. Workspace lints.'
+  last_edited_ms: 1781873424919
 36f24767cc65904b:
   path: src/app/run/mod.rs
   description: 'Sub-module declarations. 7 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), threads (thread helpers), tools (execution pipeline), watchers (file/GH).'
@@ -4326,6 +4346,10 @@
   path: crates/cp-mod-ocr/src/lib.rs
   description: 'OCR module. 1 tool: ocr. Datalab API integration. Non-blocking: returns immediately, fires spine notification on completion. Global, non-core.'
   last_edited_ms: 0
+99be3f953a4df813:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: REST resource handlers. threads() prefers view.focused_thread_id (push-fed) over disk-FocusState, falling back to disk on cold start. command() breaker check GATED on SendMessage only (control-plane bypasses tripped breaker). fleet/agent/threads serve from view; body hydrate; mint_ticket; resolve_entry. create_agent + slugify + req/receipt structs live in sibling create.rs (re-exported).
+  last_edited_ms: 1781873424878
 99dab3a44b74b436:
   path: crates/cp-orchestrator/Cargo.toml
   description: 'Backend deps: cp-wire + nix 0.30 (signal, for kill signal-0 pid-liveness) + serde_json (registry record parse). dev: tempfile. lib+bin package. Workspace lints.'
@@ -4534,6 +4558,10 @@ a0f4cef7d77b23b6:
   path: report/wiring-alignment-audit.md
   description: 'Wiring alignment audit (X818 Phase 0.1): invariant-by-invariant gap register implementation⇄design-orchestration-backend.md. Verdicts ABIDES/PARTIAL/VIOLATES per I1-I13/§7/§9/§19. Diagnoses the disk/poll vs oplog-push plane inversion = the latency root cause.'
   last_edited_ms: 0
+a0fb089c16c908dd:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport — REST + SSE over tiny_http (blocking, thread-per-conn). Backend shared state (view/breaker/hub/tickets/inspect/agents_dir/dirty_agents + X896 supervisor:AgentSupervisor + agents_root + agent_binary) under one Mutex; Backend::new is 4-arg (agents_dir,budget,agents_root,agent_binary), seeds supervisor allow-list from agent_binary. route_rest dispatches all /api routes incl POST /api/fleet/create→rest::create_agent. handle_stream redeems ticket then spawns stream::run_stream. serve/serve_bound acceptor.
+  last_edited_ms: 1781873424838
 a0fb74e7facad335:
   path: src/ui/help/config_overlay.rs
   description: Config overlay adapter — renders ConfigOverlay IR to ratatui. Centered bordered popup. Provider/model/toggle sections consume IR data. No direct State access.
@@ -5454,6 +5482,10 @@ c13963c6d7794d8b:
   path: ui/src/lib/types.ts
   description: Maquette domain types. Adds Agent (id/name/folder/branch/model/status/cost/threads/accent), FsNode (fs browser tree), AgentStatus. ViewMode = agents|cockpit|threads. Plus thread-view types.
   last_edited_ms: 1781514443039
+c15a0ff49eae9097:
+  path: web/src/main.tsx
+  description: React entry point. createRoot → StrictMode → QueryClientProvider (TanStack, the single shared queryClient from lib/queryClient) wrapping <App/>. The mount point that activates the TanStack Query cache + SSE push-plane for the whole live app.
+  last_edited_ms: 1781872625150
 c16480ad12de8da5:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -5514,6 +5546,10 @@ c3e00b84691cd46d:
   path: src/llms/claude_code/check_api.rs
   description: 'Health-check helpers: system_block(), CheckRequest struct, build_check_request() with CC-specific headers'
   last_edited_ms: 0
+c3e5c3df29670437:
+  path: crates/cp-orchestrator/src/main.rs
+  description: Backend entry point. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + X896 new-agent realm root + agent binary, creates Runtime, starts driver thread, serves HTTP (blocking). use as _ for lib-only deps incl `use portable_pty as _;` (per-target unused-crate-deps — the bin doesn't reference it; only the lib supervisor does).
+  last_edited_ms: 1781873424898
 c40782194df37336:
   path: ui/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Mounts <AccountProvider> (T30 shared managed-account state) + <TooltipProvider delay=350 closeDelay=80> around the shell. Fleet → FleetShell (Agents⇄Prompts). Cockpit → CockpitView. threads/finder per-agent (Finder keyed by agent.id). openAgent switches agent→threads. newAgent() sets view=fleet + createAgent flag → FleetShell openCreate.
@@ -5910,6 +5946,10 @@ d0d66fa4c9ac8965:
   path: crates/cp-mod-logs/src/types.rs
   description: 'Log entry types. LogEntry: id, timestamp_ms, datetime, content, importance (no tags). LogsState: logs Vec + next_log_id counter. ms_to_iso() via cp_mod_utilities::time.'
   last_edited_ms: 0
+d0e250b34eb3a7e8:
+  path: web/src/components/agents/AgentModal.tsx
+  description: 'Agent create/manage dialog. MODELS + MODEL_META (rich picker). slugify(name) derives realm folder. AgentModalMode: create or manage{agent}. X896: create-mode submit() now LIVE — useCreateAgent() mutation (POST /api/fleet/create), pending spinner ''Creating…'', inline role=alert error banner, onSuccess flash+close. Manage mode stays cosmetic (rename/archive not backend-wired). Shared by TopBar + FleetDashboard.'
+  last_edited_ms: 1781873459901
 d0eba81e4b56478a:
   path: crates/cp-mod-github/src/types.rs
   description: BranchPrInfo, GithubState (token + branch PR) with ext accessors, GithubResultRequest for cache refresh
@@ -6258,6 +6298,10 @@ dfd2c997d0826591:
   path: report/wiring-alignment-audit.md
   description: 'Wiring alignment audit (X818). Re-walked 2026-06-18 (X867+X869): §0 verdict (zero un-validated load-bearing invariants), §2 I1-I13/§7/§9/§18/§19 register, §2.5 keystone K1-K9 table (all ABIDE), §2.6 V1-V12 fault-matrix (10/12 PROVEN by landed tests incl V5+V10 via fleet_soak.rs; V4 fsync-fault-FS + V8 literal-10k-OS-soak remain external-CI for invariants validated by proxy/at-scale), §3 frontend feature wiring (e2e-proven), §4 measured latency table, §5 ledger, §6 credit, §7 disk-read ledger (X864 ABIDES).'
   last_edited_ms: 1781824003019
+e00cd2b4ae194157:
+  path: crates/cp-orchestrator/src/transport/rest/create.rs
+  description: 'POST /api/fleet/create handler (T148/X896). create_agent(state,body): parse {name,folder?,model?(ignored)}, slugify(name) mirrors web modal, folder=agents_root/slug (or explicit), mkdir -p, supervisor.spawn_pty(key=folder,binary,folder,env=[CP_BRIDGE=1,CP_AGENTS_DIR]) → 202 {status:spawning,folder,pid}. Split from rest/mod.rs for the 500-line budget. slugify unit-tested.'
+  last_edited_ms: 1781873424777
 e00dc446a2196468:
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
@@ -6426,6 +6470,10 @@ e6dc3d6c7954a439:
   path: crates/cp-render/src/frame.rs
   description: Frame-level IR types. Frame (sidebar/active_panel/status_bar/conversation/overlays), Sidebar (entries/token_bar/stats/pr_card/help), StatusBar (badge/agent/skills/git/auto_continue/reverie/queue/think), PanelContent (title/blocks).
   last_edited_ms: 0
+e6e8aeaeb953fe0b:
+  path: crates/cp-orchestrator/src/supervisor/proc.rs
+  description: 'Supervised-process representation + pty spawn helper (T148/X896), split from supervisor/mod.rs for the 500-line budget. Proc enum {Std(Child), Pty{child:Box<dyn portable_pty::Child>, _master:Box<dyn MasterPty>}, Adopted} + Supervised struct + manual Debug. spawn_pty_proc(binary,folder,env)->(Proc,u32): native_pty_system().openpty(40x120) → CommandBuilder(cwd + inherit std::env::vars() + layer env overrides) → slave.spawn_command → drop(slave) → detached master-drain thread. Master retained so the agent''s tty stays open; dropping it ends the drain thread (cp TUI needs a real tty for enable_raw_mode).'
+  last_edited_ms: 1781873424797
 e6fb6a3d0303b523:
   path: src/state/persistence/mod.rs
   description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.

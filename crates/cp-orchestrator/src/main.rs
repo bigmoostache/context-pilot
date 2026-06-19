@@ -12,6 +12,7 @@ use cp_orchestrator::runtime::{Config, Runtime};
 use cp_oplog as _;
 use nix as _;
 use notify as _;
+use portable_pty as _;
 use serde as _;
 use serde_json as _;
 use serde_yaml as _;
@@ -39,6 +40,8 @@ fn main() {
     eprintln!("agents directory: {}", config.agents_dir.display());
     eprintln!("cost budget: ${:.2}/agent", config.budget_usd);
     eprintln!("scan interval: {}ms", config.scan_interval.as_millis());
+    eprintln!("new-agent realm root: {}", config.agents_root.display());
+    eprintln!("agent binary: {}", config.agent_binary.display());
 
     let runtime = Runtime::new(config);
     let _driver = runtime.start_driver();

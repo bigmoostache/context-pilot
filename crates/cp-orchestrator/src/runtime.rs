@@ -70,6 +70,15 @@ pub struct Config {
     pub budget_usd: f64,
     /// How often the driver scans the registry and tails oplogs.
     pub scan_interval: Duration,
+    /// Root directory new agents' realm folders are created under
+    /// (`CP_AGENTS_ROOT`, default `~/code`). The dashboard's create flow puts a
+    /// new agent at `<agents_root>/<slug>`.
+    pub agents_root: PathBuf,
+    /// Absolute path of the `cp` TUI binary the supervisor spawns for a
+    /// dashboard-created agent (`CP_AGENT_BINARY`, default
+    /// `<cwd>/target/release/tui`). Seeds the supervisor's spawn allow-list
+    /// (R2-15), so only this binary can ever be launched.
+    pub agent_binary: PathBuf,
 }
 
 impl Config {
@@ -101,7 +110,26 @@ impl Config {
             .and_then(|s| s.parse::<u64>().ok())
             .map_or(DEFAULT_SCAN_INTERVAL, Duration::from_millis);
 
-        Ok(Self { port, agents_dir, budget_usd, scan_interval })
+        // Where new agents' realm folders are created. Default `~/code`, or the
+        // current directory if `$HOME` is unset (never fail — creation simply
+        // lands somewhere sensible).
+        let agents_root = match std::env::var_os("CP_AGENTS_ROOT") {
+            Some(dir) => PathBuf::from(dir),
+            None => std::env::var_os("HOME")
+                .map_or_else(|| PathBuf::from("."), |h| PathBuf::from(h).join("code")),
+        };
+
+        // The `cp` TUI binary the supervisor spawns. Default to the release
+        // build under the current working directory; override with an absolute
+        // path in deployment.
+        let agent_binary = match std::env::var_os("CP_AGENT_BINARY") {
+            Some(p) => PathBuf::from(p),
+            None => std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join("target/release/tui"),
+        };
+
+        Ok(Self { port, agents_dir, budget_usd, scan_interval, agents_root, agent_binary })
     }
 }
 
@@ -123,6 +151,8 @@ impl Runtime {
         let backend = Arc::new(Mutex::new(Backend::new(
             config.agents_dir.clone(),
             config.budget_usd,
+            config.agents_root.clone(),
+            config.agent_binary.clone(),
         )));
         Self { backend, config }
     }

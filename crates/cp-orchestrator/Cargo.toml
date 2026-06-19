@@ -21,6 +21,12 @@ tiny_http = "0.12"
 # an agent appends to its oplog, so a delta reaches the browser in single-digit
 # ms instead of waiting on a poll tick (design doc I12: inotify primary).
 notify = { workspace = true }
+# Cross-platform pseudo-terminal — lets the supervisor spawn the `cp` TUI
+# agent attached to a PTY (the binary calls `enable_raw_mode()` and needs a
+# real tty, so it cannot run with null stdio). portable-pty encapsulates the
+# openpty / controlling-tty / setsid dance in a safe API, so no `unsafe` is
+# written here (the workspace forbids it).
+portable-pty = "0.9"
 
 [dev-dependencies]
 # Test-only: the integration suite boots a real agent and drives its command

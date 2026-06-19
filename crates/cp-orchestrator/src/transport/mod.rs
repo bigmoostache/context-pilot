@@ -51,6 +51,7 @@ use cp_wire::types::registry::Entry;
 
 use crate::inspect::StateReader;
 use crate::services::{CostBreaker, MaterializedView, StreamHub};
+use crate::supervisor::AgentSupervisor;
 use ticket::TicketStore;
 use query::QueryParams;
 
@@ -84,12 +85,30 @@ pub struct Backend {
     /// Agents whose tier-② state has changed since the last SSE sweep.
     /// SSE producers drain this per-agent to emit `invalidate` events.
     pub(crate) dirty_agents: HashSet<String>,
+    /// Process-lifecycle manager — spawns dashboard-created agents (PTY) under
+    /// a binary allow-list (R2-15).
+    pub(crate) supervisor: AgentSupervisor,
+    /// Root directory new agents' realm folders are created under.
+    pub(crate) agents_root: PathBuf,
+    /// The `cp` TUI binary the supervisor spawns (also the sole allow-list
+    /// entry).
+    pub(crate) agent_binary: PathBuf,
 }
 
 impl Backend {
     /// Build a backend with empty services and the given per-agent cost budget.
+    ///
+    /// `agents_root` is where dashboard-created agents' folders are made, and
+    /// `agent_binary` is the `cp` TUI binary the supervisor may spawn — it
+    /// seeds the supervisor's allow-list (R2-15), so it is the only binary that
+    /// can ever be launched.
     #[must_use]
-    pub fn new(agents_dir: PathBuf, budget_usd: f64) -> Self {
+    pub fn new(
+        agents_dir: PathBuf,
+        budget_usd: f64,
+        agents_root: PathBuf,
+        agent_binary: PathBuf,
+    ) -> Self {
         Self {
             view: MaterializedView::new(),
             breaker: CostBreaker::new(budget_usd),
@@ -98,6 +117,9 @@ impl Backend {
             inspect: StateReader::new(),
             agents_dir,
             dirty_agents: HashSet::new(),
+            supervisor: AgentSupervisor::new(&[agent_binary.clone()]),
+            agents_root,
+            agent_binary,
         }
     }
 
@@ -136,7 +158,7 @@ impl Backend {
     /// Construct a backend from explicit services — used by tests.
     #[cfg(test)]
     pub(crate) fn for_test(agents_dir: PathBuf, view: MaterializedView, breaker: CostBreaker) -> Self {
-        Self { view, breaker, hub: StreamHub::new(DEFAULT_SUB_CAPACITY), tickets: TicketStore::new(), inspect: StateReader::new(), agents_dir, dirty_agents: HashSet::new() }
+        Self { view, breaker, hub: StreamHub::new(DEFAULT_SUB_CAPACITY), tickets: TicketStore::new(), inspect: StateReader::new(), agents_dir, dirty_agents: HashSet::new(), supervisor: AgentSupervisor::new(&[]), agents_root: PathBuf::from("/tmp/cp-test-realms"), agent_binary: PathBuf::from("/tmp/cp-test-bin") }
     }
 }
 
@@ -249,6 +271,7 @@ fn route_rest(
         (Method::Get, ["api", "agent", id, "fs", "preview"]) => inspect::finder::fs_preview(state, id, query),
         (Method::Get, ["api", "agent", id, "conversation"]) => inspect::finder::conversation(state, id),
         (Method::Post, ["api", "agent", id, "command"]) => rest::command(state, id, body_bytes),
+        (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state),
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },
     }

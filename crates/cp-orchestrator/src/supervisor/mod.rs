@@ -21,11 +21,13 @@
 #[cfg(test)]
 mod tests;
 
+mod proc;
+
 use std::collections::HashMap;
 use std::io;
 use std::os::unix::process::CommandExt as _;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -33,6 +35,8 @@ use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
 
 use cp_wire::types::registry::Entry;
+
+use proc::{Proc, Supervised, spawn_pty_proc};
 
 // ── Constants ───────────────────────────────────────────────────────────
 
@@ -75,6 +79,11 @@ pub enum Error {
         /// The `errno` returned by `kill(2)`.
         source: nix::errno::Errno,
     },
+    /// A pseudo-terminal layer operation failed (openpty / spawn / reader).
+    Pty {
+        /// Human-readable detail from the pty backend.
+        detail: String,
+    },
 }
 
 impl core::fmt::Display for Error {
@@ -91,29 +100,13 @@ impl core::fmt::Display for Error {
             }
             Self::Io { context, source } => write!(f, "{context}: {source}"),
             Self::Signal { source } => write!(f, "signal error: {source}"),
+            Self::Pty { detail } => write!(f, "pty error: {detail}"),
         }
     }
 }
 
 /// Convenience alias.
 pub type Result<T> = core::result::Result<T, Error>;
-
-// ── Supervised agent ────────────────────────────────────────────────────
-
-/// A single supervised agent process.
-#[derive(Debug)]
-struct Supervised {
-    /// Child handle — `Some` for agents we spawned, `None` for adopted.
-    child: Option<Child>,
-    /// OS pid of the agent process.
-    pid: u32,
-    /// Canonical binary path (for restart).
-    binary: PathBuf,
-    /// Working directory = agent's realm folder.
-    folder: PathBuf,
-    /// Extra CLI arguments passed at spawn (for restart).
-    args: Vec<String>,
-}
 
 // ── Supervisor events ───────────────────────────────────────────────────
 
@@ -225,11 +218,66 @@ impl AgentSupervisor {
 
         let pid = child.id();
         let _previous = self.known.insert(agent_id, Supervised {
-            child: Some(child),
+            proc: Proc::Std(child),
             pid,
             binary: canonical,
             folder: folder_canonical,
             args: extra_args.iter().map(|s| (*s).to_owned()).collect(),
+        });
+        Ok(pid)
+    }
+
+    // ── Spawn on a pseudo-terminal ──────────────────────────────────
+
+    /// Spawn a `cp` TUI agent in `folder`, attached to a pseudo-terminal.
+    ///
+    /// The `cp` binary is a Ratatui terminal app: it calls `enable_raw_mode()`
+    /// and takes over an alternate screen, which **requires a real tty**. A
+    /// plain [`spawn`](Self::spawn) with null stdio would make raw-mode init
+    /// fail and the process die instantly, so an agent created from the web
+    /// dashboard must run on a pty. We open one, spawn the binary attached to
+    /// the slave end, then spin a detached thread that **drains the master**
+    /// (an undrained pty fills its buffer and blocks the child's next write).
+    /// The master is retained in the [`Supervised`] record so the tty stays
+    /// open for the agent's lifetime; dropping it on stop ends the drain thread.
+    ///
+    /// `env` entries are layered on top of the inherited environment (so the
+    /// agent keeps the orchestrator's API keys etc.) — the caller passes
+    /// `CP_BRIDGE=1` and the shared `CP_AGENTS_DIR` so the agent self-registers
+    /// where the backend scans.
+    ///
+    /// The binary must resolve (via `realpath`) to an entry on the allow-list
+    /// (R2-15). Returns the agent's OS pid.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NotAllowed`] for an off-allow-list binary, [`Error::Io`] for a
+    /// folder that cannot be canonicalised, [`Error::AlreadySupervised`] for a
+    /// duplicate id, and [`Error::Pty`] for any pty-layer failure.
+    pub fn spawn_pty(
+        &mut self,
+        agent_id: String,
+        binary: &Path,
+        folder: &Path,
+        env: &[(&str, &str)],
+    ) -> Result<u32> {
+        if self.known.contains_key(&agent_id) {
+            return Err(Error::AlreadySupervised { agent_id });
+        }
+        let canonical = self.validate_binary(binary)?;
+        let folder_canonical = std::fs::canonicalize(folder).map_err(|e| Error::Io {
+            context: "canonicalize folder",
+            source: e,
+        })?;
+
+        let (proc, pid) = spawn_pty_proc(&canonical, &folder_canonical, env)?;
+
+        let _previous = self.known.insert(agent_id, Supervised {
+            proc,
+            pid,
+            binary: canonical,
+            folder: folder_canonical,
+            args: Vec::new(),
         });
         Ok(pid)
     }
@@ -267,9 +315,16 @@ impl AgentSupervisor {
             let _sent = send_signal(raw_pid, Signal::SIGKILL);
         }
 
-        // Reap zombie if we spawned it
-        if let Some(ref mut child) = supervised.child {
-            let _status = child.wait();
+        // Reap zombie if we spawned it (std or pty); adopted agents have no
+        // child handle to wait on.
+        match supervised.proc {
+            Proc::Std(ref mut child) => {
+                let _status = child.wait();
+            }
+            Proc::Pty { ref mut child, .. } => {
+                let _status = child.wait();
+            }
+            Proc::Adopted => {}
         }
         Ok(())
     }
@@ -309,7 +364,7 @@ impl AgentSupervisor {
             return Err(Error::AlreadySupervised { agent_id });
         }
         let _previous = self.known.insert(agent_id, Supervised {
-            child: None,
+            proc: Proc::Adopted,
             pid: entry.pid,
             binary,
             folder: PathBuf::from(&entry.folder),
@@ -332,26 +387,38 @@ impl AgentSupervisor {
             let raw_pid =
                 Pid::from_raw(i32::try_from(sup.pid).unwrap_or(i32::MAX));
 
-            if let Some(ref mut child) = sup.child {
-                match child.try_wait() {
+            match sup.proc {
+                Proc::Std(ref mut child) => match child.try_wait() {
                     Ok(Some(status)) => {
-                        events.push(Event::Exited {
-                            agent_id: id.clone(),
-                            status: status.code(),
-                        });
+                        events.push(Event::Exited { agent_id: id.clone(), status: status.code() });
                         dead_ids.push(id.clone());
                     }
                     Ok(None) => {}
                     Err(_) => {
-                        events.push(Event::Vanished {
-                            agent_id: id.clone(),
-                        });
+                        events.push(Event::Vanished { agent_id: id.clone() });
+                        dead_ids.push(id.clone());
+                    }
+                },
+                Proc::Pty { ref mut child, .. } => match child.try_wait() {
+                    Ok(Some(status)) => {
+                        // portable_pty exit codes are u32; narrow to i32 for the
+                        // shared Event shape (clamps an out-of-range code).
+                        let code = i32::try_from(status.exit_code()).ok();
+                        events.push(Event::Exited { agent_id: id.clone(), status: code });
+                        dead_ids.push(id.clone());
+                    }
+                    Ok(None) => {}
+                    Err(_) => {
+                        events.push(Event::Vanished { agent_id: id.clone() });
+                        dead_ids.push(id.clone());
+                    }
+                },
+                Proc::Adopted => {
+                    if !pid_alive(raw_pid) {
+                        events.push(Event::Vanished { agent_id: id.clone() });
                         dead_ids.push(id.clone());
                     }
                 }
-            } else if !pid_alive(raw_pid) {
-                events.push(Event::Vanished { agent_id: id.clone() });
-                dead_ids.push(id.clone());
             }
         }
 

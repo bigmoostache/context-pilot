@@ -39,6 +39,32 @@ export function fetchFleet(): Promise<Agent[]> {
   return request("/api/fleet/meta")
 }
 
+// ── Create agent ──────────────────────────────────────────────────────
+
+/** Receipt from `POST /api/fleet/create` — a 202 "spawning" acknowledgement.
+ *  The agent self-registers and appears in the fleet within a scan tick once
+ *  it has booted, so this is launch confirmation, not the agent itself. */
+export interface CreateAgentReceipt {
+  status: string
+  folder: string
+  pid: number
+}
+
+/** Create a new agent: the backend mkdir's its realm folder and spawns the
+ *  `cp` TUI on a pty (so the full agent stack runs). `model` is accepted for
+ *  forward-compat but not yet applied (the TUI has no `--model` flag). */
+export function createAgent(body: {
+  name: string
+  folder?: string
+  model?: string
+}): Promise<CreateAgentReceipt> {
+  return request("/api/fleet/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+}
+
 // ── Agent meta ────────────────────────────────────────────────────────
 
 export function fetchAgentMeta(agentId: string): Promise<Agent> {

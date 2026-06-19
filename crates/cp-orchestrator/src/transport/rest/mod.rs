@@ -26,7 +26,9 @@ use super::Backend;
 use crate::channel::AgentChannel;
 use crate::services::Verdict;
 
+mod create;
 mod thread_shape;
+pub use create::create_agent;
 use thread_shape::{overlay_roster, reshape_thread};
 
 /// A transport-agnostic reply: an HTTP status and a JSON body.
