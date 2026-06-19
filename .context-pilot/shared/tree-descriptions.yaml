@@ -4730,6 +4730,10 @@ a143d9f2b8e6e551:
   path: ui/src/components/shell/TopBar.tsx
   description: 'Cockpit header strip: app mark, path breadcrumb, branch chip, global cost, status dot.'
   last_edited_ms: 1781458541298
+a1512abb4714af7d:
+  path: web/src/components/shell/StatsPopup.tsx
+  description: 'Session ''vitals'' popup (portaled Dialog) — accepts agentId, uses usePanels()+useAgentMeta() for live token budget + cost. T269 WIDE REDESIGN: w-[760px] (was 360px), two-band sheet — top band = context-budget meter + 3 figure chips (Context/Panels/Cost) side by side; bottom band = Service vitals as a CATEGORY-GROUPED 2-column compact grid (groupByCategory preserves first-seen order, humanize() Title-Cases the backend''s category tag into a section label) so a dozen services read as a scannable board not a long stack. Healthy rows stay quiet (colored dot + latency only); only error/unavailable raise a loud status chip (VitalRow), and a header summary badge shows ''all healthy'' / ''N issues'' + ''X of Y reachable''. Hosts the on-demand (never polling) Check Vitals action: fetchVitals(agentId) → prepends 2 browser-observed rows (Frontend self ok + Frontend→Orchestrator round-trip ms via performance.now) → renders grouped grid. Local useState (vitals/checking/vitalsErr); Stethoscope/Loader2 button (Check Vitals → Re-check after first run); dashed empty-state placeholder before first check. statusColor: ok=--ok / error=--danger / unavailable=--muted-foreground.'
+  last_edited_ms: 1781884993321
 a16eceb1554ebe70:
   path: web/src/components/agents/ModelPicker.tsx
   description: Shared two-level LLM provider+model picker — web counterpart of TUI Ctrl+H. Provider rail (pills) above model cards for active provider. Used by AgentModal (manage) and ConfigPanel (defaults). Shared registry from models.ts.

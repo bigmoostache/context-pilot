@@ -114,6 +114,16 @@
   - design
   - active
   last_edited_ms: 0
+5da6f30f2cdf0ec9:
+  tl_dr: T269 vitals dialog WIDE REDESIGN shipped (StatsPopup.tsx). Details in contents.
+  contents: 'StatsPopup.tsx widened 360px→760px, two-band layout: top = context-budget meter + 3 figure chips (Context/Panels/Cost); bottom = Service vitals as a category-grouped 2-column compact grid (groupByCategory first-seen order, humanize() labels). Summary badge ''all healthy'' / ''N issues'' + ''X of Y reachable''. Healthy rows quiet (dot+latency), error/unavailable raise a loud status chip (VitalRow). Satisfies user''s ''much wider + more compact + polish'' ask. Web build green. Frontend-only — no backend/TUI change, no system_reload (dev server hot-reloads).'
+  importance: low
+  labels:
+  - T269
+  - vitals
+  - frontend
+  - shipped
+  last_edited_ms: 1781885009956
 5fca4a81f0734c4f:
   tl_dr: T271 agent retire/unretire SHIPPED end-to-end (orchestrator + web). Stop-and-keep, not delete. Details in contents.
   contents: |-
