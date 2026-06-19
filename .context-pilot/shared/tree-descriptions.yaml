@@ -3538,6 +3538,10 @@
   path: ui/src/components/panels/TokenBar.tsx
   description: Signature CP token meter — hairline phosphor fill bar with load-gradient color + glow + mount sweep animation.
   last_edited_ms: 1781458541289
+7654afde07407c6b:
+  path: web/src/components/finder/FinderPreview.tsx
+  description: 'QuickLook preview pane — kind-aware. T272 live .md/code/json/doc fetch via useFsPreview. X906 live markdown via EditableMarkdown (view⇄WYSIWYG-edit, Save→fs/write). T281/T286 live image (<img>)+PDF (<object>) via rawUrl→/fs/raw; LivePdfPreview root is h-full (fills the definite-height scroll container) + object flex-1 min-h-0 so the PDF viewer claims ALL available pane/tab height (T281 follow-up — flex-1 alone failed since the scroll parent is a plain block, not a flex column). T282 live spreadsheet (csv/xlsx/ods) via LiveSheetPreview→useFsSheet→/fs/sheet: sticky-header table (first row=header), zebra rows, row-number gutter, multi-sheet tab switcher, truncated note. Mock path unchanged. agentId prop threads the realm.'
+  last_edited_ms: 1781905221969
 765552dfc59f9d15:
   path: web/src/components/threads/ThreadComposer.tsx
   description: Thread input composer. JS-driven auto-resize (measure scrollHeight, cap 200px) so the textarea grows line-by-line like the TUI input (replaced experimental field-sizing CSS); autoFocus + key={thread.id} remount refocuses on thread open; submit resets height + refocuses. Working hint above input on AGENT'S TURN — MY_TURN ('working this thread', signal) or ACTIVE ('streaming', green/ok); THEIR_TURN (user turn) shows none. Enter=submit, Shift+Enter=newline.

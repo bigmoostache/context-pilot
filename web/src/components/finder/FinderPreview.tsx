@@ -210,11 +210,15 @@ function LiveImagePreview({ agentId, node }: { agentId: string; node: FinderNode
 function LivePdfPreview({ agentId, node }: { agentId: string; node: FinderNode }) {
   const src = useMemo(() => rawUrl(agentId, node.path), [agentId, node.path])
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
+    // h-full fills the (definite-height) scroll container so the embedded PDF
+    // viewer claims ALL available height in the pane / file tab — flex-1 alone
+    // had no effect because the scroll parent is a plain block, not a flex
+    // column, so the object collapsed to its min-height.
+    <div className="flex h-full min-h-0 flex-col gap-2">
       <object
         data={src}
         type="application/pdf"
-        className="min-h-[480px] w-full flex-1 rounded-lg border border-border bg-card card-shadow"
+        className="w-full min-h-0 flex-1 rounded-lg border border-border bg-card card-shadow"
       >
         <div className="flex flex-col items-center gap-3 py-10 text-center">
           <FileIcon kind="pdf" size={64} />

@@ -754,6 +754,17 @@ ceac945d9376fcf2:
   - feature-completion
   - sequence
   last_edited_ms: 1780648683027
+d95e3bc25242d51d:
+  tl_dr: 'T281 follow-up: PDF viewer now fills full pane/tab height. LivePdfPreview root flex-1→h-full (scroll parent is a plain block, not flex, so flex-1 didn''t resolve); object flex-1 min-h-0.'
+  importance: low
+  labels:
+  - T281
+  - finder
+  - pdf
+  - preview
+  - height
+  - shipped
+  last_edited_ms: 1781905235706
 db16d1afe23ab01d:
   tl_dr: 'T279 Finder empty-space context menu SHIPPED: right-click the content background opens a realm-level menu (New Folder, Upload, Select All, Toggle Quick Look, Refresh) + real fs_mkdir backend. New Folder now actually creates.'
   contents: |-
