@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react"
+import { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import { FolderGit2, AlertTriangle, Plus } from "lucide-react"
 import { ThreadList } from "./ThreadList"
 import { ThreadConversation } from "./ThreadConversation"
@@ -53,6 +53,26 @@ export function ThreadsView({
   const [showArchived, setShowArchived] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
 
+  // ── Auto-select a just-created thread ──────────────────────────────────────
+  // The thread ID is assigned server-side and arrives via an SSE delta. We set a
+  // "pending select" flag on create; on the next `threads` update we diff the
+  // ID set and select the newcomer. This closes the UX gap where the user had
+  // to manually click the new thread after creating it.
+  const pendingSelect = useRef(false)
+  const prevThreadIdsRef = useRef<Set<string>>(new Set())
+
+  const currentIds = useMemo(() => new Set(threads.map((t) => t.id)), [threads])
+  useEffect(() => {
+    if (pendingSelect.current && threads.length > 0) {
+      const newId = threads.find((t) => !prevThreadIdsRef.current.has(t.id))?.id
+      if (newId) {
+        setSelectedId(newId)
+        pendingSelect.current = false
+      }
+    }
+    prevThreadIdsRef.current = currentIds
+  }, [threads, currentIds])
+
   // Transient, breaker-aware failure notice. A command rejected by the backend
   // (most importantly a tripped CostBreaker → 503) must be *visible*, never the
   // old silent `.catch(console.error)` swallow (T121). One pending timer at a
@@ -84,14 +104,21 @@ export function ThreadsView({
     if (!t) return
     const kind = t.archived ? "restore_thread" : "archive_thread"
     const verb = t.archived ? "restore the thread" : "archive the thread"
+    // Deselect the thread being archived so the view falls through to the
+    // next available thread instead of sticking on a now-invisible row.
+    if (!t.archived && id === selectedId) setSelectedId("")
     sendCommand(activeAgentId, { kind, thread_id: id }).catch((e) =>
       flash(describeCommandError(verb, e)),
     )
-  }, [threads, activeAgentId, flash])
+  }, [threads, activeAgentId, flash, selectedId])
 
   const handleCreate = useCallback((title: string) => {
+    pendingSelect.current = true
     sendCommand(activeAgentId, { kind: "create_thread", name: title.trim() || "Untitled thread" })
-      .catch((e) => flash(describeCommandError("create the thread", e)))
+      .catch((e) => {
+        pendingSelect.current = false
+        flash(describeCommandError("create the thread", e))
+      })
     setNewOpen(false)
     setQuery("")
     setShowArchived(false)
