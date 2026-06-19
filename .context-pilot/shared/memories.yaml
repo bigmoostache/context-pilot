@@ -1,11 +1,3 @@
-00ce4673bc93be26:
-  tl_dr: NEVER activate autocontinuation (spine_configure continue_until_todos_done). User says it bugs badly. Always sail manually, batch by batch.
-  importance: critical
-  labels:
-  - user-preference
-  - workflow
-  - spine
-  last_edited_ms: 0
 13a1d96ff4a4e7d0:
   tl_dr: 'Context Pilot is a Rust TUI AI coding assistant (~15K LOC) built with Ratatui+Crossterm. Workspace has 18 module crates + 1 main binary. Branch: reverie-context-optimizer with +209 lines in src/app/reverie/tools.rs'
   importance: high
