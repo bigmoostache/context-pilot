@@ -3810,6 +3810,10 @@
   path: src/modules/conversation_history/mod.rs
   description: 'Conversation history module. Core/global. Dynamic panels for frozen history chunks. on_close_context redirects to Close_conversation_history tool. Sub-modules: panel, trap.'
   last_edited_ms: 0
+824fc056de9d3d84:
+  path: crates/cp-orchestrator/src/transport/inspect/finder.rs
+  description: 'Per-agent Finder file-manager endpoints (in inspect/): fs_list/fs_preview/fs_upload/fs_move/fs_download/conversation, confined to the agent realm. fs_upload (POST /fs/upload?path&name, T273): raw-bytes body → one file, bare-name guard, returns {written,path}. fs_move (POST /fs/move {items[],dest}, T275): rename each realm-relative item into dest dir; confines both sides; guards = already-there→skip (200 moved:0), collision→409 (never clobbers), folder-into-own-descendant→409; returns {moved,skipped}. Powers the Finder''s internal drag-and-drop. fs_download serves FILES raw (10MiB cap) AND FOLDERS as zip via `zip -r -q` (100MiB cap). Absolute crate::transport:: paths.'
+  last_edited_ms: 1781887805050
 8251aca4fb98413d:
   path: ui/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: selected thread''s full conversation. toChatMessage() maps ThreadMsg→ChatMessage to reuse cockpit Message renderer. Renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'
@@ -4970,6 +4974,10 @@ a9945ad52fca5540:
   path: crates/cp-base/src/config/constants.rs
   description: Layout/timing constants. SIDEBAR_HELP_HEIGHT=10 (9 help hints + separator). MAX_SIDEBAR_LABEL_LEN, INPUT_RESERVE, TEMPO_*, token thresholds, typing indicator timing.
   last_edited_ms: 0
+a9af601f39a35773:
+  path: web/src/components/finder/Finder.tsx
+  description: 'Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. T273 upload: toolbar button + drag-drop via hidden multi-file <input> + useUploadFiles → uploadFiles(). T275 internal drag-and-drop: useMoveItems → moveItemsInto(paths,destFolder) move.mutate (toast progress/result, clears selection); surface onDragOver/onDrop now GATED on dataTransfer.types.includes(''Files'') so ONLY external OS-file drags raise the ''Drop to upload'' overlay — internal MOVE_MIME drags pass through to folder drop targets. viewProps passes onMove. cmd/ctrl + shift multiselect + useMarquee rectangle selection already existed → batch moves drag the whole selection. Both FinderPreview usages pass agentId (T272). Quick Look CLOSED by default.'
+  last_edited_ms: 1781887805286
 a9bc55981ceaf2b4:
   path: crates/cp-mod-console/src/lib.rs
   description: 'Console module. 5 tools. Dynamic console panels. init: find/create Unix socket server. save/load: session reconnection + orphan cleanup. Leaks stdin on save to prevent EOF. Tool visualizer for colored output.'
@@ -7230,6 +7238,10 @@ f84a283c2aabf485:
   path: crates/cp-mod-files/src/tools/file.rs
   description: 'execute_open: accepts string or array for path param. flame!("file_open"). open_single_file: canonicalize, dedup, auto-expand tree folders. Background cache populates content.'
   last_edited_ms: 0
+f8583c1fe89c00a1:
+  path: web/src/components/finder/FinderViews.tsx
+  description: 'Finder view modes: grid/list/columns(Miller)/gallery. T275 internal drag-and-drop: MOVE_MIME (''application/x-cp-move'') carries {paths} of the dragged selection; startItemDrag makes EVERY row draggable (drags whole multi-select if the row is selected, else just it; a lone folder also sets FOLDER_DRAG_MIME for sidebar pinning). folderDropProps = reusable drop-target handlers on FOLDER rows (grid/list/Miller): highlight on hover, can''t-drop-onto-self guard, onDrop→onMove(paths,folder). isMoveDrag/readMovePayload helpers. ViewHandlers gained onMove?. Per-view dragOver useState drives the drop highlight. itemCount() uses backend count. ColumnsView = live Miller (per-ancestor useFs). relOf strips agent-folder prefix.'
+  last_edited_ms: 1781887805168
 f892ce5853334499:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (author/timestamp headers, content, file refs, question indicators). Ctrl+V dispatch.'

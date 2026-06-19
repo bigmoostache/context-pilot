@@ -417,6 +417,23 @@ export function useUploadFiles(agentId: string) {
   })
 }
 
+/**
+ * Mutation to move one or more entries into a realm directory (the Finder's
+ * internal drag-and-drop). Not a delta-covered resource → a `useMutation`. On
+ * success the WHOLE `fs` query family for the agent is invalidated (both the
+ * source and destination listings changed) so the move is reflected at once.
+ */
+export function useMoveItems(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ items, dest }: { items: string[]; dest: string }) =>
+      api.moveItems(agentId, items, dest),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["fs", agentId] })
+    },
+  })
+}
+
 export function useCreateAgent() {
   const client = useQueryClient()
   return useMutation({

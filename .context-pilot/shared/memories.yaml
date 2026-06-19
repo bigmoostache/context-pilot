@@ -86,6 +86,36 @@
   - off-by-one
   - fixed
   last_edited_ms: 1781885279186
+308aa16a8a948a32:
+  tl_dr: 'T275 professional Finder drag-and-drop SHIPPED: internal item moves into folders, overlay suppressed for internal drags, batch via existing multiselect/marquee.'
+  contents: |-
+    ## T275 — professional Finder drag-and-drop + multiselect SHIPPED
+
+    User ask (4 parts): (1) internal item drag must NOT raise the 'Drop to upload' overlay; (2) drag a file OR folder onto a folder = MOVE it inside; (3) batch ops; (4) multiselect. Parts 3+4 (cmd/ctrl + shift click toggle/range + useMarquee rectangle selection) ALREADY existed in Finder.tsx — only 1+2 were new work.
+
+    ### Backend (cp-orchestrator inspect/finder.rs)
+    fs_move(state,id,body): POST /api/agent/{id}/fs/move, JSON {items:string[],dest:string} (both realm-relative, dest ''=root). Route in transport/mod.rs route_rest. Per item: confine src + dest_dir (403 escape, 404 dest-not-dir, 400 empty items/bad name); dest_path=dest_dir.join(basename). Guards: dest_path==src→skip (counted, harmless self-drop); src.is_dir() && dest_dir.starts_with(src)→409 folder-into-itself; dest_path.exists()→409 never clobbers; std::fs::rename else 502. Returns {moved,skipped}. NOT atomic across items (partial moves not rolled back — listing refresh shows truth).
+
+    ### Frontend
+    - api.ts moveItems(agentId,items,dest)->MoveResult{moved,skipped} (JSON POST).
+    - live.ts useMoveItems(agentId)=useMutation, onSuccess invalidateQueries(['fs',agentId]) prefix (both source+dest listings refresh).
+    - FinderViews.tsx: MOVE_MIME='application/x-cp-move' carries {paths}. startItemDrag makes EVERY row draggable (whole multi-select if row ∈ selected else just it; lone folder also sets FOLDER_DRAG_MIME so sidebar pinning still works). folderDropProps(n,isOver,setOver,onMove) = reusable drop-target handlers on FOLDER rows (grid/list/Miller): isMoveDrag gate, can't-drop-onto-self (readMovePayload includes guard), highlight via per-view dragOver useState, onDrop→onMove(paths,folder). ViewHandlers gained onMove?. Removed now-unused startFolderDrag (startItemDrag covers pinning).
+    - Finder.tsx: useMoveItems→moveItemsInto(paths,destFolder) toast progress/result + clears selection. CRITICAL overlay fix: surface onDragOver/onDrop now `if (!e.dataTransfer.types.includes('Files')) return` so ONLY external OS-file drags raise the upload overlay; internal MOVE_MIME drags pass through to folder drop targets. viewProps passes onMove:moveItemsInto.
+
+    ### Proven LIVE (orchestrator debug :7878 fresh binary, test agent 834eb459c7b064db ~/code/test):
+    move file→subdir 200 moved:1 (gone from root, in dest); folder-into-itself 409; source escape ../→403; empty items→400; collision (same-name in dest)→409 never clobbers; already-there (dest file→dest)→200 moved:0 skipped:1. Artifacts cleaned.
+
+    cargo build -p cp-orchestrator + web npm run build both green; rust-check+lint passed (folder-sizes 'failure' = ./oplog/bodies runtime artifact, gitignored, unrelated). Orchestrator RESTARTED (killed :7878 via lsof, relaunched debug CP_COST_BUDGET=100000000, console P37) since running binary predated the move route. No TUI crate changed → no system_reload. Headless drag e2e not feasible; drag UX logic is pure+build-clean, backend proven.
+
+    Backlog after T275: T272 follow-up X906 (WYSIWYG markdown editor in Finder preview — needs a write endpoint + editor UI).
+  importance: medium
+  labels:
+  - T275
+  - finder
+  - drag-drop
+  - move
+  - shipped
+  last_edited_ms: 1781887832323
 3d36396d2a618055:
   tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
   importance: critical

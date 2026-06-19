@@ -367,6 +367,88 @@ pub fn fs_upload(state: &Mutex<Backend>, agent_id: &str, query: &str, body: &[u8
     }))
 }
 
+/// `POST /api/agent/{id}/fs/move` — move one or more entries into a directory.
+///
+/// Body is JSON `{ "items": ["rel/a", "rel/b"], "dest": "rel/dir" }`: each
+/// `items` entry is a realm-relative file/folder path, `dest` the realm-relative
+/// destination directory (empty = realm root). Powers the Finder's internal
+/// drag-and-drop (drop a selection onto a folder = move it inside).
+///
+/// Every source and the destination directory are confined to the agent realm
+/// (no `..`/symlink/absolute escape). Each item is moved as
+/// `dest/<basename(item)>` via [`std::fs::rename`]. Guards, per item:
+/// * **already there** (`dest` is the item's current parent) → skipped, counted
+///   as a no-op success so a stray self-drop is harmless.
+/// * **destination occupied** → `409`, never clobbers an existing entry.
+/// * **into-own-descendant** (moving a folder inside itself) → `409`.
+///
+/// Returns `{ moved, skipped }` (entries actually renamed vs. no-op'd). A single
+/// failing item aborts with the matching error status (best-effort partial moves
+/// already applied are not rolled back — the listing refresh shows the truth).
+pub fn fs_move(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply {
+    let folder = match agent_folder(state, agent_id) {
+        Ok(f) => f,
+        Err(reply) => return reply,
+    };
+
+    let parsed: serde_json::Value = match serde_json::from_slice(body) {
+        Ok(v) => v,
+        Err(_) => return HttpReply::error(400, "malformed move request"),
+    };
+    let items: Vec<String> = parsed
+        .get("items")
+        .and_then(serde_json::Value::as_array)
+        .map(|arr| {
+            arr.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect()
+        })
+        .unwrap_or_default();
+    if items.is_empty() {
+        return HttpReply::error(400, "no items to move");
+    }
+    let dest_rel = parsed.get("dest").and_then(serde_json::Value::as_str).unwrap_or("");
+
+    let dest_dir = match confined_path(&folder, dest_rel) {
+        Some(p) => p,
+        None => return HttpReply::error(403, "destination outside agent realm"),
+    };
+    if !dest_dir.is_dir() {
+        return HttpReply::error(404, "destination directory not found");
+    }
+
+    let mut moved = 0_usize;
+    let mut skipped = 0_usize;
+    for item in &items {
+        let src = match confined_path(&folder, item) {
+            Some(p) => p,
+            None => return HttpReply::error(403, "source outside agent realm"),
+        };
+        let Some(base) = src.file_name() else {
+            return HttpReply::error(400, "invalid source path");
+        };
+        let dest_path = dest_dir.join(base);
+
+        // Already in the destination directory → nothing to do.
+        if dest_path == src {
+            skipped += 1;
+            continue;
+        }
+        // Refuse to move a directory inside itself or one of its descendants.
+        if src.is_dir() && dest_dir.starts_with(&src) {
+            return HttpReply::error(409, "cannot move a folder into itself");
+        }
+        // Never clobber an existing entry.
+        if dest_path.exists() {
+            return HttpReply::error(409, "an entry with that name already exists");
+        }
+        if std::fs::rename(&src, &dest_path).is_err() {
+            return HttpReply::error(502, "move failed");
+        }
+        moved += 1;
+    }
+
+    HttpReply::ok(&serde_json::json!({ "moved": moved, "skipped": skipped }))
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /// Resolve the agent's working directory from the registry record.

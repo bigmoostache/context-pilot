@@ -1,4 +1,5 @@
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from "react"
+import { useState } from "react"
 import { ChevronRight } from "lucide-react"
 import type { FinderNode, FinderSortKey, FinderTag } from "@/lib/types"
 import { fmtBytes, sortNodes } from "@/lib/finderFs"
@@ -10,11 +11,80 @@ import { cn } from "@/lib/utils"
 /** MIME used when dragging a folder out of a view onto the sidebar to pin it. */
 export const FOLDER_DRAG_MIME = "application/x-cp-folder"
 
-/** Begin dragging a folder so it can be dropped on the sidebar Pinned zone. */
-function startFolderDrag(e: ReactDragEvent, n: FinderNode) {
-  if (n.kind !== "folder") return
-  e.dataTransfer.setData(FOLDER_DRAG_MIME, JSON.stringify({ name: n.name, path: n.path }))
-  e.dataTransfer.effectAllowed = "copy"
+/** MIME used for INTERNAL item drags (move a selection into a folder). Carries
+ *  a JSON `{ paths: string[] }` of the realm-relative entries being dragged. Its
+ *  mere presence on a drag tells the surface this is an internal move — NOT an
+ *  external OS file drop — so the "Drop to upload" overlay stays hidden. */
+export const MOVE_MIME = "application/x-cp-move"
+
+/**
+ * Begin an internal move-drag of `n`. If `n` is part of the current multi-select
+ * the WHOLE selection travels; otherwise just `n`. A lone folder also carries
+ * {@link FOLDER_DRAG_MIME} so sidebar-pinning still works. The payload is the
+ * realm-relative paths under {@link MOVE_MIME}.
+ */
+function startItemDrag(e: ReactDragEvent, n: FinderNode, selected: Set<string>) {
+  const paths = selected.has(n.path) && selected.size > 0 ? [...selected] : [n.path]
+  e.dataTransfer.setData(MOVE_MIME, JSON.stringify({ paths }))
+  e.dataTransfer.effectAllowed = "move"
+  // A single folder can ALSO be pinned by dropping on the sidebar.
+  if (n.kind === "folder" && paths.length === 1) {
+    e.dataTransfer.setData(FOLDER_DRAG_MIME, JSON.stringify({ name: n.name, path: n.path }))
+  }
+}
+
+/** Read the internal move payload off a drop event, if present. */
+function readMovePayload(e: ReactDragEvent): string[] | null {
+  const raw = e.dataTransfer.getData(MOVE_MIME)
+  if (!raw) return null
+  try {
+    const p = JSON.parse(raw) as { paths?: string[] }
+    return Array.isArray(p.paths) && p.paths.length > 0 ? p.paths : null
+  } catch {
+    return null
+  }
+}
+
+/** True when a drag carries our internal move payload (vs. an OS file drop). */
+function isMoveDrag(e: ReactDragEvent): boolean {
+  return e.dataTransfer.types.includes(MOVE_MIME)
+}
+
+/**
+ * Drop-target handlers for a FOLDER row (any view). When an internal move-drag
+ * hovers, the folder highlights (`setOver(path)`) and accepts `move`; on drop it
+ * routes the dragged paths to `onMove(paths, folder)` — unless the folder is
+ * itself one of the dragged items (can't drop onto self). A no-op when `onMove`
+ * is absent or the drag isn't an internal move.
+ */
+function folderDropProps(
+  n: FinderNode,
+  isOver: boolean,
+  setOver: (p: string | null) => void,
+  onMove: ViewHandlers["onMove"],
+) {
+  if (!onMove || n.kind !== "folder") return {}
+  return {
+    onDragOver: (e: ReactDragEvent) => {
+      if (!isMoveDrag(e)) return
+      const dragged = readMovePayload(e)
+      if (dragged?.includes(n.path)) return // can't drop onto self
+      e.preventDefault()
+      e.dataTransfer.dropEffect = "move"
+      if (!isOver) setOver(n.path)
+    },
+    onDragLeave: (e: ReactDragEvent) => {
+      if (e.currentTarget === e.target) setOver(null)
+    },
+    onDrop: (e: ReactDragEvent) => {
+      if (!isMoveDrag(e)) return
+      e.preventDefault()
+      e.stopPropagation()
+      setOver(null)
+      const dragged = readMovePayload(e)
+      if (dragged && !dragged.includes(n.path)) onMove(dragged, n)
+    },
+  }
 }
 
 /** Strip the agent-folder prefix to get the backend-relative path for `useFs`. */
@@ -30,6 +100,9 @@ export interface ViewHandlers {
   onClick: (node: FinderNode, mods: { additive: boolean; range: boolean }) => void
   onOpen: (node: FinderNode) => void
   onContext: (e: ReactMouseEvent, node: FinderNode) => void
+  /** Move the given realm-relative paths into the destination folder (internal
+   *  drag-and-drop). Absent in views that don't support drop targets. */
+  onMove?: (paths: string[], destFolder: FinderNode) => void
 }
 
 /** Colored macOS finder tag dots. */
@@ -72,6 +145,7 @@ export function GridView({
   ...h
 }: ViewHandlers & { nodes: FinderNode[]; iconSize: number }) {
   const cell = Math.round(iconSize * 1.55)
+  const [dragOver, setDragOver] = useState<string | null>(null)
   return (
     <div
       className="grid gap-1 p-4"
@@ -80,14 +154,16 @@ export function GridView({
       {nodes.map((n, i) => {
         const sel = h.selected.has(n.path)
         const focus = h.focusPath === n.path
+        const dropOver = dragOver === n.path
         return (
           <button
             key={n.path}
             title={n.name}
             data-finder-item=""
             data-path={n.path}
-            draggable={n.kind === "folder"}
-            onDragStart={(e) => startFolderDrag(e, n)}
+            draggable
+            onDragStart={(e) => startItemDrag(e, n, h.selected)}
+            {...folderDropProps(n, dropOver, setDragOver, h.onMove)}
             onClick={(e) => h.onClick(n, mods(e))}
             onDoubleClick={() => h.onOpen(n)}
             onContextMenu={(e) => h.onContext(e, n)}
@@ -98,6 +174,7 @@ export function GridView({
                 ? "border-[var(--signal)]/55 bg-[var(--signal)]/10 card-shadow"
                 : "border-transparent hover:border-border hover:bg-muted/45",
               focus && !sel && "ring-2 ring-[var(--signal)]/45",
+              dropOver && "border-[var(--signal)] bg-[var(--signal)]/15 ring-2 ring-[var(--signal)]/60",
             )}
           >
             <FileIcon
@@ -133,6 +210,7 @@ export function ListView({
   asc: boolean
   onSort: (k: FinderSortKey) => void
 }) {
+  const [dragOver, setDragOver] = useState<string | null>(null)
   return (
     <div className="px-2 py-1.5">
       <div className="sticky top-0 z-[1] grid grid-cols-[1fr_120px_92px_120px] gap-2 bg-background/90 px-2.5 py-1.5 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground/70 backdrop-blur">
@@ -145,13 +223,15 @@ export function ListView({
         const M = kindMeta[n.kind]
         const sel = h.selected.has(n.path)
         const focus = h.focusPath === n.path
+        const dropOver = dragOver === n.path
         return (
           <button
             key={n.path}
             data-finder-item=""
             data-path={n.path}
-            draggable={n.kind === "folder"}
-            onDragStart={(e) => startFolderDrag(e, n)}
+            draggable
+            onDragStart={(e) => startItemDrag(e, n, h.selected)}
+            {...folderDropProps(n, dropOver, setDragOver, h.onMove)}
             onClick={(e) => h.onClick(n, mods(e))}
             onDoubleClick={() => h.onOpen(n)}
             onContextMenu={(e) => h.onContext(e, n)}
@@ -162,6 +242,7 @@ export function ListView({
                 ? "bg-[var(--signal)]/12 text-foreground"
                 : cn("text-foreground/80 hover:bg-muted/45", i % 2 === 1 && "bg-muted/20"),
               focus && !sel && "ring-1 ring-inset ring-[var(--signal)]/50",
+              dropOver && "bg-[var(--signal)]/18 ring-1 ring-inset ring-[var(--signal)]/70",
             )}
           >
             <span className="flex min-w-0 items-center gap-2">
@@ -295,16 +376,19 @@ function MillerColumn({
   // Hook is always called (rules of hooks); its data is ignored when `provided`.
   const { data } = useFs(agentId, relOf(agentFolder, path))
   const nodes = sortNodes(provided ?? data ?? [], "name", true)
+  const [dragOver, setDragOver] = useState<string | null>(null)
   return (
     <div className="flex w-[218px] shrink-0 flex-col overflow-y-auto border-r border-border py-1">
       {nodes.map((n) => {
         const onTrail = n.path === nextPath
         const sel = h.selected.has(n.path)
+        const dropOver = dragOver === n.path
         return (
           <button
             key={n.path}
-            draggable={n.kind === "folder"}
-            onDragStart={(e) => startFolderDrag(e, n)}
+            draggable
+            onDragStart={(e) => startItemDrag(e, n, h.selected)}
+            {...folderDropProps(n, dropOver, setDragOver, h.onMove)}
             onClick={(e) => {
               h.onClick(n, mods(e))
               if (n.kind === "folder") onNavigate(n.path)
@@ -316,6 +400,7 @@ function MillerColumn({
               onTrail || sel
                 ? "bg-[var(--signal)]/14 text-foreground"
                 : "text-foreground/80 hover:bg-muted/45",
+              dropOver && "bg-[var(--signal)]/20 ring-1 ring-inset ring-[var(--signal)]/70",
             )}
           >
             <FileIcon kind={n.kind} ext={extOf(n.name)} size={17} className="shrink-0" />

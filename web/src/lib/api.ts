@@ -368,6 +368,28 @@ export function uploadFile(agentId: string, dir: string, file: File): Promise<Up
   })
 }
 
+/** Result of a move (`POST /fs/move`). */
+export interface MoveResult {
+  moved: number
+  skipped: number
+}
+
+/** Move one or more realm-relative entries into a destination directory
+ *  (`dest`, "" = realm root). Powers the Finder's internal drag-and-drop. The
+ *  backend confines both sides, refuses to clobber an existing entry, and
+ *  refuses to move a folder into its own descendant. */
+export function moveItems(
+  agentId: string,
+  items: string[],
+  dest: string,
+): Promise<MoveResult> {
+  return request(`/api/agent/${agentId}/fs/move`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items, dest }),
+  })
+}
+
 /** Trigger a browser download for a file in the agent's realm. */
 export async function downloadFile(agentId: string, path: string): Promise<void> {
   const res = await fetch(

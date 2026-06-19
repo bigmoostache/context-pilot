@@ -7,7 +7,7 @@ import type {
   FinderViewMode,
 } from "@/lib/types"
 import { fmtBytes, sortNodes } from "@/lib/finderFs"
-import { downloadFile, useFs, useUploadFiles } from "@/lib/live"
+import { downloadFile, useFs, useMoveItems, useUploadFiles } from "@/lib/live"
 
 /** Build breadcrumbs from a path relative to the agent's folder. */
 function buildCrumbs(
@@ -93,6 +93,7 @@ export function Finder({ agent }: { agent: Agent }) {
   const surfaceRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const upload = useUploadFiles(agent.id)
+  const move = useMoveItems(agent.id)
 
   const [tabs, setTabs] = useState<Tab[]>(() => [
     { id: "t0", cwd: agent.folder, label: agent.name, kind: "folder", back: [], fwd: [] },
@@ -176,6 +177,29 @@ export function Finder({ agent }: { agent: Agent }) {
           flash(err instanceof Error ? err.message : "Upload failed"),
       },
     )
+  }
+
+  // Move dragged entries (realm-relative paths) into a destination folder — the
+  // Finder's internal drag-and-drop. Both the items and the destination folder
+  // path come straight from the backend listing (realm-relative), so the
+  // backend confines them directly. Listings refresh on success.
+  const moveItemsInto = (paths: string[], destFolder: FinderNode) => {
+    if (paths.length === 0) return
+    if (paths.includes(destFolder.path)) return // dropped onto itself
+    flash(`Moving ${paths.length} item${paths.length === 1 ? "" : "s"}…`)
+    move.mutate(
+      { items: paths, dest: destFolder.path },
+      {
+        onSuccess: ({ moved }) =>
+          flash(
+            moved > 0
+              ? `Moved ${moved} item${moved === 1 ? "" : "s"} to ${destFolder.name}.`
+              : "Already there.",
+          ),
+        onError: (err) => flash(err instanceof Error ? err.message : "Move failed"),
+      },
+    )
+    setSelected(new Set())
   }
 
   // The backend lists paths RELATIVE to the realm root (e.g. "crates",
@@ -370,6 +394,7 @@ export function Finder({ agent }: { agent: Agent }) {
     onClick: select,
     onOpen: open,
     onContext: openContext,
+    onMove: moveItemsInto,
   }
 
   // ── box (marquee) selection ─────────────────────────────────────
@@ -393,6 +418,10 @@ export function Finder({ agent }: { agent: Agent }) {
       onKeyDown={onKeyDown}
       className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background outline-none"
       onDragOver={(e) => {
+        // Only the EXTERNAL OS-file drag (dataTransfer carries "Files") should
+        // raise the upload overlay. Internal item moves carry our MOVE_MIME and
+        // are handled by folder drop targets — never the upload surface.
+        if (!e.dataTransfer.types.includes("Files")) return
         e.preventDefault()
         if (!dragging) setDragging(true)
       }}
@@ -400,6 +429,7 @@ export function Finder({ agent }: { agent: Agent }) {
         if (e.currentTarget === e.target) setDragging(false)
       }}
       onDrop={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return
         e.preventDefault()
         setDragging(false)
         uploadFiles(Array.from(e.dataTransfer.files))
