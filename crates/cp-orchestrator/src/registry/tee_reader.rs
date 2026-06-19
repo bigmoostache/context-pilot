@@ -216,7 +216,12 @@ mod tests {
     /// assertion (the hub drops frames for agents with no subscribers).
     fn backend_with_subscriber(agent_id: &str) -> (Arc<Mutex<Backend>>, u64) {
         let dir = tempdir().expect("dir");
-        let backend = Arc::new(Mutex::new(Backend::new(dir.path().to_path_buf(), 100.0)));
+        let backend = Arc::new(Mutex::new(Backend::new(
+            dir.path().to_path_buf(),
+            100.0,
+            PathBuf::from("/tmp/cp-test-realms"),
+            PathBuf::from("/tmp/cp-test-bin"),
+        )));
         let sub = backend.lock().expect("lock").hub_mut().subscribe(agent_id);
         (backend, sub)
     }

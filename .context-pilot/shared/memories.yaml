@@ -108,6 +108,41 @@
   - design
   - active
   last_edited_ms: 0
+5fca4a81f0734c4f:
+  tl_dr: T271 agent retire/unretire SHIPPED end-to-end (orchestrator + web). Stop-and-keep, not delete. Details in contents.
+  contents: |-
+    ## T271 — agent retiring (retire/unretire) SHIPPED
+
+    User ask: wire 'retiring' (name it that, NOT archiving). (1) stop the agent's rust process + console server; (2) do NOT delete the realm folder; (3) show retired agents in a separate dashboard section; (4) same-path create must still fail; (5) unretire is trivial — an orchestrator-level bool (NOT agent-level state).
+
+    ### Backend
+    - **services/retire.rs** RetiredStore: RetiredRecord{id,name,folder,model,provider,retired_at_ms} persisted to <agents_dir>/retired.json (atomic tmp->rename). load/is_retired/is_folder_retired/list(most-recent-first)/retire/unretire. Why a SEPARATE store (not registry Entry): the agent writes+removes its own <id>.json on clean shutdown — exactly the moment retire kills it — so the registry can't be the retired source of truth, and the store must carry a render snapshot surviving the agent's death + a backend restart. list_entries' guarded Entry deserialize silently skips retired.json. Lives in services/ (pure single-owner data, like CostBreaker) — moved there from a top-level src/retire.rs because orchestrator/src hit the 8-entry folder cap.
+    - **rest/retire.rs** retire_agent: resolve_entry -> snapshot RetiredRecord (provider via meta::read_provider BEFORE kill) -> supervisor::kill_pid(pid) lock-free -> kill console server via <folder>/.context-pilot/console/server.pid (the console daemon survives TUI restarts by design, so it must be killed explicitly) -> drop stale supervised record -> retired.retire+persist -> 200. unretire_agent: retired.unretire (404 if absent) + spawn_pty same folder (respawn re-registers under SAME id) -> 202.
+    - **create.rs** 409 guard: reject create if retired.is_folder_retired(folder) ('a retired agent owns this realm folder — unretire it instead').
+    - **meta.rs** fleet_retired endpoint (Agent-shaped JSON, status:retired, retiredAt) + fleet_meta filters OUT retired agents from the active fleet. read_provider made pub(crate).
+    - **transport/mod.rs** Backend.retired:RetiredStore field + RetiredStore::load(agents_dir) in Backend::new; routes POST /api/agent/{id}/retire + /unretire + GET /api/fleet/retired. rest/mod.rs re-exports retire_agent/unretire_agent.
+
+    ### Frontend
+    - api.ts: retireAgent/unretireAgent/fetchRetiredFleet + RetireReceipt/UnretireReceipt types.
+    - live.ts: useRetiredFleet (useLive over /fleet/retired, no SSE) + useRetireAgent/useUnretireAgent (useMutation, invalidate qk.fleet()+qk.retiredFleet() immediately + on a short delay since kill/registry-removal/respawn settle async). qk.retiredFleet added in sync.ts.
+    - AgentModal: manage-mode footer 'Retire' button (was a cosmetic 'Archive') wired to useRetireAgent.
+    - FleetDashboard: RetiredSection (renders only when >=1 retired) + RetiredCard (dashed, identity + folder + one-click Unretire via useUnretireAgent). Active fleet unchanged.
+
+    ### Proven LIVE (orchestrator debug :7878, agent 834eb459c7b064db ~/code/test)
+    retire -> 200 {status:retired}; excluded from /fleet/meta; listed in /fleet/retired; create same path -> 409; unretire -> 202 {status:unretiring,pid:66076}; cleared from retired; re-registered under same id in active fleet; unretire unknown -> 404.
+
+    ### Tests
+    lib 105/105 + all integration green. ALSO fixed pre-existing rot that X896 left (CB3 rust-check is lib-only so it never surfaced): all 6 tests/ files needed `use portable_pty as _;` + Backend::new 2->4 arg. AND rewrote 3 STALE SSE tests (end_to_end x2, transport_http ticket) that encoded pre-T123 cold-connect-replays-history semantics — fixed via the reconnect-replay path (Last-Event-ID=0), no production code change: end_to_end test 1 pre-seeds rev 0 so the command lands at rev 1 then replays it; soak + ticket test add Last-Event-ID=0. LATENT off-by-one surfaced (NOT fixed, documented): empty-log cold connect seeds(0) and drops the first append rev 0; fix would be oplog_head_rev->Option, seed only if Some.
+
+    GOTCHA reused: orchestrator restart REQUIRED after backend change (running binary goes stale independently of TUI reload) — killed :7878 via lsof, relaunched debug CP_COST_BUDGET=100000000. No TUI crate changed -> no system_reload needed.
+  importance: high
+  labels:
+  - T271
+  - retire
+  - orchestrator
+  - frontend
+  - shipped
+  last_edited_ms: 1781882942435
 6cc818f12c0d231a:
   tl_dr: 'DOCUMENTATION QUALITY: Documentation is ABSOLUTELY CRITICAL. Do NOT half-ass it. If understanding a function requires opening extra files to see context, DO IT. Don''t document to document — document to HELP future readers. Take the extra step.'
   importance: critical

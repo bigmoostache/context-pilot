@@ -83,6 +83,47 @@ export function restartAgent(agentId: string): Promise<RestartReceipt> {
   return request(`/api/agent/${agentId}/restart`, { method: "POST" })
 }
 
+// ── Retire / unretire (T271) ──────────────────────────────────────────
+
+/** Receipt from `POST /api/agent/{id}/retire` — the agent's process (and its
+ *  console-server daemon) is stopped and the agent is recorded as retired; its
+ *  realm folder is kept intact so it can be brought back. */
+export interface RetireReceipt {
+  status: string
+  id: string
+  folder: string
+}
+
+/** Receipt from `POST /api/agent/{id}/unretire` — a 202 "unretiring" launch
+ *  acknowledgement; the agent respawns on its kept folder and re-registers
+ *  under the same id within a scan tick. */
+export interface UnretireReceipt {
+  status: string
+  id: string
+  folder: string
+  pid: number
+}
+
+/** Retire (archive) an agent: stop its process + console server, keep its
+ *  folder, and move it to the Retired section. Not a delete — fully reversible
+ *  via {@link unretireAgent}. */
+export function retireAgent(agentId: string): Promise<RetireReceipt> {
+  return request(`/api/agent/${agentId}/retire`, { method: "POST" })
+}
+
+/** Bring a retired agent back: clear its retired flag and respawn it on the
+ *  same realm folder (re-registering under the same id). */
+export function unretireAgent(agentId: string): Promise<UnretireReceipt> {
+  return request(`/api/agent/${agentId}/unretire`, { method: "POST" })
+}
+
+/** Fetch the Retired section — one `Agent`-shaped record per retired agent,
+ *  built from the orchestrator's retired store (the agents have no live process
+ *  to inspect). Each carries `status: "retired"`. */
+export function fetchRetiredFleet(): Promise<Agent[]> {
+  return request("/api/fleet/retired")
+}
+
 // ── Agent meta ────────────────────────────────────────────────────────
 
 export function fetchAgentMeta(agentId: string): Promise<Agent> {

@@ -43,9 +43,52 @@ pub fn fleet_meta(state: &Mutex<Backend>) -> HttpReply {
         Ok(e) => e,
         Err(_) => return HttpReply::ok(&serde_json::json!([])),
     };
+    // Retired agents live in the orchestrator-owned store, not the registry —
+    // exclude them from the ACTIVE fleet so they render only in the dashboard's
+    // Retired section (served by [`fleet_retired`]).
     let agents: Vec<serde_json::Value> = entries
         .iter()
+        .filter(|e| {
+            !state.lock().is_ok_and(|b| b.retired.is_retired(&e.id))
+        })
         .map(|e| build_agent_meta(state, &e.id, e))
+        .collect();
+    HttpReply::ok(&agents)
+}
+
+/// `GET /api/fleet/retired` — the dashboard's Retired (archived) section.
+///
+/// Returns one maquette-`Agent`-shaped object per retired agent, built from the
+/// orchestrator's [`RetiredStore`](crate::services::RetiredStore) snapshot rather
+/// than the live registry (a retired agent has no running process to inspect).
+/// Each carries `status: "retired"` and a `retiredAt` epoch-ms so the frontend
+/// can render and sort the section without a second lookup.
+pub fn fleet_retired(state: &Mutex<Backend>) -> HttpReply {
+    let records = {
+        let Ok(b) = state.lock() else {
+            return HttpReply::error(500, "backend lock poisoned");
+        };
+        b.retired.list()
+    };
+    let agents: Vec<serde_json::Value> = records
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "name": r.name,
+                "folder": r.folder,
+                "branch": "",
+                "model": r.model,
+                "provider": r.provider,
+                "status": "retired",
+                "costUsd": 0.0,
+                "task": "",
+                "threads": 0,
+                "lastActivity": r.retired_at_ms,
+                "retiredAt": r.retired_at_ms,
+                "accent": "interactive",
+            })
+        })
         .collect();
     HttpReply::ok(&agents)
 }
@@ -165,7 +208,7 @@ fn inspect_threads(
 /// inferring the provider from the model name. The id uses the wire serde form
 /// (lowercase: `anthropic`, `claudecode`, `claudecodeapikey`, `claudecodev2`,
 /// `grok`, `groq`, `deepseek`, `minimax`).
-fn read_provider(state: &Mutex<Backend>, folder: &str) -> String {
+pub(crate) fn read_provider(state: &Mutex<Backend>, folder: &str) -> String {
     let folder_path = std::path::Path::new(folder);
     let config = {
         let Ok(mut b) = state.lock() else {

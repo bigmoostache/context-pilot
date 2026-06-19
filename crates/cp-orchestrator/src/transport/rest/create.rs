@@ -48,6 +48,14 @@ pub fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpReply {
             Some(f) if !f.trim().is_empty() => std::path::PathBuf::from(f),
             _ => backend.agents_root.join(slugify(name)),
         };
+        // Requirement 4 (T271): a folder still owned by a RETIRED agent must
+        // not accept a fresh agent — the realm is reserved until unretired.
+        if backend.retired.is_folder_retired(&folder.to_string_lossy()) {
+            return HttpReply::error(
+                409,
+                "a retired agent owns this realm folder — unretire it instead",
+            );
+        }
         (folder, backend.agent_binary.clone(), backend.agents_dir.clone())
     };
 

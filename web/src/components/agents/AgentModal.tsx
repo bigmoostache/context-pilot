@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react"
 import type { Agent } from "@/lib/types"
-import { useCreateAgent, useRestartAgent, sendCommand } from "@/lib/live"
+import { useCreateAgent, useRestartAgent, useRetireAgent, sendCommand } from "@/lib/live"
 import { PROVIDERS, defaultModel, findModel, resolveSelection } from "@/lib/models"
 import { ModelPicker } from "./ModelPicker"
 import { cn } from "@/lib/utils"
@@ -81,9 +81,10 @@ export function AgentModal({
 
   const createAgent = useCreateAgent()
   const restartAgent = useRestartAgent()
+  const retireAgent = useRetireAgent()
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const pending = createAgent.isPending || saving || restartAgent.isPending
+  const pending = createAgent.isPending || saving || restartAgent.isPending || retireAgent.isPending
   const canSubmit = (isManage || name.trim().length > 0) && !pending
 
   /** Restart a (possibly stale-binary) agent so a fresh process can accept
@@ -98,6 +99,22 @@ export function AgentModal({
       },
       onError: (e) => {
         setError(e instanceof Error ? e.message : "Could not restart the agent.")
+      },
+    })
+  }
+
+  /** Retire (archive) the agent: stop its process + console server, keep its
+   *  folder, and move it to the dashboard's Retired section. Reversible. */
+  const retire = () => {
+    if (!agent || retireAgent.isPending) return
+    setError(null)
+    retireAgent.mutate(agent.id, {
+      onSuccess: () => {
+        onFlash?.(`Retired ${agent.name} — moved to the Retired section`)
+        onClose()
+      },
+      onError: (e) => {
+        setError(e instanceof Error ? e.message : "Could not retire the agent.")
       },
     })
   }
@@ -255,14 +272,13 @@ export function AgentModal({
         <div className="flex items-center gap-2 border-t border-border/70 bg-muted/25 px-6 py-4">
           {isManage && (
             <button
-              onClick={() => {
-                onFlash?.(`Archived ${agent?.name}`)
-                onClose()
-              }}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/10"
+              onClick={retire}
+              disabled={pending}
+              title="Stop the agent's process and console server and move it to the Retired section. The realm folder is kept — unretire brings it back."
+              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Archive className="size-3.5" />
-              Archive
+              <Archive className={cn("size-3.5", retireAgent.isPending && "animate-pulse")} />
+              Retire
             </button>
           )}
           {isManage && (

@@ -50,7 +50,7 @@ use cp_wire::types::registry::Entry;
 
 
 use crate::inspect::StateReader;
-use crate::services::{CostBreaker, MaterializedView, StreamHub};
+use crate::services::{CostBreaker, MaterializedView, RetiredStore, StreamHub};
 use crate::supervisor::AgentSupervisor;
 use ticket::TicketStore;
 use query::QueryParams;
@@ -93,6 +93,9 @@ pub struct Backend {
     /// The `cp` TUI binary the supervisor spawns (also the sole allow-list
     /// entry).
     pub(crate) agent_binary: PathBuf,
+    /// Orchestrator-owned set of retired agents (T271) — stopped-but-kept
+    /// agents, persisted independently of the agent-written registry records.
+    pub(crate) retired: RetiredStore,
 }
 
 impl Backend {
@@ -115,6 +118,7 @@ impl Backend {
             hub: StreamHub::new(DEFAULT_SUB_CAPACITY),
             tickets: TicketStore::new(),
             inspect: StateReader::new(),
+            retired: RetiredStore::load(&agents_dir),
             agents_dir,
             dirty_agents: HashSet::new(),
             supervisor: AgentSupervisor::new(&[agent_binary.clone()]),
@@ -158,7 +162,7 @@ impl Backend {
     /// Construct a backend from explicit services — used by tests.
     #[cfg(test)]
     pub(crate) fn for_test(agents_dir: PathBuf, view: MaterializedView, breaker: CostBreaker) -> Self {
-        Self { view, breaker, hub: StreamHub::new(DEFAULT_SUB_CAPACITY), tickets: TicketStore::new(), inspect: StateReader::new(), agents_dir, dirty_agents: HashSet::new(), supervisor: AgentSupervisor::new(&[]), agents_root: PathBuf::from("/tmp/cp-test-realms"), agent_binary: PathBuf::from("/tmp/cp-test-bin") }
+        Self { view, breaker, hub: StreamHub::new(DEFAULT_SUB_CAPACITY), tickets: TicketStore::new(), inspect: StateReader::new(), retired: RetiredStore::default(), agents_dir, dirty_agents: HashSet::new(), supervisor: AgentSupervisor::new(&[]), agents_root: PathBuf::from("/tmp/cp-test-realms"), agent_binary: PathBuf::from("/tmp/cp-test-bin") }
     }
 }
 
@@ -248,6 +252,7 @@ fn route_rest(
         (Method::Get, ["api", "health"]) => rest::HttpReply { status: 200, body: "{\"status\":\"ok\"}".to_owned() },
         (Method::Get, ["api", "fleet"]) => rest::fleet(state),
         (Method::Get, ["api", "fleet", "meta"]) => inspect::meta::fleet_meta(state),
+        (Method::Get, ["api", "fleet", "retired"]) => inspect::meta::fleet_retired(state),
         (Method::Get, ["api", "metrics"]) => inspect::metrics::fleet_metrics(state),
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
         (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent_meta(state, id),
@@ -273,6 +278,8 @@ fn route_rest(
         (Method::Get, ["api", "agent", id, "conversation"]) => inspect::finder::conversation(state, id),
         (Method::Post, ["api", "agent", id, "command"]) => rest::command(state, id, body_bytes),
         (Method::Post, ["api", "agent", id, "restart"]) => rest::restart_agent(state, id),
+        (Method::Post, ["api", "agent", id, "retire"]) => rest::retire_agent(state, id),
+        (Method::Post, ["api", "agent", id, "unretire"]) => rest::unretire_agent(state, id),
         (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state),
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },

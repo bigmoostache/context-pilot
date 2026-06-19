@@ -27,6 +27,7 @@
 use cp_mod_bridge as _;
 use nix as _;
 use notify as _;
+use portable_pty as _;
 use serde as _;
 use serde_yaml as _;
 use serde_json as _;

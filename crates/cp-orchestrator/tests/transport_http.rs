@@ -26,6 +26,7 @@ mod common;
 use cp_mod_bridge as _;
 use nix as _;
 use notify as _;
+use portable_pty as _;
 use serde as _;
 use serde_yaml as _;
 
@@ -117,7 +118,12 @@ fn harness(agent_id: &str, n_msgs: u8) -> Harness {
     let entry = make_entry(agent_id, oplog.path());
     write_entry(agents.path(), &entry);
 
-    let mut backend = Backend::new(agents.path().to_path_buf(), 5.0);
+    let mut backend = Backend::new(
+        agents.path().to_path_buf(),
+        5.0,
+        std::path::PathBuf::from("/tmp/cp-test-realms"),
+        std::path::PathBuf::from("/tmp/cp-test-bin"),
+    );
     backend.view_mut().apply_batch(agent_id, &replay_entries(oplog.path()));
     let state = Arc::new(Mutex::new(backend));
 
@@ -208,10 +214,13 @@ fn sse_requires_a_valid_single_use_ticket() {
     );
     assert_eq!(bogus, 401, "an unminted ticket is rejected");
 
-    // Mint a real ticket, open the stream → 200 + at least one delta.
+    // Mint a real ticket, open the stream resuming from rev 0 → 200 + the
+    // replayed tail (a cold connect head-seeds per T123, so historical deltas
+    // come from the reconnect-replay path).
     let token = ticket_token(&h);
     let path = format!("/api/stream?agent=agent-c&ticket={token}");
-    let (ok, events) = common::sse_collect(&h.addr, &path, &[], 1, Duration::from_secs(3));
+    let (ok, events) =
+        common::sse_collect(&h.addr, &path, &[("Last-Event-ID", "0")], 1, Duration::from_secs(3));
     assert_eq!(ok, 200, "a valid ticket opens the stream");
     assert!(events.iter().any(|e| e.event == "delta"), "the oplog tail streams as deltas");
 

@@ -2826,6 +2826,10 @@
   path: ui/src/components/ui/tooltip.tsx
   description: App-wide tooltip wrapper (T25). <Tip title body side triggerClassName>. Base-UI tooltip, portals to document.body (escapes .vibrancy containing block), --popover-token surface+arrow (theme-correct), title(bold)+optional body. Shared TooltipProvider at App root (delay 350/close 80).
   last_edited_ms: 1781600078174
+6359bf039e2fa3f2:
+  path: crates/cp-orchestrator/src/services/retire.rs
+  description: 'Orchestrator-owned RetiredStore (T271): stop-and-keep agents. RetiredRecord{id,name,folder,model,provider,retired_at_ms} persisted to <agents_dir>/retired.json (atomic tmp->rename). load/is_retired/is_folder_retired/list(most-recent-first)/retire/unretire. Separate from registry Entry because the agent removes its own <id>.json on clean shutdown — this store survives the agent''s death + a backend restart so a retired card renders with no live process. Lives in services/ beside CostBreaker/MaterializedView (pure single-owner data, no I/O thread).'
+  last_edited_ms: 1781882909729
 6361792c7f8df4c1:
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
@@ -5542,6 +5546,10 @@ bfa166d86fa01300:
   path: web/src/lib/live.ts
   description: 'Live data hooks: fetch + SSE-delta-apply + poll backstop. useLiveQuery generic with applyDelta reducer + rev high-water guard. applyThreadDelta folds thread_created/archived/restored/status_changed + message_created. applyAgentDelta folds phase_transition + cost_aggregate. useStreamingTokens(agentId) (§7 stream plane): subscribes SSE ''stream'', parses StreamFrame, accumulates Token text into a per-message_id ref buffer flushed ONCE per requestAnimationFrame (never setState per token — §7 mandatory), keyed by message_id (= Message.id). invalidateAgent bus + sendCommand double-invalidate.'
   last_edited_ms: 1781812786747
+bfcfb7ebe6b769b1:
+  path: crates/cp-orchestrator/src/transport/rest/retire.rs
+  description: 'POST /api/agent/{id}/retire + /unretire (T271). retire_agent: resolve entry, snapshot RetiredRecord (provider via meta::read_provider BEFORE kill), supervisor::kill_pid(pid) lock-free, kill_console_server via <folder>/.context-pilot/console/server.pid (it survives TUI restarts by design), drop stale supervised record, retired.retire+persist -> 200. unretire_agent: retired.unretire (404 if absent) + spawn_pty same folder (respawn -> same id) -> 202. NOT a folder delete. Proven live: 834eb retire->409 same-path->unretire respawn(pid)->404 unknown.'
+  last_edited_ms: 1781882909750
 bfe86519072f84a5:
   path: crates/cp-wire/src/types/ack.rs
   description: 'Command Ack: cmd_id + AckStatus (Accepted/Rejected) + optional rev. Journal-then-ack (I11).'
@@ -6806,6 +6814,10 @@ ef88c139f0bdac2b:
   path: yamls/tools/threads.yaml
   description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
   last_edited_ms: 0
+efce4dbfcda0de38:
+  path: crates/cp-orchestrator/src/services/mod.rs
+  description: 'services/ hub: declares + re-exports MaterializedView/AgentView/CostSnapshot, CostBreaker/Verdict, StreamHub/Subscriber, and RetiredRecord/RetiredStore (T271 retire).'
+  last_edited_ms: 1781882909771
 f0084294a9bef3c2:
   path: web/src/lib/sse.ts
   description: 'Reconnecting SSE client. Singleton per-agent via getOrCreateSseClient(). EventSource to /api/stream with ticket auth. RESUME via the `last_rev` QUERY param (T268 fix): native EventSource auto-reconnect is disabled (es.close() in onerror + manual scheduleReconnect), so the Last-Event-ID HEADER is never sent — the query param is the ONLY resume channel, and the backend reads `last_rev`. The old `last_event_id` name mismatch made every reconnect a cold seed at oplog HEAD, dropping deltas emitted during the disconnect window (they surfaced only on the 15s backstop poll = the 5-10s TUI→frontend delay). lastEventId captured from each event''s e.lastEventId. Exponential backoff with jitter. Named events: delta/stream/resync/invalidate.'

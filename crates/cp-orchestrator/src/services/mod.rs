@@ -15,8 +15,10 @@
 
 pub mod cost_breaker;
 pub mod materialized_view;
+pub mod retire;
 pub mod stream_hub;
 
 pub use cost_breaker::{CostBreaker, Verdict};
 pub use materialized_view::{AgentView, CostSnapshot, MaterializedView};
+pub use retire::{RetiredRecord, RetiredStore};
 pub use stream_hub::{StreamHub, Subscriber};

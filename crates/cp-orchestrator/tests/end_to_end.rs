@@ -37,6 +37,7 @@ mod common;
 // them for the per-target `unused-crate-dependencies` lint.
 use nix as _;
 use notify as _;
+use portable_pty as _;
 use serde as _;
 use serde_yaml as _;
 
@@ -94,7 +95,12 @@ fn write_entry(agents_dir: &Path, entry: &Entry) {
 /// Bind a backend serving `agents_dir` on an ephemeral port; returns its
 /// address. The acceptor thread runs until the process exits.
 fn serve_backend(agents_dir: &Path) -> (String, Arc<Mutex<Backend>>) {
-    let state = Arc::new(Mutex::new(Backend::new(agents_dir.to_path_buf(), 5.0)));
+    let state = Arc::new(Mutex::new(Backend::new(
+        agents_dir.to_path_buf(),
+        5.0,
+        std::path::PathBuf::from("/tmp/cp-test-realms"),
+        std::path::PathBuf::from("/tmp/cp-test-bin"),
+    )));
     let server = Server::http("127.0.0.1:0").expect("bind ephemeral");
     let addr = server.server_addr().to_string();
     let serve_state = Arc::clone(&state);
@@ -132,6 +138,19 @@ fn a_command_journals_on_the_agent_and_re_emerges_as_an_sse_delta() {
     let sock = agent_dir.path().join("stream.sock");
     let cap_token = "cap-token-e2e";
 
+    // Pre-seed one durable entry so the command effect lands at rev 1. A cold
+    // SSE connect seeds the tailer at the oplog HEAD and rides only the live
+    // tail (T123) — historical deltas are obtained via the reconnect-replay
+    // path (`Last-Event-ID`), which delivers every entry with `rev > last-seen`.
+    // The single writer is dropped before the agent's OplogService opens (it
+    // resumes the rev counter from the replayed head), so the next append is
+    // rev 1.
+    {
+        let mut seed = OplogWriter::open(&oplog_dir).expect("open oplog seed");
+        let _rev = seed.append(message_entry(0)).expect("seed append");
+        seed.sync().expect("sync seed");
+    }
+
     // ── Agent side: a real oplog + intake serving one command connection. ──
     let listener = UnixListener::bind(&sock).expect("bind socket");
     let agent = {
@@ -158,7 +177,7 @@ fn a_command_journals_on_the_agent_and_re_emerges_as_an_sse_delta() {
     assert!(receipt.body.contains("\"cmd_id\":\"cmd-e2e\""), "receipt echoes the cmd id");
     assert!(receipt.body.contains("\"dedup_token\":\"d-e2e\""), "receipt carries the dedup token");
     assert!(receipt.body.contains("\"status\":\"accepted\""), "the receipt says accepted");
-    assert!(receipt.body.contains("\"rev\":0"), "the durable effect landed at rev 0");
+    assert!(receipt.body.contains("\"rev\":1"), "the durable effect landed at rev 1 (rev 0 pre-seeded)");
 
     agent.join().expect("agent thread joined");
 
@@ -166,16 +185,19 @@ fn a_command_journals_on_the_agent_and_re_emerges_as_an_sse_delta() {
     let recovered = replay(&oplog_dir).expect("replay");
     assert!(recovered.seen.contains("d-e2e"), "the command effect is durable in the log");
 
-    // ── Client: stream the agent; the journalled command arrives as a delta. ──
+    // ── Client: reconnect-replay from rev 0; the journalled command (rev 1)
+    // streams back as a delta (a cold connect head-seeds, so we resume past the
+    // pre-seeded rev 0 to obtain the command effect). ──
     let token = ticket_token(&addr);
     let path = format!("/api/stream?agent=agent-e2e&ticket={token}");
-    let (status, events) = common::sse_collect(&addr, &path, &[], 1, Duration::from_secs(3));
+    let (status, events) =
+        common::sse_collect(&addr, &path, &[("Last-Event-ID", "0")], 1, Duration::from_secs(3));
     assert_eq!(status, 200, "the stream opens");
     let delta = events
         .iter()
         .find(|e| e.event == "delta")
         .expect("the command effect streams back as a delta");
-    assert_eq!(delta.id, Some(0), "the delta is tagged with the rev it reflects (id = rev framing)");
+    assert_eq!(delta.id, Some(1), "the delta is tagged with the rev it reflects (id = rev framing)");
     assert!(
         delta.data.contains("d-e2e"),
         "the streamed delta carries the command's dedup token (full loop closed)",
@@ -237,13 +259,15 @@ fn the_stream_survives_a_soak_of_connect_disconnect_cycles() {
     write_entry(agents.path(), &entry);
     let (addr, _state) = serve_backend(agents.path());
 
-    // Many short-lived stream connections: each mints a ticket, opens the
-    // stream, reads at least one delta, then drops. A leaked descriptor or a
-    // wedged producer would surface as a hang or a non-200 within the budget.
+    // Many short-lived stream connections: each mints a ticket, resumes from
+    // rev 0 (reconnect-replay, since a cold connect head-seeds — T123), reads at
+    // least one replayed delta, then drops. A leaked descriptor or a wedged
+    // producer would surface as a hang or a non-200 within the budget.
     for _cycle in 0..25 {
         let token = ticket_token(&addr);
         let path = format!("/api/stream?agent=agent-soak&ticket={token}");
-        let (status, events) = common::sse_collect(&addr, &path, &[], 1, Duration::from_secs(2));
+        let (status, events) =
+            common::sse_collect(&addr, &path, &[("Last-Event-ID", "0")], 1, Duration::from_secs(2));
         assert_eq!(status, 200, "every soak cycle opens cleanly");
         assert!(events.iter().any(|e| e.event == "delta"), "every cycle delivers a delta");
     }

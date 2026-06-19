@@ -399,6 +399,61 @@ export function useRestartAgent() {
 }
 
 /**
+ * The Retired (archived) fleet — agents stopped-but-kept (T271). Served from
+ * the orchestrator's retired store (`GET /api/fleet/retired`), so each card is
+ * rendered from a snapshot, not a live process. No SSE bridge (a retired agent
+ * emits nothing); a slow poll keeps it eventually-consistent after a retire /
+ * unretire on another tab.
+ */
+export function useRetiredFleet(): LiveQueryResult<Agent[]> {
+  return useLive(qk.retiredFleet(), () => api.fetchRetiredFleet())
+}
+
+/**
+ * Mutation to retire (archive) an agent — stop its process + console server,
+ * keep its folder. On success both the active fleet and the retired fleet are
+ * refetched (immediately + once more shortly after, since the process kill +
+ * registry-record removal settle asynchronously) so the card moves from the
+ * Active grid to the Retired section without waiting on the backstop poll.
+ */
+export function useRetireAgent() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (agentId: string) => api.retireAgent(agentId),
+    onSuccess: () => {
+      const refetch = () => {
+        void client.invalidateQueries({ queryKey: qk.fleet() })
+        void client.invalidateQueries({ queryKey: qk.retiredFleet() })
+      }
+      refetch()
+      window.setTimeout(refetch, 1500)
+    },
+  })
+}
+
+/**
+ * Mutation to unretire an agent — clear its retired flag and respawn it on the
+ * kept folder. The respawn self-registers under the same id within ~2-3s, so we
+ * refetch both fleets immediately and again shortly after to surface the
+ * back-to-life agent in the Active grid before the slow backstop poll.
+ */
+export function useUnretireAgent() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (agentId: string) => api.unretireAgent(agentId),
+    onSuccess: () => {
+      const refetch = () => {
+        void client.invalidateQueries({ queryKey: qk.fleet() })
+        void client.invalidateQueries({ queryKey: qk.retiredFleet() })
+      }
+      refetch()
+      window.setTimeout(refetch, 2000)
+      window.setTimeout(refetch, 4000)
+    },
+  })
+}
+
+/**
  * Send a command to an agent and return its receipt.
  *
  * Deliberately does **not** invalidate/refetch afterwards. Every

@@ -73,6 +73,7 @@ export interface OpEntryKind {
 export const qk = {
   fleet: () => ["fleet"] as const,
   fleetMetrics: () => ["fleet-metrics"] as const,
+  retiredFleet: () => ["fleet-retired"] as const,
   agent: (id: string) => ["agent", id] as const,
   threads: (id: string) => ["threads", id] as const,
   panels: (id: string) => ["panels", id] as const,
