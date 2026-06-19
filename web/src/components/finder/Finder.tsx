@@ -459,20 +459,20 @@ export function Finder({ agent }: { agent: Agent }) {
   }
 
   // Row click with macOS-style settle semantics. Selection feedback is INSTANT
-  // (and never reflows the layout); the only deferred effect is the macOS
-  // slow-second-click-to-rename gesture, armed by CLICK_SETTLE_MS so a real
-  // double-click (open) can pre-empt it.
+  // (and never reflows the layout). After a short settle window a click either
+  // arms the slow-second-click-to-rename gesture (re-click of a sole-selected
+  // item) or opens the Quick Look pane (first click of a fresh item).
   //
-  // A single click deliberately does NOT open the Quick Look pane. Auto-opening
-  // it on click was the source of the "my item moves under my second click" bug
-  // in GRID view: the pane opens to the side, the auto-fill grid reflows, and
-  // the item shifts before a slow second click (>CLICK_SETTLE_MS) can land on it
-  // — so slow-click-rename only ever worked in list view (rows don't move
-  // vertically when the pane opens). With the auto-open removed, the gesture
-  // works identically across grid / list / columns, and there's no reflow under
-  // the cursor at all. Quick Look still opens via Space or the toolbar toggle,
-  // and once open it tracks the selection live (select() updates `preview`), so
-  // nothing is lost. A modifier (range/additive) click only selects.
+  // The Quick Look pane is rendered as a NON-REFLOWING OVERLAY (absolutely
+  // positioned over the right of the content — see the render below), so
+  // opening it never shifts the items in the grid/list/columns. That is the
+  // crux: an earlier in-flow pane shrank the content and reflowed the auto-fill
+  // grid, so the first click of a double-click moved the item out from under
+  // the second click, and a deferred open reflowed mid-slow-rename. With a
+  // non-reflowing overlay, click-to-preview, double-click-to-open, and
+  // slow-click-to-rename all coexist identically across every view. The settle
+  // timer still lets a double-click pre-empt the preview-open so opening a file
+  // doesn't first flash the pane.
   const onRowClick = (node: FinderNode, m: { additive: boolean; range: boolean }) => {
     const wasSole =
       !m.additive &&
@@ -484,8 +484,19 @@ export function Finder({ agent }: { agent: Agent }) {
     window.clearTimeout(clickTimer.current)
     if (m.additive || m.range) return
     const inlineCapable = viewMode !== "gallery"
-    if (!wasSole || !inlineCapable) return
-    clickTimer.current = window.setTimeout(() => startRename(node), CLICK_SETTLE_MS)
+    // After the settle window (so a double-click / open can pre-empt it), a
+    // click does one of two things, depending on whether it landed on the
+    // already-sole-selected item:
+    //   • re-click a sole-selected item → slow-click-to-rename (macOS gesture);
+    //   • first click of a fresh item   → open the Quick Look pane.
+    // The Quick Look pane is a NON-REFLOWING overlay (see render), so opening it
+    // never shifts items — which is why restoring click-to-preview no longer
+    // reintroduces the "my item moves under my second click" problem in any
+    // view, and the slow-rename gesture keeps working in grid / list / columns.
+    clickTimer.current = window.setTimeout(() => {
+      if (wasSole && inlineCapable) startRename(node)
+      else if (!wasSole) setPreviewOpen(true)
+    }, CLICK_SETTLE_MS)
   }
 
   /** Open a file in its own tab (reuse an existing tab for the same file). */
@@ -767,7 +778,7 @@ export function Finder({ agent }: { agent: Agent }) {
             onClose={() => closeTab(active.id)}
           />
         ) : (
-          <>
+          <div className="relative flex min-w-0 flex-1">
             <main
               ref={mainRef}
               {...marquee.handlers}
@@ -827,14 +838,23 @@ export function Finder({ agent }: { agent: Agent }) {
               )}
             </main>
 
-            {previewOpen && (
-              <FinderPreview
-                node={previewNode}
-                agentId={agent.id}
-                onClose={() => setPreviewOpen(false)}
-              />
+            {/* Quick Look — a NON-REFLOWING overlay anchored to the right of the
+                content. It floats ABOVE the items (it does not shrink the
+                content area), so opening it never reflows the grid and the
+                click/double-click/slow-rename gestures stay stable. Only grid &
+                list use it: columns has its own trailing Miller preview pane and
+                gallery shows the selected item as a hero, so an overlay there
+                would double up. */}
+            {previewOpen && (viewMode === "grid" || viewMode === "list") && (
+              <div className="absolute inset-y-0 right-0 z-20 flex pop-shadow">
+                <FinderPreview
+                  node={previewNode}
+                  agentId={agent.id}
+                  onClose={() => setPreviewOpen(false)}
+                />
+              </div>
             )}
-          </>
+          </div>
         )}
       </div>
 
