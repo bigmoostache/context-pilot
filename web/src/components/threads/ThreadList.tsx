@@ -20,6 +20,29 @@ interface ThreadListProps {
   onNewThread: () => void
 }
 
+/**
+ * Flatten markdown to a one-line plain-text snippet for a list-row preview.
+ *
+ * A thread row shows a single truncated line, so rendering rich markdown there
+ * is wrong (headings/lists/code blocks would break the layout) — every chat
+ * client shows a flattened text snippet instead. This strips the syntax that
+ * would otherwise leak through as literal characters (`## `, `**bold**`, list
+ * bullets, links, fenced code, stray HTML tags) and collapses all whitespace
+ * to single spaces. Intentionally lightweight (a preview, not a parser): a
+ * stray `_` inside an identifier is left alone rather than risk mangling words.
+ */
+function flattenMarkdown(md: string): string {
+  return md
+    .replace(/```[\s\S]*?```/g, " ") // drop fenced code blocks
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1") // image → alt text
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // link → label
+    .replace(/<[^>]+>/g, " ") // strip HTML tags
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "") // heading/quote/bullet markers
+    .replace(/(\*\*|\*|__|~~|`)/g, "") // emphasis / code / strike markers
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 /** Last-message preview text for a thread row + search matching. */
 function previewOf(t: ThreadDetail): string {
   // Auto tool-activity traces are collapsed noise — never surface one as the
@@ -33,7 +56,8 @@ function previewOf(t: ThreadDetail): string {
     }
   }
   if (!last) return ""
-  return last.text ?? (last.tool ? `⛭ ${last.tool.name}` : last.questions ? "asked a question" : "")
+  if (last.text) return flattenMarkdown(last.text)
+  return last.tool ? `⛭ ${last.tool.name}` : last.questions ? "asked a question" : ""
 }
 
 /**
