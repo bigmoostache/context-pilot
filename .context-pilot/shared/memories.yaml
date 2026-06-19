@@ -301,6 +301,17 @@
   - documentation
   - quality
   last_edited_ms: 0
+6ef55b8fd84918e7:
+  tl_dr: 'T284 SHIPPED (5a91d38): thread sidebar row preview now flattens markdown to plain text (was showing literal ##/**).'
+  contents: 'previewOf()->flattenMarkdown() in ThreadList.tsx: drops fenced code blocks, unwraps links/images to text, strips HTML tags + heading/quote/bullet markers + emphasis/code/strike markers (** * __ ~~ `), collapses whitespace. Leaves single `_` alone (don''t mangle identifiers). Full markdown still renders rich in the conversation pane; only the one-line truncated row preview is flattened. Web build green (tsc+vite exit 0), frontend-only, dev :5175 hot-reloads, no orchestrator restart / system_reload.'
+  importance: medium
+  labels:
+  - T284
+  - threads
+  - sidebar
+  - markdown
+  - shipped
+  last_edited_ms: 1781890953821
 70dd7401ce4b7e73:
   tl_dr: 'T269 Check Vitals SHIPPED: GET /api/agent/{id}/vitals on-demand service-connectivity probe + StatsPopup button. Proven live. Details in contents.'
   contents: |-
