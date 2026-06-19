@@ -65,6 +65,31 @@
   - provider
   - fixed
   last_edited_ms: 1781884032338
+251f7f7fd6eee822:
+  tl_dr: 'T279 follow-up SHIPPED (e833835): New Folder now inline-names a placeholder before creating (macOS-style), instead of auto-creating ''untitled folder''.'
+  contents: |-
+    ## T279 follow-up — inline New Folder naming SHIPPED (e833835 pushed)
+
+    User: 'create folder' immediately created a folder; wanted it to (1) ask for the name INLINE in place (not a dialog) (2) and only THEN create.
+
+    ### Fix (frontend-only, Finder.tsx) — reuses T283 inline-rename editor
+    - NEW_FOLDER_SENTINEL = '\u0000__cp_new_folder__' (NUL can't appear in a real realm path → never collides).
+    - pendingFolderName state (null = not creating). newFolder() computes collision-free default 'untitled folder'(+2,3…) then setPendingFolderName + setRenamingPath(SENTINEL); NO mkdir. If viewMode==gallery → switch to grid (gallery has no inline field).
+    - displayNodes = pendingFolderName!=null ? [{name:pending,path:SENTINEL,kind:folder,count:0}, ...sorted] : sorted. Passed to grid/list (nodes) + columns (currentNodes). Gallery keeps sorted (guarded by the view-switch).
+    - commitRename(node,raw) branches: node.path===SENTINEL → clear pending, blank→abandon, else mkdir.mutate({dir:relCwd,name}); any other node → rename (existing).
+    - cancelRename() clears renamingPath + pendingFolderName (Esc drops the placeholder, never creates). viewProps.onRenameCancel now = cancelRename (was bare setRenamingPath(null)).
+    - RenameInput (FinderViews) already mounts focused with basename pre-selected; for the placeholder 'untitled folder' (no dot) it selects whole name → type-over.
+    - Backend fs_mkdir unchanged (already shipped T279 first pass).
+
+    Web build green (tsc+vite exit 0). Frontend-only → dev :5175 hot-reloads, NO orchestrator restart, NO system_reload. Committed+pushed e833835 (1 file, +65/-20).
+  importance: medium
+  labels:
+  - T279
+  - finder
+  - new-folder
+  - inline
+  - shipped
+  last_edited_ms: 1781890368426
 2b8f81e3109727b7:
   tl_dr: 'T271 cold-connect off-by-one FIXED + shipped: empty-oplog SSE subscriber now receives the agent''s first append (rev 0). Details in contents.'
   contents: |-
