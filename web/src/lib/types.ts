@@ -137,6 +137,9 @@ export interface Agent {
   folder: string
   branch: string
   model: string
+  /** wire serde provider id (e.g. "claudecodev2") — authoritative for the
+   *  model picker, since several providers share the same model API names. */
+  provider?: string
   status: AgentStatus
   costUsd: number
   /** one-line summary of what the agent is currently working on */

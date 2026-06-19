@@ -10,7 +10,7 @@
 // string the agent deserializes directly.
 
 import type { LucideIcon } from "lucide-react"
-import { Sparkles, Gauge, Zap, Bot, Cpu } from "lucide-react"
+import { Sparkles, Gauge, Zap, Bot, Cpu, KeyRound, ShieldCheck } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -111,6 +111,90 @@ export const PROVIDERS: ProviderDef[] = [
     name: "Anthropic",
     description: "Direct API — Opus 4.5 · Sonnet 4.5 · Haiku 4.5",
     icon: Sparkles,
+    models: [
+      {
+        id: "claude-opus45",
+        apiName: "claude-opus-4-6",
+        displayName: "Opus 4.5",
+        contextWindow: 200_000,
+        maxOutput: 128_000,
+        inputPrice: 5,
+        outputPrice: 25,
+        badge: "Most capable",
+        icon: Sparkles,
+        isDefault: true,
+      },
+      {
+        id: "claude-sonnet45",
+        apiName: "claude-sonnet-4-5-20250929",
+        displayName: "Sonnet 4.5",
+        contextWindow: 200_000,
+        maxOutput: 64_000,
+        inputPrice: 3,
+        outputPrice: 15,
+        badge: "Balanced",
+        icon: Gauge,
+      },
+      {
+        id: "claude-haiku45",
+        apiName: "claude-haiku-4-5-20251001",
+        displayName: "Haiku 4.5",
+        contextWindow: 200_000,
+        maxOutput: 64_000,
+        inputPrice: 1,
+        outputPrice: 5,
+        badge: "Fast & cheap",
+        icon: Zap,
+      },
+    ],
+  },
+  {
+    id: "claudecode",
+    name: "Claude Code (OAuth)",
+    description: "OAuth V1 — Opus 4.5 · Sonnet 4.5 · Haiku 4.5",
+    icon: ShieldCheck,
+    models: [
+      {
+        id: "claude-opus45",
+        apiName: "claude-opus-4-6",
+        displayName: "Opus 4.5",
+        contextWindow: 200_000,
+        maxOutput: 128_000,
+        inputPrice: 5,
+        outputPrice: 25,
+        badge: "Most capable",
+        icon: Sparkles,
+        isDefault: true,
+      },
+      {
+        id: "claude-sonnet45",
+        apiName: "claude-sonnet-4-5-20250929",
+        displayName: "Sonnet 4.5",
+        contextWindow: 200_000,
+        maxOutput: 64_000,
+        inputPrice: 3,
+        outputPrice: 15,
+        badge: "Balanced",
+        icon: Gauge,
+      },
+      {
+        id: "claude-haiku45",
+        apiName: "claude-haiku-4-5-20251001",
+        displayName: "Haiku 4.5",
+        contextWindow: 200_000,
+        maxOutput: 64_000,
+        inputPrice: 1,
+        outputPrice: 5,
+        badge: "Fast & cheap",
+        icon: Zap,
+      },
+    ],
+  },
+  {
+    id: "claudecodeapikey",
+    name: "Claude Code (API Key)",
+    description: "API key — Opus 4.5 · Sonnet 4.5 · Haiku 4.5",
+    icon: KeyRound,
     models: [
       {
         id: "claude-opus45",
@@ -326,4 +410,31 @@ export function resolveFromApiName(
     if (m) return { provider: p, model: m }
   }
   return undefined
+}
+
+/**
+ * Resolve the picker's provider+model selection for an agent, preferring the
+ * agent's **authoritative** provider id over guessing from the model name.
+ *
+ * Several providers share identical model API names — every Claude-Code variant
+ * (`claudecode`, `claudecodeapikey`, `claudecodev2`) reuses the Anthropic model
+ * roster — so resolving from the API name alone always collapses onto the first
+ * matching provider (Anthropic), which is the "shows Anthropic for a Claude
+ * Code V2 agent" bug. When the backend supplies the real provider id we honor
+ * it and only use the model name to pick the row within that provider (falling
+ * back to its default model). Without a provider id we degrade to the old
+ * name-only resolution.
+ */
+export function resolveSelection(
+  providerId: string | undefined,
+  apiName: string | undefined,
+): { provider: ProviderDef; model: ModelDef } | undefined {
+  const provider = providerId ? findProvider(providerId) : undefined
+  if (provider) {
+    const model =
+      (apiName && provider.models.find((m) => m.apiName === apiName)) ||
+      defaultModel(provider.id)
+    if (model) return { provider, model }
+  }
+  return apiName ? resolveFromApiName(apiName) : undefined
 }

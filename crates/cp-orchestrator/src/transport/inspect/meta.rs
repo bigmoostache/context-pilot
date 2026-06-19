@@ -76,6 +76,12 @@ fn build_agent_meta(
         inspect_threads(state, folder);
 
     let branch = git_branch(folder);
+    // The agent's configured LLM provider id (e.g. "claudecodev2", "claudecode")
+    // — authoritative for the cockpit's model picker. Several providers share
+    // identical model API names (every Claude-Code variant reuses the Anthropic
+    // model roster), so the picker cannot infer the provider from `model` alone;
+    // it needs this explicit id to select the right provider tab.
+    let provider = read_provider(state, folder);
 
     let status = derive_status(phase, lifecycle, has_my_turn);
     let accent = derive_accent(&status);
@@ -86,6 +92,7 @@ fn build_agent_meta(
         "folder": folder,
         "branch": branch,
         "model": entry.model,
+        "provider": provider,
         "status": status,
         "costUsd": cost_usd,
         "task": task,
@@ -149,6 +156,31 @@ fn inspect_threads(
         .to_owned();
 
     (count, has_my_turn, last_activity, task)
+}
+
+/// Read the agent's configured LLM provider id from `config.json`
+/// (`modules.core.llm_provider`).
+///
+/// Returns an empty string when unreadable — the frontend then falls back to
+/// inferring the provider from the model name. The id uses the wire serde form
+/// (lowercase: `anthropic`, `claudecode`, `claudecodeapikey`, `claudecodev2`,
+/// `grok`, `groq`, `deepseek`, `minimax`).
+fn read_provider(state: &Mutex<Backend>, folder: &str) -> String {
+    let folder_path = std::path::Path::new(folder);
+    let config = {
+        let Ok(mut b) = state.lock() else {
+            return String::new();
+        };
+        b.inspect_mut().read_config(folder_path).ok()
+    };
+    config
+        .as_ref()
+        .and_then(|c| c.get("modules"))
+        .and_then(|m| m.get("core"))
+        .and_then(|c| c.get("llm_provider"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .to_owned()
 }
 
 /// Read the current git branch of an agent's working directory.

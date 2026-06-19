@@ -12,7 +12,7 @@ import {
 } from "lucide-react"
 import type { Agent } from "@/lib/types"
 import { useCreateAgent, useRestartAgent, sendCommand } from "@/lib/live"
-import { PROVIDERS, defaultModel, findModel, resolveFromApiName } from "@/lib/models"
+import { PROVIDERS, defaultModel, findModel, resolveSelection } from "@/lib/models"
 import { ModelPicker } from "./ModelPicker"
 import { cn } from "@/lib/utils"
 
@@ -58,9 +58,13 @@ export function AgentModal({
   const agent = isManage ? modal.agent : undefined
   const [name, setName] = useState(agent?.name ?? "")
 
-  // Provider + model — resolve from the agent's current api model name (manage)
-  // or fall back to persisted global defaults → registry defaults (create).
-  const resolved = isManage && agent?.model ? resolveFromApiName(agent.model) : undefined
+  // Provider + model — resolve from the agent's authoritative provider id +
+  // current api model name (manage) or fall back to persisted global defaults →
+  // registry defaults (create). The provider id is decisive: several providers
+  // share model api names, so name-only resolution would mislabel (e.g. a
+  // Claude Code V2 agent showing as Anthropic).
+  const resolved =
+    isManage && agent ? resolveSelection(agent.provider, agent.model) : undefined
   const createDefault = (() => {
     if (isManage) return { p: resolved?.provider.id ?? PROVIDERS[0].id, m: resolved?.model.id ?? (defaultModel(PROVIDERS[0].id)?.id ?? PROVIDERS[0].models[0].id) }
     const lsP = localStorage.getItem("cp-default-provider") ?? PROVIDERS[0].id
