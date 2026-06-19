@@ -17,11 +17,17 @@ use crate::transport::Backend;
 /// Maximum file size for downloads (10 MiB).
 const MAX_DOWNLOAD_BYTES: u64 = 10 * 1024 * 1024;
 
-/// `GET /api/agent/{id}/fs/download?path=` — raw file download.
+/// Maximum zip archive size for folder downloads (100 MiB).
+const MAX_ZIP_BYTES: u64 = 100 * 1024 * 1024;
+
+/// `GET /api/agent/{id}/fs/download?path=` — file or folder download.
 ///
-/// Returns the file's raw bytes with `Content-Disposition: attachment` so the
-/// browser triggers a save-as dialog. Confined to the agent's folder, capped
-/// at [`MAX_DOWNLOAD_BYTES`].
+/// **Files** are returned as raw bytes with `Content-Disposition: attachment`,
+/// capped at [`MAX_DOWNLOAD_BYTES`].
+///
+/// **Folders** are zipped into a temporary archive (`/tmp`), returned as
+/// `{dirname}.zip`, capped at [`MAX_ZIP_BYTES`], then cleaned up. Uses the
+/// system `zip` command (available on macOS and most Linux distros).
 ///
 /// Returns `Ok((bytes, filename))` on success, `Err(HttpReply)` on error.
 pub fn fs_download(
@@ -38,8 +44,13 @@ pub fn fs_download(
         Some(p) => p,
         None => return Err(HttpReply::error(403, "path outside agent realm")),
     };
+
+    if target.is_dir() {
+        return zip_and_download(&target);
+    }
+
     if !target.is_file() {
-        return Err(HttpReply::error(404, "file not found"));
+        return Err(HttpReply::error(404, "not a file or directory"));
     }
 
     let meta = std::fs::metadata(&target).map_err(|_| HttpReply::error(404, "file not found"))?;
@@ -55,6 +66,48 @@ pub fn fs_download(
         .to_owned();
 
     Ok((bytes, filename))
+}
+
+/// Zip a directory into `/tmp` and return its bytes + filename.
+fn zip_and_download(dir: &Path) -> Result<(Vec<u8>, String), HttpReply> {
+    let dirname = dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("folder");
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis());
+    let tmp = format!("/tmp/cp-dl-{}-{now}.zip", std::process::id());
+
+    let output = std::process::Command::new("zip")
+        .args(["-r", "-q", &tmp, "."])
+        .current_dir(dir)
+        .output()
+        .map_err(|_| HttpReply::error(502, "zip command not available"))?;
+
+    if !output.status.success() {
+        drop(std::fs::remove_file(&tmp));
+        return Err(HttpReply::error(502, "zip failed"));
+    }
+
+    let meta = std::fs::metadata(&tmp).map_err(|_| {
+        drop(std::fs::remove_file(&tmp));
+        HttpReply::error(502, "zip read failed")
+    })?;
+    if meta.len() > MAX_ZIP_BYTES {
+        drop(std::fs::remove_file(&tmp));
+        return Err(HttpReply::error(413, "zipped folder too large"));
+    }
+
+    let bytes = std::fs::read(&tmp).map_err(|_| {
+        drop(std::fs::remove_file(&tmp));
+        HttpReply::error(502, "zip read failed")
+    })?;
+    drop(std::fs::remove_file(&tmp));
+
+    let zip_name = format!("{dirname}.zip");
+    Ok((bytes, zip_name))
 }
 
 /// Maximum file size returned by the preview endpoint (256 KiB).

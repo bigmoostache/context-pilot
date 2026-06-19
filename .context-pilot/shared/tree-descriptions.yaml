@@ -469,7 +469,7 @@
 10bfb637527a6ed4:
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. MODELS + MODEL_META (rich picker). slugify(name) derives realm folder. AgentModalMode: create or manage{agent}. X896: create-mode submit() now LIVE — useCreateAgent() mutation (POST /api/fleet/create), pending spinner ''Creating…'', inline role=alert error banner, onSuccess flash+close. Manage mode stays cosmetic (rename/archive not backend-wired). Shared by TopBar + FleetDashboard.'
-  last_edited_ms: 0
+  last_edited_ms: 1781878131896
 111109570cbe01e9:
   path: src/state/persistence/boot.rs
   description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 3 parallel threads. Loads .env files (project + global).'
@@ -1756,8 +1756,8 @@
   last_edited_ms: 1781630135192
 3d3d40f549d551f5:
   path: crates/cp-wire/src/types/command.rs
-  description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, InterruptStream, Stop, Unknown).
-  last_edited_ms: 0
+  description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, InterruptStream, Stop, Configure{provider,model}, Unknown). Frame{schema_version, auth, command} bearer-checked before payload. 5 tests incl configure round-trip + tolerant decode.
+  last_edited_ms: 1781878131920
 3d84408dcdded638:
   path: web/src/lib/api.ts
   description: Typed REST client for all 22 backend endpoints. Base URL from VITE_API_URL env (default localhost:7878). Fleet, agent meta, threads, panels (13 kinds), finder, usage, library, commands, ticket mint. Transforms 7 panel responses (memory/todos/spine/queue/scratchpad/tree/callbacks) from raw module state dicts to maquette array shapes.
@@ -3529,7 +3529,7 @@
 7a34c617a616611e:
   path: web/src/lib/models.ts
   description: 'LLM provider+model registry — web counterpart of TUI Ctrl+H. PROVIDERS array: 6 providers (ClaudeCodeV2, Anthropic, Grok, Groq, DeepSeek, MiniMax) each with ModelDef[] (id/apiName/displayName/contextWindow/pricing/badge/icon). IDs match exact serde kebab-case names for wire compat. Helpers: priceTag, findProvider, findModel, defaultModel, resolveFromApiName.'
-  last_edited_ms: 1781877377308
+  last_edited_ms: 1781878131874
 7a3d3e9e1ea6a348:
   path: ui/src/components/agents/FleetSidebar.tsx
   description: Mission-control left nav rail (fleet dashboard). FleetPage type = agents|prompts|usage|settings. NO identity header (lives in TopBar). NO in-rail collapse button — collapse is driven by the border rail FleetShell renders on the right edge. 4 nav items (icon+label+hint, active=card-shadow). collapsed prop animates aside width 212→0 (fixed-width inner shell). page/onSelect/collapsed props.
@@ -4460,8 +4460,8 @@
   last_edited_ms: 1781617086592
 9d08a42769027d02:
   path: src/app/run/threads/commands.rs
-  description: Bridge command APPLICATION (K7 mutation half), split from bridge.rs for the 500-line limit. apply_command dispatches SendMessage(inject user msg + MyTurn flip + on_user_message)/CreateThread(+emit_roster_delta ThreadCreated + prime status memo)/ArchiveThread(soft-delete + focus cleanup + emit ThreadArchived)/RestoreThread(emit ThreadRestored)/Stop|Interrupt(mirror Esc StopStreaming). Imports emit_roster_delta + wire_turn (pub(super)) from bridge.
-  last_edited_ms: 0
+  description: Bridge command APPLICATION (K7 mutation half), split from bridge.rs for the 500-line limit. apply_command dispatches SendMessage(inject user msg + MyTurn flip + on_user_message)/CreateThread(+emit_roster_delta ThreadCreated + prime status memo)/ArchiveThread(soft-delete + focus cleanup + emit ThreadArchived)/RestoreThread(emit ThreadRestored)/Stop|Interrupt(mirror Esc StopStreaming)/Configure(serde-deserialize provider+model, set on state). Imports emit_roster_delta + wire_turn (pub(super)) from bridge.
+  last_edited_ms: 1781878131942
 9d0e6a9adda50aaa:
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet mission-control shell. Owns fleetPage + collapsed state. Renders FleetSidebar + a clickable border RAIL (shadcn Sidebar pattern): thin full-height hit area at x=SIDEBAR_W(212), tracks width, sits at x=0 when collapsed, brightens to interactive on hover — click toggles collapse (no buttons). Active page: agents/prompts/usage/settings(ConfigPanel inline).'
@@ -4630,6 +4630,10 @@ a143d9f2b8e6e551:
   path: ui/src/components/shell/TopBar.tsx
   description: 'Cockpit header strip: app mark, path breadcrumb, branch chip, global cost, status dot.'
   last_edited_ms: 1781458541298
+a16eceb1554ebe70:
+  path: web/src/components/agents/ModelPicker.tsx
+  description: Shared two-level LLM provider+model picker — web counterpart of TUI Ctrl+H. Provider rail (pills) above model cards for active provider. Used by AgentModal (manage) and ConfigPanel (defaults). Shared registry from models.ts.
+  last_edited_ms: 1781878131831
 a174523ddee08620:
   path: src/ui/threads_view/messages.rs
   description: 'Thread message area: right pane of Threads view. Message display (reuses conversation IR renderer), input area with separator, question form overlay. thread_message_to_message() conversion. format_questions_markdown() for embedded questions. calculate_input_height() with 50% cap.'
@@ -5690,6 +5694,10 @@ c64acbf2bfbf9d41:
   path: crates/cp-mod-callback/src/panel.rs
   description: Callback panel. Table view of all definitions (name/pattern/blocking/timeout/active/scope/success_msg/cwd). Editor sub-view shows script content for one callback.
   last_edited_ms: 1780497937354
+c655a8256e761cef:
+  path: web/src/components/shell/ConfigPanel.tsx
+  description: 'Context Pilot settings surface — macOS System-Settings-style layout. General pane: ModelPicker for default provider+model (localStorage persisted) + ''Apply to all existing agents'' button (dispatches Configure to every fleet agent). Provider keys, Search, DocAI, Web, Integrations panes. Company-managed accounts lock key fields. Shared by ConfigModal (dialog) and FleetShell (inline).'
+  last_edited_ms: 1781878131853
 c659866126ec4a2c:
   path: crates/cp-mod-logs/src/lib.rs
   description: 'Logs module. 2 tools: log_create + Close_conversation_history (multi-panel, logs as strings, no memories/tags). Chunked JSON storage. build_log_write_ops() for batch persistence. v2 migration. Pre-flight validates panels array.'
