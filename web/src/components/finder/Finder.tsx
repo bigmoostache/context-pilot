@@ -183,6 +183,67 @@ export function Finder({ agent }: { agent: Agent }) {
     )
   }
 
+  // ── External-file drag overlay (robust lifecycle) ────────────────
+  //
+  // The "Drop to upload" overlay must appear ONLY while an OS-file drag hovers
+  // the window, and — critically — must disappear on EVERY way a drag can end:
+  // a real drop, leaving the window, OR a silent cancel (Esc / release outside),
+  // which fires no drop and (in some browsers) no element-level dragleave. The
+  // element-only handlers used before got stuck on the cancel path.
+  //
+  // We track the whole lifecycle at the WINDOW level: dragover sets the overlay
+  // and refreshes a heartbeat timestamp; an explicit window drop / dragleave-to-
+  // outside clears it immediately; and a heartbeat watchdog is the catch-all —
+  // dragover fires continuously while a drag is live, so once it stops (any
+  // cancel path) the overlay self-clears within a couple of frames. A ref holds
+  // the latest uploadFiles closure so the listeners bind once and never go stale.
+  const uploadRef = useRef(uploadFiles)
+  uploadRef.current = uploadFiles
+  const lastDragOverRef = useRef(0)
+  useEffect(() => {
+    const isFileDrag = (e: DragEvent) => !!e.dataTransfer?.types?.includes("Files")
+    const onOver = (e: DragEvent) => {
+      if (!isFileDrag(e)) return
+      e.preventDefault() // allow the drop
+      lastDragOverRef.current = Date.now()
+      setDragging(true)
+    }
+    const onDrop = (e: DragEvent) => {
+      if (!isFileDrag(e)) return
+      e.preventDefault()
+      setDragging(false)
+      const files = Array.from(e.dataTransfer?.files ?? [])
+      if (files.length) uploadRef.current(files)
+    }
+    // Fired when the cursor leaves the document for the outside (relatedTarget
+    // null) — clear at once rather than waiting on the watchdog.
+    const onLeave = (e: DragEvent) => {
+      if (e.relatedTarget === null) setDragging(false)
+    }
+    // Watchdog: a live drag emits dragover continuously; if none has arrived for
+    // a short grace window the drag has ended SOMEHOW (drop elsewhere, left the
+    // window, or Esc-cancel) → drop the overlay. Generous enough not to flicker
+    // while the pointer holds still over the window.
+    const watchdog = window.setInterval(() => {
+      if (lastDragOverRef.current && Date.now() - lastDragOverRef.current > 250) {
+        lastDragOverRef.current = 0
+        setDragging(false)
+      }
+    }, 100)
+    const onEnd = () => setDragging(false)
+    window.addEventListener("dragover", onOver)
+    window.addEventListener("drop", onDrop)
+    window.addEventListener("dragleave", onLeave)
+    window.addEventListener("dragend", onEnd)
+    return () => {
+      window.clearInterval(watchdog)
+      window.removeEventListener("dragover", onOver)
+      window.removeEventListener("drop", onDrop)
+      window.removeEventListener("dragleave", onLeave)
+      window.removeEventListener("dragend", onEnd)
+    }
+  }, [])
+
   // Create a new folder in the current directory. macOS-style: auto-name
   // "untitled folder" (then " 2", " 3", …) avoiding collisions with the live
   // listing, create it via the backend, and surface it. Used by both the
@@ -451,23 +512,6 @@ export function Finder({ agent }: { agent: Agent }) {
       tabIndex={0}
       onKeyDown={onKeyDown}
       className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background outline-none"
-      onDragOver={(e) => {
-        // Only the EXTERNAL OS-file drag (dataTransfer carries "Files") should
-        // raise the upload overlay. Internal item moves carry our MOVE_MIME and
-        // are handled by folder drop targets — never the upload surface.
-        if (!e.dataTransfer.types.includes("Files")) return
-        e.preventDefault()
-        if (!dragging) setDragging(true)
-      }}
-      onDragLeave={(e) => {
-        if (e.currentTarget === e.target) setDragging(false)
-      }}
-      onDrop={(e) => {
-        if (!e.dataTransfer.types.includes("Files")) return
-        e.preventDefault()
-        setDragging(false)
-        uploadFiles(Array.from(e.dataTransfer.files))
-      }}
     >
       <input
         ref={fileInputRef}
