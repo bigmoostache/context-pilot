@@ -98,6 +98,13 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         search_overlay::render_search_index_overlay(frame, search_overlay, area);
     }
 
+    // Render MCP setup overlay if active (from IR overlays)
+    if let Some(mcp_overlay) = ir_frame.overlays.iter().find_map(|o| {
+        if let cp_render::conversation::Overlay::McpSetup(ref m) = *o { Some(m.as_ref()) } else { None }
+    }) {
+        help::mcp_overlay::render_mcp_setup_overlay(frame, mcp_overlay, area);
+    }
+
     PERF.frame_end();
 }
 

@@ -288,6 +288,16 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.flags.ui.dirty = true;
             ActionResult::Nothing
         }
+        Action::ToggleMcpSetup => {
+            cp_mod_mcp::bridge::setup::McpSetupState::get_mut(state).toggle();
+            state.flags.ui.dirty = true;
+            ActionResult::Nothing
+        }
+        Action::McpOverlayKey(key) => {
+            let _r = crate::ui::help::mcp_overlay::input::handle_mcp_overlay_input(key, state);
+            state.flags.ui.dirty = true;
+            ActionResult::Save
+        }
         Action::ToggleIndexOverlay => {
             state.flags.overlays.index_status = !state.flags.overlays.index_status;
             state.flags.ui.dirty = true;

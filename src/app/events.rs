@@ -27,6 +27,7 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
                     KeyCode::Char('l') => return Some(Action::ClearConversation),
                     KeyCode::Char('n') => return Some(Action::NewContext),
                     KeyCode::Char('h') => return Some(Action::ToggleConfigView),
+                    KeyCode::Char('e') => return Some(Action::ToggleMcpSetup),
                     KeyCode::Char('i') => return Some(Action::ToggleIndexOverlay),
                     KeyCode::Char('v') => return Some(Action::CycleViewMode),
                     KeyCode::Char('o') => return Some(Action::ResetSessionCosts),
@@ -74,6 +75,11 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
             // Config view handles its own keys when open
             if state.flags.config.config_view {
                 return Some(handle_config_event(key, state));
+            }
+
+            // MCP setup overlay handles its own keys when open (Ctrl+E toggles)
+            if cp_mod_mcp::bridge::setup::McpSetupState::get(state).visible {
+                return Some(Action::McpOverlayKey(*key));
             }
 
             // Index overlay: Esc dismisses, Ctrl+C copies, all other keys consumed

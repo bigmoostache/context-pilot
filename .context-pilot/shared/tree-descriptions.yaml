@@ -144,8 +144,8 @@
   last_edited_ms: 0
 091c555798d713a0:
   path: crates/cp-render/src/overlay_ir.rs
-  description: Search index overlay IR types (Ctrl+I). SearchIndexOverlay, SearchServer, SearchIndex, SearchExtension, SearchSplitter, SearchEmbeddings, SearchTask, SearchRecomputed, SearchRecentFile.
-  last_edited_ms: 0
+  description: SearchIndexOverlay IR types (Ctrl+I). Pattern to follow for new overlays.
+  last_edited_ms: 1781875248510
 094971202a4be7cb:
   path: src/llms/claude_code_api_key/streaming.rs
   description: 'parse_sse_stream(): SSE event loop with verbose error diagnostics, log_sse_error() to .context-pilot/errors/'
@@ -206,6 +206,10 @@
   path: docs/logs.md
   description: Logging system design
   last_edited_ms: 0
+0bd097f5ce53902e:
+  path: crates/cp-mod-mcp/src/bridge/mod.rs
+  description: 'McpModule: connect_all/stdio/http/url, dispatch tool calls, maybe_reconnect. Module trait impl with init_state, execute_tool, overview_context_section.'
+  last_edited_ms: 0
 0c0359faadcef86e:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
@@ -224,8 +228,8 @@
   last_edited_ms: 1780565428690
 0cfd902ffe7c4aaf:
   path: crates/cp-mod-mcp/src/transport/streamable.rs
-  description: 'HttpTransport: Streamable HTTP + SSE transport (Phase 3). Pull-based — send_line POSTs JSON-RPC to a single endpoint with optional static bearer token + Mcp-Session-Id echo, drains response into an inbox; recv pops buffered msgs. Handles 202/application/json/text-event-stream. parse_sse + parse_json_messages free fns (7 unit tests). Module named streamable.rs to dodge module_name_repetitions on HttpTransport. Long-lived server-push streams deferred to Phase 5.'
-  last_edited_ms: 1781681442848
+  description: 'Streamable HTTP transport: POST JSON-RPC, parse JSON/SSE responses, session header, conditional Authorization:Bearer (empty token = no auth)'
+  last_edited_ms: 1781874932383
 0d004cfda09fe1eb:
   path: crates/cp-mod-mcp/src/bridge/config.rs
   description: '.mcp.json discovery + parsing. resolve(): project .context-pilot/shared/mcp.json → global ~/.context-pilot/mcp.json. Manifest{mcpServers: name→ServerSpec{command,args|url}}. ServerSpec::stdio() pair. Phase 2 = stdio only; url flagged unsupported.'
@@ -326,6 +330,10 @@
   path: docs/talk/slides/1-0.html
   description: 'Sub-TOC: WHYs section — left numeral, right slide list'
   last_edited_ms: 1781078806892
+123020c86328159b:
+  path: crates/cp-render/src/mcp_overlay_ir.rs
+  description: 'MCP overlay IR: McpSetupOverlay, McpSetupServer, McpSetupMode, McpSetupFormIR, McpFormField, ServerType/AuthMode/Scope enums with label() methods'
+  last_edited_ms: 0
 123157596598d710:
   path: crates/cp-mod-prompt/src/seed.rs
   description: 'Seed data: ensure_default_agent() load/merge/sort, get_active_agent_content() resolve active system prompt'
@@ -364,8 +372,8 @@
   last_edited_ms: 0
 13fd308c36b41576:
   path: crates/cp-base/src/state/actions.rs
-  description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
-  last_edited_ms: 0
+  description: Action/ActionResult enums in cp-base. Add ToggleMcpSetup + McpOverlayKey(KeyEvent) for MCP overlay wiring.
+  last_edited_ms: 1781876693179
 141e5aae8168208a:
   path: yamls/tools/firecrawl.yaml
   description: 'Firecrawl tools YAML. 4 tools: firecrawl_scrape (single URL), firecrawl_search (search+scrape), firecrawl_map (URL discovery), firecrawl_crawl (recursive crawl to file).'
@@ -434,6 +442,10 @@
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation). load_prompt_history() reads back entries.'
   last_edited_ms: 1780563343167
+17f074c1c6056d73:
+  path: src/app/events.rs
+  description: handle_event maps keys→Action. Config overlay intercepts. Ctrl+E→ToggleMcpSetup. MCP overlay key interception when visible.
+  last_edited_ms: 1781882838035
 1825b04b023b84a1:
   path: crates/cp-render/src/conversation.rs
   description: 'Conversation + overlay IR types. Message/HistorySection/StreamingTool/InputArea. Overlays: QuestionForm (with cursor/typing_other/other_text), Autocomplete (with dir_prefix/total_matches/input_visual_lines), PerfOverlay (with open_fds/fd_limit_soft/fd_semantic), ConfigOverlay, PaletteOverlay, SearchIndexOverlay. All serializable.'
@@ -496,8 +508,8 @@
   last_edited_ms: 1780565428702
 1c3761398826a262:
   path: src/state/persistence/boot.rs
-  description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 2 parallel threads (Meilisearch + Console). Loads .env files (project + global).'
-  last_edited_ms: 0
+  description: 'Phased boot: module init, .env loading, pre-start daemons (Meili+Console), rebuild_tools at end for MCP dynamic tools'
+  last_edited_ms: 1781874932352
 1c5ed1a14732eb8f:
   path: .context-pilot/config.json
   description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
@@ -616,8 +628,8 @@
   last_edited_ms: 0
 22156ffc64429132:
   path: crates/cp-mod-mcp/src/lib.rs
-  description: 'MCP crate entry. 6 modules: bridge, clients, errors, oauth, protocol, transport. Doctest shows connect_stdio→list_tools.'
-  last_edited_ms: 1781687522241
+  description: 'MCP crate lib: modules (bridge, clients, errors, oauth, protocol, transport)'
+  last_edited_ms: 1781875555374
 222420220afa8c94:
   path: crates/cp-base/Cargo.toml
   description: 'Base crate deps: cp-render, cp-mod-utilities, ratatui, crossterm, serde, serde_json, serde_yaml, unicode-width, log.'
@@ -740,8 +752,8 @@
   last_edited_ms: 0
 2868327ef95f351d:
   path: crates/cp-mod-mcp/src/clients.rs
-  description: 'McpClient<T: Transport>: handshake (initialize + notifications/initialized), list_tools, call_tool(name, &Value). Caches ServerInfo. tools_changed flag set on notifications/tools/list_changed in recv loop, take_tools_changed() clears+returns. connect_stdio spawns SubprocessTransport; connect_http builds HttpTransport with url+bearer token. AnyClient enum (Stdio|Http) with delegating call_tool/list_tools/server_info/take_tools_changed. Request-id correlation, DEFAULT_TIMEOUT_MS=30s.'
-  last_edited_ms: 1781689483471
+  description: 'Per-server MCP client: handshake, list_tools, call_tool. Generic over Transport. AnyClient enum erases transport type. connect_http(url, token) with empty token = no auth.'
+  last_edited_ms: 1781874932393
 2886480e48a90922:
   path: crates/cp-mod-files/src/panel.rs
   description: File panel. Background cache system for file content with syntax highlighting (IR spans). Hash-based change detection. PANEL_MAX_LOAD_BYTES hard limit. Pagination. No cache_refresh_interval (watcher-based).
@@ -750,6 +762,10 @@
   path: .github/workflows/pr-cleanup.yml
   description: 'CI: stale PR auto-cleanup'
   last_edited_ms: 0
+294c766d9691d649:
+  path: src/ui/help/mcp_overlay/input.rs
+  description: 'MCP overlay input handler: handle_mcp_overlay_input(key, state)->bool. List/form/delete/oauth modes. Calls McpModule::add_and_connect/remove_and_disconnect/force_reconnect + rebuild_tools.'
+  last_edited_ms: 1781876535289
 297ff0502006cc9d:
   path: crates/cp-mod-chat/src/lib.rs
   description: 'Chat module. 7 tools, 2 panels (dashboard+room). Depends on spine. init: bootstrap→Tuwunel server→Matrix client→sync loop→bridge recovery. Typing indicators via on_tool_progress. Bridge management for Telegram/Discord/Slack/GChat.'
@@ -780,8 +796,8 @@
   last_edited_ms: 0
 2a7b1dc03b363288:
   path: src/ui/help/config_overlay/builder.rs
-  description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
-  last_edited_ms: 0
+  description: 'Config overlay IR builder: state→ConfigOverlay data transform (providers, models, budget bars, toggles). Pattern to follow for MCP setup overlay.'
+  last_edited_ms: 1781875555395
 2ad0adde669b4af1:
   path: src/llms/oai_providers/openai_streaming.rs
   description: 'OAI SSE types: StreamResponse/StreamDelta, ToolCallAccumulator (index-based), normalize_stop_reason(), dump_request()'
@@ -842,6 +858,10 @@
   path: docs/question-tool.md
   description: Interactive question form tool design
   last_edited_ms: 0
+2c6e30b8dc4d83d0:
+  path: crates/cp-mod-mcp/src/bridge/config.rs
+  description: Manifest/ServerSpec serde, load()/load_global()/load_project(), save_to_global()/save_to_project(). auth+allow/deny_tools fields.
+  last_edited_ms: 1781882838055
 2c7719bfaa7c0bf3:
   path: .github/workflows/release.yml
   description: 'Release workflow: builds .deb on tag push (ubuntu-latest, amd64 only). Creates GitHub Release with softprops/action-gh-release.'
@@ -992,8 +1012,8 @@
   last_edited_ms: 0
 3664b0916e24685c:
   path: docs/design-mcp.md
-  description: 'MCP module design doc. 8 sections: goal, MCP protocol summary, dynamic tools validation (Phase 0 ✅), concurrency model, crate structure, config/secrets, phasing table (5 phases), open questions.'
-  last_edited_ms: 1781687176653
+  description: 'MCP module design doc: dynamic tools injection via rebuild_tools, phased delivery (0-5), config/secrets model'
+  last_edited_ms: 1781874932363
 36c52623bdc50f5d:
   path: src/infra/profiler.rs
   description: RAII ProfileGuard macro (profile!) for perf.log (>5ms). log_tool_time() appends ALL tool executions to .context-pilot/logs/tool-times.log — local datetime, elapsed ms, tool name(s).
@@ -1026,6 +1046,10 @@
   path: crates/cp-mod-console/src/manager.rs
   description: TUI-side session handle. spawn()/reconnect()/kill()/send_input() via console server. FilePoller + StatusPoller background threads per session. Orphan cleanup on startup. server_request() short-lived UnixStream per call. Geometric backoff socket wait (25ms→500ms cap, 3s budget).
   last_edited_ms: 0
+38481b79b9cb5e57:
+  path: src/ui/help/mcp_overlay/builder.rs
+  description: 'Builder: State→McpSetupOverlay IR. Reads McpState+McpSetupState, builds server list with scope detection, form IR.'
+  last_edited_ms: 1781882838005
 386116b9b854c8ac:
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
@@ -1042,6 +1066,10 @@
   path: docs/vision-layered-cognitive-architecture.md
   description: 'Long-term vision doc: 5-layer cognitive architecture (Reflexes→Policies→Reasoning→Reflection→Identity). Core insight: LLM as architect not executor. 6 missing pieces: policy compiler, sensory streams, motor abstraction, persistent life, delegation/swarm, consequence modeling. Maps Context Pilot''s current state to each layer.'
   last_edited_ms: 0
+39036d4bbdc37727:
+  path: src/ui/help/mcp_overlay/builder.rs
+  description: 'Builder: State→McpSetupOverlay IR. Reads McpState+McpSetupState, builds server list with scope detection, form IR.'
+  last_edited_ms: 1781876264935
 39056915756877d9:
   path: crates/cp-base/src/lib.rs
   description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (19 tool + 6 config YAML files) with #[expect(clippy::panic)].'
@@ -1118,6 +1146,10 @@
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
   last_edited_ms: 0
+3dd45ed0345747a8:
+  path: crates/cp-render/src/lib.rs
+  description: 'cp-render lib: Block/Span/Semantic primitives, module declarations incl mcp_overlay_ir'
+  last_edited_ms: 1781875258288
 3e1dcc436a6467f8:
   path: docs/talk/slides/2-3.html
   description: 'Slide: Instantaneous Feedback (HOWs section)'
@@ -1220,8 +1252,8 @@
   last_edited_ms: 0
 4208ddcb6c1fd9d1:
   path: src/ui/mod.rs
-  description: Top-level render() with flame!("render"). IR frame build → sidebar + content panel + status bar + overlays (perf from IR, autocomplete from IR, config from IR, search index from IR). Autocomplete offset-aware for Threads mode (THREAD_LIST_WIDTH). No question form layout split.
-  last_edited_ms: 0
+  description: 'Top-level render: build_frame IR, render body+sidebar+panels, then overlay stack (autocomplete, config, perf, search index). Add MCP overlay here.'
+  last_edited_ms: 1781876693240
 425ed53956de6dab:
   path: crates/cp-mod-firecrawl/src/crawl.rs
   description: Recursive site crawling — firecrawl_crawl tool. flame!("firecrawl_crawl"). Start async crawl job + poll loop (5s interval, 60 max polls, 310s timeout). write_crawl_output writes combined markdown to disk. No panel created.
@@ -1240,8 +1272,8 @@
   last_edited_ms: 0
 43532538c41614da:
   path: src/app/events.rs
-  description: 'Maps terminal events → Action. Global Ctrl shortcuts (Q/L/N/H/I/V/O/P). Config view: provider selection (1-7), model selection (a-d), theme cycling. Threads view: Tab/BackTab for thread nav (Up/Down freed for scroll). Index overlay: Esc dismiss, Ctrl+C copy. Delegates to panel.handle_key() for panel-specific keys.'
-  last_edited_ms: 0
+  description: handle_event maps keys→Action. Config overlay intercepts via handle_config_event. Ctrl+H→ToggleConfigView. Add Ctrl+M→ToggleMcpSetup + MCP key interception.
+  last_edited_ms: 1781876693195
 437b9a6fbb5c551a:
   path: src/ui/ir/render_status_bar.rs
   description: Status bar IR adapter — renders StatusBar to ratatui line. Badges (streaming/tooling/ready/blocked), agent/skill cards, git branch, auto-continue, reverie, queue, think balance. Builder from state. Wall-clock spinner.
@@ -1280,8 +1312,8 @@
   last_edited_ms: 0
 4575079ce400b65e:
   path: crates/cp-mod-mcp/src/bridge/servers.rs
-  description: 'McpState{servers: HashMap<String, McpServerEntry>}. McpServerEntry{client: Option<Mutex<AnyClient>>, tools, status, allow_tools, deny_tools}. ConnStatus (Connected/Failed/Unsupported). is_tool_exposed() gate: allow_tools whitelist takes precedence over deny_tools blacklist. connected/failed/unsupported constructors. get/get_mut + sorted_names helpers.'
-  last_edited_ms: 1781689483490
+  description: 'McpState (ext map): HashMap<String, McpServerEntry>. ConnStatus (Connected/Failed/Unsupported). allow/deny tool filters. Mutex<AnyClient> for Sync.'
+  last_edited_ms: 1781874932404
 457797ff3549e45c:
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
@@ -1294,6 +1326,10 @@
   path: crates/cp-mod-callback/src/tools.rs
   description: Callback tool dispatch with flame!("cb_dispatch"). Routes upsert/toggle/open_editor/close_editor. Delegates upsert to tools_upsert.rs.
   last_edited_ms: 1780497937352
+4650a6f533b9c166:
+  path: src/ui/help/mcp_overlay/input.rs
+  description: 'MCP overlay input handler: handle_mcp_overlay_input(key, state)->bool. List/form/delete/oauth modes. Calls McpModule::add_and_connect/remove_and_disconnect/force_reconnect + rebuild_tools.'
+  last_edited_ms: 0
 4751cc31255d89ce:
   path: chain.sh
   description: Hash chain update/verify script (password-protected)
@@ -1310,6 +1346,10 @@
   path: crates/cp-mod-callback/src/lib.rs
   description: 'Callback module. 4 tools: upsert/toggle/open/close editor. Depends on console. CallbackState: definitions (shared) + active_set/editor_open (per-worker). Glob-matched auto-fire on file edits.'
   last_edited_ms: 1780497937350
+480bf60723de50ac:
+  path: src/ui/help/mcp_overlay.rs
+  description: 'MCP setup overlay renderer: render_mcp_setup_overlay(), server list, add-form, selectors. Uses McpSetupOverlay IR.'
+  last_edited_ms: 1781882837995
 480d0b99c9c60078:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -1494,6 +1534,10 @@
   path: src/ui/search_overlay/mod.rs
   description: 'Ctrl+I Meilisearch indexing status overlay. Two-column layout: left (server, process CPU/RAM, database, index stats, extensions), right (splitter, embeddings, tasks, recomputed, recently sent). Centered bordered popup.'
   last_edited_ms: 0
+533e359eb136dfe5:
+  path: crates/cp-mod-mcp/src/bridge/module_impl.rs
+  description: 'Module trait impl for McpModule: init/save/load state, tool dispatch, panel creation, overview rendering. Extracted from mod.rs for file-size hygiene.'
+  last_edited_ms: 1781885730302
 535b255d6329530a:
   path: Cargo.lock
   description: Workspace lockfile
@@ -1554,6 +1598,10 @@
   path: crates/cp-mod-entities/src/result_panel.rs
   description: Dynamic entity result panel — large query results, static + live refresh. LivePanelMeta struct, create_result_panel, create_live_result_panel (merged via create_panel_inner), refresh_live_query with hash-based change detection. 2s cache refresh interval. EntityResultPanel Panel impl.
   last_edited_ms: 1780608591320
+562ad7f8f6e5c788:
+  path: crates/cp-render/src/mcp_overlay_ir.rs
+  description: 'MCP overlay IR: McpSetupOverlay, McpSetupServer, McpSetupMode, McpSetupFormIR, McpFormField, ServerType/AuthMode/Scope enums'
+  last_edited_ms: 1781875258298
 563e6951986b9876:
   path: crates/cp-mod-search/src/meili/download.rs
   description: Meilisearch binary download. Pinned v1.13.3. Platform detection (macOS/Linux, amd64/aarch64). GitHub releases download to ~/.context-pilot/meilisearch/bin/. Skips if already present. 5-min timeout.
@@ -1738,6 +1786,10 @@
   path: src/llms/cache/cache_engine.rs
   description: Cache breakpoint engine. Hash chain (acc_hash = sha256(block + prev)). Tracks alive BPs via hash match. Places beacon at frontier+20. Runs DP optimizer for 3 additional BPs (4 total). 5-min TTL matching Anthropic.
   last_edited_ms: 0
+624c7cd2681e3c9e:
+  path: crates/cp-mod-mcp/src/bridge/mod.rs
+  description: 'McpModule: connect_all/stdio/http/url, dispatch tool calls, maybe_reconnect. Module trait impl with init_state, execute_tool, overview_context_section.'
+  last_edited_ms: 1781876264946
 62501299531100f9:
   path: website/docs/docs.css
   description: 'Docs: documentation stylesheet'
@@ -1828,8 +1880,8 @@
   last_edited_ms: 0
 68bb461714cf1222:
   path: src/ui/help/config_overlay.rs
-  description: Config overlay adapter — renders ConfigOverlay IR to ratatui. Centered bordered popup. Provider/model/toggle sections consume IR data. No direct State access.
-  last_edited_ms: 0
+  description: 'Config overlay renderer: render_config_overlay(), uses ConfigOverlay IR. Pattern for MCP setup renderer.'
+  last_edited_ms: 1781876702889
 68cbe83e88995a59:
   path: src/ui/input.rs
   description: Renders question form and @autocomplete popup overlays. calculate_question_form_height, render_question_form, calculate_autocomplete_height, render_autocomplete_popup. Consumes QuestionForm/Autocomplete IR data directly.
@@ -1946,6 +1998,10 @@
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
   last_edited_ms: 1781794556809
+71e1353220d2b385:
+  path: .github/checks/lint-config.chain
+  description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
+  last_edited_ms: 0
 71e2df32cfa54e06:
   path: crates/cp-mod-memory/src/tools.rs
   description: Memory tools with flame!("memory_create") and flame!("memory_update"). tl_dr validation (80 token cap). Importance/labels. Batch create/update/delete.
@@ -1962,6 +2018,10 @@
   path: website/docs/index.html
   description: 'Docs: documentation index/landing'
   last_edited_ms: 0
+72cdad3a0e38244d:
+  path: crates/cp-mod-mcp/src/bridge/panel.rs
+  description: 'MCP status panel: format_for_context(), blocks(), refresh(). Read-only, no cache.'
+  last_edited_ms: 1781875248520
 72eac1f88f77b5fd:
   path: crates/cp-mod-mcp/src/bridge/panel.rs
   description: 'McpPanel: fixed sidebar panel listing configured servers, their ConnStatus, and namespaced tools with descriptions (catalog for AI discovery). Header instructs to use tool_manage. Read-only (scroll only), no cache.'
@@ -2018,6 +2078,10 @@
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks.'
   last_edited_ms: 1780651842172
+75c0a2342e100c41:
+  path: crates/cp-render/src/conversation.rs
+  description: Conversation + overlay IR types. Overlay enum has McpSetup(Box<McpSetupOverlay>) variant.
+  last_edited_ms: 1781875258277
 75eb33edbee482d1:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, metadata, pipeline, queue_flush.'
@@ -2098,6 +2162,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+7aae0376d189f3d8:
+  path: src/ui/help/mcp_overlay.rs
+  description: 'MCP setup overlay renderer: render_mcp_setup_overlay(), server list, add-form, selectors. Uses McpSetupOverlay IR.'
+  last_edited_ms: 0
 7b8f6edeaef20990:
   path: src/app/actions/streaming.rs
   description: 'Streaming action handlers: AppendChars (typewriter), StreamDone (token accounting, cache correction), StreamError (logging, truncation). Per-stream/total/tick token accumulation in apply_token_usage().'
@@ -2138,6 +2206,10 @@
   path: src/app/run/streaming.rs
   description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine.
   last_edited_ms: 0
+7e3d12337025fac9:
+  path: crates/cp-mod-mcp/src/oauth/callback.rs
+  description: PKCE generation, authorization URL building, localhost callback listener. AuthRedirect, AuthFlowParams, wait_for_redirect.
+  last_edited_ms: 1781885730335
 7f3ef5ae7601d1ab:
   path: crates/cp-mod-callback/src/storage.rs
   description: YAML-backed persistent storage for callback definitions. Keyed by name (BTreeMap alphabetical). upsert/remove/populate/migrate functions. Script file read/write helpers (strip_script_header, write_script_file). cleanup_old_hash_keys migration.
@@ -2414,6 +2486,10 @@
   path: crates/cp-mod-ocr/Cargo.toml
   description: 'OCR module deps: cp-base, cp-render, serde_json, reqwest, sha2, log.'
   last_edited_ms: 1780563847624
+8fe95266a486f0d8:
+  path: src/ui/help/mcp_overlay.rs
+  description: 'MCP setup overlay renderer: render_mcp_setup_overlay(), server list, add-form, selectors. Uses McpSetupOverlay IR. #![allow(dead_code)] until wired.'
+  last_edited_ms: 0
 8ffa84ce12a491bc:
   path: src/app/actions/streaming.rs
   description: 'Streaming action handlers: AppendChars (typewriter), StreamDone (token accounting, cache correction), StreamError (logging, truncation). Per-stream/total/tick token accumulation in apply_token_usage().'
@@ -2518,6 +2594,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+95ddce32e80be9d8:
+  path: crates/cp-base/src/state/actions.rs
+  description: Action/ActionResult enums in cp-base. Add ToggleMcpSetup + McpOverlayKey(KeyEvent) for MCP overlay wiring.
+  last_edited_ms: 0
 95dfcb290d81490b:
   path: crates/cp-mod-memory/Cargo.toml
   description: 'Memory module deps: cp-base, cp-render, crossterm, serde, serde_json, sha2.'
@@ -2614,6 +2694,10 @@
   path: crates/cp-mod-memory/src/lib.rs
   description: 'Memory module. 2 tools: memory_create/update. Fixed MEMORY panel. Global, not core. 80-token tl_dr cap. Module data: memories + next_id + open_ids. Importance-gradient visualizer (critical→low).'
   last_edited_ms: 0
+9d83869f837e0c0c:
+  path: src/state/persistence/mod.rs
+  description: Phased boot loading (5 phases). BootConfig/BootPanels structs. boot_load_config/panels/messages/assemble_state functions. Legacy load_state() entry point. panel_to_context() helper.
+  last_edited_ms: 0
 9dcfc8d8a49f3b58:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
@@ -2657,6 +2741,10 @@
 9f4b8206bce2d1b9:
   path: src/llms/cache/cache_optimizer_tests.rs
   description: Brute-force vs DP agreement tests, property tests (monotonicity, disjointness), edge cases, determinism
+  last_edited_ms: 0
+9f505c1f88da9c3c:
+  path: src/ui/ir/conversation.rs
+  description: Conversation IR builder — assembles Conversation from State. History sections, messages, streaming tools, input area, overlays (autocomplete, config, perf, search index, MCP setup).
   last_edited_ms: 0
 9f76facc7ed4b07d:
   path: crates/cp-mod-memory/src/storage.rs
@@ -2718,14 +2806,18 @@ a193e857a2a0eb75:
   path: .context-pilot/config.json
   description: Per-worker runtime config JSON. Schema version, reload flag, active theme, selected context, draft input, sidebar mode, module states, tree descriptions.
   last_edited_ms: 0
+a2283bdb253e9c4c:
+  path: src/ui/help/mcp_overlay/input.rs
+  description: 'MCP overlay input handler: handle_mcp_overlay_input(key, state)->bool. List/form/delete/oauth modes. Calls McpModule::add_and_connect/remove_and_disconnect/force_reconnect + rebuild_tools.'
+  last_edited_ms: 1781882838015
 a24ca6a492b02678:
   path: src/llms/claude_code/mod.rs
   description: Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
   last_edited_ms: 1780565754920
 a33a3e5da4a1393e:
   path: src/app/actions/config.rs
-  description: 'Config bar handlers: context budget, cleaning threshold, max cost guard rail ($10 ticks), theme cycling. 3 bars (Clean Target removed).'
-  last_edited_ms: 1781088359368
+  description: 'Config overlay actions: api_check, bar navigation, theme cycling, budget adjustment.'
+  last_edited_ms: 1781876693225
 a3468e6c6b211dc2:
   path: docs/streaming-errors.md
   description: Streaming error handling strategies
@@ -2742,13 +2834,21 @@ a39ccb64ad178103:
   path: src/modules/overview/tools_blocks.rs
   description: Tools-only IR block builder. tools_blocks() renders grouped tool table with category descriptions, enable/disable status. No agents/skills/commands (those live in Library only).
   last_edited_ms: 0
+a3d4486cf4c39269:
+  path: src/ui/mod.rs
+  description: 'Top-level render: build_frame IR, render body+sidebar+panels, then overlay stack (autocomplete, config, perf, search index). Add MCP overlay here.'
+  last_edited_ms: 0
 a4282b39d6c4fdb9:
   path: src/infra/tools.rs
   description: Re-exports cp_base::tools types. execute_tool() dispatches via module system. execute_reload_tui() sets reload flag + writes config.json.
   last_edited_ms: 0
 a445c40881ecc32a:
   path: src/ui/help/mod.rs
-  description: Re-exports CommandPalette, config_overlay module
+  description: 'Help UI: config_overlay, input, palette modules. Add mcp_overlay here.'
+  last_edited_ms: 1781875555385
+a46934d8cc149ed3:
+  path: src/app/events.rs
+  description: handle_event maps keys→Action. Config overlay intercepts via handle_config_event. Ctrl+H→ToggleConfigView. Add Ctrl+M→ToggleMcpSetup + MCP key interception.
   last_edited_ms: 0
 a49023d03b3a5764:
   path: src/ui/perf/overlay.rs
@@ -2766,6 +2866,10 @@ a59dfabe22aa1787:
   path: crates/cp-mod-console/src/tools.rs
   description: 'Console tools: create, send_keys, wait (blocking watcher), watch (async watcher), easy_bash (blocking exit watcher). Each instrumented with flame!(). CONSOLE_WAIT_BLOCKING_SENTINEL const. Git/gh/typst guardrails.'
   last_edited_ms: 0
+a5c3898fb68356d3:
+  path: crates/cp-mod-mcp/src/bridge/mod.rs
+  description: 'McpModule: connect_all/stdio/http/url, dispatch tool calls, maybe_reconnect. add_and_connect/remove_and_disconnect/force_reconnect API. Module trait impl.'
+  last_edited_ms: 1781882838025
 a5d638c214989600:
   path: src/app/run/mod.rs
   description: 'Sub-module declarations. 6 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), tools (execution pipeline), watchers (file/GH).'
@@ -3070,6 +3174,10 @@ b8c80869fc5f9ccb:
   path: crates/cp-base/src/state/flags.rs
   description: Stream-phase state machine (Idle/Receiving/ExecutingTools), UI/config/lifecycle boolean flags, streaming-tool advisory state. StatusBools composite struct organizes all flags by domain. HighlightIrFn callback type.
   last_edited_ms: 0
+b8d868a7fab8f3de:
+  path: src/app/actions/mod.rs
+  description: apply_action dispatches Action→ActionResult. Config/thread actions. Add ToggleMcpSetup + McpOverlayKey handlers.
+  last_edited_ms: 0
 b91450545db6847c:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, pipeline, queue_flush.'
@@ -3302,6 +3410,10 @@ c80cf4a36c945d80:
   path: crates/cp-mod-spine/src/lib.rs
   description: Spine module. Auto-continuation, notifications (10 processed kept), guard rails, coucou timers. Manages WatcherRegistry. on_user_message resets counters. on_stream_stop prevents re-launch.
   last_edited_ms: 0
+c82c6c5764c7f1a9:
+  path: crates/cp-render/src/mcp_overlay_ir.rs
+  description: 'MCP overlay IR: McpSetupOverlay, McpSetupServer, McpSetupMode, McpSetupFormIR, McpFormField, ServerType/AuthMode/Scope enums with label() methods'
+  last_edited_ms: 1781876264956
 c83e02c82f575734:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -3345,6 +3457,10 @@ cb25f09fa3660254:
 cb2678759db7f441:
   path: .github/checks/lint-config.chain
   description: Cryptographic hash chain protecting 12 critical lint/config files
+  last_edited_ms: 0
+cb46e80b9663f833:
+  path: src/ui/help/mod.rs
+  description: 'Help UI: config_overlay, input, palette modules. Add mcp_overlay here.'
   last_edited_ms: 0
 cbb71fe5106157bc:
   path: crates/cp-mod-logs/src/types.rs
@@ -3414,6 +3530,10 @@ ce4ce60e0bd4a007:
   path: crates/cp-mod-todo/src/lib.rs
   description: 'Todo module. 3 tools: create/update/move. Fixed TODO panel (fixed_order=0, top priority). Nested object params with parent_id nesting. overview shows X/Y done. Drives spine auto-continuation.'
   last_edited_ms: 0
+cea79bf6a5b656fe:
+  path: crates/cp-mod-mcp/src/oauth/mod.rs
+  description: 'OAuth 2.1 + PKCE entry point: discover metadata, dynamic registration, browser auth, token exchange. Blocking authorize() + try_refresh() + helpers.'
+  last_edited_ms: 1781885730313
 cf6078cbda1950a2:
   path: src/modules/conversation/markdown_ir.rs
   description: Thin re-export — delegates to cp_render::markdown::parse_line(). Backward compat for conversation renderer.
@@ -3478,6 +3598,10 @@ d2ad0203ee1c00b8:
   path: crates/cp-mod-queue/src/tools.rs
   description: Tool handlers for Queue_pause and Queue_undo with flame!("queue_pause") and flame!("queue_undo"). Queue_execute handled in pipeline.rs.
   last_edited_ms: 0
+d2c7e045dd37438f:
+  path: crates/cp-mod-mcp/src/bridge/config.rs
+  description: Manifest/ServerSpec serde, load()/load_global()/load_project(), save_to_global()/save_to_project(). auth+allow/deny_tools fields.
+  last_edited_ms: 1781876702911
 d2d0808774f88ec3:
   path: run.sh
   description: Development run script
@@ -3506,6 +3630,14 @@ d3c7b08de985c75a:
   path: crates/cp-mod-github/src/tools.rs
   description: GitHub CLI tool. Read-only → dynamic github_result panels. Mutating → async subprocess via spawn_async_tool. flame!("gh_exec"). Token redaction. Cache invalidation of affected panels. GIT_PROMPT_DISABLED.
   last_edited_ms: 0
+d40d71baff6bcc8d:
+  path: src/ui/help/mcp_overlay/builder.rs
+  description: 'Builder: State→McpSetupOverlay IR. Reads McpState+McpSetupState, builds server list with scope detection, form IR.'
+  last_edited_ms: 0
+d42df762fc0efdd2:
+  path: crates/cp-mod-mcp/src/oauth/tokens.rs
+  description: Token exchange, refresh, and persistent storage (~/.context-pilot/mcp-tokens.json). store_path, load_all, load_stored_token, exchange_code, refresh_access_token.
+  last_edited_ms: 1781885730324
 d486285ed7025782:
   path: src/app/actions/helpers.rs
   description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.
@@ -3534,6 +3666,10 @@ d5c1024fa12376ed:
   path: crates/cp-base/src/state/data/model_helpers.rs
   description: 'ModelPricing trait: model selection, pricing, context budget, cleaning thresholds — impl for State + token_cost()'
   last_edited_ms: 0
+d5ea2d2a64fcfef4:
+  path: src/ui/help/mcp_overlay/builder.rs
+  description: 'Builder: State→McpSetupOverlay IR. Reads McpState+McpSetupState, builds server list with scope detection, form IR.'
+  last_edited_ms: 0
 d693aa680fbe23a5:
   path: src/modules/questions/mod.rs
   description: 'QuestionsModule: core, 2 tools (ask_user_question, Think), ThinkState persistence, on_tool_complete counter drift'
@@ -3554,6 +3690,10 @@ d8359ab8b810ded8:
   path: crates/cp-mod-spine/src/panel.rs
   description: 'Spine panel UI. Notifications rendered as Block::Table (ID/Time/Type/Content columns) with 60-char content truncation. Sections: Unprocessed, Blocked, Recent Processed. Config as KeyValue. Active Watchers list. Context: text format for LLM.'
   last_edited_ms: 0
+d87d310ce85301c6:
+  path: src/app/actions/mod.rs
+  description: apply_action dispatches Action→ActionResult. ToggleMcpSetup + McpOverlayKey handlers for MCP overlay.
+  last_edited_ms: 1781882838045
 d88af953077b8048:
   path: src/modules/conversation/mod.rs
   description: 'Conversation display module. Core/global. Context types: ''conversation'' + ''system''. No tools — purely display/rendering. Sub-modules: list, markdown_ir, panel, refresh, render_blocks, render_input_blocks, render_json.'
@@ -3610,6 +3750,10 @@ dc669315644ebb28:
   path: crates/cp-mod-git/src/types.rs
   description: GitChangeType, GitFileChange, GitState (branch/changes/diff_base) with ext/ext_mut, GitResultRequest
   last_edited_ms: 0
+dd2488a95b1eb10e:
+  path: src/ui/ir/conversation.rs
+  description: Conversation IR builder — assembles Conversation from State. History sections, messages, streaming tools, input area, overlays (autocomplete, config, perf, search index, MCP setup).
+  last_edited_ms: 1781881144836
 ddb10c875236eedb:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
@@ -3622,6 +3766,10 @@ defc0e3a44be05bd:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+df40ef79b5b08750:
+  path: src/ui/help/input.rs
+  description: MCP question form + autocomplete overlay rendering. Different from config/MCP setup overlays.
+  last_edited_ms: 1781876702878
 df4440d55d3a9a7a:
   path: crates/cp-base/src/config/llm_types.rs
   description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends). Model enums moved to models.rs.
@@ -3672,8 +3820,8 @@ e42f22a6aaede223:
   last_edited_ms: 1780497937357
 e44464edd5ba0429:
   path: crates/cp-mod-mcp/src/oauth.rs
-  description: OAuth 2.1 + PKCE flow for remote MCP servers. discover_metadata, generate_pkce, build_auth_url (AuthFlowParams struct), wait_for_callback (non-blocking poll loop), exchange_code, refresh_access_token, register_client (RFC 7591), store_token (mcp-tokens.json), authorize orchestrator. 6 unit tests.
-  last_edited_ms: 0
+  description: 'OAuth 2.1+PKCE: discover metadata, PKCE gen, browser auth, token exchange/refresh/store. authorize() entry point.'
+  last_edited_ms: 1781875248531
 e445bc97e31d455a:
   path: crates/cp-mod-callback/src/types.rs
   description: Callback types. CallbackDefinition (name, pattern, script, blocking, timeout, success_message, cwd, is_global). CallbackState (definitions, active_set, editor_open).
@@ -3754,6 +3902,10 @@ ea6dcbc0fa8080cb:
   path: src/llms/oai_providers/deepseek.rs
   description: DeepSeek client. OpenAI-compatible with reasoning_content for deepseek-reasoner. DsMessage wrapper. Cache hit/miss tokens. DEEPSEEK_API_KEY auth.
   last_edited_ms: 0
+eaa6299d6d2d4de2:
+  path: crates/cp-mod-mcp/src/bridge/mod.rs
+  description: 'McpModule: connect_all/stdio/http/url, dispatch tool calls, maybe_reconnect. add_and_connect/remove_and_disconnect/force_reconnect API.'
+  last_edited_ms: 1781885730357
 eb0038bd66de3fa0:
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook, CLI subcommands (typst-compile/recompile-watched). use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
@@ -3782,6 +3934,10 @@ ec28737efa4930e9:
   path: .gitignore
   description: Git ignore rules
   last_edited_ms: 0
+ec3324c7bde6d416:
+  path: src/ui/help/mcp_overlay.rs
+  description: 'MCP setup overlay renderer: render_mcp_setup_overlay(), server list, add-form, selectors. Uses McpSetupOverlay IR. #![allow(dead_code)] until wired.'
+  last_edited_ms: 1781876264914
 ec35e41e73d1b8fc:
   path: crates/cp-mod-tree/src/panel.rs
   description: Tree panel. Background cache system for directory tree rendering. TreeCacheRequest data payload. Pagination. refresh_stale_from_yaml() call in apply_cache_update triggers second rebuild if descriptions changed.
@@ -3820,8 +3976,8 @@ f03a92cce423e618:
   last_edited_ms: 0
 f06693c037c58ffb:
   path: src/app/actions/mod.rs
-  description: Central action dispatch (Elm/Redux-style). CycleViewMode resets scroll_offset + user_scrolled. Thread actions extracted to threads.rs.
-  last_edited_ms: 0
+  description: apply_action dispatches Action→ActionResult. Config/thread actions. Add ToggleMcpSetup + McpOverlayKey handlers.
+  last_edited_ms: 1781876693211
 f07180e69f10e6ed:
   path: crates/cp-mod-scratchpad/src/tools.rs
   description: 'Scratchpad tools with flame!("scratch_create"), flame!("scratch_edit"), flame!("scratch_wipe"). Cell CRUD. Wipe: empty array = all, otherwise by ID.'
@@ -3870,6 +4026,10 @@ f379d2a878f22b32:
   path: crates/cp-mod-github/Cargo.toml
   description: 'GitHub module deps: cp-base, cp-render, crossterm, regex, cp-mod-utilities, serde_json, secrecy.'
   last_edited_ms: 1780565428722
+f398bbdb3ac196e7:
+  path: crates/cp-mod-mcp/src/bridge/setup.rs
+  description: 'MCP setup overlay state: McpSetupState (ext map), Mode, Form, FormField, ServerType/AuthMode/Scope enums with cycle/label methods.'
+  last_edited_ms: 1781885730346
 f39aced1820ba7c8:
   path: crates/cp-mod-logs/Cargo.toml
   description: Logs crate dependencies. cp-base, cp-render, log, serde, serde_json, chrono. No cp-mod-memory dependency.
@@ -3889,6 +4049,10 @@ f443597431fc2e8e:
 f4bcf2a916e01a82:
   path: crates/cp-mod-spine/src/engine.rs
   description: 'Spine engine — check_spine() with flame!("check_spine") evaluates auto-continuation. Bypass hierarchy: (1) is_streaming, (2) user_stopped (absolute hard stop), (3) error backoff, (4) unprocessed check, (5) double-synthetic guard, (6) guard rails. Marks all consumed notifications as processed before firing. apply_continuation() creates synthetic messages.'
+  last_edited_ms: 0
+f4cc7e8e20dc296a:
+  path: src/app/events.rs
+  description: handle_event maps keys→Action. Config overlay intercepts via handle_config_event. Ctrl+H→ToggleConfigView. Add Ctrl+M→ToggleMcpSetup + MCP key interception.
   last_edited_ms: 0
 f4e3bd6a1f8faf50:
   path: crates/cp-mod-prompt/Cargo.toml

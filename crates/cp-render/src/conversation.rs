@@ -9,6 +9,7 @@ use serde::Serialize;
 use crate::{Block, Semantic};
 
 use crate::overlay_ir::SearchIndexOverlay;
+use crate::mcp_overlay_ir::McpSetupOverlay;
 
 // ── Conversation ─────────────────────────────────────────────────────
 
@@ -111,6 +112,8 @@ pub enum Overlay {
     CommandPalette(PaletteOverlay),
     /// Meilisearch indexing status overlay (Ctrl+I).
     SearchIndex(Box<SearchIndexOverlay>),
+    /// MCP server setup overlay.
+    McpSetup(Box<McpSetupOverlay>),
 }
 
 /// A question form overlay (`ask_user_question`).

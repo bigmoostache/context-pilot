@@ -13,16 +13,16 @@ pub mod config;
 pub mod panel;
 /// Live host state: connected servers, tools, status.
 pub mod servers;
+/// Mutable form state for the MCP setup overlay.
+pub mod setup;
 /// MCP ↔ Context Pilot tool translation and dispatch helpers.
 pub mod tools;
+/// [`Module`] trait implementation (separated for file-size hygiene).
+mod module_impl;
 
-use cp_base::modules::Module;
-use cp_base::panels::Panel;
-use cp_base::state::context::{Kind, TypeMeta};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolDefinition, ToolResult, ToolUse};
 
-use self::panel::{MCP_KIND, McpPanel};
 use self::servers::{ConnStatus, McpServerEntry, McpState};
 
 use crate::clients::{AnyClient, McpClient};
@@ -65,8 +65,8 @@ impl McpModule {
             let Some(spec) = cfg.servers.get(&name) else { continue };
             let mut entry = if let Some((command, args)) = spec.stdio() {
                 Self::connect_stdio(command, args)
-            } else if let Some(url) = spec.url.as_deref() {
-                Self::connect_url(url, spec.bearer_token.as_deref())
+            } else if spec.url.is_some() {
+                Self::connect_url(spec.url.as_deref().unwrap_or_default(), spec)
             } else {
                 McpServerEntry::failed("no 'command' or 'url' in spec")
             };
@@ -77,16 +77,29 @@ impl McpModule {
         }
     }
 
-    /// Connect to a URL-based server, resolving the bearer token through a
-    /// three-tier cascade: explicit config → stored OAuth token → full OAuth
-    /// flow (opens browser). Only the third tier is blocking.
-    fn connect_url(url: &str, static_token: Option<&str>) -> McpServerEntry {
-        let token = match static_token {
-            Some(t) if !t.is_empty() => t.to_owned(),
-            _ => match crate::oauth::authorize(url) {
+    /// Connect to a URL-based server, resolving authentication through the
+    /// `auth` field in the spec:
+    /// - `"none"` → connect without any auth header
+    /// - `"oauth"` → full OAuth 2.1 + PKCE browser flow
+    /// - absent → auto: use `bearer_token` if present, else attempt OAuth
+    fn connect_url(url: &str, spec: &config::ServerSpec) -> McpServerEntry {
+        let auth_mode = spec.auth.as_deref().unwrap_or("auto");
+        let token = match auth_mode {
+            "none" => String::new(),
+            "oauth" => match crate::oauth::authorize(url) {
                 Ok(t) => t,
                 Err(e) => return McpServerEntry::failed(format!("OAuth: {e}")),
             },
+            _ => {
+                // "auto" or unrecognized: bearer_token if present, else OAuth
+                match spec.bearer_token.as_deref() {
+                    Some(t) if !t.is_empty() => t.to_owned(),
+                    _ => match crate::oauth::authorize(url) {
+                        Ok(t) => t,
+                        Err(e) => return McpServerEntry::failed(format!("OAuth: {e}")),
+                    },
+                }
+            }
         };
         Self::connect_http(url, &token)
     }
@@ -231,8 +244,8 @@ impl McpModule {
 
         let mut fresh = if let Some((cmd, args)) = spec.stdio() {
             Self::connect_stdio(cmd, args)
-        } else if let Some(url) = spec.url.as_deref() {
-            Self::connect_url(url, spec.bearer_token.as_deref())
+        } else if spec.url.is_some() {
+            Self::connect_url(spec.url.as_deref().unwrap_or_default(), &spec)
         } else {
             return;
         };
@@ -241,181 +254,114 @@ impl McpModule {
         fresh.deny_tools = deny;
         let _prev = mcp.servers.insert(server.to_owned(), fresh);
     }
-}
 
-impl Module for McpModule {
-    fn id(&self) -> &'static str {
-        "mcp"
-    }
-    fn name(&self) -> &'static str {
-        "MCP"
-    }
-    fn description(&self) -> &'static str {
-        "Connect to MCP servers and expose their tools"
-    }
+    // ── Public server management API (called from UI layer) ─────────────
 
-    fn init_state(&self, state: &mut State) {
-        let mut mcp = McpState::default();
-        Self::connect_all(&mut mcp);
-        state.set_ext(mcp);
-    }
-
-    fn reset_state(&self, state: &mut State) {
-        state.set_ext(McpState::default());
-    }
-
-    fn tool_definitions(&self) -> Vec<ToolDefinition> {
-        // All MCP tools are runtime-discovered — none are static.
-        vec![]
-    }
-
-    fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
-        // Own any namespaced tool whose server we know about.
-        let (server, _rest) = tools::split_id(&tool.name)?;
-        if !McpState::get(state).servers.contains_key(server) {
-            return None;
-        }
-        Some(Self::dispatch(tool, state))
-    }
-
-    fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
-        (context_type.as_str() == MCP_KIND).then(|| {
-            let panel: Box<dyn Panel> = Box::new(McpPanel);
-            panel
-        })
-    }
-
-    fn fixed_panel_types(&self) -> Vec<Kind> {
-        vec![Kind::new(MCP_KIND)]
-    }
-
-    fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
-        vec![(Kind::new(MCP_KIND), "MCP", false)]
-    }
-
-    fn context_type_metadata(&self) -> Vec<TypeMeta> {
-        vec![TypeMeta {
-            context_type: MCP_KIND,
-            icon_id: "tmux",
-            is_fixed: true,
-            needs_cache: false,
-            fixed_order: Some(20),
-            display_name: "mcp",
-            short_name: "mcp",
-            needs_async_wait: false,
-        }]
-    }
-
-    fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("MCP", "Tools exposed by connected MCP servers")]
-    }
-
-    fn dependencies(&self) -> &[&'static str] {
-        &[]
-    }
-
-    fn is_core(&self) -> bool {
-        false
-    }
-
-    fn is_global(&self) -> bool {
-        false
-    }
-
-    fn save_module_data(&self, _state: &State) -> serde_json::Value {
-        serde_json::Value::Null
-    }
-
-    fn load_module_data(&self, _data: &serde_json::Value, _state: &mut State) {}
-
-    fn save_worker_data(&self, _state: &State) -> serde_json::Value {
-        serde_json::Value::Null
-    }
-
-    fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
-
-    fn pre_flight(&self, _tool: &ToolUse, _state: &State) -> Option<cp_base::tools::pre_flight::Verdict> {
-        None
-    }
-
-    fn dynamic_panel_types(&self) -> Vec<Kind> {
-        vec![]
-    }
-
-    fn tool_visualizers(&self) -> Vec<(&'static str, cp_base::modules::ToolVisualizer)> {
-        vec![]
-    }
-
-    fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {
-        None
-    }
-
-    fn context_detail(&self, _ctx: &cp_base::state::context::Entry) -> Option<String> {
-        None
-    }
-
-    fn overview_context_section(&self, state: &State) -> Option<String> {
-        use std::fmt::Write as _;
-
-        let mcp = McpState::get(state);
-        if mcp.servers.is_empty() {
-            return None;
+    /// Add a new server: save to config and connect.
+    ///
+    /// `to_project` selects the config file:
+    /// - `true`  → `.context-pilot/shared/mcp.json` (project-local)
+    /// - `false` → `~/.context-pilot/mcp.json` (global)
+    ///
+    /// # Errors
+    ///
+    /// Returns a human-readable message on config I/O or serialization failure.
+    pub fn add_and_connect(
+        name: &str,
+        spec: &config::ServerSpec,
+        to_project: bool,
+        state: &mut State,
+    ) -> Result<(), String> {
+        // 1. Save to config file
+        let mut manifest = if to_project {
+            config::load_project()?
+        } else {
+            config::load_global()?
+        };
+        let _saved = manifest.servers.insert(name.to_string(), spec.clone());
+        if to_project {
+            let _p = config::save_to_project(&manifest)?;
+        } else {
+            let _p = config::save_to_global(&manifest)?;
         }
 
-        let mut parts = Vec::new();
-        for name in mcp.sorted_names() {
-            let Some(entry) = mcp.servers.get(&name) else { continue };
-            if entry.status.is_connected() {
-                parts.push(format!("{name} ({} tools)", entry.tools.len()));
-            } else {
-                parts.push(format!("{name} ({})", entry.status.label()));
+        // 2. Connect the server
+        let mut entry = if let Some((cmd, args)) = spec.stdio() {
+            Self::connect_stdio(cmd, args)
+        } else if spec.url.is_some() {
+            Self::connect_url(spec.url.as_deref().unwrap_or_default(), spec)
+        } else {
+            McpServerEntry::failed("no 'command' or 'url' in spec")
+        };
+        entry.spec = Some(spec.clone());
+        entry.allow_tools.clone_from(&spec.allow_tools);
+        entry.deny_tools.clone_from(&spec.deny_tools);
+
+        // 3. Add to runtime state
+        let mcp = McpState::get_mut(state);
+        let _inserted = mcp.servers.insert(name.to_string(), entry);
+
+        Ok(())
+    }
+
+    /// Remove a server: delete from config files and disconnect.
+    ///
+    /// Checks both global and project configs, removing from whichever
+    /// contains the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns a human-readable message on config I/O failure.
+    pub fn remove_and_disconnect(name: &str, state: &mut State) -> Result<(), String> {
+        // Remove from global config if present
+        let mut global = config::load_global()?;
+        if global.servers.remove(name).is_some() {
+            let _p = config::save_to_global(&global)?;
+        }
+
+        // Remove from project config if present
+        let mut project = config::load_project()?;
+        if project.servers.remove(name).is_some() {
+            let _p = config::save_to_project(&project)?;
+        }
+
+        // Remove from runtime state (drops client)
+        let mcp = McpState::get_mut(state);
+        let _prev = mcp.servers.remove(name);
+
+        Ok(())
+    }
+
+    /// Force-reconnect a server using its stored spec.
+    ///
+    /// Disconnects the existing client (if any) and re-connects from scratch.
+    /// No-op if the server has no stored spec.
+    pub fn force_reconnect(name: &str, state: &mut State) {
+        let (spec, allow, deny) = {
+            let mcp = McpState::get(state);
+            match mcp.servers.get(name) {
+                Some(entry) => (
+                    entry.spec.clone(),
+                    entry.allow_tools.clone(),
+                    entry.deny_tools.clone(),
+                ),
+                None => return,
             }
-        }
+        };
+        let Some(spec) = spec else { return };
 
-        let total = mcp.total_tools();
-        let mut out = String::new();
-        let _r = write!(
-            out,
-            "MCP servers: {}. {total} tools available but disabled — see MCP panel for catalog, use tool_manage to enable.",
-            parts.join(", "),
-        );
-        Some(out)
-    }
+        let mut fresh = if let Some((cmd, args)) = spec.stdio() {
+            Self::connect_stdio(cmd, args)
+        } else if spec.url.is_some() {
+            Self::connect_url(spec.url.as_deref().unwrap_or_default(), &spec)
+        } else {
+            return;
+        };
+        fresh.spec = Some(spec);
+        fresh.allow_tools = allow;
+        fresh.deny_tools = deny;
 
-    fn overview_render_sections(&self, _state: &State) -> Vec<(u8, Vec<cp_render::Block>)> {
-        vec![]
-    }
-
-    fn on_close_context(
-        &self,
-        _ctx: &cp_base::state::context::Entry,
-        _state: &mut State,
-    ) -> Option<Result<String, String>> {
-        None
-    }
-
-    fn on_user_message(&self, _state: &mut State) {}
-
-    fn on_stream_stop(&self, _state: &mut State) {}
-
-    fn on_tool_progress(&self, _tool_name: &str, _input_so_far: &str, _state: &mut State) {}
-
-    fn on_tool_complete(&self, _tool_name: &str, _state: &mut State) {}
-
-    fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
-        vec![]
-    }
-
-    fn should_invalidate_on_fs_change(
-        &self,
-        _ctx: &cp_base::state::context::Entry,
-        _changed_path: &str,
-        _is_dir_event: bool,
-    ) -> bool {
-        false
-    }
-
-    fn watcher_immediate_refresh(&self) -> bool {
-        true
+        let mcp = McpState::get_mut(state);
+        let _prev = mcp.servers.insert(name.to_owned(), fresh);
     }
 }

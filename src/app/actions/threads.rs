@@ -68,6 +68,8 @@ pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
         | Action::TmuxSendKeys { .. }
         | Action::TogglePerfMonitor
         | Action::ToggleConfigView
+        | Action::ToggleMcpSetup
+        | Action::McpOverlayKey(_)
         | Action::ToggleIndexOverlay
         | Action::CopyIndexOverlay
         | Action::ConfigSelectProvider(_)

@@ -23,6 +23,8 @@ pub mod conversation;
 pub mod frame;
 /// Markdown-to-IR conversion utilities.
 pub mod markdown;
+/// MCP setup overlay IR types.
+pub mod mcp_overlay_ir;
 /// Search index overlay IR types (Ctrl+I).
 pub mod overlay_ir;
 

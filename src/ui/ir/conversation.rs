@@ -180,6 +180,13 @@ pub(crate) fn build_overlays(state: &State) -> Vec<Overlay> {
         overlays.push(Overlay::SearchIndex(Box::new(crate::ui::search_overlay::build_search_index_overlay(state))));
     }
 
+    // MCP setup overlay
+    if cp_mod_mcp::bridge::setup::McpSetupState::get(state).visible {
+        overlays.push(Overlay::McpSetup(Box::new(
+            crate::ui::help::mcp_overlay::builder::build_mcp_setup_overlay(state),
+        )));
+    }
+
     overlays
 }
 

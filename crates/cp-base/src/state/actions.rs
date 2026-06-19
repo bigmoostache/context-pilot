@@ -101,6 +101,10 @@ pub enum Action {
     TogglePerfMonitor,
     /// Toggle the config/settings overlay (F1).
     ToggleConfigView,
+    /// Toggle the MCP server setup overlay (Ctrl+M).
+    ToggleMcpSetup,
+    /// Forward a key event to the MCP setup overlay input handler.
+    McpOverlayKey(crossterm::event::KeyEvent),
     /// Toggle the Meilisearch indexing status overlay (Ctrl+I).
     ToggleIndexOverlay,
     /// Copy the index overlay content to the system clipboard (Ctrl+C while overlay is open).

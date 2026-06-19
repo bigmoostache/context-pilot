@@ -89,6 +89,15 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
         {
             context.push(panel_to_context(&panel_data, &id));
             panel_count = panel_count.saturating_add(1);
+        } else if d.context_type.as_str() != Kind::SYSTEM {
+            // Fixed panel not yet persisted (new module added after workspace
+            // creation) — create a fresh default entry so it appears in the sidebar.
+            context.push(crate::modules::make_default_entry(
+                &id,
+                d.context_type.clone(),
+                d.display_name,
+                d.cache_deprecated,
+            ));
         }
     }
 

@@ -264,3 +264,49 @@ index ee71fe2..9316028 100755
  if [ "${1:-}" = "--update" ]; then
    password="${LINT_GUARD_PASSWORD:-}"
 # --- End entry #20 ---
+21:f0a82356065da40ee76ac697e2b389171b70cdc1b691500635102e947f450ef4:e396aade53f796bbafc4f33f13f7c91b32a8ea9ead0b8358443ecadda1eededd:f60a550f268180f9e8f47846a46b4b7c786810422fec9e0f7efd5039f6ac54d5
+# --- Diff for entry #21 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 89424e30..8f51de86 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,5 +1,5 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-mcp", "crates/cp-mod-utilities"]
+ 
+ [workspace.package]
+ version = "0.1.0"
+@@ -36,6 +36,8 @@ tree-sitter-java = "0.23"
+ tree-sitter-c = "0.24"
+ tree-sitter-cpp = "0.23"
+ openssl = { version = "0.10", features = ["vendored"] }
++sha2 = "0.10"
++base64 = "0.22"
+ rusqlite = { version = "0.33", features = ["bundled", "column_decltype"] }
+ 
+ [workspace.lints.rust]
+@@ -196,7 +198,6 @@ rust_2024_prelude_collisions = "forbid"
+ self_constructor_from_outer_item = "forbid"
+ semicolon_in_expressions_from_macros = "forbid"
+ single_use_lifetimes = "forbid"
+-soft_unstable = "forbid"
+ special_module_name = "forbid"
+ stable_features = "forbid"
+ static_mut_refs = "forbid"
+@@ -1069,12 +1070,14 @@ cp-mod-logs = { path = "crates/cp-mod-logs" }
+ cp-mod-github = { path = "crates/cp-mod-github" }
+ cp-mod-files = { path = "crates/cp-mod-files" }
+ cp-mod-spine = { path = "crates/cp-mod-spine" }
++cp-mod-threads = { path = "crates/cp-mod-threads" }
+ cp-mod-prompt = { path = "crates/cp-mod-prompt" }
+ cp-mod-brave = { path = "crates/cp-mod-brave" }
+ cp-mod-firecrawl = { path = "crates/cp-mod-firecrawl" }
+ cp-mod-queue = { path = "crates/cp-mod-queue" }
+ cp-mod-ocr = { path = "crates/cp-mod-ocr" }
+ cp-mod-search = { path = "crates/cp-mod-search" }
++cp-mod-mcp = { path = "crates/cp-mod-mcp" }
+ crossterm.workspace = true
+ ratatui.workspace = true
+ serde.workspace = true
+# --- End entry #21 ---

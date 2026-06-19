@@ -23,13 +23,13 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Project-relative location of the shared MCP config.
 const PROJECT_CONFIG: &str = ".context-pilot/shared/mcp.json";
 
 /// Root of the config file.
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Manifest {
     /// Map of server name → launch spec.
     #[serde(default, rename = "mcpServers")]
@@ -37,7 +37,7 @@ pub struct Manifest {
 }
 
 /// One server's launch specification. Either a stdio command or a remote url.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ServerSpec {
     /// Executable to spawn for a stdio server (e.g. `"npx"`).
     #[serde(default)]
@@ -52,6 +52,12 @@ pub struct ServerSpec {
     /// Omit for unauthenticated servers or when using OAuth.
     #[serde(default)]
     pub bearer_token: Option<String>,
+    /// Authentication mode for HTTP servers:
+    /// - `"none"` — no auth, connect directly
+    /// - `"oauth"` — OAuth 2.1 + PKCE browser flow
+    /// - absent/null — auto: use `bearer_token` if present, else attempt OAuth
+    #[serde(default)]
+    pub auth: Option<String>,
     /// Whitelist: only expose tools whose name appears in this list.
     /// When set, `deny_tools` is ignored.
     #[serde(default)]
@@ -128,4 +134,66 @@ pub fn active_sources() -> Vec<PathBuf> {
         sources.push(p);
     }
     sources
+}
+
+// ── Write support ───────────────────────────────────────────────────────────
+
+/// Serialize a [`Manifest`] to pretty JSON.
+fn to_json(manifest: &Manifest) -> Result<String, String> {
+    serde_json::to_string_pretty(manifest).map_err(|e| format!("serialize config: {e}"))
+}
+
+/// Write a manifest to a specific path, creating parent directories if needed.
+fn save_file(path: &std::path::Path, manifest: &Manifest) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("create dir {}: {e}", parent.display()))?;
+    }
+    let json = to_json(manifest)?;
+    std::fs::write(path, json).map_err(|e| format!("write {}: {e}", path.display()))
+}
+
+/// Save a manifest to the global config: `~/.context-pilot/mcp.json`.
+///
+/// Creates the directory and file if they don't exist.
+///
+/// # Errors
+///
+/// Returns a human-readable message on serialization or I/O failure.
+pub fn save_to_global(manifest: &Manifest) -> Result<PathBuf, String> {
+    let home = std::env::var("HOME").map_err(|_env_err| "HOME not set".to_string())?;
+    let path = PathBuf::from(home).join(".context-pilot").join("mcp.json");
+    save_file(&path, manifest)?;
+    Ok(path)
+}
+
+/// Save a manifest to the project-local config: `.context-pilot/shared/mcp.json`.
+///
+/// Creates the directory and file if they don't exist.
+///
+/// # Errors
+///
+/// Returns a human-readable message on serialization or I/O failure.
+pub fn save_to_project(manifest: &Manifest) -> Result<PathBuf, String> {
+    let path = PathBuf::from(PROJECT_CONFIG);
+    save_file(&path, manifest)?;
+    Ok(path)
+}
+
+/// Load only the global config, or an empty manifest if absent.
+///
+/// # Errors
+///
+/// Returns a human-readable message on read or parse failure.
+pub fn load_global() -> Result<Manifest, String> {
+    global_path().map_or_else(|| Ok(Manifest::default()), |path| load_file(&path))
+}
+
+/// Load only the project-local config, or an empty manifest if absent.
+///
+/// # Errors
+///
+/// Returns a human-readable message on read or parse failure.
+pub fn load_project() -> Result<Manifest, String> {
+    project_path().map_or_else(|| Ok(Manifest::default()), |path| load_file(&path))
 }
