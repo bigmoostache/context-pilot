@@ -60,14 +60,14 @@ function segmentLog(log: ThreadMsg[]): Segment[] {
 function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
   const n = msgs.length
   return (
-    <details className="group/auto mb-1.5 ml-7">
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] text-muted-foreground/55 transition-colors hover:text-muted-foreground/80">
-        <span className="transition-transform group-open/auto:rotate-90">▸</span>
+    <details className="group/auto mb-2 ml-7">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-muted-foreground/75 transition-colors hover:bg-muted/40 hover:text-muted-foreground">
+        <span className="text-muted-foreground/60 transition-transform group-open/auto:rotate-90">▸</span>
         <span>⚙ {n} tool action{n === 1 ? "" : "s"}</span>
       </summary>
-      <div className="mt-1 flex flex-col gap-0.5 border-l border-border/50 pl-3">
+      <div className="mt-1 flex flex-col gap-0.5 border-l border-border/60 pl-3">
         {msgs.map((m) => (
-          <span key={m.id} className="font-mono text-[10.5px] text-muted-foreground/65">
+          <span key={m.id} className="font-mono text-[11px] text-muted-foreground/75">
             {autoLine(m)}
           </span>
         ))}
