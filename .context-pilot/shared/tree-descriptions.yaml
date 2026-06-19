@@ -5602,6 +5602,10 @@ bd7caed81d967b3b:
   path: crates/cp-mod-git/src/lib.rs
   description: 'Git module. 1 tool: git_execute. refresh_git_status() for overview (branch + numstat). Watches .git/ paths. watcher_immediate_refresh=false to prevent feedback. overview_context_section renders changes table.'
   last_edited_ms: 0
+bd88609473646f2f:
+  path: web/src/components/finder/FinderChrome.tsx
+  description: 'Finder chrome: tab strip, main toolbar (nav/crumbs/view-switch/search/icon-size slider), left sidebar, path bar. FinderSidebar: Favorites + Locations + Pinned (drag-drop target). T276: pinned rows now render full-width identically to Locations rows — the wrapper was `relative flex items-center` which made the Place button a flex item that shrank to text width (hover/active bg only covered the text); changed to plain `relative` so Place fills the row, and the absolute Unpin button self-centers via top-1/2 -translate-y-1/2. No Get Info / Maximize2. File-active toolbar: Download + Share only.'
+  last_edited_ms: 1781885939793
 bdb821c68ede0ffb:
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. MODELS + MODEL_META (rich picker). slugify(name) derives realm folder. AgentModalMode: create or manage{agent}. onFlash optional (fleet supplies, TopBar omits). submit() decorative (no API call).'

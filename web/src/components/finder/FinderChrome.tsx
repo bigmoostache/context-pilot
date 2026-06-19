@@ -442,7 +442,12 @@ export function FinderSidebar({
           Pinned
         </span>
         {pins.map((p) => (
-          <div key={p.path} className="group/pin relative flex items-center">
+          // `relative` (not `flex`) so the Place button stretches full-width
+          // exactly like a Locations row — a flex parent would shrink it to its
+          // text width, the source of the "pinned looks different" mismatch.
+          // The Unpin button is absolutely positioned, so it never needed the
+          // flex centering; it self-centers via top-1/2 + -translate-y-1/2.
+          <div key={p.path} className="group/pin relative">
             <Place
               leading={<FileIcon kind="folder" size={16} />}
               label={p.name}
@@ -453,7 +458,7 @@ export function FinderSidebar({
             <button
               title="Unpin"
               onClick={() => onUnpin(p.path)}
-              className="absolute right-1.5 flex size-4 items-center justify-center rounded text-muted-foreground/50 opacity-0 transition-opacity hover:text-foreground group-hover/pin:opacity-100"
+              className="absolute right-1.5 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded text-muted-foreground/50 opacity-0 transition-opacity hover:text-foreground group-hover/pin:opacity-100"
             >
               <X className="size-3" />
             </button>
