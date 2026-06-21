@@ -98,7 +98,19 @@ export function AgentSwitcher({
             >
               <AgentDot accent={a.accent} status={a.status} />
               <div className="flex min-w-0 flex-1 leading-tight">
-                <span className="truncate text-[12.5px] font-medium text-foreground/90">{a.name}</span>
+                {/* base-ui's DropdownMenuItem ships a `focus:**:text-accent-foreground`
+                    rule that recolours EVERY descendant on highlight — in light
+                    mode accent-foreground is near-white, so the name turned
+                    white-on-white over our soft signal wash (T302). The item-level
+                    `!text-foreground` override doesn't reach this grandchild span, so
+                    we pin the name to `foreground` on BOTH highlight signals
+                    (data-highlighted + DOM focus) via the parent's
+                    `group/dropdown-menu-item` — a scoped child rule that outranks the
+                    universal `**:` descendant rule and leaves the status label + ✓
+                    (their own colours) untouched. Correct contrast in both themes. */}
+                <span className="truncate text-[12.5px] font-medium text-foreground/90 group-focus/dropdown-menu-item:!text-foreground group-data-[highlighted]/dropdown-menu-item:!text-foreground">
+                  {a.name}
+                </span>
               </div>
               <span
                 className="shrink-0 text-[10px] font-medium"
