@@ -106,7 +106,18 @@ pub fn read(path: &Path) -> io::Result<Scan> {
 /// Walk a framed byte buffer, collecting entries up to the first decode
 /// failure. Factored out of [`read`] so it can be unit-tested without touching
 /// the filesystem.
-fn scan_bytes(data: &[u8]) -> Scan {
+///
+/// Public so an incremental consumer (the backend [`Tailer`]) can decode only
+/// the *appended tail* of a segment — slicing the file bytes from the last
+/// consumed offset and scanning forward from there — instead of re-reading and
+/// re-deserializing the whole segment on every poll. Frames are self-delimiting
+/// (length+CRC prefix), so scanning from a previous clean record boundary is
+/// correct; the returned [`Scan::valid_len`] is the new clean boundary *within
+/// the slice*, which the caller adds to its base offset.
+///
+/// [`Tailer`]: ../../cp_orchestrator/registry/tailer/struct.Tailer.html
+#[must_use]
+pub fn scan_bytes(data: &[u8]) -> Scan {
     let mut scan = Scan::default();
     let mut offset: usize = 0;
 

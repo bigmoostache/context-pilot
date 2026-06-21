@@ -14,6 +14,7 @@
 //! within the workspace's per-file line budget; the `Tailer` remains reachable
 //! at the stable `channel::Tailer` path via a re-export there.
 
+use std::fs;
 use std::io;
 use std::path::PathBuf;
 
@@ -36,6 +37,15 @@ pub struct Tailer {
     /// scanning from this index (skipping older segments entirely).
     last_index: Option<u64>,
 
+    /// Byte offset already consumed within [`last_index`](Self::last_index)'s
+    /// segment file — the running cursor that makes [`poll`](Self::poll)
+    /// **incremental**. Each poll reads only the bytes appended past this
+    /// offset (and skips the read entirely when the file length is unchanged),
+    /// instead of re-reading and re-deserializing the entire current segment
+    /// every tick. Reset to `0` whenever the cursor advances to a newer segment
+    /// (a roll). `0` until the first segment is read.
+    last_offset: u64,
+
     /// The highest `rev` delivered to the consumer. Entries at or below this
     /// rev are filtered out, ensuring gap-free, exactly-once delivery.
     last_rev: Option<u64>,
@@ -47,7 +57,7 @@ impl Tailer {
     /// [`seed`](Tailer::seed) first to skip already-processed history.
     #[must_use]
     pub fn new(oplog_dir: PathBuf) -> Self {
-        Self { dir: oplog_dir, last_index: None, last_rev: None }
+        Self { dir: oplog_dir, last_index: None, last_offset: 0, last_rev: None }
     }
 
     /// Advance the cursor to `rev` so the next poll skips everything at or
@@ -62,33 +72,83 @@ impl Tailer {
     /// entries were appended since the last call. The method is idempotent: two
     /// consecutive calls with no intervening agent writes yield `[]` then `[]`.
     ///
+    /// # Incremental — O(new bytes), not O(segment size)
+    ///
+    /// The cursor tracks both the newest segment index **and the byte offset
+    /// already consumed within it** ([`last_offset`](Self::last_offset)). Each
+    /// poll:
+    ///
+    /// 1. Skips segments older than the cursor entirely.
+    /// 2. For the segment the cursor sits in, first compares the file length to
+    ///    the consumed offset via a single `stat` — if unchanged, **nothing was
+    ///    appended and the file is never read or parsed** (the overwhelmingly
+    ///    common idle case). This is what stops the backend burning a core
+    ///    re-deserializing an unchanged segment every tick.
+    /// 3. Otherwise reads the file and frame-decodes **only the appended tail**
+    ///    (`bytes[offset..]`) — frames are self-delimiting, so scanning from the
+    ///    previous clean record boundary is correct — then advances the offset
+    ///    by the clean length of that tail (a torn final frame leaves the offset
+    ///    at its boundary, so the now-complete frame is picked up next poll).
+    /// 4. A newer segment (a roll) resets the in-segment offset to `0`.
+    ///
+    /// The `last_rev` high-water filter is retained as a belt-and-braces
+    /// exactly-once guard (a re-read after a torn tail can never re-deliver).
+    ///
     /// # Errors
     ///
     /// Returns [`io::Error`] if a segment file cannot be listed or read.
     pub fn poll(&mut self) -> io::Result<Vec<OpEntry>> {
         let indices = segment::indices(&self.dir)?;
-        let start_from = self.last_index.unwrap_or(0);
+        let cursor_index = self.last_index.unwrap_or(0);
         let mut new_entries: Vec<OpEntry> = Vec::new();
 
         for &index in &indices {
-            if index < start_from {
+            if index < cursor_index {
+                continue; // fully-consumed historical segment.
+            }
+
+            // Byte offset already consumed in THIS segment: the running cursor
+            // for the segment we're mid-way through, else 0 for a fresh (rolled)
+            // segment we haven't touched.
+            let base_offset = if Some(index) == self.last_index { self.last_offset } else { 0 };
+
+            let path = segment::path(&self.dir, index);
+
+            // Cheap idle skip: a single `stat`. If no bytes were appended past
+            // what we've consumed, do not read or parse the file at all.
+            let file_len = fs::metadata(&path)?.len();
+            if file_len <= base_offset {
+                // Still advance the index cursor so a freshly-rolled (but empty)
+                // newer segment becomes the active one without re-`stat`ing the
+                // old one next time.
+                if Some(index) != self.last_index {
+                    self.last_index = Some(index);
+                    self.last_offset = 0;
+                }
                 continue;
             }
-            let scan = segment::read(&segment::path(&self.dir, index))
-                .map_err(|e| io::Error::other(e.to_string()))?;
+
+            // Read the whole (size-bounded) file, then frame-decode ONLY the
+            // appended tail past the consumed offset.
+            let data = fs::read(&path)?;
+            let tail = data.get(base_offset as usize..).unwrap_or(&[]);
+            let scan = segment::scan_bytes(tail);
+
             for entry in scan.entries {
                 let dominated = self.last_rev.is_some_and(|lr| entry.rev <= lr);
                 if !dominated {
                     new_entries.push(entry);
                 }
             }
+
+            // Advance the cursor: this is now the active segment, consumed up to
+            // the clean boundary within the tail (base + tail's valid_len).
+            self.last_index = Some(index);
+            self.last_offset = base_offset.saturating_add(scan.valid_len);
         }
 
         if let Some(last) = new_entries.last() {
             self.last_rev = Some(last.rev);
-        }
-        if let Some(&newest_index) = indices.last() {
-            self.last_index = Some(newest_index);
         }
         Ok(new_entries)
     }

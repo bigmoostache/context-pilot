@@ -365,14 +365,69 @@ impl App {
         );
     }
 
-    /// Tick dirty flag so time-based spinners re-render.
-    /// Throttled to 10fps (100ms) to avoid unnecessary re-renders.
+    /// Tick the dirty flag at 10fps **only while something on-screen is
+    /// actually animating**, so time-based spinners advance without pinning a
+    /// core when the agent is idle.
+    ///
+    /// Previously this forced a full-frame redraw every 100ms unconditionally —
+    /// a permanent 10fps re-render of the entire UI (sidebar + content + status
+    /// bar IR rebuilt and diffed) that ran *forever*, even with nothing to
+    /// animate, and was a primary source of the "idle yet pinning CPU"
+    /// pathology (T309). The fix gates the forced redraw on
+    /// [`has_active_animation`](Self::has_active_animation): a genuinely idle
+    /// agent (READY badge, no loading panels, no running console) now produces
+    /// **zero** periodic renders and falls to ~0% CPU, while every animated
+    /// state (streaming/tooling, a timed-watcher WAITING badge, a loading
+    /// panel, a running console) still ticks at the full 10fps. Event-driven
+    /// redraws (input, stream chunks, cache updates, state mutations) are
+    /// untouched — they set `dirty` at their source — so the screen still
+    /// updates instantly on any real change.
+    ///
+    /// The 100ms throttle gates the *condition check itself* to 10Hz, so the
+    /// (cheap) animation scan never runs at the loop's full poll cadence.
     fn update_spinner_animation(&mut self) {
         let now = now_ms();
         if now.saturating_sub(self.last_spinner_ms) < 100 {
             return;
         }
         self.last_spinner_ms = now;
-        self.state.flags.ui.dirty = true;
+        if Self::has_active_animation(&self.state) {
+            self.state.flags.ui.dirty = true;
+        }
+    }
+
+    /// Whether any on-screen element is currently animating and therefore needs
+    /// the periodic [`update_spinner_animation`](Self::update_spinner_animation)
+    /// redraw tick.
+    ///
+    /// Mirrors *exactly* the conditions under which the renderer draws a moving
+    /// spinner, so the forced-redraw cadence is driven by — and only by — real
+    /// animation:
+    /// - **streaming / tooling** — the primary badge spins;
+    /// - a **timed watcher** is pending — the `WAITING` badge (`AccentDim`)
+    ///   spins;
+    /// - a **panel is still loading** its first cache content — the `LOADING`
+    ///   badge and the sidebar entry spin;
+    /// - a **console is running** — its sidebar glyph spins.
+    ///
+    /// When none hold, the screen is static and no periodic redraw is needed.
+    fn has_active_animation(state: &crate::state::State) -> bool {
+        if state.flags.stream.phase.is_streaming() {
+            return true; // STREAMING / TOOLING badge spinner
+        }
+        // A pending timed watcher renders the animated WAITING badge.
+        let has_timed_watcher = state
+            .get_ext::<cp_base::state::watchers::WatcherRegistry>()
+            .is_some_and(|reg| reg.active_watchers().iter().any(|w| w.fire_at_ms().is_some()));
+        if has_timed_watcher {
+            return true;
+        }
+        // A panel still loading its first content (LOADING badge + sidebar
+        // spinner) or a running console (animated sidebar glyph).
+        state.context.iter().any(|c| {
+            (c.cached_content.is_none() && c.context_type.needs_cache())
+                || (c.context_type.as_str() == "console"
+                    && c.get_meta_str("console_status").is_some_and(|s| s.starts_with("running")))
+        })
     }
 }

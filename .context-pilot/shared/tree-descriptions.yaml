@@ -130,6 +130,10 @@
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
   last_edited_ms: 0
+0449de8bb372191f:
+  path: crates/cp-oplog/src/segment.rs
+  description: 'Segment files: seg-{n}.log zero-padded sortable naming. Scan{entries,valid_len,torn_tail}. path/parse_index/indices/read/scan_bytes — torn-tail-aware frame walk (decode until first CRC/length failure, report clean boundary for truncation, V1). T309: scan_bytes made pub so the backend Tailer can decode only a segment''s appended TAIL (slice past the last consumed byte offset) instead of re-scanning the whole file each poll.'
+  last_edited_ms: 1782060739452
 046c920d837dc3f5:
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): ReplayState{rev_head,heads,seen}. fold_entry(&mut ReplayState,&entry) pub(crate): Checkpoint=authoritative clone_from(heads+seen), MessageCreated=set_thread_head, CommandEffect|SeenMark=seen.mark(token,rev), others no-op. replay() fast-path reads ONLY newest segment when it opens with a checkpoint (Snapshot-seeded); replay_full fallback for seg-0-only. OplogResult from crate::error. Heads PartialEq order-sensitive. 10 tests incl seen-set V3 + fast==full.'
@@ -986,6 +990,10 @@
   path: crates/cp-orchestrator/src/registry/channel.rs
   description: Per-agent channel — backend read/write handle. AgentChannel (from_entry/hydrate/send/send_with_retry) + read_ack. Tailer moved to sibling tailer.rs (split for 500-line limit) and re-exported here via `pub use crate::registry::tailer::Tailer` so channel::Tailer stays valid for all call sites. 320 lines.
   last_edited_ms: 1781807510405
+1f92fd1970105d13:
+  path: crates/cp-mod-tree/src/lib.rs
+  description: 'Tree module. 3 tools: filter/toggle/describe (with close_panel param). Fixed TREE panel (fixed_order=3). Watches open folders. Module data: filter+descriptions. Worker data: open_folders. @-path autocomplete. T309: should_invalidate_on_fs_change now ALSO requires !path_under_control_dir(changed_path) — CONTROL_DIRS (.git/.context-pilot/oplog/target/node_modules/__pycache__/.venv/venv/dist/build/.uploads) are matched component-wise via Path::components; a change under any of them is dropped before it can invalidate+full-rebuild+rehash the whole tree, killing the self-sustaining idle busy-loop driven by the agent''s own oplog/config churn.'
+  last_edited_ms: 1782060739475
 1fb10ea87409018b:
   path: crates/cp-wire/src/types/mod.rs
   description: 'ContentHash (SHA-256, Copy, custom hex serde). NEW Phase14: ContentHash::of(&[u8])->SHA-256 (sha2 dep) is the canonical content address (vs FNV folder naming); to_hex(self) self-by-value (wrong_self_convention on Copy). Serialize reuses to_hex. Phase (Idle/Streaming/Tooling), LifecycleState. Re-exports submodules. Known-vector SHA-256 tests.'
@@ -1077,6 +1085,10 @@
 2242ec6d0248b526:
   path: web/src/components/conversation/Message.tsx
   description: Thread/conversation message renderer. AssistantMessage + UserMessage now render text via <Markdown> (lib/markdown.tsx) instead of the minimal renderInline — assistant=default variant, user=onAccent variant (legible on the signal bubble). ToolMessage = collapsible card (header name/intent, mono params, pre result, danger border on error). Streaming blink cursor preserved on assistant.
+  last_edited_ms: 0
+2262c56241784fa6:
+  path: web/src/components/finder/Finder.tsx
+  description: Per-agent Finder file manager (493 LOC after X913 split). Owns view state + derived listings + render; delegates fs mutations/nav to useFinderActions, selection/open/tab/menu to useFinderSelection, keyboard to useFinderKeyboard, external drag to useExternalDragUpload, bottom chrome to FinderOverlays. QuickLook = modal shadcn Sheet (2/3 width, grid+list).
   last_edited_ms: 0
 226622786f5f0573:
   path: yamls/injections.yaml
@@ -3910,6 +3922,10 @@
   path: crates/cp-mod-ocr/src/client.rs
   description: 'Datalab OCR API client with flame!("ocr_convert"). Multipart file upload, exponential backoff polling, disk cache (~/.context-pilot/ocr-cache/) keyed by SHA-256 of file bytes + mode. OcrMode: Markdown/TextBoxes.'
   last_edited_ms: 0
+7bf920c02095a5a5:
+  path: web/src/components/finder/FinderChrome.tsx
+  description: 'Finder chrome: tab strip, main toolbar (nav/crumbs/view-switch/search/icon-size/actions), path bar + NavBtn/SegBtn. FinderSidebar extracted to support/FinderSidebar and re-exported. 372 lines.'
+  last_edited_ms: 0
 7bfc443fcd290a77:
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
@@ -5038,6 +5054,10 @@
   path: SECURITY.md
   description: Security policy
   last_edited_ms: 0
+9fa3340ca469d86b:
+  path: crates/cp-orchestrator/src/registry/tailer.rs
+  description: 'Tailer — backend''s incremental, gap-free oplog consumer (poll/seed/last_rev). T309: added a per-segment BYTE cursor (last_offset) — poll() now skips segments < cursor, and for the active segment does a single stat(); if file_len<=consumed_offset NOTHING is read or parsed (the idle no-append case that previously re-read+re-deserialized the whole current segment every 100ms tick, pinning a core), else scans ONLY the appended tail bytes[offset..] (torn-tail-safe via Scan.valid_len), resetting offset to 0 on a segment roll. Re-exported from channel.rs. 5 tests.'
+  last_edited_ms: 1782060739426
 9fac71e6b8c307f3:
   path: crates/cp-mod-search/Cargo.toml
   description: 'Search module deps: cp-base, cp-mod-logs, cp-render, crossterm, serde, serde_json, sha2, reqwest, notify, tree-sitter (9 langs), chrono, serde_yaml, log.'
@@ -7286,6 +7306,10 @@ e7915d49cba9d5d0:
   path: web/src/components/conversation/Conversation.tsx
   description: 'Cockpit conversation surface — LIVE (§7). useConversation(agentId) for the durable record + useStreamingTokens(agentId) for the ephemeral stream plane, overlaid: buildMessages maps durable msgs→ChatMessage (text user/assistant; tool_call→tool card from tool_uses[0]; tool_result folded/skipped) then shows the longer of (live buffer, durable text) + blinking cursor while the live buffer leads, and synthesises a trailing assistant bubble for a streaming turn not yet flushed. Reconciles (live stops leading) once durable text catches up. Accepts agentId prop.'
   last_edited_ms: 1781812786723
+e7d8c153800a47ae:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop with flame!("loop"). Input-first (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. poll_bridge_commands every tick. cp_mod_bridge::try_recover throttled ~2s = bridge self-heal. X18 adaptive idle poll (8ms streaming/dirty, 2ms bridge_active, 50ms otherwise). T309: update_spinner_animation now gates its forced 100ms dirty on has_active_animation (streaming/tooling | timed-watcher WAITING | loading panel | running console) — a genuinely idle agent produces ZERO periodic renders (was a permanent 10fps full-redraw floor forever), falling to ~0% CPU; event-driven redraws untouched.'
+  last_edited_ms: 1782060739498
 e82421db0781e690:
   path: yamls/tools/files.yaml
   description: 'File tools YAML. 3 tools: Open (path string/array), Edit (file_path, old_string, new_string), Write (file_path, contents, skip_callbacks).'

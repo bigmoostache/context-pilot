@@ -229,10 +229,25 @@ impl Module for TreeModule {
     fn should_invalidate_on_fs_change(
         &self,
         ctx: &cp_base::state::context::Entry,
-        _changed_path: &str,
+        changed_path: &str,
         is_dir_event: bool,
     ) -> bool {
-        is_dir_event && ctx.context_type.as_str() == Kind::TREE
+        // A change under a high-churn control directory must NOT rebuild the
+        // tree. The watcher subscribes to every *open* folder recursively, so
+        // when the realm root is open it sees every write to the agent's own
+        // bookkeeping dirs — `.context-pilot/` (config.json atomic save =
+        // tmp-create + rename, fired on every bridge command + periodically),
+        // `oplog/` (an append/roll per phase/cost/message delta when the bridge
+        // is ON), `.git/`, `target/`, `.uploads/`. Left ungated, each of those
+        // events triggered a full `generate_tree_string` → `build_tree_new` +
+        // per-file `compute_file_hash` re-walk of the entire realm, pinning a
+        // core while the agent was otherwise idle (T309). These dirs are pure
+        // noise for a navigation tree — a coding agent never browses them and a
+        // slightly-stale child count is harmless — so an event under any of
+        // them is dropped before it can invalidate the panel.
+        is_dir_event
+            && ctx.context_type.as_str() == Kind::TREE
+            && !path_under_control_dir(changed_path)
     }
 
     fn dependencies(&self) -> &[&'static str] {
@@ -274,6 +289,48 @@ impl Module for TreeModule {
     fn watcher_immediate_refresh(&self) -> bool {
         true
     }
+}
+
+/// Directory names whose subtree is pure agent/build/VCS bookkeeping noise for
+/// a navigation tree — a change anywhere under one of these never warrants a
+/// tree rebuild (see [`path_under_control_dir`]).
+///
+/// `oplog` and `.context-pilot` are the agent's own high-frequency writers (the
+/// append-only log and the tier-② persistence dir), so they dominate the churn
+/// when the bridge is ON; the rest are the usual VCS/build/dependency dirs plus
+/// the chat-upload drop.
+const CONTROL_DIRS: &[&str] = &[
+    ".git",
+    ".context-pilot",
+    "oplog",
+    "target",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "dist",
+    "build",
+    ".uploads",
+];
+
+/// Whether any path component of `changed_path` is a [control directory](CONTROL_DIRS).
+///
+/// Splits on the path separator and matches component-wise (rather than a raw
+/// substring test) so it triggers on a genuine `…/oplog/…` segment but not on a
+/// source file that merely *contains* the word (e.g. `src/oplog_view.rs`).
+/// Accepts both absolute and realm-relative paths since either form may reach
+/// the watcher.
+fn path_under_control_dir(changed_path: &str) -> bool {
+    std::path::Path::new(changed_path)
+        .components()
+        .filter_map(|c| match c {
+            std::path::Component::Normal(os) => os.to_str(),
+            std::path::Component::Prefix(_)
+            | std::path::Component::RootDir
+            | std::path::Component::CurDir
+            | std::path::Component::ParentDir => None,
+        })
+        .any(|seg| CONTROL_DIRS.contains(&seg))
 }
 
 /// Visualizer for tree tool results.
