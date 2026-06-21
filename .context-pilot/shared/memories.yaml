@@ -349,6 +349,22 @@
   - pending
   - plan
   last_edited_ms: 1781879016382
+4c4f676bedb3a300:
+  tl_dr: 'T293 FIXED (bb1351ba): Finder move-folder-up-to-grandparent 403. Cause: ColumnsView column-body drop used absolute crumb path as dest; /fs/move is realm-relative. Fix: relOf normalize + self-drop guards. Frontend-only.'
+  contents: |-
+    T293 'Moving folder around' — moving a folder UP to a grandparent gave 403 'destination outside agent realm'.
+
+    ROOT CAUSE: In ColumnsView.tsx MillerColumn, the column-BODY drop target (drop onto a column's empty background = move into that column's folder) built a synthetic destination node `columnFolder` from the column's `path` prop VERBATIM. `path` comes from the crumb `chain` and is ABSOLUTE (agent-folder-rooted). The backend /fs/move contract is realm-relative, so confined_path() saw a leading '/' and returned None → 403. This bit exactly the grandparent case (dropping onto an ancestor column body). Folder-ROW drops used node.path (realm-relative from /fs) → already worked.
+
+    FIX (frontend-only): const relPath = relOf(agentFolder, path); columnFolder.path = relPath; and both columnDropProps self-drop guards compare dragged.includes(relPath) (the dragged payload is realm-relative, so the old absolute-path comparison never matched). Build+tsc+web-structure green. No backend change (confined_path stays strict — realm-relative contract is correct + consistent across upload/mkdir/rename/move/trash). Only structural restriction remains the descendant-loop guard, as the user wanted.
+  importance: medium
+  labels:
+  - T293
+  - finder
+  - move
+  - columns
+  - fixed
+  last_edited_ms: 1782040176755
 5623177cb0b0ed7d:
   tl_dr: 'MULTI-WORKER (subworkers branch): N equal workers in one Rust loop. Decisions + arch in contents.'
   contents: |-
