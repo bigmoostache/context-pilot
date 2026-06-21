@@ -50,7 +50,16 @@ export function ThreadsView({
   const { data: threads = [] } = useThreads(activeAgentId)
   const agent = agents.find((a) => a.id === activeAgentId)
 
-  const [selectedId, setSelectedId] = useState("")
+  // The selected thread is remembered PER AGENT in localStorage, so switching
+  // to the Finder (which unmounts this view — App renders ThreadsView only when
+  // the threads view is active) and coming back restores the same thread
+  // instead of falling through to the first one (T303). Lazily seeded from the
+  // store; kept in sync by the persist effect below. Keyed by agent so each
+  // realm remembers its own thread.
+  const threadKey = `cp-thread-${activeAgentId}`
+  const [selectedId, setSelectedId] = useState(
+    () => localStorage.getItem(threadKey) ?? "",
+  )
   const [query, setQuery] = useState("")
   const [showArchived, setShowArchived] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
@@ -100,6 +109,14 @@ export function ThreadsView({
     : threads.find((t) => !t.archived)?.id ?? threads[0]?.id ?? ""
 
   const thread = threads.find((t) => t.id === effectiveSelectedId)
+
+  // Persist the RESOLVED selection so a view switch (or a full reload) returns
+  // to the same thread (T303). We store the effective id — not the raw
+  // selectedId — so the remembered value is always a thread that actually
+  // exists (e.g. after an archive deselect resolves to the next thread).
+  useEffect(() => {
+    if (effectiveSelectedId) localStorage.setItem(threadKey, effectiveSelectedId)
+  }, [effectiveSelectedId, threadKey])
 
   const handleArchive = useCallback((id: string) => {
     const t = threads.find((th) => th.id === id)
