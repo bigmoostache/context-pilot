@@ -6174,6 +6174,10 @@ c38efa785cbc3000:
   path: crates/cp-mod-brave/src/types.rs
   description: 'Brave API serde types: BraveSearchResponse (web/rich results), LLMContextResponse (grounding items)'
   last_edited_ms: 0
+c39dbf4edd54c1cb:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Threads view shell (list | conversation). handleSend/handleArchive/handleCreate via sendCommand. T298: handleAttach uploads each picked file to .uploads/ via uploadUnique (dedup) then posts one send_message carrying buildUploadMessage(N file-upload blocks). T303: the selected thread is persisted PER AGENT to localStorage cp-thread-{agentId} (lazy-seeded on mount, kept in sync by an effect on the resolved effectiveSelectedId) so switching to the Finder (which unmounts this view) and back — or a full reload — returns to the same thread instead of the first one.'
+  last_edited_ms: 1782050523778
 c3cec48a83f06e1c:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A) + DARK ''Night Gold'' (#222831/#393E46/#FFD369/#EEEEEE: charcoal base, slate surfaces, golden-yellow accent, near-white text) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow.'
