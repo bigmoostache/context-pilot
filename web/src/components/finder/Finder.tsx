@@ -862,7 +862,7 @@ export function Finder({ agent }: { agent: Agent }) {
               <SheetContent
                 side="right"
                 showCloseButton={false}
-                className="border-l border-border p-0 data-[side=right]:w-[540px] data-[side=right]:max-w-[540px] data-[side=right]:sm:max-w-[540px]"
+                className="border-l border-border p-0 data-[side=right]:w-2/3 data-[side=right]:max-w-none data-[side=right]:sm:max-w-none"
               >
                 <FinderPreview
                   node={previewNode}

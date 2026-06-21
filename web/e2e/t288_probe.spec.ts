@@ -33,7 +33,7 @@ async function openQuickLook(page: Page) {
   return drawer
 }
 
-test("quick look is a modal shadcn drawer: backdrop, ~540px, flush-right", async ({ page }) => {
+test("quick look is a modal shadcn drawer: backdrop, ~2/3 width, flush-right", async ({ page }) => {
   await openFinder(page)
   const vw = page.viewportSize()!.width
   const drawer = await openQuickLook(page)
@@ -43,11 +43,14 @@ test("quick look is a modal shadcn drawer: backdrop, ~540px, flush-right", async
   const overlay = page.locator(`[data-slot="sheet-overlay"]`)
   await expect(overlay, "modal backdrop is rendered").toBeVisible()
 
-  // 2. Geometry: flush to the right edge, ~540px wide, nothing off-screen.
+  // 2. Geometry: flush to the right edge, ~2/3 of the viewport wide, nothing
+  //    off-screen.
   const box = (await drawer.boundingBox())!
+  const expectedW = Math.round((vw * 2) / 3)
   const report = {
     viewportWidth: vw,
     drawer: { x: Math.round(box.x), w: Math.round(box.width) },
+    expectedWidth: expectedW,
     rightEdge: Math.round(box.x + box.width),
     overflowsRight: box.x + box.width > vw + 1,
   }
@@ -56,7 +59,7 @@ test("quick look is a modal shadcn drawer: backdrop, ~540px, flush-right", async
 
   expect(report.overflowsRight, "drawer must not spill past the right edge").toBeFalsy()
   expect(Math.abs(report.rightEdge - vw), "drawer flush to viewport").toBeLessThanOrEqual(2)
-  expect(Math.abs(report.drawer.w - 540), "drawer width ~540px").toBeLessThanOrEqual(2)
+  expect(Math.abs(report.drawer.w - expectedW), "drawer width ~2/3 of viewport").toBeLessThanOrEqual(4)
 })
 
 test("Esc closes the drawer", async ({ page }) => {
