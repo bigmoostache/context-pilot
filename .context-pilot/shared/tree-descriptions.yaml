@@ -1486,6 +1486,10 @@
   path: crates/cp-mod-utilities/src/secret.rs
   description: Redacted newtype — Debug/Display print [REDACTED]. expose_secret() for access. Replaces secrecy crate.
   last_edited_ms: 1780565428680
+3146f1f62f2a8c7d:
+  path: web/src/components/finder/InfoBadge.tsx
+  description: 'Finder per-node info badge (T289) — a small ⓘ shown on a file/folder that has a tree description. HOVER-ONLY (Base UI Tooltip, delay 120): hover/keyboard-focus reveals the description; NO click behaviour and NO cursor-help (user asked to drop both — the Tooltip primitive is correct for a hover hint, never opens on click, default cursor). TooltipTrigger render={<span/>} so it nests inside a row/cell <button> without button-in-button; stopPropagation on click/dblclick/pointerdown so the badge never selects/opens/drags the node. max-w-340px content.'
+  last_edited_ms: 1782035063027
 314a1113ea438288:
   path: web/.gitignore
   description: web/ gitignore. node_modules, dist, *.local, editor dirs, and Playwright e2e artifacts (test-results, playwright-report, .playwright) — transient run output, never committed.
