@@ -35,8 +35,13 @@ export function FinderPreview({
   return (
     <aside
       className={cn(
-        "flex shrink-0 flex-col bg-surface",
-        full ? "min-w-0 flex-1" : "w-[420px] border-l border-border",
+        "flex min-h-0 flex-col bg-surface",
+        // "full" = a file tab's main area; otherwise the QuickLook pane fills
+        // its host. Inside the shadcn Sheet drawer (the only place the pane
+        // variant is used) that means it spans the drawer's full width — the
+        // Sheet owns the width + left border, so the pane no longer fixes its
+        // own 420px or draws a border.
+        full ? "min-w-0 flex-1" : "h-full w-full",
       )}
     >
       {!full && (

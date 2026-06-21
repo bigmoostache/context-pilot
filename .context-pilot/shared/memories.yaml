@@ -66,7 +66,7 @@
   - fixed
   last_edited_ms: 1781884032338
 24b54123d1af9131:
-  tl_dr: T288 Finder Quick Look → shadcn Sheet drawer SHIPPED + REAL-BROWSER VERIFIED. Off-screen + header-height fixes proven in live Chromium via web/e2e/t288_probe.spec.ts.
+  tl_dr: T288 Finder Quick Look = STANDARD MODAL shadcn Sheet drawer SHIPPED + real-browser verified. Removed the non-modal overrides (backdrop+Esc+click-outside now free), widened to 540px, FinderPreview pane fills the drawer. 3-test probe green.
   contents: |-
     Replaced the non-reflowing overlay with a Base UI Sheet anchored right; NON-MODAL (modal=false + showOverlay=false + disablePointerDismissal) so clicking another file behind updates the live preview instead of dismissing. Esc + FinderPreview's own X close it. Fixed-positioned → never reflows grid. Gated grid+list only. Shipped 6f5c12a.
 
@@ -80,7 +80,7 @@
   - quick-look
   - sheet
   - shipped
-  last_edited_ms: 1781908985325
+  last_edited_ms: 1782034851612
 251f7f7fd6eee822:
   tl_dr: 'T279 follow-up SHIPPED (e833835): New Folder now inline-names a placeholder before creating (macOS-style), instead of auto-creating ''untitled folder''.'
   contents: |-

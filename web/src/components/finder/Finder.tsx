@@ -844,35 +844,25 @@ export function Finder({ agent }: { agent: Agent }) {
               )}
             </main>
 
-            {/* Quick Look — a shadcn Sheet drawer anchored to the right edge.
-                It is NON-MODAL (modal={false}) with no backdrop (showOverlay
-                false) and pointer-dismissal disabled, so clicking another file
-                behind it never closes it — it just updates the live preview
-                (previewNode tracks the selection). Esc and the pane's own Close
-                X dismiss it. Fixed-positioned, so it never reflows the grid.
-                Only grid & list use it: columns has its own trailing Miller
-                preview pane and gallery shows the selected item as a hero, so a
-                drawer there would double up. */}
+            {/* Quick Look — a standard shadcn Sheet drawer from the right edge.
+                It is a normal MODAL sheet: the component brings the dimming
+                backdrop, slide-in/out animation, focus trap, scroll lock, and
+                Esc + click-outside dismissal for free (onOpenChange routes every
+                close path back to setPreviewOpen(false)). Only grid & list use
+                it — columns has its own trailing Miller preview pane and gallery
+                shows the selected item as a hero, so a drawer there would double
+                up. The Sheet's built-in close button is hidden because the pane
+                renders its own Quick Look header with a Close control. */}
             <Sheet
               open={previewOpen && (viewMode === "grid" || viewMode === "list")}
               onOpenChange={(o) => {
                 if (!o) setPreviewOpen(false)
               }}
-              modal={false}
-              disablePointerDismissal
             >
               <SheetContent
                 side="right"
                 showCloseButton={false}
-                showOverlay={false}
-                // Width is set with the SAME `data-[side=right]:` modifier the
-                // base SheetContent uses for its `w-3/4` + `sm:max-w-sm`, so
-                // tailwind-merge cleanly REPLACES them (a plain `w-[420px]` has a
-                // different variant prefix, so merge keeps BOTH and the base
-                // `w-3/4`/`max-w-sm` win — capping the drawer NARROWER than the
-                // 420px FinderPreview pane inside it, which then overflowed past
-                // the right viewport edge: the "part off-screen on the right").
-                className="border-l border-border p-0 data-[side=right]:w-[420px] data-[side=right]:max-w-[420px] data-[side=right]:sm:max-w-[420px]"
+                className="border-l border-border p-0 data-[side=right]:w-[540px] data-[side=right]:max-w-[540px] data-[side=right]:sm:max-w-[540px]"
               >
                 <FinderPreview
                   node={previewNode}

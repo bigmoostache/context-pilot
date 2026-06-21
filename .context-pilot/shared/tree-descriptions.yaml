@@ -2346,6 +2346,10 @@
   path: yamls/tools/search.yaml
   description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
   last_edited_ms: 0
+4d4c0be66c204da8:
+  path: web/src/components/finder/Finder.tsx
+  description: 'Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) live listings. T273 upload (toolbar+drag-drop via useUploadFiles). T275 internal drag-and-drop (useMoveItems→moveItemsInto) + WINDOW-level external-drag upload-overlay lifecycle (dragover heartbeat + 250ms watchdog clears stuck overlay on silent Esc-cancel; internal MOVE_MIME drags carry no Files so never raise it). T279 empty-space context menu (openEmptyContext on <main>; newFolder() inline-names a placeholder then useCreateFolder). cmd/ctrl+shift multiselect + useMarquee. T288 Quick Look = STANDARD MODAL shadcn Sheet drawer (right): no modal=false/showOverlay/disablePointerDismissal overrides → backdrop + focus-trap + scroll-lock + Esc + click-outside-close all FREE; width 540px (data-[side=right]: same-prefix override); showCloseButton=false (FinderPreview pane renders its own header X→setPreviewOpen(false)); grid+list only (columns/gallery have own preview). Quick Look CLOSED by default.'
+  last_edited_ms: 1782034637671
 4dbb8631408985d3:
   path: crates/cp-mod-github/src/lib.rs
   description: 'GitHub module. 1 tool: gh_execute. Dynamic github_result panels. Depends on git module. classify sub-module for read-only vs mutating. Tool visualizer for PR/issue status coloring.'
@@ -4410,6 +4414,10 @@
   path: .github/checks/protected-files.yaml
   description: Protected files list for hash chain verification
   last_edited_ms: 0
+919f8730075feae1:
+  path: web/src/components/finder/FinderPreview.tsx
+  description: QuickLook preview pane — kind-aware. T272 live .md/code/json/doc fetch via useFsPreview. X906 live markdown via EditableMarkdown (view⇄WYSIWYG-edit, Save→fs/write). T281/T286 live image (<img>)+PDF (<object>) via rawUrl→/fs/raw (LivePdfPreview h-full fills definite-height scroll container). T282 live spreadsheet via LiveSheetPreview→/fs/sheet (sticky header, zebra, sheet tabs). variant 'full' = file-tab full-bleed (min-w-0 flex-1, no header/meta); 'pane' (default, T288) = h-full w-full fills the shadcn Sheet drawer — the Sheet owns the width+left border, so the pane no longer fixes its own 420px or draws a border; keeps the Quick Look header (label + Download/Share/Close) + Meta footer. agentId prop threads the realm.
+  last_edited_ms: 1782034637693
 91a635a674cb2681:
   path: crates/cp-mod-tree/src/storage.rs
   description: YAML-backed persistent storage for tree descriptions. Delegates YAML I/O to YamlSync engine. Content-hash keys (SHA-256 of path+content). populate_from_yaml fills gaps, refresh_stale_from_yaml swaps on branch switch.
@@ -7466,6 +7474,10 @@ f78eb200d7195117:
   path: crates/cp-orchestrator/src/transport/rest.rs
   description: 'REST handlers: HttpReply, Envelope<T>{rev,data}, CommandReceipt. fleet/agent/mint_ticket/body/command/threads. command() now eprintln!s the underlying send error (io context) on the 502 path for bridge-reachability diagnostics. resolve_entry reads <id>.json. Locks Backend briefly, never across blocking agent I/O. reshape_thread/reshape_message for maquette ThreadDetail. 8 tests.'
   last_edited_ms: 1781782855052
+f7cad271b2929884:
+  path: web/e2e/t288_probe.spec.ts
+  description: 'T288 regression: real-browser Quick Look drawer probe (3 tests). Boots live web (localStorage cp-agent/cp-view=finder), opens QL via file-row click + Space, asserts the right-side shadcn Sheet is a STANDARD MODAL drawer: dimming backdrop present ([data-slot=sheet-overlay]) — the signature trait missing while non-modal; flush-right + ~540px wide (x+w==viewport, no overflow); Esc closes; clicking the backdrop closes. Screenshots /tmp/t288-drawer.png. Run: CP_WEB_URL=http://localhost:5174 npx playwright test t288_probe --reporter=line.'
+  last_edited_ms: 1782034637715
 f7d9bcc6b3edfae1:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, 50-row inline cap, RETURNING support.
