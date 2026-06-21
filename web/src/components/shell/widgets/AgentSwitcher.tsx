@@ -85,9 +85,8 @@ export function AgentSwitcher({
               className="flex items-center gap-2.5 py-1.5"
             >
               <AgentDot accent={a.accent} status={a.status} />
-              <div className="flex min-w-0 flex-1 flex-col leading-tight">
+              <div className="flex min-w-0 flex-1 leading-tight">
                 <span className="truncate text-[12.5px] font-medium text-foreground/90">{a.name}</span>
-                <span className="truncate font-mono text-[10px] text-muted-foreground/65">{a.folder}</span>
               </div>
               <span
                 className="shrink-0 text-[10px] font-medium"

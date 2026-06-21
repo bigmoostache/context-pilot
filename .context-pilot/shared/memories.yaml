@@ -216,15 +216,20 @@ efe78c079599d3d0:
   importance: critical
   last_edited_ms: 0
 f5d97b1e7a01c317:
-  tl_dr: 'ALIGNMENT EPIC (X818/T120) DONE + state-mgmt on TanStack Query (push plane owns freshness). Residuals: deploy TAG = propose to user (don''t tag unilaterally). Detail lives in git history + design-orchestration-backend.md §26.'
-  contents: 'Epic X818 (wiring⇄design-doc alignment) complete: command→visible p50~14ms/p99~33ms; threads/phase/cost/focus all ride the oplog→view→SSE push plane; frontend folds deltas via TanStack Query (queryClient.setQueryData functional updates, rev high-water guard). Stack: orchestrator :7878 CP_COST_BUDGET=100000000; live agent f3a993c0ff357b41; web dev :5174. Full per-feature detail is in git + tree descriptions + docs/design-orchestration-backend.md §26.'
+  tl_dr: ALIGNMENT EPIC (X818/T120) DONE; HUD fully push-fed incl context meter (T297). Deploy TAG = propose to user. Detail in git + design-doc §26.
+  contents: |-
+    Epic X818 (wiring⇄design-doc alignment) complete: command→visible p50~14ms/p99~33ms; threads/phase/cost/focus all ride the oplog→view→SSE push plane; frontend folds deltas via TanStack Query (queryClient.setQueryData functional updates, rev high-water guard).
+
+    T297 (HUD reactivity) complete in two passes: (1) phase/cost/tokens moved off the 15s fleet poll onto the delta-folded per-agent meta; (2) the context-window meter now shows the agent's OWN authoritative used/threshold/budget triple. ONE canonical helper `context_usage(state)->(used,threshold,budget)` in src/modules/overview/context.rs is reused by the ratatui sidebar token bar, the Statistics panel header, AND the bridge emit — so every surface shares identical math. New OpEntryKind::ContextUsage (BestEffort, emitted on-change from emit_vitals, no-op in replay, not checkpoint-carried) → folded latest-wins into AgentView.context (ContextSnapshot) → served on /meta as contextUsed/Threshold/Budget → frontend Agent fields + applyAgentDelta `context_usage` case (never-null) → StatusBar ContextBar reads the pushed triple (dropped the usePanels re-sum + fabricated hit/miss split). Web meter is byte-identical to ratatui. Verified live: /meta contextUsed=163016/190000/200000 == Statistics panel. Commit 4b2d218a.
+
+    Stack: orchestrator :7878 CP_COST_BUDGET=100000000 (launched via sh -c on ./target/debug/cp-orchestrator — kill BOTH pid+sh parent to free port, relaunch debug); live agent f3a993c0ff357b41; web dev :5174.
   importance: high
   labels:
   - latency
   - architecture
   - demaquetting
   - active
-  last_edited_ms: 1782046053906
+  last_edited_ms: 1782047424566
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium
