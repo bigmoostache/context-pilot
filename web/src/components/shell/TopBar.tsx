@@ -73,7 +73,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
           Finder · Cockpit (T25). Each tab carries a tooltip explaining the view
           since the names aren't obvious to a first-time user. */}
       {!inFleet && (
-        <div className="ml-2 flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
+        <div className="ml-2 flex h-8 items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
           <Tip
             title="Threads"
             body="Chat with this agent. Each thread is a separate conversation or task it can run in parallel."

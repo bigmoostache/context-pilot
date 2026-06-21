@@ -49,33 +49,27 @@ export function AgentSwitcher({
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-left transition-colors outline-none",
+          "flex h-8 items-center gap-2 rounded-lg border border-border bg-card px-2.5 text-left transition-colors outline-none",
           "hover:border-[var(--signal)]/50 card-shadow",
         )}
       >
+        {/* Single-line trigger: just the workspace name (the folder path was
+            redundant noise — it lives in the menu rows + Finder). The fixed
+            `h-8` locks the trigger to the exact height of the sibling
+            Threads/Finder/Cockpit view-toggle pill group (also `h-8`). */}
         {active ? (
           <>
-            <AgentDot accent={active.accent} status={active.status} />
-            <div className="flex min-w-0 flex-col leading-tight">
-              <span className="truncate text-[12.5px] font-semibold text-foreground/90">
-                {active.name}
-              </span>
-              <span className="truncate font-mono text-[10px] text-muted-foreground/70">
-                {active.folder}
-              </span>
-            </div>
+            <AgentDot accent={active.accent} status={active.status} compact />
+            <span className="truncate text-[12.5px] font-semibold text-foreground/90">
+              {active.name}
+            </span>
           </>
         ) : (
           <>
             <PlaceholderDot />
-            <div className="flex min-w-0 flex-col leading-tight">
-              <span className="truncate text-[12.5px] font-semibold text-foreground/80">
-                Select an agent
-              </span>
-              <span className="truncate text-[10px] text-muted-foreground/65">
-                Choose a workspace
-              </span>
-            </div>
+            <span className="truncate text-[12.5px] font-semibold text-foreground/80">
+              Select an agent
+            </span>
           </>
         )}
         <ChevronsUpDown className="ml-1 size-3.5 shrink-0 text-muted-foreground/60" />
@@ -121,17 +115,35 @@ export function AgentSwitcher({
   )
 }
 
-function AgentDot({ accent, status }: { accent: Agent["accent"]; status: AgentStatus }) {
+function AgentDot({
+  accent,
+  status,
+  compact = false,
+}: {
+  accent: Agent["accent"]
+  status: AgentStatus
+  /** trigger variant — a smaller 20px glyph so the switcher matches the
+   *  view-toggle pill height; the menu rows keep the default 28px dot. */
+  compact?: boolean
+}) {
   return (
-    <span className="relative flex size-7 shrink-0 items-center justify-center">
+    <span
+      className={cn(
+        "relative flex shrink-0 items-center justify-center",
+        compact ? "size-5" : "size-7",
+      )}
+    >
       <span
-        className="flex size-7 items-center justify-center rounded-md text-[11px] font-bold uppercase"
+        className={cn(
+          "flex items-center justify-center rounded-md text-[11px] font-bold uppercase",
+          compact ? "size-5" : "size-7",
+        )}
         style={{
           background: `color-mix(in oklab, ${accentVar[accent]} 16%, transparent)`,
           color: accentVar[accent],
         }}
       >
-        <FolderGit2 className="size-3.5" />
+        <FolderGit2 className={compact ? "size-3" : "size-3.5"} />
       </span>
       <span
         className={cn(
@@ -147,8 +159,8 @@ function AgentDot({ accent, status }: { accent: Agent["accent"]; status: AgentSt
 /** Neutral trigger glyph shown when no agent is focused (fleet altitude). */
 function PlaceholderDot() {
   return (
-    <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground/55">
-      <FolderGit2 className="size-3.5" />
+    <span className="flex size-5 shrink-0 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground/55">
+      <FolderGit2 className="size-3" />
     </span>
   )
 }
