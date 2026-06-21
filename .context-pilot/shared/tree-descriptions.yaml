@@ -1754,6 +1754,10 @@
   path: sandbox/tasks/inputs/password-recovery/instruction_local.md
   description: Adapted task instruction for local CP headless run — paths relative (./varsea, ./recovered_passwords.txt) instead of /app/.
   last_edited_ms: 0
+387c086ba6b10a55:
+  path: web/src/components/finder/preview/FinderPreview.tsx
+  description: 'Quick Look preview shell + Body() kind router. Routes node → mock previews (mockPreviews), live fetchers (livePreviews), or shared leaf renderers (previewParts). T306: the drawer header''s Download button is wired to downloadFile(agentId, node.path) (streams the realm file via the backend attachment endpoint) — actionable only in the live Finder (agentId scopes the realm), inert in the mock; hidden for folders. The decorative Share button was removed app-wide (no utility).'
+  last_edited_ms: 1782054164059
 387f3b11754928d1:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.

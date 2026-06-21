@@ -343,7 +343,6 @@ export function Finder({ agent }: { agent: Agent }) {
             flash(`Downloading ${active.fileNode.name}…`)
           }
         }}
-        onFileShare={() => flash(`Share ${active.fileNode?.name ?? "file"}…`)}
       />
 
       <div className="flex min-h-0 flex-1">

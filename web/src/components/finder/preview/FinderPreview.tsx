@@ -1,4 +1,4 @@
-import { Download, Share2, X } from "lucide-react"
+import { Download, X } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { downloadFile } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -80,7 +80,6 @@ export function FinderPreview({
                     agentId ? () => void downloadFile(agentId, node.path) : undefined
                   }
                 />
-                <IconBtn icon={Share2} title="Share" />
               </>
             )}
             <IconBtn icon={X} title="Close" onClick={onClose} />

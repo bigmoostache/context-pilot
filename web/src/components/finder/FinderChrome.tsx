@@ -11,7 +11,6 @@ import {
   MoreHorizontal,
   PanelBottom,
   Search,
-  Share2,
   Sidebar as SidebarIcon,
   Upload,
   X,
@@ -124,7 +123,6 @@ export function FinderToolbar({
   onTogglePathBar,
   fileActive,
   onFileDownload,
-  onFileShare,
 }: {
   crumbs: FinderNode[]
   canBack: boolean
@@ -148,7 +146,6 @@ export function FinderToolbar({
   /** true when the active tab is a single file (not a folder) */
   fileActive: boolean
   onFileDownload: () => void
-  onFileShare: () => void
 }) {
   const idx = VIEW_ORDER.indexOf(viewMode)
   // collapse a deep breadcrumb: first · … · last two
@@ -261,10 +258,7 @@ export function FinderToolbar({
       <div className="mx-0.5 h-5 w-px bg-border" />
 
       {fileActive ? (
-        <>
-          <NavBtn icon={Download} onClick={onFileDownload} title="Download" />
-          <NavBtn icon={Share2} onClick={onFileShare} title="Share" />
-        </>
+        <NavBtn icon={Download} onClick={onFileDownload} title="Download" />
       ) : (
         <>
           <NavBtn icon={FolderPlus} onClick={onNewFolder} title="New folder" />
