@@ -12,7 +12,7 @@ import {
 } from "lucide-react"
 import type { Agent } from "@/lib/types"
 import { useCreateAgent, useRestartAgent, useRetireAgent, sendCommand } from "@/lib/live"
-import { PROVIDERS, defaultModel, findModel, resolveSelection } from "@/lib/models"
+import { PROVIDERS, defaultModel, findModel, resolveSelection } from "@/lib/support/models"
 import { ModelPicker } from "./ModelPicker"
 import { cn } from "@/lib/utils"
 

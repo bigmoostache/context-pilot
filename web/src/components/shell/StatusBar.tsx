@@ -1,6 +1,6 @@
 import { Boxes, MessagesSquare, Wallet } from "lucide-react"
 import { usePanels } from "@/lib/live"
-import { fmtCost, fmtTokens } from "@/lib/panelMeta"
+import { fmtCost, fmtTokens } from "@/lib/support/panelMeta"
 import type { Agent, StreamPhase } from "@/lib/types"
 
 const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {

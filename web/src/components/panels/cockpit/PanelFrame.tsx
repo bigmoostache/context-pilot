@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { fmtTokens, fmtCost } from "@/lib/panelMeta"
+import { fmtTokens, fmtCost } from "@/lib/support/panelMeta"
 
 /**
  * Shared shell for every cockpit panel maquette. Gives each panel a consistent

@@ -898,6 +898,10 @@
   path: yamls/tools/tree.yaml
   description: Tree tools YAML. tree_filter (gitignore patterns), tree_toggle (open/close/toggle folders), tree_describe (path+description+delete+close_panel params).
   last_edited_ms: 0
+1e1e890cc70e0e69:
+  path: web/src/components/finder/Finder.tsx
+  description: Per-agent Finder file manager (493 LOC after X913 split). Owns view state + derived listings + render; delegates fs mutations/nav to useFinderActions, selection/open/tab/menu to useFinderSelection, keyboard to useFinderKeyboard, external drag to useExternalDragUpload, bottom chrome to FinderOverlays. QuickLook = modal shadcn Sheet (2/3 width, grid+list).
+  last_edited_ms: 1782038018714
 1e28ee9aca885888:
   path: src/modules/overview/tools_blocks.rs
   description: Tools-only IR block builder. tools_blocks() renders grouped tool table with category descriptions, enable/disable status. No agents/skills/commands (those live in Library only).
@@ -2190,6 +2194,10 @@
   path: chain.sh
   description: Hash chain update/verify script (password-protected)
   last_edited_ms: 0
+4757a729e74cfe51:
+  path: web/src/components/finder/preview/FinderPreview.tsx
+  description: Quick Look preview shell + Body() kind router. Routes node → mock previews (mockPreviews), live fetchers (livePreviews), or shared leaf renderers (previewParts). 121 lines.
+  last_edited_ms: 1782037375293
 477e060bfea31c3a:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -2366,6 +2374,10 @@
   path: yamls/library.yaml
   description: 'Library config: built-in agent/skill/command seeds, default agent prompt template'
   last_edited_ms: 0
+4e67e627d66a5e37:
+  path: web/src/components/finder/preview/livePreviews.tsx
+  description: 'Live-data Finder previews: LivePreview/LiveImagePreview/LivePdfPreview/LiveSheetPreview/HighlightedCode/EditableMarkdown + TEXT_KINDS. Fetch via useFsPreview/useFsSheet/useWriteFile + rawUrl + highlightCode. 398 lines.'
+  last_edited_ms: 1782037375345
 4e69291f1cd05faf:
   path: crates/cp-mod-ocr/src/client.rs
   description: Datalab OCR API client. Multipart upload, exponential backoff polling, disk cache keyed by FNV-1a hash of file bytes + mode.
@@ -2410,6 +2422,10 @@
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
   last_edited_ms: 1781354328652
+4f8c72c18c46a777:
+  path: web/src/components/finder/internal/useFinderKeyboard.ts
+  description: 'Finder surface keyboard map hook: arrow nav, type-ahead, Space QuickLook, Enter→rename (⌘/Ctrl+O open), ⌘⌫ Trash, Backspace go-up, ⌘A select-all, Esc clear. Returns onKeyDown.'
+  last_edited_ms: 1782038018622
 4f9b6f05552aa603:
   path: crates/cp-mod-todo/src/lib.rs
   description: 'Todo module. 3 tools: create/update/move. Fixed TODO panel (fixed_order=0, top priority). Nested object params with parent_id nesting. overview shows X/Y done. Drives spine auto-continuation.'
@@ -2442,6 +2458,10 @@
   path: src/app/mod.rs
   description: 'App struct — top-level container. Fields: State, TypewriterBuffer, pending tools/done, cache_tx, file/gh watchers, timers, PersistenceWriter, reverie_streams. Sub-modules: actions, context, events, panels, prompt_builder, reverie, run.'
   last_edited_ms: 0
+50ba11ee9c3a599e:
+  path: web/src/components/finder/internal/FinderOverlays.tsx
+  description: 'Finder bottom chrome + floating layers: status bar, right-click ContextMenu (full handler wiring incl Refresh via own useQueryClient), external-drag upload overlay, transient toast. Built from primitive deps.'
+  last_edited_ms: 1782038018667
 50ee07558772e95e:
   path: crates/cp-mod-console/src/types.rs
   description: 'Console module types. ConsoleState (sessions HashMap + next_session_id), ProcessStatus enum, SessionMeta for persistence. ConsoleWatcher: exit/pattern modes, easy_bash inline (≤150 lines AND ≤8000 bytes) vs panel, blocking/async. format_wait_result helper.'
@@ -3182,6 +3202,10 @@
   path: ui/src/components/finder/FinderPreview.tsx
   description: 'QuickLook pane. Bespoke kind renders: code (copy btn + line numbers + keyword tint), spreadsheet (zebra + frozen header + sheet tabs), slides (hero + thumbnails), PDF (paper mock + page strip), image (checkerboard + zoom), audio (waveform player), video (poster + scrubber), rendered markdown (for-loop fence parser), json/text, folder summary. Metadata footer + Get Info.'
   last_edited_ms: 1781518321252
+697c6f40a6d8fd65:
+  path: web/src/components/finder/support/FinderSidebar.tsx
+  description: Finder left sidebar (Favorites/Locations/Pinned drag-drop target) + private Group/Place helpers, extracted from FinderChrome for the <500 budget. Re-exported from FinderChrome. 190 lines.
+  last_edited_ms: 1782037375268
 6980171814d0d81b:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
@@ -3190,6 +3214,10 @@
   path: crates/cp-mod-callback/src/storage.rs
   description: YAML-backed persistent storage for callback definitions. Keyed by name (BTreeMap alphabetical). upsert/remove/populate/migrate functions. Script file read/write helpers (strip_script_header, write_script_file). cleanup_old_hash_keys migration.
   last_edited_ms: 0
+6a16a2fe2dff6921:
+  path: .context-pilot/scripts/folder-sizes.sh
+  description: 'CB1 callback script: runs check-folder-sizes.sh + check-file-lengths.sh (Rust 8-entry/500-line gates).'
+  last_edited_ms: 1782038018690
 6a80600c66d89e02:
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only fsync''d log + running Heads fold. open() seeds heads via replay. append(kind)->rev probes frame size, rolls at 64MiB. roll() stamps leading Checkpoint(heads) as new segment''s first record (GAP1). write_record = sole rev-assignment point (frame+write_all+sync_data+fold_entry, announce-after-durable K9). checkpoint() public. seg-0 has no leading cp. OplogError{Io,Frame}. 7 tests.'
@@ -4102,6 +4130,10 @@
   path: Cargo.toml
   description: Workspace root. 22 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
   last_edited_ms: 0
+879a2e472fca4c0c:
+  path: web/src/components/finder/views/ColumnsView.tsx
+  description: Miller-columns view (ColumnsView + MillerColumn + PaneRow), split out of FinderViews. Per-ancestor useFs fetch, traversed-path highlight (onTrail), folder drop targets, select-none for native drag (T287). Imports shared helpers from ./shared. 237 lines.
+  last_edited_ms: 1782037375222
 879bd7e62230675c:
   path: crates/cp-mod-typst/src/compiler.rs
   description: Embedded typst compilation engine. Minimal typst::World impl. compile_to_pdf/compile_and_write. today() uses cp_mod_utilities::time (now_local + decompose_epoch_secs). Font loading from system dirs. @preview/ package resolution.
@@ -4690,6 +4722,10 @@
   path: crates/cp-mod-git/Cargo.toml
   description: 'Git module deps: cp-base, cp-render, crossterm, serde_json, regex.'
   last_edited_ms: 1780563847618
+9b41ca57f6386942:
+  path: web/src/components/finder/preview/previewParts.tsx
+  description: 'Shared Finder preview leaf renderers: IconBtn, PreviewStatus, TruncatedNote, MarkdownPreview, TextPreview, FolderPreview, Generic, Meta/Row, Empty. Imported by both FinderPreview shell and livePreviews. 173 lines.'
+  last_edited_ms: 1782037375321
 9b5bd654de298c74:
   path: ui/src/components/shell/ConfigPanel.tsx
   description: 'Shared settings body (macOS System-Settings: category rail + detail pane). NO identity header on the rail (detail-pane header names the active category). variant=''dialog'' (DialogClose chrome, used by ConfigModal/TopBar gear) | ''inline'' (fills page, Save button, used by fleet Settings page). Categories: General/Providers/Search/DocAI/Web/Integrations. Masked keys w/ reveal, Connected pills, toggles, default-model picker.'
@@ -4870,6 +4906,10 @@ a0686e5188e9a8f7:
   path: ui/src/components/shell/StatusBar.tsx
   description: 'Bottom status footer, altitude-aware. fleet=false: single-agent vitals — phase dot+label on the left; right side = a fixed-width tri-color CONTEXT METER (green=cache hits / yellow=misses / grey=free) with an upward hover tooltip breaking down hit/miss/free + used·budget (T22), a divider, then cost. The agent prompt-id text was removed (T22). fleet=true: fleet aggregates — Agents count, Threads count, ''Needs you'' count, right-aligned ''Total spend''. Wired from App.tsx via fleet={view===''fleet''}.'
   last_edited_ms: 1781552868355
+a08fe4f347ae0b65:
+  path: web/src/components/finder/internal/helpers.ts
+  description: 'Finder shared types + pure helpers: Tab/PinnedFolder interfaces, CLICK_SETTLE_MS, NEW_FOLDER_SENTINEL, pinsKey/loadPins (localStorage), buildCrumbs, pathName.'
+  last_edited_ms: 1782038018552
 a09757b61a0a55ed:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -5778,6 +5818,10 @@ bcd16ce7cee3eae0:
   path: web/src/components/panels/cockpit/QueuePanel.tsx
   description: Queue panel — uses useQueue(agentId) for live staged actions. Index/tool/intent/preview per action.
   last_edited_ms: 1781695333902
+bce4ff74fb4de2b0:
+  path: web/src/components/finder/views/shared.tsx
+  description: 'Shared Finder view helpers: MOVE/FOLDER_DRAG MIME consts, startItemDrag/readMovePayload/isMoveDrag/folderDropProps drag-drop, relOf, ViewHandlers interface, RenameInput, TagDots, mods, itemCount. Imported by FinderViews + ColumnsView. 199 lines.'
+  last_edited_ms: 1782037375245
 bd2f1faa83138934:
   path: crates/cp-mod-callback/src/panel.rs
   description: Callback panel. Table view of all definitions (ID/name/pattern/blocking/timeout/scope/success_msg/cwd). Editor sub-view shows script content for one callback. No Active column.
@@ -6282,6 +6326,10 @@ cb2678759db7f441:
   path: .github/checks/lint-config.chain
   description: Cryptographic hash chain protecting 12 critical lint/config files
   last_edited_ms: 0
+cb3ba8cb29ca642b:
+  path: web/src/components/ui/tooltip.tsx
+  description: shadcn-style Tooltip on Base UI tooltip primitive (Provider/Root/Trigger/Content). Portaled, arrow, side/align positioning, tw-animate. Frozen maquette UI primitive; T289 InfoBadge uses the Popover variant instead.
+  last_edited_ms: 1782037386590
 cbb71fe5106157bc:
   path: crates/cp-mod-logs/src/types.rs
   description: 'Log entry types. LogEntry: id, timestamp_ms, datetime, content, importance (no tags). LogsState: logs Vec + next_log_id counter. ms_to_iso() helper.'
@@ -6542,6 +6590,10 @@ d3f82c22b0de608b:
   path: crates/cp-wire/tests/framing_integrity.rs
   description: 'Phase 21 (X788): exhaustive framing integrity suite — the V1 torn-tail property at byte granularity. Truncate at EVERY offset (clean-prefix-only, never fabricated frame), single-byte-flip at every offset (detected-or-byte-identical, never silent-different), payload-region corruption always CrcMismatch, trailing garbage doesn''t corrupt first decode, sub-header buffers Incomplete-never-panic, oversized len-prefix rejected-not-allocated, zero-length payload round-trips. Lib-only deps acked via use crc32c/serde/serde_json/sha2 as _ (per-target unused-crate-dependencies). 8 tests.'
   last_edited_ms: 1781648169011
+d434a8d587934f19:
+  path: web/src/components/finder/internal/useFinderActions.ts
+  description: 'Finder filesystem-mutating actions + path navigation hook: upload/move/mkdir(inline New Folder)/rename/trash live mutations + navigate/back/forward. commitRename routes sentinel→mkdir else rename; cancelRename drops pending placeholder.'
+  last_edited_ms: 1782038018598
 d4527968c406c423:
   path: web/sse_reconnect_probe.py
   description: 'T268 reconnect-replay probe (deterministic, no browser). Connects the SSE stream twice with ?last_event_id=<rev> vs ?last_rev=<rev> and counts deltas with id>rev replayed in the first 2s (= immediate gap replay). Proves the resume param-name bug: last_event_id→0 replayed (cold seed at head, deltas lost→15s poll→5-10s delay); last_rev→N replayed (gap recovered). Per-read socket timeout (0.4s) ends the idle window. Run: python3 sse_reconnect_probe.py [AGENT_ID].'
@@ -6638,6 +6690,10 @@ d707bae8d2b9a7b6:
   path: ui/src/components/agents/PromptModal.tsx
   description: 'Prompts page modals (design-only). PromptModal: create (kind picker System/Skill/Command + name/description/body textarea) or view/edit (prefilled, mock .md body, built-in name lock, Delete). ImportModal: import from other agentic systems (Claude Code/Codex/Cursor/Windsurf/Aider/Continue), per-row Imported state. Shared hand-rolled Backdrop (backdrop-fade+modal-pop) + Field. Used by PromptsPage.'
   last_edited_ms: 1781532643659
+d736a0dc22d9d164:
+  path: web/src/components/finder/FinderChrome.tsx
+  description: 'Finder chrome: tab strip, main toolbar (nav/crumbs/view-switch/search/icon-size/actions), path bar + NavBtn/SegBtn. FinderSidebar extracted to support/FinderSidebar and re-exported. 372 lines.'
+  last_edited_ms: 1782037375391
 d794e0ca2d6b10ae:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search. Dynamic entity_result panels.
@@ -6898,6 +6954,10 @@ e31c48c5949be594:
   path: crates/cp-console-server/src/protocol.rs
   description: JSON-line protocol types. Request (cmd/key/command/cwd/input/log_path). Response (ok/error/pid/status/exit_code/sessions). interpret_escapes() for \n/\t/\xHH.
   last_edited_ms: 0
+e3aeea577e818def:
+  path: web/src/components/finder/views/FinderViews.tsx
+  description: Finder grid/list/gallery views + Head/Hero. Re-exports FOLDER_DRAG_MIME/MOVE_MIME/TagDots/ViewHandlers from ./shared and ColumnsView from ./ColumnsView (keeps existing importers stable after the <500 split). 273 lines.
+  last_edited_ms: 1782037375199
 e3e5df833659a814:
   path: crates/cp-wire/tests/framing_integrity.rs
   description: 'Phase 21 (X788): exhaustive framing integrity suite — the V1 torn-tail property at byte granularity. Truncate at EVERY offset (clean-prefix-only, never fabricated frame), single-byte-flip at every offset (detected-or-byte-identical, never silent-different), payload-region corruption always CrcMismatch, trailing garbage doesn''t corrupt first decode, sub-header buffers Incomplete-never-panic, oversized len-prefix rejected-not-allocated, zero-length payload round-trips. Lib-only deps acked via use crc32c/serde/serde_json/sha2 as _ (per-target unused-crate-dependencies). 8 tests.'
@@ -7122,6 +7182,10 @@ ebdf6e51ce9dc683:
   path: crates/cp-mod-git/src/tools.rs
   description: Git tool. Read-only → dynamic git_result panels. Mutating → async subprocess via spawn_async_tool. flame!("git_exec"). GIT_ASKPASS temp script for HTTPS auth. Cache invalidation via regex patterns.
   last_edited_ms: 0
+ebf5e0b7f03bc1bf:
+  path: web/src/components/finder/internal/useFinderSelection.ts
+  description: 'Finder render-coupled selection/open/tab/context-menu handlers hook: macOS click semantics (onRowClick instant-select then deferred slow-rename or non-reflowing QuickLook open), open/openInNewTab, openContext/openEmptyContext, tab new/close, sort, goUp, trashNode.'
+  last_edited_ms: 1782038018645
 ec28737efa4930e9:
   path: .gitignore
   description: Git ignore rules
@@ -7558,6 +7622,10 @@ f9a59893086fbabb:
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view. Agent realm header (name+folder) + ''M working in parallel'' pulsing pill. Grouped: ''Needs you''=MY_TURN / ''Working in parallel''=THEIR_TURN. Each row: status dot, name, preview, time, unread. New Thread + search.'
   last_edited_ms: 1781515390716
+f9a7ae24a5d70197:
+  path: web/src/components/finder/internal/useExternalDragUpload.ts
+  description: 'Window-level external-file drag-upload lifecycle hook: shows ''Drop to upload'' overlay while an OS-file drag hovers, clears on drop/leave/cancel (heartbeat watchdog), hands dropped files to onFiles. Internal MOVE drags (no Files type) never raise it.'
+  last_edited_ms: 1782038018575
 fa07059c45a476ab:
   path: crates/cp-mod-memory/src/panel.rs
   description: Memory panel. Sorts by importance (critical→low). format_memories_for_context() YAML output for LLM. blocks() renders KeyValue with importance-colored labels. refresh() updates context entry. context() returns ContextItem. needs_cache=false.
@@ -7666,6 +7734,10 @@ fd2cc3a6e7f7a05b:
   path: ui/src/components/threads/ThreadsView.tsx
   description: Threads view assembler, scoped to ACTIVE AGENT's realm (filters threadDetails by agentId, EmptyRealm when none). 2-pane (collapsible ThreadList | ThreadConversation). Owns collapsed state; floating PanelLeft Button re-opens the rail when collapsed. No onOpenCockpit (details popup removed).
   last_edited_ms: 1781533385882
+fd5552b880f42277:
+  path: web/src/components/finder/preview/mockPreviews.tsx
+  description: 'Decorative maquette Finder previews (inline node payloads): CodePreview/SheetPreview/SlidesPreview/PdfPreview/ImagePreview/AudioPreview/VideoPreview + tint helper. 293 lines.'
+  last_edited_ms: 1782037375369
 fd5c5364aaf6141a:
   path: ui/src/components/panels/cockpit/TreePanel.tsx
   description: 'Cockpit Directory Tree maquette: depth-indented annotated rows (folder/file glyph, token-size chip, cartographer description, [!] stale marker). Reads mock treeRows.'

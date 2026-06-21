@@ -1,6 +1,6 @@
 import { ChevronDown, Terminal, User } from "lucide-react"
 import type { ChatMessage } from "@/lib/types"
-import { Markdown } from "@/lib/markdown"
+import { Markdown } from "@/lib/support/markdown"
 import { cn } from "@/lib/utils"
 
 export function Message({ msg }: { msg: ChatMessage }) {

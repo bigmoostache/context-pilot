@@ -10,7 +10,7 @@ import {
   Settings2,
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { accentVar, fmtCost } from "@/lib/panelMeta"
+import { accentVar, fmtCost } from "@/lib/support/panelMeta"
 import { useMetrics, useRetiredFleet, useUnretireAgent } from "@/lib/live"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"

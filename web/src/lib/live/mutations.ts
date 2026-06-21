@@ -1,0 +1,243 @@
+// ── Live mutations — imperative agent + finder writes ────────────────
+//
+// Split out of live/index for the file-size limit; re-exported there so
+// `@/lib/live` stays the single import surface. Each is a one-shot POST, not a
+// delta-covered resource, so they ride `useMutation` rather than the SSE push
+// plane and invalidate the affected query family on success.
+
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { qk } from "../query/sync"
+import * as api from "../api"
+import type { Agent } from "../types"
+import { useLive, type LiveQueryResult } from "./index"
+
+// ── Finder upload (TanStack mutation) ─────────────────────────────────
+//
+// Uploading files is a set of one-shot POSTs (one per file — the backend takes
+// raw bytes + a filename, sidestepping multipart). It is not a delta-covered
+// resource, so it rides a `useMutation`. On success the current directory's
+// listing query is invalidated so the new files appear immediately.
+
+/** Max upload size per file (32 MiB) — matches the backend transport's
+ *  `MAX_BODY`; a larger body would be silently truncated server-side, so we
+ *  reject it client-side with a clear message instead. */
+export const MAX_UPLOAD_BYTES = 32 * 1024 * 1024
+
+/**
+ * Mutation to upload one or more files into a realm directory. Files are sent
+ * concurrently (one POST each); any over {@link MAX_UPLOAD_BYTES} are rejected
+ * before sending. On success the destination directory's `useFs` listing is
+ * invalidated so the uploads surface at once.
+ */
+export function useUploadFiles(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ dir, files }: { dir: string; files: File[] }) => {
+      const tooBig = files.filter((f) => f.size > MAX_UPLOAD_BYTES)
+      if (tooBig.length > 0) {
+        throw new Error(
+          `${tooBig.map((f) => f.name).join(", ")} exceeds the 32 MB upload limit`,
+        )
+      }
+      await Promise.all(files.map((f) => api.uploadFile(agentId, dir, f)))
+      return { count: files.length, dir }
+    },
+    onSuccess: ({ dir }) => {
+      void client.invalidateQueries({ queryKey: qk.fs(agentId, dir) })
+    },
+  })
+}
+
+/**
+ * Mutation to overwrite an existing realm file (the Finder's in-place editor —
+ * e.g. saving the WYSIWYG markdown editor back to its `.md`). Not a delta-covered
+ * resource → a `useMutation`. On success the file's `useFsPreview` cache is
+ * invalidated so a re-open shows the saved content, and the containing
+ * directory's `useFs` listing is invalidated so its size/mtime refresh.
+ */
+export function useWriteFile(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ path, content }: { path: string; content: string }) =>
+      api.writeFile(agentId, path, content),
+    onSuccess: (_res, { path }) => {
+      void client.invalidateQueries({ queryKey: qk.fsPreview(agentId, path) })
+      void client.invalidateQueries({ queryKey: ["fs", agentId] })
+    },
+  })
+}
+
+/**
+ * Mutation to create a new folder inside a realm directory (the Finder's
+ * "New Folder" action). Not a delta-covered resource → a `useMutation`. On
+ * success the destination directory's `useFs` listing is invalidated so the
+ * new folder appears at once.
+ */
+export function useCreateFolder(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ dir, name }: { dir: string; name: string }) =>
+      api.createFolder(agentId, dir, name),
+    onSuccess: (_res, { dir }) => {
+      void client.invalidateQueries({ queryKey: qk.fs(agentId, dir) })
+    },
+  })
+}
+
+/**
+ * Mutation to move one or more entries into a realm directory (the Finder's
+ * internal drag-and-drop). Not a delta-covered resource → a `useMutation`. On
+ * success the WHOLE `fs` query family for the agent is invalidated (both the
+ * source and destination listings changed) so the move is reflected at once.
+ */
+export function useMoveItems(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ items, dest }: { items: string[]; dest: string }) =>
+      api.moveItems(agentId, items, dest),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["fs", agentId] })
+    },
+  })
+}
+
+/**
+ * Mutation to rename one entry in place (the Finder's inline rename). Not a
+ * delta-covered resource → a `useMutation`. On success the WHOLE `fs` query
+ * family for the agent is invalidated so the renamed entry surfaces under its
+ * new name at once (the containing directory's listing changed).
+ */
+export function useRenameItem(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ path, name }: { path: string; name: string }) =>
+      api.renameItem(agentId, path, name),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["fs", agentId] })
+    },
+  })
+}
+
+/**
+ * Mutation to move one or more entries to the realm trash (the Finder's
+ * right-click "Move to Trash"). Not a delta-covered resource → a `useMutation`.
+ * On success the WHOLE `fs` query family for the agent is invalidated so the
+ * trashed entries vanish from the current listing at once (they move into a
+ * hidden `.cp-trash/` the listing never shows).
+ */
+export function useTrashItems(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ items }: { items: string[] }) => api.trashItems(agentId, items),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["fs", agentId] })
+    },
+  })
+}
+
+// ── Agent lifecycle (create / restart / retire) ───────────────────────
+//
+// Creating/restarting/retiring an agent is a one-shot POST; the spawn or kill
+// is async, so each invalidates the fleet query immediately AND on a short
+// delay so the change surfaces well before the slow (15s) fleet backstop poll.
+
+/**
+ * Mutation to create a new agent. On success it nudges the fleet query to
+ * refetch immediately and again shortly after, so the freshly-spawned agent
+ * surfaces on the dashboard the moment it self-registers (the spawn is async —
+ * the receipt only confirms the launch).
+ */
+export function useCreateAgent() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { name: string; folder?: string; model?: string }) =>
+      api.createAgent(body),
+    onSuccess: () => {
+      const refetchFleet = () => {
+        void client.invalidateQueries({ queryKey: qk.fleet() })
+      }
+      refetchFleet()
+      // The agent self-registers in ~1-2s after the pty spawn; re-poll a couple
+      // of times to catch it well before the 15s backstop.
+      window.setTimeout(refetchFleet, 1500)
+      window.setTimeout(refetchFleet, 3500)
+    },
+  })
+}
+
+/**
+ * Mutation to restart an agent (kill its stale process + respawn from the
+ * current binary). Like {@link useCreateAgent}, the respawn is async: the agent
+ * re-registers under the same id within ~2-3s, so we nudge the fleet query to
+ * refetch immediately and again shortly after, surfacing the back-to-life agent
+ * well before the slow backstop poll.
+ */
+export function useRestartAgent() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (agentId: string) => api.restartAgent(agentId),
+    onSuccess: () => {
+      const refetchFleet = () => {
+        void client.invalidateQueries({ queryKey: qk.fleet() })
+      }
+      refetchFleet()
+      window.setTimeout(refetchFleet, 2000)
+      window.setTimeout(refetchFleet, 4000)
+    },
+  })
+}
+
+/**
+ * The Retired (archived) fleet — agents stopped-but-kept (T271). Served from
+ * the orchestrator's retired store (`GET /api/fleet/retired`), so each card is
+ * rendered from a snapshot, not a live process. No SSE bridge (a retired agent
+ * emits nothing); a slow poll keeps it eventually-consistent after a retire /
+ * unretire on another tab.
+ */
+export function useRetiredFleet(): LiveQueryResult<Agent[]> {
+  return useLive(qk.retiredFleet(), () => api.fetchRetiredFleet())
+}
+
+/**
+ * Mutation to retire (archive) an agent — stop its process + console server,
+ * keep its folder. On success both the active fleet and the retired fleet are
+ * refetched (immediately + once more shortly after, since the process kill +
+ * registry-record removal settle asynchronously) so the card moves from the
+ * Active grid to the Retired section without waiting on the backstop poll.
+ */
+export function useRetireAgent() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (agentId: string) => api.retireAgent(agentId),
+    onSuccess: () => {
+      const refetch = () => {
+        void client.invalidateQueries({ queryKey: qk.fleet() })
+        void client.invalidateQueries({ queryKey: qk.retiredFleet() })
+      }
+      refetch()
+      window.setTimeout(refetch, 1500)
+    },
+  })
+}
+
+/**
+ * Mutation to unretire an agent — clear its retired flag and respawn it on the
+ * kept folder. The respawn self-registers under the same id within ~2-3s, so we
+ * refetch both fleets immediately and again shortly after to surface the
+ * back-to-life agent in the Active grid before the slow backstop poll.
+ */
+export function useUnretireAgent() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (agentId: string) => api.unretireAgent(agentId),
+    onSuccess: () => {
+      const refetch = () => {
+        void client.invalidateQueries({ queryKey: qk.fleet() })
+        void client.invalidateQueries({ queryKey: qk.retiredFleet() })
+      }
+      refetch()
+      window.setTimeout(refetch, 2000)
+      window.setTimeout(refetch, 4000)
+    },
+  })
+}

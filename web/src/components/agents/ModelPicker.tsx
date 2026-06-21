@@ -6,7 +6,7 @@ import {
   priceTag,
   type ProviderDef,
   type ModelDef,
-} from "@/lib/models"
+} from "@/lib/support/models"
 import { cn } from "@/lib/utils"
 
 /**

@@ -14,7 +14,7 @@ import {
   Upload,
 } from "lucide-react"
 import type { FinderNode, FinderTag } from "@/lib/types"
-import { TAG_META } from "./kind"
+import { TAG_META } from "./support/kind"
 
 export interface MenuPos {
   x: number

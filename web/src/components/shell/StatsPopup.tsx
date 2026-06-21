@@ -3,7 +3,7 @@ import { Activity, CheckCircle2, Loader2, Stethoscope, TriangleAlert, X } from "
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
 import { usePanels, useAgentMeta } from "@/lib/live"
 import { fetchVitals, type Vital } from "@/lib/api"
-import { accentVar, fmtTokens } from "@/lib/panelMeta"
+import { accentVar, fmtTokens } from "@/lib/support/panelMeta"
 
 /**
  * Session "vitals" popup — the stats that used to live in the cockpit's right

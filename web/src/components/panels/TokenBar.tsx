@@ -1,4 +1,4 @@
-import { loadColor } from "@/lib/panelMeta"
+import { loadColor } from "@/lib/support/panelMeta"
 import { cn } from "@/lib/utils"
 
 interface TokenBarProps {

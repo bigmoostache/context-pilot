@@ -39,3 +39,13 @@ rust-check:
     echo ""
     echo "All Rust checks passed."
   last_edited_ms: 0
+web-structure:
+  name: web-structure
+  description: Enforce ≤8 entries/dir + ≤500 lines/file under web/src (shadcn ui/ exempt)
+  pattern: web/src/**
+  blocking: true
+  timeout_secs: 15
+  success_message: Web structure OK ✓
+  is_global: true
+  script_content: bash web/scripts/check-web-structure.sh
+  last_edited_ms: 1782039392004
