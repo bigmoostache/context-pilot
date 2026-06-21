@@ -71,7 +71,6 @@ export function FinderOverlays(d: OverlaysDeps) {
             downloadFile(d.agentId, n.path).catch(() => d.flash(`Failed to download ${n.name}`))
             d.flash(`Downloading ${n.name}…`)
           }}
-          onTag={(_n, tag) => d.flash(`Tagged as ${tag}`)}
           onPin={(n) => {
             d.addPin({ name: n.name, path: n.path })
             d.flash(`Pinned ${n.name}`)

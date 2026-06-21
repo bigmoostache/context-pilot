@@ -9,12 +9,10 @@ import {
   PencilLine,
   Pin,
   RefreshCw,
-  Tag,
   Trash2,
   Upload,
 } from "lucide-react"
-import type { FinderNode, FinderTag } from "@/lib/types"
-import { TAG_META } from "./support/kind"
+import type { FinderNode } from "@/lib/types"
 
 export interface MenuPos {
   x: number
@@ -34,7 +32,6 @@ export function ContextMenu({
   onAction,
   onOpen,
   onDownload,
-  onTag,
   onTrash,
   onPin,
   onNewFolder,
@@ -51,8 +48,6 @@ export function ContextMenu({
   onOpen: (node: FinderNode) => void
   /** Trigger a real file download. */
   onDownload: (node: FinderNode) => void
-  /** Toggle a tag on a node. */
-  onTag: (node: FinderNode, tag: FinderTag) => void
   /** move a node to the realm trash (item menu) */
   onTrash: (node: FinderNode) => void
   /** pin a folder to the sidebar (folders only) */
@@ -225,27 +220,6 @@ export function ContextMenu({
             <Download className="size-3.5 shrink-0 opacity-80" />
             <span className="flex-1">Download</span>
           </button>
-
-          <Separator />
-
-          {/* tag swatches — the macOS finder signature */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5">
-            <Tag className="size-3.5 shrink-0 text-muted-foreground/70" />
-            <div className="flex flex-1 items-center justify-between">
-              {Object.entries(TAG_META).map(([key, t]) => (
-                <button
-                  key={key}
-                  title={t.label}
-                  onClick={() => {
-                    onTag(node, key as FinderTag)
-                    onClose()
-                  }}
-                  className="size-3.5 rounded-full ring-1 ring-inset ring-black/10 transition-transform hover:scale-125"
-                  style={{ background: t.color }}
-                />
-              ))}
-            </div>
-          </div>
 
           <Separator />
 
