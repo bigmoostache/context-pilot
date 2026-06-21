@@ -1314,6 +1314,10 @@
   path: crates/cp-mod-firecrawl/src/lib.rs
   description: 'Firecrawl module. 4 tools: scrape/search/map/crawl. Dynamic firecrawl_result panels. No state. pub(crate) mod crawl. Nested object params (location). Simple dispatch pattern.'
   last_edited_ms: 0
+2aba885bfc9e1f6e:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread composer (always-active textarea + turn-status banner). T298: paperclip wired — hidden multi-file <input>, onAttach?(files) prop. T304: optional draftKey prop persists the UNSENT draft to localStorage — lazy-seeds text on mount, writes every keystroke, clears the key on send/empty, so a half-written reply survives a reload / view switch / thread switch (each thread its own draft). Enter sends / Shift+Enter newline, IME-guarded, auto-grow.'
+  last_edited_ms: 1782050971883
 2abec4ea3638b921:
   path: crates/cp-orchestrator/src/services/materialized_view.rs
   description: 'Phase 18: MaterializedView — in-mem fleet projection folded from OpEntry stream (one AgentView per agent). AgentView{rev,heads,phase,lifecycle,cost:CostSnapshot}.apply(&OpEntry): Checkpoint=authoritative heads reset (I5 count-bounded restart mechanism at view layer), MessageCreated=set_thread_head, PhaseTransition/Lifecycle/CostAggregate=latest-wins (cost cumulative-since-boot so NOT summed), CommandEffect/SeenMark/Unknown=inert. rev=max. MaterializedView{agents:HashMap}: apply/apply_batch/get/remove/len/agent_ids. AgentView+CostSnapshot derive Serialize for the REST transport. 7 tests.'
@@ -4514,6 +4518,10 @@
   path: ui/src/lib/finderFs.ts
   description: Finder mock filesystem + helpers. buildRealm(folder,name) grafts one rich project tree onto an agent's folder (confined realm). findNode/pathChain DFS, fmtBytes, sortNodes (folders-first). Files carry preview payloads (code/sheet/slides/pdf/image/text).
   last_edited_ms: 1781516507807
+8e62f51fa36f7fc9:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped) opened by any chip. T304: passes draftKey=cp-draft-{agentId}-{thread.id} so the composer persists each thread''s unsent draft. Takes agentId + onAttach props.'
+  last_edited_ms: 1782050971915
 8e69d18e4972e90c:
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN (width=var(--sidebar-w); collapse prop + edge-rail removed per T23). NO agent header. Working search <input> filters by name+last-preview. Groups: ''Needs you'' (MY_TURN, signal), ''Active'' (ACTIVE, green/ok, the one streaming), ''Working in parallel'' (THEIR_TURN). Per-row hover Archive/Restore action. Footer ''Archived (N)'' toggles a read-only archived view. New Thread button → onNewThread. Header pill counts agent-owned working threads.'
