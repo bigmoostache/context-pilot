@@ -4,12 +4,7 @@ import { Message } from "@/components/conversation/Message"
 import { QuestionForm } from "./QuestionForm"
 import { ThreadComposer } from "./ThreadComposer"
 import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
-import {
-  parseFileUploads,
-  uploadToNode,
-  FileUploadChip,
-  type UploadedFile,
-} from "./fileUpload"
+import { uploadToNode, type UploadedFile } from "./fileUpload"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
 import type { FinderNode } from "@/lib/types"
 
@@ -148,23 +143,11 @@ export function ThreadConversation({
               <AutoRun key={`auto-${seg.msgs[0].id}`} msgs={seg.msgs} />
             ) : (
               <div key={seg.msg.id}>
-                {(() => {
-                  const { clean, files } = parseFileUploads(seg.msg.text ?? "")
-                  return (
-                    <>
-                      {(clean.length > 0 || files.length === 0) && (
-                        <Message msg={toChatMessage({ ...seg.msg, text: clean })} />
-                      )}
-                      {files.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 pb-1.5 pl-7">
-                          {files.map((f, i) => (
-                            <FileUploadChip key={i} file={f} onOpen={() => setSheetFile(f)} />
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )
-                })()}
+                <Message
+                  msg={toChatMessage(seg.msg)}
+                  agentId={agentId}
+                  onOpenFile={setSheetFile}
+                />
                 {seg.msg.questions?.map((q, i) => (
                   <div key={i} className="pb-1.5 pl-7">
                     <QuestionForm q={q} onSubmit={(answer) => onSend?.(answer)} />

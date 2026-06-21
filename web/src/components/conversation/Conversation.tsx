@@ -130,7 +130,7 @@ export function Conversation({ agentId }: { agentId: string }) {
               Loading conversation…
             </div>
           ) : (
-            messages.map((m) => <Message key={m.id} msg={m} />)
+            messages.map((m) => <Message key={m.id} msg={m} agentId={agentId} />)
           )}
         </div>
       </ScrollArea>
