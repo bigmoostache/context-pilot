@@ -1,5 +1,6 @@
 import { Download, Share2, X } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
+import { downloadFile } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import {
   Empty,
@@ -69,7 +70,16 @@ export function FinderPreview({
           <div className="ml-auto flex items-center gap-1">
             {node && node.kind !== "folder" && (
               <>
-                <IconBtn icon={Download} title="Download" />
+                {/* Download: stream the realm file to the browser via the
+                    backend's attachment endpoint. Only actionable in the live
+                    Finder (an agentId scopes the realm); the mock has none. */}
+                <IconBtn
+                  icon={Download}
+                  title="Download"
+                  onClick={
+                    agentId ? () => void downloadFile(agentId, node.path) : undefined
+                  }
+                />
                 <IconBtn icon={Share2} title="Share" />
               </>
             )}
