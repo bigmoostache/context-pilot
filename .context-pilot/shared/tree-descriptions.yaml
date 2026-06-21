@@ -7406,6 +7406,10 @@ ec97d0753d489535:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Phase 19/30 + P1-P7: transport hub. Backend shared state + serve/serve_bound + route_rest (22 routes) + handle_stream SSE. CORS headers on all responses + OPTIONS preflight 204. /api/health. stream_to_client uses into_writer() + per-event flush. Invalidation: dirty_agents set, mark_dirty/take_dirty for SSE invalidate events.'
   last_edited_ms: 1781778261224
+ece5fde37c551550:
+  path: web/src/components/finder/preview/FinderPreview.tsx
+  description: 'Quick Look preview shell + Body() kind router. Routes node → mock previews (mockPreviews), live fetchers (livePreviews), or shared leaf renderers (previewParts). T306: the drawer header''s Download button is wired to downloadFile(agentId, node.path) (streams the realm file via the backend attachment endpoint) — actionable only in the live Finder (agentId scopes the realm), inert in the mock; hidden for folders. Share button still decorative.'
+  last_edited_ms: 1782053476346
 ecfba54941046db5:
   path: web/src/lib/live/index.ts
   description: Live data hooks barrel — TanStack Query + SSE push plane. useLive() wraps useQuery into legacy LiveQueryResult{data,loading,error,refetch}; ensureSync(agentId) guarantees the per-agent SSE→cache bridge. All agent-scoped hooks (useThreads/useMemory/useTodos/…/useMetrics) + useStreamingTokens (rAF-batched §7 token plane). Re-exports ./mutations. The @/lib/live single import surface.
