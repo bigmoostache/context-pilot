@@ -7070,6 +7070,10 @@ e04bf579d6804e04:
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
   last_edited_ms: 0
+e05b565da1ae4f39:
+  path: web/src/components/threads/fileUpload.tsx
+  description: 'Threads chat file-upload (T298): UploadedFile type + buildUploadMessage (one ```file-upload YAML block per file: path/name/size/note) + splitMessageSegments (interleaves prose + inline file chips at parse position) + uploadToNode (synthesizes a FinderNode via kindOf so the chip drives the shared Quick Look). MessageFileChip existence-checks via useFs(parent): greys ''moved/deleted'' when the file is absent OR its parent dir 404s; size shown is the REAL on-disk byte count from the listing node (never the untrusted YAML size:). FileUploadChip = clickable mac-icon chip opening QuickLookSheet; three states present-interactive / present-static / greyed-missing.'
+  last_edited_ms: 1782052687036
 e0967f55f964e135:
   path: Cargo.toml
   description: Workspace root. 22 crate members (incl cp-wire). Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny). openssl vendored.
