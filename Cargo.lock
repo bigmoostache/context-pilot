@@ -3222,6 +3222,7 @@ dependencies = [
  "cp-mod-todo",
  "cp-mod-tree",
  "cp-mod-utilities",
+ "cp-oplog",
  "cp-render",
  "cp-wire",
  "crossterm",

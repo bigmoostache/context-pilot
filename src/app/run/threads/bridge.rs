@@ -272,25 +272,91 @@ pub(super) const fn wire_turn(status: ThreadStatus) -> ThreadTurn {
 /// change (the cold roster rides the frontend's initial tier-② load).
 ///
 /// No-op when the bridge is OFF.
+/// Replay the agent's own oplog to recover the **last per-thread status the log
+/// recorded** — i.e. exactly what the backend's view has folded.
+///
+/// This is the correct seed for [`emit_thread_status`]'s change-memo on the
+/// first pass after a (re)boot: comparing the live (disk) status against *this*
+/// (not against the live status itself) makes the first diff emit precisely the
+/// transitions that landed on disk while the bridge was down but were never
+/// journaled — self-healing disk↔oplog divergence (see the seed comment in
+/// [`emit_thread_status`]).
+///
+/// Returns an empty map when the bridge is OFF or the replay fails: the caller
+/// then seeds nothing, so every live thread looks "new" to the diff and has its
+/// current status emitted — a safe, if chattier, degradation that still
+/// converges the view (it never leaves a thread stale).
+fn oplog_roster_statuses(state: &State) -> std::collections::HashMap<String, ThreadTurn> {
+    let Some(bs) = state.get_ext::<BridgeState>() else {
+        return std::collections::HashMap::new();
+    };
+    let Some(boot) = bs.boot.as_ref() else {
+        return std::collections::HashMap::new();
+    };
+    match cp_oplog::replay::replay(&boot.entry().oplog_path) {
+        Ok(recovered) => {
+            recovered.roster.into_iter().map(|t| (t.thread_id, t.status)).collect()
+        }
+        Err(e) => {
+            log::warn!("bridge: oplog replay for status seed failed: {e:?}");
+            std::collections::HashMap::new()
+        }
+    }
+}
+
+/// Emit a [`ThreadStatusChanged`](OpEntryKind::ThreadStatusChanged) the instant
+/// any thread's turn-status flips, so the backend view (and the web roster)
+/// move the thread to the right bucket in milliseconds instead of waiting on
+/// the debounced tier-② disk write.
+///
+/// A main-loop **observe-on-change chokepoint**: it diffs each thread's live
+/// status against the per-thread snapshot held in [`BridgeState`] and emits
+/// **only on an actual flip**, so it captures a transition from *every* source
+/// — a web `SendMessage`, the agent's `Send` tool, a TUI reply, the agent
+/// finishing a turn — with one uniform path. A status flip is user-visible
+/// roster state, so it rides the **durable** (never-dropped, never-loop-
+/// blocking) path ([`emit_roster_delta`]).
+///
+/// The first pass after a (re)boot seeds the snapshot from the **oplog roster**
+/// (what the backend view has folded) and then *falls through* to the diff, so
+/// any flip that landed on disk while the bridge was down but was never
+/// journaled is emitted on the very first pass — self-healing disk↔oplog
+/// divergence (see the inline seed comment).
+///
+/// No-op when the bridge is OFF.
 pub(in crate::app::run) fn emit_thread_status(app: &mut App) {
     if !bridge_active(&app.state) {
         return;
     }
 
-    // First pass: snapshot existing statuses without emitting.
+    // First pass after (re)boot: seed the memo from the **oplog's** last-known
+    // per-thread status — i.e. exactly what the backend's view has folded — and
+    // then FALL THROUGH to the diff+emit below.
+    //
+    // The memo must be seeded from the oplog, NOT from the live (disk) status:
+    // a turn flip that lands on disk while the bridge is down (e.g. a `Send`
+    // immediately before a `system_reload`, or any restart straddling a
+    // transition) is saved to tier-② config.json by the normal save path but
+    // never journaled as a `ThreadStatusChanged` delta. If we seeded from the
+    // live status, that post-flip value would become the baseline and the lost
+    // transition would be swallowed forever — leaving the backend view (rebuilt
+    // from the oplog) permanently stale (the "thread shows under the wrong
+    // turn" bug). Seeding from the oplog roster and then running the normal
+    // diff makes the very first pass emit precisely the transitions the oplog
+    // is missing, self-healing disk↔oplog divergence on every boot. Threads the
+    // oplog has never recorded a status for are simply absent from the seed, so
+    // the diff emits their current status (correct — the view doesn't know it).
     let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.status_memo_seeded);
     if !seeded {
-        let statuses: Vec<(String, ThreadTurn)> = ThreadsState::get(&app.state)
-            .threads
-            .iter()
-            .map(|t| (t.id.clone(), wire_turn(t.status)))
-            .collect();
+        let oplog_statuses = oplog_roster_statuses(&app.state);
         let bs = app.state.ext_mut::<BridgeState>();
-        for (id, turn) in statuses {
-            let _prev = bs.thread_statuses.insert(id, turn);
-        }
+        // `extend` (not an explicit `for` over the map) keeps us off the
+        // `iter_over_hash_type` lint; insertion order is irrelevant since each
+        // thread id appears once in the roster and the memo is keyed by id.
+        bs.thread_statuses.extend(oplog_statuses);
         bs.status_memo_seeded = true;
-        return;
+        // Intentionally NO early return: fall through so the diff below emits
+        // any flip the oplog missed while the bridge was down.
     }
 
     // Diff live statuses against the memo; collect the flips (owned, so the

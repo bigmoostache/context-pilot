@@ -396,6 +396,34 @@
   - frontend
   - shipped
   last_edited_ms: 1781885009956
+5e880bc0daba76c3:
+  tl_dr: 'Thread turn-status disk↔oplog divergence (T291) self-heal SHIPPED: emit_thread_status now seeds its post-reboot memo from the OPLOG REPLAY ROSTER, not live disk status, then falls through to the diff so any flip lost across a reload re-emits on the first pass.'
+  contents: |-
+    ## T291 'Threads Sidebar' — single-source-of-truth fix
+
+    ### The class of bug
+    emit_thread_status (src/app/run/threads/bridge.rs) is the observe-on-change chokepoint that emits ThreadStatusChanged oplog deltas. On the first pass after a (re)boot it SEEDS its per-thread memo (BridgeState.thread_statuses) without emitting, so a restarted agent doesn't replay every thread's status as spurious change. BUG: it used to seed from the CURRENT LIVE/DISK status. A turn flip that lands on disk while the bridge is down (e.g. a Send immediately before system_reload, or any restart straddling a my_turn↔their_turn transition) is saved to tier-② config.json by the normal save path but NEVER journaled as a ThreadStatusChanged delta. Seeding the memo from the post-flip disk value made that value the baseline → the lost transition was swallowed forever → the orchestrator view (rebuilt from the oplog) stayed permanently stale → web sidebar bucketed the thread under the wrong turn while disk said the opposite. Two backend read paths (oplog-fed view vs disk) disagreed = the single-source-of-truth violation the user saw.
+
+    ### Fix (shipped on demaquetting)
+    1. NEW helper oplog_roster_statuses(state): cp_oplog::replay::replay(boot.entry().oplog_path).roster → HashMap<thread_id, ThreadTurn> = exactly what the backend view has folded. Empty map on bridge-OFF or replay error (safe degrade: every thread looks 'new', current status emitted).
+    2. emit_thread_status first pass now: seed memo via bs.thread_statuses.extend(oplog_statuses) (extend, NOT a for-loop — dodges iter_over_hash_type forbid), set status_memo_seeded=true, and INTENTIONALLY NO early return — falls through to the normal diff+emit. So the very first pass emits precisely the transitions the oplog is missing vs live disk → self-heals disk↔oplog divergence on every boot. Threads the oplog never recorded are absent from the seed → diff emits their current status (correct).
+    3. Needed cp-oplog as a DIRECT dep of the tui crate (was only transitive via cp-mod-bridge) — added to root Cargo.toml [dependencies] (Cargo.lock updated). cp_oplog now referenced directly in bridge.rs so unused-crate-dependencies (forbid) is satisfied.
+
+    ### Validation
+    cargo build --release green (12s); cargo test -p cp-mod-bridge -p cp-oplog exit 0; rust-check (CB3) passed; folder-sizes 'failure' = ./oplog/bodies gitignored runtime artifact (unrelated); lint-integrity exit -1 = known benign chain quirk. TUI reloaded. The reload heals any pending divergence on its first emit_thread_status pass. NO orchestrator restart needed (TUI-crate-only change; orchestrator view folds the healed delta from the oplog tail).
+
+    ### Note on the live state when answering T291
+    By the time I verified, the user had sent FRESH messages into T287/T288/T289 (disk last_author=User, status=MyTurn) so those are LEGITIMATELY MY_TURN (pending user input), not divergence — nothing left to heal there this reload. The fix is for the class; it fires whenever a real disk↔oplog divergence exists at boot.
+  importance: high
+  labels:
+  - T291
+  - threads
+  - status
+  - oplog
+  - single-source-of-truth
+  - bridge
+  - shipped
+  last_edited_ms: 1782033689394
 5fca4a81f0734c4f:
   tl_dr: T271 agent retire/unretire SHIPPED end-to-end (orchestrator + web). Stop-and-keep, not delete. Details in contents.
   contents: |-
