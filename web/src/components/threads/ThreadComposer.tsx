@@ -2,6 +2,47 @@ import { useEffect, useRef, useState } from "react"
 import { ArrowUp, Paperclip, Loader2, Clock } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 
+/** A persisted composer draft: the unsent text plus the caret/selection range
+ *  to restore (T304). Stored as JSON under the composer's `draftKey`. */
+interface Draft {
+  text: string
+  selStart: number
+  selEnd: number
+}
+
+/** Clamp `n` into `[lo, hi]`. */
+function clampRange(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n))
+}
+
+/**
+ * Read and parse a persisted {@link Draft} from localStorage.
+ *
+ * Tolerant of the legacy format: early T304 drafts were stored as a bare text
+ * string (no cursor). A value that isn't our `{text,selStart,selEnd}` JSON
+ * object — a legacy plain string, or any non-object JSON — is treated as raw
+ * text with the caret at the end, so an in-flight draft from the old format is
+ * never lost on upgrade. Cursor offsets are clamped to the text length.
+ */
+function parseDraft(key: string | undefined): Draft {
+  const empty: Draft = { text: "", selStart: 0, selEnd: 0 }
+  if (!key) return empty
+  const raw = localStorage.getItem(key)
+  if (raw == null) return empty
+  try {
+    const o: unknown = JSON.parse(raw)
+    if (o && typeof o === "object" && typeof (o as Draft).text === "string") {
+      const t = (o as Draft).text
+      const s = clampRange((o as Draft).selStart ?? t.length, 0, t.length)
+      const e = clampRange((o as Draft).selEnd ?? s, 0, t.length)
+      return { text: t, selStart: s, selEnd: e }
+    }
+  } catch {
+    // not our JSON — fall through to the legacy plain-string path
+  }
+  return { text: raw, selStart: raw.length, selEnd: raw.length }
+}
+
 /**
  * Thread composer — always active, regardless of turn status. The hint above
  * the input reflects what the agent is doing with *this* thread when it is the
@@ -31,21 +72,48 @@ export function ThreadComposer({
   onAttach?: (files: File[]) => void
   /**
    * localStorage key under which the UNSENT draft is persisted (T304). When
-   * provided, what you type survives a reload, a view switch, and switching
-   * threads — each thread keeps its own pending draft. The composer is keyed by
-   * thread id upstream, so it remounts per thread and lazily seeds its text
-   * from this key; the persist effect writes every keystroke and clears the key
-   * on send (or when the draft is emptied). Omit it for an ephemeral composer.
+   * provided, what you type — and **where your caret is** — survives a reload,
+   * a view switch, and switching threads; each thread keeps its own pending
+   * draft. The composer is keyed by thread id upstream, so it remounts per
+   * thread and lazily seeds its text + selection from this key; every keystroke
+   * and caret move rewrites the draft, and it is cleared on send (or when the
+   * draft is emptied). The stored value is `{text,selStart,selEnd}` JSON (a
+   * legacy bare-string draft is still read, caret at end). Omit for an
+   * ephemeral composer.
    */
   draftKey?: string
 }) {
-  // Lazily seed from the persisted draft so a remount (thread switch / return
-  // from another view) or a full reload restores what was being typed (T304).
-  const [text, setText] = useState(() =>
-    draftKey ? localStorage.getItem(draftKey) ?? "" : "",
-  )
+  // Seed text + caret from the persisted draft ONCE per mount so a remount
+  // (thread switch / return from another view) or a full reload restores both
+  // what was being typed and where the cursor sat (T304). The ref is read by
+  // the mount effect below to apply the saved selection range.
+  const seedRef = useRef<Draft | null>(null)
+  if (seedRef.current === null) seedRef.current = parseDraft(draftKey)
+  const [text, setText] = useState(() => seedRef.current?.text ?? "")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Persist the unsent draft + caret per thread: write JSON on every keystroke
+  // and caret move, and remove the key once the draft is empty (sent or
+  // cleared) so we never leave stale drafts littering localStorage. Called
+  // explicitly from onChange/onSelect/submit with the textarea's live
+  // selection. No-op when no draftKey is supplied.
+  const persistDraft = (t: string, s: number, e: number) => {
+    if (!draftKey) return
+    if (t) localStorage.setItem(draftKey, JSON.stringify({ text: t, selStart: s, selEnd: e }))
+    else localStorage.removeItem(draftKey)
+  }
+
+  // Apply the saved caret/selection once the textarea has mounted (T304). Runs
+  // a single time; `autoFocus` puts the caret at the default position, this
+  // overrides it with the persisted range. Skipped when there is no draft.
+  useEffect(() => {
+    const el = textareaRef.current
+    const seed = seedRef.current
+    if (!el || !seed || !seed.text) return
+    el.focus()
+    el.setSelectionRange(seed.selStart, seed.selEnd)
+  }, [])
 
   /**
    * Grow the textarea to fit its content, just like the TUI input area which
@@ -62,14 +130,7 @@ export function ThreadComposer({
   }
   useEffect(autoResize, [text])
 
-  // Persist the unsent draft per thread (T304): write on every keystroke, and
-  // remove the key once the draft is empty (sent or cleared) so we never leave
-  // stale drafts littering localStorage. No-op when no draftKey is supplied.
-  useEffect(() => {
-    if (!draftKey) return
-    if (text) localStorage.setItem(draftKey, text)
-    else localStorage.removeItem(draftKey)
-  }, [text, draftKey])
+
 
   const userTurn = status === "THEIR_TURN"
   const streaming = status === "ACTIVE"
@@ -91,6 +152,7 @@ export function ThreadComposer({
     if (!canSend || !onSend) return
     onSend(text)
     setText("")
+    persistDraft("", 0, 0)
     // Collapse back to a single row after sending (matches the TUI clearing
     // its input), then refocus for the next message.
     requestAnimationFrame(() => {
@@ -149,7 +211,17 @@ export function ThreadComposer({
           ref={textareaRef}
           autoFocus
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value
+            setText(v)
+            persistDraft(v, e.target.selectionStart, e.target.selectionEnd)
+          }}
+          onSelect={(e) => {
+            // Caret / selection moved (arrow keys, click, drag) without
+            // necessarily changing the text — persist the new range too (T304).
+            const el = e.currentTarget
+            persistDraft(el.value, el.selectionStart, el.selectionEnd)
+          }}
           onKeyDown={handleKeyDown}
           placeholder="Reply to this thread…"
           rows={1}
