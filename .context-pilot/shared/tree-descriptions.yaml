@@ -194,6 +194,10 @@
   path: crates/cp-mod-bridge/Cargo.toml
   description: 'Bridge module deps: cp-base, cp-render, cp-wire, cp-oplog, nix 0.30 (fs, for Flock RAII), serde_json. dev: tempfile. Workspace lints.'
   last_edited_ms: 1781625056746
+05ecc0ce8dac154a:
+  path: crates/cp-mod-search/src/meili/server.rs
+  description: 'Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file mgmt. T295: pick_stable_port() reuses the persisted port if test-bindable (fixes Gap B — random find_free_port on each respawn left agents'' cached ports stale → silent search breakage); falls back to find_free_port on first start/port-stolen. ensure_server_running()/health_ok(port,key)/reconnect_ok()/read_port/read_master_key/is_pid_alive/global_meili_dir now pub(super) for the watchdog. Geometric backoff health polling (50ms→500ms cap, 15s budget).'
+  last_edited_ms: 1782041936531
 064c633984a0d856:
   path: crates/cp-mod-queue/src/types.rs
   description: 'QueueState + QueuedToolCall types. Trap fields: trap_active, trap_panel_ids, trap_optional_ids. Methods: enqueue, remove_by_index, flush, clear, is_queue_tool.'
@@ -642,6 +646,10 @@
   path: crates/cp-mod-prompt/src/storage.rs
   description: 'Prompt file storage: YAML-frontmatter .md files for agents/skills/commands, load_all_prompts() merges built-ins, slugify()'
   last_edited_ms: 0
+161ce61e55326e54:
+  path: web/src/components/agents/ModelPicker.tsx
+  description: Shared two-level LLM provider+model picker — web counterpart of TUI Ctrl+H. Provider rail (pills) above model cards for active provider. Used by AgentModal (manage) and ConfigPanel (defaults). Shared registry from models.ts.
+  last_edited_ms: 0
 16401e6535772605:
   path: crates/cp-mod-entities/src/sql/errors.rs
   description: 'SQL error enrichment: fuzzy suggestions (Levenshtein) + schema context for SQLite errors. enrich_error(). Moved from src/ into sql/ to keep folder ≤8 entries.'
@@ -738,6 +746,10 @@
   path: web/src/lib/sync.ts
   description: 'SSE→QueryClient delta bridge (push plane). ensureSync(agentId): one idempotent per-agent subscription. delta→fold into [''threads'',id]+[''agent'',id] via setQueryData functional updater (applyThreadDelta/applyAgentDelta), rev high-water guard; null→invalidate. qk query-key registry incl qk.fsPreview (T272 Finder live preview cache key). applyThreadDelta folds thread_created/archived/restored/status_changed/focus_changed/message_created (msgId=msg_${log.length} → dedup vs disk poll). mergeThreadLogs non-destructive poll reconcile. Kills T123 burst-clobber + T254 double-render structurally.'
   last_edited_ms: 1781885646421
+197740b32187c3a1:
+  path: web/src/components/finder/Finder.tsx
+  description: Per-agent Finder file manager (493 LOC after X913 split). Owns view state + derived listings + render; delegates fs mutations/nav to useFinderActions, selection/open/tab/menu to useFinderSelection, keyboard to useFinderKeyboard, external drag to useExternalDragUpload, bottom chrome to FinderOverlays. QuickLook = modal shadcn Sheet (2/3 width, grid+list).
+  last_edited_ms: 0
 198b5504d5c247d5:
   path: crates/cp-orchestrator/src/supervisor/mod.rs
   description: 'Phase 17 (X784) AgentSupervisor process manager + X896 pty spawn + restart support. new(allow_list) canonicalizes eagerly; validate_binary realpath-checks vs allow_list (R2-15). spawn(id,bin,folder,args)->pid: Command process_group(0), stdio null. spawn_pty(id,bin,folder,env)->pid: dup-check, validate, canonicalize folder, delegate to proc::spawn_pty_proc (cp TUI needs a real tty). is_supervised(key)->bool query. stop: SIGTERM→poll→SIGKILL→reap. restart=snapshot+stop+spawn. adopt=record live no-spawn (D7). check_liveness()->Vec<Event>. kill_pid(pid:u32) FREE fn: best-effort SIGTERM→grace→SIGKILL for an ARBITRARY (externally-launched) pid with no child handle to reap — used by the /restart route. Error::Pty variant. Proc/Supervised/spawn helper in sibling proc.rs.'
@@ -1030,6 +1042,10 @@
   path: crates/cp-base/src/state/flags.rs
   description: Stream-phase state machine (Idle/Receiving/ExecutingTools), UI/config/lifecycle boolean flags, streaming-tool advisory state. StatusBools composite struct organizes all flags by domain. HighlightIrFn callback type.
   last_edited_ms: 0
+2242ec6d0248b526:
+  path: web/src/components/conversation/Message.tsx
+  description: Thread/conversation message renderer. AssistantMessage + UserMessage now render text via <Markdown> (lib/markdown.tsx) instead of the minimal renderInline — assistant=default variant, user=onAccent variant (legible on the signal bubble). ToolMessage = collapsible card (header name/intent, mono params, pre result, danger border on error). Streaming blink cursor preserved on assistant.
+  last_edited_ms: 0
 226622786f5f0573:
   path: yamls/injections.yaml
   description: LLM-facing text injections. Spine auto-continuation, editor warning banners, console guardrails (git/gh/typst → dedicated tools), history cleanup trap messages (%PANELS% templates), behavioral redirects, provider-shared text.
@@ -1093,6 +1109,10 @@
 24b0b94593ba4546:
   path: Cargo.lock
   description: Workspace lockfile
+  last_edited_ms: 0
+24b324bfdecf9e2b:
+  path: web/src/components/finder/preview/previewParts.tsx
+  description: 'Shared Finder preview leaf renderers: IconBtn, PreviewStatus, TruncatedNote, MarkdownPreview, TextPreview, FolderPreview, Generic, Meta/Row, Empty. Imported by both FinderPreview shell and livePreviews. 173 lines.'
   last_edited_ms: 0
 24b93a56ad69e287:
   path: website/docs/advanced.html
@@ -1329,6 +1349,10 @@
 2bf988ea7580839b:
   path: README.md
   description: 'Project manifesto + flame graph telemetry docs. Philosophy: compiler-as-reviewer, 961 lints, hash chain trust, structure constraints, boss hunt, self-hosting loop. Flame section: ./run.sh --telemetry, inferno-flamegraph, ~60 spans coverage map.'
+  last_edited_ms: 0
+2bfe4a03d49b306f:
+  path: web/src/components/agents/AgentModal.tsx
+  description: 'Agent create/manage dialog. ModelPicker (provider+model, like TUI Ctrl+H), slugify(name) derives realm folder. X896: create-mode submit() LIVE via useCreateAgent (POST /api/fleet/create). Manage-mode submit() sends Configure command (provider+model). NEW Restart button (manage footer, RefreshCw icon, spins while pending): useRestartAgent → POST /api/agent/{id}/restart, kills+respawns the agent from the current binary — fixes a stale agent that rejects commands with 502 ''agent unreachable''. Shared by TopBar + FleetDashboard.'
   last_edited_ms: 0
 2c3938985a889203:
   path: web/src/lib/types.ts
@@ -2182,6 +2206,10 @@
   path: src/ui/helpers.rs
   description: 'Shared UI helpers: truncate_string, format_number, format_time_ago, wrap_text, count_wrapped_lines. Braille spinner (wall-clock-time-based, 10fps). IR-aware syntax highlighting (syntect, LRU cache, do_highlight_ir). TypewriterBuffer for streaming animation.'
   last_edited_ms: 0
+48787307d957a829:
+  path: crates/cp-mod-search/src/types.rs
+  description: Core types + config constants. SearchPersistData (recompute tracking + task_signals ring), SearchState (SharedRadarCache Arc<Mutex> + T295 watchdog:Option<WatchdogHandle> — dropped on reload to stop the old meili supervisor), Chunk, SearchResult, SearchMetrics, SearchOverlayInfo (meili_cpu_pct/memory_bytes), MeiliLiveStats, IndexerCmd, WatcherHandle. logs_index_settings.
+  last_edited_ms: 1782041936574
 48cc4020fe96e1d1:
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
@@ -3066,6 +3094,10 @@
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
   last_edited_ms: 0
+67387a9743059401:
+  path: web/src/components/shell/StatsPopup.tsx
+  description: 'Session ''vitals'' popup (portaled Dialog) — accepts agentId, uses usePanels()+useAgentMeta() for live token budget + cost. T269 WIDE REDESIGN: w-[760px] (was 360px), two-band sheet — top band = context-budget meter + 3 figure chips (Context/Panels/Cost) side by side; bottom band = Service vitals as a CATEGORY-GROUPED 2-column compact grid (groupByCategory preserves first-seen order, humanize() Title-Cases the backend''s category tag into a section label) so a dozen services read as a scannable board not a long stack. Healthy rows stay quiet (colored dot + latency only); only error/unavailable raise a loud status chip (VitalRow), and a header summary badge shows ''all healthy'' / ''N issues'' + ''X of Y reachable''. Hosts the on-demand (never polling) Check Vitals action: fetchVitals(agentId) → prepends 2 browser-observed rows (Frontend self ok + Frontend→Orchestrator round-trip ms via performance.now) → renders grouped grid. Local useState (vitals/checking/vitalsErr); Stethoscope/Loader2 button (Check Vitals → Re-check after first run); dashed empty-state placeholder before first check. statusColor: ok=--ok / error=--danger / unavailable=--muted-foreground.'
+  last_edited_ms: 0
 674c52379f221917:
   path: crates/cp-mod-utilities/src/lib.rs
   description: '4 modules: hash, time, dirs, secret. Lightweight replacements for external deps.'
@@ -3178,6 +3210,10 @@
   path: report/wiring-alignment-audit.md
   description: 'Wiring alignment audit (X818 Phase 0.1): invariant-by-invariant gap register implementation⇄design-orchestration-backend.md. Verdicts ABIDES/PARTIAL/VIOLATES per I1-I13/§7/§9/§19. Diagnoses the disk/poll vs oplog-push plane inversion = the latency root cause.'
   last_edited_ms: 0
+6b32a577a24c3d6b:
+  path: crates/cp-mod-search/src/lib.rs
+  description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. load_module_data spawns the meili WatchdogHandle (T295, only if persist.port>0) into SearchState for self-healing supervision. sync_logs_to_meilisearch() fire-and-forget. Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
+  last_edited_ms: 1782041936616
 6b337c67d5dc532a:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (980 forbid-level, 21 deny, 45 allow across clippy/rust lints). openssl vendored for cross-compilation.
@@ -3418,6 +3454,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/finder/sheet.rs
   description: 'Finder spreadsheet→table JSON (T282): fs_sheet (GET /fs/sheet?path=). csv/tsv via the `csv` reader (quote+embedded-newline aware); xlsx/xls/xlsb/ods/xlsm via calamine open_workbook_auto. Both collapse to {sheets:[{name,rows:[[cell]]}],truncated}, every cell stringified (cell_to_string: integral floats lose the .0 tail). Bounded MAX_ROWS=1000 × MAX_COLS=50 × MAX_SHEETS=20; csv read-capped 8MiB. Confined via support:: (escape 403, non-file 404, unsupported/unparseable 415, missing param 400).'
   last_edited_ms: 1781896321103
+730fd28a36ac709f:
+  path: .gitignore
+  description: Git ignore rules
+  last_edited_ms: 0
 73100eaca3b55ec3:
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: selected thread''s full conversation + composer. Header-less. toChatMessage maps ThreadMsg→ChatMessage. Passes onSend to ThreadComposer + QuestionForm.'
@@ -3578,6 +3618,10 @@
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Transport hub. Backend shared state + serve/serve_bound + route_rest (27 routes incl /api/metrics + /api/agent/{id}/metrics, and /tools /radar /entities → inspect::panels derived-empty endpoints) + handle_stream SSE. inspect/ groups read-view endpoints (meta/panels/finder/metrics). run_stream SSE producer: Tailer.poll→rev-numbered deltas, drains StreamHub, dirty→invalidate. TAIL_REPOLL=5ms re-poll cap. command→visible p50 14ms/p99 33ms.'
   last_edited_ms: 1781820973426
+775e0b26dbb80c01:
+  path: web/src/components/finder/ContextMenu.tsx
+  description: 'Finder right-click menu, two variants on pos.node presence. ITEM menu: Open, Pin (folders), Rename, Duplicate, Download, tag swatches, Move to Trash. EMPTY-SPACE menu (T279): New Folder, Upload, Select All, Toggle Quick Look, Refresh. On-screen clamping; closes on outside-click/Esc.'
+  last_edited_ms: 0
 776ceb45b6277d6d:
   path: .github/workflows/rust.yml
   description: 'CI: fmt + clippy + build + test on ubuntu-latest. Pins Rust 1.93.0. Triggers on push/PR to master.'
@@ -3810,6 +3854,10 @@
   path: Cargo.toml
   description: Workspace root. 25 crate members (incl cp-wire/cp-oplog/cp-mod-bridge/cp-orchestrator). Binary 'tui'. Edition 2024. Strict lint config (980 forbid, 21 deny). openssl vendored.
   last_edited_ms: 0
+7eae3426b401b2a2:
+  path: web/src/components/finder/internal/FinderOverlays.tsx
+  description: 'Finder bottom chrome + floating layers: status bar, right-click ContextMenu (full handler wiring incl Refresh via own useQueryClient), external-drag upload overlay, transient toast. Built from primitive deps.'
+  last_edited_ms: 0
 7f3ef5ae7601d1ab:
   path: crates/cp-mod-callback/src/storage.rs
   description: YAML-backed persistent storage for callback definitions. Keyed by name (BTreeMap alphabetical). upsert/remove/populate/migrate functions. Script file read/write helpers (strip_script_header, write_script_file). cleanup_old_hash_keys migration.
@@ -4038,6 +4086,10 @@
   path: crates/cp-mod-github/src/panel.rs
   description: 'GithubResultPanel: cached gh command output, 120s refresh, token redaction, tab-delimited PR/issue table rendering'
   last_edited_ms: 0
+864a3982a9cdd1de:
+  path: web/src/components/shell/LeftRail.tsx
+  description: 'Cockpit context navigator. Context-budget meter now LIVE: sum(usePanels tokens) / REF_BUDGET (200k), same figure as StatsPanel''s Panel-context (honest visible-panel weight, not true context occupancy). tokenBudget mock removed. First-class Conversation nav button above the scrollable panel list; selection CONTROLLED via props.'
+  last_edited_ms: 0
 86569b93b2a5f549:
   path: ui/src/App.tsx
   description: 'Cockpit shell: TopBar / (LeftRail + Conversation + RightInspector) / StatusBar flex layout.'
@@ -4146,6 +4198,10 @@
   path: web/src/components/ui/popover.tsx
   description: shadcn-style Popover on Base UI's Popover primitive. Popup PORTALED into document.body (escapes overflow-clipping ancestors), focus mgmt + outside-click/Esc dismiss + aria for free. Root accepts openOnHover (+delay) so a trigger opens on hover (the Finder info badge pattern). PopoverContent positioned via Positioner (default top-center, sideOffset 6) with tw-animate data-open/data-closed motion.
   last_edited_ms: 1781908494761
+889e30327c1207c0:
+  path: web/src/components/panels/cockpit/PanelFrame.tsx
+  description: 'Shared cockpit panel shell: accent icon + name + subtitle + token/cost chip header, scrolling body. Exports PanelFrame, PanelSection, ImportanceDot, Chip, and InspectionUnavailable (role=note honest empty-state for derived-state panels the read-only web inspection plane structurally can''t serve).'
+  last_edited_ms: 0
 88c3cb1cd35df948:
   path: src/ui/mod.rs
   description: Top-level render() with flame!("render"). IR frame build → sidebar + content panel + status bar + overlays (perf from IR, autocomplete from IR, config from IR, search index from IR). All overlays consume IR data.
@@ -4186,6 +4242,10 @@
   path: crates/cp-mod-utilities/Cargo.toml
   description: Zero external deps. Workspace lints.
   last_edited_ms: 1780565428682
+8a696b2ae126f57f:
+  path: web/src/components/shell/TopBar.tsx
+  description: 'macOS title bar. Accepts agents prop for AgentSwitcher + activeAgent lookup. View switcher Threads·Finder·Cockpit. Right cluster: cost, Activity→StatsPopup(agentId), theme, agent config (AgentModal), UserMenu (Profile+Settings).'
+  last_edited_ms: 0
 8a7426deb6512e96:
   path: src/app/run/tools/queue_flush.rs
   description: Queue flush execution — dequeues and runs all queued tool calls. FlushedTool struct + execute_queue_flush(). save_flushed_tool_call_message() creates compact Tool_execution stubs. augment_remaining_history_panels() appends remaining panel info. Extracted from pipeline.rs for file-length limit.
@@ -4442,6 +4502,10 @@
   path: crates/cp-mod-tree/Cargo.toml
   description: 'Tree module deps: cp-base, cp-render, crossterm, serde, serde_json, ignore, cp-mod-utilities.'
   last_edited_ms: 1780565428699
+928b5f1592ecc51c:
+  path: web/src/main.tsx
+  description: React entry point. createRoot → StrictMode → QueryClientProvider (TanStack, the single shared queryClient from lib/queryClient) wrapping <App/>. The mount point that activates the TanStack Query cache + SSE push-plane for the whole live app.
+  last_edited_ms: 0
 92e26c73ac8da140:
   path: ui/src/components/shell/AgentSwitcher.tsx
   description: TopBar workspace switcher dropdown (1 agent=1 folder). Items wrapped in DropdownMenuGroup (fixes Base UI MenuGroupContext error). Active agent+folder, agent list with status dots, New-agent/Manage actions open Agents view.
@@ -4678,6 +4742,10 @@
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
   last_edited_ms: 0
+9c4f1036d1e6b6cd:
+  path: crates/cp-mod-search/src/meili/mod.rs
+  description: 'Meilisearch sub-module hub: bootstrap, client(api), download, overlay, server, tasks, watchdog (T295 supervision).'
+  last_edited_ms: 1782041936658
 9c63af9928d7274a:
   path: yamls/ui.yaml
   description: 'UI configuration: sidebar layout, status bar, keybindings'
@@ -4966,6 +5034,10 @@ a4a82c99e057af5e:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
   last_edited_ms: 0
+a51c8c0bbc9d456d:
+  path: web/src/App.tsx
+  description: 'App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Uses useFleet() for live agents. Persists activeAgentId + view in localStorage (cp-agent, cp-view). effectiveView guard: falls back to ''fleet'' when a non-fleet view is persisted but activeAgent is undefined (fleet still loading OR stale localStorage agent id) — fixes the reload crash ''activeAgent is undefined'' at the Finder branch (T29). Mounts AccountProvider + TooltipProvider. Passes agents to TopBar/FleetShell/StatusBar; activeAgent to StatusBar.'
+  last_edited_ms: 0
 a51cb92eff54acdf:
   path: web/src/lib/sync.ts
   description: 'SSE→QueryClient delta bridge (push plane). ensureSync(agentId): one idempotent per-agent subscription. delta→fold into [''threads'',id]+[''agent'',id] via setQueryData functional updater, rev high-water guard; null→invalidate. qk query-key registry incl qk.fsPreview + qk.fsSheet (T282 Finder spreadsheet cache key). applyThreadDelta folds thread_created/archived/restored/status_changed/focus_changed/message_created. mergeThreadLogs non-destructive poll reconcile.'
@@ -4978,6 +5050,10 @@ a54f6b11ea86d525:
   path: src/llms/claude_code/mod.rs
   description: Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
   last_edited_ms: 0
+a56f7808cc467f26:
+  path: crates/cp-mod-search/src/meili/watchdog.rs
+  description: 'Meilisearch supervision (T295 self-heal): SpawnLock (machine-wide single-flight spawn guard = atomic create_new spawn.lock + steal-if-stale 30s, RAII removes on drop) + WatchdogHandle (per-agent supervisor thread, Mutex<stop:Sender,join> so it''s Sync; Drop signals+joins so a reload never stacks two). run() loop: every WATCHDOG_INTERVAL(5s) server::health_ok(port,key); on fail respawn() under SpawnLock (elected spawner calls ensure_server_running; losers defer LOCK_POLL then reconnect_ok); geometric backoff_for() base 2s→cap 60s on consecutive failures. Fixes Gap A (no supervision → dead meili stayed dead until reboot).'
+  last_edited_ms: 1782041936488
 a57b1692e51fccb5:
   path: src/app/prompt_builder.rs
   description: 'Canonical prompt assembly with flame!("prompt_build"). 3 phases: panel injection (fake tool_use/result pairs) → conversation messages (tool pairing) → message alternation. Seed re-injection after panels.'
@@ -5210,6 +5286,10 @@ adcf8b60551469d3:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
   last_edited_ms: 1780562263886
+ae116ff12ae35cfb:
+  path: web/src/components/shell/StatusBar.tsx
+  description: 'Bottom status footer. Fleet mode: accepts agents prop for aggregates (count, threads, needs-you, spend). Agent mode: accepts activeAgent prop, derives phase from status, wires cost live. Cache bar (cacheStats/tokenBudget) still mock.'
+  last_edited_ms: 0
 ae206df0560a302e:
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. ModelPicker (provider+model, like TUI Ctrl+H), slugify(name) derives realm folder. X896: create-mode submit() LIVE via useCreateAgent (POST /api/fleet/create). Manage-mode submit() sends Configure command (provider+model). NEW Restart button (manage footer, RefreshCw icon, spins while pending): useRestartAgent → POST /api/agent/{id}/restart, kills+respawns the agent from the current binary — fixes a stale agent that rejects commands with 502 ''agent unreachable''. Shared by TopBar + FleetDashboard.'
@@ -6329,6 +6409,10 @@ cf4e3535295d01f1:
 cf6078cbda1950a2:
   path: src/modules/conversation/markdown_ir.rs
   description: Thin re-export — delegates to cp_render::markdown::parse_line(). Backward compat for conversation renderer.
+  last_edited_ms: 0
+cf7db5bad4e490d3:
+  path: web/src/components/agents/FleetDashboard.tsx
+  description: 'Fleet welcome dashboard (live). Accepts agents prop (useFleet). Agent cards: status pill + §19 HealthBadge (polls useMetrics → surfaces FIRST non-nominal condition as a coloured role=status pill: breaker.tripped→red ''Over budget'', stream.degraded→amber ''Stream degraded'', rev.lag>REV_LAG_WARN(50)→amber ''Projection lagging''; nominal/unloaded→renders nothing so healthy cards stay clean) — makes a tripped breaker VISIBLE not a silent latch (T121). model + cost. Create/manage via AgentModal.'
   last_edited_ms: 0
 cf8e2e265d1ea9ea:
   path: ui/src/components/shell/TopBar.tsx

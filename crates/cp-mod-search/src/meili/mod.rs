@@ -16,3 +16,5 @@ pub(crate) mod overlay;
 pub(crate) mod server;
 /// Task polling and UID extraction — split `impl MeiliClient` block.
 pub(crate) mod tasks;
+/// Server supervision: single-flight spawn lock + per-agent watchdog thread.
+pub(crate) mod watchdog;

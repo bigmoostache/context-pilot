@@ -477,6 +477,46 @@
   - frontend
   - shipped
   last_edited_ms: 1781882942435
+69663a75bb787180:
+  tl_dr: 'T295 meilisearch self-heal SHIPPED + live-validated: per-agent watchdog thread + stable-port respawn in cp-mod-search. Details in contents.'
+  contents: |-
+    ## T295 — meilisearch 'down' RCA + structural self-healing hardening SHIPPED
+
+    User: meili reported DOWN in frontend vitals; do NOT just restart it, INVESTIGATE root cause + structurally prevent it (deployment can't be hand-fixed).
+
+    ### Architecture recap
+    Meili = ONE global embedded server per machine (~/.context-pilot/meilisearch/, pid/port/master.key files), all agents share it. Each agent's cp-mod-search caches the port in SearchState.persist at load.
+
+    ### ROOT CAUSE (two real gaps)
+    - **Gap A — NO supervision.** ensure_server_running() ran ONCE per agent boot/reload. Nothing monitored meili afterward → if it died mid-session (OOM under embedding burst, OS kill, laptop sleep/resume, crash) it stayed dead until an agent rebooted. That's the down window the user saw; vitals correctly but uselessly reported it.
+    - **Gap B — STALE PORT.** find_free_port() picked a NEW random port on every cold spawn → agents that cached the old port silently queried a dead port. PROVEN live: this agent had cached 49700 while the live server was on 62660.
+
+    ### FIX (crates/cp-mod-search)
+    1. **meili/watchdog.rs (NEW, 263 lines)** — SpawnLock (machine-wide single-flight spawn guard: atomic OpenOptions create_new spawn.lock, steal-if-stale >30s, RAII Drop removes; no new dep). WatchdogHandle{ inner: Mutex<{stop:mpsc::Sender<()>, join:Option<JoinHandle>}> } — Mutex makes it Sync for State TypeMap; Drop sends stop + joins so a reload never stacks two watchdogs. run() loop: every WATCHDOG_INTERVAL=5s server::health_ok(port,key); on fail respawn() under SpawnLock (elected spawner calls ensure_server_running; losers sleep LOCK_POLL then reconnect_ok); backoff_for() geometric base 2s→cap 60s on consecutive failures (honours stop signal during backoff too).
+    2. **meili/server.rs** — pick_stable_port(): reuse persisted port if TcpListener::bind test-succeeds (the dead process released it → same port reused), else find_free_port. Spawn phase uses it. Exposed global_meili_dir/read_port/read_master_key/is_pid_alive as pub(super); added health_ok(port,key)->bool + reconnect_ok()->bool.
+    3. **types.rs** — SearchState.watchdog: Option<WatchdogHandle> (+ Debug field).
+    4. **lib.rs** — load_module_data spawns the watchdog (persist.port>0).then(...) after server up, stored in SearchState; init_state sets watchdog:None.
+    5. **meili/mod.rs** — pub(crate) mod watchdog. meili/ now 8 entries (at folder cap).
+
+    Together: meili dies → watchdog respawns it on the SAME port within ~5s → every agent's cached port stays valid → transparent self-heal, no manual restart. Deployment-grade.
+
+    ### LIVE VALIDATION (this machine)
+    Killed meili pid 80784 (port 62660) → health 000. ~9s later: respawned pid 17010 on SAME port 62660, health 200. Killed AGAIN (pid 17010) → respawned pid 19897 on 62660, health 200, indexes intact (data dir survives). Proves: loops (not one-shot), stable port, data-preserving.
+
+    ### Build/deploy
+    cp-mod-search is a TUI crate → cargo build --release (green, 22.78s) + system_reload (NOT orchestrator restart — meili lifecycle is agent-side). rust-check passed; folder-sizes 'failure' = gitignored oplog/bodies runtime artifact (unrelated); meili/ at 8-entry cap. clippy fixes applied: is_ok_and (was map().unwrap_or(false)), (cond).then(||) (was if/Some/else None).
+
+    ### Honest residual (told user)
+    Stable-port covers ~all real cases (dead process releases its own port). The ONLY residual: if something UNRELATED grabs the old port between death and respawn (e.g. after a full reboot), meili lands on a new port and already-running agents with the stale cache need a reload to re-read it (loudly logged). A shared-port cell read on the hot search path would close it but was deliberately not added (too invasive for the gain).
+  importance: high
+  labels:
+  - T295
+  - meilisearch
+  - watchdog
+  - self-heal
+  - search
+  - shipped
+  last_edited_ms: 1782041969040
 6cc818f12c0d231a:
   tl_dr: 'DOCUMENTATION QUALITY: Documentation is ABSOLUTELY CRITICAL. Do NOT half-ass it. If understanding a function requires opening extra files to see context, DO IT. Don''t document to document — document to HELP future readers. Take the extra step.'
   importance: critical

@@ -192,6 +192,7 @@ impl Module for SearchModule {
             watcher: None,
             metrics: std::sync::Arc::new(std::sync::Mutex::new(types::SearchMetrics::default())),
             radar_cache: std::sync::Arc::new(std::sync::Mutex::new(types::RadarCache::default())),
+            watchdog: None,
         });
     }
 
@@ -291,12 +292,21 @@ impl Module for SearchModule {
             (None, None)
         };
 
+        // Spawn the per-agent Meilisearch watchdog (only if the server is up).
+        // It health-checks every few seconds and respawns the global server on
+        // the SAME port if it dies mid-session, so a deployment self-heals with
+        // no manual restart. Stored in SearchState so a reload drops+replaces it
+        // (its Drop stops the old thread — never stacks two watchdogs).
+        let watchdog =
+            (persist.port > 0).then(|| meili::watchdog::WatchdogHandle::spawn(persist.port, persist.master_key.clone()));
+
         state.set_ext(SearchState {
             persist,
             indexer_tx,
             watcher,
             metrics,
             radar_cache: std::sync::Arc::new(std::sync::Mutex::new(types::RadarCache::default())),
+            watchdog,
         });
 
         // Backfill: push any existing logs to Meilisearch (idempotent upsert)

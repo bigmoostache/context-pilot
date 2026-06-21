@@ -93,6 +93,10 @@ pub(crate) struct SearchState {
     /// Cached Context Radar panel content.  Shared with background refresh
     /// threads via `Arc<Mutex<>>`.  Updated by [`crate::radar::refresh`].
     pub radar_cache: SharedRadarCache,
+    /// Per-agent Meilisearch supervision thread. `None` when the server never
+    /// came up (port 0). Dropping it (on reload) stops the old watchdog so a
+    /// reload never stacks a second supervisor on the same global server.
+    pub watchdog: Option<super::meili::watchdog::WatchdogHandle>,
 }
 
 impl std::fmt::Debug for SearchState {
@@ -103,6 +107,7 @@ impl std::fmt::Debug for SearchState {
             .field("watcher", &self.watcher.is_some())
             .field("metrics", &self.metrics)
             .field("radar_cache", &self.radar_cache)
+            .field("watchdog", &self.watchdog)
             .finish()
     }
 }

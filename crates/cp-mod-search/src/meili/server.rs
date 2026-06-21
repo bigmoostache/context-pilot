@@ -14,7 +14,10 @@ use super::download;
 // -- Global paths ------------------------------------------------------------
 
 /// Root of all global Meilisearch data: `~/.context-pilot/meilisearch/`.
-fn global_meili_dir() -> Result<PathBuf, String> {
+///
+/// `pub(super)` so the watchdog can locate the machine-wide spawn lock beside
+/// the pid/port/key files it coordinates with.
+pub(super) fn global_meili_dir() -> Result<PathBuf, String> {
     std::env::var("HOME")
         .map(|h| PathBuf::from(h).join(".context-pilot/meilisearch"))
         .map_err(|_e| "Cannot determine HOME directory".to_string())
@@ -95,7 +98,9 @@ fn remove_pid() {
 ///
 /// On Linux, reads `/proc/<pid>/status` to exclude zombies.
 /// Falls back to `kill -0` on macOS and other platforms.
-fn is_pid_alive(pid: u32) -> bool {
+///
+/// `pub(super)` so the watchdog's reconnect check can verify the recorded pid.
+pub(super) fn is_pid_alive(pid: u32) -> bool {
     // Try /proc on Linux first
     let proc_status = format!("/proc/{pid}/status");
     if let Ok(content) = std::fs::read_to_string(&proc_status) {
@@ -131,6 +136,30 @@ fn find_free_port() -> Result<u16, String> {
     Ok(port)
 }
 
+/// Pick the port to bind a (re)spawned server to, preferring the persisted one.
+///
+/// Stability is the whole point: every agent caches `persist.port` at boot and
+/// keeps using it for the session, so if a respawn landed on a *new* random port
+/// (the old [`find_free_port`]-always behaviour) those agents would silently
+/// query a dead port until their next reload. Here we reuse the port already in
+/// the port file whenever it is bindable — which it is in the common
+/// death→respawn case, because the dead process released it — so the server
+/// comes back at the **same** address and the blip is transparent. We only fall
+/// back to a fresh free port on first-ever start (no port file) or if something
+/// unrelated has since claimed the old one.
+///
+/// The test-bind is dropped immediately and meili binds microseconds later; the
+/// tiny TOCTOU window is acceptable (nothing else contends for this port).
+fn pick_stable_port() -> Result<u16, String> {
+    if let Some(p) = read_port()
+        && p != 0
+        && std::net::TcpListener::bind(("127.0.0.1", p)).is_ok()
+    {
+        return Ok(p);
+    }
+    find_free_port()
+}
+
 /// Write the server port to the global port file.
 fn write_port(port: u16) -> Result<(), String> {
     let path = port_path()?;
@@ -138,7 +167,9 @@ fn write_port(port: u16) -> Result<(), String> {
 }
 
 /// Read the port from the global port file (if it exists).
-fn read_port() -> Option<u16> {
+///
+/// `pub(super)` so the watchdog can read the recorded port for reconnect.
+pub(super) fn read_port() -> Option<u16> {
     let path = port_path().ok()?;
     std::fs::read_to_string(path).ok()?.trim().parse().ok()
 }
@@ -172,7 +203,9 @@ fn write_master_key(key: &str) -> Result<(), String> {
 }
 
 /// Read the master key from the global key file (if it exists).
-fn read_master_key() -> Option<String> {
+///
+/// `pub(super)` so the watchdog can read the recorded key for reconnect.
+pub(super) fn read_master_key() -> Option<String> {
     let path = key_path().ok()?;
     let content = std::fs::read_to_string(path).ok()?;
     let trimmed = content.trim().to_string();
@@ -201,6 +234,28 @@ fn health_check(port: u16, key: &str) -> Result<(), String> {
         .map_err(|e| format!("Health check failed: {e}"))?;
 
     if resp.status().is_success() { Ok(()) } else { Err(format!("Health check returned HTTP {}", resp.status())) }
+}
+
+/// Boolean health probe over the recorded credentials — the watchdog's tick check.
+///
+/// A thin `Ok`/`Err` → `bool` wrapper over [`health_check`] so the watchdog loop
+/// reads as `if health_ok(..) { continue }`.
+pub(super) fn health_ok(port: u16, key: &str) -> bool {
+    health_check(port, key).is_ok()
+}
+
+/// Whether an already-running server can be reconnected to right now.
+///
+/// Reads the pid/port/key files and returns `true` only if the recorded process
+/// is alive *and* answers a health probe — i.e. exactly the fast-path condition
+/// [`ensure_server_running`] uses for Phase 0 reconnect. The watchdog calls this
+/// after deferring to another agent's spawn, to confirm the winner brought the
+/// server back without spawning anything itself.
+pub(super) fn reconnect_ok() -> bool {
+    let (Some(port), Some(key), Some(pid)) = (read_port(), read_master_key(), read_pid()) else {
+        return false;
+    };
+    is_pid_alive(pid) && health_check(port, &key).is_ok()
 }
 
 /// Poll the health endpoint until the server responds or timeout expires.
@@ -276,8 +331,8 @@ pub(crate) fn ensure_server_running() -> Result<ServerInfo, String> {
         k
     };
 
-    // Phase 3: find a free port and start the server
-    let port = find_free_port()?;
+    // Phase 3: pick a stable port (reuse the persisted one if free) and start.
+    let port = pick_stable_port()?;
     let bin = binary_path()?;
     let data = data_dir()?;
 
