@@ -80,6 +80,10 @@ function AgentStatus({ agent }: { agent?: Agent }) {
   const used = agent?.contextUsed ?? 0
   const budget = agent?.contextBudget ?? 200_000
   const threshold = agent?.contextThreshold ?? 0
+  // Cache hit/miss split of `used` (hit + miss === used), folded from the same
+  // ContextUsage delta — lets the meter draw ratatui's green/amber segments.
+  const hit = agent?.contextHit ?? 0
+  const miss = agent?.contextMiss ?? 0
 
   return (
     <footer className="vibrancy flex h-8 shrink-0 items-center gap-3 border-t border-border px-4 text-[12px]">
@@ -89,7 +93,7 @@ function AgentStatus({ agent }: { agent?: Agent }) {
       </span>
 
       <span className="ml-auto flex items-center gap-3">
-        <ContextBar used={used} threshold={threshold} budget={budget} />
+        <ContextBar used={used} threshold={threshold} budget={budget} hit={hit} miss={miss} />
         <span className="h-3.5 w-px bg-border" />
         <span className="tabular-nums text-muted-foreground">{fmtCost(costUsd)}</span>
       </span>
@@ -101,26 +105,56 @@ function AgentStatus({ agent }: { agent?: Agent }) {
  * Fixed-width context-window meter — the agent's authoritative occupancy.
  *
  * The bar is the whole context budget; the filled portion is `used` tokens,
- * coloured by how close it is to the cleaning threshold (green → amber → red).
- * A thin tick marks the threshold position. Hovering reveals a tooltip with the
- * exact `used / threshold / budget` figures — the SAME triple the agent renders
- * in its ratatui sidebar (T297), pushed live so the two never disagree.
+ * drawn (when the agent reports a cache split) as ratatui's two segments — a
+ * green **hit** run followed by an amber **miss** run — so the web meter mirrors
+ * the TUI sidebar token bar exactly (T297). When no split has arrived yet
+ * (`hit + miss === 0`) it falls back to a single fill coloured by proximity to
+ * the cleaning threshold. A thin tick marks the threshold; hovering reveals the
+ * exact `Used (hit)` / `Used (miss)` / Threshold / Free figures — the SAME
+ * numbers the agent renders in its ratatui sidebar.
  */
-function ContextBar({ used, threshold, budget }: { used: number; threshold: number; budget: number }) {
+function ContextBar({
+  used,
+  threshold,
+  budget,
+  hit,
+  miss,
+}: {
+  used: number
+  threshold: number
+  budget: number
+  hit: number
+  miss: number
+}) {
   const safeBudget = budget > 0 ? budget : 200_000
   const usedRatio = Math.min(1, used / safeBudget)
   const thresholdRatio = threshold > 0 ? Math.min(1, threshold / safeBudget) : 0
-  // Colour by proximity to the threshold: calm under it, hot past it.
+  // Has the agent reported a hit/miss split? (cold/older agents send only used)
+  const hasSplit = hit + miss > 0
+  const hitRatio = Math.min(1, hit / safeBudget)
+  const missRatio = Math.min(1, miss / safeBudget)
+  // Single-fill fallback colour by proximity to the threshold.
   const overThreshold = threshold > 0 && used >= threshold
   const nearThreshold = threshold > 0 && used >= threshold * 0.85
-  const fill = overThreshold ? "var(--danger)" : nearThreshold ? "var(--warn)" : "var(--ok)"
+  const fallbackFill = overThreshold ? "var(--danger)" : nearThreshold ? "var(--warn)" : "var(--ok)"
   const free = Math.max(0, safeBudget - used)
 
   return (
     <div className="group/cb relative flex items-center">
       {/* the meter */}
       <div className="relative h-2 w-28 overflow-hidden rounded-full bg-muted ring-1 ring-border/60">
-        <span style={{ width: `${usedRatio * 100}%`, background: fill }} className="block h-full rounded-full" />
+        {hasSplit ? (
+          // ratatui's two-segment bar: green hit run + amber miss run.
+          <div className="flex h-full">
+            <span style={{ width: `${hitRatio * 100}%`, background: "var(--ok)" }} className="block h-full" />
+            <span style={{ width: `${missRatio * 100}%`, background: "var(--warn)" }} className="block h-full" />
+          </div>
+        ) : (
+          <span
+            style={{ width: `${usedRatio * 100}%`, background: fallbackFill }}
+            className="block h-full rounded-full"
+          />
+        )}
         {/* threshold tick */}
         {thresholdRatio > 0 && thresholdRatio < 1 && (
           <span
@@ -139,7 +173,14 @@ function ContextBar({ used, threshold, budget }: { used: number; threshold: numb
               {(usedRatio * 100).toFixed(0)}%
             </span>
           </div>
-          <TipRow color={fill} label="Used" value={fmtTokens(used)} />
+          {hasSplit ? (
+            <>
+              <TipRow color="var(--ok)" label="Used (hit)" value={fmtTokens(hit)} />
+              <TipRow color="var(--warn)" label="Used (miss)" value={fmtTokens(miss)} />
+            </>
+          ) : (
+            <TipRow color={fallbackFill} label="Used" value={fmtTokens(used)} />
+          )}
           {threshold > 0 && (
             <TipRow color="var(--foreground)" label="Threshold" value={fmtTokens(threshold)} />
           )}

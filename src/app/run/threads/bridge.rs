@@ -234,24 +234,31 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
     }
 
     // Context-window occupancy — the agent's authoritative `used/threshold/
-    // budget` triple (the SAME helper the TUI sidebar + Statistics render), so
-    // the web HUD meter is byte-identical to ratatui (T297). Emit on change.
+    // budget` triple PLUS its cache `hit/miss` split (the SAME canonical
+    // helpers the TUI sidebar token bar renders), so the web HUD meter and its
+    // `Used (hit)` / `Used (miss)` breakdown are byte-identical to ratatui
+    // (T297). Emit on change — the memo carries hit too, so a hit↔miss flip at
+    // an unchanged total still re-emits.
     let (used, threshold, budget) = crate::modules::overview::context::context_usage(&app.state);
-    let ctx_triple = (used.to_u64(), threshold.to_u64(), budget.to_u64());
+    let (hit, miss) = crate::modules::overview::context::context_hit_miss(&app.state);
+    let ctx_tuple =
+        (used.to_u64(), threshold.to_u64(), budget.to_u64(), hit.to_u64(), miss.to_u64());
     let ctx_changed = app
         .state
         .get_ext::<BridgeState>()
-        .is_some_and(|bs| bs.last_context != Some(ctx_triple));
+        .is_some_and(|bs| bs.last_context != Some(ctx_tuple));
     if ctx_changed {
         emit_best_effort(
             &app.state,
             OpEntryKind::ContextUsage {
-                used_tokens: ctx_triple.0,
-                threshold_tokens: ctx_triple.1,
-                budget_tokens: ctx_triple.2,
+                used_tokens: ctx_tuple.0,
+                threshold_tokens: ctx_tuple.1,
+                budget_tokens: ctx_tuple.2,
+                hit_tokens: ctx_tuple.3,
+                miss_tokens: ctx_tuple.4,
             },
         );
-        app.state.ext_mut::<BridgeState>().last_context = Some(ctx_triple);
+        app.state.ext_mut::<BridgeState>().last_context = Some(ctx_tuple);
     }
 }
 

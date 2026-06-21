@@ -63,6 +63,12 @@ pub struct ContextSnapshot {
     pub threshold_tokens: u64,
     /// Hard context budget.
     pub budget_tokens: u64,
+    /// The cache-hit half of `used_tokens` (always-cached prefix + cached
+    /// panels); `hit_tokens + miss_tokens == used_tokens`. Powers the web HUD's
+    /// `Used (hit)` / `Used (miss)` split, identical to the ratatui token bar.
+    pub hit_tokens: u64,
+    /// The cache-miss half of `used_tokens` (uncached panels this turn).
+    pub miss_tokens: u64,
 }
 
 /// One agent's current projected state.
@@ -169,11 +175,13 @@ impl AgentView {
                     cost_usd: *cost_usd,
                 };
             }
-            OpEntryKind::ContextUsage { used_tokens, threshold_tokens, budget_tokens } => {
+            OpEntryKind::ContextUsage { used_tokens, threshold_tokens, budget_tokens, hit_tokens, miss_tokens } => {
                 self.context = ContextSnapshot {
                     used_tokens: *used_tokens,
                     threshold_tokens: *threshold_tokens,
                     budget_tokens: *budget_tokens,
+                    hit_tokens: *hit_tokens,
+                    miss_tokens: *miss_tokens,
                 };
             }
             // Durability-only records and forward-compat unknowns do not

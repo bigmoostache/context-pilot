@@ -210,6 +210,10 @@
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (author/timestamp headers, content, file refs, question indicators). Ctrl+V dispatch.'
   last_edited_ms: 0
+0676af1a543d049d:
+  path: src/app/run/threads/bridge.rs
+  description: Bridge command intake + live-state emission (gated bridge-ON). accept_commands forces the accepted stream BLOCKING before handle_connection (the inherited non-blocking flag broke >8KiB commands, T274). poll_bridge_commands drains all pending/tick + save_state_async (Configure has no oplog delta, T262). emit_roster_delta=durable on thread mutation. emit_vitals=best-effort PhaseTransition+CostAggregate+ContextUsage (used/threshold/budget + hit/miss via the canonical context_usage+context_hit_miss helpers, T297) on-change. emit_thread_status=durable on flip. emit_thread_focus=best-effort. wire_turn. Command APPLICATION in sibling commands.rs.
+  last_edited_ms: 1782050215897
 06abaaf6166deeeb:
   path: .gitignore
   description: Gitignore. Excludes target/, .context-pilot/* (with !shared/ negation), .claude/, test artifacts, slides build artifacts (node_modules, package files, PDF output).
@@ -2122,6 +2126,10 @@
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
   last_edited_ms: 0
+4321c32a1adfb81e:
+  path: web/src/lib/types.ts
+  description: 'Maquette domain types. Agent carries live vitals: phase?(idle|streaming|tooling) + inputTokens?/outputTokens? + context occupancy contextUsed?/Threshold?/Budget? plus the cache split contextHit?/contextMiss? (hit+miss==used), all folded from SSE deltas (T297). ContextPanel, ThreadDetail (log:ThreadMsg[] with auto flag), Finder/Library/Usage shapes.'
+  last_edited_ms: 1782050215928
 4327a9d0488d4ae9:
   path: CODE_OF_CONDUCT.md
   description: Code of conduct
@@ -2130,6 +2138,10 @@
   path: ui/src/components/threads/ThreadsView.tsx
   description: Threads view assembler, scoped to ACTIVE AGENT's realm (filters threadDetails by agentId, EmptyRealm when none). 2-pane (collapsible ThreadList | ThreadConversation). Owns collapsed state; floating PanelLeft Button re-opens the rail when collapsed. onOpenCockpit bridges to panel view.
   last_edited_ms: 1781531986889
+4375663128d8b7a1:
+  path: crates/cp-wire/src/types/oplog.rs
+  description: 'OpEntry + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated{...,inline_body}, ThreadCreated/Archived/Restored/StatusChanged, ThreadFocusChanged, Lifecycle, CostAggregate, ContextUsage{used,threshold,budget,hit_tokens,miss_tokens (T297 cache split, #[serde(default)] N-1)}, Checkpoint, Unknown. Framed (len+CRC). round-trip + tolerant-decode + roster + stable-tag tests.'
+  last_edited_ms: 1782050215768
 437b9a6fbb5c551a:
   path: src/ui/ir/render_status_bar.rs
   description: Status bar IR adapter — renders StatusBar to ratatui line. Badges (streaming/tooling/ready/blocked), agent/skill cards, git branch, auto-continue, reverie, queue, think balance. Builder from state. Wall-clock spinner.
@@ -2242,6 +2254,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+479f157ecd9a8203:
+  path: crates/cp-orchestrator/src/services/materialized_view.rs
+  description: 'MaterializedView in-mem fleet projection folded from OpEntry (one AgentView per agent). AgentView{rev,heads,roster,focused_thread_id,phase,lifecycle,cost,context}. ContextSnapshot carries used/threshold/budget + hit/miss (T297). apply: Checkpoint=authoritative reset, MessageCreated=head+roster bump, roster deltas via RosterThread helpers, ThreadFocusChanged latest-wins, Phase/Lifecycle/Cost/ContextUsage=latest-wins, CommandEffect/SeenMark/Unknown=inert. Tests in sibling file.'
+  last_edited_ms: 1782050215801
 47be3c47cf8e93af:
   path: yamls/injections.yaml
   description: LLM-facing text injections. Spine auto-continuation, editor warning banners, console guardrails (git/gh → dedicated tools), history cleanup trap messages (%PANELS% templates), behavioral redirects, provider-shared text.
@@ -2390,6 +2406,10 @@
   path: crates/cp-orchestrator/src/main.rs
   description: 'Backend entry point (thin). Prints version+protocol+agents dir, exits (no runtime loop yet). use nix/serde/serde_json/cp_oplog/tiny_http as _ acknowledges lib-only deps; #[cfg(test)] use cp_mod_bridge as _ + tempfile as _ acknowledge dev-deps for the bin-test target''s per-target unused-crate-dependencies.'
   last_edited_ms: 1781650132105
+4d1e9079d0c09956:
+  path: src/ui/ir/sidebar.rs
+  description: Sidebar IR builders. build_token_bar sources its used/threshold/budget AND green-hit/amber-miss segments from the canonical context_usage + context_hit_miss helpers (T297 single source, no inline re-derivation). build_entries (fixed+dynamic, badges, console spinner), token stats, PR card, help hints. Ctrl+C 'copied ✓' flash.
+  last_edited_ms: 1782050215736
 4d2106cb64b6d067:
   path: web/src/components/shell/StatsPopup.tsx
   description: Session 'vitals' popup — accepts agentId, uses usePanels()+useAgentMeta() for live token budget + cost. Budget/threshold hardcoded defaults. Portaled Dialog.
@@ -3774,6 +3794,10 @@
   path: src/llms/cache/cache_optimizer.rs
   description: 'Exact two-level DP optimizer. Minimizes expected recompute cost. Phase 1: per-super-block split DP. Phase 2: knapsack across super-blocks. O(N²·K) time. Prefix sums for O(1) block_cost. Backtracks for positions.'
   last_edited_ms: 0
+78c478c0dfa4ea81:
+  path: web/src/components/shell/StatusBar.tsx
+  description: 'Bottom status footer. Fleet mode: aggregates (count, threads, needs-you, spend). Agent mode: AgentStatus reads the LIVE agent.phase (streaming/tooling/ready distinct, T297) + cost folded from deltas. ContextBar meter is fully push-fed from the agent''s authoritative ContextUsage delta (contextUsed/Threshold/Budget + contextHit/contextMiss); draws ratatui''s two-segment green-hit/amber-miss bar (falls back to a single proximity-coloured fill pre-split) and a hover tooltip splitting Used into Used(hit)/Used(miss)/Threshold/Free — byte-identical to the ratatui sidebar token bar.'
+  last_edited_ms: 1782050215638
 78cfc068e4c9b991:
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore, export API keys from .env to ~/.bashrc. Guards against running as root.'
@@ -4314,6 +4338,10 @@
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
   last_edited_ms: 0
+8950e02e52b6a287:
+  path: crates/cp-mod-bridge/src/lib.rs
+  description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1; Boot failure→PENDING + background try_recover self-heals. activate() free fn assembles live BridgeState (tee/intake/store). ContextMemo type alias = (used,threshold,budget,hit,miss) for the on-change ContextUsage emit memo (T297, carries hit/miss so a hit↔miss flip at unchanged total still re-emits). on_stream_chunk→Token, on_stream_stop→PhaseHint(Idle). is_global, no tools/panels.'
+  last_edited_ms: 1782050215865
 895473fee99c332c:
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (max_cost is burst/stream-based), coucou (timer/datetime scheduling).'
@@ -4354,6 +4382,10 @@
   path: yamls/tools/memory.yaml
   description: Memory tools YAML. memory_create (content, contents, importance, labels) + memory_update (id, content, contents, importance, labels, delete).
   last_edited_ms: 1780582405270
+8a9ac665fa8fc500:
+  path: web/src/lib/query/sync.ts
+  description: 'SSE→QueryClient delta bridge (push plane Leg-2 frontend). applyThreadDelta + applyAgentDelta fold rev-numbered OpEntry into [''threads'',id]/[''agent'',id] caches via setQueryData functional updaters (rev high-water guard, structural sharing). T297: applyAgentDelta context_usage case folds used/threshold/budget + the cache hit/miss split (contextHit/contextMiss) so the HUD meter matches ratatui''s green/amber segments; phase folded never-null; cost + input/output tokens folded latest-wins. mergeThreadLogs non-destructive poll reconcile.'
+  last_edited_ms: 1782050215673
 8ac46f3f53f69dba:
   path: web/src/components/threads/ThreadsView.tsx
   description: 'Threads view assembler. Uses useThreads()+useFleet() live. handleArchive/Create/Send via sendCommand, each .catch wired to a breaker-aware flash notice (describeCommandError: a 503/tripped CostBreaker → actionable ''over budget'' alert, else generic ''Could not …'') rendered as a transient role=alert toast (6s, timer-ref cleaned on unmount) — closes the T121 silent-swallow hole where an over-budget send produced zero UI feedback. Auto-selects first valid thread. EmptyRealm fallback. Keyed by agentId in App.'
@@ -6302,6 +6334,10 @@ c7d014dda0e55831:
   path: crates/cp-wire/Cargo.toml
   description: 'Wire protocol crate manifest. deps: crc32c, serde, serde_json (I/O-free). Workspace lints inherited.'
   last_edited_ms: 1781619500094
+c7d3c855252dc096:
+  path: crates/cp-orchestrator/src/transport/inspect/meta.rs
+  description: 'Enriched agent-meta endpoints. agent_meta + fleet_meta build maquette Agent: registry record + view phase/lifecycle/cost + cumulative input/output tokens + context occupancy (contextUsed/Threshold/Budget + contextHit/contextMiss, T297) + thread inspection + git branch + provider. /meta carries raw phase (idle/streaming/tooling) so a cold load matches the SSE deltas. derive_status maps phase/lifecycle/has_my_turn.'
+  last_edited_ms: 1782050215833
 c7ea61d3ceb784d8:
   path: crates/cp-base/src/modules.rs
   description: Module trait — pluggable functionality contract. init/save/load state, tool definitions/execution/pre-flight, panel creation, overview delegation, lifecycle hooks (on_user_message/stream_stop/tool_progress), file watcher integration.
@@ -6910,6 +6946,10 @@ dc15b2a7c9536464:
   path: ui/src/App.tsx
   description: App shell. view state (agents|threads|cockpit, default agents) + activeAgentId. TopBar drives view+agent switch. AgentsView/ThreadsView(scoped to activeAgentId)/cockpit dispatch. openAgent switches agent then →threads.
   last_edited_ms: 1781515390765
+dc1c51c1d1604505:
+  path: src/modules/overview/context.rs
+  description: Canonical context-occupancy helpers + LLM context text. context_usage(state)->(used,threshold,budget) and context_hit_miss(state)->(hit,miss) are the SINGLE source of truth (T297) shared by the ratatui sidebar token bar, the Statistics header, and the bridge ContextUsage emit — hit=system-prompt×2+tool-defs+cached panels, miss=uncached panels, hit+miss==used. estimate_tool_definitions_tokens(), generate_context_content() (plain-text usage + sorted panels + stats).
+  last_edited_ms: 1782050215704
 dc25adefd5b31fad:
   path: crates/cp-mod-firecrawl/src/types.rs
   description: Firecrawl response types. ScrapeResponse/Data/Metadata, SearchResponse/SearchResult (polymorphic data field), MapResponse/MapLink. All Serialize+Deserialize.

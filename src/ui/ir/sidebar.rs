@@ -166,22 +166,11 @@ fn build_token_bar(state: &State) -> TokenBar {
     // delta the web HUD reads), so the three surfaces never drift (T297).
     let (total, threshold, budget) = crate::modules::overview::context::context_usage(state);
 
-    // Cache hit / miss breakdown — system prompt + tool defs are always "hit"
-    // (stable across turns); panels split on their live cache flag.
-    let system_prompt_tokens = {
-        let sp = cp_mod_prompt::seed::get_active_agent_content(state);
-        crate::state::estimate_tokens(&sp).saturating_mul(2)
-    };
-    let tool_def_tokens = crate::modules::overview::context::estimate_tool_definitions_tokens(state);
-    let mut hit = system_prompt_tokens.saturating_add(tool_def_tokens);
-    let mut miss = 0usize;
-    for ctx in &state.context {
-        if ctx.panel_cache_hit {
-            hit = hit.saturating_add(ctx.token_count);
-        } else {
-            miss = miss.saturating_add(ctx.token_count);
-        }
-    }
+    // Cache hit / miss breakdown from the SAME canonical helper the web HUD
+    // emit reads (T297: the web `Used (hit)` / `Used (miss)` split must be
+    // byte-identical to this bar's green/amber segments — one definition, no
+    // re-derivation that could drift).
+    let (hit, miss) = crate::modules::overview::context::context_hit_miss(state);
 
     let hit_pct = if budget > 0 { (hit.to_f64() / budget.to_f64() * 100.0).to_u8() } else { 0 };
     let miss_pct = if budget > 0 { (miss.to_f64() / budget.to_f64() * 100.0).to_u8() } else { 0 };

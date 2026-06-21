@@ -193,6 +193,19 @@ pub enum OpEntryKind {
         threshold_tokens: u64,
         /// The hard context budget (the denominator the meter fills toward).
         budget_tokens: u64,
+        /// The **cache-hit** half of `used_tokens` — the stable always-cached
+        /// prefix (system prompt ×2 + tool definitions) plus every panel the
+        /// provider served from cache this turn. `hit + miss == used` exactly.
+        /// The web HUD splits its `Used` figure into `Used (hit)` / `Used
+        /// (miss)` from this, byte-identical to the ratatui sidebar's green/
+        /// amber token-bar segments (T297). `#[serde(default)]` keeps the field
+        /// optional for N-1 readers that predate the split (they see `0`).
+        #[serde(default)]
+        hit_tokens: u64,
+        /// The **cache-miss** half of `used_tokens` — every panel (re)sent
+        /// uncached this turn. See [`hit_tokens`](Self::ContextUsage::hit_tokens).
+        #[serde(default)]
+        miss_tokens: u64,
     },
 
     /// State checkpoint — bounds replay length on restart (GAP 1 / I5).
@@ -327,6 +340,8 @@ mod tests {
                 used_tokens: 167_766,
                 threshold_tokens: 190_000,
                 budget_tokens: 200_000,
+                hit_tokens: 120_000,
+                miss_tokens: 47_766,
             },
         };
         let json = serde_json::to_string(&entry).expect("serialize");

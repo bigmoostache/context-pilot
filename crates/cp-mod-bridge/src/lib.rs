@@ -38,6 +38,14 @@ pub mod heartbeat;
 pub mod register;
 pub mod tee;
 
+/// The change-detection memo for the context-window occupancy emit.
+///
+/// `(used, threshold, budget, hit, miss)` tokens. Carrying `hit`/`miss` (not
+/// just `used`) means a panel flipping cache hit↔miss at an unchanged total
+/// still re-emits the split (named alias to keep the field off the
+/// `clippy::type_complexity` lint).
+pub type ContextMemo = (u64, u64, u64, u64, u64);
+
 /// Runtime state for the bridge (stored in [`State`]'s `TypeMap`).
 ///
 /// Not serializable — [`Boot`] holds OS resources (folder lock, stream socket,
@@ -69,12 +77,15 @@ pub struct BridgeState {
     /// `CostAggregate` is emitted only when the dollar total moves.
     pub last_cost_usd: f64,
 
-    /// Last context-window occupancy `(used, threshold, budget)` emitted as a
+    /// Last context-window occupancy `(used, threshold, budget, hit, miss)`
+    /// emitted as a
     /// [`ContextUsage`](cp_wire::types::oplog::OpEntryKind::ContextUsage) delta,
     /// so the main-loop vitals chokepoint emits one only when the figure
     /// actually moves (the same observe-on-change discipline as phase/cost).
-    /// `None` until the first emission.
-    pub last_context: Option<(u64, u64, u64)>,
+    /// `hit`/`miss` are carried in the memo too, so a panel flipping cache
+    /// hit↔miss at an unchanged total still re-emits the split. `None` until
+    /// the first emission.
+    pub last_context: Option<ContextMemo>,
 
     /// Content-addressed body store for thread-message bodies (I13). `None`
     /// when the bridge is OFF or the store could not be opened. The main-loop

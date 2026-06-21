@@ -60,6 +60,10 @@ export interface OpEntryKind {
   used_tokens?: number
   threshold_tokens?: number
   budget_tokens?: number
+  /** cache hit/miss split of used_tokens (context_usage) — folded so the HUD's
+   *  `Used (hit)` / `Used (miss)` match ratatui's green/amber bar segments. */
+  hit_tokens?: number
+  miss_tokens?: number
   /** Stable message id, e.g. "T7-m3" (message_created). */
   message_id?: string
   /** Content-addressed body hash, hex (message_created). */
@@ -309,6 +313,14 @@ export function applyAgentDelta(prev: Agent | undefined, entry: OpEntry): Agent 
       }
       if (typeof k.budget_tokens === "number" && prev.contextBudget !== k.budget_tokens) {
         next = { ...next, contextBudget: k.budget_tokens }
+      }
+      // The cache hit/miss split (hit + miss === used) so the HUD can render
+      // `Used (hit)` / `Used (miss)` matching ratatui's green/amber segments.
+      if (typeof k.hit_tokens === "number" && prev.contextHit !== k.hit_tokens) {
+        next = { ...next, contextHit: k.hit_tokens }
+      }
+      if (typeof k.miss_tokens === "number" && prev.contextMiss !== k.miss_tokens) {
+        next = { ...next, contextMiss: k.miss_tokens }
       }
       return next
     }

@@ -161,6 +161,12 @@ fn build_agent_meta(
         "contextUsed": context.used_tokens,
         "contextThreshold": context.threshold_tokens,
         "contextBudget": context.budget_tokens,
+        // The cache hit/miss split of contextUsed (hit + miss == used), folded
+        // from the same ContextUsage delta. The web HUD shows `Used (hit)` /
+        // `Used (miss)` from these, byte-identical to the ratatui sidebar's
+        // green/amber token-bar segments (T297). Zero before the first sample.
+        "contextHit": context.hit_tokens,
+        "contextMiss": context.miss_tokens,
         "task": task,
         "threads": threads_count,
         "lastActivity": last_activity_ms,

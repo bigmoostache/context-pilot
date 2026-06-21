@@ -53,6 +53,42 @@ pub(crate) fn context_usage(state: &State) -> (usize, usize, usize) {
     (used, state.cleaning_threshold_tokens(), state.effective_context_budget())
 }
 
+/// The context-window occupancy split into its **cache `(hit, miss)`** halves —
+/// the canonical companion to [`context_usage`], whose `used` equals
+/// `hit + miss` exactly.
+///
+/// This is the **single source of truth** for the hit/miss decomposition the
+/// TUI sidebar token bar renders as its green/amber segments (and lists in the
+/// sidebar cache-stats table), and which the bridge emits to the web HUD so the
+/// web meter can show the *identical* `Used (hit)` / `Used (miss)` breakdown
+/// rather than re-deriving it (the same "must match ratatui exactly" discipline
+/// as [`context_usage`], T297).
+///
+/// * **hit** = the stable, always-cached prefix (the system prompt counted
+///   twice + every enabled tool definition) **plus** every live panel whose
+///   `panel_cache_hit` flag is set — the bytes the provider served from cache.
+/// * **miss** = every live panel whose cache flag is *not* set — the bytes
+///   (re)sent uncached this turn.
+///
+/// The non-panel prefix is classed entirely as a hit because it is byte-stable
+/// across turns and therefore always rides the cache breakpoint.
+pub(crate) fn context_hit_miss(state: &State) -> (usize, usize) {
+    let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
+    let system_prompt_tokens = estimate_tokens(&system_prompt).saturating_mul(2);
+    let tool_def_tokens = estimate_tool_definitions_tokens(state);
+
+    let mut hit = system_prompt_tokens.saturating_add(tool_def_tokens);
+    let mut miss = 0usize;
+    for ctx in &state.context {
+        if ctx.panel_cache_hit {
+            hit = hit.saturating_add(ctx.token_count);
+        } else {
+            miss = miss.saturating_add(ctx.token_count);
+        }
+    }
+    (hit, miss)
+}
+
 /// Generates the plain-text/markdown context content sent to the LLM.
 /// This is separate from the TUI rendering (`overview_render.rs`).
 pub(crate) fn generate_context_content(state: &State) -> String {

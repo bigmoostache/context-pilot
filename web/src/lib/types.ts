@@ -161,6 +161,13 @@ export interface Agent {
   contextThreshold?: number
   /** the hard context budget (the meter's denominator). */
   contextBudget?: number
+  /** cache-HIT half of contextUsed (always-cached prefix + cached panels) —
+   *  folded from ContextUsage; the HUD shows `Used (hit)` from it, matching
+   *  ratatui's green token-bar segment. hit + miss === used. */
+  contextHit?: number
+  /** cache-MISS half of contextUsed (uncached panels this turn) — the HUD's
+   *  `Used (miss)`, matching ratatui's amber segment. */
+  contextMiss?: number
   /** one-line summary of what the agent is currently working on */
   task: string
   /** number of open threads on this agent */
