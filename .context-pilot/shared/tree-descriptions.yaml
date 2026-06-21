@@ -2062,6 +2062,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+41292a6072082dbd:
+  path: web/src/components/finder/ContextMenu.tsx
+  description: 'Finder right-click menu, two variants on pos.node presence. ITEM menu: Open, Pin (folders), Rename, Duplicate, Download, Move to Trash. EMPTY-SPACE menu (T279): New Folder, Upload, Select All, Toggle Quick Look, Refresh. T305: tag color-swatch row removed (dropped feature) + onTag prop/Tag/TAG_META/FinderTag imports gone. On-screen clamping; closes on outside-click/Esc.'
+  last_edited_ms: 1782051352800
 4133649e1221acab:
   path: web/src/components/finder/FinderPreview.tsx
   description: 'QuickLook preview pane — kind-aware (code/sheet/slides/pdf/image/audio/video/markdown/text/folder). T272: live .md/code/json/doc files (whose backend /fs nodes carry NO inline .text) now render via a LivePreview child that fetches content through useFsPreview (GET /fs/preview, 256KiB cap, 415 on binary→Generic no-preview fallback); markdown goes through the rich GFM <Markdown> (lib/markdown.tsx), the rest a preformatted block. TEXT_KINDS set gates which kinds fetch. truncated→TruncatedNote. Mock path (inline node.text) unchanged. The tiny hand-rolled renderMarkdown was dropped. Enriched Meta footer (Kind/Size/Dimensions/Duration/Pages/Created/Modified/Tags/Where). agentId prop threads the realm; omit for mock.'
@@ -5782,6 +5786,10 @@ b689ff54e81da946:
   path: src/infra/tools.rs
   description: Re-exports cp_base::tools types. execute_tool() dispatches via module system. execute_reload_tui() sets reload flag + writes config.json.
   last_edited_ms: 1780651842213
+b6af6ae89470c463:
+  path: web/src/components/finder/internal/FinderOverlays.tsx
+  description: 'Finder bottom chrome + floating layers: status bar, right-click ContextMenu (full handler wiring incl Refresh via own useQueryClient), external-drag upload overlay, transient toast. Built from primitive deps. T305: onTag passthrough removed.'
+  last_edited_ms: 1782051352843
 b6be0d9dc7f74661:
   path: crates/cp-mod-tree/Cargo.toml
   description: 'Tree module deps: cp-base, cp-render, crossterm, serde, serde_json, ignore, cp-mod-utilities.'
