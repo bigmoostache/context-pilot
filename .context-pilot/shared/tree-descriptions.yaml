@@ -474,6 +474,10 @@
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
   last_edited_ms: 1780562263889
+1058eb8626281c54:
+  path: web/src/components/conversation/Conversation.tsx
+  description: 'Cockpit conversation surface — LIVE (§7). useConversation(agentId) for the durable record + useStreamingTokens(agentId) for the ephemeral stream plane, overlaid: buildMessages maps durable msgs→ChatMessage (text user/assistant; tool_call→tool card from tool_uses[0]; tool_result folded/skipped) then shows the longer of (live buffer, durable text) + blinking cursor while the live buffer leads, and synthesises a trailing assistant bubble for a streaming turn not yet flushed. Reconciles (live stops leading) once durable text catches up. Accepts agentId prop.'
+  last_edited_ms: 0
 106e813949596459:
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view (collapsible). NO agent identity header (TopBar owns it). Slim top bar: thread count + ''N working'' parallel pill + PanelLeftClose collapse trigger. Width = shared var(--sidebar-w); collapsed animates →0 (fixed-width inner shell prevents reflow). Grouped ''Needs you''=MY_TURN / ''Working in parallel''=THEIR_TURN rows (status dot, name, preview, time, unread). New Thread + search.'
@@ -1182,6 +1186,10 @@
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
   last_edited_ms: 0
+265b29e3fe7ecde8:
+  path: yamls/tools/threads.yaml
+  description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
+  last_edited_ms: 0
 2660bb88e1117b5e:
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (max_cost is burst/stream-based), coucou (timer/datetime scheduling).'
@@ -1814,6 +1822,10 @@
   path: crates/cp-orchestrator/src/transport/sse.rs
   description: 'SSE plumbing. SseMessage{id:Option<rev>,event,data}.encode()→id:/event:/data: lines. delta(rev)/stream/resync/invalidate constructors. SseBody: blocking Read fed by mpsc, Ok(0) EOF when senders dropped. SseSink.send/keep_alive (Err=client gone). channel() pairs them. OplogWaiter (X18 latency): notify RecommendedWatcher (kqueue/inotify) on oplog dir, wait(timeout) parks on mpsc coalescing bursts — wakes the SSE producer the instant the agent appends (sub-ms Linux). Manual Debug impl (RecommendedWatcher not Debug). stream_to_client: raw into_writer() + per-event flush (tiny_http BufWriter would never flush an unbounded stream). Reconnect-replay-by-rev native via Last-Event-ID.'
   last_edited_ms: 1781793072072
+3a7a867ed887975c:
+  path: web/src/components/threads/fileUpload.tsx
+  description: 'Threads chat file-upload (T298): UploadedFile type + buildUploadMessage (composes a ```file-upload YAML block per file: path/name/size/note) + parseFileUploads (extracts blocks → {clean prose, files}) + uploadToNode (synthesizes a FinderNode via kindOf so the chip drives the shared Quick Look) + FileUploadChip (clickable mac-icon attachment chip opening QuickLookSheet).'
+  last_edited_ms: 0
 3ad7669c71770a9d:
   path: src/modules/overview/mod.rs
   description: 'Overview module. Core/global. Close_panel pre-flight: warns (not errors) for stale [!] or missing tree descriptions. pub(crate) has_pending_tree_describe() helper. tool_manage, panel_goto_page pre-flights. save/load module+worker data. Visualizer extracted to visualizers.rs.'
@@ -3065,6 +3077,10 @@
 6418d8f702b9149f:
   path: crates/cp-mod-search/src/meili/server.rs
   description: Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file management. read_pid() pub(super) for overlay access. Projects registry + orphan index cleanup. Geometric backoff health polling (50ms→500ms cap, 15s budget).
+  last_edited_ms: 0
+642a0790989ee5fd:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message parseFileUploads splits prose from file-upload blocks → renders FileUploadChip row (pl-7) + hosts ONE shared QuickLookSheet (agentId-scoped) opened by any chip. Takes agentId + onAttach props.'
   last_edited_ms: 0
 64763506158c3657:
   path: crates/cp-orchestrator/src/runtime.rs
@@ -4442,6 +4458,10 @@
   path: crates/cp-orchestrator/src/main.rs
   description: 'Backend entry point. Phase 16: prints version+protocol+agents dir, exits (no runtime loop yet — arrives with supervisor). Thin: machinery in lib. `use nix/serde_json/cp_oplog as _` + cfg(test) tempfile acknowledge lib-only deps for per-target unused-crate-dependencies.'
   last_edited_ms: 1781630135208
+8e33f1c4fa63db8d:
+  path: web/src/components/conversation/Message.tsx
+  description: Thread/conversation message renderer. AssistantMessage + UserMessage now render text via <Markdown> (lib/markdown.tsx) instead of the minimal renderInline — assistant=default variant, user=onAccent variant (legible on the signal bubble). ToolMessage = collapsible card (header name/intent, mono params, pre result, danger border on error). Streaming blink cursor preserved on assistant.
+  last_edited_ms: 0
 8e397fda95df9fad:
   path: src/llms/minimax/mod.rs
   description: MiniMax provider — Anthropic-compatible API via Token Plan. SSE streaming identical to Anthropic protocol. MINIMAX_API_KEY auth.
@@ -6738,6 +6758,10 @@ d5de5196647aeaa3:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme. --sidebar-w (240px, :root) = single source of truth for ALL primary sidebar widths (fleet/threads/cockpit/finder). Two palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Dungeon Forge'' = TUI D&D palette verbatim (#222220/#333331/#424240 charcoal / torch-orange #DA7659 primary+signal+your-turn / #B26245 dim accent / #C98F6B tan interactive / #F0F0F0 ink / ok #86BC6F / warn #E5C07B / danger #C85050). SF Pro chrome, IBM Plex Mono data. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker, modal-pop/backdrop-fade/opt-rise, finder-slider.'
   last_edited_ms: 1781533961612
+d679e9d5f7e34ec1:
+  path: web/src/components/shell/TopBar.tsx
+  description: 'macOS title bar. Accepts agents prop for AgentSwitcher + activeAgent lookup. View switcher Threads·Finder·Cockpit. Right cluster: cost, Activity→StatsPopup(agentId), theme, agent config (AgentModal), UserMenu (Profile+Settings).'
+  last_edited_ms: 0
 d68035df2e8b5920:
   path: crates/cp-oplog/src/compact.rs
   description: 'Phase 7 (X774): segment compaction + GAP3 grace rule. compact(dir) deletes every segment older than the newest checkpoint-bearing segment (replay fast-path already ignores them → replay output unchanged; the checkpoint Snapshot carries live heads+seen, so the checkpoint IS the ack-rev barrier). CompactReport{segments_removed,oldest_index}. total_bytes/should_compact size trigger (DEFAULT_COMPACT_THRESHOLD 256MiB). body_gc_eligible(age,grace) const predicate for GAP3 orphan-body GC: only GC bodies older than DEFAULT_GC_GRACE(60s) >> I13 barrier window, so in-flight spills never collected, only crash-orphans. 7 tests incl replay-identical-after-compaction.'
@@ -7077,6 +7101,10 @@ e445bc97e31d455a:
 e454145fc6da766a:
   path: crates/cp-orchestrator/tests/services_integration.rs
   description: 'Phase 29 (X796) backend services integration suite (4 tests, green, ~0.1s). Drives MaterializedView+CostBreaker+StreamHub TOGETHER against a REAL cp-oplog via channel::Tailer (composition the inline unit tests'' crafted OpEntry literals can''t reach): (1) restart rebuild end-to-end I5+V9: OplogService.append_durable(heads+phase+rising cost)->shutdown->tail_all(Tailer.poll)->view.apply_batch->breaker.rebuild_from_view trips; (2) real segment-roll checkpoint folds to ground-truth head: spawn_with_segment_limit(64) forces rolls (leading authoritative Checkpoint), asserts >=1 Checkpoint rode stream + final head correct; (3) R2-17 reconcile: degraded hub subscriber''s authoritative snapshot = view heads folded from real oplog, mark_reconciled clears degraded+dropped; (4) fleet isolation: 2 agents 2 oplogs -> view 2 isolated projections, breaker trips only overspender, hub fans per-agent. helpers message/cost/token/tail_all. Top `use cp_mod_bridge/nix/serde/serde_json/tiny_http as _;`.'
+  last_edited_ms: 0
+e45e802e67097d79:
+  path: web/src/App.tsx
+  description: Root shell. activeAgent = useAgentMeta(activeAgentId) (delta-folded per-agent meta) ?? fleetAgent (polled-fleet identity fallback) so the always-visible TopBar + StatusBar ride the push plane for phase/cost/tokens instead of the 15s fleet poll (T297). view/agent persisted to localStorage; effectiveView falls back to fleet when no live agent.
   last_edited_ms: 0
 e48d20dd3b0e5ca4:
   path: ui/src/components/agents/PromptsPage.tsx
@@ -7802,6 +7830,10 @@ fc62d75ef1e8e369:
   path: web/src/components/shell/config/ConfigPanel.tsx
   description: 'Settings surface shell — macOS System-Settings layout: category rail + detail pane. variant ''dialog'' (TopBar gear, DialogClose chrome) | ''inline'' (fleet Settings page). Owns rail + chrome only; panes + building blocks live in ./ConfigPanes (<500 split).'
   last_edited_ms: 1782041038969
+fc7b13ea04106f50:
+  path: web/src/components/shell/config/ConfigPanes.tsx
+  description: 'Config category panes + presentational building blocks (split from ConfigPanel for <500): CATEGORIES, CategoryBody (general/usage/providers/search/docai/web/integrations), GeneralPane (default model picker + apply-to-all via sendCommand configure), KeyRow/StatusRow/ToggleRow/ManagedKeysNotice. Company-managed accounts lock key editing.'
+  last_edited_ms: 0
 fc9cc30874f14d93:
   path: ui/src/components/shell/TopBar.tsx
   description: 'macOS title bar. App mark (Home)→fleet. ALWAYS renders / + AgentSwitcher. Per-agent view switcher order Threads·Finder·Cockpit (T25), each tab + app-mark/Activity/theme/Settings carry <Tip> tooltips. Right cluster (in-agent): cost, Activity→StatsPopup, theme, divider, then a PAIR of cog buttons — Settings2 ''Agent configuration'' (T26, opens shared AgentModal in manage mode for the active agent, one-click shortcut to the 4-step Manage flow) + Settings gear→ConfigModal (global). AgentModal rendered as a SIBLING of the .vibrancy header (fragment return) so its absolute-inset backdrop anchors to the viewport. At fleet altitude the agent-scoped controls are hidden.'
