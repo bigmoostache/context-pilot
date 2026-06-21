@@ -11,7 +11,7 @@ import {
 import { ColumnsView, GalleryView, GridView, ListView } from "./views/FinderViews"
 import { FinderPreview } from "./preview/FinderPreview"
 import { type MenuPos } from "./ContextMenu"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { QuickLookSheet } from "./QuickLookSheet"
 import { useMarquee } from "./support/useMarquee"
 import { cn } from "@/lib/utils"
 import {
@@ -441,24 +441,12 @@ export function Finder({ agent }: { agent: Agent }) {
                 shows the selected item as a hero, so a drawer there would double
                 up. The Sheet's built-in close button is hidden because the pane
                 renders its own Quick Look header with a Close control. */}
-            <Sheet
+            <QuickLookSheet
+              node={previewNode}
+              agentId={agent.id}
               open={previewOpen && (viewMode === "grid" || viewMode === "list")}
-              onOpenChange={(o) => {
-                if (!o) setPreviewOpen(false)
-              }}
-            >
-              <SheetContent
-                side="right"
-                showCloseButton={false}
-                className="border-l border-border p-0 data-[side=right]:w-2/3 data-[side=right]:max-w-none data-[side=right]:sm:max-w-none"
-              >
-                <FinderPreview
-                  node={previewNode}
-                  agentId={agent.id}
-                  onClose={() => setPreviewOpen(false)}
-                />
-              </SheetContent>
-            </Sheet>
+              onClose={() => setPreviewOpen(false)}
+            />
           </div>
         )}
       </div>

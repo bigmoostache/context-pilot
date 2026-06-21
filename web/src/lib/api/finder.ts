@@ -97,6 +97,34 @@ export function uploadFile(agentId: string, dir: string, file: File): Promise<Up
   })
 }
 
+/** Result of a dedup-aware upload (`POST /fs/upload-unique`). */
+export interface UploadUniqueResult {
+  /** realm-relative path of the stored file (possibly suffixed on collision) */
+  path: string
+  /** final stored filename — `name (1).ext` etc. when the basename collided */
+  name: string
+  /** byte count written */
+  size: number
+}
+
+/** Upload one file into a realm directory, **auto-creating** the directory and
+ *  **never overwriting**: a name collision yields a ` (1)`, ` (2)`… suffix.
+ *  Powers the threads chat composer's attachment flow (files land in the
+ *  realm's `.uploads/`). The backend returns the stored path/name/size — all
+ *  the composer needs to compose the `file-upload` message block. Throws on a
+ *  rejected name / confinement violation / write fault. */
+export function uploadUnique(
+  agentId: string,
+  dir: string,
+  file: File,
+): Promise<UploadUniqueResult> {
+  const q = `path=${encodeURIComponent(dir)}&name=${encodeURIComponent(file.name)}`
+  return request(`/api/agent/${agentId}/fs/upload-unique?${q}`, {
+    method: "POST",
+    body: file,
+  })
+}
+
 /** Result of a folder creation (`POST /fs/mkdir`). */
 export interface MkdirResult {
   created: string

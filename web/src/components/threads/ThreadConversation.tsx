@@ -1,9 +1,17 @@
-import { Fragment, useEffect, useRef } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
 import { QuestionForm } from "./QuestionForm"
 import { ThreadComposer } from "./ThreadComposer"
+import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
+import {
+  parseFileUploads,
+  uploadToNode,
+  FileUploadChip,
+  type UploadedFile,
+} from "./fileUpload"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
+import type { FinderNode } from "@/lib/types"
 
 /** Map a thread message onto the shared ChatMessage shape for the renderer. */
 function toChatMessage(m: ThreadMsg): ChatMessage {
@@ -98,11 +106,21 @@ function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
  */
 export function ThreadConversation({
   thread,
+  agentId,
   onSend,
+  onAttach,
 }: {
   thread: ThreadDetail
+  /** owning agent — needed to open the shared Quick Look drawer for an attachment */
+  agentId: string
   onSend?: (text: string) => void
+  /** upload picked files into this thread (composer paperclip) */
+  onAttach?: (files: File[]) => void
 }) {
+  // The attachment whose Quick Look drawer is open (null = closed). A
+  // `file-upload` chip in any message sets it; the shared QuickLookSheet renders
+  // it with the exact same FinderPreview the Finder uses.
+  const [sheetFile, setSheetFile] = useState<UploadedFile | null>(null)
   // Pin the conversation to the latest message: scroll to the bottom whenever
   // a thread is opened (id change) or a new message lands (log grows), so the
   // freshest exchange is always in view — matching the TUI, which keeps the
@@ -130,7 +148,23 @@ export function ThreadConversation({
               <AutoRun key={`auto-${seg.msgs[0].id}`} msgs={seg.msgs} />
             ) : (
               <div key={seg.msg.id}>
-                <Message msg={toChatMessage(seg.msg)} />
+                {(() => {
+                  const { clean, files } = parseFileUploads(seg.msg.text ?? "")
+                  return (
+                    <>
+                      {(clean.length > 0 || files.length === 0) && (
+                        <Message msg={toChatMessage({ ...seg.msg, text: clean })} />
+                      )}
+                      {files.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pb-1.5 pl-7">
+                          {files.map((f, i) => (
+                            <FileUploadChip key={i} file={f} onOpen={() => setSheetFile(f)} />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
                 {seg.msg.questions?.map((q, i) => (
                   <div key={i} className="pb-1.5 pl-7">
                     <QuestionForm q={q} onSubmit={(answer) => onSend?.(answer)} />
@@ -152,8 +186,21 @@ export function ThreadConversation({
       </ScrollArea>
 
       <div className="mx-auto w-full max-w-[720px]">
-        <ThreadComposer key={thread.id} status={thread.status} focused={thread.focused} onSend={onSend} />
+        <ThreadComposer
+          key={thread.id}
+          status={thread.status}
+          focused={thread.focused}
+          onSend={onSend}
+          onAttach={onAttach}
+        />
       </div>
+
+      <QuickLookSheet
+        node={sheetFile ? (uploadToNode(sheetFile) as FinderNode) : null}
+        agentId={agentId}
+        open={sheetFile !== null}
+        onClose={() => setSheetFile(null)}
+      />
     </main>
   )
 }

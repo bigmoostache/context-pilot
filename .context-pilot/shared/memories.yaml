@@ -758,6 +758,37 @@
   - preview
   - shipped
   last_edited_ms: 1781885667471
+9784c5384abd7aea:
+  tl_dr: 'T298 chat file-upload SHIPPED end-to-end: composer paperclip uploads to realm .uploads/ (dedup) + posts a file-upload YAML message rendered as a chip that opens the SAME shared Quick Look drawer (no doubled code).'
+  contents: |-
+    ## T298 — uploading files in chat SHIPPED
+
+    User: wire the non-functional paperclip button in the threads chat composer. (1) upload to ./.uploads/* with ` (1)`,` (2)` dedup; (2) post a USER message in the thread with one ```file-upload YAML block per file (path/name/size/note); multi-file = multi-block; (3) frontend parses file-upload blocks into clickable chips that open THE SAME Finder Quick Look drawer (Sheet+FinderPreview) — NO duplicated code.
+
+    ### Backend (cp-orchestrator inspect/finder/mutate.rs)
+    fs_upload_unique(state,id,query,body): POST /api/agent/{id}/fs/upload-unique?path={dir}&name={file}, body = raw bytes. Like fs_upload BUT tailored to the composer: (a) create_dir_all the dest dir on demand (so the first-ever .uploads attachment needs no prior mkdir); (b) unique_name() dedup — ` (n)` suffix, extension-preserving (report.pdf→report (1).pdf), bounded 1..10_000 then ns-stamp fallback, leading-dot dotfiles keep whole name as stem. Confinement: bare-name guard on name; reject `..`/absolute in dir BEFORE create_dir_all; confine realm root, create dir under it, RE-confine via confined_path after creation (defends a symlinked component). Returns {path,name,size}. Route in transport/mod.rs route_rest (Post fs/upload-unique); re-export finder/mod.rs (fs_upload_unique). mutate.rs ~470 lines (<500). Proven LIVE (834eb ~/code/test): first→cpu-test.txt, dedup→cpu-test (1).txt, (2).txt; escape name 400; escape dir 403; .uploads auto-created. Artifacts cleaned.
+
+    ### Frontend
+    - api/finder.ts: uploadUnique(agentId,dir,file)->UploadUniqueResult{path,name,size} (re-exported via lib/api `export * from ./finder`).
+    - components/finder/support/kind.tsx: kindOf(name)->FinderKind — CLIENT MIRROR of backend infer_kind (KIND_BY_EXT table, unknown→binary) so a path-only attachment routes to the right Quick Look viewer.
+    - components/finder/QuickLookSheet.tsx (NEW): the SINGLE Quick Look drawer impl — modal shadcn Sheet (side=right, data-[side=right]:w-2/3 + max-w-none pair, showCloseButton=false, p-0) wrapping <FinderPreview node agentId onClose>. Finder.tsx REFACTORED to use it (swapped the inline Sheet block + the `@/components/ui/sheet` import for QuickLookSheet; FinderPreview import retained for the file-tab variant). Both call sites now share ONE drawer — the user's no-doubled-code requirement.
+    - components/threads/fileUpload.tsx (NEW): UploadedFile{path,name,size,note}; buildUploadMessage(files) → one ```file-upload block/file joined by blank lines; parseFileUploads(text) → {clean prose (blocks stripped), files[]} via BLOCK_RE /```file-upload\n([\s\S]*?)```/g + field() line matcher (tolerant: name→basename, size→0); uploadToNode(f) synthesizes a FinderNode (kind=kindOf(name)) for the drawer; FileUploadChip{file,onOpen} clickable mac-icon+name+size chip.
+    - ThreadComposer.tsx: + onAttach?(files:File[]); hidden multi-file <input ref> (value reset post-pick); paperclip onClick→input.click(), disabled when no onAttach.
+    - ThreadConversation.tsx: + agentId + onAttach props + sheetFile state. Per non-auto msg: parseFileUploads(text)→render <Message> with CLEAN text (only if clean non-empty OR no files) + a pl-7 flex-wrap row of FileUploadChip (onOpen→setSheetFile). Hosts ONE <QuickLookSheet node={sheetFile?uploadToNode:null} agentId open onClose> at the bottom.
+    - ThreadsView.tsx: handleAttach(files) — for each file await uploadUnique(agentId,'.uploads',f) collecting UploadedFile (note=`uploaded by user at ${ISO}`), then sendCommand send_message content=buildUploadMessage(uploaded); errors→flash(describeCommandError). Passes agentId={activeAgentId} + onAttach to ThreadConversation.
+
+    ### Validation
+    web npm run build green (tsc+vite exit 0); web-structure callback passed (finder/ 8 entries at cap, threads/ fine). Backend cargo build -p cp-orchestrator green + proven live. Orchestrator RESTARTED on fresh binary (killed pid 87070 + sh parent 87069 on :7878, relaunched debug CP_COST_BUDGET=100000000, console P29) since running binary predated the upload-unique route. No TUI crate changed → no system_reload; web rides vite :5174 hot-reload.
+
+    GOTCHA reused: orchestrator launched via `sh -c ./target/debug/cp-orchestrator` — kill BOTH the orchestrator pid AND its sh -c parent to free :7878 (else the sh parent respawns it). NEVER git via console_easy_bash (blocked on 'git' substring) — use git_execute. Untracked NOT-mine never commit: .cp-trash/, report/*, .context-pilot/shared/entities/.
+  importance: high
+  labels:
+  - T298
+  - threads
+  - file-upload
+  - quicklook
+  - shipped
+  last_edited_ms: 1782045535669
 9ce91c5181530a87:
   tl_dr: T281 (PDF) + T286 (image) Finder previews SHIPPED via ONE backend inline raw-serve endpoint + frontend <img>/<object>. Details in contents.
   contents: |-

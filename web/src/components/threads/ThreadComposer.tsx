@@ -20,14 +20,18 @@ export function ThreadComposer({
   status,
   focused = false,
   onSend,
+  onAttach,
 }: {
   status: ThreadStatus
   /** true when this is the single thread the agent is currently focused on */
   focused?: boolean
   onSend?: (text: string) => void
+  /** upload one or more picked files into this thread (paperclip button) */
+  onAttach?: (files: File[]) => void
 }) {
   const [text, setText] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   /**
    * Grow the textarea to fit its content, just like the TUI input area which
@@ -98,7 +102,24 @@ export function ThreadComposer({
         </div>
       )}
       <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2.5 card-shadow focus-within:border-[var(--signal)]/60">
-        <button className="mb-0.5 text-muted-foreground/60 transition-colors hover:text-[var(--interactive)]">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? [])
+            if (files.length > 0) onAttach?.(files)
+            // Reset so picking the same file again re-fires onChange.
+            e.target.value = ""
+          }}
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={!onAttach}
+          title="Attach files"
+          className="mb-0.5 text-muted-foreground/60 transition-colors hover:text-[var(--interactive)] disabled:cursor-default disabled:opacity-40 disabled:hover:text-muted-foreground/60"
+        >
           <Paperclip className="size-4" />
         </button>
         <textarea

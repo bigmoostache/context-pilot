@@ -4,6 +4,8 @@ import { ThreadList } from "./ThreadList"
 import { ThreadConversation } from "./ThreadConversation"
 import { NewThreadDialog } from "./NewThreadDialog"
 import { useThreads, useFleet, sendCommand } from "@/lib/live"
+import { uploadUnique } from "@/lib/api"
+import { buildUploadMessage, type UploadedFile } from "./fileUpload"
 
 /**
  * Turn a rejected `sendCommand` into a human sentence for the notice toast.
@@ -133,6 +135,42 @@ export function ThreadsView({
     }).catch((e) => flash(describeCommandError("send your message", e)))
   }, [activeAgentId, effectiveSelectedId, flash])
 
+  /**
+   * Upload one or more picked files into this thread (composer paperclip).
+   * Each file is stored in the realm's `.uploads/` (dedup-suffixed on collision)
+   * and then a single user message is posted carrying one `file-upload` YAML
+   * block per file — the conversation view parses those blocks into clickable
+   * chips that open the shared Quick Look drawer, and the agent reads the same
+   * YAML as plain attachment context.
+   */
+  const handleAttach = useCallback(
+    (files: File[]) => {
+      if (!effectiveSelectedId || files.length === 0) return
+      void (async () => {
+        try {
+          const uploaded: UploadedFile[] = []
+          for (const f of files) {
+            const r = await uploadUnique(activeAgentId, ".uploads", f)
+            uploaded.push({
+              path: r.path,
+              name: r.name,
+              size: r.size,
+              note: `uploaded by user at ${new Date().toISOString()}`,
+            })
+          }
+          await sendCommand(activeAgentId, {
+            kind: "send_message",
+            thread_id: effectiveSelectedId,
+            content: buildUploadMessage(uploaded),
+          })
+        } catch (e) {
+          flash(describeCommandError("upload the file", e))
+        }
+      })()
+    },
+    [activeAgentId, effectiveSelectedId, flash],
+  )
+
   // Only bail to a bare empty state when there is genuinely no agent. A fresh
   // agent that simply has zero threads MUST still render the sidebar — that is
   // where the "New Thread" button lives — otherwise the realm is a dead end
@@ -159,7 +197,12 @@ export function ThreadsView({
           no thread selected/created yet — a hint pointing at the sidebar's New
           Thread button so an empty realm is never a dead end. */}
       {thread ? (
-        <ThreadConversation thread={thread} onSend={handleSend} />
+        <ThreadConversation
+          thread={thread}
+          agentId={activeAgentId}
+          onSend={handleSend}
+          onAttach={handleAttach}
+        />
       ) : (
         <EmptyRealm agentName={agent.name} onNewThread={() => setNewOpen(true)} />
       )}

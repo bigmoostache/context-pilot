@@ -530,6 +530,10 @@
   path: crates/cp-mod-entities/src/sync.rs
   description: Meilisearch sync for entity data — incremental dirty-tracked, delete-then-add. ensure_index, sync_table, flush_sync, full_reindex. extract_affected_tables for SQL parsing.
   last_edited_ms: 0
+11cb5999cee5ef54:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread composer (always-active textarea + turn-status banner). T298: paperclip wired — hidden multi-file <input>, onAttach?(files) prop, button disabled when no onAttach. Enter sends / Shift+Enter newline, IME-guarded, auto-grow.'
+  last_edited_ms: 1782045499750
 11ce8bd539c9f3c1:
   path: docs/talk/slides/1-0.html
   description: 'Sub-TOC: WHYs section — left numeral, right slide list'
@@ -1522,6 +1526,10 @@
   path: crates/cp-orchestrator/src/main.rs
   description: 'Backend entry point. Phase 3: prints version + protocol version, exits. Future: AgentRegistry, AgentChannel, AgentSupervisor, StreamHub, CostBreaker.'
   last_edited_ms: 1781617086617
+322e4c5d179661c8:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message parseFileUploads splits prose from file-upload blocks → renders FileUploadChip row (pl-7) + hosts ONE shared QuickLookSheet (agentId-scoped) opened by any chip. Takes agentId + onAttach props.'
+  last_edited_ms: 1782045499789
 32453767392c8e30:
   path: crates/cp-oplog/src/lib.rs
   description: 'Oplog crate root. Doc: durability tier ①, why-separate-crate (agent writes+replays, backend tails), announce-after-durable contract. Declares append + compact + replay + segment modules.'
@@ -1634,6 +1642,10 @@
   path: crates/cp-orchestrator/tests/services_integration.rs
   description: 'Phase 29 (X796) backend services integration suite (4 tests, green, ~0.1s). Drives MaterializedView+CostBreaker+StreamHub TOGETHER against a REAL cp-oplog via channel::Tailer (composition the inline unit tests'' crafted OpEntry literals can''t reach): (1) restart rebuild end-to-end I5+V9: OplogService.append_durable(heads+phase+rising cost)->shutdown->tail_all(Tailer.poll)->view.apply_batch->breaker.rebuild_from_view trips; (2) real segment-roll checkpoint folds to ground-truth head: spawn_with_segment_limit(64) forces rolls (leading authoritative Checkpoint), asserts >=1 Checkpoint rode stream + final head correct; (3) R2-17 reconcile: degraded hub subscriber''s authoritative snapshot = view heads folded from real oplog, mark_reconciled clears degraded+dropped; (4) fleet isolation: 2 agents 2 oplogs -> view 2 isolated projections, breaker trips only overspender, hub fans per-agent. helpers message/cost/token/tail_all. Top `use cp_mod_bridge/nix/serde/serde_json/tiny_http as _;`.'
   last_edited_ms: 1781650676137
+36901a27834aff55:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/mutate.rs
+  description: 'Finder writes: fs_upload/fs_write(X906 editor save-back)/fs_mkdir/fs_rename/fs_move/fs_trash (T285/T294 reversible trash into .context-pilot/trash). T298: fs_upload_unique (POST /fs/upload-unique) — create_dir_all the dest dir on demand + unique_name dedup (` (1)`,` (2)`… extension-preserving) so chat attachments land in .uploads/ without prior mkdir and never clobber. All confined, bare-name guarded.'
+  last_edited_ms: 1782045499903
 36927571593ea5a9:
   path: crates/cp-mod-bridge/src/boot.rs
   description: 'Phase 10 (X777): Boot — agent boot sequence + held resources. start_in(folder,agents_dir,model): (1) flock <folder>/bridge.lock EXCLUSIVE|NONBLOCK FIRST (single-process gate I1/D2) with BOUNDED RETRY (25 attempts × 80ms ≈ 2s) on EAGAIN/EWOULDBLOCK so a reload''s replacement process wins the lock once the outgoing process finishes exiting (defeats zombie-on-reload bridge-OFF); persistent owner → AlreadyRunning; non-contention errno → Io immediately; (2) OplogService::spawn(oplog dir); (3) bind stream.sock (unlink stale first); (4) mint cap_token+boot_id; (5) write registry <id>.json LAST. Drop removes registry+socket; lock+oplog release via own Drop. H5 FD-inherit deferred (CLOEXEC kept). 7 tests incl acquire_lock_retries_until_holder_releases (race: holder releases mid-retry → contender wins).'
@@ -2286,6 +2298,10 @@
   path: Cargo.lock
   description: Workspace lockfile
   last_edited_ms: 0
+4b177a8382c459f1:
+  path: web/src/components/finder/QuickLookSheet.tsx
+  description: 'Shared Finder Quick Look drawer (T298): a modal shadcn Sheet (2/3 viewport, right) wrapping FinderPreview for one node. SINGLE drawer implementation reused by both the Finder (grid/list Quick Look) and the threads conversation (a file-upload chip opens the exact same drawer) — no duplicated preview code. Built-in close hidden (preview pane draws its own).'
+  last_edited_ms: 1782045499630
 4b3f6bd9675aba4d:
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.5 duplicate Close_conversation_history queue check (panels[].panel_id extraction, skipped during trap), Phase 1 schema validation, Phase 2 module semantic checks.'
@@ -2486,6 +2502,10 @@
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore (.context-pilot/* with shared/agents/skills/commands negations), export API keys from .env to ~/.bashrc. Guards against running as root.'
   last_edited_ms: 1780497309373
+5177446361a66226:
+  path: web/src/components/threads/fileUpload.tsx
+  description: 'Threads chat file-upload (T298): UploadedFile type + buildUploadMessage (composes a ```file-upload YAML block per file: path/name/size/note) + parseFileUploads (extracts blocks → {clean prose, files}) + uploadToNode (synthesizes a FinderNode via kindOf so the chip drives the shared Quick Look) + FileUploadChip (clickable mac-icon attachment chip opening QuickLookSheet).'
+  last_edited_ms: 1782045499672
 5187d194ad590c8e:
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks. Phase 2 SKIPS the threads module while the history-cleanup trap is active (QueueState.trap_active) — otherwise threads focus enforcement blocks Close_conversation_history and deadlocks the two traps.'
@@ -3238,6 +3258,10 @@
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
   last_edited_ms: 0
+6bae87093ab3db51:
+  path: web/src/components/finder/support/kind.tsx
+  description: 'Visual identity for file kinds (accent+label, kindTint/kindGradient), macOS TAG_META, extOf. T298: added kindOf(name) — client mirror of backend infer_kind (KIND_BY_EXT table, unknown→binary) so a path-only file (chat file-upload chip) routes to the right Quick Look viewer.'
+  last_edited_ms: 1782045499711
 6baed006a97719a4:
   path: crates/cp-base/src/state/context.rs
   description: 'Kind registry + Entry type. TypeMeta, init_context_type_registry, fixed_panel_order. Kind string-backed context type with well-known constants (ENTITIES, ENTITY_RESULT, etc). Entry struct: id/uid/context_type/name/token_count/metadata + cache/freeze fields. estimate_tokens, make_default_entry.'
@@ -3266,6 +3290,10 @@
   path: ui/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Fleet altitude → FleetShell (4-page mission control). Cockpit = LeftRail + Conversation. threads/finder per-agent. openAgent switches agent→threads. Finder keyed by agent.id.
   last_edited_ms: 0
+6c1a7b18d21ad4d8:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Threads view shell (list | conversation). handleSend/handleArchive/handleCreate via sendCommand. T298: handleAttach uploads each picked file to .uploads/ via uploadUnique (dedup) then posts one send_message carrying buildUploadMessage(N file-upload blocks); passes agentId + onAttach to ThreadConversation.'
+  last_edited_ms: 1782045499828
 6c4e626883182716:
   path: crates/cp-orchestrator/src/transport/stream.rs
   description: 'SSE producer loop (run_stream), extracted from transport/mod.rs to stay under the line budget. Tails one agent''s oplog (rev-numbered durable deltas) + stream-hub frames, pushes both down the SSE sink until disconnect. T123 cold-connect fix: a fresh subscriber (no Last-Event-ID) seeds the Tailer at the oplog HEAD (oplog_head_rev) so it rides only the live tail instead of replaying the whole history; reconnect seeds at last-seen rev for gap replay. T271 off-by-one fix: oplog_head_rev now returns Option<u64> (was u64 via unwrap_or(0)); on an EMPTY log (rev_head None) the cold-connect path leaves the tailer UNSEEDED rather than seed(0), so the agent''s very first append (rev 0) rides the live tail instead of being silently dropped (seed is an exclusive lower bound). 2 regression unit tests: cold_connect_on_empty_oplog_delivers_first_append + cold_connect_on_nonempty_oplog_skips_backlog. TAIL_REPOLL=5ms backstop (macOS FSEvents), KEEPALIVE=10s.'
@@ -3766,6 +3794,10 @@
   path: ui/src/components/agents/FleetSidebar.tsx
   description: Mission-control left nav rail (fleet dashboard). FleetPage type = agents|prompts|usage|settings. NO identity header (lives in TopBar). NO in-rail collapse button — collapse is driven by the border rail FleetShell renders on the right edge. 4 nav items (icon+label+hint, active=card-shadow). collapsed prop animates aside width 212→0 (fixed-width inner shell). page/onSelect/collapsed props.
   last_edited_ms: 1781532872876
+7a58a0162754f062:
+  path: web/src/lib/api/finder.ts
+  description: 'Finder filesystem REST endpoints (list/descriptions/preview/sheet/write/upload/mkdir/rename/move/trash/raw/download/conversation). T298: added uploadUnique (POST /fs/upload-unique — auto-creates dir, never overwrites, returns stored path/name/size) powering the chat composer attachment flow.'
+  last_edited_ms: 1782045499865
 7ae3e41b45283bfc:
   path: docs/design-orchestration-backend.md
   description: 'Orchestration backend design doc, v7 (branch maquette). Code-grounded three-tier durability: ① bridge-owned append-only fsync''d OPLOG (authoritative: command effects, rev, seen-marks, phase, lifecycle, cost + immutable content-addressed body store) + ② existing UNTOUCHED PersistenceWriter mutable coalesced state cache (messages/{uid}.yaml, NOT load-bearing for durability) + ③ lossy UDS stream. v7''s two answers + one subtraction (round-2 senior review, thread T36): (1) I13 BODY-BEFORE-REFERENCE BARRIER — a content hash may appear in a durable oplog entry only after its body is durable; small bodies inlined in the same fsync''d append, large bodies spill tmp→fdatasync→rename before the referencing entry commits; crash-in-gap = orphan body (GC''d), never dangling ref; ''accepted=durable'' now covers contents not just envelope (V12). (2) I2 EXECUTION MODEL — the main loop NEVER fsyncs; each oplog append (incl phase transitions) is a lock-free enqueue; a dedicated oplog thread group-commits (one fdatasync/group, off-loop); command-accept ack (I11) runs on intake/oplog thread (V11). (3) SECURITY SUBTRACTION — v1 command authn = perms (0700/0600) + presence-checked bearer cap_token; HMAC/nonce/rotation deferred to remote-transport seam (G7); new I9b keeps the frontend WS single-use ticket re-justified as browser confused-deputy/DNS-rebind defense. I1-I13, K1-K9, R2-*, V1-V12 fault matrix. Companions: architecture-adversarial-analysis.md, roadmap.md. NOT implemented (discussion).'
