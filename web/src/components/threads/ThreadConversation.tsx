@@ -175,6 +175,7 @@ export function ThreadConversation({
           focused={thread.focused}
           onSend={onSend}
           onAttach={onAttach}
+          draftKey={`cp-draft-${agentId}-${thread.id}`}
         />
       </div>
 

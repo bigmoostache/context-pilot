@@ -21,6 +21,7 @@ export function ThreadComposer({
   focused = false,
   onSend,
   onAttach,
+  draftKey,
 }: {
   status: ThreadStatus
   /** true when this is the single thread the agent is currently focused on */
@@ -28,8 +29,21 @@ export function ThreadComposer({
   onSend?: (text: string) => void
   /** upload one or more picked files into this thread (paperclip button) */
   onAttach?: (files: File[]) => void
+  /**
+   * localStorage key under which the UNSENT draft is persisted (T304). When
+   * provided, what you type survives a reload, a view switch, and switching
+   * threads — each thread keeps its own pending draft. The composer is keyed by
+   * thread id upstream, so it remounts per thread and lazily seeds its text
+   * from this key; the persist effect writes every keystroke and clears the key
+   * on send (or when the draft is emptied). Omit it for an ephemeral composer.
+   */
+  draftKey?: string
 }) {
-  const [text, setText] = useState("")
+  // Lazily seed from the persisted draft so a remount (thread switch / return
+  // from another view) or a full reload restores what was being typed (T304).
+  const [text, setText] = useState(() =>
+    draftKey ? localStorage.getItem(draftKey) ?? "" : "",
+  )
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -47,6 +61,15 @@ export function ThreadComposer({
     el.style.height = `${Math.min(el.scrollHeight, MAX_H)}px`
   }
   useEffect(autoResize, [text])
+
+  // Persist the unsent draft per thread (T304): write on every keystroke, and
+  // remove the key once the draft is empty (sent or cleared) so we never leave
+  // stale drafts littering localStorage. No-op when no draftKey is supplied.
+  useEffect(() => {
+    if (!draftKey) return
+    if (text) localStorage.setItem(draftKey, text)
+    else localStorage.removeItem(draftKey)
+  }, [text, draftKey])
 
   const userTurn = status === "THEIR_TURN"
   const streaming = status === "ACTIVE"
