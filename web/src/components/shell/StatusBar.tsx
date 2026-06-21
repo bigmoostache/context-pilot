@@ -146,19 +146,25 @@ function ContextBar({
         {hasSplit ? (
           // ratatui's two-segment bar: green hit run + amber miss run.
           <div className="flex h-full">
-            <span style={{ width: `${hitRatio * 100}%`, background: "var(--ok)" }} className="block h-full" />
-            <span style={{ width: `${missRatio * 100}%`, background: "var(--warn)" }} className="block h-full" />
+            <span
+              style={{ width: `${hitRatio * 100}%`, background: "var(--ok)" }}
+              className="block h-full transition-[width] duration-1000 ease-out"
+            />
+            <span
+              style={{ width: `${missRatio * 100}%`, background: "var(--warn)" }}
+              className="block h-full transition-[width] duration-1000 ease-out"
+            />
           </div>
         ) : (
           <span
             style={{ width: `${usedRatio * 100}%`, background: fallbackFill }}
-            className="block h-full rounded-full"
+            className="block h-full rounded-full transition-[width] duration-1000 ease-out"
           />
         )}
         {/* threshold tick */}
         {thresholdRatio > 0 && thresholdRatio < 1 && (
           <span
-            className="absolute top-0 h-full w-px bg-foreground/50"
+            className="absolute top-0 h-full w-px bg-foreground/50 transition-[left] duration-1000 ease-out"
             style={{ left: `${thresholdRatio * 100}%` }}
           />
         )}
