@@ -6946,6 +6946,10 @@ db224a5ff42275a6:
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only fsync''d log. open/open_with_segment_limit, append(kind)->rev (frame+write_all+sync_data, announce-after-durable K9), maybe_roll (64MiB segments), create_segment (dir fsync I2), scan_for_resume (rev resume past highest durable, torn-tail truncate on open). OplogError{Io,Frame}. 6 tests.'
   last_edited_ms: 1781618522798
+dba98930c279fd48:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread composer (always-active textarea + turn-status banner). T298: paperclip wired — hidden multi-file <input>, onAttach?(files) prop. T304: optional draftKey persists the UNSENT draft to localStorage as {text,selStart,selEnd} JSON — lazy-seeds text on mount + reapplies the saved caret/selection range after focus, writes on every keystroke (onChange) AND caret move (onSelect), clears the key on send/empty, so a half-written reply AND the cursor position survive a reload / view switch / thread switch (each thread its own draft). parseDraft tolerantly reads the legacy bare-string format (caret at end). Enter sends / Shift+Enter newline, IME-guarded, auto-grow.'
+  last_edited_ms: 1782053022841
 dbd2d8ceeb96809d:
   path: Cargo.toml
   description: Workspace root. 25 crate members (incl cp-wire/cp-oplog/cp-mod-bridge/cp-orchestrator). Binary 'tui'. Edition 2024. Strict lint config (980 forbid, 21 deny). openssl vendored.
