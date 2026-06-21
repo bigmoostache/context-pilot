@@ -1,3 +1,28 @@
+136daa3a4207df23:
+  tl_dr: 'TAILSCALE SERVE (T310): Context Pilot reachable from phone at https://macbook.barking-hue.ts.net (tailnet-only). Recipe + single-origin proxy in contents.'
+  contents: |-
+    ## Serving Context Pilot over Tailscale (T310)
+
+    **URL (this Mac's tailnet):** https://macbook.barking-hue.ts.net — MagicDNS name `macbook.barking-hue.ts.net`, tailnet IP 100.125.55.89. iPhone (iphone171, 100.123.80.66) is on the same tailnet; just open the URL in Safari.
+
+    **Command (persistent, survives reboot, stored by tailscaled):**
+    `tailscale serve --bg --https=443 http://127.0.0.1:5174`
+    Disable: `tailscale serve --https=443 off`. Status: `tailscale serve status`. CLI at /usr/local/bin/tailscale.
+
+    **Single-origin proxy (the load-bearing fix):** the frontend used to hardcode `BASE = VITE_API_URL ?? "http://localhost:7878"` (client.ts + sse.ts) → a remote phone would call ITSELF. Fixed by making the app single-origin:
+    - `web/vite.config.ts`: `server.allowedHosts: true` (accept the .ts.net Host header from the serve reverse-proxy) + `server.proxy { '/api': { target: 'http://127.0.0.1:7878', changeOrigin: true } }`. ALL backend routes live under `/api` (REST + `/api/stream` SSE), so one proxy entry covers everything; http-proxy streams SSE unbuffered.
+    - `web/.env.local` (gitignored via `*.local`): `VITE_API_URL=` (empty string → `?? ` keeps "" → BASE="" → relative `/api/...` resolved against page origin). Committed 920ec0a5.
+    Result: works identically at localhost:5174 AND https://<host>.ts.net, no CORS, no mixed-content. Verified e2e over tailnet HTTPS: root=200, /api=200, valid cert.
+
+    **Requirements to stay reachable:** vite (:5174, console-managed, survives TUI reload) + orchestrator (:7878) must both be running. Mac sleep = phone loses access until wake (the always-on argument for Photonicat). `serve` not `funnel` (private tailnet, never public). Backend CORS is already `Access-Control-Allow-Origin: *` (would also permit cross-origin, but single-origin proxy is cleaner).
+  importance: high
+  labels:
+  - tailscale
+  - deploy
+  - ops
+  - tailnet
+  - web
+  last_edited_ms: 1782062178726
 13a1d96ff4a4e7d0:
   tl_dr: 'Context Pilot is a Rust TUI AI coding assistant (~15K LOC) built with Ratatui+Crossterm. Workspace has 18 module crates + 1 main binary. Branch: reverie-context-optimizer with +209 lines in src/app/reverie/tools.rs'
   importance: high
