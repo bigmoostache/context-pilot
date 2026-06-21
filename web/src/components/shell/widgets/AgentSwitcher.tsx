@@ -82,7 +82,19 @@ export function AgentSwitcher({
             <DropdownMenuItem
               key={a.id}
               onClick={() => onSwitch(a.id)}
-              className="flex items-center gap-2.5 py-1.5"
+              className={cn(
+                "flex items-center gap-2.5 py-1.5",
+                // A refined, theme-correct highlight. base-ui marks the active
+                // row with `data-highlighted` AND moves DOM focus onto it (the
+                // reason the shadcn default `focus:bg-accent` fires) — we
+                // override BOTH so the harsh stock accent is never seen. The
+                // tint is a `color-mix` over transparent so it reads as a soft
+                // brand wash that darkens correctly in dark mode and lightens in
+                // light mode from the popover surface beneath, with the text
+                // kept at full-contrast `foreground`.
+                "focus:!bg-[color-mix(in_oklab,var(--signal)_11%,transparent)] focus:!text-foreground",
+                "data-[highlighted]:!bg-[color-mix(in_oklab,var(--signal)_11%,transparent)] data-[highlighted]:!text-foreground",
+              )}
             >
               <AgentDot accent={a.accent} status={a.status} />
               <div className="flex min-w-0 flex-1 leading-tight">
@@ -100,11 +112,23 @@ export function AgentSwitcher({
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem onClick={onNewAgent} className="gap-2 py-1.5 text-[12.5px]">
+          <DropdownMenuItem
+            onClick={onNewAgent}
+            className={cn(
+              "gap-2 py-1.5 text-[12.5px]",
+              "focus:!bg-muted data-[highlighted]:!bg-muted focus:!text-foreground data-[highlighted]:!text-foreground",
+            )}
+          >
             <Plus className="size-3.5 text-[var(--interactive)]" />
             New agent…
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={onFleet} className="gap-2 py-1.5 text-[12.5px]">
+          <DropdownMenuItem
+            onClick={onFleet}
+            className={cn(
+              "gap-2 py-1.5 text-[12.5px]",
+              "focus:!bg-muted data-[highlighted]:!bg-muted focus:!text-foreground data-[highlighted]:!text-foreground",
+            )}
+          >
             <FolderGit2 className="size-3.5 text-muted-foreground" />
             Manage agents (fleet)
           </DropdownMenuItem>
