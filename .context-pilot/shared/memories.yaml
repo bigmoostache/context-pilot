@@ -109,7 +109,7 @@
   - shipped
   last_edited_ms: 1781890368426
 27550421d3d18b61:
-  tl_dr: 'T285 SHIPPED (5046851): Finder ''Move to Trash'' right-click now wired — reversible realm trash via hidden .cp-trash/.'
+  tl_dr: 'T285 Finder ''Move to Trash'' wired. T294 (c415e4da): trash relocated from realm-root .cp-trash/ to .context-pilot/trash so it inherits the existing .context-pilot gitignore — never committed. create_dir_all; guards unchanged.'
   contents: |-
     ## T285 — wire Move to Trash SHIPPED (5046851 pushed)
 
@@ -136,7 +136,7 @@
   - finder
   - trash
   - shipped
-  last_edited_ms: 1781891609822
+  last_edited_ms: 1782040506651
 27b181cff4ccd912:
   tl_dr: 'T283 follow-up SHIPPED (0f3bdeb): single-click Quick Look restored as a NON-REFLOWING overlay — reconciles click-to-preview + double-click-open + slow-rename in all views.'
   contents: |-

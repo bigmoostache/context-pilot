@@ -3854,6 +3854,10 @@
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
   last_edited_ms: 0
+7e4ff25455245d2a:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/mutate.rs
+  description: 'Finder writes: fs_upload/fs_write (X906 overwrite an existing confined file — markdown editor save-back)/fs_mkdir/fs_rename/fs_move/fs_trash (T285/T294 reversible trash into .context-pilot/trash, which inherits the existing .context-pilot gitignore so trashed entries are never committed; create_dir_all). All confined, never clobber. is_bare_name/rel_child/rel_sibling helpers.'
+  last_edited_ms: 1782040519855
 7e96895e37fe5975:
   path: Cargo.toml
   description: Workspace root. 25 crate members (incl cp-wire/cp-oplog/cp-mod-bridge/cp-orchestrator). Binary 'tui'. Edition 2024. Strict lint config (980 forbid, 21 deny). openssl vendored.
