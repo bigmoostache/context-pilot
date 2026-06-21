@@ -113,11 +113,19 @@ function MillerColumn({
   // `dragOver`). A body drop moves the dragged items into THIS column's folder.
   const [bodyOver, setBodyOver] = useState(false)
 
+  // This column's directory as a REALM-RELATIVE path. `path` is absolute
+  // (agent-folder-rooted, from the crumb chain), but every move payload + the
+  // backend `/fs/move` contract is realm-relative — so a body drop onto an
+  // ANCESTOR column (moving an item UP to a grandparent) must send the relative
+  // form. Sending the absolute path made the backend's realm-jail reject it as
+  // "destination outside agent realm" (403) — the T293 bug.
+  const relPath = relOf(agentFolder, path)
+
   // The column's own folder, as a destination for a body drop. Synthetic node —
   // `onMove` only reads `.path`/`.name`.
   const columnFolder: FinderNode = {
     name: path.split("/").pop() || path,
-    path,
+    path: relPath,
     kind: "folder",
     modified: "",
   }
@@ -133,7 +141,7 @@ function MillerColumn({
         onDragOver: (e: ReactDragEvent) => {
           if (!isMoveDrag(e)) return
           const dragged = readMovePayload(e)
-          if (dragged?.includes(path)) return // can't drop the folder into itself
+          if (dragged?.includes(relPath)) return // can't drop the folder into itself
           e.preventDefault()
           e.dataTransfer.dropEffect = "move"
           if (!bodyOver) setBodyOver(true)
@@ -150,7 +158,7 @@ function MillerColumn({
           e.preventDefault()
           setBodyOver(false)
           const dragged = readMovePayload(e)
-          if (dragged && !dragged.includes(path)) h.onMove?.(dragged, columnFolder)
+          if (dragged && !dragged.includes(relPath)) h.onMove?.(dragged, columnFolder)
         },
       }
     : {}
