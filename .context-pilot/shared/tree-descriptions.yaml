@@ -4214,6 +4214,10 @@
   path: src/app/actions/threads.rs
   description: Thread action handlers. Archive = SOFT-DELETE (archived=true) not remove; restore clears flag. archive_confirm is view-aware (archive in active view, restore in archived view). toggle_archived_view flips FocusState.viewing_archived. Select/archive_start resolve selection through visible_indices. Question form → MY_TURN + spine notification.
   last_edited_ms: 1781786109358
+85f319ef1b934fb2:
+  path: web/src/components/threads/fileUpload.tsx
+  description: 'Threads chat file-upload (T298): UploadedFile type + buildUploadMessage (one ```file-upload YAML block per file: path/name/size/note) + splitMessageSegments (interleaves prose + inline file chips at parse position) + uploadToNode (synthesizes a FinderNode via kindOf so the chip drives the shared Quick Look). MessageFileChip existence-checks via useFs(parent): greys ''moved/deleted'' when the file is absent from an existing listing OR the parent listing returns ANY 4xx (a nonexistent/escaping parent dir canonicalizes to nothing → backend answers 403 ''path outside agent realm'', NOT 404 — matched via /^4\d\d/ on the client error message, so a statusless network blip never false-greys). Size shown is the REAL on-disk byte count from the listing node (never the untrusted YAML size:). FileUploadChip = clickable mac-icon chip opening QuickLookSheet; three states present-interactive / present-static / greyed-missing.'
+  last_edited_ms: 1782053937580
 8620fd4094c9381f:
   path: src/app/run/mod.rs
   description: 'Sub-module declarations. 6 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), tools (execution pipeline), watchers (file/GH).'
