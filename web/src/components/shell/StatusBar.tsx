@@ -191,8 +191,8 @@ function ContextBar({
             <TipRow color="var(--foreground)" label="Threshold" value={fmtTokens(threshold)} />
           )}
           <TipRow color="var(--muted-foreground)" label="Free" value={fmtTokens(free)} dim />
-          <div className="mt-2 flex items-center justify-between border-t border-border/60 pt-1.5">
-            <span className="text-[10.5px] text-muted-foreground">Used / budget</span>
+          <div className="mt-2 flex items-center justify-between gap-8 border-t border-border/60 pt-1.5">
+            <span className="shrink-0 text-[10.5px] text-muted-foreground">Used / budget</span>
             <span className="font-mono text-[10.5px] font-medium tabular-nums text-foreground/85">
               {fmtTokens(used)} / {fmtTokens(safeBudget)}
             </span>
