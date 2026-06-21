@@ -899,6 +899,29 @@ df70428e5de94c2d:
   - tree-descriptions
   - shipped
   last_edited_ms: 1781906201240
+df92f82f26098563:
+  tl_dr: 'T287 follow-up SHIPPED: Miller-columns view now marks the traversed path — each OPENED ancestor folder gets the same signal background as a selected row + a left accent bar, so the navigation path reads at a glance.'
+  contents: |-
+    ## T287 — columns-view traversed-path highlight
+
+    User: in columns view, clicking a folder opens it in the next column (navigate), a second click selects it. Wanted the OPENED folders along the traversed path to carry the same background differentiator as the selected row, so the path is obvious at first glance.
+
+    ### Root cause the highlight wasn't showing
+    MillerColumn already computed `onTrail` (the folder whose path == nextPath, i.e. the child leading to the next column) and styled it like a selection. BUT the comparison was `n.path === nextPath` where nextPath comes from the crumb chain (ABSOLUTE, agent-folder-rooted) while listing nodes carry REALM-RELATIVE paths → they never matched → no ancestor ever lit up. Also `navigate()` clears the selection, so after the first click the clicked folder relies ENTIRELY on onTrail for its highlight (sel=false) — and onTrail was broken → looked unhighlighted until a 2nd click re-selected it.
+
+    ### Fix (frontend-only, FinderViews.tsx)
+    1. `const onTrail = nextPath != null && n.path === relOf(agentFolder, nextPath)` — normalise nextPath to the same realm-relative form before comparing, so ancestor folders match and light up.
+    2. Strengthened the shared onTrail||sel style from `bg-[var(--signal)]/14` to `bg-[var(--signal)]/20 font-medium text-foreground shadow-[inset_2px_0_0_0_var(--signal)]` — a left accent bar (inset box-shadow, no layout shift) so the whole opened chain reads as a connected trail down the columns. Selected rows look identical (parity the user asked for).
+
+    web pnpm build green (tsc+vite exit 0). Frontend-only → dev :5174/5175 hot-reloads, NO orchestrator restart / system_reload.
+  importance: medium
+  labels:
+  - T287
+  - finder
+  - columns
+  - highlight
+  - shipped
+  last_edited_ms: 1782034151782
 e8c59432f236b48d:
   tl_dr: 'T287 SHIPPED (dffb806): Miller-columns native drag-and-drop fixed via select-none on the row buttons.'
   contents: |-

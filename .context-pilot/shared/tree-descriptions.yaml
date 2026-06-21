@@ -6218,6 +6218,10 @@ c99917ed2399e73a:
   path: crates/cp-orchestrator/Cargo.toml
   description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal, for kill signal-0 pid-liveness) + serde_json (registry record parse). dev: tempfile. lib+bin package. Workspace lints.'
   last_edited_ms: 1781630135222
+c9ac09516e364b7f:
+  path: web/src/components/finder/FinderViews.tsx
+  description: 'Finder view modes: grid/list/columns(Miller)/gallery. T275 internal drag-and-drop (MOVE_MIME {paths}; startItemDrag every row draggable; folderDropProps drop-target on folder rows). ColumnsView=live Miller (per-ancestor useFs). T287 traversed-path highlight: MillerColumn onTrail = (n.path === relOf(agentFolder, nextPath)) — nextPath is absolute (crumb chain) but listing nodes are realm-relative, so normalise before comparing else no ancestor lights up; onTrail||sel row gets bg-[var(--signal)]/20 + font-medium + left inset-shadow accent so the opened chain reads as a connected trail. relOf strips agent-folder prefix.'
+  last_edited_ms: 1782034168375
 c9d4aeb2bf4dfbe4:
   path: crates/cp-mod-search/src/types.rs
   description: Core types + config constants. SearchPersistData (with recompute tracking + task_signals ring buffer), SearchState (with SharedRadarCache Arc<Mutex>), Chunk, SearchResult (no tags), SearchMetrics, SearchOverlayInfo (with meili_cpu_pct/meili_memory_bytes), MeiliLiveStats (with meili_cpu_ticks for delta), IndexerCmd, WatcherHandle. logs_index_settings without tags.

@@ -522,7 +522,13 @@ function MillerColumn({
       )}
     >
       {nodes.map((n) => {
-        const onTrail = n.path === nextPath
+        // The traversed child of THIS column (the folder opened to spawn the
+        // next column) is highlighted so the whole navigation path reads at a
+        // glance. `nextPath` comes from the crumb chain (absolute, agent-folder
+        // rooted) while listing nodes carry realm-relative paths, so normalise
+        // `nextPath` to the same relative form before comparing — otherwise the
+        // two never match and no ancestor ever lights up (T287).
+        const onTrail = nextPath != null && n.path === relOf(agentFolder, nextPath)
         const sel = h.selected.has(n.path)
         const dropOver = dragOver === n.path
         return (
@@ -545,8 +551,14 @@ function MillerColumn({
               // fires and the move silently fails (T287). Suppressing text
               // selection lets `draggable` initiate the element drag reliably.
               "mx-1 flex select-none items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors",
+              // A folder that is OPEN in the path we're traversing (its children
+              // fill the next column) gets the SAME prominent signal background
+              // as a selected row, plus a left accent bar — so the whole opened
+              // chain reads as a connected trail down the columns at a glance
+              // (T287). The accent rides an inset box-shadow (not a border) so it
+              // never shifts the row's layout.
               onTrail || sel
-                ? "bg-[var(--signal)]/14 text-foreground"
+                ? "bg-[var(--signal)]/20 font-medium text-foreground shadow-[inset_2px_0_0_0_var(--signal)]"
                 : "text-foreground/80 hover:bg-muted/45",
               dropOver && "bg-[var(--signal)]/20 ring-1 ring-inset ring-[var(--signal)]/70",
             )}
