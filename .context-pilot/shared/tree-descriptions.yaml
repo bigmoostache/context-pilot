@@ -4170,6 +4170,10 @@
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Transport hub. Backend shared state + serve/serve_bound + route_rest (22 routes) + handle_stream SSE. CORS + OPTIONS 204. run_stream SSE producer: Tailer.poll→rev-numbered delta events for every OpEntry, drains StreamHub frames, dirty→invalidate. X18 LATENCY FIX: TAIL_REPOLL=5ms caps the OplogWaiter.wait timeout so the tailer re-polls every 5ms regardless of OS event latency (macOS FSEvents coalesces ~350ms — was the visible-latency floor); waiter still wakes sub-ms on Linux inotify (I12 ''inotify primary, tight poll backstop''). KEEPALIVE_INTERVAL=10s gated on Instant so the 5ms loop doesn''t spam keepalive comments. Yielded command→visible p50 14ms / p99 33ms (from 349ms).'
   last_edited_ms: 1781793072089
+89263ee0eb59d215:
+  path: web/src/components/finder/Finder.tsx
+  description: 'Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) live listings. T273 upload (toolbar+drag-drop via useUploadFiles). T275 internal drag-and-drop (useMoveItems→moveItemsInto) + WINDOW-level external-drag upload-overlay lifecycle (dragover heartbeat + 250ms watchdog clears stuck overlay on silent Esc-cancel; internal MOVE_MIME drags carry no Files so never raise it). T279 empty-space context menu (openEmptyContext on <main>; newFolder() inline-names a placeholder then useCreateFolder). cmd/ctrl+shift multiselect + useMarquee. T288 Quick Look = STANDARD MODAL shadcn Sheet drawer (right): no modal=false/showOverlay/disablePointerDismissal overrides → backdrop + focus-trap + scroll-lock + Esc + click-outside-close all FREE; width 2/3 of viewport (data-[side=right]:w-2/3 + max-w-none, same-prefix override of base w-3/4/sm:max-w-sm); showCloseButton=false (FinderPreview pane renders its own header X→setPreviewOpen(false)); grid+list only (columns/gallery have own preview). Quick Look CLOSED by default.'
+  last_edited_ms: 1782035551064
 892ee51e57d935dd:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
@@ -5422,6 +5426,10 @@ b312b74011e0e0e8:
   path: crates/cp-orchestrator/src/runtime.rs
   description: 'Runtime — env-driven Config (port/agents_dir/budget/scan_interval) + Runtime (shared Backend + config). start_driver() spawns bg driver_loop with TWO decoupled cadences: slow scan_interval (2s default, CP_SCAN_INTERVAL_MS) for registry scan + tier-② config.json mtime backstop + tmp reap; fast TAIL_INTERVAL (100ms) inner loop for tail_all_agents (per-agent Tailer.poll → MaterializedView.apply_batch fold → CostBreaker.observe), so a durable oplog delta reaches the view in ~100ms not ~2s (step toward inotify-primary I12/§8.1). serve() blocks on HTTP transport. 1 test.'
   last_edited_ms: 1781789414090
+b32c17174c7d8d28:
+  path: web/e2e/t288_probe.spec.ts
+  description: 'T288 regression: real-browser Quick Look drawer probe (3 tests). Boots live web (localStorage cp-agent/cp-view=finder), opens QL via file-row click + Space, asserts the right-side shadcn Sheet is a STANDARD MODAL drawer: dimming backdrop present ([data-slot=sheet-overlay]); flush-right + ~2/3 viewport wide (x+w==viewport, no overflow); Esc closes; clicking the backdrop closes. Screenshots /tmp/t288-drawer.png. Run: CP_WEB_URL=http://localhost:5174 npx playwright test t288_probe --reporter=line.'
+  last_edited_ms: 1782035551088
 b336c882172fe193:
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups in order: User turn (THEIR_TURN/ACTIVE) FIRST, then Agent''s turn (MY_TURN) — reordered per T28. Sorted by lastActivityMs descending within each group. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'

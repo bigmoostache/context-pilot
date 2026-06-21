@@ -66,13 +66,15 @@
   - fixed
   last_edited_ms: 1781884032338
 24b54123d1af9131:
-  tl_dr: T288 Finder Quick Look = STANDARD MODAL shadcn Sheet drawer SHIPPED + real-browser verified. Removed the non-modal overrides (backdrop+Esc+click-outside now free), widened to 540px, FinderPreview pane fills the drawer. 3-test probe green.
+  tl_dr: T288 Finder Quick Look = STANDARD MODAL shadcn Sheet drawer SHIPPED + real-browser verified. Width WIDENED to 2/3 of viewport. Details in contents.
   contents: |-
-    Replaced the non-reflowing overlay with a Base UI Sheet anchored right; NON-MODAL (modal=false + showOverlay=false + disablePointerDismissal) so clicking another file behind updates the live preview instead of dismissing. Esc + FinderPreview's own X close it. Fixed-positioned → never reflows grid. Gated grid+list only. Shipped 6f5c12a.
+    Replaced the non-reflowing overlay with a Base UI Sheet anchored right; now a STANDARD MODAL drawer (modal default): dimming backdrop + focus-trap + scroll-lock + Esc + click-outside-close all FREE (removed the earlier modal=false/showOverlay=false/disablePointerDismissal overrides). showCloseButton=false (FinderPreview pane has its own header X→setPreviewOpen(false)); FinderPreview pane variant is h-full w-full so it fills the drawer (Sheet owns width+left border). Gated grid+list only (columns/gallery have own preview).
 
-    FOLLOW-UP fix da1d4fd (two complaints): (1) drawer part off-screen RIGHT — width override `w-[420px]` used a DIFFERENT tailwind variant prefix than the base SheetContent's `data-[side=right]:w-3/4` + `:sm:max-w-sm`, so tailwind-merge kept BOTH and the base won (~384px) while the nested FinderPreview pane (w-[420px] shrink-0) overflowed past the viewport right edge. FIX: re-express width with the SAME `data-[side=right]:` modifier so merge cleanly REPLACES the base width → clean 420 flush-right. LESSON: tailwind-merge only collapses classes that share the same variant-prefix. (2) QL pane header was h-11 (44px) vs toolbar+TopBar h-12 (48px) → bumped to h-12.
+    WIDTH: started 540px, then user asked '2/3 of the available window'. Set data-[side=right]:w-2/3 + data-[side=right]:max-w-none + data-[side=right]:sm:max-w-none. The max-w-none pair is LOAD-BEARING: the base SheetContent caps right-side width at w-3/4 AND sm:max-w-sm(384px); without lifting BOTH caps via the SAME data-[side=right]: variant prefix, tailwind-merge keeps the narrower base and w-2/3 never wins. Verified real-browser: 853px on a 1280 viewport (=2/3), x=427, right edge=1280 flush, no overflow.
 
-    REAL-BROWSER VERIFICATION (after user demanded I test, not reason): web/e2e/t288_probe.spec.ts boots the live web app (:5175, addInitScript localStorage cp-agent=f3a99 + cp-view=finder), navigates Finder, clicks a real file row by data-path (data-kind doesn't exist on rows — only data-finder-item + data-path), presses Space to open Quick Look ([data-slot=sheet-content][data-side=right]), measures boundingBox + screenshots /tmp/t288-drawer.png. PASS: viewport 1280, drawer x=860 w=420 rightEdge=1280 (FLUSH, overflowsRight=false), qlHeaderHeight=48. Probe committed as a regression artifact. GOTCHA: don't trust tailwind-merge variant-prefix reasoning — render it.
+    REAL-BROWSER VERIFICATION: web/e2e/t288_probe.spec.ts (3 tests) boots live web (:5174, localStorage cp-agent + cp-view=finder), clicks a file row by data-path, Space opens the Sheet, asserts backdrop present + ~2/3 width flush-right + Esc closes + backdrop-click closes. All green (one load-flaky timeout on the 3rd test cleared on retry). GOTCHA: don't trust tailwind-merge variant-prefix reasoning — render it. Shipped on demaquetting.
+
+    Stack: web dev :5174 (vite fell back from 5175). e2e run: cd web && CP_WEB_URL=http://localhost:5174 npx playwright test t288_probe --reporter=line.
   importance: medium
   labels:
   - T288
@@ -80,7 +82,7 @@
   - quick-look
   - sheet
   - shipped
-  last_edited_ms: 1782034851612
+  last_edited_ms: 1782035581016
 251f7f7fd6eee822:
   tl_dr: 'T279 follow-up SHIPPED (e833835): New Folder now inline-names a placeholder before creating (macOS-style), instead of auto-creating ''untitled folder''.'
   contents: |-
