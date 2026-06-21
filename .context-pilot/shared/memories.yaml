@@ -574,6 +574,43 @@
   tl_dr: 'User preference: factor code out into new files rather than trimming comments to stay under line limits.'
   importance: medium
   last_edited_ms: 0
+797a800ac442291c:
+  tl_dr: 'T297 agent phase/cost/token reactivity FIXED + live-validated: HUD now rides the threads-grade push plane instead of the 15s fleet poll.'
+  contents: |-
+    ## T297 — agent status (phase) + token/cost + context meter laggy → FIXED
+
+    User: phase (ready/streaming/tooling) + token counting update with a lot of delay in the web UI; threads are ULTRA reactive. Investigate, compare to thread sync, fix.
+
+    ### Root cause (frontend wiring gap, NOT backend slowness)
+    The agent ALREADY emits PhaseTransition + CostAggregate oplog deltas EVERY main-loop tick (lifecycle.rs:137 emit_vitals, right beside emit_thread_status which makes threads instant). Backend folds them into AgentView; SSE pushes them. The frontend threw most of it away:
+    1. **Visible bars read the POLLED fleet list, not the pushed per-agent cache.** App.tsx activeAgent = useFleet().find() → qk.fleet() is NOT delta-covered (DELTA_COVERED={threads,agent}) → only the 15s BACKSTOP_POLL. The delta-folded qk.agent cache (useAgentMeta) was read ONLY by the cockpit StatsPopup. So TopBar + StatusBar were 15s stale.
+    2. **Phase collapsed to binary status.** applyAgentDelta mapped every phase→status working/idle; tooling indistinguishable from streaming; the bar could only show Streaming/Ready.
+    3. **idle phase returned null → REST hydrate** over the slow disk-inspection /meta path on every stream-end (the most common transition) → "Ready" appeared late. Tokens weren't folded at all (only cost_usd).
+    4. **Context meter** = sum(usePanels tokens) on the 15s poll — genuinely no oplog delta (panel token weights are private working-set, never journaled).
+
+    ### Fix (commit on demaquetting)
+    Backend (cp-orchestrator inspect/meta.rs build_agent_meta): surface raw `phase` (phase_label: idle/streaming/tooling — the exact serde form applyAgentDelta uses) + `inputTokens`/`outputTokens` from the view's CostSnapshot in the /meta JSON, so a COLD load / backstop poll matches the live SSE deltas. New phase_label() helper.
+    Frontend:
+    - types.ts Agent: + phase?:idle|streaming|tooling, inputTokens?, outputTokens?.
+    - query/sync.ts applyAgentDelta: fold the EXACT phase latest-wins and NEVER return null (idle drops a stale working→idle inline; needs-you vs idle reconciles on next /meta poll — can't know my-turn from a phase delta). cost_aggregate folds cost + input_tokens + output_tokens. Zero REST hydrate on phase/cost now.
+    - App.tsx: activeAgent = useAgentMeta(activeAgentId) (delta-folded) ?? fleetAgent (identity fallback). TopBar + StatusBar now reactive.
+    - StatusBar AgentStatus: reads agent.phase directly (streaming/tooling/ready distinct) not the 2-state status projection.
+    - FleetDashboard AgentCard: const {data:live}=useAgentMeta(agent.id); a=live??agent for the status dot + cost (ensureSync per card fires via this hook) → every fleet dot+cost delta-fed.
+    - live/index.ts usePanels: pollMs 15s→4s (PANELS_POLL_MS) so the context meter tracks within seconds (mtime-cached backend read = cheap). True sub-50ms context occupancy would need a dedicated gauge delta — deliberately NOT added (told user honestly; context occupancy is private working-set, same class as the StatsPanel InspectionUnavailable).
+
+    ### Validation
+    cargo build -p cp-orchestrator + web npm run build both green; web-structure callback passed. Orchestrator RESTARTED on fresh binary (killed pid + its `sh -c` parent on :7878, relaunched CP_COST_BUDGET=100000000, console P39) since the running binary predated the meta phase/token fields. No TUI crate changed → no system_reload; web rides vite :5174 hot-reload. LIVE: curl /api/fleet/meta → every agent carries phase (idle/streaming distinct) + inputTokens/outputTokens + consistent status (f3a99 streaming/working in=3.7e9 out=1.27e7; 834eb idle/needs-you; ad078 idle).
+
+    GOTCHA: orchestrator launched via console `sh -c CP_COST_BUDGET=... ./target/debug/cp-orchestrator` — killing just the orchestrator pid gets it respawned by the sh parent; kill BOTH the orchestrator pid AND its sh -c parent to free :7878.
+  importance: high
+  labels:
+  - T297
+  - reactivity
+  - phase
+  - tokens
+  - push-plane
+  - shipped
+  last_edited_ms: 1782044289445
 7c6035d323faf713:
   tl_dr: 'Cryptographic hash chain protects 12 critical files (Cargo.toml lint sections, clippy.toml, rustfmt.toml, CI scripts, lint exceptions YAML, deploy scripts). Password: Totordu1789. Updates via chain.sh --update.'
   importance: critical

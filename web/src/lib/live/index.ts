@@ -123,10 +123,19 @@ export function useThreads(agentId: string): LiveQueryResult<ThreadDetail[]> {
   )
 }
 
+// Context-panel weights power the cockpit/HUD context-budget meter. They are
+// pure tier-② inspection reads with NO oplog delta to fold (panel token sizes
+// are private agent working-set state, never journaled), so the only freshness
+// mechanism is the poll. The default 15s backstop made the context meter feel
+// frozen (T297); a brisk poll keeps it tracking within a few seconds. The
+// backend read is mtime-cached, so an unchanged config.json is cheap to re-poll.
+const PANELS_POLL_MS = 4_000
+
 export function usePanels(agentId: string): LiveQueryResult<ContextPanel[]> {
   return useLive(qk.panels(agentId), () => api.fetchPanels(agentId), {
     agentId,
     enabled: !!agentId,
+    pollMs: PANELS_POLL_MS,
   })
 }
 

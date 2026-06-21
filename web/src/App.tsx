@@ -8,7 +8,7 @@ import { Finder } from "@/components/finder/Finder"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeProvider } from "@/lib/theme"
 import { AccountProvider } from "@/lib/support/account"
-import { useFleet } from "@/lib/live"
+import { useFleet, useAgentMeta } from "@/lib/live"
 import type { ViewMode } from "@/lib/types"
 import "./App.css"
 
@@ -34,7 +34,14 @@ function App() {
     localStorage.setItem("cp-agent", id)
   }
 
-  const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
+  // Identity + roster come from the polled fleet list; the LIVE vitals (phase,
+  // cost, tokens, status) come from the per-agent meta cache, which the SSE
+  // bridge folds in real time (T297). Spreading the delta-folded meta over the
+  // fleet row makes the always-visible TopBar + StatusBar reactive instead of
+  // riding the 15s fleet poll — the same gold path threads already use.
+  const fleetAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
+  const { data: liveAgent } = useAgentMeta(activeAgentId)
+  const activeAgent = liveAgent ?? fleetAgent
 
   // A persisted view of "threads"/"cockpit"/"finder" requires a live agent to
   // render. If the fleet is still loading, or the stored agent id no longer

@@ -11,7 +11,7 @@ import {
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { accentVar, fmtCost } from "@/lib/support/panelMeta"
-import { useMetrics, useRetiredFleet, useUnretireAgent } from "@/lib/live"
+import { useMetrics, useRetiredFleet, useUnretireAgent, useAgentMeta } from "@/lib/live"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { FLEET_MAX_W } from "./FleetShell"
@@ -117,8 +117,13 @@ function AgentCard({
   onOpen: () => void
   onManage: () => void
 }) {
-  const s = statusMeta[agent.status]
-  const accent = accentVar[agent.accent]
+  // Live vitals (status dot, cost) ride the per-agent meta cache, which the SSE
+  // bridge folds in real time (T297); the polled fleet row is only the fallback
+  // until the first delta lands. ensureSync(agent.id) is triggered by this hook.
+  const { data: live } = useAgentMeta(agent.id)
+  const a = live ?? agent
+  const s = statusMeta[a.status]
+  const accent = accentVar[a.accent]
 
   return (
     <div className="group flex flex-col gap-3 rounded-xl border border-border bg-card p-4 card-shadow transition-colors hover:border-[color-mix(in_oklab,var(--signal)_45%,transparent)]">
@@ -137,7 +142,7 @@ function AgentCard({
           style={{ background: `color-mix(in oklab, ${s.color} 14%, transparent)`, color: s.color }}
         >
           <span
-            className={cn("size-1.5 rounded-full", agent.status === "working" && "animate-pulse")}
+            className={cn("size-1.5 rounded-full", a.status === "working" && "animate-pulse")}
             style={{ background: s.color }}
           />
           {s.label}
@@ -159,7 +164,7 @@ function AgentCard({
           {agent.model}
         </span>
         <span className="ml-auto font-semibold tabular-nums text-foreground/80">
-          {fmtCost(agent.costUsd)}
+          {fmtCost(a.costUsd)}
         </span>
       </div>
 

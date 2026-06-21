@@ -38,6 +38,10 @@
   path: docs/design-orchestration-backend.md
   description: 'Orchestration backend design doc, v5 (branch maquette) — CODE-GROUNDED rewrite. Keystone: THREE durability tiers, not two — ① bridge-owned append-only fsync''d OPLOG (authoritative: command effects, rev, seen-marks, phase, lifecycle, cost; O(1) append, never coalesced) + ② existing UNTOUCHED PersistenceWriter as a best-effort coalesced reconstructible state cache + ③ lossy UDS stream plane (live tokens + latency hints). 12 invariants I1-I12: I8 oplog-as-truth (writer.rs NOT modified — honors constraint #7 for real), I11 journal-to-oplog-then-ack (''accepted''=durable, survives deadman re-exec), I12 single inotify watch per agent (no fleet-scale watch exhaustion), I2 fsync confined to oplog (not every state write), I3 content-addressed bodies + bounded heads (not O(S²) manifest enumeration), I4 dedup by semantic token evicted by ack-rev. Command injection via the existing user-message entry (actions/input.rs), NOT the autonomy spine (engine.rs check_spine guards would stall external commands — K7). §24 maps every invariant→real file/function→additive-vs-core change type. §25 fault-injection acceptance matrix (V1-V10). §20 register folds round-3 K1-K9 + round-2 R2. Resolves the round-3 critique that v4 was authored against an imagined persistence layer. Companion: architecture-adversarial-analysis.md. NOT implemented (discussion).'
   last_edited_ms: 1781608697546
+01a916933748b640:
+  path: web/src/components/shell/StatusBar.tsx
+  description: 'Bottom status footer. Fleet mode: aggregates (count, threads, needs-you, spend). Agent mode: AgentStatus reads the LIVE agent.phase (streaming/tooling/ready distinct, T297) folded from the PhaseTransition delta — not the old 2-state status projection; cost from delta-folded agent.costUsd. ContextBar meter from usePanels (4s poll).'
+  last_edited_ms: 1782044317091
 01b07fbd200b15e6:
   path: web/e2e/metrics.spec.ts
   description: '§19 e2e (X868/T121): the fleet HealthBadge surfaces backend health. page.route-intercepts **/api/agent/*/metrics to force each non-nominal condition; asserts the matching role=status pill renders (tripped→''Over budget'', degraded→''Stream degraded'', lag 300→''Projection lagging'') + a nominal snapshot shows NO pill. Deterministic regardless of live budget. Backend metrics production stays covered by rust transport tests; this is the frontend surfacing layer. 4 tests.'
@@ -386,6 +390,10 @@
   path: web/src/lib/sync.ts
   description: 'SSE→QueryClient delta bridge (push plane). ensureSync(agentId): one idempotent per-agent subscription. `delta` → parse rev OpEntry → fold into [''threads'',id]+[''agent'',id] via setQueryData FUNCTIONAL updater (applyThreadDelta/applyAgentDelta), rev high-water guard; null verdict → invalidate. applyThreadDelta folds thread_created/archived/restored/status_changed/focus_changed (sets focused flag on matching thread, clears elsewhere — live focused-thread highlight)/message_created (msgId=msg_${log.length} so delta id matches disk poll → dedup). `invalidate` → INSPECTION caches only. mergeThreadLogs non-destructive poll reconcile. Kills T123 burst-clobber + T254 double-render structurally.'
   last_edited_ms: 1781869236525
+0c9e9555483a838c:
+  path: web/src/lib/query/sync.ts
+  description: 'SSE→QueryClient delta bridge (push plane Leg-2 frontend). applyThreadDelta + applyAgentDelta fold rev-numbered OpEntry into [''threads'',id]/[''agent'',id] caches via setQueryData functional updaters (rev high-water guard, structural sharing). T297: applyAgentDelta folds the EXACT phase (idle/streaming/tooling) latest-wins + NEVER returns null (idle drops stale working→idle inline, no REST hydrate) and folds cost + input/output tokens. mergeThreadLogs non-destructive poll reconcile. invalidateInspection for non-delta resources.'
+  last_edited_ms: 1782044316946
 0cbe04c59c8e8421:
   path: crates/cp-mod-memory/src/storage.rs
   description: YAML-backed memory storage. FNV-1a keys via cp-mod-utilities. generate_yaml_key, ensure_yaml_key. populate/migrate via YamlSync.
@@ -1826,6 +1834,10 @@
   path: ui/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Mounts <TooltipProvider delay=350 closeDelay=80> (T25) around the shell so all <Tip> tooltips share one delay. Fleet → FleetShell (Agents⇄Prompts). Cockpit → CockpitView. threads/finder per-agent (Finder keyed by agent.id). openAgent switches agent→threads. newAgent() sets view=fleet + createAgent flag → FleetShell openCreate.
   last_edited_ms: 1781594050238
+3caae58f0b051155:
+  path: web/src/lib/types.ts
+  description: 'Maquette domain types. Agent now carries live vitals: phase?(idle|streaming|tooling) + inputTokens?/outputTokens? folded from the PhaseTransition/CostAggregate SSE deltas (T297) alongside status/costUsd. ContextPanel, ThreadDetail (log:ThreadMsg[] with auto flag), Finder/Library/Usage shapes.'
+  last_edited_ms: 1782044317228
 3ce602db4c4143a5:
   path: crates/cp-mod-console/src/types.rs
   description: 'Console module types. ConsoleState (sessions HashMap + next_session_id), ProcessStatus enum, SessionMeta for persistence. ConsoleWatcher: exit/pattern modes, easy_bash inline (≤150 lines AND ≤8000 bytes) vs panel, blocking/async. format_wait_result helper.'
@@ -5026,6 +5038,10 @@ a445c40881ecc32a:
   path: src/ui/help/mod.rs
   description: Re-exports CommandPalette, config_overlay module
   last_edited_ms: 0
+a488c97d4419511a:
+  path: web/src/lib/live/index.ts
+  description: 'Live data hooks (TanStack Query + SSE push plane). useLive wraps useQuery + ensureSync. useFleet/useAgentMeta/useThreads (delta-covered), inspection hooks (memory/todos/tree… invalidate-driven). T297: usePanels now polls every 4s (PANELS_POLL_MS, was 15s backstop) so the context-budget meter tracks within seconds — panel token weights have no oplog delta (private working-set), poll is the only freshness mechanism. useMetrics/useFleetMetrics 4s. useStreamingTokens rAF-batched.'
+  last_edited_ms: 1782044317043
 a49023d03b3a5764:
   path: src/ui/perf/overlay.rs
   description: Performance overlay adapter — renders PerfOverlay IR to ratatui. Consumes pre-built IR snapshot (FPS, CPU/RAM, FDs/rlimit, Meili stats, budget bars, sparkline, op table). Uses semantic_to_style() for all styling. No direct State access.
@@ -6354,6 +6370,10 @@ cd333d308467c2b4:
   path: src/app/run/tools/cleanup.rs
   description: Watcher polling (blocking sentinel replacement + async spine notifications), ASYNC_ERROR_PREFIX handling for is_error, DynPanel creation for both blocking/async paths, interrupt cleanup. flame!("watchers"). No PendingForm references.
   last_edited_ms: 1781391612067
+cd345e5b6736e7d6:
+  path: crates/cp-orchestrator/src/transport/inspect/meta.rs
+  description: 'Enriched agent-meta endpoints. agent_meta + fleet_meta build maquette Agent objects: registry record + view phase/lifecycle/cost + cumulative input/output tokens (T297) + thread inspection (count, any-MY_TURN, last activity, task) + git branch. /meta JSON now carries raw `phase` (phase_label idle/streaming/tooling — exact serde form applyAgentDelta folds) + inputTokens/outputTokens so a cold load matches the SSE deltas (live HUD reactivity). derive_status maps phase/lifecycle/has_my_turn → working/needs-you/idle.'
+  last_edited_ms: 1782044316995
 cd506418e76f9e43:
   path: crates/cp-mod-files/src/lib.rs
   description: 'Files module. Core/global. 3 tools: Open, Edit, Write. Pre-flight: queue auto-activate, old_string match against both disk and virtual (post-queue) content via build_virtual_content(). 4-way matrix: disk✓/virtual✓→OK, disk✓/virtual✗→ERROR, disk✗/virtual✓→OK, disk✗/virtual✗→ERROR.'
@@ -6678,6 +6698,10 @@ d7aae73f71c307bc:
   path: crates/cp-mod-spine/src/panel.rs
   description: 'Spine panel UI. Notifications rendered as Block::Table (ID/Time/Type/Content columns) with 60-char content truncation. Sections: Unprocessed, Blocked, Recent Processed. Config as KeyValue. Active Watchers list. Context: text format for LLM.'
   last_edited_ms: 0
+d7e7cba0c5500a70:
+  path: web/src/App.tsx
+  description: Root shell. activeAgent = useAgentMeta(activeAgentId) (delta-folded per-agent meta) ?? fleetAgent (polled-fleet identity fallback) so the always-visible TopBar + StatusBar ride the push plane for phase/cost/tokens instead of the 15s fleet poll (T297). view/agent persisted to localStorage; effectiveView falls back to fleet when no live agent.
+  last_edited_ms: 1782044317140
 d8359ab8b810ded8:
   path: crates/cp-mod-spine/src/panel.rs
   description: 'Spine panel UI. Notifications rendered as Block::Table (ID/Time/Type/Content columns) with 60-char content truncation. Sections: Unprocessed, Blocked, Recent Processed. Config as KeyValue. Active Watchers list. Context: text format for LLM.'
@@ -7730,6 +7754,10 @@ fdc71c3c93143d63:
   path: crates/cp-mod-utilities/src/secret.rs
   description: Redacted newtype — Debug/Display print [REDACTED]. expose_secret() for access. Replaces secrecy crate.
   last_edited_ms: 0
+fde108115a27e2c5:
+  path: web/src/components/agents/FleetDashboard.tsx
+  description: Fleet welcome dashboard (live). AgentCard reads useAgentMeta(agent.id) (delta-folded; ensureSync fires per card) for the live status dot + cost, falling back to the polled fleet row (T297) — every card's vitals now push-fed. §19 HealthBadge (useMetrics) surfaces first non-nominal condition. RetiredSection/RetiredCard (T271 unretire). Create/manage via AgentModal.
+  last_edited_ms: 1782044317186
 fe00926a7e481bb0:
   path: crates/cp-mod-callback/src/firing.rs
   description: 'Callback firing logic. fire_callback() spawns script via console server, registers CallbackWatcher. fire_async/blocking_callbacks() for batch dispatch. flame!("cb_fire"), flame!("cb_fire_async"), flame!("cb_fire_blocking"). CallbackWatcher: exit 0→success_message, exit 7→silent, exit !=0→deferred panel, timeout→deferred panel.'

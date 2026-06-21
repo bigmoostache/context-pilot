@@ -107,12 +107,17 @@ fn build_agent_meta(
         .and_then(std::ffi::OsStr::to_str)
         .unwrap_or(agent_id);
 
-    // Phase + lifecycle + cost from the materialized view (brief lock).
-    let (phase, lifecycle, cost_usd) = state.lock().map_or((None, None, 0.0), |b| {
-        b.view
-            .get(agent_id)
-            .map_or((None, None, 0.0), |v| (v.phase, v.lifecycle, v.cost.cost_usd))
-    });
+    // Phase + lifecycle + cost + cumulative tokens from the materialized view
+    // (brief lock). These ride the push plane (PhaseTransition / CostAggregate
+    // deltas folded into the view), so serving them here keeps a COLD load /
+    // backstop poll consistent with the live SSE deltas the frontend folds —
+    // the same value arrives over both planes (T297 live HUD reactivity).
+    let (phase, lifecycle, cost_usd, input_tokens, output_tokens) =
+        state.lock().map_or((None, None, 0.0, 0, 0), |b| {
+            b.view.get(agent_id).map_or((None, None, 0.0, 0, 0), |v| {
+                (v.phase, v.lifecycle, v.cost.cost_usd, v.cost.input_tokens, v.cost.output_tokens)
+            })
+        });
 
     // Thread count + any-MY_TURN + last activity from config.json.
     let (threads_count, has_my_turn, last_activity_ms, task) =
@@ -137,7 +142,17 @@ fn build_agent_meta(
         "model": entry.model,
         "provider": provider,
         "status": status,
+        // Raw execution phase (idle/streaming/tooling) on TOP of the derived
+        // status, so the live HUD can show the distinct phase (not just the
+        // working/idle binary) and a cold load matches the SSE PhaseTransition
+        // deltas the frontend folds (T297). `None` (pre-first-transition) → null.
+        "phase": phase.map(phase_label),
         "costUsd": cost_usd,
+        // Cumulative-since-boot tokens — folded from CostAggregate, the same
+        // figures the live `cost_aggregate` delta carries, so the HUD's token
+        // counters stay consistent across the push + cold-load planes (T297).
+        "inputTokens": input_tokens,
+        "outputTokens": output_tokens,
         "task": task,
         "threads": threads_count,
         "lastActivity": last_activity_ms,
@@ -267,6 +282,19 @@ fn derive_status(
         }
         _ if has_my_turn => "needs-you".to_owned(),
         _ => "idle".to_owned(),
+    }
+}
+
+/// Map a wire [`Phase`](cp_wire::types::Phase) to its lowercase label
+/// (`idle`/`streaming`/`tooling`) — the exact serde form the frontend's
+/// `applyAgentDelta` phase fold uses, so the cold-load `/meta` value and the
+/// live SSE `PhaseTransition` delta resolve to the same string (T297).
+fn phase_label(phase: cp_wire::types::Phase) -> &'static str {
+    use cp_wire::types::Phase;
+    match phase {
+        Phase::Idle => "idle",
+        Phase::Streaming => "streaming",
+        Phase::Tooling => "tooling",
     }
 }
 

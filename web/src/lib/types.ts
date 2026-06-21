@@ -141,7 +141,18 @@ export interface Agent {
    *  model picker, since several providers share the same model API names. */
   provider?: string
   status: AgentStatus
+  /** live execution phase (idle/streaming/tooling) — folded from the
+   *  PhaseTransition SSE delta so the HUD shows the DISTINCT phase, not just
+   *  the working/idle binary `status` collapses it into (T297). Absent before
+   *  the first phase transition. */
+  phase?: "idle" | "streaming" | "tooling"
   costUsd: number
+  /** cumulative-since-boot input tokens — folded from the CostAggregate delta
+   *  (same figure the live `cost_aggregate` carries), so the HUD token counter
+   *  rides the push plane instead of the 15s poll (T297). */
+  inputTokens?: number
+  /** cumulative-since-boot output tokens (T297). */
+  outputTokens?: number
   /** one-line summary of what the agent is currently working on */
   task: string
   /** number of open threads on this agent */

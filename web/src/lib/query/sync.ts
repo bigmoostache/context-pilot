@@ -242,30 +242,54 @@ export function applyThreadDelta(
 }
 
 /**
- * Fold one oplog delta into the live agent meta (phase + cost vitals).
+ * Fold one oplog delta into the live agent meta (phase + cost + token vitals).
  *
- * Phase maps to the maquette `status`/`accent` the fleet dot renders. A
- * `streaming`/`tooling` phase applies instantly as `working`; an `idle` phase
- * returns `null` because idle resolves to `needs-you` vs `idle` depending on
- * whether any thread is MY_TURN — a backend decision (`derive_status`) the
- * phase delta alone doesn't carry — so it falls back to a hydrate. Cost is
- * cumulative-since-boot (latest-wins), set directly.
+ * The EXACT phase (idle/streaming/tooling) is folded latest-wins so the HUD
+ * renders the distinct phase, and the coarse `status`/`accent` the fleet dot
+ * uses is kept in sync inline — **without ever returning `null`**, so a phase
+ * change (notably going idle when a stream ends) never costs a REST hydrate.
+ * Cost and the cumulative-since-boot token counters fold latest-wins too, so
+ * the token display rides the push plane instead of the backstop poll (T297).
  */
 export function applyAgentDelta(prev: Agent | undefined, entry: OpEntry): Agent | null {
   if (!prev) return null // not loaded yet → hydrate
   const k = entry.kind
   switch (k.kind) {
     case "phase_transition": {
-      if (k.phase === "streaming" || k.phase === "tooling") {
-        if (prev.status === "working") return prev // already working
-        return { ...prev, status: "working", accent: "ok" }
+      const phase = k.phase
+      if (phase !== "idle" && phase !== "streaming" && phase !== "tooling") {
+        return prev // unknown phase → ignore
       }
-      return null // idle → needs-you vs idle is a backend decision → hydrate
+      // Fold the EXACT phase (latest-wins) so the HUD can show streaming vs
+      // tooling vs ready distinctly — and NEVER return null (no REST hydrate on
+      // the most common transition, going idle). The coarse `status` the fleet
+      // dot renders is kept in sync without a refetch: streaming/tooling →
+      // "working"; idle drops a stale "working" back to "idle" (needs-you vs
+      // idle is a thread-state decision the next /meta backstop reconciles —
+      // we never know it from the phase delta alone).
+      let next: Agent = prev
+      if (prev.phase !== phase) next = { ...next, phase }
+      if (phase === "streaming" || phase === "tooling") {
+        if (next.status !== "working") next = { ...next, status: "working", accent: "ok" }
+      } else if (next.status === "working") {
+        next = { ...next, status: "idle", accent: "interactive" }
+      }
+      return next
     }
     case "cost_aggregate": {
-      if (typeof k.cost_usd !== "number") return prev
-      if (prev.costUsd === k.cost_usd) return prev
-      return { ...prev, costUsd: k.cost_usd }
+      // Cumulative-since-boot (latest-wins): fold cost AND the token counters so
+      // the HUD's token display rides the push plane, not the 15s poll (T297).
+      let next: Agent = prev
+      if (typeof k.cost_usd === "number" && prev.costUsd !== k.cost_usd) {
+        next = { ...next, costUsd: k.cost_usd }
+      }
+      if (typeof k.input_tokens === "number" && prev.inputTokens !== k.input_tokens) {
+        next = { ...next, inputTokens: k.input_tokens }
+      }
+      if (typeof k.output_tokens === "number" && prev.outputTokens !== k.output_tokens) {
+        next = { ...next, outputTokens: k.output_tokens }
+      }
+      return next
     }
     default:
       return prev // thread / lifecycle → irrelevant to meta

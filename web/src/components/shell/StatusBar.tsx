@@ -58,8 +58,20 @@ function FleetStatus({ agents }: { agents: Agent[] }) {
 
 /** Single-agent session vitals — shown while an agent is focused. */
 function AgentStatus({ agent }: { agent?: Agent }) {
-  // Derive phase from agent status when available
-  const phase: StreamPhase = agent?.status === "working" ? "streaming" : agent?.status === "needs-you" ? "ready" : "ready"
+  // Use the LIVE execution phase folded from the PhaseTransition delta (T297)
+  // so the footer distinguishes streaming · tooling · ready instead of the old
+  // 2-state projection of `status`. Falls back to `status` only before the
+  // first phase transition has been observed (phase still undefined).
+  const phase: StreamPhase =
+    agent?.phase === "streaming"
+      ? "streaming"
+      : agent?.phase === "tooling"
+        ? "tooling"
+        : agent?.phase === "idle"
+          ? "ready"
+          : agent?.status === "working"
+            ? "streaming"
+            : "ready"
   const p = phaseMeta[phase]
   const costUsd = agent?.costUsd ?? 0
 
