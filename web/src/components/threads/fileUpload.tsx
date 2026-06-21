@@ -125,6 +125,13 @@ function fmtSize(bytes: number): string {
  * `onOpen` is optional: when provided (the threads chat) the chip is a button
  * that opens the shared Quick Look drawer; when absent (read-only surfaces) it
  * renders as a static chip.
+ *
+ * The displayed byte size comes from the **actual file on disk** (the matching
+ * listing node's `size`), never from the message's YAML `size:` field — the
+ * YAML is author-supplied and can lie, so the chip shows ground truth or
+ * nothing. Likewise existence is resolved from the live listing: a file whose
+ * parent directory doesn't even exist (the listing fetch 404s) greys out just
+ * like one missing from an existing directory.
  */
 export function MessageFileChip({
   file,
@@ -140,11 +147,30 @@ export function MessageFileChip({
 }) {
   const parent = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : ""
   // No agent → can't verify; assume present rather than cry wolf.
-  const { data, loading } = useFs(agentId ?? "", parent)
+  const { data, loading, error } = useFs(agentId ?? "", parent)
+  // The matching listing node (by full realm path, falling back to basename).
+  const node = data?.find((n) => n.path === file.path || n.name === file.name)
+  // A 404 on the parent listing means the directory itself is gone → the file
+  // is definitively missing (the in-directory "not present" check can't fire
+  // because there is no listing to scan). Other errors are NOT treated as
+  // missing, to avoid greying a real file on a transient fault.
+  const parentNotFound = error?.message?.startsWith("404") ?? false
   const missing =
-    !!agentId && !loading && !!data && !data.some((n) => n.path === file.path || n.name === file.name)
+    !!agentId && !loading && (parentNotFound || (!!data && !node))
+  // Real, on-disk size — the listing node's byte count. `undefined` while the
+  // listing loads, when there is no agent to query, or when the file is gone;
+  // the chip then omits the size label rather than echo the untrusted YAML.
+  const realSize = node?.size
 
-  return <FileUploadChip file={file} onOpen={onOpen} missing={missing} onAccent={onAccent} />
+  return (
+    <FileUploadChip
+      file={file}
+      onOpen={onOpen}
+      missing={missing}
+      onAccent={onAccent}
+      size={realSize}
+    />
+  )
 }
 
 /**
@@ -163,11 +189,16 @@ export function FileUploadChip({
   onOpen,
   missing = false,
   onAccent = false,
+  size,
 }: {
   file: UploadedFile
   onOpen?: () => void
   missing?: boolean
   onAccent?: boolean
+  /** the file's REAL on-disk byte size (from the listing node), or `undefined`
+   *  when unknown — the chip shows the size label only when this is a finite
+   *  number, never the untrusted YAML `file.size`. */
+  size?: number
 }) {
   // ── Missing: greyed, non-interactive, with an explicit warning. ──
   if (missing) {
@@ -205,9 +236,11 @@ export function FileUploadChip({
       <span className={onAccent ? "min-w-0 truncate font-medium" : "min-w-0 truncate font-medium text-foreground/90"}>
         {file.name}
       </span>
-      <span className={onAccent ? "shrink-0 text-[10.5px] tabular-nums opacity-75" : "shrink-0 text-[10.5px] tabular-nums text-muted-foreground/70"}>
-        {fmtSize(file.size)}
-      </span>
+      {typeof size === "number" && (
+        <span className={onAccent ? "shrink-0 text-[10.5px] tabular-nums opacity-75" : "shrink-0 text-[10.5px] tabular-nums text-muted-foreground/70"}>
+          {fmtSize(size)}
+        </span>
+      )}
       <Paperclip className={onAccent ? "size-3 shrink-0 opacity-60" : "size-3 shrink-0 text-muted-foreground/50"} />
     </>
   )
