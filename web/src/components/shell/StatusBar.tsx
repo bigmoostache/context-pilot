@@ -1,5 +1,4 @@
 import { Boxes, MessagesSquare, Wallet } from "lucide-react"
-import { usePanels } from "@/lib/live"
 import { fmtCost, fmtTokens } from "@/lib/support/panelMeta"
 import type { Agent, StreamPhase } from "@/lib/types"
 
@@ -75,15 +74,12 @@ function AgentStatus({ agent }: { agent?: Agent }) {
   const p = phaseMeta[phase]
   const costUsd = agent?.costUsd ?? 0
 
-  // Live context window stats from real panel data
-  const { data: panels = [] } = usePanels(agent?.id ?? "")
-  const budget = 200_000
-  const totalTokens = panels.reduce((s, p) => s + (p.tokens ?? 0), 0)
-  // Panels that have never missed a cache cycle are "hits"
-  const hitTokens = panels
-    .filter((p) => p.cached)
-    .reduce((s, p) => s + (p.tokens ?? 0), 0)
-  const missTokens = totalTokens - hitTokens
+  // Context-window meter — the agent's OWN authoritative occupancy, folded from
+  // the ContextUsage push delta (T297), so this is byte-identical to the
+  // ratatui sidebar's `used / threshold / budget` line, not a frontend re-sum.
+  const used = agent?.contextUsed ?? 0
+  const budget = agent?.contextBudget ?? 200_000
+  const threshold = agent?.contextThreshold ?? 0
 
   return (
     <footer className="vibrancy flex h-8 shrink-0 items-center gap-3 border-t border-border px-4 text-[12px]">
@@ -93,7 +89,7 @@ function AgentStatus({ agent }: { agent?: Agent }) {
       </span>
 
       <span className="ml-auto flex items-center gap-3">
-        <ContextBar hit={hitTokens} miss={missTokens} budget={budget} />
+        <ContextBar used={used} threshold={threshold} budget={budget} />
         <span className="h-3.5 w-px bg-border" />
         <span className="tabular-nums text-muted-foreground">{fmtCost(costUsd)}</span>
       </span>
@@ -102,23 +98,36 @@ function AgentStatus({ agent }: { agent?: Agent }) {
 }
 
 /**
- * Fixed-width context-window meter. The bar is the whole context budget; the
- * filled portion is split into **cache hits** (green — already-cached, cheap
- * tokens) and **misses** (yellow — fresh input that had to be sent), with the
- * remaining **free** space shown in grey. Hovering reveals an "ultra-nice"
- * tooltip above the bar breaking down the exact token counts.
+ * Fixed-width context-window meter — the agent's authoritative occupancy.
+ *
+ * The bar is the whole context budget; the filled portion is `used` tokens,
+ * coloured by how close it is to the cleaning threshold (green → amber → red).
+ * A thin tick marks the threshold position. Hovering reveals a tooltip with the
+ * exact `used / threshold / budget` figures — the SAME triple the agent renders
+ * in its ratatui sidebar (T297), pushed live so the two never disagree.
  */
-function ContextBar({ hit, miss, budget }: { hit: number; miss: number; budget: number }) {
-  const free = Math.max(0, budget - hit - miss)
-  const pct = (v: number) => `${(v / budget) * 100}%`
-  const used = hit + miss
+function ContextBar({ used, threshold, budget }: { used: number; threshold: number; budget: number }) {
+  const safeBudget = budget > 0 ? budget : 200_000
+  const usedRatio = Math.min(1, used / safeBudget)
+  const thresholdRatio = threshold > 0 ? Math.min(1, threshold / safeBudget) : 0
+  // Colour by proximity to the threshold: calm under it, hot past it.
+  const overThreshold = threshold > 0 && used >= threshold
+  const nearThreshold = threshold > 0 && used >= threshold * 0.85
+  const fill = overThreshold ? "var(--danger)" : nearThreshold ? "var(--warn)" : "var(--ok)"
+  const free = Math.max(0, safeBudget - used)
 
   return (
     <div className="group/cb relative flex items-center">
       {/* the meter */}
-      <div className="flex h-2 w-28 overflow-hidden rounded-full bg-muted ring-1 ring-border/60">
-        <span style={{ width: pct(hit), background: "var(--ok)" }} className="h-full" />
-        <span style={{ width: pct(miss), background: "var(--warn)" }} className="h-full" />
+      <div className="relative h-2 w-28 overflow-hidden rounded-full bg-muted ring-1 ring-border/60">
+        <span style={{ width: `${usedRatio * 100}%`, background: fill }} className="block h-full rounded-full" />
+        {/* threshold tick */}
+        {thresholdRatio > 0 && thresholdRatio < 1 && (
+          <span
+            className="absolute top-0 h-full w-px bg-foreground/50"
+            style={{ left: `${thresholdRatio * 100}%` }}
+          />
+        )}
       </div>
 
       {/* tooltip — opens upward, above the bar */}
@@ -127,16 +136,18 @@ function ContextBar({ hit, miss, budget }: { hit: number; miss: number; budget: 
           <div className="mb-2 flex items-baseline justify-between">
             <span className="text-[11px] font-semibold text-foreground/90">Context window</span>
             <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-              {((used / budget) * 100).toFixed(0)}%
+              {(usedRatio * 100).toFixed(0)}%
             </span>
           </div>
-          <TipRow color="var(--ok)" label="Cache hits" value={fmtTokens(hit)} />
-          <TipRow color="var(--warn)" label="Misses" value={fmtTokens(miss)} />
+          <TipRow color={fill} label="Used" value={fmtTokens(used)} />
+          {threshold > 0 && (
+            <TipRow color="var(--foreground)" label="Threshold" value={fmtTokens(threshold)} />
+          )}
           <TipRow color="var(--muted-foreground)" label="Free" value={fmtTokens(free)} dim />
           <div className="mt-2 flex items-center justify-between border-t border-border/60 pt-1.5">
             <span className="text-[10.5px] text-muted-foreground">Used / budget</span>
             <span className="font-mono text-[10.5px] font-medium tabular-nums text-foreground/85">
-              {fmtTokens(used)} / {fmtTokens(budget)}
+              {fmtTokens(used)} / {fmtTokens(safeBudget)}
             </span>
           </div>
         </div>

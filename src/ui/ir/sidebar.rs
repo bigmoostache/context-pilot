@@ -3,7 +3,6 @@
 //! Extracts the sidebar data logic into pure functions returning IR types.
 //! No ratatui, no Frame.
 
-use cp_base::state::data::model_helpers::ModelPricing as _;
 use cp_render::frame::{HelpHint, PrCard, Sidebar, SidebarEntry, SidebarMode, TokenBar, TokenRow, TokenStats};
 use cp_render::{ProgressSegment, Semantic};
 
@@ -162,16 +161,18 @@ fn build_entries(state: &State) -> Vec<SidebarEntry> {
 
 /// Build the token usage progress bar.
 fn build_token_bar(state: &State) -> TokenBar {
+    // The headline `used / threshold / budget` triple comes from the single
+    // canonical helper (shared with the Statistics panel and the `ContextUsage`
+    // delta the web HUD reads), so the three surfaces never drift (T297).
+    let (total, threshold, budget) = crate::modules::overview::context::context_usage(state);
+
+    // Cache hit / miss breakdown — system prompt + tool defs are always "hit"
+    // (stable across turns); panels split on their live cache flag.
     let system_prompt_tokens = {
         let sp = cp_mod_prompt::seed::get_active_agent_content(state);
         crate::state::estimate_tokens(&sp).saturating_mul(2)
     };
     let tool_def_tokens = crate::modules::overview::context::estimate_tool_definitions_tokens(state);
-    let panel_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
-    let total = system_prompt_tokens.saturating_add(tool_def_tokens).saturating_add(panel_tokens);
-    let budget = state.effective_context_budget();
-
-    // Cache hit / miss breakdown
     let mut hit = system_prompt_tokens.saturating_add(tool_def_tokens);
     let mut miss = 0usize;
     for ctx in &state.context {
@@ -184,8 +185,6 @@ fn build_token_bar(state: &State) -> TokenBar {
 
     let hit_pct = if budget > 0 { (hit.to_f64() / budget.to_f64() * 100.0).to_u8() } else { 0 };
     let miss_pct = if budget > 0 { (miss.to_f64() / budget.to_f64() * 100.0).to_u8() } else { 0 };
-
-    let threshold = state.cleaning_threshold_tokens();
 
     TokenBar {
         segments: vec![

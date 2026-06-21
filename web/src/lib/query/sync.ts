@@ -55,6 +55,11 @@ export interface OpEntryKind {
   /** Cumulative input/output tokens since boot (cost_aggregate). */
   input_tokens?: number
   output_tokens?: number
+  /** Context-window occupancy triple (context_usage): the agent's own
+   *  used/threshold/budget tokens — folded so the web meter matches ratatui. */
+  used_tokens?: number
+  threshold_tokens?: number
+  budget_tokens?: number
   /** Stable message id, e.g. "T7-m3" (message_created). */
   message_id?: string
   /** Content-addressed body hash, hex (message_created). */
@@ -288,6 +293,22 @@ export function applyAgentDelta(prev: Agent | undefined, entry: OpEntry): Agent 
       }
       if (typeof k.output_tokens === "number" && prev.outputTokens !== k.output_tokens) {
         next = { ...next, outputTokens: k.output_tokens }
+      }
+      return next
+    }
+    case "context_usage": {
+      // The agent's authoritative context-window occupancy (latest-wins): fold
+      // used/threshold/budget so the HUD meter shows the EXACT figure ratatui
+      // shows, reactively over the push plane (T297).
+      let next: Agent = prev
+      if (typeof k.used_tokens === "number" && prev.contextUsed !== k.used_tokens) {
+        next = { ...next, contextUsed: k.used_tokens }
+      }
+      if (typeof k.threshold_tokens === "number" && prev.contextThreshold !== k.threshold_tokens) {
+        next = { ...next, contextThreshold: k.threshold_tokens }
+      }
+      if (typeof k.budget_tokens === "number" && prev.contextBudget !== k.budget_tokens) {
+        next = { ...next, contextBudget: k.budget_tokens }
       }
       return next
     }

@@ -112,10 +112,10 @@ fn build_agent_meta(
     // deltas folded into the view), so serving them here keeps a COLD load /
     // backstop poll consistent with the live SSE deltas the frontend folds —
     // the same value arrives over both planes (T297 live HUD reactivity).
-    let (phase, lifecycle, cost_usd, input_tokens, output_tokens) =
-        state.lock().map_or((None, None, 0.0, 0, 0), |b| {
-            b.view.get(agent_id).map_or((None, None, 0.0, 0, 0), |v| {
-                (v.phase, v.lifecycle, v.cost.cost_usd, v.cost.input_tokens, v.cost.output_tokens)
+    let (phase, lifecycle, cost_usd, input_tokens, output_tokens, context) =
+        state.lock().map_or((None, None, 0.0, 0, 0, Default::default()), |b| {
+            b.view.get(agent_id).map_or((None, None, 0.0, 0, 0, Default::default()), |v| {
+                (v.phase, v.lifecycle, v.cost.cost_usd, v.cost.input_tokens, v.cost.output_tokens, v.context)
             })
         });
 
@@ -153,6 +153,14 @@ fn build_agent_meta(
         // counters stay consistent across the push + cold-load planes (T297).
         "inputTokens": input_tokens,
         "outputTokens": output_tokens,
+        // Live context-window occupancy — the agent's own authoritative
+        // `used / threshold / budget` token triple (folded from ContextUsage,
+        // the same figure the live delta carries). The web HUD shows THIS so its
+        // meter is byte-identical to the agent's ratatui sidebar, not a frontend
+        // re-sum that drifts (T297). Zero until the agent emits its first sample.
+        "contextUsed": context.used_tokens,
+        "contextThreshold": context.threshold_tokens,
+        "contextBudget": context.budget_tokens,
         "task": task,
         "threads": threads_count,
         "lastActivity": last_activity_ms,

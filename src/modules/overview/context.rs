@@ -34,6 +34,25 @@ pub(crate) fn estimate_tool_definitions_tokens(state: &State) -> usize {
     total
 }
 
+/// The agent's authoritative context-window occupancy as the
+/// `(used, threshold, budget)` token triple.
+///
+/// This is the **single source of truth** for the figure rendered as the TUI
+/// sidebar's `167K / 190K / 200K` line, the Statistics panel header, and the
+/// `ContextUsage` oplog delta the bridge emits to the web HUD — so all three
+/// show the *identical* number (T297: "the web meter must match ratatui
+/// exactly"). `used` = the system prompt (counted twice, as it is sent in both
+/// the `system` field and the seed re-injection) + every enabled tool
+/// definition + the sum of all live context-panel token counts.
+pub(crate) fn context_usage(state: &State) -> (usize, usize, usize) {
+    let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
+    let system_prompt_tokens = estimate_tokens(&system_prompt).saturating_mul(2);
+    let tool_def_tokens = estimate_tool_definitions_tokens(state);
+    let panel_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+    let used = system_prompt_tokens.saturating_add(tool_def_tokens).saturating_add(panel_tokens);
+    (used, state.cleaning_threshold_tokens(), state.effective_context_budget())
+}
+
 /// Generates the plain-text/markdown context content sent to the LLM.
 /// This is separate from the TUI rendering (`overview_render.rs`).
 pub(crate) fn generate_context_content(state: &State) -> String {
@@ -45,10 +64,10 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     // Estimate tool definition tokens
     let tool_def_tokens = estimate_tool_definitions_tokens(state);
 
-    let panel_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
-    let total_tokens = system_prompt_tokens.saturating_add(tool_def_tokens).saturating_add(panel_tokens);
-    let budget = state.effective_context_budget();
-    let threshold = state.cleaning_threshold_tokens();
+    // Headline triple from the single canonical helper (shared with the sidebar
+    // token bar and the web-HUD `ContextUsage` delta), so the figure never
+    // drifts between surfaces (T297).
+    let (total_tokens, threshold, budget) = context_usage(state);
     let usage_pct = (total_tokens.to_f64() / budget.to_f64() * 100.0).min(100.0);
 
     let mut output =

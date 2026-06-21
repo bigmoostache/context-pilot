@@ -106,6 +106,7 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
         OpEntryKind::PhaseTransition { .. }
         | OpEntryKind::Lifecycle { .. }
         | OpEntryKind::CostAggregate { .. }
+        | OpEntryKind::ContextUsage { .. }
         | OpEntryKind::ThreadFocusChanged { .. }
         | OpEntryKind::Unknown => {}
     }

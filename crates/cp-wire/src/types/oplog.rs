@@ -170,6 +170,31 @@ pub enum OpEntryKind {
         cost_usd: f64,
     },
 
+    /// The agent's live **context-window occupancy** — the authoritative
+    /// `used / threshold / budget` token triple the agent itself computes and
+    /// renders (the TUI sidebar's `167K / 190K / 200K` line and the Statistics
+    /// header). Emitted on change so an observer (the web HUD) shows the
+    /// *identical* figure the agent shows, with no re-computation that could
+    /// drift — the only way to satisfy "the web meter must match ratatui
+    /// exactly" (T297).
+    ///
+    /// Ephemeral, disposable working-set state in the same class as
+    /// [`PhaseTransition`](Self::PhaseTransition): it rides the **best-effort**
+    /// durability path ([`Durability::of`](../../../cp_oplog/service/enum.Durability.html#method.of)),
+    /// is **not** carried in a [`Checkpoint`](Self::Checkpoint) snapshot, and
+    /// self-heals — a dropped sample is superseded by the next emission and a
+    /// cold backend simply shows `0` until the agent re-emits.
+    #[serde(rename = "context_usage")]
+    ContextUsage {
+        /// Tokens currently occupying the context window (system prompt ×2 +
+        /// tool definitions + every panel + chat — the agent's own sum).
+        used_tokens: u64,
+        /// The cleaning threshold (the middle figure; reverie triggers here).
+        threshold_tokens: u64,
+        /// The hard context budget (the denominator the meter fills toward).
+        budget_tokens: u64,
+    },
+
     /// State checkpoint — bounds replay length on restart (GAP 1 / I5).
     #[serde(rename = "checkpoint")]
     Checkpoint {
@@ -290,6 +315,24 @@ mod tests {
             let back: OpEntry = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(entry, back);
         }
+    }
+
+    #[test]
+    fn context_usage_round_trip_and_stable_tag() {
+        let entry = OpEntry {
+            schema_version: 1,
+            rev: 11,
+            timestamp_ms: 0,
+            kind: OpEntryKind::ContextUsage {
+                used_tokens: 167_766,
+                threshold_tokens: 190_000,
+                budget_tokens: 200_000,
+            },
+        };
+        let json = serde_json::to_string(&entry).expect("serialize");
+        assert!(json.contains("\"kind\":\"context_usage\""), "stable tag: {json}");
+        let back: OpEntry = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(entry, back);
     }
 
     #[test]

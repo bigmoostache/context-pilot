@@ -232,6 +232,27 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
         emit_best_effort(&app.state, OpEntryKind::CostAggregate { input_tokens, output_tokens, cost_usd });
         app.state.ext_mut::<BridgeState>().last_cost_usd = cost_usd;
     }
+
+    // Context-window occupancy — the agent's authoritative `used/threshold/
+    // budget` triple (the SAME helper the TUI sidebar + Statistics render), so
+    // the web HUD meter is byte-identical to ratatui (T297). Emit on change.
+    let (used, threshold, budget) = crate::modules::overview::context::context_usage(&app.state);
+    let ctx_triple = (used.to_u64(), threshold.to_u64(), budget.to_u64());
+    let ctx_changed = app
+        .state
+        .get_ext::<BridgeState>()
+        .is_some_and(|bs| bs.last_context != Some(ctx_triple));
+    if ctx_changed {
+        emit_best_effort(
+            &app.state,
+            OpEntryKind::ContextUsage {
+                used_tokens: ctx_triple.0,
+                threshold_tokens: ctx_triple.1,
+                budget_tokens: ctx_triple.2,
+            },
+        );
+        app.state.ext_mut::<BridgeState>().last_context = Some(ctx_triple);
+    }
 }
 
 // ── Thread status emission (Phase 1.4 status_changed — design doc I8) ─────

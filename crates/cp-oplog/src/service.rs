@@ -98,6 +98,7 @@ impl Durability {
         match *kind {
             OpEntryKind::PhaseTransition { .. }
             | OpEntryKind::CostAggregate { .. }
+            | OpEntryKind::ContextUsage { .. }
             | OpEntryKind::ThreadFocusChanged { .. } => Self::BestEffort,
             OpEntryKind::CommandEffect { .. }
             | OpEntryKind::SeenMark { .. }

@@ -48,6 +48,23 @@ pub struct CostSnapshot {
     pub cost_usd: f64,
 }
 
+/// One agent's live **context-window occupancy** — the authoritative
+/// `used / threshold / budget` token triple the agent computes and renders.
+///
+/// Folded latest-wins from [`ContextUsage`](OpEntryKind::ContextUsage). Like
+/// [`CostSnapshot`] the latest entry supersedes earlier ones (cumulative state,
+/// not summed). Ephemeral — not carried in a checkpoint, so a cold backend
+/// shows zeros until the agent re-emits (the meter self-heals).
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize)]
+pub struct ContextSnapshot {
+    /// Tokens currently occupying the context window.
+    pub used_tokens: u64,
+    /// Cleaning threshold (reverie trigger point).
+    pub threshold_tokens: u64,
+    /// Hard context budget.
+    pub budget_tokens: u64,
+}
+
 /// One agent's current projected state.
 ///
 /// Folded from the agent's [`OpEntry`] stream; every field reflects the most
@@ -82,6 +99,12 @@ pub struct AgentView {
 
     /// Latest cumulative cost figures.
     pub cost: CostSnapshot,
+
+    /// Latest context-window occupancy (`used`/`threshold`/`budget`). Folded
+    /// latest-wins from [`ContextUsage`](OpEntryKind::ContextUsage); ephemeral
+    /// (not checkpoint-carried), so it is `0`-valued after a cold start until
+    /// the agent emits its next sample.
+    pub context: ContextSnapshot,
 }
 
 impl AgentView {
@@ -144,6 +167,13 @@ impl AgentView {
                     input_tokens: *input_tokens,
                     output_tokens: *output_tokens,
                     cost_usd: *cost_usd,
+                };
+            }
+            OpEntryKind::ContextUsage { used_tokens, threshold_tokens, budget_tokens } => {
+                self.context = ContextSnapshot {
+                    used_tokens: *used_tokens,
+                    threshold_tokens: *threshold_tokens,
+                    budget_tokens: *budget_tokens,
                 };
             }
             // Durability-only records and forward-compat unknowns do not

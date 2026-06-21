@@ -153,6 +153,14 @@ export interface Agent {
   inputTokens?: number
   /** cumulative-since-boot output tokens (T297). */
   outputTokens?: number
+  /** live context-window occupancy (tokens currently in the window) — folded
+   *  from the ContextUsage SSE delta, the agent's OWN authoritative figure, so
+   *  the web meter is byte-identical to the ratatui sidebar (T297). */
+  contextUsed?: number
+  /** the cleaning threshold (reverie trigger point) for the context meter. */
+  contextThreshold?: number
+  /** the hard context budget (the meter's denominator). */
+  contextBudget?: number
   /** one-line summary of what the agent is currently working on */
   task: string
   /** number of open threads on this agent */

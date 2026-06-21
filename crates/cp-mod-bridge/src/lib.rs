@@ -69,6 +69,13 @@ pub struct BridgeState {
     /// `CostAggregate` is emitted only when the dollar total moves.
     pub last_cost_usd: f64,
 
+    /// Last context-window occupancy `(used, threshold, budget)` emitted as a
+    /// [`ContextUsage`](cp_wire::types::oplog::OpEntryKind::ContextUsage) delta,
+    /// so the main-loop vitals chokepoint emits one only when the figure
+    /// actually moves (the same observe-on-change discipline as phase/cost).
+    /// `None` until the first emission.
+    pub last_context: Option<(u64, u64, u64)>,
+
     /// Content-addressed body store for thread-message bodies (I13). `None`
     /// when the bridge is OFF or the store could not be opened. The main-loop
     /// message chokepoint writes each new message's body here (inline-small /
@@ -535,6 +542,7 @@ mod tests {
         assert_eq!(bs.tee_seq, 0);
         assert_eq!(bs.last_phase, None);
         assert!((bs.last_cost_usd - 0.0).abs() < f64::EPSILON);
+        assert!(bs.last_context.is_none());
         assert!(bs.store.is_none());
         assert!(bs.thread_msg_counts.is_empty());
         assert!(!bs.msg_memo_seeded);
