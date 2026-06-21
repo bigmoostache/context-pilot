@@ -7142,6 +7142,10 @@ ec97d0753d489535:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Phase 19/30 + P1-P7: transport hub. Backend shared state + serve/serve_bound + route_rest (22 routes) + handle_stream SSE. CORS headers on all responses + OPTIONS preflight 204. /api/health. stream_to_client uses into_writer() + per-event flush. Invalidation: dirty_agents set, mark_dirty/take_dirty for SSE invalidate events.'
   last_edited_ms: 1781778261224
+ed0f9d70c3955281:
+  path: web/src/components/finder/FinderViews.tsx
+  description: 'Finder view modes: grid/list/columns(Miller)/gallery. T275 internal drag-and-drop (MOVE_MIME {paths}; startItemDrag every row draggable; folderDropProps drop-target on folder rows). ColumnsView=live Miller (per-ancestor useFs) + column-BODY drop (columnDropProps moves into that column''s folder; highlight suppressed while a folder row is hovered). T287 traversed-path highlight: MillerColumn onTrail = (n.path === relOf(agentFolder, nextPath)) — nextPath is absolute (crumb chain) but listing nodes are realm-relative, so normalise before comparing else no ancestor lights up; onTrail||sel row gets bg-[var(--signal)]/20 + font-medium ONLY (background, no left accent bar — user explicitly asked to drop the inset-shadow border). relOf strips agent-folder prefix.'
+  last_edited_ms: 1782035240533
 ed11d32eca739db4:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.

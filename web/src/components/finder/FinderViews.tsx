@@ -553,12 +553,11 @@ function MillerColumn({
               "mx-1 flex select-none items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors",
               // A folder that is OPEN in the path we're traversing (its children
               // fill the next column) gets the SAME prominent signal background
-              // as a selected row, plus a left accent bar — so the whole opened
-              // chain reads as a connected trail down the columns at a glance
-              // (T287). The accent rides an inset box-shadow (not a border) so it
-              // never shifts the row's layout.
+              // as a selected row — so the whole opened chain reads as a
+              // connected trail down the columns at a glance (T287). Background
+              // only: the user explicitly asked to drop the left accent bar.
               onTrail || sel
-                ? "bg-[var(--signal)]/20 font-medium text-foreground shadow-[inset_2px_0_0_0_var(--signal)]"
+                ? "bg-[var(--signal)]/20 font-medium text-foreground"
                 : "text-foreground/80 hover:bg-muted/45",
               dropOver && "bg-[var(--signal)]/20 ring-1 ring-inset ring-[var(--signal)]/70",
             )}

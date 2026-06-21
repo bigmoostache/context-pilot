@@ -900,7 +900,7 @@ df70428e5de94c2d:
   - shipped
   last_edited_ms: 1782035074195
 df92f82f26098563:
-  tl_dr: 'T287 follow-up SHIPPED: Miller-columns view now marks the traversed path — each OPENED ancestor folder gets the same signal background as a selected row + a left accent bar, so the navigation path reads at a glance.'
+  tl_dr: 'T287 follow-up SHIPPED: Miller-columns view marks the traversed path — each OPENED ancestor folder gets the same signal BACKGROUND as a selected row (NO left accent bar; user asked it removed), so the navigation path reads at a glance.'
   contents: |-
     ## T287 — columns-view traversed-path highlight
 
@@ -921,7 +921,7 @@ df92f82f26098563:
   - columns
   - highlight
   - shipped
-  last_edited_ms: 1782034151782
+  last_edited_ms: 1782035254104
 e8c59432f236b48d:
   tl_dr: 'T287 SHIPPED (dffb806): Miller-columns native drag-and-drop fixed via select-none on the row buttons.'
   contents: |-
