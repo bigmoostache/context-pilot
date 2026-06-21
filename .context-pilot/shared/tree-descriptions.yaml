@@ -6190,6 +6190,10 @@ c20be1c967ed1030:
   path: crates/cp-mod-brave/src/tools.rs
   description: Brave tool dispatch with flame!("brave_search") and flame!("brave_llm_context"). Both async via spawn_async_tool. DynPanel creation with DYN_PANEL_ID_PLACEHOLDER.
   last_edited_ms: 0
+c25a2124eedb1bf7:
+  path: web/vite.config.ts
+  description: 'Vite dev config. T310: single-origin tailnet serving — server.allowedHosts:true (accept the macbook.<tailnet>.ts.net Host from `tailscale serve`''s reverse proxy, anti-DNS-rebinding relaxed since the server binds 127.0.0.1 and is exposed only over the private WireGuard tailnet) + server.proxy ''/api''→http://127.0.0.1:7878 (REST + /api/stream SSE) so the frontend uses a RELATIVE base (VITE_API_URL="" in .env.local) and the app works identically at localhost:5174 or https://<host>.ts.net (phone access) with no CORS/mixed-content. @ alias → ./src.'
+  last_edited_ms: 1782062124437
 c27aed29e3940dd3:
   path: ui/src/components/finder/FinderViews.tsx
   description: 'Finder main-area views: GridView (icon cards), ListView (sortable details table), ColumnsView (macOS Miller columns from breadcrumb chain). Shared onClick(additive)/onOpen handlers, selection set.'
