@@ -290,19 +290,23 @@ pub fn fs_move(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpReply
     HttpReply::ok(&serde_json::json!({ "moved": moved, "skipped": skipped }))
 }
 
-/// Name of the per-realm trash directory. A dotfile, so the listing's
-/// hidden-file filter keeps trashed entries out of every Finder view (a
-/// "Move to Trash" that vanishes from sight, like the OS trash) while staying
-/// inside the realm so the move never crosses the confinement boundary.
-const TRASH_DIR: &str = ".cp-trash";
+/// Per-realm trash directory, RELATIVE to the realm root. It lives inside the
+/// agent's `.context-pilot/` control directory — which is already git-ignored
+/// in every project Context Pilot works on — so trashed entries are never
+/// committed, with no per-project `.gitignore` editing needed. It also sits
+/// under a dotfile dir, so the listing's hidden-file filter keeps trashed
+/// entries out of every Finder view (a "Move to Trash" that vanishes from
+/// sight, like the OS trash), and it stays inside the realm so the move never
+/// crosses the confinement boundary.
+const TRASH_DIR: &str = ".context-pilot/trash";
 
 /// `POST /api/agent/{id}/fs/trash` — move one or more entries to the realm trash.
 ///
 /// Body is JSON `{ "items": ["rel/a", "rel/b"] }`: each entry is a realm-relative
 /// file/folder path. Powers the Finder's right-click "Move to Trash". Rather than
-/// destroy data, each item is moved into a hidden [`TRASH_DIR`] at the realm root
-/// (created on first use) — reversible, and invisible to the listing because the
-/// directory is a dotfile.
+/// destroy data, each item is moved into [`TRASH_DIR`] (the realm's
+/// `.context-pilot/trash`, created on first use) — reversible, git-ignored, and
+/// invisible to the listing because the parent is a dotfile directory.
 ///
 /// Every source is confined to the agent realm (no `..`/symlink/absolute escape).
 /// Guards, per item:
@@ -339,7 +343,7 @@ pub fn fs_trash(state: &Mutex<Backend>, agent_id: &str, body: &[u8]) -> HttpRepl
         return HttpReply::error(403, "realm root unresolved");
     };
     let trash = root.join(TRASH_DIR);
-    if !trash.is_dir() && std::fs::create_dir(&trash).is_err() {
+    if !trash.is_dir() && std::fs::create_dir_all(&trash).is_err() {
         return HttpReply::error(502, "could not create trash directory");
     }
 
