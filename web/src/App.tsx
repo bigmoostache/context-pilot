@@ -8,11 +8,33 @@ import { Finder } from "@/components/finder/Finder"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeProvider } from "@/lib/theme"
 import { AccountProvider } from "@/lib/support/account"
+import { DevModeProvider, useDevMode } from "@/lib/support/devMode"
 import { useFleet, useAgentMeta } from "@/lib/live"
 import type { ViewMode } from "@/lib/types"
 import "./App.css"
 
+/**
+ * Root provider shell. Mounts the global contexts (theme, account, dev-mode)
+ * and the tooltip layer **above** {@link AppShell}, so the shell can read the
+ * dev-mode flag through {@link useDevMode} to gate the developer-only Cockpit
+ * surface.
+ */
 function App() {
+  return (
+    <ThemeProvider>
+      <AccountProvider>
+        <DevModeProvider>
+          <TooltipProvider delay={350} closeDelay={80}>
+            <AppShell />
+          </TooltipProvider>
+        </DevModeProvider>
+      </AccountProvider>
+    </ThemeProvider>
+  )
+}
+
+function AppShell() {
+  const { devMode } = useDevMode()
   const { data: agents = [] } = useFleet()
   const [view, setViewRaw] = useState<ViewMode>(
     () => (localStorage.getItem("cp-view") as ViewMode) ?? "fleet",
@@ -49,8 +71,18 @@ function App() {
   // `activeAgent` is undefined and those views would crash on `activeAgent.id`.
   // Fall back to the fleet view in that case (private windows never hit this
   // because they start with empty localStorage → default "fleet").
+  //
+  // Cockpit is a DEVELOPER-only surface (T301): when dev mode is off, a
+  // persisted (or stale) "cockpit" selection resolves to "threads" so the view
+  // can never render a tab the TopBar deliberately hides.
   const effectiveView: ViewMode =
-    view !== "fleet" && !activeAgent ? "fleet" : view
+    view === "cockpit" && !devMode
+      ? activeAgent
+        ? "threads"
+        : "fleet"
+      : view !== "fleet" && !activeAgent
+        ? "fleet"
+        : view
 
   // Open an agent → drop into its threads. Switching agent from the fleet
   // dashboard is the ONLY place an agent is chosen/managed.
@@ -66,10 +98,7 @@ function App() {
   }
 
   return (
-    <ThemeProvider>
-      <AccountProvider>
-        <TooltipProvider delay={350} closeDelay={80}>
-        <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
           <TopBar
             view={effectiveView}
             onViewChange={setView}
@@ -96,9 +125,6 @@ function App() {
 
           <StatusBar fleet={effectiveView === "fleet"} agents={agents} activeAgent={activeAgent} />
         </div>
-        </TooltipProvider>
-      </AccountProvider>
-    </ThemeProvider>
   )
 }
 

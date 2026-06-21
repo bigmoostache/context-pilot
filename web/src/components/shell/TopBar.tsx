@@ -9,6 +9,7 @@ import { StatsPopup } from "./StatsPopup"
 import { UserMenu } from "./widgets/UserMenu"
 import { AgentModal } from "@/components/agents/AgentModal"
 import { Tip } from "@/components/ui/tip"
+import { useDevMode } from "@/lib/support/devMode"
 import type { Agent, ViewMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -27,6 +28,7 @@ interface TopBarProps {
 export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNewAgent, agents }: TopBarProps) {
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
   const inFleet = view === "fleet"
+  const { devMode } = useDevMode()
   const [configOpen, setConfigOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [manageOpen, setManageOpen] = useState(false)
@@ -96,17 +98,19 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
               label="Finder"
             />
           </Tip>
-          <Tip
-            title="Cockpit"
-            body="Look inside the agent's mind: its live context panels — memory, todos, stats and more."
-          >
-            <ViewTab
-              active={view === "cockpit"}
-              onClick={() => onViewChange("cockpit")}
-              icon={LayoutGrid}
-              label="Cockpit"
-            />
-          </Tip>
+          {devMode && (
+            <Tip
+              title="Cockpit"
+              body="Look inside the agent's mind: its live context panels — memory, todos, stats and more."
+            >
+              <ViewTab
+                active={view === "cockpit"}
+                onClick={() => onViewChange("cockpit")}
+                icon={LayoutGrid}
+                label="Cockpit"
+              />
+            </Tip>
+          )}
         </div>
       )}
 

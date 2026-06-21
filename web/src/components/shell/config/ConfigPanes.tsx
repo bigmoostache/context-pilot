@@ -27,6 +27,7 @@ import { ModelPicker } from "@/components/agents/ModelPicker"
 import { PROVIDERS, defaultModel as getDefaultModel, findModel } from "@/lib/support/models"
 import { useFleet, sendCommand } from "@/lib/live"
 import { useAccount } from "@/lib/support/account"
+import { useDevMode } from "@/lib/support/devMode"
 import { cn } from "@/lib/utils"
 
 // ── localStorage keys for global defaults ─────────────────────────────
@@ -218,7 +219,28 @@ function GeneralPane() {
       <ToggleRow i={0} name="Auto-continuation" detail="Let the agent keep working without a nudge" />
       <ToggleRow i={1} name="Reverie (context optimizer)" detail="Background cleaner reshapes context when it grows" on />
       <ToggleRow i={2} name="Think reminders" detail="Periodic nudge to reason before acting" on />
+      <DevModeToggle i={3} />
     </Stack>
+  )
+}
+
+/**
+ * The one **functional** General-pane toggle (T301): the global dev-mode flag,
+ * persisted via {@link useDevMode}. Unlike the decorative sibling rows it is a
+ * real controlled switch — flipping it reveals/hides the developer-only Cockpit
+ * tab in the TopBar in real time (App gates the view on the same flag). Off by
+ * default.
+ */
+function DevModeToggle({ i }: { i: number }) {
+  const { devMode, setDevMode } = useDevMode()
+  return (
+    <ToggleRow
+      i={i}
+      name="Developer mode"
+      detail="Reveal the Cockpit — the agent's live context-panel inspector"
+      value={devMode}
+      onChange={setDevMode}
+    />
   )
 }
 
@@ -361,16 +383,29 @@ function ToggleRow({
   name,
   detail,
   on: initial = false,
+  value,
+  onChange,
 }: {
   i: number
   name: string
   detail: string
   on?: boolean
+  /** when provided, the row is CONTROLLED — `value` is the source of truth and
+   *  `onChange` is fired on toggle (no internal state). Used by the functional
+   *  dev-mode row; the decorative rows omit it and keep local state. */
+  value?: boolean
+  onChange?: (next: boolean) => void
 }) {
-  const [on, setOn] = useState(initial)
+  const [localOn, setLocalOn] = useState(initial)
+  const controlled = value !== undefined
+  const on = controlled ? value : localOn
+  const handleToggle = () => {
+    if (controlled) onChange?.(!on)
+    else setLocalOn((v) => !v)
+  }
   return (
     <button
-      onClick={() => setOn((v) => !v)}
+      onClick={handleToggle}
       style={{ animationDelay: `${i * 40}ms` }}
       className="opt-rise flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left card-shadow"
     >
