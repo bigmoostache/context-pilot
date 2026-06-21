@@ -150,13 +150,18 @@ export function MessageFileChip({
   const { data, loading, error } = useFs(agentId ?? "", parent)
   // The matching listing node (by full realm path, falling back to basename).
   const node = data?.find((n) => n.path === file.path || n.name === file.name)
-  // A 404 on the parent listing means the directory itself is gone → the file
-  // is definitively missing (the in-directory "not present" check can't fire
-  // because there is no listing to scan). Other errors are NOT treated as
-  // missing, to avoid greying a real file on a transient fault.
-  const parentNotFound = error?.message?.startsWith("404") ?? false
+  // A 4xx on the parent listing means the directory can't be served — it
+  // doesn't exist (a nonexistent parent canonicalizes to nothing → the backend
+  // answers 403 "path outside agent realm", NOT 404) or the path escapes the
+  // realm. Either way the file is definitively unconfirmable → missing. We key
+  // on the client's `"<status> <path>: <body>"` error message (client.ts), so
+  // ANY 4xx is caught (the earlier 404-only check missed the 403 that a vanished
+  // parent dir actually returns — the "non-existing file shows as present" bug).
+  // A statusless error (a real network blip → `TypeError: Failed to fetch`)
+  // does NOT match, so a transient fault never greys a genuinely-present file.
+  const parentUnservable = /^4\d\d/.test(error?.message ?? "")
   const missing =
-    !!agentId && !loading && (parentNotFound || (!!data && !node))
+    !!agentId && !loading && (parentUnservable || (!!data && !node))
   // Real, on-disk size — the listing node's byte count. `undefined` while the
   // listing loads, when there is no agent to query, or when the file is gone;
   // the chip then omits the size label rather than echo the untrusted YAML.
