@@ -1,4 +1,5 @@
-import { ChevronDown, Terminal, User } from "lucide-react"
+import { useState } from "react"
+import { Check, ChevronDown, Copy, Terminal, User } from "lucide-react"
 import type { ChatMessage } from "@/lib/types"
 import { Markdown, type MarkdownVariant } from "@/lib/support/markdown"
 import {
@@ -78,6 +79,52 @@ function MessageBody({
   )
 }
 
+/**
+ * Discrete copy-to-clipboard affordance shown beneath a message bubble.
+ *
+ * Sits quietly at low opacity (brightening on hover/focus) so it never competes
+ * with the message itself, and on click copies the message's plain text and
+ * **transforms into a green check for ~2 s** before reverting — the only
+ * feedback the action gives, matching the requested "discrete, click → green
+ * tick for a few seconds" behaviour.
+ *
+ * `align` mirrors the bubble's side so the control tucks under the message's
+ * own edge (user bubbles are right-aligned, assistant left-aligned).
+ */
+function CopyButton({ text, align }: { text: string; align: "start" | "end" }) {
+  const [copied, setCopied] = useState(false)
+
+  const onCopy = () => {
+    // `?.` guards environments without the async clipboard API (insecure
+    // origin / older browser); a failed write is silently ignored — the worst
+    // case is the tick simply doesn't flash, never a thrown error in the UI.
+    navigator.clipboard?.writeText(text).then(
+      () => {
+        setCopied(true)
+        window.setTimeout(() => setCopied(false), 2000)
+      },
+      () => {},
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      aria-label={copied ? "Copied" : "Copy message"}
+      className={cn(
+        "flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] transition-colors",
+        "opacity-50 hover:opacity-100 focus-visible:opacity-100 outline-none",
+        copied ? "text-[var(--ok)] opacity-100" : "text-muted-foreground/70 hover:text-foreground",
+        align === "end" ? "self-end" : "self-start",
+      )}
+    >
+      {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+      <span>{copied ? "Copied" : "Copy"}</span>
+    </button>
+  )
+}
+
 function UserMessage({ msg, agentId, onOpenFile }: MessageProps) {
   return (
     <div className="rise flex flex-col items-end gap-1 py-2">
@@ -88,6 +135,7 @@ function UserMessage({ msg, agentId, onOpenFile }: MessageProps) {
         <User className="size-2.5" />
         {msg.ts}
       </span>
+      <CopyButton text={msg.text ?? ""} align="end" />
     </div>
   )
 }
@@ -108,6 +156,11 @@ function AssistantMessage({ msg, agentId, onOpenFile }: MessageProps) {
           <span className="cursor-blink ml-0.5 inline-block h-3.5 w-[7px] translate-y-0.5 bg-[var(--signal)]" />
         )}
       </div>
+      {!msg.streaming && (
+        <div className="pl-7">
+          <CopyButton text={msg.text ?? ""} align="start" />
+        </div>
+      )}
     </div>
   )
 }
