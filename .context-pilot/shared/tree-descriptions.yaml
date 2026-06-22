@@ -3270,6 +3270,10 @@
   path: crates/cp-mod-bridge/src/error.rs
   description: 'Bridge boot error: Error{AlreadyRunning{folder}, Io{context,source}} + BootResult + Error::io(context,source) helper. NO std::error::Error (dodges missing_trait_methods). Distinguishes ''folder already owned'' (recoverable) from ''disk broken'' (fatal).'
   last_edited_ms: 1781625056693
+61004f9422d9d2dd:
+  path: docs/trust-center/trust.css
+  description: 'Shared CSS for all Trust Center pages. Enterprise slate/navy palette, Inter + IBM Plex Mono fonts, fixed sidebar nav, breadcrumbs, cards, tables, badges (green/amber/blue/gray/red), policy blocks, FAQ accordion, status dots, CTA buttons, subprocessor logos (tc-logo/tc-logo-letter classes for SimpleIcons CDN + letter avatars), data flow diagram (tc-diagram-* classes: box/grid/node/arrow/provider pills), responsive (sidebar hides <960px, diagram grid collapses). Header left-padding aligned with content area.'
+  last_edited_ms: 1782139244519
 610108d1a979bbe7:
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore (.context-pilot/* with shared/agents/skills/commands negations), export API keys from .env to ~/.bashrc. Guards against running as root.'
