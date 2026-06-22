@@ -14,6 +14,7 @@ import type { Agent } from "@/lib/types"
 import { useCreateAgent, useRestartAgent, useRetireAgent, sendCommand } from "@/lib/live"
 import { PROVIDERS, defaultModel, findModel, resolveSelection } from "@/lib/support/models"
 import { ModelPicker } from "./ModelPicker"
+import { SessionVitals } from "../shell/SessionVitals"
 import { cn } from "@/lib/utils"
 
 /**
@@ -173,7 +174,10 @@ export function AgentModal({
       onClick={onClose}
     >
       <div
-        className="modal-pop relative flex w-[460px] flex-col overflow-hidden rounded-2xl border border-border bg-popover pop-shadow"
+        className={cn(
+          "modal-pop relative flex flex-col overflow-hidden rounded-2xl border border-border bg-popover pop-shadow",
+          isManage ? "w-[960px] max-w-[calc(100vw-3rem)]" : "w-[460px]",
+        )}
         onClick={(e) => e.stopPropagation()}
       >
         {/* hero header — a soft accent wash + grain */}
@@ -215,7 +219,14 @@ export function AgentModal({
           </button>
         </div>
 
-        <div className="flex flex-col gap-5 px-6 py-5">
+        <div
+          className={cn(
+            "px-6 py-5",
+            isManage ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-7" : "flex flex-col gap-5",
+          )}
+        >
+          {/* left column — the agent form (name + provider/model) */}
+          <div className="flex flex-col gap-5">
           {/* name — the star field, with a leading glyph + live realm preview */}
           <div className="flex flex-col gap-2">
             <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
@@ -255,6 +266,17 @@ export function AgentModal({
               onChange={(p, m) => { setProvId(p); setModelId(m) }}
             />
           </div>
+          </div>
+
+          {/* right column — live session vitals + service health (manage only) */}
+          {isManage && agent && (
+            <div className="flex flex-col gap-2 border-l border-border/50 pl-7">
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+                Session vitals
+              </span>
+              <SessionVitals agentId={agent.id} />
+            </div>
+          )}
         </div>
 
         {/* create error — surfaced inline so a spawn failure isn't silent */}

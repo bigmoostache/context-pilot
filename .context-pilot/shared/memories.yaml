@@ -31,6 +31,24 @@
   tl_dr: 'Context Pilot env vars: ANTHROPIC_API_KEY, BRAVE_API_KEY, FIRECRAWL_API_KEY, GITHUB_TOKEN (core). Optional LLM providers and chat bridge tokens. Loaded via dotenvy from .env, fallback to global config.'
   importance: high
   last_edited_ms: 0
+18e8f59aa30c4b6e:
+  tl_dr: 'MOBILE WEB (T313/T313-NATIVE): ABANDONED per T320. The mobile branch was dropped entirely (local + origin/mobile deleted) and the repo returned to demaquetting; all mobile work discarded by user decision.'
+  contents: |-
+    ## Mobile web version — ABANDONED (T320, 2026-06-22)
+
+    The entire mobile effort (T313 + T313-NATIVE, branch `mobile`) was **dropped at the user's explicit request** (T320: "Drop entirely this mobile branch. go back to demaquetting, dropping all work that was done on mobile").
+
+    Actions taken: `git checkout demaquetting`; `git branch -D mobile`; `git push origin --delete mobile`. Both the local and remote `mobile` branch are gone. The working tree is back on `demaquetting` (no web/src/mobile/**, original main.tsx + index.html restored).
+
+    The work was complete and shipped (20 phases) before being abandoned — last mobile commit was 4d25864f. If ever resurrected, the commits may still be recoverable from origin's GC grace window, but the intent was a clean drop.
+
+    Do NOT resume mobile work unless the user explicitly reverses this decision.
+  importance: low
+  labels:
+  - mobile
+  - abandoned
+  - T320
+  last_edited_ms: 1782116008800
 3d36396d2a618055:
   tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
   importance: critical
@@ -133,6 +151,28 @@
   - documentation
   - style
   last_edited_ms: 0
+979e1f9fad99acd7:
+  tl_dr: 'T322 DIAGNOSIS (no code yet, awaiting captain pick A/B/C): idle auto-Read leaves the Threads panel STALE in LLM context because tempo stays true.'
+  contents: |-
+    ## T322 — frozen Threads panel after idle auto-Read (root cause)
+
+    Bug: agent idle → user sends thread message → harness auto-injects Read → Threads PANEL in LLM context NOT updated (message only reachable via the injected Read tool-result — a 'hustle').
+
+    ROOT CAUSE = `tempo`, NOT max_freezes.
+    - `state.tempo` defaults true (crates/cp-base/src/state/runtime.rs:170-172, doc: 'tempo==true → ALL panels freeze unconditionally'). Set false ONLY in src/app/run/tools/pipeline.rs:366 (real tool ran) + cleanup.rs:316 (deferred watcher). prepare_stream_context resets it true every tick.
+    - ThreadsPanel is STATIC (cp-mod-threads/src/panel.rs): LLM content = ThreadsState.panel_content, rebuilt ONLY by Read (execute_read, tools.rs:175-176 writes panel_content). max_freezes=3.
+    - maybe_inject_auto_read (src/app/run/threads/mod.rs) calls execute_read DIRECTLY + hand-builds messages → rebuilds panel_content (fresh!) BUT never sets tempo=false (bypasses pipeline).
+    - Next prepare_stream_context (src/app/context/mod.rs): cond.tempo=true → FreezeConditions::freeze_panel priority order [1 queue→Freeze, 2 TEMPO→Freeze, 3 cache_broken→Fresh, 4 freeze_count<max_freezes→Freeze, 5 Fresh] hits #2 → Freeze → restores old emitted snapshot (pre-message) → LLM sees stale panel. max_freezes never reached (tempo short-circuits before budget). mark_panels_dirty (freeze_count=u8::MAX) would ALSO be defeated by tempo (checked before budget).
+
+    FIX OPTIONS offered on T322: A) set state.tempo=false after execute_read in maybe_inject_auto_read (narrowest, recommended); B) route injected Read through real tempo-break logic; C) panel-level force-fresh flag in freeze engine (riskiest). Awaiting captain's pick — NO code written.
+  importance: high
+  labels:
+  - T322
+  - freeze
+  - tempo
+  - threads
+  - diagnosis
+  last_edited_ms: 1782118794087
 986adb56b40b2b32:
   tl_dr: 'OPS & BUILD GOTCHAS (consolidated): orchestrator restart vs system_reload, port-freeing, git/pnpm/lint quirks, never-commit list. Full list in contents.'
   contents: |-
@@ -240,6 +280,30 @@ efe78c079599d3d0:
   tl_dr: 'User workflow preference: when exploring/describing files, MUST follow strict order: open files → describe in tree → close files → iterate to next batch. Never close before describing.'
   importance: critical
   last_edited_ms: 0
+f1097e3bb0e957bc:
+  tl_dr: 'T320 CI BLOCKER (awaiting captain decision): demaquetting Rust CI can''t pass — Cargo.toml forbids 10 lints unknown to the 1.93 CI pin (E0602). Asked captain to choose fix path on T320.'
+  contents: |-
+    ## T320 blocker — Rust CI lint/toolchain mismatch
+
+    demaquetting Rust CI cannot pass. Root `Cargo.toml` `[workspace.lints.rust]` (HASH-CHAIN PROTECTED, M39) forbids 10 lints unknown to Rust 1.93 (the CI pin) → E0602 hard build error on 1.93 (masked in CI because fmt fails first).
+
+    The 10 unknown-to-1.93 lints: ambiguous_derive_helpers, ambiguous_glob_imported_traits, ambiguous_import_visibilities, ambiguous_panic_imports, improper_gpu_kernel_arg, inline_always_mismatching_target_features, internal_eq_trait_method_impls, missing_gpu_kernel_export_name, unreachable_cfg_select_predicates, unused_visibilities.
+
+    Lint table IS valid on 1.95 (`cargo build -p cp-mod-utilities` clean on default 1.95). rust.yml pins 1.93.0 with a STALE matrix-sdk reason (matrix-sdk gone from tree). rust.yml NOT chain-protected (editable); Cargo.toml IS.
+
+    Options offered on T320: A) bump rust.yml 1.93→1.95 (recommended, not protected); B) prune protected Cargo.toml + chain.sh --update (password Totordu1789, M39); C) other.
+
+    ALREADY DONE this session (uncommitted): whole-workspace `cargo +1.93.0 fmt` (fmt --check clean, ~100 files) + X949/X950/X951 file-length refactors (all <500). boot.rs→boot/{mod,lock,activate}.rs; finder/upload.rs; overview mod.rs trim.
+
+    NEXT once captain picks A: bump pin, full 1.95 gate (clippy -D warnings + build --release + test), commit fmt+refactors+bump+memories/tree-descs, push, watch CI green, gh pr create+merge demaquetting→master.
+  importance: critical
+  labels:
+  - T320
+  - ci
+  - lints
+  - blocker
+  - merge
+  last_edited_ms: 1782118456815
 f5d97b1e7a01c317:
   tl_dr: ALIGNMENT EPIC (X818/T120) DONE; HUD fully push-fed incl context meter + hit/miss split (T297). Deploy TAG = propose to user. Detail in git + design-doc §26.
   contents: |-

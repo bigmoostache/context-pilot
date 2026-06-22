@@ -1,11 +1,9 @@
 import { useState } from "react"
-import { Activity, LayoutGrid, MessagesSquare, FolderTree, Home, Settings2 } from "lucide-react"
-import { fmtCost } from "@/lib/support/panelMeta"
+import { LayoutGrid, MessagesSquare, FolderTree, Home, Settings2 } from "lucide-react"
 import { ThemeToggle } from "./widgets/ThemeToggle"
 import { AgentSwitcher } from "./widgets/AgentSwitcher"
 import { ConfigModal } from "./config/ConfigModal"
 import { ProfileModal } from "./widgets/ProfileModal"
-import { StatsPopup } from "./StatsPopup"
 import { UserMenu } from "./widgets/UserMenu"
 import { AgentModal } from "@/components/agents/AgentModal"
 import { Tip } from "@/components/ui/tip"
@@ -30,7 +28,6 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
   const inFleet = view === "fleet"
   const { devMode } = useDevMode()
   const [configOpen, setConfigOpen] = useState(false)
-  const [statsOpen, setStatsOpen] = useState(false)
   const [manageOpen, setManageOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
 
@@ -115,24 +112,6 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
       )}
 
       <div className="ml-auto flex items-center gap-3">
-        {/* cost is agent-scoped — only meaningful inside an agent */}
-        {!inFleet && (
-          <span className="text-[12px] tabular-nums text-muted-foreground">
-            {fmtCost(activeAgent?.costUsd ?? 0)}
-          </span>
-        )}
-        {/* session vitals are agent-scoped — irrelevant at fleet altitude */}
-        {!inFleet && (
-          <Tip title="Session vitals" body="Live tokens, cost and context-budget for this agent." side="bottom">
-            <button
-              onClick={() => setStatsOpen(true)}
-              className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
-              aria-label="Open session stats"
-            >
-              <Activity className="size-[17px]" />
-            </button>
-          </Tip>
-        )}
         <Tip title="Appearance" body="Switch between light and dark." side="bottom">
           <span className="inline-flex">
             <ThemeToggle />
@@ -173,7 +152,6 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
 
       <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
-      <StatsPopup open={statsOpen} onClose={() => setStatsOpen(false)} agentId={activeAgentId} />
     </header>
 
     {/* Rendered as a SIBLING of the .vibrancy header (never a descendant) so its
