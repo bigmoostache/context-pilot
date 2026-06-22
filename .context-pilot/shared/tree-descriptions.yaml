@@ -2982,6 +2982,10 @@
   path: docs/pdf-module.md
   description: Typst PDF module design
   last_edited_ms: 0
+5781d943d06f6e62:
+  path: docs/trust-center/subprocessors.html
+  description: 'Subprocessor Register page. 7 sections: LLM providers table (6 providers with logos), auxiliary services table (5 services with logos), local services table (4 services with logos), change log table (4 entries), operator responsibility notice, vendor risk assessment criteria (8-criterion table with mandatory/preferred weights), data flow summary (HTML/CSS architecture diagram with component grid, TLS arrow, provider pills with logos).'
+  last_edited_ms: 1782136638888
 578221b18edc9b45:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.
@@ -6646,6 +6650,10 @@ c13963c6d7794d8b:
   path: ui/src/lib/types.ts
   description: Maquette domain types. Adds Agent (id/name/folder/branch/model/status/cost/threads/accent), FsNode (fs browser tree), AgentStatus. ViewMode = agents|cockpit|threads. Plus thread-view types.
   last_edited_ms: 1781514443039
+c150e7a9bba2a43d:
+  path: docs/trust-center/trust.css
+  description: 'Shared CSS for all Trust Center pages. Enterprise slate/navy palette, Inter + IBM Plex Mono fonts, fixed sidebar nav, breadcrumbs, cards, tables, badges, policy blocks, FAQ accordion, status dots, CTA buttons, subprocessor logos (tc-logo/tc-logo-letter classes for SimpleIcons CDN + letter avatars), data flow diagram (tc-diagram-* classes: box/grid/node/arrow/provider pills), responsive (sidebar hides <960px, diagram grid collapses). Header left-padding aligned with content area.'
+  last_edited_ms: 1782136638916
 c15a0ff49eae9097:
   path: web/src/main.tsx
   description: React entry point. createRoot → StrictMode → QueryClientProvider (TanStack, the single shared queryClient from lib/queryClient) wrapping <App/>. The mount point that activates the TanStack Query cache + SSE push-plane for the whole live app.
