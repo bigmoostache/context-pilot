@@ -7942,6 +7942,10 @@ ed8cdf66722e6f21:
   path: src/llms/oai_providers/grok.rs
   description: xAI Grok client. OpenAI-compatible API. Shared openai_compat message building. XAI_API_KEY auth.
   last_edited_ms: 1780565754901
+ed8f8fe56a112354:
+  path: docs/trust-center/index.html
+  description: 'Standalone trust center page. Vanta-style clean light design (Plus Jakarta Sans, white bg, green/blue accents). Sections: hero, 4 guarantee cards, 6 privacy controls, data handling table, 11 subprocessors (all real from codebase), compliance (GDPR/SOC2/MIT), 6 FAQ accordions. No cross-links to other site sections.'
+  last_edited_ms: 1782132282541
 eda799977218054d:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
