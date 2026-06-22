@@ -690,6 +690,10 @@
   path: ui/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: selected thread''s full conversation. toChatMessage() maps ThreadMsg→ChatMessage to reuse cockpit Message renderer. Renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'
   last_edited_ms: 0
+14a34138fca72971:
+  path: docs/trust-center/security.html
+  description: 'Security Architecture page. 5 sections: data flow (local-first, no proxy, local persistence, offline), integrity controls (SHA-256 hash chain, lint enforcement, structural enforcement), access model (credentials, filesystem scope, SSE tickets), incident response (disclosure, Dependabot, release integrity), business continuity.'
+  last_edited_ms: 1782133438219
 14d8aa9d69c4a452:
   path: crates/cp-mod-entities/Cargo.toml
   description: 'Entities module deps: cp-base, cp-render, cp-mod-utilities, cp-mod-search, rusqlite (bundled), crossterm, serde_json, log.'
@@ -1262,6 +1266,10 @@
   path: crates/cp-mod-entities/src/sql/parse.rs
   description: 'SQL statement parsing: SqlKind classify (SELECT/DML/DDL/CTE), strip_leading_comments, split_statements. split_statements is a SQLite-aware mini-tokenizer (skips ''/"/`/[] quoted spans + --/* */ comments) so ; inside them never mis-splits. Byte-offset-correct via str::char_indices() (fixes #113 multi-byte truncation). 15 regression tests.'
   last_edited_ms: 1781123413469
+257f81a893ff2f78:
+  path: docs/trust-center/trust.css
+  description: Shared CSS for all Trust Center pages. Enterprise slate/navy palette, Inter + IBM Plex Mono fonts, fixed sidebar nav, breadcrumbs, cards, tables, badges, policy blocks, FAQ accordion, status dots, CTA buttons, responsive (sidebar hides <960px). 631 lines.
+  last_edited_ms: 1782133438192
 25c411f4e4753d79:
   path: crates/cp-orchestrator/src/services/mod.rs
   description: 'services/ hub: declares + re-exports MaterializedView/AgentView/CostSnapshot, CostBreaker/Verdict, StreamHub/Subscriber.'
@@ -2438,6 +2446,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+4865df1f21234493:
+  path: docs/trust-center/subprocessors.html
+  description: 'Subprocessor Register page. 5 sections: LLM providers table (6 providers), auxiliary services table (5 services), local services table (4 services), change log table (4 entries), operator responsibility notice.'
+  last_edited_ms: 1782133438296
 486607bef23378be:
   path: ui/tsconfig.json
   description: TS project references root (app + node).
@@ -4074,6 +4086,10 @@
   path: crates/cp-mod-git/src/tools.rs
   description: Git tool. Read-only → dynamic git_result panels. Mutating → async subprocess via spawn_async_tool. flame!("git_exec"). GIT_ASKPASS temp script for HTTPS auth. Cache invalidation via regex patterns.
   last_edited_ms: 0
+796e04aa332c0569:
+  path: docs/trust-center/compliance.html
+  description: 'Compliance Framework page. 3 sections: regulatory assessment (GDPR compatible, SOC 2 N/A, ISO 27001 not certified, HIPAA N/A, CCPA compatible), open-source licensing (MIT + clean dependency audit), security testing table (6 active controls).'
+  last_edited_ms: 1782133438270
 797280dfc40e34bb:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
@@ -4942,6 +4958,10 @@
   path: web/src/lib/support/markdown.tsx
   description: GFM markdown renderer (react-markdown + remark-gfm) themed to app tokens; default + onAccent variants. XSS-safe (no raw HTML).
   last_edited_ms: 1782117192051
+92194bda8d7506b9:
+  path: docs/trust-center/privacy.html
+  description: 'Data Privacy page. 5 sections: data classification table (10 categories with storage/transmission/classification), privacy-by-design controls (no collection infra, no telemetry, credential isolation, opt-in services), data retention (local + provider-dependent), data subject rights table, FAQ accordion (5 items).'
+  last_edited_ms: 1782133438245
 9232da712bbcf166:
   path: crates/cp-mod-queue/src/tools.rs
   description: Tool handlers for Queue_pause and Queue_undo with flame!("queue_pause") and flame!("queue_undo"). Queue_execute handled in pipeline.rs.
@@ -5378,6 +5398,10 @@
   path: web/src/components/threads/ThreadsView.tsx
   description: 'Threads view shell (list | conversation). handleSend/handleArchive/handleCreate via sendCommand. T331: handleAttach now STAGES files as pendingFiles (upload to .uploads/ but DON''T send) — pending chips shown in composer, merged into message content only on explicit Send. T298: buildUploadMessage. T303: per-agent thread persistence to localStorage.'
   last_edited_ms: 1782132793442
+9f5ea5f349e9c1d0:
+  path: docs/trust-center/index.html
+  description: Trust Center overview/landing page. Enterprise multi-page design (Inter font, slate/navy palette, sidebar nav). Security posture summary cards, 4 nav cards to sub-pages (security/privacy/compliance/subprocessors), contact CTAs. No emojis. Version 2.0.
+  last_edited_ms: 1782133438322
 9f678ca035b102a6:
   path: web/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Uses useFleet() for live agents. Mounts AccountProvider + TooltipProvider. Passes agents to TopBar/FleetShell/StatusBar. Passes activeAgent to StatusBar.
