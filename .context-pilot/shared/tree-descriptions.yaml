@@ -5974,6 +5974,10 @@ ab03ea7b3497e494:
   path: crates/cp-orchestrator/tests/transport_http.rs
   description: Phase 30 transport surface tests over a real tiny_http server (4 tests). ticket_mint_and_command_status_codes now asserts a tripped breaker blocks a cost-incurring send_message (503) but NOT a control-plane stop (≠503, reaches delivery). REST rev-envelope+404, SSE ticket gate single-use, Last-Event-ID replay.
   last_edited_ms: 0
+abb19777c1034743:
+  path: web/src/components/finder/preview/sourcedPdfTypes.ts
+  description: Types, color map, and ZIP-bundle parser for the .sourced_pdf format. Domain types (Metadata/Value/Ref/Arrow), REF_COLORS/REF_LABELS palettes, docType() helper (pdf/xlsx/unknown from extension), parseSourcedBundle() decompresses ZIP → metadata + ALL document bytes (docBytes Map) + values + refs. Handles both v0 (generated) and v1 (production spdf-toolkit) formats. ~210 lines.
+  last_edited_ms: 1782148473713
 ac4a7fbbfcf664e7:
   path: crates/cp-mod-brave/Cargo.toml
   description: 'Brave module deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml, reqwest.'
