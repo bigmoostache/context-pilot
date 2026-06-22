@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trust Center — Context Pilot</title>
+  <meta name="description" content="Context Pilot's security architecture, data handling practices, privacy controls, and third-party service transparency.">
+  <link rel="stylesheet" href="../shared.css">
+  <style>
+    /* ── Trust Center specific ─────────────────────────── */
+
+    .trust-hero {
+      padding: 100px 0 60px;
+      text-align: center;
+      position: relative;
+    }
+    .trust-hero::before {
+      content: '';
+      position: absolute;
+      width: 600px;
+      height: 400px;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      background: radial-gradient(circle, rgba(34,197,94,.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .trust-hero h1 {
+      font-family: var(--mono);
+      font-size: 2.6rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 16px;
+    }
+    .trust-hero h1 .shield { margin-right: 12px; }
+    .trust-hero .subtitle {
+      color: var(--text-2);
+      font-size: 1.1rem;
+      max-width: 560px;
+      margin: 0 auto 28px;
+      line-height: 1.6;
+    }
+
+    /* Status banner */
+    .status-banner {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(34,197,94,.08);
+      border: 1px solid rgba(34,197,94,.18);
+      color: var(--green);
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 8px 20px;
+      border-radius: 24px;
+      letter-spacing: 0.02em;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .4; }
+    }
+
+    /* ── Principle cards row ─────────────────────────────── */
+    .principles {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 64px;
+    }
+    .principle {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      text-align: center;
+    }
+    .principle-icon {
+      font-size: 2rem;
+      margin-bottom: 14px;
+    }
+    .principle h3 {
+      font-family: var(--mono);
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .principle p {
+      font-size: 0.85rem;
+      color: var(--text-2);
+      line-height: 1.5;
+    }
+
+    /* ── Section block ──────────────────────────────────── */
+    .trust-section {
+      margin-bottom: 64px;
+    }
+    .trust-section-title {
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .trust-section-desc {
+      color: var(--text-2);
+      font-size: 0.92rem;
+      margin-bottom: 24px;
+      max-width: 680px;
+      line-height: 1.6;
+    }
+
+    /* ── Control list ───────────────────────────────────── */
+    .controls {
+      display: grid;
+      gap: 12px;
+    }
+    .control {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      transition: border-color .15s;
+    }
+    .control:hover { border-color: var(--border-hi); }
+    .control-check {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      background: rgba(34,197,94,.12);
+      border: 1px solid rgba(34,197,94,.25);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--green);
+      font-size: 0.75rem;
+      margin-top: 1px;
+    }
+    .control-body h4 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .control-body p {
+      font-size: 0.82rem;
+      color: var(--text-2);
+      line-height: 1.55;
+    }
+
+    /* ── Data flow diagram ──────────────────────────────── */
+    .flow-diagram {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      line-height: 1.9;
+      color: var(--text-2);
+      overflow-x: auto;
+      white-space: pre;
+      margin-bottom: 24px;
+    }
+    .flow-diagram .highlight { color: var(--accent); }
+    .flow-diagram .green { color: var(--green); }
+    .flow-diagram .dim { color: var(--text-3); }
+
+    /* ── Subprocessors table ─────────────────────────────── */
+    .sub-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .sub-table th {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-3);
+      text-align: left;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sub-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-2);
+    }
+    .sub-table tr:last-child td { border-bottom: none; }
+    .sub-table tr:hover td { background: var(--surface-2); }
+    .sub-table .name { color: var(--text); font-weight: 500; }
+    .sub-table .optional {
+      font-size: 0.72rem;
+      color: var(--text-3);
+      font-style: italic;
+    }
+
+    /* ── FAQ / accordion ────────────────────────────────── */
+    .faq-list { display: grid; gap: 8px; }
+    .faq-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .faq-q {
+      width: 100%;
+      padding: 18px 24px;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background .15s;
+    }
+    .faq-q:hover { background: var(--surface-2); }
+    .faq-q::after {
+      content: '+';
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      color: var(--text-3);
+      transition: transform .2s;
+    }
+    .faq-item.open .faq-q::after {
+      transform: rotate(45deg);
+      color: var(--accent);
+    }
+    .faq-a {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height .3s ease;
+    }
+    .faq-item.open .faq-a { max-height: 300px; }
+    .faq-a-inner {
+      padding: 0 24px 20px;
+      font-size: 0.85rem;
+      color: var(--text-2);
+      line-height: 1.6;
+    }
+
+    @media (max-width: 640px) {
+      .trust-hero { padding: 64px 0 40px; }
+      .trust-hero h1 { font-size: 1.8rem; }
+      .principles { grid-template-columns: 1fr; }
+      .flow-diagram { font-size: 0.68rem; padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Topbar ──────────────────────────────────────────── -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="../" class="topbar-brand">Context Pilot</a>
+      <nav class="topbar-nav">
+        <a href="../trust-center/" class="active">Trust Center</a>
+        <a href="../presentations/talk/">Presentations</a>
+        <a href="../blog/">Blog</a>
+        <a href="../documentation/">Docs</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- ── Hero ────────────────────────────────────────── -->
+    <section class="trust-hero">
+      <h1><span class="shield">🛡️</span>Trust Center</h1>
+      <p class="subtitle">
+        Context Pilot is local-first and open-source. Your code never touches our servers — because we don't have any. Here's how it works.
+      </p>
+      <div class="status-banner">
+        <span class="status-dot"></span>
+        All systems local · No cloud dependency
+      </div>
+    </section>
+
+    <!-- ── Core principles ──────────────────────────────── -->
+    <section class="principles">
+      <div class="principle">
+        <div class="principle-icon">🏠</div>
+        <h3>Local-First</h3>
+        <p>Everything runs on your machine. No remote servers, no cloud storage, no intermediary infrastructure.</p>
+      </div>
+      <div class="principle">
+        <div class="principle-icon">🔓</div>
+        <h3>Open Source</h3>
+        <p>MIT-licensed, fully auditable codebase. Every line of code is on GitHub for you to inspect.</p>
+      </div>
+      <div class="principle">
+        <div class="principle-icon">🚫</div>
+        <h3>Zero Telemetry</h3>
+        <p>No analytics, no tracking, no phone-home. We never learn what you're building or how you use the tool.</p>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ── Security Architecture ────────────────────────── -->
+    <section class="trust-section">
+      <h2 class="trust-section-title">
+        <span class="badge badge--green">✓ Verified</span>
+        Security Architecture
+      </h2>
+      <p class="trust-section-desc">
+        Context Pilot's security model is simple: your data stays on your machine. There is no Context Pilot cloud, no telemetry server, no intermediary proxy. The only network calls are the ones <em>you</em> configure — to LLM providers of your choosing.
+      </p>
+
+      <div class="flow-diagram"><span class="green">┌─────────────────────────────────────────────────────┐</span>
+<span class="green">│</span>  <span class="highlight">YOUR MACHINE</span>                                        <span class="green">│</span>
+<span class="green">│</span>                                                       <span class="green">│</span>
+<span class="green">│</span>   ┌──────────┐    ┌───────────────┐    ┌──────────┐  <span class="green">│</span>
+<span class="green">│</span>   │ Your Code │───▶│ Context Pilot │───▶│  Local   │  <span class="green">│</span>
+<span class="green">│</span>   │  (files)  │    │  (TUI agent)  │    │ Storage  │  <span class="green">│</span>
+<span class="green">│</span>   └──────────┘    └───────┬───────┘    │ .context- │  <span class="green">│</span>
+<span class="green">│</span>                           │            │  pilot/   │  <span class="green">│</span>
+<span class="green">│</span>                           │            └──────────┘  <span class="green">│</span>
+<span class="green">└───────────────────────────┼─────────────────────────┘</span>
+                            │ <span class="dim">only if you configure</span>
+                            │ <span class="dim">API keys in .env</span>
+                            ▼
+                 <span class="highlight">┌─────────────────┐</span>
+                 <span class="highlight">│  LLM Providers   │</span>
+                 <span class="highlight">│  (your API keys) │</span>
+                 <span class="highlight">└─────────────────┘</span>
+                 <span class="dim">Anthropic · OpenAI</span>
+                 <span class="dim">Google · Mistral …</span></div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ── Privacy Controls ──────────────────────────────── -->
+    <section class="trust-section">
+      <h2 class="trust-section-title">
+        Privacy Controls
+      </h2>
+      <p class="trust-section-desc">
+        Every aspect of Context Pilot is designed so you don't have to trust us — the architecture makes data exfiltration structurally impossible.
+      </p>
+
+      <div class="controls">
+        <div class="control">
+          <div class="control-check">✓</div>
+          <div class="control-body">
+            <h4>No data collection</h4>
+            <p>We never receive your code, conversations, memories, or any usage data. There is no server for it to go to.</p>
+          </div>
+        </div>
+        <div class="control">
+          <div class="control-check">✓</div>
+          <div class="control-body">
+            <h4>Local storage only</h4>
+            <p>All state — conversations, entity databases, memories, logs, scratchpad — is stored on your filesystem under <code>.context-pilot/</code>. Nothing leaves the machine.</p>
+          </div>
+        </div>
+        <div class="control">
+          <div class="control-check">✓</div>
+          <div class="control-body">
+            <h4>API key isolation</h4>
+            <p>Your API keys are stored in your local <code>.env</code> file. They are sent only to the provider they belong to — never to us or any third party.</p>
+          </div>
+        </div>
+        <div class="control">
+          <div class="control-check">✓</div>
+          <div class="control-body">
+            <h4>Open-source audit trail</h4>
+            <p>The entire codebase is MIT-licensed on GitHub. Every network call, every file access, every tool invocation is auditable by you.</p>
+          </div>
+        </div>
+        <div class="control">
+          <div class="control-check">✓</div>
+          <div class="control-body">
+            <h4>Offline capable</h4>
+            <p>Context Pilot works without internet. The only features requiring network are LLM inference, web search (Brave), and web scraping (Firecrawl) — all user-initiated and user-configured.</p>
+          </div>
+        </div>
+        <div class="control">
+          <div class="control-check">✓</div>
+          <div class="control-body">
+            <h4>Cryptographic integrity</h4>
+            <p>Critical configuration files (lint rules, CI scripts, deploy scripts) are protected by a SHA-256 hash chain. Tampering is detected automatically.</p>
+          </div>
+        </div>
+        <div class="control">
+          <div class="control-check">✓</div>
+          <div class="control-body">
+            <h4>No vendor lock-in</h4>
+            <p>MIT License. Swap LLM providers freely. Export your data anytime — it's already plain files on your disk.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ── Data Handling ─────────────────────────────────── -->
+    <section class="trust-section">
+      <h2 class="trust-section-title">
+        Data Handling
+      </h2>
+      <p class="trust-section-desc">
+        Here's exactly what data goes where. Every item on this list is either stored locally or sent to a provider you explicitly configure.
+      </p>
+
+      <div class="controls">
+        <div class="control">
+          <div class="control-check" style="background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.25);color:var(--accent);">⟠</div>
+          <div class="control-body">
+            <h4>Code context &amp; conversations</h4>
+            <p>Sent to your configured LLM provider (Anthropic, OpenAI, etc.) as part of inference requests. Governed by <em>their</em> data retention policies, not ours.</p>
+          </div>
+        </div>
+        <div class="control">
+          <div class="control-check">✓</div>
+          <div class="control-body">
+            <h4>Conversation history</h4>
+            <p>Stored locally in <code>.context-pilot/</code> as YAML files. Never transmitted anywhere.</p>
+          </div>
+        </div>
+        <div class="control">
+          <div class="control-check">✓</div>
+          <div class="control-body">
+            <h4>Entity database</h4>
+            <p>Local SQLite database under <code>.context-pilot/shared/entities/</code>. Never transmitted.</p>
+          </div>
+        </div>
+        <div class="control">
+          <div class="control-check">✓</div>
+          <div class="control-body">
+            <h4>Memories, logs, scratchpad</h4>
+            <p>Plain YAML/JSON files on your filesystem. Persist across sessions, never leave the machine.</p>
+          </div>
+        </div>
+        <div class="control">
+          <div class="control-check">✓</div>
+          <div class="control-body">
+            <h4>Search index (Meilisearch)</h4>
+            <p>Runs as a local sidecar process on <code>127.0.0.1</code>. Index data never leaves localhost.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ── Third-Party Services ──────────────────────────── -->
+    <section class="trust-section">
+      <h2 class="trust-section-title">
+        Third-Party Services
+      </h2>
+      <p class="trust-section-desc">
+        Context Pilot has no mandatory third-party dependencies. Every external service below is <strong>opt-in</strong> — you provide the API key, you choose the provider, you control the data flow.
+      </p>
+
+      <div class="card" style="padding:0; overflow:hidden;">
+        <table class="sub-table">
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Purpose</th>
+              <th>Data Sent</th>
+              <th>Required?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="name">Anthropic</td>
+              <td>LLM inference (Claude)</td>
+              <td>Code context, conversation messages</td>
+              <td><span class="badge badge--amber">Choose 1+ LLM</span></td>
+            </tr>
+            <tr>
+              <td class="name">OpenAI</td>
+              <td>LLM inference (GPT)</td>
+              <td>Code context, conversation messages</td>
+              <td><span class="badge badge--amber">Choose 1+ LLM</span></td>
+            </tr>
+            <tr>
+              <td class="name">Google AI</td>
+              <td>LLM inference (Gemini)</td>
+              <td>Code context, conversation messages</td>
+              <td><span class="badge badge--amber">Choose 1+ LLM</span></td>
+            </tr>
+            <tr>
+              <td class="name">Mistral AI</td>
+              <td>LLM inference</td>
+              <td>Code context, conversation messages</td>
+              <td><span class="badge badge--amber">Choose 1+ LLM</span></td>
+            </tr>
+            <tr>
+              <td class="name">Voyage AI</td>
+              <td>Embedding generation</td>
+              <td>Text chunks for semantic search</td>
+              <td><span class="optional">Optional</span></td>
+            </tr>
+            <tr>
+              <td class="name">Brave Search</td>
+              <td>Web search</td>
+              <td>Search queries only</td>
+              <td><span class="optional">Optional</span></td>
+            </tr>
+            <tr>
+              <td class="name">Firecrawl</td>
+              <td>Web page scraping</td>
+              <td>Target URLs only</td>
+              <td><span class="optional">Optional</span></td>
+            </tr>
+            <tr>
+              <td class="name">Datalab (Surya)</td>
+              <td>OCR / document conversion</td>
+              <td>Document files</td>
+              <td><span class="optional">Optional</span></td>
+            </tr>
+            <tr>
+              <td class="name">GitHub</td>
+              <td>Repository operations (via gh CLI)</td>
+              <td>Git operations scoped to your repos</td>
+              <td><span class="optional">Optional</span></td>
+            </tr>
+            <tr>
+              <td class="name">Meilisearch</td>
+              <td>Full-text project search</td>
+              <td>Runs locally on 127.0.0.1 — no external traffic</td>
+              <td><span class="badge badge--green">Local only</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ── Compliance ────────────────────────────────────── -->
+    <section class="trust-section">
+      <h2 class="trust-section-title">
+        Compliance
+      </h2>
+      <p class="trust-section-desc">
+        As a local-first, open-source tool with no cloud component, traditional compliance frameworks don't apply in the usual way. Here's our stance:
+      </p>
+
+      <div class="controls" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+        <div class="card">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+            <span class="badge badge--green">✓ Compatible</span>
+            <strong style="font-size:.9rem;">GDPR</strong>
+          </div>
+          <p style="font-size:.82rem;color:var(--text-2);line-height:1.55;">
+            Context Pilot processes no personal data on our behalf. Any data sent to LLM providers is governed by your agreement with that provider. We are not a data processor — we're a tool you run locally.
+          </p>
+        </div>
+        <div class="card">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+            <span class="badge badge--neutral">N/A</span>
+            <strong style="font-size:.9rem;">SOC 2</strong>
+          </div>
+          <p style="font-size:.82rem;color:var(--text-2);line-height:1.55;">
+            SOC 2 applies to cloud services that handle customer data. Context Pilot has no cloud service — your data never enters our control. SOC 2 certification would certify an empty infrastructure.
+          </p>
+        </div>
+        <div class="card">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+            <span class="badge badge--green">✓ MIT</span>
+            <strong style="font-size:.9rem;">Open Source License</strong>
+          </div>
+          <p style="font-size:.82rem;color:var(--text-2);line-height:1.55;">
+            Permissive MIT license. Use commercially, modify, distribute. No vendor lock-in, no license fees, no usage restrictions.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ── FAQ ────────────────────────────────────────────── -->
+    <section class="trust-section">
+      <h2 class="trust-section-title">
+        Frequently Asked Questions
+      </h2>
+
+      <div class="faq-list">
+        <div class="faq-item">
+          <button class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+            Does Context Pilot send my code to your servers?
+          </button>
+          <div class="faq-a">
+            <div class="faq-a-inner">
+              No. We have no servers. Context Pilot runs entirely on your machine. The only network calls are to LLM providers (Anthropic, OpenAI, etc.) that <em>you</em> configure with <em>your</em> API keys.
+            </div>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+            What data does my LLM provider see?
+          </button>
+          <div class="faq-a">
+            <div class="faq-a-inner">
+              Your LLM provider receives the conversation messages and code context that the agent constructs during your session. This is governed by your provider's data policy — for example, Anthropic's API usage policy does not train on your data by default. Check your provider's terms.
+            </div>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+            Where is my conversation history stored?
+          </button>
+          <div class="faq-a">
+            <div class="faq-a-inner">
+              In the <code>.context-pilot/</code> directory within your project. Conversations are plain YAML files, memories are YAML, the entity database is a local SQLite file. All of it is on your filesystem and never transmitted anywhere.
+            </div>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+            Can I use Context Pilot offline?
+          </button>
+          <div class="faq-a">
+            <div class="faq-a-inner">
+              The TUI itself works offline. However, LLM inference requires an API call to your configured provider — that's the nature of running large language models. All other features (file management, search, memory, logs) work without internet.
+            </div>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+            Is there any telemetry or usage tracking?
+          </button>
+          <div class="faq-a">
+            <div class="faq-a-inner">
+              None. Zero analytics, zero telemetry, zero phone-home. You can verify this yourself — the entire codebase is open-source. Search for any HTTP call that isn't to a user-configured provider: you won't find one.
+            </div>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+            How do I report a security vulnerability?
+          </button>
+          <div class="faq-a">
+            <div class="faq-a-inner">
+              Please report security vulnerabilities through <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank">GitHub's security advisory feature</a>. We take security reports seriously and will respond promptly.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── Footer ──────────────────────────────────────────── -->
+  <footer class="site-footer">
+    <p>
+      Context Pilot · MIT License ·
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a> ·
+      <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank">Security Policy</a>
+    </p>
+  </footer>
+
+</body>
+</html>

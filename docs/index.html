@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Context Pilot</title>
+  <meta name="description" content="AI coding assistant that lives in your terminal. Open-source, local-first, private by design.">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    /* ── Landing-specific ─────────────────────────────── */
+    .landing {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 48px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Subtle grid background */
+    .landing::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(39,39,42,.3) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(39,39,42,.3) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%);
+      -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%);
+    }
+
+    /* Warm glow behind title */
+    .landing::after {
+      content: '';
+      position: absolute;
+      width: 500px;
+      height: 400px;
+      top: 15%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: radial-gradient(circle, rgba(245,158,11,.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero { position: relative; z-index: 1; text-align: center; margin-bottom: 64px; }
+
+    .hero-title {
+      font-family: var(--mono);
+      font-size: 3.2rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      margin-bottom: 6px;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 3px;
+      height: 0.85em;
+      background: var(--accent);
+      margin-left: 4px;
+      vertical-align: text-bottom;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    .hero-sub {
+      font-size: 0.85rem;
+      font-family: var(--mono);
+      color: var(--text-3);
+      margin-bottom: 20px;
+      letter-spacing: 0.04em;
+    }
+
+    .hero-tagline {
+      font-size: 1.15rem;
+      color: var(--text-2);
+      max-width: 480px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* Section grid */
+    .sections {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      max-width: 680px;
+      width: 100%;
+    }
+
+    .section-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text);
+      transition: border-color .2s, transform .15s, box-shadow .2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .section-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,.4), 0 0 0 1px var(--accent);
+      color: var(--text);
+    }
+
+    .section-card::after {
+      content: '→';
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      color: var(--text-3);
+      transition: color .2s, transform .2s;
+    }
+    .section-card:hover::after {
+      color: var(--accent);
+      transform: translateX(3px);
+    }
+
+    .section-icon {
+      font-size: 1.5rem;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+    }
+
+    .section-card h2 {
+      font-family: var(--mono);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .section-card p {
+      font-size: 0.85rem;
+      color: var(--text-2);
+      line-height: 1.5;
+    }
+
+    .section-card.disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .section-card.disabled::after { content: ''; }
+
+    /* GitHub link */
+    .github-link {
+      position: relative;
+      z-index: 1;
+      margin-top: 48px;
+      font-size: 0.82rem;
+      color: var(--text-3);
+    }
+    .github-link a { color: var(--text-2); }
+    .github-link a:hover { color: var(--accent); }
+
+    @media (max-width: 540px) {
+      .hero-title { font-size: 2rem; }
+      .sections { grid-template-columns: 1fr; max-width: 400px; }
+      .section-card { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="landing">
+    <div class="hero">
+      <h1 class="hero-title">Context Pilot<span class="cursor"></span></h1>
+      <div class="hero-sub">v0.2 · open-source · mit license</div>
+      <p class="hero-tagline">
+        AI coding assistant that lives in your terminal.
+        Local-first. Private by design. Fully auditable.
+      </p>
+    </div>
+
+    <nav class="sections" role="navigation" aria-label="Site sections">
+      <a href="trust-center/" class="section-card">
+        <div class="section-icon">🛡️</div>
+        <h2>Trust Center</h2>
+        <p>Security architecture, data handling, privacy controls, and third-party services.</p>
+      </a>
+
+      <a href="presentations/talk/" class="section-card">
+        <div class="section-icon">🎬</div>
+        <h2>Presentations</h2>
+        <p>Conference talks and technical deep-dives on Context Pilot's architecture.</p>
+      </a>
+
+      <a href="blog/" class="section-card disabled">
+        <div class="section-icon">📝</div>
+        <h2>Blog</h2>
+        <p>Engineering insights, release notes, and behind-the-scenes stories. Coming soon.</p>
+      </a>
+
+      <a href="documentation/" class="section-card disabled">
+        <div class="section-icon">📖</div>
+        <h2>Documentation</h2>
+        <p>Setup guides, configuration reference, and module documentation. Coming soon.</p>
+      </a>
+    </nav>
+
+    <div class="github-link">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">
+        github.com/bigmoostache/context-pilot
+      </a>
+    </div>
+  </main>
+</body>
+</html>

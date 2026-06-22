@@ -2134,6 +2134,10 @@
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail: grouped thread sidebar (''Needs you''=MY_TURN / ''In progress''=THEIR_TURN). Each row: status dot, name, last-msg preview, time, unread badge, selection bar. + New Thread button, search box.'
   last_edited_ms: 0
+3fd7d9533cfa0b9b:
+  path: web/src/components/finder/preview/FinderPreview.tsx
+  description: 'Quick Look preview shell + Body() kind router. Routes node → mock previews (mockPreviews), live fetchers (livePreviews), or shared leaf renderers (previewParts). T329: header slimmed h-12→h-8, Meta footer removed — drawer is now 100% file-viewer. Download button wired to downloadFile(agentId, node.path). The decorative Share button was removed app-wide (no utility).'
+  last_edited_ms: 1782125344725
 3fdc7378f1993dda:
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1 (reads cwd + state.current_model(), stores BridgeState{Option<Boot>} in TypeMap). Inert when OFF. is_global=true, no tools/panels. Declares body+boot+command+error+heartbeat+register+tee modules. Deps: cp-base, cp-render, cp-wire, cp-oplog, log, nix(fs), serde_json.'
