@@ -846,6 +846,10 @@
   path: crates/cp-orchestrator/src/supervisor/mod.rs
   description: 'Phase 17 (X784) AgentSupervisor process manager + X896 pty spawn + restart support. new(allow_list) canonicalizes eagerly; validate_binary realpath-checks vs allow_list (R2-15). spawn(id,bin,folder,args)->pid: Command process_group(0), stdio null. spawn_pty(id,bin,folder,env)->pid: dup-check, validate, canonicalize folder, delegate to proc::spawn_pty_proc (cp TUI needs a real tty). is_supervised(key)->bool query. stop: SIGTERM→poll→SIGKILL→reap. restart=snapshot+stop+spawn. adopt=record live no-spawn (D7). check_liveness()->Vec<Event>. kill_pid(pid:u32) FREE fn: best-effort SIGTERM→grace→SIGKILL for an ARBITRARY (externally-launched) pid with no child handle to reap — used by the /restart route. Error::Pty variant. Proc/Supervised/spawn helper in sibling proc.rs.'
   last_edited_ms: 1781878967926
+19cc81acb2ed013c:
+  path: web/src/lib/api/index.ts
+  description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent (T328). Re-exports ./finder + shares ./client request/BASE/envelope. The @/lib/api single import surface.'
+  last_edited_ms: 1782125082297
 19e704d277ed2de0:
   path: .gitignore
   description: Gitignore. Excludes target/, .context-pilot/* (with !shared/ negation), .claude/, test artifacts, slides build artifacts (node_modules, package files, PDF output).
@@ -2762,6 +2766,10 @@
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only log + running ReplayState fold (heads+seen). open() seeds via replay. append(kind)=append_buffered+sync (announce-after-durable K9). append_buffered(kind)=frame+write_all+fold, NO sync (group-commit primitive). sync()=single fdatasync (the amortised group-commit point, I2). roll() fdatasyncs old segment BEFORE switching (batch spanning a roll loses nothing), stamps leading Checkpoint(Snapshot) on new seg (GAP1). write_record=sole rev point (no sync). checkpoint()/heads()/seen()/snapshot() public. 7 tests.'
   last_edited_ms: 0
+5357d07efbc99a23:
+  path: web/src/lib/live/mutations.ts
+  description: 'Live imperative mutations (split from live/index for <500): finder writes (useUploadFiles/useWriteFile/useCreateFolder/useMoveItems/useRenameItem/useTrashItems) + agent lifecycle (useCreateAgent/useRestartAgent/useRenameAgent(T328)/useRetiredFleet/useRetireAgent/useUnretireAgent). One-shot POSTs → useMutation, invalidate the affected query family on success.'
+  last_edited_ms: 1782125082333
 535efd332c235542:
   path: crates/cp-mod-search/src/tools.rs
   description: Search tool execution with flame!("search_exec"). Split keyword+semantic multi-search via MeiliClient. dedup_by_score() merges overlapping results. iso_to_ms() via cp_mod_utilities::time. File/log filters. Async via spawn_async_tool. DynPanel creation. Mandatory semantic_query param.
@@ -7234,6 +7242,10 @@ d5de5196647aeaa3:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme. --sidebar-w (240px, :root) = single source of truth for ALL primary sidebar widths (fleet/threads/cockpit/finder). Two palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Dungeon Forge'' = TUI D&D palette verbatim (#222220/#333331/#424240 charcoal / torch-orange #DA7659 primary+signal+your-turn / #B26245 dim accent / #C98F6B tan interactive / #F0F0F0 ink / ok #86BC6F / warn #E5C07B / danger #C85050). SF Pro chrome, IBM Plex Mono data. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker, modal-pop/backdrop-fade/opt-rise, finder-slider.'
   last_edited_ms: 1781533961612
+d626d8c95522186e:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: 'REST resource handlers. threads() prefers view.focused_thread_id (push-fed) over disk-FocusState. command() breaker check GATED on SendMessage only. rename_agent (T328): set/clear display-name override. fleet/agent/threads serve from view; body hydrate; mint_ticket; resolve_entry. create_agent + slugify in sibling create.rs.'
+  last_edited_ms: 1782125106133
 d679e9d5f7e34ec1:
   path: web/src/components/shell/TopBar.tsx
   description: 'macOS title bar. Accepts agents prop for AgentSwitcher + activeAgent lookup. View switcher Threads·Finder·Cockpit. Right cluster: cost, Activity→StatsPopup(agentId), theme, agent config (AgentModal), UserMenu (Profile+Settings).'
@@ -7294,6 +7306,10 @@ d88af953077b8048:
   path: src/modules/conversation/mod.rs
   description: 'Conversation display module. Core/global. Context types: ''conversation'' + ''system''. No tools — purely display/rendering. Sub-modules: list, markdown_ir, panel, refresh, render_blocks, render_input_blocks, render_json.'
   last_edited_ms: 0
+d8955e9e88dcddaf:
+  path: crates/cp-orchestrator/src/services/mod.rs
+  description: 'services/ hub: declares + re-exports MaterializedView/AgentView/CostSnapshot, CostBreaker/Verdict, StreamHub/Subscriber, NameOverrides (T328 agent rename), and RetiredRecord/RetiredStore (T271 retire).'
+  last_edited_ms: 1782125106047
 d897c147d141bc42:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
@@ -7346,6 +7362,10 @@ da6796beef901a47:
   path: website/docs/agents.html
   description: 'Docs: agent system guide'
   last_edited_ms: 0
+dab495b44190662a:
+  path: web/src/components/agents/AgentModal.tsx
+  description: 'Agent create/manage dialog. Manage mode (T321): wider (w-960px) + 2-col grid — left = name + provider/model form, right = <SessionVitals>. Submit sends Configure + renameAgent (T328, concurrent Promise.all when name changed). Restart/Retire footer. Create mode: narrower single-col, useCreateAgent.'
+  last_edited_ms: 1782125082375
 dac2536c296c1e56:
   path: ui/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Fleet altitude → FleetShell (4-page mission control). Cockpit = LeftRail + Conversation. threads/finder per-agent. openAgent switches agent→threads. Finder keyed by agent.id.
@@ -7478,6 +7498,10 @@ df5ab077cc587ce2:
   path: crates/cp-orchestrator/src/transport/ticket.rs
   description: 'Phase 19: single-use SSE upgrade tickets (I9b). TicketStore{live:HashMap<token,expiry_ms>,ttl}. mint() (sweep+/dev/urandom 256-bit hex token, DEFAULT_TTL 30s), redeem() true exactly once per unexpired token (remove+expiry check), lazy sweep on mint/redeem bounds map. Defends localhost endpoint vs malicious website (confused-deputy/DNS-rebind) that CORS/Origin can''t stop. 5 tests.'
   last_edited_ms: 1781647650749
+df5c09755f2eaf35:
+  path: crates/cp-orchestrator/src/transport/inspect/meta.rs
+  description: 'Enriched agent-meta endpoints. agent_meta + fleet_meta + fleet_retired build maquette Agent: registry record + view phase/lifecycle/cost + cumulative tokens + context occupancy (T297) + thread inspection + git branch + provider. Name overrides (T328) checked before folder-basename default. derive_status maps phase/lifecycle/has_my_turn.'
+  last_edited_ms: 1782125106077
 dfd2c997d0826591:
   path: report/wiring-alignment-audit.md
   description: 'Wiring alignment audit (X818). Re-walked 2026-06-18 (X867+X869): §0 verdict (zero un-validated load-bearing invariants), §2 I1-I13/§7/§9/§18/§19 register, §2.5 keystone K1-K9 table (all ABIDE), §2.6 V1-V12 fault-matrix (10/12 PROVEN by landed tests incl V5+V10 via fleet_soak.rs; V4 fsync-fault-FS + V8 literal-10k-OS-soak remain external-CI for invariants validated by proxy/at-scale), §3 frontend feature wiring (e2e-proven), §4 measured latency table, §5 ledger, §6 credit, §7 disk-read ledger (X864 ABIDES).'
@@ -7798,6 +7822,10 @@ eb0038bd66de3fa0:
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook, CLI subcommands (typst-compile/recompile-watched). use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
   last_edited_ms: 0
+eb12c09a2ea98388:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend struct holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names(T328). route_rest dispatches all /api routes incl rename(T328), fs ops, retire/unretire/restart, fleet create, vitals, metrics. handle_download/handle_raw intercepted before route_rest. handle_stream = SSE.
+  last_edited_ms: 1782125106104
 eb4a82f92e502208:
   path: crates/cp-mod-files/Cargo.toml
   description: 'Files module deps: cp-base, cp-mod-tree, cp-mod-queue, cp-render, crossterm, serde_json.'
