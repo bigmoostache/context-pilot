@@ -614,6 +614,161 @@ code, .mono {
   margin: 32px 0;
 }
 
+/* ── Data flow diagram ────────────────────────────────── */
+.tc-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.tc-diagram-box {
+  width: 100%;
+  border: 2px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  background: var(--bg);
+}
+.tc-diagram-box--external {
+  border-color: var(--slate-300);
+  background: var(--surface);
+}
+.tc-diagram-box-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+.tc-diagram-box-label svg {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.tc-diagram-box-note {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-tertiary);
+  margin-left: auto;
+}
+.tc-diagram-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.tc-diagram-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 14px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  gap: 4px;
+}
+.tc-diagram-node--primary {
+  background: var(--accent-light);
+  border-color: var(--blue-100);
+}
+.tc-diagram-node--secondary {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.tc-diagram-node-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+.tc-diagram-node-icon svg {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+.tc-diagram-node--secondary .tc-diagram-node-icon svg {
+  color: var(--text-tertiary);
+}
+.tc-diagram-node strong {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.tc-diagram-node span {
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+.tc-diagram-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0;
+}
+.tc-diagram-arrow-line {
+  width: 2px;
+  height: 16px;
+  background: var(--slate-400);
+}
+.tc-diagram-arrow-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  background: var(--amber-50);
+  border: 1px solid var(--amber-100);
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.tc-diagram-arrow-label svg {
+  width: 13px;
+  height: 13px;
+  color: var(--amber-700);
+  flex-shrink: 0;
+}
+.tc-diagram-arrow-head {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 10px solid var(--slate-400);
+}
+.tc-diagram-provider-group {
+  margin-bottom: 12px;
+}
+.tc-diagram-provider-group:last-child { margin-bottom: 0; }
+.tc-diagram-provider-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+.tc-diagram-providers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tc-diagram-pill {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 4px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  color: var(--text-secondary);
+}
+@media (max-width: 640px) {
+  .tc-diagram-grid { grid-template-columns: repeat(2, 1fr); }
+  .tc-diagram-box-note { display: none; }
+}
+
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 960px) {
   .tc-sidebar { display: none; }
