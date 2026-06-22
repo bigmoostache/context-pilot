@@ -3334,6 +3334,10 @@
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
+6380861b3c4a62a7:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/support.rs
+  description: 'Finder shared helpers: agent_folder, confined_path (realm jail), count_visible_children, infer_kind, extract_param, percent_decode + unit tests.'
+  last_edited_ms: 1782135221987
 6399f0afbf7eec50:
   path: src/app/run/watchers.rs
   description: File/cache watcher loop. flame!("cache_updates") + flame!("watcher_events"). sync_file_watchers (module→inotify/kqueue). timer_based_deprecation (poll intervals). GH sync every 5s. FD cleanup (stale watch removal). suicide() auto-close.
