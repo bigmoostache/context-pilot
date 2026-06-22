@@ -2594,6 +2594,10 @@
   path: crates/cp-mod-github/src/lib.rs
   description: 'GitHub module. 1 tool: gh_execute. Dynamic github_result panels. Depends on git module. classify sub-module for read-only vs mutating. Tool visualizer for PR/issue status coloring.'
   last_edited_ms: 0
+4dc8178a4bb06c1c:
+  path: docs/trust-center/index.html
+  description: 'Full trust center page modeled after Vanta. Sections: hero + status banner, 3 core principles (local-first/open-source/zero-telemetry), security architecture (ASCII data flow diagram), 7 privacy controls, data handling, third-party services table (10 services), compliance (GDPR/SOC2/MIT), 6 FAQ accordions.'
+  last_edited_ms: 1782129931161
 4e1229fe305d43b4:
   path: crates/cp-mod-search/src/meili/download.rs
   description: Meilisearch binary download. Pinned v1.13.3. Platform detection (macOS/Linux, amd64/aarch64). GitHub releases download to ~/.context-pilot/meilisearch/bin/. Skips if already present. 5-min timeout.
@@ -5114,6 +5118,10 @@
   path: crates/cp-mod-search/src/meili/bootstrap.rs
   description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config, project path hashing via FNV-1a, initial metrics population.'
   last_edited_ms: 1780565428716
+97cb99254029fbec:
+  path: docs/blog/index.html
+  description: Blog placeholder (coming soon). Shared topbar nav + GitHub link.
+  last_edited_ms: 1782129931187
 97e600789e19c98b:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
@@ -5194,6 +5202,10 @@
   path: web/src/components/finder/preview/previewParts.tsx
   description: 'Shared Finder preview leaf renderers: IconBtn, PreviewStatus, TruncatedNote, MarkdownPreview, TextPreview, FolderPreview, Generic, Meta/Row, Empty. Imported by both FinderPreview shell and livePreviews. 173 lines.'
   last_edited_ms: 1782037375321
+9b4ac7843534f919:
+  path: docs/index.html
+  description: Main landing page. Centered hero (blinking cursor, tagline), 2×2 nav grid linking Trust Center, Presentations, Blog (disabled), Documentation (disabled). Grid background + amber glow.
+  last_edited_ms: 1782129931134
 9b5bd654de298c74:
   path: ui/src/components/shell/ConfigPanel.tsx
   description: 'Shared settings body (macOS System-Settings: category rail + detail pane). NO identity header on the rail (detail-pane header names the active category). variant=''dialog'' (DialogClose chrome, used by ConfigModal/TopBar gear) | ''inline'' (fills page, Save button, used by fleet Settings page). Categories: General/Providers/Search/DocAI/Web/Integrations. Masked keys w/ reveal, Connected pills, toggles, default-model picker.'
@@ -5662,6 +5674,10 @@ a8971e7eeba4f12c:
   path: crates/cp-orchestrator/src/transport/inspect/finder/mod.rs
   description: 'Finder module hub: re-exports fs_list/fs_preview/conversation (listing), fs_sheet (sheet — CSV/xlsx→table, T282), fs_upload/write/mkdir/rename/move/trash (mutate), fs_download + fs_raw (download — fs_raw is the inline image/PDF raw-serve, T281/T286). Submodules: listing/sheet/mutate/download/support.'
   last_edited_ms: 0
+a8b7b16abb019949:
+  path: docs/shared.css
+  description: 'Shared CSS for GitHub Pages site. Terminal-inspired editorial aesthetic: Space Mono + Instrument Sans, dark zinc palette (#09090b), amber accent. Tokens, reset, container, topbar, section headers, cards, badges, divider, footer, coming-soon, responsive.'
+  last_edited_ms: 1782129931106
 a8d34b34101ad428:
   path: web/src/components/threads/ThreadList.tsx
   description: Threads left rail. flattenMarkdown() one-line row preview (T284). previewOf skips auto traces. Groups User-turn/Agent's-turn, archived view sorted recent-first. Per-row Archive/Restore.
@@ -6274,6 +6290,10 @@ ba4b46d00e37d261:
   path: ui/src/components/agents/PromptModal.tsx
   description: 'Prompts page modals. PromptModal: LARGE dialog (1180x90vh) — create (kind picker System/Skill/Command + name/desc) or view/edit (prefilled, built-in name lock, Delete). Body = WYSIWYG MarkdownEditor, remounts on isNew/item.id (not kind). ImportModal: import from Claude Code/Codex/Cursor/Windsurf/Aider/Continue, per-row Imported state. Shared Backdrop+Field.'
   last_edited_ms: 1781600078223
+ba75d21e77c6c405:
+  path: .github/workflows/pages.yml
+  description: 'CI: GitHub Pages deployment for website. Deploys from docs/ root (was docs/talk/). Triggers on docs/** or workflow change.'
+  last_edited_ms: 1782129931240
 ba9ad5938b7f9770:
   path: crates/cp-orchestrator/tests/end_to_end.rs
   description: 'Phase 30 (X797) end-to-end loopback capstone (3 tests, green ~0.06s). Real agent stack ↔ real backend transport over real sockets, no mocks. (1) capstone loop: agent thread = OplogService + Intake + UnixListener accept; client POST /command → AgentChannel::send (UDS) → Intake journal-then-ack → receipt cmd_id+dedup_token+rev:0+accepted; replay confirms durable; then SSE /stream tails the SAME oplog → CommandEffect re-emerges as delta with id=Some(0) (rev framing) + data carries dedup token = full loop closed; (2) spilled body hydrates over GET /…/body/{hash} byte-for-byte, malformed=400, absent=404; (3) soak: 25 SSE connect/disconnect cycles all 200+delta, server still healthy after (no FD/thread leak hang). serve_backend helper. Top `use nix/serde as _;`.'
@@ -8362,6 +8382,10 @@ fb1849f59e096f34:
   path: crates/cp-wire/tests/protocol.rs
   description: 'Phase 21 (X788): cp-wire protocol coverage at public-API boundary. Every OpEntryKind variant JSON round-trip incl Checkpoint{Snapshot} (the inline tests skip CommandEffect/SeenMark/Lifecycle/CostAggregate/Checkpoint), checkpoint-carries-faithful-snapshot (GAP1 fast-replay reseed integrity), accepts() N-1 window sweep 0..PV+4, ContentHash to_hex/from_hex bijection + uppercase-accepted + malformed-rejected-never-panic, SeenSet evict_through retires exactly acked tokens + rev_of preserved, Heads upsert last-write-wins-per-thread (I3 bounded). serde_json used directly; crc32c/serde/sha2 acked as _. 7 tests.'
   last_edited_ms: 1781648169025
+fb3b055bf69a46d4:
+  path: docs/documentation/index.html
+  description: Documentation placeholder (coming soon). Shared topbar nav + README link.
+  last_edited_ms: 1782129931214
 fb5f6b73cd86340a:
   path: crates/cp-orchestrator/src/services/stream_hub.rs
   description: 'Phase 18: StreamHub — per-agent stream fan-out to N bounded subscribers (R2-17). Subscriber{id,buffer:VecDeque<Frame>,capacity,degraded,dropped}: admit() evicts OLDEST on full + sets degraded + bumps dropped; cap 0 drops all. agent_stream_health(id)->(subscribers,total_dropped,any_degraded) aggregate accessor for §19 metrics. publish/drain/subscribe/unsubscribe/mark_reconciled. Single-owner lock-free. 9 tests.'
