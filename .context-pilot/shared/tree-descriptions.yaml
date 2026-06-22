@@ -3142,6 +3142,10 @@
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams/CrawlParams structs. post_json() + get_json() generic helpers. start_crawl() + poll_crawl() for async crawl jobs. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
   last_edited_ms: 0
+5d932c22580695f4:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 5dce0d14a3c70540:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
@@ -4342,6 +4346,10 @@
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1 (Boot itself now emits Lifecycle::Running — not lib.rs), binds tee.sock + spawns Tee, creates Intake from oplog replay, opens content-addressed body Store. on_stream_chunk→Token frames (tagged with state.messages.last().id for §7 live-typing correlation), on_stream_stop→PhaseHint(Idle). BridgeState{boot,tee,intake,tee_seq,last_phase,last_cost_usd,store,thread_msg_counts,msg_memo_seeded}. is_global, no tools/panels.'
   last_edited_ms: 1781813916300
+803db784e2dcddb5:
+  path: .gitignore
+  description: Git ignore rules
+  last_edited_ms: 0
 808105a6e4c4e570:
   path: ui/src/components/ui/dialog.tsx
   description: shadcn-style Dialog on Base UI primitive. Portals to document.body (escapes ancestor backdrop-filter/transform containing blocks that trap position:fixed — the ConfigModal half-off-screen bug). Focus-trap, scroll-lock, Esc, backdrop fade + modal-pop spring. Exports Dialog/Trigger/Close/Content/Backdrop/Title/Description.
