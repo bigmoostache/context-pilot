@@ -46,11 +46,7 @@ pub fn restart_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         let Ok(backend) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
-        (
-            backend.agent_binary.clone(),
-            backend.agents_dir.clone(),
-            backend.supervisor.is_supervised(&key),
-        )
+        (backend.agent_binary.clone(), backend.agents_dir.clone(), backend.supervisor.is_supervised(&key))
     };
 
     // Kill the old process (lock-free — this can block up to the stop grace).
@@ -78,11 +74,10 @@ pub fn restart_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     };
 
     match spawn_result {
-        Ok(pid) => HttpReply::json(202, &RestartReceipt {
-            status: "restarting",
-            folder: folder.to_string_lossy().into_owned(),
-            pid,
-        }),
+        Ok(pid) => HttpReply::json(
+            202,
+            &RestartReceipt { status: "restarting", folder: folder.to_string_lossy().into_owned(), pid },
+        ),
         Err(e) => {
             eprintln!("restart_agent spawn error: {e}");
             HttpReply::error(502, &format!("agent respawn failed: {e}"))

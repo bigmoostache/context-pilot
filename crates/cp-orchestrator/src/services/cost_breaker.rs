@@ -191,10 +191,7 @@ mod tests {
         assert!(breaker.is_tripped("a1"));
 
         breaker.observe("a1", 0.0); // boot #2 — cumulative reset to 0
-        assert!(
-            breaker.is_tripped("a1"),
-            "a lower post-reboot cost must not lower the high-water mark",
-        );
+        assert!(breaker.is_tripped("a1"), "a lower post-reboot cost must not lower the high-water mark",);
         assert_eq!(breaker.spend_of("a1"), Some(8.0));
     }
 

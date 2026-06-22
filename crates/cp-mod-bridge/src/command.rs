@@ -56,7 +56,7 @@ use cp_wire::types::command::{Command, Frame as CommandFrame};
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::snapshot::SeenSet;
 
-use crate::error::{Error, BootResult};
+use crate::error::{BootResult, Error};
 
 /// Schema version stamped onto the [`Ack`]s this intake emits.
 const ACK_SCHEMA_VERSION: u32 = 1;
@@ -97,8 +97,8 @@ impl Intake {
     ///
     /// Returns [`Error::Io`] if the oplog directory cannot be replayed.
     pub fn new(oplog_dir: &std::path::Path, cap_token: String) -> BootResult<Self> {
-        let recovered = replay::replay(oplog_dir)
-            .map_err(|e| Error::io("replay oplog for command dedup", into_io(&e)))?;
+        let recovered =
+            replay::replay(oplog_dir).map_err(|e| Error::io("replay oplog for command dedup", into_io(&e)))?;
         Ok(Self { cap_token, seen: recovered.seen })
     }
 
@@ -110,15 +110,9 @@ impl Intake {
     /// framed `Ack::Rejected` and no command to apply (fail-closed). A duplicate
     /// delivery yields `Ack::Accepted` (with the original `rev`) and no command
     /// to apply, because the effect is already durable.
-    pub fn handle_frame(
-        &mut self,
-        oplog: &OplogService,
-        frame_bytes: &[u8],
-    ) -> (Vec<u8>, Option<Command>) {
-        let (ack, to_apply) = decode_frame(frame_bytes).map_or_else(
-            || (reject("", "malformed command frame"), None),
-            |frame| self.process(oplog, frame),
-        );
+    pub fn handle_frame(&mut self, oplog: &OplogService, frame_bytes: &[u8]) -> (Vec<u8>, Option<Command>) {
+        let (ack, to_apply) = decode_frame(frame_bytes)
+            .map_or_else(|| (reject("", "malformed command frame"), None), |frame| self.process(oplog, frame));
         (encode_ack(&ack), to_apply)
     }
 
@@ -135,11 +129,7 @@ impl Intake {
     /// Returns [`Error::Io`] on a socket read/write fault. A peer that floods
     /// un-decodable bytes past [`MAX_CONNECTION_BUFFER`] ends the connection
     /// with an `Error::Io` rather than growing memory without bound.
-    pub fn handle_connection(
-        &mut self,
-        oplog: &OplogService,
-        stream: &mut UnixStream,
-    ) -> BootResult<Vec<Command>> {
+    pub fn handle_connection(&mut self, oplog: &OplogService, stream: &mut UnixStream) -> BootResult<Vec<Command>> {
         let mut buf: Vec<u8> = Vec::new();
         let mut chunk = vec![0u8; READ_CHUNK].into_boxed_slice();
         let mut applied: Vec<Command> = Vec::new();
@@ -148,9 +138,7 @@ impl Intake {
             // Drain every complete frame currently buffered.
             while let Some((consumed, frame)) = take_frame(&buf) {
                 let (ack, to_apply) = self.process(oplog, frame);
-                stream
-                    .write_all(&encode_ack(&ack))
-                    .map_err(|e| Error::io("write command ack", e))?;
+                stream.write_all(&encode_ack(&ack)).map_err(|e| Error::io("write command ack", e))?;
                 if let Some(command) = to_apply {
                     applied.push(command);
                 }

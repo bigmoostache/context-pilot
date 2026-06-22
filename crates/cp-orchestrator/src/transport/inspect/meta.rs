@@ -10,8 +10,8 @@ use std::sync::Mutex;
 
 use cp_wire::types::registry::Entry;
 
-use crate::transport::rest::HttpReply;
 use crate::transport::Backend;
+use crate::transport::rest::HttpReply;
 
 /// `GET /api/agent/{id}/meta` — enriched agent info for the fleet/agent views.
 ///
@@ -48,9 +48,7 @@ pub fn fleet_meta(state: &Mutex<Backend>) -> HttpReply {
     // Retired section (served by [`fleet_retired`]).
     let agents: Vec<serde_json::Value> = entries
         .iter()
-        .filter(|e| {
-            !state.lock().is_ok_and(|b| b.retired.is_retired(&e.id))
-        })
+        .filter(|e| !state.lock().is_ok_and(|b| b.retired.is_retired(&e.id)))
         .map(|e| build_agent_meta(state, &e.id, e))
         .collect();
     HttpReply::ok(&agents)
@@ -96,16 +94,9 @@ pub fn fleet_retired(state: &Mutex<Backend>) -> HttpReply {
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /// Build the enriched agent JSON for one agent.
-fn build_agent_meta(
-    state: &Mutex<Backend>,
-    agent_id: &str,
-    entry: &Entry,
-) -> serde_json::Value {
+fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde_json::Value {
     let folder = &entry.folder;
-    let name = std::path::Path::new(folder)
-        .file_name()
-        .and_then(std::ffi::OsStr::to_str)
-        .unwrap_or(agent_id);
+    let name = std::path::Path::new(folder).file_name().and_then(std::ffi::OsStr::to_str).unwrap_or(agent_id);
 
     // Phase + lifecycle + cost + cumulative tokens from the materialized view
     // (brief lock). These ride the push plane (PhaseTransition / CostAggregate
@@ -120,8 +111,7 @@ fn build_agent_meta(
         });
 
     // Thread count + any-MY_TURN + last activity from config.json.
-    let (threads_count, has_my_turn, last_activity_ms, task) =
-        inspect_threads(state, folder);
+    let (threads_count, has_my_turn, last_activity_ms, task) = inspect_threads(state, folder);
 
     let branch = git_branch(folder);
     // The agent's configured LLM provider id (e.g. "claudecodev2", "claudecode")
@@ -176,10 +166,7 @@ fn build_agent_meta(
 
 /// Inspect an agent's threads from config.json for count, `MY_TURN` status,
 /// last activity, and current task (focused thread name).
-fn inspect_threads(
-    state: &Mutex<Backend>,
-    folder: &str,
-) -> (usize, bool, u64, String) {
+fn inspect_threads(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, String) {
     let folder_path = std::path::Path::new(folder);
     let config = {
         let Ok(mut b) = state.lock() else {
@@ -199,11 +186,7 @@ fn inspect_threads(
         .unwrap_or(&empty_arr);
 
     let count = threads.len();
-    let has_my_turn = threads.iter().any(|t| {
-        t.get("status")
-            .and_then(serde_json::Value::as_str)
-            == Some("MyTurn")
-    });
+    let has_my_turn = threads.iter().any(|t| t.get("status").and_then(serde_json::Value::as_str) == Some("MyTurn"));
     let last_activity = threads
         .iter()
         .filter_map(|t| {
@@ -219,9 +202,7 @@ fn inspect_threads(
     // Task = name of the first MY_TURN thread, or empty.
     let task = threads
         .iter()
-        .find(|t| {
-            t.get("status").and_then(serde_json::Value::as_str) == Some("MyTurn")
-        })
+        .find(|t| t.get("status").and_then(serde_json::Value::as_str) == Some("MyTurn"))
         .and_then(|t| t.get("name"))
         .and_then(serde_json::Value::as_str)
         .unwrap_or("")
@@ -264,13 +245,11 @@ fn git_branch(folder: &str) -> String {
         .args(["-C", folder, "rev-parse", "--abbrev-ref", "HEAD"])
         .output()
         .ok()
-        .and_then(|o| {
-            if o.status.success() {
-                String::from_utf8(o.stdout).ok().map(|s| s.trim().to_owned())
-            } else {
-                None
-            }
-        })
+        .and_then(
+            |o| {
+                if o.status.success() { String::from_utf8(o.stdout).ok().map(|s| s.trim().to_owned()) } else { None }
+            },
+        )
         .unwrap_or_default()
 }
 
@@ -291,9 +270,7 @@ fn derive_status(
         return if has_my_turn { "needs-you".to_owned() } else { "idle".to_owned() };
     }
     match phase {
-        Some(cp_wire::types::Phase::Streaming | cp_wire::types::Phase::Tooling) => {
-            "working".to_owned()
-        }
+        Some(cp_wire::types::Phase::Streaming | cp_wire::types::Phase::Tooling) => "working".to_owned(),
         _ if has_my_turn => "needs-you".to_owned(),
         _ => "idle".to_owned(),
     }

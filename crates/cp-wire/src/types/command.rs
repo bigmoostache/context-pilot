@@ -144,10 +144,7 @@ mod tests {
             id: "cmd-001".into(),
             seq: 42,
             dedup_token: "user-msg-abc".into(),
-            kind: Kind::SendMessage {
-                thread_id: "T1".into(),
-                content: "Hello".into(),
-            },
+            kind: Kind::SendMessage { thread_id: "T1".into(), content: "Hello".into() },
         };
         let json = serde_json::to_string(&cmd).expect("serialize");
         let back: Command = serde_json::from_str(&json).expect("deserialize");
@@ -188,10 +185,7 @@ mod tests {
             id: "cmd-004".into(),
             seq: 5,
             dedup_token: "cfg-1".into(),
-            kind: Kind::Configure {
-                provider: "anthropic".into(),
-                model: "claude-opus45".into(),
-            },
+            kind: Kind::Configure { provider: "anthropic".into(), model: "claude-opus45".into() },
         };
         let json = serde_json::to_string(&cmd).expect("serialize");
         let back: Command = serde_json::from_str(&json).expect("deserialize");

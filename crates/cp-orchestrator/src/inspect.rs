@@ -119,10 +119,10 @@ impl StateReader {
     pub fn read_worker(&mut self, folder: &Path, worker_id: &str) -> io::Result<Value> {
         let path = folder.join(CP_DIR).join(STATES_DIR).join(format!("{worker_id}.json"));
         let cache = self.agents.entry(folder.to_path_buf()).or_default();
-        let slot = cache.workers.entry(worker_id.to_owned()).or_insert_with(|| CachedJson {
-            mtime: SystemTime::UNIX_EPOCH,
-            data: Value::Null,
-        });
+        let slot = cache
+            .workers
+            .entry(worker_id.to_owned())
+            .or_insert_with(|| CachedJson { mtime: SystemTime::UNIX_EPOCH, data: Value::Null });
         read_cached_json_slot(&path, slot)
     }
 

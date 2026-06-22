@@ -345,14 +345,14 @@ impl Module for OverviewModule {
                                             .unwrap_or_default();
                                     if !desc.file_hash.is_empty()
                                         && desc.file_hash != current_hash
-                                        && !has_pending_tree_describe(state, rel_str.as_ref())
+                                        && !tools::close_context::has_pending_tree_describe(state, rel_str.as_ref())
                                     {
                                         pf.warnings.push(format!(
                                             "Panel '{id}' ({rel_str}) has a stale [!] tree description — \
                                              will be skipped. Update it with tree_describe first."
                                         ));
                                     }
-                                } else if !has_pending_tree_describe(state, rel_str.as_ref()) {
+                                } else if !tools::close_context::has_pending_tree_describe(state, rel_str.as_ref()) {
                                     pf.warnings.push(format!(
                                         "Panel '{id}' ({rel_str}) has no tree description — \
                                          will be skipped. Add one with tree_describe first."
@@ -484,18 +484,4 @@ impl Module for OverviewModule {
     fn watcher_immediate_refresh(&self) -> bool {
         true
     }
-}
-
-/// Check if there's a pending `tree_describe` in the queue for the given path.
-pub(crate) fn has_pending_tree_describe(state: &State, rel_path: &str) -> bool {
-    state.active_modules.contains("queue")
-        && cp_mod_queue::types::QueueState::get(state).queued_calls.iter().any(|call| {
-            call.tool_name == "tree_describe"
-                && call.input.get("descriptions").and_then(|v| v.as_array()).is_some_and(|descs| {
-                    descs.iter().any(|d| {
-                        d.get("path").and_then(|p| p.as_str()) == Some(rel_path)
-                            && d.get("delete").and_then(serde_json::Value::as_bool) != Some(true)
-                    })
-                })
-        })
 }

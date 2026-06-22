@@ -51,10 +51,7 @@ pub fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpReply {
         // Requirement 4 (T271): a folder still owned by a RETIRED agent must
         // not accept a fresh agent — the realm is reserved until unretired.
         if backend.retired.is_folder_retired(&folder.to_string_lossy()) {
-            return HttpReply::error(
-                409,
-                "a retired agent owns this realm folder — unretire it instead",
-            );
+            return HttpReply::error(409, "a retired agent owns this realm folder — unretire it instead");
         }
         (folder, backend.agent_binary.clone(), backend.agents_dir.clone())
     };
@@ -78,11 +75,10 @@ pub fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpReply {
     };
 
     match spawn_result {
-        Ok(pid) => HttpReply::json(202, &CreateAgentReceipt {
-            status: "spawning",
-            folder: folder.to_string_lossy().into_owned(),
-            pid,
-        }),
+        Ok(pid) => HttpReply::json(
+            202,
+            &CreateAgentReceipt { status: "spawning", folder: folder.to_string_lossy().into_owned(), pid },
+        ),
         Err(e) => {
             eprintln!("create_agent spawn error: {e}");
             HttpReply::error(502, &format!("agent spawn failed: {e}"))

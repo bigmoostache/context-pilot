@@ -67,12 +67,7 @@ impl Liveness {
 /// a missing/foreign beat, then a `boot_id` mismatch, then freshness. The
 /// `now_ms` / `max_age` pair bounds heartbeat freshness ([`Heartbeat::is_fresh`]).
 #[must_use]
-pub fn verdict(
-    entry: &Entry,
-    heartbeat: Option<&Heartbeat>,
-    now_ms: u64,
-    max_age: Duration,
-) -> Liveness {
+pub fn verdict(entry: &Entry, heartbeat: Option<&Heartbeat>, now_ms: u64, max_age: Duration) -> Liveness {
     if !pid_alive(entry.pid) {
         return Liveness::StalePid;
     }
@@ -83,11 +78,7 @@ pub fn verdict(
         return Liveness::BootIdMismatch;
     }
     let max_age_ms = u64::try_from(max_age.as_millis()).unwrap_or(u64::MAX);
-    if hb.is_fresh(now_ms, max_age_ms) {
-        Liveness::Live
-    } else {
-        Liveness::StaleHeartbeat
-    }
+    if hb.is_fresh(now_ms, max_age_ms) { Liveness::Live } else { Liveness::StaleHeartbeat }
 }
 
 /// Whether `pid` names a live process.
@@ -109,7 +100,7 @@ fn pid_alive(pid: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cp_wire::heartbeat::{HEARTBEAT_SCHEMA_VERSION, DEFAULT_MAX_AGE};
+    use cp_wire::heartbeat::{DEFAULT_MAX_AGE, HEARTBEAT_SCHEMA_VERSION};
     use cp_wire::types::registry::AgentStatus;
     use std::path::Path;
 
@@ -159,19 +150,13 @@ mod tests {
     #[test]
     fn stale_pid_when_process_dead() {
         let hb = heartbeat(DEAD_PID, BOOT_A, 1_000);
-        assert_eq!(
-            verdict(&entry(DEAD_PID, BOOT_A), Some(&hb), 1_000, DEFAULT_MAX_AGE),
-            Liveness::StalePid,
-        );
+        assert_eq!(verdict(&entry(DEAD_PID, BOOT_A), Some(&hb), 1_000, DEFAULT_MAX_AGE), Liveness::StalePid,);
     }
 
     #[test]
     fn stale_heartbeat_when_missing() {
         let me = std::process::id();
-        assert_eq!(
-            verdict(&entry(me, BOOT_A), None, 1_000, DEFAULT_MAX_AGE),
-            Liveness::StaleHeartbeat,
-        );
+        assert_eq!(verdict(&entry(me, BOOT_A), None, 1_000, DEFAULT_MAX_AGE), Liveness::StaleHeartbeat,);
     }
 
     #[test]
@@ -179,10 +164,7 @@ mod tests {
         let me = std::process::id();
         let hb = heartbeat(me, BOOT_A, 0);
         // now is far past the beat → outside any sane freshness window.
-        assert_eq!(
-            verdict(&entry(me, BOOT_A), Some(&hb), 1_000_000, DEFAULT_MAX_AGE),
-            Liveness::StaleHeartbeat,
-        );
+        assert_eq!(verdict(&entry(me, BOOT_A), Some(&hb), 1_000_000, DEFAULT_MAX_AGE), Liveness::StaleHeartbeat,);
     }
 
     #[test]
@@ -191,9 +173,6 @@ mod tests {
         // the record is not our agent.
         let me = std::process::id();
         let hb = heartbeat(me, BOOT_B, 1_000);
-        assert_eq!(
-            verdict(&entry(me, BOOT_A), Some(&hb), 1_000, DEFAULT_MAX_AGE),
-            Liveness::BootIdMismatch,
-        );
+        assert_eq!(verdict(&entry(me, BOOT_A), Some(&hb), 1_000, DEFAULT_MAX_AGE), Liveness::BootIdMismatch,);
     }
 }

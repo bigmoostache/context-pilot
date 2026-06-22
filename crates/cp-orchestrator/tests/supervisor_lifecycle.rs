@@ -25,8 +25,8 @@ use cp_oplog as _;
 use notify as _;
 use portable_pty as _;
 use serde as _;
-use serde_yaml as _;
 use serde_json as _;
+use serde_yaml as _;
 use tiny_http as _;
 
 use std::os::unix::process::ExitStatusExt as _;
@@ -90,12 +90,7 @@ fn a_stubborn_agent_that_ignores_sigterm_is_killed_by_escalation() {
     // A shell that traps (ignores) SIGTERM and then sleeps: stop() must fall
     // through the grace window and escalate to the uncatchable SIGKILL.
     let pid = sup
-        .spawn(
-            "stubborn".to_owned(),
-            Path::new("/bin/sh"),
-            folder.path(),
-            &["-c", "trap '' TERM; exec sleep 60"],
-        )
+        .spawn("stubborn".to_owned(), Path::new("/bin/sh"), folder.path(), &["-c", "trap '' TERM; exec sleep 60"])
         .expect("spawn stubborn agent");
     assert!(pid_present(pid), "the agent is running");
 
@@ -105,10 +100,7 @@ fn a_stubborn_agent_that_ignores_sigterm_is_killed_by_escalation() {
 
     assert!(sup.is_empty(), "the supervisor dropped the stopped agent");
     assert!(!pid_present(pid), "SIGKILL escalation removed the stubborn process");
-    assert!(
-        elapsed < ESCALATION_BUDGET,
-        "stop completed within the grace+kill budget (took {elapsed:?})",
-    );
+    assert!(elapsed < ESCALATION_BUDGET, "stop completed within the grace+kill budget (took {elapsed:?})",);
 }
 
 // ── 2. a supervised fleet is tracked and fully torn down ────────────────────
@@ -183,9 +175,8 @@ fn check_liveness_routes_a_spawned_exit_and_an_adopted_vanish_in_one_pass() {
     let mut sup = AgentSupervisor::new(&[PathBuf::from("/bin/sleep")]);
 
     // A spawned agent that exits on its own almost immediately.
-    let _spawned = sup
-        .spawn("exits".to_owned(), Path::new("/bin/sleep"), folder.path(), &["0"])
-        .expect("spawn exiting agent");
+    let _spawned =
+        sup.spawn("exits".to_owned(), Path::new("/bin/sleep"), folder.path(), &["0"]).expect("spawn exiting agent");
 
     // A foreign process we adopt, then let fully die + be reaped, so its pid is
     // genuinely gone before the liveness probe (an unreaped zombie would still
@@ -211,12 +202,8 @@ fn check_liveness_routes_a_spawned_exit_and_an_adopted_vanish_in_one_pass() {
     let events = sup.check_liveness();
     assert_eq!(events.len(), 2, "both deaths are reported in one pass");
 
-    let saw_exited = events
-        .iter()
-        .any(|e| matches!(e, Event::Exited { agent_id, .. } if agent_id == "exits"));
-    let saw_vanished = events
-        .iter()
-        .any(|e| matches!(e, Event::Vanished { agent_id } if agent_id == "vanished"));
+    let saw_exited = events.iter().any(|e| matches!(e, Event::Exited { agent_id, .. } if agent_id == "exits"));
+    let saw_vanished = events.iter().any(|e| matches!(e, Event::Vanished { agent_id } if agent_id == "vanished"));
     assert!(saw_exited, "the spawned child is reported Exited (reaped via try_wait)");
     assert!(saw_vanished, "the adopted process is reported Vanished (signal-0 probe)");
     assert!(sup.is_empty(), "both dead agents are removed");

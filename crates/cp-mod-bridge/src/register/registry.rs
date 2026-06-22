@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 
 use cp_wire::types::registry::Entry;
 
-use crate::error::{Error, BootResult};
+use crate::error::{BootResult, Error};
 
 /// Restrictive mode for the registry file: owner read+write only (`0600`).
 /// The file embeds the capability token, so it must never be group/world
@@ -34,9 +34,8 @@ const REGISTRY_MODE: u32 = 0o600;
 /// Returns [`Error::Io`] if `$HOME` is unset (there is nowhere to anchor
 /// the path).
 pub fn default_agents_dir() -> BootResult<PathBuf> {
-    let home = std::env::var_os("HOME").ok_or_else(|| {
-        Error::io("resolve agents dir", std::io::Error::other("$HOME is not set"))
-    })?;
+    let home = std::env::var_os("HOME")
+        .ok_or_else(|| Error::io("resolve agents dir", std::io::Error::other("$HOME is not set")))?;
     Ok(PathBuf::from(home).join(".context-pilot").join("agents"))
 }
 
@@ -58,8 +57,7 @@ pub fn path(agents_dir: &Path, id: &str) -> PathBuf {
 /// file cannot be written or `fsync`'d, the rename fails, or the entry cannot
 /// be serialised.
 pub fn write_entry(agents_dir: &Path, entry: &Entry) -> BootResult<PathBuf> {
-    fs::create_dir_all(agents_dir)
-        .map_err(|e| Error::io(format!("create agents dir {}", agents_dir.display()), e))?;
+    fs::create_dir_all(agents_dir).map_err(|e| Error::io(format!("create agents dir {}", agents_dir.display()), e))?;
 
     let json = serde_json::to_vec_pretty(entry)
         .map_err(|e| Error::io("serialise registry entry", std::io::Error::other(e)))?;
@@ -88,20 +86,15 @@ fn write_tmp(tmp_path: &Path, bytes: &[u8]) -> BootResult<()> {
         .mode(REGISTRY_MODE)
         .open(tmp_path)
         .map_err(|e| Error::io(format!("open temp registry {}", tmp_path.display()), e))?;
-    file.write_all(bytes)
-        .map_err(|e| Error::io(format!("write temp registry {}", tmp_path.display()), e))?;
-    file.sync_all()
-        .map_err(|e| Error::io(format!("fsync temp registry {}", tmp_path.display()), e))?;
+    file.write_all(bytes).map_err(|e| Error::io(format!("write temp registry {}", tmp_path.display()), e))?;
+    file.sync_all().map_err(|e| Error::io(format!("fsync temp registry {}", tmp_path.display()), e))?;
     Ok(())
 }
 
 /// `fsync` a directory so a freshly `rename`d child entry is durable.
 fn sync_dir(dir: &Path) -> BootResult<()> {
-    let handle =
-        File::open(dir).map_err(|e| Error::io(format!("open dir {}", dir.display()), e))?;
-    handle
-        .sync_all()
-        .map_err(|e| Error::io(format!("fsync dir {}", dir.display()), e))?;
+    let handle = File::open(dir).map_err(|e| Error::io(format!("open dir {}", dir.display()), e))?;
+    handle.sync_all().map_err(|e| Error::io(format!("fsync dir {}", dir.display()), e))?;
     Ok(())
 }
 

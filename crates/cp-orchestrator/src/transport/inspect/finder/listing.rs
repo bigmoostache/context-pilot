@@ -3,8 +3,8 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use crate::transport::rest::HttpReply;
 use crate::transport::Backend;
+use crate::transport::rest::HttpReply;
 
 use super::support::{agent_folder, confined_path, count_visible_children, extract_param, infer_kind};
 
@@ -26,10 +26,7 @@ pub fn fs_descriptions(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         Ok(f) => f,
         Err(reply) => return reply,
     };
-    let path = PathBuf::from(&folder)
-        .join(".context-pilot")
-        .join("shared")
-        .join("tree-descriptions.yaml");
+    let path = PathBuf::from(&folder).join(".context-pilot").join("shared").join("tree-descriptions.yaml");
 
     let Ok(raw) = std::fs::read(&path) else {
         return HttpReply::ok(&serde_json::json!({}));
@@ -94,17 +91,9 @@ pub fn fs_list(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply
             continue;
         }
 
-        let entry_path = if relative.is_empty() {
-            name_str.to_owned()
-        } else {
-            format!("{relative}/{name_str}")
-        };
+        let entry_path = if relative.is_empty() { name_str.to_owned() } else { format!("{relative}/{name_str}") };
 
-        let kind = if meta.is_dir() {
-            "folder"
-        } else {
-            infer_kind(name_str)
-        };
+        let kind = if meta.is_dir() { "folder" } else { infer_kind(name_str) };
 
         let modified_ms = meta
             .modified()
@@ -120,20 +109,15 @@ pub fn fs_list(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply
         });
 
         if meta.is_file() {
-            let _prev = node
-                .as_object_mut()
-                .expect("just built")
-                .insert("size".to_owned(), serde_json::json!(meta.len()));
+            let _prev =
+                node.as_object_mut().expect("just built").insert("size".to_owned(), serde_json::json!(meta.len()));
         } else if meta.is_dir() {
             // Direct (non-hidden) child count, so every view can render
             // "N items" on a folder without a second round-trip. Mirrors the
             // hidden-file skip below, so the count matches what a listing of
             // this folder would actually show.
             let count = count_visible_children(&entry.path());
-            let _prev = node
-                .as_object_mut()
-                .expect("just built")
-                .insert("count".to_owned(), serde_json::json!(count));
+            let _prev = node.as_object_mut().expect("just built").insert("count".to_owned(), serde_json::json!(count));
         }
 
         nodes.push(node);
@@ -143,13 +127,11 @@ pub fn fs_list(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply
     nodes.sort_by(|a, b| {
         let a_folder = a.get("kind").and_then(serde_json::Value::as_str) == Some("folder");
         let b_folder = b.get("kind").and_then(serde_json::Value::as_str) == Some("folder");
-        b_folder
-            .cmp(&a_folder)
-            .then_with(|| {
-                let a_name = a.get("name").and_then(serde_json::Value::as_str).unwrap_or("");
-                let b_name = b.get("name").and_then(serde_json::Value::as_str).unwrap_or("");
-                a_name.to_lowercase().cmp(&b_name.to_lowercase())
-            })
+        b_folder.cmp(&a_folder).then_with(|| {
+            let a_name = a.get("name").and_then(serde_json::Value::as_str).unwrap_or("");
+            let b_name = b.get("name").and_then(serde_json::Value::as_str).unwrap_or("");
+            a_name.to_lowercase().cmp(&b_name.to_lowercase())
+        })
     });
 
     HttpReply::ok(&nodes)
@@ -217,9 +199,7 @@ pub fn conversation(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         Ok(f) => f,
         Err(reply) => return reply,
     };
-    let messages_dir = PathBuf::from(&folder)
-        .join(".context-pilot")
-        .join("messages");
+    let messages_dir = PathBuf::from(&folder).join(".context-pilot").join("messages");
 
     let entries = match std::fs::read_dir(&messages_dir) {
         Ok(rd) => rd,
@@ -229,11 +209,7 @@ pub fn conversation(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let mut files: Vec<PathBuf> = entries
         .filter_map(|e| e.ok())
         .map(|e| e.path())
-        .filter(|p| {
-            p.extension()
-                .and_then(std::ffi::OsStr::to_str)
-                .map_or(false, |ext| ext == "yaml" || ext == "yml")
-        })
+        .filter(|p| p.extension().and_then(std::ffi::OsStr::to_str).map_or(false, |ext| ext == "yaml" || ext == "yml"))
         .collect();
 
     // Sort by filename (UID_*.yaml encodes insertion order).

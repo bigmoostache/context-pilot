@@ -8,8 +8,8 @@
 //! barrier).
 
 use cp_base::state::runtime::State;
-use cp_mod_bridge::body::Stored;
 use cp_mod_bridge::BridgeState;
+use cp_mod_bridge::body::Stored;
 use cp_mod_threads::types::{ThreadAuthor, ThreadMessage, ThreadsState};
 use cp_wire::types::oplog::OpEntryKind;
 
@@ -52,11 +52,8 @@ pub(in crate::app::run) fn emit_messages(app: &mut App) {
     // backlog rides the frontend's initial tier-② load, not the delta stream).
     let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.msg_memo_seeded);
     if !seeded {
-        let counts: Vec<(String, usize)> = ThreadsState::get(&app.state)
-            .threads
-            .iter()
-            .map(|t| (t.id.clone(), t.messages.len()))
-            .collect();
+        let counts: Vec<(String, usize)> =
+            ThreadsState::get(&app.state).threads.iter().map(|t| (t.id.clone(), t.messages.len())).collect();
         let bs = app.state.ext_mut::<BridgeState>();
         for (id, len) in counts {
             let _prev = bs.thread_msg_counts.insert(id, len);
@@ -85,11 +82,7 @@ pub(in crate::app::run) fn emit_messages(app: &mut App) {
 
     for p in pending {
         emit_one_message(&app.state, &p.thread_id, &p.message_id, &p.body);
-        let _prev = app
-            .state
-            .ext_mut::<BridgeState>()
-            .thread_msg_counts
-            .insert(p.thread_id, p.index.saturating_add(1));
+        let _prev = app.state.ext_mut::<BridgeState>().thread_msg_counts.insert(p.thread_id, p.index.saturating_add(1));
     }
 }
 

@@ -43,17 +43,15 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-
 use tiny_http::{Header, Method, Request, Response, Server};
 
 use cp_wire::types::registry::Entry;
 
-
 use crate::inspect::StateReader;
 use crate::services::{CostBreaker, MaterializedView, RetiredStore, StreamHub};
 use crate::supervisor::AgentSupervisor;
-use ticket::TicketStore;
 use query::QueryParams;
+use ticket::TicketStore;
 
 /// Default per-agent SSE subscriber buffer capacity.
 const DEFAULT_SUB_CAPACITY: usize = 256;
@@ -113,12 +111,7 @@ impl Backend {
     /// seeds the supervisor's allow-list (R2-15), so it is the only binary that
     /// can ever be launched.
     #[must_use]
-    pub fn new(
-        agents_dir: PathBuf,
-        budget_usd: f64,
-        agents_root: PathBuf,
-        agent_binary: PathBuf,
-    ) -> Self {
+    pub fn new(agents_dir: PathBuf, budget_usd: f64, agents_root: PathBuf, agent_binary: PathBuf) -> Self {
         Self {
             view: MaterializedView::new(),
             breaker: CostBreaker::new(budget_usd),
@@ -169,7 +162,19 @@ impl Backend {
     /// Construct a backend from explicit services — used by tests.
     #[cfg(test)]
     pub(crate) fn for_test(agents_dir: PathBuf, view: MaterializedView, breaker: CostBreaker) -> Self {
-        Self { view, breaker, hub: StreamHub::new(DEFAULT_SUB_CAPACITY), tickets: TicketStore::new(), inspect: StateReader::new(), retired: RetiredStore::default(), agents_dir, dirty_agents: HashSet::new(), supervisor: AgentSupervisor::new(&[]), agents_root: PathBuf::from("/tmp/cp-test-realms"), agent_binary: PathBuf::from("/tmp/cp-test-bin") }
+        Self {
+            view,
+            breaker,
+            hub: StreamHub::new(DEFAULT_SUB_CAPACITY),
+            tickets: TicketStore::new(),
+            inspect: StateReader::new(),
+            retired: RetiredStore::default(),
+            agents_dir,
+            dirty_agents: HashSet::new(),
+            supervisor: AgentSupervisor::new(&[]),
+            agents_root: PathBuf::from("/tmp/cp-test-realms"),
+            agent_binary: PathBuf::from("/tmp/cp-test-bin"),
+        }
     }
 }
 
@@ -290,8 +295,12 @@ fn route_rest(
         (Method::Get, ["api", "agent", id, "fs", "descriptions"]) => inspect::finder::fs_descriptions(state, id),
         (Method::Get, ["api", "agent", id, "conversation"]) => inspect::finder::conversation(state, id),
         (Method::Post, ["api", "agent", id, "command"]) => rest::command(state, id, body_bytes),
-        (Method::Post, ["api", "agent", id, "fs", "upload"]) => inspect::finder::fs_upload(state, id, query, body_bytes),
-        (Method::Post, ["api", "agent", id, "fs", "upload-unique"]) => inspect::finder::fs_upload_unique(state, id, query, body_bytes),
+        (Method::Post, ["api", "agent", id, "fs", "upload"]) => {
+            inspect::finder::fs_upload(state, id, query, body_bytes)
+        }
+        (Method::Post, ["api", "agent", id, "fs", "upload-unique"]) => {
+            inspect::finder::fs_upload_unique(state, id, query, body_bytes)
+        }
         (Method::Post, ["api", "agent", id, "fs", "write"]) => inspect::finder::fs_write(state, id, query, body_bytes),
         (Method::Post, ["api", "agent", id, "fs", "mkdir"]) => inspect::finder::fs_mkdir(state, id, query),
         (Method::Post, ["api", "agent", id, "fs", "rename"]) => inspect::finder::fs_rename(state, id, query),
@@ -427,11 +436,7 @@ fn respond_json(request: Request, reply: &rest::HttpReply) {
 
 /// Extract a `Last-Event-ID` header value as a `rev`.
 fn last_event_id(request: &Request) -> Option<u64> {
-    request
-        .headers()
-        .iter()
-        .find(|h| h.field.equiv("Last-Event-ID"))
-        .and_then(|h| h.value.as_str().parse().ok())
+    request.headers().iter().find(|h| h.field.equiv("Last-Event-ID")).and_then(|h| h.value.as_str().parse().ok())
 }
 
 /// Split a URL into its path and query-string halves.
@@ -448,7 +453,10 @@ mod tests {
 
     #[test]
     fn split_url_separates_path_and_query() {
-        assert_eq!(split_url("/api/stream?agent=a1&ticket=x"), ("/api/stream".to_owned(), "agent=a1&ticket=x".to_owned()));
+        assert_eq!(
+            split_url("/api/stream?agent=a1&ticket=x"),
+            ("/api/stream".to_owned(), "agent=a1&ticket=x".to_owned())
+        );
         assert_eq!(split_url("/api/fleet"), ("/api/fleet".to_owned(), String::new()));
     }
 }

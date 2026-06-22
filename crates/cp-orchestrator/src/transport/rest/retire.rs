@@ -50,11 +50,8 @@ pub fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     };
     let folder = entry.folder.clone();
     let key = std::path::PathBuf::from(&folder).to_string_lossy().into_owned();
-    let name = std::path::Path::new(&folder)
-        .file_name()
-        .and_then(std::ffi::OsStr::to_str)
-        .unwrap_or(agent_id)
-        .to_owned();
+    let name =
+        std::path::Path::new(&folder).file_name().and_then(std::ffi::OsStr::to_str).unwrap_or(agent_id).to_owned();
 
     // Provider snapshot (best-effort) before the process dies.
     let provider = crate::transport::inspect::meta::read_provider(state, &folder);
@@ -139,12 +136,9 @@ pub fn unretire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     };
 
     match spawn_result {
-        Ok(pid) => HttpReply::json(202, &UnretireReceipt {
-            status: "unretiring",
-            id: agent_id,
-            folder: record.folder,
-            pid,
-        }),
+        Ok(pid) => {
+            HttpReply::json(202, &UnretireReceipt { status: "unretiring", id: agent_id, folder: record.folder, pid })
+        }
         Err(e) => {
             eprintln!("unretire_agent spawn error: {e}");
             HttpReply::error(502, &format!("agent respawn failed: {e}"))
@@ -161,10 +155,7 @@ pub fn unretire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
 /// daemon shuts its child sessions down cleanly. Entirely best-effort: a
 /// missing/garbage file (no console ever started) is a silent no-op.
 fn kill_console_server(folder: &str) {
-    let pid_path = std::path::Path::new(folder)
-        .join(".context-pilot")
-        .join("console")
-        .join("server.pid");
+    let pid_path = std::path::Path::new(folder).join(".context-pilot").join("console").join("server.pid");
     let Ok(raw) = std::fs::read_to_string(&pid_path) else {
         return;
     };

@@ -42,11 +42,11 @@ use cp_mod_bridge::tee::{Outcome, Tee};
 use cp_oplog::replay::replay;
 use cp_oplog::service::Service as OplogService;
 use cp_wire::framing;
+use cp_wire::types::ContentHash;
+use cp_wire::types::ack::{Ack, Status};
 use cp_wire::types::command::{Command, Frame as CommandFrame, Kind as CommandKind};
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::stream::{Frame as StreamFrame, Kind as StreamKind};
-use cp_wire::types::ack::{Ack, Status};
-use cp_wire::types::ContentHash;
 use tempfile::tempdir;
 
 const TOKEN: &str = "cap-token-256bit-secret";
@@ -210,8 +210,7 @@ fn the_i13_barrier_and_orphan_gc_hold_across_a_real_journal() {
 
     // GC driven by the replayed heads — exactly how the agent reclaims bodies.
     let recovered = replay(dir.path()).expect("replay with reference");
-    let live: HashSet<ContentHash> =
-        recovered.heads.threads.iter().map(|h| h.last_message_hash).collect();
+    let live: HashSet<ContentHash> = recovered.heads.threads.iter().map(|h| h.last_message_hash).collect();
     assert!(live.contains(&referenced.hash()), "the journalled head is in the live set");
 
     let removed = store.gc(&live, Duration::ZERO).expect("gc");

@@ -135,10 +135,7 @@ impl StreamHub {
     pub fn subscribe(&mut self, agent_id: &str) -> u64 {
         let id = self.next_id;
         self.next_id = self.next_id.saturating_add(1);
-        self.agents
-            .entry(agent_id.to_owned())
-            .or_default()
-            .push(Subscriber::new(id, self.sub_capacity));
+        self.agents.entry(agent_id.to_owned()).or_default().push(Subscriber::new(id, self.sub_capacity));
         id
     }
 

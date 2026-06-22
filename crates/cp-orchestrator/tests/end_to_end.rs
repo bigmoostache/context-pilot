@@ -54,11 +54,11 @@ use cp_oplog::append::OplogWriter;
 use cp_oplog::replay::replay;
 use cp_oplog::service::Service as OplogService;
 
-use cp_orchestrator::transport::{serve_bound, Backend};
+use cp_orchestrator::transport::{Backend, serve_bound};
 
+use cp_wire::types::ContentHash;
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::registry::{AgentStatus, Entry};
-use cp_wire::types::ContentHash;
 
 use tempfile::tempdir;
 
@@ -190,18 +190,11 @@ fn a_command_journals_on_the_agent_and_re_emerges_as_an_sse_delta() {
     // pre-seeded rev 0 to obtain the command effect). ──
     let token = ticket_token(&addr);
     let path = format!("/api/stream?agent=agent-e2e&ticket={token}");
-    let (status, events) =
-        common::sse_collect(&addr, &path, &[("Last-Event-ID", "0")], 1, Duration::from_secs(3));
+    let (status, events) = common::sse_collect(&addr, &path, &[("Last-Event-ID", "0")], 1, Duration::from_secs(3));
     assert_eq!(status, 200, "the stream opens");
-    let delta = events
-        .iter()
-        .find(|e| e.event == "delta")
-        .expect("the command effect streams back as a delta");
+    let delta = events.iter().find(|e| e.event == "delta").expect("the command effect streams back as a delta");
     assert_eq!(delta.id, Some(1), "the delta is tagged with the rev it reflects (id = rev framing)");
-    assert!(
-        delta.data.contains("d-e2e"),
-        "the streamed delta carries the command's dedup token (full loop closed)",
-    );
+    assert!(delta.data.contains("d-e2e"), "the streamed delta carries the command's dedup token (full loop closed)",);
 }
 
 // ── 2. a spilled body hydrates over REST ────────────────────────────────────
@@ -266,8 +259,7 @@ fn the_stream_survives_a_soak_of_connect_disconnect_cycles() {
     for _cycle in 0..25 {
         let token = ticket_token(&addr);
         let path = format!("/api/stream?agent=agent-soak&ticket={token}");
-        let (status, events) =
-            common::sse_collect(&addr, &path, &[("Last-Event-ID", "0")], 1, Duration::from_secs(2));
+        let (status, events) = common::sse_collect(&addr, &path, &[("Last-Event-ID", "0")], 1, Duration::from_secs(2));
         assert_eq!(status, 200, "every soak cycle opens cleanly");
         assert!(events.iter().any(|e| e.event == "delta"), "every cycle delivers a delta");
     }

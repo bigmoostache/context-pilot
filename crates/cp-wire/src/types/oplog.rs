@@ -230,9 +230,7 @@ mod tests {
             schema_version: 1,
             rev: 17,
             timestamp_ms: 1_718_000_000_000,
-            kind: OpEntryKind::PhaseTransition {
-                phase: Phase::Streaming,
-            },
+            kind: OpEntryKind::PhaseTransition { phase: Phase::Streaming },
         };
         let json = serde_json::to_string(&entry).expect("serialize");
         let back: OpEntry = serde_json::from_str(&json).expect("deserialize");
@@ -317,10 +315,7 @@ mod tests {
             },
             OpEntryKind::ThreadArchived { thread_id: "T7".into() },
             OpEntryKind::ThreadRestored { thread_id: "T7".into() },
-            OpEntryKind::ThreadStatusChanged {
-                thread_id: "T7".into(),
-                status: ThreadTurn::TheirTurn,
-            },
+            OpEntryKind::ThreadStatusChanged { thread_id: "T7".into(), status: ThreadTurn::TheirTurn },
         ];
         for kind in kinds {
             let entry = OpEntry { schema_version: 1, rev: 1, timestamp_ms: 0, kind: kind.clone() };

@@ -17,9 +17,9 @@
 
 use std::sync::Mutex;
 
+use cp_wire::types::ContentHash;
 use cp_wire::types::command::{Command, Kind};
 use cp_wire::types::registry::Entry;
-use cp_wire::types::ContentHash;
 use serde::Serialize;
 
 use super::Backend;
@@ -143,10 +143,9 @@ pub fn body(state: &Mutex<Backend>, id: &str, hash_hex: &str) -> HttpReply {
     };
     // Hydrate is blocking agent I/O — performed with no lock held.
     match AgentChannel::from_entry(&entry).hydrate(hash) {
-        Ok(Some(bytes)) => HttpReply {
-            status: 200,
-            body: serde_json::to_string(&BodyPayload { bytes: &bytes }).unwrap_or_default(),
-        },
+        Ok(Some(bytes)) => {
+            HttpReply { status: 200, body: serde_json::to_string(&BodyPayload { bytes: &bytes }).unwrap_or_default() }
+        }
         Ok(None) => HttpReply::error(404, "body not found"),
         Err(_) => HttpReply::error(502, "body read failed"),
     }
@@ -269,22 +268,15 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         let cfg = reader.read_config(folder).ok();
 
         // Read focused_thread_id from the first worker's FocusState.
-        let focused = reader
-            .list_workers(folder)
-            .unwrap_or_default()
-            .into_iter()
-            .find_map(|wid| {
-                reader
-                    .read_worker(folder, &wid)
-                    .ok()
-                    .and_then(|w| {
-                        w.get("modules")
-                            .and_then(|m| m.get("threads_worker"))
-                            .and_then(|tw| tw.get("focused_thread_id"))
-                            .and_then(serde_json::Value::as_str)
-                            .map(String::from)
-                    })
-            });
+        let focused = reader.list_workers(folder).unwrap_or_default().into_iter().find_map(|wid| {
+            reader.read_worker(folder, &wid).ok().and_then(|w| {
+                w.get("modules")
+                    .and_then(|m| m.get("threads_worker"))
+                    .and_then(|tw| tw.get("focused_thread_id"))
+                    .and_then(serde_json::Value::as_str)
+                    .map(String::from)
+            })
+        });
         // The `reader` borrow ends with `cfg`/`focused` (both owned); now read
         // the live roster + focused thread from the view under the same lock.
         // The view's focus (push-fed via `ThreadFocusChanged`) is the fresher
@@ -292,11 +284,8 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         // none yet (a backend cold start before the agent's first focus
         // emission — design doc I5: live reads ride the view, disk is the
         // bounded backstop).
-        let (roster, view_focus) = b
-            .view
-            .get(agent_id)
-            .map(|v| (v.roster.clone(), v.focused_thread_id.clone()))
-            .unwrap_or_default();
+        let (roster, view_focus) =
+            b.view.get(agent_id).map(|v| (v.roster.clone(), v.focused_thread_id.clone())).unwrap_or_default();
         let focused = view_focus.or(focused);
         (cfg, focused, roster)
     };
@@ -312,8 +301,7 @@ pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
         .and_then(serde_json::Value::as_array)
         .unwrap_or_else(|| empty_arr.as_array().expect("empty vec is array"));
 
-    let mut details: Vec<serde_json::Value> =
-        raw_threads.iter().map(|t| reshape_thread(t, agent_id)).collect();
+    let mut details: Vec<serde_json::Value> = raw_threads.iter().map(|t| reshape_thread(t, agent_id)).collect();
 
     // Overlay the view's fresher roster onto matching disk threads, then append
     // any view-only threads the disk has not yet flushed.
@@ -348,8 +336,8 @@ struct TrippedBody {
 mod tests {
     use super::*;
     use crate::services::{CostBreaker, MaterializedView};
-    use cp_wire::types::oplog::{OpEntry, OpEntryKind};
     use cp_wire::types::Phase;
+    use cp_wire::types::oplog::{OpEntry, OpEntryKind};
     use std::path::PathBuf;
 
     fn phase_entry(rev: u64, phase: Phase) -> OpEntry {

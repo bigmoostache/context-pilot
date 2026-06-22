@@ -29,8 +29,8 @@ use nix as _;
 use notify as _;
 use portable_pty as _;
 use serde as _;
-use serde_yaml as _;
 use serde_json as _;
+use serde_yaml as _;
 use tiny_http as _;
 
 use std::path::Path;
@@ -92,9 +92,7 @@ fn a_fresh_view_and_breaker_rebuild_from_a_real_oplog_after_restart() {
         let _r0 = oplog.append_durable(message("T1", 0x11)).expect("msg");
         let _r1 = oplog.append_durable(message("T1", 0x12)).expect("msg"); // newer head wins
         let _r2 = oplog.append_durable(message("T2", 0x21)).expect("msg");
-        let _r3 = oplog
-            .append_durable(OpEntryKind::PhaseTransition { phase: Phase::Streaming })
-            .expect("phase");
+        let _r3 = oplog.append_durable(OpEntryKind::PhaseTransition { phase: Phase::Streaming }).expect("phase");
         let _r4 = oplog.append_durable(cost(3.0)).expect("cost");
         let _r5 = oplog.append_durable(cost(9.0)).expect("cost"); // over a 5.0 budget
         oplog.shutdown().expect("shutdown");
@@ -175,14 +173,7 @@ fn a_degraded_subscriber_reconciles_from_the_views_oplog_snapshot() {
     // folded from the durable oplog.
     let mut view = MaterializedView::new();
     view.apply_batch("a1", &tail_all(dir.path()));
-    let authoritative_head = view
-        .get("a1")
-        .expect("agent")
-        .heads
-        .threads
-        .first()
-        .expect("T1 head")
-        .last_message_hash;
+    let authoritative_head = view.get("a1").expect("agent").heads.threads.first().expect("T1 head").last_message_hash;
     assert_eq!(authoritative_head, ContentHash::new([0x33; 32]));
 
     // A tiny-capacity subscriber overflows and goes degraded.

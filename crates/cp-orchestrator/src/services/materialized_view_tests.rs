@@ -28,12 +28,7 @@ fn message_created_sets_thread_head() {
 
     let agent = view.get("a1").expect("agent present");
     assert_eq!(agent.rev, 0);
-    let head = agent
-        .heads
-        .threads
-        .iter()
-        .find(|h| h.thread_id == "T1")
-        .expect("thread head present");
+    let head = agent.heads.threads.iter().find(|h| h.thread_id == "T1").expect("thread head present");
     assert_eq!(head.last_message_hash, ContentHash::new([0x11; 32]));
 }
 
@@ -50,10 +45,7 @@ fn checkpoint_resets_heads_authoritatively() {
 
     let agent = view.get("a1").expect("agent present");
     assert_eq!(agent.rev, 5);
-    assert!(
-        agent.heads.threads.iter().all(|h| h.thread_id != "T1"),
-        "checkpoint must drop the pre-checkpoint head",
-    );
+    assert!(agent.heads.threads.iter().all(|h| h.thread_id != "T1"), "checkpoint must drop the pre-checkpoint head",);
     assert_eq!(agent.heads.threads.len(), 1);
     assert_eq!(agent.heads.threads.first().expect("T2").thread_id, "T2");
 }
@@ -97,10 +89,7 @@ fn checkpoint_restores_roster_wholesale() {
     assert_eq!(e.status, ThreadTurn::MyTurn);
     assert!(e.archived);
     assert_eq!(e.msg_count, 4);
-    assert!(
-        agent.roster.iter().all(|r| r.thread_id != "T-stale"),
-        "the pre-checkpoint roster entry is dropped",
-    );
+    assert!(agent.roster.iter().all(|r| r.thread_id != "T-stale"), "the pre-checkpoint roster entry is dropped",);
 }
 
 #[test]
@@ -156,14 +145,8 @@ fn phase_and_lifecycle_are_latest_wins() {
 #[test]
 fn cost_aggregate_is_latest_not_summed() {
     let mut view = MaterializedView::new();
-    view.apply(
-        "a1",
-        &entry(0, OpEntryKind::CostAggregate { input_tokens: 100, output_tokens: 10, cost_usd: 1.0 }),
-    );
-    view.apply(
-        "a1",
-        &entry(1, OpEntryKind::CostAggregate { input_tokens: 250, output_tokens: 30, cost_usd: 2.5 }),
-    );
+    view.apply("a1", &entry(0, OpEntryKind::CostAggregate { input_tokens: 100, output_tokens: 10, cost_usd: 1.0 }));
+    view.apply("a1", &entry(1, OpEntryKind::CostAggregate { input_tokens: 250, output_tokens: 30, cost_usd: 2.5 }));
 
     let agent = view.get("a1").expect("agent present");
     // Cumulative-since-boot ⇒ latest wins, never 350/40/3.5.
@@ -195,10 +178,7 @@ fn apply_batch_folds_in_order_and_tracks_max_rev() {
 #[test]
 fn durability_only_and_unknown_entries_are_inert() {
     let mut view = MaterializedView::new();
-    view.apply(
-        "a1",
-        &entry(0, OpEntryKind::CommandEffect { cmd_id: "c".into(), dedup_token: "d".into() }),
-    );
+    view.apply("a1", &entry(0, OpEntryKind::CommandEffect { cmd_id: "c".into(), dedup_token: "d".into() }));
     view.apply("a1", &entry(1, OpEntryKind::SeenMark { dedup_token: "d".into() }));
     view.apply("a1", &entry(2, OpEntryKind::Unknown));
 
@@ -242,18 +222,9 @@ fn roster_create_archive_restore_cycle() {
 
     view.apply(
         "a1",
-        &entry(
-            3,
-            OpEntryKind::ThreadStatusChanged {
-                thread_id: "T1".into(),
-                status: ThreadTurn::MyTurn,
-            },
-        ),
+        &entry(3, OpEntryKind::ThreadStatusChanged { thread_id: "T1".into(), status: ThreadTurn::MyTurn }),
     );
-    assert_eq!(
-        view.get("a1").expect("a").roster.first().expect("e").status,
-        ThreadTurn::MyTurn,
-    );
+    assert_eq!(view.get("a1").expect("a").roster.first().expect("e").status, ThreadTurn::MyTurn,);
 }
 
 #[test]
@@ -267,11 +238,7 @@ fn thread_created_folds_idempotently_on_replay() {
     };
     view.apply("a1", &entry(0, created.clone()));
     view.apply("a1", &entry(0, created)); // duplicate delivery / replay
-    assert_eq!(
-        view.get("a1").expect("agent").roster.len(),
-        1,
-        "a re-seen creation must refresh, never duplicate",
-    );
+    assert_eq!(view.get("a1").expect("agent").roster.len(), 1, "a re-seen creation must refresh, never duplicate",);
 }
 
 #[test]

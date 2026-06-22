@@ -297,8 +297,8 @@ impl Module for SearchModule {
         // the SAME port if it dies mid-session, so a deployment self-heals with
         // no manual restart. Stored in SearchState so a reload drops+replaces it
         // (its Drop stops the old thread — never stacks two watchdogs).
-        let watchdog =
-            (persist.port > 0).then(|| meili::watchdog::WatchdogHandle::spawn(persist.port, persist.master_key.clone()));
+        let watchdog = (persist.port > 0)
+            .then(|| meili::watchdog::WatchdogHandle::spawn(persist.port, persist.master_key.clone()));
 
         state.set_ext(SearchState {
             persist,

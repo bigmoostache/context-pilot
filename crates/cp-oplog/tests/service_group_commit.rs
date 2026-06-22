@@ -60,29 +60,16 @@ fn durability_of_is_exhaustive_over_every_kind() {
     // Best-effort: only the two disposable, self-healing classes.
     assert_eq!(Durability::of(&phase()), Durability::BestEffort);
     assert_eq!(
-        Durability::of(&OpEntryKind::CostAggregate {
-            input_tokens: 1,
-            output_tokens: 2,
-            cost_usd: 0.5,
-        }),
+        Durability::of(&OpEntryKind::CostAggregate { input_tokens: 1, output_tokens: 2, cost_usd: 0.5 }),
         Durability::BestEffort,
     );
 
     // Durable: everything effect-bearing, plus the conservative Unknown.
     assert_eq!(Durability::of(&effect("c")), Durability::Durable);
-    assert_eq!(
-        Durability::of(&OpEntryKind::SeenMark { dedup_token: "d".to_owned() }),
-        Durability::Durable,
-    );
+    assert_eq!(Durability::of(&OpEntryKind::SeenMark { dedup_token: "d".to_owned() }), Durability::Durable,);
     assert_eq!(Durability::of(&msg("T1", 1)), Durability::Durable);
-    assert_eq!(
-        Durability::of(&OpEntryKind::Lifecycle { state: LifecycleState::Running }),
-        Durability::Durable,
-    );
-    assert_eq!(
-        Durability::of(&OpEntryKind::Checkpoint { snapshot: Snapshot::default() }),
-        Durability::Durable,
-    );
+    assert_eq!(Durability::of(&OpEntryKind::Lifecycle { state: LifecycleState::Running }), Durability::Durable,);
+    assert_eq!(Durability::of(&OpEntryKind::Checkpoint { snapshot: Snapshot::default() }), Durability::Durable,);
     assert_eq!(
         Durability::of(&OpEntryKind::Unknown),
         Durability::Durable,
@@ -198,12 +185,7 @@ fn a_large_final_batch_is_flushed_on_shutdown() {
 
     let recovered = replay(dir.path()).expect("replay");
     assert_eq!(recovered.rev_head, Some(last), "the last durable rev survived shutdown");
-    let t1 = recovered
-        .heads
-        .threads
-        .iter()
-        .find(|h| h.thread_id == "T1")
-        .expect("T1 head present");
+    let t1 = recovered.heads.threads.iter().find(|h| h.thread_id == "T1").expect("T1 head present");
     assert_eq!(t1.last_message_hash, ContentHash::new([29; 32]), "the final head is durable");
 }
 
@@ -229,11 +211,6 @@ fn interleaved_durable_and_best_effort_preserves_every_durable_record() {
         assert!(recovered.seen.contains(token), "durable token {token} survived the interleave");
     }
     assert_eq!(recovered.seen.len(), tokens.len(), "no durable effect lost or duplicated");
-    let t1 = recovered
-        .heads
-        .threads
-        .iter()
-        .find(|h| h.thread_id == "T1")
-        .expect("T1 head present");
+    let t1 = recovered.heads.threads.iter().find(|h| h.thread_id == "T1").expect("T1 head present");
     assert_eq!(t1.last_message_hash, ContentHash::new([19; 32]), "last durable head is correct");
 }

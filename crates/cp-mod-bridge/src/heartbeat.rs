@@ -32,7 +32,7 @@ use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use cp_wire::heartbeat::{Heartbeat, HEARTBEAT_SCHEMA_VERSION};
+use cp_wire::heartbeat::{HEARTBEAT_SCHEMA_VERSION, Heartbeat};
 
 /// The unchanging parameters of every beat: the identity stamped into each
 /// record plus the loop's wake cadence. Bundled so the beat loop and the
@@ -78,8 +78,7 @@ impl Beacon {
     /// cannot be written (`boot_id` not 32 bytes is mapped to
     /// [`io::ErrorKind::InvalidInput`]).
     pub fn start(path: &Path, pid: u32, boot_id: String, cadence: Duration) -> io::Result<Self> {
-        let mut file =
-            OpenOptions::new().read(true).write(true).create(true).truncate(false).open(path)?;
+        let mut file = OpenOptions::new().read(true).write(true).create(true).truncate(false).open(path)?;
 
         let beat = Beat { pid, boot_id, cadence };
         // The first beat is written before returning, so a reader that opens
@@ -149,8 +148,7 @@ fn write_beat(file: &mut File, beat: &Beat, sequence: u64) -> io::Result<()> {
         pid: beat.pid,
         boot_id: beat.boot_id.clone(),
     };
-    let bytes =
-        record.encode().map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?;
+    let bytes = record.encode().map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?;
 
     let _pos = file.seek(SeekFrom::Start(0))?;
     file.write_all(&bytes)?;
@@ -179,8 +177,7 @@ mod tests {
     fn first_beat_is_written_synchronously() {
         let dir = tempdir().expect("tempdir");
         let path = dir.path().join("heartbeat");
-        let beacon =
-            Beacon::start(&path, 4242, BOOT.to_owned(), Duration::from_secs(10)).expect("start");
+        let beacon = Beacon::start(&path, 4242, BOOT.to_owned(), Duration::from_secs(10)).expect("start");
 
         // The file exists and holds a valid, fresh beat immediately.
         let bytes = std::fs::read(&path).expect("read");
@@ -197,8 +194,7 @@ mod tests {
     fn beats_advance_at_cadence() {
         let dir = tempdir().expect("tempdir");
         let path = dir.path().join("heartbeat");
-        let beacon =
-            Beacon::start(&path, 7, BOOT.to_owned(), Duration::from_millis(20)).expect("start");
+        let beacon = Beacon::start(&path, 7, BOOT.to_owned(), Duration::from_millis(20)).expect("start");
 
         // Wait for a few cadences, then confirm the sequence has advanced past
         // the synchronous beat 0.
@@ -215,8 +211,7 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let path = dir.path().join("heartbeat");
         {
-            let _beacon =
-                Beacon::start(&path, 1, BOOT.to_owned(), Duration::from_millis(10)).expect("start");
+            let _beacon = Beacon::start(&path, 1, BOOT.to_owned(), Duration::from_millis(10)).expect("start");
             sleep(Duration::from_millis(30));
         } // dropped here → thread joined.
 
@@ -232,8 +227,7 @@ mod tests {
     fn record_stays_fixed_size_across_beats() {
         let dir = tempdir().expect("tempdir");
         let path = dir.path().join("heartbeat");
-        let beacon =
-            Beacon::start(&path, 9, BOOT.to_owned(), Duration::from_millis(15)).expect("start");
+        let beacon = Beacon::start(&path, 9, BOOT.to_owned(), Duration::from_millis(15)).expect("start");
         sleep(Duration::from_millis(70));
         // In-place overwrite must never grow the file.
         assert_eq!(std::fs::metadata(&path).expect("meta").len(), HEARTBEAT_LEN as u64);

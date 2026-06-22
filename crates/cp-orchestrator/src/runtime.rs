@@ -89,21 +89,16 @@ impl Config {
     /// Returns a message if `CP_AGENTS_DIR` is absent **and** `$HOME` is unset
     /// (so the default directory cannot be derived).
     pub fn from_env() -> Result<Self, String> {
-        let port = std::env::var("CP_ORCH_PORT")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(DEFAULT_PORT);
+        let port = std::env::var("CP_ORCH_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_PORT);
 
         let agents_dir = match std::env::var_os("CP_AGENTS_DIR") {
             Some(dir) => PathBuf::from(dir),
-            None => crate::registry::default_agents_dir()
-                .map_err(|e| format!("cannot derive agents directory: {e}"))?,
+            None => {
+                crate::registry::default_agents_dir().map_err(|e| format!("cannot derive agents directory: {e}"))?
+            }
         };
 
-        let budget_usd = std::env::var("CP_COST_BUDGET")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(DEFAULT_BUDGET);
+        let budget_usd = std::env::var("CP_COST_BUDGET").ok().and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_BUDGET);
 
         let scan_interval = std::env::var("CP_SCAN_INTERVAL_MS")
             .ok()
@@ -115,8 +110,7 @@ impl Config {
         // lands somewhere sensible).
         let agents_root = match std::env::var_os("CP_AGENTS_ROOT") {
             Some(dir) => PathBuf::from(dir),
-            None => std::env::var_os("HOME")
-                .map_or_else(|| PathBuf::from("."), |h| PathBuf::from(h).join("code")),
+            None => std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), |h| PathBuf::from(h).join("code")),
         };
 
         // The `cp` TUI binary the supervisor spawns. Default to the release
@@ -124,9 +118,7 @@ impl Config {
         // path in deployment.
         let agent_binary = match std::env::var_os("CP_AGENT_BINARY") {
             Some(p) => PathBuf::from(p),
-            None => std::env::current_dir()
-                .unwrap_or_else(|_| PathBuf::from("."))
-                .join("target/release/tui"),
+            None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("target/release/tui"),
         };
 
         Ok(Self { port, agents_dir, budget_usd, scan_interval, agents_root, agent_binary })
@@ -205,8 +197,7 @@ fn driver_loop(backend: Arc<Mutex<Backend>>, agents_dir: PathBuf, interval: Dura
     let mut config_mtimes: HashMap<String, SystemTime> = HashMap::new();
 
     // How many fast tail ticks fit in one slow scan interval (at least one).
-    let tail_ticks =
-        u64::try_from(interval.as_millis() / TAIL_INTERVAL.as_millis()).unwrap_or(1).max(1);
+    let tail_ticks = u64::try_from(interval.as_millis() / TAIL_INTERVAL.as_millis()).unwrap_or(1).max(1);
 
     loop {
         // ── Slow cadence: discovery + tier-② backstop + crash-orphan reap ──

@@ -303,18 +303,12 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let mut writer = OplogWriter::open(dir.path()).expect("open");
         let _a = writer
-            .append(OpEntryKind::CommandEffect {
-                cmd_id: "c1".to_owned(),
-                dedup_token: "tok-a".to_owned(),
-            })
+            .append(OpEntryKind::CommandEffect { cmd_id: "c1".to_owned(), dedup_token: "tok-a".to_owned() })
             .expect("append");
         // A duplicate delivery of the same token folds as a no-op.
         let _b = writer.append(OpEntryKind::SeenMark { dedup_token: "tok-a".to_owned() }).expect("dup");
         let _c = writer
-            .append(OpEntryKind::CommandEffect {
-                cmd_id: "c2".to_owned(),
-                dedup_token: "tok-b".to_owned(),
-            })
+            .append(OpEntryKind::CommandEffect { cmd_id: "c2".to_owned(), dedup_token: "tok-b".to_owned() })
             .expect("append");
 
         let state = replay(dir.path()).expect("replay");
@@ -387,10 +381,7 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let mut writer = OplogWriter::open_with_segment_limit(dir.path(), 16).expect("open");
         let _e = writer
-            .append(OpEntryKind::CommandEffect {
-                cmd_id: "c1".to_owned(),
-                dedup_token: "tok-early".to_owned(),
-            })
+            .append(OpEntryKind::CommandEffect { cmd_id: "c1".to_owned(), dedup_token: "tok-early".to_owned() })
             .expect("append");
         // Force several rolls so the token is carried only by a checkpoint.
         for byte in 0..8u8 {

@@ -21,10 +21,10 @@ use std::time::Duration;
 use std::{fs, thread};
 
 use cp_wire::framing;
+use cp_wire::types::ContentHash;
 use cp_wire::types::ack::Ack;
 use cp_wire::types::command::{Command, Frame as CommandFrame};
 use cp_wire::types::registry::Entry;
-use cp_wire::types::ContentHash;
 
 /// Re-export so the tailer stays reachable at the historical `channel::Tailer`
 /// path despite living in its own file (call sites and rustdoc links are
@@ -121,15 +121,10 @@ impl AgentChannel {
     /// the socket write fails, the ack is not received within
     /// [`ACK_READ_TIMEOUT`], or the response cannot be decoded.
     pub fn send(&self, command: Command) -> io::Result<Ack> {
-        let frame = CommandFrame {
-            schema_version: FRAME_SCHEMA_VERSION,
-            auth: self.cap_token.clone(),
-            command,
-        };
-        let payload = serde_json::to_vec(&frame)
-            .map_err(|e| io::Error::other(format!("serialize command frame: {e}")))?;
-        let frame_bytes = framing::encode_raw(&payload)
-            .map_err(|e| io::Error::other(format!("frame command: {e}")))?;
+        let frame = CommandFrame { schema_version: FRAME_SCHEMA_VERSION, auth: self.cap_token.clone(), command };
+        let payload =
+            serde_json::to_vec(&frame).map_err(|e| io::Error::other(format!("serialize command frame: {e}")))?;
+        let frame_bytes = framing::encode_raw(&payload).map_err(|e| io::Error::other(format!("frame command: {e}")))?;
 
         let mut stream = UnixStream::connect(&self.socket_path)?;
         let _timeout = stream.set_read_timeout(Some(ACK_READ_TIMEOUT));
@@ -179,8 +174,7 @@ fn read_ack(stream: &mut UnixStream) -> io::Result<Ack> {
         }
         // Try to decode a complete framed Ack.
         if let Ok((payload, _consumed)) = framing::decode_raw(&buf) {
-            let ack: Ack = serde_json::from_slice(payload)
-                .map_err(|e| io::Error::other(format!("decode ack: {e}")))?;
+            let ack: Ack = serde_json::from_slice(payload).map_err(|e| io::Error::other(format!("decode ack: {e}")))?;
             return Ok(ack);
         }
         if read == 0 {
@@ -276,12 +270,7 @@ mod tests {
             }
         }
         // We don't need to parse the command — just ack it.
-        let ack = Ack {
-            schema_version: 1,
-            cmd_id: "cmd-echo".to_owned(),
-            status: Status::Accepted,
-            rev: Some(42),
-        };
+        let ack = Ack { schema_version: 1, cmd_id: "cmd-echo".to_owned(), status: Status::Accepted, rev: Some(42) };
         let payload = serde_json::to_vec(&ack).expect("ser");
         let frame = framing::encode_raw(&payload).expect("frame");
         conn.write_all(&frame).expect("write");
@@ -295,11 +284,7 @@ mod tests {
 
         let server = thread::spawn(move || echo_ack_server(listener));
 
-        let ch = AgentChannel {
-            socket_path: sock,
-            cap_token: "tok".to_owned(),
-            bodies_dir: PathBuf::new(),
-        };
+        let ch = AgentChannel { socket_path: sock, cap_token: "tok".to_owned(), bodies_dir: PathBuf::new() };
         let ack = ch.send(test_command("echo")).expect("send");
         assert_eq!(ack.status, Status::Accepted);
         assert_eq!(ack.rev, Some(42));

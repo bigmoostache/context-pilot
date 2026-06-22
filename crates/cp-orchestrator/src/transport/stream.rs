@@ -18,8 +18,8 @@ use std::time::Duration;
 
 use cp_wire::types::stream::Frame;
 
-use super::sse;
 use super::Backend;
+use super::sse;
 use crate::channel::Tailer;
 
 /// Tight tail re-poll cadence for the SSE producer.
@@ -197,8 +197,8 @@ fn oplog_head_rev(oplog_dir: &std::path::Path) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cp_wire::types::oplog::OpEntryKind;
     use cp_wire::types::Phase;
+    use cp_wire::types::oplog::OpEntryKind;
 
     /// The keystone T271 regression: a subscriber cold-connecting to an EMPTY
     /// oplog must receive the agent's very first append (`rev 0`). The bug was
@@ -219,9 +219,7 @@ mod tests {
 
         // The agent now appends its first entry (rev 0).
         let mut writer = cp_oplog::append::OplogWriter::open(&oplog).expect("open oplog");
-        let _rev = writer
-            .append(OpEntryKind::PhaseTransition { phase: Phase::Streaming })
-            .expect("append");
+        let _rev = writer.append(OpEntryKind::PhaseTransition { phase: Phase::Streaming }).expect("append");
 
         // The cold subscriber must see rev 0 on the live tail.
         let got = tailer.poll().expect("poll");
@@ -240,9 +238,7 @@ mod tests {
 
         // Pre-existing backlog: one entry at rev 0.
         let mut writer = cp_oplog::append::OplogWriter::open(&oplog).expect("open oplog");
-        let _rev0 = writer
-            .append(OpEntryKind::PhaseTransition { phase: Phase::Streaming })
-            .expect("append rev 0");
+        let _rev0 = writer.append(OpEntryKind::PhaseTransition { phase: Phase::Streaming }).expect("append rev 0");
 
         // Cold connect now seeds at the head (Some), skipping the backlog.
         let head = oplog_head_rev(&oplog).expect("non-empty log has a head");
@@ -251,9 +247,7 @@ mod tests {
         assert!(tailer.poll().expect("poll").is_empty(), "backlog is not replayed");
 
         // A future append is delivered live.
-        let _rev1 = writer
-            .append(OpEntryKind::PhaseTransition { phase: Phase::Idle })
-            .expect("append rev 1");
+        let _rev1 = writer.append(OpEntryKind::PhaseTransition { phase: Phase::Idle }).expect("append rev 1");
         let got = tailer.poll().expect("poll");
         assert_eq!(got.len(), 1, "future append delivered");
         assert_eq!(got[0].rev, 1, "only the post-seed rev arrives");

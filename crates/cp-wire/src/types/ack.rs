@@ -48,12 +48,7 @@ mod tests {
 
     #[test]
     fn ack_accepted_round_trip() {
-        let ack = Ack {
-            schema_version: 1,
-            cmd_id: "cmd-99".into(),
-            status: Status::Accepted,
-            rev: Some(42),
-        };
+        let ack = Ack { schema_version: 1, cmd_id: "cmd-99".into(), status: Status::Accepted, rev: Some(42) };
         let json = serde_json::to_string(&ack).expect("serialize");
         let back: Ack = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(ack, back);
@@ -64,9 +59,7 @@ mod tests {
         let ack = Ack {
             schema_version: 1,
             cmd_id: "cmd-100".into(),
-            status: Status::Rejected {
-                reason: "bad bearer token".into(),
-            },
+            status: Status::Rejected { reason: "bad bearer token".into() },
             rev: None,
         };
         let json = serde_json::to_string(&ack).expect("serialize");

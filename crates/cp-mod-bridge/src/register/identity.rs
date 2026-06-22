@@ -21,7 +21,7 @@
 use std::fs::File;
 use std::io::Read as _;
 
-use crate::error::{Error, BootResult};
+use crate::error::{BootResult, Error};
 
 /// FNV-1a 64-bit offset basis.
 const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
@@ -71,8 +71,7 @@ pub fn mint_boot_id() -> BootResult<String> {
 /// Read `N` bytes from `/dev/urandom` and hex-encode them.
 fn random_hex<const N: usize>(context: &str) -> BootResult<String> {
     let mut buf = [0u8; N];
-    let mut file =
-        File::open("/dev/urandom").map_err(|e| Error::io(format!("open urandom for {context}"), e))?;
+    let mut file = File::open("/dev/urandom").map_err(|e| Error::io(format!("open urandom for {context}"), e))?;
     file.read_exact(&mut buf).map_err(|e| Error::io(format!("read urandom for {context}"), e))?;
 
     let mut hex = String::with_capacity(N.wrapping_mul(2));

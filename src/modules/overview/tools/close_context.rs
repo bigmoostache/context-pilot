@@ -54,13 +54,13 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             let rel_str = rel.to_string_lossy();
             let ts = cp_mod_tree::types::TreeState::get(state);
             let needs_skip = ts.descriptions.iter().find(|d| d.path == rel_str.as_ref()).map_or_else(
-                || !super::super::has_pending_tree_describe(state, rel_str.as_ref()),
+                || !has_pending_tree_describe(state, rel_str.as_ref()),
                 |desc| {
                     let current_hash =
                         cp_mod_tree::tools::compute_file_hash(std::path::Path::new(file_path)).unwrap_or_default();
                     !desc.file_hash.is_empty()
                         && desc.file_hash != current_hash
-                        && !super::super::has_pending_tree_describe(state, rel_str.as_ref())
+                        && !has_pending_tree_describe(state, rel_str.as_ref())
                 },
             );
             if needs_skip {
@@ -131,4 +131,25 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut result = ToolResult::new(tool.id.clone(), output, closed.is_empty() && skipped.is_empty());
     result.preserves_tempo = true;
     result
+}
+
+/// Check if there's a pending `tree_describe` in the queue for the given path.
+///
+/// The `Close_panel` stale-/missing-description guard skips a file panel whose
+/// tree description is absent or out of date — UNLESS the agent has already
+/// queued a `tree_describe` for that path (the fix is in flight), in which case
+/// closing is allowed. Lives beside the guard that consumes it (the `Close_panel`
+/// tool), and is re-exported to the overview module's `pre_flight` which applies
+/// the same rule before the tool runs.
+pub(crate) fn has_pending_tree_describe(state: &State, rel_path: &str) -> bool {
+    state.active_modules.contains("queue")
+        && cp_mod_queue::types::QueueState::get(state).queued_calls.iter().any(|call| {
+            call.tool_name == "tree_describe"
+                && call.input.get("descriptions").and_then(|v| v.as_array()).is_some_and(|descs| {
+                    descs.iter().any(|d| {
+                        d.get("path").and_then(|p| p.as_str()) == Some(rel_path)
+                            && d.get("delete").and_then(serde_json::Value::as_bool) != Some(true)
+                    })
+                })
+        })
 }

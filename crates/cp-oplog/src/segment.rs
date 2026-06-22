@@ -130,7 +130,13 @@ pub fn scan_bytes(data: &[u8]) -> Scan {
                 scan.entries.push(entry);
                 offset = offset.wrapping_add(consumed);
             }
-            Err(FrameError::Incomplete | FrameError::CrcMismatch { .. } | FrameError::DeserializeError(_) | FrameError::PayloadTooLarge(_) | FrameError::SerializeError(_)) => {
+            Err(
+                FrameError::Incomplete
+                | FrameError::CrcMismatch { .. }
+                | FrameError::DeserializeError(_)
+                | FrameError::PayloadTooLarge(_)
+                | FrameError::SerializeError(_),
+            ) => {
                 scan.torn_tail = true;
                 break;
             }
@@ -145,16 +151,11 @@ pub fn scan_bytes(data: &[u8]) -> Scan {
 mod tests {
     use super::*;
     use cp_wire::framing::encode_entry;
-    use cp_wire::types::oplog::OpEntryKind;
     use cp_wire::types::Phase;
+    use cp_wire::types::oplog::OpEntryKind;
 
     fn entry(rev: u64) -> OpEntry {
-        OpEntry {
-            schema_version: 1,
-            rev,
-            timestamp_ms: 0,
-            kind: OpEntryKind::PhaseTransition { phase: Phase::Idle },
-        }
+        OpEntry { schema_version: 1, rev, timestamp_ms: 0, kind: OpEntryKind::PhaseTransition { phase: Phase::Idle } }
     }
 
     #[test]

@@ -46,10 +46,10 @@
 
 use std::io::{self, Write as _};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 use std::sync::Arc;
-use std::thread::{self, sleep, JoinHandle};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::mpsc::{Receiver, SyncSender, TrySendError, sync_channel};
+use std::thread::{self, JoinHandle, sleep};
 use std::time::Duration;
 
 use cp_wire::framing;

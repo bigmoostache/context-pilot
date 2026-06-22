@@ -50,7 +50,7 @@ use cp_wire::types::oplog::{OpEntry, OpEntryKind};
 use cp_wire::types::snapshot::{Heads, SeenSet, Snapshot};
 
 use crate::error::OplogResult;
-use crate::replay::{self, fold_entry, Recovered};
+use crate::replay::{self, Recovered, fold_entry};
 use crate::segment;
 
 /// Default segment size limit: roll to a new segment once appending the next
@@ -123,10 +123,8 @@ impl OplogWriter {
         if let Some(index) = indices.last().copied() {
             let path = segment::path(&dir, index);
             let scan = segment::read(&path)?;
-            let segment_has_record = scan
-                .entries
-                .iter()
-                .any(|entry| !matches!(entry.kind, OpEntryKind::Checkpoint { .. }));
+            let segment_has_record =
+                scan.entries.iter().any(|entry| !matches!(entry.kind, OpEntryKind::Checkpoint { .. }));
             let mut file = OpenOptions::new().read(true).write(true).open(&path)?;
             if scan.torn_tail {
                 file.set_len(scan.valid_len)?;
@@ -212,16 +210,11 @@ impl OplogWriter {
         // Probe the framed size to decide whether this record would overflow
         // the segment. (The probe re-encodes; `rev`/timestamp do not affect the
         // decision, so a zeroed placeholder is fine.)
-        let probe = OpEntry {
-            schema_version: WRITER_SCHEMA_VERSION,
-            rev: self.next_rev,
-            timestamp_ms: 0,
-            kind: kind.clone(),
-        };
+        let probe =
+            OpEntry { schema_version: WRITER_SCHEMA_VERSION, rev: self.next_rev, timestamp_ms: 0, kind: kind.clone() };
         let frame_len = framing::encode_entry(&probe)?.len() as u64;
 
-        if self.segment_has_record && self.segment_bytes.wrapping_add(frame_len) > self.segment_limit
-        {
+        if self.segment_has_record && self.segment_bytes.wrapping_add(frame_len) > self.segment_limit {
             self.roll()?;
         }
         self.write_record(kind, true)
@@ -286,8 +279,7 @@ impl OplogWriter {
     /// is assigned.
     fn write_record(&mut self, kind: OpEntryKind, is_record: bool) -> OplogResult<u64> {
         let rev = self.next_rev;
-        let entry =
-            OpEntry { schema_version: WRITER_SCHEMA_VERSION, rev, timestamp_ms: now_ms(), kind };
+        let entry = OpEntry { schema_version: WRITER_SCHEMA_VERSION, rev, timestamp_ms: now_ms(), kind };
         let frame = framing::encode_entry(&entry)?;
 
         self.file.write_all(&frame)?;
@@ -329,11 +321,7 @@ impl OplogWriter {
     /// written into a checkpoint record.
     #[must_use]
     pub fn snapshot(&self) -> Snapshot {
-        Snapshot {
-            heads: self.state.heads.clone(),
-            seen: self.state.seen.clone(),
-            roster: self.state.roster.clone(),
-        }
+        Snapshot { heads: self.state.heads.clone(), seen: self.state.seen.clone(), roster: self.state.roster.clone() }
     }
 }
 

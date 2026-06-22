@@ -210,10 +210,7 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
 
     // Phase — emit on transition only.
     let phase = wire_phase(app.state.flags.stream.phase);
-    let phase_changed = app
-        .state
-        .get_ext::<BridgeState>()
-        .is_some_and(|bs| bs.last_phase != Some(phase));
+    let phase_changed = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_phase != Some(phase));
     if phase_changed {
         emit_best_effort(&app.state, OpEntryKind::PhaseTransition { phase });
         app.state.ext_mut::<BridgeState>().last_phase = Some(phase);
@@ -221,13 +218,10 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
 
     // Cost — cumulative-since-boot; emit when the dollar total moves.
     let cost_usd = app.state.cost_hit_usd + app.state.cost_miss_usd + app.state.cost_output_usd;
-    let cost_changed = app
-        .state
-        .get_ext::<BridgeState>()
-        .is_some_and(|bs| (bs.last_cost_usd - cost_usd).abs() > f64::EPSILON);
+    let cost_changed =
+        app.state.get_ext::<BridgeState>().is_some_and(|bs| (bs.last_cost_usd - cost_usd).abs() > f64::EPSILON);
     if cost_changed {
-        let input_tokens =
-            app.state.cache_hit_tokens.to_u64().saturating_add(app.state.cache_miss_tokens.to_u64());
+        let input_tokens = app.state.cache_hit_tokens.to_u64().saturating_add(app.state.cache_miss_tokens.to_u64());
         let output_tokens = app.state.total_output_tokens.to_u64();
         emit_best_effort(&app.state, OpEntryKind::CostAggregate { input_tokens, output_tokens, cost_usd });
         app.state.ext_mut::<BridgeState>().last_cost_usd = cost_usd;
@@ -241,12 +235,8 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
     // an unchanged total still re-emits.
     let (used, threshold, budget) = crate::modules::overview::context::context_usage(&app.state);
     let (hit, miss) = crate::modules::overview::context::context_hit_miss(&app.state);
-    let ctx_tuple =
-        (used.to_u64(), threshold.to_u64(), budget.to_u64(), hit.to_u64(), miss.to_u64());
-    let ctx_changed = app
-        .state
-        .get_ext::<BridgeState>()
-        .is_some_and(|bs| bs.last_context != Some(ctx_tuple));
+    let ctx_tuple = (used.to_u64(), threshold.to_u64(), budget.to_u64(), hit.to_u64(), miss.to_u64());
+    let ctx_changed = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_context != Some(ctx_tuple));
     if ctx_changed {
         emit_best_effort(
             &app.state,
@@ -322,9 +312,7 @@ fn oplog_roster_statuses(state: &State) -> std::collections::HashMap<String, Thr
         return std::collections::HashMap::new();
     };
     match cp_oplog::replay::replay(&boot.entry().oplog_path) {
-        Ok(recovered) => {
-            recovered.roster.into_iter().map(|t| (t.thread_id, t.status)).collect()
-        }
+        Ok(recovered) => recovered.roster.into_iter().map(|t| (t.thread_id, t.status)).collect(),
         Err(e) => {
             log::warn!("bridge: oplog replay for status seed failed: {e:?}");
             std::collections::HashMap::new()
@@ -402,10 +390,7 @@ pub(in crate::app::run) fn emit_thread_status(app: &mut App) {
     };
 
     for (thread_id, status) in changed {
-        emit_roster_delta(
-            &app.state,
-            OpEntryKind::ThreadStatusChanged { thread_id: thread_id.clone(), status },
-        );
+        emit_roster_delta(&app.state, OpEntryKind::ThreadStatusChanged { thread_id: thread_id.clone(), status });
         let _prev = app.state.ext_mut::<BridgeState>().thread_statuses.insert(thread_id, status);
     }
 }
@@ -452,8 +437,7 @@ pub(in crate::app::run) fn emit_thread_focus(app: &mut App) {
     }
 
     // Emit only on an actual change.
-    let changed =
-        app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_focus != focused);
+    let changed = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.last_focus != focused);
     if changed {
         emit_best_effort(&app.state, OpEntryKind::ThreadFocusChanged { thread_id: focused.clone() });
         app.state.ext_mut::<BridgeState>().last_focus = focused;

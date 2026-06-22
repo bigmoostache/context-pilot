@@ -117,10 +117,7 @@ fn child_spam(dir: &Path) -> ! {
 /// marker, then spin so the parent can `SIGKILL` the journalling process.
 fn child_command(dir: &Path) -> ! {
     let mut writer = OplogWriter::open(dir).unwrap_or_else(|e| panic!("child open: {e}"));
-    let kind = OpEntryKind::CommandEffect {
-        cmd_id: "deadman-cmd".to_owned(),
-        dedup_token: COMMAND_TOKEN.to_owned(),
-    };
+    let kind = OpEntryKind::CommandEffect { cmd_id: "deadman-cmd".to_owned(), dedup_token: COMMAND_TOKEN.to_owned() };
     let rev = writer.append(kind).unwrap_or_else(|e| panic!("child command append: {e}"));
     append_marker(dir, &format!("ACKED {rev}"));
     loop {
@@ -280,7 +277,7 @@ fn v2_journalled_command_is_exactly_once_after_deadman_reexec() {
 /// crash-in-gap test that lands with the body store.
 #[test]
 fn v12_barrier_is_pending_the_body_store() {
-    use cp_oplog::compact::{body_gc_eligible, DEFAULT_GC_GRACE};
+    use cp_oplog::compact::{DEFAULT_GC_GRACE, body_gc_eligible};
     // An in-flight spill (young) is never collected; a provable crash-orphan
     // (older than any barrier window) is.
     assert!(!body_gc_eligible(Duration::from_secs(1), DEFAULT_GC_GRACE));

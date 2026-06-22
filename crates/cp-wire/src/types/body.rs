@@ -34,11 +34,7 @@ mod tests {
 
     #[test]
     fn body_round_trip() {
-        let body = Body {
-            schema_version: 1,
-            hash: ContentHash::new([0xff; 32]),
-            data: b"hello world".to_vec(),
-        };
+        let body = Body { schema_version: 1, hash: ContentHash::new([0xff; 32]), data: b"hello world".to_vec() };
         let json = serde_json::to_string(&body).expect("serialize");
         let back: Body = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(body, back);
@@ -46,11 +42,7 @@ mod tests {
 
     #[test]
     fn empty_body_round_trip() {
-        let body = Body {
-            schema_version: 1,
-            hash: ContentHash::new([0x00; 32]),
-            data: vec![],
-        };
+        let body = Body { schema_version: 1, hash: ContentHash::new([0x00; 32]), data: vec![] };
         let json = serde_json::to_string(&body).expect("serialize");
         let back: Body = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(body, back);

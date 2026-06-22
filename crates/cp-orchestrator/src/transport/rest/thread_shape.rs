@@ -19,25 +19,19 @@ use crate::services::materialized_view::RosterEntry;
 /// up-to-the-millisecond source — design doc I5); otherwise synthesise a
 /// log-less `ThreadDetail` so a thread created since the last disk flush still
 /// appears immediately.
-pub(super) fn overlay_roster(
-    details: &mut Vec<serde_json::Value>,
-    roster: &[RosterEntry],
-    agent_id: &str,
-) {
+pub(super) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[RosterEntry], agent_id: &str) {
     for entry in roster {
-        let existing = details.iter_mut().find(|d| {
-            d.get("id").and_then(serde_json::Value::as_str) == Some(entry.thread_id.as_str())
-        });
+        let existing = details
+            .iter_mut()
+            .find(|d| d.get("id").and_then(serde_json::Value::as_str) == Some(entry.thread_id.as_str()));
         match existing {
             Some(detail) => {
                 if let Some(obj) = detail.as_object_mut() {
                     let _prev = obj.insert("status".to_owned(), roster_status_value(entry.status));
-                    let _prev =
-                        obj.insert("archived".to_owned(), serde_json::Value::Bool(entry.archived));
+                    let _prev = obj.insert("archived".to_owned(), serde_json::Value::Bool(entry.archived));
                     // Activity is the later of the two: disk has real message
                     // timestamps; the view bumps on creation/restore.
-                    let disk_activity =
-                        obj.get("lastActivity").and_then(serde_json::Value::as_u64).unwrap_or(0);
+                    let disk_activity = obj.get("lastActivity").and_then(serde_json::Value::as_u64).unwrap_or(0);
                     let _prev = obj.insert(
                         "lastActivity".to_owned(),
                         serde_json::Value::from(disk_activity.max(entry.last_activity_ms)),
@@ -81,9 +75,7 @@ pub(super) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_j
     let messages = raw.get("messages").and_then(serde_json::Value::as_array);
     let msg_count = messages.map_or(0, Vec::len);
     let unread = messages.map_or(0, |msgs| {
-        msgs.iter()
-            .filter(|m| m.get("acknowledged") == Some(&serde_json::Value::Bool(false)))
-            .count()
+        msgs.iter().filter(|m| m.get("acknowledged") == Some(&serde_json::Value::Bool(false))).count()
     });
     let last_msg = messages
         .and_then(|msgs| msgs.last())
@@ -96,15 +88,13 @@ pub(super) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_j
         .and_then(serde_json::Value::as_u64)
         .unwrap_or(0);
 
-    let log: Vec<serde_json::Value> = messages
-        .map(|msgs| msgs.iter().enumerate().map(|(i, m)| reshape_message(m, i)).collect())
-        .unwrap_or_default();
+    let log: Vec<serde_json::Value> =
+        messages.map(|msgs| msgs.iter().enumerate().map(|(i, m)| reshape_message(m, i)).collect()).unwrap_or_default();
 
-    let status_str =
-        match raw.get("status").and_then(serde_json::Value::as_str).unwrap_or("TheirTurn") {
-            "MyTurn" => "MY_TURN",
-            _ => "THEIR_TURN",
-        };
+    let status_str = match raw.get("status").and_then(serde_json::Value::as_str).unwrap_or("TheirTurn") {
+        "MyTurn" => "MY_TURN",
+        _ => "THEIR_TURN",
+    };
 
     serde_json::json!({
         "id": raw.get("id").and_then(serde_json::Value::as_str).unwrap_or(""),
@@ -141,10 +131,7 @@ fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
     }
     if let Some(q) = raw.get("question") {
         if !q.is_null() {
-            let _prev = msg
-                .as_object_mut()
-                .expect("just built")
-                .insert("questions".to_owned(), serde_json::json!([q]));
+            let _prev = msg.as_object_mut().expect("just built").insert("questions".to_owned(), serde_json::json!([q]));
         }
     }
     msg

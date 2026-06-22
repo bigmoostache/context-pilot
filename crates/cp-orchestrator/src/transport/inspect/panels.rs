@@ -12,8 +12,8 @@
 use std::path::Path;
 use std::sync::Mutex;
 
-use crate::transport::rest::HttpReply;
 use crate::transport::Backend;
+use crate::transport::rest::HttpReply;
 
 /// `GET /api/agent/{id}/panels` — live context panel list read from the
 /// agent's `panels/` directory.
@@ -205,11 +205,7 @@ pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
             }
             let Ok(content) = std::fs::read_to_string(&path) else { continue };
             let (name, description) = parse_frontmatter(&content);
-            let id = path
-                .file_stem()
-                .and_then(std::ffi::OsStr::to_str)
-                .unwrap_or("")
-                .to_owned();
+            let id = path.file_stem().and_then(std::ffi::OsStr::to_str).unwrap_or("").to_owned();
             items.push(serde_json::json!({
                 "id": id,
                 "name": name,
@@ -312,12 +308,7 @@ fn agent_folder(state: &Mutex<Backend>, agent_id: &str) -> Result<String, HttpRe
 ///
 /// Extracts `modules.<module_key>` from the worker state. Falls back to the
 /// first discovered worker when no `?worker=` query parameter is given.
-fn worker_module(
-    state: &Mutex<Backend>,
-    agent_id: &str,
-    query: &str,
-    module_key: &str,
-) -> HttpReply {
+fn worker_module(state: &Mutex<Backend>, agent_id: &str, query: &str, module_key: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -348,11 +339,8 @@ fn worker_module(
     let worker_state = backend.inspect_mut().read_worker(folder_path, &wid);
     match worker_state {
         Ok(ws) => {
-            let module_data = ws
-                .get("modules")
-                .and_then(|m| m.get(module_key))
-                .cloned()
-                .unwrap_or(serde_json::Value::Null);
+            let module_data =
+                ws.get("modules").and_then(|m| m.get(module_key)).cloned().unwrap_or(serde_json::Value::Null);
             HttpReply::ok(&module_data)
         }
         Err(_) => HttpReply::error(404, "worker state unavailable"),
@@ -381,13 +369,10 @@ fn read_shared_yaml(state: &Mutex<Backend>, folder: &str, filename: &str) -> Htt
 
 /// Extract the `worker` query parameter from a raw query string.
 fn extract_worker_param(query: &str) -> Option<String> {
-    query
-        .split('&')
-        .filter(|s| !s.is_empty())
-        .find_map(|pair| {
-            let (k, v) = pair.split_once('=')?;
-            if k == "worker" { Some(v.to_owned()) } else { None }
-        })
+    query.split('&').filter(|s| !s.is_empty()).find_map(|pair| {
+        let (k, v) = pair.split_once('=')?;
+        if k == "worker" { Some(v.to_owned()) } else { None }
+    })
 }
 
 #[cfg(test)]

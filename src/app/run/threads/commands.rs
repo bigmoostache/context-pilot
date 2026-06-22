@@ -8,9 +8,7 @@
 //! exactly as local user input would be (the K7 path).
 
 use cp_base::config::llm_types::LlmProvider;
-use cp_base::config::models::{
-    AnthropicModel, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, MiniMaxModel,
-};
+use cp_base::config::models::{AnthropicModel, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, MiniMaxModel};
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
 use cp_mod_spine::types::SpineState;
@@ -112,12 +110,15 @@ fn apply_create_thread(state: &mut State, name: &str) {
     // status memo is primed to this value so creating then immediately sending
     // a message produces exactly one follow-up `ThreadStatusChanged`.
     let created_turn = wire_turn(ThreadStatus::TheirTurn);
-    emit_roster_delta(state, OpEntryKind::ThreadCreated {
-        thread_id: id.clone(),
-        name: name.to_owned(),
-        status: created_turn,
-        timestamp_ms: now_ms(),
-    });
+    emit_roster_delta(
+        state,
+        OpEntryKind::ThreadCreated {
+            thread_id: id.clone(),
+            name: name.to_owned(),
+            status: created_turn,
+            timestamp_ms: now_ms(),
+        },
+    );
     if let Some(bs) = state.get_ext_mut::<BridgeState>() {
         let _prev = bs.thread_statuses.insert(id.clone(), created_turn);
     }
@@ -178,16 +179,15 @@ fn apply_stop(state: &mut State) {
 
     if state.flags.stream.phase.is_streaming() {
         state.flags.stream.phase.transition(StreamPhase::Idle);
-        if let Some(ctx) = state
-            .context
-            .iter_mut()
-            .find(|c| c.context_type.as_str() == cp_base::state::context::Kind::CONVERSATION)
+        if let Some(ctx) =
+            state.context.iter_mut().find(|c| c.context_type.as_str() == cp_base::state::context::Kind::CONVERSATION)
         {
             ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
         }
         state.streaming_estimated_tokens = 0;
         if let Some(msg) = state.messages.last_mut()
-            && msg.role == "assistant" && !msg.content.is_empty()
+            && msg.role == "assistant"
+            && !msg.content.is_empty()
         {
             msg.content.push_str("\n[Stopped]");
         }
@@ -220,37 +220,27 @@ fn apply_configure(state: &mut State, provider_str: &str, model_str: &str) {
     let model_val = serde_json::Value::String(model_str.to_owned());
     let model_ok = match provider {
         LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-            serde_json::from_value::<AnthropicModel>(model_val)
-                .map(|m| state.anthropic_model = m)
-                .is_ok()
+            serde_json::from_value::<AnthropicModel>(model_val).map(|m| state.anthropic_model = m).is_ok()
         }
-        LlmProvider::ClaudeCodeV2 => serde_json::from_value::<ClaudeCodeV2Model>(model_val)
-            .map(|m| state.claude_code_v2_model = m)
-            .is_ok(),
-        LlmProvider::Grok => serde_json::from_value::<GrokModel>(model_val)
-            .map(|m| state.grok_model = m)
-            .is_ok(),
-        LlmProvider::Groq => serde_json::from_value::<GroqModel>(model_val)
-            .map(|m| state.groq_model = m)
-            .is_ok(),
-        LlmProvider::DeepSeek => serde_json::from_value::<DeepSeekModel>(model_val)
-            .map(|m| state.deepseek_model = m)
-            .is_ok(),
-        LlmProvider::MiniMax => serde_json::from_value::<MiniMaxModel>(model_val)
-            .map(|m| state.minimax_model = m)
-            .is_ok(),
+        LlmProvider::ClaudeCodeV2 => {
+            serde_json::from_value::<ClaudeCodeV2Model>(model_val).map(|m| state.claude_code_v2_model = m).is_ok()
+        }
+        LlmProvider::Grok => serde_json::from_value::<GrokModel>(model_val).map(|m| state.grok_model = m).is_ok(),
+        LlmProvider::Groq => serde_json::from_value::<GroqModel>(model_val).map(|m| state.groq_model = m).is_ok(),
+        LlmProvider::DeepSeek => {
+            serde_json::from_value::<DeepSeekModel>(model_val).map(|m| state.deepseek_model = m).is_ok()
+        }
+        LlmProvider::MiniMax => {
+            serde_json::from_value::<MiniMaxModel>(model_val).map(|m| state.minimax_model = m).is_ok()
+        }
     };
 
     if !model_ok {
-        log::warn!(
-            "bridge: Configure unknown model \"{model_str}\" for provider \"{provider_str}\""
-        );
+        log::warn!("bridge: Configure unknown model \"{model_str}\" for provider \"{provider_str}\"");
         return;
     }
 
     state.llm_provider = provider;
     state.flags.ui.dirty = true;
-    log::info!(
-        "bridge: configured provider={provider_str} model={model_str}"
-    );
+    log::info!("bridge: configured provider={provider_str} model={model_str}");
 }

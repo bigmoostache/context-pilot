@@ -48,7 +48,7 @@ use cp_orchestrator::channel::{AgentChannel, Tailer};
 use cp_orchestrator::liveness::Liveness;
 use cp_orchestrator::registry::{AgentRegistry, Event};
 
-use cp_wire::heartbeat::{Heartbeat, HEARTBEAT_SCHEMA_VERSION};
+use cp_wire::heartbeat::{HEARTBEAT_SCHEMA_VERSION, Heartbeat};
 use cp_wire::types::ack::Status;
 use cp_wire::types::command::{Command, Kind as CommandKind};
 use cp_wire::types::oplog::OpEntryKind;
@@ -231,12 +231,7 @@ fn the_tailer_picks_up_a_spilled_body_the_channel_then_hydrates() {
 
     // The channel hydrates the spilled body (integrity verified), but an
     // inlined body has no file to hydrate — it rode its oplog entry.
-    let ch = AgentChannel::from_entry(&entry(
-        "a",
-        &dir.path().join("hb"),
-        &oplog_dir,
-        &dir.path().join("a.sock"),
-    ));
+    let ch = AgentChannel::from_entry(&entry("a", &dir.path().join("hb"), &oplog_dir, &dir.path().join("a.sock")));
     assert_eq!(
         ch.hydrate(head).expect("hydrate"),
         Some(b"a large body that spills to its own durable file".to_vec()),

@@ -45,10 +45,7 @@ fn every_opentry_kind_round_trips() {
     snapshot.seen.mark("dedup-in-snapshot", 4);
 
     let kinds = [
-        OpEntryKind::CommandEffect {
-            cmd_id: "cmd-1".to_owned(),
-            dedup_token: "dt-1".to_owned(),
-        },
+        OpEntryKind::CommandEffect { cmd_id: "cmd-1".to_owned(), dedup_token: "dt-1".to_owned() },
         OpEntryKind::SeenMark { dedup_token: "dt-2".to_owned() },
         OpEntryKind::PhaseTransition { phase: Phase::Tooling },
         OpEntryKind::MessageCreated {
@@ -107,13 +104,8 @@ fn accepts_window_is_exactly_n_minus_one() {
     // `PV-1 <= their <= PV` holds at every point — a future PROTOCOL_VERSION
     // bump that widened or inverted the window would fail here.
     for their in 0..=PROTOCOL_VERSION.wrapping_add(4) {
-        let expected =
-            their <= PROTOCOL_VERSION && their >= PROTOCOL_VERSION.saturating_sub(1);
-        assert_eq!(
-            accepts(their),
-            expected,
-            "accepts({their}) wrong for PROTOCOL_VERSION {PROTOCOL_VERSION}",
-        );
+        let expected = their <= PROTOCOL_VERSION && their >= PROTOCOL_VERSION.saturating_sub(1);
+        assert_eq!(accepts(their), expected, "accepts({their}) wrong for PROTOCOL_VERSION {PROTOCOL_VERSION}",);
     }
 }
 

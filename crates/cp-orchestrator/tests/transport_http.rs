@@ -38,15 +38,15 @@ use std::time::Duration;
 use cp_oplog::append::OplogWriter;
 
 use cp_orchestrator::channel::Tailer;
-use cp_orchestrator::transport::{serve_bound, Backend};
+use cp_orchestrator::transport::{Backend, serve_bound};
 
+use cp_wire::types::ContentHash;
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
 use cp_wire::types::registry::{AgentStatus, Entry};
-use cp_wire::types::ContentHash;
 
 use tiny_http::Server;
 
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 
 /// Build a registry [`Entry`] with the full schema, pointing at `oplog_dir`.
 fn make_entry(id: &str, oplog_dir: &Path) -> Entry {
@@ -205,13 +205,8 @@ fn sse_requires_a_valid_single_use_ticket() {
     assert_eq!(no_ticket, 401, "the stream demands a ticket");
 
     // A bogus ticket → 401.
-    let (bogus, _e) = common::sse_collect(
-        &h.addr,
-        "/api/stream?agent=agent-c&ticket=deadbeef",
-        &[],
-        1,
-        Duration::from_millis(600),
-    );
+    let (bogus, _e) =
+        common::sse_collect(&h.addr, "/api/stream?agent=agent-c&ticket=deadbeef", &[], 1, Duration::from_millis(600));
     assert_eq!(bogus, 401, "an unminted ticket is rejected");
 
     // Mint a real ticket, open the stream resuming from rev 0 → 200 + the
@@ -219,8 +214,7 @@ fn sse_requires_a_valid_single_use_ticket() {
     // come from the reconnect-replay path).
     let token = ticket_token(&h);
     let path = format!("/api/stream?agent=agent-c&ticket={token}");
-    let (ok, events) =
-        common::sse_collect(&h.addr, &path, &[("Last-Event-ID", "0")], 1, Duration::from_secs(3));
+    let (ok, events) = common::sse_collect(&h.addr, &path, &[("Last-Event-ID", "0")], 1, Duration::from_secs(3));
     assert_eq!(ok, 200, "a valid ticket opens the stream");
     assert!(events.iter().any(|e| e.event == "delta"), "the oplog tail streams as deltas");
 
@@ -238,11 +232,9 @@ fn sse_resumes_from_last_event_id() {
     let path = format!("/api/stream?agent=agent-d&ticket={token}");
 
     // Resume from rev 2 → only deltas with a higher rev are delivered.
-    let (status, events) =
-        common::sse_collect(&h.addr, &path, &[("Last-Event-ID", "2")], 1, Duration::from_secs(3));
+    let (status, events) = common::sse_collect(&h.addr, &path, &[("Last-Event-ID", "2")], 1, Duration::from_secs(3));
     assert_eq!(status, 200);
-    let deltas: Vec<u64> =
-        events.iter().filter(|e| e.event == "delta").filter_map(|e| e.id).collect();
+    let deltas: Vec<u64> = events.iter().filter(|e| e.event == "delta").filter_map(|e| e.id).collect();
     assert!(!deltas.is_empty(), "replay delivers the tail past rev 2");
     assert!(deltas.iter().all(|&rev| rev > 2), "no delta at or below the resumed rev");
     // Each delta carries the JSON-encoded oplog entry as its data payload.
@@ -251,5 +243,3 @@ fn sse_resumes_from_last_event_id() {
         "a delta's data payload is the serialized oplog entry",
     );
 }
-
-

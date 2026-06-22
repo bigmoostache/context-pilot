@@ -99,9 +99,7 @@ pub(crate) fn sse_collect(
     deadline: Duration,
 ) -> (u16, Vec<SseEvent>) {
     let mut stream = TcpStream::connect(addr).expect("connect");
-    stream
-        .set_read_timeout(Some(Duration::from_millis(200)))
-        .expect("set read timeout");
+    stream.set_read_timeout(Some(Duration::from_millis(200))).expect("set read timeout");
 
     let mut req = format!("{method} {path} HTTP/1.1\r\nHost: localhost\r\n", method = "GET");
     req.push_str("Accept: text/event-stream\r\n");
@@ -192,9 +190,5 @@ fn parse_event(block: &str) -> Option<SseEvent> {
 
 /// Parse the status code out of an HTTP status line at the start of `text`.
 fn parse_status_line(text: &str) -> u16 {
-    text.lines()
-        .next()
-        .and_then(|line| line.split_whitespace().nth(1))
-        .and_then(|code| code.parse().ok())
-        .unwrap_or(0)
+    text.lines().next().and_then(|line| line.split_whitespace().nth(1)).and_then(|code| code.parse().ok()).unwrap_or(0)
 }

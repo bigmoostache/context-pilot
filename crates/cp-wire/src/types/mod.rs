@@ -120,10 +120,7 @@ impl<'de> Deserialize<'de> for ContentHash {
         Ok(Self(bytes))
     }
 
-    fn deserialize_in_place<D: serde::Deserializer<'de>>(
-        deserializer: D,
-        place: &mut Self,
-    ) -> Result<(), D::Error> {
+    fn deserialize_in_place<D: serde::Deserializer<'de>>(deserializer: D, place: &mut Self) -> Result<(), D::Error> {
         *place = Self::deserialize(deserializer)?;
         Ok(())
     }
@@ -210,10 +207,7 @@ mod tests {
     #[test]
     fn content_hash_of_matches_known_vectors() {
         // Canonical SHA-256 test vectors.
-        assert_eq!(
-            ContentHash::of(b"").to_hex(),
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        );
+        assert_eq!(ContentHash::of(b"").to_hex(), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",);
         assert_eq!(
             ContentHash::of(b"abc").to_hex(),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
@@ -265,12 +259,9 @@ mod tests {
 
     #[test]
     fn lifecycle_round_trip() {
-        for state in [
-            LifecycleState::Starting,
-            LifecycleState::Running,
-            LifecycleState::Stopping,
-            LifecycleState::Stopped,
-        ] {
+        for state in
+            [LifecycleState::Starting, LifecycleState::Running, LifecycleState::Stopping, LifecycleState::Stopped]
+        {
             let json = serde_json::to_string(&state).expect("serialize");
             let back: LifecycleState = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(state, back);

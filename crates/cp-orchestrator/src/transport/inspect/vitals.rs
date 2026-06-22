@@ -34,16 +34,16 @@
 
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
 use std::sync::Mutex;
+use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use cp_wire::heartbeat::{Heartbeat, DEFAULT_MAX_AGE};
+use cp_wire::heartbeat::{DEFAULT_MAX_AGE, Heartbeat};
 use cp_wire::types::registry::Entry;
 
-use crate::transport::rest::HttpReply;
 use crate::transport::Backend;
+use crate::transport::rest::HttpReply;
 
 /// Per-probe network timeout. Bounds DNS+connect for a single remote check.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
@@ -140,9 +140,7 @@ fn agent_connection_vital(entry: &Entry) -> serde_json::Value {
 /// This is a status read, not a connection: `ok` carries the live phase as its
 /// detail; a `Stopped`/`Stopping` lifecycle surfaces as `error`.
 fn agent_status_vital(state: &Mutex<Backend>, agent_id: &str) -> serde_json::Value {
-    let snapshot = state.lock().ok().and_then(|b| {
-        b.view.get(agent_id).map(|v| (v.phase, v.lifecycle))
-    });
+    let snapshot = state.lock().ok().and_then(|b| b.view.get(agent_id).map(|v| (v.phase, v.lifecycle)));
     let Some((phase, lifecycle)) = snapshot else {
         return vital("Agent loop status", "agent", "unavailable", None, "no view yet");
     };
@@ -166,17 +164,8 @@ fn meilisearch_vital() -> serde_json::Value {
         return vital("Meilisearch", "infra", "unavailable", None, "no port file (not started)");
     };
     let started = Instant::now();
-    match TcpStream::connect_timeout(
-        &(std::net::Ipv4Addr::LOCALHOST, port).into(),
-        PROBE_TIMEOUT,
-    ) {
-        Ok(_) => vital(
-            "Meilisearch",
-            "infra",
-            "ok",
-            Some(elapsed_ms(started)),
-            &format!("127.0.0.1:{port}"),
-        ),
+    match TcpStream::connect_timeout(&(std::net::Ipv4Addr::LOCALHOST, port).into(), PROBE_TIMEOUT) {
+        Ok(_) => vital("Meilisearch", "infra", "ok", Some(elapsed_ms(started)), &format!("127.0.0.1:{port}")),
         Err(e) => vital("Meilisearch", "infra", "error", None, &format!("connect failed: {e}")),
     }
 }
@@ -298,13 +287,7 @@ fn lifecycle_label(state: cp_wire::types::LifecycleState) -> &'static str {
 }
 
 /// Build one vital JSON object.
-fn vital(
-    name: &str,
-    category: &str,
-    status: &str,
-    latency_ms: Option<u64>,
-    detail: &str,
-) -> serde_json::Value {
+fn vital(name: &str, category: &str, status: &str, latency_ms: Option<u64>, detail: &str) -> serde_json::Value {
     serde_json::json!({
         "name": name,
         "category": category,
@@ -321,11 +304,7 @@ fn elapsed_ms(started: Instant) -> u64 {
 
 /// Current wall-clock time in epoch milliseconds.
 fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .ok()
-        .and_then(|d| u64::try_from(d.as_millis()).ok())
-        .unwrap_or(0)
+    SystemTime::now().duration_since(UNIX_EPOCH).ok().and_then(|d| u64::try_from(d.as_millis()).ok()).unwrap_or(0)
 }
 
 /// The user's home directory (`$HOME`), if set.

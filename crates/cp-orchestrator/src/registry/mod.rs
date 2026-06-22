@@ -33,7 +33,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use cp_wire::heartbeat::{Heartbeat, DEFAULT_MAX_AGE};
+use cp_wire::heartbeat::{DEFAULT_MAX_AGE, Heartbeat};
 use cp_wire::types::registry::{AgentStatus, Entry};
 
 pub mod channel;
@@ -41,7 +41,7 @@ pub mod liveness;
 pub mod tailer;
 pub mod tee_reader;
 
-use self::liveness::{verdict, Liveness};
+use self::liveness::{Liveness, verdict};
 
 /// File-name suffix of a published registry record.
 const RECORD_SUFFIX: &str = ".json";
@@ -284,8 +284,7 @@ fn file_age(path: &Path) -> Option<Duration> {
 ///
 /// Returns [`io::Error`] if `$HOME` is unset.
 pub fn default_agents_dir() -> io::Result<PathBuf> {
-    let home = std::env::var_os("HOME")
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "$HOME is not set"))?;
+    let home = std::env::var_os("HOME").ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "$HOME is not set"))?;
     Ok(Path::new(&home).join(".context-pilot").join("agents"))
 }
 

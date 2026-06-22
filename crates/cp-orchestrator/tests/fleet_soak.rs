@@ -202,21 +202,14 @@ fn n_agents_under_concurrent_load_stay_gap_free_and_isolated() {
     for idx in 0..AGENTS {
         let agent_id = format!("agent-{idx}");
         let agent = view.get(&agent_id).unwrap_or_else(|| panic!("{agent_id} projected"));
-        let head = agent
-            .heads
-            .threads
-            .iter()
-            .find(|h| h.thread_id == "T1")
-            .unwrap_or_else(|| panic!("{agent_id} T1 head"));
+        let head =
+            agent.heads.threads.iter().find(|h| h.thread_id == "T1").unwrap_or_else(|| panic!("{agent_id} T1 head"));
         assert_eq!(
             head.last_message_hash,
             ContentHash::new([RECORDS_PER_AGENT - 1; 32]),
             "{agent_id}: head is this agent's own last message, not a neighbour's",
         );
-        assert!(
-            agent.roster.iter().any(|t| t.thread_id == "T1"),
-            "{agent_id}: roster carries its own thread",
-        );
+        assert!(agent.roster.iter().any(|t| t.thread_id == "T1"), "{agent_id}: roster carries its own thread",);
     }
 
     // The breaker trips exactly the over-budget agents and no others.
@@ -248,14 +241,8 @@ fn a_flooded_reordered_subscriber_coalesces_then_reconciles_from_the_view() {
     }
     let mut view = MaterializedView::new();
     view.apply_batch("chaos", &tail_all(dir.path()));
-    let authoritative_head = view
-        .get("chaos")
-        .expect("agent")
-        .heads
-        .threads
-        .first()
-        .expect("T1 head")
-        .last_message_hash;
+    let authoritative_head =
+        view.get("chaos").expect("agent").heads.threads.first().expect("T1 head").last_message_hash;
     assert_eq!(authoritative_head, ContentHash::new([0x42; 32]));
 
     // A small-capacity subscriber is flooded with MORE frames than it can hold,

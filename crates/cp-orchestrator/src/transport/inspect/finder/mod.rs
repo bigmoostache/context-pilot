@@ -23,8 +23,10 @@ mod listing;
 mod mutate;
 mod sheet;
 pub(super) mod support;
+mod upload;
 
 pub use download::{fs_download, fs_raw};
 pub use listing::{conversation, fs_descriptions, fs_list, fs_preview};
-pub use mutate::{fs_mkdir, fs_move, fs_rename, fs_trash, fs_upload, fs_upload_unique, fs_write};
+pub use mutate::{fs_mkdir, fs_move, fs_rename, fs_trash, fs_write};
 pub use sheet::fs_sheet;
+pub use upload::{fs_upload, fs_upload_unique};

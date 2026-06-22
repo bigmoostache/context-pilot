@@ -95,15 +95,10 @@ impl SpawnLock {
                 if Self::is_stale(&path) {
                     let _r = std::fs::remove_file(&path);
                     // One more attempt after stealing; if we still lose, defer.
-                    OpenOptions::new()
-                        .write(true)
-                        .create_new(true)
-                        .open(&path)
-                        .ok()
-                        .map(|mut f| {
-                            let _w = writeln!(f, "{}", std::process::id());
-                            Self { path }
-                        })
+                    OpenOptions::new().write(true).create_new(true).open(&path).ok().map(|mut f| {
+                        let _w = writeln!(f, "{}", std::process::id());
+                        Self { path }
+                    })
                 } else {
                     None
                 }
@@ -227,10 +222,7 @@ fn run(rx: &mpsc::Receiver<()>, port: u16, master_key: &str) {
 /// Geometric back-off `BASE_BACKOFF * 2^(n-1)`, capped at [`MAX_BACKOFF`].
 fn backoff_for(consecutive_failures: u32) -> Duration {
     let shift = consecutive_failures.saturating_sub(1).min(6);
-    BASE_BACKOFF
-        .checked_mul(1u32 << shift)
-        .unwrap_or(MAX_BACKOFF)
-        .min(MAX_BACKOFF)
+    BASE_BACKOFF.checked_mul(1u32 << shift).unwrap_or(MAX_BACKOFF).min(MAX_BACKOFF)
 }
 
 /// Drive one single-flight respawn of the global server.

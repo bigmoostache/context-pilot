@@ -38,9 +38,9 @@ use std::path::Path;
 use std::time::SystemTime;
 
 use cp_mod_bridge::boot::Boot;
+use cp_wire::PROTOCOL_VERSION;
 use cp_wire::heartbeat::{DEFAULT_MAX_AGE, HEARTBEAT_LEN, Heartbeat};
 use cp_wire::types::registry::{AgentStatus, Entry};
-use cp_wire::PROTOCOL_VERSION;
 use tempfile::TempDir;
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -178,8 +178,5 @@ fn a_real_beat_drives_the_freshness_and_boot_match_verdict() {
 
     // Bound to its own boot only — the pid-reuse defence.
     assert!(beat.matches_boot(&entry.boot_id), "matches its own boot_id");
-    assert!(
-        !beat.matches_boot("ffffffffffffffffffffffffffffffff"),
-        "rejects a different boot_id",
-    );
+    assert!(!beat.matches_boot("ffffffffffffffffffffffffffffffff"), "rejects a different boot_id",);
 }

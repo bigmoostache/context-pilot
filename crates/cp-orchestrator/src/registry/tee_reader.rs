@@ -31,10 +31,10 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::thread::{self, sleep, JoinHandle};
+use std::thread::{self, JoinHandle, sleep};
 use std::time::Duration;
 
-use cp_wire::framing::{decode_raw, FrameError, MAX_PAYLOAD_SIZE};
+use cp_wire::framing::{FrameError, MAX_PAYLOAD_SIZE, decode_raw};
 use cp_wire::types::stream::Frame as StreamFrame;
 
 use crate::transport::Backend;
@@ -130,12 +130,7 @@ fn read_loop(agent_id: &str, tee_path: &PathBuf, backend: &Arc<Mutex<Backend>>, 
 
 /// Drain one connected socket frame-by-frame into the hub. Returns when the
 /// connection ends (EOF / hard error) or `stop` is set.
-fn pump_connection(
-    agent_id: &str,
-    mut stream: UnixStream,
-    backend: &Arc<Mutex<Backend>>,
-    stop: &AtomicBool,
-) {
+fn pump_connection(agent_id: &str, mut stream: UnixStream, backend: &Arc<Mutex<Backend>>, stop: &AtomicBool) {
     let mut buf: Vec<u8> = Vec::with_capacity(READ_CHUNK);
     let mut chunk = [0u8; READ_CHUNK];
 
@@ -194,10 +189,10 @@ fn publish(agent_id: &str, frame: &StreamFrame, backend: &Arc<Mutex<Backend>>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write as _;
-    use std::os::unix::net::UnixListener;
     use cp_wire::framing::encode_raw;
     use cp_wire::types::stream::Kind;
+    use std::io::Write as _;
+    use std::os::unix::net::UnixListener;
     use tempfile::tempdir;
 
     fn token(seq: u64, text: &str) -> StreamFrame {

@@ -63,10 +63,7 @@ const fn u32_to_le(value: u32) -> [u8; 4] {
 /// Decode four little-endian bytes into a `u32`.
 fn u32_from_le(bytes: [u8; 4]) -> u32 {
     let [b0, b1, b2, b3] = bytes;
-    u32::from(b0)
-        | u32::from(b1).wrapping_shl(8)
-        | u32::from(b2).wrapping_shl(16)
-        | u32::from(b3).wrapping_shl(24)
+    u32::from(b0) | u32::from(b1).wrapping_shl(8) | u32::from(b2).wrapping_shl(16) | u32::from(b3).wrapping_shl(24)
 }
 
 // ── errors ─────────────────────────────────────────────────────────────
@@ -153,16 +150,10 @@ pub fn encode_raw(payload: &[u8]) -> Result<Vec<u8>, FrameError> {
 /// * [`FrameError::CrcMismatch`] — integrity check failed (torn /
 ///   corrupt).
 pub fn decode_raw(buf: &[u8]) -> Result<RawFrame<'_>, FrameError> {
-    let len_bytes: [u8; 4] = buf
-        .get(0..4)
-        .ok_or(FrameError::Incomplete)?
-        .try_into()
-        .map_err(|_ignored| FrameError::Incomplete)?;
-    let crc_bytes: [u8; 4] = buf
-        .get(4..8)
-        .ok_or(FrameError::Incomplete)?
-        .try_into()
-        .map_err(|_ignored| FrameError::Incomplete)?;
+    let len_bytes: [u8; 4] =
+        buf.get(0..4).ok_or(FrameError::Incomplete)?.try_into().map_err(|_ignored| FrameError::Incomplete)?;
+    let crc_bytes: [u8; 4] =
+        buf.get(4..8).ok_or(FrameError::Incomplete)?.try_into().map_err(|_ignored| FrameError::Incomplete)?;
 
     let len = u32_from_le(len_bytes);
     let expected_crc = u32_from_le(crc_bytes);

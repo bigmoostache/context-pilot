@@ -169,11 +169,8 @@ impl AgentView {
                 self.lifecycle = Some(*state);
             }
             OpEntryKind::CostAggregate { input_tokens, output_tokens, cost_usd } => {
-                self.cost = CostSnapshot {
-                    input_tokens: *input_tokens,
-                    output_tokens: *output_tokens,
-                    cost_usd: *cost_usd,
-                };
+                self.cost =
+                    CostSnapshot { input_tokens: *input_tokens, output_tokens: *output_tokens, cost_usd: *cost_usd };
             }
             OpEntryKind::ContextUsage { used_tokens, threshold_tokens, budget_tokens, hit_tokens, miss_tokens } => {
                 self.context = ContextSnapshot {
@@ -186,9 +183,7 @@ impl AgentView {
             }
             // Durability-only records and forward-compat unknowns do not
             // affect the projected state.
-            OpEntryKind::CommandEffect { .. }
-            | OpEntryKind::SeenMark { .. }
-            | OpEntryKind::Unknown => {}
+            OpEntryKind::CommandEffect { .. } | OpEntryKind::SeenMark { .. } | OpEntryKind::Unknown => {}
         }
     }
 }

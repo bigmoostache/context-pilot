@@ -245,9 +245,7 @@ impl Module for TreeModule {
         // noise for a navigation tree — a coding agent never browses them and a
         // slightly-stale child count is harmless — so an event under any of
         // them is dropped before it can invalidate the panel.
-        is_dir_event
-            && ctx.context_type.as_str() == Kind::TREE
-            && !path_under_control_dir(changed_path)
+        is_dir_event && ctx.context_type.as_str() == Kind::TREE && !path_under_control_dir(changed_path)
     }
 
     fn dependencies(&self) -> &[&'static str] {

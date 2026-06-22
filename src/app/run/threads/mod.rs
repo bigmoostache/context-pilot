@@ -13,8 +13,8 @@ pub(super) use bridge::{bridge_active, emit_thread_focus, emit_thread_status, em
 pub(super) use messages::emit_messages;
 
 use crate::app::App;
-use crate::app::panels::now_ms;
 use crate::app::PendingDone;
+use crate::app::panels::now_ms;
 use cp_base::tools::ToolUse;
 use cp_mod_spine::types::{NotificationType, SpineState};
 use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};

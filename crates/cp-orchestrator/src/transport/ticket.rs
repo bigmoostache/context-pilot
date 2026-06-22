@@ -95,9 +95,7 @@ impl Default for TicketStore {
 
 /// Milliseconds since the Unix epoch, saturating at 0 on a pre-epoch clock.
 fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| saturating_millis(d))
+    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| saturating_millis(d))
 }
 
 /// A `Duration` as `u64` milliseconds, saturating on overflow.
@@ -112,14 +110,9 @@ fn saturating_millis(d: Duration) -> u64 {
 /// tickets are a defence-in-depth layer, not the sole authority.
 fn random_token() -> String {
     let mut bytes = [0u8; TOKEN_BYTES];
-    if std::fs::File::open("/dev/urandom")
-        .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut bytes))
-        .is_err()
-    {
+    if std::fs::File::open("/dev/urandom").and_then(|mut f| std::io::Read::read_exact(&mut f, &mut bytes)).is_err() {
         // Fallback: spread a nanosecond clock across the buffer.
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(0u128, |d| d.as_nanos());
+        let seed = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0u128, |d| d.as_nanos());
         for (i, slot) in bytes.iter_mut().enumerate() {
             let shift = u32::try_from((i % 16).saturating_mul(8)).unwrap_or(0);
             *slot = u8::try_from(seed.wrapping_shr(shift) & 0xff).unwrap_or(0);

@@ -165,9 +165,9 @@ impl Tailer {
 mod tests {
     use super::*;
     use cp_oplog::append::OplogWriter;
-    use cp_wire::types::oplog::OpEntryKind;
     use cp_wire::types::ContentHash;
     use cp_wire::types::Phase;
+    use cp_wire::types::oplog::OpEntryKind;
     use tempfile::tempdir;
 
     fn phase_kind() -> OpEntryKind {

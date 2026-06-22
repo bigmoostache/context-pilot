@@ -3570,6 +3570,10 @@
   path: ui/src/components/agents/PromptModal.tsx
   description: 'Prompts page modals (design-only). PromptModal: LARGE dialog (1180x90vh, max 96vw) — create (kind picker System/Skill/Command + name/description) or view/edit (prefilled, built-in name lock, Delete). Body uses the WYSIWYG MarkdownEditor (flex-grows to fill height), not a textarea; editor remounts on isNew/item.id (NOT kind) so the kind toggle no longer wipes the body. ImportModal: import from other agentic systems (Claude Code/Codex/Cursor/Windsurf/Aider/Continue), per-row Imported state. Shared hand-rolled Backdrop (backdrop-fade+modal-pop) + Field. Used by PromptsPage.'
   last_edited_ms: 1781534862032
+6d072a9fe2323359:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 6d1c9ace53ca22c9:
   path: docs/roadmap.md
   description: 'Implementation roadmap for the v5 orchestration backend (companion to design-orchestration-backend.md). Goals→Tasks→Subtasks; every task has a single testable Objective (assertable acceptance criterion). 12 phases P0-P11: P0 foundations (lock §21 open Qs, cp-wire protocol crate, scaffold cp-mod-bridge + cp-orchestrator, flock×deadman-reexec FD spike H5), P1 oplog keystone (append+fsync+CRC framing, torn-tail replay, seen-set ack-rev eviction, compaction), P2 agent bridge boot/lock/registry/heartbeat (additive, writer.rs untouched), P3 stream tee SPSC+publisher (I7 no-backpressure), P4 command intake HMAC+nonce/journal-then-ack/user-message-injection K7/lifecycle, P5 backend skeleton 3 seams (Registry/Channel/Supervisor, single inotify watch I12, rev-pinned hydrate I5, allow-list spawn R2-15), P6 StreamHub fan-out + durable CostBreaker + lazy MaterializedView, P7 frontend REST+auth''d-WS ticket + reconnect/replay/client-queue R2-1, P8 frontend rAF batching + orphan buffer + degraded indicator, P9 security audit, P10 observability/versioning, P11 fault-injection gate (runs design §25 V1-V10 matrix + soak + sign-off). Milestones M0-M4, critical-path dependency order, out-of-scope list. Each V-test embedded as the originating task''s objective. NOT implemented (plan).'

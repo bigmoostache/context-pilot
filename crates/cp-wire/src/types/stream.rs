@@ -94,9 +94,7 @@ mod tests {
             thread_id: "T1".into(),
             message_id: "msg-42".into(),
             seq: 7,
-            kind: Kind::Token {
-                text: "Hello".into(),
-            },
+            kind: Kind::Token { text: "Hello".into() },
         };
         let json = serde_json::to_string(&frame).expect("serialize");
         let back: Frame = serde_json::from_str(&json).expect("deserialize");
@@ -112,9 +110,7 @@ mod tests {
             thread_id: "T".into(),
             message_id: "m".into(),
             seq: 0,
-            kind: Kind::PhaseHint {
-                phase: Phase::Tooling,
-            },
+            kind: Kind::PhaseHint { phase: Phase::Tooling },
         };
         let json = serde_json::to_string(&frame).expect("serialize");
         let back: Frame = serde_json::from_str(&json).expect("deserialize");

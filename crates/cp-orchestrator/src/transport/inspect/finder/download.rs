@@ -3,8 +3,8 @@
 use std::path::Path;
 use std::sync::Mutex;
 
-use crate::transport::rest::HttpReply;
 use crate::transport::Backend;
+use crate::transport::rest::HttpReply;
 
 use super::support::{agent_folder, confined_path, extract_param};
 
@@ -24,11 +24,7 @@ const MAX_ZIP_BYTES: u64 = 100 * 1024 * 1024;
 /// system `zip` command (available on macOS and most Linux distros).
 ///
 /// Returns `Ok((bytes, filename))` on success, `Err(HttpReply)` on error.
-pub fn fs_download(
-    state: &Mutex<Backend>,
-    agent_id: &str,
-    query: &str,
-) -> Result<(Vec<u8>, String), HttpReply> {
+pub fn fs_download(state: &Mutex<Backend>, agent_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
     let folder = agent_folder(state, agent_id)?;
     let relative = match extract_param(query, "path") {
         Some(p) if !p.is_empty() => p,
@@ -53,25 +49,16 @@ pub fn fs_download(
     }
 
     let bytes = std::fs::read(&target).map_err(|_| HttpReply::error(502, "read failed"))?;
-    let filename = target
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("download")
-        .to_owned();
+    let filename = target.file_name().and_then(|n| n.to_str()).unwrap_or("download").to_owned();
 
     Ok((bytes, filename))
 }
 
 /// Zip a directory into `/tmp` and return its bytes + filename.
 fn zip_and_download(dir: &Path) -> Result<(Vec<u8>, String), HttpReply> {
-    let dirname = dir
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("folder");
+    let dirname = dir.file_name().and_then(|n| n.to_str()).unwrap_or("folder");
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_millis());
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis());
     let tmp = format!("/tmp/cp-dl-{}-{now}.zip", std::process::id());
 
     let output = std::process::Command::new("zip")
@@ -113,11 +100,7 @@ fn zip_and_download(dir: &Path) -> Result<(Vec<u8>, String), HttpReply> {
 /// this URL. Confined to the agent realm and capped at [`MAX_DOWNLOAD_BYTES`].
 ///
 /// Returns `Ok((bytes, content_type))` on success, `Err(HttpReply)` on error.
-pub fn fs_raw(
-    state: &Mutex<Backend>,
-    agent_id: &str,
-    query: &str,
-) -> Result<(Vec<u8>, String), HttpReply> {
+pub fn fs_raw(state: &Mutex<Backend>, agent_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
     let folder = agent_folder(state, agent_id)?;
     let relative = match extract_param(query, "path") {
         Some(p) if !p.is_empty() => p,
@@ -137,10 +120,7 @@ pub fn fs_raw(
     }
 
     let bytes = std::fs::read(&target).map_err(|_| HttpReply::error(502, "read failed"))?;
-    let ctype = target
-        .file_name()
-        .and_then(|n| n.to_str())
-        .map_or("application/octet-stream", content_type_for);
+    let ctype = target.file_name().and_then(|n| n.to_str()).map_or("application/octet-stream", content_type_for);
 
     Ok((bytes, ctype.to_owned()))
 }

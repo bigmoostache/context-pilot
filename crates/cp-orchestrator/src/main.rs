@@ -10,6 +10,8 @@ use cp_orchestrator::runtime::{Config, Runtime};
 // Acknowledge crate-level dependencies used only by the library half or by
 // dev-dependencies linked into the bin-test target.
 use calamine as _;
+#[cfg(test)]
+use cp_mod_bridge as _;
 use cp_oplog as _;
 use csv as _;
 use nix as _;
@@ -18,18 +20,12 @@ use portable_pty as _;
 use serde as _;
 use serde_json as _;
 use serde_yaml as _;
-use tiny_http as _;
-#[cfg(test)]
-use cp_mod_bridge as _;
 #[cfg(test)]
 use tempfile as _;
+use tiny_http as _;
 
 fn main() {
-    eprintln!(
-        "cp-orchestrator v{} (protocol v{})",
-        env!("CARGO_PKG_VERSION"),
-        cp_wire::PROTOCOL_VERSION,
-    );
+    eprintln!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION,);
 
     let config = match Config::from_env() {
         Ok(c) => c,

@@ -4,8 +4,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use crate::transport::rest::HttpReply;
 use crate::transport::Backend;
+use crate::transport::rest::HttpReply;
 
 /// Resolve the agent's working directory from the registry record.
 pub(super) fn agent_folder(state: &Mutex<Backend>, agent_id: &str) -> Result<String, HttpReply> {
@@ -32,11 +32,7 @@ pub(super) fn confined_path(root: &str, relative: &str) -> Option<PathBuf> {
 
     let candidate = root_path.join(relative);
     let canonical = candidate.canonicalize().ok()?;
-    if canonical.starts_with(&root_canonical) {
-        Some(canonical)
-    } else {
-        None
-    }
+    if canonical.starts_with(&root_canonical) { Some(canonical) } else { None }
 }
 
 /// Count the non-hidden direct children of a directory.
@@ -49,54 +45,43 @@ pub(super) fn count_visible_children(dir: &Path) -> usize {
     let Ok(rd) = std::fs::read_dir(dir) else {
         return 0;
     };
-    rd.filter_map(Result::ok)
-        .filter(|e| {
-            e.file_name()
-                .to_str()
-                .is_some_and(|n| !n.starts_with('.'))
-        })
-        .count()
+    rd.filter_map(Result::ok).filter(|e| e.file_name().to_str().is_some_and(|n| !n.starts_with('.'))).count()
 }
 
 /// Infer a `FinderKind` string from a filename's extension.
 pub(super) fn infer_kind(name: &str) -> &'static str {
     let ext = name.rsplit('.').next().unwrap_or("").to_lowercase();
     match ext.as_str() {
-        "rs" | "py" | "js" | "ts" | "tsx" | "jsx" | "go" | "c" | "cpp" | "h" | "hpp" | "java"
-        | "rb" | "sh" | "bash" | "zsh" | "lua" | "zig" | "swift" | "kt" | "scala" | "ex"
-        | "exs" | "erl" | "hs" | "ml" | "css" | "scss" | "html" | "sql" | "r" | "pl"
-        | "php" | "cs" | "fs" | "vue" | "svelte" | "dart" | "nim" | "v" | "wasm" => "code",
+        "rs" | "py" | "js" | "ts" | "tsx" | "jsx" | "go" | "c" | "cpp" | "h" | "hpp" | "java" | "rb" | "sh"
+        | "bash" | "zsh" | "lua" | "zig" | "swift" | "kt" | "scala" | "ex" | "exs" | "erl" | "hs" | "ml" | "css"
+        | "scss" | "html" | "sql" | "r" | "pl" | "php" | "cs" | "fs" | "vue" | "svelte" | "dart" | "nim" | "v"
+        | "wasm" => "code",
         "md" | "mdx" => "markdown",
         "json" | "jsonl" | "json5" => "json",
         "pdf" => "pdf",
-        "png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" | "bmp" | "ico" | "tiff" | "heic" => {
-            "image"
-        }
+        "png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" | "bmp" | "ico" | "tiff" | "heic" => "image",
         "csv" | "xlsx" | "xls" | "ods" | "tsv" => "sheet",
         "pptx" | "ppt" | "odp" => "slides",
         "zip" | "tar" | "gz" | "bz2" | "xz" | "7z" | "rar" | "zst" => "archive",
         "mp3" | "wav" | "flac" | "m4a" | "ogg" | "aac" | "wma" => "audio",
         "mp4" | "mov" | "avi" | "mkv" | "webm" | "wmv" | "flv" => "video",
-        "txt" | "log" | "yml" | "yaml" | "toml" | "cfg" | "ini" | "env" | "conf"
-        | "properties" | "lock" | "editorconfig" | "gitignore" | "dockerignore" => "doc",
+        "txt" | "log" | "yml" | "yaml" | "toml" | "cfg" | "ini" | "env" | "conf" | "properties" | "lock"
+        | "editorconfig" | "gitignore" | "dockerignore" => "doc",
         _ => "binary",
     }
 }
 
 /// Extract a query parameter value by key from a raw query string.
 pub(super) fn extract_param(query: &str, key: &str) -> Option<String> {
-    query
-        .split('&')
-        .filter(|s| !s.is_empty())
-        .find_map(|pair| {
-            let (k, v) = pair.split_once('=')?;
-            if k == key {
-                // Percent-decode the value (basic: %20 → space, %2F → /).
-                Some(percent_decode(v))
-            } else {
-                None
-            }
-        })
+    query.split('&').filter(|s| !s.is_empty()).find_map(|pair| {
+        let (k, v) = pair.split_once('=')?;
+        if k == key {
+            // Percent-decode the value (basic: %20 → space, %2F → /).
+            Some(percent_decode(v))
+        } else {
+            None
+        }
+    })
 }
 
 /// Basic percent-decoding for path parameters.
@@ -162,14 +147,8 @@ mod tests {
 
     #[test]
     fn extract_param_finds_value() {
-        assert_eq!(
-            extract_param("path=src%2Flib&format=json", "path"),
-            Some("src/lib".to_owned())
-        );
-        assert_eq!(
-            extract_param("path=src%2Flib&format=json", "format"),
-            Some("json".to_owned())
-        );
+        assert_eq!(extract_param("path=src%2Flib&format=json", "path"), Some("src/lib".to_owned()));
+        assert_eq!(extract_param("path=src%2Flib&format=json", "format"), Some("json".to_owned()));
         assert_eq!(extract_param("path=src", "missing"), None);
     }
 }

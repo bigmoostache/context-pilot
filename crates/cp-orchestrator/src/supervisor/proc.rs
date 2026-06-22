@@ -6,8 +6,8 @@
 
 use std::io::Read as _;
 use std::path::Path;
-use std::process::Child;
 use std::path::PathBuf;
+use std::process::Child;
 use std::thread;
 
 use portable_pty::{CommandBuilder, MasterPty, PtySize, native_pty_system};
@@ -88,11 +88,7 @@ impl core::fmt::Debug for Supervised {
 /// # Errors
 ///
 /// [`Error::Pty`] for any pty-layer failure (openpty / spawn / reader clone).
-pub(super) fn spawn_pty_proc(
-    binary: &Path,
-    folder: &Path,
-    env: &[(&str, &str)],
-) -> Result<(Proc, u32)> {
+pub(super) fn spawn_pty_proc(binary: &Path, folder: &Path, env: &[(&str, &str)]) -> Result<(Proc, u32)> {
     let pty = native_pty_system();
     let pair = pty
         .openpty(PtySize { rows: 40, cols: 120, pixel_width: 0, pixel_height: 0 })
@@ -110,10 +106,7 @@ pub(super) fn spawn_pty_proc(
         cmd.env(*k, *v);
     }
 
-    let child = pair
-        .slave
-        .spawn_command(cmd)
-        .map_err(|e| Error::Pty { detail: e.to_string() })?;
+    let child = pair.slave.spawn_command(cmd).map_err(|e| Error::Pty { detail: e.to_string() })?;
     // The parent must not retain the slave (the child owns it now); holding it
     // open would prevent the master ever seeing EOF.
     drop(pair.slave);
@@ -123,10 +116,7 @@ pub(super) fn spawn_pty_proc(
     // Drain the master into the void so the agent's tty writes never block on a
     // full buffer. The thread ends when the master is dropped (stop) or the
     // agent exits (read returns 0 / errors).
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .map_err(|e| Error::Pty { detail: e.to_string() })?;
+    let mut reader = pair.master.try_clone_reader().map_err(|e| Error::Pty { detail: e.to_string() })?;
     let _drain = thread::spawn(move || {
         let mut buf = [0u8; 4096];
         while let Ok(n) = reader.read(&mut buf) {

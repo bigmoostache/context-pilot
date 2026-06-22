@@ -198,8 +198,7 @@ impl Heartbeat {
         }
 
         let boot_bytes = buf.get(OFF_BOOT_ID..OFF_CRC).unwrap_or(&[]);
-        let boot_id =
-            core::str::from_utf8(boot_bytes).map_err(|_ignored| Error::BootIdNotUtf8)?;
+        let boot_id = core::str::from_utf8(boot_bytes).map_err(|_ignored| Error::BootIdNotUtf8)?;
 
         Ok(Self {
             schema_version,
@@ -258,10 +257,7 @@ const fn u32_to_le(value: u32) -> [u8; 4] {
 /// Decode four little-endian bytes into a `u32`.
 fn u32_from_le(bytes: [u8; 4]) -> u32 {
     let [b0, b1, b2, b3] = bytes;
-    u32::from(b0)
-        | u32::from(b1).wrapping_shl(8)
-        | u32::from(b2).wrapping_shl(16)
-        | u32::from(b3).wrapping_shl(24)
+    u32::from(b0) | u32::from(b1).wrapping_shl(8) | u32::from(b2).wrapping_shl(16) | u32::from(b3).wrapping_shl(24)
 }
 
 /// Encode a `u64` as eight little-endian bytes.
@@ -313,16 +309,12 @@ fn write_u64(buf: &mut [u8; HEARTBEAT_LEN], offset: usize, value: u64) {
 
 /// Read a `u32` little-endian at `offset`, or `0` if out of range.
 fn read_u32(buf: &[u8], offset: usize) -> u32 {
-    buf.get(offset..offset.wrapping_add(4))
-        .and_then(|s| <[u8; 4]>::try_from(s).ok())
-        .map_or(0, u32_from_le)
+    buf.get(offset..offset.wrapping_add(4)).and_then(|s| <[u8; 4]>::try_from(s).ok()).map_or(0, u32_from_le)
 }
 
 /// Read a `u64` little-endian at `offset`, or `0` if out of range.
 fn read_u64(buf: &[u8], offset: usize) -> u64 {
-    buf.get(offset..offset.wrapping_add(8))
-        .and_then(|s| <[u8; 8]>::try_from(s).ok())
-        .map_or(0, u64_from_le)
+    buf.get(offset..offset.wrapping_add(8)).and_then(|s| <[u8; 8]>::try_from(s).ok()).map_or(0, u64_from_le)
 }
 
 #[cfg(test)]

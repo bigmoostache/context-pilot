@@ -49,7 +49,7 @@ use std::time::Duration;
 use cp_oplog::compact::body_gc_eligible;
 use cp_wire::types::ContentHash;
 
-use crate::error::{Error, BootResult};
+use crate::error::{BootResult, Error};
 
 /// Default inline/spill cutoff (4 KiB).
 ///
@@ -130,8 +130,7 @@ impl Store {
     /// Returns [`Error::Io`] if the `bodies` directory cannot be created.
     pub fn open_with_threshold(oplog_dir: &Path, inline_threshold: usize) -> BootResult<Self> {
         let dir = oplog_dir.join(BODIES_DIR);
-        fs::create_dir_all(&dir)
-            .map_err(|e| Error::io(format!("create body store {}", dir.display()), e))?;
+        fs::create_dir_all(&dir).map_err(|e| Error::io(format!("create body store {}", dir.display()), e))?;
         Ok(Self { dir, inline_threshold })
     }
 
@@ -234,8 +233,7 @@ impl Store {
             }
             let Some(age) = file_age(&entry.path()) else { continue };
             if body_gc_eligible(age, grace) {
-                fs::remove_file(entry.path())
-                    .map_err(|e| Error::io(format!("gc body {name}"), e))?;
+                fs::remove_file(entry.path()).map_err(|e| Error::io(format!("gc body {name}"), e))?;
                 removed = removed.wrapping_add(1);
             }
         }
@@ -263,17 +261,14 @@ fn write_durable(path: &Path, bytes: &[u8]) -> BootResult<()> {
         .truncate(true)
         .open(path)
         .map_err(|e| Error::io(format!("open body tmp {}", path.display()), e))?;
-    file.write_all(bytes)
-        .map_err(|e| Error::io(format!("write body tmp {}", path.display()), e))?;
-    file.sync_data()
-        .map_err(|e| Error::io(format!("fdatasync body tmp {}", path.display()), e))?;
+    file.write_all(bytes).map_err(|e| Error::io(format!("write body tmp {}", path.display()), e))?;
+    file.sync_data().map_err(|e| Error::io(format!("fdatasync body tmp {}", path.display()), e))?;
     Ok(())
 }
 
 /// `fsync` a directory so a freshly `rename`d child entry is durable.
 fn sync_dir(dir: &Path) -> BootResult<()> {
-    let handle =
-        File::open(dir).map_err(|e| Error::io(format!("open dir {}", dir.display()), e))?;
+    let handle = File::open(dir).map_err(|e| Error::io(format!("open dir {}", dir.display()), e))?;
     handle.sync_all().map_err(|e| Error::io(format!("fsync dir {}", dir.display()), e))?;
     Ok(())
 }

@@ -105,12 +105,7 @@ mod tests {
 
     #[test]
     fn agent_status_round_trip() {
-        for status in [
-            AgentStatus::Starting,
-            AgentStatus::Running,
-            AgentStatus::Stopping,
-            AgentStatus::Down,
-        ] {
+        for status in [AgentStatus::Starting, AgentStatus::Running, AgentStatus::Stopping, AgentStatus::Down] {
             let json = serde_json::to_string(&status).expect("serialize");
             let back: AgentStatus = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(status, back);

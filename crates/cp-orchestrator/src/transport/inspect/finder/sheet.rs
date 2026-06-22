@@ -13,10 +13,10 @@
 
 use std::sync::Mutex;
 
-use calamine::{open_workbook_auto, Data, Reader};
+use calamine::{Data, Reader, open_workbook_auto};
 
-use crate::transport::rest::HttpReply;
 use crate::transport::Backend;
+use crate::transport::rest::HttpReply;
 
 use super::support::{agent_folder, confined_path, extract_param};
 
@@ -58,11 +58,7 @@ pub fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRepl
         return HttpReply::error(404, "file not found");
     }
 
-    let ext = target
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
+    let ext = target.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
 
     let parsed = match ext.as_str() {
         "csv" => parse_delimited(&target, b','),
@@ -96,11 +92,8 @@ fn parse_delimited(path: &std::path::Path, delimiter: u8) -> Option<Workbook> {
     let bytes = read_capped(path, MAX_CSV_BYTES)?;
     let over_cap = bytes.len() as u64 >= MAX_CSV_BYTES;
 
-    let mut reader = csv::ReaderBuilder::new()
-        .delimiter(delimiter)
-        .has_headers(false)
-        .flexible(true)
-        .from_reader(bytes.as_slice());
+    let mut reader =
+        csv::ReaderBuilder::new().delimiter(delimiter).has_headers(false).flexible(true).from_reader(bytes.as_slice());
 
     let mut rows: Vec<serde_json::Value> = Vec::new();
     let mut truncated = over_cap;
@@ -121,15 +114,8 @@ fn parse_delimited(path: &std::path::Path, delimiter: u8) -> Option<Workbook> {
         rows.push(serde_json::json!(cells));
     }
 
-    let name = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("Sheet1")
-        .to_owned();
-    Some(Workbook {
-        sheets: vec![serde_json::json!({ "name": name, "rows": rows })],
-        truncated,
-    })
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("Sheet1").to_owned();
+    Some(Workbook { sheets: vec![serde_json::json!({ "name": name, "rows": rows })], truncated })
 }
 
 /// Parse a binary workbook (`xlsx`/`xls`/`xlsb`/`ods`) into one sheet per tab.
@@ -183,11 +169,7 @@ fn cell_to_string(cell: &Data) -> String {
         Data::Float(f) => {
             // Render an integral float without the ".0" tail (e.g. 42 not 42.0),
             // matching how a spreadsheet shows a whole number.
-            if f.fract() == 0.0 && f.abs() < 1e15 {
-                format!("{}", *f as i64)
-            } else {
-                format!("{f}")
-            }
+            if f.fract() == 0.0 && f.abs() < 1e15 { format!("{}", *f as i64) } else { format!("{f}") }
         }
         Data::Int(i) => format!("{i}"),
         Data::Bool(b) => format!("{b}"),

@@ -200,11 +200,8 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
 
     // Help / confirmation hint
     if confirming {
-        let (verb, key_sem) = if viewing_archived {
-            (" Restore? ", Semantic::KeyHint)
-        } else {
-            (" Archive? ", Semantic::KeyHint)
-        };
+        let (verb, key_sem) =
+            if viewing_archived { (" Restore? ", Semantic::KeyHint) } else { (" Archive? ", Semantic::KeyHint) };
         ir_blocks.push(IrBlock::Line(vec![
             S::warning(verb.to_owned()),
             S::styled("y".to_owned(), key_sem),

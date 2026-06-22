@@ -51,11 +51,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Default true: agent keeps its turn (progress update). Set false to
     // hand the thread back to the user (delivery complete).
-    let still_my_turn = tool
-        .input
-        .get("still_my_turn")
-        .and_then(serde_json::Value::as_bool)
-        .unwrap_or(true);
+    let still_my_turn = tool.input.get("still_my_turn").and_then(serde_json::Value::as_bool).unwrap_or(true);
 
     let msg = ThreadMessage {
         author: ThreadAuthor::Assistant,

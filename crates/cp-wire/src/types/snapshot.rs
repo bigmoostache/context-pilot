@@ -320,10 +320,7 @@ mod tests {
     fn heads_round_trip() {
         let heads = Heads {
             schema_version: 1,
-            threads: vec![ThreadHead {
-                thread_id: "T1".into(),
-                last_message_hash: ContentHash::new([0x11; 32]),
-            }],
+            threads: vec![ThreadHead { thread_id: "T1".into(), last_message_hash: ContentHash::new([0x11; 32]) }],
             panels: vec![PanelHead { panel_id: "P5".into(), hash: ContentHash::new([0x22; 32]) }],
         };
         let json = serde_json::to_string(&heads).expect("serialize");

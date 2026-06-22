@@ -175,12 +175,7 @@ impl ThreadsState {
     /// visible list.
     #[must_use]
     pub fn visible_indices(&self, archived: bool) -> Vec<usize> {
-        self.threads
-            .iter()
-            .enumerate()
-            .filter(|(_, t)| t.archived == archived)
-            .map(|(i, _)| i)
-            .collect()
+        self.threads.iter().enumerate().filter(|(_, t)| t.archived == archived).map(|(i, _)| i).collect()
     }
 }
 

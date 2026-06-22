@@ -91,11 +91,7 @@ fn a_dedup_token_survives_a_long_gap_and_a_duplicate_delivery_is_a_no_op() {
     // commit rev — eviction is ack-driven, never time- or gap-driven.
     let recovered = replay(dir.path()).expect("replay");
     assert!(recovered.seen.contains("tok-early"), "token survives the gap + reopen");
-    assert_eq!(
-        recovered.seen.rev_of("tok-early"),
-        Some(first_commit_rev),
-        "replay preserves the original commit rev",
-    );
+    assert_eq!(recovered.seen.rev_of("tok-early"), Some(first_commit_rev), "replay preserves the original commit rev",);
     assert_eq!(recovered.seen.len(), 1, "the duplicate added no second entry");
 }
 
@@ -146,10 +142,7 @@ fn replay_is_byte_for_byte_identical_across_compaction() {
     // Only segments at or after the surviving checkpoint remain.
     let indices_after = segment::indices(dir.path()).expect("indices after");
     let oldest = report.oldest_index.expect("a surviving checkpoint segment");
-    assert!(
-        indices_after.iter().all(|&i| i >= oldest),
-        "no segment older than the surviving checkpoint remains",
-    );
+    assert!(indices_after.iter().all(|&i| i >= oldest), "no segment older than the surviving checkpoint remains",);
 }
 
 #[test]
@@ -182,17 +175,9 @@ fn a_writer_reopened_after_compaction_keeps_appending_correctly() {
     }
     let after = replay(dir.path()).expect("replay after new append");
 
-    assert!(
-        after.rev_head > before.rev_head,
-        "the post-compaction append advances rev_head past the compacted base",
-    );
+    assert!(after.rev_head > before.rev_head, "the post-compaction append advances rev_head past the compacted base",);
     assert_eq!(after.rev_head, Some(new_rev), "replay sees the freshly appended record");
-    let t1 = after
-        .heads
-        .threads
-        .iter()
-        .find(|h| h.thread_id == "T1")
-        .expect("T1 head present");
+    let t1 = after.heads.threads.iter().find(|h| h.thread_id == "T1").expect("T1 head present");
     assert_eq!(t1.last_message_hash, ContentHash::new([250; 32]), "T1 head is the fresh write");
 }
 

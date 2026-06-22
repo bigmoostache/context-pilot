@@ -11,10 +11,7 @@ fn tmp() -> tempfile::TempDir {
 fn reject_binary_not_on_allow_list() {
     let sup = AgentSupervisor::new(&[PathBuf::from("/bin/echo")]);
     let result = sup.validate_binary(Path::new("/bin/cat"));
-    assert!(
-        matches!(result, Err(Error::NotAllowed { .. })),
-        "expected NotAllowed, got {result:?}"
-    );
+    assert!(matches!(result, Err(Error::NotAllowed { .. })), "expected NotAllowed, got {result:?}");
 }
 
 #[test]
@@ -30,8 +27,7 @@ fn symlink_resolved_against_allow_list() {
     let target = PathBuf::from("/bin/echo");
     let link = dir.path().join("my-echo");
 
-    std::os::unix::fs::symlink(&target, &link)
-        .unwrap_or_else(|e| panic!("symlink: {e}"));
+    std::os::unix::fs::symlink(&target, &link).unwrap_or_else(|e| panic!("symlink: {e}"));
 
     // Allow-list has the real binary; symlink should resolve to it.
     let sup = AgentSupervisor::new(&[target]);
@@ -73,20 +69,11 @@ fn spawn_rejects_duplicate_id() {
     let folder = tmp();
     let mut sup = AgentSupervisor::new(&[PathBuf::from("/bin/sleep")]);
 
-    let _pid = sup
-        .spawn("a1".into(), Path::new("/bin/sleep"), folder.path(), &["60"])
-        .unwrap_or_else(|e| panic!("{e}"));
+    let _pid =
+        sup.spawn("a1".into(), Path::new("/bin/sleep"), folder.path(), &["60"]).unwrap_or_else(|e| panic!("{e}"));
 
-    let dup = sup.spawn(
-        "a1".into(),
-        Path::new("/bin/sleep"),
-        folder.path(),
-        &["60"],
-    );
-    assert!(
-        matches!(dup, Err(Error::AlreadySupervised { .. })),
-        "duplicate spawn should fail"
-    );
+    let dup = sup.spawn("a1".into(), Path::new("/bin/sleep"), folder.path(), &["60"]);
+    assert!(matches!(dup, Err(Error::AlreadySupervised { .. })), "duplicate spawn should fail");
 
     let _stopped = sup.stop("a1");
 }
@@ -132,8 +119,7 @@ fn adopt_and_detect_vanish() {
         status: cp_wire::types::registry::AgentStatus::Running,
     };
 
-    sup.adopt("a2".into(), &entry, PathBuf::from("/bin/sleep"))
-        .unwrap_or_else(|e| panic!("adopt: {e}"));
+    sup.adopt("a2".into(), &entry, PathBuf::from("/bin/sleep")).unwrap_or_else(|e| panic!("adopt: {e}"));
     assert_eq!(sup.len(), 1);
 
     let events = sup.check_liveness();
@@ -178,9 +164,8 @@ fn check_liveness_reaps_exited_child() {
     let folder = tmp();
     let mut sup = AgentSupervisor::new(&[PathBuf::from("/bin/sleep")]);
 
-    let _pid = sup
-        .spawn("a4".into(), Path::new("/bin/sleep"), folder.path(), &["0"])
-        .unwrap_or_else(|e| panic!("spawn: {e}"));
+    let _pid =
+        sup.spawn("a4".into(), Path::new("/bin/sleep"), folder.path(), &["0"]).unwrap_or_else(|e| panic!("spawn: {e}"));
 
     thread::sleep(Duration::from_millis(200));
 
@@ -197,8 +182,5 @@ fn check_liveness_reaps_exited_child() {
 fn stop_not_found() {
     let mut sup = AgentSupervisor::new(&[]);
     let result = sup.stop("nonexistent");
-    assert!(
-        matches!(result, Err(Error::NotFound { .. })),
-        "expected NotFound"
-    );
+    assert!(matches!(result, Err(Error::NotFound { .. })), "expected NotFound");
 }

@@ -33,8 +33,8 @@ use std::sync::Mutex;
 
 use cp_wire::types::registry::Entry;
 
-use crate::transport::rest::HttpReply;
 use crate::transport::Backend;
+use crate::transport::rest::HttpReply;
 
 /// `GET /api/agent/{id}/metrics` — the §19 observability snapshot for one agent.
 pub fn agent_metrics(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
@@ -57,8 +57,7 @@ pub fn fleet_metrics(state: &Mutex<Backend>) -> HttpReply {
         Ok(e) => e,
         Err(_) => return HttpReply::ok(&serde_json::json!([])),
     };
-    let metrics: Vec<serde_json::Value> =
-        entries.iter().map(|e| build_metrics(state, &e.id, e)).collect();
+    let metrics: Vec<serde_json::Value> = entries.iter().map(|e| build_metrics(state, &e.id, e)).collect();
     HttpReply::ok(&metrics)
 }
 
@@ -75,26 +74,13 @@ fn build_metrics(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde
         let spend = b.breaker.spend_of(agent_id).unwrap_or(0.0);
         let budget = b.breaker.budget();
         let (subs, dropped, degraded) = b.hub.agent_stream_health(agent_id);
-        let (view_rev, phase, lifecycle, in_tok, out_tok) = b.view.get(agent_id).map_or(
-            (0, None, None, 0, 0),
-            |v| (v.rev, v.phase, v.lifecycle, v.cost.input_tokens, v.cost.output_tokens),
-        );
+        let (view_rev, phase, lifecycle, in_tok, out_tok) = b.view.get(agent_id).map_or((0, None, None, 0, 0), |v| {
+            (v.rev, v.phase, v.lifecycle, v.cost.input_tokens, v.cost.output_tokens)
+        });
         (tripped, spend, budget, subs, dropped, degraded, view_rev, phase, lifecycle, in_tok, out_tok)
     });
 
-    let Some((
-        tripped,
-        spend,
-        budget,
-        subs,
-        dropped,
-        degraded,
-        view_rev,
-        phase,
-        lifecycle,
-        in_tok,
-        out_tok,
-    )) = snapshot
+    let Some((tripped, spend, budget, subs, dropped, degraded, view_rev, phase, lifecycle, in_tok, out_tok)) = snapshot
     else {
         return serde_json::json!({ "id": agent_id, "error": "backend lock poisoned" });
     };

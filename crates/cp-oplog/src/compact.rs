@@ -221,10 +221,7 @@ mod tests {
         {
             let mut writer = OplogWriter::open_with_segment_limit(dir.path(), 16).expect("open");
             let _c = writer
-                .append(OpEntryKind::CommandEffect {
-                    cmd_id: "c1".to_owned(),
-                    dedup_token: "tok-keep".to_owned(),
-                })
+                .append(OpEntryKind::CommandEffect { cmd_id: "c1".to_owned(), dedup_token: "tok-keep".to_owned() })
                 .expect("append");
             for byte in 0..10u8 {
                 let _r = writer.append(msg("T1", byte)).expect("append");

@@ -144,10 +144,7 @@ impl AgentSupervisor {
     /// Each path is canonicalised eagerly; entries that fail to resolve are
     /// silently skipped (the binary may not exist yet on disk).
     pub fn new(allow_list: &[PathBuf]) -> Self {
-        let resolved = allow_list
-            .iter()
-            .filter_map(|p| std::fs::canonicalize(p).ok())
-            .collect();
+        let resolved = allow_list.iter().filter_map(|p| std::fs::canonicalize(p).ok()).collect();
         Self { allow_list: resolved, known: HashMap::new() }
     }
 
@@ -173,16 +170,9 @@ impl AgentSupervisor {
     /// Returns the canonicalised path on success.  Rejects symlinks / `..`
     /// that resolve outside the list (R2-15).
     pub(crate) fn validate_binary(&self, requested: &Path) -> Result<PathBuf> {
-        let canonical =
-            std::fs::canonicalize(requested).map_err(|e| Error::Io {
-                context: "canonicalize binary path",
-                source: e,
-            })?;
-        if self.allow_list.contains(&canonical) {
-            Ok(canonical)
-        } else {
-            Err(Error::NotAllowed { binary: canonical })
-        }
+        let canonical = std::fs::canonicalize(requested)
+            .map_err(|e| Error::Io { context: "canonicalize binary path", source: e })?;
+        if self.allow_list.contains(&canonical) { Ok(canonical) } else { Err(Error::NotAllowed { binary: canonical }) }
     }
 
     // ── Spawn ───────────────────────────────────────────────────────
@@ -194,22 +184,13 @@ impl AgentSupervisor {
     /// survives backend termination.  stdin/stdout/stderr are closed.
     ///
     /// Returns the agent's OS pid.
-    pub fn spawn(
-        &mut self,
-        agent_id: String,
-        binary: &Path,
-        folder: &Path,
-        extra_args: &[&str],
-    ) -> Result<u32> {
+    pub fn spawn(&mut self, agent_id: String, binary: &Path, folder: &Path, extra_args: &[&str]) -> Result<u32> {
         if self.known.contains_key(&agent_id) {
             return Err(Error::AlreadySupervised { agent_id });
         }
         let canonical = self.validate_binary(binary)?;
         let folder_canonical =
-            std::fs::canonicalize(folder).map_err(|e| Error::Io {
-                context: "canonicalize folder",
-                source: e,
-            })?;
+            std::fs::canonicalize(folder).map_err(|e| Error::Io { context: "canonicalize folder", source: e })?;
 
         let child = Command::new(&canonical)
             .current_dir(&folder_canonical)
@@ -222,13 +203,16 @@ impl AgentSupervisor {
             .map_err(|e| Error::Io { context: "spawn agent", source: e })?;
 
         let pid = child.id();
-        let _previous = self.known.insert(agent_id, Supervised {
-            proc: Proc::Std(child),
-            pid,
-            binary: canonical,
-            folder: folder_canonical,
-            args: extra_args.iter().map(|s| (*s).to_owned()).collect(),
-        });
+        let _previous = self.known.insert(
+            agent_id,
+            Supervised {
+                proc: Proc::Std(child),
+                pid,
+                binary: canonical,
+                folder: folder_canonical,
+                args: extra_args.iter().map(|s| (*s).to_owned()).collect(),
+            },
+        );
         Ok(pid)
     }
 
@@ -259,31 +243,19 @@ impl AgentSupervisor {
     /// [`Error::NotAllowed`] for an off-allow-list binary, [`Error::Io`] for a
     /// folder that cannot be canonicalised, [`Error::AlreadySupervised`] for a
     /// duplicate id, and [`Error::Pty`] for any pty-layer failure.
-    pub fn spawn_pty(
-        &mut self,
-        agent_id: String,
-        binary: &Path,
-        folder: &Path,
-        env: &[(&str, &str)],
-    ) -> Result<u32> {
+    pub fn spawn_pty(&mut self, agent_id: String, binary: &Path, folder: &Path, env: &[(&str, &str)]) -> Result<u32> {
         if self.known.contains_key(&agent_id) {
             return Err(Error::AlreadySupervised { agent_id });
         }
         let canonical = self.validate_binary(binary)?;
-        let folder_canonical = std::fs::canonicalize(folder).map_err(|e| Error::Io {
-            context: "canonicalize folder",
-            source: e,
-        })?;
+        let folder_canonical =
+            std::fs::canonicalize(folder).map_err(|e| Error::Io { context: "canonicalize folder", source: e })?;
 
         let (proc, pid) = spawn_pty_proc(&canonical, &folder_canonical, env)?;
 
-        let _previous = self.known.insert(agent_id, Supervised {
-            proc,
-            pid,
-            binary: canonical,
-            folder: folder_canonical,
-            args: Vec::new(),
-        });
+        let _previous = self
+            .known
+            .insert(agent_id, Supervised { proc, pid, binary: canonical, folder: folder_canonical, args: Vec::new() });
         Ok(pid)
     }
 
@@ -294,11 +266,9 @@ impl AgentSupervisor {
     /// Sends SIGTERM, polls for exit up to [`STOP_GRACE`], then escalates
     /// to SIGKILL.  For spawned agents the child is reaped via `wait()`.
     pub fn stop(&mut self, agent_id: &str) -> Result<()> {
-        let mut supervised = self.known.remove(agent_id).ok_or_else(|| {
-            Error::NotFound { agent_id: agent_id.to_owned() }
-        })?;
-        let raw_pid =
-            Pid::from_raw(i32::try_from(supervised.pid).unwrap_or(i32::MAX));
+        let mut supervised =
+            self.known.remove(agent_id).ok_or_else(|| Error::NotFound { agent_id: agent_id.to_owned() })?;
+        let raw_pid = Pid::from_raw(i32::try_from(supervised.pid).unwrap_or(i32::MAX));
 
         // Phase 1: SIGTERM
         let _sent = send_signal(raw_pid, Signal::SIGTERM);
@@ -340,9 +310,7 @@ impl AgentSupervisor {
     ///
     /// Returns the new pid.
     pub fn restart(&mut self, agent_id: &str) -> Result<u32> {
-        let info = self.known.get(agent_id).ok_or_else(|| {
-            Error::NotFound { agent_id: agent_id.to_owned() }
-        })?;
+        let info = self.known.get(agent_id).ok_or_else(|| Error::NotFound { agent_id: agent_id.to_owned() })?;
         let binary = info.binary.clone();
         let folder = info.folder.clone();
         let args = info.args.clone();
@@ -359,22 +327,20 @@ impl AgentSupervisor {
     ///
     /// No process is spawned — the supervisor merely records the mapping so
     /// that subsequent `stop`/`restart` calls work.
-    pub fn adopt(
-        &mut self,
-        agent_id: String,
-        entry: &Entry,
-        binary: PathBuf,
-    ) -> Result<()> {
+    pub fn adopt(&mut self, agent_id: String, entry: &Entry, binary: PathBuf) -> Result<()> {
         if self.known.contains_key(&agent_id) {
             return Err(Error::AlreadySupervised { agent_id });
         }
-        let _previous = self.known.insert(agent_id, Supervised {
-            proc: Proc::Adopted,
-            pid: entry.pid,
-            binary,
-            folder: PathBuf::from(&entry.folder),
-            args: Vec::new(),
-        });
+        let _previous = self.known.insert(
+            agent_id,
+            Supervised {
+                proc: Proc::Adopted,
+                pid: entry.pid,
+                binary,
+                folder: PathBuf::from(&entry.folder),
+                args: Vec::new(),
+            },
+        );
         Ok(())
     }
 
@@ -389,8 +355,7 @@ impl AgentSupervisor {
         let mut dead_ids = Vec::new();
 
         for (id, sup) in &mut self.known {
-            let raw_pid =
-                Pid::from_raw(i32::try_from(sup.pid).unwrap_or(i32::MAX));
+            let raw_pid = Pid::from_raw(i32::try_from(sup.pid).unwrap_or(i32::MAX));
 
             match sup.proc {
                 Proc::Std(ref mut child) => match child.try_wait() {
@@ -446,10 +411,7 @@ fn send_signal(pid: Pid, sig: Signal) -> bool {
 
 /// Probe whether a pid is alive via signal-0.
 pub(crate) fn pid_alive(pid: Pid) -> bool {
-    matches!(
-        signal::kill(pid, None),
-        Ok(()) | Err(nix::errno::Errno::EPERM)
-    )
+    matches!(signal::kill(pid, None), Ok(()) | Err(nix::errno::Errno::EPERM))
 }
 
 /// Best-effort terminate an **arbitrary** pid (SIGTERM → grace → SIGKILL).
