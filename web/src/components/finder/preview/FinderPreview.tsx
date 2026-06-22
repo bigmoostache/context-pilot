@@ -8,7 +8,6 @@ import {
   Generic,
   IconBtn,
   MarkdownPreview,
-  Meta,
   TextPreview,
 } from "./previewParts"
 import {
@@ -65,7 +64,7 @@ export function FinderPreview({
       )}
     >
       {!full && (
-        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
+        <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border px-3">
           <span className="text-[12px] font-semibold text-muted-foreground">Quick Look</span>
           <div className="ml-auto flex items-center gap-1">
             {node && node.kind !== "folder" && (
@@ -94,7 +93,6 @@ export function FinderPreview({
           <div className="min-h-0 flex-1 overflow-auto p-4">
             <Body node={node} agentId={agentId} />
           </div>
-          {!full && <Meta node={node} />}
         </div>
       )}
     </aside>
