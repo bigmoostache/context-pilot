@@ -25,12 +25,14 @@ interface MessageProps {
   agentId?: string
   /** open the shared Quick Look drawer for an inline attachment */
   onOpenFile?: (file: UploadedFile) => void
+  /** navigate the Finder to a file's parent and select it */
+  onShowInFinder?: (path: string) => void
 }
 
-export function Message({ msg, agentId, onOpenFile }: MessageProps) {
+export function Message({ msg, agentId, onOpenFile, onShowInFinder }: MessageProps) {
   if (msg.role === "tool" && msg.tool) return <ToolMessage msg={msg} />
-  if (msg.role === "user") return <UserMessage msg={msg} agentId={agentId} onOpenFile={onOpenFile} />
-  return <AssistantMessage msg={msg} agentId={agentId} onOpenFile={onOpenFile} />
+  if (msg.role === "user") return <UserMessage msg={msg} agentId={agentId} onOpenFile={onOpenFile} onShowInFinder={onShowInFinder} />
+  return <AssistantMessage msg={msg} agentId={agentId} onOpenFile={onOpenFile} onShowInFinder={onShowInFinder} />
 }
 
 /**
@@ -48,11 +50,13 @@ function MessageBody({
   variant,
   agentId,
   onOpenFile,
+  onShowInFinder,
 }: {
   text: string
   variant: MarkdownVariant
   agentId?: string
   onOpenFile?: (file: UploadedFile) => void
+  onShowInFinder?: (path: string) => void
 }) {
   const segments = splitMessageSegments(text)
   // Fast path: no attachment block → a single markdown render.
@@ -71,6 +75,7 @@ function MessageBody({
               agentId={agentId}
               onAccent={variant === "onAccent"}
               onOpen={onOpenFile ? () => onOpenFile(seg.file) : undefined}
+              onShowInFinder={onShowInFinder ? () => onShowInFinder(seg.file.path) : undefined}
             />
           </div>
         ),
@@ -125,11 +130,11 @@ function CopyButton({ text, align }: { text: string; align: "start" | "end" }) {
   )
 }
 
-function UserMessage({ msg, agentId, onOpenFile }: MessageProps) {
+function UserMessage({ msg, agentId, onOpenFile, onShowInFinder }: MessageProps) {
   return (
     <div className="rise flex flex-col items-end gap-1 py-2">
       <div className="max-w-[78%] rounded-2xl rounded-br-md bg-[var(--signal)] px-3.5 py-2 text-[13px] leading-relaxed text-[var(--primary-foreground)] card-shadow">
-        <MessageBody text={msg.text ?? ""} variant="onAccent" agentId={agentId} onOpenFile={onOpenFile} />
+        <MessageBody text={msg.text ?? ""} variant="onAccent" agentId={agentId} onOpenFile={onOpenFile} onShowInFinder={onShowInFinder} />
       </div>
       <span className="flex items-center gap-1 pr-1 text-[10px] text-muted-foreground/60">
         <User className="size-2.5" />
@@ -140,7 +145,7 @@ function UserMessage({ msg, agentId, onOpenFile }: MessageProps) {
   )
 }
 
-function AssistantMessage({ msg, agentId, onOpenFile }: MessageProps) {
+function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder }: MessageProps) {
   return (
     <div className="rise flex flex-col gap-1.5 py-2">
       <div className="flex items-center gap-2">
@@ -151,7 +156,7 @@ function AssistantMessage({ msg, agentId, onOpenFile }: MessageProps) {
         <span className="text-[10px] text-muted-foreground/60">{msg.ts}</span>
       </div>
       <div className="max-w-[88%] pl-7 text-[13.5px] leading-relaxed text-foreground/90">
-        <MessageBody text={msg.text ?? ""} variant="default" agentId={agentId} onOpenFile={onOpenFile} />
+        <MessageBody text={msg.text ?? ""} variant="default" agentId={agentId} onOpenFile={onOpenFile} onShowInFinder={onShowInFinder} />
         {msg.streaming && (
           <span className="cursor-blink ml-0.5 inline-block h-3.5 w-[7px] translate-y-0.5 bg-[var(--signal)]" />
         )}

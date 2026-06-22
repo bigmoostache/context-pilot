@@ -106,6 +106,7 @@ export function ThreadConversation({
   onAttach,
   pendingFiles = [],
   onRemoveFile,
+  onShowInFinder,
 }: {
   thread: ThreadDetail
   /** owning agent — needed to open the shared Quick Look drawer for an attachment */
@@ -117,6 +118,8 @@ export function ThreadConversation({
   pendingFiles?: UploadedFile[]
   /** remove a pending file by index */
   onRemoveFile?: (index: number) => void
+  /** navigate the Finder to a file's parent directory and select it (T334) */
+  onShowInFinder?: (path: string) => void
 }) {
   // The attachment whose Quick Look drawer is open (null = closed). A
   // `file-upload` chip in any message sets it; the shared QuickLookSheet renders
@@ -153,6 +156,7 @@ export function ThreadConversation({
                   msg={toChatMessage(seg.msg)}
                   agentId={agentId}
                   onOpenFile={setSheetFile}
+                  onShowInFinder={onShowInFinder}
                 />
                 {seg.msg.questions?.map((q, i) => (
                   <div key={i} className="pb-1.5 pl-7">

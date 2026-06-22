@@ -1,4 +1,4 @@
-import { Paperclip, AlertTriangle } from "lucide-react"
+import { Paperclip, AlertTriangle, FolderOpen } from "lucide-react"
 import { kindOf, extOf } from "@/components/finder/support/kind"
 import { FileIcon } from "@/components/finder/support/macIcons"
 import { useFs } from "@/lib/live"
@@ -137,11 +137,14 @@ export function MessageFileChip({
   file,
   agentId,
   onOpen,
+  onShowInFinder,
   onAccent = false,
 }: {
   file: UploadedFile
   agentId?: string
   onOpen?: () => void
+  /** navigate the Finder to this file's parent and select it */
+  onShowInFinder?: () => void
   /** style for the coloured user bubble (translucent chrome over the accent) */
   onAccent?: boolean
 }) {
@@ -171,6 +174,7 @@ export function MessageFileChip({
     <FileUploadChip
       file={file}
       onOpen={onOpen}
+      onShowInFinder={onShowInFinder}
       missing={missing}
       onAccent={onAccent}
       size={realSize}
@@ -192,12 +196,15 @@ export function MessageFileChip({
 export function FileUploadChip({
   file,
   onOpen,
+  onShowInFinder,
   missing = false,
   onAccent = false,
   size,
 }: {
   file: UploadedFile
   onOpen?: () => void
+  /** navigate the Finder to this file's parent and select it */
+  onShowInFinder?: () => void
   missing?: boolean
   onAccent?: boolean
   /** the file's REAL on-disk byte size (from the listing node), or `undefined`
@@ -252,11 +259,41 @@ export function FileUploadChip({
 
   // ── Static (no opener) vs. interactive button. ──
   if (!onOpen) {
-    return <span className={`${base} ${skin} cursor-default`}>{body}</span>
+    return (
+      <span className="inline-flex items-center gap-1">
+        <span className={`${base} ${skin} cursor-default`}>{body}</span>
+        {onShowInFinder && !missing && (
+          <button
+            onClick={onShowInFinder}
+            title="Show in Finder"
+            className={onAccent
+              ? "flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100"
+              : "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted/60 hover:text-foreground/80"
+            }
+          >
+            <FolderOpen className="size-3.5" />
+          </button>
+        )}
+      </span>
+    )
   }
   return (
-    <button onClick={onOpen} className={`${base} ${skin}`}>
-      {body}
-    </button>
+    <span className="inline-flex items-center gap-1">
+      <button onClick={onOpen} className={`${base} ${skin}`}>
+        {body}
+      </button>
+      {onShowInFinder && !missing && (
+        <button
+          onClick={onShowInFinder}
+          title="Show in Finder"
+          className={onAccent
+            ? "flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100"
+            : "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted/60 hover:text-foreground/80"
+          }
+        >
+          <FolderOpen className="size-3.5" />
+        </button>
+      )}
+    </span>
   )
 }

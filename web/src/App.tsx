@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { TopBar } from "@/components/shell/TopBar"
 import { CockpitView } from "@/components/shell/CockpitView"
 import { StatusBar } from "@/components/shell/StatusBar"
@@ -97,6 +97,13 @@ function AppShell() {
     setCreateAgent(true)
   }
 
+  // T334: "Show in Finder" — switch to finder view and reveal a specific file.
+  const [finderRevealPath, setFinderRevealPath] = useState<string | null>(null)
+  const showInFinder = useCallback((path: string) => {
+    setFinderRevealPath(path)
+    setView("finder")
+  }, [])
+
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
           <TopBar
@@ -118,9 +125,9 @@ function AppShell() {
           ) : effectiveView === "cockpit" ? (
             <CockpitView agentId={activeAgentId} />
           ) : effectiveView === "finder" ? (
-            <Finder key={activeAgent.id} agent={activeAgent} />
+            <Finder key={activeAgent.id} agent={activeAgent} revealPath={finderRevealPath} onRevealConsumed={() => setFinderRevealPath(null)} />
           ) : (
-            <ThreadsView key={activeAgentId} activeAgentId={activeAgentId} />
+            <ThreadsView key={activeAgentId} activeAgentId={activeAgentId} onShowInFinder={showInFinder} />
           )}
 
           <StatusBar fleet={effectiveView === "fleet"} agents={agents} activeAgent={activeAgent} />

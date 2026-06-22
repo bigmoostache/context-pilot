@@ -45,7 +45,7 @@ export type { PinnedFolder } from "./internal/helpers"
  * {@link useExternalDragUpload}. This file owns view state, derived listings,
  * and the render.
  */
-export function Finder({ agent }: { agent: Agent }) {
+export function Finder({ agent, revealPath, onRevealConsumed }: { agent: Agent; revealPath?: string | null; onRevealConsumed?: () => void }) {
   const root: FinderNode = useMemo(
     () => ({ name: agent.name, path: agent.folder, kind: "folder" as const, modified: "" }),
     [agent],
@@ -243,6 +243,18 @@ export function Finder({ agent }: { agent: Agent }) {
 
   // Cancel any pending single-click settle timer on unmount.
   useEffect(() => () => window.clearTimeout(clickTimer.current), [])
+
+  // T334: "Show in Finder" — navigate to a file's parent and select it.
+  useEffect(() => {
+    if (!revealPath) return
+    const lastSlash = revealPath.lastIndexOf("/")
+    const parentRel = lastSlash >= 0 ? revealPath.slice(0, lastSlash) : ""
+    const parentAbs = parentRel ? `${agent.folder}/${parentRel}` : agent.folder
+    navigate(parentAbs)
+    setSelected(new Set([revealPath]))
+    setFocusPath(revealPath)
+    onRevealConsumed?.()
+  }, [revealPath])
 
   // ── status bar figures ──────────────────────────────────────────
   const selSize = [...selected]

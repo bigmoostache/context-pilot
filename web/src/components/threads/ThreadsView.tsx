@@ -56,8 +56,11 @@ function describeCommandError(verb: string, err: unknown): string {
  */
 export function ThreadsView({
   activeAgentId,
+  onShowInFinder,
 }: {
   activeAgentId: string
+  /** navigate the Finder to a file's parent directory and select it (T334) */
+  onShowInFinder?: (path: string) => void
 }) {
   const { data: agents = [] } = useFleet()
   const { data: threads = [] } = useThreads(activeAgentId)
@@ -248,6 +251,7 @@ export function ThreadsView({
           onAttach={handleAttach}
           pendingFiles={pendingFiles}
           onRemoveFile={(i) => setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
+          onShowInFinder={onShowInFinder}
         />
       ) : (
         <EmptyRealm agentName={agent.name} onNewThread={() => setNewOpen(true)} />
