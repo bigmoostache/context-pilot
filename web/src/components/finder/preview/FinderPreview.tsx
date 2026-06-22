@@ -26,6 +26,7 @@ import {
   SlidesPreview,
   VideoPreview,
 } from "./mockPreviews"
+import { LiveSourcedPdfPreview } from "./sourcedPdfPreview"
 
 /**
  * QuickLook preview pane — the Finder's centerpiece. Renders a rich, kind-aware
@@ -123,6 +124,8 @@ function Body({ node, agentId }: { node: FinderNode; agentId?: string }) {
   if (agentId && node.kind === "image") return <LiveImagePreview agentId={agentId} node={node} />
   if (agentId && node.kind === "pdf") return <LivePdfPreview agentId={agentId} node={node} />
   if (agentId && node.kind === "sheet") return <LiveSheetPreview agentId={agentId} node={node} />
+  if (agentId && node.name.endsWith(".sourced_pdf"))
+    return <LiveSourcedPdfPreview agentId={agentId} node={node} />
   if (agentId && TEXT_KINDS.has(node.kind)) return <LivePreview agentId={agentId} node={node} />
   return <Generic node={node} />
 }
