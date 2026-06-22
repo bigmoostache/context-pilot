@@ -53,7 +53,7 @@ export function LiveImagePreview({ agentId, node }: { agentId: string; node: Fin
   if (failed) return <Generic node={node} />
   return (
     <div className="flex flex-col gap-2">
-      <div className="checker overflow-hidden rounded-lg border border-border">
+      <div className="checker overflow-hidden">
         <div className="flex items-center justify-center p-4">
           <img
             src={src}
@@ -157,7 +157,7 @@ export function LiveSheetPreview({ agentId, node }: { agentId: string; node: Fin
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex flex-col overflow-hidden rounded-lg border border-border card-shadow">
+      <div className="flex flex-col overflow-hidden">
         <div className="overflow-auto">
           <table className="w-full border-collapse text-[11px]">
             <thead className="sticky top-0">
@@ -257,7 +257,7 @@ function HighlightedCode({
     window.setTimeout(() => setCopied(false), 1400)
   }
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card card-shadow">
+    <div className="bg-card">
       <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-1.5">
         <span className="flex gap-1.5">
           <span className="size-2.5 rounded-full bg-[#ff5f57]" />
