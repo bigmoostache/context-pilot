@@ -1582,6 +1582,10 @@
   path: web/src/lib/query/sync.ts
   description: 'SSE→QueryClient delta bridge (push plane Leg-2 frontend). applyThreadDelta + applyAgentDelta fold rev-numbered OpEntry into [''threads'',id]/[''agent'',id] caches via setQueryData functional updaters (rev high-water guard, structural sharing). T297: applyAgentDelta folds the EXACT phase (idle/streaming/tooling) latest-wins + NEVER returns null (idle drops stale working→idle inline, no REST hydrate) and folds cost + input/output tokens. mergeThreadLogs non-destructive poll reconcile. invalidateInspection for non-delta resources.'
   last_edited_ms: 0
+2eef60fc439399b1:
+  path: web/src/components/finder/preview/previewParts.tsx
+  description: 'Shared Finder preview leaf renderers: IconBtn, PreviewStatus, TruncatedNote, MarkdownPreview, TextPreview, FolderPreview, Generic, Meta/Row, Empty. T329: card chrome (rounded-lg/border/card-shadow) stripped from TextPreview and MarkdownPreview. 173 lines.'
+  last_edited_ms: 1782130584537
 2f549657a1b2300b:
   path: src/app/actions/cursor.rs
   description: Cursor movement, text editing, selection management, command expansion. Selection helpers (delete/clear/extend). Sentinel detection + skip. Single-char and word movement with selection variants. handle_command_expansion, handle_input_backspace, handle_delete_word_left.
@@ -6242,6 +6246,10 @@ b8b9fb7ac436f7b5:
   path: src/app/actions/threads.rs
   description: 'Thread action handlers. Archive cleanup: clears focused_thread_id + last_read_count + notified_my_turn_id for archived thread. Question form: YAML answers with escaped other_text -> ThreadMessage -> MY_TURN + spine notification.'
   last_edited_ms: 0
+b8c4d7c32d4e5cc7:
+  path: web/src/components/finder/preview/livePreviews.tsx
+  description: 'Live-data Finder previews: LivePreview/LiveImagePreview/LivePdfPreview/LiveSheetPreview/HighlightedCode/EditableMarkdown + TEXT_KINDS. Fetch via useFsPreview/useFsSheet/useWriteFile + rawUrl + highlightCode. T329: all card chrome (rounded-lg/border/card-shadow) stripped from every preview type for true full-bleed. 398 lines.'
+  last_edited_ms: 1782130584504
 b8c80869fc5f9ccb:
   path: crates/cp-base/src/state/flags.rs
   description: Stream-phase state machine (Idle/Receiving/ExecutingTools), UI/config/lifecycle boolean flags, streaming-tool advisory state. StatusBools composite struct organizes all flags by domain. HighlightIrFn callback type.
