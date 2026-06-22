@@ -1946,6 +1946,10 @@
   path: crates/cp-base/src/lib.rs
   description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (19 tool + 6 config YAML files) with #[expect(clippy::panic)].'
   last_edited_ms: 0
+392885d3a081e398:
+  path: web/src/components/finder/preview/sourcedPdfTypes.ts
+  description: Types, color map, and ZIP-bundle parser for the .sourced_pdf format. Domain types (Metadata/Value/Ref/Arrow), REF_COLORS/REF_LABELS palettes, docType() helper (pdf/xlsx/unknown from extension), parseSourcedBundle() decompresses ZIP → metadata + ALL document bytes (docBytes Map) + values + refs. 160 lines.
+  last_edited_ms: 1782148226563
 394677c93656e26d:
   path: crates/cp-wire/src/types/ack.rs
   description: 'Command Ack: cmd_id + Status (Accepted/Rejected) + optional rev. Journal-then-ack (I11).'
@@ -4746,6 +4750,10 @@
   path: src/app/run/tools/queue_flush.rs
   description: Queue flush execution — dequeues and runs all queued tool calls. FlushedTool struct + execute_queue_flush(). save_flushed_tool_call_message() creates compact Tool_execution stubs. augment_remaining_history_panels() appends remaining panel info. Extracted from pipeline.rs for file-length limit.
   last_edited_ms: 0
+88481b9ef6c1a43e:
+  path: web/src/components/finder/preview/sourcedPdfPreview.tsx
+  description: 'Integrated Finder preview for .sourced_pdf bundles — true split-view cross-reference auditor. Left: target PDF via pdf.js with colored subject highlights. Right: actual source document (PDF rendered with arrow highlight, or Excel value card with sheet/cell locator). RefStrip compact detail bar. NavBar with ref type badges + concordance %. PdfPage shared (highlightValueId for source side). 456 lines.'
+  last_edited_ms: 1782148226591
 8861fb325d9d1c23:
   path: .github/checks/rust_lints_compare.py
   description: Compares rustc lint defaults (from rust_lints_list.md) against Cargo.toml overrides. Outputs rust_lints_compared_list.md — hides forbid-level lints, shows remaining with emoji indicators.
