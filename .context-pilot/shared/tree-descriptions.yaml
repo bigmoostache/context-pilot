@@ -4634,6 +4634,10 @@
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
   last_edited_ms: 0
+893bb6b6b3b0e375:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread composer (always-active textarea + turn-status banner). T298: paperclip wired — hidden multi-file <input>, onAttach?(files) prop. T304: optional draftKey persists the UNSENT draft to localStorage. T331: accepts pendingFiles + onRemoveFile — renders removable FileUploadChip chips above the textarea; canSend allows send with files-only (no text). Enter sends / Shift+Enter newline, IME-guarded, auto-grow.'
+  last_edited_ms: 1782132793497
 8950e02e52b6a287:
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1; Boot failure→PENDING + background try_recover self-heals. activate() free fn assembles live BridgeState (tee/intake/store). ContextMemo type alias = (used,threshold,budget,hit,miss) for the on-change ContextUsage emit memo (T297, carries hit/miss so a hit↔miss flip at unchanged total still re-emits). on_stream_chunk→Token, on_stream_stop→PhaseHint(Idle). is_global, no tools/panels.'
@@ -5370,6 +5374,10 @@
   path: src/llms/cache/cache_optimizer_tests.rs
   description: Brute-force vs DP agreement tests, property tests (monotonicity, disjointness), edge cases, determinism
   last_edited_ms: 0
+9f4dbb4f2a73d9b2:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Threads view shell (list | conversation). handleSend/handleArchive/handleCreate via sendCommand. T331: handleAttach now STAGES files as pendingFiles (upload to .uploads/ but DON''T send) — pending chips shown in composer, merged into message content only on explicit Send. T298: buildUploadMessage. T303: per-agent thread persistence to localStorage.'
+  last_edited_ms: 1782132793442
 9f678ca035b102a6:
   path: web/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Uses useFleet() for live agents. Mounts AccountProvider + TooltipProvider. Passes agents to TopBar/FleetShell/StatusBar. Passes activeAgent to StatusBar.
@@ -5566,6 +5574,10 @@ a4a82c99e057af5e:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
   last_edited_ms: 0
+a518e4ca051d1d28:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped) opened by any chip. T304: passes draftKey. T331: passes pendingFiles + onRemoveFile to ThreadComposer. Takes agentId + onAttach props.'
+  last_edited_ms: 1782132793471
 a51c8c0bbc9d456d:
   path: web/src/App.tsx
   description: 'App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Uses useFleet() for live agents. Persists activeAgentId + view in localStorage (cp-agent, cp-view). effectiveView guard: falls back to ''fleet'' when a non-fleet view is persisted but activeAgent is undefined (fleet still loading OR stale localStorage agent id) — fixes the reload crash ''activeAgent is undefined'' at the Finder branch (T29). Mounts AccountProvider + TooltipProvider. Passes agents to TopBar/FleetShell/StatusBar; activeAgent to StatusBar.'
