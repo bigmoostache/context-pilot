@@ -758,6 +758,10 @@
   path: crates/cp-orchestrator/src/supervisor/proc.rs
   description: 'Supervised-process representation + pty spawn helper (T148/X896), split from supervisor/mod.rs for the 500-line budget. Proc enum {Std(Child), Pty{child:Box<dyn portable_pty::Child>, _master:Box<dyn MasterPty>}, Adopted} + Supervised struct + manual Debug. spawn_pty_proc(binary,folder,env)->(Proc,u32): native_pty_system().openpty(40x120) → CommandBuilder(cwd + inherit std::env::vars() + layer env overrides) → slave.spawn_command → drop(slave) → detached master-drain thread. Master retained so the agent''s tty stays open; dropping it ends the drain thread (cp TUI needs a real tty for enable_raw_mode).'
   last_edited_ms: 0
+165ff4f3d54b12f7:
+  path: web/src/components/finder/preview/sourcedPdfTypes.ts
+  description: Types, color map, and ZIP-bundle parser for the .sourced_pdf format. Domain types (Metadata/Value/Ref/Arrow), REF_COLORS/REF_LABELS palettes (blue=BG, purple=N-1, teal=internal, orange=arithmetic, gray=unassigned), parseSourcedBundle() decompresses ZIP → metadata + target PDF bytes + values + refs. 145 lines.
+  last_edited_ms: 1782146270291
 1679c66c4477ed40:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
@@ -2142,6 +2146,10 @@
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. Manage mode (T321): wider (w-960px) + 2-col grid — left = name + provider/model form, right = <SessionVitals>. Clickable avatar in header uploads profile pic (T338). Submit sends Configure + renameAgent (T328, concurrent Promise.all when name changed). Restart/Retire footer. Create mode: narrower single-col, useCreateAgent.'
   last_edited_ms: 1782141874859
+3ed478c59c253d59:
+  path: web/src/components/finder/preview/sourcedPdfPreview.tsx
+  description: 'Integrated Finder preview for .sourced_pdf bundles — split-view cross-reference auditor. Left: PDF pages via pdf.js canvas with colored highlight overlays (positioned from PyMuPDF bbox). Right: ref inspector panel grouped by type (BG/N-1/internal/arithmetic) with concordance badges, expandable detail (subject, arrows, écart). Click highlight↔ref bidirectional selection + page navigation. Fetches raw ZIP via rawUrl, decompresses JSZip, renders pdf.js. 402 lines.'
+  last_edited_ms: 1782146270263
 3ef10822edf6232f:
   path: ui/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Fleet → FleetShell (4-page mission control). Cockpit → CockpitView (LeftRail|PanelPane|Conversation 3-col, panel-centered). threads/finder per-agent. openAgent switches agent→threads. Finder keyed by agent.id.
@@ -2410,6 +2418,10 @@
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints.'
   last_edited_ms: 0
+44be1b66e515d705:
+  path: .uploads/sourced_pdf/sourced_pdf/model.py
+  description: 'Core sourced_pdf model library. Bundle class: open ZIP/dir, load metadata+values+refs, validate integrity (hashes, ids, arrows, roles, écarts). Value/Ref dataclasses. compute_ecart recalculates from values. init_bundle creates new bundles. parse_amount handles French number formatting.'
+  last_edited_ms: 1782145700578
 44edddddbfd879d4:
   path: crates/cp-mod-prompt/src/skill_panel.rs
   description: Skill panel UI. Markdown-rendered content via cp_render::markdown::to_blocks(). Title/refresh/context methods. refresh() syncs cached_content for all loaded skills.
@@ -2718,6 +2730,10 @@
   path: src/app/reverie/tools.rs
   description: 'Reverie tools: build_tool_restrictions_text(), Report (queue guard), optimize_context (agent selection), dispatch_reverie_tool()'
   last_edited_ms: 0
+4f69605e4730b184:
+  path: .uploads/sourced_pdf/sourced_pdf/SPEC.md
+  description: 'sourced_pdf format specification v1. Bundle structure: metadata.yaml, refs-schema.yaml, documents/, values/ (per-doc numbers with locators), refs/ (qualifications with arrows). 3 primitives: VALUE (number+location), ARROW (pointer to value), REF (qualification of target value). 5 ref types: unassigned, report_bg, report_n-1, report_internal, arithmetic. Écart tolerance 0.005.'
+  last_edited_ms: 1782145700550
 4f6d57370d56e43b:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
@@ -3290,6 +3306,10 @@
   path: crates/cp-mod-bridge/src/error.rs
   description: 'Bridge boot error: Error{AlreadyRunning{folder}, Io{context,source}} + BootResult + Error::io(context,source) helper. NO std::error::Error (dodges missing_trait_methods). Distinguishes ''folder already owned'' (recoverable) from ''disk broken'' (fatal).'
   last_edited_ms: 1781625056693
+60facb61f2ae4c7a:
+  path: .uploads/sourced_pdf/sourced_pdf/render.py
+  description: Jetable PDF view renderer using PyMuPDF (fitz). Highlights subject values on target PDF by ref type (blue=BG, mauve=N-1, teal=internal, orange=arithmetic, gray=unassigned). Adds tooltips, pastilles, écart frames. Generates summary pages with GoTo links.
+  last_edited_ms: 1782145700606
 61004f9422d9d2dd:
   path: docs/trust-center/trust.css
   description: 'Shared CSS for all Trust Center pages. Enterprise slate/navy palette, Inter + IBM Plex Mono fonts, fixed sidebar nav, breadcrumbs, cards, tables, badges (green/amber/blue/gray/red), policy blocks, FAQ accordion, status dots, CTA buttons, subprocessor logos (tc-logo/tc-logo-letter classes for SimpleIcons CDN + letter avatars), data flow diagram (tc-diagram-* classes: box/grid/node/arrow/provider pills), responsive (sidebar hides <960px, diagram grid collapses). Header left-padding aligned with content area.'
@@ -3846,6 +3866,10 @@
   path: ui/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Greeting, aggregate stat strip, AgentCard grid (status badge Working/Needs input/Standby + one-line task summary + branch·model·cost, Open→agent threads, Manage→modal), New-agent card. AgentModal (Apple-grade): backdrop-fade+modal-pop entrance, gradient hero header, name-as-star field with focus-within ring + live slugified realm preview (folder picker dropped — realm derived from name), rich model cards (MODEL_META: tier/blurb/price/icon, radio-check, opt-rise stagger), quiet Archive ghost, name-gated primary, autofocus+Esc+⌘↵ keyboard.'
   last_edited_ms: 0
+70bc7b703e57dd0b:
+  path: .uploads/sourced_pdf/sourced_pdf/extract.py
+  description: Value extractors for PDF (PyMuPDF word fusion with millier grouping) and XLSX (openpyxl numeric cells). Writes values/doc_K.yaml.
+  last_edited_ms: 1782145700633
 70bf1dbf660a25ad:
   path: crates/cp-mod-git/src/lib.rs
   description: 'Git module. 1 tool: git_execute. refresh_git_status() for overview (branch + numstat). Watches .git/ paths. watcher_immediate_refresh=false to prevent feedback. overview_context_section renders changes table.'
@@ -4030,6 +4054,10 @@
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
   last_edited_ms: 1780648757744
+75641655c2d1f1ad:
+  path: .uploads/sourced_pdf/sourced_pdf/cli.py
+  description: 'CLI entry point (spdf). Subcommands: init, extract, validate, render, seal. Wires model.py + extract.py + render.py.'
+  last_edited_ms: 1782145700659
 757a1436a5544f76:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage, Thread, ThreadQuestionForm (from_json with 50q x 100opt caps + field-length caps via cap_str, YAML-escaped other_text with \r), ThreadsState + FocusState with TypeMap accessors.'
@@ -4778,6 +4806,10 @@
   path: src/state/persistence/panel.rs
   description: 'Panel persistence (panels/{uid}.json): load_panel(uid) → Option<PanelData>'
   last_edited_ms: 0
+89dbc3d6b2077d6a:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 89e06b089aa1aa8e:
   path: docs/talk/slides/2-1.html
   description: 'Learnings: Pot-Pourri — interactive feature explorer with 11 panel blocks'
@@ -4909,6 +4941,10 @@
 8dd905ab22bc0a9d:
   path: crates/cp-orchestrator/src/transport/inspect/metrics.rs
   description: '§19 observability metrics endpoints. agent_metrics + fleet_metrics build per-agent snapshot: durable cost-breaker state (tripped/spend/budget), stream health (subs/dropped/degraded), view-vs-oplog rev lag (oplog_head_rev read fresh outside the lock), phase+lifecycle. Only figures the backend genuinely holds — latency histograms deliberately not synthesised.'
+  last_edited_ms: 0
+8de42bf786a172cd:
+  path: web/package.json
+  description: 'Frontend deps: @base-ui/react 1.5, @tanstack/react-query 5.101, react 19.2, react-markdown 10 + remark-gfm, highlight.js 11.11, tailwindcss 4.3, shadcn 4.11, vite 8, playwright. scripts: dev/build(tsc -b && vite build)/lint/preview.'
   last_edited_ms: 0
 8de5004b2cda2e81:
   path: crates/cp-wire/src/types/snapshot.rs
@@ -7382,6 +7418,10 @@ d3f82c22b0de608b:
   path: crates/cp-wire/tests/framing_integrity.rs
   description: 'Phase 21 (X788): exhaustive framing integrity suite — the V1 torn-tail property at byte granularity. Truncate at EVERY offset (clean-prefix-only, never fabricated frame), single-byte-flip at every offset (detected-or-byte-identical, never silent-different), payload-region corruption always CrcMismatch, trailing garbage doesn''t corrupt first decode, sub-header buffers Incomplete-never-panic, oversized len-prefix rejected-not-allocated, zero-length payload round-trips. Lib-only deps acked via use crc32c/serde/serde_json/sha2 as _ (per-target unused-crate-dependencies). 8 tests.'
   last_edited_ms: 1781648169011
+d431d404079fef54:
+  path: web/src/components/finder/preview/FinderPreview.tsx
+  description: 'Quick Look preview shell + Body() kind router. Routes node → mock previews (mockPreviews), live fetchers (livePreviews), or shared leaf renderers (previewParts). T329: header slimmed h-12→h-8, Meta footer removed, body p-4→p-0 (edge-to-edge). Download button wired to downloadFile(agentId, node.path). The decorative Share button was removed app-wide (no utility).'
+  last_edited_ms: 1782146270318
 d434a8d587934f19:
   path: web/src/components/finder/internal/useFinderActions.ts
   description: 'Finder filesystem-mutating actions + path navigation hook: upload/move/mkdir(inline New Folder)/rename/trash live mutations + navigate/back/forward. commitRename routes sentinel→mkdir else rename; cancelRename drops pending placeholder.'
