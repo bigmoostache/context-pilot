@@ -1202,6 +1202,10 @@
   path: crates/cp-mod-logs/src/tools.rs
   description: Log tool execution. flame!("log_create") and flame!("close_history"). push_log() helper. execute_log_create() creates entries from array. execute_close_conversation_history() processes panels array — per-panel logs (strings), timestamp from panel's last message, panel removal.
   last_edited_ms: 0
+22f763ba98065e09:
+  path: web/src/components/finder/Finder.tsx
+  description: 'Per-agent Finder file manager (493 LOC after X913 split). Owns view state + derived listings + render; delegates fs mutations/nav to useFinderActions, selection/open/tab/menu to useFinderSelection, keyboard to useFinderKeyboard, external drag to useExternalDragUpload, bottom chrome to FinderOverlays. QuickLook = modal shadcn Sheet (2/3 width, grid+list). T334: revealPath prop — navigates to file''s parent directory and selects the file when set (used by Show in Finder from thread file chips).'
+  last_edited_ms: 1782134369940
 23152c68c4aaf519:
   path: ui/src/lib/mock.ts
   description: 'Mock session data approximating a live CP session: panels, tokenBudget, cacheStats, messages, threads, spine, stats, status.'
@@ -2118,6 +2122,10 @@
   path: docs/rust-static-analysis-tools.md
   description: 'Comprehensive listing of Rust static analysis tools, modeled after Holzmann''s classic C tools page. Covers: compiler (rustc/clippy), commercial (CodeQL/Semgrep/Coverity/Klocwork/SonarQube/TrustInSoft), academic (Miri/Rudra/MIRAI/MirChecker/lockbud/Yuga), formal verification (Kani/Prusti/Verus/Creusot/Flux/Aeneas/hax), theory (RustBelt/Stacked Borrows), fuzzing (cargo-fuzz/bolero/proptest/loom), supply chain (cargo-audit/deny/geiger/vet/crev), CI pipeline recommendations, textbooks.'
   last_edited_ms: 0
+3f063b641da90997:
+  path: web/src/App.tsx
+  description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) (delta-folded per-agent meta) ?? fleetAgent (polled-fleet identity fallback) so the always-visible TopBar + StatusBar ride the push plane for phase/cost/tokens instead of the 15s fleet poll (T297). view/agent persisted to localStorage; effectiveView falls back to fleet when no live agent. T334: finderRevealPath state + showInFinder handler switch to finder view and pass revealPath to Finder for file reveal.'
+  last_edited_ms: 1782134369911
 3f07cca3d8f73cbd:
   path: src/app/run/threads/bridge.rs
   description: 'Bridge command intake + live-state emission (gated bridge-ON). poll_bridge_commands drains ALL pending commands/tick (Leg 3) → super::commands::apply_command, then calls app.save_state_async() when ≥1 command applied — LOAD-BEARING for config-only mutations with NO oplog-delta representation (chiefly Configure: LLM provider+model), which would otherwise live only in memory and revert on reload (the ''provider reverts after Ctrl+R'' bug, T262). Roster mutations ride oplog→view so the save is just a disk-backstop promptness bonus there. emit_roster_delta (pub(super)) = non-blocking DURABLE oplog append on thread mutation. emit_vitals = chokepoint: best-effort PhaseTransition + CostAggregate, on-change only, never fsyncs loop (I2). emit_thread_status = observe-on-change chokepoint diffing wire_turn(status) vs thread_statuses memo → DURABLE ThreadStatusChanged on flip. emit_thread_focus = observe-on-change chokepoint diffing FocusState.focused_thread_id vs BridgeState.last_focus memo (seeded no-emit first pass) → BEST-EFFORT ThreadFocusChanged on change (ephemeral UI state like phase; self-heals from disk FocusState). wire_turn (pub(super)) ThreadStatus→ThreadTurn identity-by-name. Command APPLICATION extracted to sibling commands.rs.'
@@ -3142,6 +3150,10 @@
   path: crates/cp-mod-logs/src/tools.rs
   description: Log tool execution. flame!("log_create") and flame!("close_history"). push_log() helper. execute_log_create() creates entries from array. execute_close_conversation_history() processes panels array — per-panel logs (strings), timestamp from panel's last message, panel removal.
   last_edited_ms: 0
+5ea5dea550672135:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Threads view shell (list | conversation). handleSend/handleArchive/handleCreate via sendCommand. T331: handleAttach now STAGES files as pendingFiles (upload to .uploads/ but DON''T send) — pending chips shown in composer, merged into message content only on explicit Send. T298: buildUploadMessage. T303: per-agent thread persistence to localStorage. T334: accepts onShowInFinder prop from App, forwards to ThreadConversation.'
+  last_edited_ms: 1782134369883
 5eaf816692080bab:
   path: crates/cp-mod-spine/src/engine.rs
   description: 'Spine engine — check_spine() with flame!("check_spine") evaluates auto-continuation. Bypass hierarchy: (1) is_streaming, (2) user_stopped (absolute hard stop), (3) error backoff, (4) unprocessed check, (5) double-synthetic guard, (6) guard rails. Marks all consumed notifications as processed before firing. apply_continuation() creates synthetic messages.'
@@ -4210,6 +4222,10 @@
   path: src/llms/cache/density.rs
   description: 'Divergence density distributions. Production: ConversationTailDensity (zeros out assistant blocks, quadratic on user-side panels + last user turn). Test-only: Uniform, Quadratic, PowerLaw, Empirical.'
   last_edited_ms: 0
+7d1fdb01891ad40e:
+  path: web/src/components/conversation/Message.tsx
+  description: 'Thread/conversation message renderer (shared by web ThreadConversation + cockpit Conversation). AssistantMessage + UserMessage render text via <Markdown> (assistant=default, user=onAccent); MessageBody splices inline file-upload chips. T311: discrete CopyButton beneath BOTH user & assistant bubbles — low-opacity Copy icon (align mirrors bubble side: user self-end, assistant left under pl-7), click → navigator.clipboard.writeText(text) → flips to green var(--ok) Check ''Copied'' for ~2s then reverts (guarded ?. for insecure-origin/no-clipboard, silent fail); hidden on assistant while streaming. ToolMessage = collapsible card. Streaming blink cursor preserved. T334: onShowInFinder prop threaded to MessageFileChip for Show in Finder navigation.'
+  last_edited_ms: 1782134369830
 7d3f6d9336871a4e:
   path: crates/cp-base/src/tools/mod.rs
   description: 'Tool system. ToolUse/ToolResult (display, tldr, preserves_tempo). ToolDefinition + ToolDefBuilder (schema in Rust, descriptions from YAML). ParamType recursive JSON Schema. build_api() generates LLM tool array. Sub-modules: pre_flight, async_exec.'
@@ -4702,6 +4718,10 @@
   path: web/src/lib/query/sync.ts
   description: 'SSE→QueryClient delta bridge (push plane Leg-2 frontend). applyThreadDelta + applyAgentDelta fold rev-numbered OpEntry into [''threads'',id]/[''agent'',id] caches via setQueryData functional updaters (rev high-water guard, structural sharing). T297: applyAgentDelta context_usage case folds used/threshold/budget + the cache hit/miss split (contextHit/contextMiss) so the HUD meter matches ratatui''s green/amber segments; phase folded never-null; cost + input/output tokens folded latest-wins. mergeThreadLogs non-destructive poll reconcile.'
   last_edited_ms: 1782050215673
+8aa2ea3e2f2af1fc:
+  path: web/src/components/threads/fileUpload.tsx
+  description: 'Threads chat file-upload (T298): UploadedFile type + buildUploadMessage (one ```file-upload YAML block per file: path/name/size/note) + splitMessageSegments (interleaves prose + inline file chips at parse position) + uploadToNode (synthesizes a FinderNode via kindOf so the chip drives the shared Quick Look). MessageFileChip existence-checks via useFs(parent): greys ''moved/deleted'' when the file is absent from an existing listing OR the parent listing returns ANY 4xx (a nonexistent/escaping parent dir canonicalizes to nothing → backend answers 403 ''path outside agent realm'', NOT 404 — matched via /^4\d\d/ on the client error message, so a statusless network blip never false-greys). Size shown is the REAL on-disk byte count from the listing node (never the untrusted YAML size:). FileUploadChip = clickable mac-icon chip opening QuickLookSheet; three states present-interactive / present-static / greyed-missing. T334: small FolderOpen button beside the chip — ''Show in Finder'' navigates to the file''s parent and selects it.'
+  last_edited_ms: 1782134369795
 8ac46f3f53f69dba:
   path: web/src/components/threads/ThreadsView.tsx
   description: 'Threads view assembler. Uses useThreads()+useFleet() live. handleArchive/Create/Send via sendCommand, each .catch wired to a breaker-aware flash notice (describeCommandError: a 503/tripped CostBreaker → actionable ''over budget'' alert, else generic ''Could not …'') rendered as a transient role=alert toast (6s, timer-ref cleaned on unmount) — closes the T121 silent-swallow hole where an over-budget send produced zero UI feedback. Auto-selects first valid thread. EmptyRealm fallback. Keyed by agentId in App.'
@@ -5838,6 +5858,10 @@ acc3faefa78f1085:
   path: crates/cp-orchestrator/src/registry/mod.rs
   description: 'AgentRegistry: poll-based scan-and-diff of agents dir. Events: Appeared/Disappeared/StatusChanged/Stale. Three-factor liveness verdict. reap_tmp for crash-orphan writes. 8 tests.'
   last_edited_ms: 0
+acc791ac2f872692:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped) opened by any chip. T304: passes draftKey. T331: passes pendingFiles + onRemoveFile to ThreadComposer. T334: onShowInFinder prop forwarded to Message for Show in Finder navigation. Takes agentId + onAttach props.'
+  last_edited_ms: 1782134369857
 acde3d0765ea24ec:
   path: crates/cp-mod-tree/src/tools.rs
   description: Tree tools with flame!(). compute_file_hash uses FNV-1a. Toggle/describe/filter. @-autocomplete via list_dir_entries.
@@ -5898,6 +5922,10 @@ ae7544be6efd88b2:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, ≤150 lines AND ≤8000 bytes inline+tempo, bigger entity_result panel+no tempo. 200-row cap. RETURNING support.
   last_edited_ms: 1780606466419
+aec5d14317c1423a:
+  path: docs/trust-center/trust.css
+  description: Shared CSS for all Trust Center pages. Enterprise slate/navy palette, Inter + IBM Plex Mono fonts, fixed sidebar nav, breadcrumbs, cards, tables, badges, policy blocks, FAQ accordion, status dots, CTA buttons, responsive (sidebar hides <960px). Header left-padding aligned with content area. 631 lines.
+  last_edited_ms: 1782134011620
 aec798aa0357f6d1:
   path: crates/cp-oplog/src/compact.rs
   description: 'Phase 7 (X774): segment compaction + GAP3 grace rule. compact(dir) deletes every segment older than the newest checkpoint-bearing segment (replay fast-path already ignores them → replay output unchanged; checkpoint Snapshot carries live heads+seen, so the checkpoint IS the ack-rev barrier). CompactReport{segments_removed,oldest_index}. total_bytes/should_compact size trigger (256MiB). body_gc_eligible(age,grace) const predicate for GAP3: only GC bodies older than DEFAULT_GC_GRACE(60s) >> I13 barrier window, so in-flight spills never collected, only crash-orphans. OplogResult from crate::error. 7 tests incl replay-identical-after-compaction.'
