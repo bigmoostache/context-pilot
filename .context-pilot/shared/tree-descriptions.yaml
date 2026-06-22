@@ -3194,6 +3194,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: 'macOS title bar. App mark (Home)→fleet. At fleet altitude ''Mission control'' caption (switcher + branch/cost hidden); inside an agent: AgentSwitcher + per-agent segmented switcher Threads·Cockpit·Finder + branch+cost. Far-right: Activity button (StatsPopup) + ThemeToggle + Settings gear (ConfigModal). Both modals always-mounted, controlled open.'
   last_edited_ms: 1781526515057
+61898d4be517fc51:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 6192121729fa4dc7:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search. Dynamic entity_result panels.
@@ -3342,6 +3346,10 @@
   path: ui/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: selected thread''s full conversation. toChatMessage() maps ThreadMsg→ChatMessage to reuse cockpit Message renderer. Renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'
   last_edited_ms: 0
+6682e4880a8b883f:
+  path: crates/cp-orchestrator/src/transport/inspect/finder/mod.rs
+  description: 'Finder module hub: re-exports fs_list/fs_preview/conversation (listing), fs_sheet (sheet — CSV/xlsx→table, T282), fs_write/mkdir/rename/move/trash (mutate), fs_upload/fs_upload_unique (upload), fs_download + fs_raw (download — fs_raw is the inline image/PDF raw-serve, T281/T286). Private re-export of is_bare_name/rel_child for upload.rs. Submodules: listing/sheet/mutate/upload/download/support.'
+  last_edited_ms: 1782125022893
 6685b46338a4024a:
   path: crates/cp-mod-memory/src/types.rs
   description: Memory types. MemoryItem (id, yaml_key, tl_dr, contents, importance, labels, open). Importance enum (Low/Medium/High/Critical). MemoryState (memories, next_id, open_ids).
@@ -4812,8 +4820,8 @@
   last_edited_ms: 1781648604853
 8f88314445a45b4c:
   path: crates/cp-mod-bridge/src/lib.rs
-  description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1; PENDING+try_recover self-heal. ContextMemo alias for ContextUsage emit memo. on_stream_chunk→Token, on_stream_stop→PhaseHint(Idle).'
-  last_edited_ms: 0
+  description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1 OR --bridge CLI flag (OnceLock). request_bridge() pub API for CLI activation. PENDING+try_recover self-heal. ContextMemo alias for ContextUsage emit memo. on_stream_chunk→Token, on_stream_stop→PhaseHint(Idle).'
+  last_edited_ms: 1782122714467
 8facb37b4c21cf2a:
   path: crates/cp-mod-ocr/Cargo.toml
   description: 'OCR module deps: cp-base, cp-render, serde_json, reqwest, sha2, log.'
@@ -4832,8 +4840,8 @@
   last_edited_ms: 0
 902e922ca834c835:
   path: src/main.rs
-  description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
-  last_edited_ms: 0
+  description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. --bridge CLI flag (safe OnceLock, no unsafe set_var). --resume-stream for self-restart. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
+  last_edited_ms: 1782122714441
 905c0880360bca44:
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet mission-control shell — shown when no agent is focused. Owns fleetPage state, renders FleetSidebar + active page: agents (FleetDashboard) / prompts (PromptsPage) / usage (UsagePage) / settings (ConfigPanel variant=''inline''). App.tsx renders this at fleet altitude.'
@@ -7898,6 +7906,10 @@ ee5a9f8f28812c41:
   path: crates/cp-mod-brave/src/lib.rs
   description: 'Brave Search module. 2 tools: brave_search (snippets), brave_llm_context (deep extracted content). Dynamic brave_result panels. No state. Global, non-core.'
   last_edited_ms: 0
+ee8d4cb29bfb6892:
+  path: crates/cp-orchestrator/src/services/names.rs
+  description: 'Orchestrator-owned agent display-name overrides (T328). NameOverrides: HashMap<agent_id, display_name> persisted to <agents_dir>/agent-names.json (atomic tmp→rename). load/get/set (empty name clears override). Independent of agent process — orchestrator-only. Unit-tested roundtrip + clear.'
+  last_edited_ms: 1782125022862
 eea64e117a25ef2b:
   path: crates/cp-mod-spine/src/coucou.rs
   description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper.

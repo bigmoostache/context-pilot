@@ -119,6 +119,20 @@ export function fetchRetiredFleet(): Promise<Agent[]> {
 
 // ── Agent meta ────────────────────────────────────────────────────────
 
+/** Set or clear a custom display name for an agent. An empty name reverts to
+ *  the folder-derived default. Stored orchestrator-side in `agent-names.json`,
+ *  independent of the agent process (T328). */
+export function renameAgent(
+  agentId: string,
+  name: string,
+): Promise<{ ok: boolean }> {
+  return request(`/api/agent/${agentId}/rename`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  })
+}
+
 export function fetchAgentMeta(agentId: string): Promise<Agent> {
   return request(`/api/agent/${agentId}/meta`)
 }

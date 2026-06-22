@@ -48,7 +48,7 @@ use tiny_http::{Header, Method, Request, Response, Server};
 use cp_wire::types::registry::Entry;
 
 use crate::inspect::StateReader;
-use crate::services::{CostBreaker, MaterializedView, RetiredStore, StreamHub};
+use crate::services::{CostBreaker, MaterializedView, NameOverrides, RetiredStore, StreamHub};
 use crate::supervisor::AgentSupervisor;
 use query::QueryParams;
 use ticket::TicketStore;
@@ -101,6 +101,8 @@ pub struct Backend {
     /// Orchestrator-owned set of retired agents (T271) — stopped-but-kept
     /// agents, persisted independently of the agent-written registry records.
     pub(crate) retired: RetiredStore,
+    /// Custom display-name overrides set via the dashboard (T328).
+    pub(crate) names: NameOverrides,
 }
 
 impl Backend {
@@ -119,6 +121,7 @@ impl Backend {
             tickets: TicketStore::new(),
             inspect: StateReader::new(),
             retired: RetiredStore::load(&agents_dir),
+            names: NameOverrides::load(&agents_dir),
             agents_dir,
             dirty_agents: HashSet::new(),
             supervisor: AgentSupervisor::new(&[agent_binary.clone()]),
@@ -169,6 +172,7 @@ impl Backend {
             tickets: TicketStore::new(),
             inspect: StateReader::new(),
             retired: RetiredStore::default(),
+            names: NameOverrides::default(),
             agents_dir,
             dirty_agents: HashSet::new(),
             supervisor: AgentSupervisor::new(&[]),
@@ -309,6 +313,7 @@ fn route_rest(
         (Method::Post, ["api", "agent", id, "restart"]) => rest::restart_agent(state, id),
         (Method::Post, ["api", "agent", id, "retire"]) => rest::retire_agent(state, id),
         (Method::Post, ["api", "agent", id, "unretire"]) => rest::unretire_agent(state, id),
+        (Method::Post, ["api", "agent", id, "rename"]) => rest::rename_agent(state, id, body_bytes),
         (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state),
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },

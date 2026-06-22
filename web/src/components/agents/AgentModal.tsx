@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react"
 import type { Agent } from "@/lib/types"
-import { useCreateAgent, useRestartAgent, useRetireAgent, sendCommand } from "@/lib/live"
+import { useCreateAgent, useRenameAgent, useRestartAgent, useRetireAgent, sendCommand } from "@/lib/live"
 import { PROVIDERS, defaultModel, findModel, resolveSelection } from "@/lib/support/models"
 import { ModelPicker } from "./ModelPicker"
 import { SessionVitals } from "../shell/SessionVitals"
@@ -83,6 +83,7 @@ export function AgentModal({
   const createAgent = useCreateAgent()
   const restartAgent = useRestartAgent()
   const retireAgent = useRetireAgent()
+  const renameAgent = useRenameAgent()
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const pending = createAgent.isPending || saving || restartAgent.isPending || retireAgent.isPending
@@ -125,13 +126,22 @@ export function AgentModal({
     if (isManage && agent) {
       setSaving(true)
       setError(null)
-      sendCommand(agent.id, { kind: "configure", provider: provId, model: modelId })
+      const tasks: Promise<unknown>[] = [
+        sendCommand(agent.id, { kind: "configure", provider: provId, model: modelId }),
+      ]
+      const nameChanged = name.trim() !== (agent.name ?? "")
+      if (nameChanged) {
+        tasks.push(renameAgent.mutateAsync({ agentId: agent.id, name: name.trim() }))
+      }
+      Promise.all(tasks)
         .then(() => {
-          onFlash?.(`Model updated to ${findModel(provId, modelId)?.displayName ?? modelId}`)
+          onFlash?.(nameChanged
+            ? `Saved changes to ${name.trim()}`
+            : `Model updated to ${findModel(provId, modelId)?.displayName ?? modelId}`)
           onClose()
         })
         .catch((e: unknown) => {
-          setError(e instanceof Error ? e.message : "Failed to update model")
+          setError(e instanceof Error ? e.message : "Failed to save changes")
         })
         .finally(() => setSaving(false))
       return

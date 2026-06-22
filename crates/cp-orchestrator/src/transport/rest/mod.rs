@@ -205,6 +205,26 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
     }
 }
 
+/// `POST /api/agent/{id}/rename` — set or clear a custom display name.
+///
+/// Body: `{ "name": "My Custom Name" }`.  An empty or whitespace-only name
+/// reverts to the folder-derived default.  The override is persisted in the
+/// orchestrator's `agent-names.json` (independent of the agent process).
+pub fn rename_agent(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply {
+    #[derive(serde::Deserialize)]
+    struct Req {
+        name: String,
+    }
+    let Ok(req) = serde_json::from_slice::<Req>(body_bytes) else {
+        return HttpReply::error(400, "expected {\"name\":\"...\"}");
+    };
+    let Ok(mut b) = state.lock() else {
+        return HttpReply::error(500, "backend lock poisoned");
+    };
+    let _prev = b.names.set(id, &req.name);
+    HttpReply::ok(&serde_json::json!({ "ok": true }))
+}
+
 /// Load an agent's registry [`Entry`] from the configured agents directory.
 ///
 /// Returns an [`HttpReply`] error directly so handlers can `?`-style early-out.

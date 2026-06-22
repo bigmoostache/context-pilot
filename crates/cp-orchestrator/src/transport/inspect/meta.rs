@@ -71,9 +71,16 @@ pub fn fleet_retired(state: &Mutex<Backend>) -> HttpReply {
     let agents: Vec<serde_json::Value> = records
         .iter()
         .map(|r| {
+            // Dashboard name override wins over the folder-basename snapshot
+            // captured at retire time — the user may rename a retired agent.
+            let name = state
+                .lock()
+                .ok()
+                .and_then(|b| b.names.get(&r.id).map(str::to_owned))
+                .unwrap_or_else(|| r.name.clone());
             serde_json::json!({
                 "id": r.id,
-                "name": r.name,
+                "name": name,
                 "folder": r.folder,
                 "branch": "",
                 "model": r.model,
@@ -96,7 +103,9 @@ pub fn fleet_retired(state: &Mutex<Backend>) -> HttpReply {
 /// Build the enriched agent JSON for one agent.
 fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde_json::Value {
     let folder = &entry.folder;
-    let name = std::path::Path::new(folder).file_name().and_then(std::ffi::OsStr::to_str).unwrap_or(agent_id);
+    let name_override = state.lock().ok().and_then(|b| b.names.get(agent_id).map(str::to_owned));
+    let default_name = std::path::Path::new(folder).file_name().and_then(std::ffi::OsStr::to_str).unwrap_or(agent_id);
+    let name = name_override.as_deref().unwrap_or(default_name);
 
     // Phase + lifecycle + cost + cumulative tokens from the materialized view
     // (brief lock). These ride the push plane (PhaseTransition / CostAggregate

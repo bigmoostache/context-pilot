@@ -135,11 +135,30 @@ export function useTrashItems(agentId: string) {
   })
 }
 
-// ── Agent lifecycle (create / restart / retire) ───────────────────────
+// ── Agent lifecycle (create / restart / retire / rename) ──────────────
 //
 // Creating/restarting/retiring an agent is a one-shot POST; the spawn or kill
 // is async, so each invalidates the fleet query immediately AND on a short
 // delay so the change surfaces well before the slow (15s) fleet backstop poll.
+
+/**
+ * Mutation to set or clear an agent's custom display name (T328). The override
+ * is persisted orchestrator-side in `agent-names.json`, independent of the
+ * agent process. On success both the fleet and the per-agent meta queries are
+ * invalidated so the new name surfaces everywhere at once.
+ */
+export function useRenameAgent() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ agentId, name }: { agentId: string; name: string }) =>
+      api.renameAgent(agentId, name),
+    onSuccess: (_res, { agentId }) => {
+      void client.invalidateQueries({ queryKey: qk.fleet() })
+      void client.invalidateQueries({ queryKey: qk.retiredFleet() })
+      void client.invalidateQueries({ queryKey: qk.agent(agentId) })
+    },
+  })
+}
 
 /**
  * Mutation to create a new agent. On success it nudges the fleet query to
