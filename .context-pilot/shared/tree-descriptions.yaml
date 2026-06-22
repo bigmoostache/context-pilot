@@ -1766,6 +1766,10 @@
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
   last_edited_ms: 0
+3541d076658725f2:
+  path: docs/trust-center/subprocessors.html
+  description: 'Subprocessor Register page. 7 sections: LLM providers table (6 providers), auxiliary services table (5 services), local services table (4 services), change log table (4 entries), operator responsibility notice, vendor risk assessment criteria (8-criterion table with mandatory/preferred weights), data flow summary (HTML/CSS architecture diagram with component grid, TLS arrow, provider pills).'
+  last_edited_ms: 1782135413741
 3555f17d402bb18e:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread select resets scroll to bottom.'
@@ -6094,6 +6098,10 @@ b2692d69f7a93563:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 1780592402527
+b2730a6af4d32805:
+  path: docs/trust-center/trust.css
+  description: 'Shared CSS for all Trust Center pages. Enterprise slate/navy palette, Inter + IBM Plex Mono fonts, fixed sidebar nav, breadcrumbs, cards, tables, badges, policy blocks, FAQ accordion, status dots, CTA buttons, data flow diagram (tc-diagram-* classes: box/grid/node/arrow/provider pills), responsive (sidebar hides <960px, diagram grid collapses). Header left-padding aligned with content area.'
+  last_edited_ms: 1782135413768
 b2783b3948678143:
   path: web/src/lib/queryClient.ts
   description: The single TanStack QueryClient (replaces the bespoke useLiveQuery cache). staleTime Infinity + refetchOnFocus/Mount/Reconnect OFF — the SSE push plane (setQueryData in sync.ts) owns freshness; the per-hook refetchInterval (BACKSTOP_POLL_MS=15s) is the only time-based refresh. Structural sharing makes the T123 delta-burst-clobber structurally impossible.
