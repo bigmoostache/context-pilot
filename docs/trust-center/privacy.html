@@ -343,6 +343,186 @@
                 Delete the <code>.context-pilot/</code> directory in your project root. For global configuration, delete <code>~/.context-pilot/</code>. These are the only two locations where Context Pilot writes persistent data. No external cleanup is required on our side because we hold no data.
               </div></div>
             </div>
+            <div class="tc-faq-item">
+              <button class="tc-faq-q" onclick="this.parentElement.classList.toggle('open')">
+                Does Context Pilot comply with my company's data loss prevention (DLP) policy?
+                <svg class="tc-faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <div class="tc-faq-a"><div class="tc-faq-a-inner">
+                Context Pilot transmits data only to explicitly configured API providers. All outbound connections are enumerable and predictable (see the <a href="subprocessors.html">Subprocessor Register</a>). If your DLP policy restricts data transmission to specific endpoints, you can verify compliance by reviewing the configured provider list. No undocumented or hidden network calls exist. For maximum control, you can operate Context Pilot with only a locally-hosted LLM provider, achieving zero data egress.
+              </div></div>
+            </div>
+            <div class="tc-faq-item">
+              <button class="tc-faq-q" onclick="this.parentElement.classList.toggle('open')">
+                Can I use Context Pilot with confidential or classified data?
+                <svg class="tc-faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <div class="tc-faq-a"><div class="tc-faq-a-inner">
+                Context Pilot itself does not transmit data to any Context Pilot-operated infrastructure. However, it does transmit code context to your configured LLM provider for inference. Whether this is acceptable depends on your LLM provider's data handling terms and your organization's classification requirements. For highest sensitivity, consider using a locally-hosted LLM (via an OpenAI-compatible API endpoint) to keep all data on-premises.
+              </div></div>
+            </div>
+            <div class="tc-faq-item">
+              <button class="tc-faq-q" onclick="this.parentElement.classList.toggle('open')">
+                Does Context Pilot store any biometric data or PII?
+                <svg class="tc-faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <div class="tc-faq-a"><div class="tc-faq-a-inner">
+                No. Context Pilot does not collect, process, or store biometric data, personally identifiable information (PII), or any form of personal data. The only "user data" that exists is the operator's own project files, which Context Pilot reads (with filesystem-level permissions) to provide coding assistance. Context Pilot has no concept of user identity, user accounts, or user profiles.
+              </div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Cookie and Tracking -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">6. Cookie &amp; Tracking Policy</h2>
+          <p class="tc-section-desc">
+            Context Pilot has no cookie or tracking infrastructure. This section exists to provide a definitive, auditable answer for compliance questionnaires.
+          </p>
+
+          <div class="tc-controls">
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Zero cookies</h4>
+                <p>Context Pilot does not set, read, or transmit HTTP cookies. The orchestration backend does not issue <code>Set-Cookie</code> headers. No session cookies, authentication cookies, tracking cookies, or third-party cookies exist in the application.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Zero tracking pixels</h4>
+                <p>No tracking pixels, web beacons, fingerprinting scripts, or third-party analytics SDKs are included in any part of the application. The web frontend loads only first-party JavaScript from the local development server.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>No advertising identifiers</h4>
+                <p>No advertising IDs, device fingerprints, Google Analytics, Mixpanel, Amplitude, Segment, Heap, Hotjar, FullStory, or equivalent services are integrated. No consent banner is needed because there is nothing to consent to.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Local storage usage</h4>
+                <p>The web frontend uses the browser's <code>localStorage</code> API for user preferences only (active view, active agent, thread selection, draft composer text). This data never leaves the browser and is fully controlled by the operator. It can be cleared via standard browser developer tools at any time.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- International Data Transfers -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">7. International Data Transfers</h2>
+          <p class="tc-section-desc">
+            Context Pilot's local-first architecture means no data crosses international borders through Context Pilot infrastructure. However, operator-configured API integrations may involve cross-border data transfers.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Context Pilot Infrastructure</h4>
+              <span class="tc-badge tc-badge--green">No Transfer</span>
+            </div>
+            <p>
+              Context Pilot does not operate servers in any jurisdiction. All data processing occurs on the operator's workstation in the operator's jurisdiction. No data crosses borders through Context Pilot-controlled infrastructure because no such infrastructure exists.
+            </p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Third-Party Provider Transfers</h4>
+              <span class="tc-badge tc-badge--amber">Operator Responsibility</span>
+            </div>
+            <p>
+              When the operator configures API integrations (LLM providers, search, OCR), data may be transmitted to servers in the provider's jurisdiction. The operator is responsible for evaluating the data transfer implications:
+            </p>
+            <ul>
+              <li><strong>Anthropic:</strong> US-based. Processes API data in the United States. See <a href="https://www.anthropic.com/policies" target="_blank">Anthropic's privacy policy</a> for SCCs and adequacy measures.</li>
+              <li><strong>OpenAI:</strong> US-based. Data processed in the United States. Enterprise agreements may include EU data residency. See <a href="https://openai.com/policies" target="_blank">OpenAI's data policy</a>.</li>
+              <li><strong>Google AI:</strong> Global infrastructure. Data processing location depends on the operator's Google Cloud configuration.</li>
+              <li><strong>Mistral AI:</strong> EU-based (Paris, France). Data processed within the European Union.</li>
+              <li><strong>Brave Search:</strong> US-based. Search queries processed in the United States.</li>
+              <li><strong>Voyage AI:</strong> US-based. Text chunks processed for embedding generation.</li>
+            </ul>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>GDPR Transfer Mechanisms</h4>
+            </div>
+            <p>
+              Operators subject to GDPR who transmit data to non-EU providers should verify that their provider offers appropriate transfer mechanisms: Standard Contractual Clauses (SCCs), adequacy decisions, or Binding Corporate Rules (BCRs). Context Pilot cannot negotiate or enforce these mechanisms on behalf of operators, as it is not a party to the data processing relationship.
+            </p>
+          </div>
+        </section>
+
+        <!-- DPA Framework -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">8. Data Processing Agreement Framework</h2>
+          <p class="tc-section-desc">
+            Context Pilot's architecture fundamentally differs from cloud SaaS products. This section addresses the applicability of Data Processing Agreements.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>DPA Applicability Assessment</h4>
+            </div>
+            <p>
+              A Data Processing Agreement (DPA) is a contractual arrangement between a data controller and a data processor. Context Pilot does not process data on behalf of operators &mdash; it is software that runs on the operator's own infrastructure. Context Pilot's legal relationship to the operator is that of a <strong>software licensor</strong>, not a data processor. Therefore:
+            </p>
+            <ul>
+              <li>A DPA between the operator and Context Pilot is <strong>not applicable</strong> &mdash; no data is processed on our infrastructure</li>
+              <li>DPAs between the operator and their configured <strong>API providers</strong> (Anthropic, OpenAI, etc.) <strong>may be required</strong> depending on the operator's regulatory obligations</li>
+              <li>The operator should evaluate each provider's DPA independently based on their use case and jurisdiction</li>
+            </ul>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Provider DPA Availability</h4>
+            </div>
+            <table class="tc-table" style="margin-top: 12px;">
+              <thead>
+                <tr>
+                  <th>Provider</th>
+                  <th>DPA Available</th>
+                  <th>Standard Terms</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="cell-name">Anthropic</td>
+                  <td>Yes (enterprise agreements)</td>
+                  <td><a href="https://www.anthropic.com/policies" target="_blank">Terms of Service</a></td>
+                </tr>
+                <tr>
+                  <td class="cell-name">OpenAI</td>
+                  <td>Yes (DPA available on request)</td>
+                  <td><a href="https://openai.com/policies" target="_blank">Terms of Use</a></td>
+                </tr>
+                <tr>
+                  <td class="cell-name">Google AI</td>
+                  <td>Yes (Google Cloud DPA)</td>
+                  <td><a href="https://cloud.google.com/terms" target="_blank">Service Terms</a></td>
+                </tr>
+                <tr>
+                  <td class="cell-name">Mistral AI</td>
+                  <td>Yes (EU-based, GDPR-native)</td>
+                  <td><a href="https://mistral.ai/terms" target="_blank">Terms of Service</a></td>
+                </tr>
+                <tr>
+                  <td class="cell-name">Brave Search</td>
+                  <td>Privacy-focused by design</td>
+                  <td><a href="https://brave.com/privacy/browser/" target="_blank">Privacy Policy</a></td>
+                </tr>
+                <tr>
+                  <td class="cell-name">Voyage AI</td>
+                  <td>Contact provider</td>
+                  <td><a href="https://www.voyageai.com" target="_blank">voyageai.com</a></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
 

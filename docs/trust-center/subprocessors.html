@@ -353,6 +353,105 @@
           </div>
         </section>
 
+        <!-- Vendor Risk Assessment -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">6. Vendor Risk Assessment Criteria</h2>
+          <p class="tc-section-desc">
+            The following criteria are evaluated when considering new third-party service integrations for Context Pilot. This framework ensures that any addition to the subprocessor register meets minimum security and privacy standards.
+          </p>
+
+          <table class="tc-table">
+            <thead>
+              <tr>
+                <th>Criterion</th>
+                <th>Requirement</th>
+                <th>Weight</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cell-name">API-key authentication</td>
+                <td>Provider must support API key authentication (no OAuth flows that require Context Pilot to hold session tokens on behalf of users)</td>
+                <td><span class="tc-badge tc-badge--green">Mandatory</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">TLS encryption</td>
+                <td>Provider must serve all API endpoints over HTTPS with TLS 1.2 or higher</td>
+                <td><span class="tc-badge tc-badge--green">Mandatory</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Published privacy policy</td>
+                <td>Provider must publish a clear privacy policy describing data handling, retention, and processing purposes</td>
+                <td><span class="tc-badge tc-badge--green">Mandatory</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Opt-in activation</td>
+                <td>Integration must require explicit operator configuration (API key provisioning). No provider may be active by default.</td>
+                <td><span class="tc-badge tc-badge--green">Mandatory</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Data minimization</td>
+                <td>Only data strictly necessary for the service's function is transmitted (e.g., search queries for search, code context for inference)</td>
+                <td><span class="tc-badge tc-badge--green">Mandatory</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">No training on API data</td>
+                <td>Provider should not use API-submitted data for model training without explicit opt-in from the operator</td>
+                <td><span class="tc-badge tc-badge--amber">Strong preference</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">DPA availability</td>
+                <td>Provider should offer a Data Processing Agreement for enterprise customers</td>
+                <td><span class="tc-badge tc-badge--amber">Preferred</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">SOC 2 / ISO 27001</td>
+                <td>Provider should hold recognized security certifications or demonstrate equivalent controls</td>
+                <td><span class="tc-badge tc-badge--amber">Preferred</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Data Flow Diagram -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">7. Data Flow Summary</h2>
+          <p class="tc-section-desc">
+            The following diagram summarizes the data flow architecture. All arrows represent operator-initiated, operator-configured connections. No connection exists that is not explicitly listed below.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Operator Workstation (Local)</h4>
+            </div>
+<pre style="font-family: var(--font-mono); font-size: 0.75rem; line-height: 1.6; color: var(--text-secondary); padding: 16px 0; overflow-x: auto;">
+  +--------------------------------------------------+
+  |           Operator's Workstation                  |
+  |                                                   |
+  |  +----------+   +-------------+   +----------+  |
+  |  | TUI Agent|   | Orchestrator|   | Web      |  |
+  |  | (Rust)   |&lt;--| :7878       |--&gt;| Frontend |  |
+  |  +-----+----+   +------+------+   +----------+  |
+  |        |               |                          |
+  |  +-----+----+   +------+------+                  |
+  |  |Meilisearch|   | Console    |                  |
+  |  |:localhost |   | Server     |                  |
+  |  +----------+   | (Unix sock)|                  |
+  |                  +-------------+                  |
+  +---------------------|-----------------------------+
+                        | TLS (outbound only)
+                        v
+  +--------------------------------------------------+
+  | Configured API Providers (operator's API keys)    |
+  |                                                   |
+  |  Anthropic | OpenAI | Google | Mistral | Groq    |
+  |  Brave Search | Firecrawl | Voyage AI | Datalab  |
+  |  GitHub API                                       |
+  +--------------------------------------------------+
+</pre>
+          </div>
+        </section>
+
       </div>
     </main>
   </div>

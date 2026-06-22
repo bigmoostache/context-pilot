@@ -267,6 +267,128 @@
           </table>
         </section>
 
+        <!-- AI-Specific Regulation -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">4. AI-Specific Regulation</h2>
+          <p class="tc-section-desc">
+            As an AI-powered development tool, Context Pilot's regulatory posture includes assessment against emerging AI-specific frameworks.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>EU AI Act</h4>
+              <span class="tc-badge tc-badge--green">Low Risk</span>
+            </div>
+            <p>
+              Under the EU AI Act risk classification framework, Context Pilot is categorized as a <strong>low-risk</strong> or <strong>minimal-risk</strong> AI system. It does not perform biometric identification, critical infrastructure management, education scoring, employment filtering, law enforcement, or any other high-risk use case enumerated in Annex III. Context Pilot is a general-purpose coding assistant that operates under direct human supervision at all times.
+            </p>
+            <ul>
+              <li><strong>Human oversight:</strong> All AI outputs require explicit human review. The tool does not make autonomous decisions affecting natural persons.</li>
+              <li><strong>Transparency:</strong> The system is clearly identified as an AI assistant. Users interact with it knowingly and intentionally.</li>
+              <li><strong>No prohibited practices:</strong> No subliminal manipulation, social scoring, or real-time biometric identification capabilities exist.</li>
+              <li><strong>General-purpose AI model:</strong> Context Pilot does not train or fine-tune AI models. It uses third-party provider APIs for inference only. GPAI obligations apply to the model providers (Anthropic, OpenAI, etc.), not to Context Pilot.</li>
+            </ul>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>NIST AI Risk Management Framework (AI RMF 1.0)</h4>
+              <span class="tc-badge tc-badge--green">Aligned</span>
+            </div>
+            <p>
+              Context Pilot's design aligns with the NIST AI RMF's core functions:
+            </p>
+            <ul>
+              <li><strong>Govern:</strong> Open-source development with public code review, documented architecture, and transparent decision-making.</li>
+              <li><strong>Map:</strong> Clear system boundaries &mdash; Context Pilot is a developer tool, not an autonomous decision system. Usage context is well-defined.</li>
+              <li><strong>Measure:</strong> All AI interactions are logged locally (conversation history) for operator review. Cost tracking provides usage visibility.</li>
+              <li><strong>Manage:</strong> Guard rails (cost limits, message limits, duration limits) prevent runaway AI operations. Human approval is required for destructive actions.</li>
+            </ul>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Responsible AI Practices</h4>
+              <span class="tc-badge tc-badge--green">Implemented</span>
+            </div>
+            <p>
+              Context Pilot implements multiple safeguards for responsible AI use:
+            </p>
+            <ul>
+              <li><strong>Cost controls:</strong> Per-agent budget limits prevent uncontrolled API spending. Circuit breakers halt operations when budgets are exceeded.</li>
+              <li><strong>Audit trail:</strong> Complete conversation history, tool call logs, and decision traces are preserved locally for operator review.</li>
+              <li><strong>Model transparency:</strong> The operator selects and configures the LLM model. Model identity is always visible. No hidden model switching occurs.</li>
+              <li><strong>Output attribution:</strong> AI-generated content is clearly distinguished from user input in the conversation interface.</li>
+              <li><strong>Operator control:</strong> The operator can interrupt, redirect, or terminate AI operations at any time through guard rails, keyboard shortcuts, or process termination.</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Export Controls -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">5. Export Controls &amp; Sanctions Compliance</h2>
+          <p class="tc-section-desc">
+            This section addresses Context Pilot's posture regarding export controls and international trade sanctions.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Encryption Export Classification</h4>
+              <span class="tc-badge tc-badge--green">Standard</span>
+            </div>
+            <p>
+              Context Pilot uses only standard, commercially available cryptographic implementations (TLS via OpenSSL/rustls, SHA-256 via the <code>sha2</code> crate). No custom or novel cryptographic algorithms are implemented. The software falls under EAR Exception TSU (Technology and Software Unrestricted) for publicly available encryption source code. As open-source software published on GitHub, it qualifies for the publicly available exemption under both US EAR and EU Dual-Use Regulation.
+            </p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Sanctions Compliance</h4>
+            </div>
+            <p>
+              Context Pilot is distributed as open-source software under the MIT License. Distribution is subject to GitHub's terms of service and applicable US export control laws. The software itself does not interact with financial systems, payment processors, or sanctioned entities. Operators are responsible for ensuring their use of third-party API providers complies with applicable sanctions in their jurisdiction.
+            </p>
+          </div>
+        </section>
+
+        <!-- Accessibility -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">6. Accessibility</h2>
+          <p class="tc-section-desc">
+            Context Pilot is committed to making its interfaces accessible to all users.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Web Interface</h4>
+              <span class="tc-badge tc-badge--amber">In Progress</span>
+            </div>
+            <p>
+              The web frontend uses semantic HTML, ARIA attributes, and keyboard-navigable controls. The interface is built with React and shadcn/ui components that include accessibility foundations. Current accessibility features include:
+            </p>
+            <ul>
+              <li>Semantic HTML structure with proper heading hierarchy</li>
+              <li>Keyboard navigation for all interactive elements</li>
+              <li>Sufficient color contrast ratios for text and interactive elements</li>
+              <li>Screen reader compatibility for core workflows</li>
+              <li>No motion-sensitive content or auto-playing media</li>
+            </ul>
+            <p style="margin-top: 8px;">
+              Formal WCAG 2.1 AA compliance audit has not yet been conducted. Accessibility improvements are accepted as contributions and prioritized alongside feature development.
+            </p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Terminal Interface (TUI)</h4>
+              <span class="tc-badge tc-badge--green">Screen Reader Compatible</span>
+            </div>
+            <p>
+              The terminal user interface (TUI) renders through standard terminal emulators and is compatible with terminal-based screen readers. All interactive elements are keyboard-driven by design (the TUI has no mouse interaction as its primary mode). Color is used for enhancement only &mdash; all information is also conveyed through text labels and structural formatting.
+            </p>
+          </div>
+        </section>
+
       </div>
     </main>
   </div>
