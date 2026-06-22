@@ -966,6 +966,10 @@
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
   last_edited_ms: 0
+1d68448437509227:
+  path: docs/trust-center/security.html
+  description: 'Security Architecture page. 10 sections: data flow (4 controls), integrity controls (3 policies: hash chain, lint, structural), access model (3 controls), incident response (3 policies), business continuity (3 controls), supply chain security (4 policies + 6-row table), encryption (4 controls: transit/rest/credential/no-custom-crypto), network architecture (4 policies + 5-row attack vector table), change management (5 controls: VCS/CI/hash-chain/structural/release), vulnerability disclosure program (3 policies: channel/response/scope).'
+  last_edited_ms: 1782134784743
 1d7de6027c99f4a5:
   path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
   description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape.'
@@ -2070,6 +2074,10 @@
   path: src/app/run/threads/mod.rs
   description: 'Thread helpers for main loop: maybe_inject_auto_read (synthetic Read on auto-continuation — note: does NOT break tempo, root cause of T322 stale-panel bug per M103), check_my_turn_threads, extract_thread_ids, maybe_append_tool_activity (auto traces).'
   last_edited_ms: 1782119136396
+3e03972c6df449ea:
+  path: docs/trust-center/subprocessors.html
+  description: 'Subprocessor Register page. 7 sections: LLM providers table (6 providers), auxiliary services table (5 services), local services table (4 services), change log table (4 entries), operator responsibility notice, vendor risk assessment criteria (8-criterion table with mandatory/preferred weights), data flow summary (ASCII architecture diagram).'
+  last_edited_ms: 1782134784830
 3e1dcc436a6467f8:
   path: docs/talk/slides/2-3.html
   description: 'Slide: Instantaneous Feedback (HOWs section)'
@@ -2926,6 +2934,10 @@
   path: web/e2e/smoke.spec.ts
   description: 'Phase 0 e2e smoke (4 tests): live pipe end-to-end. Orchestrator REST /api/fleet/meta returns the real agent; fleet dashboard renders the real agent card; Open→threads view; footer shows live cost. Agent id f3a993c0ff357b41, web :5175, API :7878.'
   last_edited_ms: 1781814025119
+56583ad3ac10e102:
+  path: docs/trust-center/index.html
+  description: 'Trust Center overview/landing page. Enterprise multi-page design (Inter font, slate/navy palette, sidebar nav). At-a-Glance Q&A table (12 procurement questions), Project Statistics cards (6 metrics: LOC, commits, lint rules, crates, protected files, telemetry), Security posture summary cards, 4 nav cards to sub-pages (security/privacy/compliance/subprocessors), contact CTAs. No emojis. Version 2.1.'
+  last_edited_ms: 1782134784713
 5664af275f4d4125:
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): ReplayState{rev_head,heads,seen}. fold_entry(&mut ReplayState,&entry) pub(crate): Checkpoint=authoritative clone_from(heads+seen), MessageCreated=set_thread_head, CommandEffect|SeenMark=seen.mark(token,rev), others no-op. replay() fast-path reads ONLY newest segment when it opens with a checkpoint (Snapshot-seeded); replay_full fallback for seg-0-only. Heads PartialEq order-sensitive. 10 tests incl seen-set V3 + fast==full.'
@@ -3634,6 +3646,10 @@
   path: src/ui/markdown.rs
   description: Markdown table rendering — render_markdown_table() and parse_inline_markdown() return cp_render::Span (IR-native). No ratatui/theme imports. Border/accent/bold/code semantic styling.
   last_edited_ms: 0
+6cf74017442e79ff:
+  path: docs/trust-center/privacy.html
+  description: 'Data Privacy page. 8 sections: data classification table (10 categories with storage/transmission/classification), privacy-by-design controls (4 controls), data retention (2 policies), data subject rights table (5 rights), FAQ accordion (9 items including DLP/classified/biometric/PII), cookie & tracking policy (4 controls: zero cookies/pixels/adIDs + localStorage), international data transfers (3 policies per provider jurisdiction), DPA framework (applicability assessment + 6-provider DPA availability table).'
+  last_edited_ms: 1782134784770
 6cfc3300509aee07:
   path: crates/cp-mod-todo/Cargo.toml
   description: 'Todo module deps: cp-base, cp-render, crossterm, serde, serde_json.'
@@ -5262,6 +5278,10 @@
   path: docs/index.html
   description: Main landing page. Centered hero (blinking cursor, tagline), 2×2 nav grid linking Trust Center, Presentations, Blog (disabled), Documentation (disabled). Grid background + amber glow.
   last_edited_ms: 1782129931134
+9b55d23929970d69:
+  path: docs/trust-center/compliance.html
+  description: 'Compliance Framework page. 6 sections: regulatory assessment (GDPR compatible, SOC 2 N/A, ISO 27001 not certified, HIPAA N/A, CCPA compatible), open-source licensing (MIT + clean dependency audit), security testing table (6 active controls), AI-specific regulation (EU AI Act low-risk + NIST AI RMF aligned + responsible AI practices), export controls & sanctions (EAR TSU + sanctions compliance), accessibility (web in-progress WCAG + TUI screen-reader compatible).'
+  last_edited_ms: 1782134784800
 9b5bd654de298c74:
   path: ui/src/components/shell/ConfigPanel.tsx
   description: 'Shared settings body (macOS System-Settings: category rail + detail pane). NO identity header on the rail (detail-pane header names the active category). variant=''dialog'' (DialogClose chrome, used by ConfigModal/TopBar gear) | ''inline'' (fills page, Save button, used by fleet Settings page). Categories: General/Providers/Search/DocAI/Web/Integrations. Masked keys w/ reveal, Connected pills, toggles, default-model picker.'
