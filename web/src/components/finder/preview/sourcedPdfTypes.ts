@@ -53,9 +53,19 @@ export interface Ref {
 export interface SourcedBundle {
   metadata: Metadata
   targetDocBytes: Uint8Array
+  /** Every document's raw bytes, keyed by document id. */
+  docBytes: Map<string, Uint8Array>
   values: Value[]
   refs: Ref[]
   valuesById: Map<string, Value>
+}
+
+/** Infer document type from its path extension. */
+export function docType(path: string): "pdf" | "xlsx" | "unknown" {
+  const ext = path.split(".").pop()?.toLowerCase() ?? ""
+  if (ext === "pdf") return "pdf"
+  if (["xlsx", "xls", "xlsm", "xlsb", "ods"].includes(ext)) return "xlsx"
+  return "unknown"
 }
 
 // ── ref-type color palette (from render.py) ───────────────────────
@@ -120,6 +130,13 @@ export async function parseSourcedBundle(zipBytes: ArrayBuffer): Promise<Sourced
   if (!pdfFile) throw new Error(`PDF not found at ${targetDoc.path}`)
   const targetDocBytes = await pdfFile.async("uint8array")
 
+  // ALL document bytes (target + sources)
+  const docBytes = new Map<string, Uint8Array>()
+  for (const doc of metadata.documents) {
+    const f = zip.file(pfx + doc.path)
+    if (f) docBytes.set(doc.id, await f.async("uint8array"))
+  }
+
   // values — one YAML per document under values/
   const values: Value[] = []
   const valPrefix = pfx + "values/"
@@ -141,5 +158,5 @@ export async function parseSourcedBundle(zipBytes: ArrayBuffer): Promise<Sourced
     if (Array.isArray(docRefs)) refs.push(...docRefs)
   }
 
-  return { metadata, targetDocBytes, values, refs, valuesById }
+  return { metadata, targetDocBytes, docBytes, values, refs, valuesById }
 }
