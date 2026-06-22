@@ -175,6 +175,8 @@ export interface Agent {
   lastActivity: string
   /** accent color token for the agent's dot/avatar */
   accent: "signal" | "interactive" | "ok" | "warn" | "danger"
+  /** whether the agent has a profile picture stored at the orchestrator */
+  hasAvatar?: boolean
 }
 
 /** A node in the (mock) filesystem browser. */

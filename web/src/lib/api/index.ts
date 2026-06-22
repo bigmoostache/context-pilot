@@ -137,6 +137,32 @@ export function fetchAgentMeta(agentId: string): Promise<Agent> {
   return request(`/api/agent/${agentId}/meta`)
 }
 
+// ── Agent avatar ──────────────────────────────────────────────────────
+
+/** Upload or replace an agent's profile picture. Body is raw image bytes.
+ *  Content type is sniffed server-side from magic bytes. Max 2 MiB. */
+export function uploadAvatar(agentId: string, file: File): Promise<{ ok: boolean }> {
+  return file.arrayBuffer().then((buf) =>
+    request(`/api/agent/${agentId}/avatar`, {
+      method: "POST",
+      body: buf,
+    }),
+  )
+}
+
+/** Remove an agent's profile picture. */
+export function deleteAvatar(agentId: string): Promise<{ ok: boolean }> {
+  return request(`/api/agent/${agentId}/avatar`, { method: "DELETE" })
+}
+
+/** Build the URL to an agent's avatar image (for use as `<img src>`).
+ *  Append a cache-bust `v` param to force re-fetch after upload. */
+export function avatarUrl(agentId: string, cacheBust?: number): string {
+  const base = import.meta.env.VITE_API_URL || ""
+  const v = cacheBust ? `?v=${cacheBust}` : ""
+  return `${base}/api/agent/${agentId}/avatar${v}`
+}
+
 // ── Threads ───────────────────────────────────────────────────────────
 
 /** Format an epoch-ms timestamp as a relative age string ("just now", "3m ago", etc). */

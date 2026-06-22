@@ -12,6 +12,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { accentVar, fmtCost } from "@/lib/support/panelMeta"
 import { useMetrics, useRetiredFleet, useUnretireAgent, useAgentMeta } from "@/lib/live"
+import { avatarUrl } from "@/lib/api"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { FLEET_MAX_W } from "./FleetShell"
@@ -128,12 +129,20 @@ function AgentCard({
   return (
     <div className="group flex flex-col gap-3 rounded-xl border border-border bg-card p-4 card-shadow transition-colors hover:border-[color-mix(in_oklab,var(--signal)_45%,transparent)]">
       <div className="flex items-center gap-3">
-        <span
-          className="flex size-10 shrink-0 items-center justify-center rounded-lg"
-          style={{ background: `color-mix(in oklab, ${accent} 16%, transparent)`, color: accent }}
-        >
-          <FolderGit2 className="size-5" />
-        </span>
+        {a.hasAvatar ? (
+          <img
+            src={avatarUrl(agent.id)}
+            alt={agent.name}
+            className="size-10 shrink-0 rounded-lg object-cover"
+          />
+        ) : (
+          <span
+            className="flex size-10 shrink-0 items-center justify-center rounded-lg"
+            style={{ background: `color-mix(in oklab, ${accent} 16%, transparent)`, color: accent }}
+          >
+            <FolderGit2 className="size-5" />
+          </span>
+        )}
         <div className="flex min-w-0 flex-1 flex-col leading-tight">
           <span className="truncate text-[14px] font-semibold text-foreground/90">{agent.name}</span>
         </div>

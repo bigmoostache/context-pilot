@@ -11,7 +11,8 @@ import {
   X,
 } from "lucide-react"
 import type { Agent } from "@/lib/types"
-import { useCreateAgent, useRenameAgent, useRestartAgent, useRetireAgent, sendCommand } from "@/lib/live"
+import { useCreateAgent, useRenameAgent, useRestartAgent, useRetireAgent, useUploadAvatar, sendCommand } from "@/lib/live"
+import { avatarUrl } from "@/lib/api"
 import { PROVIDERS, defaultModel, findModel, resolveSelection } from "@/lib/support/models"
 import { ModelPicker } from "./ModelPicker"
 import { SessionVitals } from "../shell/SessionVitals"
@@ -84,6 +85,9 @@ export function AgentModal({
   const restartAgent = useRestartAgent()
   const retireAgent = useRetireAgent()
   const renameAgent = useRenameAgent()
+  const uploadAvatar = useUploadAvatar()
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const [avatarBust, setAvatarBust] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const pending = createAgent.isPending || saving || restartAgent.isPending || retireAgent.isPending
@@ -206,10 +210,40 @@ export function AgentModal({
               isManage
                 ? "bg-[var(--signal)]/14 text-[var(--signal)] ring-[var(--signal)]/25"
                 : "bg-[var(--interactive)]/14 text-[var(--interactive)] ring-[var(--interactive)]/25",
+              isManage && "cursor-pointer overflow-hidden transition-opacity hover:opacity-80",
             )}
+            onClick={isManage ? () => avatarInputRef.current?.click() : undefined}
+            title={isManage ? "Click to change avatar" : undefined}
           >
-            {isManage ? <Settings2 className="size-[22px]" /> : <Wand2 className="size-[22px]" />}
+            {isManage && agent?.hasAvatar ? (
+              <img
+                src={avatarUrl(agent.id, avatarBust || undefined)}
+                alt={agent.name}
+                className="size-11 rounded-xl object-cover"
+              />
+            ) : isManage ? (
+              <Settings2 className="size-[22px]" />
+            ) : (
+              <Wand2 className="size-[22px]" />
+            )}
           </span>
+          {isManage && (
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (!file || !agent) return
+                uploadAvatar.mutate({ agentId: agent.id, file }, {
+                  onSuccess: () => setAvatarBust(Date.now()),
+                  onError: (err) => setError(err instanceof Error ? err.message : "Avatar upload failed"),
+                })
+                e.target.value = ""
+              }}
+            />
+          )}
           <div className="relative flex flex-1 flex-col gap-0.5 pt-0.5">
             <h3 className="text-[17px] font-semibold tracking-tight text-foreground">
               {isManage ? `Manage ${agent?.name}` : "Create an agent"}

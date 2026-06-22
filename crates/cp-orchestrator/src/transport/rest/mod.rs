@@ -225,6 +225,33 @@ pub fn rename_agent(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> Http
     HttpReply::ok(&serde_json::json!({ "ok": true }))
 }
 
+/// `POST /api/agent/{id}/avatar` — upload or replace an agent's profile picture.
+///
+/// Body: raw image bytes (PNG/JPEG/GIF/WebP/SVG). Content type is sniffed from
+/// magic bytes — the `Content-Type` header is not required. Max 2 MiB
+/// ([`MAX_AVATAR_BYTES`](crate::services::avatars::MAX_AVATAR_BYTES)).
+pub fn upload_avatar(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply {
+    if body_bytes.is_empty() {
+        return HttpReply::error(400, "empty body");
+    }
+    let Ok(mut b) = state.lock() else {
+        return HttpReply::error(500, "backend lock poisoned");
+    };
+    match b.avatars.set(id, body_bytes) {
+        Ok(()) => HttpReply::ok(&serde_json::json!({ "ok": true })),
+        Err(msg) => HttpReply::error(400, &msg),
+    }
+}
+
+/// `DELETE /api/agent/{id}/avatar` — remove an agent's profile picture.
+pub fn delete_avatar(state: &Mutex<Backend>, id: &str) -> HttpReply {
+    let Ok(mut b) = state.lock() else {
+        return HttpReply::error(500, "backend lock poisoned");
+    };
+    let _existed = b.avatars.remove(id);
+    HttpReply::ok(&serde_json::json!({ "ok": true }))
+}
+
 /// Load an agent's registry [`Entry`] from the configured agents directory.
 ///
 /// Returns an [`HttpReply`] error directly so handlers can `?`-style early-out.

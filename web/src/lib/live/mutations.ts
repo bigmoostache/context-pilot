@@ -260,3 +260,37 @@ export function useUnretireAgent() {
     },
   })
 }
+
+// ── Agent avatar (T338) ───────────────────────────────────────────────
+
+/**
+ * Mutation to upload or replace an agent's profile picture. On success the
+ * fleet and per-agent meta queries are invalidated so the avatar appears
+ * everywhere at once.
+ */
+export function useUploadAvatar() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ agentId, file }: { agentId: string; file: File }) =>
+      api.uploadAvatar(agentId, file),
+    onSuccess: (_res, { agentId }) => {
+      void client.invalidateQueries({ queryKey: qk.fleet() })
+      void client.invalidateQueries({ queryKey: qk.agent(agentId) })
+    },
+  })
+}
+
+/**
+ * Mutation to remove an agent's profile picture. On success the fleet and
+ * per-agent meta queries are invalidated so the fallback icon reappears.
+ */
+export function useDeleteAvatar() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (agentId: string) => api.deleteAvatar(agentId),
+    onSuccess: (_res, agentId) => {
+      void client.invalidateQueries({ queryKey: qk.fleet() })
+      void client.invalidateQueries({ queryKey: qk.agent(agentId) })
+    },
+  })
+}

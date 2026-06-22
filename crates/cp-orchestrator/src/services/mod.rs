@@ -13,12 +13,14 @@
 //!   subscribers with overflow-drop, degraded marking, and snapshot reconcile
 //!   (R2-17).
 
+pub mod avatars;
 pub mod cost_breaker;
 pub mod materialized_view;
 pub mod names;
 pub mod retire;
 pub mod stream_hub;
 
+pub use avatars::AvatarStore;
 pub use cost_breaker::{CostBreaker, Verdict};
 pub use materialized_view::{AgentView, CostSnapshot, MaterializedView};
 pub use names::NameOverrides;

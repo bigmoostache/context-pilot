@@ -48,7 +48,7 @@ use tiny_http::{Header, Method, Request, Response, Server};
 use cp_wire::types::registry::Entry;
 
 use crate::inspect::StateReader;
-use crate::services::{CostBreaker, MaterializedView, NameOverrides, RetiredStore, StreamHub};
+use crate::services::{CostBreaker, MaterializedView, NameOverrides, RetiredStore, StreamHub, AvatarStore};
 use crate::supervisor::AgentSupervisor;
 use query::QueryParams;
 use ticket::TicketStore;
@@ -103,6 +103,8 @@ pub struct Backend {
     pub(crate) retired: RetiredStore,
     /// Custom display-name overrides set via the dashboard (T328).
     pub(crate) names: NameOverrides,
+    /// Agent profile picture store (T338).
+    pub(crate) avatars: AvatarStore,
 }
 
 impl Backend {
@@ -122,6 +124,7 @@ impl Backend {
             inspect: StateReader::new(),
             retired: RetiredStore::load(&agents_dir),
             names: NameOverrides::load(&agents_dir),
+            avatars: AvatarStore::load(&agents_dir),
             agents_dir,
             dirty_agents: HashSet::new(),
             supervisor: AgentSupervisor::new(&[agent_binary.clone()]),
@@ -173,6 +176,7 @@ impl Backend {
             inspect: StateReader::new(),
             retired: RetiredStore::default(),
             names: NameOverrides::default(),
+            avatars: AvatarStore::default(),
             agents_dir,
             dirty_agents: HashSet::new(),
             supervisor: AgentSupervisor::new(&[]),
@@ -235,6 +239,10 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
 
     // File download — returns raw bytes, not JSON.
     if method == Method::Get {
+        if let ["api", "agent", id, "avatar"] = segments.as_slice() {
+            handle_avatar(request, state, id);
+            return;
+        }
         if let ["api", "agent", id, "fs", "download"] = segments.as_slice() {
             handle_download(request, state, id, &query);
             return;
@@ -314,6 +322,8 @@ fn route_rest(
         (Method::Post, ["api", "agent", id, "retire"]) => rest::retire_agent(state, id),
         (Method::Post, ["api", "agent", id, "unretire"]) => rest::unretire_agent(state, id),
         (Method::Post, ["api", "agent", id, "rename"]) => rest::rename_agent(state, id, body_bytes),
+        (Method::Post, ["api", "agent", id, "avatar"]) => rest::upload_avatar(state, id, body_bytes),
+        (Method::Delete, ["api", "agent", id, "avatar"]) => rest::delete_avatar(state, id),
         (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state),
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },
@@ -401,6 +411,27 @@ fn handle_raw(request: Request, state: &Arc<Mutex<Backend>>, id: &str, query: &s
     }
 }
 
+/// Serve an agent's avatar image inline (Content-Type from the avatar store).
+fn handle_avatar(request: Request, state: &Arc<Mutex<Backend>>, id: &str) {
+    let avatar = state.lock().ok().and_then(|b| b.avatars.get(id));
+    match avatar {
+        Some((bytes, ctype)) => {
+            let mut response = Response::from_data(bytes).with_status_code(200);
+            if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], ctype.as_bytes()) {
+                response = response.with_header(h);
+            }
+            if let Ok(h) = Header::from_bytes(&b"Cache-Control"[..], &b"public, max-age=3600"[..]) {
+                response = response.with_header(h);
+            }
+            for header in cors_headers() {
+                response = response.with_header(header);
+            }
+            let _sent = request.respond(response);
+        }
+        None => respond_json(request, &rest::HttpReply::error(404, "no avatar")),
+    }
+}
+
 /// Load an agent's registry record from the backend's agents directory.
 fn load_entry(state: &Arc<Mutex<Backend>>, id: &str) -> Option<Entry> {
     let dir = state.lock().ok()?.agents_dir.clone();
@@ -413,7 +444,7 @@ fn load_entry(state: &Arc<Mutex<Backend>>, id: &str) -> Option<Entry> {
 fn cors_headers() -> Vec<Header> {
     [
         Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]),
-        Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET, POST, OPTIONS"[..]),
+        Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET, POST, DELETE, OPTIONS"[..]),
         Header::from_bytes(&b"Access-Control-Allow-Headers"[..], &b"Content-Type, Last-Event-ID"[..]),
         // Expose Content-Disposition so cross-origin fetch() (web dev server →
         // backend) can read the server-chosen download filename. Without this,

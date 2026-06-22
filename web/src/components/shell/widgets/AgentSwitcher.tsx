@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { accentVar } from "@/lib/support/panelMeta"
+import { avatarUrl } from "@/lib/api"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -59,7 +60,7 @@ export function AgentSwitcher({
             Threads/Finder/Cockpit view-toggle pill group (also `h-8`). */}
         {active ? (
           <>
-            <AgentDot accent={active.accent} status={active.status} compact />
+            <AgentDot accent={active.accent} status={active.status} agentId={active.id} hasAvatar={active.hasAvatar} compact />
             <span className="truncate text-[12.5px] font-semibold text-foreground/90">
               {active.name}
             </span>
@@ -96,7 +97,7 @@ export function AgentSwitcher({
                 "data-[highlighted]:!bg-[color-mix(in_oklab,var(--signal)_11%,transparent)] data-[highlighted]:!text-foreground",
               )}
             >
-              <AgentDot accent={a.accent} status={a.status} />
+              <AgentDot accent={a.accent} status={a.status} agentId={a.id} hasAvatar={a.hasAvatar} />
               <div className="flex min-w-0 flex-1 leading-tight">
                 {/* base-ui's DropdownMenuItem ships a `focus:**:text-accent-foreground`
                     rule that recolours EVERY descendant on highlight — in light
@@ -153,10 +154,14 @@ export function AgentSwitcher({
 function AgentDot({
   accent,
   status,
+  agentId,
+  hasAvatar,
   compact = false,
 }: {
   accent: Agent["accent"]
   status: AgentStatus
+  agentId?: string
+  hasAvatar?: boolean
   /** trigger variant — a smaller 20px glyph so the switcher matches the
    *  view-toggle pill height; the menu rows keep the default 28px dot. */
   compact?: boolean
@@ -168,18 +173,29 @@ function AgentDot({
         compact ? "size-5" : "size-7",
       )}
     >
-      <span
-        className={cn(
-          "flex items-center justify-center rounded-md text-[11px] font-bold uppercase",
-          compact ? "size-5" : "size-7",
-        )}
-        style={{
-          background: `color-mix(in oklab, ${accentVar[accent]} 16%, transparent)`,
-          color: accentVar[accent],
-        }}
-      >
-        <FolderGit2 className={compact ? "size-3" : "size-3.5"} />
-      </span>
+      {hasAvatar && agentId ? (
+        <img
+          src={avatarUrl(agentId)}
+          alt=""
+          className={cn(
+            "rounded-md object-cover",
+            compact ? "size-5" : "size-7",
+          )}
+        />
+      ) : (
+        <span
+          className={cn(
+            "flex items-center justify-center rounded-md text-[11px] font-bold uppercase",
+            compact ? "size-5" : "size-7",
+          )}
+          style={{
+            background: `color-mix(in oklab, ${accentVar[accent]} 16%, transparent)`,
+            color: accentVar[accent],
+          }}
+        >
+          <FolderGit2 className={compact ? "size-3" : "size-3.5"} />
+        </span>
+      )}
       <span
         className={cn(
           "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-card",

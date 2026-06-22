@@ -132,6 +132,7 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
 
     let status = derive_status(phase, lifecycle, has_my_turn);
     let accent = derive_accent(&status);
+    let has_avatar = state.lock().is_ok_and(|b| b.avatars.has(agent_id));
 
     serde_json::json!({
         "id": agent_id,
@@ -170,6 +171,7 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
         "threads": threads_count,
         "lastActivity": last_activity_ms,
         "accent": accent,
+        "hasAvatar": has_avatar,
     })
 }
 
