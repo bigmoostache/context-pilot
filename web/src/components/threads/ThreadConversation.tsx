@@ -104,6 +104,8 @@ export function ThreadConversation({
   agentId,
   onSend,
   onAttach,
+  pendingFiles = [],
+  onRemoveFile,
 }: {
   thread: ThreadDetail
   /** owning agent — needed to open the shared Quick Look drawer for an attachment */
@@ -111,6 +113,10 @@ export function ThreadConversation({
   onSend?: (text: string) => void
   /** upload picked files into this thread (composer paperclip) */
   onAttach?: (files: File[]) => void
+  /** files uploaded but not yet sent — shown as chips in the composer (T331) */
+  pendingFiles?: UploadedFile[]
+  /** remove a pending file by index */
+  onRemoveFile?: (index: number) => void
 }) {
   // The attachment whose Quick Look drawer is open (null = closed). A
   // `file-upload` chip in any message sets it; the shared QuickLookSheet renders
@@ -175,6 +181,8 @@ export function ThreadConversation({
           focused={thread.focused}
           onSend={onSend}
           onAttach={onAttach}
+          pendingFiles={pendingFiles}
+          onRemoveFile={onRemoveFile}
           draftKey={`cp-draft-${agentId}-${thread.id}`}
         />
       </div>

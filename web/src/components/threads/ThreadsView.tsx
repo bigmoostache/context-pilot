@@ -8,6 +8,19 @@ import { uploadUnique } from "@/lib/api"
 import { buildUploadMessage, type UploadedFile } from "./fileUpload"
 
 /**
+ * Build a combined message body from user text and pending file attachments.
+ * Text comes first (if any), then file blocks. Either can be absent — a
+ * send with only pending files produces just the file blocks; one with only
+ * text produces just text.
+ */
+function buildCombinedContent(text: string, files: UploadedFile[]): string {
+  const parts: string[] = []
+  if (text.trim()) parts.push(text.trim())
+  if (files.length > 0) parts.push(buildUploadMessage(files))
+  return parts.join("\n\n")
+}
+
+/**
  * Turn a rejected `sendCommand` into a human sentence for the notice toast.
  *
  * `api.request` throws `Error("<status> <path>: <body>")` on any non-2xx, so a
@@ -64,6 +77,13 @@ export function ThreadsView({
   const [showArchived, setShowArchived] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
 
+  // ── Pending file attachments (T331) ────────────────────────────────────────
+  // Files picked via the composer paperclip are uploaded eagerly (to `.uploads/`)
+  // but NOT sent as a message yet — they queue here so the user can add a text
+  // caption before sending. On send, the pending files are merged into the
+  // message content alongside the typed text, then cleared.
+  const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([])
+
   // ── Auto-select a just-created thread ──────────────────────────────────────
   // The thread ID is assigned server-side and arrives via an SSE delta. We set a
   // "pending select" flag on create; on the next `threads` update we diff the
@@ -118,6 +138,13 @@ export function ThreadsView({
     if (effectiveSelectedId) localStorage.setItem(threadKey, effectiveSelectedId)
   }, [effectiveSelectedId, threadKey])
 
+  // Clear pending file attachments when switching threads — the files are
+  // already persisted on disk (`.uploads/`), but they belong to the thread
+  // the user was composing in; carrying them over would be confusing.
+  useEffect(() => {
+    setPendingFiles([])
+  }, [effectiveSelectedId])
+
   const handleArchive = useCallback((id: string) => {
     const t = threads.find((th) => th.id === id)
     if (!t) return
@@ -144,21 +171,25 @@ export function ThreadsView({
   }, [activeAgentId, flash])
 
   const handleSend = useCallback((text: string) => {
-    if (!effectiveSelectedId || !text.trim()) return
+    if (!effectiveSelectedId) return
+    const content = buildCombinedContent(text, pendingFiles)
+    if (!content) return
     sendCommand(activeAgentId, {
       kind: "send_message",
       thread_id: effectiveSelectedId,
-      content: text.trim(),
+      content,
     }).catch((e) => flash(describeCommandError("send your message", e)))
-  }, [activeAgentId, effectiveSelectedId, flash])
+    setPendingFiles([])
+  }, [activeAgentId, effectiveSelectedId, flash, pendingFiles])
 
   /**
-   * Upload one or more picked files into this thread (composer paperclip).
+   * Upload one or more picked files into this thread's staging area (T331).
+   *
    * Each file is stored in the realm's `.uploads/` (dedup-suffixed on collision)
-   * and then a single user message is posted carrying one `file-upload` YAML
-   * block per file — the conversation view parses those blocks into clickable
-   * chips that open the shared Quick Look drawer, and the agent reads the same
-   * YAML as plain attachment context.
+   * and added to `pendingFiles` — visible as chips above the composer. The
+   * actual thread message (text + file blocks) is NOT created until the user
+   * explicitly presses Send, so they can add a caption first. This avoids
+   * flipping the thread to MY_TURN prematurely.
    */
   const handleAttach = useCallback(
     (files: File[]) => {
@@ -175,11 +206,7 @@ export function ThreadsView({
               note: `uploaded by user at ${new Date().toISOString()}`,
             })
           }
-          await sendCommand(activeAgentId, {
-            kind: "send_message",
-            thread_id: effectiveSelectedId,
-            content: buildUploadMessage(uploaded),
-          })
+          setPendingFiles((prev) => [...prev, ...uploaded])
         } catch (e) {
           flash(describeCommandError("upload the file", e))
         }
@@ -219,6 +246,8 @@ export function ThreadsView({
           agentId={activeAgentId}
           onSend={handleSend}
           onAttach={handleAttach}
+          pendingFiles={pendingFiles}
+          onRemoveFile={(i) => setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
         />
       ) : (
         <EmptyRealm agentName={agent.name} onNewThread={() => setNewOpen(true)} />

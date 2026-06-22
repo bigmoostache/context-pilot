@@ -111,15 +111,14 @@ bc38d2fd0bcf015a:
   - bridge
   last_edited_ms: 1782121419937
 caf6de1cb65ac661:
-  tl_dr: 'DEMAQUETTING (branch ''demaquetting''): wire live frontend↔backend. Two planes: orchestration (oplog+SSE) + inspection (read tier-② state→JSON). web/ = live app; ui/ = frozen maquette. MERGING TO MASTER.'
+  tl_dr: 'DEMAQUETTING COMPLETE: branch merged to master (f1de2e65) and deleted (local + remote). Working on master from now on. All demaquetting work is on master.'
   contents: '18-phase plan, 4 workstreams: backend runtime, inspection REST, bridge activation, web client. Stack: orchestrator :7878, web dev :5174.'
   importance: critical
   labels:
   - demaquetting
-  - frontend
-  - plan
-  - active
-  last_edited_ms: 1782121426497
+  - complete
+  - master
+  last_edited_ms: 1782131583402
 ceac945d9376fcf2:
   tl_dr: 'FEATURE COMPLETION SEQUENCE: build → reload → commit+push (with memories/tree-descs) → clean context. Always, every time.'
   importance: critical

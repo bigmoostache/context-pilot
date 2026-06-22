@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react"
-import { ArrowUp, Paperclip, Loader2, Clock } from "lucide-react"
+import { ArrowUp, Paperclip, Loader2, Clock, X } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
+import type { UploadedFile } from "./fileUpload"
+import { FileUploadChip } from "./fileUpload"
 
 /** A persisted composer draft: the unsent text plus the caret/selection range
  *  to restore (T304). Stored as JSON under the composer's `draftKey`. */
@@ -62,6 +64,8 @@ export function ThreadComposer({
   focused = false,
   onSend,
   onAttach,
+  pendingFiles = [],
+  onRemoveFile,
   draftKey,
 }: {
   status: ThreadStatus
@@ -70,6 +74,10 @@ export function ThreadComposer({
   onSend?: (text: string) => void
   /** upload one or more picked files into this thread (paperclip button) */
   onAttach?: (files: File[]) => void
+  /** files uploaded but not yet sent — rendered as removable chips (T331) */
+  pendingFiles?: UploadedFile[]
+  /** remove a staged file by its index in pendingFiles */
+  onRemoveFile?: (index: number) => void
   /**
    * localStorage key under which the UNSENT draft is persisted (T304). When
    * provided, what you type — and **where your caret is** — survives a reload,
@@ -146,7 +154,7 @@ export function ThreadComposer({
         ? { working: true, color: "var(--signal)", text: "Agent is working this thread…" }
         : { working: false, color: undefined, text: "Agent will pick up this thread soon." }
 
-  const canSend = text.trim().length > 0
+  const canSend = text.trim().length > 0 || pendingFiles.length > 0
 
   const handleSubmit = () => {
     if (!canSend || !onSend) return
@@ -184,6 +192,25 @@ export function ThreadComposer({
             <Clock className="size-3.5" />
           )}
           <span>{banner.text}</span>
+        </div>
+      )}
+
+      {/* Pending file attachments — uploaded but not yet sent (T331). Shown as
+          removable chips so the user can review / discard before sending. */}
+      {pendingFiles.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {pendingFiles.map((f, i) => (
+            <span key={`${f.path}-${i}`} className="inline-flex items-center gap-1">
+              <FileUploadChip file={f} size={f.size} />
+              <button
+                onClick={() => onRemoveFile?.(i)}
+                className="flex size-4 items-center justify-center rounded-full bg-muted text-muted-foreground/70 transition-colors hover:bg-destructive/20 hover:text-destructive"
+                title="Remove attachment"
+              >
+                <X className="size-2.5" strokeWidth={3} />
+              </button>
+            </span>
+          ))}
         </div>
       )}
       <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2.5 card-shadow focus-within:border-[var(--signal)]/60">
