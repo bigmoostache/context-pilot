@@ -41,7 +41,9 @@
   --amber-700: #b45309;
 
   --red-50:  #fef2f2;
+  --red-100: #fecaca;
   --red-600: #dc2626;
+  --red-700: #b91c1c;
 
   /* Semantic */
   --bg: #ffffff;
@@ -443,6 +445,7 @@ code, .mono {
 .tc-badge--amber { background: var(--amber-50); color: var(--amber-700); border: 1px solid var(--amber-100); }
 .tc-badge--blue { background: var(--blue-50); color: var(--blue-700); border: 1px solid var(--blue-100); }
 .tc-badge--gray { background: var(--surface-alt); color: var(--text-secondary); border: 1px solid var(--border); }
+.tc-badge--red { background: var(--red-50); color: var(--red-700); border: 1px solid var(--red-100); }
 
 /* ── Control items ───────────────────────────────────── */
 .tc-controls {
