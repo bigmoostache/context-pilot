@@ -30,6 +30,22 @@ use crate::boot::Boot;
 use crate::command::Intake;
 use crate::tee::Tee;
 
+/// CLI-driven bridge activation flag — set by `cpilot --bridge` before any
+/// threads spawn. Complements the `CP_BRIDGE=1` env-var check so the binary
+/// can activate the bridge without `unsafe` `set_var` (Rust 2024 edition).
+static BRIDGE_REQUESTED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Request bridge activation from a CLI flag.  Call **once**, early in
+/// `main()`, before module init.  Idempotent — second calls are no-ops.
+pub fn request_bridge() {
+    let _already_set = BRIDGE_REQUESTED.set(true);
+}
+
+/// Whether bridge mode was requested (env var *or* CLI flag).
+fn bridge_active() -> bool {
+    std::env::var("CP_BRIDGE").as_deref() == Ok("1") || BRIDGE_REQUESTED.get().copied().unwrap_or(false)
+}
+
 pub mod body;
 pub mod boot;
 pub mod command;
@@ -205,8 +221,7 @@ impl Module for BridgeModule {
     }
 
     fn init_state(&self, state: &mut State) {
-        let active = std::env::var("CP_BRIDGE").as_deref() == Ok("1");
-        if !active {
+        if !bridge_active() {
             state.set_ext(BridgeState::default());
             return;
         }

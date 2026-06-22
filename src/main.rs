@@ -239,6 +239,12 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     let resume_stream = args.iter().any(|a| a == "--resume-stream");
 
+    // --bridge: activate the orchestration bridge (equivalent to CP_BRIDGE=1).
+    // Uses a safe OnceLock flag so BridgeModule::init_state picks it up during boot.
+    if args.iter().any(|a| a == "--bridge") {
+        cp_mod_bridge::request_bridge();
+    }
+
     // Panic hook: restore terminal state and log the panic to disk.
     // Without this, a panic leaves the terminal in raw mode + alternate screen,
     // which corrupts the SSH session and the error is lost.
