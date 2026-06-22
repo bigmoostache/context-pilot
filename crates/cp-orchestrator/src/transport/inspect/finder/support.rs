@@ -84,26 +84,45 @@ pub(super) fn extract_param(query: &str, key: &str) -> Option<String> {
     })
 }
 
-/// Basic percent-decoding for path parameters.
+/// Percent-decode a query-parameter value.
+///
+/// Operates on raw bytes so multi-byte UTF-8 sequences (`%C3%A9` → `é`) are
+/// reassembled correctly. The old char-by-char approach pushed each decoded
+/// byte as a Unicode code point, turning `é` into `Ã©` (mojibake).
 fn percent_decode(input: &str) -> String {
-    let mut result = String::with_capacity(input.len());
-    let mut chars = input.chars();
-    while let Some(c) = chars.next() {
-        if c == '%' {
-            let hex: String = chars.by_ref().take(2).collect();
-            if let Ok(byte) = u8::from_str_radix(&hex, 16) {
-                result.push(byte as char);
+    let mut bytes = Vec::with_capacity(input.len());
+    let mut src = input.as_bytes().iter().copied();
+    while let Some(b) = src.next() {
+        if b == b'%' {
+            let h1 = src.next();
+            let h2 = src.next();
+            if let (Some(h1), Some(h2)) = (h1, h2) {
+                // SAFETY: h1 and h2 are ASCII hex digits (or not); from_str_radix
+                // validates, so the unwrap_or fallback is unreachable for valid
+                // percent-encoded input.
+                let pair = [h1, h2];
+                if let Ok(decoded) = u8::from_str_radix(std::str::from_utf8(&pair).unwrap_or(""), 16) {
+                    bytes.push(decoded);
+                } else {
+                    // Not valid hex — pass through literally.
+                    bytes.push(b'%');
+                    bytes.push(h1);
+                    bytes.push(h2);
+                }
             } else {
-                result.push('%');
-                result.push_str(&hex);
+                // Trailing `%` at end of string — pass through literally.
+                bytes.push(b'%');
+                if let Some(h1) = h1 {
+                    bytes.push(h1);
+                }
             }
-        } else if c == '+' {
-            result.push(' ');
+        } else if b == b'+' {
+            bytes.push(b' ');
         } else {
-            result.push(c);
+            bytes.push(b);
         }
     }
-    result
+    String::from_utf8(bytes).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
 }
 
 #[cfg(test)]
@@ -146,9 +165,25 @@ mod tests {
     }
 
     #[test]
+    fn percent_decode_handles_multibyte_utf8() {
+        // é = U+00E9 = UTF-8 bytes C3 A9
+        assert_eq!(percent_decode("t%C3%A9st"), "tést");
+        // ñ = U+00F1 = UTF-8 bytes C3 B1
+        assert_eq!(percent_decode("espa%C3%B1ol"), "español");
+        // 日 = U+65E5 = UTF-8 bytes E6 97 A5
+        assert_eq!(percent_decode("%E6%97%A5%E6%9C%AC"), "日本");
+        // Mixed: spaces + accents
+        assert_eq!(percent_decode("caf%C3%A9%20latt%C3%A9"), "café latté");
+        // emoji: 🎉 = U+1F389 = UTF-8 bytes F0 9F 8E 89
+        assert_eq!(percent_decode("%F0%9F%8E%89"), "🎉");
+    }
+
+    #[test]
     fn extract_param_finds_value() {
         assert_eq!(extract_param("path=src%2Flib&format=json", "path"), Some("src/lib".to_owned()));
         assert_eq!(extract_param("path=src%2Flib&format=json", "format"), Some("json".to_owned()));
         assert_eq!(extract_param("path=src", "missing"), None);
+        // Multi-byte UTF-8: é in a filename
+        assert_eq!(extract_param("name=t%C3%A9st.xlsx", "name"), Some("tést.xlsx".to_owned()));
     }
 }
