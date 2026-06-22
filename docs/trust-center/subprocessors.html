@@ -60,7 +60,7 @@
         </ul>
       </div>
       <div class="tc-sidebar-footer">
-        <p>Document version 2.0<br>Last reviewed: June 22, 2026</p>
+        <p>Document version 3.0<br>Last reviewed: June 22, 2026</p>
       </div>
     </aside>
 
@@ -84,7 +84,7 @@
           </div>
           <div class="tc-meta-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            Register SR-2.0
+            Register SR-3.0
           </div>
         </div>
 
@@ -161,6 +161,15 @@
                 <td>Direct API</td>
                 <td>Short prompts for auxiliary inference (soul journal)</td>
                 <td><code>GROQ_API_KEY</code></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><span class="tc-logo-letter" style="background:#6366f1;">M</span>MiniMax</div>
+                  <div class="cell-url">api.minimaxi.com</div>
+                </td>
+                <td>Direct API</td>
+                <td>System prompt, conversation messages, code context from open files, tool definitions</td>
+                <td><code>MINIMAX_API_KEY</code></td>
               </tr>
             </tbody>
           </table>
@@ -293,9 +302,219 @@
           </table>
         </section>
 
-        <!-- Change Log -->
+        <!-- Subprocessor Change Log -->
         <section class="tc-section">
-          <h2 class="tc-section-title">4. Subprocessor Change Log</h2>
+          <h2 class="tc-section-title">4. Subprocessor Compliance Matrix</h2>
+          <p class="tc-section-desc">
+            Detailed compliance posture for each external subprocessor, based on independent research conducted June 2026. Operators subject to regulatory requirements should verify all claims directly with each provider.
+          </p>
+
+          <table class="tc-table" style="font-size: 0.82rem;">
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Trust Center</th>
+                <th>SOC 2</th>
+                <th>ISO 27001</th>
+                <th>DPA</th>
+                <th>API Data Retention</th>
+                <th>Training on API Data</th>
+                <th>Data Location</th>
+                <th>Risk</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cell-name">Anthropic</td>
+                <td><a href="https://trust.anthropic.com/" target="_blank">trust.anthropic.com</a></td>
+                <td><span class="tc-badge tc-badge--green">Type II</span></td>
+                <td><span class="tc-badge tc-badge--green">27001</span></td>
+                <td><a href="https://www.anthropic.com/policies/commercial-terms" target="_blank">Auto-included</a></td>
+                <td>7 days (ZDR avail.)</td>
+                <td><span class="tc-badge tc-badge--green">No</span></td>
+                <td>US (EU via Bedrock/Vertex)</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">OpenAI</td>
+                <td><a href="https://trust.openai.com/" target="_blank">trust.openai.com</a></td>
+                <td><span class="tc-badge tc-badge--green">Type 2</span></td>
+                <td><span class="tc-badge tc-badge--green">27001</span></td>
+                <td><a href="https://openai.com/policies/data-processing-addendum/" target="_blank">Public DPA</a></td>
+                <td>30 days (ZDR avail.)</td>
+                <td><span class="tc-badge tc-badge--green">No</span></td>
+                <td>US (EU avail. Enterprise)</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Google AI</td>
+                <td><a href="https://cloud.google.com/security/compliance" target="_blank">Cloud Compliance</a></td>
+                <td><span class="tc-badge tc-badge--green">Type 2</span></td>
+                <td><span class="tc-badge tc-badge--green">27001</span></td>
+                <td><a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank">Cloud DPA</a></td>
+                <td>55 days (paid API)</td>
+                <td><span class="tc-badge tc-badge--green">No (paid)</span></td>
+                <td>Global (EU via Vertex)</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Mistral AI</td>
+                <td><a href="https://trust.mistral.ai/" target="_blank">trust.mistral.ai</a></td>
+                <td><span class="tc-badge tc-badge--green">Type II</span></td>
+                <td><span class="tc-badge tc-badge--amber">Aligned</span></td>
+                <td><a href="https://legal.mistral.ai/terms/data-processing-addendum" target="_blank">Public DPA</a></td>
+                <td>30 days</td>
+                <td><span class="tc-badge tc-badge--green">No</span></td>
+                <td>EU + US (since Feb 2025)</td>
+                <td><span class="tc-badge tc-badge--amber">Medium</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Groq</td>
+                <td><a href="https://trust.groq.com" target="_blank">trust.groq.com</a></td>
+                <td><span class="tc-badge tc-badge--green">Type II</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><a href="https://console.groq.com/docs/legal/customer-data-processing-addendum" target="_blank">Public DPA</a></td>
+                <td>Transient (no storage)</td>
+                <td><span class="tc-badge tc-badge--green">N/A</span></td>
+                <td>US only</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">MiniMax</td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><span class="tc-badge tc-badge--red">Not public</span></td>
+                <td>Not documented</td>
+                <td><span class="tc-badge tc-badge--amber">Unclear</span></td>
+                <td>China</td>
+                <td><span class="tc-badge tc-badge--red">High</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Brave Search</td>
+                <td><a href="https://api-dashboard.search.brave.com/app/documentation/general/security" target="_blank">API Security</a></td>
+                <td><span class="tc-badge tc-badge--green">Type II</span></td>
+                <td><span class="tc-badge tc-badge--amber">Aligned</span></td>
+                <td><a href="https://cdn.search.brave.com/search-api/web/v1/client/_app/immutable/assets/brave-search-api-dpa-2025-09-09.DRXCoye6.pdf" target="_blank">Public DPA</a></td>
+                <td>90 days (query logs)</td>
+                <td><span class="tc-badge tc-badge--green">N/A</span></td>
+                <td>US</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Firecrawl</td>
+                <td><a href="https://www.firecrawl.dev/enterprise" target="_blank">Enterprise</a></td>
+                <td><span class="tc-badge tc-badge--green">Type II</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td>Available (not public)</td>
+                <td>Transient (ZDR default)</td>
+                <td><span class="tc-badge tc-badge--green">N/A</span></td>
+                <td>US (self-host avail.)</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Voyage AI</td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><span class="tc-badge tc-badge--red">Not public</span></td>
+                <td>Not documented</td>
+                <td><span class="tc-badge tc-badge--red">Default YES</span></td>
+                <td>US</td>
+                <td><span class="tc-badge tc-badge--red">High</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Datalab</td>
+                <td>SOC 2 badge (no portal)</td>
+                <td><span class="tc-badge tc-badge--green">Type II</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td>Custom (VPC tier)</td>
+                <td>Transient (OCR)</td>
+                <td><span class="tc-badge tc-badge--amber">Unclear</span></td>
+                <td>US (self-host avail.)</td>
+                <td><span class="tc-badge tc-badge--amber">Medium</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">GitHub</td>
+                <td><a href="https://trust.github.com/" target="_blank">trust.github.com</a></td>
+                <td><span class="tc-badge tc-badge--green">Type 2</span></td>
+                <td><span class="tc-badge tc-badge--green">27001</span></td>
+                <td>Enterprise Agreement</td>
+                <td>Per service (90d audit logs)</td>
+                <td><span class="tc-badge tc-badge--green">No (gh CLI)</span></td>
+                <td>US (EU preview)</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Detailed Compliance Notes -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">5. Detailed Compliance Notes</h2>
+          <p class="tc-section-desc">
+            Material compliance observations for each subprocessor, including certifications, jurisdictional considerations, and known risks. Research conducted June 2026.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Anthropic (Low Risk)</h4></div>
+            <p>SOC 2 Type II + ISO 27001:2022 + ISO/IEC 42001:2023 (AI Management System). API data retention reduced to 7 days (Sept 2025). Zero Data Retention available for Enterprise. DPA with SCCs auto-included in Commercial Terms. HIPAA BAA available. EU data residency for Team/Enterprise (Aug 2025). FedRAMP in progress. API data never used for training.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>OpenAI (Low Risk)</h4></div>
+            <p>SOC 2 Type 2 + ISO 27001/27017/27018/27701 + CSA STAR + PCI-DSS. Public DPA (effective Dec 2025) and public subprocessor list (updated Feb 2026). 30-day default retention; ZDR approval-gated. EU data residency available for Enterprise/Edu/API Projects (Nov 2025). HIPAA BAA available. AES-256 at rest. EU-US DPF certified.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Google AI — Gemini (Low Risk)</h4></div>
+            <p>Context Pilot uses the <strong>paid Gemini API tier</strong> (not free AI Studio). Inherits Google Cloud certifications: SOC 1/2/3, ISO 27001/27017/27018/27701, ISO 42001 (AI Management), FedRAMP High, PCI-DSS v4.0. 55-day retention for abuse monitoring only. Section 17 "Training Restriction" contractually prohibits training. Cloud DPA auto-incorporated for EEA. <strong>Note:</strong> Free AI Studio tier has no DPA, is prohibited for EEA/UK users, and uses data for training — operators must not use the free tier.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Mistral AI (Medium Risk)</h4></div>
+            <p>French company (Paris), directly subject to GDPR. SOC 2 Type I+II. ISO 27001/27701 framework alignment (not explicitly certified). Public DPA with SCCs. 30-day API retention, no training. <strong>Risks:</strong> (1) US processing added Feb 2025 creates CLOUD Act exposure despite EU headquarters; (2) CNIL complaint (Feb 2025) regarding free-tier opt-out difficulty — decision pending. Self-deployment option eliminates both risks.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Groq (Low Risk)</h4></div>
+            <p>Inference platform (LPU hardware) running third-party open-source models — not a model developer. SOC 2 Type II. Data transient by design (not stored beyond request lifecycle). Formal DPA with SCCs covering GDPR/CCPA/PDPL. US-only (GCP). HIPAA explicitly not available. Training question is N/A since Groq does not train models.</p>
+          </div>
+
+          <div class="tc-policy" style="border-left-color: var(--tc-red, #dc2626);">
+            <div class="tc-policy-header"><h4>MiniMax (High Risk)</h4></div>
+            <p><strong>Chinese company</strong> (Shanghai/Beijing) subject to PIPL, Cybersecurity Law, and Data Security Law. No trust center, no SOC 2, no ISO 27001, no public DPA, no public subprocessor list. Data retention and training policies not clearly documented. <strong>Key risks:</strong> Chinese jurisdiction enables government data access under domestic law; no Western-standard certifications; limited public transparency; PIPL cross-border transfer restrictions. Operators handling regulated data should avoid this provider or evaluate jurisdictional exposure carefully.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Brave Search (Low Risk)</h4></div>
+            <p>SOC 2 Type II (Oct 2025). External pentests (HackerOne). ISO 27001/27701 framework aligned but not yet certified. Public DPA with SCCs — note: DPA does not cover Search Query Data (Brave's legal position: API queries are machine-to-machine, not personal data). 90-day query log retention; ZDR available for Enterprise. Independent 40B+ page search index. TEE for AI features.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Firecrawl (Low Risk)</h4></div>
+            <p>SOC 2 Type II. Fundamentally transient processing: web pages processed in memory and immediately deleted — zero data retention by default. DPA available but not publicly linked. Full self-host option for air-gapped deployments. 99.9% SLA on Enterprise tier. Context Pilot sends only target URLs; scraped content returned and discarded by Firecrawl.</p>
+          </div>
+
+          <div class="tc-policy" style="border-left-color: var(--tc-red, #dc2626);">
+            <div class="tc-policy-header"><h4>Voyage AI (High Risk)</h4></div>
+            <p>No trust center, no SOC 2, no ISO 27001, no public DPA. <strong>Critical:</strong> Privacy policy grants Voyage AI a "worldwide, irrevocable, perpetual, royalty-free license" to use customer content for training by default. Opt-out requires explicit request. No public subprocessor list. Limited compliance maturity. <strong>Mitigating factor:</strong> Context Pilot sends only code chunks and log entries for embedding generation (semantic search indexing), not conversation content or prompts. Operators concerned about code exposure should consider disabling the Voyage AI embedder (<code>VOYAGE_API_KEY</code> is optional — keyword search works without it).</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Datalab / Surya (Medium Risk)</h4></div>
+            <p>SOC 2 Type II for Managed Cloud tier. Open-source models (Surya 56.6k stars, Marker 11.1k stars on GitHub) — fully auditable code. Three deployment tiers: Managed Cloud (SOC 2, pay-as-you-go), VPC (AWS/GCP/Azure, custom BAA/DPA), and On-prem/Air-gapped (zero internet). Trusted by Anthropic, Siemens Healthineers, Stanford, MIT. Context Pilot sends documents temporarily for OCR processing. Self-host option eliminates external data transfer entirely.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>GitHub (Low Risk)</h4></div>
+            <p>Microsoft subsidiary. SOC 1/2 Type 2, SOC 3, ISO 27001, CSA CAIQ, FedRAMP authorized. DPA included in Enterprise Customer Agreement; Microsoft DPA apparatus inherited. EU data residency in preview. Context Pilot uses the <code>gh</code> CLI for repository operations (issues, PRs) — not GitHub Copilot. Private repos not used for training without consent. EU-US DPF certified (via Microsoft).</p>
+          </div>
+        </section>
+
+        <!-- Subprocessor Change Log -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">6. Subprocessor Change Log</h2>
           <p class="tc-section-desc">
             Material changes to the subprocessor register are documented below. Enterprise customers evaluating Context Pilot for procurement may reference this log to track third-party dependency changes across versions.
           </p>
@@ -309,6 +528,18 @@
               </tr>
             </thead>
             <tbody>
+              <tr>
+                <td class="cell-name">June 2026</td>
+                <td><span class="tc-badge tc-badge--blue">Added</span></td>
+                <td>MiniMax</td>
+                <td>Added as optional LLM provider. Note: Chinese jurisdiction — see Compliance Matrix for risk assessment</td>
+              </tr>
+              <tr>
+                <td class="cell-name">June 2026</td>
+                <td><span class="tc-badge tc-badge--green">Enhanced</span></td>
+                <td>All providers</td>
+                <td>Independent compliance research conducted: trust centers, certifications, DPA availability, data retention, training policies documented per subprocessor</td>
+              </tr>
               <tr>
                 <td class="cell-name">June 2026</td>
                 <td><span class="tc-badge tc-badge--blue">Added</span></td>
@@ -339,7 +570,7 @@
 
         <!-- Notice -->
         <section class="tc-section">
-          <h2 class="tc-section-title">5. Important Notice</h2>
+          <h2 class="tc-section-title">7. Important Notice</h2>
           <div class="tc-policy">
             <div class="tc-policy-header">
               <h4>Operator Responsibility</h4>
@@ -355,7 +586,7 @@
 
         <!-- Vendor Risk Assessment -->
         <section class="tc-section">
-          <h2 class="tc-section-title">6. Vendor Risk Assessment Criteria</h2>
+          <h2 class="tc-section-title">8. Vendor Risk Assessment Criteria</h2>
           <p class="tc-section-desc">
             The following criteria are evaluated when considering new third-party service integrations for Context Pilot. This framework ensures that any addition to the subprocessor register meets minimum security and privacy standards.
           </p>
@@ -415,7 +646,7 @@
 
         <!-- Data Flow Diagram -->
         <section class="tc-section">
-          <h2 class="tc-section-title">7. Data Flow Summary</h2>
+          <h2 class="tc-section-title">9. Data Flow Summary</h2>
           <p class="tc-section-desc">
             The following diagram summarizes the data flow architecture. All arrows represent operator-initiated, operator-configured connections. No connection exists that is not explicitly listed below.
           </p>
@@ -499,6 +730,7 @@
                   <span class="tc-diagram-pill"><img class="tc-logo-sm" src="https://cdn.simpleicons.org/google/64748b" alt="">Google AI</span>
                   <span class="tc-diagram-pill"><img class="tc-logo-sm" src="https://cdn.simpleicons.org/mistralai/64748b" alt="">Mistral AI</span>
                   <span class="tc-diagram-pill"><img class="tc-logo-sm" src="logos/groq.svg" alt="">Groq</span>
+                  <span class="tc-diagram-pill"><span class="tc-logo-letter tc-logo-letter--sm" style="background:#6366f1;">M</span>MiniMax</span>
                 </div>
               </div>
               <div class="tc-diagram-provider-group">
@@ -520,7 +752,7 @@
   </div>
 
   <footer class="tc-footer">
-    <span>Context Pilot Trust Center &middot; Version 2.0 &middot; MIT License</span>
+    <span>Context Pilot Trust Center &middot; Version 3.0 &middot; MIT License</span>
     <div class="tc-footer-links">
       <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a>
       <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank">Security Policy</a>
