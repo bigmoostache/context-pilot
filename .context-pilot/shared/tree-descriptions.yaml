@@ -618,6 +618,10 @@
   path: crates/cp-mod-prompt/src/seed.rs
   description: 'Seed data: ensure_default_agent() load/merge/sort, get_active_agent_content() resolve active system prompt'
   last_edited_ms: 0
+125398cd2636339d:
+  path: docs/trust-center/logos/groq.svg
+  description: 'Groq lightning bolt logo SVG (white bolt on #F55036 orange rounded rect). From groq.com/favicon.svg.'
+  last_edited_ms: 1782137224607
 1253cb71c93904cd:
   path: src/modules/conversation/panel.rs
   description: 'Conversation panel. Multi-level cache (full → per-message → input). Input hash includes selection anchor. Keybindings: Shift+Arrow selection, Ctrl/Alt+Arrow word jump, Ctrl+A select all, Ctrl+Backspace delete word. Enter send-on-empty-line logic.'
@@ -1286,6 +1290,10 @@
   path: crates/cp-orchestrator/src/services/stream_hub.rs
   description: 'Phase 18: StreamHub — per-agent stream fan-out to N bounded subscribers (R2-17). Subscriber{id,buffer:VecDeque<Frame>,capacity,degraded,dropped}: admit() evicts OLDEST on full (coalesce toward latest window) + sets degraded + bumps dropped; cap 0 drops all. StreamHub{agents:HashMap<id,Vec<Subscriber>>,next_id,sub_capacity}: subscribe→id, unsubscribe, publish(id,&frame)=fan to all (clone per sub, returns clean-delivery count), drain(id,sub), subscriber(id,sub) inspect, mark_reconciled clears degraded+dropped (after caller delivers oplog-snapshot resync). Single-owner lock-free; socket-read + WS-writer wiring deferred to Phase 19. 8 tests incl per-subscriber degraded isolation + overflow-evicts-oldest.'
   last_edited_ms: 1781646122383
+25e9d34823dff4cb:
+  path: docs/trust-center/logos/openai.svg
+  description: 'OpenAI hexagonal flower logomark SVG, fill #334155 (slate monochrome). From simple-icons CDN.'
+  last_edited_ms: 1782137224579
 2610b21d60e96425:
   path: src/ui/help/config_overlay/builder.rs
   description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
@@ -1566,6 +1574,10 @@
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
   last_edited_ms: 0
+2dd8737ace049963:
+  path: docs/trust-center/logos/datalab.svg
+  description: 'Datalab geometric mark SVG, fill #1A1A1A. From datalab.to/images/datalab-icon.svg.'
+  last_edited_ms: 1782137224686
 2dea930e4e0ccee5:
   path: web/src/components/shell/config/ConfigPanes.tsx
   description: 'Config category panes + presentational building blocks (split from ConfigPanel for <500): CATEGORIES, CategoryBody (general/usage/providers/search/docai/web/integrations), GeneralPane (default model picker + apply-to-all via sendCommand configure), KeyRow/StatusRow/ToggleRow/ManagedKeysNotice. Company-managed accounts lock key editing.'
@@ -1694,6 +1706,10 @@
   path: crates/cp-orchestrator/src/main.rs
   description: 'Backend entry point. Phase 3: prints version + protocol version, exits. Future: AgentRegistry, AgentChannel, AgentSupervisor, StreamHub, CostBreaker.'
   last_edited_ms: 1781617086617
+3220f60162b8d6aa:
+  path: docs/trust-center/logos/voyageai.svg
+  description: 'Voyage AI ''V'' letterform logo SVG, fill #012E33 (dark teal). From voyageai.com/icon.svg.'
+  last_edited_ms: 1782137224659
 322e4c5d179661c8:
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message parseFileUploads splits prose from file-upload blocks → renders FileUploadChip row (pl-7) + hosts ONE shared QuickLookSheet (agentId-scoped) opened by any chip. Takes agentId + onAttach props.'
@@ -2398,6 +2414,10 @@
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups: Agent''s turn (MY_TURN), User turn (THEIR_TURN/ACTIVE). Sorted by lastActivityMs descending. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
   last_edited_ms: 1781781907933
+455fbd6b32e87e08:
+  path: docs/trust-center/subprocessors.html
+  description: 'Subprocessor Register page. 7 sections: LLM providers table (6 providers with logos), auxiliary services table (5 services with logos), local services table (4 services), change log table (4 entries), operator responsibility notice, vendor risk assessment criteria (8 criteria), data flow summary (HTML/CSS architecture diagram with real brand logos in pills). All subprocessor logos are real brand assets (local SVGs or SimpleIcons CDN), no letter avatars.'
+  last_edited_ms: 1782137224712
 457797ff3549e45c:
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
@@ -5106,6 +5126,10 @@
   path: crates/cp-oplog/tests/crash_replay.rs
   description: 'Phase 9 (X776) MILESTONE M0 crash-replay harness. Unix-only (#![cfg(unix)]). Self-re-exec pattern: env-gated #[test] crash_child_entrypoint re-runs the test binary as a child via current_exe(); parent/child handshake through a fdatasync''d marker file (libtest stdout is noisy). V1 v1_real_sigkill_leaves_a_clean_replayable_oplog: child spams durable MessageCreated appends, parent kill()s (real SIGKILL), fresh process replay() never errors + every announced-durable rev survives + torn tail truncated (announce-after-durable K9 across real crash). V2 v2_journalled_command_is_exactly_once_after_deadman_reexec: child journals CommandEffect then dies, fresh process recovers seen-set token, duplicate SeenMark delivery folds to no-op (exactly-once across process boundary). V12 v12_barrier_is_pending_the_body_store: asserts body_gc_eligible rule, explicit placeholder until body store lands Phase 14. 4 tests green.'
   last_edited_ms: 1781623644158
+9487fb6b9b29e1d4:
+  path: docs/trust-center/subprocessors.html
+  description: 'Subprocessor Register page. 9 sections: LLM providers table (7 providers incl MiniMax with logos), auxiliary services table (5 services with logos), local services table (4 services), compliance matrix (11 providers: trust center links, SOC 2, ISO 27001, DPA, retention, training, location, risk level), detailed compliance notes (per-provider risk paragraphs), change log table (6 entries), operator responsibility notice, vendor risk assessment criteria (8 criteria), data flow summary (HTML/CSS architecture diagram with real brand logos in pills). All subprocessor logos are real brand assets (local SVGs or SimpleIcons CDN). Independent compliance research conducted June 2026. Version SR-3.0.'
+  last_edited_ms: 1782138959312
 94a5320bb61a1ca6:
   path: src/app/actions/threads.rs
   description: 'Thread action handlers. Dispatches Thread* action variants (select/create/archive/question navigation). Question form: cursor movement, toggle selection, Enter submit (YAML answers with escaped other_text -> ThreadMessage -> MY_TURN + spine notification), dismiss, char/backspace for Other field.'
@@ -7586,6 +7610,10 @@ dc669315644ebb28:
   path: crates/cp-mod-git/src/types.rs
   description: GitChangeType, GitFileChange, GitState (branch/changes/diff_base) with ext/ext_mut, GitResultRequest
   last_edited_ms: 0
+dc9766deb2c04757:
+  path: docs/trust-center/logos/firecrawl.svg
+  description: 'Firecrawl flame logo SVG, fill #FA5D19 (orange). From firecrawl.dev/logo.svg.'
+  last_edited_ms: 1782137224633
 dc9b4729550534d2:
   path: crates/cp-orchestrator/tests/end_to_end.rs
   description: 'Phase 30 (X797) end-to-end loopback capstone (3 tests, green ~0.06s). Real agent stack ↔ real backend transport over real sockets, no mocks. (1) capstone loop: agent thread = OplogService + Intake + UnixListener accept; client POST /command → AgentChannel::send (UDS) → Intake journal-then-ack → receipt cmd_id+dedup_token+rev:0+accepted; replay confirms durable; then SSE /stream tails the SAME oplog → CommandEffect re-emerges as delta with id=Some(0) (rev framing) + data carries dedup token = full loop closed; (2) spilled body hydrates over GET /…/body/{hash} byte-for-byte, malformed=400, absent=404; (3) soak: 25 SSE connect/disconnect cycles all 200+delta, server still healthy after (no FD/thread leak hang). serve_backend helper. Top `use nix/serde as _;`.'
