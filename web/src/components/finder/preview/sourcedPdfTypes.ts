@@ -110,52 +110,116 @@ async function readYaml<T>(zip: JSZip, path: string): Promise<T> {
   return yamlLoad(text) as T
 }
 
+/** Parse a dot-separated value reference ("doc_0.value_34") used by the v1
+ *  production format. Returns the full string as `value_id` (composite key). */
+function parseValueRef(dotRef: string): { value_id: string; document_id: string } {
+  const dot = dotRef.indexOf(".")
+  if (dot < 0) return { value_id: dotRef, document_id: "" }
+  return { document_id: dotRef.slice(0, dot), value_id: dotRef }
+}
+
 /**
  * Decompress and parse a `.sourced_pdf` ZIP bundle into a render-ready
- * {@link SourcedBundle}. Resolves the target PDF bytes, all extracted values,
- * and all cross-reference qualifications.
+ * {@link SourcedBundle}. Handles two metadata dialects:
+ *
+ * - **v0** (generated bundles): `target_doc_id`, `path` per doc, flat value
+ *   arrays with `document_id` per value, `arrows` array in refs.
+ * - **v1** (production/spdf-toolkit): `target`, `filename` per doc, per-file
+ *   `doc` + nested `values` array with flat page/bbox, singular `arrow` or
+ *   `operands` in refs, dot-separated value references.
  */
 export async function parseSourcedBundle(zipBytes: ArrayBuffer): Promise<SourcedBundle> {
   const zip = await JSZip.loadAsync(zipBytes)
   const files = Object.keys(zip.files)
   const pfx = findPrefix(files)
 
-  // metadata
-  const metadata = await readYaml<Metadata>(zip, pfx + "metadata.yaml")
+  // ── metadata (normalize field names) ──
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = await readYaml<any>(zip, pfx + "metadata.yaml")
+  const metadata: Metadata = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    documents: (raw.documents as any[]).map((d) => ({
+      id: d.id,
+      path: d.path ?? `documents/${d.filename}`,
+      role: d.role,
+      sha256: d.sha256,
+    })),
+    target_doc_id: raw.target_doc_id ?? raw.target,
+    refs_schema_path: raw.refs_schema_path ?? "refs-schema.yaml",
+  }
   const targetDoc = metadata.documents.find((d) => d.id === metadata.target_doc_id)
   if (!targetDoc) throw new Error(`Target doc ${metadata.target_doc_id} not in metadata`)
 
-  // target PDF bytes
+  // ── document bytes ──
   const pdfFile = zip.file(pfx + targetDoc.path)
   if (!pdfFile) throw new Error(`PDF not found at ${targetDoc.path}`)
   const targetDocBytes = await pdfFile.async("uint8array")
-
-  // ALL document bytes (target + sources)
   const docBytes = new Map<string, Uint8Array>()
   for (const doc of metadata.documents) {
     const f = zip.file(pfx + doc.path)
     if (f) docBytes.set(doc.id, await f.async("uint8array"))
   }
 
-  // values — one YAML per document under values/
+  // ── values (two dialects) ──
   const values: Value[] = []
   const valPrefix = pfx + "values/"
   for (const path of files) {
     if (!path.startsWith(valPrefix) || !path.endsWith(".yaml")) continue
     if (path.includes("__MACOSX")) continue
-    const docVals = await readYaml<Value[]>(zip, path)
-    if (Array.isArray(docVals)) values.push(...docVals)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = await readYaml<any>(zip, path)
+    if (body && typeof body === "object" && "doc" in body && Array.isArray(body.values)) {
+      // v1 production format: file-level doc, flat page/bbox per value
+      const docId = body.doc as string
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const v of body.values as any[]) {
+        values.push({
+          id: `${docId}.${v.id}`,
+          document_id: docId,
+          text: v.text,
+          number: v.number ?? null,
+          locator: { page: v.page, bbox: v.bbox, sheet: v.sheet, cell: v.cell },
+        })
+      }
+    } else if (Array.isArray(body)) {
+      // v0 generated format: flat array with document_id per value
+      values.push(...(body as Value[]))
+    }
   }
   const valuesById = new Map(values.map((v) => [v.id, v]))
 
-  // refs — one or more YAML files under refs/
+  // ── refs (two dialects) ──
   const refs: Ref[] = []
   const refPrefix = pfx + "refs/"
   for (const path of files) {
     if (!path.startsWith(refPrefix) || !path.endsWith(".yaml")) continue
     if (path.includes("__MACOSX")) continue
-    const docRefs = await readYaml<Ref[]>(zip, path)
-    if (Array.isArray(docRefs)) refs.push(...docRefs)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = await readYaml<any[]>(zip, path)
+    if (!Array.isArray(body)) continue
+    for (const r of body) {
+      const ref: Ref = {
+        id: r.id, type: r.type,
+        subject: typeof r.subject === "string" ? parseValueRef(r.subject) : r.subject,
+        arrows: [],
+        ecart: r.ecart, ecart_abs: r.ecart_abs,
+        concordance: r.concordance, status: r.status, comment: r.comment,
+      }
+      if (r.arrows) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ref.arrows = (r.arrows as any[]).map((a) =>
+          typeof a === "string" ? parseValueRef(a) : a)
+      } else if (r.arrow) {
+        ref.arrows = [parseValueRef(r.arrow as string)]
+      } else if (r.operands) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ref.arrows = (r.operands as any[]).map((op) => ({
+          ...parseValueRef(op.arrow as string),
+          sign: op.sign === "+" ? ("+" as const) : ("-" as const),
+        }))
+      }
+      refs.push(ref)
+    }
   }
 
   return { metadata, targetDocBytes, docBytes, values, refs, valuesById }
