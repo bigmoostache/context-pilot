@@ -90,7 +90,7 @@ export function FinderPreview({
         <Empty />
       ) : (
         <div key={node.path} className="ql-pop flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-auto p-4">
+          <div className="min-h-0 flex-1 overflow-auto">
             <Body node={node} agentId={agentId} />
           </div>
         </div>

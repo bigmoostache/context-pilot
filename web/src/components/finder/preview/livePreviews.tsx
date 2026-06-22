@@ -109,7 +109,7 @@ export function LivePdfPreview({ agentId, node }: { agentId: string; node: Finde
       <object
         data={src}
         type="application/pdf"
-        className="w-full min-h-0 flex-1 rounded-lg border border-border bg-card card-shadow"
+        className="w-full min-h-0 flex-1 bg-card"
       >
         <div className="flex flex-col items-center gap-3 py-10 text-center">
           <FileIcon kind="pdf" size={64} />
