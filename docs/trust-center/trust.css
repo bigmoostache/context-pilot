@@ -614,6 +614,53 @@ code, .mono {
   margin: 32px 0;
 }
 
+/* ── Subprocessor logos ───────────────────────────────── */
+.tc-logo {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  margin-right: 6px;
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 3px;
+}
+.tc-logo-sm {
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+  margin-right: 4px;
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+.tc-logo-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #fff;
+  vertical-align: middle;
+  margin-right: 6px;
+  flex-shrink: 0;
+  font-family: var(--font-body);
+  line-height: 1;
+}
+.tc-logo-letter--sm {
+  width: 14px;
+  height: 14px;
+  font-size: 0.55rem;
+  margin-right: 4px;
+  border-radius: 3px;
+}
+.tc-table .cell-name {
+  display: flex;
+  align-items: center;
+}
+
 /* ── Data flow diagram ────────────────────────────────── */
 .tc-diagram {
   display: flex;
@@ -756,6 +803,8 @@ code, .mono {
   gap: 6px;
 }
 .tc-diagram-pill {
+  display: inline-flex;
+  align-items: center;
   font-size: 0.75rem;
   font-weight: 500;
   padding: 4px 12px;
