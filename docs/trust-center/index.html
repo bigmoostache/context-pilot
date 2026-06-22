@@ -4,774 +4,213 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trust Center — Context Pilot</title>
-  <meta name="description" content="Context Pilot security, privacy, and compliance. Local-first architecture, zero telemetry, open source.">
+  <meta name="description" content="Context Pilot Trust Center. Security architecture, data privacy controls, compliance posture, and subprocessor register for enterprise evaluation.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      --bg: #ffffff;
-      --surface: #f8fafc;
-      --surface-2: #f1f5f9;
-      --text: #0f172a;
-      --text-2: #475569;
-      --text-3: #94a3b8;
-      --border: #e2e8f0;
-      --green: #16a34a;
-      --green-bg: #f0fdf4;
-      --green-border: #bbf7d0;
-      --blue: #2563eb;
-      --blue-bg: #eff6ff;
-      --amber: #d97706;
-      --amber-bg: #fffbeb;
-      --amber-border: #fde68a;
-      --radius: 8px;
-      --max-w: 960px;
-    }
-
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    a { color: var(--blue); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    code {
-      font-family: 'SF Mono', 'Fira Code', 'Fira Mono', monospace;
-      font-size: 0.85em;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: 1px 5px;
-      border-radius: 4px;
-    }
-
-    /* ── Header ──────────────────────────────────────── */
-    .header {
-      border-bottom: 1px solid var(--border);
-      padding: 20px 32px;
-    }
-    .header-inner {
-      max-width: var(--max-w);
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-      color: var(--text);
-    }
-    .brand svg { flex-shrink: 0; }
-    .brand-name {
-      font-size: 0.95rem;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-    }
-    .header-links {
-      display: flex;
-      gap: 20px;
-      font-size: 0.82rem;
-    }
-    .header-links a { color: var(--text-2); }
-    .header-links a:hover { color: var(--text); text-decoration: none; }
-
-    /* ── Main ─────────────────────────────────────────── */
-    .main { max-width: var(--max-w); margin: 0 auto; padding: 0 32px; }
-
-    /* ── Hero ─────────────────────────────────────────── */
-    .hero {
-      padding: 64px 0 48px;
-      border-bottom: 1px solid var(--border);
-    }
-    .hero-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--green);
-      margin-bottom: 16px;
-    }
-    .hero-label svg { flex-shrink: 0; }
-    .hero h1 {
-      font-size: 2.2rem;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      line-height: 1.2;
-      margin-bottom: 12px;
-    }
-    .hero-desc {
-      font-size: 1.05rem;
-      color: var(--text-2);
-      max-width: 640px;
-      line-height: 1.65;
-    }
-
-    /* ── Guarantees ───────────────────────────────────── */
-    .guarantees {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      padding: 40px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .guarantee {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      text-align: center;
-    }
-    .guarantee-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 12px;
-      font-size: 1.15rem;
-    }
-    .guarantee-icon--green { background: var(--green-bg); border: 1px solid var(--green-border); }
-    .guarantee-icon--blue { background: var(--blue-bg); border: 1px solid #bfdbfe; }
-    .guarantee h3 {
-      font-size: 0.82rem;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    .guarantee p {
-      font-size: 0.75rem;
-      color: var(--text-2);
-      line-height: 1.5;
-    }
-
-    /* ── Section ──────────────────────────────────────── */
-    .section {
-      padding: 48px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .section:last-child { border-bottom: none; }
-    .section-header {
-      margin-bottom: 28px;
-    }
-    .section-title {
-      font-size: 1.15rem;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      margin-bottom: 6px;
-    }
-    .section-desc {
-      font-size: 0.9rem;
-      color: var(--text-2);
-      max-width: 640px;
-      line-height: 1.6;
-    }
-
-    /* ── Controls list ────────────────────────────────── */
-    .controls-grid {
-      display: grid;
-      gap: 10px;
-    }
-    .control-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 16px 20px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-    .check-icon {
-      flex-shrink: 0;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: var(--green-bg);
-      border: 1px solid var(--green-border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 1px;
-    }
-    .check-icon svg { width: 12px; height: 12px; color: var(--green); }
-    .control-text h4 {
-      font-size: 0.88rem;
-      font-weight: 600;
-      margin-bottom: 2px;
-    }
-    .control-text p {
-      font-size: 0.82rem;
-      color: var(--text-2);
-      line-height: 1.55;
-    }
-
-    /* ── Data flow ────────────────────────────────────── */
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-    .data-table th {
-      text-align: left;
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-3);
-      padding: 12px 16px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-    }
-    .data-table td {
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-    }
-    .data-table tr:last-child td { border-bottom: none; }
-    .data-table tr:hover td { background: var(--surface); }
-
-    /* ── Badges ───────────────────────────────────────── */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 0.72rem;
-      font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 12px;
-      white-space: nowrap;
-    }
-    .badge--green {
-      background: var(--green-bg);
-      color: var(--green);
-      border: 1px solid var(--green-border);
-    }
-    .badge--amber {
-      background: var(--amber-bg);
-      color: var(--amber);
-      border: 1px solid var(--amber-border);
-    }
-    .badge--gray {
-      background: var(--surface-2);
-      color: var(--text-2);
-      border: 1px solid var(--border);
-    }
-
-    /* ── Subprocessors table ──────────────────────────── */
-    .sub-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-    .sub-table th {
-      text-align: left;
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-3);
-      padding: 12px 16px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-    }
-    .sub-table td {
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
-      color: var(--text-2);
-      vertical-align: top;
-    }
-    .sub-table tr:last-child td { border-bottom: none; }
-    .sub-table tr:hover td { background: var(--surface); }
-    .sub-name {
-      font-weight: 600;
-      color: var(--text);
-    }
-    .sub-url {
-      font-size: 0.75rem;
-      color: var(--text-3);
-      font-family: 'SF Mono', monospace;
-    }
-
-    /* ── FAQ ──────────────────────────────────────────── */
-    .faq-list { display: grid; gap: 8px; }
-    .faq-item {
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-    .faq-q {
-      width: 100%;
-      padding: 16px 20px;
-      background: none;
-      border: none;
-      color: var(--text);
-      font-family: var(--font);
-      font-size: 0.88rem;
-      font-weight: 600;
-      text-align: left;
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .faq-q:hover { background: var(--surface); }
-    .faq-chevron {
-      width: 16px;
-      height: 16px;
-      color: var(--text-3);
-      transition: transform 0.2s;
-      flex-shrink: 0;
-    }
-    .faq-item.open .faq-chevron {
-      transform: rotate(180deg);
-      color: var(--blue);
-    }
-    .faq-a {
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.3s ease;
-    }
-    .faq-item.open .faq-a { max-height: 400px; }
-    .faq-a-inner {
-      padding: 0 20px 16px;
-      font-size: 0.85rem;
-      color: var(--text-2);
-      line-height: 1.65;
-    }
-
-    /* ── Footer ───────────────────────────────────────── */
-    .footer {
-      border-top: 1px solid var(--border);
-      padding: 32px;
-      text-align: center;
-      font-size: 0.78rem;
-      color: var(--text-3);
-    }
-    .footer a { color: var(--text-2); }
-
-    /* ── Responsive ───────────────────────────────────── */
-    @media (max-width: 768px) {
-      .main { padding: 0 20px; }
-      .header { padding: 16px 20px; }
-      .hero { padding: 40px 0 32px; }
-      .hero h1 { font-size: 1.6rem; }
-      .guarantees { grid-template-columns: repeat(2, 1fr); }
-      .sub-table, .data-table { font-size: 0.78rem; }
-      .sub-table th, .sub-table td,
-      .data-table th, .data-table td { padding: 10px 12px; }
-    }
-    @media (max-width: 480px) {
-      .guarantees { grid-template-columns: 1fr; }
-    }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="trust.css">
 </head>
 <body>
 
-  <!-- Header -->
-  <header class="header">
-    <div class="header-inner">
-      <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener" class="brand">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-        <span class="brand-name">Context Pilot</span>
+  <!-- ── Header ──────────────────────────────────────── -->
+  <header class="tc-header">
+    <div class="tc-header-inner">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener" class="tc-brand">
+        <div class="tc-brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <span class="tc-brand-name">Context Pilot</span>
+        <span class="tc-brand-sep">/</span>
+        <span class="tc-brand-label">Trust Center</span>
       </a>
-      <nav class="header-links">
-        <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">GitHub</a>
+      <nav class="tc-header-links">
+        <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">Repository</a>
         <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank" rel="noopener">Security Policy</a>
+        <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank" rel="noopener">License</a>
       </nav>
     </div>
   </header>
 
-  <main class="main">
+  <div class="tc-layout">
+    <!-- ── Sidebar ────────────────────────────────────── -->
+    <aside class="tc-sidebar">
+      <div class="tc-sidebar-section">
+        <div class="tc-sidebar-label">Trust Center</div>
+        <ul class="tc-sidebar-nav">
+          <li><a href="index.html" class="active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Overview
+          </a></li>
+          <li><a href="security.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Security Architecture
+          </a></li>
+          <li><a href="privacy.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Data Privacy
+          </a></li>
+          <li><a href="compliance.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Compliance
+          </a></li>
+          <li><a href="subprocessors.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            Subprocessors
+          </a></li>
+        </ul>
+      </div>
+      <div class="tc-sidebar-footer">
+        <p>Document version 2.0<br>Last reviewed: June 22, 2026</p>
+      </div>
+    </aside>
 
-    <!-- Hero -->
-    <section class="hero">
-      <div class="hero-label">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        Trust Center
-      </div>
-      <h1>Security &amp; Privacy</h1>
-      <p class="hero-desc">
-        Context Pilot is a local-first, open-source AI coding assistant. Your code never touches our servers — because we don't have any. This page documents our security architecture, data handling, and every third-party service the tool communicates with.
-      </p>
-    </section>
+    <!-- ── Content ────────────────────────────────────── -->
+    <main class="tc-content">
+      <div class="tc-content-inner">
 
-    <!-- Guarantees -->
-    <section class="guarantees">
-      <div class="guarantee">
-        <div class="guarantee-icon guarantee-icon--green">🏠</div>
-        <h3>Local-First</h3>
-        <p>Runs entirely on your machine. No cloud, no intermediary.</p>
-      </div>
-      <div class="guarantee">
-        <div class="guarantee-icon guarantee-icon--green">🔓</div>
-        <h3>Open Source</h3>
-        <p>MIT license. Every line auditable on GitHub.</p>
-      </div>
-      <div class="guarantee">
-        <div class="guarantee-icon guarantee-icon--blue">🚫</div>
-        <h3>Zero Telemetry</h3>
-        <p>No analytics, no tracking, no phone-home.</p>
-      </div>
-      <div class="guarantee">
-        <div class="guarantee-icon guarantee-icon--blue">🔑</div>
-        <h3>Your Keys, Your Data</h3>
-        <p>API keys stay local. Sent only to the provider they belong to.</p>
-      </div>
-    </section>
+        <div class="tc-breadcrumb">
+          <a href="../index.html">Context Pilot</a>
+          <span class="tc-breadcrumb-sep">/</span>
+          <span>Trust Center</span>
+        </div>
 
-    <!-- Privacy Controls -->
-    <section class="section">
-      <div class="section-header">
-        <h2 class="section-title">Privacy Controls</h2>
-        <p class="section-desc">Context Pilot's architecture makes data exfiltration structurally impossible. There is no Context Pilot cloud, no telemetry endpoint, no intermediary proxy.</p>
-      </div>
-      <div class="controls-grid">
-        <div class="control-item">
-          <div class="check-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-          <div class="control-text">
-            <h4>No data collection</h4>
-            <p>We never receive your code, conversations, memories, or any usage data. There is no server for it to go to.</p>
+        <h1 class="tc-page-title">Trust Center</h1>
+        <div class="tc-page-meta">
+          <div class="tc-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Last updated: June 22, 2026
+          </div>
+          <div class="tc-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Version 2.0
           </div>
         </div>
-        <div class="control-item">
-          <div class="check-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-          <div class="control-text">
-            <h4>Local storage only</h4>
-            <p>All state — conversations, entity databases, memories, logs — is stored under <code>.context-pilot/</code> on your filesystem. Nothing leaves the machine.</p>
-          </div>
-        </div>
-        <div class="control-item">
-          <div class="check-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-          <div class="control-text">
-            <h4>API key isolation</h4>
-            <p>Your API keys live in a local <code>.env</code> file. Each key is sent only to its respective provider — never to us or any third party.</p>
-          </div>
-        </div>
-        <div class="control-item">
-          <div class="check-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-          <div class="control-text">
-            <h4>Open-source audit trail</h4>
-            <p>The entire codebase is MIT-licensed. Every network call, file access, and tool invocation is auditable. Verify yourself: <a href="https://github.com/bigmoostache/context-pilot" target="_blank">github.com/bigmoostache/context-pilot</a>.</p>
-          </div>
-        </div>
-        <div class="control-item">
-          <div class="check-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-          <div class="control-text">
-            <h4>Offline capable</h4>
-            <p>Context Pilot works without internet. Only LLM inference, web search, and web scraping require network — all user-initiated and user-configured.</p>
-          </div>
-        </div>
-        <div class="control-item">
-          <div class="check-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-          <div class="control-text">
-            <h4>Cryptographic integrity</h4>
-            <p>Critical configuration files (lint rules, CI scripts, deploy scripts) are protected by a SHA-256 hash chain. Unauthorized modifications are detected automatically.</p>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- Data Handling -->
-    <section class="section">
-      <div class="section-header">
-        <h2 class="section-title">Data Handling</h2>
-        <p class="section-desc">Every piece of data is either stored locally or sent to a provider you explicitly configure. Here's the complete breakdown.</p>
-      </div>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Data Type</th>
-            <th>Storage</th>
-            <th>Transmitted?</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Code context &amp; prompts</strong></td>
-            <td>Assembled in-memory during sessions</td>
-            <td><span class="badge badge--amber">To your LLM provider</span></td>
-          </tr>
-          <tr>
-            <td><strong>Conversation history</strong></td>
-            <td><code>.context-pilot/</code> — YAML files</td>
-            <td><span class="badge badge--green">Local only</span></td>
-          </tr>
-          <tr>
-            <td><strong>Entity database</strong></td>
-            <td><code>.context-pilot/shared/entities/</code> — SQLite</td>
-            <td><span class="badge badge--green">Local only</span></td>
-          </tr>
-          <tr>
-            <td><strong>Memories &amp; logs</strong></td>
-            <td><code>.context-pilot/</code> — YAML files</td>
-            <td><span class="badge badge--green">Local only</span></td>
-          </tr>
-          <tr>
-            <td><strong>Search index</strong></td>
-            <td>Meilisearch on <code>127.0.0.1</code></td>
-            <td><span class="badge badge--green">Local only</span></td>
-          </tr>
-          <tr>
-            <td><strong>Search queries</strong></td>
-            <td>Not persisted</td>
-            <td><span class="badge badge--amber">To Brave Search (if configured)</span></td>
-          </tr>
-          <tr>
-            <td><strong>Text chunks (embeddings)</strong></td>
-            <td>Indexed locally in Meilisearch</td>
-            <td><span class="badge badge--amber">To Voyage AI (if configured)</span></td>
-          </tr>
-          <tr>
-            <td><strong>Documents (OCR)</strong></td>
-            <td>Cached at <code>~/.context-pilot/ocr-cache/</code></td>
-            <td><span class="badge badge--amber">To Datalab (if configured)</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+        <p class="tc-page-desc">
+          This Trust Center provides comprehensive documentation of Context Pilot's security architecture, data handling practices, compliance posture, and third-party service integrations. It is designed to support enterprise security reviews, vendor risk assessments, and procurement due diligence.
+        </p>
 
-    <!-- Subprocessors -->
-    <section class="section">
-      <div class="section-header">
-        <h2 class="section-title">Subprocessors</h2>
-        <p class="section-desc">Context Pilot has no mandatory third-party dependencies. Every external service is opt-in — you provide the API key, you control the data flow. These are the services the software can communicate with.</p>
-      </div>
-      <table class="sub-table">
-        <thead>
-          <tr>
-            <th>Service</th>
-            <th>Purpose</th>
-            <th>Data Sent</th>
-            <th>Required</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>
-              <div class="sub-name">Anthropic</div>
-              <div class="sub-url">api.anthropic.com</div>
-            </td>
-            <td>LLM inference (Claude models)</td>
-            <td>Code context, conversation messages, tool definitions</td>
-            <td><span class="badge badge--amber">1 LLM required</span></td>
-          </tr>
-          <tr>
-            <td>
-              <div class="sub-name">Anthropic (OAuth)</div>
-              <div class="sub-url">api.claude.ai</div>
-            </td>
-            <td>LLM inference via Claude Code OAuth</td>
-            <td>Code context, conversation messages, tool definitions</td>
-            <td><span class="badge badge--amber">1 LLM required</span></td>
-          </tr>
-          <tr>
-            <td>
-              <div class="sub-name">OpenAI</div>
-              <div class="sub-url">api.openai.com</div>
-            </td>
-            <td>LLM inference (GPT models)</td>
-            <td>Code context, conversation messages, tool definitions</td>
-            <td><span class="badge badge--amber">1 LLM required</span></td>
-          </tr>
-          <tr>
-            <td>
-              <div class="sub-name">Google AI</div>
-              <div class="sub-url">generativelanguage.googleapis.com</div>
-            </td>
-            <td>LLM inference (Gemini models)</td>
-            <td>Code context, conversation messages, tool definitions</td>
-            <td><span class="badge badge--amber">1 LLM required</span></td>
-          </tr>
-          <tr>
-            <td>
-              <div class="sub-name">Mistral AI</div>
-              <div class="sub-url">api.mistral.ai</div>
-            </td>
-            <td>LLM inference</td>
-            <td>Code context, conversation messages, tool definitions</td>
-            <td><span class="badge badge--amber">1 LLM required</span></td>
-          </tr>
-          <tr>
-            <td>
-              <div class="sub-name">Voyage AI</div>
-              <div class="sub-url">api.voyageai.com</div>
-            </td>
-            <td>Text embedding generation (voyage-code-3) for hybrid semantic search</td>
-            <td>Code/text chunks from indexed files</td>
-            <td><span class="badge badge--gray">Optional</span></td>
-          </tr>
-          <tr>
-            <td>
-              <div class="sub-name">Brave Search</div>
-              <div class="sub-url">api.search.brave.com</div>
-            </td>
-            <td>Web search (snippets and LLM context extraction)</td>
-            <td>Search queries</td>
-            <td><span class="badge badge--gray">Optional</span></td>
-          </tr>
-          <tr>
-            <td>
-              <div class="sub-name">Firecrawl</div>
-              <div class="sub-url">api.firecrawl.dev</div>
-            </td>
-            <td>Web page scraping, crawling, and content extraction</td>
-            <td>Target URLs</td>
-            <td><span class="badge badge--gray">Optional</span></td>
-          </tr>
-          <tr>
-            <td>
-              <div class="sub-name">Datalab (Surya)</div>
-              <div class="sub-url">www.datalab.to</div>
-            </td>
-            <td>OCR and document-to-text conversion</td>
-            <td>Document files (PDF, images)</td>
-            <td><span class="badge badge--gray">Optional</span></td>
-          </tr>
-          <tr>
-            <td>
-              <div class="sub-name">GitHub</div>
-              <div class="sub-url">api.github.com</div>
-            </td>
-            <td>Repository operations via <code>gh</code> CLI</td>
-            <td>Git operations scoped to your repositories</td>
-            <td><span class="badge badge--gray">Optional</span></td>
-          </tr>
-          <tr>
-            <td>
-              <div class="sub-name">Meilisearch</div>
-              <div class="sub-url">127.0.0.1 (local)</div>
-            </td>
-            <td>Full-text and semantic project search</td>
-            <td>No external traffic — runs as a local sidecar process</td>
-            <td><span class="badge badge--green">Local only</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-
-    <!-- Compliance -->
-    <section class="section">
-      <div class="section-header">
-        <h2 class="section-title">Compliance</h2>
-        <p class="section-desc">As a local-first tool with no cloud component, traditional compliance frameworks apply differently.</p>
-      </div>
-      <div class="controls-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
-        <div class="control-item" style="flex-direction: column; gap: 8px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span class="badge badge--green">Compatible</span>
-            <strong style="font-size: 0.88rem;">GDPR</strong>
-          </div>
-          <p style="font-size: 0.82rem; color: var(--text-2); line-height: 1.55;">
-            Context Pilot processes no personal data on our behalf. Data sent to LLM providers is governed by your agreement with that provider. We are not a data processor.
+        <!-- Key guarantees -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">Security Posture Summary</h2>
+          <p class="tc-section-desc">
+            Context Pilot operates under a local-first architecture with no cloud infrastructure, no intermediary proxies, and no telemetry collection. The following controls are enforced at the architectural level.
           </p>
-        </div>
-        <div class="control-item" style="flex-direction: column; gap: 8px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span class="badge badge--gray">N/A</span>
-            <strong style="font-size: 0.88rem;">SOC 2</strong>
+          <div class="tc-cards">
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              </div>
+              <h3>Local-First Execution</h3>
+              <p>All processing occurs on the operator's workstation. No cloud infrastructure exists for data to be transmitted to.</p>
+            </div>
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <h3>Zero Telemetry</h3>
+              <p>No analytics, usage tracking, crash reporting, or phone-home mechanisms. Network egress is limited to user-configured API providers.</p>
+            </div>
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+              </div>
+              <h3>Open Source (MIT)</h3>
+              <p>Complete source code is publicly auditable under the MIT license. Every network call, file operation, and tool invocation is verifiable.</p>
+            </div>
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <h3>API Key Isolation</h3>
+              <p>Credentials are stored locally and transmitted only to their designated provider endpoint. No cross-provider or intermediary routing occurs.</p>
+            </div>
           </div>
-          <p style="font-size: 0.82rem; color: var(--text-2); line-height: 1.55;">
-            SOC 2 applies to cloud services handling customer data. Context Pilot has no cloud service — your data never enters our control.
+        </section>
+
+        <!-- Navigation to sub-pages -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">Documentation</h2>
+          <p class="tc-section-desc">
+            Select a topic below for detailed documentation. Each section is designed to address specific categories commonly required during enterprise security assessments.
           </p>
-        </div>
-        <div class="control-item" style="flex-direction: column; gap: 8px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span class="badge badge--green">MIT License</span>
-            <strong style="font-size: 0.88rem;">Open Source</strong>
+          <div class="tc-nav-cards">
+            <a href="security.html" class="tc-nav-card">
+              <div class="tc-nav-card-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <h3>Security Architecture</h3>
+              </div>
+              <p>Data flow architecture, encryption practices, integrity controls, access model, and incident response procedures.</p>
+              <div class="tc-nav-card-arrow">
+                Read documentation
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </div>
+            </a>
+            <a href="privacy.html" class="tc-nav-card">
+              <div class="tc-nav-card-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <h3>Data Privacy</h3>
+              </div>
+              <p>Data classification, storage locations, retention policies, data subject rights, and privacy-by-design controls.</p>
+              <div class="tc-nav-card-arrow">
+                Read documentation
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </div>
+            </a>
+            <a href="compliance.html" class="tc-nav-card">
+              <div class="tc-nav-card-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <h3>Compliance Framework</h3>
+              </div>
+              <p>Regulatory alignment assessment including GDPR, SOC 2, ISO 27001, and open-source licensing obligations.</p>
+              <div class="tc-nav-card-arrow">
+                Read documentation
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </div>
+            </a>
+            <a href="subprocessors.html" class="tc-nav-card">
+              <div class="tc-nav-card-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                <h3>Subprocessor Register</h3>
+              </div>
+              <p>Complete inventory of third-party services, data transmitted, opt-in requirements, and provider-specific data processing details.</p>
+              <div class="tc-nav-card-arrow">
+                Read documentation
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </div>
+            </a>
           </div>
-          <p style="font-size: 0.82rem; color: var(--text-2); line-height: 1.55;">
-            Permissive MIT license. Use commercially, modify, distribute. No vendor lock-in, no usage restrictions.
+        </section>
+
+        <!-- Quick contact -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">Contact</h2>
+          <p class="tc-section-desc">
+            For security-related inquiries, vendor risk assessment questionnaires, or to report a vulnerability, please use the appropriate channel below.
           </p>
-        </div>
-      </div>
-    </section>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank" class="tc-cta">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Report a Vulnerability
+            </a>
+            <a href="https://github.com/bigmoostache/context-pilot/issues" target="_blank" class="tc-cta">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Open an Issue
+            </a>
+          </div>
+        </section>
 
-    <!-- FAQ -->
-    <section class="section">
-      <div class="section-header">
-        <h2 class="section-title">Frequently Asked Questions</h2>
       </div>
-      <div class="faq-list">
-        <div class="faq-item">
-          <button class="faq-q" onclick="this.parentElement.classList.toggle('open')">
-            Does Context Pilot send my code to your servers?
-            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="faq-a"><div class="faq-a-inner">
-            No. We have no servers. Context Pilot runs entirely on your machine. The only network calls are to LLM providers you configure with your own API keys.
-          </div></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" onclick="this.parentElement.classList.toggle('open')">
-            What data does my LLM provider see?
-            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="faq-a"><div class="faq-a-inner">
-            Your LLM provider receives the conversation messages and code context assembled during your session, plus tool definitions. This is governed by your provider's data policy — for example, Anthropic's API does not train on your data by default.
-          </div></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" onclick="this.parentElement.classList.toggle('open')">
-            Where is my data stored?
-            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="faq-a"><div class="faq-a-inner">
-            In the <code>.context-pilot/</code> directory within your project. Conversations are YAML files, the entity database is SQLite, memories are YAML. Everything is on your filesystem and never transmitted.
-          </div></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" onclick="this.parentElement.classList.toggle('open')">
-            Can I use Context Pilot offline?
-            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="faq-a"><div class="faq-a-inner">
-            The TUI works offline. LLM inference requires an API call to your configured provider. All other features — file management, search, memory, logs — work without internet.
-          </div></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" onclick="this.parentElement.classList.toggle('open')">
-            Is there any telemetry or tracking?
-            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="faq-a"><div class="faq-a-inner">
-            None. Zero analytics, zero telemetry, zero phone-home. The codebase is open source — search for any HTTP call that isn't to a user-configured provider. You won't find one.
-          </div></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q" onclick="this.parentElement.classList.toggle('open')">
-            How do I report a security vulnerability?
-            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="faq-a"><div class="faq-a-inner">
-            Please report security vulnerabilities through <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank">GitHub's security advisory feature</a>. We respond promptly.
-          </div></div>
-        </div>
-      </div>
-    </section>
+    </main>
+  </div>
 
-  </main>
-
-  <footer class="footer">
-    Context Pilot · MIT License ·
-    <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a> ·
-    <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank">Security</a>
+  <footer class="tc-footer">
+    <span>Context Pilot Trust Center &middot; Version 2.0 &middot; MIT License</span>
+    <div class="tc-footer-links">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a>
+      <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank">Security Policy</a>
+      <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank">License</a>
+    </div>
   </footer>
 
 </body>

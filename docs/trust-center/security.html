@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security Architecture — Context Pilot Trust Center</title>
+  <meta name="description" content="Context Pilot security architecture: local-first data flow, integrity controls, cryptographic verification, and incident response procedures.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="trust.css">
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────── -->
+  <header class="tc-header">
+    <div class="tc-header-inner">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener" class="tc-brand">
+        <div class="tc-brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <span class="tc-brand-name">Context Pilot</span>
+        <span class="tc-brand-sep">/</span>
+        <span class="tc-brand-label">Trust Center</span>
+      </a>
+      <nav class="tc-header-links">
+        <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">Repository</a>
+        <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank" rel="noopener">Security Policy</a>
+        <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank" rel="noopener">License</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="tc-layout">
+    <!-- ── Sidebar ────────────────────────────────────── -->
+    <aside class="tc-sidebar">
+      <div class="tc-sidebar-section">
+        <div class="tc-sidebar-label">Trust Center</div>
+        <ul class="tc-sidebar-nav">
+          <li><a href="index.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Overview
+          </a></li>
+          <li><a href="security.html" class="active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Security Architecture
+          </a></li>
+          <li><a href="privacy.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Data Privacy
+          </a></li>
+          <li><a href="compliance.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Compliance
+          </a></li>
+          <li><a href="subprocessors.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            Subprocessors
+          </a></li>
+        </ul>
+      </div>
+      <div class="tc-sidebar-footer">
+        <p>Document version 2.0<br>Last reviewed: June 22, 2026</p>
+      </div>
+    </aside>
+
+    <!-- ── Content ────────────────────────────────────── -->
+    <main class="tc-content">
+      <div class="tc-content-inner">
+
+        <div class="tc-breadcrumb">
+          <a href="../index.html">Context Pilot</a>
+          <span class="tc-breadcrumb-sep">/</span>
+          <a href="index.html">Trust Center</a>
+          <span class="tc-breadcrumb-sep">/</span>
+          <span>Security Architecture</span>
+        </div>
+
+        <h1 class="tc-page-title">Security Architecture</h1>
+        <div class="tc-page-meta">
+          <div class="tc-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Last updated: June 22, 2026
+          </div>
+          <div class="tc-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Policy SA-2.0
+          </div>
+        </div>
+
+        <p class="tc-page-desc">
+          This document describes the security architecture, controls, and operational procedures that govern Context Pilot's design and deployment. Context Pilot is engineered to eliminate entire categories of security risk through architectural decisions rather than compensating controls.
+        </p>
+
+        <!-- Data Flow Architecture -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">1. Data Flow Architecture</h2>
+          <p class="tc-section-desc">
+            Context Pilot employs a strictly local-first architecture. All computation, state management, and file operations execute on the operator's workstation. No Context Pilot-operated servers, proxies, or intermediary services exist in the data path.
+          </p>
+          <div class="tc-controls">
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>No intermediary proxy</h4>
+                <p>LLM API requests are transmitted directly from the operator's machine to the configured provider endpoint. Context Pilot does not operate relay servers, API gateways, or request-forwarding infrastructure of any kind.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Operator-controlled network egress</h4>
+                <p>All outbound network connections are initiated by the operator through explicit configuration (API key provisioning). The software makes no network calls that are not directly attributable to a user-configured service integration.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Local-only persistence</h4>
+                <p>All application state &mdash; conversation history, entity databases, memory stores, configuration, and search indices &mdash; is persisted to the local filesystem under <code>.context-pilot/</code> within the project directory. No state is synchronized to external services.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Offline capability</h4>
+                <p>Core functionality &mdash; file management, search indexing, memory systems, entity databases, and conversation management &mdash; operates without network connectivity. Only LLM inference, web search, web scraping, and OCR require external API access, all of which are user-initiated.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Integrity Controls -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">2. Integrity Controls</h2>
+          <p class="tc-section-desc">
+            Context Pilot implements multiple layers of integrity verification to ensure that critical configuration and security-relevant files have not been modified without authorization.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>SHA-256 Hash Chain Verification</h4>
+              <span class="tc-badge tc-badge--green">Implemented</span>
+            </div>
+            <p>
+              Twelve critical files &mdash; including lint configurations, CI pipeline definitions, deployment scripts, and security exception registries &mdash; are protected by a SHA-256 hash chain. Each chain entry records the cryptographic hash of the protected file set, creating a tamper-evident audit trail. Unauthorized modifications to any protected file are detected automatically during verification.
+            </p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Lint Enforcement</h4>
+              <span class="tc-badge tc-badge--green">Implemented</span>
+            </div>
+            <p>
+              The codebase enforces 980 Rust compiler and Clippy lints at the <code>forbid</code> level and 21 additional lints at the <code>deny</code> level. Lint suppressions (<code>#[allow(...)]</code>) are prohibited project-wide; exceptions require registration in a tracked exception file that is itself part of the hash chain. This prevents silent introduction of unsafe patterns.
+            </p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Structural Enforcement</h4>
+              <span class="tc-badge tc-badge--green">Implemented</span>
+            </div>
+            <p>
+              Automated CI and pre-commit callbacks enforce a maximum of 500 lines per source file and 8 entries per directory. These constraints promote code modularity and ensure that security-sensitive logic is isolated into reviewable units rather than embedded in large, complex files.
+            </p>
+          </div>
+        </section>
+
+        <!-- Access Model -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">3. Access and Authentication Model</h2>
+          <p class="tc-section-desc">
+            Context Pilot's access model reflects its local-first architecture. There are no user accounts, no authentication tokens issued by Context Pilot, and no multi-tenant isolation requirements.
+          </p>
+          <div class="tc-controls">
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Credential management</h4>
+                <p>API keys are stored in a local <code>.env</code> file or system environment variables. Each credential is transmitted only to its designated provider endpoint. No credential is ever transmitted to Context Pilot infrastructure (which does not exist) or shared across providers.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Filesystem-scoped access</h4>
+                <p>The agent operates within the boundaries of its project directory. File system access is confined to the project root and its subdirectories. Path traversal protections are enforced at the API level for all file operations exposed through the orchestration backend.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>SSE ticket system</h4>
+                <p>The orchestration backend's Server-Sent Events endpoint is protected by single-use, time-limited tickets (30-second TTL, cryptographically random 256-bit tokens). This prevents confused-deputy and DNS rebinding attacks against the localhost-bound HTTP server.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Incident Response -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">4. Incident Response</h2>
+          <p class="tc-section-desc">
+            As an open-source, locally-deployed tool, Context Pilot's incident response model differs from cloud-hosted services. Security issues are addressed through the project's responsible disclosure program.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Responsible Disclosure Program</h4>
+              <span class="tc-badge tc-badge--green">Active</span>
+            </div>
+            <p>
+              Security vulnerabilities should be reported through <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank">GitHub's Security Advisory feature</a>. Reports are triaged promptly. Critical vulnerabilities affecting data confidentiality or integrity are prioritized for patch release within the current development cycle.
+            </p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Dependency Management</h4>
+              <span class="tc-badge tc-badge--green">Automated</span>
+            </div>
+            <p>
+              GitHub Dependabot monitors all dependencies (Rust crates and npm packages) for known vulnerabilities. CodeQL static analysis runs on every push and pull request to the main branch, detecting common vulnerability patterns including injection flaws, path traversal, and unsafe memory operations.
+            </p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Release Integrity</h4>
+              <span class="tc-badge tc-badge--green">Implemented</span>
+            </div>
+            <p>
+              Release binaries are built exclusively through the CI/CD pipeline (GitHub Actions) from the audited source tree. Build artifacts are published as GitHub Releases with provenance metadata. The release workflow is itself a protected file within the hash chain, preventing unauthorized modifications to the build process.
+            </p>
+          </div>
+        </section>
+
+        <!-- Business Continuity -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">5. Business Continuity</h2>
+          <p class="tc-section-desc">
+            Context Pilot's local-first architecture provides inherent resilience against service disruptions.
+          </p>
+          <div class="tc-controls">
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>No single point of failure</h4>
+                <p>Because Context Pilot has no cloud backend, there is no centralized service whose outage would affect all users. Each deployment is fully independent. LLM provider outages degrade AI inference only; all other functionality continues uninterrupted.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Data portability</h4>
+                <p>All state is stored in standard formats (YAML, SQLite, plain text) on the local filesystem. No proprietary encoding, no cloud-locked storage. Data can be backed up, restored, or migrated using standard filesystem tools.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Multi-provider support</h4>
+                <p>Context Pilot supports multiple LLM providers (Anthropic, OpenAI, Google, Mistral). If one provider experiences an outage, operators can switch to an alternative without data loss or workflow disruption.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <footer class="tc-footer">
+    <span>Context Pilot Trust Center &middot; Version 2.0 &middot; MIT License</span>
+    <div class="tc-footer-links">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a>
+      <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank">Security Policy</a>
+      <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank">License</a>
+    </div>
+  </footer>
+
+</body>
+</html>
