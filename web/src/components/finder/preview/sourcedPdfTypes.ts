@@ -136,11 +136,26 @@ export async function parseSourcedBundle(zipBytes: ArrayBuffer): Promise<Sourced
   // ── metadata (normalize field names) ──
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw = await readYaml<any>(zip, pfx + "metadata.yaml")
+
+  /** Resolve a document's path inside the ZIP — tries multiple naming
+   *  conventions: explicit `path`, bare `filename`, `id__filename` (v1). */
+  function resolveDocPath(d: { id: string; path?: string; filename?: string }): string {
+    if (d.path) return d.path
+    const fn = d.filename ?? d.id
+    const candidates = [`documents/${fn}`, `documents/${d.id}__${fn}`]
+    for (const c of candidates) { if (zip.file(pfx + c)) return c }
+    // Last resort: scan documents/ for a file ending with the filename
+    const suffix = `/${fn}`
+    const match = files.find((f) => f.endsWith(suffix) && !f.includes("__MACOSX"))
+    if (match) return match.slice(pfx.length)
+    return candidates[0] // will fail at load time with a clear error
+  }
+
   const metadata: Metadata = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     documents: (raw.documents as any[]).map((d) => ({
       id: d.id,
-      path: d.path ?? `documents/${d.filename}`,
+      path: resolveDocPath(d),
       role: d.role,
       sha256: d.sha256,
     })),
