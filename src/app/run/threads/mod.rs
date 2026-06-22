@@ -14,32 +14,49 @@ pub(super) use messages::emit_messages;
 
 use crate::app::App;
 use crate::app::panels::now_ms;
-use cp_base::state::data::message::{MsgKind, MsgStatus, ToolResultRecord, ToolUseRecord};
+use crate::app::PendingDone;
 use cp_base::tools::ToolUse;
 use cp_mod_spine::types::{NotificationType, SpineState};
 use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
 
-/// Inject a synthetic `Read` tool call when auto-continuation fires
-/// for a thread notification while the AI is unfocused.
+/// Inject a synthetic `Read` tool call when auto-continuation fires for a
+/// thread notification while the AI is unfocused.
 ///
-/// The Read is 100% deterministic in this scenario — the AI would
-/// always call it anyway. Injecting it saves a full round-trip:
-/// the AI starts streaming with focus already set and thread content
-/// visible, so it can immediately `Send` its response.
+/// The Read is 100% deterministic in this scenario — the AI would always call
+/// it anyway. Injecting it saves a full round-trip: the AI starts streaming
+/// with focus already set and the thread content visible, so it can immediately
+/// `Send` its response.
+///
+/// # Transparency (the load-bearing property — T322)
+///
+/// This does **not** execute the Read itself or hand-build any messages. It
+/// hands a `Read` [`ToolUse`] to the **normal tool pipeline** via
+/// [`inject_tool_call`], so the injected call is processed by *exactly* the same
+/// code path as an LLM-emitted Read: pre-flight, `execute_tool` dispatch,
+/// callbacks, the **tempo break** (`tempo = false`), message pairing, and the
+/// follow-up `continue_streaming`. The *only* difference from a real LLM Read is
+/// its **origin** (the harness placed it on `pending_tools` instead of the LLM
+/// stream parsing it out).
+///
+/// This is what fixes the stale-Threads-panel freeze: because the Read now runs
+/// through the pipeline, it breaks `tempo` just like a real Read would, so the
+/// panel it refreshes is no longer frozen by the idle-tick `tempo` guard.
 ///
 /// Thread selection priority:
-/// 1. Extract thread IDs from the synthetic message (notification content)
-///    and pick the first one that's still `MY_TURN`.
+/// 1. Extract thread IDs from the synthetic continuation message and pick the
+///    first one that's still `MY_TURN`.
 /// 2. Fall back to any `MY_TURN` thread if no notification thread ID matches.
 ///
-/// Modifies the message list by popping the empty streaming-target
-/// assistant message, inserting the Read `tool_use` + `tool_result` pair,
-/// then pushing a new empty assistant for streaming.
-pub(super) fn maybe_inject_auto_read(app: &mut App) {
+/// Returns `true` if a Read was injected. When `true`, the caller MUST NOT start
+/// its own LLM stream — the pipeline will execute the Read on the next loop tick
+/// and drive the follow-up stream itself (via `continue_streaming`). Returns
+/// `false` (no injection) when the agent is already focused or no eligible
+/// `MY_TURN` thread exists, in which case the caller starts the stream normally.
+pub(super) fn maybe_inject_auto_read(app: &mut App) -> bool {
     // Only inject when unfocused + a MY_TURN thread exists.
     let fs = FocusState::get(&app.state);
     if fs.focused_thread_id.is_some() {
-        return;
+        return false;
     }
 
     // Extract thread IDs from the synthetic message that triggered this
@@ -61,84 +78,71 @@ pub(super) fn maybe_inject_auto_read(app: &mut App) {
     // Archived threads are LLM-invisible (T9) and never auto-read.
     let my_turn = candidate_ids
         .iter()
-        .find_map(|tid| {
-            ts.threads.iter().find(|t| t.id == *tid && !t.archived && t.status == ThreadStatus::MyTurn)
-        })
+        .find_map(|tid| ts.threads.iter().find(|t| t.id == *tid && !t.archived && t.status == ThreadStatus::MyTurn))
         .or_else(|| ts.threads.iter().find(|t| !t.archived && t.status == ThreadStatus::MyTurn));
 
     let Some(thread) = my_turn else {
-        return;
+        return false;
     };
     let tid = thread.id.clone();
 
-    // Pop the empty assistant (streaming target) — we'll push a fresh
-    // one after the injected Read messages.
-    let Some(streaming_target) = app.state.messages.pop() else {
-        return;
+    // Build the Read ToolUse exactly as the LLM would, then hand it to the
+    // normal pipeline. The pipeline does ALL the rest (focus, panel refresh,
+    // tempo break, message pairing, follow-up stream) — see `inject_tool_call`.
+    let tool_use = ToolUse {
+        id: format!("auto_read_{tid}"),
+        name: "Read".into(),
+        input: serde_json::json!({
+            "thread_id": tid,
+            "intent": "Focus on thread",
+            "verb": "Reading",
+        }),
     };
 
-    // Build a synthetic ToolUse for Read.
-    let tool_use_id = format!("auto_read_{tid}");
-    let input = serde_json::json!({
-        "thread_id": tid,
-        "intent": "Focus on thread",
-        "verb": "Reading",
-    });
+    inject_tool_call(app, tool_use);
+    true
+}
 
-    let tool_use = ToolUse { id: tool_use_id.clone(), name: "Read".into(), input: input.clone() };
-
-    // Execute Read — this sets focus and returns formatted messages.
-    let result = cp_mod_threads::tools::execute_read(&tool_use, &mut app.state);
-
-    // Create assistant message carrying the tool_use record.
-    let tool_call_msg = crate::state::Message {
-        id: format!("T{}", app.state.next_tool_id),
-        uid: Some(format!("UID_{}_T", app.state.global_next_uid)),
-        role: "assistant".into(),
-        content: String::new(),
-        msg_type: MsgKind::ToolCall,
-        status: MsgStatus::Full,
-        tool_uses: vec![ToolUseRecord { id: tool_use_id.clone(), name: "Read".into(), input }],
-        tool_results: vec![],
-        input_tokens: 0,
-        content_token_count: 0,
-        timestamp_ms: now_ms(),
-    };
-    app.state.next_tool_id = app.state.next_tool_id.saturating_add(1);
-    app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
-
-    // Create tool_result message (user role).
-    let result_msg = crate::state::Message {
-        id: format!("R{}", app.state.next_result_id),
-        uid: Some(format!("UID_{}_R", app.state.global_next_uid)),
-        role: "user".into(),
-        content: String::new(),
-        msg_type: MsgKind::ToolResult,
-        status: MsgStatus::Full,
-        tool_uses: vec![],
-        tool_results: vec![ToolResultRecord {
-            tool_use_id,
-            content: result.content,
-            display: None,
-            tldr: None,
-            is_error: result.is_error,
-            tool_name: "Read".into(),
-        }],
-        input_tokens: 0,
-        content_token_count: 0,
-        timestamp_ms: now_ms(),
-    };
-    app.state.next_result_id = app.state.next_result_id.saturating_add(1);
-    app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
-
-    // Persist both injected messages.
-    app.save_message_async(&tool_call_msg);
-    app.save_message_async(&result_msg);
-
-    // Push: tool_call → tool_result → streaming target.
-    app.state.messages.push(tool_call_msg);
-    app.state.messages.push(result_msg);
-    app.state.messages.push(streaming_target);
+/// Inject a **harness-originated tool call** into the normal execution pipeline,
+/// making it behaviorally identical to an LLM-emitted call — the only difference
+/// is the *origin*.
+///
+/// An LLM tool call reaches execution by two facts being true when the main loop
+/// runs [`handle_tool_execution`](crate::app::run::tools::pipeline): the stream
+/// is in a streaming phase, and there is a finished stream
+/// ([`App::pending_done`] is `Some`) carrying one or more parsed tool calls in
+/// [`App::pending_tools`]. This helper reproduces precisely that situation for a
+/// harness-supplied [`ToolUse`]:
+///
+/// * the `tool` is pushed onto [`App::pending_tools`], and
+/// * a **synthetic, all-zero** [`PendingDone`] is set (`stop_reason =
+///   "tool_use"`, no token counts, no breakpoint hashes), so the pipeline's
+///   guard passes and it proceeds to run the tool.
+///
+/// The zeroed token/cost figures are correct: a harness-injected call is **not**
+/// a billed LLM turn, so `accumulate_pending_token_stats` adds nothing, and the
+/// empty breakpoint-hash list means the cache engine is left untouched.
+///
+/// # Caller contract
+///
+/// The caller must ensure the stream is already in a streaming phase (e.g. via
+/// [`begin_streaming`](cp_base::state::runtime::State::begin_streaming), which
+/// `apply_continuation` calls) and must **not** start its own LLM stream — the
+/// pipeline will execute this tool on the next loop tick and then call
+/// `continue_streaming` itself, so the follow-up LLM stream begins with the
+/// tool's result already in context. Starting a stream as well would race two
+/// streams against one set of pending tools.
+///
+/// Because the call rides the *real* pipeline, it inherits every pipeline
+/// behaviour transparently — pre-flight, queue interception (an injected call is
+/// enqueued if a queue is active, exactly as an LLM call would be), callbacks,
+/// the tempo break, and persisted `tool_call`/`tool_result` message pairing.
+pub(super) fn inject_tool_call(app: &mut App, tool: ToolUse) {
+    app.pending_tools.push(tool);
+    // Synthetic "stream finished with a tool_use" receipt: zero tokens/cost,
+    // no breakpoint hashes — see the doc comment for why each field is zero.
+    let synthetic_done: PendingDone = (0, 0, 0, 0, Some("tool_use".to_string()), Vec::new(), 0, Vec::new());
+    app.pending_done = Some(synthetic_done);
 }
 
 /// Notify when idle and a thread has `MY_TURN` status.

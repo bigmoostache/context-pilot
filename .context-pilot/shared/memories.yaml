@@ -49,6 +49,35 @@
   - abandoned
   - T320
   last_edited_ms: 1782116008800
+1fa52985c8d21a8b:
+  tl_dr: T322 Option B (auto-Read pipeline injection, B3) — IMPLEMENTED + built + reloaded. Awaiting live verification + T322 reply.
+  contents: |-
+    ## T322 Option B — harness-injected auto-Read flows through the REAL tool pipeline (DONE)
+
+    Captain's ask: a reusable, fully-transparent way to inject harness-originated tool calls — the ONLY difference from an LLM-emitted Read being the ORIGIN. Read must NOT preserve tempo (fixes the stale-Threads-panel freeze, root cause M103). Option A (one-line tempo=false) was REJECTED.
+
+    ## Shipped design (B3 = route through handle_tool_execution)
+    src/app/run/threads/mod.rs:
+    - `maybe_inject_auto_read(app) -> bool` (was `()`): unfocused + MY_TURN thread selection unchanged; builds a Read `ToolUse` and hands it to the new reusable helper `inject_tool_call`; returns true iff injected. No longer executes Read inline or hand-builds messages.
+    - `inject_tool_call(app, tool: ToolUse)`: pushes `tool` onto `app.pending_tools` + sets a synthetic all-zero `PendingDone = (0,0,0,0, Some("tool_use".into()), Vec::new(), 0, Vec::new())` so the pipeline guard passes. Zeroed tokens/cost (injected call isn't a billed turn) + empty bp-hashes (cache untouched). Fully documented (transparency, caller contract).
+    - Import fixed to `crate::app::PendingDone`.
+
+    src/app/run/lifecycle.rs (check_spine SpineDecision::Continue, should_stream block): now `if !maybe_inject_auto_read(self) { typewriter.reset(); pending_tools.clear(); prepare_stream_context; start_streaming } ` then shared tail `save_state_async(); dirty=true`. When injected: SKIP stream start + pending_tools.clear (pipeline drives the follow-up stream via continue_streaming on next tick). Shared tail HOISTED out of if/else to dodge clippy::branches_sharing_code (the prior failure).
+
+    ## Result
+    Next tick after injection: handle_tool_execution runs the Read through the real path → execute_read focuses thread + rebuilds panel_content → TEMPO BREAK (tempo=false) → result message → continue_streaming. So the Threads panel is FRESH in the follow-up stream. Behaviourally == 'LLM emitted Read as first action'.
+
+    ## Status: cargo build --release green, rust-check (clippy/fmt) passed, system_reload done. PENDING: live smoke (idle→thread msg→confirm Threads panel fresh), commit+push (M45), reply T322.
+  importance: high
+  labels:
+  - T322
+  - freeze
+  - tempo
+  - auto-read
+  - pipeline
+  - design
+  - in-progress
+  last_edited_ms: 1782120057427
 3d36396d2a618055:
   tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
   importance: critical
