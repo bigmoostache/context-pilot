@@ -86,10 +86,34 @@ fn is_public_route(segments: &[&str]) -> bool {
         ["api", "health"]
             | ["api", "auth", "login"]
             | ["api", "auth", "register"]
+            | ["api", "auth", "status"]
             // SSE uses ticket-based auth, not Bearer (Phase 7 enriches tickets
             // with user_id; until then the ticket mechanism is the sole gate).
             | ["api", "stream"]
     )
+}
+
+/// `GET /api/auth/status` — report whether auth is enabled and whether at
+/// least one user exists (public, always accessible so the frontend can
+/// decide whether to show a login vs bootstrap-register page before any
+/// Bearer token is available).
+pub(crate) fn auth_status(state: &Mutex<Backend>) -> HttpReply {
+    let (enabled, bootstrapped) = state
+        .lock()
+        .map(|b| {
+            let enabled = b.auth.is_some();
+            let bootstrapped = b
+                .auth
+                .as_ref()
+                .and_then(|a| a.count_users().ok())
+                .map_or(false, |n| n > 0);
+            (enabled, bootstrapped)
+        })
+        .unwrap_or((false, false));
+    HttpReply::ok(&serde_json::json!({
+        "enabled": enabled,
+        "bootstrapped": bootstrapped,
+    }))
 }
 
 // ─────────────────────── public routes ───────────────────────────────

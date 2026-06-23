@@ -336,6 +336,7 @@ fn route_rest(
         (Method::Get, ["api", "health"]) => rest::HttpReply { status: 200, body: "{\"status\":\"ok\"}".to_owned() },
 
         // ── Auth routes (§6 of design doc) ──────────────────────────
+        (Method::Get, ["api", "auth", "status"]) => auth::auth_status(state),
         (Method::Post, ["api", "auth", "login"]) => auth::login(state, body_bytes),
         (Method::Post, ["api", "auth", "register"]) => auth::register(state, body_bytes, auth_user),
         (Method::Post, ["api", "auth", "logout"]) => auth::logout(state, auth_token),

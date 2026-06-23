@@ -6,29 +6,35 @@ import { ThreadsView } from "@/components/threads/ThreadsView"
 import { FleetShell } from "@/components/agents/FleetShell"
 import { Finder } from "@/components/finder/Finder"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { AuthGuard } from "@/components/auth/AuthGuard"
 import { ThemeProvider } from "@/lib/theme"
 import { AccountProvider } from "@/lib/support/account"
+import { AuthProvider } from "@/lib/support/auth"
 import { DevModeProvider, useDevMode } from "@/lib/support/devMode"
 import { useFleet, useAgentMeta } from "@/lib/live"
 import type { ViewMode } from "@/lib/types"
 import "./App.css"
 
 /**
- * Root provider shell. Mounts the global contexts (theme, account, dev-mode)
- * and the tooltip layer **above** {@link AppShell}, so the shell can read the
- * dev-mode flag through {@link useDevMode} to gate the developer-only Cockpit
- * surface.
+ * Root provider shell. Mounts the global contexts (theme, auth, account,
+ * dev-mode) and the tooltip layer **above** {@link AppShell}. AuthProvider
+ * probes the backend's auth status on mount; AuthGuard shows the login page
+ * when auth is enabled but no valid session exists.
  */
 function App() {
   return (
     <ThemeProvider>
-      <AccountProvider>
-        <DevModeProvider>
-          <TooltipProvider delay={350} closeDelay={80}>
-            <AppShell />
-          </TooltipProvider>
-        </DevModeProvider>
-      </AccountProvider>
+      <AuthProvider>
+        <AccountProvider>
+          <DevModeProvider>
+            <TooltipProvider delay={350} closeDelay={80}>
+              <AuthGuard>
+                <AppShell />
+              </AuthGuard>
+            </TooltipProvider>
+          </DevModeProvider>
+        </AccountProvider>
+      </AuthProvider>
     </ThemeProvider>
   )
 }
