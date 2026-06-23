@@ -192,7 +192,7 @@ export function AgentModal({
     >
       <div
         className={cn(
-          "modal-pop relative flex flex-col overflow-hidden rounded-2xl border border-border bg-popover pop-shadow",
+          "modal-pop relative flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover pop-shadow",
           isManage ? "w-[960px] max-w-[calc(100vw-3rem)]" : "w-[460px]",
         )}
         onClick={(e) => e.stopPropagation()}
@@ -268,7 +268,7 @@ export function AgentModal({
 
         <div
           className={cn(
-            "px-6 py-5",
+            "min-h-0 flex-1 overflow-y-auto px-6 py-5",
             isManage ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-7" : "flex flex-col gap-5",
           )}
         >
