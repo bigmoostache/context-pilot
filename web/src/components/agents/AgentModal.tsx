@@ -16,7 +16,6 @@ import { avatarUrl } from "@/lib/api"
 import { useAuth } from "@/lib/support/auth"
 import { PROVIDERS, defaultModel, findModel, resolveSelection } from "@/lib/support/models"
 import { ModelPicker } from "./ModelPicker"
-import { SessionVitals } from "../shell/SessionVitals"
 import { AgentAclSection } from "../auth/AgentAclSection"
 import { cn } from "@/lib/utils"
 
@@ -269,7 +268,7 @@ export function AgentModal({
         <div
           className={cn(
             "min-h-0 flex-1 overflow-y-auto px-6 py-5",
-            isManage ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-7" : "flex flex-col gap-5",
+            isManage && authEnabled ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-7" : "flex flex-col gap-5",
           )}
         >
           {/* left column — the agent form (name + provider/model) */}
@@ -315,16 +314,10 @@ export function AgentModal({
           </div>
           </div>
 
-          {/* right column — live session vitals + ACL (manage only) */}
-          {isManage && agent && (
+          {/* right column — ACL (manage + auth only) */}
+          {isManage && agent && authEnabled && (
             <div className="flex flex-col gap-5 border-l border-border/50 pl-7">
-              <div className="flex flex-col gap-2">
-                <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
-                  Session vitals
-                </span>
-                <SessionVitals agentId={agent.id} />
-              </div>
-              {authEnabled && <AgentAclSection agentId={agent.id} />}
+              <AgentAclSection agentId={agent.id} />
             </div>
           )}
         </div>
