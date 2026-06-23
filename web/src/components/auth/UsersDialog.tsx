@@ -5,13 +5,18 @@
 
 import { useState, type FormEvent } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { LogOut, Plus, Shield, Trash2, Users, X } from "lucide-react"
+import { LogOut, Plus, Shield, Trash2, Users } from "lucide-react"
 import {
   fetchUsers,
   createUser,
   deleteUser,
   forceLogoutUser,
 } from "@/lib/api"
+import {
+  Dialog,
+  DialogContent,
+  DialogClose,
+} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
 // ── Role badge ───────────────────────────────────────────────────────
@@ -35,7 +40,7 @@ export function RoleBadge({ role }: { role: string }) {
 
 // ── Main dialog ──────────────────────────────────────────────────────
 
-export function UsersDialog({ onClose }: { onClose: () => void }) {
+export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient()
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["auth-users"],
@@ -53,14 +58,8 @@ export function UsersDialog({ onClose }: { onClose: () => void }) {
   })
 
   return (
-    <div
-      className="backdrop-fade fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[3px]"
-      onClick={onClose}
-    >
-      <div
-        className="modal-pop relative flex max-h-[80vh] w-[520px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover pop-shadow"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="flex max-h-[80vh] w-[520px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0">
         {/* header */}
         <div className="flex items-center gap-3 border-b border-border/70 px-5 py-4">
           <span className="flex size-9 items-center justify-center rounded-xl bg-[var(--signal)]/14 text-[var(--signal)] ring-1 ring-inset ring-[var(--signal)]/25">
@@ -81,12 +80,12 @@ export function UsersDialog({ onClose }: { onClose: () => void }) {
             <Plus className="size-3.5" />
             Add user
           </button>
-          <button
-            onClick={onClose}
+          <DialogClose
+            aria-label="Close"
             className="flex size-7 items-center justify-center rounded-md text-muted-foreground/55 transition-colors hover:bg-muted/70 hover:text-foreground"
           >
-            <X className="size-4" />
-          </button>
+            ✕
+          </DialogClose>
         </div>
 
         {/* create form (collapsible) */}
@@ -183,8 +182,8 @@ export function UsersDialog({ onClose }: { onClose: () => void }) {
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

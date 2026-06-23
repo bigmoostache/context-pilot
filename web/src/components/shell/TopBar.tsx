@@ -155,7 +155,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
 
       <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
-      {usersOpen && <UsersDialog onClose={() => setUsersOpen(false)} />}
+      <UsersDialog open={usersOpen} onClose={() => setUsersOpen(false)} />
     </header>
 
     {/* Rendered as a SIBLING of the .vibrancy header (never a descendant) so its
