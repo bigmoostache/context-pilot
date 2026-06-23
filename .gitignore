@@ -79,3 +79,6 @@ demo/
 .cp-trash/test-ocr.pdf
 .cp-trash/wiring-alignment-audit.md
 docs/test.xlsx
+sandbox/
+/.uploads
+*.sourced_pdf
