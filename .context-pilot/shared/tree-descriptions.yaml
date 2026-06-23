@@ -486,6 +486,10 @@
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
   last_edited_ms: 0
+0dee9d22a359a528:
+  path: crates/cp-orchestrator/tests/transport_http.rs
+  description: Phase 30 transport surface tests over a real tiny_http server (4 tests). Backend::new takes 6 args (auth=None, session_ttl). ticket_mint_and_command_status_codes asserts tripped breaker blocks cost-incurring send_message (503) but NOT control-plane stop (≠503). REST rev-envelope+404, SSE ticket gate single-use, Last-Event-ID replay.
+  last_edited_ms: 1782239655024
 0dfbb953ddfa39dc:
   path: crates/cp-orchestrator/src/transport/rest/retire.rs
   description: 'POST /api/agent/{id}/retire + /unretire (T271). retire_agent: resolve entry, snapshot RetiredRecord (provider via meta::read_provider BEFORE kill), supervisor::kill_pid(pid) lock-free, kill_console_server via <folder>/.context-pilot/console/server.pid (it survives TUI restarts by design), drop stale supervised record, retired.retire+persist -> 200. unretire_agent: retired.unretire (404 if absent) + spawn_pty same folder (respawn -> same id) -> 202. NOT a folder delete. Proven live: 834eb retire->409 same-path->unretire respawn(pid)->404 unknown.'
@@ -530,6 +534,10 @@
   path: src/llms/cache/prompt_tick_csv.rs
   description: 'Prompt tick CSV dumper for cache debugging. Writes every assembled-prompt message to .context-pilot/prompt_ticks/ each tick (datetime-named). Rolling deletion keeps 20 most recent. Columns: hash, role, type, context, tokens, acc/rev_acc tokens, preview. classify_text_context() tags panel headers/timestamps/footers/seed/conversation blocks. Moved from src/llms/ to cache/ for folder-size limit.'
   last_edited_ms: 1781084621779
+0f90c52bd8516a24:
+  path: crates/cp-orchestrator/src/services/auth/types.rs
+  description: 'Auth domain types: AuthError, UserRole (admin/user, serde lowercase), AgentRole (agent-admin/agent-user, serde kebab-case), User (pub, serde skip password_hash), AclEntry. Session struct removed (dead_code — fields only consumed by tests, validate_session now returns User directly). row_to_user helper.'
+  last_edited_ms: 1782239654410
 0ffe6ba25445c03a:
   path: src/ui/ir/render_status_bar.rs
   description: Status bar IR adapter — renders StatusBar to ratatui line. Badges (streaming/tooling/ready/blocked), agent/skill cards, git branch, auto-continue, reverie, queue, think balance. Builder from state. Wall-clock spinner. No QUESTIONING badge (PendingForm removed).
@@ -562,6 +570,10 @@
   path: src/llms/oai_providers/mod.rs
   description: 'Module declarations: deepseek, grok, groq, openai_compat, openai_streaming.'
   last_edited_ms: 0
+10803e08b36f9029:
+  path: crates/cp-orchestrator/src/transport/ticket.rs
+  description: 'Phase 19: single-use SSE upgrade tickets (I9b). TicketStore{live:HashMap<token,TicketEntry>,ttl}. mint(user_id) (sweep+/dev/urandom 256-bit hex token, DEFAULT_TTL 30s), redeem() returns Option<RedeemedTicket> exactly once per unexpired token (single-use + expiry check + user identity), lazy sweep on mint/redeem bounds map. Phase 7: TicketEntry carries optional user_id embedded at mint; RedeemedTicket returned on redeem carries the identity for SSE ACL check. 7 tests.'
+  last_edited_ms: 1782239654291
 10899fbf2b6216c0:
   path: src/app/run/threads.rs
   description: 'Thread-related helpers for the main event loop. maybe_inject_auto_read (synthetic Read on auto-continuation), check_my_turn_threads (idle MY_TURN detection + spine notification), extract_thread_ids (parse thread IDs from notification content). Bridge command polling: poll_bridge_commands + accept_commands (non-blocking accept, 500ms read timeout) + apply_command dispatch (SendMessage/CreateThread/Archive/Restore/Stop/Interrupt via K7 path). Free functions taking &mut App.'
@@ -730,6 +742,10 @@
   path: report/wiring-alignment-audit.md
   description: 'Wiring alignment audit (X818). Re-walked 2026-06-18 (X867): §0 verdict (zero un-validated load-bearing invariants), §1 two planes, §2 I1-I13/§7/§9/§18/§19 register (§19 ABIDES load-bearing + histograms deferred non-load-bearing), §2.5 keystone K1-K9 table (all ABIDE), §2.6 V1-V12 fault-matrix validation (8/12 PROVEN by landed tests, V4/V5/V8/V10 deferred to X869 CI), §3 frontend feature wiring (e2e-proven), §4 measured latency table, §5 ledger (all DONE except X869 soak + X870 doc/tag), §6 credit, §7 disk-read ledger (X864 ABIDES).'
   last_edited_ms: 1781823231307
+1571144c670d3277:
+  path: crates/cp-orchestrator/src/transport/auth/mod.rs
+  description: 'Auth middleware + REST handlers. authenticate(): centralized Bearer gate (no-op when disabled, NFR-09). Public routes: login (FR-05), register (bootstrap FR-03 or admin-creates). Protected: logout, me, list/create/delete users. Re-exports ACL functions from acl.rs.'
+  last_edited_ms: 1782239654735
 15782d1830b79255:
   path: ui/src/components/finder/Finder.tsx
   description: Top-level Finder orchestrator. buildRealm(agent) memo, tabs w/ per-tab back/fwd history, keyboard nav (arrows/Enter/Backspace/Space QuickLook/⌘A/⌘I/type-ahead), additive + range selection, right-click context menu, Get Info modal, 4 view modes, icon-size slider, path bar, drag-drop upload overlay, status bar, transient toast. Stagger re-trigger by keying views on cwd.
@@ -810,6 +826,10 @@
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation). load_prompt_history() reads back entries.'
   last_edited_ms: 1780563343167
+1802674b8c6abcd9:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend struct holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names(T328)/avatars(T338)/auth(T341)/session_ttl. route_rest dispatches all /api routes incl auth/ACL. handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with Phase 7 ticket-based ACL.
+  last_edited_ms: 1782239655680
 1825b04b023b84a1:
   path: crates/cp-render/src/conversation.rs
   description: 'Conversation + overlay IR types. Message/HistorySection/StreamingTool/InputArea. Overlays: QuestionForm (with cursor/typing_other/other_text), Autocomplete (with dir_prefix/total_matches/input_visual_lines), PerfOverlay (with open_fds/fd_limit_soft/fd_semantic), ConfigOverlay, PaletteOverlay, SearchIndexOverlay. All serializable.'
@@ -950,6 +970,10 @@
   path: crates/cp-mod-memory/Cargo.toml
   description: 'Memory module deps: cp-base, cp-render, crossterm, serde, serde_json, cp-mod-utilities.'
   last_edited_ms: 1780565428702
+1bc570e16fddf54a:
+  path: crates/cp-orchestrator/tests/fleet_soak.rs
+  description: Phase 9.4 (X869) multi-agent soak + fleet-scale fault-matrix slice (2 tests). 16 agents concurrent contended workloads, gap-free+isolated projections. Flooded reordered subscriber coalesces then reconciles.
+  last_edited_ms: 1782239655441
 1bcb47316615366d:
   path: web/src/components/finder/ContextMenu.tsx
   description: 'Finder right-click context menu (macOS-style), TWO variants keyed on pos.node presence. ITEM menu (right-click a file/folder): Open (folder nav / Quick Look), Pin to Sidebar (folders), Rename, Duplicate, Download (real downloadFile), tag swatches (real onTag), Move to Trash. EMPTY-SPACE menu (T279, right-click the content background, pos.node absent): New Folder (real mkdir), Upload… (file picker), Select All, Toggle Quick Look, Refresh — via onNewFolder/onUpload/onSelectAll/onTogglePreview/onRefresh props. EmptyItem row helper. On-screen clamping; closes on outside-click/Esc.'
@@ -1202,6 +1226,10 @@
   path: web/src/components/threads/ThreadsView.tsx
   description: Threads view assembler. Uses useThreads()+useFleet() live. handleArchive/Create/Send via sendCommand. Auto-selects first valid thread. EmptyRealm fallback. Keyed by agentId in App.
   last_edited_ms: 0
+21b5eef53857fa3a:
+  path: crates/cp-orchestrator/src/main.rs
+  description: 'Backend entry point. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + X896 new-agent realm root + agent binary, creates Runtime, starts driver thread, serves HTTP (blocking). `use <crate> as _` block acknowledges lib-only deps in the bin target (per-target unused-crate-dependencies forbid): incl argon2, rusqlite, portable_pty, calamine, csv.'
+  last_edited_ms: 1782239654828
 222420220afa8c94:
   path: crates/cp-base/Cargo.toml
   description: 'Base crate deps: cp-render, cp-mod-utilities, ratatui, crossterm, serde, serde_json, serde_yaml, unicode-width, log.'
@@ -3954,6 +3982,10 @@
   path: src/ui/ir/render_conversation.rs
   description: 'IR-controlled chrome: border, title, scrollbar, auto-scroll. Delegates content to build_content_cached(). Question form + autocomplete overlay rendering via IR data.'
   last_edited_ms: 0
+71919665e8f3e698:
+  path: crates/cp-orchestrator/tests/supervisor_lifecycle.rs
+  description: Phase 28 (X795) backend supervisor lifecycle suite (4 tests, all green, ~15s). Black-box public-API + real OS processes. SIGTERM→grace→SIGKILL escalation, multi-agent fleet spawn/stop, adopted FOREIGN process signalled, check_liveness routes.
+  last_edited_ms: 1782239655123
 719459febde878f8:
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1 (Boot emits Lifecycle::Running). on_stream_chunk→Token frames (tagged state.messages.last().id for §7 live-typing), on_stream_stop→PhaseHint(Idle). BridgeState{boot,tee,intake,tee_seq,last_phase,last_cost_usd,store,thread_msg_counts,msg_memo_seeded,thread_statuses,status_memo_seeded}: msg_memo + status_memo are the observe-on-change baselines for the emit_messages / emit_thread_status main-loop chokepoints (seeded no-emit at boot so a restart doesn''t replay backlog/status as spurious deltas). is_global, no tools/panels.'
@@ -4326,6 +4358,10 @@
   path: web/src/lib/api/finder.ts
   description: 'Finder filesystem REST endpoints (list/descriptions/preview/sheet/write/upload/mkdir/rename/move/trash/raw/download/conversation). T298: added uploadUnique (POST /fs/upload-unique — auto-creates dir, never overwrites, returns stored path/name/size) powering the chat composer attachment flow.'
   last_edited_ms: 1782045499865
+7a957e6bf92dc7ec:
+  path: crates/cp-orchestrator/tests/services_integration.rs
+  description: 'Phase 29 (X796) backend services integration suite (4 tests, green, ~0.1s). Drives MaterializedView+CostBreaker+StreamHub TOGETHER against real cp-oplog via Tailer: restart rebuild, real segment-roll checkpoint, R2-17 reconcile, fleet isolation.'
+  last_edited_ms: 1782239655341
 7aacf20c52beff82:
   path: web/package.json
   description: 'Frontend deps: @base-ui/react 1.5, @tanstack/react-query 5.101, react 19.2, react-markdown 10 + remark-gfm, highlight.js 11.11, tailwindcss 4.3, shadcn 4.11, vite 8, playwright. scripts: dev/build(tsc -b && vite build)/lint/preview.'
@@ -6286,6 +6322,10 @@ b1f377ed4ee6032b:
   path: crates/cp-render/src/overlay_ir.rs
   description: Search index overlay IR types (Ctrl+I). SearchIndexOverlay, SearchServer, SearchIndex, SearchExtension, SearchSplitter, SearchEmbeddings, SearchTask, SearchRecomputed, SearchRecentFile.
   last_edited_ms: 0
+b20197e483020234:
+  path: crates/cp-orchestrator/tests/registry_channel.rs
+  description: 'Phase 27 (X794) backend↔agent seam suite (4 tests, all green). Drives discovery+channel against real cp-mod-bridge artifacts: boot→Appeared→quiet scan→Disappeared, Stale transition, body spill→hydrate, command send→exactly-once dedup.'
+  last_edited_ms: 1782239655231
 b20dd51814738fc5:
   path: crates/cp-orchestrator/src/transport/inspect/panels.rs
   description: 'Cockpit inspection-panel endpoints (in inspect/): memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list = tier-② disk reads reshaped to maquette JSON. PLUS tools/radar/entities = DERIVED-state endpoints that return their NORMAL EMPTY shape by design (200 [] / {anchors:[],results:[]}, NOT 404): the inspection plane structurally can''t rebuild them from tier-② files (tools catalog=compile-time module YAMLs in the agent binary; radar=live half-life log ranking; entities=open SQLite, on-disk db is 0 bytes) — agent_folder guard so an unknown id still 404s; frontend renders an honest ''unavailable over web inspection plane'' notice. Absolute crate::transport:: paths.'
@@ -6594,6 +6634,10 @@ b9e499de92a61a13:
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
   last_edited_ms: 1780562263879
+b9fd423d3587e6a5:
+  path: crates/cp-orchestrator/src/services/auth/tests.rs
+  description: '18 auth unit tests: schema, hashing, token/UUID gen, user CRUD (create/get/list/delete cascade), session lifecycle (create/validate/revoke/expired sweep), ACL (grant/revoke/update role/list/cascade delete/overwrite).'
+  last_edited_ms: 1782239654619
 ba0ad25788c859f0:
   path: crates/cp-wire/Cargo.toml
   description: 'Wire protocol crate manifest. deps: crc32c, serde, serde_json, sha2 (0.10, for ContentHash::of SHA-256). I/O-free. Workspace lints.'
@@ -7278,6 +7322,10 @@ ccc5f36bc89c57cf:
   path: crates/cp-wire/src/types/body.rs
   description: 'Content-addressed Body: hash + data bytes. Inline-small in oplog or spill to oplog/bodies/{hash}.'
   last_edited_ms: 1781617163188
+cd119edce88e0ed4:
+  path: crates/cp-orchestrator/tests/end_to_end.rs
+  description: Phase 30 end-to-end loopback capstone (3 tests). Backend::new takes 6 args (auth=None, session_ttl). Real agent stack ↔ real backend transport over real sockets. Command journals on agent and re-emerges as SSE delta. Spilled body hydrates over REST. 25 SSE connect/disconnect soak cycles.
+  last_edited_ms: 1782239654917
 cd333d308467c2b4:
   path: src/app/run/tools/cleanup.rs
   description: Watcher polling (blocking sentinel replacement + async spine notifications), ASYNC_ERROR_PREFIX handling for is_error, DynPanel creation for both blocking/async paths, interrupt cleanup. flame!("watchers"). No PendingForm references.
@@ -7498,6 +7546,10 @@ d3b0432ae34befdb:
   path: crates/cp-mod-github/Cargo.toml
   description: 'GitHub module deps: cp-base, cp-render, crossterm, regex, cp-mod-utilities, serde_json.'
   last_edited_ms: 1780565754913
+d3b2da2605f40d13:
+  path: crates/cp-orchestrator/src/services/auth/store.rs
+  description: AuthStore — SQLite-backed auth CRUD. Schema init (users/sessions/agent_acl), Argon2id hashing, token/UUID generation. User CRUD, session lifecycle (create/validate→Option<User>/revoke with lazy sweep), ACL operations (grant/revoke/update_role/check/list_agent_users/list_user_agents/is_agent_admin). revoke_all_sessions + auto_grant_creator removed (dead code, re-add when wired). 18 tests in sibling tests.rs.
+  last_edited_ms: 1782239654523
 d3c7b08de985c75a:
   path: crates/cp-mod-github/src/tools.rs
   description: GitHub CLI tool. Read-only → dynamic github_result panels. Mutating → async subprocess via spawn_async_tool. flame!("gh_exec"). Token redaction. Cache invalidation of affected panels. GIT_PROMPT_DISABLED.
@@ -7834,6 +7886,10 @@ de0df96ea79bf414:
   path: crates/cp-mod-bridge/src/body.rs
   description: 'Phase 14 (X781): Store — agent immutable content-addressed body store + I13 barrier. put(bytes)->Stored: small (<=inline_threshold 4KiB)=Inline{hash,bytes} (caller embeds in same oplog entry, rides its fsync, zero extra file); large=Spilled{hash} written durably tmp->fdatasync->rename->fsync(dir) BEFORE put() returns (I13: body durable before referencing entry journaled). Content-addressed => idempotent spill (existing file=no-op), crash-in-gap=harmless orphan. get(hash)->Option<Vec<u8>> re-hashes & verifies integrity (mismatch=Err). gc(referenced:&HashSet<ContentHash>, grace) deletes bodies BOTH unreferenced AND older-than-grace, reusing cp_oplog::compact::body_gc_eligible (GAP3 single source). file_age=mtime elapsed (unknown=conservatively keep). bodies/{64-hex} files; .tmp.{pid} staging. 8 tests incl gc-keeps-in-flight-spill-within-grace (V12 race guard) + get-detects-corruption. NOT yet wired into MessageCreated (bridge-ON).'
   last_edited_ms: 0
+de43dbada76ad0c1:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() breaker check GATED on SendMessage only. rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket embeds auth_user.id in ticket (Phase 7). resolve_entry. create_agent + retire in siblings.
+  last_edited_ms: 1782239655572
 def0ccd673154b9d:
   path: crates/cp-mod-todo/Cargo.toml
   description: 'Todo module deps: cp-base, cp-render, crossterm, serde, serde_json.'
