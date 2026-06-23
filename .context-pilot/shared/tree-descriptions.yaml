@@ -838,6 +838,10 @@
   path: .gitignore
   description: Gitignore. Excludes target/, .context-pilot/* (with !shared/ negation), .claude/, test artifacts, slides build artifacts (node_modules, package files, PDF output).
   last_edited_ms: 0
+1831a2eaa0f7f428:
+  path: web/src/components/auth/AuthGuard.tsx
+  description: Auth gate wrapper (Phase 9). Shows LoginPage when auth enabled + no session, passes through when disabled or authenticated. Loading spinner while probing.
+  last_edited_ms: 1782241220186
 184297cd17b59bc2:
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only log + running ReplayState fold (heads+seen+roster). open() seeds via replay. append(kind)=append_buffered+sync (announce-after-durable K9). append_buffered=frame+write_all+fold, NO sync (group-commit primitive). sync()=single fdatasync (I2 group-commit point). roll() fdatasyncs old segment BEFORE switching, stamps leading Checkpoint(Snapshot) on new seg (GAP1) — snapshot() now carries heads+seen+roster so a compacted log still rebuilds the thread roster. checkpoint()/heads()/seen()/snapshot() public.'
@@ -2118,6 +2122,10 @@
   path: crates/cp-mod-firecrawl/src/tools.rs
   description: 'Firecrawl tool dispatch with flame!("firecrawl_scrape"), flame!("firecrawl_search"), flame!("firecrawl_map"). Crawl delegated to crate::crawl. All async via spawn_async_tool. DynPanel creation with DYN_PANEL_ID_PLACEHOLDER. Shared helpers: get_client, err_result, PANEL_WARNING, timeout/poll constants.'
   last_edited_ms: 1780563343162
+3c51be7f4f0da8db:
+  path: web/src/lib/support/auth.tsx
+  description: 'Auth context (Phase 9): AuthProvider probes GET /api/auth/status, validates stored token via /me, exposes user/token/authEnabled/bootstrapped/loading + login/register/logout. Listens for cp-auth-expired events from the fetch wrapper. useAuth() hook.'
+  last_edited_ms: 1782241219983
 3c94f28a9a474a41:
   path: crates/cp-mod-prompt/src/skill_panel.rs
   description: Skill panel UI. Markdown-rendered content via cp_render::markdown::to_blocks(). Title/refresh/context methods. refresh() syncs cached_content for all loaded skills.
@@ -4146,6 +4154,10 @@
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
   last_edited_ms: 1780648757744
+75485f15695aa11c:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend struct holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names(T328)/avatars(T338)/auth(T341)/session_ttl. route_rest dispatches all /api routes incl auth/ACL + auth/status. handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with Phase 7 ticket-based ACL.
+  last_edited_ms: 1782241220745
 75641655c2d1f1ad:
   path: .uploads/sourced_pdf/sourced_pdf/cli.py
   description: 'CLI entry point (spdf). Subcommands: init, extract, validate, render, seal. Wires model.py + extract.py + render.py.'
@@ -5502,6 +5514,10 @@
   path: ui/src/components/finder/FinderChrome.tsx
   description: 'Finder chrome. FinderTabs (strip + new/close; each tab shows a kind icon colored by kindMeta accent). FinderToolbar — context-aware: folder tab shows back/fwd, breadcrumb, icon-size slider [grid], 4-mode segmented control, search, New Folder/Upload/Download, path-bar+QuickLook toggles; FILE tab (fileActive) hides those and shows file actions Get Info(Maximize2)/Download/Share. FinderSidebar (Favorites/Locations/Tags/Recents + confined-realm note). FinderPathBar (bottom).'
   last_edited_ms: 1781531576316
+9a3dfb3caa3e5c62:
+  path: web/src/lib/api/index.ts
+  description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent (T328) + avatar CRUD (uploadAvatar/deleteAvatar/avatarUrl, T338). Re-exports ./auth + ./finder + shares ./client request/BASE/envelope. The @/lib/api single import surface.'
+  last_edited_ms: 1782241220387
 9a61a00374a7164b:
   path: src/state/mod.rs
   description: 'Re-exports from cp_base (Entry, Kind, State, Message, etc.) + local submodules: cache, persistence'
@@ -5778,6 +5794,10 @@ a128756ff810873f:
   path: crates/cp-console-server/src/protocol.rs
   description: JSON-line protocol types. Request (cmd/key/command/cwd/input/log_path). Response (ok/error/pid/status/exit_code/sessions). interpret_escapes() for \n/\t/\xHH.
   last_edited_ms: 0
+a13895d03474acd9:
+  path: web/src/lib/api/auth.ts
+  description: 'Auth REST endpoints (Phase 9, split from index.ts): fetchAuthStatus, AuthUser type, authLogin, authRegister, authLogout, authMe. Re-exported via index.ts.'
+  last_edited_ms: 1782241219835
 a139f333bbc083aa:
   path: .github/checks/clippy_lints_list.md
   description: Expected clippy lints list for comparison
@@ -6538,6 +6558,10 @@ b64ae8c801052751:
   path: web/src/components/finder/views/FinderViews.tsx
   description: Finder grid/list/gallery views + Head/Hero. Re-exports FOLDER_DRAG_MIME/MOVE_MIME/TagDots/ViewHandlers from ./shared and ColumnsView from ./ColumnsView (keeps importers stable after the <500 split).
   last_edited_ms: 1782040975646
+b6592ec258fe7a3f:
+  path: web/src/components/auth/LoginPage.tsx
+  description: 'Login / bootstrap-register page (Phase 9). Two modes: !bootstrapped → ''Create Admin Account'' register form; bootstrapped → ''Sign In'' login form. Centered card with CP branding, error display, loading state.'
+  last_edited_ms: 1782241220084
 b689ff54e81da946:
   path: src/infra/tools.rs
   description: Re-exports cp_base::tools types. execute_tool() dispatches via module system. execute_reload_tui() sets reload flag + writes config.json.
@@ -7242,6 +7266,10 @@ c9d4aeb2bf4dfbe4:
   path: crates/cp-mod-search/src/types.rs
   description: Core types + config constants. SearchPersistData (with recompute tracking + task_signals ring buffer), SearchState (with SharedRadarCache Arc<Mutex>), Chunk, SearchResult (no tags), SearchMetrics, SearchOverlayInfo (with meili_cpu_pct/meili_memory_bytes), MeiliLiveStats (with meili_cpu_ticks for delta), IndexerCmd, WatcherHandle. logs_index_settings without tags.
   last_edited_ms: 0
+ca0b939ed668eb9c:
+  path: crates/cp-orchestrator/src/transport/auth/mod.rs
+  description: 'Auth middleware + REST handlers. authenticate(): centralized Bearer gate (no-op when disabled, NFR-09). Public routes: login (FR-05), register (bootstrap FR-03 or admin-creates), auth/status (returns enabled+bootstrapped). Protected: logout, me, list/create/delete users. Re-exports ACL functions from acl.rs.'
+  last_edited_ms: 1782241220627
 ca1fb9a37e39702d:
   path: logs/bridge.log
   description: Bridge activity log
@@ -8022,6 +8050,10 @@ e29a9e64463f2ec8:
   path: .github/checks/allowed-lint-exceptions.yaml
   description: 'Curated list of allowed #[expect]/#[allow] annotations (10 entries). Every occurrence in the codebase MUST have an entry here. Fields: path, match, reason, strategy.'
   last_edited_ms: 0
+e2be8400e7878d25:
+  path: web/src/App.tsx
+  description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) (delta-folded per-agent meta) ?? fleetAgent (polled-fleet identity fallback) so the always-visible TopBar + StatusBar ride the push plane for phase/cost/tokens instead of the 15s fleet poll (T297). view/agent persisted to localStorage; effectiveView falls back to fleet when no live agent. T334: finderRevealPath state + showInFinder handler switch to finder view and pass revealPath to Finder for file reveal. T341: wrapped with AuthProvider + AuthGuard.'
+  last_edited_ms: 1782241220490
 e2c3fd78a28d00cd:
   path: ui/src/components/panels/cockpit/RadarPanel.tsx
   description: 'Cockpit Context Radar maquette: anchor signals + recency-weighted scored results with score meter, importance dot, timestamp. Reads mock radarAnchors/radarResults.'
@@ -8706,6 +8738,10 @@ f78eb200d7195117:
   path: crates/cp-orchestrator/src/transport/rest.rs
   description: 'REST handlers: HttpReply, Envelope<T>{rev,data}, CommandReceipt. fleet/agent/mint_ticket/body/command/threads. command() now eprintln!s the underlying send error (io context) on the 502 path for bridge-reachability diagnostics. resolve_entry reads <id>.json. Locks Backend briefly, never across blocking agent I/O. reshape_thread/reshape_message for maquette ThreadDetail. 8 tests.'
   last_edited_ms: 1781782855052
+f7a2abdde1db23d2:
+  path: web/src/lib/api/client.ts
+  description: 'Shared REST client primitives: BASE url (VITE_API_URL ?? localhost:7878), request<T>() typed fetch wrapper with Bearer injection + 401 interceptor (cp-auth-expired event), getToken/setToken localStorage helpers, buildCommandEnvelope.'
+  last_edited_ms: 1782241220292
 f7cad271b2929884:
   path: web/e2e/t288_probe.spec.ts
   description: 'T288 regression: real-browser Quick Look drawer probe (3 tests). Boots live web (localStorage cp-agent/cp-view=finder), opens QL via file-row click + Space, asserts the right-side shadcn Sheet is a STANDARD MODAL drawer: dimming backdrop present ([data-slot=sheet-overlay]) — the signature trait missing while non-modal; flush-right + ~540px wide (x+w==viewport, no overflow); Esc closes; clicking the backdrop closes. Screenshots /tmp/t288-drawer.png. Run: CP_WEB_URL=http://localhost:5174 npx playwright test t288_probe --reporter=line.'
