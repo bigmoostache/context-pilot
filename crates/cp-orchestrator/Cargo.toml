@@ -33,6 +33,14 @@ portable-pty = "0.9"
 # renders any spreadsheet as a table.
 calamine = "0.26"
 csv = "1"
+# Password hashing — Argon2id (OWASP current recommendation). Pure-Rust,
+# memory-hard. Default features bring password-hash PHC format + OsRng for salt
+# generation. Used by services/auth for credential storage (FR-01, NFR-01).
+argon2 = "0.5"
+# Auth database — users, sessions, agent ACL stored in a dedicated SQLite file
+# at orchestrator level (~/.context-pilot/orchestrator/auth.db). Bundled build
+# (same as cp-mod-entities) so no system libsqlite dependency.
+rusqlite = { workspace = true }
 
 [dev-dependencies]
 # Test-only: the integration suite boots a real agent and drives its command

@@ -79,6 +79,16 @@ pub struct Config {
     /// `<cwd>/target/release/tui`). Seeds the supervisor's spawn allow-list
     /// (R2-15), so only this binary can ever be launched.
     pub agent_binary: PathBuf,
+    /// Whether authentication is enabled (`CP_AUTH_ENABLED`, default `false`).
+    /// When disabled, all requests pass through unauthenticated (FR-18/FR-19).
+    pub auth_enabled: bool,
+    /// Session lifetime (`CP_SESSION_TTL_SECS`, default 30 days). Absolute
+    /// expiry — a session cannot be refreshed past its original TTL (Q6).
+    pub session_ttl: Duration,
+    /// Path to the auth SQLite database (`CP_AUTH_DB`, default
+    /// `~/.context-pilot/orchestrator/auth.db`). Orchestrator-level storage,
+    /// not inside agents_dir (D7/Q9).
+    pub auth_db_path: PathBuf,
 }
 
 impl Config {
@@ -121,7 +131,25 @@ impl Config {
             None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("target/release/tui"),
         };
 
-        Ok(Self { port, agents_dir, budget_usd, scan_interval, agents_root, agent_binary })
+        // Auth configuration (§8 of design doc).
+        let auth_enabled = std::env::var("CP_AUTH_ENABLED")
+            .ok()
+            .map(|s| s.eq_ignore_ascii_case("true") || s == "1")
+            .unwrap_or(false);
+
+        let session_ttl = std::env::var("CP_SESSION_TTL_SECS")
+            .ok()
+            .and_then(|s| s.parse::<u64>().ok())
+            .map_or(Duration::from_secs(2_592_000), Duration::from_secs); // 30 days
+
+        let auth_db_path = match std::env::var_os("CP_AUTH_DB") {
+            Some(p) => PathBuf::from(p),
+            None => std::env::var_os("HOME")
+                .map(|h| PathBuf::from(h).join(".context-pilot/orchestrator/auth.db"))
+                .unwrap_or_else(|| PathBuf::from("auth.db")),
+        };
+
+        Ok(Self { port, agents_dir, budget_usd, scan_interval, agents_root, agent_binary, auth_enabled, session_ttl, auth_db_path })
     }
 }
 
@@ -140,11 +168,31 @@ impl Runtime {
     /// Build a runtime from the given configuration.
     #[must_use]
     pub fn new(config: Config) -> Self {
+        // Open the auth database when auth is enabled (FR-18). On failure,
+        // log the error and proceed without auth — the middleware will
+        // refuse all requests (fail-closed, NFR-06).
+        let auth_store = if config.auth_enabled {
+            match crate::services::auth::store::AuthStore::open(&config.auth_db_path) {
+                Ok(store) => {
+                    eprintln!("auth enabled — database at {}", config.auth_db_path.display());
+                    Some(store)
+                }
+                Err(err) => {
+                    eprintln!("WARN: auth enabled but database open failed: {err} — running WITHOUT auth");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         let backend = Arc::new(Mutex::new(Backend::new(
             config.agents_dir.clone(),
             config.budget_usd,
             config.agents_root.clone(),
             config.agent_binary.clone(),
+            auth_store,
+            config.session_ttl,
         )));
         Self { backend, config }
     }

@@ -216,6 +216,8 @@ mod tests {
             100.0,
             PathBuf::from("/tmp/cp-test-realms"),
             PathBuf::from("/tmp/cp-test-bin"),
+            None,
+            Duration::from_secs(3600),
         )));
         let sub = backend.lock().expect("lock").hub_mut().subscribe(agent_id);
         (backend, sub)

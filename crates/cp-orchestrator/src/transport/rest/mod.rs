@@ -91,17 +91,29 @@ pub struct CommandReceipt {
 ///
 /// The envelope `rev` is the maximum `rev` across all agents, so a client can
 /// open one fleet-wide stream from that point.
-pub fn fleet(state: &Mutex<Backend>) -> HttpReply {
+///
+/// When auth is enabled, the result is filtered to only agents the caller has
+/// access to (FR-12). System admins see everything (FR-09).
+pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::types::User>) -> HttpReply {
+    let Ok(backend) = state.lock() else {
+        return HttpReply::error(500, "backend lock poisoned");
+    };
+    let all_ids: Vec<String> = backend.view.agent_ids().map(str::to_owned).collect();
+    drop(backend);
+
+    // Filter by ACL when auth is enabled (FR-12).
+    let visible_ids = crate::transport::auth::filter_fleet(state, &all_ids, auth_user);
+
     let Ok(backend) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
     };
     let mut agents = serde_json::Map::new();
     let mut max_rev = 0u64;
-    for id in backend.view.agent_ids() {
+    for id in &visible_ids {
         if let Some(view) = backend.view.get(id) {
             max_rev = max_rev.max(view.rev);
             if let Ok(value) = serde_json::to_value(view) {
-                let _prev = agents.insert(id.to_owned(), value);
+                let _prev = agents.insert(id.clone(), value);
             }
         }
     }
@@ -400,7 +412,7 @@ mod tests {
     #[test]
     fn fleet_lists_agents_with_max_rev() {
         let state = backend_with_agent();
-        let reply = fleet(&state);
+        let reply = fleet(&state, None);
         assert_eq!(reply.status, 200);
         assert!(reply.body.contains("\"rev\":7"), "envelope carries the max rev");
         assert!(reply.body.contains("a1"), "agent id present");

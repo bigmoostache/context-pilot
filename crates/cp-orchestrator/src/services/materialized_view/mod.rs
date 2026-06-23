@@ -255,5 +255,5 @@ impl MaterializedView {
 }
 
 #[cfg(test)]
-#[path = "materialized_view_tests.rs"]
+#[path = "tests.rs"]
 mod tests;

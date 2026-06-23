@@ -100,6 +100,8 @@ fn serve_backend(agents_dir: &Path) -> (String, Arc<Mutex<Backend>>) {
         5.0,
         std::path::PathBuf::from("/tmp/cp-test-realms"),
         std::path::PathBuf::from("/tmp/cp-test-bin"),
+        None,
+        Duration::from_secs(3600),
     )));
     let server = Server::http("127.0.0.1:0").expect("bind ephemeral");
     let addr = server.server_addr().to_string();

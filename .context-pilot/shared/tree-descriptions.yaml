@@ -202,6 +202,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/metrics.rs
   description: '§19 observability metrics endpoints. agent_metrics (GET /api/agent/{id}/metrics) + fleet_metrics (GET /api/metrics) expose ALREADY-COLLECTED backend state: breaker {tripped,spendUsd,budgetUsd} (durable R2-8 latch made VISIBLE — T121), stream {subscribers,droppedFrames,degraded} (StreamHub.agent_stream_health), rev {view,oplogHead,lag} (view rev vs fresh cp_oplog::replay rev_head — lag~0 under live tail), phase+lifecycle. Lock held once for in-mem reads; oplog_head_rev read from disk OUTSIDE lock. Latency/fsync histograms deliberately NOT synthesised (need new instrumentation) — no fabricated metrics. Proven live: agent f3a993c0 rev lag 0-1, 1 subscriber, 0 dropped.'
   last_edited_ms: 1781817532335
+0525e236bfc89f82:
+  path: docs/design-auth.md
+  description: 'Auth design doc v2. 12 sections: context, 21 FR (+ 4 deferred), 21 NFR, 7 arch decisions (server-side sessions, Bearer, Argon2id, auth disabled by default), data model (users/sessions/agent_acl), API surface, integration points, config, migration strategy, deps, 12 resolved questions, scope estimate.'
+  last_edited_ms: 1782237717722
 053accd087ac049f:
   path: crates/cp-mod-firecrawl/src/crawl.rs
   description: Recursive site crawling — firecrawl_crawl tool. flame!("firecrawl_crawl"). Start async crawl job + poll loop (5s interval, 60 max polls, 310s timeout). write_crawl_output writes combined markdown to disk. No panel created.
@@ -974,6 +978,10 @@
   path: crates/cp-base/Cargo.toml
   description: 'Base crate deps: crossterm, serde, serde_json, serde_yaml, sha2, chrono, log, parking_lot, typemap_rev, globset, syntect, tree-sitter, reqwest, tokio. No ratatui.'
   last_edited_ms: 1780497937359
+1d2859667e9c87a2:
+  path: .gitignore
+  description: Git ignore rules
+  last_edited_ms: 0
 1d56292f7cfa0f19:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
@@ -1002,6 +1010,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation, threads. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread actions extracted to threads.rs.'
   last_edited_ms: 1781447353339
+1dff7b8ca6a2e0d1:
+  path: crates/cp-orchestrator/src/services/auth/tests.rs
+  description: '21 auth unit tests: schema, hashing, token/UUID gen, user CRUD (create/get/list/delete cascade), session lifecycle (create/validate/revoke/expired sweep), ACL (grant/revoke/update role/list/auto-grant creator/cascade delete/overwrite).'
+  last_edited_ms: 1782237717284
 1e0df9189377d812:
   path: yamls/tools/tree.yaml
   description: Tree tools YAML. tree_filter (gitignore patterns), tree_toggle (open/close/toggle folders), tree_describe (path+description+delete+close_panel params).
@@ -1030,6 +1042,10 @@
   path: yamls/tools/search.yaml
   description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
   last_edited_ms: 0
+1e76164b64173e61:
+  path: web/src/components/finder/preview/FinderPreview.tsx
+  description: 'Quick Look preview shell + Body() kind router. Routes node → mock previews (mockPreviews), live fetchers (livePreviews), or shared leaf renderers (previewParts). T329: header slimmed h-12→h-8, Meta footer removed, body p-4→p-0 (edge-to-edge). Download button wired to downloadFile(agentId, node.path). The decorative Share button was removed app-wide (no utility).'
+  last_edited_ms: 1782233053710
 1e829d9769d0f9f9:
   path: web/src/components/finder/FinderViews.tsx
   description: 'Finder view modes: grid/list/columns(Miller)/gallery. itemCount() uses backend count (folder child counts) with children fallback. Folder rows draggable (startFolderDrag, FOLDER_DRAG_MIME export) to pin via sidebar. ColumnsView REWRITTEN for live data: one MillerColumn per ancestor in the path chain, each useFs-fetches its own children; deepest column reuses currentNodes; nextPath highlight; folder-click navigates (truncates chain). relOf strips agent-folder prefix for useFs.'
@@ -1354,6 +1370,10 @@
   path: crates/cp-base/src/ui/render_cache.rs
   description: 'MessageCache/InputCache/FullCache: IR block caching with content hashes for conversation panel perf'
   last_edited_ms: 0
+276d30267df1b2e0:
+  path: crates/cp-orchestrator/tests/end_to_end.rs
+  description: Phase 30 end-to-end loopback capstone (3 tests). Backend::new takes 6 args (auth=None, session_ttl). Real agent stack ↔ real backend transport over real sockets. Command journals on agent and re-emerges as SSE delta. Spilled body hydrates over REST. 25 SSE connect/disconnect soak cycles.
+  last_edited_ms: 1782236757271
 276f9adfd69e1d62:
   path: ui/src/lib/types.ts
   description: 'Maquette domain types. Agent (incl task summary), FsNode (legacy). Finder: FinderKind (+audio/video/binary), FinderTag, FinderNode (+tags/created/starred/media/preview payloads), Sheet/SlidePreview, FinderViewMode=grid|list|columns|gallery, FinderSortKey. ThreadDetail+agentId. ViewMode=fleet|cockpit|threads|finder.'
@@ -2026,6 +2046,10 @@
   path: crates/cp-orchestrator/src/lib.rs
   description: Backend library root. Declares channel+inspect+registry+runtime+services+supervisor+transport. Re-exports registry::{channel,liveness} at crate root.
   last_edited_ms: 1781682988833
+3add8399a899c274:
+  path: crates/cp-orchestrator/src/services/auth/types.rs
+  description: 'Auth domain types: AuthError, UserRole (admin/user, serde lowercase), AgentRole (agent-admin/agent-user, serde kebab-case), User (pub, serde skip password_hash), Session, AclEntry. row_to_user helper.'
+  last_edited_ms: 1782237717396
 3aed888cf400f15c:
   path: crates/cp-mod-console/src/lib.rs
   description: 'Console module. 5 tools. Dynamic console panels. init: find/create Unix socket server. save/load: session reconnection + orphan cleanup. Leaks stdin on save to prevent EOF. Tool visualizer for colored output.'
@@ -2434,6 +2458,10 @@
   path: crates/cp-mod-prompt/src/skill_panel.rs
   description: Skill panel UI. Markdown-rendered content via cp_render::markdown::to_blocks(). Title/refresh/context methods. refresh() syncs cached_content for all loaded skills.
   last_edited_ms: 0
+44f57cebe2777598:
+  path: crates/cp-orchestrator/src/services/auth/mod.rs
+  description: Auth service module hub — declares types, store, helpers submodules. Orchestrator-level user/session/ACL backed by dedicated SQLite (design doc §5).
+  last_edited_ms: 1782237717090
 4508cc30971b8586:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Frontend transport — REST + SSE over tiny_http (blocking, thread-per-conn). Backend shared state (view/breaker/hub/tickets/inspect/agents_dir/dirty_agents + supervisor:AgentSupervisor + agents_root + agent_binary) under one Mutex; Backend::new 4-arg, seeds supervisor allow-list from agent_binary. route_rest dispatches all /api routes incl POST /api/fleet/create→rest::create_agent + POST /api/agent/{id}/restart. handle_download serves file/folder-zip via inspect::finder::fs_download. cors_headers() sets Access-Control-Expose-Headers: Content-Disposition so cross-origin fetch() can read the server filename (else a folder zip saves as ''src'' not ''src.zip'' — T265). handle_stream redeems ticket then stream::run_stream.'
@@ -3634,6 +3662,10 @@
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
   last_edited_ms: 0
+69a536b6c1c51f05:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: 'Thread tool handlers. execute_send/execute_read/build_panel_content. Archived threads filtered out of LLM-facing context. X887: build_panel_content also filters .filter(|m| !m.auto) (visible Vec, skip/total on non-auto count) so the AI never re-reads its own auto tool-activity traces. T343: tool result only lists threads with unack > 0 (concise). MAX caps on content/file-path/questions/panel-messages.'
+  last_edited_ms: 1782223854663
 69a7d215ea113b10:
   path: crates/cp-mod-callback/src/storage.rs
   description: YAML-backed persistent storage for callback definitions. Keyed by name (BTreeMap alphabetical). upsert/remove/populate/migrate functions. Script file read/write helpers (strip_script_header, write_script_file). cleanup_old_hash_keys migration.
@@ -4282,6 +4314,10 @@
   path: web/src/lib/api/finder.ts
   description: 'Finder filesystem REST endpoints (list/descriptions/preview/sheet/write/upload/mkdir/rename/move/trash/raw/download/conversation). T298: added uploadUnique (POST /fs/upload-unique — auto-creates dir, never overwrites, returns stored path/name/size) powering the chat composer attachment flow.'
   last_edited_ms: 1782045499865
+7aacf20c52beff82:
+  path: web/package.json
+  description: 'Frontend deps: @base-ui/react 1.5, @tanstack/react-query 5.101, react 19.2, react-markdown 10 + remark-gfm, highlight.js 11.11, tailwindcss 4.3, shadcn 4.11, vite 8, playwright. scripts: dev/build(tsc -b && vite build)/lint/preview.'
+  last_edited_ms: 1782233053738
 7ae3e41b45283bfc:
   path: docs/design-orchestration-backend.md
   description: 'Orchestration backend design doc, v7 (branch maquette). Code-grounded three-tier durability: ① bridge-owned append-only fsync''d OPLOG (authoritative: command effects, rev, seen-marks, phase, lifecycle, cost + immutable content-addressed body store) + ② existing UNTOUCHED PersistenceWriter mutable coalesced state cache (messages/{uid}.yaml, NOT load-bearing for durability) + ③ lossy UDS stream. v7''s two answers + one subtraction (round-2 senior review, thread T36): (1) I13 BODY-BEFORE-REFERENCE BARRIER — a content hash may appear in a durable oplog entry only after its body is durable; small bodies inlined in the same fsync''d append, large bodies spill tmp→fdatasync→rename before the referencing entry commits; crash-in-gap = orphan body (GC''d), never dangling ref; ''accepted=durable'' now covers contents not just envelope (V12). (2) I2 EXECUTION MODEL — the main loop NEVER fsyncs; each oplog append (incl phase transitions) is a lock-free enqueue; a dedicated oplog thread group-commits (one fdatasync/group, off-loop); command-accept ack (I11) runs on intake/oplog thread (V11). (3) SECURITY SUBTRACTION — v1 command authn = perms (0700/0600) + presence-checked bearer cap_token; HMAC/nonce/rotation deferred to remote-transport seam (G7); new I9b keeps the frontend WS single-use ticket re-justified as browser confused-deputy/DNS-rebind defense. I1-I13, K1-K9, R2-*, V1-V12 fault matrix. Companions: architecture-adversarial-analysis.md, roadmap.md. NOT implemented (discussion).'
@@ -5086,6 +5122,10 @@
   path: crates/cp-mod-github/src/lib.rs
   description: 'GitHub module. 1 tool: gh_execute. Dynamic github_result panels. Depends on git module. classify sub-module for read-only vs mutating. Tool visualizer for PR/issue status coloring.'
   last_edited_ms: 0
+915974f8055cf505:
+  path: crates/cp-orchestrator/tests/transport_http.rs
+  description: Phase 30 transport surface tests over a real tiny_http server (4 tests). Backend::new takes 6 args (auth=None, session_ttl). ticket_mint_and_command_status_codes asserts tripped breaker blocks cost-incurring send_message (503) but NOT control-plane stop (≠503). REST rev-envelope+404, SSE ticket gate single-use, Last-Event-ID replay.
+  last_edited_ms: 1782236757153
 917b5bfdbe23cb9a:
   path: crates/cp-mod-firecrawl/src/panel.rs
   description: Firecrawl result panel. Same pattern as brave panel — static content in metadata, cache restore post-reload, pagination. FIRECRAWL_PANEL_TYPE constant.
@@ -5190,6 +5230,10 @@
   path: crates/cp-wire/src/types/body.rs
   description: 'Content-addressed Body: hash + data bytes. Inline-small in oplog or spill to oplog/bodies/{hash}.'
   last_edited_ms: 0
+9404b0d5a0a9768b:
+  path: crates/cp-orchestrator/src/services/materialized_view/mod.rs
+  description: In-memory materialized view of the fleet — per-agent projection folded from oplog entries. AgentView (rev/heads/roster/phase/lifecycle/cost/context/focused_thread), MaterializedView (HashMap<agent_id, AgentView>). Checkpoint = authoritative reset (bounded restart). CostSnapshot + ContextSnapshot value types.
+  last_edited_ms: 1782236026979
 94068c195165fda1:
   path: crates/cp-mod-entities/src/sql/mod.rs
   description: 'Declares sql submodules: errors + parse.'
@@ -5714,6 +5758,10 @@ a2ab866cbb42292d:
   path: crates/cp-wire/src/types/mod.rs
   description: 'ContentHash (SHA-256, Copy, hex serde: of/to_hex/from_hex). Phase enum (Idle/Streaming/Tooling), LifecycleState (Starting/Running/Stopping/Stopped), ThreadTurn (MyTurn/TheirTurn/Unknown, snake_case) — wire mirror of threads ThreadStatus, defined here (not imported from cp-mod-threads) to keep layering one-directional. Declares+re-exports ack/body/command/oplog/registry/snapshot/stream. SHA-256 vector + round-trip + ThreadTurn tolerant-decode tests.'
   last_edited_ms: 1781787267822
+a2f4321209185df2:
+  path: crates/cp-orchestrator/src/transport/auth/mod.rs
+  description: 'Auth middleware + REST handlers. authenticate(): centralized Bearer gate (no-op when disabled, NFR-09). Public routes: login (FR-05), register (bootstrap FR-03 or admin-creates). Protected: logout, me, list/create/delete users. Re-exports ACL functions from acl.rs.'
+  last_edited_ms: 1782237717528
 a332cc8b0055c3a8:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. Declares sql/ + panels/ submodules with re-exports. Depends on search.
@@ -5806,6 +5854,10 @@ a59dfabe22aa1787:
   path: crates/cp-mod-console/src/tools.rs
   description: 'Console tools: create, send_keys, wait (blocking watcher), watch (async watcher), easy_bash (blocking exit watcher). Each instrumented with flame!(). CONSOLE_WAIT_BLOCKING_SENTINEL const. Git/gh/typst guardrails.'
   last_edited_ms: 0
+a5a78837f6116e83:
+  path: crates/cp-orchestrator/src/registry/tee_reader.rs
+  description: 'TeeReader — backend consumer of an agent''s live stream plane (§7). One reader per agent (spawned on Appeared, stopped on Disappeared): connects <folder>/tee.sock, reads len+CRC framed StreamFrames, republishes each into the shared StreamHub for SSE fan-out. Lossy by design (tier-③): corrupt frame resyncs the buffer, absent socket retries, EOF (agent restart) reconnects. 3 tests (republish, absent-then-connect, corrupt-resync). Backend::new takes 6 args (auth added).'
+  last_edited_ms: 1782236757049
 a5d638c214989600:
   path: src/app/run/mod.rs
   description: 'Sub-module declarations. 6 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), tools (execution pipeline), watchers (file/GH).'
@@ -7442,6 +7494,10 @@ d3f82c22b0de608b:
   path: crates/cp-wire/tests/framing_integrity.rs
   description: 'Phase 21 (X788): exhaustive framing integrity suite — the V1 torn-tail property at byte granularity. Truncate at EVERY offset (clean-prefix-only, never fabricated frame), single-byte-flip at every offset (detected-or-byte-identical, never silent-different), payload-region corruption always CrcMismatch, trailing garbage doesn''t corrupt first decode, sub-header buffers Incomplete-never-panic, oversized len-prefix rejected-not-allocated, zero-length payload round-trips. Lib-only deps acked via use crc32c/serde/serde_json/sha2 as _ (per-target unused-crate-dependencies). 8 tests.'
   last_edited_ms: 1781648169011
+d401265b69a38f4a:
+  path: .gitignore
+  description: Git ignore rules. Includes *.sourced_pdf, .uploads, bridge runtime artifacts, harbor outputs, mitmproxy captures, .DS_Store, docs/slides build artifacts.
+  last_edited_ms: 1782234757988
 d431d404079fef54:
   path: web/src/components/finder/preview/FinderPreview.tsx
   description: 'Quick Look preview shell + Body() kind router. Routes node → mock previews (mockPreviews), live fetchers (livePreviews), or shared leaf renderers (previewParts). T329: header slimmed h-12→h-8, Meta footer removed, body p-4→p-0 (edge-to-edge). Download button wired to downloadFile(agentId, node.path). The decorative Share button was removed app-wide (no utility).'
@@ -7938,6 +7994,10 @@ e511d6e0566f4f01:
   path: src/modules/overview/tools/close_context.rs
   description: 'Close_panel execution. Partial close: valid panels close, undescribed/stale-description file panels are skipped (not blocked). Module on_close_context hooks. Output: closed/skipped/not_found/errors sections.'
   last_edited_ms: 0
+e519594d12a6f10f:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 e566b5261513df72:
   path: web/sse_listen.py
   description: SSE listener debug script — prints all deltas with wall-clock timestamps for TUI→frontend latency correlation.
@@ -8218,6 +8278,10 @@ ee094a5116fc9a90:
   path: ui/src/components/finder/FinderPreview.tsx
   description: 'QuickLook preview pane. Kind-aware bespoke renders: code (line numbers + keyword tint), spreadsheet (A/B/C grid), slide deck (hero + thumbnails), PDF (paper mock), image (gradient), markdown/json/text, folder summary. Metadata footer (kind/size/modified/path).'
   last_edited_ms: 1781516507787
+ee2f4e90cf841383:
+  path: crates/cp-orchestrator/src/services/auth/helpers.rs
+  description: 'Auth subsystem low-level helpers: fill_random (/dev/urandom with nanosecond fallback), to_hex, random_hex, format_uuid (UUID v4 string with dashes), now_ms (epoch millis). Shared by store.rs.'
+  last_edited_ms: 1782237717834
 ee41eb6a94d78b30:
   path: crates/cp-wire/Cargo.toml
   description: Wire protocol crate manifest. No deps yet (I/O-free). Workspace lints inherited.
@@ -8474,6 +8538,10 @@ f5d4d3f43b22032b:
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet mission-control shell. Owns fleetPage + collapsed state. Renders FleetSidebar + clickable collapse RAIL (shadcn Sidebar pattern): 20px hit zone at x=var(--sidebar-w) (x=6 collapsed), a 3px→5px highlight band that brightens to interactive on hover, plus a pill-grip handle (3 dots) that fades in on hover — click toggles collapse (no buttons). Active page: agents/prompts/usage/settings(ConfigPanel inline).'
   last_edited_ms: 1781534744518
+f5d937e367ae4cb0:
+  path: crates/cp-orchestrator/src/services/auth/store.rs
+  description: AuthStore — SQLite-backed auth CRUD. Schema init (users/sessions/agent_acl), Argon2id hashing, token/UUID generation. User CRUD, session lifecycle (create/validate/revoke with lazy sweep), ACL operations (grant/revoke/update_role/check/list_agent_users/list_user_agents/is_agent_admin/auto_grant_creator). 21 tests in sibling tests.rs.
+  last_edited_ms: 1782237717185
 f5e668bba86256b3:
   path: crates/cp-mod-spine/src/lib.rs
   description: Spine module. Auto-continuation, notifications (10 processed kept), guard rails, coucou timers. Manages WatcherRegistry. on_user_message resets counters. on_stream_stop prevents re-launch.
@@ -8634,6 +8702,10 @@ fa80f56f6a550a79:
   path: crates/cp-mod-callback/src/tools_upsert.rs
   description: Callback upsert tool. Create/update/delete callback definitions. Script file management. Diff-based script editing (old_string/new_string). YAML sync on every mutation.
   last_edited_ms: 1780649207729
+faa9337e657e1df2:
+  path: crates/cp-orchestrator/src/transport/auth/acl.rs
+  description: 'Per-agent ACL enforcement (Phase 6): extract_agent_id, authorize_agent (admin bypass FR-09), can_manage_acl (system-admin OR agent-admin). CRUD: acl_list/grant/update_role/revoke. filter_fleet for per-user fleet visibility (FR-12).'
+  last_edited_ms: 1782237717620
 facee2199f39362a:
   path: Cargo.toml
   description: Workspace root. 22 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.

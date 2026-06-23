@@ -31,6 +31,7 @@
 //! | `GET`  | `/api/stream?agent={id}&ticket={t}` | SSE (this module) |
 
 pub mod inspect;
+mod auth;
 mod query;
 pub mod rest;
 pub mod sse;
@@ -42,12 +43,14 @@ use std::io::Read as _;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 use tiny_http::{Header, Method, Request, Response, Server};
 
 use cp_wire::types::registry::Entry;
 
 use crate::inspect::StateReader;
+use crate::services::auth::store::AuthStore;
 use crate::services::{CostBreaker, MaterializedView, NameOverrides, RetiredStore, StreamHub, AvatarStore};
 use crate::supervisor::AgentSupervisor;
 use query::QueryParams;
@@ -105,6 +108,11 @@ pub struct Backend {
     pub(crate) names: NameOverrides,
     /// Agent profile picture store (T338).
     pub(crate) avatars: AvatarStore,
+    /// Auth store — `None` when auth is disabled (`CP_AUTH_ENABLED=false`).
+    /// Contains the SQLite-backed user/session/ACL database (design doc §5).
+    pub(crate) auth: Option<AuthStore>,
+    /// Session lifetime for newly created sessions (FR-15).
+    pub(crate) session_ttl: Duration,
 }
 
 impl Backend {
@@ -115,7 +123,14 @@ impl Backend {
     /// seeds the supervisor's allow-list (R2-15), so it is the only binary that
     /// can ever be launched.
     #[must_use]
-    pub fn new(agents_dir: PathBuf, budget_usd: f64, agents_root: PathBuf, agent_binary: PathBuf) -> Self {
+    pub fn new(
+        agents_dir: PathBuf,
+        budget_usd: f64,
+        agents_root: PathBuf,
+        agent_binary: PathBuf,
+        auth: Option<AuthStore>,
+        session_ttl: Duration,
+    ) -> Self {
         Self {
             view: MaterializedView::new(),
             breaker: CostBreaker::new(budget_usd),
@@ -130,6 +145,8 @@ impl Backend {
             supervisor: AgentSupervisor::new(&[agent_binary.clone()]),
             agents_root,
             agent_binary,
+            auth,
+            session_ttl,
         }
     }
 
@@ -182,6 +199,8 @@ impl Backend {
             supervisor: AgentSupervisor::new(&[]),
             agents_root: PathBuf::from("/tmp/cp-test-realms"),
             agent_binary: PathBuf::from("/tmp/cp-test-bin"),
+            auth: None,
+            session_ttl: Duration::from_secs(3600),
         }
     }
 }
@@ -231,6 +250,37 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
         return;
     }
 
+    // Extract the Bearer token for auth-aware handlers.
+    let auth_token = request.headers().iter().find_map(|h| {
+        if h.field.equiv("Authorization") {
+            h.value.as_str().strip_prefix("Bearer ").map(str::to_owned)
+        } else {
+            None
+        }
+    });
+
+    // Centralised auth gate (Phase 5, NFR-16). Validates the session for
+    // protected routes when auth is enabled; no-op when disabled (NFR-09).
+    let auth_user = match auth::authenticate(&state, &segments, auth_token.as_deref()) {
+        Ok(user) => user,
+        Err(reply) => {
+            respond_json(request, &reply);
+            return;
+        }
+    };
+
+    // Per-agent ACL check (Phase 6). When auth is enabled and the route
+    // targets a specific agent, verify the caller has access. System admins
+    // bypass (FR-09); regular users need an ACL entry (FR-10).
+    if let Some(agent_id) = auth::extract_agent_id(&segments) {
+        if let Some(ref user) = auth_user {
+            if !auth::authorize_agent(state, agent_id, user) {
+                respond_json(request, &rest::HttpReply::error(403, "no access to this agent"));
+                return;
+            }
+        }
+    }
+
     // SSE stream is the one route that takes ownership of the request to stream.
     if method == Method::Get && segments.as_slice() == ["api", "stream"] {
         handle_stream(request, state, &query);
@@ -255,9 +305,13 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
 
     // Read the body up-front (only POST routes consume it). The mutable borrow
     // ends here, before the request is moved into the response.
-    let body_bytes = if method == Method::Post { read_body(&mut request) } else { Vec::new() };
+    let body_bytes = if method == Method::Post || method == Method::Patch {
+        read_body(&mut request)
+    } else {
+        Vec::new()
+    };
 
-    let reply = route_rest(&method, &segments, state, body_bytes.as_slice(), &query);
+    let reply = route_rest(&method, &segments, state, body_bytes.as_slice(), &query, auth_token.as_deref(), auth_user.as_ref());
     respond_json(request, &reply);
 }
 
@@ -275,10 +329,31 @@ fn route_rest(
     state: &Arc<Mutex<Backend>>,
     body_bytes: &[u8],
     query: &str,
+    auth_token: Option<&str>,
+    auth_user: Option<&crate::services::auth::types::User>,
 ) -> rest::HttpReply {
     match (method, segments) {
         (Method::Get, ["api", "health"]) => rest::HttpReply { status: 200, body: "{\"status\":\"ok\"}".to_owned() },
-        (Method::Get, ["api", "fleet"]) => rest::fleet(state),
+
+        // ── Auth routes (§6 of design doc) ──────────────────────────
+        (Method::Post, ["api", "auth", "login"]) => auth::login(state, body_bytes),
+        (Method::Post, ["api", "auth", "register"]) => auth::register(state, body_bytes, auth_user),
+        (Method::Post, ["api", "auth", "logout"]) => auth::logout(state, auth_token),
+        (Method::Get, ["api", "auth", "me"]) => auth::me(auth_user),
+        (Method::Get, ["api", "auth", "users"]) => auth::list_users(state, auth_user),
+        (Method::Post, ["api", "auth", "users"]) => auth::create_user(state, body_bytes, auth_user),
+        (Method::Delete, ["api", "auth", "users", user_id]) => auth::delete_user(state, user_id, auth_user),
+
+        // ── ACL routes (Phase 6, §6 of design doc) ─────────────────
+        (Method::Get, ["api", "agent", id, "acl"]) => auth::acl_list(state, id, auth_user),
+        (Method::Post, ["api", "agent", id, "acl"]) => auth::acl_grant(state, id, body_bytes, auth_user),
+        (Method::Patch, ["api", "agent", id, "acl", user_id]) => {
+            auth::acl_update_role(state, id, user_id, body_bytes, auth_user)
+        }
+        (Method::Delete, ["api", "agent", id, "acl", user_id]) => auth::acl_revoke(state, id, user_id, auth_user),
+
+        // ── Fleet + agent routes ────────────────────────────────────
+        (Method::Get, ["api", "fleet"]) => rest::fleet(state, auth_user),
         (Method::Get, ["api", "fleet", "meta"]) => inspect::meta::fleet_meta(state),
         (Method::Get, ["api", "fleet", "retired"]) => inspect::meta::fleet_retired(state),
         (Method::Get, ["api", "metrics"]) => inspect::metrics::fleet_metrics(state),
@@ -444,8 +519,8 @@ fn load_entry(state: &Arc<Mutex<Backend>>, id: &str) -> Option<Entry> {
 fn cors_headers() -> Vec<Header> {
     [
         Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]),
-        Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET, POST, DELETE, OPTIONS"[..]),
-        Header::from_bytes(&b"Access-Control-Allow-Headers"[..], &b"Content-Type, Last-Event-ID"[..]),
+        Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET, POST, PATCH, DELETE, OPTIONS"[..]),
+        Header::from_bytes(&b"Access-Control-Allow-Headers"[..], &b"Content-Type, Last-Event-ID, Authorization"[..]),
         // Expose Content-Disposition so cross-origin fetch() (web dev server →
         // backend) can read the server-chosen download filename. Without this,
         // the header is hidden by CORS and the client falls back to the URL's

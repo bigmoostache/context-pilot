@@ -14,6 +14,7 @@
 //!   (R2-17).
 
 pub mod avatars;
+pub mod auth;
 pub mod cost_breaker;
 pub mod materialized_view;
 pub mod names;
