@@ -124,10 +124,16 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     let thread_name = target_thread.name.clone();
     let thread_status = target_thread.status;
 
-    // Per-thread unacknowledged counts (archived threads are LLM-invisible, T9)
+    // Per-thread unacknowledged counts — only threads with new messages (T343).
+    // Archived threads are LLM-invisible (T9). Threads with 0 unacknowledged
+    // are omitted to keep the tool result concise (the full list lives in the
+    // Threads panel).
     let mut thread_summaries: Vec<String> = Vec::new();
     for t in ts.threads.iter().filter(|t| !t.archived) {
         let unack = t.messages.iter().filter(|m| !m.acknowledged).count();
+        if unack == 0 {
+            continue;
+        }
         let marker = if t.id == tid { " ← focused" } else { "" };
         thread_summaries.push(format!(
             "  {id} \"{name}\" [{status}]: {unack} new{marker}",
@@ -220,11 +226,15 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
             },
         );
 
-    let mut result_lines = vec![
-        format!("Thread {tid} \"{thread_name}\" [{thread_status}] — now focused.\n"),
-        "Unacknowledged messages:".to_string(),
-    ];
-    result_lines.extend(thread_summaries);
+    let mut result_lines = vec![format!(
+        "Thread {tid} \"{thread_name}\" [{thread_status}] — now focused.\n"
+    )];
+    if thread_summaries.is_empty() {
+        result_lines.push("No unacknowledged messages across active threads.".to_string());
+    } else {
+        result_lines.push("Unacknowledged messages:".to_string());
+        result_lines.extend(thread_summaries);
+    }
 
     if new_count > 0 {
         result_lines.push(format!("\n{new_count} new message(s) acknowledged in {tid}:"));
