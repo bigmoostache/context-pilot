@@ -38,6 +38,7 @@ use std::time::{Duration, SystemTime};
 use crate::channel::Tailer;
 use crate::registry::tee_reader::TeeReader;
 use crate::registry::{AgentRegistry, Event};
+use crate::services::auth::backup::BackupScheduler;
 use crate::transport::Backend;
 
 /// Default HTTP listen port.
@@ -206,8 +207,13 @@ impl Runtime {
         let backend = Arc::clone(&self.backend);
         let agents_dir = self.config.agents_dir.clone();
         let interval = self.config.scan_interval;
+        let backup_scheduler = if self.config.auth_enabled {
+            Some(BackupScheduler::new(self.config.auth_db_path.clone()))
+        } else {
+            None
+        };
 
-        thread::spawn(move || driver_loop(backend, agents_dir, interval))
+        thread::spawn(move || driver_loop(backend, agents_dir, interval, backup_scheduler))
     }
 
     /// Block the calling thread on the HTTP transport, serving requests until
@@ -232,7 +238,7 @@ impl Runtime {
 /// runs every [`TAIL_INTERVAL`] in a tight inner loop, so a freshly-appended
 /// entry becomes visible in the view within ~100 ms rather than the (much
 /// longer) registry-scan cadence.
-fn driver_loop(backend: Arc<Mutex<Backend>>, agents_dir: PathBuf, interval: Duration) {
+fn driver_loop(backend: Arc<Mutex<Backend>>, agents_dir: PathBuf, interval: Duration, mut backup_scheduler: Option<BackupScheduler>) {
     let mut registry = AgentRegistry::new(agents_dir);
     let mut tailers: HashMap<String, Tailer> = HashMap::new();
     // Per-agent live stream-plane readers (connect each agent's tee.sock and
@@ -277,6 +283,15 @@ fn driver_loop(backend: Arc<Mutex<Backend>>, agents_dir: PathBuf, interval: Dura
 
         // 3. Reap stale *.tmp registry writes (crash-orphans).
         let _reaped = registry.reap_tmp(crate::registry::DEFAULT_TMP_GRACE);
+
+        // 4. Auth database backup (NFR-19/20) — rolling + daily snapshots.
+        if let Some(ref mut scheduler) = backup_scheduler {
+            if let Ok(b) = backend.lock() {
+                if let Some(ref auth) = b.auth {
+                    scheduler.tick(auth);
+                }
+            }
+        }
 
         // ── Fast cadence: fold every agent's oplog tail into the view ──
         //

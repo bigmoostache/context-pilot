@@ -2682,6 +2682,10 @@
   path: crates/cp-mod-spine/src/guard_rail.rs
   description: 'Guard rail implementations: MaxOutputTokens, MaxCost (stream/burst-based), MaxDuration, MaxMessages, MaxAutoRetries. GuardRailStopLogic trait. all_guard_rails() static list.'
   last_edited_ms: 0
+4bf2f56dee380b83:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 4c1d66b03646b860:
   path: src/app/mod.rs
   description: 'App struct — top-level container. Fields: State, TypewriterBuffer, pending tools/done, cache_tx, file/gh watchers, timers, PersistenceWriter, reverie_streams. Sub-modules: actions, context, events, panels, prompt_builder, reverie, run.'
@@ -8390,6 +8394,10 @@ eec3c55348ffe829:
   path: web/src/components/finder/InfoBadge.tsx
   description: Finder per-node info badge (T289) — a small ⓘ shown on a file/folder that has a tree description; hover (delay 120) or click opens a Popover with the description. PopoverTrigger render={<span/>} so it nests inside a row/cell <button> without button-in-button; stopPropagation on click/dblclick/pointerdown so the badge never selects/opens/drags the node. max-w-340px.
   last_edited_ms: 1781908494786
+eecc4deca2426af9:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 ef0729aa90244126:
   path: crates/cp-oplog/tests/crash_replay.rs
   description: 'Phase 9 (X776) MILESTONE M0 crash-replay harness. Unix-only (#![cfg(unix)]). Self-re-exec pattern: env-gated #[test] crash_child_entrypoint re-runs the test binary as a child via current_exe(); parent/child handshake through a fdatasync''d marker file (libtest stdout is noisy). V1 v1_real_sigkill_leaves_a_clean_replayable_oplog: child spams durable MessageCreated appends, parent kill()s (real SIGKILL), fresh process replay() never errors + every announced-durable rev survives + torn tail truncated (announce-after-durable K9 across real crash). V2 v2_journalled_command_is_exactly_once_after_deadman_reexec: child journals CommandEffect then dies, fresh process recovers seen-set token, duplicate SeenMark delivery folds to no-op (exactly-once across process boundary). V12 v12_barrier_is_pending_the_body_store: asserts body_gc_eligible rule, explicit placeholder until body store lands Phase 14. 4 tests green.'

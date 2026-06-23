@@ -36,7 +36,7 @@ tree-sitter-java = "0.23"
 tree-sitter-c = "0.24"
 tree-sitter-cpp = "0.23"
 openssl = { version = "0.10", features = ["vendored"] }
-rusqlite = { version = "0.33", features = ["bundled", "column_decltype"] }
+rusqlite = { version = "0.33", features = ["bundled", "column_decltype", "backup"] }
 
 [workspace.lints.rust]
 aarch64_softfloat_neon = "forbid"

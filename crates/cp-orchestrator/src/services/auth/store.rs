@@ -24,7 +24,7 @@ use super::types::{AclEntry, AgentRole, AuthError, User, UserRole, row_to_user};
 #[derive(Debug)]
 pub struct AuthStore {
     /// The SQLite connection — WAL mode, foreign keys enforced.
-    conn: Connection,
+    pub(crate) conn: Connection,
 }
 
 impl AuthStore {
