@@ -24,10 +24,14 @@
 
 // Linked into this integration-test target but not named directly; acknowledge
 // them for the per-target `unused-crate-dependencies` lint.
+use argon2 as _;
+use calamine as _;
 use cp_mod_bridge as _;
+use csv as _;
 use nix as _;
 use notify as _;
 use portable_pty as _;
+use rusqlite as _;
 use serde as _;
 use serde_json as _;
 use serde_yaml as _;

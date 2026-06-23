@@ -400,7 +400,7 @@ fn route_rest(
         (Method::Post, ["api", "agent", id, "avatar"]) => rest::upload_avatar(state, id, body_bytes),
         (Method::Delete, ["api", "agent", id, "avatar"]) => rest::delete_avatar(state, id),
         (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes),
-        (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state),
+        (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state, auth_user),
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },
     }
 }
@@ -417,11 +417,41 @@ fn handle_stream(request: Request, state: &Arc<Mutex<Backend>>, query: &str) {
         return;
     };
 
-    // Single-use ticket redemption.
-    let redeemed = state.lock().map(|mut b| b.tickets.redeem(token)).unwrap_or(false);
-    if !redeemed {
+    // Single-use ticket redemption (Phase 7: now returns user identity).
+    let ticket = state.lock().ok().and_then(|mut b| b.tickets.redeem(token));
+    let Some(ticket) = ticket else {
         respond_json(request, &rest::HttpReply { status: 401, body: "{\"error\":\"invalid ticket\"}".to_owned() });
         return;
+    };
+
+    // Phase 7: per-agent ACL check on SSE connect. The ticket carries the
+    // minting user's identity; when auth is enabled we verify they have access
+    // to the requested agent before committing to a stream. System admins
+    // bypass (FR-09). When auth is disabled (user_id is None) the check is
+    // skipped entirely (NFR-09).
+    if let Some(ref user_id) = ticket.user_id {
+        let authorized = state.lock().ok().map_or(false, |b| {
+            match b.auth.as_ref() {
+                Some(auth) => match auth.get_user_by_id(user_id) {
+                    Ok(Some(user)) => {
+                        use crate::services::auth::types::UserRole;
+                        if user.role == UserRole::Admin {
+                            true
+                        } else {
+                            auth.check_access(agent_id, user_id)
+                                .map(|role| role.is_some())
+                                .unwrap_or(false)
+                        }
+                    }
+                    _ => false,
+                },
+                None => true, // auth not enabled — pass through
+            }
+        });
+        if !authorized {
+            respond_json(request, &rest::HttpReply { status: 403, body: "{\"error\":\"no access to this agent\"}".to_owned() });
+            return;
+        }
     }
 
     // Resolve the agent's oplog directory before committing to a stream.

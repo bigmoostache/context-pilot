@@ -132,11 +132,14 @@ pub fn agent(state: &Mutex<Backend>, id: &str) -> HttpReply {
 }
 
 /// `POST /api/ticket` — mint a single-use SSE upgrade ticket.
-pub fn mint_ticket(state: &Mutex<Backend>) -> HttpReply {
+///
+/// When auth is enabled the caller's user id is embedded in the ticket so the
+/// SSE redeem path can enforce per-agent ACL (Phase 7, design doc §7).
+pub fn mint_ticket(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::types::User>) -> HttpReply {
     let Ok(mut backend) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
     };
-    let token = backend.tickets.mint();
+    let token = backend.tickets.mint(auth_user.map(|u| u.id.as_str()));
     HttpReply { status: 200, body: format!("{{\"ticket\":{}}}", json_string(&token)) }
 }
 
@@ -435,7 +438,7 @@ mod tests {
     #[test]
     fn mint_ticket_returns_token() {
         let state = backend_with_agent();
-        let reply = mint_ticket(&state);
+        let reply = mint_ticket(&state, None);
         assert_eq!(reply.status, 200);
         assert!(reply.body.contains("\"ticket\""));
     }

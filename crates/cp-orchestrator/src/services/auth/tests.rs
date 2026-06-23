@@ -158,17 +158,13 @@ fn session_lifecycle() {
     let token = store
         .create_session(&user.id, Some("test-agent"), Duration::from_secs(3600))
         .unwrap_or_else(|err| panic!("session failed: {err}"));
-    // Valid session.
-    let (session, found_user) = store
+    // Valid session returns the correct user.
+    let found_user = store
         .validate_session(&token)
         .unwrap_or_else(|err| panic!("validate failed: {err}"))
         .unwrap_or_else(|| panic!("session should be valid"));
-    assert_eq!(session.user_id, user.id);
+    assert_eq!(found_user.id, user.id);
     assert_eq!(found_user.email, "sess@x.com");
-    assert_eq!(session.user_agent.as_deref(), Some("test-agent"));
-    assert_eq!(session.token.len(), 64, "token is 256-bit hex");
-    assert!(session.created_at > 0, "created_at is set");
-    assert!(session.expires_at > session.created_at, "expires_at is after created_at");
     // Revoke.
     assert!(store.revoke_session(&token).unwrap_or(false));
     assert!(store.validate_session(&token).unwrap_or(None).is_none());
@@ -192,22 +188,6 @@ fn expired_session_swept() {
         .validate_session(&token)
         .unwrap_or_else(|err| panic!("validate failed: {err}"));
     assert!(valid.is_none(), "expired session should be swept");
-}
-
-#[test]
-fn revoke_all_sessions() {
-    let store = AuthStore::open(Path::new(":memory:")).unwrap_or_else(|err| {
-        panic!("open failed: {err}");
-    });
-    let user = store
-        .create_user("rev@x.com", "Rev", "pass1234", UserRole::User)
-        .unwrap_or_else(|err| panic!("create failed: {err}"));
-    let _t1 = store.create_session(&user.id, None, Duration::from_secs(3600));
-    let _t2 = store.create_session(&user.id, None, Duration::from_secs(3600));
-    let revoked = store
-        .revoke_all_sessions(&user.id)
-        .unwrap_or_else(|err| panic!("revoke_all failed: {err}"));
-    assert_eq!(revoked, 2);
 }
 
 #[test]
@@ -307,20 +287,6 @@ fn list_agent_users_and_user_agents() {
         .list_user_agents(&alice.id)
         .unwrap_or_else(|err| panic!("list failed: {err}"));
     assert_eq!(agents, vec!["agent-1", "agent-2"]);
-}
-
-#[test]
-fn auto_grant_creator() {
-    let store = AuthStore::open(Path::new(":memory:")).unwrap_or_else(|err| {
-        panic!("open failed: {err}");
-    });
-    let user = store
-        .create_user("creator@x.com", "Creator", "pass1234", UserRole::User)
-        .unwrap_or_else(|err| panic!("create failed: {err}"));
-    store
-        .auto_grant_creator("new-agent", &user.id)
-        .unwrap_or_else(|err| panic!("auto_grant failed: {err}"));
-    assert!(store.is_agent_admin("new-agent", &user.id).unwrap_or(false));
 }
 
 #[test]

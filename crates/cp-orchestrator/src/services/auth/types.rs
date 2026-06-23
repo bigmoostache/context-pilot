@@ -100,21 +100,6 @@ pub struct User {
     pub(crate) updated_at: u64,
 }
 
-/// An active session (row from `sessions`).
-#[derive(Clone, Debug)]
-pub(crate) struct Session {
-    /// Opaque session token (256-bit hex).
-    pub(crate) token: String,
-    /// Owning user's UUID.
-    pub(crate) user_id: String,
-    /// Creation timestamp (ms since Unix epoch).
-    pub(crate) created_at: u64,
-    /// Expiry timestamp (ms since Unix epoch).
-    pub(crate) expires_at: u64,
-    /// Optional user-agent string recorded at login.
-    pub(crate) user_agent: Option<String>,
-}
-
 /// An access-control list entry — one user's permission on one agent,
 /// joined with their profile info for display.
 #[derive(Clone, Debug, serde::Serialize)]

@@ -226,6 +226,10 @@
   path: docs/talk/slides/0-2.html
   description: 'Slide: Where it is now — single screenshot'
   last_edited_ms: 1781078806873
+05a69fad17c226a4:
+  path: crates/cp-orchestrator/src/runtime.rs
+  description: 'Runtime — env Config (port/agents_dir/budget/scan_interval + X896 agents_root/agent_binary + T341 auth_enabled/session_ttl/auth_db_path) + driver loop with TWO decoupled cadences: slow scan_interval (2s) registry scan + config.json mtime backstop + tmp reap; fast TAIL_INTERVAL (100ms) tail_all_agents. Runtime::new opens AuthStore when auth enabled, builds Backend with 6 args.'
+  last_edited_ms: 1782238272535
 05ab5ce0d2a53561:
   path: crates/cp-mod-files/src/tools/edit_file.rs
   description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
@@ -934,6 +938,10 @@
   path: src/modules/conversation/refresh.rs
   description: estimate_message_tokens() (content+tools), refresh_conversation_context() updates Conversation context element
   last_edited_ms: 0
+1b6413d87ec2c2ce:
+  path: crates/cp-orchestrator/src/services/mod.rs
+  description: 'services/ hub: declares + re-exports MaterializedView/AgentView/CostSnapshot, CostBreaker/Verdict, StreamHub/Subscriber, NameOverrides (T328 agent rename), RetiredRecord/RetiredStore (T271 retire), AvatarStore (T338 agent profile pics), and auth module.'
+  last_edited_ms: 1782238272432
 1ba41727f640ea63:
   path: crates/cp-orchestrator/src/supervisor/mod.rs
   description: 'Phase 17 (X784): AgentSupervisor process manager. new(allow_list) canonicalizes paths eagerly. validate_binary(req) realpath-canonicalizes vs allow_list (R2-15: defeats symlink/.. escape). spawn(id,bin,folder,args)->pid: validate, Command process_group(0) (NOT setsid — unsafe forbidden; safe + detaches from terminal signals), stdio null, refuse dup id. stop(id): SIGTERM→poll pid_alive up to STOP_GRACE(5s)/POLL_INTERVAL(100ms)→SIGKILL→reap child.wait(). restart=snapshot cfg+stop+spawn. adopt(id,&Entry,bin): record live agent no-spawn (child:None, D7 re-adopt on backend restart). check_liveness()->Vec<Event>: spawned via try_wait reap (Exited{status}), adopted via pid_alive signal-0 (Vanished), dead removed. Helpers: send_signal (swallow ESRCH), pub(crate) pid_alive (Ok|EPERM=alive). Error/Event enums fully field-doc''d; Debug derived. Error has NO std::error::Error (dodges missing_trait_methods).'
@@ -2666,6 +2674,10 @@
   path: src/modules/conversation/panel.rs
   description: 'Conversation panel. Multi-level cache (full → per-message → input). Input hash includes selection anchor. Keybindings: Shift+Arrow selection, Ctrl/Alt+Arrow word jump, Ctrl+A select all, Ctrl+Backspace delete word. Enter send-on-empty-line logic.'
   last_edited_ms: 0
+4c9a9d538c55c354:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() breaker check GATED on SendMessage only. rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket, resolve_entry. create_agent + retire in siblings.
+  last_edited_ms: 1782238272790
 4ca9437ec189df40:
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket. Re-exports ./finder + shares ./client request/BASE/envelope. The @/lib/api single import surface.'
@@ -5206,6 +5218,10 @@
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): Recovered{rev_head,heads,seen}. fold_entry: Checkpoint=authoritative clone_from, MessageCreated=set_thread_head, CommandEffect|SeenMark=seen.mark, others (incl 4 thread-roster variants) no-op — agent replay rebuilds only heads+seen; roster is recovered by tier-② load + folded by the BACKEND MaterializedView, not agent replay. Fast-path reads only newest checkpoint-bearing segment. 10 tests.'
   last_edited_ms: 0
+9324f3d14575af7d:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend struct holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names(T328)/avatars(T338)/auth(T341)/session_ttl. route_rest dispatches all /api routes incl auth/ACL. handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE.
+  last_edited_ms: 1782238272648
 93437a4d1fcca158:
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() extracts paths from Edit/Write tools. match_callbacks() with flame!("cb_match") matches files against glob patterns. validate_skip_names() warns on non-existent callbacks. partition_callbacks() splits blocking/async.
@@ -5522,6 +5538,10 @@
   path: crates/cp-mod-spine/src/tools.rs
   description: Spine tool handlers. execute_mark_processed (batch notification marking), execute_configure (guard rail limits with zero-value rejection, counter reset).
   last_edited_ms: 0
+9d2bd6784ae2e971:
+  path: crates/cp-orchestrator/Cargo.toml
+  description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal) + serde + serde_json + serde_yaml + tiny_http (0.12) + notify (oplog inotify) + portable-pty 0.9 (X896 safe pty) + calamine 0.26 & csv 1 (T282 Finder spreadsheet→table preview) + argon2 0.5 (Argon2id hashing) + rusqlite (auth SQLite). dev: cp-mod-bridge + tempfile. lib+bin. Workspace lints.'
+  last_edited_ms: 1782238272279
 9d44f622741914cf:
   path: crates/cp-mod-chat/src/bootstrap.rs
   description: First-run bootstrap for Tuwunel. Creates directory layout, generates homeserver.toml, bridge registrations. project_post_start() registers bot account + default room.

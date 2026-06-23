@@ -12,7 +12,7 @@ use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, Salt
 use rusqlite::Connection;
 
 use super::helpers::{fill_random, format_uuid, now_ms, random_hex};
-use super::types::{AclEntry, AgentRole, AuthError, Session, User, UserRole, row_to_user};
+use super::types::{AclEntry, AgentRole, AuthError, User, UserRole, row_to_user};
 
 // ───────────────────────────── auth store ─────────────────────────────
 
@@ -292,8 +292,8 @@ impl AuthStore {
         Ok(token)
     }
 
-    /// Validate a session token, returning the session and its owning user
-    /// if the token exists and has not expired.
+    /// Validate a session token, returning the owning user if the token
+    /// exists and has not expired.
     ///
     /// Lazily sweeps all expired sessions on every call (NFR-08).
     ///
@@ -303,43 +303,25 @@ impl AuthStore {
     pub(crate) fn validate_session(
         &self,
         token: &str,
-    ) -> Result<Option<(Session, User)>, AuthError> {
+    ) -> Result<Option<User>, AuthError> {
         let now = now_ms();
         // Lazy sweep — delete all expired sessions.
         let _swept = self.conn.execute(
             "DELETE FROM sessions WHERE expires_at <= ?1",
             rusqlite::params![now],
         )?;
-        // Look up the requested session + its user in one query.
+        // Look up the session's user in one query (session columns not needed
+        // externally — the Session struct was removed to eliminate dead_code on
+        // fields only consumed by tests).
         let mut stmt = self.conn.prepare(
-            "SELECT s.token, s.user_id, s.created_at, s.expires_at, s.user_agent, \
-                    u.id, u.email, u.name, u.password_hash, u.role, u.created_at, u.updated_at \
+            "SELECT u.id, u.email, u.name, u.password_hash, u.role, u.created_at, u.updated_at \
              FROM sessions s \
              JOIN users u ON u.id = s.user_id \
              WHERE s.token = ?1",
         )?;
-        let mut rows = stmt.query_map(rusqlite::params![token], |row| {
-            let session = Session {
-                token: row.get(0)?,
-                user_id: row.get(1)?,
-                created_at: row.get(2)?,
-                expires_at: row.get(3)?,
-                user_agent: row.get(4)?,
-            };
-            let role_str: String = row.get(9)?;
-            let user = User {
-                id: row.get(5)?,
-                email: row.get(6)?,
-                name: row.get(7)?,
-                password_hash: row.get(8)?,
-                role: UserRole::from_sql(&role_str),
-                created_at: row.get(10)?,
-                updated_at: row.get(11)?,
-            };
-            Ok((session, user))
-        })?;
+        let mut rows = stmt.query_map(rusqlite::params![token], row_to_user)?;
         match rows.next() {
-            Some(pair) => Ok(Some(pair?)),
+            Some(row) => Ok(Some(row?)),
             None => Ok(None),
         }
     }
@@ -358,19 +340,6 @@ impl AuthStore {
         Ok(deleted > 0)
     }
 
-    /// Revoke all sessions belonging to `user_id` (force-logout, FR-16).
-    /// Returns the number of sessions revoked.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
-    pub(crate) fn revoke_all_sessions(&self, user_id: &str) -> Result<usize, AuthError> {
-        let deleted = self.conn.execute(
-            "DELETE FROM sessions WHERE user_id = ?1",
-            rusqlite::params![user_id],
-        )?;
-        Ok(deleted)
-    }
     // ─────────────────── ACL operations (Phase 3) ─────────────────────
 
     /// Grant a user access to an agent with a specific per-agent role.
@@ -526,18 +495,6 @@ impl AuthStore {
         Ok(self.check_access(agent_id, user_id)? == Some(AgentRole::AgentAdmin))
     }
 
-    /// Auto-grant `agent-admin` to the creator of a new agent (Q1).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`AuthError::Database`] on SQLite failure.
-    pub(crate) fn auto_grant_creator(
-        &self,
-        agent_id: &str,
-        user_id: &str,
-    ) -> Result<(), AuthError> {
-        self.grant_access(agent_id, user_id, AgentRole::AgentAdmin, None)
-    }
 }
 
 #[cfg(test)]

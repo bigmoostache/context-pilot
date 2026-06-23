@@ -73,7 +73,7 @@ pub(crate) fn authenticate(
         .ok_or_else(|| HttpReply::error(501, "auth not enabled"))?;
 
     match auth.validate_session(token) {
-        Ok(Some((_session, user))) => Ok(Some(user)),
+        Ok(Some(user)) => Ok(Some(user)),
         Ok(None) => Err(HttpReply::error(401, "invalid or expired session")),
         Err(_) => Err(HttpReply::error(500, "session validation error")),
     }
