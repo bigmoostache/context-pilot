@@ -5,6 +5,7 @@ import { AgentSwitcher } from "./widgets/AgentSwitcher"
 import { ConfigModal } from "./config/ConfigModal"
 import { ProfileModal } from "./widgets/ProfileModal"
 import { UserMenu } from "./widgets/UserMenu"
+import { UsersDialog } from "@/components/auth/UsersDialog"
 import { AgentModal } from "@/components/agents/AgentModal"
 import { Tip } from "@/components/ui/tip"
 import { useDevMode } from "@/lib/support/devMode"
@@ -30,6 +31,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
   const [configOpen, setConfigOpen] = useState(false)
   const [manageOpen, setManageOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [usersOpen, setUsersOpen] = useState(false)
 
   return (
     <>
@@ -147,11 +149,13 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
         <UserMenu
           onOpenSettings={() => setConfigOpen(true)}
           onOpenProfile={() => setProfileOpen(true)}
+          onOpenUsers={() => setUsersOpen(true)}
         />
       </div>
 
       <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
+      {usersOpen && <UsersDialog onClose={() => setUsersOpen(false)} />}
     </header>
 
     {/* Rendered as a SIBLING of the .vibrancy header (never a descendant) so its

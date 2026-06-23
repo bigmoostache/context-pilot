@@ -335,6 +335,37 @@ pub(crate) fn create_user(
     }
 }
 
+/// `POST /api/auth/users/{id}/logout` — admin-only: revoke all sessions
+/// for a user (force re-authentication without deleting the account).
+pub(crate) fn force_logout_user(
+    state: &Mutex<Backend>,
+    user_id: &str,
+    auth_user: Option<&User>,
+) -> HttpReply {
+    let Some(caller) = auth_user else {
+        return HttpReply::error(501, "auth not enabled");
+    };
+    if caller.role != UserRole::Admin {
+        return HttpReply::error(403, "admin access required");
+    }
+    let Ok(b) = state.lock() else {
+        return HttpReply::error(500, "backend lock poisoned");
+    };
+    let Some(auth) = b.auth.as_ref() else {
+        return HttpReply::error(501, "auth not enabled");
+    };
+    match auth.conn.execute(
+        "DELETE FROM sessions WHERE user_id = ?1",
+        rusqlite::params![user_id],
+    ) {
+        Ok(deleted) => HttpReply::ok(&serde_json::json!({
+            "ok": true,
+            "revoked_sessions": deleted,
+        })),
+        Err(_) => HttpReply::error(500, "database error"),
+    }
+}
+
 /// `DELETE /api/auth/users/{id}` — admin-only: delete a user (FR-17).
 /// Cascades to their sessions and ACL entries.
 pub(crate) fn delete_user(

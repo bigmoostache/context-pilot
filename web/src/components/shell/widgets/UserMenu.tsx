@@ -1,4 +1,4 @@
-import { Building2, LogOut, Settings, User as UserIcon } from "lucide-react"
+import { Building2, LogOut, Settings, User as UserIcon, Users } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useAccount } from "@/lib/support/account"
+import { useAuth } from "@/lib/support/auth"
 import { accentVar } from "@/lib/support/panelMeta"
 import type { User } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -26,11 +27,15 @@ import { cn } from "@/lib/utils"
 export function UserMenu({
   onOpenSettings,
   onOpenProfile,
+  onOpenUsers,
 }: {
   onOpenSettings: () => void
   onOpenProfile: () => void
+  /** Open the admin user-management dialog (Phase 10). */
+  onOpenUsers?: () => void
 }) {
   const { user: u } = useAccount()
+  const { authEnabled, user: authUser, logout } = useAuth()
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -66,13 +71,22 @@ export function UserMenu({
             <Settings className="size-4 text-muted-foreground" />
             Settings
           </DropdownMenuItem>
+          {authEnabled && authUser?.role === "admin" && onOpenUsers && (
+            <DropdownMenuItem onClick={onOpenUsers} className="gap-2.5 py-1.5 text-[12.5px]">
+              <Users className="size-4 text-muted-foreground" />
+              Manage Users
+            </DropdownMenuItem>
+          )}
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
-          {/* decorative — design-only maquette */}
-          <DropdownMenuItem variant="destructive" className="gap-2.5 py-1.5 text-[12.5px]">
+          <DropdownMenuItem
+            variant="destructive"
+            className="gap-2.5 py-1.5 text-[12.5px]"
+            onClick={authEnabled ? () => logout() : undefined}
+          >
             <LogOut className="size-4" />
             Sign out
           </DropdownMenuItem>

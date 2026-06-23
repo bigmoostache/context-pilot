@@ -13,9 +13,11 @@ import {
 import type { Agent } from "@/lib/types"
 import { useCreateAgent, useRenameAgent, useRestartAgent, useRetireAgent, useUploadAvatar, sendCommand } from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
+import { useAuth } from "@/lib/support/auth"
 import { PROVIDERS, defaultModel, findModel, resolveSelection } from "@/lib/support/models"
 import { ModelPicker } from "./ModelPicker"
 import { SessionVitals } from "../shell/SessionVitals"
+import { AgentAclSection } from "../auth/AgentAclSection"
 import { cn } from "@/lib/utils"
 
 /**
@@ -88,6 +90,7 @@ export function AgentModal({
   const uploadAvatar = useUploadAvatar()
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const [avatarBust, setAvatarBust] = useState(0)
+  const { authEnabled } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const pending = createAgent.isPending || saving || restartAgent.isPending || retireAgent.isPending
@@ -312,13 +315,16 @@ export function AgentModal({
           </div>
           </div>
 
-          {/* right column — live session vitals + service health (manage only) */}
+          {/* right column — live session vitals + ACL (manage only) */}
           {isManage && agent && (
-            <div className="flex flex-col gap-2 border-l border-border/50 pl-7">
-              <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
-                Session vitals
-              </span>
-              <SessionVitals agentId={agent.id} />
+            <div className="flex flex-col gap-5 border-l border-border/50 pl-7">
+              <div className="flex flex-col gap-2">
+                <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+                  Session vitals
+                </span>
+                <SessionVitals agentId={agent.id} />
+              </div>
+              {authEnabled && <AgentAclSection agentId={agent.id} />}
             </div>
           )}
         </div>

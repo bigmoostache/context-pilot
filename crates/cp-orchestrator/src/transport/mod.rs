@@ -344,6 +344,7 @@ fn route_rest(
         (Method::Get, ["api", "auth", "users"]) => auth::list_users(state, auth_user),
         (Method::Post, ["api", "auth", "users"]) => auth::create_user(state, body_bytes, auth_user),
         (Method::Delete, ["api", "auth", "users", user_id]) => auth::delete_user(state, user_id, auth_user),
+        (Method::Post, ["api", "auth", "users", user_id, "logout"]) => auth::force_logout_user(state, user_id, auth_user),
 
         // ── ACL routes (Phase 6, §6 of design doc) ─────────────────
         (Method::Get, ["api", "agent", id, "acl"]) => auth::acl_list(state, id, auth_user),

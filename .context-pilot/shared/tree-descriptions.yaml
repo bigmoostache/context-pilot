@@ -578,6 +578,10 @@
   path: src/app/run/threads.rs
   description: 'Thread-related helpers for the main event loop. maybe_inject_auto_read (synthetic Read on auto-continuation), check_my_turn_threads (idle MY_TURN detection + spine notification), extract_thread_ids (parse thread IDs from notification content). Bridge command polling: poll_bridge_commands + accept_commands (non-blocking accept, 500ms read timeout) + apply_command dispatch (SendMessage/CreateThread/Archive/Restore/Stop/Interrupt via K7 path). Free functions taking &mut App.'
   last_edited_ms: 0
+108be586fdc3cf85:
+  path: crates/cp-orchestrator/src/transport/auth/mod.rs
+  description: 'Auth middleware + REST handlers. authenticate(): centralized Bearer gate (no-op when disabled, NFR-09). Public routes: login (FR-05), register (bootstrap FR-03 or admin-creates), auth/status (returns enabled+bootstrapped). Protected: logout, me, list/create/delete users, force-logout user (Phase 10: POST /users/{id}/logout revokes all sessions). Re-exports ACL functions from acl.rs.'
+  last_edited_ms: 1782241802477
 10929e2d7defe9c1:
   path: rustfmt.toml
   description: Rust formatting config
@@ -1334,6 +1338,10 @@
   path: src/llms/cache/cache_engine_tests.rs
   description: '17 integration tests: hash chain, frontier, beacon, prune, serialization, BP limits, optimizer spread, determinism'
   last_edited_ms: 0
+24e35f582a900925:
+  path: web/src/lib/api/auth.ts
+  description: 'Auth REST endpoints (Phase 9+10, split from index.ts): fetchAuthStatus, AuthUser type, authLogin, authRegister, authLogout, authMe + admin endpoints (fetchUsers, createUser, deleteUser, forceLogoutUser) + per-agent ACL (AclEntry type, fetchAgentAcl, grantAccess, updateAgentRole, revokeAccess). Re-exported via index.ts.'
+  last_edited_ms: 1782241802534
 2519f2f34ec0f95d:
   path: src/llms/claude_code_api_key/streaming.rs
   description: 'parse_sse_stream(): SSE event loop with verbose error diagnostics, log_sse_error() to .context-pilot/errors/. Types and parser are pub(crate) for reuse by claude_code_v2.'
@@ -3570,6 +3578,10 @@
   path: crates/cp-mod-bridge/src/heartbeat.rs
   description: 'Phase 11 (X778): Beacon — agent-side liveness heartbeat thread. start(&Path,pid,boot_id,cadence) opens/creates file, writes first beat (seq 0) synchronously, spawns thread. beat_loop(File,&Beat,&Receiver) recv_timeout(cadence): Timeout=write next beat in-place (seek0+write_all+sync_data, fixed-size never grows), signal/Disconnected=stop. Beat{pid,boot_id,cadence} bundles params (too_many_arguments). RAII Drop signals+joins. 4 tests.'
   last_edited_ms: 1781626203763
+66489a640f04b66c:
+  path: web/src/components/auth/UsersDialog.tsx
+  description: Admin user management dialog (Phase 10). Lists all users with RoleBadge, create user form (collapsible), delete user with confirmation, force-logout (revoke all sessions). TanStack Query hooks. Accessible from UserMenu when admin.
+  last_edited_ms: 1782241934872
 66534c47658ea1f7:
   path: .github/checks/lint-config.chain
   description: Cryptographic hash chain protecting 12 critical lint/config files
@@ -4550,6 +4562,10 @@
   path: .gitignore
   description: Git ignore rules
   last_edited_ms: 0
+80619247f5c1d0f5:
+  path: web/src/components/shell/widgets/UserMenu.tsx
+  description: 'Account avatar menu (T30). Gradient AvatarMark trigger + portaled dropdown: identity header div, Profile/Settings/Manage Users (Phase 10, admin-only)/Sign-out. Sign out wired to useAuth().logout when auth enabled. onOpenUsers callback triggers admin UsersDialog.'
+  last_edited_ms: 1782241802316
 808105a6e4c4e570:
   path: ui/src/components/ui/dialog.tsx
   description: shadcn-style Dialog on Base UI primitive. Portals to document.body (escapes ancestor backdrop-filter/transform containing blocks that trap position:fixed — the ConfigModal half-off-screen bug). Focus-trap, scroll-lock, Esc, backdrop fade + modal-pop spring. Exports Dialog/Trigger/Close/Content/Backdrop/Title/Description.
@@ -5226,6 +5242,10 @@
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (confined to agent realm). Uses useFs(agentId, cwd) for live directory listings. Tabs+history+nav+selection+drag-drop+statusbar. buildCrumbs/pathName helpers replace mock tree navigation. Four view modes (grid/list/columns/gallery), keyboard control, marquee selection.
   last_edited_ms: 1781695707834
+91efd4b38383dcf8:
+  path: web/src/components/agents/AgentModal.tsx
+  description: 'Agent create/manage dialog. Manage mode (T321): wider (w-960px) + 2-col grid — left = name + provider/model form, right = <SessionVitals> + <AgentAclSection> (Phase 10, auth-gated). Clickable avatar in header uploads profile pic (T338). Submit sends Configure + renameAgent (T328, concurrent Promise.all when name changed). Restart/Retire footer. Create mode: narrower single-col, useCreateAgent.'
+  last_edited_ms: 1782241802586
 91faf7c4fd9fd3ee:
   path: LICENSE
   description: MIT License
@@ -6034,6 +6054,10 @@ a8971e7eeba4f12c:
   path: crates/cp-orchestrator/src/transport/inspect/finder/mod.rs
   description: 'Finder module hub: re-exports fs_list/fs_preview/conversation (listing), fs_sheet (sheet — CSV/xlsx→table, T282), fs_upload/write/mkdir/rename/move/trash (mutate), fs_download + fs_raw (download — fs_raw is the inline image/PDF raw-serve, T281/T286). Submodules: listing/sheet/mutate/download/support.'
   last_edited_ms: 0
+a8acb209824955d3:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend struct holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names(T328)/avatars(T338)/auth(T341)/session_ttl. route_rest dispatches all /api routes incl auth/ACL + auth/status + force-logout. handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with Phase 7 ticket-based ACL.
+  last_edited_ms: 1782241802638
 a8b7b16abb019949:
   path: docs/shared.css
   description: 'Shared CSS for GitHub Pages site. Terminal-inspired editorial aesthetic: Space Mono + Instrument Sans, dark zinc palette (#09090b), amber accent. Tokens, reset, container, topbar, section headers, cards, badges, divider, footer, coming-soon, responsive.'
@@ -6910,6 +6934,10 @@ c04dce1a2fe7aa72:
   path: crates/cp-oplog/tests/service_group_commit.rs
   description: 'Phase 24 (X791): cp-oplog group-commit Service public-API suite (5 tests). Properties that emerge only under concurrency/pressure (GAP2/I2): durability_of_is_exhaustive_over_every_kind (all 8 OpEntryKind discriminants: PhaseTransition+CostAggregate=BestEffort, CommandEffect+SeenMark+MessageCreated+Lifecycle+Checkpoint{Snapshot::default}+Unknown=Durable); concurrent_durable_submitters_get_unique_contiguous_revs (Arc<Service>, 8 threads x 50 append_durable, default limit=no rolls=no checkpoint revs → revs exactly 0..400 contiguous no dup/gap proving single commit thread is sole serialised rev-assigner; replay rev_head=399 + seen.len=400; flush via drop(service) Arc→0→Drop joins+syncs); best_effort_floods_drop_without_ever_blocking (200k phase try_sends ≫ 1024 queue cap → <5s never-block + dropped>0 deterministic under any real fdatasync latency + submitted>0 + post-flood durable append survives replay); a_large_final_batch_is_flushed_on_shutdown (30 durable then shutdown drains+syncs, rev_head+T1 head durable); interleaved_durable_and_best_effort_preserves_every_durable_record (phase between each durable pair, all 20 tokens + final head survive, seen.len==tokens). Service is Send+Sync (SyncSender+JoinHandle). shutdown consumes self (no double-shutdown by type). NO append-with-capacity hook so deterministic queue-full saturation only via flood≫cap.'
   last_edited_ms: 1781648807776
+c053425f2b1e3c58:
+  path: web/src/components/shell/TopBar.tsx
+  description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit), agent-config gear, account UserMenu. Phase 10: UsersDialog state + onOpenUsers wired to UserMenu for admin user management.'
+  last_edited_ms: 1782241802690
 c05cfb30ec6be543:
   path: crates/cp-orchestrator/src/transport/inspect/finder/support.rs
   description: 'Finder shared helpers: agent_folder, confined_path (realm jail), count_visible_children, infer_kind, extract_param, percent_decode + unit tests.'
@@ -7706,6 +7734,10 @@ d626d8c95522186e:
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
   description: 'REST resource handlers. threads() prefers view.focused_thread_id (push-fed) over disk-FocusState. command() breaker check GATED on SendMessage only. rename_agent (T328): set/clear display-name override. fleet/agent/threads serve from view; body hydrate; mint_ticket; resolve_entry. create_agent + slugify in sibling create.rs.'
   last_edited_ms: 1782125106133
+d66af40c87661284:
+  path: web/src/components/auth/UsersDialog.tsx
+  description: Admin user management dialog (Phase 10). Lists all users with RoleBadge, create user form (collapsible), delete user with confirmation, force-logout (revoke all sessions). TanStack Query hooks. Accessible from UserMenu when admin.
+  last_edited_ms: 1782241802371
 d679e9d5f7e34ec1:
   path: web/src/components/shell/TopBar.tsx
   description: 'macOS title bar. Accepts agents prop for AgentSwitcher + activeAgent lookup. View switcher Threads·Finder·Cockpit. Right cluster: cost, Activity→StatsPopup(agentId), theme, agent config (AgentModal), UserMenu (Profile+Settings).'
@@ -8294,6 +8326,10 @@ ea6dcbc0fa8080cb:
   path: src/llms/oai_providers/deepseek.rs
   description: DeepSeek client. OpenAI-compatible with reasoning_content for deepseek-reasoner. DsMessage wrapper. Cache hit/miss tokens. DEEPSEEK_API_KEY auth.
   last_edited_ms: 0
+ea7f17025c7f4e2c:
+  path: web/src/components/auth/AgentAclSection.tsx
+  description: Per-agent ACL management section (Phase 10). Embedded in AgentModal manage mode. Lists access entries with AgentRoleBadge, grant form (select user + role), role toggle (agent-admin ↔ agent-user), revoke access. TanStack Query hooks.
+  last_edited_ms: 1782241802425
 eb0038bd66de3fa0:
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook, CLI subcommands (typst-compile/recompile-watched). use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.

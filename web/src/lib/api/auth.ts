@@ -62,3 +62,88 @@ export function authLogout(): Promise<{ ok: boolean }> {
 export function authMe(): Promise<AuthUser> {
   return request<AuthUser>("/api/auth/me")
 }
+
+// ── Admin: user management ───────────────────────────────────────────
+
+/** List all registered users (admin only). */
+export function fetchUsers(): Promise<AuthUser[]> {
+  return request("/api/auth/users")
+}
+
+/** Admin: create a new user account. */
+export function createUser(
+  email: string,
+  name: string,
+  password: string,
+  role: "admin" | "user" = "user",
+): Promise<{ user: AuthUser }> {
+  return request("/api/auth/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, name, password, role }),
+  })
+}
+
+/** Admin: delete a user (cascades sessions + ACL). */
+export function deleteUser(userId: string): Promise<{ ok: boolean }> {
+  return request(`/api/auth/users/${userId}`, { method: "DELETE" })
+}
+
+/** Admin: force-logout a user (revoke all their sessions). */
+export function forceLogoutUser(
+  userId: string,
+): Promise<{ ok: boolean; revoked_sessions: number }> {
+  return request(`/api/auth/users/${userId}/logout`, { method: "POST" })
+}
+
+// ── Per-agent ACL management ─────────────────────────────────────────
+
+/** ACL entry returned by the agent ACL endpoints. */
+export interface AclEntry {
+  agent_id: string
+  user_id: string
+  role: "agent-admin" | "agent-user"
+  granted_at: number
+  granted_by: string | null
+  user_email: string
+  user_name: string
+}
+
+/** List users with access to an agent (admin or agent-admin). */
+export function fetchAgentAcl(agentId: string): Promise<AclEntry[]> {
+  return request(`/api/agent/${agentId}/acl`)
+}
+
+/** Grant a user access to an agent. */
+export function grantAccess(
+  agentId: string,
+  userId: string,
+  role: "agent-admin" | "agent-user" = "agent-user",
+): Promise<{ ok: boolean }> {
+  return request(`/api/agent/${agentId}/acl`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId, role }),
+  })
+}
+
+/** Change a user's per-agent role. */
+export function updateAgentRole(
+  agentId: string,
+  userId: string,
+  role: "agent-admin" | "agent-user",
+): Promise<{ ok: boolean }> {
+  return request(`/api/agent/${agentId}/acl/${userId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  })
+}
+
+/** Revoke a user's access to an agent. */
+export function revokeAccess(
+  agentId: string,
+  userId: string,
+): Promise<{ ok: boolean }> {
+  return request(`/api/agent/${agentId}/acl/${userId}`, { method: "DELETE" })
+}
