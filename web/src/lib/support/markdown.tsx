@@ -1,6 +1,9 @@
 import { memo, type ReactNode } from "react"
 import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
+import remarkMath from "remark-math"
+import rehypeKatex from "rehype-katex"
+import "katex/dist/katex.min.css"
 
 import { cn } from "@/lib/utils"
 
@@ -201,7 +204,7 @@ export const Markdown = memo(function Markdown({
 }): ReactNode {
   return (
     <div className={cn("break-words", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components(variant)}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={components(variant)}>
         {normalizeMarkdown(text)}
       </ReactMarkdown>
     </div>
