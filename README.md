@@ -65,6 +65,17 @@ State changes flow through a central **action dispatcher** (`src/app/actions/`),
 - **Tool pipeline** (`src/app/run/tools/pipeline.rs`) — pre-flight validation → queue interception → execution → file-edit callbacks → tempo break → sentinel deferral. Each tool is its own flame-graph span.
 - **Prompt assembly** (`src/app/prompt_builder.rs`) — rebuilds the LLM prompt in three phases: context panels injected as synthetic `tool_use`/`tool_result` pairs, then the conversation history, then strict role alternation.
 
+### Main-loop watchdog
+
+Because the loop is **single-threaded**, every step runs inline on the one thread — so any synchronous block (a tool hitting a hung dependency, a slow panel rehash, a lock wait, a stalled socket read) freezes the *entire* UI for its full duration, historically with no trace of *which* step wedged. The watchdog (`src/app/run/tools/watchdog.rs`) ends that blind spot. It is the interactive sibling of the headless deadman, but **purely observational**: it never terminates, re-execs, or signals the process (a human is at the keyboard) — it only writes a diagnostic so a freeze that "had no apparent reason" becomes "the log says it wedged in `<step>` for `<N>s`."
+
+Two cooperating detectors run off cheap atomic markers the loop updates each pass:
+
+- **Heartbeat** — *is the loop alive?* The loop stamps a timestamp at the top of every iteration; since it ticks at least every ~50 ms even when idle, a timestamp gone **>15 s stale** means a genuine wedge.
+- **Activity marker** — *which step wedged?* Before each phase (input, bridge, stream drain, cache, watchers, tool execution, panel refresh, spine, reverie, render, save) the loop sets a one-byte marker; a single step in flight **>12 s** is named as the culprit.
+
+A detached monitor thread polls every 2 s and, on a trip, dumps `.context-pilot/errors/watchdog-<timestamp>.log` with the wedged step + duration, the process **CPU%** (high ≈ a busy-loop, low ≈ a blocked syscall or deadlock), and per-thread states (Linux `/proc/self/task` wait-channels, or a macOS `sample` backtrace). The heartbeat/marker writes are single relaxed atomic stores (a few nanoseconds), so the happy path is untouched and the monitor merely sleeps until something actually freezes.
+
 ### Modules — the plugin system
 
 Functionality is a set of **modules** implementing a common `Module` trait (defined in `cp-base/src/modules.rs`): each can hold state, declare and execute tools, create panels, and hook into lifecycle events (`on_user_message`, `on_stream_chunk`, `on_tool_complete`, …). Twenty-one modules are registered via `all_modules()` (`src/modules/mod.rs`), one crate each:
