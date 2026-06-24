@@ -162,7 +162,7 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
 
     // Read the body up-front (only POST routes consume it). The mutable borrow
     // ends here, before the request is moved into the response.
-    let body_bytes = if method == Method::Post || method == Method::Patch {
+    let body_bytes = if method == Method::Post || method == Method::Patch || method == Method::Put {
         read_body(&mut request)
     } else {
         Vec::new()
@@ -217,9 +217,22 @@ fn route_rest(
         (Method::Get, ["api", "fleet", "retired"]) => inspect::meta::fleet_retired(state, auth_user),
         (Method::Get, ["api", "metrics"]) => inspect::metrics::fleet_metrics(state, auth_user),
 
-        // ── Env-key inspection (T399) ─────────────────────────────
-        (Method::Get, ["api", "env-keys"]) => rest::env_keys_list(),
-        (Method::Get, ["api", "env-keys", name]) => rest::env_key_reveal(name, auth_user),
+        // ── Env-key inspection (T399) + editing (T404) ────────────
+        (Method::Get, ["api", "env-keys"]) => {
+            let overrides = state.lock().map_or_else(|_| std::collections::HashMap::new(), |b| b.env_overrides.clone());
+            rest::env_keys_list(&overrides)
+        }
+        (Method::Get, ["api", "env-keys", name]) => {
+            let overrides = state.lock().map_or_else(|_| std::collections::HashMap::new(), |b| b.env_overrides.clone());
+            rest::env_key_reveal(name, auth_user, &overrides)
+        }
+        (Method::Put, ["api", "env-keys", name]) => {
+            let body = String::from_utf8_lossy(body_bytes);
+            match state.lock() {
+                Ok(mut b) => rest::env_key_update(name, auth_user, &body, &mut b.env_overrides),
+                Err(_) => rest::HttpReply::error(500, "internal error"),
+            }
+        }
 
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
         (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent_meta(state, id),
@@ -414,7 +427,7 @@ fn load_entry(state: &Arc<Mutex<Backend>>, id: &str) -> Option<Entry> {
 fn cors_headers() -> Vec<Header> {
     [
         Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]),
-        Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET, POST, PATCH, DELETE, OPTIONS"[..]),
+        Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET, POST, PUT, PATCH, DELETE, OPTIONS"[..]),
         Header::from_bytes(&b"Access-Control-Allow-Headers"[..], &b"Content-Type, Last-Event-ID, Authorization"[..]),
         // Expose Content-Disposition so cross-origin fetch() (web dev server →
         // backend) can read the server-chosen download filename. Without this,

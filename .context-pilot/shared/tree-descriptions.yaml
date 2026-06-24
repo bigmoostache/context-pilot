@@ -1398,6 +1398,10 @@
   path: web/src/components/agents/PromptsPage.tsx
   description: Global prompt library — accepts optional agentId, uses useLibrary() with mockLibrary fallback. Cards for agents/skills/commands. Create/edit decorative.
   last_edited_ms: 1781695982747
+24326d667e7ccddf:
+  path: web/src/components/shell/config/ConfigPanes.tsx
+  description: 'Config category panes + presentational building blocks (split from ConfigPanel for <500): CATEGORIES, CategoryBody (general/usage/providers/search/docai/web/integrations), GeneralPane (default model picker + apply-to-all via sendCommand configure), KeyRow/StatusRow/ToggleRow/ManagedKeysNotice. Key-bearing panes lock when EITHER company-managed (useAccount) OR auth-active-and-caller-not-admin (T346, useAuth: authEnabled && role!==''admin''). LockReason ''company''|''admin'' drives copy: admin → ''Reserved to Administrators'' (ShieldCheck), company → ''Keys managed by {company}'' (Building2). Regular users still SEE the panes, greyed. T399: KeyRow fetches masked value on-demand via revealEnvKey API (eye button), env-key status from live /api/env-keys query. T403: noReveal prop skips eye button for non-env-var rows (Claude Code OAuth).'
+  last_edited_ms: 1782341291167
 24652f0a1096d6c2:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl fs preview/sheet (CSV/xlsx table, T282)/upload/write(X906 editor save-back)/mkdir/rename/move/trash, retire/unretire/restart, fleet create, vitals, metrics. GET fs/download (attachment) + fs/raw (handle_raw: inline, image+PDF previews) intercepted before route_rest. handle_stream = SSE.'

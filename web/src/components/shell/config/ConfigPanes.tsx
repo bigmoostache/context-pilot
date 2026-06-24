@@ -17,6 +17,7 @@ import {
   Boxes,
   Loader2,
   Lock,
+  Pencil,
   Search,
   Send,
   ShieldCheck,
@@ -28,7 +29,7 @@ import { UsagePage } from "@/components/agents/UsagePage"
 import { ModelPicker } from "@/components/agents/ModelPicker"
 import { PROVIDERS, defaultModel as getDefaultModel, findModel } from "@/lib/support/models"
 import { useFleet, sendCommand } from "@/lib/live"
-import { fetchEnvKeys, revealEnvKey } from "@/lib/api"
+import { fetchEnvKeys, revealEnvKey, updateEnvKey } from "@/lib/api"
 import { useAccount } from "@/lib/support/account"
 import { useAuth } from "@/lib/support/auth"
 import { useDevMode } from "@/lib/support/devMode"
@@ -155,14 +156,8 @@ function ManagedKeysNotice({ reason, company }: { reason: LockReason; company: s
         {admin ? <ShieldCheck className="size-4" /> : <Building2 className="size-4" />}
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-[12.5px] font-semibold text-foreground/90">
-          {admin ? "Reserved to Administrators" : `Keys managed by ${company}`}
-        </span>
-        <span className="text-[11.5px] leading-relaxed text-muted-foreground">
-          {admin
-            ? "Only system administrators can manage provider and API keys. Contact an administrator to change a key."
-            : "API keys are provisioned centrally by your organization and can't be edited here. Contact your administrator to change a provider key."}
-        </span>
+        <span className="text-[12.5px] font-semibold text-foreground/90">{admin ? "Reserved to Administrators" : `Keys managed by ${company}`}</span>
+        <span className="text-[11.5px] leading-relaxed text-muted-foreground">{admin ? "Only system administrators can manage provider and API keys. Contact an administrator to change a key." : "API keys are provisioned centrally by your organization and can't be edited here. Contact your administrator to change a provider key."}</span>
       </div>
     </div>
   )
@@ -317,17 +312,29 @@ function KeyRow({
   company?: string
 }) {
   const connected = status === "connected"
-  const [maskedValue, setMaskedValue] = useState<string | null>(null)
+  const [revealedValue, setRevealedValue] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editValue, setEditValue] = useState("")
+  const [saving, setSaving] = useState(false)
 
-  /** Fetch the masked key on demand, or toggle it off. */
+  /** Fetch the full key on demand, or toggle it off. */
   const handleReveal = () => {
-    if (maskedValue) { setMaskedValue(null); return }
+    if (revealedValue) { setRevealedValue(null); setEditing(false); return }
     setLoading(true)
     void revealEnvKey(env)
-      .then((r) => setMaskedValue(r.masked))
-      .catch(() => setMaskedValue("reveal failed"))
+      .then((r) => setRevealedValue(r.value ?? r.masked ?? ""))
+      .catch(() => setRevealedValue("reveal failed"))
       .finally(() => setLoading(false))
+  }
+
+  const handleStartEdit = () => { setEditValue(revealedValue ?? ""); setEditing(true) }
+  const handleSave = () => {
+    setSaving(true)
+    void updateEnvKey(env, editValue)
+      .then((r) => { setRevealedValue(r.value ?? editValue); setEditing(false) })
+      .catch(() => setEditing(false))
+      .finally(() => setSaving(false))
   }
 
   return (
@@ -352,30 +359,43 @@ function KeyRow({
         )}
       >
         <KeyRound className="size-3.5 shrink-0 text-muted-foreground/55" />
-        <code className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-foreground/75">
-          {connected ? (maskedValue ?? <span className="text-muted-foreground/45">•••••••••••••••</span>) : <span className="text-muted-foreground/45">not configured</span>}
-        </code>
+        {editing ? (
+          <input
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") setEditing(false) }}
+            className="min-w-0 flex-1 bg-transparent font-mono text-[11.5px] text-foreground/90 outline-none placeholder:text-muted-foreground/40"
+            placeholder="Enter value…"
+            autoFocus
+          />
+        ) : (
+          <code className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-foreground/75">
+            {connected ? (revealedValue ?? <span className="text-muted-foreground/45">•••••••••••••••</span>) : <span className="text-muted-foreground/45">not configured</span>}
+          </code>
+        )}
         <span className="shrink-0 rounded bg-muted/70 px-1.5 py-px font-mono text-[9.5px] text-muted-foreground/70">{env}</span>
-        {connected && !noReveal &&
+        {editing ? (
+          <button onClick={handleSave} disabled={saving} className="shrink-0 text-[var(--interactive)] transition-colors hover:text-[var(--interactive)]/80 disabled:opacity-50" aria-label="Save">
+            {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" strokeWidth={3} />}
+          </button>
+        ) : connected && !noReveal &&
           (managed ? (
             <Lock className="size-3.5 shrink-0 text-muted-foreground/50" aria-label="Locked by organization" />
-          ) : (
-            <button
-              onClick={handleReveal}
-              disabled={loading}
-              className="shrink-0 text-muted-foreground/55 transition-colors hover:text-foreground disabled:opacity-50"
-              aria-label={maskedValue ? "Hide" : "Reveal"}
-            >
-              {loading ? <Loader2 className="size-3.5 animate-spin" /> : maskedValue ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+          ) : (<>
+            {revealedValue && (
+              <button onClick={handleStartEdit} className="shrink-0 text-muted-foreground/55 transition-colors hover:text-foreground" aria-label="Edit">
+                <Pencil className="size-3.5" />
+              </button>
+            )}
+            <button onClick={handleReveal} disabled={loading} className="shrink-0 text-muted-foreground/55 transition-colors hover:text-foreground disabled:opacity-50" aria-label={revealedValue ? "Hide" : "Reveal"}>
+              {loading ? <Loader2 className="size-3.5 animate-spin" /> : revealedValue ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
             </button>
-          ))}
+          </>))}
       </div>
       {managed && connected && (
         <span className="flex items-center gap-1 pl-0.5 text-[10.5px] text-muted-foreground/65">
           <Lock className="size-3" />
-          {reason === "admin"
-            ? "Reserved to administrators — contact an administrator to change."
-            : `Managed by ${company ?? "your organization"} — contact your administrator to change.`}
+          {reason === "admin" ? "Reserved to administrators — contact an administrator to change." : `Managed by ${company ?? "your organization"} — contact your administrator to change.`}
         </span>
       )}
     </div>
@@ -469,24 +489,11 @@ function ToggleRow({
 
 /** A small "Locked" pill for keys the company manages. */
 function ManagedPill() {
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted/70 px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground/80">
-      <Lock className="size-3" />
-      Locked
-    </span>
-  )
+  return <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted/70 px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground/80"><Lock className="size-3" />Locked</span>
 }
 
 function StatusPill({ connected }: { connected: boolean }) {
-  return connected ? (
-    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--interactive)]/12 px-2 py-0.5 text-[10.5px] font-medium text-[var(--interactive)]">
-      <Check className="size-3" strokeWidth={3} />
-      Connected
-    </span>
-  ) : (
-    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted/70 px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground/70">
-      <span className="size-1.5 rounded-full bg-muted-foreground/40" />
-      Not set
-    </span>
-  )
+  return connected
+    ? <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--interactive)]/12 px-2 py-0.5 text-[10.5px] font-medium text-[var(--interactive)]"><Check className="size-3" strokeWidth={3} />Connected</span>
+    : <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted/70 px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground/70"><span className="size-1.5 rounded-full bg-muted-foreground/40" />Not set</span>
 }

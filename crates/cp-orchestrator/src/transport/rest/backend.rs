@@ -3,7 +3,7 @@
 //!
 //! Extracted from `transport/mod.rs` to keep both files within the line budget.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -60,6 +60,13 @@ pub struct Backend {
     pub(crate) auth: Option<AuthStore>,
     /// Session lifetime for newly created sessions (FR-15).
     pub(crate) session_ttl: Duration,
+    /// Runtime overrides for environment variables (T404).
+    ///
+    /// `PUT /api/env-keys/{name}` writes here for immediate visibility; the
+    /// value is also persisted to `~/.context-pilot/.env` so agents pick it up
+    /// on their next launch.  `env_key_reveal` / `env_keys_list` read this
+    /// map first, falling back to [`std::env::var`].
+    pub(crate) env_overrides: HashMap<String, String>,
 }
 
 impl Backend {
@@ -94,6 +101,7 @@ impl Backend {
             agent_binary,
             auth,
             session_ttl,
+            env_overrides: HashMap::new(),
         }
     }
 
@@ -148,6 +156,7 @@ impl Backend {
             agent_binary: PathBuf::from("/tmp/cp-test-bin"),
             auth: None,
             session_ttl: Duration::from_secs(3600),
+            env_overrides: HashMap::new(),
         }
     }
 }

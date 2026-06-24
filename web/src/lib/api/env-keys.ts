@@ -16,6 +16,7 @@ export interface EnvKeyStatus {
 /** Masked reveal of a single env var's value. */
 export interface EnvKeyReveal {
   env: string
+  value: string | null
   masked: string | null
   exists: boolean
 }
@@ -31,4 +32,17 @@ export function fetchEnvKeys(): Promise<EnvKeyStatus[]> {
  *  characters with the middle redacted. */
 export function revealEnvKey(name: string): Promise<EnvKeyReveal> {
   return request(`/api/env-keys/${encodeURIComponent(name)}`)
+}
+
+/** Update an env-key value (admin-only).  Persists to ~/.context-pilot/.env
+ *  and stores an in-memory override for immediate visibility. */
+export function updateEnvKey(
+  name: string,
+  value: string,
+): Promise<EnvKeyReveal> {
+  return request(`/api/env-keys/${encodeURIComponent(name)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ value }),
+  })
 }
