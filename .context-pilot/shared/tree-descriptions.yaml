@@ -530,6 +530,10 @@
   path: crates/cp-mod-brave/Cargo.toml
   description: 'Brave module deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml, reqwest.'
   last_edited_ms: 0
+0f66970beb0c8e53:
+  path: web/src/lib/api/index.ts
+  description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent (T328) + avatar CRUD (T338) + createCommand (T350). Re-exports ./auth + ./finder + ./body (T357 fetchMessageBody, split out for <500) + shares ./client request/BASE/envelope. The @/lib/api single import surface.'
+  last_edited_ms: 1782299337464
 0f83c9509db27936:
   path: src/llms/cache/prompt_tick_csv.rs
   description: 'Prompt tick CSV dumper for cache debugging. Writes every assembled-prompt message to .context-pilot/prompt_ticks/ each tick (datetime-named). Rolling deletion keeps 20 most recent. Columns: hash, role, type, context, tokens, acc/rev_acc tokens, preview. classify_text_context() tags panel headers/timestamps/footers/seed/conversation blocks. Moved from src/llms/ to cache/ for folder-size limit.'
@@ -594,6 +598,10 @@
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. MODELS + MODEL_META (rich picker). slugify(name) derives realm folder. AgentModalMode: create or manage{agent}. X896: create-mode submit() now LIVE — useCreateAgent() mutation (POST /api/fleet/create), pending spinner ''Creating…'', inline role=alert error banner, onSuccess flash+close. Manage mode stays cosmetic (rename/archive not backend-wired). Shared by TopBar + FleetDashboard.'
   last_edited_ms: 1781878131896
+10dda8b63fda92d9:
+  path: web/src/lib/api/body.ts
+  description: 'Content-addressed message-body hydrate (T357, split from api/index for <500). fetchMessageBody(agentId,hash): GET /api/agent/{id}/body/{hash} → {bytes:number[]} → TextDecoder UTF-8 string (same JSON a small message rides inline). Race-free: the body is stored before the referencing MessageCreated delta is emitted (I13 body-before-reference barrier). Re-exported from api/index.ts barrel. Consumed by the SSE bridge''s spilled-body hydrate.'
+  last_edited_ms: 1782299337406
 111109570cbe01e9:
   path: src/state/persistence/boot.rs
   description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 3 parallel threads. Loads .env files (project + global).'
@@ -4154,6 +4162,10 @@
   path: ui/src/components/shell/LeftRail.tsx
   description: 'Context navigator: token-budget meter, scrollable panel list (icon+name+token-bar+freeze/miss), cache economics footer (hit/miss/out + cost).'
   last_edited_ms: 0
+73c4d45dac7335bf:
+  path: web/src/lib/query/sync.ts
+  description: 'SSE→QueryClient delta bridge (push plane Leg-2 frontend) — the IMPERATIVE half (pure folds live in ./reducers, T357 split). Owns qk (query-key registry), ensureSync (idempotent per-agent SSE subscription), applyDelta (functional-updater setQueryData fold of threads+agent caches, rev high-water guard) and hydrateSpilledMessage (T357: a message_created delta with no inline_body but a head hash → fetchMessageBody → re-fold as synthetic inline delta via applyThreadDelta, so big messages appear live instead of waiting the 15s backstop poll; fetch-fail → invalidate). Re-exports applyThreadDelta/applyAgentDelta/mergeThreadLogs/OpEntry for existing consumers.'
+  last_edited_ms: 1782299337492
 73d30784479fee52:
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks.'
@@ -8318,6 +8330,10 @@ e589cf82e3ae867c:
   path: ui/src/components/ui/table.tsx
   description: shadcn-style table primitives (Table/Header/Body/Footer/Row/Head/Cell/Caption) — semantic HTML table + Tailwind, no deps. Used by UsagePage monthly breakdown.
   last_edited_ms: 1781534744506
+e5b16bd2559f4180:
+  path: web/src/lib/query/reducers.ts
+  description: 'PURE oplog-delta reducers (split from query/sync for <500, T357). The OpEntry/OpEntryKind wire shape + turnToStatus/ago helpers + the three folds: applyThreadDelta (thread_created/archived/restored/status_changed/focus_changed/message_created — message_created appends inline bodies at positional msg_{n} id, spilled bodies only bump activity for the bridge to hydrate), applyAgentDelta (phase_transition never-null + cost_aggregate + context_usage hit/miss split, T297), mergeThreadLogs (non-destructive backstop-poll reconcile, T123). No I/O, no react-query side effects — sync.ts owns the imperative bridge and imports these.'
+  last_edited_ms: 1782299337436
 e5b628f35c392405:
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): Recovered{rev_head,heads,seen,roster}. fold_entry: Checkpoint=authoritative clone_from heads+seen+roster, MessageCreated=set_thread_head + RosterThread::fold_message, ThreadCreated/Archived/Restored/StatusChanged=RosterThread fold helpers (roster rebuilt from deltas), CommandEffect|SeenMark=seen.mark, others no-op. Fast-path reads only newest checkpoint-bearing segment; roster survives compaction because the checkpoint Snapshot carries it. Tests incl replay_rebuilds_roster_from_thread_deltas + roster_survives_compaction_via_checkpoint.'

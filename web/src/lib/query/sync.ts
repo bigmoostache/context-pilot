@@ -9,6 +9,10 @@
 //   • `invalidate` → mark the agent's INSPECTION caches stale so they refetch
 //                    (memory/todos/tree/… have no oplog delta to fold).
 //
+// The PURE folds (the OpEntry shape + applyThreadDelta/applyAgentDelta/
+// mergeThreadLogs) live in ./reducers; this module owns only the imperative
+// bridge — subscription, `setQueryData`, and the async spilled-body hydrate.
+//
 // **Why this kills the T123 class of bug structurally.** A single send emits a
 // burst of two deltas (`message_created` + `thread_status_changed`) in one
 // synchronous SSE macrotask. The old hand-rolled engine applied them with a
@@ -26,52 +30,14 @@
 import type { QueryClient } from "@tanstack/react-query"
 import { getOrCreateSseClient } from "./sse"
 import { queryClient } from "./queryClient"
+import { fetchMessageBody } from "../api"
+import { applyAgentDelta, applyThreadDelta, type OpEntry } from "./reducers"
 import type { Agent, ThreadDetail } from "../types"
 
-// ── Oplog delta shape (the push-plane payload) ───────────────────────
-//
-// One rev-numbered oplog entry as carried by an SSE `delta` event. Mirrors
-// cp-wire `OpEntry` — an internally-tagged `kind` discriminant plus rev. We
-// only need a structural subset (the thread-roster + message + phase/cost
-// kinds); every other kind is acknowledged and ignored by the reducers.
-
-export interface OpEntry {
-  rev: number
-  timestamp_ms?: number
-  kind: OpEntryKind
-}
-
-export interface OpEntryKind {
-  kind: string
-  thread_id?: string
-  name?: string
-  /** ThreadTurn — snake_case "my_turn" / "their_turn". */
-  status?: string
-  timestamp_ms?: number
-  /** Phase — snake_case "idle" / "streaming" / "tooling" (phase_transition). */
-  phase?: string
-  /** Cumulative spend in USD since boot (cost_aggregate). */
-  cost_usd?: number
-  /** Cumulative input/output tokens since boot (cost_aggregate). */
-  input_tokens?: number
-  output_tokens?: number
-  /** Context-window occupancy triple (context_usage): the agent's own
-   *  used/threshold/budget tokens — folded so the web meter matches ratatui. */
-  used_tokens?: number
-  threshold_tokens?: number
-  budget_tokens?: number
-  /** cache hit/miss split of used_tokens (context_usage) — folded so the HUD's
-   *  `Used (hit)` / `Used (miss)` match ratatui's green/amber bar segments. */
-  hit_tokens?: number
-  miss_tokens?: number
-  /** Stable message id, e.g. "T7-m3" (message_created). */
-  message_id?: string
-  /** Content-addressed body hash, hex (message_created). */
-  head?: string
-  /** UTF-8 JSON message body, inlined when small (message_created). Absent
-   *  when the body spilled to the content-addressed store (hydrate by head). */
-  inline_body?: string
-}
+// Re-export the pure folds + delta type so existing `@/lib/query/sync`
+// consumers keep their import surface (the reducers moved to ./reducers for the
+// 500-line file budget).
+export { applyThreadDelta, applyAgentDelta, mergeThreadLogs, type OpEntry } from "./reducers"
 
 // ── Query keys (the single source of truth for cache identity) ───────
 //
@@ -109,259 +75,6 @@ export const qk = {
  *  push plane owns them). Everything else agent-scoped is inspection. */
 const DELTA_COVERED = new Set(["threads", "agent"])
 
-// ── Helpers ───────────────────────────────────────────────────────────
-
-/** Map a wire ThreadTurn to the web ThreadStatus (MY_TURN = agent's turn). */
-function turnToStatus(turn: string | undefined): ThreadDetail["status"] {
-  return turn === "my_turn" ? "MY_TURN" : "THEIR_TURN"
-}
-
-/** Compact relative-time label (mirrors api.ts formatAge for synthesized rows). */
-function ago(epochMs: number): string {
-  const s = Math.max(0, Math.floor((Date.now() - epochMs) / 1000))
-  if (s < 5) return "just now"
-  if (s < 60) return `${s}s ago`
-  const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
-}
-
-// ── Reducers (pure folds: prev cache + OpEntry → next cache) ─────────
-//
-// Each returns a NEW value when the delta mutates the resource, the SAME
-// reference when the delta is irrelevant to it (so `setQueryData` is a no-op),
-// or `null` when it can't be folded confidently (unknown id) — the bridge then
-// invalidates that key so the next read hydrates ground truth.
-
-/**
- * Fold one oplog delta into the live thread roster (the threads cache).
- */
-export function applyThreadDelta(
-  prev: ThreadDetail[] | undefined,
-  entry: OpEntry,
-): ThreadDetail[] | null {
-  if (!prev) return null // not loaded yet → invalidate/hydrate
-  const k = entry.kind
-  switch (k.kind) {
-    case "thread_created": {
-      if (!k.thread_id) return prev
-      if (prev.some((t) => t.id === k.thread_id)) return prev // idempotent
-      const ts = k.timestamp_ms ?? entry.timestamp_ms ?? Date.now()
-      const created: ThreadDetail = {
-        id: k.thread_id,
-        name: k.name ?? "Untitled thread",
-        status: turnToStatus(k.status),
-        agentId: "",
-        agent: "",
-        createdAt: new Date(ts).toISOString(),
-        lastActivity: ago(ts),
-        lastActivityMs: ts,
-        unread: 0,
-        archived: false,
-        focused: false,
-        log: [],
-      }
-      return [created, ...prev]
-    }
-    case "thread_archived":
-    case "thread_restored": {
-      const archived = k.kind === "thread_archived"
-      if (!prev.some((t) => t.id === k.thread_id)) return null
-      return prev.map((t) => (t.id === k.thread_id ? { ...t, archived } : t))
-    }
-    case "thread_status_changed": {
-      if (!prev.some((t) => t.id === k.thread_id)) return null
-      return prev.map((t) =>
-        t.id === k.thread_id ? { ...t, status: turnToStatus(k.status) } : t,
-      )
-    }
-    case "thread_focus_changed": {
-      // Focus moved to k.thread_id (or was released when undefined). Set the
-      // focused flag on the matching thread and clear it everywhere else, so
-      // the UI's focused-thread highlight tracks the agent in real time instead
-      // of waiting on the disk-fed backstop poll. A no-op fold (same flags)
-      // returns the SAME refs via map, which structural sharing collapses.
-      return prev.map((t) => {
-        const focused = t.id === k.thread_id
-        return t.focused === focused ? t : { ...t, focused }
-      })
-    }
-    case "message_created": {
-      const thread = prev.find((t) => t.id === k.thread_id)
-      if (!thread) return null // unknown thread → hydrate
-      const ts = entry.timestamp_ms ?? Date.now()
-      // A spilled (large) body has no inline payload — bump activity and let a
-      // hydrate fetch the full log (rare for chat).
-      if (!k.inline_body) {
-        return prev.map((t) =>
-          t.id === k.thread_id ? { ...t, lastActivityMs: ts, lastActivity: ago(ts) } : t,
-        )
-      }
-      let raw: {
-        id?: string
-        author?: string
-        text?: string | null
-        ts?: number
-        question?: unknown
-        fileRef?: string | null
-        auto?: boolean
-      }
-      try {
-        raw = JSON.parse(k.inline_body)
-      } catch {
-        return null // malformed → ground-truth hydrate
-      }
-      // CRITICAL: id MUST match the disk-poll id so the backstop poll dedups
-      // this message instead of rendering it twice. The backend `/threads`
-      // reshape ids each message positionally as `msg_{index}` (thread_shape.rs
-      // reshape_message). The delta folds the message at the end of the log, so
-      // its disk index == the current log length. Deriving the id from that
-      // position — NOT from raw.id (`{thread}-m{n}`) or k.message_id — keeps the
-      // two planes' ids identical, so mergeThreadLogs collapses them to one.
-      const msgId = `msg_${thread.log.length}`
-      if (thread.log.some((m) => m.id === msgId)) return prev // dedup
-      const msgTs = typeof raw.ts === "number" ? raw.ts : ts
-      const appended: ThreadDetail["log"][number] = {
-        id: msgId,
-        author: raw.author === "user" ? "user" : "assistant",
-        text: raw.text ?? undefined,
-        ts: new Date(msgTs).toISOString(),
-        questions: raw.question
-          ? (raw.question as ThreadDetail["log"][number]["questions"])
-          : undefined,
-        fileRef: raw.fileRef ?? undefined,
-        auto: raw.auto ?? undefined,
-      }
-      return prev.map((t) =>
-        t.id === k.thread_id
-          ? {
-              ...t,
-              log: [...t.log, appended],
-              lastActivityMs: ts,
-              lastActivity: ago(ts),
-            }
-          : t,
-      )
-    }
-    default:
-      return prev // phase / cost / lifecycle → irrelevant to threads
-  }
-}
-
-/**
- * Fold one oplog delta into the live agent meta (phase + cost + token vitals).
- *
- * The EXACT phase (idle/streaming/tooling) is folded latest-wins so the HUD
- * renders the distinct phase, and the coarse `status`/`accent` the fleet dot
- * uses is kept in sync inline — **without ever returning `null`**, so a phase
- * change (notably going idle when a stream ends) never costs a REST hydrate.
- * Cost and the cumulative-since-boot token counters fold latest-wins too, so
- * the token display rides the push plane instead of the backstop poll (T297).
- */
-export function applyAgentDelta(prev: Agent | undefined, entry: OpEntry): Agent | null {
-  if (!prev) return null // not loaded yet → hydrate
-  const k = entry.kind
-  switch (k.kind) {
-    case "phase_transition": {
-      const phase = k.phase
-      if (phase !== "idle" && phase !== "streaming" && phase !== "tooling") {
-        return prev // unknown phase → ignore
-      }
-      // Fold the EXACT phase (latest-wins) so the HUD can show streaming vs
-      // tooling vs ready distinctly — and NEVER return null (no REST hydrate on
-      // the most common transition, going idle). The coarse `status` the fleet
-      // dot renders is kept in sync without a refetch: streaming/tooling →
-      // "working"; idle drops a stale "working" back to "idle" (needs-you vs
-      // idle is a thread-state decision the next /meta backstop reconciles —
-      // we never know it from the phase delta alone).
-      let next: Agent = prev
-      if (prev.phase !== phase) next = { ...next, phase }
-      if (phase === "streaming" || phase === "tooling") {
-        if (next.status !== "working") next = { ...next, status: "working", accent: "ok" }
-      } else if (next.status === "working") {
-        next = { ...next, status: "idle", accent: "interactive" }
-      }
-      return next
-    }
-    case "cost_aggregate": {
-      // Cumulative-since-boot (latest-wins): fold cost AND the token counters so
-      // the HUD's token display rides the push plane, not the 15s poll (T297).
-      let next: Agent = prev
-      if (typeof k.cost_usd === "number" && prev.costUsd !== k.cost_usd) {
-        next = { ...next, costUsd: k.cost_usd }
-      }
-      if (typeof k.input_tokens === "number" && prev.inputTokens !== k.input_tokens) {
-        next = { ...next, inputTokens: k.input_tokens }
-      }
-      if (typeof k.output_tokens === "number" && prev.outputTokens !== k.output_tokens) {
-        next = { ...next, outputTokens: k.output_tokens }
-      }
-      return next
-    }
-    case "context_usage": {
-      // The agent's authoritative context-window occupancy (latest-wins): fold
-      // used/threshold/budget so the HUD meter shows the EXACT figure ratatui
-      // shows, reactively over the push plane (T297).
-      let next: Agent = prev
-      if (typeof k.used_tokens === "number" && prev.contextUsed !== k.used_tokens) {
-        next = { ...next, contextUsed: k.used_tokens }
-      }
-      if (typeof k.threshold_tokens === "number" && prev.contextThreshold !== k.threshold_tokens) {
-        next = { ...next, contextThreshold: k.threshold_tokens }
-      }
-      if (typeof k.budget_tokens === "number" && prev.contextBudget !== k.budget_tokens) {
-        next = { ...next, contextBudget: k.budget_tokens }
-      }
-      // The cache hit/miss split (hit + miss === used) so the HUD can render
-      // `Used (hit)` / `Used (miss)` matching ratatui's green/amber segments.
-      if (typeof k.hit_tokens === "number" && prev.contextHit !== k.hit_tokens) {
-        next = { ...next, contextHit: k.hit_tokens }
-      }
-      if (typeof k.miss_tokens === "number" && prev.contextMiss !== k.miss_tokens) {
-        next = { ...next, contextMiss: k.miss_tokens }
-      }
-      return next
-    }
-    default:
-      return prev // thread / lifecycle → irrelevant to meta
-  }
-}
-
-// ── Non-destructive poll reconcile (the backstop merge, T123) ────────
-//
-// The backstop poll (`refetchInterval`) refetches `/threads`, whose per-thread
-// `log` is sourced from the tier-② disk cache (config.json) the agent flushes
-// on a debounce. A just-sent message rides the FAST push plane (a delta folded
-// in ~14–60 ms), but the disk cache lags. If the poll REPLACED the cache
-// wholesale, a poll firing inside that lag window would serve a stale log
-// without the message and erase the delta-applied bubble — the T123 flicker.
-//
-// `mergeThreadLogs` converges state UPWARD: every message the local cache has
-// that the poll lacks is preserved, and delta-created threads not yet on disk
-// are kept. Once the disk flush lands, the poll's log already contains the
-// message (deduped by id) and the two planes agree. The threads queryFn calls
-// this against the current cache (`getQueryData`) so the poll can never drop a
-// delta-applied message.
-export function mergeThreadLogs(
-  prev: ThreadDetail[] | undefined,
-  next: ThreadDetail[],
-): ThreadDetail[] {
-  if (!prev) return next // cold load — nothing to preserve yet
-  const prevById = new Map(prev.map((t) => [t.id, t]))
-  const merged = next.map((t) => {
-    const p = prevById.get(t.id)
-    if (!p || p.log.length === 0) return t
-    const haveIds = new Set(t.log.map((m) => m.id))
-    const extra = p.log.filter((m) => !haveIds.has(m.id))
-    return extra.length ? { ...t, log: [...t.log, ...extra] } : t
-  })
-  const nextIds = new Set(next.map((t) => t.id))
-  const missing = prev.filter((t) => !nextIds.has(t.id))
-  return missing.length ? [...missing, ...merged] : merged
-}
-
 // ── The bridge ────────────────────────────────────────────────────────
 
 /** Per-agent high-water rev guard — drops replay dupes on SSE reconnect
@@ -369,6 +82,48 @@ export function mergeThreadLogs(
 const lastRev = new Map<string, number>()
 /** Agents whose SSE bridge is already wired (idempotent `ensureSync`). */
 const wired = new Set<string>()
+
+/**
+ * Hydrate a SPILLED (large) message body and fold it into the live thread log.
+ *
+ * A small message rides its `MessageCreated` delta inline (`inline_body`), so
+ * the synchronous {@link applyThreadDelta} reducer appends it at once. A large
+ * message instead spills to the content-addressed store: its delta carries only
+ * the `head` hash and no `inline_body`, so the pure reducer can't render it —
+ * it merely bumps the thread's activity. Without this, a big message never
+ * entered the log via the push plane and only surfaced on the 15s backstop poll
+ * (the "big messages don't appear until I refresh" bug, T357).
+ *
+ * Here the bridge fetches the body bytes over `/body/{head}`, then re-folds the
+ * delta as if it had arrived inline — reusing {@link applyThreadDelta}'s exact
+ * append path (positional `msg_{n}` id derivation + dedup), so the hydrated
+ * message lands identically to an inline one and the backstop poll dedups it.
+ * The body is immutable and stored before the delta is emitted (the I13
+ * body-before-reference barrier), so the fetch is race-free. A fetch failure
+ * falls back to invalidating the threads query so a refetch still surfaces it.
+ */
+async function hydrateSpilledMessage(client: QueryClient, agentId: string, entry: OpEntry): Promise<void> {
+  const head = entry.kind.head
+  if (!head) return
+  const tk = qk.threads(agentId)
+  let bodyStr: string
+  try {
+    bodyStr = await fetchMessageBody(agentId, head)
+  } catch {
+    void client.invalidateQueries({ queryKey: tk }) // hydrate failed → ground-truth refetch
+    return
+  }
+  // Re-fold as an inline delta against the FRESHEST cache (the append's id is
+  // positional, so it must read the current log length at apply time).
+  const synthetic: OpEntry = { ...entry, kind: { ...entry.kind, inline_body: bodyStr } }
+  const prev = client.getQueryData<ThreadDetail[]>(tk)
+  const next = applyThreadDelta(prev, synthetic)
+  if (next === null || next === undefined) {
+    if (prev !== undefined) void client.invalidateQueries({ queryKey: tk })
+  } else if (next !== prev) {
+    client.setQueryData(tk, next)
+  }
+}
 
 /**
  * Apply one parsed delta to the agent's delta-covered caches. Folds into BOTH
@@ -381,6 +136,16 @@ function applyDelta(client: QueryClient, agentId: string, entry: OpEntry): void 
     const seen = lastRev.get(agentId) ?? -1
     if (entry.rev <= seen) return // replay dupe
     lastRev.set(agentId, entry.rev)
+  }
+
+  // A spilled (large) message has no inline body — its delta carries only the
+  // `head` hash. Kick off an async hydrate that fetches the body and folds the
+  // full message in (T357). The synchronous threads fold below still runs and
+  // bumps the thread's activity immediately; the bubble's text lands a moment
+  // later when the hydrate resolves.
+  const km = entry.kind
+  if (km.kind === "message_created" && !km.inline_body && km.head) {
+    void hydrateSpilledMessage(client, agentId, entry)
   }
 
   // Threads cache fold.

@@ -27,6 +27,7 @@ import { request, buildCommandEnvelope } from "./client"
 export { getToken, setToken } from "./client"
 export * from "./auth"
 export * from "./finder"
+export * from "./body"
 
 // ── Fleet ─────────────────────────────────────────────────────────────
 
