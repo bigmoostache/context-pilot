@@ -74,6 +74,22 @@ pub fn try_recover(state: &mut State) {
 /// `clippy::type_complexity` lint).
 pub type ContextMemo = (u64, u64, u64, u64, u64);
 
+/// Seed flags for observe-on-change memos.
+///
+/// Each flag is `false` until the corresponding chokepoint runs its first
+/// pass (seed without emit), then `true` for the remainder of the session.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct MemoSeeds {
+    /// Messages memo seeded (`emit_messages`).
+    pub messages: bool,
+    /// Thread-status memo seeded (`emit_thread_status`).
+    pub statuses: bool,
+    /// Focus memo seeded (`emit_thread_focus`).
+    pub focus: bool,
+    /// Archived memo seeded (`emit_thread_archived`).
+    pub archived: bool,
+}
+
 /// Runtime state for the bridge (stored in [`State`]'s `TypeMap`).
 ///
 /// Not serializable — [`Boot`] holds OS resources (folder lock, stream socket,
@@ -129,14 +145,6 @@ pub struct BridgeState {
     /// phase/cost vitals).
     pub thread_msg_counts: std::collections::HashMap<String, usize>,
 
-    /// Whether [`thread_msg_counts`](Self::thread_msg_counts) has been seeded
-    /// from the threads already present at boot. Until it is, the first
-    /// chokepoint pass records existing message counts **without** emitting, so
-    /// a (re)started agent does not replay its entire backlog onto the oplog —
-    /// only messages created after boot become deltas (the cold backlog is
-    /// served from tier-② disk on the frontend's initial load).
-    pub msg_memo_seeded: bool,
-
     /// Last per-thread turn-status emitted as a `ThreadStatusChanged` delta,
     /// keyed by thread id. The status chokepoint diffs each thread's live
     /// status against this memo every tick and emits only on an actual flip
@@ -146,12 +154,6 @@ pub struct BridgeState {
     /// finishing a turn — reaches the backend view (and the web roster) in
     /// milliseconds, not on the next disk flush.
     pub thread_statuses: std::collections::HashMap<String, cp_wire::types::ThreadTurn>,
-
-    /// Whether [`thread_statuses`](Self::thread_statuses) has been seeded from
-    /// the threads present at boot. Until it is, the first chokepoint pass
-    /// records existing statuses **without** emitting, so a (re)started agent
-    /// does not replay every thread's status as a spurious "change".
-    pub status_memo_seeded: bool,
 
     /// Last focused-thread id emitted as a `ThreadFocusChanged` delta. The
     /// focus chokepoint diffs the live `FocusState.focused_thread_id` against
@@ -163,11 +165,16 @@ pub struct BridgeState {
     /// milliseconds, not on the next debounced disk flush + poll.
     pub last_focus: Option<String>,
 
-    /// Whether [`last_focus`](Self::last_focus) has been seeded from the focus
-    /// state present at boot. Until it is, the first chokepoint pass records
-    /// the existing focus **without** emitting, so a (re)started agent does not
-    /// replay its focus as a spurious "change".
-    pub focus_memo_seeded: bool,
+    /// Per-thread archived flag as last emitted/seeded, keyed by thread id.
+    /// The archived chokepoint diffs each thread's live `archived` against this
+    /// memo every tick and emits `ThreadArchived`/`ThreadRestored` only on an
+    /// actual change — the same observe-on-change discipline as the status and
+    /// message chokepoints.
+    pub thread_archived_memo: std::collections::HashMap<String, bool>,
+
+    /// Flags tracking which observe-on-change memos have been seeded from the
+    /// oplog roster on the first tick after boot. See [`MemoSeeds`].
+    pub seeded: MemoSeeds,
 
     /// The bridge is **pending recovery**: `CP_BRIDGE=1` was set but
     /// [`Boot::start`] failed (most commonly an `AlreadyRunning` `flock` race
@@ -398,11 +405,13 @@ mod tests {
         assert!(bs.last_context.is_none());
         assert!(bs.store.is_none());
         assert!(bs.thread_msg_counts.is_empty());
-        assert!(!bs.msg_memo_seeded);
         assert!(bs.thread_statuses.is_empty());
-        assert!(!bs.status_memo_seeded);
         assert!(bs.last_focus.is_none());
-        assert!(!bs.focus_memo_seeded);
+        assert!(bs.thread_archived_memo.is_empty());
+        assert!(!bs.seeded.messages);
+        assert!(!bs.seeded.statuses);
+        assert!(!bs.seeded.focus);
+        assert!(!bs.seeded.archived);
         assert!(!bs.pending);
         assert!(bs.pending_model.is_empty());
     }

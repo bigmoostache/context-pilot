@@ -151,6 +151,9 @@ fn apply_archive_thread(state: &mut State, thread_id: &str) {
     }
 
     emit_roster_delta(state, OpEntryKind::ThreadArchived { thread_id: thread_id.to_owned() });
+    if let Some(bs) = state.get_ext_mut::<BridgeState>() {
+        let _inserted = bs.thread_archived_memo.insert(thread_id.to_owned(), true);
+    }
 
     state.flags.ui.dirty = true;
     log::info!("bridge: archived thread {thread_id}");
@@ -164,6 +167,9 @@ fn apply_restore_thread(state: &mut State, thread_id: &str) {
     if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) {
         thread.archived = false;
         emit_roster_delta(state, OpEntryKind::ThreadRestored { thread_id: thread_id.to_owned() });
+        if let Some(bs) = state.get_ext_mut::<BridgeState>() {
+            let _prev = bs.thread_archived_memo.insert(thread_id.to_owned(), false);
+        }
         state.flags.ui.dirty = true;
         log::info!("bridge: restored thread {thread_id}");
     } else {

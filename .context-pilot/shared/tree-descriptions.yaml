@@ -14,6 +14,10 @@
   path: crates/cp-orchestrator/src/transport/rest.rs
   description: 'REST handlers: HttpReply, Envelope<T>{rev,data}, CommandReceipt. fleet/agent/mint_ticket/body/command/threads. resolve_entry reads <id>.json. Locks Backend briefly, never across blocking agent I/O. reshape_thread/reshape_message for maquette ThreadDetail. 8 tests.'
   last_edited_ms: 0
+008626e2118e35d4:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop with flame!("loop"). Input-first (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. poll_bridge_commands every tick. cp_mod_bridge::try_recover throttled ~2s = bridge self-heal. X18 adaptive idle poll (8ms streaming/dirty, 2ms bridge_active, 50ms otherwise). T309: update_spinner_animation now gates its forced 100ms dirty on has_active_animation (streaming/tooling | timed-watcher WAITING | loading panel | running console) — a genuinely idle agent produces ZERO periodic renders (was a permanent 10fps full-redraw floor forever), falling to ~0% CPU; event-driven redraws untouched.'
+  last_edited_ms: 0
 00ac33e6a916fcf9:
   path: crates/cp-mod-bridge/tests/tee_intake_body.rs
   description: 'Phase 26 (X793): cp-mod-bridge tee+intake+body integration suite (4 tests, second tests/ target). Cross-component properties the inline tests can''t show: (1) a_command_round_trips...across_reexec — framed command over UnixStream::pair → Intake::handle_connection journals via live OplogService, acked; tear down + respawn + redeliver SAME dedup → applied.is_empty (exactly-once across deadman re-exec), replay seen.len==1. (2) one_connection_applies_distinct_and_dedups — 3 frames (dt-a,dt-b,dt-a) one connection → applied.len==2, 3 Accepted acks, seen.len==2. (3) the_i13_barrier_and_orphan_gc_hold_across_a_real_journal — Store::open_with_threshold(4): orphan body spills durably + integrity-checked but never journalled (crash-in-gap), replay heads empty; referenced body journalled via OplogService.append_durable(MessageCreated{head}), replay heads→live HashSet<ContentHash>, store.gc(&live,Duration::ZERO) reclaims the 1 orphan keeps referenced (replay-heads-driven GC = how agent reclaims). (4) the_tee_streams_an_ordered_multi_frame_burst — Tee over real UnixListener, observer reads 16 frames back via framing::decode_raw in seq order. HANG FIX: handle_connection blocks on read-until-EOF; shutdown(Shutdown::Write) on a socketpair end did NOT reliably propagate EOF to the peer → tests #1/#2 hung >60s. Fix: read_acks(stream,expected:usize) reads exactly N acks then drop(client) → EOF → server returns (mirrors the proven inline handle_connection pattern; NEVER rely on shutdown(Write)→peer-EOF for UnixStream::pair). NAMES cp_mod_bridge+cp_wire+cp_oplog+serde_json+tempfile; `use cp_base/cp_render/nix as _;` (Stored import dropped — only methods used). 48 cp-mod-bridge green (40 inline+4 boot_heartbeat+4 tee_intake_body).'
@@ -514,6 +518,10 @@
   path: crates/cp-wire/src/types/snapshot.rs
   description: 'Bounded replay snapshot: Snapshot{heads,seen}. Heads (per-thread/panel content hashes, O(threads+panels)) + SeenSet (dedup-tokens of durable command effects, evicted by acked-rev via evict_through, NEVER time — I4/R2-1). SeenSet.mark idempotent keeps first rev. Checkpoint carries Snapshot (both heads AND seen) so seen rebuild doesn''t fold from offset 0. Replaces old heads.rs (merged to keep types/ ≤ 8 files). 9 tests.'
   last_edited_ms: 1781620291993
+0e8102ada905edf0:
+  path: web/src/lib/support/markdown.tsx
+  description: GFM markdown renderer (react-markdown + remark-gfm) themed to app tokens; default + onAccent variants. XSS-safe (no raw HTML).
+  last_edited_ms: 0
 0e866044c537cc8c:
   path: web/src/components/panels/cockpit/EntitiesPanel.tsx
   description: Cockpit Entities panel. useEntities(agentId); one card per SQLite table w/ row count + sample rows. On empty, renders InspectionUnavailable notice (entity DB is an open SQLite connection; on-disk file is 0-byte handle).
@@ -1814,6 +1822,10 @@
   path: web/.gitignore
   description: web/ gitignore. node_modules, dist, *.local, editor dirs, and Playwright e2e artifacts (test-results, playwright-report, .playwright) — transient run output, never committed.
   last_edited_ms: 1781814025229
+314cac58c76158d9:
+  path: src/app/run/threads/commands.rs
+  description: Bridge command APPLICATION (K7 mutation half), split from bridge.rs for the 500-line limit. apply_command dispatches SendMessage(inject user msg + MyTurn flip + on_user_message)/CreateThread(+emit_roster_delta ThreadCreated + prime status memo)/ArchiveThread(soft-delete + focus cleanup + emit ThreadArchived)/RestoreThread(emit ThreadRestored)/Stop|Interrupt(mirror Esc StopStreaming)/Configure(serde-deserialize provider+model, set on state). Imports emit_roster_delta + wire_turn (pub(super)) from bridge.
+  last_edited_ms: 0
 31613082603214f2:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -2481,6 +2493,10 @@
 425ed53956de6dab:
   path: crates/cp-mod-firecrawl/src/crawl.rs
   description: Recursive site crawling — firecrawl_crawl tool. flame!("firecrawl_crawl"). Start async crawl job + poll loop (5s interval, 60 max polls, 310s timeout). write_crawl_output writes combined markdown to disk. No panel created.
+  last_edited_ms: 0
+4298dc3f49380fa2:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 42c7cbbc97d7c48c:
   path: src/ui/perf/mod.rs
@@ -4166,6 +4182,10 @@
   path: crates/cp-oplog/tests/service_group_commit.rs
   description: 'Phase 24 (X791): cp-oplog group-commit Service public-API suite (5 tests). Properties that emerge only under concurrency/pressure (GAP2/I2): durability_of_is_exhaustive_over_every_kind (all 8 OpEntryKind discriminants: PhaseTransition+CostAggregate=BestEffort, CommandEffect+SeenMark+MessageCreated+Lifecycle+Checkpoint{Snapshot::default}+Unknown=Durable); concurrent_durable_submitters_get_unique_contiguous_revs (Arc<Service>, 8 threads x 50 append_durable, default limit=no rolls=no checkpoint revs → revs exactly 0..400 contiguous no dup/gap proving single commit thread is sole serialised rev-assigner; replay rev_head=399 + seen.len=400; flush via drop(service) Arc→0→Drop joins+syncs); best_effort_floods_drop_without_ever_blocking (200k phase try_sends ≫ 1024 queue cap → <5s never-block + dropped>0 deterministic under any real fdatasync latency + submitted>0 + post-flood durable append survives replay); a_large_final_batch_is_flushed_on_shutdown (30 durable then shutdown drains+syncs, rev_head+T1 head durable); interleaved_durable_and_best_effort_preserves_every_durable_record (phase between each durable pair, all 20 tokens + final head survive, seen.len==tokens). Service is Send+Sync (SyncSender+JoinHandle). shutdown consumes self (no double-shutdown by type). NO append-with-capacity hook so deterministic queue-full saturation only via flood≫cap.'
   last_edited_ms: 0
+72ec60f8777a78ad:
+  path: src/app/run/threads/messages.rs
+  description: 'Phase 2.2 (X839): live thread-message emission for the main loop. emit_messages = observe-on-change chokepoint diffing each thread''s message vector vs BridgeState.thread_msg_counts (seeded no-emit on first pass so a restarted agent doesn''t replay backlog). build_pending → JSON body {id,author,text,ts,question,fileRef}; emit_one_message stages body in content-addressed Store (I13 barrier: small=Inline rides delta, large=Spilled durable file) BEFORE submit_durable(MessageCreated{thread_id,message_id,head,inline_body}). No-op bridge-OFF. Captures messages from every source (Send tool / TUI reply / web SendMessage) via one uniform path.'
+  last_edited_ms: 0
 72fc31657e6fec83:
   path: crates/cp-orchestrator/src/transport/inspect/finder/sheet.rs
   description: 'Finder spreadsheet→table JSON (T282): fs_sheet (GET /fs/sheet?path=). csv/tsv via the `csv` reader (quote+embedded-newline aware); xlsx/xls/xlsb/ods/xlsm via calamine open_workbook_auto. Both collapse to {sheets:[{name,rows:[[cell]]}],truncated}, every cell stringified (cell_to_string: integral floats lose the .0 tail). Bounded MAX_ROWS=1000 × MAX_COLS=50 × MAX_SHEETS=20; csv read-capped 8MiB. Confined via support:: (escape 403, non-file 404, unsupported/unparseable 415, missing param 400).'
@@ -4670,6 +4690,10 @@
   path: crates/cp-orchestrator/src/lib.rs
   description: 'Backend library root. Declares channel + liveness + registry + services + supervisor + transport modules. Backend-only peer of cp-mod-bridge: bridge WRITES registry/heartbeat/oplog, backend READS/tails across a fleet.'
   last_edited_ms: 1781647650763
+7f8950a56744393f:
+  path: web/package.json
+  description: 'Frontend deps: @base-ui/react 1.5, @tanstack/react-query 5.101, react 19.2, react-markdown 10 + remark-gfm, highlight.js 11.11, tailwindcss 4.3, shadcn 4.11, vite 8, playwright. scripts: dev/build(tsc -b && vite build)/lint/preview.'
+  last_edited_ms: 0
 7f96c638d0d94837:
   path: src/ui/ir/conversation.rs
   description: 'Conversation + overlay IR builder. Messages, history sections, streaming tools, input area. Overlays: QuestionForm, Autocomplete, PerfOverlay (build_perf_overlay with frame budgets, CPU/Meili stats, FD count, op table). Perf builder calls PERF.snapshot() and cp_mod_search::overlay_info().'
@@ -6250,6 +6274,10 @@ a90395fd4627a456:
   path: crates/cp-mod-firecrawl/src/lib.rs
   description: 'Firecrawl module. 4 tools: scrape/search/map/crawl. Dynamic firecrawl_result panels. No state. pub(crate) mod crawl. Nested object params (location). Simple dispatch pattern.'
   last_edited_ms: 1780563343165
+a9093bc09aec6ee8:
+  path: src/app/run/threads/mod.rs
+  description: 'Thread helpers for main loop: maybe_inject_auto_read (synthetic Read on auto-continuation — note: does NOT break tempo, root cause of T322 stale-panel bug per M103), check_my_turn_threads, extract_thread_ids, maybe_append_tool_activity (auto traces).'
+  last_edited_ms: 0
 a91032af6edb5c3b:
   path: test_file_to_describe.txt
   description: Version B of the test file
@@ -7278,6 +7306,10 @@ c40782194df37336:
   path: ui/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Mounts <AccountProvider> (T30 shared managed-account state) + <TooltipProvider delay=350 closeDelay=80> around the shell. Fleet → FleetShell (Agents⇄Prompts). Cockpit → CockpitView. threads/finder per-agent (Finder keyed by agent.id). openAgent switches agent→threads. newAgent() sets view=fleet + createAgent flag → FleetShell openCreate.
   last_edited_ms: 1781599152974
+c4131792081c5fee:
+  path: crates/cp-mod-bridge/src/lib.rs
+  description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1 OR --bridge CLI flag (OnceLock). request_bridge() pub API for CLI activation. PENDING+try_recover self-heal. ContextMemo alias for ContextUsage emit memo. on_stream_chunk→Token, on_stream_stop→PhaseHint(Idle).'
+  last_edited_ms: 0
 c42065b68b84aa34:
   path: crates/cp-orchestrator/src/registry/mod.rs
   description: 'AgentRegistry: poll-based scan-and-diff of agents dir. Events: Appeared/Disappeared/StatusChanged/Stale. Three-factor liveness verdict. reap_tmp for crash-orphan writes. 8 tests.'
@@ -7474,6 +7506,10 @@ c89410cd290ef513:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Nordic Tide'' (#213448 deep navy bg / #547792 steel-blue accent / #94B4C1 seafoam primary+signal / #EAE0CF warm beige ''ink'' text; cool ground + warm ink, intermediate surfaces derived) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (modals), finder-slider.'
   last_edited_ms: 1781524915486
+c8ebffd329211a91:
+  path: src/app/run/threads/bridge.rs
+  description: Bridge command intake + live-state emission (gated bridge-ON). accept_commands forces the accepted stream BLOCKING before handle_connection (the inherited non-blocking flag broke >8KiB commands, T274). poll_bridge_commands drains all pending/tick + save_state_async (Configure has no oplog delta, T262). emit_roster_delta=durable on thread mutation. emit_vitals=best-effort PhaseTransition+CostAggregate+ContextUsage (used/threshold/budget + hit/miss via the canonical context_usage+context_hit_miss helpers, T297) on-change. emit_thread_status=durable on flip. emit_thread_focus=best-effort. wire_turn. Command APPLICATION in sibling commands.rs.
+  last_edited_ms: 0
 c92262342f94a31f:
   path: crates/cp-mod-entities/src/panel.rs
   description: Fixed Entities panel. Live schema + sample data context for LLM. Empty-state onboarding guide with quick-start SQL. IR blocks with Accent/Code/Muted styling. Migration count display.

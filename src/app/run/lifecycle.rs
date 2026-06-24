@@ -152,6 +152,7 @@ impl App {
             super::threads::emit_messages(self);
             super::threads::emit_thread_status(self);
             super::threads::emit_thread_focus(self);
+            super::threads::emit_thread_archived(self);
             super::tools::watchdog::mark(super::tools::watchdog::Step::Stream);
             super::streaming::process_stream_events(self, ch.rx);
             super::streaming::handle_retry(self, ch.tx);
