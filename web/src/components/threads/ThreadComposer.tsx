@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { lineBounds, resolveEnter, resolveTab } from "@/lib/utils"
-import { ArrowUp, Paperclip, Loader2, Clock, X, Plus } from "lucide-react"
+import { ArrowUp, Paperclip, Loader2, Clock } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
-import type { UploadedFile } from "./fileUpload"
-import { FileUploadChip } from "./fileUpload"
+import { ComposerBubbles, type UploadedFile, type CommandSuggestion } from "./fileUpload"
 
 /** A persisted composer draft: the unsent text plus the caret/selection range
  *  to restore (T304). Stored as JSON under the composer's `draftKey`. */
@@ -18,21 +17,11 @@ function clampRange(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n))
 }
 
-/**
- * A `/command` offered as a first-message suggestion bubble above the composer
- * (T348). `command` is the literal text inserted into the textarea on click
- * (e.g. `/clean`); `name` + `description` label the bubble.
- */
-export interface CommandSuggestion {
-  command: string
-  name: string
-  description: string
-  /** the prompt body the `/command` expands to (T350). When present, clicking
-   *  the bubble seeds THIS into the composer (followed by a blank line with the
-   *  caret on it) instead of the bare `/command` literal, so the user gets the
-   *  real prompt ready to extend. Falls back to `command` when absent. */
-  body?: string
-}
+// CommandSuggestion now lives beside the file-chip abstraction in ./fileUpload
+// (both composer pill families share ONE module + ONE rendered row). Re-exported
+// here for the existing `import { type CommandSuggestion } from "./ThreadComposer"`
+// consumers (ThreadConversation).
+export type { CommandSuggestion } from "./fileUpload"
 
 /**
  * Read and parse a persisted {@link Draft} from localStorage.
@@ -210,6 +199,11 @@ export function ThreadComposer({
     return text.slice(start, end) === "/"
   }, [text, caret])
 
+  // Whether the /command bubbles should be offered right now: mid-draft on a
+  // lone `/` line (any thread), OR on a brand-new thread with an empty composer
+  // (the first-message palette). File chips show independently of this.
+  const commandsActive = slashActive || (firstMessage && !text.trim())
+
   /**
    * Prefill the composer from a suggested `/command` bubble (T348/T350). We
    * seed the command's **expanded prompt body** when it carries one (so a
@@ -308,44 +302,19 @@ export function ThreadComposer({
 
   return (
     <div className="shrink-0 px-5 pb-4 pt-2">
-      {/* First-message /command suggestions (T348) + the create-command pill
-          (T350). Shown either as a first-message palette on an EMPTY thread
-          with an empty composer (firstMessage), OR mid-draft on ANY thread when
-          the caret's line is exactly `/` (slashActive). */}
-      {(suggestions.length > 0 || onCreateCommand) &&
-        pendingFiles.length === 0 &&
-        (slashActive || (firstMessage && !text.trim())) && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {suggestions.map((s) => (
-            <button
-              key={s.command}
-              type="button"
-              onClick={() => prefill(s)}
-              title={s.description || s.name}
-              className="group inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground/75 transition-colors hover:border-[var(--signal)]/60 hover:text-[var(--signal)]"
-            >
-              <span className="font-mono font-medium text-[var(--interactive)] group-hover:text-[var(--signal)]">
-                {s.command}
-              </span>
-              {s.description && (
-                <span className="max-w-[180px] truncate text-muted-foreground/70">
-                  {s.description}
-                </span>
-              )}
-            </button>
-          ))}
-          {onCreateCommand && (
-            <button
-              type="button"
-              onClick={onCreateCommand}
-              title="Create a new /command"
-              className="group inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-card px-2.5 py-1 text-[11.5px] text-muted-foreground/80 transition-colors hover:border-[var(--signal)]/60 hover:text-[var(--signal)]"
-            >
-              <Plus className="size-3 text-muted-foreground/70 group-hover:text-[var(--signal)]" strokeWidth={2.5} />
-              <span className="font-medium">create command</span>
-            </button>
-          )}
-        </div>
+      {/* Unified bubble row (T350) — file-upload chips + /command suggestions +
+          the create-command pill, all in ONE transparent, normal-flow container
+          between the conversation and the textarea. The two pill families now
+          coexist (a staged file no longer hides the slash bubbles). Commands are
+          offered only in slash / first-message mode; files whenever staged. */}
+      {(pendingFiles.length > 0 || commandsActive) && (
+        <ComposerBubbles
+          files={pendingFiles}
+          onRemoveFile={onRemoveFile}
+          suggestions={commandsActive ? suggestions : []}
+          onPick={prefill}
+          onCreateCommand={commandsActive ? onCreateCommand : undefined}
+        />
       )}
       {banner && (
         <div className="mb-2 flex items-center justify-center gap-2 rounded-xl bg-muted/40 px-3 py-1.5 text-[11.5px] text-muted-foreground">
@@ -358,24 +327,9 @@ export function ThreadComposer({
         </div>
       )}
 
-      {/* Pending file attachments — uploaded but not yet sent (T331). Shown as
-          removable chips so the user can review / discard before sending. */}
-      {pendingFiles.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {pendingFiles.map((f, i) => (
-            <span key={`${f.path}-${i}`} className="inline-flex items-center gap-1">
-              <FileUploadChip file={f} size={f.size} />
-              <button
-                onClick={() => onRemoveFile?.(i)}
-                className="flex size-4 items-center justify-center rounded-full bg-muted text-muted-foreground/70 transition-colors hover:bg-destructive/20 hover:text-destructive"
-                title="Remove attachment"
-              >
-                <X className="size-2.5" strokeWidth={3} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+      {/* Pending file attachments now render inside the unified ComposerBubbles
+          row above (T350), alongside the /command bubbles — no separate row. */}
+
       <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2.5 card-shadow focus-within:border-[var(--signal)]/60">
         <input
           ref={fileInputRef}

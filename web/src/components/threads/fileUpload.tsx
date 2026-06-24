@@ -1,4 +1,4 @@
-import { Paperclip, AlertTriangle, FolderOpen } from "lucide-react"
+import { Paperclip, AlertTriangle, FolderOpen, Plus, X } from "lucide-react"
 import { kindOf, extOf } from "@/components/finder/support/kind"
 import { FileIcon } from "@/components/finder/support/macIcons"
 import { useFs } from "@/lib/live"
@@ -19,6 +19,25 @@ export interface UploadedFile {
   size: number
   /** provenance note, e.g. `uploaded by user at 2026-…` */
   note: string
+}
+
+/**
+ * A `/command` offered as a composer suggestion bubble (T348/T350). `command`
+ * is the literal slash token (e.g. `/clean`); `name` + `description` label the
+ * bubble; `body` is the expanded prompt seeded on click (when present).
+ *
+ * Lives here — beside {@link UploadedFile} and {@link FileUploadChip} — so the
+ * composer's two pill families (file attachments + command suggestions) share
+ * ONE module and ONE rendered row ({@link ComposerBubbles}), instead of being
+ * two divergent ad-hoc blocks that can't coexist.
+ */
+export interface CommandSuggestion {
+  command: string
+  name: string
+  description: string
+  /** the prompt body the `/command` expands to; seeded into the composer on
+   *  click. Falls back to the bare `command` literal when absent. */
+  body?: string
 }
 
 /**
@@ -295,5 +314,93 @@ export function FileUploadChip({
         </button>
       )}
     </span>
+  )
+}
+
+/**
+ * The composer's unified bubble row — the SINGLE abstraction shared by the two
+ * pill families that sit between the conversation and the textarea: staged
+ * file-upload chips and `/command` suggestion bubbles (+ the create-command
+ * pill). Both render here, in one flex-wrap row, so they coexist cleanly
+ * instead of mutually excluding each other (the pre-fix bug where staging a
+ * file hid the slash-command bubbles, and vice-versa).
+ *
+ * Layout contract (per the T350 request):
+ *   - the **container is transparent** (no background) and lives in normal flow,
+ *     so the space it occupies is carved out *between* the textarea and the
+ *     conversation — it never overlays or hides message content beneath it;
+ *   - each **pill is opaque** (`bg-card`), so nothing bleeds through it.
+ *
+ * Render order: file chips first (most contextual — what you're about to send),
+ * then the command suggestions, then the create-command pill. Any subset may be
+ * empty; the caller decides whether the row renders at all.
+ */
+export function ComposerBubbles({
+  files = [],
+  onRemoveFile,
+  suggestions = [],
+  onPick,
+  onCreateCommand,
+}: {
+  /** staged-but-unsent uploads, rendered as removable chips */
+  files?: UploadedFile[]
+  /** remove a staged file by its index in `files` */
+  onRemoveFile?: (index: number) => void
+  /** `/command` suggestions to offer (empty unless in slash / first-message mode) */
+  suggestions?: CommandSuggestion[]
+  /** seed the composer from a picked suggestion */
+  onPick?: (s: CommandSuggestion) => void
+  /** open the create-command dialog (omit to hide the pill) */
+  onCreateCommand?: () => void
+}) {
+  const showCommands = suggestions.length > 0 || !!onCreateCommand
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-1.5 bg-transparent">
+      {/* Staged file attachments — opaque removable chips. */}
+      {files.map((f, i) => (
+        <span key={`${f.path}-${i}`} className="inline-flex items-center gap-1">
+          <FileUploadChip file={f} size={f.size} />
+          <button
+            onClick={() => onRemoveFile?.(i)}
+            className="flex size-4 items-center justify-center rounded-full bg-muted text-muted-foreground/70 transition-colors hover:bg-destructive/20 hover:text-destructive"
+            title="Remove attachment"
+          >
+            <X className="size-2.5" strokeWidth={3} />
+          </button>
+        </span>
+      ))}
+
+      {/* /command suggestion bubbles — opaque pills. */}
+      {showCommands &&
+        suggestions.map((s) => (
+          <button
+            key={s.command}
+            type="button"
+            onClick={() => onPick?.(s)}
+            title={s.description || s.name}
+            className="group inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground/75 transition-colors hover:border-[var(--signal)]/60 hover:text-[var(--signal)]"
+          >
+            <span className="font-mono font-medium text-[var(--interactive)] group-hover:text-[var(--signal)]">
+              {s.command}
+            </span>
+            {s.description && (
+              <span className="max-w-[180px] truncate text-muted-foreground/70">{s.description}</span>
+            )}
+          </button>
+        ))}
+
+      {/* Create-command pill — opaque, dashed to read as an action. */}
+      {showCommands && onCreateCommand && (
+        <button
+          type="button"
+          onClick={onCreateCommand}
+          title="Create a new /command"
+          className="group inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-card px-2.5 py-1 text-[11.5px] text-muted-foreground/80 transition-colors hover:border-[var(--signal)]/60 hover:text-[var(--signal)]"
+        >
+          <Plus className="size-3 text-muted-foreground/70 group-hover:text-[var(--signal)]" strokeWidth={2.5} />
+          <span className="font-medium">create command</span>
+        </button>
+      )}
+    </div>
   )
 }
