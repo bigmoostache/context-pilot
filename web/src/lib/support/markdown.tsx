@@ -52,6 +52,13 @@ function components(variant: MarkdownVariant): Components {
   const tableBorder = onAccent ? "border-white/25" : "border-border"
   const tableHeadBg = onAccent ? "bg-white/10" : "bg-muted/60"
 
+  // List bullet/number ink. On the accent bubble the marker MUST inherit the
+  // bubble's foreground (`currentColor` = `--primary-foreground`) — the old
+  // hardcoded `text-muted-foreground/60` resolved to a near-background tint in
+  // dark mode, rendering bullets and numbers white-on-white (invisible). The
+  // default surface keeps the deliberately-muted marker.
+  const markerColor = onAccent ? "marker:text-current" : "marker:text-muted-foreground/60"
+
   return {
     // ── Headings — graded scale, tight top spacing, no top margin on first. ──
     h1: ({ children }) => (
@@ -90,12 +97,12 @@ function components(variant: MarkdownVariant): Components {
 
     // ── Lists ──
     ul: ({ children }) => (
-      <ul className="my-1.5 list-disc space-y-0.5 pl-5 marker:text-muted-foreground/60 first:mt-0 last:mb-0">
+      <ul className={cn("my-1.5 list-disc space-y-0.5 pl-5 first:mt-0 last:mb-0", markerColor)}>
         {children}
       </ul>
     ),
     ol: ({ children }) => (
-      <ol className="my-1.5 list-decimal space-y-0.5 pl-5 marker:text-muted-foreground/60 first:mt-0 last:mb-0">
+      <ol className={cn("my-1.5 list-decimal space-y-0.5 pl-5 first:mt-0 last:mb-0", markerColor)}>
         {children}
       </ol>
     ),
