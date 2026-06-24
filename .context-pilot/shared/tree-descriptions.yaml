@@ -3010,6 +3010,10 @@
   path: src/llms/anthropic/mod.rs
   description: Direct Anthropic Messages API client. SSE stream parsing (content_block_start/delta/stop, message_delta/stop). x-api-key auth from ANTHROPIC_API_KEY. No cache breakpoints. timeout(None) for long streams.
   last_edited_ms: 0
+52b8aca4f362da0b:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 52c0b2221621f20c:
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: selected thread''s full conversation + composer. Header-less. Auto-scrolls to bottom on thread open (thread.id change) and when the log grows, via a bottom sentinel ref + scrollIntoView (T35 — keeps latest message in view like the TUI). toChatMessage maps ThreadMsg→ChatMessage. ThreadComposer keyed by thread.id (remount refocuses/clears on switch). Passes onSend to composer + QuestionForm.'
@@ -3494,6 +3498,10 @@
   path: src/llms/claude_code_api_key/mod.rs
   description: Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
   last_edited_ms: 1780565754894
+6135b901cdf79a53:
+  path: src/app/run/tools/mod.rs
+  description: 'Sub-module declarations: checks, cleanup, pipeline, queue_flush.'
+  last_edited_ms: 0
 613a03b6bbdd6bbb:
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): ReplayState{rev_head,heads,seen}. fold_entry(&mut ReplayState,&entry) pub(crate): Checkpoint=authoritative clone_from(heads+seen), MessageCreated=set_thread_head, CommandEffect|SeenMark=seen.mark(token,rev), others no-op. replay() fast-path reads ONLY newest segment when it opens with a checkpoint (Snapshot-seeded); replay_full fallback for seg-0-only. OplogResult from crate::error. Heads PartialEq order-sensitive. 10 tests incl seen-set V3 + fast==full.'
@@ -7626,6 +7634,10 @@ cea9094e8b06f613:
   path: crates/cp-mod-bridge/src/boot.rs
   description: 'Phase 10 (X777): Boot — agent boot sequence + held resources. start_in(folder,agents_dir,model): (1) flock <folder>/bridge.lock EXCLUSIVE|NONBLOCK FIRST (single-process gate I1/D2, EAGAIN→AlreadyRunning); (2) OplogService::spawn(oplog dir); (3) bind stream.sock (unlink stale first); (4) mint cap_token+boot_id; (5) write registry <id>.json LAST (atomic, after all resources). Drop removes registry+socket; lock+oplog release via own Drop. H5 FD-inherit deferred (CLOEXEC kept). 6 tests: all-resources, second-boot-refuses, lock-released-on-drop, registry-removed, stale-socket-replaced.'
   last_edited_ms: 0
+cec811487d1a1825:
+  path: src/app/run/tools/watchdog.rs
+  description: 'Interactive main-loop watchdog (T358) — PURELY OBSERVATIONAL wedge detector + auto-diagnostics, never terminates/signals (human at keyboard). Two cooperating detectors on the single-threaded TUI loop: (1) heartbeat — beat() stored at loop top each iteration; stale > WEDGE_STALL_MS(15s) ⇒ total wedge; (2) activity marker — mark(Step) before each loop phase (Step enum 0..12 Idle/Input/Bridge/ThreadsEmit/Stream/Cache/Watchers/Tools/Spine/Reverie/PanelRefresh/Render/Save); a step in flight > SLOW_STEP_MS(12s) ⇒ names the wedged culprit. spawn() launches a detached monitor_loop()->! polling every 2s; on a trip dump_diagnostic(&Wedge) writes .context-pilot/errors/watchdog-<ts>.log with CPU% (high=busy-loop, low=blocked/deadlock) + per-thread states (Linux /proc/self/task wchan) / macOS `sample` backtrace. beat/mark = AtomicU64/U8 Relaxed (~ns, zero happy-path cost). Episode-dedup via last heartbeat. CPU_SAMPLE_MS cfg-gated to linux.'
+  last_edited_ms: 1782303374753
 cee0067c856dd433:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Cream Noir'', the SYMMETRIC LIGHTNESS-MIRROR of Cream (#1C1815 espresso bg / #2B2620 surface / #CF8A7D lifted clay-rose / #F3EBDD cream fg; warm hue + clay-rose primary + teal accent preserved) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (agent dialog), finder-slider.'
@@ -7917,6 +7929,10 @@ d66af40c87661284:
 d679e9d5f7e34ec1:
   path: web/src/components/shell/TopBar.tsx
   description: 'macOS title bar. Accepts agents prop for AgentSwitcher + activeAgent lookup. View switcher Threads·Finder·Cockpit. Right cluster: cost, Activity→StatsPopup(agentId), theme, agent config (AgentModal), UserMenu (Profile+Settings).'
+  last_edited_ms: 0
+d67fd0e309b7375f:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop with flame!("loop"). Input-first (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. poll_bridge_commands every tick. cp_mod_bridge::try_recover throttled ~2s = bridge self-heal. X18 adaptive idle poll (8ms streaming/dirty, 2ms bridge_active, 50ms otherwise). T309: update_spinner_animation now gates its forced 100ms dirty on has_active_animation (streaming/tooling | timed-watcher WAITING | loading panel | running console) — a genuinely idle agent produces ZERO periodic renders (was a permanent 10fps full-redraw floor forever), falling to ~0% CPU; event-driven redraws untouched.'
   last_edited_ms: 0
 d68035df2e8b5920:
   path: crates/cp-oplog/src/compact.rs

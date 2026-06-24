@@ -6,3 +6,5 @@ pub(crate) mod cleanup;
 pub(crate) mod pipeline;
 /// Queue flush execution — dequeues and runs all queued tool calls.
 pub(crate) mod queue_flush;
+/// Interactive main-loop wedge watchdog (heartbeat + activity marker + diagnostic dump).
+pub(crate) mod watchdog;

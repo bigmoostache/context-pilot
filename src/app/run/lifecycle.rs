@@ -47,6 +47,11 @@ impl App {
         // Claim ownership immediately
         save_state(&self.state);
 
+        // Start the interactive main-loop watchdog (purely observational — dumps
+        // a diagnostic to .context-pilot/errors/ if the single-threaded loop
+        // wedges, never terminates/signals the process). Idempotent.
+        super::tools::watchdog::spawn();
+
         // Auto-resume streaming if flag was set (e.g., after reload_tui)
         if self.resume_stream {
             self.resume_stream = false;
@@ -62,6 +67,13 @@ impl App {
         loop {
             let current_ms = now_ms();
             let _fg = cp_base::flame!("loop");
+
+            // Main-loop heartbeat: a fresh tick every iteration. The watchdog
+            // thread declares a wedge if this stops advancing (the loop ticks at
+            // least every ~50 ms even while idle, so staleness is unambiguous).
+            super::tools::watchdog::beat();
+            super::tools::watchdog::mark(super::tools::watchdog::Step::Input);
+
 
             // === INPUT FIRST: Process user input with minimal latency ===
             // Non-blocking check for input - handle immediately for responsive feel
@@ -133,15 +145,20 @@ impl App {
             }
 
             // === BACKGROUND PROCESSING ===
+            super::tools::watchdog::mark(super::tools::watchdog::Step::Bridge);
             super::threads::poll_bridge_commands(self);
+            super::tools::watchdog::mark(super::tools::watchdog::Step::ThreadsEmit);
             super::threads::emit_vitals(self);
             super::threads::emit_messages(self);
             super::threads::emit_thread_status(self);
             super::threads::emit_thread_focus(self);
+            super::tools::watchdog::mark(super::tools::watchdog::Step::Stream);
             super::streaming::process_stream_events(self, ch.rx);
             super::streaming::handle_retry(self, ch.tx);
             super::streaming::process_typewriter(self);
+            super::tools::watchdog::mark(super::tools::watchdog::Step::Cache);
             super::watchers::process_cache_updates(self, ch.cache_rx);
+            super::tools::watchdog::mark(super::tools::watchdog::Step::Watchers);
             super::watchers::process_watcher_events(self);
             // Check if we're waiting for panels and they're ready (non-blocking)
             super::tools::checks::check_waiting_for_panels(self, ch.tx);
@@ -169,16 +186,20 @@ impl App {
             // inside prepare_stream_context() which never happens when idle.
             if current_ms.saturating_sub(self.last_chat_drain_ms) >= 2_000 {
                 self.last_chat_drain_ms = current_ms;
+                super::tools::watchdog::mark(super::tools::watchdog::Step::PanelRefresh);
                 crate::app::panels::refresh_all_panels(&mut self.state);
             }
             super::watchers::check_timer_based_deprecation(self);
+            super::tools::watchdog::mark(super::tools::watchdog::Step::Tools);
             super::tools::pipeline::handle_tool_execution(self, ch.tx);
             super::streaming::finalize_stream(self);
+            super::tools::watchdog::mark(super::tools::watchdog::Step::Spine);
             self.check_spine(ch.tx);
             super::threads::check_my_turn_threads(self);
             super::streaming::process_api_check_results(self);
 
             // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
+            super::tools::watchdog::mark(super::tools::watchdog::Step::Reverie);
             // Check if a reverie needs to start streaming (state.reverie exists but no stream yet)
             super::reverie::maybe_start_reverie_stream(self);
             // Poll reverie stream events (text chunks, tool calls, done/error)
@@ -201,6 +222,7 @@ impl App {
             // Check ownership periodically (every 1 second)
             if current_ms.saturating_sub(self.last_ownership_check_ms) >= 1000 {
                 self.last_ownership_check_ms = current_ms;
+                super::tools::watchdog::mark(super::tools::watchdog::Step::Save);
                 if !check_ownership() {
                     // Another instance took over - exit gracefully
                     break;
@@ -212,6 +234,7 @@ impl App {
 
             // Render if dirty and enough time has passed (capped at ~28fps)
             if self.state.flags.ui.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
+                super::tools::watchdog::mark(super::tools::watchdog::Step::Render);
                 let _r = terminal.draw(|frame| {
                     ui::render(frame, &mut self.state);
                     self.command_palette.render(frame, &self.state);
@@ -219,6 +242,7 @@ impl App {
                 self.state.flags.ui.dirty = false;
                 self.last_render_ms = current_ms;
             }
+
 
             // Adaptive poll: sleep longer when idle, shorter when actively
             // streaming or when the orchestration bridge is connected (a web
@@ -232,6 +256,7 @@ impl App {
             } else {
                 50 // 50ms when idle — still responsive for typing, much less CPU
             };
+            super::tools::watchdog::mark(super::tools::watchdog::Step::Idle);
             let _r = event::poll(Duration::from_millis(poll_ms))?;
         }
 
