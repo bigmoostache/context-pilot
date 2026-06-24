@@ -362,7 +362,7 @@ pub(in crate::app::run) fn emit_thread_status(app: &mut App) {
     // is missing, self-healing disk↔oplog divergence on every boot. Threads the
     // oplog has never recorded a status for are simply absent from the seed, so
     // the diff emits their current status (correct — the view doesn't know it).
-    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.statuses);
+    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.statuses());
     if !seeded {
         let oplog_statuses = oplog_roster_statuses(&app.state);
         let bs = app.state.ext_mut::<BridgeState>();
@@ -370,7 +370,7 @@ pub(in crate::app::run) fn emit_thread_status(app: &mut App) {
         // `iter_over_hash_type` lint; insertion order is irrelevant since each
         // thread id appears once in the roster and the memo is keyed by id.
         bs.thread_statuses.extend(oplog_statuses);
-        bs.seeded.statuses = true;
+        bs.seeded.seed_statuses();
         // Intentionally NO early return: fall through so the diff below emits
         // any flip the oplog missed while the bridge was down.
     }
@@ -428,11 +428,11 @@ pub(in crate::app::run) fn emit_thread_focus(app: &mut App) {
     let focused = FocusState::get(&app.state).focused_thread_id.clone();
 
     // First pass: snapshot the existing focus without emitting.
-    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.focus);
+    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.focus());
     if !seeded {
         let bs = app.state.ext_mut::<BridgeState>();
         bs.last_focus = focused;
-        bs.seeded.focus = true;
+        bs.seeded.seed_focus();
         return;
     }
 

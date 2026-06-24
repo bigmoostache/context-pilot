@@ -104,6 +104,12 @@ pub struct Thread {
     /// but retained in state so the web frontend can display and restore them.
     #[serde(default)]
     pub archived: bool,
+    /// Pause flag — paused threads suppress `MY_TURN` idle notifications so
+    /// the AI does not nag about them, but remain visible and fully functional.
+    /// The user sets this when they are still composing input and do not want
+    /// the agent to act yet.
+    #[serde(default)]
+    pub paused: bool,
 }
 
 // =============================================================================
@@ -161,7 +167,7 @@ impl ThreadsState {
     /// makes it count again.
     #[must_use]
     pub fn has_my_turn_threads(&self) -> bool {
-        self.threads.iter().any(|t| !t.archived && t.status == ThreadStatus::MyTurn)
+        self.threads.iter().any(|t| !t.archived && !t.paused && t.status == ThreadStatus::MyTurn)
     }
 
     /// Indices into [`Self::threads`] of the threads whose `archived` flag

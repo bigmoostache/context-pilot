@@ -363,6 +363,8 @@ export interface ThreadDetail {
   unread: number
   /** archived threads are hidden from the main list, viewable on demand */
   archived?: boolean
+  /** paused threads suppress MY_TURN notifications but remain visible (T371) */
+  paused?: boolean
   /** true when this is the thread the AI is currently focused on */
   focused?: boolean
   log: ThreadMsg[]

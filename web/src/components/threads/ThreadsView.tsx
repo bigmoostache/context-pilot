@@ -161,6 +161,16 @@ export function ThreadsView({
     )
   }, [threads, activeAgentId, flash, selectedId])
 
+  const handlePause = useCallback((id: string) => {
+    const t = threads.find((th) => th.id === id)
+    if (!t) return
+    const kind = t.paused ? "resume_thread" : "pause_thread"
+    const verb = t.paused ? "resume the thread" : "pause the thread"
+    sendCommand(activeAgentId, { kind, thread_id: id }).catch((e) =>
+      flash(describeCommandError(verb, e)),
+    )
+  }, [threads, activeAgentId, flash])
+
   const handleCreate = useCallback((title: string) => {
     pendingSelect.current = true
     sendCommand(activeAgentId, { kind: "create_thread", name: title.trim() || "Untitled thread" })
@@ -237,6 +247,7 @@ export function ThreadsView({
         showArchived={showArchived}
         onToggleArchived={setShowArchived}
         onArchive={handleArchive}
+        onPause={handlePause}
         onNewThread={() => setNewOpen(true)}
       />
 

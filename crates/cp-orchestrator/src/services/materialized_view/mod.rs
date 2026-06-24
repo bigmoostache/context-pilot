@@ -156,6 +156,12 @@ impl AgentView {
             OpEntryKind::ThreadRestored { thread_id } => {
                 RosterThread::fold_archived(&mut self.roster, thread_id, false);
             }
+            OpEntryKind::ThreadPaused { thread_id } => {
+                RosterThread::fold_paused(&mut self.roster, thread_id, true);
+            }
+            OpEntryKind::ThreadResumed { thread_id } => {
+                RosterThread::fold_paused(&mut self.roster, thread_id, false);
+            }
             OpEntryKind::ThreadStatusChanged { thread_id, status } => {
                 RosterThread::fold_status(&mut self.roster, thread_id, *status);
             }

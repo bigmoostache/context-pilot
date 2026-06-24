@@ -78,6 +78,11 @@ pub struct RosterThread {
     /// list but restorable).
     pub archived: bool,
 
+    /// Whether the thread is paused — `MY_TURN` status no longer fires idle
+    /// notifications, but the thread remains visible and functional.
+    #[serde(default)]
+    pub paused: bool,
+
     /// Epoch-ms of the latest activity — creation time, then bumped by each
     /// message.
     pub last_activity_ms: u64,
@@ -125,6 +130,7 @@ impl RosterThread {
                 name: created.name.to_owned(),
                 status: created.status,
                 archived: false,
+                paused: false,
                 last_activity_ms: created.timestamp_ms,
                 msg_count: 0,
             });
@@ -135,6 +141,13 @@ impl RosterThread {
     pub fn fold_archived(roster: &mut [Self], thread_id: &str, archived: bool) {
         if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
             existing.archived = archived;
+        }
+    }
+
+    /// Set the `paused` flag for `thread_id`, if present (a no-op otherwise).
+    pub fn fold_paused(roster: &mut [Self], thread_id: &str, paused: bool) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
+            existing.paused = paused;
         }
     }
 

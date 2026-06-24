@@ -126,6 +126,22 @@ pub enum OpEntryKind {
         thread_id: String,
     },
 
+    /// A thread was paused — its `MY_TURN` status no longer fires idle
+    /// notifications, but it remains visible and fully functional.
+    #[serde(rename = "thread_paused")]
+    ThreadPaused {
+        /// The paused thread.
+        thread_id: String,
+    },
+
+    /// A previously-paused thread was resumed — its `MY_TURN` status fires
+    /// idle notifications again.
+    #[serde(rename = "thread_resumed")]
+    ThreadResumed {
+        /// The resumed thread.
+        thread_id: String,
+    },
+
     /// A thread's turn ownership changed (`MyTurn` ↔ `TheirTurn`).
     #[serde(rename = "thread_status_changed")]
     ThreadStatusChanged {

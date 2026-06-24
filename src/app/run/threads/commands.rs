@@ -36,6 +36,12 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
         CommandKind::RestoreThread { thread_id } => {
             apply_restore_thread(&mut app.state, &thread_id);
         }
+        CommandKind::PauseThread { thread_id } => {
+            apply_pause_thread(&mut app.state, &thread_id);
+        }
+        CommandKind::ResumeThread { thread_id } => {
+            apply_resume_thread(&mut app.state, &thread_id);
+        }
         CommandKind::Stop | CommandKind::InterruptStream => {
             apply_stop(&mut app.state);
         }
@@ -101,6 +107,7 @@ fn apply_create_thread(state: &mut State, name: &str) {
         messages: vec![],
         created_at: now_ms(),
         archived: false,
+        paused: false,
     });
 
     // Emit the durable roster delta so the backend view reflects the new
@@ -174,6 +181,42 @@ fn apply_restore_thread(state: &mut State, thread_id: &str) {
         log::info!("bridge: restored thread {thread_id}");
     } else {
         log::warn!("bridge: RestoreThread for unknown thread {thread_id}");
+    }
+}
+
+// ── PauseThread ─────────────────────────────────────────────────────────
+
+/// Pause a thread — suppress `MY_TURN` notifications without archiving.
+fn apply_pause_thread(state: &mut State, thread_id: &str) {
+    let ts = ThreadsState::get_mut(state);
+    if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) {
+        thread.paused = true;
+        emit_roster_delta(state, OpEntryKind::ThreadPaused { thread_id: thread_id.to_owned() });
+        if let Some(bs) = state.get_ext_mut::<BridgeState>() {
+            let _prev = bs.thread_paused_memo.insert(thread_id.to_owned(), true);
+        }
+        state.flags.ui.dirty = true;
+        log::info!("bridge: paused thread {thread_id}");
+    } else {
+        log::warn!("bridge: PauseThread for unknown thread {thread_id}");
+    }
+}
+
+// ── ResumeThread ────────────────────────────────────────────────────────
+
+/// Resume a paused thread — re-enable `MY_TURN` notifications.
+fn apply_resume_thread(state: &mut State, thread_id: &str) {
+    let ts = ThreadsState::get_mut(state);
+    if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) {
+        thread.paused = false;
+        emit_roster_delta(state, OpEntryKind::ThreadResumed { thread_id: thread_id.to_owned() });
+        if let Some(bs) = state.get_ext_mut::<BridgeState>() {
+            let _prev = bs.thread_paused_memo.insert(thread_id.to_owned(), false);
+        }
+        state.flags.ui.dirty = true;
+        log::info!("bridge: resumed thread {thread_id}");
+    } else {
+        log::warn!("bridge: ResumeThread for unknown thread {thread_id}");
     }
 }
 

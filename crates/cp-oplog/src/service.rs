@@ -106,6 +106,8 @@ impl Durability {
             | OpEntryKind::ThreadCreated { .. }
             | OpEntryKind::ThreadArchived { .. }
             | OpEntryKind::ThreadRestored { .. }
+            | OpEntryKind::ThreadPaused { .. }
+            | OpEntryKind::ThreadResumed { .. }
             | OpEntryKind::ThreadStatusChanged { .. }
             | OpEntryKind::Lifecycle { .. }
             | OpEntryKind::Checkpoint { .. }

@@ -98,6 +98,12 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
         OpEntryKind::ThreadRestored { thread_id } => {
             RosterThread::fold_archived(&mut state.roster, thread_id, false);
         }
+        OpEntryKind::ThreadPaused { thread_id } => {
+            RosterThread::fold_paused(&mut state.roster, thread_id, true);
+        }
+        OpEntryKind::ThreadResumed { thread_id } => {
+            RosterThread::fold_paused(&mut state.roster, thread_id, false);
+        }
         OpEntryKind::ThreadStatusChanged { thread_id, status } => {
             RosterThread::fold_status(&mut state.roster, thread_id, *status);
         }

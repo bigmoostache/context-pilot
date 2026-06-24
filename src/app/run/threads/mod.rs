@@ -10,9 +10,11 @@ mod bridge;
 mod commands;
 mod messages;
 mod archived;
+mod paused;
 pub(super) use bridge::{bridge_active, emit_thread_focus, emit_thread_status, emit_vitals, poll_bridge_commands};
 pub(super) use messages::emit_messages;
 pub(super) use archived::emit_thread_archived;
+pub(super) use paused::emit_thread_paused;
 
 use crate::app::App;
 use crate::app::PendingDone;
@@ -80,8 +82,8 @@ pub(super) fn maybe_inject_auto_read(app: &mut App) -> bool {
     // Archived threads are LLM-invisible (T9) and never auto-read.
     let my_turn = candidate_ids
         .iter()
-        .find_map(|tid| ts.threads.iter().find(|t| t.id == *tid && !t.archived && t.status == ThreadStatus::MyTurn))
-        .or_else(|| ts.threads.iter().find(|t| !t.archived && t.status == ThreadStatus::MyTurn));
+        .find_map(|tid| ts.threads.iter().find(|t| t.id == *tid && !t.archived && !t.paused && t.status == ThreadStatus::MyTurn))
+        .or_else(|| ts.threads.iter().find(|t| !t.archived && !t.paused && t.status == ThreadStatus::MyTurn));
 
     let Some(thread) = my_turn else {
         return false;
@@ -159,7 +161,8 @@ pub(super) fn check_my_turn_threads(app: &mut App) {
 
     let threads = ThreadsState::get(&app.state);
     // Archived threads are invisible to the LLM (T9) — they never nudge.
-    let my_turn = threads.threads.iter().find(|t| !t.archived && t.status == ThreadStatus::MyTurn);
+    // Paused threads suppress MY_TURN notifications (T371).
+    let my_turn = threads.threads.iter().find(|t| !t.archived && !t.paused && t.status == ThreadStatus::MyTurn);
 
     let Some(thread) = my_turn else {
         // No MY_TURN threads — clear debounce.

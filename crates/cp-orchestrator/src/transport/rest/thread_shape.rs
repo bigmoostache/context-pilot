@@ -29,6 +29,7 @@ pub(super) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[Ros
                 if let Some(obj) = detail.as_object_mut() {
                     let _prev = obj.insert("status".to_owned(), roster_status_value(entry.status));
                     let _prev = obj.insert("archived".to_owned(), serde_json::Value::Bool(entry.archived));
+                    let _prev = obj.insert("paused".to_owned(), serde_json::Value::Bool(entry.paused));
                     // Activity is the later of the two: disk has real message
                     // timestamps; the view bumps on creation/restore.
                     let disk_activity = obj.get("lastActivity").and_then(serde_json::Value::as_u64).unwrap_or(0);
@@ -55,6 +56,7 @@ fn synthesize_from_roster(entry: &RosterEntry, agent_id: &str) -> serde_json::Va
         "messageCount": entry.msg_count,
         "unread": 0,
         "archived": entry.archived,
+        "paused": entry.paused,
         "log": serde_json::Value::Array(Vec::new()),
     })
 }
@@ -106,6 +108,7 @@ pub(super) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_j
         "messageCount": msg_count,
         "unread": unread,
         "archived": raw.get("archived").and_then(serde_json::Value::as_bool).unwrap_or(false),
+        "paused": raw.get("paused").and_then(serde_json::Value::as_bool).unwrap_or(false),
         "log": log,
     })
 }

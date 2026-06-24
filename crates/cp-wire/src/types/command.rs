@@ -69,6 +69,20 @@ pub enum Kind {
         thread_id: String,
     },
 
+    /// Pause a thread (suppress `MY_TURN` notifications).
+    #[serde(rename = "pause_thread")]
+    PauseThread {
+        /// Thread to pause.
+        thread_id: String,
+    },
+
+    /// Resume a previously paused thread.
+    #[serde(rename = "resume_thread")]
+    ResumeThread {
+        /// Thread to resume.
+        thread_id: String,
+    },
+
     /// Interrupt the agent's current LLM stream.
     #[serde(rename = "interrupt_stream")]
     InterruptStream,

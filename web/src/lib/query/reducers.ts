@@ -123,6 +123,7 @@ export function applyThreadDelta(
         lastActivityMs: ts,
         unread: 0,
         archived: false,
+        paused: false,
         focused: false,
         log: [],
       }
@@ -133,6 +134,12 @@ export function applyThreadDelta(
       const archived = k.kind === "thread_archived"
       if (!prev.some((t) => t.id === k.thread_id)) return null
       return prev.map((t) => (t.id === k.thread_id ? { ...t, archived } : t))
+    }
+    case "thread_paused":
+    case "thread_resumed": {
+      const paused = k.kind === "thread_paused"
+      if (!prev.some((t) => t.id === k.thread_id)) return null
+      return prev.map((t) => (t.id === k.thread_id ? { ...t, paused } : t))
     }
     case "thread_status_changed": {
       if (!prev.some((t) => t.id === k.thread_id)) return null

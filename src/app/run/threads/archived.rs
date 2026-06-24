@@ -60,12 +60,12 @@ pub(in crate::app::run) fn emit_thread_archived(app: &mut App) {
     }
 
     // First pass after (re)boot: seed from the oplog, then FALL THROUGH.
-    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.archived);
+    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.archived());
     if !seeded {
         let oplog_archived = oplog_roster_archived(&app.state);
         let bs = app.state.ext_mut::<BridgeState>();
         bs.thread_archived_memo.extend(oplog_archived);
-        bs.seeded.archived = true;
+        bs.seeded.seed_archived();
         // Fall through — diff below emits any flip the oplog missed.
     }
 

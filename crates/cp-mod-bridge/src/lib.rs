@@ -78,16 +78,49 @@ pub type ContextMemo = (u64, u64, u64, u64, u64);
 ///
 /// Each flag is `false` until the corresponding chokepoint runs its first
 /// pass (seed without emit), then `true` for the remainder of the session.
+/// Stored as a compact bitfield to stay under the `struct_excessive_bools`
+/// lint (5 independent seed flags).
 #[derive(Debug, Default, Clone, Copy)]
-pub struct MemoSeeds {
+pub struct MemoSeeds(u8);
+
+impl MemoSeeds {
+    /// Bit position: messages memo.
+    const MESSAGES: u8 = 1 << 0;
+    /// Bit position: statuses memo.
+    const STATUSES: u8 = 1 << 1;
+    /// Bit position: focus memo.
+    const FOCUS: u8 = 1 << 2;
+    /// Bit position: archived memo.
+    const ARCHIVED: u8 = 1 << 3;
+    /// Bit position: paused memo.
+    const PAUSED: u8 = 1 << 4;
+
     /// Messages memo seeded (`emit_messages`).
-    pub messages: bool,
+    #[must_use]
+    pub const fn messages(self) -> bool { self.0 & Self::MESSAGES != 0 }
     /// Thread-status memo seeded (`emit_thread_status`).
-    pub statuses: bool,
+    #[must_use]
+    pub const fn statuses(self) -> bool { self.0 & Self::STATUSES != 0 }
     /// Focus memo seeded (`emit_thread_focus`).
-    pub focus: bool,
+    #[must_use]
+    pub const fn focus(self) -> bool { self.0 & Self::FOCUS != 0 }
     /// Archived memo seeded (`emit_thread_archived`).
-    pub archived: bool,
+    #[must_use]
+    pub const fn archived(self) -> bool { self.0 & Self::ARCHIVED != 0 }
+    /// Paused memo seeded (`emit_thread_paused`).
+    #[must_use]
+    pub const fn paused(self) -> bool { self.0 & Self::PAUSED != 0 }
+
+    /// Mark messages as seeded.
+    pub const fn seed_messages(&mut self) { self.0 |= Self::MESSAGES; }
+    /// Mark statuses as seeded.
+    pub const fn seed_statuses(&mut self) { self.0 |= Self::STATUSES; }
+    /// Mark focus as seeded.
+    pub const fn seed_focus(&mut self) { self.0 |= Self::FOCUS; }
+    /// Mark archived as seeded.
+    pub const fn seed_archived(&mut self) { self.0 |= Self::ARCHIVED; }
+    /// Mark paused as seeded.
+    pub const fn seed_paused(&mut self) { self.0 |= Self::PAUSED; }
 }
 
 /// Runtime state for the bridge (stored in [`State`]'s `TypeMap`).
@@ -171,6 +204,12 @@ pub struct BridgeState {
     /// actual change — the same observe-on-change discipline as the status and
     /// message chokepoints.
     pub thread_archived_memo: std::collections::HashMap<String, bool>,
+
+    /// Per-thread paused flag as last emitted/seeded, keyed by thread id.
+    /// The paused chokepoint diffs each thread's live `paused` against this
+    /// memo every tick and emits `ThreadPaused`/`ThreadResumed` only on an
+    /// actual change — mirrors the archived chokepoint (T371).
+    pub thread_paused_memo: std::collections::HashMap<String, bool>,
 
     /// Flags tracking which observe-on-change memos have been seeded from the
     /// oplog roster on the first tick after boot. See [`MemoSeeds`].
@@ -408,10 +447,12 @@ mod tests {
         assert!(bs.thread_statuses.is_empty());
         assert!(bs.last_focus.is_none());
         assert!(bs.thread_archived_memo.is_empty());
-        assert!(!bs.seeded.messages);
-        assert!(!bs.seeded.statuses);
-        assert!(!bs.seeded.focus);
-        assert!(!bs.seeded.archived);
+        assert!(bs.thread_paused_memo.is_empty());
+        assert!(!bs.seeded.messages());
+        assert!(!bs.seeded.statuses());
+        assert!(!bs.seeded.focus());
+        assert!(!bs.seeded.archived());
+        assert!(!bs.seeded.paused());
         assert!(!bs.pending);
         assert!(bs.pending_model.is_empty());
     }

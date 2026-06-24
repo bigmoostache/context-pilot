@@ -251,6 +251,7 @@ fn handle_thread_create(state: &mut State) -> ActionResult {
         messages: vec![],
         created_at: crate::app::panels::now_ms(),
         archived: false,
+        paused: false,
     };
     threads_state.threads.push(thread);
 

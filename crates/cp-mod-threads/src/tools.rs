@@ -305,6 +305,9 @@ fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String 
         if focused {
             _ = writeln!(output, "    focused: true");
         }
+        if t.paused {
+            _ = writeln!(output, "    paused: true");
+        }
     }
 
     // Focused thread's conversation (last MAX_PANEL_MESSAGES messages)

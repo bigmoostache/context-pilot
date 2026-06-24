@@ -90,6 +90,10 @@
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+027893de92611844:
+  path: src/app/run/threads/mod.rs
+  description: 'Thread helpers for main loop: maybe_inject_auto_read (filters paused threads — T371), check_my_turn_threads (filters paused threads — T371), extract_thread_ids, maybe_append_tool_activity. emit_thread_paused re-exported from paused.rs.'
+  last_edited_ms: 1782311327193
 02d8802643f1f70d:
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread input composer. Textarea always visible/usable. Working hint above input shows on AGENT''S TURN — MY_TURN (''Agent is working this thread…'', signal) or ACTIVE (''Agent is streaming…'', green/ok); THEIR_TURN (user turn) shows NO hint, just a ready composer (T28 fix: hint was previously inverted onto THEIR_TURN). onSend callback, Enter=submit, Shift+Enter=newline.'
@@ -134,6 +138,10 @@
   path: yamls/tools/entities.yaml
   description: 'Entity SQL tool YAML. Single tool: entity_sql with sql param. Full SQLite support description (JOINs, CTEs, RETURNING, CREATE TABLE IF NOT EXISTS).'
   last_edited_ms: 1780583349377
+03c5c6547ef76638:
+  path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
+  description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/paused/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape. paused field included in overlay and reshape (T371).'
+  last_edited_ms: 1782311326977
 03d52ab0d0f728e9:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
@@ -306,6 +314,10 @@
   path: ui/src/components/shell/ConfigPanel.tsx
   description: 'Shared settings body (macOS System-Settings: category rail + detail pane). variant=''dialog''|''inline''. Categories: General/Usage/Providers/Search/DocAI/Web/Integrations. Reads useAccount: when managedByCompany (T30) key panes show ManagedKeysNotice banner + each KeyRow LOCKED (Lock glyph, masked, ManagedPill). Usage renders <UsagePage/> full-bleed. Personal accounts: masked keys w/ reveal eye, toggles, default-model picker.'
   last_edited_ms: 1781600078282
+07c144ddda3ec013:
+  path: src/app/run/threads/archived.rs
+  description: 'Live thread-archived emission chokepoint: diffs each thread''s archived flag vs memo, emits durable ThreadArchived/ThreadRestored deltas. Seeds from oplog roster on first pass.'
+  last_edited_ms: 1782310414819
 07c4e2a77b4470b1:
   path: yamls/tools/ocr.yaml
   description: 'OCR tool YAML. Single tool: ocr with path/mode/output params. Datalab Surya engine, markdown or text_boxes modes.'
@@ -1518,6 +1530,10 @@
   path: .github/workflows/pr-cleanup.yml
   description: 'CI: stale PR auto-cleanup'
   last_edited_ms: 0
+28c2b4ddd3bbf30c:
+  path: src/app/run/threads/bridge.rs
+  description: Bridge command intake + live-state emission (gated bridge-ON). emit_thread_status seeds from oplog roster, uses MemoSeeds bitfield accessors. emit_thread_focus uses MemoSeeds.focus()/seed_focus(). emit_vitals=best-effort. emit_roster_delta=durable. wire_turn. Command APPLICATION in sibling commands.rs.
+  last_edited_ms: 1782311327100
 28c8b16d76679d60:
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups: Needs you/Active/Working in parallel. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
@@ -2238,6 +2254,10 @@
   path: crates/cp-wire/src/types/command.rs
   description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, InterruptStream, Stop, Configure{provider,model}, Unknown). Frame{schema_version, auth, command} bearer-checked before payload. 5 tests incl configure round-trip + tolerant decode.
   last_edited_ms: 1781878131920
+3d572830cad0a123:
+  path: crates/cp-oplog/src/replay.rs
+  description: 'Oplog replay (GAP1/I5): Recovered{rev_head,heads,seen,roster}. fold_entry: Checkpoint=authoritative clone_from heads+seen+roster, MessageCreated=set_thread_head + RosterThread::fold_message, ThreadCreated/Archived/Restored/Paused/Resumed/StatusChanged=RosterThread fold helpers (roster rebuilt from deltas), CommandEffect|SeenMark=seen.mark, others no-op. Fast-path reads only newest checkpoint-bearing segment; roster survives compaction because the checkpoint Snapshot carries it. Tests incl replay_rebuilds_roster_from_thread_deltas + roster_survives_compaction_via_checkpoint.'
+  last_edited_ms: 1782311326686
 3da03a369c997301:
   path: demo/report-france/index.html
   description: Dummy pre-flight France report (delivered T236). Placeholder content, validates pipeline. Real reports go in sibling report-<country>/ folders.
@@ -2922,6 +2942,10 @@
   path: src/app/reverie/tools.rs
   description: 'Reverie tools: build_tool_restrictions_text(), Report (queue guard), optimize_context (agent selection), dispatch_reverie_tool()'
   last_edited_ms: 0
+4f5bb4865e3e0414:
+  path: src/app/actions/input.rs
+  description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation. Thread input routing: handle_thread_input_submit resolves selected_thread_idx through ThreadsState::visible_indices(viewing_archived) — the selection is a VISIBLE-slice position (T9 archive refactor), so the virtual ''+ New Thread'' row is detected as selected_idx >= visible.len() (active view only) and message-send maps the visible position back to a real storage index. handle_thread_create stores the new thread''s VISIBLE index. Thread struct includes paused:false default. MAX_THREAD_NAME_LEN=200. Paste sentinel expansion. /command replacement.'
+  last_edited_ms: 1782311326745
 4f69605e4730b184:
   path: .uploads/sourced_pdf/sourced_pdf/SPEC.md
   description: 'sourced_pdf format specification v1. Bundle structure: metadata.yaml, refs-schema.yaml, documents/, values/ (per-doc numbers with locators), refs/ (qualifications with arrows). 3 primitives: VALUE (number+location), ARROW (pointer to value), REF (qualification of target value). 5 ref types: unassigned, report_bg, report_n-1, report_internal, arithmetic. Écart tolerance 0.005.'
@@ -3514,6 +3538,10 @@
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.5 duplicate Close_conversation_history queue check (panels[].panel_id extraction, skipped during trap), Phase 1 schema validation, Phase 2 module semantic checks.'
   last_edited_ms: 0
+60ab6ee9a11a1c99:
+  path: crates/cp-oplog/src/service.rs
+  description: 'OplogService — off-loop group-commit thread + GAP2/I2 asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate|ContextUsage|ThreadFocusChanged=BestEffort (disposable/self-healing), all else (roster mutations incl ThreadPaused/ThreadResumed + Lifecycle + Unknown)=Durable. THREE submit paths: append_durable (blocks+awaits sync — intake/I11), submit_durable (non-blocking durable, detached ack — I2 main loop), append_best_effort (try_send drop-on-full — phase/cost/focus). commit_loop drains batch, ONE fdatasync. Tests in sibling service_tests.rs.'
+  last_edited_ms: 1782311326716
 60bad2b9bbf7560b:
   path: crates/cp-mod-search/src/panel.rs
   description: Search result panel + YAML formatter. format_results() groups file chunks by path, includes log entries. visualize_search_output() for conversation view highlighting. Same metadata persistence pattern. No tags.
@@ -3666,6 +3694,10 @@
   path: crates/cp-oplog/src/compact.rs
   description: 'Phase 7 (X774): segment compaction + GAP3 grace rule. compact(dir) deletes every segment older than the newest checkpoint-bearing segment (replay fast-path already ignores them → replay output unchanged; checkpoint Snapshot carries live heads+seen, so the checkpoint IS the ack-rev barrier). CompactReport{segments_removed,oldest_index}. total_bytes/should_compact size trigger (256MiB). body_gc_eligible(age,grace) const predicate for GAP3: only GC bodies older than DEFAULT_GC_GRACE(60s) >> I13 barrier window, so in-flight spills never collected, only crash-orphans. OplogResult from crate::error. 7 tests incl replay-identical-after-compaction.'
   last_edited_ms: 0
+64e014f4c53ba5da:
+  path: web/src/components/threads/ThreadList.tsx
+  description: 'Thread sidebar list. ThreadList (search/filter/new-thread) + ThreadRow (dot/name/focused+paused badges/time/preview + hover actions: pause/play + archive/restore). Groups: User turn / Agent''s turn / Archived. Pause button only in active view (T371).'
+  last_edited_ms: 1782311620210
 650a0ba5c8a439e2:
   path: ui/src/components/threads/ThreadDetailRail.tsx
   description: 'Right rail: thread metadata (status badge, agent, message count, created, last activity, id) + ''Open agent cockpit'' bridge to the panel-centered view.'
@@ -3894,6 +3926,10 @@
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread composer (always-active textarea + turn-status banner). T298: paperclip wired — hidden multi-file <input>, onAttach?(files) prop. T304: optional draftKey persists the UNSENT draft (text+caret) to localStorage. T331: pendingFiles + onRemoveFile — removable FileUploadChip chips above textarea; canSend allows files-only. T348: optional suggestions (CommandSuggestion[]) — /command first-message bubbles shown above the textarea ONLY when composer is empty (no text, no staged files); clicking prefills the command literal via prefill() (caret-at-end, refocus, regrow) so the user can edit before sending. Enter sends / Shift+Enter newline, IME-guarded, auto-grow.'
   last_edited_ms: 1782294786975
+6b6b3f721e0fac4f:
+  path: web/src/lib/types.ts
+  description: 'Thread types: ThreadDetail (id/name/status/agent/timestamps/unread/archived/paused/focused/log). ThreadStatus, ThreadMsg, ThreadQuestion. paused:boolean added T371.'
+  last_edited_ms: 1782311620149
 6b9f77904ef7fe30:
   path: crates/cp-wire/src/types/oplog.rs
   description: OpEntry (rev, timestamp_ms) + OpEntryKind (CommandEffect, SeenMark, PhaseTransition, MessageCreated, Lifecycle, CostAggregate, Checkpoint, Unknown).
@@ -4342,6 +4378,10 @@
   path: crates/cp-base/src/config/mod.rs
   description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations. Sub-modules: constants, global, llm_types, yaml_sync, behavioral, accessors.'
   last_edited_ms: 0
+763dc6624bc8b2dd:
+  path: src/app/run/threads/messages.rs
+  description: 'Phase 2.2 (X839): live thread-message emission. emit_messages = observe-on-change chokepoint diffing each thread''s message vector vs BridgeState.thread_msg_counts. MemoSeeds bitfield accessors (seeded.messages()/seed_messages()). build_pending → JSON body; emit_one_message stages body in Store (I13 barrier). No-op bridge-OFF.'
+  last_edited_ms: 1782311327130
 764dd5b60b60efd6:
   path: ui/src/components/panels/TokenBar.tsx
   description: Signature CP token meter — hairline phosphor fill bar with load-gradient color + glow + mount sweep animation.
@@ -4978,10 +5018,18 @@
   path: src/infra/api.rs
   description: Thin re-export of llms::{StreamEvent, StreamParams, start_streaming}. Backward-compat shim.
   last_edited_ms: 0
+8728a6697f8ab790:
+  path: crates/cp-wire/src/types/oplog.rs
+  description: 'OpEntry + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated{...,inline_body}, ThreadCreated/Archived/Restored/Paused/Resumed/StatusChanged, ThreadFocusChanged, Lifecycle, CostAggregate, ContextUsage{used,threshold,budget,hit_tokens,miss_tokens (T297 cache split, #[serde(default)] N-1)}, Checkpoint, Unknown. Framed (len+CRC). round-trip + tolerant-decode + roster + stable-tag tests.'
+  last_edited_ms: 1782311326774
 87496429f6346a6f:
   path: crates/cp-wire/src/types/stream.rs
   description: Frame (agent/worker/thread/message_id, seq) + Kind (MessageStartHint, Token, ToolArgs, PhaseHint, Unknown).
   last_edited_ms: 0
+8753991686731e9c:
+  path: crates/cp-wire/src/types/command.rs
+  description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, PauseThread, ResumeThread, InterruptStream, Stop, Configure{provider,model}, Unknown). Frame{schema_version, auth, command}. PauseThread/ResumeThread added for T371.
+  last_edited_ms: 1782311327040
 87637162da3e6bf7:
   path: crates/cp-mod-typst/src/lib.rs
   description: 'Typst module. 1 tool: typst_execute. Embedded compiler (no external binary). Depends on core+callback. catch-all watchlist callback recompiles affected docs. Seeds shared templates. @preview/ package support.'
@@ -6116,8 +6164,8 @@ a445c40881ecc32a:
   last_edited_ms: 0
 a488c97d4419511a:
   path: web/src/lib/live/index.ts
-  description: 'Live data hooks (TanStack Query + SSE push plane). useLive wraps useQuery + ensureSync. useFleet/useAgentMeta/useThreads (delta-covered), inspection hooks (memory/todos/tree… invalidate-driven). T297: usePanels now polls every 4s (PANELS_POLL_MS, was 15s backstop) so the context-budget meter tracks within seconds — panel token weights have no oplog delta (private working-set), poll is the only freshness mechanism. useMetrics/useFleetMetrics 4s. useStreamingTokens rAF-batched.'
-  last_edited_ms: 1782044317043
+  description: Live data hooks (TanStack Query + SSE). useAgentMeta/useThreads/useConversation/useStreamingTokens/useLibrary/useFleet/useFleetMetrics/useMetrics. ensureSync SSE watcher. sendCommand dispatches to REST. useFsPreview/useFsSheet for Finder.
+  last_edited_ms: 1782311620270
 a49023d03b3a5764:
   path: src/ui/perf/overlay.rs
   description: Performance overlay adapter — renders PerfOverlay IR to ratatui. Consumes pre-built IR snapshot (FPS, CPU/RAM, FDs/rlimit, Meili stats, budget bars, sparkline, op table). Uses semantic_to_style() for all styling. No direct State access.
@@ -6218,6 +6266,10 @@ a782ecbead9d4209:
   path: src/llms/anthropic/mod.rs
   description: Direct Anthropic Messages API client. SSE stream parsing (content_block_start/delta/stop, message_delta/stop). x-api-key auth from ANTHROPIC_API_KEY. No cache breakpoints. timeout(None) for long streams.
   last_edited_ms: 0
+a786a84433055a74:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: 'Thread tool handlers. execute_send/execute_read/build_panel_content. T353: execute_send AUTO-UNARCHIVES archived threads. build_panel_content shows paused:true for paused threads (T371). Archived threads filtered out of LLM-facing context. YAML-structured output (T372). MAX caps on content/file-path/questions/panel-messages.'
+  last_edited_ms: 1782311326902
 a7b95447dd5bdb0b:
   path: docs/talk/slides/1-2.html
   description: 'Slide: What''s failing — 11-item slider (WHYs section)'
@@ -6442,6 +6494,10 @@ adcf8b60551469d3:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
   last_edited_ms: 1780562263886
+adf6ee86164c694c:
+  path: src/app/run/threads/archived.rs
+  description: 'Live thread-archived emission chokepoint: diffs each thread''s archived flag vs memo, emits durable ThreadArchived/ThreadRestored deltas. Seeds from oplog roster on first pass. MemoSeeds bitfield accessors (seeded.archived()/seed_archived()).'
+  last_edited_ms: 1782311327070
 ae116ff12ae35cfb:
   path: web/src/components/shell/StatusBar.tsx
   description: 'Bottom status footer. Fleet mode: accepts agents prop for aggregates (count, threads, needs-you, spend). Agent mode: accepts activeAgent prop, derives phase from status, wires cost live. Cache bar (cacheStats/tokenBudget) still mock.'
@@ -6550,6 +6606,10 @@ b046c48f6f19946f:
   path: src/modules/questions/think.rs
   description: ThinkState (count/threshold/next_notification_at), execute() increments counter + encouraging status
   last_edited_ms: 0
+b054ebaa2c1e6ccd:
+  path: crates/cp-wire/src/types/snapshot.rs
+  description: 'Bounded replay snapshot: Snapshot{heads,seen,roster}. Heads (per-thread/panel content hashes) + SeenSet (dedup-tokens, evicted by acked-rev) + roster:Vec<RosterThread> (#[serde(default)] for N-1 tolerance). RosterThread{thread_id,name,status:ThreadTurn,archived,paused,last_activity_ms,msg_count} = the live thread list + fold helpers (fold_created via ThreadCreation<''src>, fold_archived, fold_paused, fold_status, fold_message). Checkpoint carries the whole Snapshot. Tests: round-trip, with-roster, tolerant-decode, fold-helpers.'
+  last_edited_ms: 1782311326804
 b05803356f877031:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
@@ -6646,6 +6706,10 @@ b303c82afde350e5:
   path: ui/src/components/shell/ConfigModal.tsx
   description: 'Settings modal (macOS System-Settings style): category rail (General/Model Providers/Search & Embeddings/Document AI/Web & Scraping/Integrations) + detail pane. Surfaces all CP config params — provider keys (Anthropic, Claude Code OAuth, Grok, Groq, DeepSeek, MiniMax), Voyage, Meilisearch status, Datalab, Brave, Firecrawl, GitHub — plus default-model picker + autonomy toggles. Masked keys w/ reveal, Connected/Not-set pills, opt-rise stagger, modal-pop/backdrop-fade motion. Design-only. Opened from TopBar gear.'
   last_edited_ms: 1781520371459
+b311e86446e8702d:
+  path: src/app/run/threads/commands.rs
+  description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/Stop|Interrupt/Configure. PauseThread sets thread.paused=true + emits ThreadPaused + syncs paused_memo. ResumeThread mirrors.
+  last_edited_ms: 1782311327009
 b312b74011e0e0e8:
   path: crates/cp-orchestrator/src/runtime.rs
   description: 'Runtime — env-driven Config (port/agents_dir/budget/scan_interval) + Runtime (shared Backend + config). start_driver() spawns bg driver_loop with TWO decoupled cadences: slow scan_interval (2s default, CP_SCAN_INTERVAL_MS) for registry scan + tier-② config.json mtime backstop + tmp reap; fast TAIL_INTERVAL (100ms) inner loop for tail_all_agents (per-agent Tailer.poll → MaterializedView.apply_batch fold → CostBreaker.observe), so a durable oplog delta reaches the view in ~100ms not ~2s (step toward inotify-primary I12/§8.1). serve() blocks on HTTP transport. 1 test.'
@@ -6682,6 +6746,10 @@ b3ff665a662b885f:
   path: CONTRIBUTING.md
   description: Contributing guidelines
   last_edited_ms: 0
+b41008f5b79f7fa8:
+  path: web/src/lib/query/reducers.ts
+  description: 'SSE delta reducers: applyThreadDelta folds thread_created/archived/restored/paused/resumed/status_changed/focus_changed/message_created into TanStack cache. mergeThreadLogs reconciles poll+delta. applyAgentDelta folds phase/cost/context.'
+  last_edited_ms: 1782311620180
 b410fc09231b32ca:
   path: crates/cp-oplog/src/service.rs
   description: 'Phase 8 (X775) GAP2: OplogService — off-loop group-commit thread + asymmetric backpressure. Durability::of(&kind) pure predicate: PhaseTransition|CostAggregate=BestEffort, all else (incl Unknown, conservative) =Durable. append_durable(kind)->rev blocks on bounded sync_channel (durability backpressure), awaits post-sync ack (announce-after-durable). append_best_effort(kind)->Submitted|Dropped via try_send (drop-on-full). Dedicated commit_loop drains a batch (≤MAX_BATCH 1024), append_buffered each, ONE sync, then releases durable acks (sync failure overrides per-record success). Drop+shutdown both join (final batch synced). ack channel carries Result<u64,String> (OplogError not Clone). 6 tests.'
@@ -7018,6 +7086,10 @@ bc2adb7e342ab710:
   path: run.sh
   description: Supervisor script. Builds tui + cp-console-server upfront, then loops cargo run --release with reload detection via config.json. --telemetry flag sets CP_FLAMEGRAPH=1. ulimit -n 2048. Loads .env. --resume-stream on reload.
   last_edited_ms: 0
+bc2c5289a4df124a:
+  path: src/app/run/threads/paused.rs
+  description: 'Live thread-paused emission chokepoint (T371): diffs each thread''s paused flag vs thread_paused_memo, emits durable ThreadPaused/ThreadResumed deltas. Seeds from oplog roster on first pass. Mirrors archived.rs exactly. MemoSeeds bitfield accessors (seeded.paused()/seed_paused()).'
+  last_edited_ms: 1782311326656
 bc5d0e87b26ec54a:
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view (collapsible). NO agent identity header (lives in TopBar). Slim top bar: thread count + ''N working'' parallel pill + PanelLeftClose collapse trigger. collapsed prop animates aside width 240→0 (fixed-width inner shell prevents reflow). Grouped ''Needs you''=MY_TURN / ''Working in parallel''=THEIR_TURN rows (status dot, name, preview, time, unread). New Thread + search. SIDEBAR_W=240 shared with cockpit/finder rails.'
@@ -7374,6 +7446,10 @@ c5b9a1c1444e3f7a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
   last_edited_ms: 0
+c5e2de2dac312524:
+  path: web/src/components/ui/button.tsx
+  description: Button with CVA variant system (default/outline/secondary/ghost/destructive/link × 8 sizes incl icon variants). Base UI primitive, group/button data-slot.
+  last_edited_ms: 1782310401557
 c605ffa985571748:
   path: src/ui/threads_view/messages.rs
   description: 'Thread message area: right pane of Threads view. Message display (reuses conversation IR renderer), input area with separator, question form overlay. thread_message_to_message() conversion. format_questions_markdown() for embedded questions. calculate_input_height() with 50% cap.'
@@ -7389,6 +7465,10 @@ c60e173425c891fe:
 c619ffe298a03ec9:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (author/timestamp headers, content, file refs, question indicators). Ctrl+V dispatch.'
+  last_edited_ms: 0
+c61ae888028cbeb4:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 c62233b3861945b4:
   path: crates/cp-base/src/state/watchers.rs
@@ -7490,6 +7570,10 @@ c80cf4a36c945d80:
   path: crates/cp-mod-spine/src/lib.rs
   description: Spine module. Auto-continuation, notifications (10 processed kept), guard rails, coucou timers. Manages WatcherRegistry. on_user_message resets counters. on_stream_stop prevents re-launch.
   last_edited_ms: 0
+c80f02630bd906bc:
+  path: crates/cp-mod-threads/src/types.rs
+  description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage (with archived support + auto flag — X887 auto tool-activity traces, #[serde(default)]), Thread (archived:bool, paused:bool — T371 suppresses MY_TURN notifications). ThreadsState + FocusState. has_my_turn_threads filters archived AND paused. visible_indices(archived). mark_selected_read resolves selection through visible list.'
+  last_edited_ms: 1782311326865
 c8259a170addb048:
   path: web/src/components/finder/FinderViews.tsx
   description: 'Finder view modes: grid/list/columns(Miller)/gallery. T275 internal drag-and-drop: MOVE_MIME (''application/x-cp-move'') carries {paths} of the dragged selection; startItemDrag makes EVERY row draggable (drags whole multi-select if the row is selected, else just it; a lone folder also sets FOLDER_DRAG_MIME for sidebar pinning). folderDropProps = reusable drop-target handlers on FOLDER rows (grid/list/Miller): highlight on hover, can''t-drop-onto-self guard, onDrop→onMove(paths,folder). isMoveDrag/readMovePayload helpers. ViewHandlers gained onMove?. Per-view dragOver useState drives the drop highlight. itemCount() uses backend count. ColumnsView = live Miller (per-ancestor useFs). relOf strips agent-folder prefix.'
@@ -8034,6 +8118,10 @@ d6fe3bef04a79aab:
   path: ideas.md
   description: Brainstorming / feature ideas
   last_edited_ms: 0
+d704fc1f71541f44:
+  path: crates/cp-orchestrator/src/services/materialized_view/mod.rs
+  description: In-memory materialized view of the fleet — per-agent projection folded from oplog entries. AgentView (rev/heads/roster/phase/lifecycle/cost/context/focused_thread). apply() folds ThreadPaused/ThreadResumed via RosterThread::fold_paused. Checkpoint = authoritative reset (bounded restart). CostSnapshot + ContextSnapshot value types.
+  last_edited_ms: 1782311326833
 d707bae8d2b9a7b6:
   path: ui/src/components/agents/PromptModal.tsx
   description: 'Prompts page modals (design-only). PromptModal: create (kind picker System/Skill/Command + name/description/body textarea) or view/edit (prefilled, mock .md body, built-in name lock, Delete). ImportModal: import from other agentic systems (Claude Code/Codex/Cursor/Windsurf/Aider/Continue), per-row Imported state. Shared hand-rolled Backdrop (backdrop-fade+modal-pop) + Field. Used by PromptsPage.'
@@ -8818,6 +8906,10 @@ f0b31ec1e8039bea:
   path: yamls/tools/threads.yaml
   description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
   last_edited_ms: 1781354328668
+f0e1cef017b6f0f7:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Thread sidebar orchestrator. ThreadsView: selected thread state, handleArchive (archive/restore command), handlePause (pause/resume command, T371), handleSend. Wires ThreadList + ThreadConversation + NewThreadDialog.'
+  last_edited_ms: 1782311620240
 f156d809f3ca7d6c:
   path: crates/cp-mod-ocr/Cargo.toml
   description: 'OCR module deps: cp-base, cp-render, serde_json, reqwest, cp-mod-utilities, log.'
@@ -8858,6 +8950,10 @@ f2416d7f3fc53dce:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams/CrawlParams structs. post_json() + get_json() generic helpers. start_crawl() + poll_crawl() for async crawl jobs. 30s timeout. Bearer auth. Rate limit + forbidden error handling.
   last_edited_ms: 1780560886868
+f254b3596441f5c1:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop with flame!("loop"). Input-first (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. emit_thread_paused wired in main loop (T371). X18 adaptive idle poll. T309: update_spinner_animation gated on has_active_animation.'
+  last_edited_ms: 1782311326940
 f25c2de2cd9f7542:
   path: ui/src/lib/types.ts
   description: 'Maquette domain types. Agent, FsNode, Finder types, ThreadDetail+agentId, ThreadStatus (MY_TURN/ACTIVE/THEIR_TURN), ViewMode=fleet|cockpit|threads|finder, Library/Usage types. Cockpit panel maquette types (T16): Importance, MemoryCard, RadarAnchor, RadarResult, TodoItem, EntityTable, ToolRow/ToolGroup, CallbackRow, QueueAction, ScratchCell, TreeRow.'
@@ -8946,6 +9042,10 @@ f4e3bd6a1f8faf50:
   path: crates/cp-mod-prompt/Cargo.toml
   description: 'Prompt module crate deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml.'
   last_edited_ms: 0
+f4e4f8c20d99727b:
+  path: web/src/components/ui/input.tsx
+  description: Base UI input wrapper with cn() styling — ring/border/disabled/invalid states, md:text-sm, dark mode bg.
+  last_edited_ms: 1782310401527
 f4f7ce1b81b33585:
   path: crates/cp-mod-search/src/meili/watchdog.rs
   description: 'Meilisearch supervision (T295 self-heal): SpawnLock (machine-wide single-flight spawn guard = atomic create_new spawn.lock + steal-if-stale 30s, RAII removes on drop) + WatchdogHandle (per-agent supervisor thread, Mutex<stop:Sender,join> so it''s Sync; Drop signals+joins so a reload never stacks two). run() loop: every WATCHDOG_INTERVAL(5s) server::health_ok(port,key); on fail respawn() under SpawnLock (elected spawner calls ensure_server_running; losers defer LOCK_POLL then reconnect_ok); geometric backoff_for() base 2s→cap 60s on consecutive failures. Fixes Gap A (no supervision → dead meili stayed dead until reboot).'
@@ -9206,6 +9306,10 @@ fb5f6b73cd86340a:
   path: crates/cp-orchestrator/src/services/stream_hub.rs
   description: 'Phase 18: StreamHub — per-agent stream fan-out to N bounded subscribers (R2-17). Subscriber{id,buffer:VecDeque<Frame>,capacity,degraded,dropped}: admit() evicts OLDEST on full + sets degraded + bumps dropped; cap 0 drops all. agent_stream_health(id)->(subscribers,total_dropped,any_degraded) aggregate accessor for §19 metrics. publish/drain/subscribe/unsubscribe/mark_reconciled. Single-owner lock-free. 9 tests.'
   last_edited_ms: 0
+fb9ce968c3ad6157:
+  path: crates/cp-mod-bridge/src/lib.rs
+  description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1 OR --bridge CLI flag. MemoSeeds u8 bitfield (5 flags: messages/statuses/focus/archived/paused) with const accessor/seed methods. BridgeState includes thread_paused_memo HashMap + seeded:MemoSeeds. PENDING+try_recover self-heal.'
+  last_edited_ms: 1782311327163
 fbb69ddde0f9c6f6:
   path: ui/src/components/agents/PromptModal.tsx
   description: 'Prompts page modals (design-only). PromptModal: LARGE dialog (1180x90vh, max 96vw) — create (kind picker System/Skill/Command + name/description) or view/edit (prefilled, built-in name lock, Delete). Body uses the WYSIWYG MarkdownEditor (flex-grows to fill height), not a textarea. ImportModal: import from other agentic systems (Claude Code/Codex/Cursor/Windsurf/Aider/Continue), per-row Imported state. Shared hand-rolled Backdrop (backdrop-fade+modal-pop) + Field. Used by PromptsPage.'

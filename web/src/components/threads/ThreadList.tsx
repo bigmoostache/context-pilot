@@ -1,4 +1,4 @@
-import { Plus, Search, X, Archive, ArchiveRestore, ChevronLeft } from "lucide-react"
+import { Plus, Search, X, Archive, ArchiveRestore, ChevronLeft, Pause, Play } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ThreadDetail } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -16,6 +16,8 @@ interface ThreadListProps {
   onToggleArchived: (v: boolean) => void
   /** archive ↔ restore a single thread */
   onArchive: (id: string) => void
+  /** pause ↔ resume a single thread (T371) */
+  onPause: (id: string) => void
   /** open the New Thread dialog */
   onNewThread: () => void
 }
@@ -82,6 +84,7 @@ export function ThreadList({
   showArchived,
   onToggleArchived,
   onArchive,
+  onPause,
   onNewThread,
 }: ThreadListProps) {
   const q = query.trim().toLowerCase()
@@ -206,12 +209,12 @@ export function ThreadList({
               <>
                 {working.length > 0 && <Group label="User turn" count={working.length} />}
                 {working.map((t) => (
-                  <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} />
+                  <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} onPause={onPause} />
                 ))}
 
                 {mine.length > 0 && <Group label="Agent's turn" count={mine.length} />}
                 {mine.map((t) => (
-                  <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} />
+                  <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} onPause={onPause} />
                 ))}
               </>
             )}
@@ -259,16 +262,19 @@ function ThreadRow({
   selected,
   onSelect,
   onArchive,
+  onPause,
   archived,
 }: {
   t: ThreadDetail
   selected: boolean
   onSelect: (id: string) => void
   onArchive: (id: string) => void
+  onPause?: (id: string) => void
   archived?: boolean
 }) {
   const preview = previewOf(t)
   const isFocused = !archived && t.focused
+  const isPaused = !archived && t.paused
   const dot =
     isFocused
       ? "var(--ok)"
@@ -289,8 +295,8 @@ function ThreadRow({
       <button onClick={() => onSelect(t.id)} className="flex flex-col gap-1 text-left">
         <div className="flex items-center gap-2">
           <span
-            className={cn("size-2 shrink-0 rounded-full", pulse && !archived && "animate-pulse")}
-            style={{ background: archived ? "var(--muted-foreground)" : dot }}
+            className={cn("size-2 shrink-0 rounded-full", pulse && !archived && !isPaused && "animate-pulse")}
+            style={{ background: archived ? "var(--muted-foreground)" : isPaused ? "var(--warn)" : dot }}
           />
           <span className="truncate text-[13px] font-medium text-foreground/90">{t.name}</span>
           {isFocused && (
@@ -299,6 +305,14 @@ function ThreadRow({
               style={{ background: "color-mix(in oklab, var(--ok) 18%, transparent)", color: "var(--ok)" }}
             >
               focused
+            </span>
+          )}
+          {isPaused && (
+            <span
+              className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide"
+              style={{ background: "color-mix(in oklab, var(--warn) 18%, transparent)", color: "var(--warn)" }}
+            >
+              paused
             </span>
           )}
           <span className="ml-auto shrink-0 pr-5 text-[10.5px] tabular-nums text-muted-foreground/50">
@@ -318,7 +332,19 @@ function ThreadRow({
         </div>
       </button>
 
-      {/* hover action — archive (or restore in the archived view) */}
+      {/* hover actions — pause/resume + archive/restore */}
+      {!archived && onPause && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onPause(t.id)
+          }}
+          title={isPaused ? "Resume thread" : "Pause thread"}
+          className="absolute right-9 top-2 flex size-6 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition-all hover:bg-muted hover:text-foreground group-hover:opacity-100"
+        >
+          {isPaused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
+        </button>
+      )}
       <button
         onClick={(e) => {
           e.stopPropagation()

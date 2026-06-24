@@ -50,7 +50,7 @@ pub(in crate::app::run) fn emit_messages(app: &mut App) {
 
     // First pass: record existing message counts without emitting (the cold
     // backlog rides the frontend's initial tier-② load, not the delta stream).
-    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.messages);
+    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.messages());
     if !seeded {
         let counts: Vec<(String, usize)> =
             ThreadsState::get(&app.state).threads.iter().map(|t| (t.id.clone(), t.messages.len())).collect();
@@ -58,7 +58,7 @@ pub(in crate::app::run) fn emit_messages(app: &mut App) {
         for (id, len) in counts {
             let _prev = bs.thread_msg_counts.insert(id, len);
         }
-        bs.seeded.messages = true;
+        bs.seeded.seed_messages();
         return;
     }
 
