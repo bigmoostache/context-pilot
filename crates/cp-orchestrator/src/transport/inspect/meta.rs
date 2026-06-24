@@ -32,7 +32,17 @@ pub fn agent_meta(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
 /// Returns an array of maquette-compatible `Agent` objects, one per known
 /// agent in the registry directory. Each is built the same way as the
 /// per-agent `/meta` endpoint.
-pub fn fleet_meta(state: &Mutex<Backend>) -> HttpReply {
+///
+/// When auth is enabled the list is filtered to only agents the caller may
+/// access (FR-12) — system admins see everything (FR-09), regular users see
+/// only their ACL-granted agents. This is the enriched twin of
+/// [`fleet`](crate::transport::rest::fleet) and the endpoint the web dashboard
+/// actually reads, so it must apply the same ACL filter or a regular user would
+/// see every agent's card (T346).
+pub fn fleet_meta(
+    state: &Mutex<Backend>,
+    auth_user: Option<&crate::services::auth::types::User>,
+) -> HttpReply {
     let dir = {
         let Ok(b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
@@ -46,9 +56,17 @@ pub fn fleet_meta(state: &Mutex<Backend>) -> HttpReply {
     // Retired agents live in the orchestrator-owned store, not the registry —
     // exclude them from the ACTIVE fleet so they render only in the dashboard's
     // Retired section (served by [`fleet_retired`]).
-    let agents: Vec<serde_json::Value> = entries
+    let active: Vec<&Entry> =
+        entries.iter().filter(|e| !state.lock().is_ok_and(|b| b.retired.is_retired(&e.id))).collect();
+
+    // ACL filter (FR-12) — drop agents the caller has no access to.
+    let active_ids: Vec<String> = active.iter().map(|e| e.id.clone()).collect();
+    let visible = crate::transport::auth::filter_fleet(state, &active_ids, auth_user);
+    let visible: std::collections::HashSet<&str> = visible.iter().map(String::as_str).collect();
+
+    let agents: Vec<serde_json::Value> = active
         .iter()
-        .filter(|e| !state.lock().is_ok_and(|b| b.retired.is_retired(&e.id)))
+        .filter(|e| visible.contains(e.id.as_str()))
         .map(|e| build_agent_meta(state, &e.id, e))
         .collect();
     HttpReply::ok(&agents)
@@ -61,15 +79,25 @@ pub fn fleet_meta(state: &Mutex<Backend>) -> HttpReply {
 /// than the live registry (a retired agent has no running process to inspect).
 /// Each carries `status: "retired"` and a `retiredAt` epoch-ms so the frontend
 /// can render and sort the section without a second lookup.
-pub fn fleet_retired(state: &Mutex<Backend>) -> HttpReply {
+pub fn fleet_retired(
+    state: &Mutex<Backend>,
+    auth_user: Option<&crate::services::auth::types::User>,
+) -> HttpReply {
     let records = {
         let Ok(b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
         b.retired.list()
     };
+    // ACL filter (FR-12) — a regular user only sees retired agents they were
+    // granted access to (the ACL entry survives retirement). System admins see
+    // all; auth-disabled passes everything through.
+    let ids: Vec<String> = records.iter().map(|r| r.id.clone()).collect();
+    let visible = crate::transport::auth::filter_fleet(state, &ids, auth_user);
+    let visible: std::collections::HashSet<&str> = visible.iter().map(String::as_str).collect();
     let agents: Vec<serde_json::Value> = records
         .iter()
+        .filter(|r| visible.contains(r.id.as_str()))
         .map(|r| {
             // Dashboard name override wins over the folder-basename snapshot
             // captured at retire time — the user may rename a retired agent.

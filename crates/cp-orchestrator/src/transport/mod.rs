@@ -356,9 +356,9 @@ fn route_rest(
 
         // ── Fleet + agent routes ────────────────────────────────────
         (Method::Get, ["api", "fleet"]) => rest::fleet(state, auth_user),
-        (Method::Get, ["api", "fleet", "meta"]) => inspect::meta::fleet_meta(state),
-        (Method::Get, ["api", "fleet", "retired"]) => inspect::meta::fleet_retired(state),
-        (Method::Get, ["api", "metrics"]) => inspect::metrics::fleet_metrics(state),
+        (Method::Get, ["api", "fleet", "meta"]) => inspect::meta::fleet_meta(state, auth_user),
+        (Method::Get, ["api", "fleet", "retired"]) => inspect::meta::fleet_retired(state, auth_user),
+        (Method::Get, ["api", "metrics"]) => inspect::metrics::fleet_metrics(state, auth_user),
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
         (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent_meta(state, id),
         (Method::Get, ["api", "agent", id, "metrics"]) => inspect::metrics::agent_metrics(state, id),

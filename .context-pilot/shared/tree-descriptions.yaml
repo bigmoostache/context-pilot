@@ -6226,6 +6226,10 @@ ad68ded86b688df6:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
   last_edited_ms: 0
+ad8f1e4759447cc5:
+  path: crates/cp-orchestrator/src/transport/inspect/metrics.rs
+  description: '§19 observability metrics endpoints. agent_metrics + fleet_metrics build per-agent snapshot: durable cost-breaker state (tripped/spend/budget), stream health (subs/dropped/degraded), view-vs-oplog rev lag (oplog_head_rev read fresh outside the lock), phase+lifecycle. T346: fleet_metrics now takes auth_user and ACL-filters via auth::filter_fleet (mirrors fleet_meta — a regular user must not enumerate every agent''s id/cost/budget via the Usage page). Only figures the backend genuinely holds — latency histograms deliberately not synthesised.'
+  last_edited_ms: 1782290809181
 ad9470f62fadf09b:
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): Recovered{rev_head,heads,seen,roster}. fold_entry: Checkpoint=authoritative clone_from heads+seen+roster, MessageCreated=set_thread_head + RosterThread::fold_message, ThreadCreated/Archived/Restored/StatusChanged=RosterThread fold helpers (roster rebuilt from deltas), CommandEffect|SeenMark=seen.mark, others no-op. Fast-path reads only newest checkpoint-bearing segment; roster survives compaction because the checkpoint Snapshot carries it. Tests incl replay_rebuilds_roster_from_thread_deltas + roster_survives_compaction_via_checkpoint.'
@@ -9070,6 +9074,10 @@ fe515544c5126b36:
   path: web/src/components/panels/cockpit/StatsPanel.tsx
   description: Statistics panel — LIVE (truthful). Session row = cumulative-since-boot input/output tokens (useMetrics.tokens) + spend (useAgentMeta costUsd); Panel-context meter = sum(usePanels tokens)/200k REF_BUDGET (labelled as visible-panel weight, NOT true context occupancy); Context-elements list = live panels. Cache-economics + live-context-size section = InspectionUnavailable notice (hit/miss split + true context-window occupancy are private agent state, never on the oplog). Mock imports removed.
   last_edited_ms: 1781822675654
+fe5b91a1b8e1355f:
+  path: crates/cp-orchestrator/src/transport/inspect/meta.rs
+  description: 'Enriched agent-meta endpoints. agent_meta + fleet_meta + fleet_retired build maquette Agent: registry record + view phase/lifecycle/cost + cumulative tokens + context occupancy (T297) + thread inspection + git branch + provider + hasAvatar (T338). Name overrides (T328) checked before folder-basename default. derive_status maps phase/lifecycle/has_my_turn. T346: fleet_meta + fleet_retired now take auth_user and ACL-filter via auth::filter_fleet (the dashboard reads /fleet/meta, so without this a regular user saw EVERY agent card despite zero ACL grants).'
+  last_edited_ms: 1782290809128
 fe8012896753e20c:
   path: clippy_compared_list.md
   description: Clippy lint comparison results
