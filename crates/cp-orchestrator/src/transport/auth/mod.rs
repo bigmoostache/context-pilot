@@ -90,6 +90,14 @@ fn is_public_route(segments: &[&str]) -> bool {
             // SSE uses ticket-based auth, not Bearer (Phase 7 enriches tickets
             // with user_id; until then the ticket mechanism is the sole gate).
             | ["api", "stream"]
+            // Agent avatars are loaded by a plain `<img src>` element, which
+            // cannot attach an `Authorization: Bearer` header — so the route
+            // must be public or every avatar 401s once auth is on (T345).
+            // Profile pictures are non-sensitive (shown in the switcher to any
+            // authenticated viewer), so public access is safe. Marking it
+            // public here also skips the per-agent ACL check in `handle`
+            // (which only runs when `auth_user` is `Some`).
+            | ["api", "agent", _, "avatar"]
     )
 }
 
