@@ -22,14 +22,15 @@ use cp_wire::types::command::Command;
 use cp_wire::types::registry::Entry;
 use serde::Serialize;
 
-use super::Backend;
 use crate::channel::AgentChannel;
 
+mod backend;
 mod create;
 mod library;
 mod restart;
 mod retire;
 mod thread_shape;
+pub use backend::Backend;
 pub use create::create_agent;
 pub use library::create_command;
 pub use restart::restart_agent;

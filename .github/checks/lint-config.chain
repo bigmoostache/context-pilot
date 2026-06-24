@@ -334,3 +334,51 @@ index 35cd0c2..0db023d 100755
 +  -not -path './web/*')
  exit $exit_code
 # --- End entry #22 ---
+23:b6808d09d2a0589b0ec3e688e4dce0471a2c8d38a22b9149f7e7a2c51aaba3b9:0beda613b2cafae74829e0d40dec6ad53166222b51cf6f8c40a1ce4c34e8c45a:2747f22d7d81e6069979cbf5781e8332f8efc28d983e55b2d7625c8e517084d7
+# --- Diff for entry #23 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 0e530569..a7521f77 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -36,7 +36,7 @@ tree-sitter-java = "0.23"
+ tree-sitter-c = "0.24"
+ tree-sitter-cpp = "0.23"
+ openssl = { version = "0.10", features = ["vendored"] }
+-rusqlite = { version = "0.33", features = ["bundled", "column_decltype"] }
++rusqlite = { version = "0.33", features = ["bundled", "column_decltype", "backup"] }
+ 
+ [workspace.lints.rust]
+ aarch64_softfloat_neon = "forbid"
+@@ -1071,6 +1071,8 @@ cp-mod-files = { path = "crates/cp-mod-files" }
+ cp-mod-spine = { path = "crates/cp-mod-spine" }
+ cp-mod-threads = { path = "crates/cp-mod-threads" }
+ cp-mod-bridge = { path = "crates/cp-mod-bridge" }
++cp-wire = { path = "crates/cp-wire" }
++cp-oplog = { path = "crates/cp-oplog" }
+ cp-mod-prompt = { path = "crates/cp-mod-prompt" }
+ cp-mod-brave = { path = "crates/cp-mod-brave" }
+ cp-mod-firecrawl = { path = "crates/cp-mod-firecrawl" }
+diff --git a/.github/checks/check-folder-sizes.sh b/.github/checks/check-folder-sizes.sh
+index 0db023d6..6b838269 100755
+--- a/.github/checks/check-folder-sizes.sh
++++ b/.github/checks/check-folder-sizes.sh
+@@ -37,5 +37,17 @@ done < <(find . -mindepth 1 -type d \
+   -not -path './ui' \
+   -not -path './ui/*' \
+   -not -path './web' \
+-  -not -path './web/*')
++  -not -path './web/*' \
++  -not -path './.uploads' \
++  -not -path './.uploads/*' \
++  -not -path './oplog' \
++  -not -path './oplog/*' \
++  -not -path './logs' \
++  -not -path './logs/*' \
++  -not -path './dumps' \
++  -not -path './dumps/*' \
++  -not -path './sandbox' \
++  -not -path './sandbox/*' \
++  -not -path './report' \
++  -not -path './report/*')
+ exit $exit_code
+# --- End entry #23 ---

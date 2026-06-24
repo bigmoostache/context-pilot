@@ -15,5 +15,6 @@
 
 pub mod types;
 pub mod store;
+pub(crate) mod acl;
 pub(crate) mod backup;
 mod helpers;
