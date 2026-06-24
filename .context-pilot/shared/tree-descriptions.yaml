@@ -1286,6 +1286,10 @@
   path: ui/src/components/finder/FinderPreview.tsx
   description: 'QuickLook pane with variant prop: ''pane'' (420px side rail w/ Quick Look header + metadata footer + Get Info) or ''full'' (file-tab main area — BARE content only, no header/footer; actions live in the toolbar). Bespoke kind renders: code (copy btn + line numbers + keyword tint), spreadsheet (zebra + frozen header + tabs), slides, PDF (page strip), image (checkerboard + zoom), audio (waveform), video (poster + scrubber), rendered markdown, json/text, folder summary.'
   last_edited_ms: 1781531576305
+20eeee9404bf7d3f:
+  path: web/src/lib/api/index.ts
+  description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent (T328) + avatar CRUD (T338) + createCommand (T350). Re-exports ./auth + ./finder + ./body (T357) + ./env-keys (T399). The @/lib/api single import surface.'
+  last_edited_ms: 1782340148410
 210d0c5c4f54a2fc:
   path: crates/cp-mod-search/src/tools.rs
   description: Search tool execution with flame!("search_exec"). Split keyword+semantic multi-search via MeiliClient. dedup_by_score() merges overlapping results. iso_to_ms() via cp_mod_utilities::time. File/log filters. Async via spawn_async_tool. DynPanel creation. Mandatory semantic_query param.
@@ -2750,6 +2754,10 @@
   path: crates/cp-orchestrator/src/services/materialized_view.rs
   description: 'MaterializedView in-mem fleet projection folded from OpEntry (one AgentView per agent). AgentView{rev,heads,roster,focused_thread_id,phase,lifecycle,cost,context}. ContextSnapshot carries used/threshold/budget + hit/miss (T297). apply: Checkpoint=authoritative reset, MessageCreated=head+roster bump, roster deltas via RosterThread helpers, ThreadFocusChanged latest-wins, Phase/Lifecycle/Cost/ContextUsage=latest-wins, CommandEffect/SeenMark/Unknown=inert. Tests in sibling file.'
   last_edited_ms: 1782050215801
+47a3a6c2bcf65f5b:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: 'REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() dispatches commands. rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket embeds auth_user.id (Phase 7). resolve_entry. Backend re-exported from backend.rs. Submodules: create, restart, retire, library, thread_shape, backend, env_keys.'
+  last_edited_ms: 1782340148291
 47be3c47cf8e93af:
   path: yamls/injections.yaml
   description: LLM-facing text injections. Spine auto-continuation, editor warning banners, console guardrails (git/gh → dedicated tools), history cleanup trap messages (%PANELS% templates), behavioral redirects, provider-shared text.
@@ -9106,10 +9114,18 @@ ef0729aa90244126:
   path: crates/cp-oplog/tests/crash_replay.rs
   description: 'Phase 9 (X776) MILESTONE M0 crash-replay harness. Unix-only (#![cfg(unix)]). Self-re-exec pattern: env-gated #[test] crash_child_entrypoint re-runs the test binary as a child via current_exe(); parent/child handshake through a fdatasync''d marker file (libtest stdout is noisy). V1 v1_real_sigkill_leaves_a_clean_replayable_oplog: child spams durable MessageCreated appends, parent kill()s (real SIGKILL), fresh process replay() never errors + every announced-durable rev survives + torn tail truncated (announce-after-durable K9 across real crash). V2 v2_journalled_command_is_exactly_once_after_deadman_reexec: child journals CommandEffect then dies, fresh process recovers seen-set token, duplicate SeenMark delivery folds to no-op (exactly-once across process boundary). V12 v12_barrier_is_pending_the_body_store: asserts body_gc_eligible rule, explicit placeholder until body store lands Phase 14. 4 tests green.'
   last_edited_ms: 0
+ef35e3e6bf20ad18:
+  path: web/src/components/threads/ThreadList.tsx
+  description: 'Thread sidebar list. ThreadList (search/filter/new-thread) + ThreadRow (dot/name/focused+paused badges/preview + hover-swap: timestamp fades out on row hover, Archive+Pause/Play buttons fade in at same position). Groups: User turn / Agent''s turn / Archived. Pause button only in active view (T371). Delete (Trash2) button in archived view (T371). T401: outer row element is <div> not <button> to avoid nested-button hydration error.'
+  last_edited_ms: 1782340433130
 ef4fe8d8f33e402a:
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread composer (always-active textarea + turn-status banner). T298: paperclip wired. T304: optional draftKey persists UNSENT draft (text+caret) to localStorage. T331: pendingFiles + onRemoveFile removable chips; files-only send allowed. T348/T350: optional suggestions (CommandSuggestion[] with optional body) — /command first-message bubbles shown above textarea ONLY when composer empty; clicking prefills the EXPANDED prompt body (s.body, fallback /cmd literal) + trailing newline with caret on the blank line. T350: optional onCreateCommand → renders a dashed ''create command'' Plus pill beside the bubbles (shown even with zero suggestions so the first command can be bootstrapped); the suggestions row gates on (suggestions.length>0||onCreateCommand). Enter sends / Shift+Enter newline, IME-guarded, auto-grow.'
   last_edited_ms: 1782297712793
+ef5adb67ffe9c560:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend re-exported from rest::Backend. route_rest dispatches all /api routes incl auth/ACL/env-keys (T399). handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with Phase 7 ticket-based ACL. serve/serve_bound acceptor loop.
+  last_edited_ms: 1782340148352
 ef88c139f0bdac2b:
   path: yamls/tools/threads.yaml
   description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
