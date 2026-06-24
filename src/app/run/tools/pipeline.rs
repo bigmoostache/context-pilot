@@ -127,15 +127,30 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     for tool in &tools {
         save_tool_call_message(app, tool);
 
-        let result = if tool.name == "Queue_execute" {
-            // History cleanup trap: block flush when too many history panels are open
+        let result = if tool.name == "Queue_execute" || tool.name == "Queue_pause" {
+            // History cleanup trap: block flush/pause when too many history panels
+            // are open. Queue_pause is checked here too — otherwise the LLM can
+            // pause the queue and then execute tools normally, bypassing the trap
+            // (which only fires on Queue_execute).
             if let Some(trap_msg) = crate::modules::conversation_history::trap::check_and_trigger_trap(&mut app.state) {
                 crate::infra::tools::ToolResult::new(tool.id.clone(), trap_msg, false)
-            } else {
+            } else if tool.name == "Queue_execute" {
                 // Queue flush: execute all queued calls, collect them for pipeline replay
                 let (summary_result, flushed) = super::queue_flush::execute_queue_flush(tool, &mut app.state);
                 flushed_tools = flushed;
                 summary_result
+            } else {
+                // Queue_pause — no trap conditions met, execute normally
+                let pf = pre_flight_tool(tool, &app.state, &app.state.active_modules.clone());
+                if pf.has_errors() {
+                    crate::infra::tools::ToolResult::new(tool.id.clone(), pf.format_errors(), true)
+                } else {
+                    let mut result = execute_tool(tool, &mut app.state);
+                    if pf.has_warnings() {
+                        let _r = write!(result.content, "\n{}", pf.format_errors());
+                    }
+                    result
+                }
             }
         } else {
             // Pre-flight: schema check + module semantic check (ALWAYS runs, queue or not)
