@@ -1706,6 +1706,10 @@
   path: src/app/actions/cursor.rs
   description: Cursor movement, text editing, selection management, command expansion. Selection helpers (delete/clear/extend). Sentinel detection + skip. Single-char and word movement with selection variants. handle_command_expansion, handle_input_backspace, handle_delete_word_left.
   last_edited_ms: 0
+2f941a6980e1731d:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped) opened by any chip. T304: passes draftKey. T331: passes pendingFiles + onRemoveFile to ThreadComposer. T334: onShowInFinder forwarded to Message. T348: useLibrary(agentId) → command suggestions (kind===''command'', /${id}) passed to composer ONLY for an empty thread (thread.log.length===0). Takes agentId + onAttach props.'
+  last_edited_ms: 0
 2fbeef291b1996a9:
   path: crates/cp-render/Cargo.toml
   description: 'Render crate deps: serde only. Minimal.'
@@ -2514,6 +2518,10 @@
   path: .uploads/sourced_pdf/sourced_pdf/model.py
   description: 'Core sourced_pdf model library. Bundle class: open ZIP/dir, load metadata+values+refs, validate integrity (hashes, ids, arrows, roles, écarts). Value/Ref dataclasses. compute_ecart recalculates from values. init_bundle creates new bundles. parse_amount handles French number formatting.'
   last_edited_ms: 1782145700578
+44caef253819f02f:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 44edddddbfd879d4:
   path: crates/cp-mod-prompt/src/skill_panel.rs
   description: Skill panel UI. Markdown-rendered content via cp_render::markdown::to_blocks(). Title/refresh/context methods. refresh() syncs cached_content for all loaded skills.
@@ -3005,6 +3013,10 @@
 53d4d56914a84a3d:
   path: src/ui/search_overlay/display.rs
   description: 'Display column builders for the search index overlay. Converts SearchIndexOverlay IR data into ratatui Line sequences for the two-column layout (left: server/database/index/extensions, right: splitter/embeddings/tasks/recomputed/recent). Centered bordered popup.'
+  last_edited_ms: 0
+53d7ffa3f6ff96c9:
+  path: web/src/components/threads/QuestionForm.tsx
+  description: Embedded question form — single/multi-select options, interactive pick state, onSubmit callback sends formatted answers via sendCommand.
   last_edited_ms: 0
 53f725374ad67d0f:
   path: crates/cp-orchestrator/src/registry/tee_reader.rs
@@ -5374,6 +5386,10 @@
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
   last_edited_ms: 1780498269752
+944d0bdced2dae10:
+  path: web/src/lib/types.ts
+  description: 'Maquette domain types. Agent carries live vitals: phase?(idle|streaming|tooling) + inputTokens?/outputTokens? + context occupancy contextUsed?/Threshold?/Budget? plus the cache split contextHit?/contextMiss? (hit+miss==used), all folded from SSE deltas (T297). hasAvatar? (T338). ContextPanel, ThreadDetail (log:ThreadMsg[] with auto flag), Finder/Library/Usage shapes.'
+  last_edited_ms: 0
 94561e4c272a40bd:
   path: src/modules/overview/mod.rs
   description: 'Overview module. Core/global. Close_panel pre-flight: warns (not errors) for stale [!] or missing tree descriptions. pub(crate) has_pending_tree_describe() helper. tool_manage, panel_goto_page pre-flights. save/load module+worker data.'
@@ -5586,6 +5602,10 @@
   path: docs/index.html
   description: Main landing page. Centered hero (blinking cursor, tagline), 2×2 nav grid linking Trust Center, Presentations, Blog (disabled), Documentation (disabled). Grid background + amber glow.
   last_edited_ms: 1782129931134
+9b4fc660b76ea801:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: 'Thread tool handlers. execute_send/execute_read/build_panel_content. T353: execute_send AUTO-UNARCHIVES an archived target thread (thread.archived=true → set false) — sending to an archived thread is allowed (AI may remember its id), and the reply makes it visible again, mirroring the web frontend''s unarchive-on-send; surfaced in the tool result as ''[thread was archived — automatically unarchived]''. Archived threads filtered out of LLM-facing context. X887: build_panel_content also filters .filter(|m| !m.auto) (visible Vec, skip/total on non-auto count) so the AI never re-reads its own auto tool-activity traces. T343: tool result only lists threads with unack > 0 (concise). MAX caps on content/file-path/questions/panel-messages.'
+  last_edited_ms: 1782296463977
 9b55d23929970d69:
   path: docs/trust-center/compliance.html
   description: 'Compliance Framework page. 6 sections: regulatory assessment (GDPR compatible, SOC 2 N/A, ISO 27001 not certified, HIPAA N/A, CCPA compatible), open-source licensing (MIT + clean dependency audit), security testing table (6 active controls), AI-specific regulation (EU AI Act low-risk + NIST AI RMF aligned + responsible AI practices), export controls & sanctions (EAR TSU + sanctions compliance), accessibility (web in-progress WCAG + TUI screen-reader compatible).'

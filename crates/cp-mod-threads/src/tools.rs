@@ -78,9 +78,21 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Mutate thread state: push message + conditionally flip status.
+    //
+    // `unarchived` records whether this Send resurrected an archived thread.
+    // Sending to an archived thread is allowed — the AI may legitimately
+    // remember its id — but a reply must make the thread visible again, so we
+    // auto-unarchive it (matching the web frontend, which unarchives on a user
+    // send). The flag is surfaced in the tool result so the AI knows the
+    // thread is now live in the active list again (T353).
+    let mut unarchived = false;
     {
         let ts = ThreadsState::get_mut(state);
         if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == tid) {
+            if thread.archived {
+                thread.archived = false;
+                unarchived = true;
+            }
             thread.messages.push(msg);
             if !still_my_turn {
                 thread.status = ThreadStatus::TheirTurn;
@@ -99,8 +111,12 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     let suffix = if still_my_turn { " (still your turn)" } else { "" };
-    let mut result =
-        ToolResult::new(tool.id.clone(), format!("Sent to {tid} \"{thread_name}\": {msg_preview}{suffix}"), false);
+    let unarchived_note = if unarchived { " [thread was archived — automatically unarchived]" } else { "" };
+    let mut result = ToolResult::new(
+        tool.id.clone(),
+        format!("Sent to {tid} \"{thread_name}\": {msg_preview}{suffix}{unarchived_note}"),
+        false,
+    );
     result.preserves_tempo = true;
     result
 }
