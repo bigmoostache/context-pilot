@@ -113,7 +113,7 @@ function parseListLine(line: string): ParsedLine | null {
 }
 
 /** Locate the line containing `pos`: its [start, end) offsets in `value`. */
-function lineBounds(value: string, pos: number): { start: number; end: number } {
+export function lineBounds(value: string, pos: number): { start: number; end: number } {
   const start = value.lastIndexOf("\n", pos - 1) + 1
   const end = value.indexOf("\n", pos)
   return { start, end: end === -1 ? value.length : end }

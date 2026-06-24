@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react"
-import { resolveEnter, resolveTab } from "@/lib/utils"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { lineBounds, resolveEnter, resolveTab } from "@/lib/utils"
 import { ArrowUp, Paperclip, Loader2, Clock, X, Plus } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 import type { UploadedFile } from "./fileUpload"
@@ -132,6 +132,9 @@ export function ThreadComposer({
   const seedRef = useRef<Draft | null>(null)
   if (seedRef.current === null) seedRef.current = parseDraft(draftKey)
   const [text, setText] = useState(() => seedRef.current?.text ?? "")
+  // Caret offset, tracked so we can tell which line the user is editing — used
+  // to surface the /command bubbles when the current line is exactly `/` (T350).
+  const [caret, setCaret] = useState(() => seedRef.current?.selStart ?? 0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -190,6 +193,15 @@ export function ThreadComposer({
 
   const canSend = text.trim().length > 0 || pendingFiles.length > 0
 
+  // The line the caret sits on is exactly `/` — a lightweight in-composer
+  // trigger for the /command bubbles mid-draft (T350). Recomputed on every
+  // edit + caret move; the moment the line becomes anything other than `/`
+  // (e.g. `/c`, text, blank) the bubbles vanish.
+  const slashActive = useMemo(() => {
+    const { start, end } = lineBounds(text, caret)
+    return text.slice(start, end) === "/"
+  }, [text, caret])
+
   /**
    * Prefill the composer from a suggested `/command` bubble (T348/T350). We
    * seed the command's **expanded prompt body** when it carries one (so a
@@ -203,13 +215,23 @@ export function ThreadComposer({
   const prefill = (s: CommandSuggestion) => {
     const base = s.body && s.body.trim().length > 0 ? s.body.trimEnd() : s.command
     const seeded = `${base}\n`
-    setText(seeded)
-    persistDraft(seeded, seeded.length, seeded.length)
+    // Two seeding modes (T350):
+    //  • slash trigger — the caret's line is exactly `/`: REPLACE just that `/`
+    //    line with the expanded prompt, preserving any other lines, caret on the
+    //    fresh blank line below it.
+    //  • empty composer — seed the whole composer with the prompt.
+    const { start, end } = lineBounds(text, caret)
+    const onSlashLine = text.slice(start, end) === "/"
+    const next = onSlashLine ? text.slice(0, start) + seeded + text.slice(end) : seeded
+    const caretPos = onSlashLine ? start + seeded.length : seeded.length
+    setText(next)
+    setCaret(caretPos)
+    persistDraft(next, caretPos, caretPos)
     requestAnimationFrame(() => {
       const el = textareaRef.current
       if (!el) return
       el.focus()
-      el.setSelectionRange(seeded.length, seeded.length)
+      el.setSelectionRange(caretPos, caretPos)
       autoResize()
     })
   }
@@ -218,6 +240,7 @@ export function ThreadComposer({
     if (!canSend || !onSend) return
     onSend(text)
     setText("")
+    setCaret(0)
     persistDraft("", 0, 0)
     // Collapse back to a single row after sending (matches the TUI clearing
     // its input), then refocus for the next message.
@@ -235,6 +258,7 @@ export function ThreadComposer({
    */
   const applyEdit = (value: string, caret: number) => {
     setText(value)
+    setCaret(caret)
     persistDraft(value, caret, caret)
     requestAnimationFrame(() => {
       const el = textareaRef.current
@@ -277,10 +301,12 @@ export function ThreadComposer({
   return (
     <div className="shrink-0 px-5 pb-4 pt-2">
       {/* First-message /command suggestions (T348) + the create-command pill
-          (T350). Shown only for an empty composer (no typed text, no staged
-          files) so they never clutter an in-progress reply. The create pill
-          shows even with zero suggestions so the first command can be made. */}
-      {(suggestions.length > 0 || onCreateCommand) && !text.trim() && pendingFiles.length === 0 && (
+          (T350). Shown for an empty composer (no typed text, no staged files)
+          OR mid-draft when the caret's line is exactly `/` (T350) so commands
+          are reachable without clearing the composer. */}
+      {(suggestions.length > 0 || onCreateCommand) &&
+        pendingFiles.length === 0 &&
+        (!text.trim() || slashActive) && (
         <div className="mb-2 flex flex-wrap gap-1.5">
           {suggestions.map((s) => (
             <button
@@ -370,12 +396,14 @@ export function ThreadComposer({
           onChange={(e) => {
             const v = e.target.value
             setText(v)
+            setCaret(e.target.selectionStart)
             persistDraft(v, e.target.selectionStart, e.target.selectionEnd)
           }}
           onSelect={(e) => {
             // Caret / selection moved (arrow keys, click, drag) without
             // necessarily changing the text — persist the new range too (T304).
             const el = e.currentTarget
+            setCaret(el.selectionStart)
             persistDraft(el.value, el.selectionStart, el.selectionEnd)
           }}
           onKeyDown={handleKeyDown}
