@@ -382,3 +382,18 @@ index 0db023d6..6b838269 100755
 +  -not -path './report/*')
  exit $exit_code
 # --- End entry #23 ---
+24:2747f22d7d81e6069979cbf5781e8332f8efc28d983e55b2d7625c8e517084d7:12b63a3aed3f55b6d7077babbd3906d75e38d4daff5b97a7bf2348234a3e8ea1:b302ba41ae76a9610a8b4440f54493533ffd272adc91ad31c3c90b23df905d2a
+# --- Diff for entry #24 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index a7521f77..0cd83915 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -196,7 +196,6 @@ rust_2024_prelude_collisions = "forbid"
+ self_constructor_from_outer_item = "forbid"
+ semicolon_in_expressions_from_macros = "forbid"
+ single_use_lifetimes = "forbid"
+-soft_unstable = "forbid"
+ special_module_name = "forbid"
+ stable_features = "forbid"
+ static_mut_refs = "forbid"
+# --- End entry #24 ---
