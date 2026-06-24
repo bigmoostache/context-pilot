@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { resolveEnter } from "@/lib/utils"
 import { ArrowUp, Paperclip, Loader2, Clock, X, Plus } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 import type { UploadedFile } from "./fileUpload"
@@ -227,15 +228,61 @@ export function ThreadComposer({
     })
   }
 
+  /**
+   * Splice a new value + caret into the textarea and React state in one shot,
+   * keeping the persisted draft and auto-grow in sync. Caret is restored after
+   * the controlled re-render via rAF (React resets it on value change).
+   */
+  const applyEdit = (value: string, caret: number) => {
+    setText(value)
+    persistDraft(value, caret, caret)
+    requestAnimationFrame(() => {
+      const el = textareaRef.current
+      if (!el) return
+      el.setSelectionRange(caret, caret)
+      autoResize()
+    })
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Enter sends, Shift+Enter inserts a newline — matching the TUI input.
-    // `isComposing` guards an in-flight IME/dead-key composition (e.g. accents,
-    // CJK candidates): committing the composition with Enter must NOT fire a
-    // send. We read it off the native event because React's synthetic event
-    // doesn't surface `isComposing`.
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-      e.preventDefault()
-      handleSubmit()
+    // Faithful port of the TUI input area (T359). `isComposing` guards an
+    // in-flight IME/dead-key composition (accents, CJK candidates) — committing
+    // it with Enter must never act. Shift+Enter always inserts a newline (we
+    // let the browser's default handle it). A plain Enter is fully hijacked:
+    // resolveEnter decides send / list-continue / empty-item-remove / newline,
+    // mirroring src/modules/conversation/{list,panel}.rs exactly.
+    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return
+    e.preventDefault()
+
+    const el = e.currentTarget
+    const { value, selectionStart: s, selectionEnd } = el
+    const action = resolveEnter(value, s, selectionEnd)
+
+    switch (action.kind) {
+      case "send":
+        handleSubmit()
+        return
+      case "newline": {
+        const next = `${value.slice(0, s)}\n${value.slice(selectionEnd)}`
+        applyEdit(next, s + 1)
+        return
+      }
+      case "continue": {
+        // Insert the continuation (newline + next marker) at the caret, like
+        // the TUI InsertText action.
+        const next = `${value.slice(0, s)}${action.text}${value.slice(selectionEnd)}`
+        applyEdit(next, s + action.text.length)
+        return
+      }
+      case "remove": {
+        // Strip the empty list marker on the current line, collapsing it to a
+        // blank line — TUI handle_remove_list_item (delete from line start to
+        // caret, caret → line start).
+        const lineStart = value.lastIndexOf("\n", s - 1) + 1
+        const next = value.slice(0, lineStart) + value.slice(s)
+        applyEdit(next, lineStart)
+        return
+      }
     }
   }
 
