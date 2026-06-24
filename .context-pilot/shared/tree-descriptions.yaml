@@ -3326,6 +3326,10 @@
   path: crates/cp-base/src/cast.rs
   description: 'Safe trait: saturating numeric casts for all int/float types, macro-driven impls, replaces raw `as` casts'
   last_edited_ms: 0
+572bbc37f7d40095:
+  path: crates/cp-orchestrator/src/services/auth/acl.rs
+  description: Per-agent access-control operations on AuthStore. Extracted from store.rs. grant/revoke/update_role/check_access/list_agent_users/list_user_agents/is_agent_admin.
+  last_edited_ms: 1782332268397
 5730a4905add5122:
   path: web/src/index.css
   description: Tailwind v4 + tw-animate. Two palettes (:root Cream light / .dark Dungeon Forge) as CSS token blocks; semantic tokens (signal/ok/warn/danger/surface). Finder micro-motion keyframes (finder-pop/ql-pop/menu-pop/ants/checker), modal-pop, highlight.js .hljs-* theme mapped to tokens (T280).

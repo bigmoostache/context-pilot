@@ -2,8 +2,6 @@
 //!
 //! Extracted from `store.rs` to keep both files within the line budget.
 
-use rusqlite;
-
 use super::store::AuthStore;
 use super::helpers::now_ms;
 use super::types::{AclEntry, AgentRole, AuthError};
