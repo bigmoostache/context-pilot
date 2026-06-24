@@ -4582,6 +4582,10 @@
   path: crates/cp-orchestrator/src/services/materialized_view.rs
   description: 'Phase 18: MaterializedView in-mem fleet projection folded from OpEntry (one AgentView per agent). AgentView{rev,heads,phase,lifecycle,cost}.apply: Checkpoint=authoritative heads reset, MessageCreated=set_thread_head, Phase/Lifecycle/Cost=latest-wins, CommandEffect/SeenMark/4-thread-roster-variants/Unknown=inert (roster projection not yet a field on AgentView — lands with X835 view-fold). 7 tests.'
   last_edited_ms: 1781787267872
+7c7a2625c6aaee1e:
+  path: web/src/lib/support/markdown.tsx
+  description: GFM markdown renderer (react-markdown + remark-gfm) themed to app tokens; default + onAccent variants. XSS-safe (no raw HTML).
+  last_edited_ms: 0
 7c8d1c712f95c232:
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
@@ -6822,6 +6826,10 @@ b689ff54e81da946:
   path: src/infra/tools.rs
   description: Re-exports cp_base::tools types. execute_tool() dispatches via module system. execute_reload_tui() sets reload flag + writes config.json.
   last_edited_ms: 1780651842213
+b6a9a8a7459e51c7:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 b6af6ae89470c463:
   path: web/src/components/finder/internal/FinderOverlays.tsx
   description: 'Finder bottom chrome + floating layers: status bar, right-click ContextMenu (full handler wiring incl Refresh via own useQueryClient), external-drag upload overlay, transient toast. Built from primitive deps. T305: onTag passthrough removed.'
@@ -9250,6 +9258,10 @@ fc7d4dce281874be:
   path: crates/cp-orchestrator/src/services/avatars.rs
   description: 'Orchestrator-owned agent avatar store (T338). AvatarStore: HashMap<agent_id, content_type> + raw image files under <agents_dir>/agent-avatars/. Magic-byte sniffing (PNG/JPEG/GIF/WebP/BMP/ICO/SVG). 2MiB limit. Atomic persist (sidecar JSON map + file write). load/get/set/remove/has. Unit-tested roundtrip + oversize rejection.'
   last_edited_ms: 1782141874672
+fc951562b9dce358:
+  path: crates/cp-mod-threads/src/tools.rs
+  description: 'Thread tool handlers. execute_send/execute_read/build_panel_content. T353: execute_send AUTO-UNARCHIVES an archived target thread (thread.archived=true → set false) — sending to an archived thread is allowed (AI may remember its id), and the reply makes it visible again, mirroring the web frontend''s unarchive-on-send; surfaced in the tool result as ''[thread was archived — automatically unarchived]''. Archived threads filtered out of LLM-facing context. X887: build_panel_content also filters .filter(|m| !m.auto) (visible Vec, skip/total on non-auto count) so the AI never re-reads its own auto tool-activity traces. T343: tool result only lists threads with unack > 0 (concise). MAX caps on content/file-path/questions/panel-messages.'
+  last_edited_ms: 0
 fc9cc30874f14d93:
   path: ui/src/components/shell/TopBar.tsx
   description: 'macOS title bar. App mark (Home)→fleet. ALWAYS renders / + AgentSwitcher. Per-agent view switcher order Threads·Finder·Cockpit (T25), each tab + app-mark/Activity/theme/Settings carry <Tip> tooltips. Right cluster (in-agent): cost, Activity→StatsPopup, theme, divider, then a PAIR of cog buttons — Settings2 ''Agent configuration'' (T26, opens shared AgentModal in manage mode for the active agent, one-click shortcut to the 4-step Manage flow) + Settings gear→ConfigModal (global). AgentModal rendered as a SIBLING of the .vibrancy header (fragment return) so its absolute-inset backdrop anchors to the viewport. At fleet altitude the agent-scoped controls are hidden.'

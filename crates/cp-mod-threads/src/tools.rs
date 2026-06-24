@@ -279,71 +279,86 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// Called by `execute_read` to generate the static panel text that the LLM sees.
 /// Limits the focused thread to the last [`MAX_PANEL_MESSAGES`] messages to keep
 /// token usage bounded for long-lived threads.
+///
+/// Emits **YAML-structured** output (T372) so the LLM can parse thread state
+/// cleanly — matching the style of the Search result panels.
 fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String {
     /// Maximum messages shown in the panel for a single focused thread.
     const MAX_PANEL_MESSAGES: usize = 50;
 
     let ts = ThreadsState::get(state);
-    let mut output = String::from("=== Threads ===\n");
+    let mut output = String::from("threads:\n");
 
     // Archived threads are invisible to the LLM (T9): only active threads
     // appear in the context the model reads. The web frontend still lists
     // archived threads (inspection plane) behind its own toggle.
     for t in ts.threads.iter().filter(|t| !t.archived) {
         let unack = t.messages.iter().filter(|m| !m.acknowledged).count();
-        let focus_marker = if t.id == focused_tid { " ★" } else { "" };
-        _ = writeln!(
-            output,
-            "{id} \"{name}\" [{status}] — {count} msgs, {unack} unacknowledged{focus_marker}",
-            id = t.id,
-            name = t.name,
-            status = t.status,
-            count = t.messages.len(),
-        );
+        let focused = t.id == focused_tid;
+        _ = writeln!(output, "  - id: {}", t.id);
+        _ = writeln!(output, "    name: \"{}\"", yaml_escape(&t.name));
+        _ = writeln!(output, "    status: {}", t.status);
+        _ = writeln!(output, "    messages: {}", t.messages.len());
+        if unack > 0 {
+            _ = writeln!(output, "    unread: {unack}");
+        }
+        if focused {
+            _ = writeln!(output, "    focused: true");
+        }
     }
 
     // Focused thread's conversation (last MAX_PANEL_MESSAGES messages)
     if let Some(thread) = ts.threads.iter().find(|t| t.id == focused_tid) {
-        _ = writeln!(
-            output,
-            "\n=== {tid} \"{name}\" [{status}] — Full Conversation ===",
-            tid = thread.id,
-            name = thread.name,
-            status = thread.status,
-        );
+        // Auto tool-activity traces are hidden from the AI's own context —
+        // the model should never re-read its own action log (token bloat +
+        // self-referential loop risk). They remain visible (collapsed) in
+        // the web UI / TUI for the human.
+        let visible: Vec<&ThreadMessage> = thread.messages.iter().filter(|m| !m.auto).collect();
+        let total = visible.len();
+        let skip = total.saturating_sub(MAX_PANEL_MESSAGES);
 
-        if thread.messages.is_empty() {
-            _ = writeln!(output, "(no messages)");
+        _ = writeln!(output, "\nconversation:");
+        _ = writeln!(output, "  thread_id: {}", thread.id);
+        _ = writeln!(output, "  name: \"{}\"", yaml_escape(&thread.name));
+        _ = writeln!(output, "  status: {}", thread.status);
+        if skip > 0 {
+            _ = writeln!(output, "  omitted: {skip}");
+        }
+
+        if visible.is_empty() {
+            _ = writeln!(output, "  messages: []");
         } else {
-            // Auto tool-activity traces are hidden from the AI's own context —
-            // the model should never re-read its own action log (token bloat +
-            // self-referential loop risk). They remain visible (collapsed) in
-            // the web UI / TUI for the human.
-            let visible: Vec<&ThreadMessage> = thread.messages.iter().filter(|m| !m.auto).collect();
-            if visible.is_empty() {
-                _ = writeln!(output, "(no messages)");
-            } else {
-                let total = visible.len();
-                let skip = total.saturating_sub(MAX_PANEL_MESSAGES);
-                if skip > 0 {
-                    _ = writeln!(output, "\n({skip} older message(s) omitted)");
+            _ = writeln!(output, "  messages:");
+            for msg in visible.iter().skip(skip) {
+                let age = format_age(now_ms, msg.timestamp);
+                _ = writeln!(output, "    - author: {}", msg.author);
+                _ = writeln!(output, "      ts: \"{age}\"");
+                let content = msg.content.as_deref().unwrap_or("[no text]");
+                // Use YAML block scalar for multi-line text, inline for single.
+                if content.contains('\n') {
+                    _ = writeln!(output, "      text: |");
+                    for line in content.lines() {
+                        _ = writeln!(output, "        {line}");
+                    }
+                } else {
+                    _ = writeln!(output, "      text: \"{}\"", yaml_escape(content));
                 }
-                for msg in visible.iter().skip(skip) {
-                    let age = format_age(now_ms, msg.timestamp);
-                    let content = msg.content.as_deref().unwrap_or("[no text]");
-                    _ = writeln!(output, "\n[{author}] {age}:\n{content}", author = msg.author);
-                    if let Some(fp) = &msg.file_path {
-                        _ = writeln!(output, "  📎 {fp}");
-                    }
-                    if msg.question.is_some() {
-                        _ = writeln!(output, "  ❓ [questions attached]");
-                    }
+                if let Some(fp) = &msg.file_path {
+                    _ = writeln!(output, "      file: \"{}\"", yaml_escape(fp));
+                }
+                if msg.question.is_some() {
+                    _ = writeln!(output, "      questions: true");
                 }
             }
         }
     }
 
     output
+}
+
+/// Escape a string for YAML double-quoted context: `\` → `\\`, `"` → `\"`.
+fn yaml_escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 /// Format an age duration from two epoch-ms timestamps as a human-readable
