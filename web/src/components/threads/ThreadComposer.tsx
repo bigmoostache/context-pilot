@@ -85,6 +85,7 @@ export function ThreadComposer({
   onRemoveFile,
   draftKey,
   suggestions = [],
+  firstMessage = false,
   onCreateCommand,
 }: {
   status: ThreadStatus
@@ -105,6 +106,13 @@ export function ThreadComposer({
    * jumping-off point for the first message, not a persistent palette.
    */
   suggestions?: CommandSuggestion[]
+  /**
+   * True when the thread has no messages yet (T350). Scopes the *empty-composer*
+   * auto-show of the suggestion bubbles to a first message only — on a
+   * non-empty thread the bubbles still appear, but solely via the lone-`/` line
+   * trigger, never just because the composer happens to be empty.
+   */
+  firstMessage?: boolean
   /**
    * Opens the "create command" dialog (T350). When provided, a pill styled
    * exactly like the suggestion bubbles is rendered alongside them (and shown
@@ -301,12 +309,12 @@ export function ThreadComposer({
   return (
     <div className="shrink-0 px-5 pb-4 pt-2">
       {/* First-message /command suggestions (T348) + the create-command pill
-          (T350). Shown for an empty composer (no typed text, no staged files)
-          OR mid-draft when the caret's line is exactly `/` (T350) so commands
-          are reachable without clearing the composer. */}
+          (T350). Shown either as a first-message palette on an EMPTY thread
+          with an empty composer (firstMessage), OR mid-draft on ANY thread when
+          the caret's line is exactly `/` (slashActive). */}
       {(suggestions.length > 0 || onCreateCommand) &&
         pendingFiles.length === 0 &&
-        (!text.trim() || slashActive) && (
+        (slashActive || (firstMessage && !text.trim())) && (
         <div className="mb-2 flex flex-wrap gap-1.5">
           {suggestions.map((s) => (
             <button

@@ -139,12 +139,15 @@ export function ThreadConversation({
   // (the id is the command's file-stem slug, e.g. "clean" → `/clean`).
   const { data: library = [] } = useLibrary(agentId)
   const isEmpty = thread.log.length === 0
+  // Command suggestions are built for EVERY thread (not just empty ones): the
+  // composer surfaces them both as first-message bubbles on an empty thread AND
+  // mid-draft on any thread when the caret's line is a lone `/` (T350). The
+  // `firstMessage` flag below scopes only the empty-composer auto-show.
   const suggestions = useMemo<CommandSuggestion[]>(() => {
-    if (!isEmpty) return []
     return library
       .filter((item) => item.kind === "command")
       .map((item) => ({ command: `/${item.id}`, name: item.name, description: item.description, body: item.body }))
-  }, [isEmpty, library])
+  }, [library])
   // Pin the conversation to the latest message: scroll to the bottom whenever
   // a thread is opened (id change) or a new message lands (log grows), so the
   // freshest exchange is always in view — matching the TUI, which keeps the
@@ -208,7 +211,8 @@ export function ThreadConversation({
           pendingFiles={pendingFiles}
           onRemoveFile={onRemoveFile}
           suggestions={suggestions}
-          onCreateCommand={isEmpty ? () => setCreateCmdOpen(true) : undefined}
+          firstMessage={isEmpty}
+          onCreateCommand={() => setCreateCmdOpen(true)}
           draftKey={`cp-draft-${agentId}-${thread.id}`}
         />
       </div>
