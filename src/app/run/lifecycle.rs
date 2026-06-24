@@ -362,12 +362,18 @@ impl App {
         if !ts.has_incomplete_todos() {
             return;
         }
+        // Report only the COUNT plus the FIRST incomplete item — never the full
+        // list. On a large roadmap (hundreds of todos) dumping every remaining
+        // entry floods the model with redundant tokens on every auto-continuation
+        // tick; the count conveys the scale and the first item points at what to
+        // pick up next, which is all the continuation nudge needs (T361).
         let summary = ts.incomplete_todos_summary();
+        let first = summary.first().map_or("", String::as_str);
         let _r = SpineState::create_notification(
             &mut self.state,
             NotificationType::Custom,
             "todo_continuation".to_string(),
-            format!("{} todo(s) remaining: {}", summary.len(), summary.join(", ")),
+            format!("Non-completed todo items ({}). First: {first}", summary.len()),
         );
     }
 
