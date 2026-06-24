@@ -12,6 +12,7 @@
 // bridge then invalidates that key so the next read hydrates ground truth.
 
 import type { Agent, ThreadDetail } from "../types"
+import { mapRawQuestions } from "../api"
 
 // ── Oplog delta shape (the push-plane payload) ───────────────────────
 //
@@ -209,9 +210,7 @@ export function applyThreadDelta(
         author: raw.author === "user" ? "user" : "assistant",
         text: raw.text ?? undefined,
         ts: new Date(msgTs).toISOString(),
-        questions: raw.question
-          ? (raw.question as ThreadDetail["log"][number]["questions"])
-          : undefined,
+        questions: mapRawQuestions(raw.question),
         fileRef: raw.fileRef ?? undefined,
         auto: raw.auto ?? undefined,
       }

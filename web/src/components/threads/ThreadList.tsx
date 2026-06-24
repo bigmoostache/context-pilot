@@ -293,12 +293,39 @@ function ThreadRow({
       )}
     >
       <button onClick={() => onSelect(t.id)} className="flex flex-col gap-1 text-left">
+        {/* line 1 — dot + name + time + overflow menu */}
         <div className="flex items-center gap-2">
           <span
             className={cn("size-2 shrink-0 rounded-full", pulse && !archived && !isPaused && "animate-pulse")}
             style={{ background: archived ? "var(--muted-foreground)" : isPaused ? "var(--warn)" : dot }}
           />
           <span className="truncate text-[13px] font-medium text-foreground/90">{t.name}</span>
+          <span className="relative ml-auto shrink-0">
+            <span className="text-[10.5px] tabular-nums text-muted-foreground/50 transition-opacity group-hover:opacity-0">
+              {t.lastActivity}
+            </span>
+            <span className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+              <button
+                onClick={(e) => { e.stopPropagation(); onArchive(t.id) }}
+                className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+                title={archived ? "Restore" : "Archive"}
+              >
+                {archived ? <ArchiveRestore className="size-3" /> : <Archive className="size-3" />}
+              </button>
+              {!archived && onPause && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onPause(t.id) }}
+                  className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+                  title={isPaused ? "Resume" : "Pause"}
+                >
+                  {isPaused ? <Play className="size-3" /> : <Pause className="size-3" />}
+                </button>
+              )}
+            </span>
+          </span>
+        </div>
+        {/* line 2 — badges + preview */}
+        <div className="flex items-center gap-1.5 pl-4">
           {isFocused && (
             <span
               className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide"
@@ -315,11 +342,6 @@ function ThreadRow({
               paused
             </span>
           )}
-          <span className="ml-auto shrink-0 pr-5 text-[10.5px] tabular-nums text-muted-foreground/50">
-            {t.lastActivity}
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 pl-4">
           <span className="truncate text-[11.5px] text-muted-foreground/70">{preview}</span>
           {!archived && t.unread > 0 && (
             <span
@@ -332,29 +354,6 @@ function ThreadRow({
         </div>
       </button>
 
-      {/* hover actions — pause/resume + archive/restore */}
-      {!archived && onPause && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onPause(t.id)
-          }}
-          title={isPaused ? "Resume thread" : "Pause thread"}
-          className="absolute right-9 top-2 flex size-6 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition-all hover:bg-muted hover:text-foreground group-hover:opacity-100"
-        >
-          {isPaused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
-        </button>
-      )}
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          onArchive(t.id)
-        }}
-        title={archived ? "Restore thread" : "Archive thread"}
-        className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition-all hover:bg-muted hover:text-foreground group-hover:opacity-100"
-      >
-        {archived ? <ArchiveRestore className="size-3.5" /> : <Archive className="size-3.5" />}
-      </button>
     </div>
   )
 }

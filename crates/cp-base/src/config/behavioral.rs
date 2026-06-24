@@ -15,7 +15,7 @@ pub struct RedirectInjections {
 /// conversation history panels before a queued batch can execute.
 #[derive(Debug, Deserialize)]
 pub struct TrapInjections {
-    /// Shown when the trap triggers (≥3 history panels at queue flush time).
+    /// Shown when the trap triggers (≥4 history panels at queue flush time).
     pub history_cleanup_triggered: String,
     /// Shown when the AI tries any non-allowed tool while the trap is active.
     pub history_cleanup_blocked: String,

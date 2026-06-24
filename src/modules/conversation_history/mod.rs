@@ -1,5 +1,7 @@
 /// Panel implementation for frozen conversation history display.
 mod panel;
+/// Recompute open tree folders after history panels are closed.
+pub(crate) mod recompute_toggled_tree_folders;
 /// History cleanup trap: forces AI to close old panels before queue flush.
 pub(crate) mod trap;
 

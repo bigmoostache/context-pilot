@@ -33,7 +33,7 @@ console_guardrails:
 # before executing a queued batch when too many accumulate.
 trap:
   history_cleanup_triggered: |
-    Trap triggered: all subsequent tool calls other than Close_conversation_history will be refused until you close the following conversation history panels (oldest to most recent): %PANELS%. If you deem relevant to keep %OPTIONAL_1% or %OPTIONAL_2% for your work in progress, closing those two is not compulsory.
+    Trap triggered: all subsequent tool calls other than Close_conversation_history will be refused until you close the following conversation history panels (oldest to most recent): %PANELS%. If you deem relevant to keep %OPTIONAL_1% for your work in progress, closing that one is not compulsory.
   history_cleanup_blocked: |
     History cleanup trap is active. Only Close_conversation_history is allowed until you close enough conversation history panels. Remaining panels to close: %REMAINING_PANELS%
 

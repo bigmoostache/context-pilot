@@ -134,7 +134,7 @@ fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
     }
     if let Some(q) = raw.get("question") {
         if !q.is_null() {
-            let _prev = msg.as_object_mut().expect("just built").insert("questions".to_owned(), serde_json::json!([q]));
+            let _prev = msg.as_object_mut().expect("just built").insert("questions".to_owned(), q.clone());
         }
     }
     msg

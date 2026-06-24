@@ -264,12 +264,16 @@ export type ViewMode = "fleet" | "cockpit" | "threads" | "finder"
 
 /** A single embedded question form inside a thread message (CP signature). */
 export interface ThreadQuestion {
+  /** Short title shown above the question text. */
+  header?: string
   prompt: string
   options: string[]
   /** allow multiple selections */
   multi?: boolean
   /** offer a free-text "other" field */
   allowOther?: boolean
+  /** user's answers (set after submission — makes the form read-only) */
+  answered?: string[]
 }
 
 /** One message in a thread's conversation. */

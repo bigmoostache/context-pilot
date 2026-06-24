@@ -23,19 +23,10 @@ function buildCombinedContent(text: string, files: UploadedFile[]): string {
 /**
  * Turn a rejected `sendCommand` into a human sentence for the notice toast.
  *
- * `api.request` throws `Error("<status> <path>: <body>")` on any non-2xx, so a
- * tripped **CostBreaker** surfaces as a `503` whose body carries
- * `{"status":"tripped"}` (design doc R2-8 / V9). That case gets a specific,
- * actionable message — the silent-failure hole behind T121, where an
- * over-budget send was swallowed by `.catch(console.error)` and the user saw
- * nothing happen. Every other failure degrades to a generic, still-visible
- * line so a command is *never* silently dropped again.
+ * Every failure is surfaced visibly so a command is never silently dropped.
  */
 function describeCommandError(verb: string, err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err)
-  if (msg.includes("503") || msg.toLowerCase().includes("tripped")) {
-    return "Send blocked — this agent is over its spend budget (cost breaker tripped). Raise the budget or stop the run, then try again."
-  }
   return `Could not ${verb}: ${msg}`
 }
 

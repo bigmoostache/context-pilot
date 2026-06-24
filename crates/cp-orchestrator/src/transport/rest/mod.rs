@@ -18,13 +18,12 @@
 use std::sync::Mutex;
 
 use cp_wire::types::ContentHash;
-use cp_wire::types::command::{Command, Kind};
+use cp_wire::types::command::Command;
 use cp_wire::types::registry::Entry;
 use serde::Serialize;
 
 use super::Backend;
 use crate::channel::AgentChannel;
-use crate::services::Verdict;
 
 mod create;
 mod library;
@@ -177,24 +176,6 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
     let Ok(command) = serde_json::from_slice::<Command>(body_bytes) else {
         return HttpReply::error(400, "malformed command");
     };
-
-    // Fail-closed breaker check — but ONLY for cost-incurring commands.
-    //
-    // The breaker (R2-8/V9) exists to stop *new spending* once an agent is over
-    // budget. Only `SendMessage` incurs LLM cost (it injects a user turn that
-    // triggers a stream); the control-plane commands (create/archive/restore a
-    // thread, stop, interrupt) cost nothing — and a tripped breaker is exactly
-    // when the user most needs them (to stop a runaway agent or tidy threads).
-    // Gating those on the breaker would lock the user out of the very controls
-    // that recover from the overspend, so they bypass the check entirely.
-    if matches!(command.kind, Kind::SendMessage { .. }) {
-        let Ok(backend) = state.lock() else {
-            return HttpReply::error(500, "backend lock poisoned");
-        };
-        if backend.breaker.check(id) == Verdict::Tripped {
-            return HttpReply::json(503, &TrippedBody { status: "tripped" });
-        }
-    }
 
     let entry = match resolve_entry(state, id) {
         Ok(entry) => entry,
@@ -389,12 +370,6 @@ struct BodyPayload<'a> {
     bytes: &'a [u8],
 }
 
-/// The JSON body returned when the cost breaker is tripped.
-#[derive(Serialize)]
-struct TrippedBody {
-    /// Always `"tripped"`.
-    status: &'static str,
-}
 
 #[cfg(test)]
 mod tests {
@@ -457,37 +432,4 @@ mod tests {
         assert_eq!(command(&state, "a1", b"{not json").status, 400);
     }
 
-    #[test]
-    fn command_fails_closed_when_breaker_tripped() {
-        let mut view = MaterializedView::new();
-        view.apply("a1", &phase_entry(1, Phase::Idle));
-        let mut breaker = CostBreaker::new(5.0);
-        breaker.observe("a1", 99.0); // over budget ⇒ tripped
-        let state = Mutex::new(Backend::for_test(PathBuf::from("/tmp/x"), view, breaker));
-
-        // A cost-incurring SendMessage must be refused while the breaker is
-        // tripped (the breaker gates new spending).
-        let cmd = b"{\"schema_version\":1,\"id\":\"c1\",\"seq\":1,\"dedup_token\":\"d1\",\"kind\":{\"kind\":\"send_message\",\"thread_id\":\"T1\",\"content\":\"hi\"}}";
-        let reply = command(&state, "a1", cmd);
-        assert_eq!(reply.status, 503, "tripped breaker blocks a cost-incurring command");
-        assert!(reply.body.contains("tripped"));
-    }
-
-    #[test]
-    fn tripped_breaker_allows_control_plane_command() {
-        let mut view = MaterializedView::new();
-        view.apply("a1", &phase_entry(1, Phase::Idle));
-        let mut breaker = CostBreaker::new(5.0);
-        breaker.observe("a1", 99.0); // over budget ⇒ tripped
-        let state = Mutex::new(Backend::for_test(PathBuf::from("/tmp/x"), view, breaker));
-
-        // A control-plane Stop costs nothing, so a tripped breaker must NOT
-        // refuse it — the user has to be able to halt a runaway agent. It sails
-        // past the breaker gate and only then fails to resolve the (absent)
-        // agent registry record, proving it was never breaker-blocked.
-        let cmd = b"{\"schema_version\":1,\"id\":\"c2\",\"seq\":1,\"dedup_token\":\"d2\",\"kind\":{\"kind\":\"stop\"}}";
-        let reply = command(&state, "a1", cmd);
-        assert_ne!(reply.status, 503, "a tripped breaker must not block control-plane commands");
-        assert_eq!(reply.status, 404, "Stop passes the breaker gate and reaches entry resolution");
-    }
 }

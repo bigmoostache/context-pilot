@@ -231,6 +231,16 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
         super::queue_flush::augment_remaining_history_panels(&app.state, &tools, &mut tool_results);
     }
 
+    // === TREE FOLDER RECOMPUTATION ===
+    // After Close_conversation_history, rebuild the tree's open-folder set from
+    // what's still in context (file panels + explicitly-opened folders in
+    // surviving conversations), so irrelevant folders auto-collapse.
+    if tools.iter().any(|t| t.name == "Close_conversation_history") {
+        crate::modules::conversation_history::recompute_toggled_tree_folders::recompute_tree_folders(
+            &mut app.state,
+        );
+    }
+
     // === LOGS → MEILISEARCH SYNC ===
     // Push new log entries to the search index AFTER tool execution.
     // Cannot use on_tool_complete (fires during streaming, before execution).

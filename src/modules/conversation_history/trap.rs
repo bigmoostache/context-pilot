@@ -21,10 +21,10 @@ use cp_base::state::runtime::State;
 use cp_mod_queue::types::QueueState;
 
 /// Minimum number of conversation history panels that triggers the trap.
-const TRAP_THRESHOLD: usize = 3;
+const TRAP_THRESHOLD: usize = 4;
 
 /// Number of most-recent panels the AI may optionally keep.
-const OPTIONAL_KEEP: usize = 2;
+const OPTIONAL_KEEP: usize = 1;
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 
@@ -71,15 +71,13 @@ pub(crate) fn check_and_trigger_trap(state: &mut State) -> Option<String> {
     // Format trigger message from YAML template
     let panels_str = all_ids.join(", ");
     let opt_1 = optional_ids.first().map_or("?", String::as_str);
-    let opt_2 = optional_ids.get(1).map_or("?", String::as_str);
 
     let msg = INJECTIONS
         .trap
         .history_cleanup_triggered
         .trim_end()
         .replace("%PANELS%", &panels_str)
-        .replace("%OPTIONAL_1%", opt_1)
-        .replace("%OPTIONAL_2%", opt_2);
+        .replace("%OPTIONAL_1%", opt_1);
 
     Some(msg)
 }

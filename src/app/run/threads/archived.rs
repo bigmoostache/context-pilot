@@ -59,10 +59,17 @@ pub(in crate::app::run) fn emit_thread_archived(app: &mut App) {
         return;
     }
 
+    // Emit the changed count only once (when the diff fires on the first tick).
+    // Normal ticks have zero changes — no log noise.
+
     // First pass after (re)boot: seed from the oplog, then FALL THROUGH.
     let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.archived());
     if !seeded {
         let oplog_archived = oplog_roster_archived(&app.state);
+        log::info!(
+            "bridge: emit_thread_archived seeding from oplog roster ({} entries)",
+            oplog_archived.len(),
+        );
         let bs = app.state.ext_mut::<BridgeState>();
         bs.thread_archived_memo.extend(oplog_archived);
         bs.seeded.seed_archived();
@@ -82,7 +89,17 @@ pub(in crate::app::run) fn emit_thread_archived(app: &mut App) {
             .collect()
     };
 
+    if !changed.is_empty() {
+        log::info!(
+            "bridge: emit_thread_archived found {} divergence(s)",
+            changed.len(),
+        );
+    }
+
     for (thread_id, archived) in changed {
+        log::info!(
+            "bridge: emit_thread_archived divergence: {thread_id} → archived={archived}",
+        );
         let kind = if archived {
             OpEntryKind::ThreadArchived { thread_id: thread_id.clone() }
         } else {

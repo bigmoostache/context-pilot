@@ -30,7 +30,6 @@ export * from "./finder"
 export * from "./body"
 
 // ── Fleet ─────────────────────────────────────────────────────────────
-
 export function fetchFleet(): Promise<Agent[]> {
   return request("/api/fleet/meta")
 }
@@ -218,6 +217,27 @@ interface ThreadsResponse {
   threads: RawThread[]
 }
 
+/** Map backend question JSON (`{header,question,multiSelect,options:[{label}]}`)
+ * to frontend ThreadQuestion (`{header,prompt,multi,options:string[]}`).
+ * Handles legacy double-wrapped arrays from pre-fix REST endpoint. */
+export function mapRawQuestions(raw: unknown): ThreadDetail["log"][number]["questions"] {
+  if (!raw) return undefined
+  // Unwrap double-wrapped arrays (pre-fix: reshape_message did json!([q]) on an already-array value)
+  let arr = Array.isArray(raw) ? raw : [raw]
+  if (arr.length === 1 && Array.isArray(arr[0])) arr = arr[0]
+
+  return arr.map((q: Record<string, unknown>) => ({
+    header: (q.header as string) ?? undefined,
+    prompt: (q.question as string) ?? (q.prompt as string) ?? "",
+    options: Array.isArray(q.options)
+      ? q.options.map((o: unknown) =>
+          typeof o === "string" ? o : (o as Record<string, string>)?.label ?? "")
+      : [],
+    multi: (q.multiSelect as boolean) ?? (q.multi as boolean) ?? false,
+    allowOther: (q.allowOther as boolean) ?? false,
+  }))
+}
+
 export function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
   return request<ThreadsResponse | RawThread[]>(`/api/agent/${agentId}/threads`).then((raw) => {
     // Handle both wrapper shape { focusedThreadId, threads } and legacy array
@@ -241,7 +261,7 @@ export function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
         text: m.text ?? m.content,
         ts: m.ts ?? (m.timestamp ? new Date(m.timestamp).toISOString() : ""),
         tool: m.tool as ThreadDetail["log"][number]["tool"],
-        questions: m.questions as ThreadDetail["log"][number]["questions"],
+        questions: mapRawQuestions(m.questions),
         fileRef: m.fileRef,
         auto: m.auto,
       })),
@@ -250,7 +270,6 @@ export function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
 }
 
 // ── Panels ────────────────────────────────────────────────────────────
-
 export function fetchPanels(agentId: string): Promise<ContextPanel[]> {
   return request(`/api/agent/${agentId}/panels`)
 }
