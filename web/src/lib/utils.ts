@@ -1,8 +1,63 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { zip as fflateZip } from "fflate"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+// ── Client-side zip-on-drop (T367) ────────────────────────────────────
+//
+// Bundle the file(s) a user drops onto the thread conversation into a SINGLE
+// `.zip` (built entirely in the browser via fflate) before they're uploaded, so
+// what lands in the realm is one compressed archive instead of N loose files.
+// Only the drag-and-drop path uses this; the paperclip picker still uploads raw
+// files unchanged.
+
+/**
+ * De-duplicate an entry name within a zip: if `name` is already a key in `taken`,
+ * append ` (1)`, ` (2)`… before the extension until it's unique. Two files
+ * dragged from different folders can share a basename — without this the second
+ * would silently overwrite the first inside the archive.
+ */
+function uniqueZipEntry(taken: Record<string, unknown>, name: string): string {
+  if (!(name in taken)) return name
+  const dot = name.lastIndexOf(".")
+  const stem = dot > 0 ? name.slice(0, dot) : name
+  const ext = dot > 0 ? name.slice(dot) : ""
+  for (let i = 1; ; i++) {
+    const candidate = `${stem} (${i})${ext}`
+    if (!(candidate in taken)) return candidate
+  }
+}
+
+/**
+ * Zip the dropped `files` into one archive `File`, built client-side with
+ * fflate (DEFLATE, level 6). The archive is named after the lone file when a
+ * single one is dropped (`report.pdf` → `report.pdf.zip`, matching the macOS
+ * Finder "Compress" convention) or `dropped-<n>-files.zip` for several. Each
+ * entry keeps its original filename (de-duplicated on collision). Rejects if
+ * fflate fails or a file can't be read.
+ */
+export function zipFiles(files: File[]): Promise<File> {
+  return Promise.all(
+    files.map(async (f) => [f.name, new Uint8Array(await f.arrayBuffer())] as const),
+  ).then(
+    (entries) =>
+      new Promise<File>((resolve, reject) => {
+        const data: Record<string, Uint8Array> = {}
+        for (const [name, bytes] of entries) data[uniqueZipEntry(data, name)] = bytes
+        fflateZip(data, { level: 6 }, (err, out) => {
+          if (err) {
+            reject(err)
+            return
+          }
+          const zipName =
+            files.length === 1 && files[0] ? `${files[0].name}.zip` : `dropped-${files.length}-files.zip`
+          resolve(new File([out], zipName, { type: "application/zip" }))
+        })
+      }),
+  )
 }
 
 // ── List Enter / Tab behaviour (T359) ────────────────────────────────

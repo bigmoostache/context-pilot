@@ -6,6 +6,7 @@ import { ThreadComposer, type CommandSuggestion } from "./ThreadComposer"
 import { CreateCommandDialog } from "./CreateCommandDialog"
 import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
+import { zipFiles } from "@/lib/utils"
 import { uploadToNode, type UploadedFile } from "./fileUpload"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
 import type { FinderNode } from "@/lib/types"
@@ -161,13 +162,26 @@ export function ThreadConversation({
     dragDepth.current = Math.max(0, dragDepth.current - 1)
     if (dragDepth.current === 0) setDragging(false)
   }
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     if (!isFileDrag(e)) return
     e.preventDefault()
     dragDepth.current = 0
     setDragging(false)
+    // Capture the File list synchronously — dataTransfer is cleared once the
+    // handler returns, so the array must be built before any await.
     const files = Array.from(e.dataTransfer.files)
-    if (files.length > 0) onAttach?.(files)
+    if (files.length === 0) return
+    // Zip the dropped file(s) client-side into one archive, then upload that
+    // single zip via the same paperclip path (T367). The paperclip picker is
+    // unchanged — only drag-and-drop compresses.
+    try {
+      const archive = await zipFiles(files)
+      onAttach?.([archive])
+    } catch {
+      // Zipping failed (unreadable file / fflate error) — fall back to
+      // uploading the raw files so a drop is never silently lost.
+      onAttach?.(files)
+    }
   }
 
   // Whether the "create command" dialog (T350) is open — toggled by the pill
