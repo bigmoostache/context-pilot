@@ -208,7 +208,7 @@ export function ThreadConversation({
           pendingFiles={pendingFiles}
           onRemoveFile={onRemoveFile}
           suggestions={suggestions}
-          onCreateCommand={() => setCreateCmdOpen(true)}
+          onCreateCommand={isEmpty ? () => setCreateCmdOpen(true) : undefined}
           draftKey={`cp-draft-${agentId}-${thread.id}`}
         />
       </div>
