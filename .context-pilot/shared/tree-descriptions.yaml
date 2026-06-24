@@ -1322,6 +1322,10 @@
   path: website/style.css
   description: Website stylesheet
   last_edited_ms: 0
+2492fe628b59551b:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 24b0b94593ba4546:
   path: Cargo.lock
   description: Workspace lockfile
@@ -2834,6 +2838,10 @@
   path: .uploads/sourced_pdf/sourced_pdf/SPEC.md
   description: 'sourced_pdf format specification v1. Bundle structure: metadata.yaml, refs-schema.yaml, documents/, values/ (per-doc numbers with locators), refs/ (qualifications with arrows). 3 primitives: VALUE (number+location), ARROW (pointer to value), REF (qualification of target value). 5 ref types: unassigned, report_bg, report_n-1, report_internal, arithmetic. Écart tolerance 0.005.'
   last_edited_ms: 1782145700550
+4f6ad1e1513c9150:
+  path: Cargo.toml
+  description: Workspace root. 25 crate members (incl cp-wire/cp-oplog/cp-mod-bridge/cp-orchestrator). Binary 'tui'. Edition 2024. Strict lint config (980 forbid, 21 deny). openssl vendored.
+  last_edited_ms: 0
 4f6d57370d56e43b:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
@@ -6842,6 +6850,10 @@ bd662097808facee:
   path: src/infra/constants.rs
   description: API/layout/loop/persistence constants + theme color accessors (from YAML themes) + card design tokens (card_text, card_agent_bg, card_reverie_bg, card_queue_bg, card_think_bg) + icons + prompts.
   last_edited_ms: 0
+bd6e6f698df00cbb:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend struct holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names(T328)/avatars(T338)/auth(T341)/session_ttl. route_rest dispatches all /api routes incl auth/ACL + auth/status + force-logout. handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with Phase 7 ticket-based ACL.
+  last_edited_ms: 0
 bd75f22269fa0698:
   path: src/app/actions/threads.rs
   description: Thread action handlers. Archive = SOFT-DELETE (archived=true) not remove; restore clears flag. archive_confirm is view-aware (archive in active view, restore in archived view). toggle_archived_view flips FocusState.viewing_archived. Select/archive_start resolve selection through visible_indices. Question form → MY_TURN + spine notification.
@@ -7966,6 +7978,10 @@ dc9b4729550534d2:
   path: crates/cp-orchestrator/tests/end_to_end.rs
   description: 'Phase 30 (X797) end-to-end loopback capstone (3 tests, green ~0.06s). Real agent stack ↔ real backend transport over real sockets, no mocks. (1) capstone loop: agent thread = OplogService + Intake + UnixListener accept; client POST /command → AgentChannel::send (UDS) → Intake journal-then-ack → receipt cmd_id+dedup_token+rev:0+accepted; replay confirms durable; then SSE /stream tails the SAME oplog → CommandEffect re-emerges as delta with id=Some(0) (rev framing) + data carries dedup token = full loop closed; (2) spilled body hydrates over GET /…/body/{hash} byte-for-byte, malformed=400, absent=404; (3) soak: 25 SSE connect/disconnect cycles all 200+delta, server still healthy after (no FD/thread leak hang). serve_backend helper. Top `use nix/serde as _;`.'
   last_edited_ms: 1781679569041
+dc9f4e77914b4f5c:
+  path: crates/cp-mod-git/src/lib.rs
+  description: 'Git module. 1 tool: git_execute. refresh_git_status() for overview (branch + numstat). Watches .git/ paths. watcher_immediate_refresh=false to prevent feedback. overview_context_section renders changes table — HARD-CAPPED at GIT_OVERVIEW_CAP_BYTES (8 KiB): a broken .gitignore mid-rebase can make git report thousands of files, ballooning the section to 1M+ tokens and wrecking context; beyond budget it truncates on a newline boundary + appends ''(Rest hidden, N kB left)''.'
+  last_edited_ms: 1782291787377
 dcb9ef498a7d8eef:
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'

@@ -130,6 +130,14 @@ pub fn refresh_git_status(state: &mut State) {
 /// Timeout for git commands (seconds)
 pub const GIT_CMD_TIMEOUT_SECS: u64 = 30;
 
+/// Hard byte cap on the git section of the Overview panel (context + content).
+///
+/// A broken `.gitignore` (commonly during a rebase) can make `git` report
+/// thousands of changed files; without a cap the per-file table grows to 1M+
+/// tokens and destroys the agent's context. Beyond this budget the section is
+/// truncated with a `(Rest hidden, N kB left)` marker.
+const GIT_OVERVIEW_CAP_BYTES: usize = 8 * 1024;
+
 /// Refresh interval for git status (milliseconds)
 pub(crate) const GIT_STATUS_REFRESH_MS: u64 = 2_000; // 2 seconds
 
@@ -272,6 +280,25 @@ impl Module for GitModule {
             let total_net = total_add.saturating_sub(total_del);
             let total_net_str = if total_net >= 0 { format!("+{total_net}") } else { format!("{total_net}") };
             let _r = writeln!(output, "| **Total** | **+{total_add}** | **-{total_del}** | **{total_net_str}** |");
+        }
+        // Hard cap: a broken .gitignore (e.g. mid-rebase) can make git report
+        // thousands of changed files, ballooning this section to 1M+ tokens and
+        // wrecking the agent's context. Truncate at a fixed byte budget and
+        // report how much was elided. Cut on the last newline within budget so
+        // the table never ends mid-row.
+        if output.len() > GIT_OVERVIEW_CAP_BYTES {
+            let kb_left = output.len().saturating_sub(GIT_OVERVIEW_CAP_BYTES).div_ceil(1024);
+            // Last newline at-or-before the byte budget — a guaranteed UTF-8
+            // boundary, so no char-boundary fixup or string slicing is needed.
+            let cut = output
+                .char_indices()
+                .take_while(|(i, _)| *i <= GIT_OVERVIEW_CAP_BYTES)
+                .filter(|(_, c)| *c == '\n')
+                .map(|(i, _)| i)
+                .last()
+                .unwrap_or(0);
+            output.truncate(cut);
+            let _r = write!(output, "\n\n_(Rest hidden, {kb_left} kB left)_\n");
         }
         Some(output)
     }
