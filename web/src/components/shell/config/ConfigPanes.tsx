@@ -101,7 +101,7 @@ export function CategoryBody({ cat }: { cat: CatId }) {
         <Stack>
           {locked && <ManagedKeysNotice reason={reason} company={company} />}
           <KeyRow i={0} name="Anthropic" env="ANTHROPIC_API_KEY" icon={Sparkles} status={ks("ANTHROPIC_API_KEY")} hint="Claude 4 family" managed={locked} reason={reason} company={company} />
-          <KeyRow i={1} name="Claude Code (OAuth)" env="Keychain · ~/.claude" icon={Cpu} status="connected" hint="opus-4-8 · sonnet-4-6 · fable-5" managed={locked} reason={reason} company={company} />
+          <KeyRow i={1} name="Claude Code (OAuth)" env="Keychain · ~/.claude" icon={Cpu} status="connected" hint="opus-4-8 · sonnet-4-6 · fable-5" managed={locked} reason={reason} company={company} noReveal />
           <KeyRow i={2} name="Grok (xAI)" env="XAI_API_KEY" icon={Zap} status={ks("XAI_API_KEY")} hint="grok-4" managed={locked} reason={reason} company={company} />
           <KeyRow i={3} name="Groq" env="GROQ_API_KEY" icon={Gauge} status={ks("GROQ_API_KEY")} hint="Llama 3.x · fast" managed={locked} reason={reason} company={company} />
           <KeyRow i={4} name="DeepSeek" env="DEEPSEEK_API_KEY" icon={Bot} status={ks("DEEPSEEK_API_KEY")} hint="deepseek-chat / reasoner" managed={locked} reason={reason} company={company} />
@@ -301,6 +301,7 @@ function KeyRow({
   status,
   hint,
   managed = false,
+  noReveal = false,
   reason = "company",
   company,
 }: {
@@ -311,6 +312,7 @@ function KeyRow({
   status: "connected" | "missing"
   hint: string
   managed?: boolean
+  noReveal?: boolean
   reason?: LockReason
   company?: string
 }) {
@@ -354,7 +356,7 @@ function KeyRow({
           {connected ? (maskedValue ?? <span className="text-muted-foreground/45">•••••••••••••••</span>) : <span className="text-muted-foreground/45">not configured</span>}
         </code>
         <span className="shrink-0 rounded bg-muted/70 px-1.5 py-px font-mono text-[9.5px] text-muted-foreground/70">{env}</span>
-        {connected &&
+        {connected && !noReveal &&
           (managed ? (
             <Lock className="size-3.5 shrink-0 text-muted-foreground/50" aria-label="Locked by organization" />
           ) : (
