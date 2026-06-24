@@ -50,6 +50,10 @@ pub fn get_settings(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpRep
         "is_admin": can_admin(state, auth_user),
         "auth_enabled": auth_enabled,
         "providers": providers,
+        // Whether a Claude Code OAuth credential is present — lets onboarding
+        // treat "Claude Code connected" as satisfying the provider requirement
+        // without an API key.
+        "claude_oauth_connected": crate::services::claude_oauth::credentials_present(),
     }))
 }
 

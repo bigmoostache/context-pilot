@@ -113,6 +113,10 @@ pub struct Backend {
     pub(crate) auth: Option<AuthStore>,
     /// Session lifetime for newly created sessions (FR-15).
     pub(crate) session_ttl: Duration,
+    /// In-flight Claude Code OAuth manual login — the PKCE pending state set by
+    /// `/api/auth/oauth/start` and consumed by `/finish`. `None` when no login
+    /// is in progress.
+    pub(crate) pending_oauth: Option<crate::services::claude_oauth::Pending>,
 }
 
 impl Backend {
@@ -147,6 +151,7 @@ impl Backend {
             agent_binary,
             auth,
             session_ttl,
+            pending_oauth: None,
         }
     }
 
@@ -201,6 +206,7 @@ impl Backend {
             agent_binary: PathBuf::from("/tmp/cp-test-bin"),
             auth: None,
             session_ttl: Duration::from_secs(3600),
+            pending_oauth: None,
         }
     }
 }
@@ -348,6 +354,8 @@ fn route_rest(
         (Method::Get, ["api", "settings"]) => rest::get_settings(state, auth_user),
         (Method::Post, ["api", "settings"]) => rest::update_settings(state, body_bytes, auth_user),
         (Method::Post, ["api", "settings", "keys"]) => rest::update_keys(state, body_bytes, auth_user),
+        (Method::Post, ["api", "auth", "oauth", "start"]) => rest::oauth::start(state, auth_user),
+        (Method::Post, ["api", "auth", "oauth", "finish"]) => rest::oauth::finish(state, body_bytes, auth_user),
         (Method::Get, ["api", "auth", "users"]) => auth::list_users(state, auth_user),
         (Method::Post, ["api", "auth", "users"]) => auth::create_user(state, body_bytes, auth_user),
         (Method::Delete, ["api", "auth", "users", user_id]) => auth::delete_user(state, user_id, auth_user),

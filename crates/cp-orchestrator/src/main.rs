@@ -45,6 +45,7 @@ fn main() {
 
     let runtime = Runtime::new(config);
     let _driver = runtime.start_driver();
+    let _oauth_refresher = runtime.start_oauth_refresher();
 
     if let Err(e) = runtime.serve() {
         eprintln!("serve failed: {e}");

@@ -10,10 +10,11 @@
 // On submit it writes the keys + defaults and flips `onboarding_completed`,
 // then calls `onComplete()` so the guard re-checks and reveals the app.
 
-import { useMemo, useState, type FormEvent } from "react"
+import { useEffect, useMemo, useState, type FormEvent } from "react"
 import { ModelPicker } from "@/components/agents/ModelPicker"
 import { PROVIDERS, defaultModel } from "@/lib/support/models"
-import { updateProviderKeys, updateSettings } from "@/lib/api"
+import { fetchSettings, updateProviderKeys, updateSettings } from "@/lib/api"
+import { OAuthConnect } from "./OAuthConnect"
 
 /** Providers that take an API key, keyed by the backend's canonical name. */
 const KEY_PROVIDERS: { id: string; label: string; sample: string }[] = [
@@ -28,8 +29,23 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [provider, setProvider] = useState(firstProvider)
   const [model, setModel] = useState(defaultModel(firstProvider)?.id ?? "")
   const [keys, setKeys] = useState<Record<string, string>>({})
+  const [oauthConnected, setOauthConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // Detect an already-present Claude Code OAuth credential — it satisfies the
+  // provider requirement without an API key.
+  useEffect(() => {
+    let cancelled = false
+    void fetchSettings()
+      .then((s) => {
+        if (!cancelled) setOauthConnected(s.claude_oauth_connected)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const setKey = (id: string, value: string) =>
     setKeys((prev) => ({ ...prev, [id]: value }))
@@ -44,7 +60,8 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   }, [keys])
 
   const hasKey = Object.keys(filledKeys).length > 0
-  const canSubmit = model !== "" && hasKey && !busy
+  const hasProvider = hasKey || oauthConnected
+  const canSubmit = model !== "" && hasProvider && !busy
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -100,15 +117,24 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
             />
           </section>
 
-          {/* ── Provider keys ── */}
+          {/* ── Providers ── */}
           <section className="flex flex-col gap-3">
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Provider keys
+              Providers
               <span className="ml-2 normal-case text-muted-foreground/60">
-                At least one is required
+                {oauthConnected
+                  ? "Claude Code connected — a key is optional"
+                  : "Connect Claude Code or add at least one key"}
               </span>
             </span>
             <div className="flex flex-col gap-2.5">
+              {oauthConnected ? (
+                <div className="flex items-center gap-2 rounded-md border border-[var(--ok)]/30 bg-[var(--ok)]/[0.07] px-3 py-2 text-[12px] text-[var(--ok)]">
+                  ✓ Claude Code is connected on this device.
+                </div>
+              ) : (
+                <OAuthConnect onConnected={() => setOauthConnected(true)} />
+              )}
               {KEY_PROVIDERS.map((p) => (
                 <KeyInput
                   key={p.id}
@@ -136,9 +162,9 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
           >
             {busy ? "Finishing…" : "Finish setup"}
           </button>
-          {!hasKey && (
+          {!hasProvider && (
             <p className="-mt-3 text-center text-[11px] text-muted-foreground/70">
-              Add at least one provider key to continue.
+              Connect Claude Code or add at least one provider key to continue.
             </p>
           )}
         </form>

@@ -27,6 +27,7 @@ use crate::channel::AgentChannel;
 
 mod create;
 mod library;
+pub mod oauth;
 mod restart;
 mod retire;
 mod settings;

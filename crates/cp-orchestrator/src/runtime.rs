@@ -216,6 +216,18 @@ impl Runtime {
         thread::spawn(move || driver_loop(backend, agents_dir, interval, backup_scheduler))
     }
 
+    /// Spawn the Claude Code OAuth token refresher. The cockpit writes the
+    /// credential to `~/.claude/.credentials.json`, but the agent's Claude Code
+    /// client never refreshes it — so on a headless host the access token would
+    /// die after ~1h. This thread renews it via `grant_type=refresh_token`
+    /// before it expires.
+    ///
+    /// Returns the [`JoinHandle`](thread::JoinHandle); the thread runs until the
+    /// process exits.
+    pub fn start_oauth_refresher(&self) -> thread::JoinHandle<()> {
+        thread::spawn(oauth_refresh_loop)
+    }
+
     /// Block the calling thread on the HTTP transport, serving requests until
     /// the process exits.
     ///
@@ -226,6 +238,23 @@ impl Runtime {
         let addr = format!("0.0.0.0:{}", self.config.port);
         eprintln!("serving on http://{addr}");
         crate::transport::serve(&addr, Arc::clone(&self.backend))
+    }
+}
+
+/// How often the OAuth refresher wakes to check the Claude Code token.
+const OAUTH_REFRESH_INTERVAL: Duration = Duration::from_secs(5 * 60);
+
+/// The OAuth refresher loop: every [`OAUTH_REFRESH_INTERVAL`], refresh the
+/// stored Claude Code token if it is near expiry. A failure is logged and
+/// retried on the next tick (never fatal).
+fn oauth_refresh_loop() {
+    loop {
+        match crate::services::claude_oauth::refresh_if_needed() {
+            Ok(true) => eprintln!("oauth: refreshed Claude Code token"),
+            Ok(false) => {}
+            Err(e) => eprintln!("oauth: refresh failed: {e}"),
+        }
+        thread::sleep(OAUTH_REFRESH_INTERVAL);
     }
 }
 
