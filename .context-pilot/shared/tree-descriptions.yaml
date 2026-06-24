@@ -1150,6 +1150,10 @@
   path: crates/cp-orchestrator/src/runtime.rs
   description: 'Runtime — env Config (port/agents_dir/budget/scan_interval + X896 agents_root[CP_AGENTS_ROOT ~/code] + agent_binary[CP_AGENT_BINARY <cwd>/target/release/tui]) + driver loop with TWO decoupled cadences: slow scan_interval (2s) registry scan + config.json mtime backstop + tmp reap; fast TAIL_INTERVAL (100ms) tail_all_agents (Tailer.poll→view.apply_batch→breaker.observe). Runtime::new builds Backend with the 4-arg new. serve() blocks on HTTP.'
   last_edited_ms: 1781873424858
+1f1e32ecce9040ac:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped). T304: passes draftKey. T331: passes pendingFiles + onRemoveFile. T334: onShowInFinder forwarded to Message. T348: useLibrary(agentId) → command suggestions (kind===''command'', /${id}, with body) passed to composer ONLY for an empty thread. T350: owns createCmdOpen state + renders CreateCommandDialog; passes onCreateCommand to composer to open it. Takes agentId + onAttach props.'
+  last_edited_ms: 0
 1f22019f5a6e5ddb:
   path: src/app/run/tools/checks.rs
   description: 'Post-tool non-blocking polls: panel readiness (5s timeout), deferred sleep timer. Each resumes streaming pipeline when condition met. Imports has_dirty_panels from streaming.rs.'
@@ -1746,6 +1750,10 @@
   path: crates/cp-base/src/config/global.rs
   description: 'Global config at ~/.config/context-pilot/config.json. API key resolution cascade: env var → config file. KEY_ENV_MAP for canonical names. store_api_key/resolve_api_key/env_var_for_key.'
   last_edited_ms: 1780565428671
+2feeee8bda179253:
+  path: web/src/components/threads/fileUpload.tsx
+  description: 'Threads chat file-upload (T298) + the shared composer bubble abstraction (T350). Types: UploadedFile, CommandSuggestion (moved here from ThreadComposer so both pill families share ONE module). buildUploadMessage (```file-upload YAML blocks) + splitMessageSegments (interleave prose + inline chips) + uploadToNode (kindOf→FinderNode for Quick Look). MessageFileChip existence-checks via useFs(parent): greys ''moved/deleted'' on absent file OR any 4xx (/^4\d\d/, the 403 a vanished parent returns), shows REAL on-disk size. FileUploadChip = clickable mac-icon chip → QuickLookSheet (3 states present-interactive/present-static/greyed-missing) + Show-in-Finder button (T334). ComposerBubbles (T350) = the SINGLE unified row rendering file chips + /command suggestion bubbles + create-command pill together in one TRANSPARENT normal-flow container (opaque bg-card pills) between conversation and textarea — replaces the old mutually-exclusive two-row layout so a staged file no longer hides the slash bubbles.'
+  last_edited_ms: 1782305289180
 2ffa7822cffc7ddf:
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules() (incl BridgeModule). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
@@ -2726,6 +2734,10 @@
   path: ui/src/components/agents/PromptsPage.tsx
   description: Global prompt-library page (fleet 'Prompts'). Renders mock library[] (agents/skills/commands) as cards with KIND_META icon/accent/blurb, filter tabs (all + per-kind w/ counts), kind sections in 'all' view, active/built-in badges. Design-only create/edit.
   last_edited_ms: 1781531138853
+4b004aeaf1e36dc7:
+  path: README.md
+  description: 'Project README — global ARCHITECTURE overview (rewritten from the old philosophy/marketing copy, T278). 10 sections + ASCII topology diagram: system overview (5 surfaces), the agent TUI (main loop/modules/panels/LLM providers/tier-② persistence), three-tier durability + push-vs-inspection planes, the orchestrator (registry/services/supervisor/transport routes), the bridge (CP_BRIDGE=1 boot sequence), the web frontend (TanStack Query + SSE push), sidecars (console server, Meilisearch, SQLite entities), the cp-wire protocol types, repo layout, engineering constraints (500-line/8-entry caps, lints, hash chain) + flame telemetry.'
+  last_edited_ms: 0
 4b135e1d04a3a861:
   path: Cargo.lock
   description: Workspace lockfile
@@ -5986,6 +5998,10 @@ a174523ddee08620:
   path: src/ui/threads_view/messages.rs
   description: 'Thread message area: right pane of Threads view. Message display (reuses conversation IR renderer), input area with separator, question form overlay. thread_message_to_message() conversion. format_questions_markdown() for embedded questions. calculate_input_height() with 50% cap.'
   last_edited_ms: 1781447392469
+a174d5d1534d0498:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 a17d304c5a64b3ef:
   path: crates/cp-orchestrator/src/transport/rest.rs
   description: 'REST handlers: HttpReply, Envelope<T>{rev,data}, CommandReceipt. fleet/agent/mint_ticket/body/command/threads. resolve_entry reads <id>.json. Locks Backend briefly, never across blocking agent I/O. reshape_thread/reshape_message for maquette ThreadDetail. 8 tests.'
@@ -6258,6 +6274,10 @@ a9f88f8f946e171c:
   path: crates/cp-wire/src/types/oplog.rs
   description: 'OpEntry + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated{thread_id,message_id,head,inline_body}, ThreadCreated/Archived/Restored/StatusChanged, ThreadFocusChanged{thread_id:Option<String>} (focused-thread highlight — ephemeral best-effort, NOT checkpoint-carried, self-heals from disk FocusState), Lifecycle, CostAggregate, Checkpoint{snapshot}, Unknown. inline_body rides small bodies inline (I13). Framed (len+CRC). round-trip + tolerant-decode + roster + stable-tag tests.'
   last_edited_ms: 0
+aa04707ccf8c0bcb:
+  path: web/src/lib/utils.ts
+  description: 'cn() class-merge helper + the web port of the TUI input-area list logic (T359). resolveEnter(value,selStart,selEnd) → {kind:''send''} | {kind:''edit'',value,caret}: send on empty trailing line, else continue/remove an ordered or unordered list item or insert a newline — ordered markers auto-increment (numeric +1, single-letter bijective base-26 a→b…z→aa, case kept), unordered markers are BEAUTIFIED on continuation to a depth-styled Unicode glyph (BULLETS = •◦▪‣, single UTF-16 unit so width-preserving). resolveTab(value,selStart,_selEnd,shift) → {value,caret} | null: Tab indents / Shift+Tab outdents the caret''s list line one level (INDENT=2 spaces) — unordered restyles to the new depth''s glyph, ordered resets to a fresh 1./a. sublist count; null off a list line (default Tab stands) or Shift+Tab at depth 0. Shared parseListLine() recognises -,*,+ and the pretty bullets as unordered, digits/single-letter as ordered. Imported by ThreadComposer.'
+  last_edited_ms: 0
 aa0b01dc0f42fdb6:
   path: web/src/components/shell/config/ConfigPanes.tsx
   description: 'Config category panes + presentational building blocks (split from ConfigPanel for <500): CATEGORIES, CategoryBody (general/usage/providers/search/docai/web/integrations), GeneralPane (default model picker + apply-to-all via sendCommand configure), KeyRow/StatusRow/ToggleRow/ManagedKeysNotice. Key-bearing panes lock when EITHER company-managed (useAccount) OR auth-active-and-caller-not-admin (T346, useAuth: authEnabled && role!==''admin''). LockReason ''company''|''admin'' drives copy: admin → ''Reserved to Administrators'' (ShieldCheck), company → ''Keys managed by {company}'' (Building2). Regular users still SEE the panes, greyed.'
@@ -6417,6 +6437,10 @@ aec5d14317c1423a:
 aec798aa0357f6d1:
   path: crates/cp-oplog/src/compact.rs
   description: 'Phase 7 (X774): segment compaction + GAP3 grace rule. compact(dir) deletes every segment older than the newest checkpoint-bearing segment (replay fast-path already ignores them → replay output unchanged; checkpoint Snapshot carries live heads+seen, so the checkpoint IS the ack-rev barrier). CompactReport{segments_removed,oldest_index}. total_bytes/should_compact size trigger (256MiB). body_gc_eligible(age,grace) const predicate for GAP3: only GC bodies older than DEFAULT_GC_GRACE(60s) >> I13 barrier window, so in-flight spills never collected, only crash-orphans. OplogResult from crate::error. 7 tests incl replay-identical-after-compaction.'
+  last_edited_ms: 0
+aee5385db27bde2a:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread composer (always-active textarea + turn-status banner). T298 paperclip; T304 draftKey persists unsent text+caret to localStorage; T331 removable pendingFiles chips; T348/T350 /command suggestion bubbles (empty composer only) + create-command pill. T359: Enter handler is a faithful TUI port via resolveEnter (imported from @/lib/utils) — plain Enter does send/list-continue/empty-item-remove/newline; Shift+Enter newline; IME-guarded; applyEdit splices value+caret keeping draft+auto-grow in sync. List helpers extracted to lib/utils.ts to stay under the 500-line cap.'
   last_edited_ms: 0
 aeee549fd5ab07f2:
   path: crates/cp-mod-firecrawl/src/types.rs
@@ -8206,6 +8230,10 @@ dfd2c997d0826591:
   path: report/wiring-alignment-audit.md
   description: 'Wiring alignment audit (X818). Re-walked 2026-06-18 (X867+X869): §0 verdict (zero un-validated load-bearing invariants), §2 I1-I13/§7/§9/§18/§19 register, §2.5 keystone K1-K9 table (all ABIDE), §2.6 V1-V12 fault-matrix (10/12 PROVEN by landed tests incl V5+V10 via fleet_soak.rs; V4 fsync-fault-FS + V8 literal-10k-OS-soak remain external-CI for invariants validated by proxy/at-scale), §3 frontend feature wiring (e2e-proven), §4 measured latency table, §5 ledger, §6 credit, §7 disk-read ledger (X864 ABIDES).'
   last_edited_ms: 1781824003019
+dfdc92360331c0cc:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread composer (always-active textarea + turn-status banner). T298 paperclip; T304 draftKey persists unsent text+caret to localStorage; T331 staged pendingFiles; T348/T350 /command suggestion bubbles + create-command pill; T359 Enter/Tab list logic via resolveEnter/resolveTab (@/lib/utils). T350 unify: file chips + command bubbles now render through ONE shared <ComposerBubbles> (imported from ./fileUpload) in a single transparent row — commandsActive (slashActive || firstMessage-empty) gates command bubbles, pendingFiles gates chips, the two coexist. CommandSuggestion re-exported from ./fileUpload for back-compat. prefill seeds expanded prompt body (slash-line replace or whole-composer).'
+  last_edited_ms: 1782305289210
 e00cd2b4ae194157:
   path: crates/cp-orchestrator/src/transport/rest/create.rs
   description: 'POST /api/fleet/create handler (T148/X896). create_agent(state,body): parse {name,folder?,model?(ignored)}, slugify(name) mirrors web modal, folder=agents_root/slug (or explicit), mkdir -p, supervisor.spawn_pty(key=folder,binary,folder,env=[CP_BRIDGE=1,CP_AGENTS_DIR]) → 202 {status:spawning,folder,pid}. Split from rest/mod.rs for the 500-line budget. slugify unit-tested.'
