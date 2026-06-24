@@ -206,11 +206,18 @@ pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
             let Ok(content) = std::fs::read_to_string(&path) else { continue };
             let (name, description) = parse_frontmatter(&content);
             let id = path.file_stem().and_then(std::ffi::OsStr::to_str).unwrap_or("").to_owned();
+            // For commands, surface the prompt BODY (text after frontmatter) so
+            // the web thread composer can seed the actual prompt when a `/cmd`
+            // suggestion bubble is clicked (T350) — not the bare `/cmd` token.
+            // Skipped for agents/skills (their bodies are large system prompts /
+            // reference docs that nothing in the library list consumes).
+            let body = (kind == "command").then(|| parse_command_body(&content));
             items.push(serde_json::json!({
                 "id": id,
                 "name": name,
                 "kind": kind,
                 "description": description,
+                "body": body,
             }));
         }
     }
@@ -266,6 +273,36 @@ pub fn entities(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     match agent_folder(state, agent_id) {
         Ok(_) => HttpReply::ok(&serde_json::json!([])),
         Err(reply) => reply,
+    }
+}
+
+/// Extract the markdown **body** of a command file — everything after the
+/// YAML frontmatter block.
+///
+/// This is the text a `/command` expands to (the prompt that replaces the
+/// `/cmd` literal). The web thread composer seeds it into the textarea when a
+/// suggestion bubble is clicked (T350), so a `/boss-hunt` bubble fills with the
+/// command's actual prompt rather than the bare `/boss-hunt` token.
+///
+/// Mirrors [`parse_frontmatter`]'s fence detection:
+/// * no opening `---` → the whole (trimmed) file is the body;
+/// * opening `---` but no closing `\n---` → no recoverable body (empty);
+/// * otherwise → the trimmed text after the closing fence line.
+fn parse_command_body(content: &str) -> String {
+    let trimmed = content.trim_start();
+    if !trimmed.starts_with("---") {
+        return trimmed.trim().to_owned();
+    }
+    let after_first = trimmed[3..].trim_start_matches(['\r', '\n']);
+    let Some(end) = after_first.find("\n---") else {
+        return String::new();
+    };
+    // `after_first[end..]` begins with "\n---"; skip the newline so we sit on
+    // the closing fence line, then take everything after that line ends.
+    let after_fence = &after_first[end + 1..];
+    match after_fence.find('\n') {
+        Some(nl) => after_fence[nl + 1..].trim().to_owned(),
+        None => String::new(),
     }
 }
 

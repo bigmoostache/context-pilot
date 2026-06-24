@@ -138,7 +138,7 @@ export function ThreadConversation({
     if (!isEmpty) return []
     return library
       .filter((item) => item.kind === "command")
-      .map((item) => ({ command: `/${item.id}`, name: item.name, description: item.description }))
+      .map((item) => ({ command: `/${item.id}`, name: item.name, description: item.description, body: item.body }))
   }, [isEmpty, library])
   // Pin the conversation to the latest message: scroll to the bottom whenever
   // a thread is opened (id change) or a new message lands (log grows), so the

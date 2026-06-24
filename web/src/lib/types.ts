@@ -303,6 +303,10 @@ export interface LibraryItem {
   description: string
   /** e.g. how many agents currently use this skill, or "/cmd" for commands */
   meta?: string
+  /** for commands: the prompt body the `/command` expands to — seeded into the
+   *  thread composer when a suggestion bubble is clicked (T350). Absent for
+   *  agents/skills (their bodies are large and unused by the library list). */
+  body?: string
   /** a built-in entry ships with the app and can't be deleted */
   builtin?: boolean
   /** currently active (agents) / loaded (skills) somewhere */

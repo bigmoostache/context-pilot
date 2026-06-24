@@ -26,6 +26,11 @@ export interface CommandSuggestion {
   command: string
   name: string
   description: string
+  /** the prompt body the `/command` expands to (T350). When present, clicking
+   *  the bubble seeds THIS into the composer (followed by a blank line with the
+   *  caret on it) instead of the bare `/command` literal, so the user gets the
+   *  real prompt ready to extend. Falls back to `command` when absent. */
+  body?: string
 }
 
 /**
@@ -177,18 +182,25 @@ export function ThreadComposer({
   const canSend = text.trim().length > 0 || pendingFiles.length > 0
 
   /**
-   * Prefill the composer with a suggested `/command` (T348). We fill rather
-   * than auto-send so the user can review or add arguments first; the caret is
-   * placed at the end and the textarea refocused + regrown.
+   * Prefill the composer from a suggested `/command` bubble (T348/T350). We
+   * seed the command's **expanded prompt body** when it carries one (so a
+   * `/boss-hunt` bubble fills with the actual prompt, not the bare token),
+   * falling back to the `/command` literal otherwise. A trailing newline is
+   * appended and the caret placed on that fresh blank line, so the user can
+   * immediately add their own context beneath the seeded prompt. We fill rather
+   * than auto-send so they can review or extend it first; the textarea is
+   * refocused + regrown.
    */
-  const prefill = (command: string) => {
-    setText(command)
-    persistDraft(command, command.length, command.length)
+  const prefill = (s: CommandSuggestion) => {
+    const base = s.body && s.body.trim().length > 0 ? s.body.trimEnd() : s.command
+    const seeded = `${base}\n`
+    setText(seeded)
+    persistDraft(seeded, seeded.length, seeded.length)
     requestAnimationFrame(() => {
       const el = textareaRef.current
       if (!el) return
       el.focus()
-      el.setSelectionRange(command.length, command.length)
+      el.setSelectionRange(seeded.length, seeded.length)
       autoResize()
     })
   }
@@ -230,7 +242,7 @@ export function ThreadComposer({
             <button
               key={s.command}
               type="button"
-              onClick={() => prefill(s.command)}
+              onClick={() => prefill(s)}
               title={s.description || s.name}
               className="group inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground/75 transition-colors hover:border-[var(--signal)]/60 hover:text-[var(--signal)]"
             >
