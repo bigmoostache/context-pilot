@@ -1,9 +1,10 @@
-import { Fragment, useEffect, useRef, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
 import { QuestionForm } from "./QuestionForm"
-import { ThreadComposer } from "./ThreadComposer"
+import { ThreadComposer, type CommandSuggestion } from "./ThreadComposer"
 import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
+import { useLibrary } from "@/lib/live"
 import { uploadToNode, type UploadedFile } from "./fileUpload"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
 import type { FinderNode } from "@/lib/types"
@@ -125,6 +126,20 @@ export function ThreadConversation({
   // `file-upload` chip in any message sets it; the shared QuickLookSheet renders
   // it with the exact same FinderPreview the Finder uses.
   const [sheetFile, setSheetFile] = useState<UploadedFile | null>(null)
+
+  // First-message `/command` suggestions (T348). Surfaced ONLY for an empty
+  // thread — the agent's command library is a jumping-off point for the very
+  // first message, never a persistent palette. Built from the live prompt
+  // library (kind === "command"); each command's slash invocation is `/${id}`
+  // (the id is the command's file-stem slug, e.g. "clean" → `/clean`).
+  const { data: library = [] } = useLibrary(agentId)
+  const isEmpty = thread.log.length === 0
+  const suggestions = useMemo<CommandSuggestion[]>(() => {
+    if (!isEmpty) return []
+    return library
+      .filter((item) => item.kind === "command")
+      .map((item) => ({ command: `/${item.id}`, name: item.name, description: item.description }))
+  }, [isEmpty, library])
   // Pin the conversation to the latest message: scroll to the bottom whenever
   // a thread is opened (id change) or a new message lands (log grows), so the
   // freshest exchange is always in view — matching the TUI, which keeps the
@@ -187,6 +202,7 @@ export function ThreadConversation({
           onAttach={onAttach}
           pendingFiles={pendingFiles}
           onRemoveFile={onRemoveFile}
+          suggestions={suggestions}
           draftKey={`cp-draft-${agentId}-${thread.id}`}
         />
       </div>

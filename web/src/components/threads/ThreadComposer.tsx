@@ -18,6 +18,17 @@ function clampRange(n: number, lo: number, hi: number): number {
 }
 
 /**
+ * A `/command` offered as a first-message suggestion bubble above the composer
+ * (T348). `command` is the literal text inserted into the textarea on click
+ * (e.g. `/clean`); `name` + `description` label the bubble.
+ */
+export interface CommandSuggestion {
+  command: string
+  name: string
+  description: string
+}
+
+/**
  * Read and parse a persisted {@link Draft} from localStorage.
  *
  * Tolerant of the legacy format: early T304 drafts were stored as a bare text
@@ -67,6 +78,7 @@ export function ThreadComposer({
   pendingFiles = [],
   onRemoveFile,
   draftKey,
+  suggestions = [],
 }: {
   status: ThreadStatus
   /** true when this is the single thread the agent is currently focused on */
@@ -78,6 +90,14 @@ export function ThreadComposer({
   pendingFiles?: UploadedFile[]
   /** remove a staged file by its index in pendingFiles */
   onRemoveFile?: (index: number) => void
+  /**
+   * `/command` first-message suggestions (T348). When non-empty, each renders
+   * as a clickable bubble above the textarea; clicking prefills the composer
+   * with the command's literal text (the user can edit before sending).
+   * Callers pass these only for an EMPTY thread — the suggestions are a
+   * jumping-off point for the first message, not a persistent palette.
+   */
+  suggestions?: CommandSuggestion[]
   /**
    * localStorage key under which the UNSENT draft is persisted (T304). When
    * provided, what you type — and **where your caret is** — survives a reload,
@@ -156,6 +176,23 @@ export function ThreadComposer({
 
   const canSend = text.trim().length > 0 || pendingFiles.length > 0
 
+  /**
+   * Prefill the composer with a suggested `/command` (T348). We fill rather
+   * than auto-send so the user can review or add arguments first; the caret is
+   * placed at the end and the textarea refocused + regrown.
+   */
+  const prefill = (command: string) => {
+    setText(command)
+    persistDraft(command, command.length, command.length)
+    requestAnimationFrame(() => {
+      const el = textareaRef.current
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(command.length, command.length)
+      autoResize()
+    })
+  }
+
   const handleSubmit = () => {
     if (!canSend || !onSend) return
     onSend(text)
@@ -184,6 +221,31 @@ export function ThreadComposer({
 
   return (
     <div className="shrink-0 px-5 pb-4 pt-2">
+      {/* First-message /command suggestions (T348). Shown only for an empty
+          composer (no typed text, no staged files) so they never clutter an
+          in-progress reply. Clicking a bubble prefills the command. */}
+      {suggestions.length > 0 && !text.trim() && pendingFiles.length === 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {suggestions.map((s) => (
+            <button
+              key={s.command}
+              type="button"
+              onClick={() => prefill(s.command)}
+              title={s.description || s.name}
+              className="group inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground/75 transition-colors hover:border-[var(--signal)]/60 hover:text-[var(--signal)]"
+            >
+              <span className="font-mono font-medium text-[var(--interactive)] group-hover:text-[var(--signal)]">
+                {s.command}
+              </span>
+              {s.description && (
+                <span className="max-w-[180px] truncate text-muted-foreground/70">
+                  {s.description}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
       {banner && (
         <div className="mb-2 flex items-center justify-center gap-2 rounded-xl bg-muted/40 px-3 py-1.5 text-[11.5px] text-muted-foreground">
           {banner.working ? (
