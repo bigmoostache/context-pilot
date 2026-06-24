@@ -128,6 +128,48 @@ export function ThreadConversation({
   // it with the exact same FinderPreview the Finder uses.
   const [sheetFile, setSheetFile] = useState<UploadedFile | null>(null)
 
+  // ── OS-file drag-and-drop onto the whole conversation (T367) ──────────
+  //
+  // Dragging files from the OS anywhere over the <main> uploads them exactly as
+  // the composer's paperclip does (the SAME `onAttach` path → staged pending
+  // chips), and the entire surface gets a discrete blur while a drag is in
+  // flight (300ms ease in AND out) as the only affordance — no overlay, no
+  // dashed border. The whole feature is gated on `onAttach`: with no upload sink
+  // the surface neither blurs nor accepts a drop.
+  const [dragging, setDragging] = useState(false)
+  // dragenter/dragleave fire for every child crossed, so a plain boolean would
+  // flicker; a depth counter tracks "is the cursor still somewhere inside".
+  const dragDepth = useRef(0)
+  // True only for an actual OS *file* drag — a text/selection drag must not blur.
+  const isFileDrag = (e: React.DragEvent) => e.dataTransfer?.types?.includes("Files")
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    e.preventDefault()
+    dragDepth.current += 1
+    setDragging(true)
+  }
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    // Must preventDefault on every dragover to keep the element a valid drop
+    // target; the copy cursor signals an upload.
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "copy"
+  }
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    dragDepth.current = Math.max(0, dragDepth.current - 1)
+    if (dragDepth.current === 0) setDragging(false)
+  }
+  const handleDrop = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    e.preventDefault()
+    dragDepth.current = 0
+    setDragging(false)
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length > 0) onAttach?.(files)
+  }
+
   // Whether the "create command" dialog (T350) is open — toggled by the pill
   // the composer renders beside the /command suggestion bubbles.
   const [createCmdOpen, setCreateCmdOpen] = useState(false)
@@ -158,7 +200,20 @@ export function ThreadConversation({
   }, [thread.id, thread.log.length])
 
   return (
-    <main className="flex min-w-0 flex-1 flex-col bg-background">
+    <main
+      className="flex min-w-0 flex-1 flex-col bg-background"
+      // Discrete drag affordance (T367): a subtle 2px blur over the whole
+      // surface while an OS file drag is in flight, eased 300ms in and out. The
+      // baseline blur(0px) is kept so the OUT direction interpolates too.
+      style={{
+        filter: dragging ? "blur(2px)" : "blur(0px)",
+        transition: "filter 300ms ease",
+      }}
+      onDragEnter={onAttach ? handleDragEnter : undefined}
+      onDragOver={onAttach ? handleDragOver : undefined}
+      onDragLeave={onAttach ? handleDragLeave : undefined}
+      onDrop={onAttach ? handleDrop : undefined}
+    >
       {/* messages */}
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">
