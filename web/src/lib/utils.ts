@@ -125,6 +125,41 @@ function resetOrderedMarker(marker: string): string {
   return marker === marker.toUpperCase() ? "A" : "a"
 }
 
+/** Increment an ordered marker preserving its style: numeric `+1`, else the
+ *  bijective base-26 letter step. */
+function incrementOrderedMarker(marker: string): string {
+  return /^\d+$/.test(marker) ? String(Number.parseInt(marker, 10) + 1) : nextAlphaMarker(marker)
+}
+
+/**
+ * Find the ordered marker of the nearest *preceding sibling* at `targetIndentLen`
+ * — the last list item directly above `lineStart` whose indent matches the target
+ * depth — so a depth change (indent / outdent) can RESUME that list's count
+ * instead of restarting at 1. Returns null when there is no such sibling (the
+ * enclosing list was just entered, a shallower line ends it, a blank/non-list
+ * line breaks it, or the sibling is unordered), in which case the caller resets
+ * to a fresh `1.` / `a.`.
+ *
+ * Walks upward skipping deeper (nested-child) lines; stops the moment it leaves
+ * the enclosing context so numbering never bleeds across separate lists.
+ */
+function siblingOrderedMarkerAtDepth(value: string, lineStart: number, targetIndentLen: number): string | null {
+  if (lineStart === 0) return null // current line is the first — no sibling above
+  const before = value.slice(0, lineStart - 1) // drop the \n preceding the current line
+  const lines = before.split("\n")
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const ln = lines[i] ?? ""
+    if (ln.trim().length === 0) return null // blank line breaks the list
+    const indentLen = ln.length - ln.replace(/^\s+/, "").length
+    if (indentLen > targetIndentLen) continue // nested child of a sibling — skip
+    if (indentLen < targetIndentLen) return null // left the enclosing list
+    const parsed = parseListLine(ln)
+    if (!parsed) return null // non-list line at this depth breaks it
+    return parsed.kind === "ol" ? parsed.marker : null // unordered → no count
+  }
+  return null
+}
+
 /** The decision Enter yields: send the message, or splice a new value + caret. */
 export type EnterAction = { kind: "send" } | { kind: "edit"; value: string; caret: number }
 
@@ -168,9 +203,7 @@ export function resolveEnter(value: string, selStart: number, selEnd: number): E
   }
 
   // Non-empty ordered → next marker (numeric +1, or bijective base-26 letter).
-  const nextMarker = /^\d+$/.test(parsed.marker)
-    ? String(Number.parseInt(parsed.marker, 10) + 1)
-    : nextAlphaMarker(parsed.marker)
+  const nextMarker = incrementOrderedMarker(parsed.marker)
   const ins = `\n${parsed.indent}${nextMarker}. `
   const next = value.slice(0, selStart) + ins + value.slice(selEnd)
   return { kind: "edit", value: next, caret: selStart + ins.length }
@@ -203,10 +236,19 @@ export function resolveTab(value: string, selStart: number, _selEnd: number, shi
     newDepth = parsed.depth + 1
   }
 
-  const markerToken =
-    parsed.kind === "ul"
-      ? bulletForDepth(newDepth)
-      : `${resetOrderedMarker(parsed.marker)}.`
+  // Ordered items resume the count of the nearest preceding sibling at the NEW
+  // depth (so Shift+Tab back out of a sublist continues the parent list — `1.`
+  // above ⇒ `2.` — instead of restarting at 1, and Tab into an existing sublist
+  // continues it too); with no such sibling we start a fresh `1.` / `a.`. The
+  // sibling's own style drives numeric-vs-alpha; the current marker is the
+  // fallback when starting fresh.
+  let markerToken: string
+  if (parsed.kind === "ul") {
+    markerToken = bulletForDepth(newDepth)
+  } else {
+    const sib = siblingOrderedMarkerAtDepth(value, lineStart, newIndent.length)
+    markerToken = sib ? `${incrementOrderedMarker(sib)}.` : `${resetOrderedMarker(parsed.marker)}.`
+  }
   const rebuilt = `${newIndent}${markerToken} ${parsed.rest}`
   const next = value.slice(0, lineStart) + rebuilt + value.slice(lineEnd)
 
