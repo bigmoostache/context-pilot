@@ -1734,6 +1734,10 @@
   path: crates/cp-mod-tree/src/lib.rs
   description: 'Tree module. 3 tools: filter/toggle/describe (with close_panel param). Fixed TREE panel (fixed_order=3). Watches open folders. Dir-event-only invalidation. Module data: filter+descriptions. Worker data: open_folders. @-path autocomplete.'
   last_edited_ms: 0
+2d7e540182272b0b:
+  path: crates/cp-orchestrator/src/services/auth/store.rs
+  description: AuthStore — SQLite-backed auth CRUD. Schema init (users/sessions/agent_acl), Argon2id hashing, token/UUID generation. User CRUD, session lifecycle (create/validate/revoke with lazy sweep). ACL ops extracted to sibling acl.rs.
+  last_edited_ms: 1782324281327
 2d8795d69497a439:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
@@ -2642,6 +2646,10 @@
   path: crates/cp-mod-prompt/src/skill_panel.rs
   description: Skill panel UI. Markdown-rendered content via cp_render::markdown::to_blocks(). Title/refresh/context methods. refresh() syncs cached_content for all loaded skills.
   last_edited_ms: 0
+44f22bfb2b47eb7f:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 44f57cebe2777598:
   path: crates/cp-orchestrator/src/services/auth/mod.rs
   description: Auth service module hub — declares types, store, helpers submodules. Orchestrator-level user/session/ACL backed by dedicated SQLite (design doc §5).
@@ -2906,6 +2914,10 @@
   path: web/src/components/shell/StatsPopup.tsx
   description: Session 'vitals' popup — accepts agentId, uses usePanels()+useAgentMeta() for live token budget + cost. Budget/threshold hardcoded defaults. Portaled Dialog.
   last_edited_ms: 1781695982732
+4d425724c4ce666f:
+  path: src/app/run/threads/paused.rs
+  description: 'Live thread-paused emission chokepoint (T371): diffs each thread''s paused flag vs thread_paused_memo, emits durable ThreadPaused/ThreadResumed deltas. Seeds from oplog roster on first pass. Mirrors archived.rs exactly. MemoSeeds bitfield accessors (seeded.paused()/seed_paused()).'
+  last_edited_ms: 0
 4d457b7ceca9acae:
   path: yamls/tools/search.yaml
   description: Search tool YAML. tools.search with description + flat parameters map (query, scope, path_prefix, extension, sort, from/to_date, limit, semantic_query, hide_contents). semantic_ratio removed — always split search now. Results are panel-only (pointer tool result).
@@ -3526,6 +3538,10 @@
   path: crates/cp-orchestrator/Cargo.toml
   description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal, for kill signal-0 pid-liveness) + serde_json (registry record parse). dev: tempfile. lib+bin package. Workspace lints.'
   last_edited_ms: 0
+5f31cba8928de9e1:
+  path: crates/cp-orchestrator/src/services/auth/acl.rs
+  description: Per-agent access-control operations on AuthStore. Extracted from store.rs. grant/revoke/update_role/check_access/list_agent_users/list_user_agents/is_agent_admin.
+  last_edited_ms: 1782324281213
 5f3b4848b37bb4a1:
   path: src/app/run/streaming.rs
   description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine, checks chat rooms.
@@ -5438,6 +5454,10 @@
   path: .github/CODEOWNERS
   description: 'Code ownership: PR review assignments'
   last_edited_ms: 0
+8f5c8d032dbf7392:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 8f7e949f6243f706:
   path: crates/cp-oplog/tests/dedup_compaction.rs
   description: 'Phase 23 (X790): cp-oplog dedup + compaction public-API black-box suite (7 tests). V3 dedup-across-long-gap: CommandEffect token committed early, 24 filler records force rolls (token lives only in checkpoint), duplicate SeenMark delivery folds no-op (seen.len unchanged, rev_of keeps FIRST commit rev = exactly-once), survives reopen+replay. Compaction: replay() Recovered (rev_head+heads+seen) byte-identical before/after over rich 3-thread/multi-token/many-roll log (build_rich_log), every committed token rides surviving checkpoint, no segment older than oldest_index remains; idempotent (2nd pass removes 0, boundary stable); reopen-after-compact keeps appending (rev_head advances, T1 head=fresh write); noop-before-first-roll (seg-0 alone). total_bytes feeds over_threshold trigger (strict greater-than boundary). body_gc_eligible parametric in grace knob (10ms grace: 5ms keep, =grace keep, 20ms eligible). tempfile+cp_wire direct (no as _).'
@@ -5958,6 +5978,10 @@
   path: crates/cp-wire/src/types/oplog.rs
   description: 'OpEntry + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated{...,inline_body}, ThreadCreated/Archived/Restored/StatusChanged, ThreadFocusChanged, Lifecycle, CostAggregate, ContextUsage{used,threshold,budget,hit_tokens,miss_tokens (T297 cache split, #[serde(default)] N-1)}, Checkpoint, Unknown. Framed (len+CRC). round-trip + tolerant-decode + roster + stable-tag tests.'
   last_edited_ms: 0
+9e101e3e150cf350:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: 'REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() dispatches commands. rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket embeds auth_user.id (Phase 7). resolve_entry. Backend re-exported from backend.rs. Submodules: create, restart, retire, library, thread_shape, backend.'
+  last_edited_ms: 1782324281383
 9e202c919322b366:
   path: crates/cp-mod-brave/src/panel.rs
   description: Brave result panel. Static content persisted in metadata (META_CONTENT). Cache restore from metadata post-reload. Pagination support. BRAVE_PANEL_TYPE constant.
@@ -6026,6 +6050,10 @@
   path: web/src/components/threads/ThreadsView.tsx
   description: 'Threads view shell (list | conversation). handleSend/handleArchive/handleCreate via sendCommand. T331: handleAttach now STAGES files as pendingFiles (upload to .uploads/ but DON''T send) — pending chips shown in composer, merged into message content only on explicit Send. T298: buildUploadMessage. T303: per-agent thread persistence to localStorage.'
   last_edited_ms: 1782132793442
+9f53f7508b2db895:
+  path: .github/checks/check-folder-sizes.sh
+  description: Folder size check script (max 8 entries)
+  last_edited_ms: 0
 9f5ea5f349e9c1d0:
   path: docs/trust-center/index.html
   description: Trust Center overview/landing page. Enterprise multi-page design (Inter font, slate/navy palette, sidebar nav). Security posture summary cards, 4 nav cards to sub-pages (security/privacy/compliance/subprocessors), contact CTAs. No emojis. Version 2.0.
@@ -7402,6 +7430,10 @@ c192ef13584f001b:
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (max_cost is burst/stream-based), coucou (timer/datetime scheduling).'
   last_edited_ms: 0
+c1a6b191d4c73b8f:
+  path: crates/cp-orchestrator/src/services/auth/mod.rs
+  description: Auth service module hub — declares types, store, backup, helpers submodules. Orchestrator-level user/session/ACL backed by dedicated SQLite (design doc §5).
+  last_edited_ms: 0
 c1c75b25f257919c:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, count positive. Send to a THEIR_TURN thread is ALLOWED (status stays THEIR_TURN) — no block. Focus enforcement with dangling/escalation. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
@@ -8058,6 +8090,10 @@ d31e0cea5b615120:
   path: ui/src/components/ui/scroll-area.tsx
   description: shadcn scroll-area (Base UI). Used across rails/views.
   last_edited_ms: 1781516472115
+d35db1c7d920f425:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend re-exported from rest::Backend. route_rest dispatches all /api routes incl auth/ACL. handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with Phase 7 ticket-based ACL. serve/serve_bound acceptor loop.
+  last_edited_ms: 1782324281438
 d3757733b7f060a3:
   path: src/ui/ir/render_status_bar.rs
   description: Status bar IR adapter — renders StatusBar to ratatui line. Badges (streaming/tooling/ready/blocked), agent/skill cards, git branch, auto-continue, reverie, queue, think balance. Builder from state. Wall-clock spinner.
@@ -8529,6 +8565,10 @@ e0c2ca859aee6bef:
 e0c59a647adcab4b:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
+  last_edited_ms: 0
+e0fc85a2b3682058:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 e12046b8a487c76a:
   path: crates/cp-mod-bridge/src/lib.rs
@@ -9046,6 +9086,10 @@ f1db8c64c998169a:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, 50-row inline cap, RETURNING support.
   last_edited_ms: 0
+f1ef49c4898af50a:
+  path: crates/cp-orchestrator/src/transport/rest/backend.rs
+  description: Backend shared state struct + impl. Extracted from transport/mod.rs. Holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names/avatars/auth/session_ttl. Accessor methods + for_test.
+  last_edited_ms: 1782324281271
 f1f5ea818e50172d:
   path: crates/cp-mod-tree/src/types.rs
   description: Tree state types. TreeFileDescription (path, description, file_hash). TreeState (filter, open_folders, descriptions). DEFAULT_TREE_FILTER constant.
