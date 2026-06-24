@@ -44,10 +44,15 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             continue;
         }
 
-        // Guard: file panels need a current tree description before closing
+        // Guard: file panels need a current tree description before closing.
+        // EXCEPTION: a file that no longer exists on disk is exempt (T355) — a
+        // deleted / branch-switched-away file can't be tree_described (the tool
+        // rejects "path not found"), so demanding a description would block the
+        // close forever. Such panels must be freely closable.
         if state.active_modules.contains("tree")
             && ctx_elem.context_type.as_str() == Kind::FILE
             && let Some(file_path) = ctx_elem.get_meta_str("file_path")
+            && std::path::Path::new(file_path).exists()
             && let Ok(cwd) = std::env::current_dir().and_then(|d| d.canonicalize())
             && let Ok(rel) = std::path::Path::new(file_path).strip_prefix(&cwd)
         {

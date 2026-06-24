@@ -3862,6 +3862,10 @@
   path: web/src/components/shell/StatusBar.tsx
   description: 'Bottom status footer. Fleet mode: aggregates (count, threads, needs-you, spend). Agent mode: AgentStatus reads the LIVE agent.phase (streaming/tooling/ready distinct, T297) + cost folded from deltas. ContextBar meter is fully push-fed from the agent''s authoritative ContextUsage delta (contextUsed/Threshold/Budget + contextHit/contextMiss); draws ratatui''s two-segment green-hit/amber-miss bar (falls back to a single proximity-coloured fill pre-split) + threshold tick + hover tooltip Used(hit)/Used(miss)/Threshold/Free. T297: bar segments + fallback fill + threshold tick ease to new widths over 1s (transition-[width|left] duration-1000 ease-out) so a changing context window is agreeable to watch.'
   last_edited_ms: 1782051673741
+6c9893e8c3a62a6f:
+  path: src/modules/overview/tools/close_context.rs
+  description: 'Close_panel execution. Partial close: valid panels close, undescribed/stale-description file panels are skipped (not blocked). Module on_close_context hooks. Output: closed/skipped/not_found/errors sections. T355: the describe-before-close gate now also requires Path::exists(file_path) — a file that''s gone from disk is EXEMPT from the gate (tree_describe rejects ''path not found'', so demanding a description would block the close forever), making deleted/branch-switched file panels freely closable. Also owns has_pending_tree_describe(state,rel_path) — the queue-introspection helper (queued tree_describe in flight ⇒ allow close) used both locally and re-exported to the overview module''s pre_flight.'
+  last_edited_ms: 1782296816078
 6ca310966523a17c:
   path: src/ui/markdown.rs
   description: Markdown table rendering — render_markdown_table() and parse_inline_markdown() return cp_render::Span (IR-native). No ratatui/theme imports. Border/accent/bold/code semantic styling.
@@ -5842,10 +5846,18 @@ a09bd2cf1845c3a9:
   path: crates/cp-mod-spine/Cargo.toml
   description: 'Spine module deps: cp-base, cp-render, chrono, crossterm, serde, serde_json.'
   last_edited_ms: 1780563847635
+a09c61434ed6d63b:
+  path: src/modules/overview/mod.rs
+  description: 'OverviewModule (id=''core'', is_global) — owns the Statistics + Tools panels, core system tools (Close_panel/system_reload/tool_manage/panel_goto_page/module_toggle), and the GLOBAL config persistence in config.json modules.core. save/load_module_data serialize active_modules, dev_mode, llm_provider + EVERY provider''s model enum + reverie/cleaning/budget + token/cost counters + disabled_tools. Close_panel pre_flight warns on stale [!]/missing tree descriptions (T355: skips the warning when the file no longer exists on disk — matches the execute-time exemption), delegating the queue-introspection guard to tools::close_context::has_pending_tree_describe. Visualizers in visualizers.rs.'
+  last_edited_ms: 1782296816106
 a0a473d4d16966f9:
   path: ui/src/components/threads/ThreadComposer.tsx
   description: 'Thread input composer. MY_TURN: active prompt w/ attach + send + caret. Non-MY_TURN shows a subdued working spinner — ACTIVE (green/ok, ''streaming this thread right now'') vs THEIR_TURN (signal, ''working it in parallel''). Design-only.'
   last_edited_ms: 1781543836100
+a0e093892a43a64b:
+  path: web/src/lib/support/account.tsx
+  description: 'Account context (T30): AccountProvider holds the mock user + managedByCompany flag (single shared source flipping identity editability in Profile modal AND API-key lock in Settings). useAccount() hook. setManaged for the account-type switch.'
+  last_edited_ms: 1782296552571
 a0f4cef7d77b23b6:
   path: report/wiring-alignment-audit.md
   description: 'Wiring alignment audit (X818 Phase 0.1): invariant-by-invariant gap register implementation⇄design-orchestration-backend.md. Verdicts ABIDES/PARTIAL/VIOLATES per I1-I13/§7/§9/§19. Diagnoses the disk/poll vs oplog-push plane inversion = the latency root cause.'
@@ -6046,6 +6058,10 @@ a61f9b3e3a51d9b2:
   path: ui/src/components/threads/QuestionForm.tsx
   description: 'Embedded thread question form (CP signature): single/multi-select options with interactive pick state, allowOther field, submit button. Cyan-accented, decorative but stateful.'
   last_edited_ms: 1781459201179
+a6872fbd5f53c6e7:
+  path: .context-pilot/commands/boss-hunt.md
+  description: '/boss-hunt command: slow, methodical #[expect] elimination one boss at a time. Body is the prompt seeded into the composer when the suggestion bubble is clicked (T350).'
+  last_edited_ms: 1782296552600
 a6c691fbfe4d7d3b:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. Declares sql/ + panels/ submodules with re-exports. Depends on search.
@@ -6478,6 +6494,10 @@ b2783b3948678143:
   path: web/src/lib/queryClient.ts
   description: The single TanStack QueryClient (replaces the bespoke useLiveQuery cache). staleTime Infinity + refetchOnFocus/Mount/Reconnect OFF — the SSE push plane (setQueryData in sync.ts) owns freshness; the per-hook refetchInterval (BACKSTOP_POLL_MS=15s) is the only time-based refresh. Structural sharing makes the T123 delta-burst-clobber structurally impossible.
   last_edited_ms: 1781863885432
+b28cfc4e27bddb0b:
+  path: crates/cp-mod-files/src/panel.rs
+  description: 'File panel. Background cache system for file content with syntax highlighting (IR spans). Hash-based change detection. PANEL_MAX_LOAD_BYTES hard limit. Pagination. No cache_refresh_interval (watcher-based). T355: suicide() now reaps a panel whose backing file no longer exists on disk (manual delete / git branch switch) EVEN when it has loaded content — gated on (cached_content.is_none() || cache_deprecated) so an editor''s atomic save-via-rename (brief unlink) doesn''t nuke a live panel mid-save; previously the cached_content.is_some() early-return meant a loaded panel never auto-closed and lingered with stale content.'
+  last_edited_ms: 1782296816049
 b303c82afde350e5:
   path: ui/src/components/shell/ConfigModal.tsx
   description: 'Settings modal (macOS System-Settings style): category rail (General/Model Providers/Search & Embeddings/Document AI/Web & Scraping/Integrations) + detail pane. Surfaces all CP config params — provider keys (Anthropic, Claude Code OAuth, Grok, Groq, DeepSeek, MiniMax), Voyage, Meilisearch status, Datalab, Brave, Firecrawl, GitHub — plus default-model picker + autonomy toggles. Masked keys w/ reveal, Connected/Not-set pills, opt-rise stagger, modal-pop/backdrop-fade motion. Design-only. Opened from TopBar gear.'
@@ -6617,6 +6637,10 @@ b5d3c95f7e9e4018:
 b5df67a15d36402d:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Thread methods extracted to run/threads.rs.'
+  last_edited_ms: 0
+b5e4961c7473a60e:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 b5e5095cae7ebe03:
   path: crates/cp-mod-git/src/lib.rs

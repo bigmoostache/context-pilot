@@ -32,15 +32,21 @@ impl Panel for FilePanel {
     }
 
     fn suicide(&self, ctx: &Entry, _state: &State) -> bool {
-        // Only check when still loading — don't kill panels with content
-        if ctx.cached_content.is_some() {
+        // Auto-close a file panel whose backing file no longer exists on disk —
+        // e.g. the user deleted it, or a git branch switch removed it (T355).
+        // Otherwise the panel lingers forever with stale content AND can't be
+        // hand-closed (the describe-before-close gate is unsatisfiable for a path
+        // tree_describe rejects as "not found").
+        let Some(path) = ctx.get_meta_str("file_path") else { return false };
+        if PathBuf::from(path).exists() {
             return false;
         }
-        // If the file has been deleted from disk, close the panel
-        if let Some(path) = ctx.get_meta_str("file_path") {
-            return !PathBuf::from(path).exists();
-        }
-        false
+        // File is gone. Reap the panel when it never loaded (initial state) or when
+        // a refresh is pending (`cache_deprecated` — the watcher flagged a change
+        // and the file is confirmed absent at this point). A loaded panel with a
+        // FRESH cache is spared so an editor's atomic save-via-rename (a sub-ms
+        // unlink before the new file lands) doesn't nuke a live panel mid-save.
+        ctx.cached_content.is_none() || ctx.cache_deprecated
     }
 
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {

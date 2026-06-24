@@ -334,6 +334,7 @@ impl Module for OverviewModule {
                                 && let Some(ctx) =
                                     state.context.iter().find(|c| c.id == id && c.context_type.as_str() == Kind::FILE)
                                 && let Some(file_path) = ctx.get_meta_str("file_path")
+                                && std::path::Path::new(file_path).exists()
                                 && let Ok(cwd) = std::env::current_dir().and_then(|d| d.canonicalize())
                                 && let Ok(rel) = std::path::Path::new(file_path).strip_prefix(&cwd)
                             {
