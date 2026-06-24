@@ -682,6 +682,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+133cc613408ad643:
+  path: web/src/lib/utils.ts
+  description: 'cn() classname helper (clsx+tailwind-merge) PLUS the T359 ordered-list Enter helpers: EnterAction type + resolveEnter(value,selStart,selEnd) (faithful web port of the TUI src/modules/conversation/list.rs detect_list_action + panel.rs Enter branch). resolveEnter decides send (caret at end on empty trailing line) / continue (ordered+unordered list marker auto-increment: numeric 2→3, bijective base-26 alpha a→b…z→aa case-preserved, bullets repeat) / remove (empty list item collapses to blank) / newline. Consumed by ThreadComposer''s keydown handler.'
+  last_edited_ms: 1782302494767
 1347cda87d213463:
   path: crates/cp-mod-search/src/meili/overlay.rs
   description: Ctrl+I overlay data provider. Fetches live Meilisearch stats + process stats (CPU%/RAM via /proc or ps). read_process_stats(pid) platform-specific. CPU% from tick deltas cached in MeiliLiveStats. 2s refresh cache. Builds SearchOverlayInfo.
@@ -9162,6 +9166,10 @@ fceb53aa84039016:
   path: Cargo.toml
   description: Workspace root. 21 crate members. Binary 'tui'. Edition 2024. Strict lint config (hundreds of forbid-level clippy/rust lints). openssl vendored for cross-compilation.
   last_edited_ms: 1780568982802
+fd0c02612d3b123c:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread composer (always-active textarea + turn-status banner). T298 paperclip; T304 draftKey persists unsent text+caret to localStorage; T331 removable pendingFiles chips; T348/T350 /command suggestion bubbles (empty composer only) + create-command pill. T359: Enter handler is a faithful TUI port via resolveEnter (imported from @/lib/utils) — plain Enter does send/list-continue/empty-item-remove/newline; Shift+Enter newline; IME-guarded; applyEdit splices value+caret keeping draft+auto-grow in sync. List helpers extracted to lib/utils.ts to stay under the 500-line cap.'
+  last_edited_ms: 1782302494835
 fd1e3cc5db6b4c53:
   path: crates/cp-orchestrator/src/transport/inspect/finder/support.rs
   description: 'Finder shared helpers: agent_folder, confined_path (realm jail), count_visible_children, infer_kind, extract_param, percent_decode + unit tests.'
