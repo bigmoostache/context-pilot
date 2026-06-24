@@ -28,6 +28,7 @@ import { ModelPicker } from "@/components/agents/ModelPicker"
 import { PROVIDERS, defaultModel as getDefaultModel, findModel } from "@/lib/support/models"
 import { useFleet, sendCommand } from "@/lib/live"
 import { fetchSettings, updateSettings } from "@/lib/api"
+import { OAuthConnect } from "@/components/auth/OAuthConnect"
 import { useAccount } from "@/lib/support/account"
 import { useAuth } from "@/lib/support/auth"
 import { useDevMode } from "@/lib/support/devMode"
@@ -94,8 +95,8 @@ export function CategoryBody({ cat }: { cat: CatId }) {
       return (
         <Stack>
           {locked && <ManagedKeysNotice reason={reason} company={company} />}
+          <ClaudeCodeOAuthRow locked={locked} reason={reason} company={company} />
           <KeyRow i={0} name="Anthropic" env="ANTHROPIC_API_KEY" icon={Sparkles} status="connected" hint="Claude 4 family" sample="sk-ant-••••••••••3f7a" managed={locked} reason={reason} company={company} />
-          <KeyRow i={1} name="Claude Code (OAuth)" env="Keychain · ~/.claude" icon={Cpu} status="connected" hint="opus-4-8 · sonnet-4-6 · fable-5" sample="oauth-••••••••••2c19" managed={locked} reason={reason} company={company} />
           <KeyRow i={2} name="Grok (xAI)" env="XAI_API_KEY" icon={Zap} status="missing" hint="grok-4" managed={locked} reason={reason} company={company} />
           <KeyRow i={3} name="Groq" env="GROQ_API_KEY" icon={Gauge} status="connected" hint="Llama 3.x · fast" sample="gsk_••••••••••8b02" managed={locked} reason={reason} company={company} />
           <KeyRow i={4} name="DeepSeek" env="DEEPSEEK_API_KEY" icon={Bot} status="missing" hint="deepseek-chat / reasoner" managed={locked} reason={reason} company={company} />
@@ -135,6 +136,73 @@ export function CategoryBody({ cat }: { cat: CatId }) {
         </Stack>
       )
   }
+}
+
+/** Functional Claude Code (OAuth) row — connect via the manual paste flow.
+ *  Reads the real connected state from `/api/settings`; offers the connect
+ *  action to admins, a read-only status otherwise. */
+function ClaudeCodeOAuthRow({
+  locked,
+  reason,
+  company,
+}: {
+  locked: boolean
+  reason: LockReason
+  company: string
+}) {
+  const [connected, setConnected] = useState<boolean | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchSettings()
+      .then((s) => {
+        if (cancelled) return
+        setConnected(s.claude_oauth_connected)
+        setIsAdmin(s.is_admin)
+      })
+      .catch(() => {
+        if (!cancelled) setConnected(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (connected) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-[var(--ok)]/30 bg-[var(--ok)]/[0.07] px-3.5 py-3">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--ok)]/15 text-[var(--ok)]">
+          <Cpu className="size-4" />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="text-[13px] font-medium text-foreground/90">Claude Code (OAuth)</span>
+          <span className="text-[11px] text-muted-foreground">Connected · token auto-refreshed · ~/.claude/.credentials.json</span>
+        </div>
+        <span className="text-[11px] font-medium text-[var(--ok)]">Connected</span>
+      </div>
+    )
+  }
+
+  // Not connected. Admins (and the single-user appliance) get the connect flow;
+  // everyone else sees a read-only "managed" row consistent with the API keys.
+  if (locked || !isAdmin) {
+    return (
+      <KeyRow
+        i={1}
+        name="Claude Code (OAuth)"
+        env="Keychain · ~/.claude"
+        icon={Cpu}
+        status="missing"
+        hint="Sign in with an Anthropic account — admin only"
+        managed
+        reason={reason}
+        company={company}
+      />
+    )
+  }
+
+  return <OAuthConnect onConnected={() => setConnected(true)} />
 }
 
 /** Why a key pane is read-only — drives the lock copy. */
