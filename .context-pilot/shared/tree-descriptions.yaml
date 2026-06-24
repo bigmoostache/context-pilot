@@ -6122,6 +6122,10 @@ a9f88f8f946e171c:
   path: crates/cp-wire/src/types/oplog.rs
   description: 'OpEntry + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated{thread_id,message_id,head,inline_body}, ThreadCreated/Archived/Restored/StatusChanged, ThreadFocusChanged{thread_id:Option<String>} (focused-thread highlight — ephemeral best-effort, NOT checkpoint-carried, self-heals from disk FocusState), Lifecycle, CostAggregate, Checkpoint{snapshot}, Unknown. inline_body rides small bodies inline (I13). Framed (len+CRC). round-trip + tolerant-decode + roster + stable-tag tests.'
   last_edited_ms: 0
+aa0b01dc0f42fdb6:
+  path: web/src/components/shell/config/ConfigPanes.tsx
+  description: 'Config category panes + presentational building blocks (split from ConfigPanel for <500): CATEGORIES, CategoryBody (general/usage/providers/search/docai/web/integrations), GeneralPane (default model picker + apply-to-all via sendCommand configure), KeyRow/StatusRow/ToggleRow/ManagedKeysNotice. Key-bearing panes lock when EITHER company-managed (useAccount) OR auth-active-and-caller-not-admin (T346, useAuth: authEnabled && role!==''admin''). LockReason ''company''|''admin'' drives copy: admin → ''Reserved to Administrators'' (ShieldCheck), company → ''Keys managed by {company}'' (Building2). Regular users still SEE the panes, greyed.'
+  last_edited_ms: 1782289719513
 aa0e06c92f399127:
   path: src/llms/mod.rs
   description: LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging.

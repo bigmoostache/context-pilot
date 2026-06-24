@@ -18,6 +18,7 @@ import {
   Lock,
   Search,
   Send,
+  ShieldCheck,
   Sliders,
   Sparkles,
   Zap,
@@ -27,6 +28,7 @@ import { ModelPicker } from "@/components/agents/ModelPicker"
 import { PROVIDERS, defaultModel as getDefaultModel, findModel } from "@/lib/support/models"
 import { useFleet, sendCommand } from "@/lib/live"
 import { useAccount } from "@/lib/support/account"
+import { useAuth } from "@/lib/support/auth"
 import { useDevMode } from "@/lib/support/devMode"
 import { cn } from "@/lib/utils"
 
@@ -68,10 +70,18 @@ export const CATEGORIES: {
 
 // ── per-category bodies ───────────────────────────────────────────
 export function CategoryBody({ cat }: { cat: CatId }) {
-  // Company-managed accounts can't edit API keys — the org provisions them
-  // centrally. Lock every key-bearing pane and explain why.
+  // Two independent reasons a key pane can be read-only:
+  //   • company-managed account — the org provisions keys centrally;
+  //   • auth active + caller is NOT a system administrator — only admins
+  //     manage provider/API keys (T346). Regular users still SEE the panes
+  //     (greyed) so they know the integration exists.
+  // The admin reason takes precedence in the copy when both apply.
   const { user } = useAccount()
-  const managed = user.managedByCompany
+  const { user: authUser, authEnabled } = useAuth()
+  const companyManaged = user.managedByCompany
+  const adminLocked = authEnabled === true && authUser !== null && authUser.role !== "admin"
+  const locked = companyManaged || adminLocked
+  const reason: LockReason = adminLocked ? "admin" : "company"
   const company = user.company ?? "your organization"
 
   switch (cat) {
@@ -82,20 +92,20 @@ export function CategoryBody({ cat }: { cat: CatId }) {
     case "providers":
       return (
         <Stack>
-          {managed && <ManagedKeysNotice company={company} />}
-          <KeyRow i={0} name="Anthropic" env="ANTHROPIC_API_KEY" icon={Sparkles} status="connected" hint="Claude 4 family" sample="sk-ant-••••••••••3f7a" managed={managed} company={company} />
-          <KeyRow i={1} name="Claude Code (OAuth)" env="Keychain · ~/.claude" icon={Cpu} status="connected" hint="opus-4-8 · sonnet-4-6 · fable-5" sample="oauth-••••••••••2c19" managed={managed} company={company} />
-          <KeyRow i={2} name="Grok (xAI)" env="XAI_API_KEY" icon={Zap} status="missing" hint="grok-4" managed={managed} company={company} />
-          <KeyRow i={3} name="Groq" env="GROQ_API_KEY" icon={Gauge} status="connected" hint="Llama 3.x · fast" sample="gsk_••••••••••8b02" managed={managed} company={company} />
-          <KeyRow i={4} name="DeepSeek" env="DEEPSEEK_API_KEY" icon={Bot} status="missing" hint="deepseek-chat / reasoner" managed={managed} company={company} />
-          <KeyRow i={5} name="MiniMax" env="MINIMAX_API_KEY" icon={Bot} status="connected" hint="Token Plan" sample="sk-cp-••••••••••5Wk8" managed={managed} company={company} />
+          {locked && <ManagedKeysNotice reason={reason} company={company} />}
+          <KeyRow i={0} name="Anthropic" env="ANTHROPIC_API_KEY" icon={Sparkles} status="connected" hint="Claude 4 family" sample="sk-ant-••••••••••3f7a" managed={locked} reason={reason} company={company} />
+          <KeyRow i={1} name="Claude Code (OAuth)" env="Keychain · ~/.claude" icon={Cpu} status="connected" hint="opus-4-8 · sonnet-4-6 · fable-5" sample="oauth-••••••••••2c19" managed={locked} reason={reason} company={company} />
+          <KeyRow i={2} name="Grok (xAI)" env="XAI_API_KEY" icon={Zap} status="missing" hint="grok-4" managed={locked} reason={reason} company={company} />
+          <KeyRow i={3} name="Groq" env="GROQ_API_KEY" icon={Gauge} status="connected" hint="Llama 3.x · fast" sample="gsk_••••••••••8b02" managed={locked} reason={reason} company={company} />
+          <KeyRow i={4} name="DeepSeek" env="DEEPSEEK_API_KEY" icon={Bot} status="missing" hint="deepseek-chat / reasoner" managed={locked} reason={reason} company={company} />
+          <KeyRow i={5} name="MiniMax" env="MINIMAX_API_KEY" icon={Bot} status="connected" hint="Token Plan" sample="sk-cp-••••••••••5Wk8" managed={locked} reason={reason} company={company} />
         </Stack>
       )
     case "search":
       return (
         <Stack>
-          {managed && <ManagedKeysNotice company={company} />}
-          <KeyRow i={0} name="Voyage AI" env="VOYAGE_API_KEY" icon={Database} status="connected" hint="voyage-code-3 · 1024-dim embeddings" sample="pa-••••••••••d41e" managed={managed} company={company} />
+          {locked && <ManagedKeysNotice reason={reason} company={company} />}
+          <KeyRow i={0} name="Voyage AI" env="VOYAGE_API_KEY" icon={Database} status="connected" hint="voyage-code-3 · 1024-dim embeddings" sample="pa-••••••••••d41e" managed={locked} reason={reason} company={company} />
           <StatusRow i={1} name="Meilisearch" icon={Search} state="Running" detail="Embedded server · 6 417 chunks · port 49286" />
           <ToggleRow i={2} name="Hybrid semantic search" detail="Blend keyword + vector results" on />
         </Stack>
@@ -103,41 +113,48 @@ export function CategoryBody({ cat }: { cat: CatId }) {
     case "docai":
       return (
         <Stack>
-          {managed && <ManagedKeysNotice company={company} />}
-          <KeyRow i={0} name="Datalab" env="DATALAB_API_KEY" icon={FileText} status="connected" hint="Surya OCR · PDF / image → markdown" sample="dl-••••••••••9a23" managed={managed} company={company} />
+          {locked && <ManagedKeysNotice reason={reason} company={company} />}
+          <KeyRow i={0} name="Datalab" env="DATALAB_API_KEY" icon={FileText} status="connected" hint="Surya OCR · PDF / image → markdown" sample="dl-••••••••••9a23" managed={locked} reason={reason} company={company} />
           <ToggleRow i={1} name="Cache OCR results" detail="~/.context-pilot/ocr-cache" on />
         </Stack>
       )
     case "web":
       return (
         <Stack>
-          {managed && <ManagedKeysNotice company={company} />}
-          <KeyRow i={0} name="Brave Search" env="BRAVE_API_KEY" icon={Globe} status="connected" hint="Independent 40-B index" sample="BSA-••••••••••71fd" managed={managed} company={company} />
-          <KeyRow i={1} name="Firecrawl" env="FIRECRAWL_API_KEY" icon={Globe} status="connected" hint="Scrape · search · crawl" sample="fc-••••••••••e0c8" managed={managed} company={company} />
+          {locked && <ManagedKeysNotice reason={reason} company={company} />}
+          <KeyRow i={0} name="Brave Search" env="BRAVE_API_KEY" icon={Globe} status="connected" hint="Independent 40-B index" sample="BSA-••••••••••71fd" managed={locked} reason={reason} company={company} />
+          <KeyRow i={1} name="Firecrawl" env="FIRECRAWL_API_KEY" icon={Globe} status="connected" hint="Scrape · search · crawl" sample="fc-••••••••••e0c8" managed={locked} reason={reason} company={company} />
         </Stack>
       )
     case "integrations":
       return (
         <Stack>
-          {managed && <ManagedKeysNotice company={company} />}
-          <KeyRow i={0} name="GitHub" env="GITHUB_TOKEN" icon={Boxes} status="connected" hint="PRs · issues · gh CLI" sample="ghp_••••••••••a7d5" managed={managed} company={company} />
+          {locked && <ManagedKeysNotice reason={reason} company={company} />}
+          <KeyRow i={0} name="GitHub" env="GITHUB_TOKEN" icon={Boxes} status="connected" hint="PRs · issues · gh CLI" sample="ghp_••••••••••a7d5" managed={locked} reason={reason} company={company} />
         </Stack>
       )
   }
 }
 
-/** Banner shown atop key-bearing panes when the account is company-managed. */
-function ManagedKeysNotice({ company }: { company: string }) {
+/** Why a key pane is read-only — drives the lock copy. */
+type LockReason = "company" | "admin"
+
+/** Banner shown atop key-bearing panes when the keys are read-only. */
+function ManagedKeysNotice({ reason, company }: { reason: LockReason; company: string }) {
+  const admin = reason === "admin"
   return (
     <div className="flex items-start gap-3 rounded-xl border border-[var(--interactive)]/30 bg-[var(--interactive)]/[0.06] px-3.5 py-3">
       <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--interactive)]/14 text-[var(--interactive)]">
-        <Building2 className="size-4" />
+        {admin ? <ShieldCheck className="size-4" /> : <Building2 className="size-4" />}
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-[12.5px] font-semibold text-foreground/90">Keys managed by {company}</span>
+        <span className="text-[12.5px] font-semibold text-foreground/90">
+          {admin ? "Reserved to Administrators" : `Keys managed by ${company}`}
+        </span>
         <span className="text-[11.5px] leading-relaxed text-muted-foreground">
-          API keys are provisioned centrally by your organization and can't be edited here. Contact
-          your administrator to change a provider key.
+          {admin
+            ? "Only system administrators can manage provider and API keys. Contact an administrator to change a key."
+            : "API keys are provisioned centrally by your organization and can't be edited here. Contact your administrator to change a provider key."}
         </span>
       </div>
     </div>
@@ -278,6 +295,7 @@ function KeyRow({
   hint,
   sample,
   managed = false,
+  reason = "company",
   company,
 }: {
   i: number
@@ -288,6 +306,7 @@ function KeyRow({
   hint: string
   sample?: string
   managed?: boolean
+  reason?: LockReason
   company?: string
 }) {
   const connected = status === "connected"
@@ -338,7 +357,9 @@ function KeyRow({
       {managed && connected && (
         <span className="flex items-center gap-1 pl-0.5 text-[10.5px] text-muted-foreground/65">
           <Lock className="size-3" />
-          Managed by {company ?? "your organization"} — contact your administrator to change.
+          {reason === "admin"
+            ? "Reserved to administrators — contact an administrator to change."
+            : `Managed by ${company ?? "your organization"} — contact your administrator to change.`}
         </span>
       )}
     </div>
