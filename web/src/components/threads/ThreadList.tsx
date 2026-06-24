@@ -1,4 +1,4 @@
-import { Plus, Search, X, Archive, ArchiveRestore, ChevronLeft, Pause, Play } from "lucide-react"
+import { Plus, Search, X, Archive, ArchiveRestore, ChevronLeft, Pause, Play, Trash2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ThreadDetail } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -16,6 +16,8 @@ interface ThreadListProps {
   onToggleArchived: (v: boolean) => void
   /** archive ↔ restore a single thread */
   onArchive: (id: string) => void
+  /** permanently delete a thread (T371) */
+  onDelete: (id: string) => void
   /** pause ↔ resume a single thread (T371) */
   onPause: (id: string) => void
   /** open the New Thread dialog */
@@ -84,6 +86,7 @@ export function ThreadList({
   showArchived,
   onToggleArchived,
   onArchive,
+  onDelete,
   onPause,
   onNewThread,
 }: ThreadListProps) {
@@ -222,7 +225,7 @@ export function ThreadList({
             {showArchived &&
               // Latest-archived first (T277) — most recently active on top.
               [...visible].sort(byRecent).map((t) => (
-                <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} archived />
+                <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} onDelete={onDelete} archived />
               ))}
           </div>
         </ScrollArea>
@@ -263,6 +266,7 @@ function ThreadRow({
   onSelect,
   onArchive,
   onPause,
+  onDelete,
   archived,
 }: {
   t: ThreadDetail
@@ -270,6 +274,7 @@ function ThreadRow({
   onSelect: (id: string) => void
   onArchive: (id: string) => void
   onPause?: (id: string) => void
+  onDelete?: (id: string) => void
   archived?: boolean
 }) {
   const preview = previewOf(t)
@@ -312,6 +317,15 @@ function ThreadRow({
               >
                 {archived ? <ArchiveRestore className="size-3" /> : <Archive className="size-3" />}
               </button>
+              {archived && onDelete && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(t.id) }}
+                  className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-[var(--danger)]"
+                  title="Delete permanently"
+                >
+                  <Trash2 className="size-3" />
+                </button>
+              )}
               {!archived && onPause && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onPause(t.id) }}

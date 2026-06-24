@@ -42,6 +42,9 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
         CommandKind::ResumeThread { thread_id } => {
             apply_resume_thread(&mut app.state, &thread_id);
         }
+        CommandKind::DeleteThread { thread_id } => {
+            apply_delete_thread(&mut app.state, &thread_id);
+        }
         CommandKind::Stop | CommandKind::InterruptStream => {
             apply_stop(&mut app.state);
         }
@@ -218,6 +221,44 @@ fn apply_resume_thread(state: &mut State, thread_id: &str) {
     } else {
         log::warn!("bridge: ResumeThread for unknown thread {thread_id}");
     }
+}
+
+// ── DeleteThread ────────────────────────────────────────────────────────
+
+/// Permanently delete a thread and all its messages.
+fn apply_delete_thread(state: &mut State, thread_id: &str) {
+    let ts = ThreadsState::get_mut(state);
+    let existed = ts.threads.iter().any(|t| t.id == thread_id);
+    if !existed {
+        log::warn!("bridge: DeleteThread for unknown thread {thread_id}");
+        return;
+    }
+    ts.threads.retain(|t| t.id != thread_id);
+
+    // Clean up focus references (mirrors archive path).
+    let focus = FocusState::get_mut(state);
+    if focus.focused_thread_id.as_deref() == Some(thread_id) {
+        focus.focused_thread_id = None;
+        focus.dangling_remaining = 0;
+        focus.escalation_level = 0;
+    }
+    let _prev = focus.last_read_count.remove(thread_id);
+    if focus.notified_my_turn_id.as_deref() == Some(thread_id) {
+        focus.notified_my_turn_id = None;
+    }
+
+    emit_roster_delta(state, OpEntryKind::ThreadDeleted { thread_id: thread_id.to_owned() });
+
+    // Clean up all bridge memos for the deleted thread.
+    if let Some(bs) = state.get_ext_mut::<BridgeState>() {
+        let _status = bs.thread_statuses.remove(thread_id);
+        let _archived = bs.thread_archived_memo.remove(thread_id);
+        let _paused = bs.thread_paused_memo.remove(thread_id);
+        let _msgs = bs.thread_msg_counts.remove(thread_id);
+    }
+
+    state.flags.ui.dirty = true;
+    log::info!("bridge: permanently deleted thread {thread_id}");
 }
 
 // ── Stop / Interrupt ────────────────────────────────────────────────────

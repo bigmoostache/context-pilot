@@ -142,6 +142,14 @@ pub enum OpEntryKind {
         thread_id: String,
     },
 
+    /// A thread was permanently deleted — removed from the roster and all
+    /// its messages discarded. Irreversible.
+    #[serde(rename = "thread_deleted")]
+    ThreadDeleted {
+        /// The deleted thread.
+        thread_id: String,
+    },
+
     /// A thread's turn ownership changed (`MyTurn` ↔ `TheirTurn`).
     #[serde(rename = "thread_status_changed")]
     ThreadStatusChanged {

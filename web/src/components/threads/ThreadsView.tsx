@@ -162,6 +162,13 @@ export function ThreadsView({
     )
   }, [threads, activeAgentId, flash])
 
+  const handleDelete = useCallback((id: string) => {
+    if (id === selectedId) setSelectedId("")
+    sendCommand(activeAgentId, { kind: "delete_thread", thread_id: id }).catch((e) =>
+      flash(describeCommandError("delete the thread", e)),
+    )
+  }, [activeAgentId, flash, selectedId])
+
   const handleCreate = useCallback((title: string) => {
     pendingSelect.current = true
     sendCommand(activeAgentId, { kind: "create_thread", name: title.trim() || "Untitled thread" })
@@ -238,6 +245,7 @@ export function ThreadsView({
         showArchived={showArchived}
         onToggleArchived={setShowArchived}
         onArchive={handleArchive}
+        onDelete={handleDelete}
         onPause={handlePause}
         onNewThread={() => setNewOpen(true)}
       />

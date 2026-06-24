@@ -2918,6 +2918,10 @@
   path: web/src/lib/live/mutations.ts
   description: 'Live imperative mutations (split from live/index for <500): finder writes (useUploadFiles/useWriteFile/useCreateFolder/useMoveItems/useRenameItem/useTrashItems) + agent lifecycle (useCreateAgent/useRestartAgent/useRetiredFleet/useRetireAgent/useUnretireAgent). One-shot POSTs → useMutation, invalidate the affected query family on success.'
   last_edited_ms: 1782040975304
+4da5516894ba288f:
+  path: web/src/lib/query/reducers.ts
+  description: 'SSE delta reducers: applyThreadDelta folds thread_created/archived/restored/paused/resumed/deleted/status_changed/focus_changed/message_created into TanStack cache. mergeThreadLogs reconciles poll+delta. applyAgentDelta folds phase/cost/context.'
+  last_edited_ms: 1782315774800
 4dbb8631408985d3:
   path: crates/cp-mod-github/src/lib.rs
   description: 'GitHub module. 1 tool: gh_execute. Dynamic github_result panels. Depends on git module. classify sub-module for read-only vs mutating. Tool visualizer for PR/issue status coloring.'
@@ -3130,6 +3134,10 @@
   path: src/ui/search_overlay/mod.rs
   description: 'Ctrl+I Meilisearch indexing status overlay. Two-column layout: left (server, process CPU/RAM, database, index stats, extensions), right (splitter, embeddings, tasks, recomputed, recently sent). Centered bordered popup.'
   last_edited_ms: 0
+532f62eb217f6ef5:
+  path: crates/cp-wire/src/types/snapshot.rs
+  description: 'Bounded replay snapshot: Snapshot{heads,seen,roster}. Heads (per-thread/panel content hashes) + SeenSet (dedup-tokens, evicted by acked-rev) + roster:Vec<RosterThread> (#[serde(default)] for N-1 tolerance). RosterThread{thread_id,name,status:ThreadTurn,archived,paused,last_activity_ms,msg_count} = the live thread list + fold helpers (fold_created via ThreadCreation<''src>, fold_archived, fold_paused, fold_deleted, fold_status, fold_message). Checkpoint carries the whole Snapshot. Tests: round-trip, with-roster, tolerant-decode, fold-helpers.'
+  last_edited_ms: 1782315774576
 53489ffafaca0e41:
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only log + running ReplayState fold (heads+seen). open() seeds via replay. append(kind)=append_buffered+sync (announce-after-durable K9). append_buffered(kind)=frame+write_all+fold, NO sync (group-commit primitive). sync()=single fdatasync (the amortised group-commit point, I2). roll() fdatasyncs old segment BEFORE switching (batch spanning a roll loses nothing), stamps leading Checkpoint(Snapshot) on new seg (GAP1). write_record=sole rev point (no sync). checkpoint()/heads()/seen()/snapshot() public. 7 tests.'
@@ -3802,6 +3810,10 @@
   path: crates/cp-mod-bridge/Cargo.toml
   description: 'Bridge module deps: cp-base, cp-render, cp-wire, serde_json. Workspace lints.'
   last_edited_ms: 1781617086605
+66ab0aa1178096ea:
+  path: src/app/run/threads/commands.rs
+  description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/Stop|Interrupt/Configure. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted.
+  last_edited_ms: 1782315774705
 66ca7309ab004897:
   path: ui/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). FleetDashboard at fleet altitude; the other three are per-agent views. openAgent switches agent→threads. Finder keyed by agent.id (remounts per agent).
@@ -3946,6 +3958,10 @@
   path: crates/cp-mod-search/src/panel.rs
   description: Search result panel + YAML formatter. format_results() groups file chunks by path, includes log entries. visualize_search_output() for conversation view highlighting. Same metadata persistence pattern. No tags.
   last_edited_ms: 0
+6a912534173b6c6c:
+  path: crates/cp-oplog/src/replay.rs
+  description: 'Oplog replay (GAP1/I5): Recovered{rev_head,heads,seen,roster}. fold_entry: Checkpoint=authoritative clone_from heads+seen+roster, MessageCreated=set_thread_head + RosterThread::fold_message, ThreadCreated/Archived/Restored/Paused/Resumed/Deleted/StatusChanged=RosterThread fold helpers (roster rebuilt from deltas), CommandEffect|SeenMark=seen.mark, others no-op. Fast-path reads only newest checkpoint-bearing segment; roster survives compaction because the checkpoint Snapshot carries it. Tests incl replay_rebuilds_roster_from_thread_deltas + roster_survives_compaction_via_checkpoint.'
+  last_edited_ms: 1782315774643
 6ac2dc94e8071e0e:
   path: crates/cp-oplog/src/error.rs
   description: 'OplogError{Io,Frame} + Display + From<io::Error>/From<FrameError> + OplogResult alias. Extracted from append.rs (folder-size: append.rs hit 501 lines). Deliberately NO std::error::Error impl (dodges missing_trait_methods on unstable provide()).'
@@ -4870,6 +4886,10 @@
   path: .github/checks/check-lint-config.sh
   description: 'Lint integrity hash chain checker. Verifies protected files haven''t been tampered with. --update appends new entry + git diffs of changed protected files. Readers skip non-entry lines via ^[0-9]+: guard. Password required for --update.'
   last_edited_ms: 1781347849835
+81933d40455c64d5:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Thread sidebar orchestrator. ThreadsView: selected thread state, handleArchive (archive/restore command), handlePause (pause/resume command, T371), handleDelete (permanent delete command, T371), handleSend. Generic describeCommandError (breaker special-case removed T378). Wires ThreadList + ThreadConversation + NewThreadDialog.'
+  last_edited_ms: 1782315774768
 81a162f1e0d9a52e:
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
@@ -4986,6 +5006,10 @@
   path: src/llms/claude_code_api_key/helpers.rs
   description: 'CC API-key helpers: constants (endpoint/headers), map_model_name(), inject_system_reminder(), apply_claude_code_headers()'
   last_edited_ms: 0
+8530745ba2d5af41:
+  path: crates/cp-orchestrator/src/services/materialized_view/mod.rs
+  description: In-memory materialized view of the fleet — per-agent projection folded from oplog entries. AgentView (rev/heads/roster/phase/lifecycle/cost/context/focused_thread). apply() folds ThreadPaused/ThreadResumed/ThreadDeleted via RosterThread::fold_paused/fold_deleted. Checkpoint = authoritative reset (bounded restart). CostSnapshot + ContextSnapshot value types.
+  last_edited_ms: 1782315774611
 85322b55d0f7ee4c:
   path: src/ui/threads_view/messages.rs
   description: 'Thread message area: right pane of Threads view. Message display (reuses conversation IR renderer), input area, question form overlay. X887: auto:true traces render as a single dim ''⚙ {line}'' IR line (auto_line() strips marker) instead of a full bubble, so a run stacks into a quiet block. thread_message_to_message() conversion; calculate_input_height() 50% cap.'
@@ -5950,6 +5974,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+9e4bc105277e97d1:
+  path: crates/cp-wire/src/types/command.rs
+  description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, PauseThread, ResumeThread, DeleteThread, InterruptStream, Stop, Configure{provider,model}, Unknown). Frame{schema_version, auth, command}. PauseThread/ResumeThread added for T371. DeleteThread added for T371 permanent delete.
+  last_edited_ms: 1782315774512
 9e742fd75d006bc4:
   path: src/ui/threads_view/mod.rs
   description: Threads view layout + thread list rendering. Two-pane layout (thread list | messages). Virtual '+ New Thread' entry. IR pipeline for list items (status dots, unread indicators, selection highlight). maybe_activate_thread_question() lazy question form init. truncate_str helper.
@@ -6146,6 +6174,10 @@ a1a57238a872a6d6:
   path: crates/cp-wire/src/types/snapshot.rs
   description: 'Bounded replay snapshot: Snapshot{heads,seen,roster}. Heads (per-thread/panel content hashes) + SeenSet (dedup-tokens, evicted by acked-rev) + roster:Vec<RosterThread> (#[serde(default)] for N-1 tolerance). RosterThread{thread_id,name,status:ThreadTurn,archived,last_activity_ms,msg_count} = the live thread list + fold helpers (fold_created via ThreadCreation<''src> carrier struct to keep arg count ≤4, fold_archived/fold_status/fold_message) = single source of truth for the roster fold (agent replay + backend view fold both call them, so a folded roster == a checkpoint-restored roster). Checkpoint carries the whole Snapshot so heads+seen+roster rebuild without folding from offset 0. Replaces old heads.rs. Tests: round-trip, with-roster, tolerant-decode-without-roster, fold-helpers, ThreadCreation idempotent re-fold.'
   last_edited_ms: 0
+a1be7723d6430d79:
+  path: crates/cp-wire/src/types/oplog.rs
+  description: 'OpEntry + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated{...,inline_body}, ThreadCreated/Archived/Restored/Paused/Resumed/Deleted/StatusChanged, ThreadFocusChanged, Lifecycle, CostAggregate, ContextUsage{used,threshold,budget,hit_tokens,miss_tokens (T297 cache split, #[serde(default)] N-1)}, Checkpoint, Unknown. Framed (len+CRC). round-trip + tolerant-decode + roster + stable-tag tests.'
+  last_edited_ms: 1782315774544
 a20374514cb825df:
   path: Cargo.lock
   description: Workspace lockfile
@@ -6342,6 +6374,10 @@ a86121643145f349:
   path: src/app/run/input.rs
   description: App::new() constructor, save_state/message_async(), handle_autocomplete/palette events. No question form event handling (removed).
   last_edited_ms: 1781391612087
+a87cac88d537b98a:
+  path: web/src/components/threads/ThreadList.tsx
+  description: 'Thread sidebar list. ThreadList (search/filter/new-thread) + ThreadRow (dot/name/focused+paused badges/preview + hover-swap: timestamp fades out on row hover, Archive+Pause/Play buttons fade in at same position). Groups: User turn / Agent''s turn / Archived. Pause button only in active view (T371). Delete (Trash2) button in archived view (T371).'
+  last_edited_ms: 1782315774736
 a87d013c74abe709:
   path: ui/src/components/shell/LeftRail.tsx
   description: Cockpit context navigator (width = shared var(--sidebar-w)). Context-budget meter + scrollable panel list (icon+name+tokens). Selection is CONTROLLED via props (selected/onSelect) — lifted to CockpitView so the chosen panel drives the center PanelPane. Dense per-panel telemetry omitted for calm enterprise feel.
@@ -6450,6 +6486,10 @@ aa88d97c8df48765:
   path: crates/cp-mod-spine/src/coucou.rs
   description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper. MIN_RECURRENCE_MS=60s floor for custom recurrence.
   last_edited_ms: 0
+aae8ebc31cc17953:
+  path: src/modules/conversation_history/recompute_toggled_tree_folders.rs
+  description: Rebuilds tree open_folders set from (1) ancestor folders of open file panels, (2) explicitly opened folders from current + remaining history conversations, (3) root. Called after Close_conversation_history. 5 unit tests.
+  last_edited_ms: 1782315358004
 aaebf3202a462574:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl fs upload/mkdir/rename/move/trash, retire/unretire/restart, fleet create, vitals, metrics. GET fs/download (attachment) + fs/raw (handle_raw: inline Content-Type/Disposition, image+PDF previews T281/T286) intercepted before route_rest as raw-byte responses. handle_stream = SSE.'
@@ -7798,6 +7838,10 @@ ccc5f36bc89c57cf:
   path: crates/cp-wire/src/types/body.rs
   description: 'Content-addressed Body: hash + data bytes. Inline-small in oplog or spill to oplog/bodies/{hash}.'
   last_edited_ms: 1781617163188
+ccee0da7019e157a:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 cd119edce88e0ed4:
   path: crates/cp-orchestrator/tests/end_to_end.rs
   description: Phase 30 end-to-end loopback capstone (3 tests). Backend::new takes 6 args (auth=None, session_ttl). Real agent stack ↔ real backend transport over real sockets. Command journals on agent and re-emerges as SSE delta. Spilled body hydrates over REST. 25 SSE connect/disconnect soak cycles.
@@ -8062,6 +8106,10 @@ d434a8d587934f19:
   path: web/src/components/finder/internal/useFinderActions.ts
   description: 'Finder filesystem-mutating actions + path navigation hook: upload/move/mkdir(inline New Folder)/rename/trash live mutations + navigate/back/forward. commitRename routes sentinel→mkdir else rename; cancelRename drops pending placeholder.'
   last_edited_ms: 1782038018598
+d450ede17de86081:
+  path: crates/cp-oplog/src/service.rs
+  description: 'OplogService — off-loop group-commit thread + GAP2/I2 asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate|ContextUsage|ThreadFocusChanged=BestEffort (disposable/self-healing), all else (roster mutations incl ThreadPaused/ThreadResumed/ThreadDeleted + Lifecycle + Unknown)=Durable. THREE submit paths: append_durable (blocks+awaits sync — intake/I11), submit_durable (non-blocking durable, detached ack — I2 main loop), append_best_effort (try_send drop-on-full — phase/cost/focus). commit_loop drains batch, ONE fdatasync. Tests in sibling service_tests.rs.'
+  last_edited_ms: 1782315774673
 d4527968c406c423:
   path: web/sse_reconnect_probe.py
   description: 'T268 reconnect-replay probe (deterministic, no browser). Connects the SSE stream twice with ?last_event_id=<rev> vs ?last_rev=<rev> and counts deltas with id>rev replayed in the first 2s (= immediate gap replay). Proves the resume param-name bug: last_event_id→0 replayed (cold seed at head, deltas lost→15s poll→5-10s delay); last_rev→N replayed (gap recovered). Per-read socket timeout (0.4s) ends the idle window. Run: python3 sse_reconnect_probe.py [AGENT_ID].'

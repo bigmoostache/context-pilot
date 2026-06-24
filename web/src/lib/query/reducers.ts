@@ -142,6 +142,10 @@ export function applyThreadDelta(
       if (!prev.some((t) => t.id === k.thread_id)) return null
       return prev.map((t) => (t.id === k.thread_id ? { ...t, paused } : t))
     }
+    case "thread_deleted": {
+      if (!prev.some((t) => t.id === k.thread_id)) return prev
+      return prev.filter((t) => t.id !== k.thread_id)
+    }
     case "thread_status_changed": {
       if (!prev.some((t) => t.id === k.thread_id)) return null
       return prev.map((t) =>

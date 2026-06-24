@@ -151,6 +151,11 @@ impl RosterThread {
         }
     }
 
+    /// Remove `thread_id` from the roster entirely (permanent delete).
+    pub fn fold_deleted(roster: &mut Vec<Self>, thread_id: &str) {
+        roster.retain(|e| e.thread_id != thread_id);
+    }
+
     /// Set the turn `status` for `thread_id`, if present (a no-op otherwise).
     pub fn fold_status(roster: &mut [Self], thread_id: &str, status: ThreadTurn) {
         if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {

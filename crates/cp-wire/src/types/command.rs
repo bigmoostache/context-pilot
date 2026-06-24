@@ -83,6 +83,13 @@ pub enum Kind {
         thread_id: String,
     },
 
+    /// Permanently delete a thread and all its messages.
+    #[serde(rename = "delete_thread")]
+    DeleteThread {
+        /// Thread to delete.
+        thread_id: String,
+    },
+
     /// Interrupt the agent's current LLM stream.
     #[serde(rename = "interrupt_stream")]
     InterruptStream,
