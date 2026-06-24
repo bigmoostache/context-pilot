@@ -27,10 +27,12 @@ use crate::channel::AgentChannel;
 use crate::services::Verdict;
 
 mod create;
+mod library;
 mod restart;
 mod retire;
 mod thread_shape;
 pub use create::create_agent;
+pub use library::create_command;
 pub use restart::restart_agent;
 pub use retire::{retire_agent, unretire_agent};
 use thread_shape::{overlay_roster, reshape_thread};

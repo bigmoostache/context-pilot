@@ -734,6 +734,10 @@
   path: src/app/actions/history.rs
   description: Prompt history navigation and panel clipboard copy. PromptHistoryNav struct with lazy-load from JSONL. Safe indexing via .get(), saturating arithmetic. handle_history_prev/next (Ctrl+U/D), handle_copy_panel_content (Ctrl+C via pbcopy).
   last_edited_ms: 1780563343160
+151daea2a2effba7:
+  path: web/src/lib/live/mutations.ts
+  description: 'Live imperative mutations (split from live/index for <500): finder writes (useUploadFiles/useWriteFile/useCreateFolder/useMoveItems/useRenameItem/useTrashItems) + agent lifecycle (useCreateAgent/useRestartAgent/useRenameAgent(T328)/useRetiredFleet/useRetireAgent/useUnretireAgent) + avatar (useUploadAvatar/useDeleteAvatar, T338) + useCreateCommand (T350 — POST library/command, invalidates qk.library). One-shot POSTs → useMutation, invalidate the affected query family on success.'
+  last_edited_ms: 1782297712878
 1525aa9d29c4eb94:
   path: crates/cp-orchestrator/src/transport/inspect/panels.rs
   description: 'Cockpit inspection-panel endpoints (in inspect/): memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list = tier-② disk reads reshaped to maquette JSON. library() scans .context-pilot/{agents,skills,commands}/*.md frontmatter; for COMMAND-kind entries it ALSO returns the prompt `body` (text after frontmatter via parse_command_body, T350) so the web composer can seed the real prompt when a /cmd suggestion bubble is clicked — agents/skills omit it (large bodies, unused). PLUS tools/radar/entities = DERIVED-state endpoints returning NORMAL EMPTY shape by design (200 [] / {anchors,results}, NOT 404). agent_folder guard so an unknown id still 404s.'
@@ -866,6 +870,10 @@
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A) + DARK ''Deep Ocean'' (#0A2647/#144272/#205295/#2C74B3: navy base, layered blues, bright azure accent, icy-white text) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow.'
   last_edited_ms: 1781516794266
+186bfa570bdcfd19:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend struct holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names(T328)/avatars(T338)/auth(T341)/session_ttl. route_rest dispatches all /api routes incl auth/ACL + auth/status + force-logout + POST agent/{id}/library/command (T350 create command). handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with Phase 7 ticket-based ACL.
+  last_edited_ms: 1782297712765
 1895e1cece749858:
   path: crates/cp-mod-bridge/tests/boot_heartbeat.rs
   description: 'Phase 25 (X792): cp-mod-bridge boot+heartbeat integration suite (4 tests, FIRST tests/ dir for this crate). Discovery contract viewed AS THE BACKEND SEES IT — reads artifacts back through cp_wire exactly like Phase 15 registry+liveness. a_booted_agent_is_fully_discoverable (registry <id>.json round-trips to valid Entry: protocol_version=PROTOCOL_VERSION, status=Starting, cap_token 64hex, boot_id 32hex; all advertised paths oplog/socket/heartbeat EXIST on disk; heartbeat file decodes to fresh beat whose matches_boot(entry.boot_id)+pid agree = cross-artifact tie inline tests don''t make). two_folders_boot_independently_into_one_fleet (folder A+B both alive simultaneously in one agents_dir → distinct id/cap_token/boot_id, both records coexist+round-trip, both beats fresh+bound = lock is per-folder not global, fleet precondition). rebooting_a_folder_keeps_its_id_but_mints_a_fresh_identity (drop boot1, boot2 same folder → SAME folder_id deterministic but DIFFERENT boot_id+cap_token = restart-identity/pid-reuse defence at boot layer). a_real_beat_drives_the_freshness_and_boot_match_verdict (beacon-produced beat: is_fresh(now,DEFAULT_MAX_AGE)=true, is_fresh(ts+60s,10ms)=false age-driven, matches_boot self=true/other=false). is_fresh(now_ms:u64,max_age_ms:u64) takes MILLIS not Duration → DEFAULT_MAX_AGE.as_millis() try_from. Per-target unused-crate-dependencies: `use cp_base/cp_render/cp_oplog/nix as _;` (bridge deps not directly named); names cp_mod_bridge+cp_wire+serde_json(from_str)+tempfile. 44 cp-mod-bridge tests green (40 inline + 4 integration).'
@@ -1670,6 +1678,10 @@
   path: web/src/components/shell/config/ConfigPanes.tsx
   description: 'Config category panes + presentational building blocks (split from ConfigPanel for <500): CATEGORIES, CategoryBody (general/usage/providers/search/docai/web/integrations), GeneralPane (default model picker + apply-to-all via sendCommand configure), KeyRow/StatusRow/ToggleRow/ManagedKeysNotice. Company-managed accounts lock key editing.'
   last_edited_ms: 1782041039029
+2e11ea484c65cd6f:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread composer (always-active textarea + turn-status banner). T298: paperclip wired. T304: optional draftKey persists UNSENT draft (text+caret) to localStorage. T331: pendingFiles + onRemoveFile removable chips; files-only send allowed. T348/T350: optional suggestions (CommandSuggestion[] with optional body) — /command first-message bubbles shown above textarea ONLY when composer empty; clicking calls prefill(s) which seeds the command''s EXPANDED prompt body (s.body, falling back to the /cmd literal) followed by a trailing newline with the caret on that fresh blank line, so the user can extend it before sending (never auto-sends). Enter sends / Shift+Enter newline, IME-guarded, auto-grow.'
+  last_edited_ms: 0
 2e174d5c4021ee64:
   path: src/infra/watcher.rs
   description: 'FileWatcher: notify crate wrapper, WatchEvent enum, canonical path dedup, rewatch_file() for atomic renames, non-blocking poll'
@@ -2166,6 +2178,10 @@
   path: crates/cp-orchestrator/tests/registry_channel.rs
   description: 'Phase 27 (X794) backend↔agent seam suite (4 tests, all green). Drives discovery+channel against real cp-mod-bridge artifacts: (1) real Boot→AgentRegistry Appeared+Live→idempotent quiet scan→drop→Disappeared; (2) Stale fires ONLY on Live→non-live transition, first-sight staleness rides Appeared (crafted Entry+Heartbeat); (3) body Store spill→OplogService MessageCreated→Tailer.poll→AgentChannel.hydrate integrity-verified + inlined body hydrate=None; (4) AgentChannel.send→real Intake.handle_connection over UnixListener (Accepted), resend same dedup_token Accepted but replay seen.len==1 (exactly-once). Top `use nix/serde/tiny_http as _;` for per-target unused-crate-dependencies.'
   last_edited_ms: 1781650132073
+3d00515f14ca732a:
+  path: crates/cp-orchestrator/src/transport/rest/library.rs
+  description: 'POST /api/agent/{id}/library/command handler (T350). create_command: parse {name,description?,body}, slugify(name) (reused pub(super) from create.rs), write .context-pilot/commands/<slug>.md with YAML frontmatter (name+description via yaml_scalar quote/escape, CR/LF→space so single-line) + body; 409 if file exists (never clobbers), 502 on mkdir/write fail, 404 unknown agent, 400 blank name/body. Agent''s prompt module filesystem-watches commands/ → picks up the new file live (no restart), so the /command becomes invocable + surfaces as a web suggestion bubble on next library refetch. yaml_scalar unit-tested.'
+  last_edited_ms: 1782297712621
 3d01ee7d42699b5d:
   path: src/ui/threads_view/mod.rs
   description: Threads view layout + list rendering. Renders over visible_indices(viewing_archived) filtered list; virtual '+ New Thread' only in active view; ARCHIVED header tag + empty-state hint in archived view; view-aware help/confirm hints (Ctrl+A arch/restore, Ctrl+U toggle). maybe_activate_thread_question resolves selection via visible list.
@@ -3262,6 +3278,10 @@
   path: docs/ROADMAP.md
   description: 'Public roadmap: v0.2 (providers/context/DX), v0.3 (multi-agent/IDE/knowledge), long-term (plugins/collab)'
   last_edited_ms: 0
+5b69269daf374b09:
+  path: web/src/components/threads/CreateCommandDialog.tsx
+  description: 'Create Command shadcn Dialog (T350) — authors a new /command in the active agent''s prompt library. Opened by the composer''s dashed ''create command'' pill. Fields: Name (live /slug preview mirroring backend slugify), optional Description (bubble label), Prompt body (mono Textarea). Disabled replica of the suggestion bubble previews the result. Submit → useCreateCommand mutation → writes .context-pilot/commands/<slug>.md; agent''s fs-watch picks it up, bubble surfaces on library refetch. 409 duplicate surfaced inline. Built on portaled Base UI Dialog (focus-trap/scroll-lock/Esc) + shadcn Input/Textarea/Button.'
+  last_edited_ms: 1782297712651
 5b91e2fb74aace6c:
   path: crates/cp-orchestrator/src/transport/ticket.rs
   description: 'Phase 19: single-use SSE upgrade tickets (I9b). TicketStore{live:HashMap<token,expiry_ms>,ttl}. mint() (sweep+/dev/urandom 256-bit hex token, DEFAULT_TTL 30s), redeem() true exactly once per unexpired token (remove+expiry check), lazy sweep on mint/redeem bounds map. Defends localhost endpoint vs malicious website (confused-deputy/DNS-rebind) that CORS/Origin can''t stop. 5 tests.'
@@ -3374,6 +3394,10 @@
   path: crates/cp-mod-entities/src/migrations.rs
   description: Auto-capture DDL as numbered migration files + sequential replay. write_migration() saves to _meta + disk. apply_pending() replays unapplied. list_files() sorted glob. migration_count().
   last_edited_ms: 1780585450704
+5f4e4cdcdacd0a5b:
+  path: web/src/lib/api/index.ts
+  description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent (T328) + avatar CRUD (T338) + createCommand (T350 — POST library/command, CreateCommandReceipt). Re-exports ./auth + ./finder + shares ./client request/BASE/envelope. The @/lib/api single import surface.'
+  last_edited_ms: 1782297712850
 5f515c37519dc9cd:
   path: crates/cp-mod-entities/src/tools.rs
   description: 'SQL execution engine. execute() dispatches to execute_select/dml/ddl. execute_dml_stmts is row-aware: dispatches per-statement on prep.column_count()>0 so a DML batch can end in a plain SELECT (not just RETURNING) without rusqlite ''Execute returned results'' error. dry_run via SAVEPOINT+ROLLBACK. Parsing from crate::parse. request_path reads .sql. live/output_path routing. ≤150 lines AND ≤8000 bytes inline, bigger→entity_result panel. 200-row cap. 4 DML-dispatch regression tests.'
@@ -4002,6 +4026,10 @@
   path: web/src/components/shell/LeftRail.tsx
   description: Cockpit context navigator. Accepts agentId, uses usePanels() for live panel list. Filters out threads panel (redundant — T11). Context-budget meter (mock tokenBudget), Conversation nav button, scrollable panel list with token counts.
   last_edited_ms: 1781776806612
+6fdff23b3f9f22b4:
+  path: crates/cp-orchestrator/src/transport/rest/create.rs
+  description: 'POST /api/fleet/create handler (T148/X896). create_agent(state,body): parse {name,folder?,model?(ignored)}, slugify(name) mirrors web modal, folder=agents_root/slug (or explicit), mkdir -p, supervisor.spawn_pty(key=folder,binary,folder,env=[CP_BRIDGE=1,CP_AGENTS_DIR]) → 202 {status:spawning,folder,pid}. slugify is pub(super) (T350: reused by sibling rest/library.rs create_command to name commands/<slug>.md). slugify unit-tested.'
+  last_edited_ms: 1782297712707
 702cf6546b8e9372:
   path: ui/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Greeting, aggregate stat strip, AgentCard grid (status badge Working/Needs input/Standby + one-line task summary + branch·model·cost, Open→agent threads, Manage→modal), New-agent card. AgentModal (Apple-grade): backdrop-fade+modal-pop entrance, gradient hero header, name-as-star field with focus-within ring + live slugified realm preview (folder picker dropped — realm derived from name), rich model cards (MODEL_META: tier/blurb/price/icon, radio-check, opt-rise stagger), quiet Archive ghost, name-gated primary, autofocus+Esc+⌘↵ keyboard.'
@@ -4466,6 +4494,10 @@
   path: crates/cp-oplog/src/service.rs
   description: 'Phase 8 (X775) GAP2: OplogService off-loop group-commit + asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate=BestEffort, all else (incl 4 thread-roster mutations + Unknown)=Durable. THREE submit paths: append_durable (blocks+awaits sync, returns rev — intake/I11 path), submit_durable (NON-blocking durable, detached ack — I2 main-loop path: enqueue now, group-commit+fdatasync off-loop, never dropped), append_best_effort (try_send drop-on-full — hot phase/cost). commit_loop drains batch, ONE fdatasync, releases acks. 8 tests incl submit_durable_persists_without_awaiting_the_sync.'
   last_edited_ms: 0
+7c634328e2919e21:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 7c6348e9a357189c:
   path: crates/cp-orchestrator/src/services/materialized_view.rs
   description: 'Phase 18: MaterializedView in-mem fleet projection folded from OpEntry (one AgentView per agent). AgentView{rev,heads,phase,lifecycle,cost}.apply: Checkpoint=authoritative heads reset, MessageCreated=set_thread_head, Phase/Lifecycle/Cost=latest-wins, CommandEffect/SeenMark/4-thread-roster-variants/Unknown=inert (roster projection not yet a field on AgentView — lands with X835 view-fold). 7 tests.'
@@ -4598,6 +4630,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor. Selection-aware InputChar/Delete/InsertText/PasteText. 9 cursor/selection action dispatches.'
   last_edited_ms: 0
+8031a5a19d9f8a7d:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: 'REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() breaker check GATED on SendMessage only. rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket embeds auth_user.id in ticket (Phase 7). resolve_entry. Submodules: create_agent, restart, retire, create_command (T350 rest/library.rs — POST library/command).'
+  last_edited_ms: 1782297712736
 803d8b7cbcd25627:
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1 (Boot itself now emits Lifecycle::Running — not lib.rs), binds tee.sock + spawns Tee, creates Intake from oplog replay, opens content-addressed body Store. on_stream_chunk→Token frames (tagged with state.messages.last().id for §7 live-typing correlation), on_stream_stop→PhaseHint(Idle). BridgeState{boot,tee,intake,tee_seq,last_phase,last_cost_usd,store,thread_msg_counts,msg_memo_seeded}. is_global, no tools/panels.'
@@ -5222,6 +5258,10 @@
   path: src/ui/search_overlay/mod.rs
   description: 'Ctrl+I Meilisearch indexing status overlay. Two-column layout: left (server, process CPU/RAM, database, index stats, extensions), right (splitter, embeddings, tasks, recomputed, recently sent). Centered bordered popup.'
   last_edited_ms: 0
+90136ec6071b923a:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped). T304: passes draftKey. T331: passes pendingFiles + onRemoveFile. T334: onShowInFinder forwarded to Message. T348: useLibrary(agentId) → command suggestions (kind===''command'', /${id}, with body) passed to composer ONLY for an empty thread. T350: owns createCmdOpen state + renders CreateCommandDialog; passes onCreateCommand to composer to open it. Takes agentId + onAttach props.'
+  last_edited_ms: 1782297712821
 902e922ca834c835:
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. --bridge CLI flag (safe OnceLock, no unsafe set_var). --resume-stream for self-restart. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
@@ -8346,6 +8386,10 @@ e764dee9fb758b38:
   path: crates/cp-mod-entities/src/types.rs
   description: EntitiesState (db_path, dump_path, migrations_dir, schema_cache), SchemaCache, TableInfo, ColumnInfo, ForeignKeyInfo. get/get_mut helpers for State TypeMap access.
   last_edited_ms: 1780585450727
+e76b980dedc1ab19:
+  path: web/src/components/ui/textarea.tsx
+  description: shadcn-style Textarea — plain <textarea> themed to app tokens (border/ring/disabled like Input, min-h-16, vertical resize). Multi-line counterpart of Input. Added T350 for CreateCommandDialog's prompt body field.
+  last_edited_ms: 1782297712679
 e7915d49cba9d5d0:
   path: web/src/components/conversation/Conversation.tsx
   description: 'Cockpit conversation surface — LIVE (§7). useConversation(agentId) for the durable record + useStreamingTokens(agentId) for the ephemeral stream plane, overlaid: buildMessages maps durable msgs→ChatMessage (text user/assistant; tool_call→tool card from tool_uses[0]; tool_result folded/skipped) then shows the longer of (live buffer, durable text) + blinking cursor while the live buffer leads, and synthesises a trailing assistant bubble for a streaming turn not yet flushed. Reconciles (live stops leading) once durable text catches up. Accepts agentId prop.'
@@ -8594,6 +8638,10 @@ ef0729aa90244126:
   path: crates/cp-oplog/tests/crash_replay.rs
   description: 'Phase 9 (X776) MILESTONE M0 crash-replay harness. Unix-only (#![cfg(unix)]). Self-re-exec pattern: env-gated #[test] crash_child_entrypoint re-runs the test binary as a child via current_exe(); parent/child handshake through a fdatasync''d marker file (libtest stdout is noisy). V1 v1_real_sigkill_leaves_a_clean_replayable_oplog: child spams durable MessageCreated appends, parent kill()s (real SIGKILL), fresh process replay() never errors + every announced-durable rev survives + torn tail truncated (announce-after-durable K9 across real crash). V2 v2_journalled_command_is_exactly_once_after_deadman_reexec: child journals CommandEffect then dies, fresh process recovers seen-set token, duplicate SeenMark delivery folds to no-op (exactly-once across process boundary). V12 v12_barrier_is_pending_the_body_store: asserts body_gc_eligible rule, explicit placeholder until body store lands Phase 14. 4 tests green.'
   last_edited_ms: 0
+ef4fe8d8f33e402a:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread composer (always-active textarea + turn-status banner). T298: paperclip wired. T304: optional draftKey persists UNSENT draft (text+caret) to localStorage. T331: pendingFiles + onRemoveFile removable chips; files-only send allowed. T348/T350: optional suggestions (CommandSuggestion[] with optional body) — /command first-message bubbles shown above textarea ONLY when composer empty; clicking prefills the EXPANDED prompt body (s.body, fallback /cmd literal) + trailing newline with caret on the blank line. T350: optional onCreateCommand → renders a dashed ''create command'' Plus pill beside the bubbles (shown even with zero suggestions so the first command can be bootstrapped); the suggestions row gates on (suggestions.length>0||onCreateCommand). Enter sends / Shift+Enter newline, IME-guarded, auto-grow.'
+  last_edited_ms: 1782297712793
 ef88c139f0bdac2b:
   path: yamls/tools/threads.yaml
   description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'

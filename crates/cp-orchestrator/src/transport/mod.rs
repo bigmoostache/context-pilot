@@ -384,6 +384,7 @@ fn route_rest(
         (Method::Get, ["api", "agent", id, "fs", "descriptions"]) => inspect::finder::fs_descriptions(state, id),
         (Method::Get, ["api", "agent", id, "conversation"]) => inspect::finder::conversation(state, id),
         (Method::Post, ["api", "agent", id, "command"]) => rest::command(state, id, body_bytes),
+        (Method::Post, ["api", "agent", id, "library", "command"]) => rest::create_command(state, id, body_bytes),
         (Method::Post, ["api", "agent", id, "fs", "upload"]) => {
             inspect::finder::fs_upload(state, id, query, body_bytes)
         }

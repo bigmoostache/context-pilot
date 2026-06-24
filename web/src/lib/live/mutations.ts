@@ -294,3 +294,24 @@ export function useDeleteAvatar() {
     },
   })
 }
+
+// ── Prompt library (T350) ──────────────────────────────────────────────
+
+/**
+ * Mutation to create a new `/command` in an agent's prompt library (the thread
+ * composer's "create command" button). One-shot POST writing a markdown file
+ * into the agent's `.context-pilot/commands/`; not a delta-covered resource → a
+ * `useMutation`. On success the agent's `useLibrary` query is invalidated so the
+ * new command surfaces as a suggestion bubble immediately (the running agent
+ * also picks the file up on its own filesystem watch).
+ */
+export function useCreateCommand(agentId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (cmd: { name: string; description?: string; body: string }) =>
+      api.createCommand(agentId, cmd),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: qk.library(agentId) })
+    },
+  })
+}

@@ -422,6 +422,30 @@ export function fetchLibrary(agentId: string): Promise<LibraryItem[]> {
   return request(`/api/agent/${agentId}/library`)
 }
 
+/** Receipt from `POST /api/agent/{id}/library/command` — confirms a new command
+ *  markdown file was written into the agent's `.context-pilot/commands/`. The
+ *  running agent picks it up automatically, so it becomes invocable (and shows
+ *  as a `/command` suggestion bubble) within a library refetch. */
+export interface CreateCommandReceipt {
+  id: string
+  status: string
+}
+
+/** Create a new `/command` in an agent's prompt library. `name` derives the
+ *  command's slug (its `/invocation`); `body` is the prompt it expands to;
+ *  `description` is the optional one-line label on the suggestion bubble. Rejects
+ *  with a 409 if a command with the same slug already exists. */
+export function createCommand(
+  agentId: string,
+  cmd: { name: string; description?: string; body: string },
+): Promise<CreateCommandReceipt> {
+  return request(`/api/agent/${agentId}/library/command`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cmd),
+  })
+}
+
 // ── Commands (mutating) ───────────────────────────────────────────────
 
 export interface CommandReceipt {

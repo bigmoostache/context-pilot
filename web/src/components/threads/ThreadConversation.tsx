@@ -3,6 +3,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
 import { QuestionForm } from "./QuestionForm"
 import { ThreadComposer, type CommandSuggestion } from "./ThreadComposer"
+import { CreateCommandDialog } from "./CreateCommandDialog"
 import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { uploadToNode, type UploadedFile } from "./fileUpload"
@@ -127,6 +128,10 @@ export function ThreadConversation({
   // it with the exact same FinderPreview the Finder uses.
   const [sheetFile, setSheetFile] = useState<UploadedFile | null>(null)
 
+  // Whether the "create command" dialog (T350) is open — toggled by the pill
+  // the composer renders beside the /command suggestion bubbles.
+  const [createCmdOpen, setCreateCmdOpen] = useState(false)
+
   // First-message `/command` suggestions (T348). Surfaced ONLY for an empty
   // thread — the agent's command library is a jumping-off point for the very
   // first message, never a persistent palette. Built from the live prompt
@@ -203,6 +208,7 @@ export function ThreadConversation({
           pendingFiles={pendingFiles}
           onRemoveFile={onRemoveFile}
           suggestions={suggestions}
+          onCreateCommand={() => setCreateCmdOpen(true)}
           draftKey={`cp-draft-${agentId}-${thread.id}`}
         />
       </div>
@@ -212,6 +218,12 @@ export function ThreadConversation({
         agentId={agentId}
         open={sheetFile !== null}
         onClose={() => setSheetFile(null)}
+      />
+
+      <CreateCommandDialog
+        open={createCmdOpen}
+        onClose={() => setCreateCmdOpen(false)}
+        agentId={agentId}
       />
     </main>
   )

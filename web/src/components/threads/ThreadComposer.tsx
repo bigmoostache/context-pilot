@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { ArrowUp, Paperclip, Loader2, Clock, X } from "lucide-react"
+import { ArrowUp, Paperclip, Loader2, Clock, X, Plus } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 import type { UploadedFile } from "./fileUpload"
 import { FileUploadChip } from "./fileUpload"
@@ -84,6 +84,7 @@ export function ThreadComposer({
   onRemoveFile,
   draftKey,
   suggestions = [],
+  onCreateCommand,
 }: {
   status: ThreadStatus
   /** true when this is the single thread the agent is currently focused on */
@@ -103,6 +104,13 @@ export function ThreadComposer({
    * jumping-off point for the first message, not a persistent palette.
    */
   suggestions?: CommandSuggestion[]
+  /**
+   * Opens the "create command" dialog (T350). When provided, a pill styled
+   * exactly like the suggestion bubbles is rendered alongside them (and shown
+   * even when there are no commands yet, so the first one can be bootstrapped);
+   * clicking it invokes this callback. Omit to hide the pill.
+   */
+  onCreateCommand?: () => void
   /**
    * localStorage key under which the UNSENT draft is persisted (T304). When
    * provided, what you type — and **where your caret is** — survives a reload,
@@ -233,10 +241,11 @@ export function ThreadComposer({
 
   return (
     <div className="shrink-0 px-5 pb-4 pt-2">
-      {/* First-message /command suggestions (T348). Shown only for an empty
-          composer (no typed text, no staged files) so they never clutter an
-          in-progress reply. Clicking a bubble prefills the command. */}
-      {suggestions.length > 0 && !text.trim() && pendingFiles.length === 0 && (
+      {/* First-message /command suggestions (T348) + the create-command pill
+          (T350). Shown only for an empty composer (no typed text, no staged
+          files) so they never clutter an in-progress reply. The create pill
+          shows even with zero suggestions so the first command can be made. */}
+      {(suggestions.length > 0 || onCreateCommand) && !text.trim() && pendingFiles.length === 0 && (
         <div className="mb-2 flex flex-wrap gap-1.5">
           {suggestions.map((s) => (
             <button
@@ -256,6 +265,17 @@ export function ThreadComposer({
               )}
             </button>
           ))}
+          {onCreateCommand && (
+            <button
+              type="button"
+              onClick={onCreateCommand}
+              title="Create a new /command"
+              className="group inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-card px-2.5 py-1 text-[11.5px] text-muted-foreground/80 transition-colors hover:border-[var(--signal)]/60 hover:text-[var(--signal)]"
+            >
+              <Plus className="size-3 text-muted-foreground/70 group-hover:text-[var(--signal)]" strokeWidth={2.5} />
+              <span className="font-medium">create command</span>
+            </button>
+          )}
         </div>
       )}
       {banner && (

@@ -88,7 +88,10 @@ pub fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpReply {
 
 /// Derive a filesystem-safe realm slug from an agent name (mirrors the web
 /// modal's `slugify`): lowercase, non-alphanumerics → `-`, trimmed, never empty.
-fn slugify(name: &str) -> String {
+///
+/// `pub(super)` so the sibling command-create handler ([`super::library`]) can
+/// reuse the exact same slug derivation when naming a `commands/<slug>.md` file.
+pub(super) fn slugify(name: &str) -> String {
     let mut slug = String::with_capacity(name.len());
     let mut prev_dash = false;
     for ch in name.trim().to_lowercase().chars() {
