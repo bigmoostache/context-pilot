@@ -169,6 +169,23 @@ function components(variant: MarkdownVariant): Components {
   }
 }
 
+// ── Pre-processor ─────────────────────────────────────────────────────
+//
+// The thread composer's Tab-nesting (`resolveTab` in utils.ts) emits Unicode
+// bullet characters `• ◦ ▪ ‣` as depth-styled list markers. CommonMark only
+// recognises `-`, `*`, `+` — so the Unicode bullets land as plain inline text
+// and collapse onto a single line (the "bullets on one line" bug, T369).
+//
+// `normalizeMarkdown` converts those characters back to the CommonMark `- `
+// marker, preserving leading whitespace (for nesting depth).  Applied BEFORE
+// react-markdown so the parser sees valid list syntax.
+
+const BULLET_RE = /^([ \t]*)[•◦▪‣][ \t]/gm
+
+function normalizeMarkdown(text: string): string {
+  return text.replace(BULLET_RE, "$1- ")
+}
+
 /**
  * Render `text` as themed markdown. Memoised on `text`+`variant` so an
  * unrelated re-render of the conversation doesn't re-parse every message.
@@ -185,7 +202,7 @@ export const Markdown = memo(function Markdown({
   return (
     <div className={cn("break-words", className)}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components(variant)}>
-        {text}
+        {normalizeMarkdown(text)}
       </ReactMarkdown>
     </div>
   )
