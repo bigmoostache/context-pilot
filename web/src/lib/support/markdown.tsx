@@ -204,7 +204,7 @@ export const Markdown = memo(function Markdown({
 }): ReactNode {
   return (
     <div className={cn("break-words", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={components(variant)}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]} rehypePlugins={[rehypeKatex]} components={components(variant)}>
         {normalizeMarkdown(text)}
       </ReactMarkdown>
     </div>
