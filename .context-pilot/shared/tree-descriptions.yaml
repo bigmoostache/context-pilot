@@ -1922,6 +1922,10 @@
   path: web/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Uses useFleet() for live agents. Mounts AccountProvider + TooltipProvider. Passes agents to TopBar/FleetShell/StatusBar. openAgent switches agent→threads.
   last_edited_ms: 1781694241267
+3593e7155577e8b8:
+  path: web/src/lib/utils.ts
+  description: 'cn() class-merge helper + the web port of the TUI input-area list logic (T359). resolveEnter(value,selStart,selEnd) → {kind:''send''} | {kind:''edit'',value,caret}: send on empty trailing line, else continue/remove an ordered or unordered list item or insert a newline — ordered markers auto-increment (numeric +1, single-letter bijective base-26 a→b…z→aa, case kept), unordered markers are BEAUTIFIED on continuation to a depth-styled Unicode glyph (BULLETS = •◦▪‣, single UTF-16 unit so width-preserving). resolveTab(value,selStart,_selEnd,shift) → {value,caret} | null: Tab indents / Shift+Tab outdents the caret''s list line one level (INDENT=2 spaces) — unordered restyles to the new depth''s glyph, ordered resets to a fresh 1./a. sublist count; null off a list line (default Tab stands) or Shift+Tab at depth 0. Shared parseListLine() recognises -,*,+ and the pretty bullets as unordered, digits/single-letter as ordered. Imported by ThreadComposer.'
+  last_edited_ms: 1782303722739
 35e14e7c1aa44927:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A) + DARK ''Night Gold'' (#222831/#393E46/#FFD369/#EEEEEE: charcoal base, slate surfaces, golden-yellow accent, near-white text) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (agent dialog), finder-slider.'

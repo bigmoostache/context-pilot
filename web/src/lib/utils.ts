@@ -5,27 +5,48 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// ── Ordered-list Enter behaviour (T359) ──────────────────────────────
+// ── List Enter / Tab behaviour (T359) ────────────────────────────────
 //
-// Faithful web port of the TUI input area (src/modules/conversation/list.rs +
-// panel.rs Enter branch), used by the thread composer. On a plain Enter the
-// composer:
+// Web port of the TUI input area (src/modules/conversation/list.rs +
+// panel.rs Enter branch), used by the thread composer, extended with
+// nesting (Tab / Shift+Tab) and depth-styled unordered bullets.
+//
+// Plain Enter:
 //   1. continues an ordered/unordered list — `2. foo` → newline + `3. ` (the
 //      marker auto-increments: numeric 2→3, single-letter a→b … z→aa with the
-//      Rust bijective base-26 scheme, case preserved; bullets `- `/`* ` repeat);
-//   2. on an EMPTY list item (`3. ` with nothing after) removes the marker,
-//      collapsing the line to blank instead of spawning another item;
+//      Rust bijective base-26 scheme, case preserved; unordered bullets repeat
+//      and are beautified to the depth's pretty glyph, see below);
+//   2. on an EMPTY list item (`3. ` / `• ` with nothing after) removes the
+//      marker, collapsing the line to blank instead of spawning another item;
 //   3. sends only when the caret sits on an empty trailing line (so a stray
 //      Enter mid-message inserts a newline rather than firing too early);
 //   4. otherwise inserts a newline.
 // Shift+Enter always inserts a newline (handled in the keydown handler).
+//
+// Tab / Shift+Tab (on a list line):
+//   - Tab indents the current item one level (a *sublist*): the leading indent
+//     grows by [`INDENT`], an unordered marker becomes the next depth's pretty
+//     glyph, and an ordered marker resets to a fresh `1.` / `a.` sublist count.
+//   - Shift+Tab outdents one level (no-op at depth 0).
+//
+// Pretty bullets: the user types the plain `- ` / `* ` they know; the FIRST
+// continuation (or any indent) rewrites the marker to a depth-appropriate
+// Unicode glyph from [`BULLETS`] — every one a single UTF-16 code unit, so the
+// swap is width-preserving and never disturbs caret offsets.
 
-/** The decision Enter yields, mirroring the TUI's three list outcomes + send. */
-export type EnterAction =
-  | { kind: "send" }
-  | { kind: "newline" }
-  | { kind: "continue"; text: string }
-  | { kind: "remove" }
+/** Spaces per nesting level (one indent step). */
+const INDENT = "  "
+/** Depth-styled unordered bullet glyphs (clamped past the last). */
+const BULLETS = ["•", "◦", "▪", "‣"]
+/** Plain unordered markers the user might type (normalised to a pretty glyph). */
+const PLAIN_BULLETS = ["-", "*", "+"]
+/** Every char accepted as an unordered marker: plain inputs + pretty glyphs. */
+const UL_MARKERS = new Set([...PLAIN_BULLETS, ...BULLETS])
+
+/** The depth's pretty bullet (clamped to the last glyph for deep nesting). */
+function bulletForDepth(depth: number): string {
+  return BULLETS[Math.min(Math.max(depth, 0), BULLETS.length - 1)] ?? "•"
+}
 
 /**
  * Increment a single alphabetical list marker, porting the TUI's bijective
@@ -47,53 +68,71 @@ function nextAlphaMarker(marker: string): string {
   return out
 }
 
+/** A parsed list line, or null when the line is not a list item. */
+interface ParsedLine {
+  /** Leading whitespace (the indent). */
+  indent: string
+  /** Nesting depth = floor(indent / INDENT). */
+  depth: number
+  /** Ordered (`ol`) or unordered (`ul`). */
+  kind: "ol" | "ul"
+  /** The marker token: a bullet glyph (`ul`) or the count `1`/`a`/`II` (`ol`). */
+  marker: string
+  /** Text after the `marker + space` prefix (empty for a bare item). */
+  rest: string
+}
+
 /**
- * Detect the list action for a single line — direct port of the TUI
- * `detect_list_action`. Returns a continuation string, an empty-item removal,
- * or null (no list ⇒ plain newline).
+ * Parse one line into its list shape (indent / depth / kind / marker / rest),
+ * or null when it isn't a recognised ordered or unordered item. Shared by the
+ * Enter and Tab resolvers so both agree on what a list line is.
  */
-function detectListAction(line: string): { kind: "continue"; text: string } | { kind: "remove" } | null {
+function parseListLine(line: string): ParsedLine | null {
   const trimmed = line.replace(/^\s+/, "")
   if (trimmed.length === 0) return null
-  const indent = " ".repeat(line.length - trimmed.length)
+  const indent = line.slice(0, line.length - trimmed.length)
+  const depth = Math.floor(indent.length / INDENT.length)
 
-  // Empty unordered item.
-  if (trimmed === "- " || trimmed === "* ") return { kind: "remove" }
+  // Unordered: a single marker char followed by a space.
+  const head = trimmed[0] ?? ""
+  if (UL_MARKERS.has(head) && trimmed[1] === " ") {
+    return { indent, depth, kind: "ul", marker: head, rest: trimmed.slice(2) }
+  }
 
+  // Ordered: `<count>. ` where count is digits or a single letter.
   const dot = trimmed.indexOf(". ")
-  if (dot >= 0) {
+  if (dot > 0) {
     const marker = trimmed.slice(0, dot)
-    const after = trimmed.slice(dot + 2)
-    const isNumeric = marker.length > 0 && /^\d+$/.test(marker)
-    const isAlpha = marker.length === 1 && (/^[a-z]$/.test(marker) || /^[A-Z]$/.test(marker))
-    if (after.length === 0 && (isNumeric || isAlpha)) return { kind: "remove" }
-  }
-
-  // Non-empty unordered item → repeat the bullet.
-  if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-    return { kind: "continue", text: `\n${indent}${trimmed.slice(0, 2)}` }
-  }
-
-  // Non-empty ordered item → next marker.
-  if (dot >= 0) {
-    const marker = trimmed.slice(0, dot)
-    if (/^\d+$/.test(marker)) {
-      const n = Number.parseInt(marker, 10)
-      return { kind: "continue", text: `\n${indent}${n + 1}. ` }
-    }
-    if (marker.length === 1 && (/^[a-z]$/.test(marker) || /^[A-Z]$/.test(marker))) {
-      return { kind: "continue", text: `\n${indent}${nextAlphaMarker(marker)}. ` }
+    const isNumeric = /^\d+$/.test(marker)
+    const isAlpha = marker.length === 1 && /^[a-zA-Z]$/.test(marker)
+    if (isNumeric || isAlpha) {
+      return { indent, depth, kind: "ol", marker, rest: trimmed.slice(dot + 2) }
     }
   }
   return null
 }
 
+/** Locate the line containing `pos`: its [start, end) offsets in `value`. */
+function lineBounds(value: string, pos: number): { start: number; end: number } {
+  const start = value.lastIndexOf("\n", pos - 1) + 1
+  const end = value.indexOf("\n", pos)
+  return { start, end: end === -1 ? value.length : end }
+}
+
+/** A fresh ordered sublist marker matching the parent's numeric/alpha style. */
+function resetOrderedMarker(marker: string): string {
+  if (/^\d+$/.test(marker)) return "1"
+  return marker === marker.toUpperCase() ? "A" : "a"
+}
+
+/** The decision Enter yields: send the message, or splice a new value + caret. */
+export type EnterAction = { kind: "send" } | { kind: "edit"; value: string; caret: number }
+
 /**
  * Resolve what a plain Enter should do given the textarea value + caret,
  * mirroring the TUI panel.rs Enter branch: send only when the caret is at the
  * very end on an empty trailing line, else continue/remove a list or newline.
- * The list decision keys off the line the caret sits on (equivalent to the
- * TUI's last-line check when the caret is at the end, the dominant case).
+ * Returns a full `{value, caret}` splice so the caller applies it in one shot.
  */
 export function resolveEnter(value: string, selStart: number, selEnd: number): EnterAction {
   const atEnd = selStart === selEnd && selStart === value.length
@@ -101,10 +140,79 @@ export function resolveEnter(value: string, selStart: number, selEnd: number): E
   const endsEmptyLine = value.endsWith("\n") || lastLine.trim().length === 0
   if (atEnd && endsEmptyLine) return { kind: "send" }
 
-  const lineStart = value.lastIndexOf("\n", selStart - 1) + 1
-  const lineEnd = value.indexOf("\n", selStart)
-  const curLine = value.slice(lineStart, lineEnd === -1 ? value.length : lineEnd)
-  const action = detectListAction(curLine)
-  if (!action) return { kind: "newline" }
-  return action
+  const { start: lineStart, end: lineEnd } = lineBounds(value, selStart)
+  const curLine = value.slice(lineStart, lineEnd)
+  const parsed = parseListLine(curLine)
+
+  // Not a list line → plain newline at the caret.
+  if (!parsed) {
+    const next = `${value.slice(0, selStart)}\n${value.slice(selEnd)}`
+    return { kind: "edit", value: next, caret: selStart + 1 }
+  }
+
+  // Empty item → strip it, collapsing the line to blank (caret to line start).
+  if (parsed.rest.length === 0) {
+    const next = value.slice(0, lineStart) + value.slice(selStart)
+    return { kind: "edit", value: next, caret: lineStart }
+  }
+
+  // Non-empty unordered → beautify this line's marker to the depth glyph (a
+  // width-preserving 1-char swap, caret unaffected) and continue with it.
+  if (parsed.kind === "ul") {
+    const pretty = bulletForDepth(parsed.depth)
+    const markerIdx = lineStart + parsed.indent.length
+    const swapped = value.slice(0, markerIdx) + pretty + value.slice(markerIdx + 1)
+    const ins = `\n${parsed.indent}${pretty} `
+    const next = swapped.slice(0, selStart) + ins + swapped.slice(selEnd)
+    return { kind: "edit", value: next, caret: selStart + ins.length }
+  }
+
+  // Non-empty ordered → next marker (numeric +1, or bijective base-26 letter).
+  const nextMarker = /^\d+$/.test(parsed.marker)
+    ? String(Number.parseInt(parsed.marker, 10) + 1)
+    : nextAlphaMarker(parsed.marker)
+  const ins = `\n${parsed.indent}${nextMarker}. `
+  const next = value.slice(0, selStart) + ins + value.slice(selEnd)
+  return { kind: "edit", value: next, caret: selStart + ins.length }
+}
+
+/**
+ * Resolve a Tab / Shift+Tab on the current line — indent or outdent a list item
+ * by one level. Returns the new `{value, caret}` splice, or null when the line
+ * is not a list item (or Shift+Tab at depth 0), letting the textarea's default
+ * Tab behaviour stand.
+ *
+ * Indenting an unordered item restyles its bullet to the next depth's glyph;
+ * indenting an ordered item starts a fresh `1.` / `a.` sublist count. Outdenting
+ * reverses both. The caret tracks the content as the indent/marker width shifts.
+ */
+export function resolveTab(value: string, selStart: number, _selEnd: number, shift: boolean): { value: string; caret: number } | null {
+  const { start: lineStart, end: lineEnd } = lineBounds(value, selStart)
+  const oldLine = value.slice(lineStart, lineEnd)
+  const parsed = parseListLine(oldLine)
+  if (!parsed) return null
+
+  let newIndent: string
+  let newDepth: number
+  if (shift) {
+    if (parsed.indent.length < INDENT.length) return null // already top-level
+    newIndent = parsed.indent.slice(INDENT.length)
+    newDepth = parsed.depth - 1
+  } else {
+    newIndent = parsed.indent + INDENT
+    newDepth = parsed.depth + 1
+  }
+
+  const markerToken =
+    parsed.kind === "ul"
+      ? bulletForDepth(newDepth)
+      : `${resetOrderedMarker(parsed.marker)}.`
+  const rebuilt = `${newIndent}${markerToken} ${parsed.rest}`
+  const next = value.slice(0, lineStart) + rebuilt + value.slice(lineEnd)
+
+  // Shift the caret by the change in line length so a caret in the content
+  // region stays put relative to the text; clamp inside the rebuilt line.
+  const delta = rebuilt.length - oldLine.length
+  const caret = Math.max(lineStart, Math.min(lineStart + rebuilt.length, selStart + delta))
+  return { value: next, caret }
 }
