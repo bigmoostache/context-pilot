@@ -1314,6 +1314,10 @@
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
   last_edited_ms: 1780565754910
+217b64590c01723d:
+  path: web/src/components/auth/UsersDialog.tsx
+  description: 'Admin user management dialog (Phase 10). Lists all users with RoleBadge, create user form (collapsible), delete user with confirmation, force-logout (revoke all sessions). TanStack Query hooks. useQuery enabled:open — only fetches when dialog is visible (T402: prevents 501 when auth disabled). Accessible from UserMenu when admin.'
+  last_edited_ms: 1782340993320
 21b5a0d10a4cb88f:
   path: web/src/components/threads/ThreadsView.tsx
   description: Threads view assembler. Uses useThreads()+useFleet() live. handleArchive/Create/Send via sendCommand. Auto-selects first valid thread. EmptyRealm fallback. Keyed by agentId in App.
@@ -4809,7 +4813,7 @@
 7db2128d8ffd59da:
   path: web/src/components/auth/AgentAclSection.tsx
   description: Per-agent ACL management section (Phase 10). Embedded in AgentModal manage mode. Lists access entries with AgentRoleBadge, grant form (select user + role, flex-wrap for narrow columns), role toggle (agent-admin ↔ agent-user), revoke access. TanStack Query hooks.
-  last_edited_ms: 1782248685532
+  last_edited_ms: 1782340993380
 7dc53ade05866d3c:
   path: web/src/components/panels/cockpit/PanelPane.tsx
   description: 'Cockpit panel router: usePanels lookup by id, renders bespoke view by kind (tree/memory/radar/todo/stats/tools/entities/spine/callback/queue/scratchpad). ''conversation'' sentinel → <Conversation> (live §7). Graceful Placeholder for undesigned kinds.'

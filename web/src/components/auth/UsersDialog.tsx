@@ -45,6 +45,7 @@ export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => v
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["auth-users"],
     queryFn: fetchUsers,
+    enabled: open,
   })
   const [showCreate, setShowCreate] = useState(false)
   const [confirm, setConfirm] = useState<{ id: string; name: string } | null>(null)
