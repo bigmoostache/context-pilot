@@ -65,6 +65,25 @@ function turnToStatus(turn: string | undefined): ThreadDetail["status"] {
   return turn === "my_turn" ? "MY_TURN" : "THEIR_TURN"
 }
 
+/**
+ * Stable content signature for a thread message — used to dedup the SAME
+ * logical message across the two freshness planes when their positional
+ * `msg_{n}` ids drift (T360).
+ *
+ * The positional id only dedups when the SSE-delta log and the backstop-poll
+ * (disk) log assign the message the identical index. But the push plane runs
+ * AHEAD of disk by design, so during a burst the delta appends the message at a
+ * higher local index than the disk poll later assigns it — the two ids differ
+ * and the id-only dedup keeps BOTH, rendering the message (notably the user's
+ * just-sent one) twice. A signature over `author|ts|text` collapses them
+ * regardless of index: both planes derive these three from the same stored
+ * `ThreadMessage`, so the strings are identical, while two genuinely distinct
+ * messages can't share an exact-millisecond `ts` AND identical text AND author.
+ */
+function msgSignature(m: { author?: string; ts?: string; text?: string }): string {
+  return `${m.author ?? ""}|${m.ts ?? ""}|${m.text ?? ""}`
+}
+
 /** Compact relative-time label (mirrors api.ts formatAge for synthesized rows). */
 function ago(epochMs: number): string {
   const s = Math.max(0, Math.floor((Date.now() - epochMs) / 1000))
@@ -165,8 +184,19 @@ export function applyThreadDelta(
       // position — NOT from raw.id (`{thread}-m{n}`) or k.message_id — keeps the
       // two planes' ids identical, so mergeThreadLogs collapses them to one.
       const msgId = `msg_${thread.log.length}`
-      if (thread.log.some((m) => m.id === msgId)) return prev // dedup
       const msgTs = typeof raw.ts === "number" ? raw.ts : ts
+      const candidate = {
+        author: raw.author === "user" ? "user" : "assistant",
+        ts: new Date(msgTs).toISOString(),
+        text: raw.text ?? undefined,
+      }
+      // Dedup by positional id OR content signature (T360). The id guard alone
+      // misses a message that already landed via the backstop poll under a
+      // DIFFERENT positional index (the push plane runs ahead of disk, so the
+      // two planes can index the same message differently) — the signature
+      // closes that gap so a just-sent message can't be appended a second time.
+      const sig = msgSignature(candidate)
+      if (thread.log.some((m) => m.id === msgId || msgSignature(m) === sig)) return prev
       const appended: ThreadDetail["log"][number] = {
         id: msgId,
         author: raw.author === "user" ? "user" : "assistant",
@@ -298,7 +328,14 @@ export function mergeThreadLogs(
     const p = prevById.get(t.id)
     if (!p || p.log.length === 0) return t
     const haveIds = new Set(t.log.map((m) => m.id))
-    const extra = p.log.filter((m) => !haveIds.has(m.id))
+    const haveSigs = new Set(t.log.map((m) => msgSignature(m)))
+    // Keep a local (delta-folded) message only if the poll's disk log has it
+    // under neither the same positional id NOR the same content signature.
+    // The signature guard is the T360 fix: the push plane indexes a message
+    // ahead of disk, so the same message can carry different `msg_{n}` ids in
+    // the two planes — an id-only filter would then preserve BOTH and render
+    // the message twice. Matching on signature collapses that drifted-id dupe.
+    const extra = p.log.filter((m) => !haveIds.has(m.id) && !haveSigs.has(msgSignature(m)))
     return extra.length ? { ...t, log: [...t.log, ...extra] } : t
   })
   const nextIds = new Set(next.map((t) => t.id))
