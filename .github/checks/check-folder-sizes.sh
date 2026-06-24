@@ -37,5 +37,17 @@ done < <(find . -mindepth 1 -type d \
   -not -path './ui' \
   -not -path './ui/*' \
   -not -path './web' \
-  -not -path './web/*')
+  -not -path './web/*' \
+  -not -path './.uploads' \
+  -not -path './.uploads/*' \
+  -not -path './oplog' \
+  -not -path './oplog/*' \
+  -not -path './logs' \
+  -not -path './logs/*' \
+  -not -path './dumps' \
+  -not -path './dumps/*' \
+  -not -path './sandbox' \
+  -not -path './sandbox/*' \
+  -not -path './report' \
+  -not -path './report/*')
 exit $exit_code
