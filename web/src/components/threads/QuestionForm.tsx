@@ -10,6 +10,11 @@ import { cn } from "@/lib/utils"
  */
 export function QuestionForm({ q, onSubmit }: { q: ThreadQuestion; onSubmit?: (answer: string) => void }) {
   const [picked, setPicked] = useState<number[]>([])
+  // Defensive: a question may arrive without an `options` array (a free-text
+  // prompt, or a malformed/partial payload over the wire). Default to an empty
+  // list so the form renders the prompt + "Other…" affordance instead of
+  // crashing the whole conversation view on `undefined.map` (T348 follow-up).
+  const options = q.options ?? []
   const toggle = (i: number) => {
     setPicked((cur) => {
       if (q.multi) return cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i]
@@ -35,7 +40,7 @@ export function QuestionForm({ q, onSubmit }: { q: ThreadQuestion; onSubmit?: (a
         <p className="mb-2.5 text-[13px] leading-relaxed text-foreground/90">{q.prompt}</p>
 
         <div className="flex flex-col gap-1.5">
-          {q.options.map((opt, i) => {
+          {options.map((opt, i) => {
             const on = picked.includes(i)
             return (
               <button
@@ -79,7 +84,7 @@ export function QuestionForm({ q, onSubmit }: { q: ThreadQuestion; onSubmit?: (a
           <button
             onClick={() => {
               if (picked.length === 0 || !onSubmit) return
-              const answers = picked.map((i) => q.options[i])
+              const answers = picked.map((i) => options[i])
               onSubmit(answers.join(", "))
             }}
             disabled={picked.length === 0}
