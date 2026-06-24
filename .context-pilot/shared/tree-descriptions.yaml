@@ -802,6 +802,10 @@
   path: report/wiring-alignment-audit.md
   description: 'Wiring alignment audit (X818). Re-walked 2026-06-18 (X867): §0 verdict (zero un-validated load-bearing invariants), §1 two planes, §2 I1-I13/§7/§9/§18/§19 register (§19 ABIDES load-bearing + histograms deferred non-load-bearing), §2.5 keystone K1-K9 table (all ABIDE), §2.6 V1-V12 fault-matrix validation (8/12 PROVEN by landed tests, V4/V5/V8/V10 deferred to X869 CI), §3 frontend feature wiring (e2e-proven), §4 measured latency table, §5 ledger (all DONE except X869 soak + X870 doc/tag), §6 credit, §7 disk-read ledger (X864 ABIDES).'
   last_edited_ms: 1781823231307
+156ec007f09ecea8:
+  path: web/package.json
+  description: 'Frontend deps: @base-ui/react 1.5, @tanstack/react-query 5.101, react 19.2, react-markdown 10 + remark-gfm + remark-math + rehype-katex + katex, highlight.js 11.11, tailwindcss 4.3, shadcn 4.11, vite 8, playwright. scripts: dev/build(tsc -b && vite build)/lint/preview.'
+  last_edited_ms: 1782326331531
 1571144c670d3277:
   path: crates/cp-orchestrator/src/transport/auth/mod.rs
   description: 'Auth middleware + REST handlers. authenticate(): centralized Bearer gate (no-op when disabled, NFR-09). Public routes: login (FR-05), register (bootstrap FR-03 or admin-creates). Protected: logout, me, list/create/delete users. Re-exports ACL functions from acl.rs.'
@@ -1730,6 +1734,10 @@
   path: web/src/components/agents/UsagePage.tsx
   description: 'Cost & token Usage page — LIVE (no mock). useFleet + useFleetMetrics joined per agent: summary cards (total spend / input / output tokens), per-agent table (input/output tokens, spend, % budget, over-budget badge), $/tokens unit lens + agent filter. Honest role=note notice: month-by-month history + cache hit/miss split are NOT retained by the backend (oplog carries only cumulative-since-boot totals; hit/miss is private agent working-set, never journaled). Rewritten off the old usagePoints/USAGE_RATES mock.'
   last_edited_ms: 1781822675633
+2cee82f7c5d3d7cd:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 2d148b27781aaa02:
   path: crates/cp-mod-tree/src/lib.rs
   description: 'Tree module. 3 tools: filter/toggle/describe (with close_panel param). Fixed TREE panel (fixed_order=3). Watches open folders. Dir-event-only invalidation. Module data: filter+descriptions. Worker data: open_folders. @-path autocomplete.'
@@ -2222,6 +2230,10 @@
   path: src/modules/overview/tools/mod.rs
   description: 'Tool submodule routing: close_context, manage_tools, panel_goto_page'
   last_edited_ms: 0
+3b7f0ffe44580d7d:
+  path: web/src/lib/support/markdown.tsx
+  description: GFM markdown renderer (react-markdown + remark-gfm + remark-math + rehype-katex) themed to app tokens; default + onAccent variants. LaTeX via KaTeX ($...$ inline, $$...$$ display). XSS-safe (no raw HTML).
+  last_edited_ms: 1782326331471
 3bb1eea2a698eec7:
   path: src/ui/help/config_overlay/builder.rs
   description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
@@ -6354,6 +6366,10 @@ a6c691fbfe4d7d3b:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. Declares sql/ + panels/ submodules with re-exports. Depends on search.
   last_edited_ms: 1781122618152
+a6d876641795e572:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 a6e931ee84d698fc:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -6793,6 +6809,10 @@ b20197e483020234:
 b20dd51814738fc5:
   path: crates/cp-orchestrator/src/transport/inspect/panels.rs
   description: 'Cockpit inspection-panel endpoints (in inspect/): memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list = tier-② disk reads reshaped to maquette JSON. PLUS tools/radar/entities = DERIVED-state endpoints that return their NORMAL EMPTY shape by design (200 [] / {anchors:[],results:[]}, NOT 404): the inspection plane structurally can''t rebuild them from tier-② files (tools catalog=compile-time module YAMLs in the agent binary; radar=live half-life log ranking; entities=open SQLite, on-disk db is 0 bytes) — agent_folder guard so an unknown id still 404s; frontend renders an honest ''unavailable over web inspection plane'' notice. Absolute crate::transport:: paths.'
+  last_edited_ms: 0
+b25540f9a8b3b20d:
+  path: .github/checks/lint-config.chain
+  description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
   last_edited_ms: 0
 b2587ecb9c9dda41:
   path: yamls/tools/spine.yaml
@@ -7682,6 +7702,10 @@ c7d3c855252dc096:
   path: crates/cp-orchestrator/src/transport/inspect/meta.rs
   description: 'Enriched agent-meta endpoints. agent_meta + fleet_meta build maquette Agent: registry record + view phase/lifecycle/cost + cumulative input/output tokens + context occupancy (contextUsed/Threshold/Budget + contextHit/contextMiss, T297) + thread inspection + git branch + provider. /meta carries raw phase (idle/streaming/tooling) so a cold load matches the SSE deltas. derive_status maps phase/lifecycle/has_my_turn.'
   last_edited_ms: 1782050215833
+c7d6cd529c626dbf:
+  path: src/app/run/tools/pipeline.rs
+  description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. No PendingForm guard or __QUESTION_PENDING__ block. flame!("tool_pipeline") + flame!("callbacks").
+  last_edited_ms: 0
 c7ea61d3ceb784d8:
   path: crates/cp-base/src/modules.rs
   description: Module trait — pluggable functionality contract. init/save/load state, tool definitions/execution/pre-flight, panel creation, overview delegation, lifecycle hooks (on_user_message/stream_stop/tool_progress), file watcher integration.
