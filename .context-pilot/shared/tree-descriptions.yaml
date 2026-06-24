@@ -10,6 +10,10 @@
   path: crates/cp-mod-search/src/meili/overlay.rs
   description: Ctrl+I overlay data provider. Fetches live Meilisearch stats + process stats (CPU%/RAM via /proc or ps). read_process_stats(pid) platform-specific. CPU% from tick deltas cached in MeiliLiveStats. 2s refresh cache. Builds SearchOverlayInfo.
   last_edited_ms: 0
+004bd6b72ba8b3af:
+  path: .github/checks/lint-config.chain
+  description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
+  last_edited_ms: 0
 00648889f8efe17b:
   path: crates/cp-orchestrator/src/transport/rest.rs
   description: 'REST handlers: HttpReply, Envelope<T>{rev,data}, CommandReceipt. fleet/agent/mint_ticket/body/command/threads. resolve_entry reads <id>.json. Locks Backend briefly, never across blocking agent I/O. reshape_thread/reshape_message for maquette ThreadDetail. 8 tests.'
@@ -74,6 +78,10 @@
   path: crates/cp-orchestrator/src/transport/rest.rs
   description: 'Phase 19: REST handlers. HttpReply{status,body} transport-agnostic. Envelope<T>{rev,data} wraps every read so client knows currency + SSE resume point. CommandReceipt{cmd_id,dedup_token,rev,status}. fleet (max-rev across agents), agent (404 unknown), mint_ticket, body (hydrate via AgentChannel, 400 malformed hash/404 absent/502 read-fail), command (fail-closed 503 on tripped breaker, 400 malformed, 502 unreachable). resolve_entry reads <id>.json. Locks Backend briefly, never across blocking agent I/O. 8 tests.'
   last_edited_ms: 1781647650721
+01f22354c7d18144:
+  path: .context-pilot/shared/entities/schema.sql
+  description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
+  last_edited_ms: 0
 02229788bdef9209:
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
@@ -2125,6 +2133,10 @@
 38ae83a3cc2a1d02:
   path: docs/vision-layered-cognitive-architecture.md
   description: 'Long-term vision doc: 5-layer cognitive architecture (Reflexes→Policies→Reasoning→Reflection→Identity). Core insight: LLM as architect not executor. 6 missing pieces: policy compiler, sensory streams, motor abstraction, persistent life, delegation/swarm, consequence modeling. Maps Context Pilot''s current state to each layer.'
+  last_edited_ms: 0
+38c999b0841cf949:
+  path: crates/cp-base/src/tools/api_schema.rs
+  description: LLM API schema builder. build_api() generates JSON tool array. inject_global_params() adds compulsory intent/verb to every tool schema.
   last_edited_ms: 0
 38cc8295338d1f92:
   path: ui/src/components/threads/ThreadsView.tsx
@@ -7086,6 +7098,10 @@ b826d6fb5b883155:
   path: web/src/lib/sse.ts
   description: 'Reconnecting SSE client. Singleton per-agent via getOrCreateSseClient(). EventSource to /api/stream with ticket auth + Last-Event-ID replay. Exponential backoff with jitter. Named events: delta/stream/resync.'
   last_edited_ms: 1781687538005
+b85352c4b2e55902:
+  path: Cargo.toml
+  description: Workspace root. 25 crate members (incl cp-wire/cp-oplog/cp-mod-bridge/cp-orchestrator). Binary 'tui'. Edition 2024. Strict lint config (980 forbid, 21 deny). openssl vendored.
+  last_edited_ms: 0
 b8637dcb7f3162bc:
   path: src/app/run/streaming.rs
   description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine.
@@ -7246,6 +7262,10 @@ bc984e2b55facad0:
   path: ui/src/App.css
   description: App root sizing (#root full width/height).
   last_edited_ms: 1781516472135
+bc99738c8a929d2a:
+  path: crates/cp-base/src/tools/api_schema.rs
+  description: LLM API schema builder. build_api() generates JSON tool array. inject_global_params() adds compulsory intent/verb to every tool schema.
+  last_edited_ms: 0
 bccd6076aebcf1e7:
   path: crates/cp-mod-memory/src/tools.rs
   description: Memory tools with flame!("memory_create") and flame!("memory_update"). tl_dr validation (80 token cap). Importance/labels. Batch create/update/delete.
@@ -7706,6 +7726,10 @@ c7d3c855252dc096:
   path: crates/cp-orchestrator/src/transport/inspect/meta.rs
   description: 'Enriched agent-meta endpoints. agent_meta + fleet_meta build maquette Agent: registry record + view phase/lifecycle/cost + cumulative input/output tokens + context occupancy (contextUsed/Threshold/Budget + contextHit/contextMiss, T297) + thread inspection + git branch + provider. /meta carries raw phase (idle/streaming/tooling) so a cold load matches the SSE deltas. derive_status maps phase/lifecycle/has_my_turn.'
   last_edited_ms: 1782050215833
+c7d6bbb2b4d596b0:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 c7d6cd529c626dbf:
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. No PendingForm guard or __QUESTION_PENDING__ block. flame!("tool_pipeline") + flame!("callbacks").
