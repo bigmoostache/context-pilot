@@ -29,11 +29,13 @@ mod create;
 mod library;
 mod restart;
 mod retire;
+mod settings;
 mod thread_shape;
 pub use create::create_agent;
 pub use library::create_command;
 pub use restart::restart_agent;
 pub use retire::{retire_agent, unretire_agent};
+pub use settings::{get_settings, update_keys, update_settings};
 use thread_shape::{overlay_roster, reshape_thread};
 
 /// A transport-agnostic reply: an HTTP status and a JSON body.

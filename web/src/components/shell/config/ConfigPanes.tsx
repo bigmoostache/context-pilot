@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Bot,
   Building2,
@@ -27,6 +27,7 @@ import { UsagePage } from "@/components/agents/UsagePage"
 import { ModelPicker } from "@/components/agents/ModelPicker"
 import { PROVIDERS, defaultModel as getDefaultModel, findModel } from "@/lib/support/models"
 import { useFleet, sendCommand } from "@/lib/live"
+import { fetchSettings, updateSettings } from "@/lib/api"
 import { useAccount } from "@/lib/support/account"
 import { useAuth } from "@/lib/support/auth"
 import { useDevMode } from "@/lib/support/devMode"
@@ -165,16 +166,45 @@ function GeneralPane() {
   const defaults = readDefaults()
   const [provId, setProvId] = useState(defaults.provider)
   const [modelId, setModelId] = useState(defaults.model)
+  // Server-side defaults are authoritative; localStorage is a same-machine
+  // cache the create-agent dialog reads synchronously. Only admins may write
+  // the central defaults.
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const fleet = useFleet()
   const [applying, setApplying] = useState(false)
   const [applyResult, setApplyResult] = useState<string | null>(null)
+
+  // Seed from the server's central defaults on mount (falls back to the
+  // localStorage cache when unset).
+  useEffect(() => {
+    let cancelled = false
+    void fetchSettings()
+      .then((s) => {
+        if (cancelled) return
+        setIsAdmin(s.is_admin)
+        if (s.default_provider) setProvId(s.default_provider)
+        if (s.default_model) setModelId(s.default_model)
+        if (s.default_provider && s.default_model) {
+          writeDefaults(s.default_provider, s.default_model)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleChange = (p: string, m: string) => {
     setProvId(p)
     setModelId(m)
     writeDefaults(p, m)
     setApplyResult(null) // clear stale result when selection changes
+    // Persist to the central server-side defaults (admins only; a non-admin
+    // write 403s harmlessly and is ignored).
+    if (isAdmin) {
+      void updateSettings({ default_provider: p, default_model: m }).catch(() => {})
+    }
   }
 
   const applyToAll = async () => {

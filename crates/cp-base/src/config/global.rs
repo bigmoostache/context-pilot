@@ -45,6 +45,12 @@ pub struct Config {
     /// `"telegram_bot"`).
     #[serde(default)]
     pub keys: HashMap<String, String>,
+    /// Non-secret central settings, keyed by name (e.g. `"default_provider"`,
+    /// `"default_model"`, `"onboarding_completed"`). Server-side replacement
+    /// for the cockpit's former localStorage defaults — set by the admin at
+    /// onboarding and shared by all agents/users.
+    #[serde(default)]
+    pub settings: HashMap<String, String>,
 }
 
 // -- Paths -------------------------------------------------------------------
@@ -127,4 +133,40 @@ pub fn store_api_key(name: &str, value: &str) -> Result<(), String> {
 #[must_use]
 pub fn env_var_for_key(name: &str) -> Option<&'static str> {
     KEY_ENV_MAP.iter().find(|(k, _)| *k == name).map(|(_, v)| *v)
+}
+
+/// Whether a non-empty key is available for `name` (env var **or** stored),
+/// without revealing the value — used to show "configured" state in the UI.
+#[must_use]
+pub fn has_api_key(name: &str) -> bool {
+    resolve_api_key(name).is_some()
+}
+
+// -- Central settings (non-secret) -------------------------------------------
+
+/// Read a central setting by name, or `None` if unset/empty.
+#[must_use]
+pub fn get_setting(name: &str) -> Option<String> {
+    load().settings.get(name).filter(|v| !v.trim().is_empty()).cloned()
+}
+
+/// Read every central setting as a map (non-secret values only).
+#[must_use]
+pub fn all_settings() -> HashMap<String, String> {
+    load().settings
+}
+
+/// Persist a central setting. An empty `value` removes the key.
+///
+/// # Errors
+///
+/// Returns a message if the config file cannot be written.
+pub fn set_setting(name: &str, value: &str) -> Result<(), String> {
+    let mut cfg = load();
+    if value.trim().is_empty() {
+        drop(cfg.settings.remove(name));
+    } else {
+        drop(cfg.settings.insert(name.to_owned(), value.to_owned()));
+    }
+    save(&cfg)
 }

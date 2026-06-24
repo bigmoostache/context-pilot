@@ -12,6 +12,11 @@ readme.workspace = true
 [dependencies]
 cp-wire = { path = "../cp-wire" }
 cp-oplog = { path = "../cp-oplog" }
+# Shared config — central API-key + settings store at
+# ~/.config/context-pilot/config.json. The cockpit writes provider keys and
+# new-agent defaults here (admin onboarding); agents read them via the same
+# module, so both sides agree on one source of truth.
+cp-base.workspace = true
 nix = { version = "0.30", features = ["signal"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

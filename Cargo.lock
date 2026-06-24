@@ -594,6 +594,7 @@ version = "0.1.0"
 dependencies = [
  "argon2",
  "calamine",
+ "cp-base",
  "cp-mod-bridge",
  "cp-oplog",
  "cp-wire",

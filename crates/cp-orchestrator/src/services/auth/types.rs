@@ -120,6 +120,22 @@ pub(crate) struct AclEntry {
     pub(crate) user_name: String,
 }
 
+/// One device session for the "active sessions" profile list — never exposes
+/// the raw bearer token, only an opaque per-session `id` used for revocation.
+#[derive(Clone, Debug, serde::Serialize)]
+pub(crate) struct SessionInfo {
+    /// Opaque per-session id (safe to send to the client; not the token).
+    pub(crate) id: String,
+    /// Creation timestamp (ms since Unix epoch).
+    pub(crate) created_at: u64,
+    /// Absolute expiry (ms since Unix epoch).
+    pub(crate) expires_at: u64,
+    /// User-agent string captured at login, if any.
+    pub(crate) user_agent: Option<String>,
+    /// Whether this is the session making the request (the current device).
+    pub(crate) current: bool,
+}
+
 /// Map a `rusqlite::Row` from the canonical `SELECT` column order into a
 /// [`User`].  Column indices: 0=id, 1=email, 2=name, 3=password_hash,
 /// 4=role, 5=created_at, 6=updated_at.

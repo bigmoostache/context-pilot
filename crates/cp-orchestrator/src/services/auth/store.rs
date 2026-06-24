@@ -70,6 +70,7 @@ impl AuthStore {
 
              CREATE TABLE IF NOT EXISTS sessions (
                  token      TEXT PRIMARY KEY,
+                 id         TEXT,
                  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                  created_at INTEGER NOT NULL,
                  expires_at INTEGER NOT NULL,
@@ -92,6 +93,13 @@ impl AuthStore {
              CREATE INDEX IF NOT EXISTS idx_acl_user
                  ON agent_acl(user_id);",
         )?;
+        // Migration for databases created before the per-session `id` column
+        // existed — adds it if absent. The duplicate-column error on fresh
+        // databases (where the CREATE already includes `id`) is expected and
+        // ignored.
+        let _ = self
+            .conn
+            .execute("ALTER TABLE sessions ADD COLUMN id TEXT", []);
         Ok(())
     }
 
@@ -281,15 +289,123 @@ impl AuthStore {
         ttl: Duration,
     ) -> Result<String, AuthError> {
         let token = Self::generate_token();
+        let id = Self::generate_uuid();
         let now = now_ms();
         let ttl_ms = u64::try_from(ttl.as_millis()).unwrap_or(u64::MAX);
         let expires_at = now.saturating_add(ttl_ms);
         let _rows = self.conn.execute(
-            "INSERT INTO sessions (token, user_id, created_at, expires_at, user_agent) \
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            rusqlite::params![token, user_id, now, expires_at, user_agent],
+            "INSERT INTO sessions (token, id, user_id, created_at, expires_at, user_agent) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![token, id, user_id, now, expires_at, user_agent],
         )?;
         Ok(token)
+    }
+
+    /// List a user's active (unexpired) sessions for the profile view, newest
+    /// first. Never returns the raw token — only the opaque per-session `id`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AuthError::Database`] on SQLite failure.
+    pub(crate) fn list_sessions(
+        &self,
+        user_id: &str,
+        current_token: Option<&str>,
+    ) -> Result<Vec<super::types::SessionInfo>, AuthError> {
+        let now = now_ms();
+        let current = current_token.unwrap_or_default();
+        let mut stmt = self.conn.prepare(
+            "SELECT id, created_at, expires_at, user_agent, token \
+             FROM sessions \
+             WHERE user_id = ?1 AND expires_at > ?2 \
+             ORDER BY created_at DESC",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![user_id, now], |row| {
+            let token: String = row.get(4)?;
+            Ok(super::types::SessionInfo {
+                id: row.get::<_, Option<String>>(0)?.unwrap_or_default(),
+                created_at: row.get(1)?,
+                expires_at: row.get(2)?,
+                user_agent: row.get(3)?,
+                current: !current.is_empty() && token == current,
+            })
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
+    /// Revoke a single session by its opaque `id`, scoped to `user_id` so a
+    /// user can only drop their own devices. Returns `true` if a row was
+    /// removed. Returns the revoked session's token so the caller can detect
+    /// self-revocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AuthError::Database`] on SQLite failure.
+    pub(crate) fn revoke_session_by_id(
+        &self,
+        user_id: &str,
+        id: &str,
+    ) -> Result<Option<String>, AuthError> {
+        let token: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT token FROM sessions WHERE id = ?1 AND user_id = ?2",
+                rusqlite::params![id, user_id],
+                |row| row.get(0),
+            )
+            .ok();
+        let deleted = self.conn.execute(
+            "DELETE FROM sessions WHERE id = ?1 AND user_id = ?2",
+            rusqlite::params![id, user_id],
+        )?;
+        Ok(if deleted > 0 { token } else { None })
+    }
+
+    /// Update a user's password hash (after the caller has verified the
+    /// current password). Bumps `updated_at`. Returns `true` if a row changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AuthError::Hash`] if hashing fails, [`AuthError::Database`] on
+    /// SQLite failure.
+    pub(crate) fn update_password(
+        &self,
+        user_id: &str,
+        new_password: &str,
+    ) -> Result<bool, AuthError> {
+        let hash = Self::hash_password(new_password)?;
+        let now = now_ms();
+        let updated = self.conn.execute(
+            "UPDATE users SET password_hash = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![hash, now, user_id],
+        )?;
+        Ok(updated > 0)
+    }
+
+    /// Update a user's display name and email. Bumps `updated_at`. The unique
+    /// email constraint surfaces as an [`AuthError::Database`] the caller maps
+    /// to a 409.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AuthError::Database`] on SQLite failure (incl. duplicate
+    /// email).
+    pub(crate) fn update_profile(
+        &self,
+        user_id: &str,
+        name: &str,
+        email: &str,
+    ) -> Result<bool, AuthError> {
+        let now = now_ms();
+        let updated = self.conn.execute(
+            "UPDATE users SET name = ?1, email = ?2, updated_at = ?3 WHERE id = ?4",
+            rusqlite::params![name, email, now, user_id],
+        )?;
+        Ok(updated > 0)
     }
 
     /// Validate a session token, returning the owning user if the token
