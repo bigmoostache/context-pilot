@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import {
   Bot,
   Building2,
@@ -27,6 +28,7 @@ import { UsagePage } from "@/components/agents/UsagePage"
 import { ModelPicker } from "@/components/agents/ModelPicker"
 import { PROVIDERS, defaultModel as getDefaultModel, findModel } from "@/lib/support/models"
 import { useFleet, sendCommand } from "@/lib/live"
+import { fetchEnvKeys, revealEnvKey } from "@/lib/api"
 import { useAccount } from "@/lib/support/account"
 import { useAuth } from "@/lib/support/auth"
 import { useDevMode } from "@/lib/support/devMode"
@@ -84,6 +86,11 @@ export function CategoryBody({ cat }: { cat: CatId }) {
   const reason: LockReason = adminLocked ? "admin" : "company"
   const company = user.company ?? "your organization"
 
+  // Live env-key status from the orchestrator (T399).
+  const { data: envKeys } = useQuery({ queryKey: ["env-keys"], queryFn: fetchEnvKeys })
+  const ks = (env: string): "connected" | "missing" =>
+    envKeys?.find((k) => k.env === env)?.exists ? "connected" : "missing"
+
   switch (cat) {
     case "general":
       return <GeneralPane />
@@ -93,19 +100,19 @@ export function CategoryBody({ cat }: { cat: CatId }) {
       return (
         <Stack>
           {locked && <ManagedKeysNotice reason={reason} company={company} />}
-          <KeyRow i={0} name="Anthropic" env="ANTHROPIC_API_KEY" icon={Sparkles} status="connected" hint="Claude 4 family" sample="sk-ant-••••••••••3f7a" managed={locked} reason={reason} company={company} />
-          <KeyRow i={1} name="Claude Code (OAuth)" env="Keychain · ~/.claude" icon={Cpu} status="connected" hint="opus-4-8 · sonnet-4-6 · fable-5" sample="oauth-••••••••••2c19" managed={locked} reason={reason} company={company} />
-          <KeyRow i={2} name="Grok (xAI)" env="XAI_API_KEY" icon={Zap} status="missing" hint="grok-4" managed={locked} reason={reason} company={company} />
-          <KeyRow i={3} name="Groq" env="GROQ_API_KEY" icon={Gauge} status="connected" hint="Llama 3.x · fast" sample="gsk_••••••••••8b02" managed={locked} reason={reason} company={company} />
-          <KeyRow i={4} name="DeepSeek" env="DEEPSEEK_API_KEY" icon={Bot} status="missing" hint="deepseek-chat / reasoner" managed={locked} reason={reason} company={company} />
-          <KeyRow i={5} name="MiniMax" env="MINIMAX_API_KEY" icon={Bot} status="connected" hint="Token Plan" sample="sk-cp-••••••••••5Wk8" managed={locked} reason={reason} company={company} />
+          <KeyRow i={0} name="Anthropic" env="ANTHROPIC_API_KEY" icon={Sparkles} status={ks("ANTHROPIC_API_KEY")} hint="Claude 4 family" managed={locked} reason={reason} company={company} />
+          <KeyRow i={1} name="Claude Code (OAuth)" env="Keychain · ~/.claude" icon={Cpu} status="connected" hint="opus-4-8 · sonnet-4-6 · fable-5" managed={locked} reason={reason} company={company} />
+          <KeyRow i={2} name="Grok (xAI)" env="XAI_API_KEY" icon={Zap} status={ks("XAI_API_KEY")} hint="grok-4" managed={locked} reason={reason} company={company} />
+          <KeyRow i={3} name="Groq" env="GROQ_API_KEY" icon={Gauge} status={ks("GROQ_API_KEY")} hint="Llama 3.x · fast" managed={locked} reason={reason} company={company} />
+          <KeyRow i={4} name="DeepSeek" env="DEEPSEEK_API_KEY" icon={Bot} status={ks("DEEPSEEK_API_KEY")} hint="deepseek-chat / reasoner" managed={locked} reason={reason} company={company} />
+          <KeyRow i={5} name="MiniMax" env="MINIMAX_API_KEY" icon={Bot} status={ks("MINIMAX_API_KEY")} hint="Token Plan" managed={locked} reason={reason} company={company} />
         </Stack>
       )
     case "search":
       return (
         <Stack>
           {locked && <ManagedKeysNotice reason={reason} company={company} />}
-          <KeyRow i={0} name="Voyage AI" env="VOYAGE_API_KEY" icon={Database} status="connected" hint="voyage-code-3 · 1024-dim embeddings" sample="pa-••••••••••d41e" managed={locked} reason={reason} company={company} />
+          <KeyRow i={0} name="Voyage AI" env="VOYAGE_API_KEY" icon={Database} status={ks("VOYAGE_API_KEY")} hint="voyage-code-3 · 1024-dim embeddings" managed={locked} reason={reason} company={company} />
           <StatusRow i={1} name="Meilisearch" icon={Search} state="Running" detail="Embedded server · 6 417 chunks · port 49286" />
           <ToggleRow i={2} name="Hybrid semantic search" detail="Blend keyword + vector results" on />
         </Stack>
@@ -114,7 +121,7 @@ export function CategoryBody({ cat }: { cat: CatId }) {
       return (
         <Stack>
           {locked && <ManagedKeysNotice reason={reason} company={company} />}
-          <KeyRow i={0} name="Datalab" env="DATALAB_API_KEY" icon={FileText} status="connected" hint="Surya OCR · PDF / image → markdown" sample="dl-••••••••••9a23" managed={locked} reason={reason} company={company} />
+          <KeyRow i={0} name="Datalab" env="DATALAB_API_KEY" icon={FileText} status={ks("DATALAB_API_KEY")} hint="Surya OCR · PDF / image → markdown" managed={locked} reason={reason} company={company} />
           <ToggleRow i={1} name="Cache OCR results" detail="~/.context-pilot/ocr-cache" on />
         </Stack>
       )
@@ -122,15 +129,15 @@ export function CategoryBody({ cat }: { cat: CatId }) {
       return (
         <Stack>
           {locked && <ManagedKeysNotice reason={reason} company={company} />}
-          <KeyRow i={0} name="Brave Search" env="BRAVE_API_KEY" icon={Globe} status="connected" hint="Independent 40-B index" sample="BSA-••••••••••71fd" managed={locked} reason={reason} company={company} />
-          <KeyRow i={1} name="Firecrawl" env="FIRECRAWL_API_KEY" icon={Globe} status="connected" hint="Scrape · search · crawl" sample="fc-••••••••••e0c8" managed={locked} reason={reason} company={company} />
+          <KeyRow i={0} name="Brave Search" env="BRAVE_API_KEY" icon={Globe} status={ks("BRAVE_API_KEY")} hint="Independent 40-B index" managed={locked} reason={reason} company={company} />
+          <KeyRow i={1} name="Firecrawl" env="FIRECRAWL_API_KEY" icon={Globe} status={ks("FIRECRAWL_API_KEY")} hint="Scrape · search · crawl" managed={locked} reason={reason} company={company} />
         </Stack>
       )
     case "integrations":
       return (
         <Stack>
           {locked && <ManagedKeysNotice reason={reason} company={company} />}
-          <KeyRow i={0} name="GitHub" env="GITHUB_TOKEN" icon={Boxes} status="connected" hint="PRs · issues · gh CLI" sample="ghp_••••••••••a7d5" managed={locked} reason={reason} company={company} />
+          <KeyRow i={0} name="GitHub" env="GITHUB_TOKEN" icon={Boxes} status={ks("GITHUB_TOKEN")} hint="PRs · issues · gh CLI" managed={locked} reason={reason} company={company} />
         </Stack>
       )
   }
@@ -293,7 +300,6 @@ function KeyRow({
   icon: Icon,
   status,
   hint,
-  sample,
   managed = false,
   reason = "company",
   company,
@@ -304,16 +310,23 @@ function KeyRow({
   icon: typeof Bot
   status: "connected" | "missing"
   hint: string
-  sample?: string
   managed?: boolean
   reason?: LockReason
   company?: string
 }) {
   const connected = status === "connected"
-  const [reveal, setReveal] = useState(false)
-  const value = sample ?? ""
-  // Managed accounts never reveal/edit — keep the value masked regardless.
-  const shown = reveal && connected && !managed ? value.replace(/•+/, "sk-live-7Q2a8FnZ") : value
+  const [maskedValue, setMaskedValue] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  /** Fetch the masked key on demand, or toggle it off. */
+  const handleReveal = () => {
+    if (maskedValue) { setMaskedValue(null); return }
+    setLoading(true)
+    void revealEnvKey(env)
+      .then((r) => setMaskedValue(r.masked))
+      .catch(() => setMaskedValue("reveal failed"))
+      .finally(() => setLoading(false))
+  }
 
   return (
     <div
@@ -338,7 +351,7 @@ function KeyRow({
       >
         <KeyRound className="size-3.5 shrink-0 text-muted-foreground/55" />
         <code className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-foreground/75">
-          {connected ? shown : <span className="text-muted-foreground/45">not configured</span>}
+          {connected ? (maskedValue ?? <span className="text-muted-foreground/45">•••••••••••••••</span>) : <span className="text-muted-foreground/45">not configured</span>}
         </code>
         <span className="shrink-0 rounded bg-muted/70 px-1.5 py-px font-mono text-[9.5px] text-muted-foreground/70">{env}</span>
         {connected &&
@@ -346,11 +359,12 @@ function KeyRow({
             <Lock className="size-3.5 shrink-0 text-muted-foreground/50" aria-label="Locked by organization" />
           ) : (
             <button
-              onClick={() => setReveal((r) => !r)}
-              className="shrink-0 text-muted-foreground/55 transition-colors hover:text-foreground"
-              aria-label={reveal ? "Hide" : "Reveal"}
+              onClick={handleReveal}
+              disabled={loading}
+              className="shrink-0 text-muted-foreground/55 transition-colors hover:text-foreground disabled:opacity-50"
+              aria-label={maskedValue ? "Hide" : "Reveal"}
             >
-              {reveal ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+              {loading ? <Loader2 className="size-3.5 animate-spin" /> : maskedValue ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
             </button>
           ))}
       </div>

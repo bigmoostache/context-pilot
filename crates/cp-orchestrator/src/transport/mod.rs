@@ -216,6 +216,11 @@ fn route_rest(
         (Method::Get, ["api", "fleet", "meta"]) => inspect::meta::fleet_meta(state, auth_user),
         (Method::Get, ["api", "fleet", "retired"]) => inspect::meta::fleet_retired(state, auth_user),
         (Method::Get, ["api", "metrics"]) => inspect::metrics::fleet_metrics(state, auth_user),
+
+        // ── Env-key inspection (T399) ─────────────────────────────
+        (Method::Get, ["api", "env-keys"]) => rest::env_keys_list(),
+        (Method::Get, ["api", "env-keys", name]) => rest::env_key_reveal(name, auth_user),
+
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
         (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent_meta(state, id),
         (Method::Get, ["api", "agent", id, "metrics"]) => inspect::metrics::agent_metrics(state, id),

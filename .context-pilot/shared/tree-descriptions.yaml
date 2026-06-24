@@ -1798,6 +1798,10 @@
   path: docs/design-meilisearch.md
   description: Meilisearch integration design doc. 9 decision rounds, architecture diagram, data model (files+logs indexes), module design, indexer thread, splitter chain, OCR pipeline, implementation plan (6 phases). Fully implemented — see docs/search-module.md.
   last_edited_ms: 1780582405227
+2ee5ca4fc7e9d971:
+  path: web/src/components/shell/config/ConfigPanes.tsx
+  description: 'Config category panes + presentational building blocks (split from ConfigPanel for <500): CATEGORIES, CategoryBody (general/usage/providers/search/docai/web/integrations), GeneralPane (default model picker + apply-to-all via sendCommand configure), KeyRow/StatusRow/ToggleRow/ManagedKeysNotice. Key-bearing panes lock when EITHER company-managed (useAccount) OR auth-active-and-caller-not-admin (T346, useAuth: authEnabled && role!==''admin''). LockReason ''company''|''admin'' drives copy: admin → ''Reserved to Administrators'' (ShieldCheck), company → ''Keys managed by {company}'' (Building2). Regular users still SEE the panes, greyed. T399: KeyRow fetches masked value on-demand via revealEnvKey API (eye button), env-key status from live /api/env-keys query.'
+  last_edited_ms: 1782340075633
 2ee6fbb76ee0a184:
   path: web/src/lib/query/sync.ts
   description: 'SSE→QueryClient delta bridge (push plane Leg-2 frontend). applyThreadDelta + applyAgentDelta fold rev-numbered OpEntry into [''threads'',id]/[''agent'',id] caches via setQueryData functional updaters (rev high-water guard, structural sharing). T297: applyAgentDelta folds the EXACT phase (idle/streaming/tooling) latest-wins + NEVER returns null (idle drops stale working→idle inline, no REST hydrate) and folds cost + input/output tokens. mergeThreadLogs non-destructive poll reconcile. invalidateInspection for non-delta resources.'
@@ -3070,6 +3074,10 @@
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend struct holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names(T328)/avatars(T338). route_rest dispatches all /api routes incl rename(T328), avatar upload/delete(T338), fs ops, retire/unretire/restart, fleet create, vitals, metrics. handle_avatar/handle_download/handle_raw intercepted before route_rest. handle_stream = SSE.
   last_edited_ms: 1782141874727
+505d39d8d6923ce3:
+  path: crates/cp-orchestrator/src/transport/rest/env_keys.rs
+  description: 'On-demand env-key inspection (T399). KNOWN_KEYS whitelist prevents arbitrary env-var enum. env_keys_list(): GET /api/env-keys returns [{env,label,exists}] — no values. env_key_reveal(name): GET /api/env-keys/{name} returns masked value (first-4 + last-4, middle dots) — admin-only when auth active, 404 for unknown keys. mask_key helper. 5 unit tests.'
+  last_edited_ms: 1782340075518
 5070bb1e46b86870:
   path: web/src/components/shell/widgets/AgentSwitcher.tsx
   description: TopBar workspace switcher dropdown (one agent=one folder); switch/create/fleet. AgentDot shows avatar image (T338) when hasAvatar is true, fallback to accent-tinted FolderGit2 icon.
@@ -3082,6 +3090,10 @@
   path: ui/src/components/agents/FleetSidebar.tsx
   description: 'Mission-control left nav rail (fleet dashboard). FleetPage type = agents|prompts|usage|settings. macOS-sidebar register: CP identity header + 4 nav items (icon+label+hint, active=card-shadow). page/onSelect props.'
   last_edited_ms: 1781531138842
+50b58763164f3ef6:
+  path: web/src/lib/api/env-keys.ts
+  description: Env-key inspection REST endpoints (T399). EnvKeyStatus/EnvKeyReveal types. fetchEnvKeys() lists status, revealEnvKey(name) fetches masked value. Re-exported via index.ts barrel.
+  last_edited_ms: 1782340075576
 50b655ad3209fd44:
   path: src/app/mod.rs
   description: 'App struct — top-level container. Fields: State, TypewriterBuffer, pending tools/done, cache_tx, file/gh watchers, timers, PersistenceWriter, reverie_streams. Sub-modules: actions, context, events, panels, prompt_builder, reverie, run.'
@@ -7894,6 +7906,10 @@ cbeaa3dfd0701f21:
   path: src/llms/mod.rs
   description: LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging.
   last_edited_ms: 0
+cbebf582f4aa099c:
+  path: web/src/components/agents/AgentModal.tsx
+  description: 'Agent create/manage dialog. Manage mode: always 2-col (960px) — left = name + provider/model form, right = SessionVitals (always) + AgentAclSection (auth only). Clickable avatar in header (T338). Submit sends Configure + renameAgent (T328). Restart/Retire footer. Create mode: single-col.'
+  last_edited_ms: 1782338531262
 cc0b0aa6ddc3f7da:
   path: crates/cp-mod-bridge/src/tee.rs
   description: 'Phase 12 (X779) MILESTONE M1: agent-side stream tee. Tee::publish(frame)->Outcome{Published,Dropped} = ONE non-blocking try_send into a bounded mpsc::sync_channel (unsafe forbidden → no hand-rolled lock-free ring; producer-never-blocks contract preserved). Ring-full → O(1) drop + degraded flag + dropped counter (P3 observability). Dedicated Publisher thread owns receiver + UnixListener: non-blocking accept (≤1 observer), drain frame, serialize JSON + framing::encode_raw (len+CRC, same as oplog), non-blocking UDS write with bounded backoff (MAX_WRITE_ATTEMPTS×WRITE_BACKOFF ~5ms then drop+degraded; broken pipe → drop observer). No observer → discard (late observer sees live frames not backlog). RAII Drop stops+joins. NOT yet wired into Boot — socket ownership (bidirectional? stream-out + command-in) deferred to Phase 13. 5 tests incl V7 stalled-consumer-never-blocks-producer (100k publishes <5s despite wedged reader).'

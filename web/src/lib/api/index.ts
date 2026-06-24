@@ -28,6 +28,7 @@ export { getToken, setToken } from "./client"
 export * from "./auth"
 export * from "./finder"
 export * from "./body"
+export * from "./env-keys"
 
 // ── Fleet ─────────────────────────────────────────────────────────────
 export function fetchFleet(): Promise<Agent[]> {
@@ -465,7 +466,6 @@ export function createCommand(
     body: JSON.stringify(cmd),
   })
 }
-
 // ── Commands (mutating) ───────────────────────────────────────────────
 
 export interface CommandReceipt {
