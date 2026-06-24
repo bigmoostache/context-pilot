@@ -5022,6 +5022,10 @@
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation. Thread input routing: handle_thread_input_submit resolves selected_thread_idx through ThreadsState::visible_indices(viewing_archived) — the selection is a VISIBLE-slice position (T9 archive refactor), so the virtual ''+ New Thread'' row is detected as selected_idx >= visible.len() (active view only) and message-send maps the visible position back to a real storage index (fixes the regression where typed names were routed as messages into another thread when archived threads existed). handle_thread_create stores the new thread''s VISIBLE index. MAX_THREAD_NAME_LEN=200. Paste sentinel expansion. /command replacement.'
   last_edited_ms: 0
+843e49cf0a8afa42:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 8450887d84aa9bc0:
   path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
   description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape.'
@@ -7178,6 +7182,10 @@ ba4b46d00e37d261:
   path: ui/src/components/agents/PromptModal.tsx
   description: 'Prompts page modals. PromptModal: LARGE dialog (1180x90vh) — create (kind picker System/Skill/Command + name/desc) or view/edit (prefilled, built-in name lock, Delete). Body = WYSIWYG MarkdownEditor, remounts on isNew/item.id (not kind). ImportModal: import from Claude Code/Codex/Cursor/Windsurf/Aider/Continue, per-row Imported state. Shared Backdrop+Field.'
   last_edited_ms: 1781600078223
+ba5427a915d75053:
+  path: web/src/lib/support/markdown.tsx
+  description: GFM markdown renderer (react-markdown + remark-gfm + remark-math + rehype-katex) themed to app tokens; default + onAccent variants. LaTeX via KaTeX ($...$ inline DISABLED, $$...$$ display). XSS-safe (no raw HTML).
+  last_edited_ms: 1782337557789
 ba75d21e77c6c405:
   path: .github/workflows/pages.yml
   description: 'CI: GitHub Pages deployment for website. Deploys from docs/ root (was docs/talk/). Triggers on docs/** or workflow change.'
@@ -8069,6 +8077,10 @@ d1002291148c8efd:
 d165a994ae75f945:
   path: crates/cp-mod-utilities/src/hash.rs
   description: FNV-1a 128-bit content hashing. compute(bytes) and compute_str(str) return 32-char hex. Replaces sha2 crate.
+  last_edited_ms: 0
+d181f51c6a51bf01:
+  path: yamls/tools/threads.yaml
+  description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
   last_edited_ms: 0
 d18def4b79e96906:
   path: web/sse_capture.py
