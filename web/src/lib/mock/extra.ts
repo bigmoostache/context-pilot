@@ -245,15 +245,15 @@ export const queueActions: QueueAction[] = [
 ]
 
 // ── Account / current user (avatar menu + Profile modal) ──────────
-// The signed-in human. `managedByCompany: true` showcases the enterprise/SSO
-// path (locked email + org callout); flip it in the Profile modal's design-only
-// preview toggle to see the personal-account layout.
+// The signed-in human. `managedByCompany: false` is the default for self-hosted
+// instances with no org provisioning. Flip to `true` in the Profile modal's
+// design-only preview toggle to see the enterprise/SSO layout.
 export const currentUser: User = {
   name: "Guillaume Draznieks",
-  email: "g.draznieks@acme-robotics.com",
+  email: "g.draznieks@gmail.com",
   initials: "GD",
   accent: "interactive",
-  managedByCompany: true,
-  company: "Acme Robotics",
-  role: "Staff Engineer",
+  managedByCompany: false,
+  company: undefined,
+  role: "Admin",
 }

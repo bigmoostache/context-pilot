@@ -28,6 +28,7 @@ export { getToken, setToken } from "./client"
 export * from "./auth"
 export * from "./finder"
 export * from "./body"
+export * from "./env-keys"
 
 // ── Fleet ─────────────────────────────────────────────────────────────
 export function fetchFleet(): Promise<Agent[]> {
@@ -79,7 +80,6 @@ export function restartAgent(agentId: string): Promise<RestartReceipt> {
 }
 
 // ── Retire / unretire (T271) ──────────────────────────────────────────
-
 /** Receipt from `POST /api/agent/{id}/retire` — the agent's process (and its
  *  console-server daemon) is stopped and the agent is recorded as retired; its
  *  realm folder is kept intact so it can be brought back. */
@@ -120,7 +120,6 @@ export function fetchRetiredFleet(): Promise<Agent[]> {
 }
 
 // ── Agent meta ────────────────────────────────────────────────────────
-
 /** Set or clear a custom display name for an agent. An empty name reverts to
  *  the folder-derived default. Stored orchestrator-side in `agent-names.json`,
  *  independent of the agent process (T328). */
@@ -205,6 +204,7 @@ interface RawThread {
   messageCount?: number
   unread?: number
   archived?: boolean
+  paused?: boolean
   log?: RawMsg[]
   // maquette fields (pass through if present)
   agent?: string
@@ -254,6 +254,7 @@ export function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
       lastActivityMs: typeof t.lastActivity === "number" ? t.lastActivity : 0,
       unread: t.unread ?? 0,
       archived: t.archived ?? false,
+      paused: t.paused ?? false,
       focused: focusedId != null && t.id === focusedId,
       log: (t.log ?? []).map((m) => ({
         id: m.id,
@@ -465,7 +466,6 @@ export function createCommand(
     body: JSON.stringify(cmd),
   })
 }
-
 // ── Commands (mutating) ───────────────────────────────────────────────
 
 export interface CommandReceipt {

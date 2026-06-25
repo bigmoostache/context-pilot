@@ -27,6 +27,9 @@ pub fn build_api(tools: &[ToolDefinition]) -> Value {
 
 // All hands on deck — these two params ride with every tool call
 /// Inject `intent` and `verb` as required parameters into a tool's JSON Schema.
+///
+/// Descriptions are kept minimal because they repeat across all ~55 tools.
+/// The system prompt carries the full convention; these are just reminders.
 fn inject_global_params(schema: &mut Value) {
     if let Some(obj) = schema.as_object_mut() {
         if let Some(props) = obj.get_mut("properties").and_then(Value::as_object_mut) {
@@ -34,20 +37,25 @@ fn inject_global_params(schema: &mut Value) {
                 "intent".to_string(),
                 json!({
                     "type": "string",
-                    "description": "Why you're calling this tool (1-10 words)"
+                    "description": "One-sentence TLDR"
                 }),
             ));
             drop(props.insert(
                 "verb".to_string(),
                 json!({
                     "type": "string",
-                    "description": "Single action word ending in -ING (e.g., Investigating, Building, Fixing)"
+                    "description": "One-word TLDR"
                 }),
             ));
         }
-        if let Some(required) = obj.get_mut("required").and_then(Value::as_array_mut) {
-            required.push(json!("intent"));
-            required.push(json!("verb"));
+        // Ensure `required` array exists, then append intent + verb.
+        let required = obj
+            .entry("required")
+            .or_insert_with(|| json!([]))
+            .as_array_mut();
+        if let Some(arr) = required {
+            arr.push(json!("intent"));
+            arr.push(json!("verb"));
         }
     }
 }

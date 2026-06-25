@@ -96,7 +96,7 @@ function MessageBody({
  * `align` mirrors the bubble's side so the control tucks under the message's
  * own edge (user bubbles are right-aligned, assistant left-aligned).
  */
-function CopyButton({ text, align }: { text: string; align: "start" | "end" }) {
+export function CopyButton({ text, align, className: extra }: { text: string; align: "start" | "end"; className?: string }) {
   const [copied, setCopied] = useState(false)
 
   const onCopy = () => {
@@ -120,7 +120,7 @@ function CopyButton({ text, align }: { text: string; align: "start" | "end" }) {
       className={cn(
         "flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] transition-colors",
         "opacity-50 hover:opacity-100 focus-visible:opacity-100 outline-none",
-        copied ? "text-[var(--ok)] opacity-100" : "text-muted-foreground/70 hover:text-foreground",
+        copied ? "text-[var(--ok)] opacity-100" : cn("text-muted-foreground/70 hover:text-foreground", extra),
         align === "end" ? "self-end" : "self-start",
       )}
     >

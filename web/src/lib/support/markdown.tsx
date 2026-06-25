@@ -1,7 +1,11 @@
-import { memo, type ReactNode } from "react"
+import { memo, useState, type ReactNode } from "react"
 import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
+import remarkMath from "remark-math"
+import rehypeKatex from "rehype-katex"
+import "katex/dist/katex.min.css"
 
+import { CopyButton } from "@/components/conversation/Message"
 import { cn } from "@/lib/utils"
 
 /**
@@ -25,6 +29,44 @@ import { cn } from "@/lib/utils"
  *   it stays legible on the accent fill.
  */
 export type MarkdownVariant = "default" | "onAccent"
+
+/** Recursively extract plain text from a React element tree (for copy). */
+function extractText(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return ""
+  if (typeof node === "string" || typeof node === "number") return String(node)
+  if (Array.isArray(node)) return node.map(extractText).join("")
+  if (typeof node === "object" && "props" in node) {
+    return extractText((node as { props: { children?: ReactNode } }).props.children)
+  }
+  return ""
+}
+
+/**
+ * Inline code chip with click-to-copy.
+ *
+ * Clicking copies the text content and briefly flashes the border/text to
+ * `--ok` green as confirmation. Clicks inside a `<pre>` (fenced code blocks)
+ * are ignored — those have a dedicated CopyButton beneath them.
+ */
+function ClickableCode({ baseClass, children, ...rest }: { baseClass: string; children?: ReactNode; [k: string]: unknown }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <code
+      className={cn(baseClass, "cursor-pointer transition-colors duration-150", copied && "!border-[var(--ok)] !text-[var(--ok)]")}
+      onClick={(ev) => {
+        if ((ev.target as HTMLElement).closest("pre")) return
+        const text = typeof children === "string" ? children : extractText(children)
+        navigator.clipboard?.writeText(text).then(() => {
+          setCopied(true)
+          window.setTimeout(() => setCopied(false), 1500)
+        }, () => {})
+      }}
+      {...rest}
+    >
+      {children}
+    </code>
+  )
+}
 
 /** Build the element→component style map for a given variant. */
 function components(variant: MarkdownVariant): Components {
@@ -116,19 +158,22 @@ function components(variant: MarkdownVariant): Components {
     // border/padding, inherit colour) — the `pre` owns the block frame. This is
     // robust regardless of whether a fence declares a language.
     code: ({ className, children, ...rest }) => (
-      <code className={cn(inlineCode, className)} {...rest}>
+      <ClickableCode baseClass={cn(inlineCode, className)} {...rest}>
         {children}
-      </code>
+      </ClickableCode>
     ),
     pre: ({ children }) => (
-      <pre
-        className={cn(
-          preBox,
-          "[&>code]:border-0 [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-[inherit]",
-        )}
-      >
-        {children}
-      </pre>
+      <div>
+        <pre
+          className={cn(
+            preBox,
+            "[&>code]:border-0 [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-[inherit]",
+          )}
+        >
+          {children}
+        </pre>
+        <CopyButton text={extractText(children)} align="start" className={onAccent ? "text-current/60 hover:text-current" : undefined} />
+      </div>
     ),
 
     // ── Blockquote ──
@@ -201,7 +246,7 @@ export const Markdown = memo(function Markdown({
 }): ReactNode {
   return (
     <div className={cn("break-words", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components(variant)}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]} rehypePlugins={[rehypeKatex]} components={components(variant)}>
         {normalizeMarkdown(text)}
       </ReactMarkdown>
     </div>

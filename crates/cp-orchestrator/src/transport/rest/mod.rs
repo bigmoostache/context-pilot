@@ -22,17 +22,20 @@ use cp_wire::types::command::Command;
 use cp_wire::types::registry::Entry;
 use serde::Serialize;
 
-use super::Backend;
 use crate::channel::AgentChannel;
 
+mod backend;
 mod create;
+mod env_keys;
 mod library;
 pub mod oauth;
 mod restart;
 mod retire;
 mod settings;
 mod thread_shape;
+pub use backend::Backend;
 pub use create::create_agent;
+pub(crate) use env_keys::{env_key_reveal, env_key_update, env_keys_list};
 pub use library::create_command;
 pub use restart::restart_agent;
 pub use retire::{retire_agent, unretire_agent};

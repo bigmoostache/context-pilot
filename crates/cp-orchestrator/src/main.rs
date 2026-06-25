@@ -10,7 +10,9 @@ use cp_orchestrator::runtime::{Config, Runtime};
 // Acknowledge crate-level dependencies used only by the library half or by
 // dev-dependencies linked into the bin-test target.
 use argon2 as _;
+use base64 as _;
 use calamine as _;
+use cp_base as _;
 #[cfg(test)]
 use cp_mod_bridge as _;
 use cp_oplog as _;
@@ -18,8 +20,11 @@ use csv as _;
 use nix as _;
 use notify as _;
 use portable_pty as _;
+use rand as _;
+use reqwest as _;
 use rusqlite as _;
 use serde as _;
+use sha2 as _;
 use serde_json as _;
 use serde_yaml as _;
 #[cfg(test)]

@@ -31,6 +31,10 @@ tools:
       (optional bytes, for the size label), `note` (optional one-line caption).
       Only reference files that actually exist in the agent's folder — e.g. one
       you just wrote, or an upload under `.uploads/`.
+
+      MATH RENDERING:
+      Single `$` is treated as a literal dollar sign (NOT inline math).
+      For LaTeX math, use `$$...$$` (display block) or `\(...\)` (inline).
     parameters:
       thread_id: "Thread ID to post to (e.g., 'T1')"
       markdown: "Markdown text content for the message"

@@ -59,6 +59,13 @@ pub(in crate::app::run) fn emit_thread_paused(app: &mut App) {
     }
 
     // Diff live paused flags against the memo; collect changes (owned).
+    //
+    // Only emit for threads that ARE in the memo — threads absent from the
+    // oplog roster (pre-bridge legacy) are unknown to the view and emitting
+    // `thread_resumed` for them is both pointless (the view ignores it) and
+    // noisy (pollutes the oplog with 20+ spurious entries on every restart).
+    // For those threads, the command handler emits the delta directly on the
+    // first real pause/resume action.
     let changed: Vec<(String, bool)> = {
         let ts = ThreadsState::get(&app.state);
         let memo = &app.state.ext::<BridgeState>().thread_paused_memo;
@@ -66,7 +73,10 @@ pub(in crate::app::run) fn emit_thread_paused(app: &mut App) {
             .iter()
             .filter_map(|t| {
                 let live = t.paused;
-                (memo.get(&t.id).copied() != Some(live)).then(|| (t.id.clone(), live))
+                match memo.get(&t.id) {
+                    Some(&m) if m != live => Some((t.id.clone(), live)),
+                    _ => None,
+                }
             })
             .collect()
     };

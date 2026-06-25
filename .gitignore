@@ -82,9 +82,10 @@ docs/test.xlsx
 sandbox/
 /.uploads
 *.sourced_pdf
-
 # Playwright MCP browser session dumps (generated per run, never commit)
 .playwright-mcp/
 
 # Stray npm lockfile — the web/ project uses pnpm (pnpm-lock.yaml)
 web/package-lock.json
+
+devis-attali-context-pilot.md
