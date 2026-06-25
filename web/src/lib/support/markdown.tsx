@@ -172,7 +172,7 @@ function components(variant: MarkdownVariant): Components {
         >
           {children}
         </pre>
-        <CopyButton text={extractText(children)} align="start" />
+        <CopyButton text={extractText(children)} align="start" className={onAccent ? "text-current/60 hover:text-current" : undefined} />
       </div>
     ),
 
