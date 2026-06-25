@@ -782,6 +782,10 @@
   path: docs/trust-center/security.html
   description: 'Security Architecture page. 5 sections: data flow (local-first, no proxy, local persistence, offline), integrity controls (SHA-256 hash chain, lint enforcement, structural enforcement), access model (credentials, filesystem scope, SSE tickets), incident response (disclosure, Dependabot, release integrity), business continuity.'
   last_edited_ms: 1782133438219
+14ce5498e3a0c82c:
+  path: mobile/analysis_options.yaml
+  description: 'Strict Dart analysis: strict-casts/inference/raw-types + ~90 lint rules (error prevention + style enforcement)'
+  last_edited_ms: 1782420491785
 14d8aa9d69c4a452:
   path: crates/cp-mod-entities/Cargo.toml
   description: 'Entities module deps: cp-base, cp-render, cp-mod-utilities, cp-mod-search, rusqlite (bundled), crossterm, serde_json, log.'
@@ -5890,6 +5894,10 @@
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search.
   last_edited_ms: 0
+9905336f09d4b722:
+  path: mobile/lib/main.dart
+  description: Flutter agent fleet listing app. Connects to cp-orchestrator /api/fleet, shows AgentCard with lifecycle/phase/cost/threads. Dark Material 3. Dio HTTP client. Pull-to-refresh + configurable backend URL.
+  last_edited_ms: 1782420491846
 990c54d5571a1a67:
   path: web/e2e/t288_probe.spec.ts
   description: 'T288 regression: real-browser Quick Look drawer geometry probe. Boots live web (:5175, localStorage cp-agent/cp-view), opens QL via file-row click + Space, asserts the right-side Sheet drawer is flush-right (x+w==viewport, no overflow), 420px wide, header h-12=48px (matches toolbar). Screenshots /tmp/t288-drawer.png. Proved the off-screen + header-height fixes (da1d4fd) actually render — caught that tailwind-merge variant-prefix reasoning needs visual confirmation.'
@@ -5918,6 +5926,10 @@
   path: src/modules/conversation_history/trap.rs
   description: History cleanup trap. check_and_trigger_trap() activates when ≥3 history panels on Queue_execute. trap_blocks_tool() blocks all except Close_conversation_history and Think. would_defuse_trap() projects remaining after queued closes. force_deactivate_trap() for auto-flush path. maybe_deactivate_trap() lifts when <3 remain. Shared project_remaining_panels() helper.
   last_edited_ms: 0
+9a28e4162112af05:
+  path: crates/cp-orchestrator/tests/openapi.rs
+  description: 'OpenAPI 3.0.3 spec generator (integration test, --ignored). Builds the full spec manually (schemas + paths for all ~50 endpoints). Run: cargo test -p cp-orchestrator --test openapi generate_openapi -- --ignored. Writes openapi.json at workspace root.'
+  last_edited_ms: 1782421880492
 9a2da07aae0bb6d6:
   path: src/modules/overview/tools/manage_tools.rs
   description: 'tool_manage execute: enable/disable tools, MANAGE_TOOLS_ID + panel_goto_page protection, partial success'
@@ -8602,6 +8614,10 @@ def0ccd673154b9d:
   path: crates/cp-mod-todo/Cargo.toml
   description: 'Todo module deps: cp-base, cp-render, crossterm, serde, serde_json.'
   last_edited_ms: 1780563847638
+def3194f98e571bc:
+  path: openapi.json
+  description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
+  last_edited_ms: 1782421880551
 defc0e3a44be05bd:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -8810,6 +8826,10 @@ e589cf82e3ae867c:
   path: ui/src/components/ui/table.tsx
   description: shadcn-style table primitives (Table/Header/Body/Footer/Row/Head/Cell/Caption) — semantic HTML table + Tailwind, no deps. Used by UsagePage monthly breakdown.
   last_edited_ms: 1781534744506
+e59f7e43c2fdb786:
+  path: .github/checks/check-typescript-contract.sh
+  description: 'CI guard: regenerates openapi.json from Rust + TypeScript client from openapi.json, then git diff --exit-code catches any drift. Ensures backend types and frontend client stay in sync.'
+  last_edited_ms: 1782421880609
 e5b16bd2559f4180:
   path: web/src/lib/query/reducers.ts
   description: 'PURE oplog-delta reducers (split from query/sync for <500, T357). The OpEntry/OpEntryKind wire shape + turnToStatus/ago helpers + the three folds: applyThreadDelta (thread_created/archived/restored/status_changed/focus_changed/message_created — message_created appends inline bodies at positional msg_{n} id, spilled bodies only bump activity for the bridge to hydrate), applyAgentDelta (phase_transition never-null + cost_aggregate + context_usage hit/miss split, T297), mergeThreadLogs (non-destructive backstop-poll reconcile, T123). No I/O, no react-query side effects — sync.ts owns the imperative bridge and imports these.'
