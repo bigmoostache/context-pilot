@@ -8,20 +8,29 @@
 import type {
   Agent,
   ContextPanel,
-  MemoryCard,
-  TodoItem,
-  SpineNotif,
-  QueueAction,
-  ScratchCell,
-  TreeRow,
-  CallbackRow,
-  ToolGroup,
-  RadarAnchor,
-  RadarResult,
-  EntityTable,
   ThreadDetail,
-  LibraryItem,
 } from "../types"
+import type {
+  AgentMetrics,
+  CallbackRow,
+  CommandReceipt as GenCommandReceipt,
+  CreateAgentReceipt,
+  CreateCommandReceipt,
+  EntityTable,
+  LibraryItem,
+  MemoryCard,
+  QueueAction,
+  RadarData,
+  RestartReceipt,
+  RetireReceipt,
+  ScratchCell,
+  SpineNotif,
+  TodoItem,
+  ToolGroup,
+  TreeRow,
+  UnretireReceipt,
+  Vital,
+} from "./generated/types.gen"
 import { request, buildCommandEnvelope } from "./client"
 
 export { getToken, setToken } from "./client"
@@ -37,14 +46,7 @@ export function fetchFleet(): Promise<Agent[]> {
 
 // ── Create agent ──────────────────────────────────────────────────────
 
-/** Receipt from `POST /api/fleet/create` — a 202 "spawning" acknowledgement.
- *  The agent self-registers and appears in the fleet within a scan tick once
- *  it has booted, so this is launch confirmation, not the agent itself. */
-export interface CreateAgentReceipt {
-  status: string
-  folder: string
-  pid: number
-}
+export type { CreateAgentReceipt } from "./generated/types.gen"
 
 /** Create a new agent: the backend mkdir's its realm folder and spawns the
  *  `cp` TUI on a pty (so the full agent stack runs). `model` is accepted for
@@ -61,15 +63,7 @@ export function createAgent(body: {
   })
 }
 
-/** Receipt from `POST /api/agent/{id}/restart` — a 202 "restarting"
- *  acknowledgement. The agent's old process is killed and a fresh one is
- *  spawned on the same realm folder (so it re-registers under the same id);
- *  it re-appears in the fleet within a scan tick once it has booted. */
-export interface RestartReceipt {
-  status: string
-  folder: string
-  pid: number
-}
+export type { RestartReceipt } from "./generated/types.gen"
 
 /** Restart an agent: kill its (possibly stale) running process and respawn it
  *  from the backend's current `cp` binary on the same realm folder. Used when
@@ -80,24 +74,7 @@ export function restartAgent(agentId: string): Promise<RestartReceipt> {
 }
 
 // ── Retire / unretire (T271) ──────────────────────────────────────────
-/** Receipt from `POST /api/agent/{id}/retire` — the agent's process (and its
- *  console-server daemon) is stopped and the agent is recorded as retired; its
- *  realm folder is kept intact so it can be brought back. */
-export interface RetireReceipt {
-  status: string
-  id: string
-  folder: string
-}
-
-/** Receipt from `POST /api/agent/{id}/unretire` — a 202 "unretiring" launch
- *  acknowledgement; the agent respawns on its kept folder and re-registers
- *  under the same id within a scan tick. */
-export interface UnretireReceipt {
-  status: string
-  id: string
-  folder: string
-  pid: number
-}
+export type { RetireReceipt, UnretireReceipt } from "./generated/types.gen"
 
 /** Retire (archive) an agent: stop its process + console server, keep its
  *  folder, and move it to the Retired section. Not a delete — fully reversible
@@ -365,10 +342,7 @@ export function fetchTools(agentId: string): Promise<ToolGroup[]> {
   return request(`/api/agent/${agentId}/tools`)
 }
 
-export interface RadarData {
-  anchors: RadarAnchor[]
-  results: RadarResult[]
-}
+export type { RadarData } from "./generated/types.gen"
 
 export function fetchRadar(agentId: string): Promise<RadarData> {
   return request(`/api/agent/${agentId}/radar`)
@@ -380,21 +354,7 @@ export function fetchEntities(agentId: string): Promise<EntityTable[]> {
 
 // ── Metrics (§19 observability) ───────────────────────────────────────
 
-/** The §19 observability snapshot for one agent (GET /api/agent/{id}/metrics).
- *
- * Mirrors the backend `build_metrics` JSON: durable cost-breaker state, stream
- * health, and the view-vs-oplog rev lag — the figures that let the cockpit
- * *show* a tripped breaker or a lagging projection instead of inferring it. */
-export interface AgentMetrics {
-  id: string
-  breaker: { tripped: boolean; spendUsd: number; budgetUsd: number }
-  stream: { subscribers: number; droppedFrames: number; degraded: boolean }
-  rev: { view: number; oplogHead: number | null; lag: number }
-  /** Cumulative-since-boot token totals folded from `CostAggregate`. */
-  tokens?: { input: number; output: number }
-  phase?: string | null
-  lifecycle?: string | null
-}
+export type { AgentMetrics } from "./generated/types.gen"
 
 export function fetchMetrics(agentId: string): Promise<AgentMetrics> {
   return request(`/api/agent/${agentId}/metrics`)
@@ -402,20 +362,7 @@ export function fetchMetrics(agentId: string): Promise<AgentMetrics> {
 
 // ── Vitals (on-demand service-connectivity probes) ────────────────────
 
-/** One service-connectivity probe result from `GET /api/agent/{id}/vitals`.
- *
- * `status` is honest: `"ok"` reachable, `"error"` present-but-failing,
- * `"unavailable"` when the backend genuinely cannot perform the check from
- * where it sits (mirrors the inspection plane's derived-state contract).
- * `category` groups the rows (orchestrator / agent / llm / service / infra,
- * plus `frontend` for the two rows the client adds itself). */
-export interface Vital {
-  name: string
-  category: string
-  status: "ok" | "error" | "unavailable"
-  latencyMs?: number | null
-  detail?: string
-}
+export type { Vital } from "./generated/types.gen"
 
 /** Run the agent's live service-connectivity checks on demand (the cockpit's
  *  "Check Vitals" button). The backend probes everything it can reach —
@@ -443,14 +390,7 @@ export function fetchLibrary(agentId: string): Promise<LibraryItem[]> {
   return request(`/api/agent/${agentId}/library`)
 }
 
-/** Receipt from `POST /api/agent/{id}/library/command` — confirms a new command
- *  markdown file was written into the agent's `.context-pilot/commands/`. The
- *  running agent picks it up automatically, so it becomes invocable (and shows
- *  as a `/command` suggestion bubble) within a library refetch. */
-export interface CreateCommandReceipt {
-  id: string
-  status: string
-}
+export type { CreateCommandReceipt } from "./generated/types.gen"
 
 /** Create a new `/command` in an agent's prompt library. `name` derives the
  *  command's slug (its `/invocation`); `body` is the prompt it expands to;
@@ -468,12 +408,8 @@ export function createCommand(
 }
 // ── Commands (mutating) ───────────────────────────────────────────────
 
-export interface CommandReceipt {
-  cmd_id: string
-  dedup_token: string
-  rev: number
-  accepted: boolean
-}
+/** Re-export generated CommandReceipt (cmd_id, dedup_token, rev, accepted). */
+export type CommandReceipt = GenCommandReceipt
 
 /**
  * Send a command to an agent. Accepts just the `kind` payload —
