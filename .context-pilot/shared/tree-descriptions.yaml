@@ -2550,6 +2550,10 @@
   path: web/src/components/panels/cockpit/TodoPanel.tsx
   description: Todo List panel — uses useTodos(agentId) for live task plan. Depth-indented, status-colored glyphs, progress bar.
   last_edited_ms: 1781695333858
+4168b472e3787b38:
+  path: crates/cp-orchestrator/src/services/auth/tests.rs
+  description: '18 auth unit tests: schema, hashing, token/UUID gen, user CRUD (create/get/list/delete cascade), session lifecycle (create/validate/revoke/expired sweep), ACL (grant/revoke/update role/list/cascade delete/overwrite).'
+  last_edited_ms: 1782421966458
 41806aede16bafe2:
   path: web/src/components/panels/cockpit/PanelPane.tsx
   description: Cockpit panel router. Accepts agentId, uses usePanels() for lookup. Routes to 12 panel components by kind, each receiving agentId. 'conversation' sentinel renders Conversation. EmptyState fallback.
@@ -3014,6 +3018,10 @@
   path: crates/cp-mod-ocr/src/client.rs
   description: Datalab OCR API client. Multipart upload, exponential backoff polling, disk cache keyed by FNV-1a hash of file bytes + mode.
   last_edited_ms: 0
+4e74d32d119ec418:
+  path: web/src/lib/utils.ts
+  description: 'Shared web utils. cn() (clsx+tailwind-merge). T367 zip-on-drop: zipFiles(files)->Promise<File> bundles dropped file(s) into ONE .zip client-side via fflate (DEFLATE level 6); single file -> `<name>.zip` (macOS Compress convention), many -> `dropped-<n>-files.zip`; uniqueZipEntry dedups colliding basenames inside the archive; rejects on read/fflate error (caller falls back to raw upload). T359 list logic: resolveEnter (send/newline/continue/remove, ordered marker auto-increment numeric+bijective-base26 alpha, unordered pretty bullets •◦▪‣ per depth) + resolveTab (Tab/Shift+Tab indent/outdent, ordered resumes sibling count via siblingOrderedMarkerAtDepth) + lineBounds + parseListLine. Consumed by ThreadComposer + ThreadConversation.'
+  last_edited_ms: 1782421966517
 4ea144f928ecd2db:
   path: crates/cp-oplog/src/segment.rs
   description: 'Segment files: seg-{n}.log zero-padded sortable naming. Scan{entries,valid_len,torn_tail}. path/parse_index/indices/read/scan_bytes — torn-tail-aware frame walk (decode until first CRC/length failure, report clean boundary for truncation, V1). T309: scan_bytes made pub so the backend Tailer can decode only a segment''s appended TAIL (slice past the last consumed byte offset) instead of re-scanning the whole file each poll.'
@@ -3538,6 +3546,10 @@
   path: Cargo.lock
   description: Workspace lockfile
   last_edited_ms: 0
+5cb971dafd3af160:
+  path: crates/cp-orchestrator/Cargo.toml
+  description: 'Backend deps: cp-wire (with openapi feature) + cp-oplog + utoipa 5 + nix 0.30 (signal) + serde + serde_json + serde_yaml + tiny_http (0.12) + notify (oplog inotify) + portable-pty 0.9 (X896 safe pty) + calamine 0.26 & csv 1 (T282 Finder spreadsheet→table preview) + argon2 0.5 (Argon2id hashing) + rusqlite (auth SQLite). dev: cp-mod-bridge + tempfile. lib+bin. Workspace lints.'
+  last_edited_ms: 1782421966281
 5cbac6637983eeee:
   path: web/src/components/finder/kind.tsx
   description: 'Finder kind metadata (live web). kindMeta: FinderKind→{accent token, label}. kindTint/kindGradient color helpers. TAG_META: macOS finder tag colors. extOf(name). Note: full-color file/folder icons live in macIcons.tsx (FileIcon); this file is the non-icon accent/label metadata.'
@@ -3774,6 +3786,10 @@
   path: ui/src/components/shell/UserMenu.tsx
   description: 'Account avatar menu (T30) — replaced the old top-right Settings gear. Portaled Base-UI dropdown: avatar trigger (gradient-initials AvatarMark) opens a floating menu with an identity header (name/email + Company/Personal pill via currentUser) and Profile / Settings / Sign-out items. Settings still opens ConfigModal (reversible re-skin). Exports UserMenu + AvatarMark (shared with ProfileModal).'
   last_edited_ms: 1781596817732
+62ffaa0c0482206e:
+  path: crates/cp-wire/Cargo.toml
+  description: 'Wire protocol crate manifest. deps: crc32c, serde, serde_json, sha2 (0.10, for ContentHash::of SHA-256). Optional: utoipa (openapi feature for ToSchema derives). I/O-free. Workspace lints.'
+  last_edited_ms: 1782421966222
 630d6115abc684bb:
   path: ui/src/components/ui/tooltip.tsx
   description: App-wide tooltip wrapper (T25). <Tip title body side triggerClassName>. Base-UI tooltip, portals to document.body (escapes .vibrancy containing block), --popover-token surface+arrow (theme-correct), title(bold)+optional body. Shared TooltipProvider at App root (delay 350/close 80).
@@ -3862,6 +3878,10 @@
   path: crates/cp-mod-bridge/src/heartbeat.rs
   description: 'Phase 11 (X778): Beacon — agent-side liveness heartbeat thread. start(&Path,pid,boot_id,cadence) opens/creates file, writes first beat (seq 0) synchronously, spawns thread. beat_loop(File,&Beat,&Receiver) recv_timeout(cadence): Timeout=write next beat in-place (seek0+write_all+sync_data, fixed-size never grows), signal/Disconnected=stop. Beat{pid,boot_id,cadence} bundles params (too_many_arguments). RAII Drop signals+joins. 4 tests.'
   last_edited_ms: 1781626203763
+6600389de4f6772b:
+  path: crates/cp-wire/src/types/mod.rs
+  description: 'ContentHash (SHA-256, Copy, hex serde: of/to_hex/from_hex). Phase enum (Idle/Streaming/Tooling), LifecycleState (Starting/Running/Stopping/Stopped), ThreadTurn (MyTurn/TheirTurn/Unknown, snake_case). All three carry #[cfg_attr(feature="openapi", derive(utoipa::ToSchema))] for OpenAPI spec generation. Declares+re-exports ack/body/command/oplog/registry/snapshot/stream.'
+  last_edited_ms: 1782421966339
 66489a640f04b66c:
   path: web/src/components/auth/UsersDialog.tsx
   description: Admin user management dialog (Phase 10). Lists all users with RoleBadge, create user form (collapsible), delete user with confirmation, force-logout (revoke all sessions). TanStack Query hooks. Accessible from UserMenu when admin.
@@ -5190,6 +5210,10 @@
   path: ui/src/components/shell/ConfigModal.tsx
   description: Settings dialog — thin portaled Base UI Dialog wrapper around ConfigPanel variant='dialog'. Used by TopBar gear (in-agent). Portal escapes the .vibrancy backdrop-filter containing block (half-off-screen fix). Controlled open/onClose.
   last_edited_ms: 1781531138885
+871589169b936af9:
+  path: crates/cp-orchestrator/src/services/materialized_view/mod.rs
+  description: In-memory materialized view of the fleet — per-agent projection folded from oplog entries. AgentView (rev/heads/roster/phase/lifecycle/cost/context/focused_thread). apply() folds ThreadPaused/ThreadResumed/ThreadDeleted via RosterThread::fold_paused/fold_deleted. Checkpoint = authoritative reset (bounded restart). CostSnapshot + ContextSnapshot value types with utoipa::ToSchema for OpenAPI.
+  last_edited_ms: 1782421966399
 871bb8b9be861acd:
   path: crates/cp-console-server/src/cleanup.rs
   description: 'Process cleanup: reaper thread (30s grace), graceful shutdown (kill_all_sessions), signal handlers (SIGINT/SIGHUP), FD limit raising. Uses BTreeMap for ordered exit_times tracking.'
@@ -9158,6 +9182,10 @@ ee5a9f8f28812c41:
   path: crates/cp-mod-brave/src/lib.rs
   description: 'Brave Search module. 2 tools: brave_search (snippets), brave_llm_context (deep extracted content). Dynamic brave_result panels. No state. Global, non-core.'
   last_edited_ms: 0
+ee7435b5e0e5f5f5:
+  path: crates/cp-orchestrator/src/services/materialized_view/tests.rs
+  description: 'Unit tests for materialized view fold: message head tracking, checkpoint authoritative reset (heads + roster), roster lifecycle (create/archive/restore/delete/pause), phase/lifecycle/cost latest-wins, batch folding, durability-only entries inert, remove drops agent.'
+  last_edited_ms: 1782421966163
 ee8d4cb29bfb6892:
   path: crates/cp-orchestrator/src/services/names.rs
   description: 'Orchestrator-owned agent display-name overrides (T328). NameOverrides: HashMap<agent_id, display_name> persisted to <agents_dir>/agent-names.json (atomic tmp→rename). load/get/set (empty name clears override). Independent of agent process — orchestrator-only. Unit-tested roundtrip + clear.'
