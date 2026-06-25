@@ -96,7 +96,7 @@ function MessageBody({
  * `align` mirrors the bubble's side so the control tucks under the message's
  * own edge (user bubbles are right-aligned, assistant left-aligned).
  */
-function CopyButton({ text, align }: { text: string; align: "start" | "end" }) {
+export function CopyButton({ text, align }: { text: string; align: "start" | "end" }) {
   const [copied, setCopied] = useState(false)
 
   const onCopy = () => {

@@ -5,6 +5,7 @@ import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import "katex/dist/katex.min.css"
 
+import { CopyButton } from "@/components/conversation/Message"
 import { cn } from "@/lib/utils"
 
 /**
@@ -28,6 +29,17 @@ import { cn } from "@/lib/utils"
  *   it stays legible on the accent fill.
  */
 export type MarkdownVariant = "default" | "onAccent"
+
+/** Recursively extract plain text from a React element tree (for copy). */
+function extractText(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return ""
+  if (typeof node === "string" || typeof node === "number") return String(node)
+  if (Array.isArray(node)) return node.map(extractText).join("")
+  if (typeof node === "object" && "props" in node) {
+    return extractText((node as { props: { children?: ReactNode } }).props.children)
+  }
+  return ""
+}
 
 /** Build the element→component style map for a given variant. */
 function components(variant: MarkdownVariant): Components {
@@ -124,14 +136,17 @@ function components(variant: MarkdownVariant): Components {
       </code>
     ),
     pre: ({ children }) => (
-      <pre
-        className={cn(
-          preBox,
-          "[&>code]:border-0 [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-[inherit]",
-        )}
-      >
-        {children}
-      </pre>
+      <div>
+        <pre
+          className={cn(
+            preBox,
+            "[&>code]:border-0 [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-[inherit]",
+          )}
+        >
+          {children}
+        </pre>
+        <CopyButton text={extractText(children)} align="start" />
+      </div>
     ),
 
     // ── Blockquote ──

@@ -1990,6 +1990,10 @@
   path: docs/custom-visualization.md
   description: Custom panel visualization system
   last_edited_ms: 0
+344f8dc3b81dd51e:
+  path: web/src/components/shell/config/ConfigPanes.tsx
+  description: 'Config category panes + presentational building blocks (split from ConfigPanel for <500): CATEGORIES, CategoryBody (general/usage/providers/search/docai/web/integrations), GeneralPane (default model picker + apply-to-all via sendCommand configure), KeyRow/StatusRow/ToggleRow/ManagedKeysNotice. Key-bearing panes lock when EITHER company-managed (useAccount) OR auth-active-and-caller-not-admin (T346). T399: KeyRow fetches full value on-demand via revealEnvKey API (eye button). T403: noReveal prop skips eye button for non-env-var rows. T404: full value reveal + inline edit (Pencil→input→Check save) via updateEnvKey PUT. 499 lines.'
+  last_edited_ms: 1782342443071
 345b7dda1d007e3a:
   path: ui/src/components/shell/TopBar.tsx
   description: 'macOS title bar: app mark, AgentSwitcher (workspace dropdown), 3-tab segmented switcher (Agents/Threads/Cockpit), branch+cost driven by active agent, ThemeToggle.'
@@ -3926,6 +3930,10 @@
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet shell — mission-control workspace shown when no agent is focused. NO sidebar (T18): collapsed to a single page. Slim top bar with a segmented [Agents | Prompts] toggle; renders FleetDashboard or PromptsPage full-bleed below. Usage moved into the Settings dialog (ConfigPanel ''usage'' category); Settings reachable only via TopBar gear. Only prop: onOpenAgent.'
   last_edited_ms: 1781544801616
+6763bfeffecfe63f:
+  path: crates/cp-orchestrator/src/transport/rest/backend.rs
+  description: Backend shared state struct + impl. Extracted from transport/mod.rs. Holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names/avatars/auth/session_ttl/env_overrides(T404). Accessor methods + for_test.
+  last_edited_ms: 1782342442836
 676d245887a27c5d:
   path: web/src/components/panels/cockpit/ScratchpadPanel.tsx
   description: Scratchpad panel — uses useScratchpad(agentId) for live working cells. Id/title/preview per cell.
@@ -4170,6 +4178,10 @@
   path: src/infra/constants.rs
   description: API/layout/loop/persistence constants + theme color accessors (from YAML themes) + card design tokens (card_text, card_agent_bg, card_reverie_bg, card_queue_bg, card_think_bg) + icons + prompts.
   last_edited_ms: 0
+6db299c6de39a2b9:
+  path: crates/cp-orchestrator/src/transport/rest/env_keys.rs
+  description: 'On-demand env-key inspection (T399) and editing (T404). KNOWN_KEYS whitelist prevents arbitrary env-var enum. resolve_env() checks runtime overrides before std::env. env_keys_list(): GET /api/env-keys returns [{env,label,exists}]. env_key_reveal(name): GET /api/env-keys/{name} returns full value + masked — admin-only when auth active. env_key_update(name): PUT /api/env-keys/{name} persists to ~/.context-pilot/.env + in-memory override for immediate visibility. mask_key helper. persist_to_global_env + format_env_line. 10 unit tests.'
+  last_edited_ms: 1782342442769
 6df12cce867df544:
   path: src/modules/overview/context.rs
   description: estimate_tool_definitions_tokens(), generate_context_content() — plain-text LLM context (usage, sorted panels, stats)
@@ -7054,6 +7066,10 @@ b5f74248ea10c6c9:
   path: crates/cp-orchestrator/tests/registry_channel.rs
   description: 'Phase 27 (X794) backend↔agent seam suite (4 tests, all green). Drives discovery+channel against real cp-mod-bridge artifacts: (1) real Boot→AgentRegistry Appeared+Live→idempotent quiet scan→drop→Disappeared; (2) Stale fires ONLY on Live→non-live transition, first-sight staleness rides Appeared (crafted Entry+Heartbeat); (3) body Store spill→OplogService MessageCreated→Tailer.poll→AgentChannel.hydrate integrity-verified + inlined body hydrate=None; (4) AgentChannel.send→real Intake.handle_connection over UnixListener (Accepted), resend same dedup_token Accepted but replay seen.len==1 (exactly-once). Top `use nix/serde/tiny_http as _;` for per-target unused-crate-dependencies.'
   last_edited_ms: 0
+b5f784c527cdf5c0:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 b6162eed9f57263f:
   path: crates/cp-mod-files/src/tools/mod.rs
   description: 'Tool submodule routing: diff, edit_file, file, write'
@@ -7878,6 +7894,10 @@ ca4184ddf0768185:
   path: web/src/components/panels/cockpit/panels/context/StatsPanel.tsx
   description: 'Cockpit Statistics panel: session token/cost vitals + panel-context meter; honest unavailable notice for cache split + live context size.'
   last_edited_ms: 1782117192111
+ca5bd0ed55b850bc:
+  path: web/src/lib/mock/extra.ts
+  description: 'Mock data (split from mock/index for <500): usage analytics (USAGE_RATES, genUsage 12-month history) + cockpit panel payloads (treeRows/memoryCards/radar/todoItems/entityTables/toolGroups/callbackRows/scratchCells/queueActions) + currentUser.'
+  last_edited_ms: 0
 ca61d72fc90b435b:
   path: ui/src/components/agents/FleetDashboard.tsx
   description: Fleet welcome dashboard — mission control + agent create/manage entry. Centred on shared FLEET_MAX_W. Greeting, AgentCard grid (status badge + one-line task + model·cost; Open→threads, Manage→AgentModal), New-agent card. autoCreate prop (T21) opens AgentModal in create mode then calls onAutoCreateConsumed. AgentModal now lives in its own file (./AgentModal, T26) and is shared with the TopBar per-agent config button.
@@ -9482,6 +9502,10 @@ f8da9563a5f056ab:
   path: web/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Uses useFleet() for live agents. Persists activeAgentId + view in localStorage (cp-agent, cp-view). Mounts AccountProvider + TooltipProvider. Passes agents to TopBar/FleetShell/StatusBar. Passes activeAgent to StatusBar.
   last_edited_ms: 1781774995995
+f8e2851da34e0bb3:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: 'REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() dispatches commands. rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket embeds auth_user.id (Phase 7). resolve_entry. Backend re-exported from backend.rs. Submodules: create, restart, retire, library, thread_shape, backend, env_keys. Re-exports env_key_reveal, env_key_update, env_keys_list.'
+  last_edited_ms: 1782342442896
 f8eeeec12b309794:
   path: crates/cp-mod-search/src/meili/mod.rs
   description: 'Meilisearch sub-module hub: bootstrap, client, download, overlay, server, tasks.'
@@ -9518,6 +9542,10 @@ f9a7ae24a5d70197:
   path: web/src/components/finder/internal/useExternalDragUpload.ts
   description: 'Window-level external-file drag-upload lifecycle hook: shows ''Drop to upload'' overlay while an OS-file drag hovers, clears on drop/leave/cancel (heartbeat watchdog), hands dropped files to onFiles. Internal MOVE drags (no Files type) never raise it.'
   last_edited_ms: 1782038018575
+f9c0502308e9a92e:
+  path: web/src/lib/api/env-keys.ts
+  description: Env-key inspection + editing REST endpoints (T399/T404). EnvKeyStatus/EnvKeyReveal types (value field for full reveal). fetchEnvKeys() lists status, revealEnvKey(name) fetches full+masked value, updateEnvKey(name,value) PUTs new value. Re-exported via index.ts barrel.
+  last_edited_ms: 1782342443013
 fa07059c45a476ab:
   path: crates/cp-mod-memory/src/panel.rs
   description: Memory panel. Sorts by importance (critical→low). format_memories_for_context() YAML output for LLM. blocks() renders KeyValue with importance-colored labels. refresh() updates context entry. context() returns ContextItem. needs_cache=false.
@@ -9574,6 +9602,10 @@ fb3b055bf69a46d4:
   path: docs/documentation/index.html
   description: Documentation placeholder (coming soon). Shared topbar nav + README link.
   last_edited_ms: 1782129931214
+fb451ee02de061c4:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: 'Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend re-exported from rest::Backend. route_rest dispatches all /api routes incl auth/ACL/env-keys (T399/T404: GET list/reveal + PUT update with env_overrides). handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with Phase 7 ticket-based ACL. PUT in CORS Allow-Methods + body reading. serve/serve_bound acceptor loop.'
+  last_edited_ms: 1782342442955
 fb5f6b73cd86340a:
   path: crates/cp-orchestrator/src/services/stream_hub.rs
   description: 'Phase 18: StreamHub — per-agent stream fan-out to N bounded subscribers (R2-17). Subscriber{id,buffer:VecDeque<Frame>,capacity,degraded,dropped}: admit() evicts OLDEST on full + sets degraded + bumps dropped; cap 0 drops all. agent_stream_health(id)->(subscribers,total_dropped,any_degraded) aggregate accessor for §19 metrics. publish/drain/subscribe/unsubscribe/mark_reconciled. Single-owner lock-free. 9 tests.'
