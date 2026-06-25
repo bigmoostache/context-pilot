@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from "react"
+import { memo, useState, type ReactNode } from "react"
 import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
@@ -39,6 +39,33 @@ function extractText(node: ReactNode): string {
     return extractText((node as { props: { children?: ReactNode } }).props.children)
   }
   return ""
+}
+
+/**
+ * Inline code chip with click-to-copy.
+ *
+ * Clicking copies the text content and briefly flashes the border/text to
+ * `--ok` green as confirmation. Clicks inside a `<pre>` (fenced code blocks)
+ * are ignored — those have a dedicated CopyButton beneath them.
+ */
+function ClickableCode({ baseClass, children, ...rest }: { baseClass: string; children?: ReactNode; [k: string]: unknown }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <code
+      className={cn(baseClass, "cursor-pointer transition-colors duration-150", copied && "!border-[var(--ok)] !text-[var(--ok)]")}
+      onClick={(ev) => {
+        if ((ev.target as HTMLElement).closest("pre")) return
+        const text = typeof children === "string" ? children : extractText(children)
+        navigator.clipboard?.writeText(text).then(() => {
+          setCopied(true)
+          window.setTimeout(() => setCopied(false), 1500)
+        }, () => {})
+      }}
+      {...rest}
+    >
+      {children}
+    </code>
+  )
 }
 
 /** Build the element→component style map for a given variant. */
@@ -131,9 +158,9 @@ function components(variant: MarkdownVariant): Components {
     // border/padding, inherit colour) — the `pre` owns the block frame. This is
     // robust regardless of whether a fence declares a language.
     code: ({ className, children, ...rest }) => (
-      <code className={cn(inlineCode, className)} {...rest}>
+      <ClickableCode baseClass={cn(inlineCode, className)} {...rest}>
         {children}
-      </code>
+      </ClickableCode>
     ),
     pre: ({ children }) => (
       <div>
