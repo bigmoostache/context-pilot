@@ -246,6 +246,10 @@
   path: docs/talk/slides/0-2.html
   description: 'Slide: Where it is now — single screenshot'
   last_edited_ms: 1781078806873
+05a428512c20dfd6:
+  path: web/src/components/conversation/Message.tsx
+  description: 'Thread/conversation message renderer (shared by web ThreadConversation + cockpit Conversation). AssistantMessage + UserMessage render text via <Markdown> (assistant=default, user=onAccent); MessageBody splices inline file-upload chips. T311: discrete CopyButton beneath BOTH user & assistant bubbles — low-opacity Copy icon (align mirrors bubble side: user self-end, assistant left under pl-7), click → navigator.clipboard.writeText(text) → flips to green var(--ok) Check ''Copied'' for ~2s then reverts (guarded ?. for insecure-origin/no-clipboard, silent fail); hidden on assistant while streaming. T406: CopyButton exported for reuse in markdown.tsx code block copy. ToolMessage = collapsible card. Streaming blink cursor preserved. T334: onShowInFinder prop threaded to MessageFileChip for Show in Finder navigation.'
+  last_edited_ms: 1782382289385
 05a69fad17c226a4:
   path: crates/cp-orchestrator/src/runtime.rs
   description: 'Runtime — env Config (port/agents_dir/budget/scan_interval + X896 agents_root/agent_binary + T341 auth_enabled/session_ttl/auth_db_path) + driver loop with TWO decoupled cadences: slow scan_interval (2s) registry scan + config.json mtime backstop + tmp reap; fast TAIL_INTERVAL (100ms) tail_all_agents. Runtime::new opens AuthStore when auth enabled, builds Backend with 6 args.'
@@ -4002,6 +4006,10 @@
   path: src/app/actions/config.rs
   description: 'Config bar handlers: context budget, cleaning threshold, target proportion, max cost guard rail, theme cycling'
   last_edited_ms: 0
+693d6eeb680bfe80:
+  path: web/src/lib/support/markdown.tsx
+  description: GFM markdown renderer (react-markdown + remark-gfm + remark-math + rehype-katex) themed to app tokens; default + onAccent variants. LaTeX via KaTeX ($...$ inline DISABLED, $$...$$ display). XSS-safe (no raw HTML). Code block copy button via CopyButton + extractText helper. Inline code click-to-copy via ClickableCode (green flash feedback, closest('pre') guard).
+  last_edited_ms: 1782383157676
 694cecf1683c6932:
   path: ui/src/components/finder/FinderPreview.tsx
   description: 'QuickLook pane. Bespoke kind renders: code (copy btn + line numbers + keyword tint), spreadsheet (zebra + frozen header + sheet tabs), slides (hero + thumbnails), PDF (paper mock + page strip), image (checkerboard + zoom), audio (waveform player), video (poster + scrubber), rendered markdown (for-loop fence parser), json/text, folder summary. Metadata footer + Get Info.'
@@ -4030,6 +4038,10 @@
   path: crates/cp-oplog/tests/service_group_commit.rs
   description: 'Phase 24 (X791): cp-oplog group-commit Service public-API suite (5 tests). Properties that emerge only under concurrency/pressure (GAP2/I2): durability_of_is_exhaustive_over_every_kind (all 8 OpEntryKind discriminants: PhaseTransition+CostAggregate=BestEffort, CommandEffect+SeenMark+MessageCreated+Lifecycle+Checkpoint{Snapshot::default}+Unknown=Durable); concurrent_durable_submitters_get_unique_contiguous_revs (Arc<Service>, 8 threads x 50 append_durable, default limit=no rolls=no checkpoint revs → revs exactly 0..400 contiguous no dup/gap proving single commit thread is sole serialised rev-assigner; replay rev_head=399 + seen.len=400; flush via drop(service) Arc→0→Drop joins+syncs); best_effort_floods_drop_without_ever_blocking (200k phase try_sends ≫ 1024 queue cap → <5s never-block + dropped>0 deterministic under any real fdatasync latency + submitted>0 + post-flood durable append survives replay); a_large_final_batch_is_flushed_on_shutdown (30 durable then shutdown drains+syncs, rev_head+T1 head durable); interleaved_durable_and_best_effort_preserves_every_durable_record (phase between each durable pair, all 20 tokens + final head survive, seen.len==tokens). Service is Send+Sync (SyncSender+JoinHandle). shutdown consumes self (no double-shutdown by type). NO append-with-capacity hook so deterministic queue-full saturation only via flood≫cap.'
   last_edited_ms: 0
+6a5fb67cdaee15d9:
+  path: web/src/lib/support/markdown.tsx
+  description: GFM markdown renderer (react-markdown + remark-gfm + remark-math + rehype-katex) themed to app tokens; default + onAccent variants. LaTeX via KaTeX ($...$ inline DISABLED, $$...$$ display). XSS-safe (no raw HTML). Code block copy button via CopyButton + extractText helper; onAccent variant passes text-current/60 for dark-mode contrast. Inline code click-to-copy via ClickableCode (green flash feedback, closest('pre') guard).
+  last_edited_ms: 1782390908778
 6a80600c66d89e02:
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only fsync''d log + running Heads fold. open() seeds heads via replay. append(kind)->rev probes frame size, rolls at 64MiB. roll() stamps leading Checkpoint(heads) as new segment''s first record (GAP1). write_record = sole rev-assignment point (frame+write_all+sync_data+fold_entry, announce-after-durable K9). checkpoint() public. seg-0 has no leading cp. OplogError{Io,Frame}. 7 tests.'
@@ -4558,6 +4570,10 @@
   path: web/src/components/finder/ContextMenu.tsx
   description: 'Finder right-click menu, two variants on pos.node presence. ITEM menu: Open, Pin (folders), Rename, Duplicate, Download, tag swatches, Move to Trash. EMPTY-SPACE menu (T279): New Folder, Upload, Select All, Toggle Quick Look, Refresh. On-screen clamping; closes on outside-click/Esc.'
   last_edited_ms: 0
+776902cecd0dbc5d:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 776ceb45b6277d6d:
   path: .github/workflows/rust.yml
   description: 'CI: fmt + clippy + build + test on ubuntu-latest. Pins Rust 1.93.0. Triggers on push/PR to master.'
@@ -4718,6 +4734,10 @@
   path: crates/cp-orchestrator/tests/services_integration.rs
   description: 'Phase 29 (X796) backend services integration suite (4 tests, green, ~0.1s). Drives MaterializedView+CostBreaker+StreamHub TOGETHER against real cp-oplog via Tailer: restart rebuild, real segment-roll checkpoint, R2-17 reconcile, fleet isolation.'
   last_edited_ms: 1782239655341
+7aa7e7fd61179722:
+  path: .gitignore
+  description: Git ignore rules. Includes *.sourced_pdf, .uploads, bridge runtime artifacts, harbor outputs, mitmproxy captures, .DS_Store, docs/slides build artifacts. devis-attali-context-pilot.md added after security incident. .context-pilot/* blocks messages/ (116K conversation YAMLs) from accidental commit.
+  last_edited_ms: 1782399372622
 7aacf20c52beff82:
   path: web/package.json
   description: 'Frontend deps: @base-ui/react 1.5, @tanstack/react-query 5.101, react 19.2, react-markdown 10 + remark-gfm, highlight.js 11.11, tailwindcss 4.3, shadcn 4.11, vite 8, playwright. scripts: dev/build(tsc -b && vite build)/lint/preview.'
@@ -8082,6 +8102,10 @@ cff217746851151f:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage (with archived support + `auto` flag — X887 auto tool-activity traces, #[serde(default)]), Thread (archived:bool). ThreadsState + FocusState (viewing_archived). visible_indices(archived) maps a view to real storage indices; has_my_turn filters archived; mark_selected_read resolves selection through visible list.'
   last_edited_ms: 1781866658163
+d0061f384eadaa0a:
+  path: web/src/components/conversation/Message.tsx
+  description: 'Thread/conversation message renderer (shared by web ThreadConversation + cockpit Conversation). AssistantMessage + UserMessage render text via <Markdown> (assistant=default, user=onAccent); MessageBody splices inline file-upload chips. T311: discrete CopyButton beneath BOTH user & assistant bubbles — low-opacity Copy icon (align mirrors bubble side: user self-end, assistant left under pl-7), click → navigator.clipboard.writeText(text) → flips to green var(--ok) Check ''Copied'' for ~2s then reverts (guarded ?. for insecure-origin/no-clipboard, silent fail); hidden on assistant while streaming. T406: CopyButton exported for reuse in markdown.tsx code block copy; className prop added for accent-aware color override. ToolMessage = collapsible card. Streaming blink cursor preserved. T334: onShowInFinder prop threaded to MessageFileChip for Show in Finder navigation.'
+  last_edited_ms: 1782390908747
 d0113e9c2175d3c2:
   path: crates/cp-mod-firecrawl/src/lib.rs
   description: 'Firecrawl module. 3 tools: scrape/search/map. Dynamic firecrawl_result panels. No state. Nested object params (location). Simple dispatch pattern.'
@@ -9494,6 +9518,10 @@ f8583c1fe89c00a1:
   path: web/src/components/finder/FinderViews.tsx
   description: 'Finder view modes: grid/list/columns(Miller)/gallery. T275 internal drag-and-drop: MOVE_MIME (''application/x-cp-move'') carries {paths} of the dragged selection; startItemDrag makes EVERY row draggable (drags whole multi-select if the row is selected, else just it; a lone folder also sets FOLDER_DRAG_MIME for sidebar pinning). folderDropProps = reusable drop-target handlers on FOLDER rows (grid/list/Miller): highlight on hover, can''t-drop-onto-self guard, onDrop→onMove(paths,folder). isMoveDrag/readMovePayload helpers. ViewHandlers gained onMove?. Per-view dragOver useState drives the drop highlight. itemCount() uses backend count. ColumnsView = live Miller (per-ancestor useFs). relOf strips agent-folder prefix.'
   last_edited_ms: 1781887805168
+f86326a465282da6:
+  path: web/src/lib/support/markdown.tsx
+  description: GFM markdown renderer (react-markdown + remark-gfm + remark-math + rehype-katex) themed to app tokens; default + onAccent variants. LaTeX via KaTeX ($...$ inline DISABLED, $$...$$ display). XSS-safe (no raw HTML). Code block copy button via CopyButton + extractText helper.
+  last_edited_ms: 1782382272041
 f892ce5853334499:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (author/timestamp headers, content, file refs, question indicators). Ctrl+V dispatch.'
