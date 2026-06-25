@@ -2926,6 +2926,10 @@
   path: crates/cp-mod-tree/src/types.rs
   description: Tree state types. TreeFileDescription (path, description, file_hash). TreeState (filter, open_folders, descriptions). DEFAULT_TREE_FILTER constant.
   last_edited_ms: 0
+4c6e6d76c577d3c9:
+  path: web/src/lib/api/index.ts
+  description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent + avatar CRUD + createCommand. Type re-exports from generated/types.gen (AgentMetrics, Vital, CreateAgentReceipt, RestartReceipt, RetireReceipt, UnretireReceipt, CommandReceipt, CreateCommandReceipt, RadarData). Re-exports ./auth + ./finder + ./body + ./env-keys. The @/lib/api single import surface.'
+  last_edited_ms: 1782423808491
 4c7ba801294b7e93:
   path: src/modules/conversation/panel.rs
   description: 'Conversation panel. Multi-level cache (full → per-message → input). Input hash includes selection anchor. Keybindings: Shift+Arrow selection, Ctrl/Alt+Arrow word jump, Ctrl+A select all, Ctrl+Backspace delete word. Enter send-on-empty-line logic.'
@@ -5974,6 +5978,10 @@
   path: crates/cp-mod-git/Cargo.toml
   description: 'Git module deps: cp-base, cp-render, crossterm, serde_json, regex.'
   last_edited_ms: 1780563847618
+9b0457ff4ef6955b:
+  path: web/src/lib/api/generated/sdk.gen.ts
+  description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
+  last_edited_ms: 1782423397512
 9b41ca57f6386942:
   path: web/src/components/finder/preview/previewParts.tsx
   description: 'Shared Finder preview leaf renderers: IconBtn, PreviewStatus, TruncatedNote, MarkdownPreview, TextPreview, FolderPreview, Generic, Meta/Row, Empty. Imported by both FinderPreview shell and livePreviews. 173 lines.'
@@ -5998,6 +6006,10 @@
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: selected thread''s full conversation + composer. Header-less, auto-scrolls to bottom on thread.id/log growth. X887: segmentLog() folds consecutive auto:true traces into runs, rendered by AutoRun as a 3-column CSS grid (verb · tool · intent) with colored columns (--interactive verb, foreground/70 tool, muted intent); parseAutoLine() splits the marker format. Normal messages keep bubble chrome. Renders embedded QuestionForm + fileRef chips. Passes status+focused+onSend to ThreadComposer.'
   last_edited_ms: 1781876994626
+9bb44250deb222ca:
+  path: web/src/lib/types.ts
+  description: 'Domain types barrel. Re-exports 15 backend types from generated/types.gen.ts (CallbackRow, EntityTable, LibraryItem, MemoryCard, QueueAction, RadarAnchor, RadarResult, ScratchCell, SpineNotif, ThreadQuestion, TodoItem, ToolCall, ToolGroup, ToolRow, TreeRow). Extended re-exports: Agent (+accent), ContextPanel (+PanelKind), ThreadMsg (+streaming), ThreadDetail (+typed log). Derived aliases: AgentStatus, ThreadStatus, Importance, NotifKind, LibraryKind. UI-only types: PanelKind, StreamPhase, ChatMessage, User, Finder*, ViewMode, Usage*.'
+  last_edited_ms: 1782423808425
 9bb5142dd0e6600d:
   path: src/llms/oai_providers/groq.rs
   description: Groq client. OpenAI-compatible with built-in tools (browser_search, code_interpreter) for GPT-OSS models. GROQ_API_KEY auth.
