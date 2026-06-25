@@ -16,6 +16,7 @@
 //! paths, so nesting them here required no change to their handler bodies.
 
 pub mod finder;
+mod helpers;
 pub mod meta;
 pub mod metrics;
 pub mod panels;

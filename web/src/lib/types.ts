@@ -35,6 +35,7 @@ export type {
 import type {
   Agent as GenAgent,
   ContextPanel as GenContextPanel,
+  FinderNode as GenFinderNode,
   ThreadDetail as GenThreadDetail,
   ThreadMsg as GenThreadMsg,
 } from "./api/generated/types.gen"
@@ -198,15 +199,11 @@ export interface SlidePreview {
   bullets: string[]
 }
 
-/** A node in the Finder's (mock) realm filesystem — confined to one agent. */
-export interface FinderNode {
-  name: string
-  path: string
+/** A node in the Finder's realm filesystem — base fields from the generated
+ *  OpenAPI type, extended with UI-enriched fields (kind refinement, preview
+ *  payloads, tags) that exist only on the client side. */
+export type FinderNode = Omit<GenFinderNode, "modified" | "kind"> & {
   kind: FinderKind
-  /** size in bytes (files only) */
-  size?: number
-  /** direct (non-hidden) child count — folders only, supplied by the backend */
-  count?: number
   /** human relative modified time, e.g. "2d ago" */
   modified: string
   /** human relative created time */

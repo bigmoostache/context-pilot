@@ -650,6 +650,29 @@ efe78c079599d3d0:
   tl_dr: 'User workflow preference: when exploring/describing files, MUST follow strict order: open files → describe in tree → close files → iterate to next batch. Never close before describing.'
   importance: critical
   last_edited_ms: 0
+f3090cd5b6320bde:
+  tl_dr: 'ARCHITECTURE: ALL logic in Rust backend. Frontend = dumb render layer, zero business logic. Backend is sole source of truth.'
+  contents: |-
+    Reasons:
+    1. Frontend may run on completely separate VM — no OS/filesystem/env access
+    2. Frontend is disposable. Backend is source of truth. One backend: Rust.
+    3. No logic duplication across frontend implementations (web, mobile, etc.)
+    4-7. Lower SEV exposure (repeated 4x for emphasis)
+
+    Consequences:
+    - No filesystem operations in frontend
+    - No env variable management in frontend
+    - No data transformation/reshaping in frontend (backend returns exactly what UI needs)
+    - Frontend only renders what the backend gives it
+    - Any new feature = Rust endpoint first, then thin SDK call in frontend
+  importance: critical
+  labels:
+  - architecture
+  - frontend
+  - backend
+  - SEV
+  - principle
+  last_edited_ms: 1782426985989
 f5d97b1e7a01c317:
   tl_dr: 'ALIGNMENT EPIC (X818/T120) DONE; HUD fully push-fed incl context meter + hit/miss split (T297). Stack: orchestrator :7878, web dev :5174. Context helpers in src/modules/overview/context.rs. OpEntryKind::ContextUsage carries used/threshold/budget + hit/miss.'
   importance: high

@@ -1,11 +1,12 @@
 // ── REST API client for the orchestration backend ────────────────────
 //
-// Two-layer barrel: endpoints whose backend response matches the OpenAPI
-// spec call the generated SDK directly (thin 1-line wrappers); endpoints
-// whose backend serialisation still diverges from the spec keep a manual
-// `request()` with a transformation.  The sub-modules (auth, finder, body,
-// env-keys) are re-exported so `@/lib/api` remains the single import
-// surface.
+// Every endpoint uses the generated SDK from openapi.json — zero manual
+// fetch calls.  Thin presentation wrappers (formatAge, mapRawQuestions)
+// reshape backend data for UI consumption; the API contract itself is
+// enforced by the generated types.
+//
+// The sub-modules (auth, finder, body, env-keys) are re-exported so
+// `@/lib/api` remains the single import surface.
 //
 // NOTE: setupClient.ts configures the hey-api singleton with
 // `throwOnError: true` + `responseStyle: 'data'`, so SDK calls return
@@ -51,6 +52,14 @@ import {
   getApiAgentByIdVitals,
   getApiAgentByIdLibrary,
   getApiAgentByIdUsage,
+  getApiAgentByIdThreads,
+  getApiAgentByIdMemory,
+  getApiAgentByIdTodos,
+  getApiAgentByIdSpine,
+  getApiAgentByIdQueue,
+  getApiAgentByIdScratchpad,
+  getApiAgentByIdTree,
+  getApiAgentByIdCallbacks,
   getApiMetrics,
   postApiFleetCreate,
   postApiAgentByIdRestart,
@@ -63,7 +72,7 @@ import {
   postApiAgentByIdLibraryCommand,
   postApiTicket,
 } from "./generated"
-import { request, buildCommandEnvelope } from "./client"
+import { buildCommandEnvelope, sdk } from "./client"
 
 export { getToken, setToken } from "./client"
 export * from "./auth"
@@ -82,12 +91,6 @@ export type { Vital } from "./generated/types.gen"
 export type { CreateCommandReceipt } from "./generated/types.gen"
 
 // ── Helper: align TS with runtime (setupClient.ts guarantees) ─────────
-
-/** SDK calls return `T` at runtime (throwOnError + responseStyle:'data'),
- *  but the generic defaults produce a wider type.  This cast is safe. */
-function sdk<T>(call: unknown): Promise<T> {
-  return call as Promise<T>
-}
 
 // ── Fleet (SDK) ───────────────────────────────────────────────────────
 
@@ -223,17 +226,10 @@ export async function mintTicket(): Promise<string> {
   return res.ticket
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Endpoints below keep manual request() because the backend response
-// format diverges from the OpenAPI spec (raw YAML dumps or wrapped
-// objects).  TODO: fix backend handlers to return spec-compliant shapes,
-// then migrate these to SDK calls.
-// ═══════════════════════════════════════════════════════════════════════
-
-// ── Threads (manual — backend field names differ from spec) ───────────
+// ── Threads (SDK + thin presentation wrapper) ────────────────────────
 
 /** Format an epoch-ms timestamp as a relative age string. */
-function formatAge(epochMs: number): string {
+export function formatAge(epochMs: number): string {
   const delta = Date.now() - epochMs
   if (delta < 60_000) return "just now"
   const mins = Math.floor(delta / 60_000)
@@ -242,41 +238,6 @@ function formatAge(epochMs: number): string {
   if (hrs < 24) return `${hrs}h ago`
   const days = Math.floor(hrs / 24)
   return `${days}d ago`
-}
-
-interface RawMsg {
-  id: string
-  role: string
-  content?: string
-  timestamp?: number
-  text?: string
-  author?: string
-  ts?: string
-  tool?: unknown
-  questions?: unknown
-  fileRef?: string
-  auto?: boolean
-}
-
-interface RawThread {
-  id: string
-  name: string
-  status: string
-  agentId: string
-  lastActivity: number | string
-  lastMessage?: string
-  messageCount?: number
-  unread?: number
-  archived?: boolean
-  paused?: boolean
-  log?: RawMsg[]
-  agent?: string
-  createdAt?: string
-}
-
-interface ThreadsResponse {
-  focusedThreadId: string | null
-  threads: RawThread[]
 }
 
 /** Map backend question JSON to frontend ThreadQuestion shape. */
@@ -296,133 +257,66 @@ export function mapRawQuestions(raw: unknown): ThreadDetail["log"][number]["ques
   }))
 }
 
-export function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
-  return request<ThreadsResponse | RawThread[]>(`/api/agent/${agentId}/threads`).then((raw) => {
-    const focusedId = Array.isArray(raw) ? null : raw.focusedThreadId
-    const list: RawThread[] = Array.isArray(raw) ? raw : (raw.threads ?? [])
-    return list.map((t) => ({
-      id: t.id,
-      name: t.name,
-      status: (t.status === "MyTurn" ? "MY_TURN" : t.status === "TheirTurn" ? "THEIR_TURN" : t.status) as ThreadDetail["status"],
-      agentId: t.agentId ?? agentId,
-      agent: t.agent ?? agentId,
-      createdAt: t.createdAt ?? (typeof t.lastActivity === "number" ? new Date(t.lastActivity).toISOString() : t.lastActivity),
-      lastActivity: typeof t.lastActivity === "number" ? formatAge(t.lastActivity) : t.lastActivity,
-      lastActivityMs: typeof t.lastActivity === "number" ? t.lastActivity : 0,
-      unread: t.unread ?? 0,
-      archived: t.archived ?? false,
-      paused: t.paused ?? false,
-      focused: focusedId != null && t.id === focusedId,
-      log: (t.log ?? []).map((m) => ({
-        id: m.id,
-        author: (m.author ?? m.role ?? "user") as "user" | "assistant",
-        text: m.text ?? m.content,
-        ts: m.ts ?? (m.timestamp ? new Date(m.timestamp).toISOString() : ""),
-        tool: m.tool as ThreadDetail["log"][number]["tool"],
-        questions: mapRawQuestions(m.questions),
-        fileRef: m.fileRef,
-        auto: m.auto,
-      })),
-    }))
-  })
+export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
+  const res = await sdk<{ focusedThreadId?: string | null; threads: ThreadDetail[] }>(
+    getApiAgentByIdThreads({ path: { id: agentId } }),
+  )
+  const focusedId = res.focusedThreadId ?? null
+  return res.threads.map((t) => ({
+    ...t,
+    agentId: t.agentId ?? agentId,
+    lastActivity: typeof t.lastActivity === "number"
+      ? formatAge(t.lastActivity as unknown as number)
+      : (t.lastActivity ?? ""),
+    lastActivityMs: typeof t.lastActivityMs === "number"
+      ? t.lastActivityMs
+      : (typeof t.lastActivity === "number" ? (t.lastActivity as unknown as number) : 0),
+    focused: focusedId != null && t.id === focusedId,
+    log: (t.log ?? []).map((m) => ({
+      ...m,
+      questions: mapRawQuestions(m.questions),
+    })),
+  }))
 }
 
-// ── Memory (manual — backend sends raw YAML map, not MemoryCard[]) ───
+// ── Memory (SDK) ──────────────────────────────────────────────────────
 
 export function fetchMemory(agentId: string): Promise<MemoryCard[]> {
-  return request<Record<string, Record<string, unknown>>>(`/api/agent/${agentId}/memory`).then((raw) => {
-    if (Array.isArray(raw)) return raw as unknown as MemoryCard[]
-    return Object.entries(raw).map(([_id, m], i) => ({
-      id: `M${i + 1}`,
-      tldr: (m.tl_dr ?? "") as string,
-      importance: (m.importance ?? "medium") as MemoryCard["importance"],
-      labels: (m.labels ?? []) as string[],
-    }))
-  })
+  return sdk(getApiAgentByIdMemory({ path: { id: agentId } }))
 }
 
-// ── Todos (manual — backend wraps in {todos: [...]}) ──────────────────
+// ── Todos (SDK) ───────────────────────────────────────────────────────
 
 export function fetchTodos(agentId: string): Promise<TodoItem[]> {
-  return request<Record<string, unknown>>(`/api/agent/${agentId}/todos`).then((raw) => {
-    if (Array.isArray(raw)) return raw as TodoItem[]
-    const todos = (raw.todos ?? []) as Array<Record<string, unknown>>
-    return todos.map((t) => ({
-      id: t.id as string,
-      name: t.name as string,
-      status: (t.status ?? "pending") as TodoItem["status"],
-      depth: (t.depth as number) ?? 0,
-    }))
-  })
+  return sdk(getApiAgentByIdTodos({ path: { id: agentId } }))
 }
 
-// ── Spine (manual — backend wraps in {notifications: [...]}) ──────────
+// ── Spine (SDK) ───────────────────────────────────────────────────────
 
 export function fetchSpine(agentId: string): Promise<SpineNotif[]> {
-  return request<Record<string, unknown>>(`/api/agent/${agentId}/spine`).then((raw) => {
-    if (Array.isArray(raw)) return raw as SpineNotif[]
-    const notifs = (raw.notifications ?? []) as Array<Record<string, unknown>>
-    return notifs.map((n) => ({
-      id: n.id as string,
-      kind: (n.notification_type ?? "custom") as SpineNotif["kind"],
-      time: n.timestamp_ms ? new Date(n.timestamp_ms as number).toISOString() : "",
-      text: (n.content ?? "") as string,
-      processed: n.status === "processed",
-    }))
-  })
+  return sdk(getApiAgentByIdSpine({ path: { id: agentId } }))
 }
 
-// ── Queue (manual — backend wraps in {queued_calls: [...]}) ───────────
+// ── Queue (SDK) ───────────────────────────────────────────────────────
 
 export function fetchQueue(agentId: string): Promise<QueueAction[]> {
-  return request<Record<string, unknown>>(`/api/agent/${agentId}/queue`).then((raw) => {
-    if (Array.isArray(raw)) return raw as QueueAction[]
-    return (raw.queued_calls ?? []) as QueueAction[]
-  })
+  return sdk(getApiAgentByIdQueue({ path: { id: agentId } }))
 }
 
-// ── Scratchpad (manual — backend wraps in {scratchpad_cells: [...]}) ──
+// ── Scratchpad (SDK) ──────────────────────────────────────────────────
 
 export function fetchScratchpad(agentId: string): Promise<ScratchCell[]> {
-  return request<Record<string, unknown>>(`/api/agent/${agentId}/scratchpad`).then((raw) => {
-    if (Array.isArray(raw)) return raw as ScratchCell[]
-    const cells = (raw.scratchpad_cells ?? []) as Array<Record<string, unknown>>
-    return cells.map((c) => ({
-      id: (c.id ?? "") as string,
-      title: (c.title ?? "") as string,
-      preview: ((c.content ?? "") as string).slice(0, 200),
-    }))
-  })
+  return sdk(getApiAgentByIdScratchpad({ path: { id: agentId } }))
 }
 
-// ── Tree (manual — backend sends raw YAML map, not TreeRow[]) ─────────
+// ── Tree (SDK) ────────────────────────────────────────────────────────
 
 export function fetchTree(agentId: string): Promise<TreeRow[]> {
-  return request<Record<string, Record<string, unknown>>>(`/api/agent/${agentId}/tree`).then((raw) => {
-    if (Array.isArray(raw)) return raw as unknown as TreeRow[]
-    return Object.values(raw).map((t) => ({
-      depth: 0,
-      name: ((t.path as string) ?? "").split("/").pop() ?? "",
-      kind: "file" as const,
-      desc: (t.description ?? "") as string,
-      changed: !!t.changed,
-    }))
-  })
+  return sdk(getApiAgentByIdTree({ path: { id: agentId } }))
 }
 
-// ── Callbacks (manual — backend sends raw YAML map, not CallbackRow[])─
+// ── Callbacks (SDK) ───────────────────────────────────────────────────
 
 export function fetchCallbacks(agentId: string): Promise<CallbackRow[]> {
-  return request<Record<string, Record<string, unknown>>>(`/api/agent/${agentId}/callbacks`).then((raw) => {
-    if (Array.isArray(raw)) return raw as unknown as CallbackRow[]
-    return Object.entries(raw).map(([id, c]) => ({
-      id,
-      name: (c.name ?? id) as string,
-      pattern: (c.pattern ?? "") as string,
-      blocking: !!c.blocking,
-      timeout: c.timeout ? `${c.timeout}s` : "",
-      scope: c.is_global ? "global" : "local",
-      cwd: (c.cwd ?? "") as string,
-    }))
-  })
+  return sdk(getApiAgentByIdCallbacks({ path: { id: agentId } }))
 }

@@ -177,10 +177,17 @@ export function applyThreadDelta(
       let raw: {
         id?: string
         author?: string
+        // The SSE inline_body carries the raw ThreadMessage from the TUI agent,
+        // which uses `content`/`timestamp`/`file_path`. The REST /threads
+        // endpoint reshapes these to `text`/`ts`/`fileRef` (thread_shape.rs B8).
+        // Accept BOTH variants so the delta reducer works regardless of source.
         text?: string | null
+        content?: string | null
         ts?: number
+        timestamp?: number
         question?: unknown
         fileRef?: string | null
+        file_path?: string | null
         auto?: boolean
       }
       try {
@@ -196,11 +203,13 @@ export function applyThreadDelta(
       // position — NOT from raw.id (`{thread}-m{n}`) or k.message_id — keeps the
       // two planes' ids identical, so mergeThreadLogs collapses them to one.
       const msgId = `msg_${thread.log.length}`
-      const msgTs = typeof raw.ts === "number" ? raw.ts : ts
+      const msgTs = typeof raw.ts === "number" ? raw.ts : (typeof raw.timestamp === "number" ? raw.timestamp : ts)
+      const msgText = raw.text ?? raw.content ?? undefined
+      const msgFileRef = raw.fileRef ?? raw.file_path ?? undefined
       const candidate = {
         author: raw.author === "user" ? "user" : "assistant",
         ts: new Date(msgTs).toISOString(),
-        text: raw.text ?? undefined,
+        text: msgText,
       }
       // Dedup by positional id OR content signature (T360). The id guard alone
       // misses a message that already landed via the backstop poll under a
@@ -212,10 +221,10 @@ export function applyThreadDelta(
       const appended: ThreadDetail["log"][number] = {
         id: msgId,
         author: raw.author === "user" ? "user" : "assistant",
-        text: raw.text ?? undefined,
+        text: msgText,
         ts: new Date(msgTs).toISOString(),
         questions: mapRawQuestions(raw.question),
-        fileRef: raw.fileRef ?? undefined,
+        fileRef: msgFileRef,
         auto: raw.auto ?? undefined,
       }
       return prev.map((t) =>

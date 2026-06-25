@@ -68,8 +68,8 @@ export type AuthLogin = {
 };
 
 export type AuthStatus = {
+    bootstrapped?: boolean;
     enabled: boolean;
-    hasUsers?: boolean;
 };
 
 export type AuthUser = {
@@ -114,6 +114,21 @@ export type ContextPanel = {
     tokens: number;
 };
 
+export type ConversationMsg = {
+    content: string;
+    id: string;
+    message_type?: string | null;
+    role: string;
+    timestamp_ms: number;
+    tool_results?: Array<{
+        [key: string]: unknown;
+    }> | null;
+    tool_uses?: Array<{
+        [key: string]: unknown;
+    }> | null;
+    uid: string;
+};
+
 export type CreateAgentReceipt = {
     folder: string;
     pid: number;
@@ -123,6 +138,10 @@ export type CreateAgentReceipt = {
 export type CreateCommandReceipt = {
     id: string;
     status: string;
+};
+
+export type CreateUserResponse = {
+    user: AuthUser;
 };
 
 export type EntityTable = {
@@ -135,7 +154,6 @@ export type EntityTable = {
 export type EnvKeyReveal = {
     env: string;
     exists: boolean;
-    label: string;
     masked?: string;
     value?: string;
 };
@@ -146,8 +164,49 @@ export type EnvKeyStatus = {
     label: string;
 };
 
+export type EnvKeyUpdateResult = {
+    env: string;
+    exists: boolean;
+    masked?: string;
+    persisted?: boolean;
+    value?: string;
+};
+
 export type Error = {
     error: string;
+};
+
+export type FinderNode = {
+    /**
+     * Visible children (folders only)
+     */
+    count?: number | null;
+    kind: 'folder' | 'file' | 'image' | 'pdf' | 'csv' | 'xlsx' | 'audio' | 'video' | 'markdown' | 'code' | 'archive';
+    /**
+     * Epoch ms
+     */
+    modified?: number;
+    name: string;
+    path: string;
+    size?: number | null;
+};
+
+export type ForceLogoutResponse = {
+    ok: boolean;
+    revoked_sessions?: number;
+};
+
+/**
+ * Map of relative path to description
+ */
+export type FsDescriptions = {
+    [key: string]: string;
+};
+
+export type FsPreview = {
+    content: string;
+    size: number;
+    truncated: boolean;
 };
 
 export type LibraryItem = {
@@ -166,6 +225,15 @@ export type MemoryCard = {
     importance: 'low' | 'medium' | 'high' | 'critical';
     labels: Array<string>;
     tldr: string;
+};
+
+export type MkdirResult = {
+    created: string;
+};
+
+export type MoveResult = {
+    moved: number;
+    skipped: number;
 };
 
 export type OkResponse = {
@@ -196,6 +264,14 @@ export type RadarResult = {
     score: number;
 };
 
+export type RegisterResponse = {
+    user: AuthUser;
+};
+
+export type RenameResult = {
+    renamed: string;
+};
+
 export type RestartReceipt = {
     folder: string;
     pid: number;
@@ -212,6 +288,16 @@ export type ScratchCell = {
     id: string;
     preview?: string;
     title: string;
+};
+
+export type SheetData = {
+    sheets: Array<SheetTab>;
+    truncated: boolean;
+};
+
+export type SheetTab = {
+    name: string;
+    rows: Array<Array<string>>;
 };
 
 export type SpineNotif = {
@@ -246,7 +332,7 @@ export type ThreadMsg = {
     questions?: Array<ThreadQuestion>;
     text?: string;
     tool?: ToolCall;
-    ts?: string;
+    ts?: number;
 };
 
 export type ThreadQuestion = {
@@ -296,6 +382,11 @@ export type ToolRow = {
     status: 'on' | 'off';
 };
 
+export type TrashResult = {
+    skipped: number;
+    trashed: number;
+};
+
 export type TreeRow = {
     changed?: boolean;
     depth: number;
@@ -313,6 +404,17 @@ export type UnretireReceipt = {
     status: string;
 };
 
+export type UploadResult = {
+    path: string;
+    written: number;
+};
+
+export type UploadUniqueResult = {
+    name: string;
+    path: string;
+    size: number;
+};
+
 export type Vital = {
     category: string;
     detail?: string;
@@ -320,6 +422,40 @@ export type Vital = {
     name: string;
     status: 'ok' | 'error' | 'unavailable';
 };
+
+export type WriteResult = {
+    path: string;
+    written: number;
+};
+
+export type GetApiAgentByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/agent/{id}';
+};
+
+export type GetApiAgentByIdErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiAgentByIdError = GetApiAgentByIdErrors[keyof GetApiAgentByIdErrors];
+
+export type GetApiAgentByIdResponses = {
+    /**
+     * Success
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type GetApiAgentByIdResponse = GetApiAgentByIdResponses[keyof GetApiAgentByIdResponses];
 
 export type GetApiAgentByIdAclData = {
     body?: never;
@@ -341,7 +477,7 @@ export type GetApiAgentByIdAclError = GetApiAgentByIdAclErrors[keyof GetApiAgent
 
 export type GetApiAgentByIdAclResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<AclEntry>;
 };
@@ -371,7 +507,7 @@ export type PostApiAgentByIdAclError = PostApiAgentByIdAclErrors[keyof PostApiAg
 
 export type PostApiAgentByIdAclResponses = {
     /**
-     * OK
+     * Success
      */
     200: AclEntry;
 };
@@ -399,7 +535,7 @@ export type DeleteApiAgentByIdAclByUserIdError = DeleteApiAgentByIdAclByUserIdEr
 
 export type DeleteApiAgentByIdAclByUserIdResponses = {
     /**
-     * OK
+     * Success
      */
     200: OkResponse;
 };
@@ -429,7 +565,7 @@ export type PatchApiAgentByIdAclByUserIdError = PatchApiAgentByIdAclByUserIdErro
 
 export type PatchApiAgentByIdAclByUserIdResponses = {
     /**
-     * OK
+     * Success
      */
     200: AclEntry;
 };
@@ -456,11 +592,9 @@ export type DeleteApiAgentByIdAvatarError = DeleteApiAgentByIdAvatarErrors[keyof
 
 export type DeleteApiAgentByIdAvatarResponses = {
     /**
-     * OK
+     * Success
      */
-    200: {
-        ok?: boolean;
-    };
+    200: OkResponse;
 };
 
 export type DeleteApiAgentByIdAvatarResponse = DeleteApiAgentByIdAvatarResponses[keyof DeleteApiAgentByIdAvatarResponses];
@@ -485,7 +619,7 @@ export type PostApiAgentByIdAvatarError = PostApiAgentByIdAvatarErrors[keyof Pos
 
 export type PostApiAgentByIdAvatarResponses = {
     /**
-     * OK
+     * Success
      */
     200: OkResponse;
 };
@@ -513,7 +647,7 @@ export type GetApiAgentByIdBodyByHashError = GetApiAgentByIdBodyByHashErrors[key
 
 export type GetApiAgentByIdBodyByHashResponses = {
     /**
-     * OK
+     * Success
      */
     200: BodyPayload;
 };
@@ -540,7 +674,7 @@ export type GetApiAgentByIdCallbacksError = GetApiAgentByIdCallbacksErrors[keyof
 
 export type GetApiAgentByIdCallbacksResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<CallbackRow>;
 };
@@ -569,12 +703,39 @@ export type PostApiAgentByIdCommandError = PostApiAgentByIdCommandErrors[keyof P
 
 export type PostApiAgentByIdCommandResponses = {
     /**
-     * OK
+     * Success
      */
     200: CommandReceipt;
 };
 
 export type PostApiAgentByIdCommandResponse = PostApiAgentByIdCommandResponses[keyof PostApiAgentByIdCommandResponses];
+
+export type GetApiAgentByIdConversationData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/agent/{id}/conversation';
+};
+
+export type GetApiAgentByIdConversationErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiAgentByIdConversationError = GetApiAgentByIdConversationErrors[keyof GetApiAgentByIdConversationErrors];
+
+export type GetApiAgentByIdConversationResponses = {
+    /**
+     * Success
+     */
+    200: Array<ConversationMsg>;
+};
+
+export type GetApiAgentByIdConversationResponse = GetApiAgentByIdConversationResponses[keyof GetApiAgentByIdConversationResponses];
 
 export type GetApiAgentByIdEntitiesData = {
     body?: never;
@@ -596,12 +757,374 @@ export type GetApiAgentByIdEntitiesError = GetApiAgentByIdEntitiesErrors[keyof G
 
 export type GetApiAgentByIdEntitiesResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<EntityTable>;
 };
 
 export type GetApiAgentByIdEntitiesResponse = GetApiAgentByIdEntitiesResponses[keyof GetApiAgentByIdEntitiesResponses];
+
+export type GetApiAgentByIdFsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        path?: string;
+    };
+    url: '/api/agent/{id}/fs';
+};
+
+export type GetApiAgentByIdFsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiAgentByIdFsError = GetApiAgentByIdFsErrors[keyof GetApiAgentByIdFsErrors];
+
+export type GetApiAgentByIdFsResponses = {
+    /**
+     * Success
+     */
+    200: Array<FinderNode>;
+};
+
+export type GetApiAgentByIdFsResponse = GetApiAgentByIdFsResponses[keyof GetApiAgentByIdFsResponses];
+
+export type GetApiAgentByIdFsDescriptionsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/agent/{id}/fs/descriptions';
+};
+
+export type GetApiAgentByIdFsDescriptionsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiAgentByIdFsDescriptionsError = GetApiAgentByIdFsDescriptionsErrors[keyof GetApiAgentByIdFsDescriptionsErrors];
+
+export type GetApiAgentByIdFsDescriptionsResponses = {
+    /**
+     * Success
+     */
+    200: FsDescriptions;
+};
+
+export type GetApiAgentByIdFsDescriptionsResponse = GetApiAgentByIdFsDescriptionsResponses[keyof GetApiAgentByIdFsDescriptionsResponses];
+
+export type GetApiAgentByIdFsDownloadData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/agent/{id}/fs/download';
+};
+
+export type GetApiAgentByIdFsDownloadResponses = {
+    /**
+     * Raw file bytes
+     */
+    200: Blob | File;
+};
+
+export type GetApiAgentByIdFsDownloadResponse = GetApiAgentByIdFsDownloadResponses[keyof GetApiAgentByIdFsDownloadResponses];
+
+export type PostApiAgentByIdFsMkdirData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+        name: string;
+    };
+    url: '/api/agent/{id}/fs/mkdir';
+};
+
+export type PostApiAgentByIdFsMkdirErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiAgentByIdFsMkdirError = PostApiAgentByIdFsMkdirErrors[keyof PostApiAgentByIdFsMkdirErrors];
+
+export type PostApiAgentByIdFsMkdirResponses = {
+    /**
+     * Success
+     */
+    200: MkdirResult;
+};
+
+export type PostApiAgentByIdFsMkdirResponse = PostApiAgentByIdFsMkdirResponses[keyof PostApiAgentByIdFsMkdirResponses];
+
+export type PostApiAgentByIdFsMoveData = {
+    body: {
+        dest: string;
+        items: Array<string>;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/agent/{id}/fs/move';
+};
+
+export type PostApiAgentByIdFsMoveErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiAgentByIdFsMoveError = PostApiAgentByIdFsMoveErrors[keyof PostApiAgentByIdFsMoveErrors];
+
+export type PostApiAgentByIdFsMoveResponses = {
+    /**
+     * Success
+     */
+    200: MoveResult;
+};
+
+export type PostApiAgentByIdFsMoveResponse = PostApiAgentByIdFsMoveResponses[keyof PostApiAgentByIdFsMoveResponses];
+
+export type GetApiAgentByIdFsPreviewData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/agent/{id}/fs/preview';
+};
+
+export type GetApiAgentByIdFsPreviewErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiAgentByIdFsPreviewError = GetApiAgentByIdFsPreviewErrors[keyof GetApiAgentByIdFsPreviewErrors];
+
+export type GetApiAgentByIdFsPreviewResponses = {
+    /**
+     * Success
+     */
+    200: FsPreview;
+};
+
+export type GetApiAgentByIdFsPreviewResponse = GetApiAgentByIdFsPreviewResponses[keyof GetApiAgentByIdFsPreviewResponses];
+
+export type GetApiAgentByIdFsRawData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/agent/{id}/fs/raw';
+};
+
+export type GetApiAgentByIdFsRawResponses = {
+    /**
+     * Raw file bytes inline
+     */
+    200: Blob | File;
+};
+
+export type GetApiAgentByIdFsRawResponse = GetApiAgentByIdFsRawResponses[keyof GetApiAgentByIdFsRawResponses];
+
+export type PostApiAgentByIdFsRenameData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+        name: string;
+    };
+    url: '/api/agent/{id}/fs/rename';
+};
+
+export type PostApiAgentByIdFsRenameErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiAgentByIdFsRenameError = PostApiAgentByIdFsRenameErrors[keyof PostApiAgentByIdFsRenameErrors];
+
+export type PostApiAgentByIdFsRenameResponses = {
+    /**
+     * Success
+     */
+    200: RenameResult;
+};
+
+export type PostApiAgentByIdFsRenameResponse = PostApiAgentByIdFsRenameResponses[keyof PostApiAgentByIdFsRenameResponses];
+
+export type GetApiAgentByIdFsSheetData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/agent/{id}/fs/sheet';
+};
+
+export type GetApiAgentByIdFsSheetErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiAgentByIdFsSheetError = GetApiAgentByIdFsSheetErrors[keyof GetApiAgentByIdFsSheetErrors];
+
+export type GetApiAgentByIdFsSheetResponses = {
+    /**
+     * Success
+     */
+    200: SheetData;
+};
+
+export type GetApiAgentByIdFsSheetResponse = GetApiAgentByIdFsSheetResponses[keyof GetApiAgentByIdFsSheetResponses];
+
+export type PostApiAgentByIdFsTrashData = {
+    body: {
+        items: Array<string>;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/agent/{id}/fs/trash';
+};
+
+export type PostApiAgentByIdFsTrashErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiAgentByIdFsTrashError = PostApiAgentByIdFsTrashErrors[keyof PostApiAgentByIdFsTrashErrors];
+
+export type PostApiAgentByIdFsTrashResponses = {
+    /**
+     * Success
+     */
+    200: TrashResult;
+};
+
+export type PostApiAgentByIdFsTrashResponse = PostApiAgentByIdFsTrashResponses[keyof PostApiAgentByIdFsTrashResponses];
+
+export type PostApiAgentByIdFsUploadData = {
+    body: Blob | File;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+        name: string;
+    };
+    url: '/api/agent/{id}/fs/upload';
+};
+
+export type PostApiAgentByIdFsUploadErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiAgentByIdFsUploadError = PostApiAgentByIdFsUploadErrors[keyof PostApiAgentByIdFsUploadErrors];
+
+export type PostApiAgentByIdFsUploadResponses = {
+    /**
+     * Success
+     */
+    200: UploadResult;
+};
+
+export type PostApiAgentByIdFsUploadResponse = PostApiAgentByIdFsUploadResponses[keyof PostApiAgentByIdFsUploadResponses];
+
+export type PostApiAgentByIdFsUploadUniqueData = {
+    body: Blob | File;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+        name: string;
+    };
+    url: '/api/agent/{id}/fs/upload-unique';
+};
+
+export type PostApiAgentByIdFsUploadUniqueErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiAgentByIdFsUploadUniqueError = PostApiAgentByIdFsUploadUniqueErrors[keyof PostApiAgentByIdFsUploadUniqueErrors];
+
+export type PostApiAgentByIdFsUploadUniqueResponses = {
+    /**
+     * Success
+     */
+    200: UploadUniqueResult;
+};
+
+export type PostApiAgentByIdFsUploadUniqueResponse = PostApiAgentByIdFsUploadUniqueResponses[keyof PostApiAgentByIdFsUploadUniqueResponses];
+
+export type PostApiAgentByIdFsWriteData = {
+    body: string;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/agent/{id}/fs/write';
+};
+
+export type PostApiAgentByIdFsWriteErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiAgentByIdFsWriteError = PostApiAgentByIdFsWriteErrors[keyof PostApiAgentByIdFsWriteErrors];
+
+export type PostApiAgentByIdFsWriteResponses = {
+    /**
+     * Success
+     */
+    200: WriteResult;
+};
+
+export type PostApiAgentByIdFsWriteResponse = PostApiAgentByIdFsWriteResponses[keyof PostApiAgentByIdFsWriteResponses];
 
 export type GetApiAgentByIdLibraryData = {
     body?: never;
@@ -623,7 +1146,7 @@ export type GetApiAgentByIdLibraryError = GetApiAgentByIdLibraryErrors[keyof Get
 
 export type GetApiAgentByIdLibraryResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<LibraryItem>;
 };
@@ -654,7 +1177,7 @@ export type PostApiAgentByIdLibraryCommandError = PostApiAgentByIdLibraryCommand
 
 export type PostApiAgentByIdLibraryCommandResponses = {
     /**
-     * OK
+     * Success
      */
     200: CreateCommandReceipt;
 };
@@ -681,7 +1204,7 @@ export type GetApiAgentByIdMemoryError = GetApiAgentByIdMemoryErrors[keyof GetAp
 
 export type GetApiAgentByIdMemoryResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<MemoryCard>;
 };
@@ -708,7 +1231,7 @@ export type GetApiAgentByIdMetaError = GetApiAgentByIdMetaErrors[keyof GetApiAge
 
 export type GetApiAgentByIdMetaResponses = {
     /**
-     * OK
+     * Success
      */
     200: Agent;
 };
@@ -735,7 +1258,7 @@ export type GetApiAgentByIdMetricsError = GetApiAgentByIdMetricsErrors[keyof Get
 
 export type GetApiAgentByIdMetricsResponses = {
     /**
-     * OK
+     * Success
      */
     200: AgentMetrics;
 };
@@ -762,7 +1285,7 @@ export type GetApiAgentByIdPanelsError = GetApiAgentByIdPanelsErrors[keyof GetAp
 
 export type GetApiAgentByIdPanelsResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<ContextPanel>;
 };
@@ -789,7 +1312,7 @@ export type GetApiAgentByIdQueueError = GetApiAgentByIdQueueErrors[keyof GetApiA
 
 export type GetApiAgentByIdQueueResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<QueueAction>;
 };
@@ -816,7 +1339,7 @@ export type GetApiAgentByIdRadarError = GetApiAgentByIdRadarErrors[keyof GetApiA
 
 export type GetApiAgentByIdRadarResponses = {
     /**
-     * OK
+     * Success
      */
     200: RadarData;
 };
@@ -845,7 +1368,7 @@ export type PostApiAgentByIdRenameError = PostApiAgentByIdRenameErrors[keyof Pos
 
 export type PostApiAgentByIdRenameResponses = {
     /**
-     * OK
+     * Success
      */
     200: OkResponse;
 };
@@ -872,7 +1395,7 @@ export type PostApiAgentByIdRestartError = PostApiAgentByIdRestartErrors[keyof P
 
 export type PostApiAgentByIdRestartResponses = {
     /**
-     * OK
+     * Success
      */
     200: RestartReceipt;
 };
@@ -899,7 +1422,7 @@ export type PostApiAgentByIdRetireError = PostApiAgentByIdRetireErrors[keyof Pos
 
 export type PostApiAgentByIdRetireResponses = {
     /**
-     * OK
+     * Success
      */
     200: RetireReceipt;
 };
@@ -926,7 +1449,7 @@ export type GetApiAgentByIdScratchpadError = GetApiAgentByIdScratchpadErrors[key
 
 export type GetApiAgentByIdScratchpadResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<ScratchCell>;
 };
@@ -953,7 +1476,7 @@ export type GetApiAgentByIdSpineError = GetApiAgentByIdSpineErrors[keyof GetApiA
 
 export type GetApiAgentByIdSpineResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<SpineNotif>;
 };
@@ -980,7 +1503,7 @@ export type GetApiAgentByIdThreadsError = GetApiAgentByIdThreadsErrors[keyof Get
 
 export type GetApiAgentByIdThreadsResponses = {
     /**
-     * OK
+     * Success
      */
     200: ThreadsResponse;
 };
@@ -1007,7 +1530,7 @@ export type GetApiAgentByIdTodosError = GetApiAgentByIdTodosErrors[keyof GetApiA
 
 export type GetApiAgentByIdTodosResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<TodoItem>;
 };
@@ -1034,7 +1557,7 @@ export type GetApiAgentByIdToolsError = GetApiAgentByIdToolsErrors[keyof GetApiA
 
 export type GetApiAgentByIdToolsResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<ToolGroup>;
 };
@@ -1061,7 +1584,7 @@ export type GetApiAgentByIdTreeError = GetApiAgentByIdTreeErrors[keyof GetApiAge
 
 export type GetApiAgentByIdTreeResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<TreeRow>;
 };
@@ -1088,7 +1611,7 @@ export type PostApiAgentByIdUnretireError = PostApiAgentByIdUnretireErrors[keyof
 
 export type PostApiAgentByIdUnretireResponses = {
     /**
-     * OK
+     * Success
      */
     200: UnretireReceipt;
 };
@@ -1115,7 +1638,7 @@ export type GetApiAgentByIdUsageError = GetApiAgentByIdUsageErrors[keyof GetApiA
 
 export type GetApiAgentByIdUsageResponses = {
     /**
-     * OK
+     * Success
      */
     200: {
         [key: string]: unknown;
@@ -1144,7 +1667,7 @@ export type GetApiAgentByIdVitalsError = GetApiAgentByIdVitalsErrors[keyof GetAp
 
 export type GetApiAgentByIdVitalsResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<Vital>;
 };
@@ -1172,7 +1695,7 @@ export type PostApiAuthLoginError = PostApiAuthLoginErrors[keyof PostApiAuthLogi
 
 export type PostApiAuthLoginResponses = {
     /**
-     * OK
+     * Success
      */
     200: AuthLogin;
 };
@@ -1197,7 +1720,7 @@ export type PostApiAuthLogoutError = PostApiAuthLogoutErrors[keyof PostApiAuthLo
 
 export type PostApiAuthLogoutResponses = {
     /**
-     * OK
+     * Success
      */
     200: OkResponse;
 };
@@ -1222,7 +1745,7 @@ export type GetApiAuthMeError = GetApiAuthMeErrors[keyof GetApiAuthMeErrors];
 
 export type GetApiAuthMeResponses = {
     /**
-     * OK
+     * Success
      */
     200: AuthUser;
 };
@@ -1251,9 +1774,9 @@ export type PostApiAuthRegisterError = PostApiAuthRegisterErrors[keyof PostApiAu
 
 export type PostApiAuthRegisterResponses = {
     /**
-     * OK
+     * Success
      */
-    200: AuthLogin;
+    200: RegisterResponse;
 };
 
 export type PostApiAuthRegisterResponse = PostApiAuthRegisterResponses[keyof PostApiAuthRegisterResponses];
@@ -1276,7 +1799,7 @@ export type GetApiAuthStatusError = GetApiAuthStatusErrors[keyof GetApiAuthStatu
 
 export type GetApiAuthStatusResponses = {
     /**
-     * OK
+     * Success
      */
     200: AuthStatus;
 };
@@ -1301,7 +1824,7 @@ export type GetApiAuthUsersError = GetApiAuthUsersErrors[keyof GetApiAuthUsersEr
 
 export type GetApiAuthUsersResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<AuthUser>;
 };
@@ -1331,16 +1854,18 @@ export type PostApiAuthUsersError = PostApiAuthUsersErrors[keyof PostApiAuthUser
 
 export type PostApiAuthUsersResponses = {
     /**
-     * OK
+     * Success
      */
-    200: AuthUser;
+    200: CreateUserResponse;
 };
 
 export type PostApiAuthUsersResponse = PostApiAuthUsersResponses[keyof PostApiAuthUsersResponses];
 
 export type DeleteApiAuthUsersByUserIdData = {
     body?: never;
-    path?: never;
+    path: {
+        userId: string;
+    };
     query?: never;
     url: '/api/auth/users/{userId}';
 };
@@ -1356,18 +1881,18 @@ export type DeleteApiAuthUsersByUserIdError = DeleteApiAuthUsersByUserIdErrors[k
 
 export type DeleteApiAuthUsersByUserIdResponses = {
     /**
-     * OK
+     * Success
      */
-    200: {
-        ok?: boolean;
-    };
+    200: OkResponse;
 };
 
 export type DeleteApiAuthUsersByUserIdResponse = DeleteApiAuthUsersByUserIdResponses[keyof DeleteApiAuthUsersByUserIdResponses];
 
 export type PostApiAuthUsersByUserIdLogoutData = {
     body?: never;
-    path?: never;
+    path: {
+        userId: string;
+    };
     query?: never;
     url: '/api/auth/users/{userId}/logout';
 };
@@ -1383,9 +1908,9 @@ export type PostApiAuthUsersByUserIdLogoutError = PostApiAuthUsersByUserIdLogout
 
 export type PostApiAuthUsersByUserIdLogoutResponses = {
     /**
-     * OK
+     * Success
      */
-    200: OkResponse;
+    200: ForceLogoutResponse;
 };
 
 export type PostApiAuthUsersByUserIdLogoutResponse = PostApiAuthUsersByUserIdLogoutResponses[keyof PostApiAuthUsersByUserIdLogoutResponses];
@@ -1408,7 +1933,7 @@ export type GetApiEnvKeysError = GetApiEnvKeysErrors[keyof GetApiEnvKeysErrors];
 
 export type GetApiEnvKeysResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<EnvKeyStatus>;
 };
@@ -1417,7 +1942,9 @@ export type GetApiEnvKeysResponse = GetApiEnvKeysResponses[keyof GetApiEnvKeysRe
 
 export type GetApiEnvKeysByNameData = {
     body?: never;
-    path?: never;
+    path: {
+        name: string;
+    };
     query?: never;
     url: '/api/env-keys/{name}';
 };
@@ -1433,7 +1960,7 @@ export type GetApiEnvKeysByNameError = GetApiEnvKeysByNameErrors[keyof GetApiEnv
 
 export type GetApiEnvKeysByNameResponses = {
     /**
-     * OK
+     * Success
      */
     200: EnvKeyReveal;
 };
@@ -1441,7 +1968,9 @@ export type GetApiEnvKeysByNameResponses = {
 export type GetApiEnvKeysByNameResponse = GetApiEnvKeysByNameResponses[keyof GetApiEnvKeysByNameResponses];
 
 export type PutApiEnvKeysByNameData = {
-    body: string;
+    body: {
+        value: string;
+    };
     path: {
         name: string;
     };
@@ -1460,12 +1989,39 @@ export type PutApiEnvKeysByNameError = PutApiEnvKeysByNameErrors[keyof PutApiEnv
 
 export type PutApiEnvKeysByNameResponses = {
     /**
-     * OK
+     * Success
      */
-    200: OkResponse;
+    200: EnvKeyUpdateResult;
 };
 
 export type PutApiEnvKeysByNameResponse = PutApiEnvKeysByNameResponses[keyof PutApiEnvKeysByNameResponses];
+
+export type GetApiFleetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/fleet';
+};
+
+export type GetApiFleetErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetError = GetApiFleetErrors[keyof GetApiFleetErrors];
+
+export type GetApiFleetResponses = {
+    /**
+     * Success
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type GetApiFleetResponse = GetApiFleetResponses[keyof GetApiFleetResponses];
 
 export type PostApiFleetCreateData = {
     body: {
@@ -1489,7 +2045,7 @@ export type PostApiFleetCreateError = PostApiFleetCreateErrors[keyof PostApiFlee
 
 export type PostApiFleetCreateResponses = {
     /**
-     * OK
+     * Success
      */
     200: CreateAgentReceipt;
 };
@@ -1514,7 +2070,7 @@ export type GetApiFleetMetaError = GetApiFleetMetaErrors[keyof GetApiFleetMetaEr
 
 export type GetApiFleetMetaResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<Agent>;
 };
@@ -1539,7 +2095,7 @@ export type GetApiFleetRetiredError = GetApiFleetRetiredErrors[keyof GetApiFleet
 
 export type GetApiFleetRetiredResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<Agent>;
 };
@@ -1564,7 +2120,7 @@ export type GetApiHealthError = GetApiHealthErrors[keyof GetApiHealthErrors];
 
 export type GetApiHealthResponses = {
     /**
-     * OK
+     * Success
      */
     200: {
         status?: string;
@@ -1591,7 +2147,7 @@ export type GetApiMetricsError = GetApiMetricsErrors[keyof GetApiMetricsErrors];
 
 export type GetApiMetricsResponses = {
     /**
-     * OK
+     * Success
      */
     200: Array<AgentMetrics>;
 };
@@ -1616,7 +2172,7 @@ export type PostApiTicketError = PostApiTicketErrors[keyof PostApiTicketErrors];
 
 export type PostApiTicketResponses = {
     /**
-     * OK
+     * Success
      */
     200: TicketResponse;
 };
