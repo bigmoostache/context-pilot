@@ -650,6 +650,10 @@
   path: src/app/actions/cursor.rs
   description: Cursor movement, text editing, selection management, command expansion. Selection helpers (delete/clear/extend). Sentinel detection + skip. Single-char and word movement with selection variants. handle_command_expansion, handle_input_backspace, handle_delete_word_left.
   last_edited_ms: 0
+113f14ca076d759a:
+  path: web/src/lib/api/index.ts
+  description: 'REST API client barrel. SDK layer: 22 endpoints use generated SDK functions (fleet, panels, tools, radar, entities, metrics, vitals, usage, library, lifecycle, avatar, commands, ticket). Manual layer: 8 endpoints keep request() with transformations (threads, memory, todos, spine, queue, scratchpad, tree, callbacks) because backend response format diverges from OpenAPI spec. Re-exports ./auth + ./finder + ./body + ./env-keys.'
+  last_edited_ms: 1782425537586
 114cba4e3d81254f:
   path: src/infra/config.rs
   description: 'Re-exports: active_theme/set_active_theme, LIBRARY/PROMPTS/THEME_ORDER/normalize_icon from cp_base::config'
@@ -1458,6 +1462,10 @@
   path: docs/trust-center/trust.css
   description: Shared CSS for all Trust Center pages. Enterprise slate/navy palette, Inter + IBM Plex Mono fonts, fixed sidebar nav, breadcrumbs, cards, tables, badges, policy blocks, FAQ accordion, status dots, CTA buttons, responsive (sidebar hides <960px). 631 lines.
   last_edited_ms: 1782133438192
+259993b5c0a816d3:
+  path: web/src/lib/api/generated/client/index.ts
+  description: 'Client barrel re-exports: createClient, createConfig, mergeHeaders, type exports (Client, Config, Options, RequestResult, TDataShape, etc).'
+  last_edited_ms: 1782425020257
 25c411f4e4753d79:
   path: crates/cp-orchestrator/src/services/mod.rs
   description: 'services/ hub: declares + re-exports MaterializedView/AgentView/CostSnapshot, CostBreaker/Verdict, StreamHub/Subscriber.'
@@ -1570,6 +1578,10 @@
   path: .github/workflows/pr-cleanup.yml
   description: 'CI: stale PR auto-cleanup'
   last_edited_ms: 0
+28bd716a8391acdb:
+  path: web/src/lib/api/generated/client/types.gen.ts
+  description: 'Client type definitions: Config, RequestOptions, RequestResult (generic over ThrowOnError + ResponseStyle), ClientOptions, Client interface with HTTP method fns + interceptors + SSE. TDataShape for SDK Options. ResponseStyle = ''data'' | ''fields''.'
+  last_edited_ms: 1782425020319
 28c2b4ddd3bbf30c:
   path: src/app/run/threads/bridge.rs
   description: Bridge command intake + live-state emission (gated bridge-ON). emit_thread_status seeds from oplog roster, uses MemoSeeds bitfield accessors. emit_thread_focus uses MemoSeeds.focus()/seed_focus(). emit_vitals=best-effort. emit_roster_delta=durable. wire_turn. Command APPLICATION in sibling commands.rs.
@@ -2642,6 +2654,10 @@
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
   last_edited_ms: 0
+4380b1cb82f35936:
+  path: web/src/lib/api/generated/client/client.gen.ts
+  description: Client factory (createClient). Configurable fetch-based HTTP client with interceptors (request/response/error), SSE support, response parsing (json/stream/blob/etc), throwOnError support. Singleton configured via setConfig().
+  last_edited_ms: 1782425020225
 43bb987e2fb2fc3c:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
@@ -3366,6 +3382,10 @@
   path: crates/cp-mod-spine/src/types.rs
   description: 'Notification/SpineState/SpineConfig types. NotificationType (UserMessage/ReloadResume/Custom), NotificationStatus (Unprocessed/Blocked/Processed). SpineConfig: guard rail limits + runtime tracking. SpineState: create/mark/delete/unblock notifications. mark_all_unprocessed_as_processed() for continuation consumption.'
   last_edited_ms: 0
+569604154b4c1937:
+  path: web/src/lib/api/setupClient.ts
+  description: 'Side-effect module imported once at app startup. Configures the @hey-api generated client singleton: baseUrl from VITE_API_URL, throwOnError:true, responseStyle:''data''. Request interceptor injects Bearer token. Error interceptor clears token + dispatches cp-auth-expired on 401.'
+  last_edited_ms: 1782425537522
 56be46c397fb36d5:
   path: .gitignore
   description: Git ignore rules
@@ -5618,6 +5638,10 @@
   path: ui/src/components/conversation/InputBar.tsx
   description: 'Mock input bar: blinking caret, key hints (send/cycle-view/file). Non-functional (design only).'
   last_edited_ms: 1781458541355
+90af66ae846c2c38:
+  path: web/src/main.tsx
+  description: React entry point. Imports setupClient.ts (hey-api config side-effect), createRoot → StrictMode → QueryClientProvider (TanStack shared queryClient) wrapping <App/>. Activates TanStack Query cache + SSE push-plane.
+  last_edited_ms: 1782425537555
 90b4bfb29616f302:
   path: src/app/run/threads/bridge.rs
   description: 'Bridge command intake + live-state emission (gated bridge-ON). accept_commands: non-blocking accept off the listener, then set_nonblocking(FALSE) on the accepted stream BEFORE handle_connection — the accepted fd INHERITS the listener''s non-blocking flag (macOS / Linux-without-accept4), so left non-blocking the read loop hits a transient WouldBlock the instant the AF_UNIX socket buffer (~8KiB) drains mid-frame and treats it as fatal → any command larger than the buffer closes the connection → backend BrokenPipe / 502 ''agent unreachable'' (the ''big messages don''t go through'' bug, T274). Forcing blocking makes the 500ms per-read timeout the real wedge-guard. poll_bridge_commands drains ALL pending commands/tick (Leg 3) → super::commands::apply_command, then save_state_async() when ≥1 applied — LOAD-BEARING for config-only mutations with NO oplog delta (chiefly Configure provider+model, T262; else reverts on reload). emit_roster_delta (pub(super)) = non-blocking DURABLE oplog append on thread mutation. emit_vitals = best-effort PhaseTransition+CostAggregate on-change. emit_thread_status = DURABLE ThreadStatusChanged on flip (observe-on-change vs memo). emit_thread_focus = BEST-EFFORT ThreadFocusChanged on change (self-heals from disk FocusState). wire_turn (pub(super)) ThreadStatus→ThreadTurn. Command APPLICATION in sibling commands.rs.'
@@ -6926,6 +6950,10 @@ b2587ecb9c9dda41:
   path: yamls/tools/spine.yaml
   description: 'Spine tool YAML. 3 tools: notification_mark_processed, spine_configure (max_cost is burst/stream-based), coucou (timer/datetime scheduling).'
   last_edited_ms: 0
+b262c136635cef72:
+  path: web/src/lib/api/generated/client.gen.ts
+  description: Default client singleton instance. Creates the shared @hey-api client with baseUrl localhost:7878. SDK functions import this as their default client. Configured at runtime via setupClient.ts.
+  last_edited_ms: 1782425020288
 b269061204ca853d:
   path: yamls/tools/ocr.yaml
   description: 'OCR tool YAML. Single tool: ocr with path/mode/output params. Datalab Surya engine, markdown or text_boxes modes.'
