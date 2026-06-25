@@ -1,9 +1,17 @@
 // ── REST API client for the orchestration backend ────────────────────
 //
-// Fleet/agent/threads/panels/commands/metrics/vitals endpoints. The Finder
-// filesystem endpoints live in ./finder and are re-exported here so `@/lib/api`
-// remains the single import surface. Shared `request`/`BASE`/envelope helpers
-// live in ./client.
+// Two-layer barrel: endpoints whose backend response matches the OpenAPI
+// spec call the generated SDK directly (thin 1-line wrappers); endpoints
+// whose backend serialisation still diverges from the spec keep a manual
+// `request()` with a transformation.  The sub-modules (auth, finder, body,
+// env-keys) are re-exported so `@/lib/api` remains the single import
+// surface.
+//
+// NOTE: setupClient.ts configures the hey-api singleton with
+// `throwOnError: true` + `responseStyle: 'data'`, so SDK calls return
+// data directly and throw on non-2xx.  TypeScript generics default to
+// `ThrowOnError = false`, hence the `as` casts below — they align the
+// compile-time type with the runtime guarantee.
 
 import type {
   Agent,
@@ -31,6 +39,30 @@ import type {
   UnretireReceipt,
   Vital,
 } from "./generated/types.gen"
+import {
+  getApiFleetMeta,
+  getApiFleetRetired,
+  getApiAgentByIdMeta,
+  getApiAgentByIdPanels,
+  getApiAgentByIdTools,
+  getApiAgentByIdRadar,
+  getApiAgentByIdEntities,
+  getApiAgentByIdMetrics,
+  getApiAgentByIdVitals,
+  getApiAgentByIdLibrary,
+  getApiAgentByIdUsage,
+  getApiMetrics,
+  postApiFleetCreate,
+  postApiAgentByIdRestart,
+  postApiAgentByIdRetire,
+  postApiAgentByIdUnretire,
+  postApiAgentByIdRename,
+  postApiAgentByIdAvatar,
+  deleteApiAgentByIdAvatar,
+  postApiAgentByIdCommand,
+  postApiAgentByIdLibraryCommand,
+  postApiTicket,
+} from "./generated"
 import { request, buildCommandEnvelope } from "./client"
 
 export { getToken, setToken } from "./client"
@@ -39,111 +71,168 @@ export * from "./finder"
 export * from "./body"
 export * from "./env-keys"
 
-// ── Fleet ─────────────────────────────────────────────────────────────
-export function fetchFleet(): Promise<Agent[]> {
-  return request("/api/fleet/meta")
-}
-
-// ── Create agent ──────────────────────────────────────────────────────
+// ── Type re-exports ───────────────────────────────────────────────────
 
 export type { CreateAgentReceipt } from "./generated/types.gen"
+export type { RestartReceipt } from "./generated/types.gen"
+export type { RetireReceipt, UnretireReceipt } from "./generated/types.gen"
+export type { RadarData } from "./generated/types.gen"
+export type { AgentMetrics } from "./generated/types.gen"
+export type { Vital } from "./generated/types.gen"
+export type { CreateCommandReceipt } from "./generated/types.gen"
 
-/** Create a new agent: the backend mkdir's its realm folder and spawns the
- *  `cp` TUI on a pty (so the full agent stack runs). `model` is accepted for
- *  forward-compat but not yet applied (the TUI has no `--model` flag). */
+// ── Helper: align TS with runtime (setupClient.ts guarantees) ─────────
+
+/** SDK calls return `T` at runtime (throwOnError + responseStyle:'data'),
+ *  but the generic defaults produce a wider type.  This cast is safe. */
+function sdk<T>(call: unknown): Promise<T> {
+  return call as Promise<T>
+}
+
+// ── Fleet (SDK) ───────────────────────────────────────────────────────
+
+export function fetchFleet(): Promise<Agent[]> {
+  return sdk(getApiFleetMeta())
+}
+
+export function fetchRetiredFleet(): Promise<Agent[]> {
+  return sdk(getApiFleetRetired())
+}
+
+// ── Agent lifecycle (SDK) ─────────────────────────────────────────────
+
 export function createAgent(body: {
   name: string
   folder?: string
   model?: string
 }): Promise<CreateAgentReceipt> {
-  return request("/api/fleet/create", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  })
+  return sdk(postApiFleetCreate({ body }))
 }
 
-export type { RestartReceipt } from "./generated/types.gen"
-
-/** Restart an agent: kill its (possibly stale) running process and respawn it
- *  from the backend's current `cp` binary on the same realm folder. Used when
- *  an agent's running binary predates a command the cockpit wants to send and
- *  its bridge rejects it with `502 agent unreachable`. */
 export function restartAgent(agentId: string): Promise<RestartReceipt> {
-  return request(`/api/agent/${agentId}/restart`, { method: "POST" })
+  return sdk(postApiAgentByIdRestart({ path: { id: agentId } }))
 }
 
-// ── Retire / unretire (T271) ──────────────────────────────────────────
-export type { RetireReceipt, UnretireReceipt } from "./generated/types.gen"
-
-/** Retire (archive) an agent: stop its process + console server, keep its
- *  folder, and move it to the Retired section. Not a delete — fully reversible
- *  via {@link unretireAgent}. */
 export function retireAgent(agentId: string): Promise<RetireReceipt> {
-  return request(`/api/agent/${agentId}/retire`, { method: "POST" })
+  return sdk(postApiAgentByIdRetire({ path: { id: agentId } }))
 }
 
-/** Bring a retired agent back: clear its retired flag and respawn it on the
- *  same realm folder (re-registering under the same id). */
 export function unretireAgent(agentId: string): Promise<UnretireReceipt> {
-  return request(`/api/agent/${agentId}/unretire`, { method: "POST" })
+  return sdk(postApiAgentByIdUnretire({ path: { id: agentId } }))
 }
 
-/** Fetch the Retired section — one `Agent`-shaped record per retired agent,
- *  built from the orchestrator's retired store (the agents have no live process
- *  to inspect). Each carries `status: "retired"`. */
-export function fetchRetiredFleet(): Promise<Agent[]> {
-  return request("/api/fleet/retired")
-}
-
-// ── Agent meta ────────────────────────────────────────────────────────
-/** Set or clear a custom display name for an agent. An empty name reverts to
- *  the folder-derived default. Stored orchestrator-side in `agent-names.json`,
- *  independent of the agent process (T328). */
 export function renameAgent(
   agentId: string,
   name: string,
 ): Promise<{ ok: boolean }> {
-  return request(`/api/agent/${agentId}/rename`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
-  })
+  return sdk(postApiAgentByIdRename({ path: { id: agentId }, body: { name } }))
 }
 
+// ── Agent meta (SDK) ──────────────────────────────────────────────────
+
 export function fetchAgentMeta(agentId: string): Promise<Agent> {
-  return request(`/api/agent/${agentId}/meta`)
+  return sdk(getApiAgentByIdMeta({ path: { id: agentId } }))
 }
 
 // ── Agent avatar ──────────────────────────────────────────────────────
 
-/** Upload or replace an agent's profile picture. Body is raw image bytes.
- *  Content type is sniffed server-side from magic bytes. Max 2 MiB. */
 export function uploadAvatar(agentId: string, file: File): Promise<{ ok: boolean }> {
-  return file.arrayBuffer().then((buf) =>
-    request(`/api/agent/${agentId}/avatar`, {
-      method: "POST",
-      body: buf,
-    }),
-  )
+  return sdk(postApiAgentByIdAvatar({ path: { id: agentId }, body: file }))
 }
 
-/** Remove an agent's profile picture. */
 export function deleteAvatar(agentId: string): Promise<{ ok: boolean }> {
-  return request(`/api/agent/${agentId}/avatar`, { method: "DELETE" })
+  return sdk(deleteApiAgentByIdAvatar({ path: { id: agentId } }))
 }
 
-/** Build the URL to an agent's avatar image (for use as `<img src>`).
- *  Append a cache-bust `v` param to force re-fetch after upload. */
+/** Build the URL to an agent's avatar image (for use as `<img src>`). */
 export function avatarUrl(agentId: string, cacheBust?: number): string {
   const base = import.meta.env.VITE_API_URL || ""
   const v = cacheBust ? `?v=${cacheBust}` : ""
   return `${base}/api/agent/${agentId}/avatar${v}`
 }
 
-// ── Threads ───────────────────────────────────────────────────────────
+// ── Panels (SDK) ──────────────────────────────────────────────────────
 
-/** Format an epoch-ms timestamp as a relative age string ("just now", "3m ago", etc). */
+export function fetchPanels(agentId: string): Promise<ContextPanel[]> {
+  return sdk(getApiAgentByIdPanels({ path: { id: agentId } }))
+}
+
+// ── Tools / Radar / Entities (SDK) ────────────────────────────────────
+
+export function fetchTools(agentId: string): Promise<ToolGroup[]> {
+  return sdk(getApiAgentByIdTools({ path: { id: agentId } }))
+}
+
+export function fetchRadar(agentId: string): Promise<RadarData> {
+  return sdk(getApiAgentByIdRadar({ path: { id: agentId } }))
+}
+
+export function fetchEntities(agentId: string): Promise<EntityTable[]> {
+  return sdk(getApiAgentByIdEntities({ path: { id: agentId } }))
+}
+
+// ── Metrics / Vitals (SDK) ────────────────────────────────────────────
+
+export function fetchMetrics(agentId: string): Promise<AgentMetrics> {
+  return sdk(getApiAgentByIdMetrics({ path: { id: agentId } }))
+}
+
+export function fetchVitals(agentId: string): Promise<Vital[]> {
+  return sdk(getApiAgentByIdVitals({ path: { id: agentId } }))
+}
+
+export function fetchFleetMetrics(): Promise<AgentMetrics[]> {
+  return sdk(getApiMetrics())
+}
+
+// ── Usage / Library (SDK) ─────────────────────────────────────────────
+
+export function fetchUsage(agentId: string): Promise<Record<string, unknown>> {
+  return sdk(getApiAgentByIdUsage({ path: { id: agentId } }))
+}
+
+export function fetchLibrary(agentId: string): Promise<LibraryItem[]> {
+  return sdk(getApiAgentByIdLibrary({ path: { id: agentId } }))
+}
+
+// ── Commands (SDK) ────────────────────────────────────────────────────
+
+export type CommandReceipt = GenCommandReceipt
+
+export async function sendCommand(
+  agentId: string,
+  kind: Record<string, unknown>,
+): Promise<CommandReceipt> {
+  return sdk(postApiAgentByIdCommand({
+    path: { id: agentId },
+    body: buildCommandEnvelope(kind) as Record<string, unknown>,
+  }))
+}
+
+export function createCommand(
+  agentId: string,
+  cmd: { name: string; description?: string; body: string },
+): Promise<CreateCommandReceipt> {
+  return sdk(postApiAgentByIdLibraryCommand({ path: { id: agentId }, body: cmd }))
+}
+
+// ── Ticket (SDK) ──────────────────────────────────────────────────────
+
+export async function mintTicket(): Promise<string> {
+  const res = await sdk<{ ticket: string }>(postApiTicket())
+  return res.ticket
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Endpoints below keep manual request() because the backend response
+// format diverges from the OpenAPI spec (raw YAML dumps or wrapped
+// objects).  TODO: fix backend handlers to return spec-compliant shapes,
+// then migrate these to SDK calls.
+// ═══════════════════════════════════════════════════════════════════════
+
+// ── Threads (manual — backend field names differ from spec) ───────────
+
+/** Format an epoch-ms timestamp as a relative age string. */
 function formatAge(epochMs: number): string {
   const delta = Date.now() - epochMs
   if (delta < 60_000) return "just now"
@@ -155,7 +244,6 @@ function formatAge(epochMs: number): string {
   return `${days}d ago`
 }
 
-/** Raw message shape from the backend (differs from maquette ThreadMsg). */
 interface RawMsg {
   id: string
   role: string
@@ -170,7 +258,6 @@ interface RawMsg {
   auto?: boolean
 }
 
-/** Raw thread shape from the backend. */
 interface RawThread {
   id: string
   name: string
@@ -183,26 +270,20 @@ interface RawThread {
   archived?: boolean
   paused?: boolean
   log?: RawMsg[]
-  // maquette fields (pass through if present)
   agent?: string
   createdAt?: string
 }
 
-/** Wrapper shape from the backend threads endpoint. */
 interface ThreadsResponse {
   focusedThreadId: string | null
   threads: RawThread[]
 }
 
-/** Map backend question JSON (`{header,question,multiSelect,options:[{label}]}`)
- * to frontend ThreadQuestion (`{header,prompt,multi,options:string[]}`).
- * Handles legacy double-wrapped arrays from pre-fix REST endpoint. */
+/** Map backend question JSON to frontend ThreadQuestion shape. */
 export function mapRawQuestions(raw: unknown): ThreadDetail["log"][number]["questions"] {
   if (!raw) return undefined
-  // Unwrap double-wrapped arrays (pre-fix: reshape_message did json!([q]) on an already-array value)
   let arr = Array.isArray(raw) ? raw : [raw]
   if (arr.length === 1 && Array.isArray(arr[0])) arr = arr[0]
-
   return arr.map((q: Record<string, unknown>) => ({
     header: (q.header as string) ?? undefined,
     prompt: (q.question as string) ?? (q.prompt as string) ?? "",
@@ -217,7 +298,6 @@ export function mapRawQuestions(raw: unknown): ThreadDetail["log"][number]["ques
 
 export function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
   return request<ThreadsResponse | RawThread[]>(`/api/agent/${agentId}/threads`).then((raw) => {
-    // Handle both wrapper shape { focusedThreadId, threads } and legacy array
     const focusedId = Array.isArray(raw) ? null : raw.focusedThreadId
     const list: RawThread[] = Array.isArray(raw) ? raw : (raw.threads ?? [])
     return list.map((t) => ({
@@ -247,10 +327,7 @@ export function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
   })
 }
 
-// ── Panels ────────────────────────────────────────────────────────────
-export function fetchPanels(agentId: string): Promise<ContextPanel[]> {
-  return request(`/api/agent/${agentId}/panels`)
-}
+// ── Memory (manual — backend sends raw YAML map, not MemoryCard[]) ───
 
 export function fetchMemory(agentId: string): Promise<MemoryCard[]> {
   return request<Record<string, Record<string, unknown>>>(`/api/agent/${agentId}/memory`).then((raw) => {
@@ -264,6 +341,8 @@ export function fetchMemory(agentId: string): Promise<MemoryCard[]> {
   })
 }
 
+// ── Todos (manual — backend wraps in {todos: [...]}) ──────────────────
+
 export function fetchTodos(agentId: string): Promise<TodoItem[]> {
   return request<Record<string, unknown>>(`/api/agent/${agentId}/todos`).then((raw) => {
     if (Array.isArray(raw)) return raw as TodoItem[]
@@ -276,6 +355,8 @@ export function fetchTodos(agentId: string): Promise<TodoItem[]> {
     }))
   })
 }
+
+// ── Spine (manual — backend wraps in {notifications: [...]}) ──────────
 
 export function fetchSpine(agentId: string): Promise<SpineNotif[]> {
   return request<Record<string, unknown>>(`/api/agent/${agentId}/spine`).then((raw) => {
@@ -291,12 +372,16 @@ export function fetchSpine(agentId: string): Promise<SpineNotif[]> {
   })
 }
 
+// ── Queue (manual — backend wraps in {queued_calls: [...]}) ───────────
+
 export function fetchQueue(agentId: string): Promise<QueueAction[]> {
   return request<Record<string, unknown>>(`/api/agent/${agentId}/queue`).then((raw) => {
     if (Array.isArray(raw)) return raw as QueueAction[]
     return (raw.queued_calls ?? []) as QueueAction[]
   })
 }
+
+// ── Scratchpad (manual — backend wraps in {scratchpad_cells: [...]}) ──
 
 export function fetchScratchpad(agentId: string): Promise<ScratchCell[]> {
   return request<Record<string, unknown>>(`/api/agent/${agentId}/scratchpad`).then((raw) => {
@@ -309,6 +394,8 @@ export function fetchScratchpad(agentId: string): Promise<ScratchCell[]> {
     }))
   })
 }
+
+// ── Tree (manual — backend sends raw YAML map, not TreeRow[]) ─────────
 
 export function fetchTree(agentId: string): Promise<TreeRow[]> {
   return request<Record<string, Record<string, unknown>>>(`/api/agent/${agentId}/tree`).then((raw) => {
@@ -323,6 +410,8 @@ export function fetchTree(agentId: string): Promise<TreeRow[]> {
   })
 }
 
+// ── Callbacks (manual — backend sends raw YAML map, not CallbackRow[])─
+
 export function fetchCallbacks(agentId: string): Promise<CallbackRow[]> {
   return request<Record<string, Record<string, unknown>>>(`/api/agent/${agentId}/callbacks`).then((raw) => {
     if (Array.isArray(raw)) return raw as unknown as CallbackRow[]
@@ -336,101 +425,4 @@ export function fetchCallbacks(agentId: string): Promise<CallbackRow[]> {
       cwd: (c.cwd ?? "") as string,
     }))
   })
-}
-
-export function fetchTools(agentId: string): Promise<ToolGroup[]> {
-  return request(`/api/agent/${agentId}/tools`)
-}
-
-export type { RadarData } from "./generated/types.gen"
-
-export function fetchRadar(agentId: string): Promise<RadarData> {
-  return request(`/api/agent/${agentId}/radar`)
-}
-
-export function fetchEntities(agentId: string): Promise<EntityTable[]> {
-  return request(`/api/agent/${agentId}/entities`)
-}
-
-// ── Metrics (§19 observability) ───────────────────────────────────────
-
-export type { AgentMetrics } from "./generated/types.gen"
-
-export function fetchMetrics(agentId: string): Promise<AgentMetrics> {
-  return request(`/api/agent/${agentId}/metrics`)
-}
-
-// ── Vitals (on-demand service-connectivity probes) ────────────────────
-
-export type { Vital } from "./generated/types.gen"
-
-/** Run the agent's live service-connectivity checks on demand (the cockpit's
- *  "Check Vitals" button). The backend probes everything it can reach —
- *  orchestrator self, agent heartbeat + loop status, the picked LLM provider +
- *  Voyage/Datalab/Brave/Firecrawl reachability, Meilisearch, console server —
- *  and the caller prepends the two checks only the browser can observe (its own
- *  liveness + the round-trip latency of this very request). */
-export function fetchVitals(agentId: string): Promise<Vital[]> {
-  return request(`/api/agent/${agentId}/vitals`)
-}
-
-/** The §19 snapshot for every known agent (GET /api/metrics). Powers the fleet
- *  Usage page's live per-agent cost + token totals. */
-export function fetchFleetMetrics(): Promise<AgentMetrics[]> {
-  return request("/api/metrics")
-}
-
-// ── Usage + Library ───────────────────────────────────────────────────
-
-export function fetchUsage(agentId: string): Promise<Record<string, unknown>> {
-  return request(`/api/agent/${agentId}/usage`)
-}
-
-export function fetchLibrary(agentId: string): Promise<LibraryItem[]> {
-  return request(`/api/agent/${agentId}/library`)
-}
-
-export type { CreateCommandReceipt } from "./generated/types.gen"
-
-/** Create a new `/command` in an agent's prompt library. `name` derives the
- *  command's slug (its `/invocation`); `body` is the prompt it expands to;
- *  `description` is the optional one-line label on the suggestion bubble. Rejects
- *  with a 409 if a command with the same slug already exists. */
-export function createCommand(
-  agentId: string,
-  cmd: { name: string; description?: string; body: string },
-): Promise<CreateCommandReceipt> {
-  return request(`/api/agent/${agentId}/library/command`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(cmd),
-  })
-}
-// ── Commands (mutating) ───────────────────────────────────────────────
-
-/** Re-export generated CommandReceipt (cmd_id, dedup_token, rev, accepted). */
-export type CommandReceipt = GenCommandReceipt
-
-/**
- * Send a command to an agent. Accepts just the `kind` payload —
- * the envelope (schema_version, id, seq, dedup_token) is auto-generated.
- *
- * Example: `sendCommand("agent1", { kind: "send_message", thread_id: "T1", content: "hi" })`
- */
-export async function sendCommand(
-  agentId: string,
-  kind: Record<string, unknown>,
-): Promise<CommandReceipt> {
-  return request(`/api/agent/${agentId}/command`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(buildCommandEnvelope(kind)),
-  })
-}
-
-// ── Ticket (for SSE) ──────────────────────────────────────────────────
-
-export async function mintTicket(): Promise<string> {
-  const res = await request<{ ticket: string }>("/api/ticket", { method: "POST" })
-  return res.ticket
 }
