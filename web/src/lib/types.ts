@@ -1,4 +1,76 @@
-// ── Context Pilot maquette — domain types (design-only, no backend) ──
+// ── Context Pilot — domain types ─────────────────────────────────────
+//
+// Types that have a backend equivalent are RE-EXPORTED from the generated
+// OpenAPI client (web/src/lib/api/generated/types.gen.ts). UI-only types
+// that exist only on the frontend are defined here. This keeps the backend
+// contract as the single source of truth while letting the UI carry its
+// own display-layer extensions.
+
+// ── Re-exports from generated OpenAPI client ─────────────────────────
+//
+// These types mirror Rust backend structs. The generated file is the
+// authoritative source — edits go through the Rust types → openapi.json →
+// codegen pipeline, never by hand.
+
+export type {
+  CallbackRow,
+  EntityTable,
+  LibraryItem,
+  MemoryCard,
+  QueueAction,
+  RadarAnchor,
+  RadarResult,
+  ScratchCell,
+  SpineNotif,
+  ThreadQuestion,
+  TodoItem,
+  ToolCall,
+  ToolGroup,
+  ToolRow,
+  TreeRow,
+} from "./api/generated/types.gen"
+
+// ── Extended re-exports (generated base + UI-only fields) ────────────
+
+import type {
+  Agent as GenAgent,
+  ContextPanel as GenContextPanel,
+  ThreadDetail as GenThreadDetail,
+  ThreadMsg as GenThreadMsg,
+} from "./api/generated/types.gen"
+
+/** Accent color tokens for dots, avatars, and stat rows. */
+export type AccentToken = "signal" | "interactive" | "ok" | "warn" | "danger"
+
+/** Agent with UI-only `accent` field (computed client-side in reducers). */
+export type Agent = GenAgent & {
+  accent: AccentToken
+}
+
+/** ContextPanel with a typed `kind` discriminant (generated uses `string`). */
+export type ContextPanel = Omit<GenContextPanel, "kind"> & {
+  kind: PanelKind
+}
+
+/** ThreadMsg with UI-only `streaming` flag (set during active LLM output). */
+export type ThreadMsg = GenThreadMsg & {
+  streaming?: boolean
+}
+
+/** ThreadDetail re-exported as-is (field optionality matches backend). */
+export type ThreadDetail = Omit<GenThreadDetail, "log"> & {
+  log: ThreadMsg[]
+}
+
+// ── Derived type aliases (extracted from generated union literals) ────
+
+export type AgentStatus = GenAgent["status"]
+export type ThreadStatus = GenThreadDetail["status"]
+export type Importance = import("./api/generated/types.gen").MemoryCard["importance"]
+export type NotifKind = import("./api/generated/types.gen").SpineNotif["kind"]
+export type LibraryKind = import("./api/generated/types.gen").LibraryItem["kind"]
+
+// ── UI-only types (no backend equivalent) ────────────────────────────
 
 export type PanelKind =
   | "tree"
@@ -18,30 +90,9 @@ export type PanelKind =
   | "tools"
   | "radar"
 
-export interface ContextPanel {
-  id: string
-  kind: PanelKind
-  name: string
-  tokens: number
-  costUsd: number
-  cached: boolean
-  frozen: number | null
-  misses: number
-  fixed: boolean
-}
-
 export type StreamPhase = "ready" | "streaming" | "tooling" | "blocked"
 
 export type MsgRole = "user" | "assistant" | "tool"
-
-export interface ToolCall {
-  name: string
-  intent: string
-  verb: string
-  params: Record<string, string>
-  result?: string
-  isError?: boolean
-}
 
 export interface ChatMessage {
   id: string
@@ -49,20 +100,10 @@ export interface ChatMessage {
   /** rich text (markdown-ish) for user/assistant */
   text?: string
   /** present when role === "tool" */
-  tool?: ToolCall
+  tool?: import("./api/generated/types.gen").ToolCall
   ts: string
   streaming?: boolean
 }
-
-/**
- * Thread turn-status.
- * - `MY_TURN`    — the thread is waiting on the human (needs you).
- * - `ACTIVE`     — the agent is *currently streaming* this thread. Exactly ONE
- *                  thread per realm is ACTIVE at any time; shown in green.
- * - `THEIR_TURN` — the agent owns the thread but isn't actively streaming it
- *                  right now (queued / working in parallel).
- */
-export type ThreadStatus = "MY_TURN" | "ACTIVE" | "THEIR_TURN"
 
 export interface Thread {
   id: string
@@ -73,20 +114,10 @@ export interface Thread {
   last: string
 }
 
-export type NotifKind = "user" | "reload" | "custom"
-
-export interface SpineNotif {
-  id: string
-  kind: NotifKind
-  time: string
-  text: string
-  processed: boolean
-}
-
 export interface StatRow {
   label: string
   value: string
-  accent?: "signal" | "interactive" | "ok" | "warn" | "danger"
+  accent?: AccentToken
 }
 
 export interface StatusModel {
@@ -105,9 +136,8 @@ export interface StatusModel {
 
 /**
  * The signed-in human's account. Drives the TopBar avatar menu and the Profile
- * modal (T30). `managedByCompany` decides whether the profile is editable or
- * provisioned (SSO) by an organization — the modal renders a different account
- * section for each case.
+ * modal. `managedByCompany` decides whether the profile is editable or
+ * provisioned (SSO) by an organization.
  */
 export interface User {
   name: string
@@ -115,7 +145,7 @@ export interface User {
   /** 1–2 letter fallback shown in the avatar when there's no picture */
   initials: string
   /** accent token for the avatar fallback gradient */
-  accent: "signal" | "interactive" | "ok" | "warn" | "danger"
+  accent: AccentToken
   /** true → account is provisioned & managed by an organization (SSO/org) */
   managedByCompany: boolean
   /** the managing organization (present when managedByCompany) */
@@ -124,60 +154,7 @@ export interface User {
   role?: string
 }
 
-// ── Agents / workspaces (1 agent = 1 folder) ──────────────────────
-
-export type AgentStatus = "working" | "needs-you" | "idle"
-
-/** An agent IS a workspace folder. Switching agents = switching folders. */
-export interface Agent {
-  id: string
-  /** display label */
-  name: string
-  /** absolute folder path the agent lives in */
-  folder: string
-  branch: string
-  model: string
-  /** wire serde provider id (e.g. "claudecodev2") — authoritative for the
-   *  model picker, since several providers share the same model API names. */
-  provider?: string
-  status: AgentStatus
-  /** live execution phase (idle/streaming/tooling) — folded from the
-   *  PhaseTransition SSE delta so the HUD shows the DISTINCT phase, not just
-   *  the working/idle binary `status` collapses it into (T297). Absent before
-   *  the first phase transition. */
-  phase?: "idle" | "streaming" | "tooling"
-  costUsd: number
-  /** cumulative-since-boot input tokens — folded from the CostAggregate delta
-   *  (same figure the live `cost_aggregate` carries), so the HUD token counter
-   *  rides the push plane instead of the 15s poll (T297). */
-  inputTokens?: number
-  /** cumulative-since-boot output tokens (T297). */
-  outputTokens?: number
-  /** live context-window occupancy (tokens currently in the window) — folded
-   *  from the ContextUsage SSE delta, the agent's OWN authoritative figure, so
-   *  the web meter is byte-identical to the ratatui sidebar (T297). */
-  contextUsed?: number
-  /** the cleaning threshold (reverie trigger point) for the context meter. */
-  contextThreshold?: number
-  /** the hard context budget (the meter's denominator). */
-  contextBudget?: number
-  /** cache-HIT half of contextUsed (always-cached prefix + cached panels) —
-   *  folded from ContextUsage; the HUD shows `Used (hit)` from it, matching
-   *  ratatui's green token-bar segment. hit + miss === used. */
-  contextHit?: number
-  /** cache-MISS half of contextUsed (uncached panels this turn) — the HUD's
-   *  `Used (miss)`, matching ratatui's amber segment. */
-  contextMiss?: number
-  /** one-line summary of what the agent is currently working on */
-  task: string
-  /** number of open threads on this agent */
-  threads: number
-  lastActivity: string
-  /** accent color token for the agent's dot/avatar */
-  accent: "signal" | "interactive" | "ok" | "warn" | "danger"
-  /** whether the agent has a profile picture stored at the orchestrator */
-  hasAvatar?: boolean
-}
+// ── Filesystem browser ───────────────────────────────────────────
 
 /** A node in the (mock) filesystem browser. */
 export interface FsNode {
@@ -254,68 +231,13 @@ export interface FinderNode {
 export type FinderViewMode = "grid" | "list" | "columns" | "gallery"
 export type FinderSortKey = "name" | "size" | "modified" | "kind"
 
-// ── Thread-centered view ──────────────────────────────────────────
+// ── View modes ────────────────────────────────────────────────────
 
 /**
  * Top-level surfaces. `fleet` = the mission-control dashboard (the ONLY place
  * agents are managed). The other three are the per-agent views.
  */
 export type ViewMode = "fleet" | "cockpit" | "threads" | "finder"
-
-/** A single embedded question form inside a thread message (CP signature). */
-export interface ThreadQuestion {
-  /** Short title shown above the question text. */
-  header?: string
-  prompt: string
-  options: string[]
-  /** allow multiple selections */
-  multi?: boolean
-  /** offer a free-text "other" field */
-  allowOther?: boolean
-  /** user's answers (set after submission — makes the form read-only) */
-  answered?: string[]
-}
-
-/** One message in a thread's conversation. */
-export interface ThreadMsg {
-  id: string
-  author: "user" | "assistant"
-  text?: string
-  ts: string
-  /** when present, render an embedded tool-call card */
-  tool?: ToolCall
-  /** when present, render an embedded question form (awaiting the user) */
-  questions?: ThreadQuestion[]
-  /** an attached file reference */
-  fileRef?: string
-  streaming?: boolean
-  /** true → an auto tool-activity trace (collapsed into a run in the UI) */
-  auto?: boolean
-}
-
-// ── Global prompt library (Prompts page) ─────────────────────────
-
-/** Kind of library entry — mirrors the TUI's prompt library. */
-export type LibraryKind = "agent" | "skill" | "command"
-
-/** One entry in the global prompt library. */
-export interface LibraryItem {
-  id: string
-  /** display name */
-  name: string
-  kind: LibraryKind
-  description: string
-  /** e.g. how many agents currently use this skill, or "/cmd" for commands */
-  meta?: string
-  /** for commands: the prompt body the `/command` expands to — seeded into the
-   *  thread composer when a suggestion bubble is clicked (T350). Absent for
-   *  agents/skills (their bodies are large and unused by the library list). */
-  body?: string
-  /** a built-in entry ships with the app and can't be deleted */
-  builtin?: boolean
-  /** currently active (agents) / loaded (skills) somewhere */
-  active?: boolean
-}
 
 // ── Usage / cost analytics (Usage page) ──────────────────────────
 
@@ -328,8 +250,6 @@ export type UsageUnit = "usd" | "tokens"
  *  - **hit**    — cache-read tokens (cheap)
  *  - **miss**   — input / uncached tokens
  *  - **output** — generated tokens (expensive)
- * Dollar figures are derived from these via {@link UsageRates}, so the token
- * and dollar lenses stay perfectly consistent.
  */
 export interface UsagePoint {
   agentId: string
@@ -349,127 +269,4 @@ export interface UsageRates {
   hit: number
   miss: number
   output: number
-}
-
-/** A full thread with its conversation log — drives the thread-centered view. */
-export interface ThreadDetail {
-  id: string
-  name: string
-  status: ThreadStatus
-  /** the agent (folder/realm) this thread lives in — threads never cross agents */
-  agentId: string
-  /** which agent is assigned to / working this thread */
-  agent: string
-  createdAt: string
-  lastActivity: string
-  /** epoch-ms of the most recent message — used for sort-by-recency (live data) */
-  lastActivityMs?: number
-  unread: number
-  /** archived threads are hidden from the main list, viewable on demand */
-  archived?: boolean
-  /** paused threads suppress MY_TURN notifications but remain visible (T371) */
-  paused?: boolean
-  /** true when this is the thread the AI is currently focused on */
-  focused?: boolean
-  log: ThreadMsg[]
-}
-
-// ── Cockpit panel maquettes (one designed view per sidebar panel) ─────────
-// Lightweight, design-only shapes feeding the panel-centered "cockpit" view.
-// Each mirrors what its real Context Pilot TUI panel surfaces.
-
-export type Importance = "low" | "medium" | "high" | "critical"
-
-/** One memory card in the Memories panel (id · tl;dr · importance · labels). */
-export interface MemoryCard {
-  id: string
-  tldr: string
-  importance: Importance
-  labels: string[]
-}
-
-/** A recency-weighted anchor signal at the top of the Context Radar. */
-export interface RadarAnchor {
-  time: string
-  signal: string
-}
-
-/** A scored recall result in the Context Radar body. */
-export interface RadarResult {
-  content: string
-  datetime: string
-  importance: Importance
-  score: number
-}
-
-/** One (possibly nested) todo row. `depth` drives indentation. */
-export interface TodoItem {
-  id: string
-  name: string
-  status: "pending" | "in_progress" | "done"
-  depth: number
-}
-
-/** A table in the Entities (SQLite) panel. */
-export interface EntityTable {
-  name: string
-  rows: number
-  /** compact column signature, e.g. "name TEXT PK, type TEXT, …" */
-  columns: string
-  /** a couple of sample row tuples, pre-stringified */
-  samples: string[]
-}
-
-/** One tool row inside a Tools-panel category group. */
-export interface ToolRow {
-  name: string
-  status: "on" | "off"
-  desc: string
-}
-
-/** A category grouping of tools in the Tools panel. */
-export interface ToolGroup {
-  category: string
-  tools: ToolRow[]
-}
-
-/** A callback definition row in the Callbacks panel. */
-export interface CallbackRow {
-  id: string
-  name: string
-  pattern: string
-  blocking: boolean
-  timeout: string
-  scope: string
-  cwd: string
-}
-
-/** A queued tool call awaiting flush in the Queue panel. */
-export interface QueueAction {
-  index: number
-  tool: string
-  intent: string
-  preview: string
-}
-
-/** A scratchpad cell (title + body preview). */
-export interface ScratchCell {
-  id: string
-  title: string
-  preview: string
-}
-
-/** One row of the Directory Tree panel (flattened for rendering). */
-export interface TreeRow {
-  depth: number
-  name: string
-  kind: "dir" | "file"
-  /** token-size chip (files/dirs), e.g. "19.5K" */
-  size?: string
-  /** cartographer description */
-  desc?: string
-  /** [!] — file changed since its description was written */
-  changed?: boolean
-  /** open folder (▼) vs closed (▶) */
-  open?: boolean
 }

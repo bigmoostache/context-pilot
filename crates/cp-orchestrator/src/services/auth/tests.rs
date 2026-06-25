@@ -1,6 +1,7 @@
 //! Unit tests for the auth store — schema, hashing, CRUD, sessions.
 
 use super::*;
+use super::super::types::AgentRole;
 
 #[test]
 fn schema_creates_tables() {
