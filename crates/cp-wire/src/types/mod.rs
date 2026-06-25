@@ -144,6 +144,7 @@ const fn hex_nibble(b: u8) -> Option<u8> {
 /// carries a `PhaseHint` for low-latency display that self-heals from the
 /// oplog on any drop (design doc I10/K6).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum Phase {
     /// No LLM call or tool execution in progress.
@@ -157,6 +158,7 @@ pub enum Phase {
 /// Lifecycle state observable by the backend (oplog-recorded, not just a
 /// heartbeat inference).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum LifecycleState {
     /// Agent is initialising (bridge boot sequence).
@@ -180,6 +182,7 @@ pub enum LifecycleState {
 /// `cp-mod-threads` to keep the layering one-directional (modules depend on the
 /// wire, never the reverse).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ThreadTurn {
     /// The thread is waiting on the human — it needs a user response.

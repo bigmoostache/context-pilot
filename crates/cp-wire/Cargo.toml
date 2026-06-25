@@ -9,11 +9,15 @@ keywords.workspace = true
 categories.workspace = true
 readme.workspace = true
 
+[features]
+openapi = ["dep:utoipa"]
+
 [dependencies]
 crc32c = "0.6"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
+utoipa = { version = "5", optional = true }
 
 [dev-dependencies]
 

@@ -76,6 +76,7 @@ fn checkpoint_restores_roster_wholesale() {
         name: "carried".into(),
         status: ThreadTurn::MyTurn,
         archived: true,
+        paused: false,
         last_activity_ms: 9_000,
         msg_count: 4,
     });
@@ -103,6 +104,7 @@ fn roster_survives_compaction_via_checkpoint_then_folds_tail() {
         name: "carried".into(),
         status: ThreadTurn::TheirTurn,
         archived: false,
+        paused: false,
         last_activity_ms: 100,
         msg_count: 2,
     });
