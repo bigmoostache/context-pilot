@@ -38,7 +38,7 @@ pub type RosterEntry = RosterThread;
 ///
 /// A [`CostAggregate`](OpEntryKind::CostAggregate) is cumulative-since-boot, so
 /// the **latest** entry supersedes earlier ones (the figures are not summed).
-#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, utoipa::ToSchema)]
 pub struct CostSnapshot {
     /// Cumulative input tokens since the agent booted.
     pub input_tokens: u64,
@@ -55,7 +55,7 @@ pub struct CostSnapshot {
 /// [`CostSnapshot`] the latest entry supersedes earlier ones (cumulative state,
 /// not summed). Ephemeral — not carried in a checkpoint, so a cold backend
 /// shows zeros until the agent re-emits (the meter self-heals).
-#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, utoipa::ToSchema)]
 pub struct ContextSnapshot {
     /// Tokens currently occupying the context window.
     pub used_tokens: u64,

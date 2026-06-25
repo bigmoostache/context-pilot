@@ -35,6 +35,7 @@
 // Linked into this integration-test target but not all named directly;
 // acknowledge them for the per-target `unused-crate-dependencies` lint (M60).
 use argon2 as _;
+use utoipa as _;
 use calamine as _;
 use cp_mod_bridge as _;
 use csv as _;

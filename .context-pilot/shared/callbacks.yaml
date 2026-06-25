@@ -39,6 +39,26 @@ rust-check:
     echo ""
     echo "All Rust checks passed."
   last_edited_ms: 0
+ts-contract:
+  name: ts-contract
+  description: Regenerate TypeScript client from openapi.json on TS file edits to catch contract drift
+  pattern: web/src/**/*.ts
+  blocking: true
+  timeout_secs: 30
+  success_message: TS contract OK ✓
+  is_global: true
+  script_content: |-
+    cd web
+    npx @hey-api/openapi-ts -i ../openapi.json -o src/lib/api/generated 2>&1
+
+    # Check for drift in tracked generated files (-- separates paths from revisions)
+    if ! git diff --exit-code --quiet -- web/src/lib/api/generated/ 2>/dev/null; then
+      echo "::error::Generated TypeScript client drifted from openapi.json!"
+      echo "Do not hand-edit generated files."
+      git diff --stat -- web/src/lib/api/generated/
+      exit 1
+    fi
+  last_edited_ms: 1782421737199
 web-structure:
   name: web-structure
   description: Enforce ≤8 entries/dir + ≤500 lines/file under web/src (shadcn ui/ exempt)

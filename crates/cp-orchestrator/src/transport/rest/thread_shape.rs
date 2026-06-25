@@ -154,6 +154,7 @@ mod tests {
             name: "fresh".into(),
             status: ThreadTurn::TheirTurn,
             archived: false,
+            paused: false,
             last_activity_ms: 4_242,
             msg_count: 0,
         }];
@@ -186,6 +187,7 @@ mod tests {
             name: "old".into(),
             status: ThreadTurn::MyTurn,
             archived: true,
+            paused: false,
             last_activity_ms: 500,
             msg_count: 1,
         }];
