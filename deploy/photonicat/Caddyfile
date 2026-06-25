@@ -1,0 +1,19 @@
+# Context Pilot — Caddy reverse proxy + TLS (Let's Encrypt via OVH DNS-01).
+# Native on the Photonicat (no Docker); binary built with the caddy-dns/ovh plugin.
+#
+# TLS uses the DNS-01 challenge (works behind NAT/CGNAT — no inbound :80 needed),
+# exactly like the Pi "nestor". OVH credentials come from the process env
+# (loaded from caddy/ovh.env by the procd service).
+#
+pcat.h1.dev.celestorbe.fr {
+	tls {
+		dns ovh {
+			endpoint {env.OVH_ENDPOINT}
+			application_key {env.OVH_APPLICATION_KEY}
+			application_secret {env.OVH_APPLICATION_SECRET}
+			consumer_key {env.OVH_CONSUMER_KEY}
+		}
+	}
+	# The orchestrator serves both the API and the SPA on :7878.
+	reverse_proxy 127.0.0.1:7878
+}
