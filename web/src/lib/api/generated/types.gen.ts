@@ -599,6 +599,24 @@ export type DeleteApiAgentByIdAvatarResponses = {
 
 export type DeleteApiAgentByIdAvatarResponse = DeleteApiAgentByIdAvatarResponses[keyof DeleteApiAgentByIdAvatarResponses];
 
+export type GetApiAgentByIdAvatarData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/agent/{id}/avatar';
+};
+
+export type GetApiAgentByIdAvatarResponses = {
+    /**
+     * Avatar image bytes
+     */
+    200: Blob | File;
+};
+
+export type GetApiAgentByIdAvatarResponse = GetApiAgentByIdAvatarResponses[keyof GetApiAgentByIdAvatarResponses];
+
 export type PostApiAgentByIdAvatarData = {
     body: Blob | File;
     path: {

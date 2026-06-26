@@ -8,6 +8,7 @@
 mod paths;
 mod schemas;
 mod schemas_ext;
+mod exhaustive;
 
 // Acknowledge lib-only deps visible to the integration-test binary.
 use argon2 as _;

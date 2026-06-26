@@ -1701,6 +1701,35 @@
           "agent"
         ]
       },
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Avatar image bytes"
+          }
+        },
+        "summary": "Get agent avatar image",
+        "tags": [
+          "agent"
+        ]
+      },
       "post": {
         "parameters": [
           {

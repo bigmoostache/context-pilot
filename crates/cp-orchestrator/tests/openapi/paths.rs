@@ -196,9 +196,17 @@ pub(super) fn paths() -> Value {
             "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"]
         })), r("OkResponse"))),
         "/api/agent/{id}/avatar": merge(
-            with_agent(post("agent", "Upload avatar",
-                Some(json!({ "type": "string", "format": "binary" })), r("OkResponse"))),
-            with_agent(del("agent", "Delete avatar"))
+            with_agent(json!({ "get": {
+                "tags": ["agent"], "summary": "Get agent avatar image",
+                "responses": { "200": { "description": "Avatar image bytes", "content": {
+                    "image/*": { "schema": { "type": "string", "format": "binary" } }
+                }}}
+            }})),
+            merge(
+                with_agent(post("agent", "Upload avatar",
+                    Some(json!({ "type": "string", "format": "binary" })), r("OkResponse"))),
+                with_agent(del("agent", "Delete avatar"))
+            )
         ),
         "/api/agent/{id}/library/command": with_agent(post("agent", "Create command", Some(json!({
             "type": "object",
