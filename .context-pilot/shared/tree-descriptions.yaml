@@ -7258,6 +7258,10 @@ aec798aa0357f6d1:
   path: crates/cp-oplog/src/compact.rs
   description: 'Phase 7 (X774): segment compaction + GAP3 grace rule. compact(dir) deletes every segment older than the newest checkpoint-bearing segment (replay fast-path already ignores them → replay output unchanged; checkpoint Snapshot carries live heads+seen, so the checkpoint IS the ack-rev barrier). CompactReport{segments_removed,oldest_index}. total_bytes/should_compact size trigger (256MiB). body_gc_eligible(age,grace) const predicate for GAP3: only GC bodies older than DEFAULT_GC_GRACE(60s) >> I13 barrier window, so in-flight spills never collected, only crash-orphans. OplogResult from crate::error. 7 tests incl replay-identical-after-compaction.'
   last_edited_ms: 0
+aecfdff78bce048d:
+  path: .github/workflows/build.yml
+  description: 'Cross-platform build workflow. 4-target matrix: linux-x86_64 (native), linux-aarch64 (cross), macos-x86_64 (macos-latest), macos-aarch64 (macos-latest). Pins Rust 1.95.0. Builds tui + cp-console-server. 30-day artifact retention.'
+  last_edited_ms: 1782491732686
 aee5385db27bde2a:
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread composer (always-active textarea + turn-status banner). T298 paperclip; T304 draftKey persists unsent text+caret to localStorage; T331 removable pendingFiles chips; T348/T350 /command suggestion bubbles (empty composer only) + create-command pill. T359: Enter handler is a faithful TUI port via resolveEnter (imported from @/lib/utils) — plain Enter does send/list-continue/empty-item-remove/newline; Shift+Enter newline; IME-guarded; applyEdit splices value+caret keeping draft+auto-grow in sync. List helpers extracted to lib/utils.ts to stay under the 500-line cap.'
