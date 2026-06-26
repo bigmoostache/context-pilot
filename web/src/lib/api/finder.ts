@@ -122,7 +122,7 @@ export function rawUrl(agentId: string, path: string): string {
 
 /** Trigger a browser download for a file in the agent's realm. */
 export async function downloadFile(agentId: string, path: string): Promise<void> {
-  const res = await fetch(
+  const res = await fetch( // ok:manual — binary blob download, irreducible
     `${BASE}/api/agent/${agentId}/fs/download?path=${encodeURIComponent(path)}`,
   )
   if (!res.ok) {
