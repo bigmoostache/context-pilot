@@ -205,13 +205,18 @@ export function ThreadConversation({
       .map((item) => ({ command: `/${item.id}`, name: item.name, description: item.description, body: item.body }))
   }, [library])
   // Pin the conversation to the latest message: scroll to the bottom whenever
-  // a thread is opened (id change) or a new message lands (log grows), so the
-  // freshest exchange is always in view — matching the TUI, which keeps the
-  // conversation pinned to the bottom.
+  // a thread is opened (id change) or a new NON-AUTO message lands (user or
+  // assistant text — not tool-activity traces). Auto messages update the tool
+  // counter inside a collapsed <details> and must NOT yank the scroll position
+  // away from the message the user is reading (T414).
   const bottomRef = useRef<HTMLDivElement>(null)
+  const nonAutoCount = useMemo(
+    () => thread.log.filter((m) => !m.auto).length,
+    [thread.log],
+  )
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" })
-  }, [thread.id, thread.log.length])
+  }, [thread.id, nonAutoCount])
 
   return (
     <main

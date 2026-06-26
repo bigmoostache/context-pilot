@@ -62,6 +62,10 @@
   path: crates/cp-orchestrator/src/services/materialized_view_tests.rs
   description: 'Unit tests for materialized_view.rs (the fleet projection fold). Split from materialized_view.rs to respect the 500-line limit; #[path]-included so `super` resolves to the materialized_view module. Covers roster create/archive/restore cycle, idempotent ThreadCreated fold on replay, MessageCreated bumps roster count+activity, checkpoint_restores_roster_wholesale, and roster-survives-compaction-via-checkpoint-then-folds-tail.'
   last_edited_ms: 0
+01bafe85ddb70659:
+  path: web/src/lib/support/markdown.tsx
+  description: 'GFM markdown renderer (react-markdown + remark-gfm + remark-math + rehype-katex) themed to app tokens; default + onAccent variants. LaTeX via KaTeX ($...$ inline DISABLED, $$...$$ display). XSS-safe (no raw HTML). Code block copy button via CopyButton + extractText helper; onAccent variant passes text-current/60 for dark-mode contrast. Inline code click-to-copy via ClickableCode (green flash feedback, closest(''pre'') guard). CopyableTable: GFM table + Copy table button (tableToMarkdown reads DOM, outputs pipe-delimited markdown).'
+  last_edited_ms: 1782464289689
 01bfbf5b9ab05a09:
   path: crates/cp-wire/Cargo.toml
   description: Wire protocol crate manifest. No deps yet (I/O-free). Workspace lints inherited.
@@ -9266,6 +9270,10 @@ ec97d0753d489535:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Phase 19/30 + P1-P7: transport hub. Backend shared state + serve/serve_bound + route_rest (22 routes) + handle_stream SSE. CORS headers on all responses + OPTIONS preflight 204. /api/health. stream_to_client uses into_writer() + per-event flush. Invalidation: dirty_agents set, mark_dirty/take_dirty for SSE invalidate events.'
   last_edited_ms: 1781778261224
+ecbe9cbcd30cd952:
+  path: web/src/components/conversation/Message.tsx
+  description: 'Thread/conversation message renderer (shared by web ThreadConversation + cockpit Conversation). AssistantMessage + UserMessage render text via <Markdown> (assistant=default, user=onAccent); MessageBody splices inline file-upload chips. T311: discrete CopyButton beneath BOTH user & assistant bubbles — low-opacity Copy icon (align mirrors bubble side: user self-end, assistant left under pl-7), click → navigator.clipboard.writeText(text) → flips to green var(--ok) Check ''Copied'' for ~2s then reverts (guarded ?. for insecure-origin/no-clipboard, silent fail); hidden on assistant while streaming. CopyButton: exported, accepts label+getText props for reuse (code blocks, tables). Labels: Copy message (bubbles), Copy code (pre blocks), Copy table (GFM tables). T406: className prop for accent-aware color override. ToolMessage = collapsible card. Streaming blink cursor preserved. T334: onShowInFinder prop threaded to MessageFileChip for Show in Finder navigation.'
+  last_edited_ms: 1782464289751
 ece5fde37c551550:
   path: web/src/components/finder/preview/FinderPreview.tsx
   description: 'Quick Look preview shell + Body() kind router. Routes node → mock previews (mockPreviews), live fetchers (livePreviews), or shared leaf renderers (previewParts). T306: the drawer header''s Download button is wired to downloadFile(agentId, node.path) (streams the realm file via the backend attachment endpoint) — actionable only in the live Finder (agentId scopes the realm), inert in the mock; hidden for folders. Share button still decorative.'
