@@ -31,6 +31,17 @@ export function ModelPicker({
 }) {
   const activeProv = findProvider(providers, provider) ?? providers[0]
 
+  // The registry loads async (useProviders) and an allowlist can filter it
+  // down — guard the empty case so the picker never dereferences an undefined
+  // provider (it simply renders nothing until models are available).
+  if (!activeProv) {
+    return (
+      <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-[12px] text-muted-foreground">
+        No models available.
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-3">
       {/* provider rail */}
