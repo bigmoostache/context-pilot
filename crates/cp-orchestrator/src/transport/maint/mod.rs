@@ -58,6 +58,17 @@ pub(crate) fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
     let method = request.method().clone();
 
+    // Serve the maintenance SPA (M5): every non-`/api` GET is the wizard UI,
+    // served from disk BEFORE the Admin gate (the shell + assets must load for
+    // an unauthenticated operator to reach the login screen). The same bundle
+    // serves both planes; loaded here it self-detects maintenance mode via
+    // `GET /api/maint/status` and renders the wizard. API routes live under
+    // `/api`, so they are untouched.
+    if method == Method::Get && segments.first() != Some(&"api") && super::files::web_root().is_some() {
+        super::files::serve_static(request, &path);
+        return;
+    }
+
     let auth_token = request.headers().iter().find_map(|h| {
         if h.field.equiv("Authorization") { h.value.as_str().strip_prefix("Bearer ").map(str::to_owned) } else { None }
     });
@@ -131,8 +142,8 @@ fn route(
         // fingerprint for out-of-band verification.
         (Method::Get, ["api", "maint", "ca", "fingerprint"]) => ca::ca_fingerprint(),
 
-        // Provisioning state machine (M2).
-        (Method::Post, ["api", "maint", "finalize"]) => finalize(state, auth_user),
+        // Provisioning state machine (M2/M3).
+        (Method::Post, ["api", "maint", "finalize"]) => identity::finalize(state, auth_user),
 
         _ => HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },
     }
@@ -204,54 +215,6 @@ fn status(state: &Mutex<Backend>) -> HttpReply {
         // the wizard can skip or prefill the identity step (Admin GETs the value).
         "identity_set": identity_set,
     }))
-}
-
-/// `POST /api/maint/finalize` (Admin) — flip the box to *provisioned* and start
-/// serving the cockpit.
-///
-/// Pre-requisites (Obj 5.4): the seeded paper password must have been changed
-/// (`must_change_password == false`) **and** the box identity (name/IP) must be
-/// set — the leaf needs subjects before the cockpit can be trusted. On success
-/// it persists the durable flag, then re-renders the Caddyfile in *provisioned*
-/// mode and reloads Caddy so `:443` begins serving the cockpit (Obj 2.2.2).
-/// Idempotent: finalizing an already-provisioned box re-writes the same flag and
-/// re-applies the same Caddy config.
-fn finalize(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
-    // The Admin gate guarantees `auth_user` is `Some(Admin)` here.
-    let Some(caller) = auth_user else {
-        return HttpReply::error(401, "admin authorization required");
-    };
-
-    // Pre-requisite: the seeded paper password must have been changed.
-    if caller.must_change_password {
-        return HttpReply::error(412, "change the admin password before finalizing");
-    }
-
-    let (flag_path, identity) = match state.lock() {
-        Ok(b) => (b.provision_flag_path.clone(), identity::load_identity(&identity::identity_path(&b.agents_dir))),
-        Err(_) => return HttpReply::error(500, "backend lock poisoned"),
-    };
-
-    // Pre-requisite: the box must be named (a leaf needs subjects).
-    let Some(identity) = identity else {
-        return HttpReply::error(412, "set the box name/IP before finalizing");
-    };
-
-    if let Err(e) = state::set_provisioned(&flag_path, true) {
-        eprintln!("finalize: could not persist provisioned flag: {e}");
-        return HttpReply::error(500, "could not persist provisioned flag");
-    }
-
-    // Re-render Caddy in provisioned mode → :443 starts serving the cockpit.
-    match caddy::regenerate(true, Some(&identity)) {
-        Ok(reloaded) => HttpReply::ok(&serde_json::json!({ "provisioned": true, "reloaded": reloaded })),
-        Err(e) => {
-            eprintln!("finalize: caddy reload failed: {e}");
-            // The box is provisioned (flag persisted); a retry/identity change
-            // will re-apply the cockpit config.
-            HttpReply::error(502, "provisioned but the TLS reload failed")
-        }
-    }
 }
 
 /// Whether the request's peer is permitted by the LAN-only guard.
@@ -367,13 +330,13 @@ mod tests {
 
         // With the identity set and the password changed, finalize succeeds.
         set_test_identity(&state);
-        let r = finalize(&state, Some(&admin));
+        let r = identity::finalize(&state, Some(&admin));
         assert_eq!(r.status, 200, "finalize succeeds once pre-reqs are met");
         assert!(r.body.contains("\"provisioned\":true"));
 
         // Status now reflects the durable flag, and re-finalizing is idempotent.
         assert!(status(&state).body.contains("\"provisioned\":true"), "status reflects the flag");
-        assert_eq!(finalize(&state, Some(&admin)).status, 200, "re-finalize is idempotent");
+        assert_eq!(identity::finalize(&state, Some(&admin)).status, 200, "re-finalize is idempotent");
     }
 
     #[test]
@@ -383,7 +346,7 @@ mod tests {
         // An admin who still must change the seeded paper password cannot finalize.
         let mut unchanged = admin.clone();
         unchanged.must_change_password = true;
-        let r = finalize(&state, Some(&unchanged));
+        let r = identity::finalize(&state, Some(&unchanged));
         assert_eq!(r.status, 412, "finalize refused until the password is changed");
         assert!(!status(&state).body.contains("\"provisioned\":true"), "box stays unprovisioned");
     }
@@ -392,7 +355,7 @@ mod tests {
     fn finalize_is_blocked_until_the_box_is_named() {
         let (state, admin) = backend_with_admin();
         // Password changed (default) but no identity yet → blocked.
-        let r = finalize(&state, Some(&admin));
+        let r = identity::finalize(&state, Some(&admin));
         assert_eq!(r.status, 412, "finalize refused until the box name/IP is set");
         assert!(!status(&state).body.contains("\"provisioned\":true"));
     }

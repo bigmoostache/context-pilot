@@ -1,4 +1,6 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
+import { MaintWizard } from "@/components/auth/maint/MaintWizard"
+import { probeMaintPlane, type MaintStatus } from "@/lib/api/maint"
 import { TopBar } from "@/components/shell/TopBar"
 import { CockpitView } from "@/components/shell/CockpitView"
 import { StatusBar } from "@/components/shell/StatusBar"
@@ -20,8 +22,35 @@ import "./App.css"
  * dev-mode) and the tooltip layer **above** {@link AppShell}. AuthProvider
  * probes the backend's auth status on mount; AuthGuard shows the login page
  * when auth is enabled but no valid session exists.
+ *
+ * Before any of that, it probes whether this origin is the **IT maintenance
+ * plane** (:9090). The same bundle serves both planes; on the maintenance plane
+ * `GET /api/maint/status` answers, and we render the provisioning wizard instead
+ * of the cockpit (Milestone 5). On the cockpit that route 404s, so the normal
+ * app renders.
  */
 function App() {
+  const [maint, setMaint] = useState<MaintStatus | null | "loading">("loading")
+
+  useEffect(() => {
+    let live = true
+    void probeMaintPlane().then((s) => {
+      if (live) setMaint(s)
+    })
+    return () => {
+      live = false
+    }
+  }, [])
+
+  if (maint === "loading") return null
+  if (maint) {
+    return (
+      <ThemeProvider>
+        <MaintWizard initialStatus={maint} />
+      </ThemeProvider>
+    )
+  }
+
   return (
     <ThemeProvider>
       <AuthProvider>

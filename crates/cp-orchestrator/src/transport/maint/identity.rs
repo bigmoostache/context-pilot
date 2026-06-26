@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use super::Backend;
 use super::HttpReply;
 use super::state::write_atomic;
+use crate::services::auth::types::User;
 
 /// The box's operator-chosen identity — the cert subjects for the private leaf.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -78,6 +79,51 @@ pub(crate) fn validate_name(name: &str) -> bool {
 #[must_use]
 pub(crate) fn validate_ip(ip: &str) -> bool {
     ip.parse::<std::net::IpAddr>().is_ok()
+}
+
+/// `POST /api/maint/finalize` (Admin) — flip the box to *provisioned* and start
+/// serving the cockpit.
+///
+/// Pre-requisites (Obj 5.4): the seeded paper password must have been changed
+/// (`must_change_password == false`) **and** the box identity (name/IP) must be
+/// set — the leaf needs subjects before the cockpit can be trusted. On success it
+/// persists the durable flag, then re-renders the Caddyfile in *provisioned* mode
+/// and reloads Caddy so `:443` begins serving the cockpit (Obj 2.2.2). Idempotent.
+pub(crate) fn finalize(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
+    // The Admin gate guarantees `auth_user` is `Some(Admin)` here.
+    let Some(caller) = auth_user else {
+        return HttpReply::error(401, "admin authorization required");
+    };
+    // Pre-requisite: the seeded paper password must have been changed.
+    if caller.must_change_password {
+        return HttpReply::error(412, "change the admin password before finalizing");
+    }
+
+    let (flag_path, identity) = match state.lock() {
+        Ok(b) => (b.provision_flag_path.clone(), load_identity(&identity_path(&b.agents_dir))),
+        Err(_) => return HttpReply::error(500, "backend lock poisoned"),
+    };
+
+    // Pre-requisite: the box must be named (a leaf needs subjects).
+    let Some(identity) = identity else {
+        return HttpReply::error(412, "set the box name/IP before finalizing");
+    };
+
+    if let Err(e) = super::state::set_provisioned(&flag_path, true) {
+        eprintln!("finalize: could not persist provisioned flag: {e}");
+        return HttpReply::error(500, "could not persist provisioned flag");
+    }
+
+    // Re-render Caddy in provisioned mode → :443 starts serving the cockpit.
+    match super::caddy::regenerate(true, Some(&identity)) {
+        Ok(reloaded) => HttpReply::ok(&serde_json::json!({ "provisioned": true, "reloaded": reloaded })),
+        Err(e) => {
+            eprintln!("finalize: caddy reload failed: {e}");
+            // The box is provisioned (flag persisted); a retry/identity change
+            // will re-apply the cockpit config.
+            HttpReply::error(502, "provisioned but the TLS reload failed")
+        }
+    }
 }
 
 /// `GET /api/maint/identity` (Admin) — the current box identity, or `null` when
