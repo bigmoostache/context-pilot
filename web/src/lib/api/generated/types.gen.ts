@@ -65,6 +65,19 @@ export type AgentMetrics = {
     };
 };
 
+export type AppSettings = {
+    allowed_models: Array<string>;
+    auth_enabled: boolean;
+    default_model?: string | null;
+    default_provider?: string | null;
+    is_admin: boolean;
+    onboarding_completed: boolean;
+    providers: Array<{
+        configured: boolean;
+        id: string;
+    }>;
+};
+
 export type ArchResponse = {
     arch: string;
     archAuto: boolean;
@@ -386,6 +399,14 @@ export type SelectResponse = {
     binaryPath: string;
     status: string;
     tag: string;
+};
+
+export type SessionInfo = {
+    created_at: number;
+    current: boolean;
+    expires_at: number;
+    id: string;
+    user_agent?: string | null;
 };
 
 export type SheetData = {
@@ -1868,6 +1889,64 @@ export type GetApiAuthMeResponses = {
 
 export type GetApiAuthMeResponse = GetApiAuthMeResponses[keyof GetApiAuthMeResponses];
 
+export type PatchApiAuthMeData = {
+    body: {
+        email: string;
+        name: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/me';
+};
+
+export type PatchApiAuthMeErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PatchApiAuthMeError = PatchApiAuthMeErrors[keyof PatchApiAuthMeErrors];
+
+export type PatchApiAuthMeResponses = {
+    /**
+     * Success
+     */
+    200: {
+        user: AuthUser;
+    };
+};
+
+export type PatchApiAuthMeResponse = PatchApiAuthMeResponses[keyof PatchApiAuthMeResponses];
+
+export type PostApiAuthPasswordData = {
+    body: {
+        current: string;
+        new: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/password';
+};
+
+export type PostApiAuthPasswordErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiAuthPasswordError = PostApiAuthPasswordErrors[keyof PostApiAuthPasswordErrors];
+
+export type PostApiAuthPasswordResponses = {
+    /**
+     * Success
+     */
+    200: OkResponse;
+};
+
+export type PostApiAuthPasswordResponse = PostApiAuthPasswordResponses[keyof PostApiAuthPasswordResponses];
+
 export type PostApiAuthRegisterData = {
     body: {
         email: string;
@@ -1896,6 +1975,60 @@ export type PostApiAuthRegisterResponses = {
 };
 
 export type PostApiAuthRegisterResponse = PostApiAuthRegisterResponses[keyof PostApiAuthRegisterResponses];
+
+export type GetApiAuthSessionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auth/sessions';
+};
+
+export type GetApiAuthSessionsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiAuthSessionsError = GetApiAuthSessionsErrors[keyof GetApiAuthSessionsErrors];
+
+export type GetApiAuthSessionsResponses = {
+    /**
+     * Success
+     */
+    200: {
+        sessions: Array<SessionInfo>;
+    };
+};
+
+export type GetApiAuthSessionsResponse = GetApiAuthSessionsResponses[keyof GetApiAuthSessionsResponses];
+
+export type DeleteApiAuthSessionsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/auth/sessions/{id}';
+};
+
+export type DeleteApiAuthSessionsByIdErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type DeleteApiAuthSessionsByIdError = DeleteApiAuthSessionsByIdErrors[keyof DeleteApiAuthSessionsByIdErrors];
+
+export type DeleteApiAuthSessionsByIdResponses = {
+    /**
+     * Success
+     */
+    200: OkResponse;
+};
+
+export type DeleteApiAuthSessionsByIdResponse = DeleteApiAuthSessionsByIdResponses[keyof DeleteApiAuthSessionsByIdResponses];
 
 export type GetApiAuthStatusData = {
     body?: never;
@@ -2428,6 +2561,61 @@ export type DeleteApiReleasesByTagResponses = {
 };
 
 export type DeleteApiReleasesByTagResponse = DeleteApiReleasesByTagResponses[keyof DeleteApiReleasesByTagResponses];
+
+export type GetApiSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/settings';
+};
+
+export type GetApiSettingsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiSettingsError = GetApiSettingsErrors[keyof GetApiSettingsErrors];
+
+export type GetApiSettingsResponses = {
+    /**
+     * Success
+     */
+    200: AppSettings;
+};
+
+export type GetApiSettingsResponse = GetApiSettingsResponses[keyof GetApiSettingsResponses];
+
+export type PostApiSettingsData = {
+    body: {
+        allowed_models?: Array<string>;
+        default_model?: string;
+        default_provider?: string;
+        onboarding_completed?: boolean;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/settings';
+};
+
+export type PostApiSettingsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiSettingsError = PostApiSettingsErrors[keyof PostApiSettingsErrors];
+
+export type PostApiSettingsResponses = {
+    /**
+     * Success
+     */
+    200: AppSettings;
+};
+
+export type PostApiSettingsResponse = PostApiSettingsResponses[keyof PostApiSettingsResponses];
 
 export type PostApiTicketData = {
     body?: never;
