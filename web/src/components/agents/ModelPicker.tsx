@@ -31,6 +31,9 @@ export function ModelPicker({
 }) {
   const activeProv = findProvider(providers, provider) ?? providers[0]
 
+  // Guard: providers not yet loaded (API in flight).
+  if (!activeProv) return null
+
   return (
     <div className="flex flex-col gap-3">
       {/* provider rail */}

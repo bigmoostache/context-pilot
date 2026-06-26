@@ -28,15 +28,15 @@ mod backend;
 mod create;
 mod env_keys;
 mod library;
-mod restart;
-mod retire;
+mod lifecycle;
+mod releases;
 mod thread_shape;
 pub use backend::Backend;
 pub use create::create_agent;
 pub(crate) use env_keys::{env_key_reveal, env_key_update, env_keys_list};
 pub use library::create_command;
-pub use restart::restart_agent;
-pub use retire::{retire_agent, unretire_agent};
+pub use lifecycle::{restart_agent, retire_agent, unretire_agent};
+pub(crate) use releases::{delete_release, download_release, list_releases, select_release, set_arch};
 use thread_shape::{overlay_roster, reshape_thread};
 
 /// A transport-agnostic reply: an HTTP status and a JSON body.
@@ -230,7 +230,7 @@ pub fn rename_agent(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> Http
 ///
 /// Body: raw image bytes (PNG/JPEG/GIF/WebP/SVG). Content type is sniffed from
 /// magic bytes — the `Content-Type` header is not required. Max 2 MiB
-/// ([`MAX_AVATAR_BYTES`](crate::services::avatars::MAX_AVATAR_BYTES)).
+/// ([`MAX_AVATAR_BYTES`](crate::services::agent_meta::MAX_AVATAR_BYTES)).
 pub fn upload_avatar(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply {
     if body_bytes.is_empty() {
         return HttpReply::error(400, "empty body");

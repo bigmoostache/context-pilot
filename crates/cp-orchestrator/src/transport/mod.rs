@@ -279,6 +279,14 @@ fn route_rest(
         (Method::Delete, ["api", "agent", id, "avatar"]) => rest::delete_avatar(state, id),
         (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state, auth_user),
+
+        // ── Release management (T427, admin-only) ──────────────────
+        (Method::Get, ["api", "releases"]) => rest::list_releases(state),
+        (Method::Put, ["api", "releases", "arch"]) => rest::set_arch(state, body_bytes),
+        (Method::Post, ["api", "releases", "download"]) => rest::download_release(state, body_bytes),
+        (Method::Put, ["api", "releases", "select"]) => rest::select_release(state, body_bytes),
+        (Method::Delete, ["api", "releases", tag]) => rest::delete_release(state, tag),
+
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },
     }
 }

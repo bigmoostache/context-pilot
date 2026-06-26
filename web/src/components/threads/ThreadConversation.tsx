@@ -328,6 +328,7 @@ export function ThreadConversation({
           key={thread.id}
           status={thread.status}
           focused={thread.focused}
+          paused={thread.paused}
           onSend={onSend}
           onAttach={onAttach}
           pendingFiles={pendingFiles}

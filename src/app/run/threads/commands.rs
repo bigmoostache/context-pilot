@@ -270,10 +270,11 @@ fn apply_delete_thread(state: &mut State, thread_id: &str) {
 /// timestamp (unique within a thread).
 ///
 /// **Cascade rule:** when the deleted message is from the assistant,
-/// all *consecutive* `auto: true` messages immediately following it are
-/// also removed (tool-trace cleanup). The cascade stops at the first
-/// non-auto message. One `MessageDeleted` delta is emitted per removed
-/// message so the frontend reducer handles each independently.
+/// all *consecutive* `auto: true` messages immediately *preceding* it are
+/// also removed (tool-trace cleanup — these are the tool calls that
+/// produced the response). The cascade stops at the first non-auto
+/// message. One `MessageDeleted` delta is emitted per removed message so
+/// the frontend reducer handles each independently.
 fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
     let ts = ThreadsState::get_mut(state);
     let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) else {
@@ -293,12 +294,15 @@ fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
     let mut to_delete: Vec<u64> = vec![message_ts];
 
     if is_assistant {
-        // Walk forward from idx+1 collecting consecutive auto messages.
-        for msg in thread.messages.iter().skip(idx.saturating_add(1)) {
-            if msg.auto {
-                to_delete.push(msg.timestamp);
-            } else {
-                break;
+        // Walk backward from idx-1 collecting consecutive auto messages
+        // (tool-call traces that produced this response).
+        if let Some(preceding) = thread.messages.get(..idx) {
+            for msg in preceding.iter().rev() {
+                if msg.auto {
+                    to_delete.push(msg.timestamp);
+                } else {
+                    break;
+                }
             }
         }
     }

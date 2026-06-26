@@ -1,15 +1,9 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
-  Bot,
-  Building2,
-  Check,
-  CheckCircle2,
-  Coins,
-  Cpu,
-  Database,
-  Eye,
-  EyeOff,
+  Bot, Building2, Check, CheckCircle2,
+  Coins, Cpu, Database,
+  Eye, EyeOff,
   FileText,
   Gauge,
   Globe,
@@ -17,6 +11,7 @@ import {
   Boxes,
   Loader2,
   Lock,
+  Package,
   Pencil,
   Search,
   Send,
@@ -27,6 +22,7 @@ import {
 } from "lucide-react"
 import { UsagePage } from "@/components/agents/UsagePage"
 import { ModelPicker } from "@/components/agents/ModelPicker"
+import { ReleasesPane } from "./ReleasesPane"
 import { useProviders, defaultModel, findModel } from "@/lib/support/models"
 import { useFleet, sendCommand } from "@/lib/live"
 import { fetchEnvKeys, revealEnvKey, updateEnvKey } from "@/lib/api"
@@ -46,7 +42,7 @@ function writeDefaults(provider: string, model: string) {
 }
 
 // ── categories ────────────────────────────────────────────────────
-export type CatId = "general" | "usage" | "providers" | "search" | "docai" | "web" | "integrations"
+export type CatId = "general" | "usage" | "providers" | "search" | "docai" | "web" | "integrations" | "releases"
 
 export const CATEGORIES: {
   id: CatId
@@ -54,6 +50,7 @@ export const CATEGORIES: {
   blurb: string
   icon: typeof Sliders
   count?: number
+  adminOnly?: boolean
 }[] = [
   { id: "general", label: "General", blurb: "Defaults & autonomy", icon: Sliders },
   { id: "usage", label: "Usage & Cost", blurb: "Spend & token analytics", icon: Coins },
@@ -62,6 +59,7 @@ export const CATEGORIES: {
   { id: "docai", label: "Document AI", blurb: "OCR & extraction", icon: FileText },
   { id: "web", label: "Web & Scraping", blurb: "Search & crawl", icon: Globe, count: 2 },
   { id: "integrations", label: "Integrations", blurb: "Git & external services", icon: Boxes },
+  { id: "releases", label: "Releases", blurb: "Manage binary versions", icon: Package, adminOnly: true },
 ]
 
 // ── per-category bodies ───────────────────────────────────────────
@@ -134,6 +132,8 @@ export function CategoryBody({ cat }: { cat: CatId }) {
           <KeyRow i={0} name="GitHub" env="GITHUB_TOKEN" icon={Boxes} status={ks("GITHUB_TOKEN")} hint="PRs · issues · gh CLI" managed={locked} reason={reason} company={company} />
         </Stack>
       )
+    case "releases":
+      return <ReleasesPane />
   }
 }
 

@@ -342,6 +342,59 @@ pub(super) fn transport() -> Value {
                 "kind": r("OpEntryKind")
             },
             "required": ["rev", "kind"]
+        },
+        // ── Release management (T427) ───────────────────────────────
+        "ReleaseEntry": {
+            "type": "object",
+            "properties": {
+                "tag": { "type": "string" },
+                "name": { "type": "string" },
+                "publishedAt": { "type": "string", "nullable": true },
+                "assetUrl": { "type": "string", "nullable": true },
+                "assetSize": { "type": "integer", "nullable": true },
+                "isLatest": { "type": "boolean" },
+                "local": { "type": "boolean" },
+                "selected": { "type": "boolean" },
+                "binarySize": { "type": "integer", "nullable": true }
+            },
+            "required": ["tag", "name", "local", "selected"]
+        },
+        "ReleasesResponse": {
+            "type": "object",
+            "properties": {
+                "arch": { "type": "string" },
+                "archAuto": { "type": "boolean" },
+                "activeTag": { "type": "string", "nullable": true },
+                "currentBinary": { "type": "string" },
+                "knownArchs": arr(json!({ "type": "string" })),
+                "releases": arr(r("ReleaseEntry"))
+            },
+            "required": ["arch", "archAuto", "currentBinary", "knownArchs", "releases"]
+        },
+        "ArchResponse": {
+            "type": "object",
+            "properties": {
+                "arch": { "type": "string" },
+                "archAuto": { "type": "boolean" }
+            },
+            "required": ["arch", "archAuto"]
+        },
+        "DownloadResponse": {
+            "type": "object",
+            "properties": {
+                "status": { "type": "string" },
+                "tag": { "type": "string" }
+            },
+            "required": ["status", "tag"]
+        },
+        "SelectResponse": {
+            "type": "object",
+            "properties": {
+                "status": { "type": "string" },
+                "tag": { "type": "string" },
+                "binaryPath": { "type": "string" }
+            },
+            "required": ["status", "tag", "binaryPath"]
         }
     })
 }
