@@ -261,6 +261,7 @@ export type OpEntryKind = {
     input_tokens?: number;
     kind: string;
     message_id?: string;
+    message_ts?: number;
     miss_tokens?: number;
     name?: string;
     output_tokens?: number;

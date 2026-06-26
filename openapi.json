@@ -801,6 +801,9 @@
           "message_id": {
             "type": "string"
           },
+          "message_ts": {
+            "type": "integer"
+          },
           "miss_tokens": {
             "type": "integer"
           },

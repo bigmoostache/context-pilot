@@ -296,7 +296,8 @@ pub(super) fn transport() -> Value {
                 "miss_tokens": { "type": "integer" },
                 "message_id": { "type": "string" },
                 "head": { "type": "string" },
-                "inline_body": { "type": "string" }
+                "inline_body": { "type": "string" },
+                "message_ts": { "type": "integer" }
             },
             "required": ["kind"]
         },

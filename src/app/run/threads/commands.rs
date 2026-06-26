@@ -45,6 +45,9 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
         CommandKind::DeleteThread { thread_id } => {
             apply_delete_thread(&mut app.state, &thread_id);
         }
+        CommandKind::DeleteMessage { thread_id, message_ts } => {
+            apply_delete_message(&mut app.state, &thread_id, message_ts);
+        }
         CommandKind::Stop | CommandKind::InterruptStream => {
             apply_stop(&mut app.state);
         }
@@ -259,6 +262,33 @@ fn apply_delete_thread(state: &mut State, thread_id: &str) {
 
     state.flags.ui.dirty = true;
     log::info!("bridge: permanently deleted thread {thread_id}");
+}
+
+// ── DeleteMessage ───────────────────────────────────────────────────
+
+/// Delete a single message from a thread, identified by its epoch-ms
+/// timestamp (unique within a thread).
+fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
+    let ts = ThreadsState::get_mut(state);
+    let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) else {
+        log::warn!("bridge: DeleteMessage for unknown thread {thread_id}");
+        return;
+    };
+
+    let before = thread.messages.len();
+    thread.messages.retain(|m| m.timestamp != message_ts);
+    if thread.messages.len() == before {
+        log::warn!("bridge: DeleteMessage no message with ts={message_ts} in thread {thread_id}");
+        return;
+    }
+
+    emit_roster_delta(
+        state,
+        OpEntryKind::MessageDeleted { thread_id: thread_id.to_owned(), message_ts },
+    );
+
+    state.flags.ui.dirty = true;
+    log::info!("bridge: deleted message ts={message_ts} from thread {thread_id}");
 }
 
 // ── Stop / Interrupt ────────────────────────────────────────────────────

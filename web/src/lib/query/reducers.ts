@@ -111,6 +111,22 @@ export function applyThreadDelta(
       if (!prev.some((t) => t.id === k.thread_id)) return prev
       return prev.filter((t) => t.id !== k.thread_id)
     }
+    case "message_deleted": {
+      const thread = prev.find((t) => t.id === k.thread_id)
+      if (!thread) return null // unknown thread → hydrate
+      const target = k.message_ts
+      if (target === undefined) return prev
+      // The log's `ts` is epoch-ms (number from REST) or ISO string (from an
+      // SSE-appended message). Normalise both to number for comparison.
+      const filtered = thread.log.filter((m) => {
+        const mTs = typeof m.ts === "number" ? m.ts : new Date(m.ts as string).getTime()
+        return mTs !== target
+      })
+      if (filtered.length === thread.log.length) return prev // no match
+      return prev.map((t) =>
+        t.id === k.thread_id ? { ...t, log: filtered } : t,
+      )
+    }
     case "thread_status_changed": {
       if (!prev.some((t) => t.id === k.thread_id)) return null
       return prev.map((t) =>

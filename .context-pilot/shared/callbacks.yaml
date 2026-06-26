@@ -20,6 +20,50 @@ lint-integrity:
   is_global: true
   script_content: bash .github/checks/check-lint-config.sh
   last_edited_ms: 0
+openapi-contract:
+  name: openapi-contract
+  description: 'Full OpenAPI pipeline: regenerate spec + route exhaustiveness + TS client codegen + tsc + manual API audit'
+  pattern: '*.rs'
+  blocking: true
+  timeout_secs: 60
+  success_message: OpenAPI contract OK ✓
+  is_global: true
+  script_content: |
+    echo "▸ Regenerating openapi.json + route exhaustiveness..."
+    cargo test -p cp-orchestrator --test openapi -- --ignored 2>&1
+
+    # ── Step 3: Regenerate TypeScript client ─────────────────────────────
+    echo "▸ Regenerating TS client from openapi.json..."
+    cd web
+    npx @hey-api/openapi-ts -i ../openapi.json -o src/lib/api/generated 2>&1
+
+    # ── Step 4: Type-check frontend ──────────────────────────────────────
+    echo "▸ Type-checking (tsc --noEmit)..."
+    npx tsc --noEmit 2>&1
+
+    # ── Step 5: Audit — no manual API calls ──────────────────────────────
+    # The API layer must use the generated SDK exclusively. The only
+    # acceptable manual patterns are:
+    #   - downloadFile in finder.ts (binary blob, needs manual fetch)
+    #   - rawUrl / avatarUrl (URL builders, not fetch calls)
+    echo "▸ Auditing for manual API calls..."
+    cd src/lib/api
+
+    # Check for raw fetch( calls (excluding downloadFile which is irreducible)
+    MANUAL_FETCH=$(grep -rn 'fetch(' --include='*.ts' . \
+      | grep -v '/generated/' \
+      | grep -v 'downloadFile' \
+      | grep -v '// ok:manual' \
+      || true)
+
+    if [ -n "$MANUAL_FETCH" ]; then
+      echo "::error::Manual fetch() calls found in API layer — use generated SDK instead:"
+      echo "$MANUAL_FETCH"
+      exit 1
+    fi
+
+    echo "✓ All checks passed"
+  last_edited_ms: 0
 rust-check:
   name: rust-check
   description: Run cargo check, clippy, and fmt --check on Rust file edits

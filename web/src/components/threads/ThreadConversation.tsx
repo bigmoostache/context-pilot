@@ -6,6 +6,7 @@ import { ThreadComposer, type CommandSuggestion } from "./ThreadComposer"
 import { CreateCommandDialog } from "./CreateCommandDialog"
 import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
+import { sendCommand } from "@/lib/api"
 import { zipFiles } from "@/lib/utils"
 import { uploadToNode, type UploadedFile } from "./fileUpload"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
@@ -218,6 +219,12 @@ export function ThreadConversation({
     bottomRef.current?.scrollIntoView({ block: "end" })
   }, [thread.id, nonAutoCount])
 
+  /** Delete a message from this thread via the agent command bridge. */
+  const handleDelete = (msg: ThreadMsg) => {
+    const ts = typeof msg.ts === "number" ? msg.ts : new Date(msg.ts as string).getTime()
+    sendCommand(agentId, { kind: "delete_message", thread_id: thread.id, message_ts: ts })
+  }
+
   return (
     <main
       className="flex min-w-0 flex-1 flex-col bg-background"
@@ -254,6 +261,7 @@ export function ThreadConversation({
                   agentId={agentId}
                   onOpenFile={setSheetFile}
                   onShowInFinder={onShowInFinder}
+                  onDelete={() => handleDelete(seg.msg)}
                 />
                 {seg.msg.questions?.map((q, i) => (
                   <div key={i} className="pb-1.5 pl-7">

@@ -190,9 +190,12 @@ impl AgentView {
                     miss_tokens: *miss_tokens,
                 };
             }
-            // Durability-only records and forward-compat unknowns do not
-            // affect the projected state.
-            OpEntryKind::CommandEffect { .. } | OpEntryKind::SeenMark { .. } | OpEntryKind::Unknown => {}
+            // Durability-only records, message-delete, and forward-compat
+            // unknowns do not affect the projected state.
+            OpEntryKind::CommandEffect { .. }
+            | OpEntryKind::SeenMark { .. }
+            | OpEntryKind::MessageDeleted { .. }
+            | OpEntryKind::Unknown => {}
         }
     }
 }
