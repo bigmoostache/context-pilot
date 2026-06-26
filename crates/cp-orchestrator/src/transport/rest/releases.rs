@@ -80,12 +80,18 @@ pub(crate) fn list_releases(state: &Mutex<Backend>) -> HttpReply {
         }
     }
 
-    // Flatten into a sorted array (newest first).
+    // Flatten into a sorted array (newest first by publish date, then semver).
     let mut release_list: Vec<serde_json::Value> = releases.into_values().collect();
     release_list.sort_by(|a, b| {
-        let ta = a.get("tag").and_then(|v| v.as_str()).unwrap_or("");
-        let tb = b.get("tag").and_then(|v| v.as_str()).unwrap_or("");
-        semver_sort_key(tb).cmp(&semver_sort_key(ta))
+        let pa = a.get("publishedAt").and_then(|v| v.as_str()).unwrap_or("");
+        let pb = b.get("publishedAt").and_then(|v| v.as_str()).unwrap_or("");
+        // Primary: published date descending (ISO 8601 sorts lexicographically).
+        // Fallback: semver descending for releases without a publish date.
+        pb.cmp(pa).then_with(|| {
+            let ta = a.get("tag").and_then(|v| v.as_str()).unwrap_or("");
+            let tb = b.get("tag").and_then(|v| v.as_str()).unwrap_or("");
+            semver_sort_key(tb).cmp(&semver_sort_key(ta))
+        })
     });
 
     HttpReply::ok(&serde_json::json!({
