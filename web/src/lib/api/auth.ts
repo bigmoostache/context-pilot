@@ -125,24 +125,6 @@ export interface AppSettings {
   is_admin: boolean
   auth_enabled: boolean
   providers: ProviderKeyState[]
-  /** Whether a Claude Code OAuth credential is present (keyless provider). */
-  claude_oauth_connected: boolean
-}
-
-// ── Claude Code OAuth (manual paste flow) ────────────────────────────
-
-/** Begin the Claude Code OAuth manual login → authorize URL to open. */
-export function oauthStart(): Promise<{ authorize_url: string }> {
-  return request("/api/auth/oauth/start", { method: "POST" })
-}
-
-/** Finish the OAuth login with the pasted `code#state`. Writes credentials. */
-export function oauthFinish(code: string): Promise<{ ok: boolean }> {
-  return request("/api/auth/oauth/finish", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code }),
-  })
 }
 
 /** Read central settings + onboarding state (any authenticated user). */

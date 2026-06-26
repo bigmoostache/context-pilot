@@ -28,7 +28,6 @@ mod backend;
 mod create;
 mod env_keys;
 mod library;
-pub mod oauth;
 mod restart;
 mod retire;
 mod settings;

@@ -67,10 +67,6 @@ pub struct Backend {
     /// on their next launch.  `env_key_reveal` / `env_keys_list` read this
     /// map first, falling back to [`std::env::var`].
     pub(crate) env_overrides: HashMap<String, String>,
-    /// In-flight Claude Code OAuth manual login — the PKCE pending state set by
-    /// `/api/auth/oauth/start` and consumed by `/finish`. `None` when no login
-    /// is in progress.
-    pub(crate) pending_oauth: Option<crate::services::claude_oauth::Pending>,
 }
 
 impl Backend {
@@ -106,7 +102,6 @@ impl Backend {
             auth,
             session_ttl,
             env_overrides: HashMap::new(),
-            pending_oauth: None,
         }
     }
 
@@ -162,7 +157,6 @@ impl Backend {
             auth: None,
             session_ttl: Duration::from_secs(3600),
             env_overrides: HashMap::new(),
-            pending_oauth: None,
         }
     }
 }

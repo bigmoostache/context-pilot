@@ -47,15 +47,6 @@ argon2 = "0.5"
 # at orchestrator level (~/.context-pilot/orchestrator/auth.db). Bundled build
 # (same as cp-mod-entities) so no system libsqlite dependency.
 rusqlite = { workspace = true }
-# Claude Code OAuth manual-login flow (P-oauth): PKCE verifier/challenge needs a
-# CSPRNG (`rand`), SHA-256 (`sha2`), and base64url (`base64`); the token exchange
-# + background refresh use a blocking HTTPS client. Use **rustls** (not
-# native-tls) so the orchestrator cross-compiles to aarch64 without a system
-# OpenSSL.
-rand = "0.8"
-sha2 = "0.10"
-base64 = "0.22"
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 
 [dev-dependencies]
 # Test-only: the integration suite boots a real agent and drives its command
