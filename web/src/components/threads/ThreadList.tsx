@@ -358,7 +358,7 @@ function ThreadRow({
             </span>
           )}
           <span className="truncate text-[11.5px] text-muted-foreground/70">{preview}</span>
-          {!archived && t.unread > 0 && (
+          {!archived && (t.unread ?? 0) > 0 && (
             <span
               className="ml-auto shrink-0 rounded-full px-1.5 text-[10px] font-semibold tabular-nums text-[var(--primary-foreground)]"
               style={{ background: "var(--signal)" }}
