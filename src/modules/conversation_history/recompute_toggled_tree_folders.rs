@@ -119,7 +119,7 @@ fn collect_opened_folders_from_messages(messages: &[Message], folders: &mut Hash
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cp_base::state::data::message::{MsgKind, MsgStatus, ToolUseRecord};
+    use cp_base::state::data::message::{MsgStatus, ToolUseRecord};
 
     fn make_tool_call(name: &str, input: serde_json::Value) -> Message {
         Message {
