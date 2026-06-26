@@ -1888,8 +1888,8 @@
   last_edited_ms: 0
 2fa918f340b5a63e:
   path: crates/cp-wire/src/types/command.rs
-  description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, PauseThread, ResumeThread, DeleteThread, InterruptStream, Stop, Configure{provider,model}, Unknown). Frame{schema_version, auth, command}. PauseThread/ResumeThread added for T371. DeleteThread added for T371 permanent delete.
-  last_edited_ms: 0
+  description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, PauseThread, ResumeThread, DeleteThread, DeleteMessage{thread_id,message_ts}, InterruptStream, Stop, Configure{provider,model}, Unknown). Frame{schema_version, auth, command}. PauseThread/ResumeThread added for T371. DeleteThread added for T371 permanent delete. DeleteMessage added for T416 per-message delete.
+  last_edited_ms: 1782466861139
 2fbeef291b1996a9:
   path: crates/cp-render/Cargo.toml
   description: 'Render crate deps: serde only. Minimal.'
@@ -3680,8 +3680,8 @@
   last_edited_ms: 1781545579109
 5d59dd38eaa87708:
   path: crates/cp-wire/src/types/oplog.rs
-  description: 'OpEntry + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated{...,inline_body}, ThreadCreated/Archived/Restored/Paused/Resumed/Deleted/StatusChanged, ThreadFocusChanged, Lifecycle, CostAggregate, ContextUsage{used,threshold,budget,hit_tokens,miss_tokens (T297 cache split, #[serde(default)] N-1)}, Checkpoint, Unknown. Framed (len+CRC). round-trip + tolerant-decode + roster + stable-tag tests.'
-  last_edited_ms: 0
+  description: 'OpEntry + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated{...,inline_body}, MessageDeleted{thread_id,message_ts}, ThreadCreated/Archived/Restored/Paused/Resumed/Deleted/StatusChanged, ThreadFocusChanged, Lifecycle, CostAggregate, ContextUsage{used,threshold,budget,hit_tokens,miss_tokens (T297 cache split, #[serde(default)] N-1)}, Checkpoint, Unknown. Framed (len+CRC). round-trip + tolerant-decode + roster + stable-tag tests.'
+  last_edited_ms: 1782466861203
 5d6c3bd44be65976:
   path: ui/src/lib/types.ts
   description: 'Maquette domain types. User (T30: name/email/initials/accent/managedByCompany/company/role for avatar menu + Profile modal). Agent, FsNode, Finder types, ThreadDetail+agentId, ThreadStatus (MY_TURN/ACTIVE/THEIR_TURN), ViewMode=fleet|cockpit|threads|finder, Library/Usage types. Cockpit panel maquette types (T16).'
@@ -5320,8 +5320,8 @@
   last_edited_ms: 0
 864108c638c6102a:
   path: src/app/run/threads/commands.rs
-  description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/Stop|Interrupt/Configure. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted.
-  last_edited_ms: 0
+  description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/DeleteMessage(T416 per-message delete by epoch-ms timestamp)/Stop|Interrupt/Configure. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted. DeleteMessage removes single message by timestamp, emits durable MessageDeleted.
+  last_edited_ms: 1782466861236
 864a3982a9cdd1de:
   path: web/src/components/shell/LeftRail.tsx
   description: 'Cockpit context navigator. Context-budget meter now LIVE: sum(usePanels tokens) / REF_BUDGET (200k), same figure as StatsPanel''s Panel-context (honest visible-panel weight, not true context occupancy). tokenBudget mock removed. First-class Conversation nav button above the scrollable panel list; selection CONTROLLED via props.'
@@ -6032,8 +6032,8 @@
   last_edited_ms: 0
 96fc682fbcfe20ea:
   path: web/src/lib/query/reducers.ts
-  description: 'SSE delta reducers: applyThreadDelta folds thread_created/archived/restored/paused/resumed/deleted/status_changed/focus_changed/message_created into TanStack cache. mergeThreadLogs reconciles poll+delta. applyAgentDelta folds phase/cost/context. OpEntry/OpEntryKind re-exported from generated types (zero manual SEV).'
-  last_edited_ms: 0
+  description: 'SSE delta reducers: applyThreadDelta folds thread_created/archived/restored/paused/resumed/deleted/status_changed/focus_changed/message_created/message_deleted into TanStack cache. mergeThreadLogs reconciles poll+delta. applyAgentDelta folds phase/cost/context. OpEntry/OpEntryKind re-exported from generated types (zero manual SEV).'
+  last_edited_ms: 1782466861353
 96fe5b020ab92fe9:
   path: src/app/run/threads/commands.rs
   description: Bridge command APPLICATION (K7 mutation half), split from bridge.rs for the 500-line limit. apply_command dispatches SendMessage(inject user msg + MyTurn flip + on_user_message)/CreateThread(+emit_roster_delta ThreadCreated + prime status memo)/ArchiveThread(soft-delete + focus cleanup + emit ThreadArchived)/RestoreThread(emit ThreadRestored)/Stop|Interrupt(mirror Esc StopStreaming)/Configure(serde-deserialize provider+model, set on state). Imports emit_roster_delta + wire_turn (pub(super)) from bridge.
@@ -6532,8 +6532,8 @@ a2ab866cbb42292d:
   last_edited_ms: 1781787267822
 a2d05b95c8ab1458:
   path: web/src/components/threads/ThreadConversation.tsx
-  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped). T304 draftKey; T331 pendingFiles+onRemoveFile; T334 onShowInFinder; T348 useLibrary command suggestions; T350 createCmdOpen + CreateCommandDialog. T367: OS-file drag-and-drop onto the whole <main> -> handleDrop zips the dropped file(s) client-side (zipFiles, @/lib/utils) into ONE archive then uploads via onAttach (same paperclip path, staged pendingFiles), falling back to raw files if zipping throws; while a file drag is in flight the surface gets a discrete 2px blur eased 300ms in/out (inline filter blur(2px)/blur(0px)); dragDepth useRef counter avoids child-cross flicker, isFileDrag guards on dataTransfer.types includes ''Files'', gated on onAttach (blur is the ONLY affordance). T414: auto-scroll only on non-auto messages (nonAutoCount dep instead of log.length) so tool counter updates don''t yank scroll. Takes agentId + onAttach props.'
-  last_edited_ms: 0
+  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped). T304 draftKey; T331 pendingFiles+onRemoveFile; T334 onShowInFinder; T348 useLibrary command suggestions; T350 createCmdOpen + CreateCommandDialog. T367: OS-file drag-and-drop onto the whole <main> -> handleDrop zips the dropped file(s) client-side (zipFiles, @/lib/utils) into ONE archive then uploads via onAttach (same paperclip path, staged pendingFiles), falling back to raw files if zipping throws; while a file drag is in flight the surface gets a discrete 2px blur eased 300ms in/out (inline filter blur(2px)/blur(0px)); dragDepth useRef counter avoids child-cross flicker, isFileDrag guards on dataTransfer.types includes ''Files'', gated on onAttach (blur is the ONLY affordance). T414: auto-scroll only on non-auto messages (nonAutoCount dep instead of log.length) so tool counter updates don''t yank scroll. T416: handleDelete sends delete_message command via sendCommand(agentId, {kind, thread_id, message_ts}), onDelete threaded to Message component. Takes agentId + onAttach props.'
+  last_edited_ms: 1782466861325
 a2f4321209185df2:
   path: crates/cp-orchestrator/src/transport/auth/mod.rs
   description: 'Auth middleware + REST handlers. authenticate(): centralized Bearer gate (no-op when disabled, NFR-09). Public routes: login (FR-05), register (bootstrap FR-03 or admin-creates). Protected: logout, me, list/create/delete users. Re-exports ACL functions from acl.rs.'
@@ -8624,8 +8624,8 @@ d626d8c95522186e:
   last_edited_ms: 1782125106133
 d6497a2dad8c0a5c:
   path: web/src/components/conversation/Message.tsx
-  description: 'Thread/conversation message renderer (shared by web ThreadConversation + cockpit Conversation). AssistantMessage + UserMessage render text via <Markdown> (assistant=default, user=onAccent); MessageBody splices inline file-upload chips. T311: discrete CopyButton beneath BOTH user & assistant bubbles — low-opacity Copy icon (align mirrors bubble side: user self-end, assistant left under pl-7), click → navigator.clipboard.writeText(text) → flips to green var(--ok) Check ''Copied'' for ~2s then reverts (guarded ?. for insecure-origin/no-clipboard, silent fail); hidden on assistant while streaming. CopyButton: exported, accepts label+getText props for reuse (code blocks, tables). Labels: Copy message (bubbles), Copy code (pre blocks), Copy table (GFM tables). T406: className prop for accent-aware color override. ToolMessage = collapsible card. Streaming blink cursor preserved. T334: onShowInFinder prop threaded to MessageFileChip for Show in Finder navigation.'
-  last_edited_ms: 0
+  description: 'Thread/conversation message renderer (shared by web ThreadConversation + cockpit Conversation). AssistantMessage + UserMessage render text via <Markdown> (assistant=default, user=onAccent); MessageBody splices inline file-upload chips. T311: discrete CopyButton beneath BOTH user & assistant bubbles — low-opacity Copy icon (align mirrors bubble side: user self-end, assistant left under pl-7), click → navigator.clipboard.writeText(text) → flips to green var(--ok) Check ''Copied'' for ~2s then reverts (guarded ?. for insecure-origin/no-clipboard, silent fail); hidden on assistant while streaming. CopyButton: exported, accepts label+getText props for reuse (code blocks, tables). Labels: Copy message (bubbles), Copy code (pre blocks), Copy table (GFM tables). T406: className prop for accent-aware color override. T416: DeleteButton (Trash2 icon, danger colour on hover) beside CopyButton for both user+assistant messages, fires onDelete callback. ToolMessage = collapsible card. Streaming blink cursor preserved. T334: onShowInFinder prop threaded to MessageFileChip for Show in Finder navigation.'
+  last_edited_ms: 1782466861296
 d66af40c87661284:
   path: web/src/components/auth/UsersDialog.tsx
   description: Admin user management dialog (Phase 10). Lists all users with RoleBadge, create user form (collapsible), delete user with confirmation, force-logout (revoke all sessions). TanStack Query hooks. Accessible from UserMenu when admin.
@@ -9600,8 +9600,8 @@ f379d2a878f22b32:
   last_edited_ms: 1780565428722
 f384173f6c84e64e:
   path: crates/cp-oplog/src/service.rs
-  description: 'OplogService — off-loop group-commit thread + GAP2/I2 asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate|ContextUsage|ThreadFocusChanged=BestEffort (disposable/self-healing), all else (roster mutations incl ThreadPaused/ThreadResumed/ThreadDeleted + Lifecycle + Unknown)=Durable. THREE submit paths: append_durable (blocks+awaits sync — intake/I11), submit_durable (non-blocking durable, detached ack — I2 main loop), append_best_effort (try_send drop-on-full — phase/cost/focus). commit_loop drains batch, ONE fdatasync. Tests in sibling service_tests.rs.'
-  last_edited_ms: 0
+  description: 'OplogService — off-loop group-commit thread + GAP2/I2 asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate|ContextUsage|ThreadFocusChanged=BestEffort (disposable/self-healing), all else (roster mutations incl ThreadPaused/ThreadResumed/ThreadDeleted + MessageDeleted + Lifecycle + Unknown)=Durable. THREE submit paths: append_durable (blocks+awaits sync — intake/I11), submit_durable (non-blocking durable, detached ack — I2 main loop), append_best_effort (try_send drop-on-full — phase/cost/focus). commit_loop drains batch, ONE fdatasync. Tests in sibling service_tests.rs.'
+  last_edited_ms: 1782466861266
 f39aced1820ba7c8:
   path: crates/cp-mod-logs/Cargo.toml
   description: Logs crate dependencies. cp-base, cp-render, log, serde, serde_json, chrono. No cp-mod-memory dependency.
