@@ -47,6 +47,9 @@ argon2 = "0.5"
 # at orchestrator level (~/.context-pilot/orchestrator/auth.db). Bundled build
 # (same as cp-mod-entities) so no system libsqlite dependency.
 rusqlite = { workspace = true }
+# HTTP client — GitHub Releases API + binary download for the release manager
+# (services/releases.rs). Reuses the workspace dep (blocking + json features).
+reqwest = { workspace = true }
 
 [dev-dependencies]
 # Test-only: the integration suite boots a real agent and drives its command

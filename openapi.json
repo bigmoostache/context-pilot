@@ -212,6 +212,21 @@
         ],
         "type": "object"
       },
+      "ArchResponse": {
+        "properties": {
+          "arch": {
+            "type": "string"
+          },
+          "archAuto": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "arch",
+          "archAuto"
+        ],
+        "type": "object"
+      },
       "AuthLogin": {
         "properties": {
           "token": {
@@ -474,6 +489,21 @@
         },
         "required": [
           "user"
+        ],
+        "type": "object"
+      },
+      "DownloadResponse": {
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "tag"
         ],
         "type": "object"
       },
@@ -1049,6 +1079,85 @@
         ],
         "type": "object"
       },
+      "ReleaseEntry": {
+        "properties": {
+          "assetSize": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "assetUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "binarySize": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "isLatest": {
+            "type": "boolean"
+          },
+          "local": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "selected": {
+            "type": "boolean"
+          },
+          "tag": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "name",
+          "local",
+          "selected"
+        ],
+        "type": "object"
+      },
+      "ReleasesResponse": {
+        "properties": {
+          "activeTag": {
+            "nullable": true,
+            "type": "string"
+          },
+          "arch": {
+            "type": "string"
+          },
+          "archAuto": {
+            "type": "boolean"
+          },
+          "currentBinary": {
+            "type": "string"
+          },
+          "knownArchs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "releases": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseEntry"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "arch",
+          "archAuto",
+          "currentBinary",
+          "knownArchs",
+          "releases"
+        ],
+        "type": "object"
+      },
       "RenameResult": {
         "properties": {
           "renamed": {
@@ -1113,6 +1222,25 @@
         "required": [
           "id",
           "title"
+        ],
+        "type": "object"
+      },
+      "SelectResponse": {
+        "properties": {
+          "binaryPath": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "tag",
+          "binaryPath"
         ],
         "type": "object"
       },
@@ -4516,6 +4644,220 @@
         "summary": "LLM provider + model registry",
         "tags": [
           "providers"
+        ]
+      }
+    },
+    "/api/releases": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleasesResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List releases (local + remote)",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
+    "/api/releases/arch": {
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "arch": {
+                    "type": "string"
+                  },
+                  "auto": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set architecture",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
+    "/api/releases/download": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "tag": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tag"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Download a release",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
+    "/api/releases/select": {
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "tag": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tag"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelectResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Select active release",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
+    "/api/releases/{tag}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tag",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete downloaded release",
+        "tags": [
+          "releases"
         ]
       }
     },

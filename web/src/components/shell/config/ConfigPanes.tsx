@@ -7,11 +7,13 @@ import {
   Coins,
   Loader2,
   Lock,
+  Package,
   Send,
   Sliders,
 } from "lucide-react"
 import { UsagePage } from "@/components/agents/UsagePage"
 import { ModelPicker } from "@/components/agents/ModelPicker"
+import { ReleasesPane } from "./ReleasesPane"
 import { useProviders, defaultModel, findModel, modelKey, usableProviders } from "@/lib/support/models"
 import { useFleet, sendCommand } from "@/lib/live"
 import { fetchSettings, updateSettings, fetchEnvKeys } from "@/lib/api"
@@ -29,7 +31,7 @@ function writeDefaults(provider: string, model: string) {
 }
 
 // ── categories ────────────────────────────────────────────────────
-export type CatId = "general" | "usage" | "services"
+export type CatId = "general" | "usage" | "services" | "releases"
 
 export const CATEGORIES: {
   id: CatId
@@ -37,10 +39,12 @@ export const CATEGORIES: {
   blurb: string
   icon: typeof Sliders
   count?: number
+  adminOnly?: boolean
 }[] = [
   { id: "general", label: "General", blurb: "Defaults & autonomy", icon: Sliders },
   { id: "usage", label: "Usage & Cost", blurb: "Spend & token analytics", icon: Coins },
   { id: "services", label: "Services", blurb: "Available integrations", icon: Boxes },
+  { id: "releases", label: "Releases", blurb: "Manage binary versions", icon: Package, adminOnly: true },
 ]
 
 // ── per-category bodies ───────────────────────────────────────────
@@ -57,6 +61,8 @@ export function CategoryBody({ cat }: { cat: CatId }) {
       return <UsagePage />
     case "services":
       return <ServicesPane />
+    case "releases":
+      return <ReleasesPane />
   }
 }
 

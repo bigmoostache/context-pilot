@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { lineBounds, resolveEnter, resolveTab } from "@/lib/utils"
-import { ArrowUp, Paperclip, Loader2, Clock } from "lucide-react"
+import { ArrowUp, Paperclip, Loader2, Clock, Pause } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 import { ComposerBubbles, type UploadedFile, type CommandSuggestion } from "./fileUpload"
 
@@ -68,6 +68,7 @@ function parseDraft(key: string | undefined): Draft {
 export function ThreadComposer({
   status,
   focused = false,
+  paused = false,
   onSend,
   onAttach,
   pendingFiles = [],
@@ -80,6 +81,8 @@ export function ThreadComposer({
   status: ThreadStatus
   /** true when this is the single thread the agent is currently focused on */
   focused?: boolean
+  /** true when this thread has been paused by the user (T371) */
+  paused?: boolean
   onSend?: (text: string) => void
   /** upload one or more picked files into this thread (paperclip button) */
   onAttach?: (files: File[]) => void
@@ -180,13 +183,15 @@ export function ThreadComposer({
   const agentBusy = !userTurn
   // Only the FOCUSED thread is being worked right now; any other agent-turn
   // thread is queued and will be picked up soon (T39).
-  const banner = !agentBusy
-    ? null
-    : streaming
-      ? { working: true, color: "var(--ok)", text: "Agent is streaming…" }
-      : focused
-        ? { working: true, color: "var(--signal)", text: "Agent is working this thread…" }
-        : { working: false, color: undefined, text: "Agent will pick up this thread soon." }
+  const banner = paused
+    ? { working: false, paused: true, color: undefined, text: "Thread paused — the agent won't respond until resumed." }
+    : !agentBusy
+      ? null
+      : streaming
+        ? { working: true, paused: false, color: "var(--ok)", text: "Agent is streaming…" }
+        : focused
+          ? { working: true, paused: false, color: "var(--signal)", text: "Agent is working this thread…" }
+          : { working: false, paused: false, color: undefined, text: "Agent will pick up this thread soon." }
 
   const canSend = text.trim().length > 0 || pendingFiles.length > 0
 
@@ -317,8 +322,10 @@ export function ThreadComposer({
         />
       )}
       {banner && (
-        <div className="mb-2 flex items-center justify-center gap-2 rounded-xl bg-muted/40 px-3 py-1.5 text-[11.5px] text-muted-foreground">
-          {banner.working ? (
+        <div className={`mb-2 flex items-center justify-center gap-2 rounded-xl px-3 py-1.5 text-[11.5px] ${banner.paused ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted/40 text-muted-foreground"}`}>
+          {banner.paused ? (
+            <Pause className="size-3.5" />
+          ) : banner.working ? (
             <Loader2 className="size-3.5 animate-spin" style={{ color: banner.color }} />
           ) : (
             <Clock className="size-3.5" />

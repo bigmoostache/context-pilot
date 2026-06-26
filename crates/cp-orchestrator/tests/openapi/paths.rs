@@ -243,6 +243,35 @@ pub(super) fn paths() -> Value {
                 ],
                 "responses": merge(ok(r("OkResponse")), err())
             }})
-        )
+        ),
+        // ── Releases (T427, admin-only) ─────────────────────────────
+        "/api/releases": get("releases", "List releases (local + remote)", r("ReleasesResponse")),
+        "/api/releases/arch": json!({ "put": {
+            "tags": ["releases"], "summary": "Set architecture",
+            "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                "type": "object",
+                "properties": { "arch": { "type": "string" }, "auto": { "type": "boolean" } }
+            }}}},
+            "responses": merge(ok(r("ArchResponse")), err())
+        }}),
+        "/api/releases/download": post("releases", "Download a release", Some(json!({
+            "type": "object",
+            "properties": { "tag": { "type": "string" } },
+            "required": ["tag"]
+        })), r("DownloadResponse")),
+        "/api/releases/select": json!({ "put": {
+            "tags": ["releases"], "summary": "Select active release",
+            "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                "type": "object",
+                "properties": { "tag": { "type": "string" } },
+                "required": ["tag"]
+            }}}},
+            "responses": merge(ok(r("SelectResponse")), err())
+        }}),
+        "/api/releases/{tag}": json!({ "delete": {
+            "tags": ["releases"], "summary": "Delete downloaded release",
+            "parameters": [{ "name": "tag", "in": "path", "required": true, "schema": { "type": "string" } }],
+            "responses": merge(ok(r("OkResponse")), err())
+        }})
     })
 }
