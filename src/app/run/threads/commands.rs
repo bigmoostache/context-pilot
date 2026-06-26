@@ -281,11 +281,21 @@ fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
         log::warn!("bridge: DeleteMessage no message with ts={message_ts} in thread {thread_id}");
         return;
     }
+    // Capture the post-delete count before dropping the borrow on ThreadsState.
+    let new_count = thread.messages.len();
 
     emit_roster_delta(
         state,
         OpEntryKind::MessageDeleted { thread_id: thread_id.to_owned(), message_ts },
     );
+
+    // Update the bridge's message-count memo so `emit_messages` sees the
+    // reduced count and correctly emits `MessageCreated` for any subsequent
+    // append — without this, the memo still holds the pre-delete count and
+    // a new message (restoring the old length) is silently skipped.
+    if let Some(bs) = state.get_ext_mut::<BridgeState>() {
+        let _prev = bs.thread_msg_counts.insert(thread_id.to_owned(), new_count);
+    }
 
     state.flags.ui.dirty = true;
     log::info!("bridge: deleted message ts={message_ts} from thread {thread_id}");

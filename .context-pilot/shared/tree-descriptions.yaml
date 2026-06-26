@@ -910,6 +910,10 @@
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
   last_edited_ms: 0
+16ddd5e1c10ff31f:
+  path: crates/cp-orchestrator/tests/openapi/schemas_ext.rs
+  description: Transport-layer OpenAPI schemas — receipts (Command/Create/Restart/Retire/Unretire), auth (AuthStatus/AuthUser/AuthLogin/Register/ForceLogout/AclEntry), env-keys (EnvKeyStatus/Reveal/UpdateResult), filesystem (FinderNode/FsDescriptions/FsPreview/SheetTab/SheetData/Write/Mkdir/Rename/Move/Trash/Upload results), generic responses (Ok/Ticket), conversation (ConversationMsg), SSE delta protocol (OpEntry/OpEntryKind), and DeleteMessageCommand schema.
+  last_edited_ms: 1782466925411
 171360bcd64a4a48:
   path: web/sse_latency.py
   description: SSE latency probe — measures end-to-end TUI→SSE delay by comparing ThreadMessage.timestamp (epoch ms) with wall-clock arrival time for each message_created delta.
@@ -6310,6 +6314,10 @@
   path: src/ui/threads_view/mod.rs
   description: Threads view layout + thread list rendering. Two-pane layout (thread list | messages). Virtual '+ New Thread' entry. IR pipeline for list items (status dots, unread indicators, selection highlight). maybe_activate_thread_question() lazy question form init. truncate_str helper.
   last_edited_ms: 0
+9e791ee7afa963dd:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 9e7b5def696af37a:
   path: crates/cp-mod-prompt/src/tools.rs
   description: Prompt tool dispatch with flame!("prompt_dispatch"). behaviour_create (agent/skill/command .md file creation), agent_load (switch active agent), skill_load (create skill Entry panel).
@@ -9198,6 +9206,10 @@ e82421db0781e690:
   path: yamls/tools/files.yaml
   description: 'File tools YAML. 3 tools: Open (path string/array), Edit (file_path, old_string, new_string), Write (file_path, contents, skip_callbacks).'
   last_edited_ms: 1780648767307
+e83afe53297de69e:
+  path: src/app/run/threads/commands.rs
+  description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/DeleteMessage(T416 per-message delete by epoch-ms timestamp)/Stop|Interrupt/Configure. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted. DeleteMessage removes single message by timestamp, emits durable MessageDeleted.
+  last_edited_ms: 0
 e8400426f9791225:
   path: docs/talk/slides/1-3.html
   description: 'Slide: What I''d Add — Context/Feedback/LLM-X (WHYs section)'
@@ -9737,6 +9749,10 @@ f61e3df67e228736:
 f62063a3417a112a:
   path: crates/cp-base/src/config/behavioral.rs
   description: 'Extracted injection types: RedirectInjections (conversation_history_close redirect) + TrapInjections (history_cleanup_triggered, history_cleanup_blocked). Moved from config/mod.rs for line-count limit.'
+  last_edited_ms: 0
+f6414d247fc53079:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 f645a25f1e60e29f:
   path: ui/src/components/finder/FinderChrome.tsx
