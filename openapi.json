@@ -252,6 +252,9 @@
           "id": {
             "type": "string"
           },
+          "must_change_password": {
+            "type": "boolean"
+          },
           "name": {
             "type": "string"
           },
@@ -270,7 +273,8 @@
           "id",
           "email",
           "name",
-          "role"
+          "role",
+          "must_change_password"
         ],
         "type": "object"
       },

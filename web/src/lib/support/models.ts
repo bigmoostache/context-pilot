@@ -114,6 +114,33 @@ export function priceTag(m: GenModelDef): string {
   return `$${m.inputPrice} · ${ctx}`
 }
 
+// ── Allowlist ──────────────────────────────────────────────────────────
+
+/** Compound id used by the org allowlist setting: `"<providerId>:<modelId>"`. */
+export function modelKey(providerId: string, modelId: string): string {
+  return `${providerId}:${modelId}`
+}
+
+/**
+ * Restrict providers' models to the org allowlist of `"provider:model"` ids.
+ * An **empty** allowlist means everything is allowed (delivery default), so the
+ * registry passes through untouched. Providers left with no allowed model are
+ * dropped so the picker never shows an empty provider.
+ */
+export function filterAllowed(
+  providers: ProviderDef[],
+  allowed: string[],
+): ProviderDef[] {
+  if (allowed.length === 0) return providers
+  const set = new Set(allowed)
+  return providers
+    .map((p) => ({
+      ...p,
+      models: p.models.filter((m) => set.has(modelKey(p.id, m.id))),
+    }))
+    .filter((p) => p.models.length > 0)
+}
+
 // ── Lookup helpers ─────────────────────────────────────────────────────
 
 /** Find a provider by its serde id. */

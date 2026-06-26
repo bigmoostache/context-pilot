@@ -104,10 +104,11 @@ pub(super) fn transport() -> Value {
                 "email": { "type": "string" },
                 "name": { "type": "string" },
                 "role": { "type": "string", "enum": ["admin", "user"] },
+                "must_change_password": { "type": "boolean" },
                 "created_at": { "type": "integer" },
                 "updated_at": { "type": "integer" }
             },
-            "required": ["id", "email", "name", "role"]
+            "required": ["id", "email", "name", "role", "must_change_password"]
         },
         "AuthLogin": {
             "type": "object",

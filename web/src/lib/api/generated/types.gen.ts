@@ -79,6 +79,7 @@ export type AuthUser = {
     created_at?: number;
     email: string;
     id: string;
+    must_change_password: boolean;
     name: string;
     role: 'admin' | 'user';
     updated_at?: number;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Bot,
   Building2,
@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 import { UsagePage } from "@/components/agents/UsagePage"
 import { ModelPicker } from "@/components/agents/ModelPicker"
-import { useProviders, defaultModel, findModel } from "@/lib/support/models"
+import { useProviders, defaultModel, findModel, modelKey } from "@/lib/support/models"
 import { useFleet, sendCommand } from "@/lib/live"
 import { fetchSettings, updateSettings, fetchEnvKeys, revealEnvKey, updateEnvKey } from "@/lib/api"
 import { useAccount } from "@/lib/support/account"
@@ -255,11 +255,95 @@ function GeneralPane() {
         </div>
       </FieldGroup>
 
+      <AllowedModelsSection />
+
       <ToggleRow i={0} name="Auto-continuation" detail="Let the agent keep working without a nudge" />
       <ToggleRow i={1} name="Reverie (context optimizer)" detail="Background cleaner reshapes context when it grows" on />
       <ToggleRow i={2} name="Think reminders" detail="Periodic nudge to reason before acting" on />
       <DevModeToggle i={3} />
     </Stack>
+  )
+}
+
+/**
+ * Admin-only allowlist of usable models (org-wide). The operator (vendor)
+ * provisions provider keys out-of-band; the admin decides which of the working
+ * models their users may pick. An empty allowlist means *all allowed* — exposed
+ * here as an "Allow all models" master switch. When restricted, each model has
+ * a checkbox; the stored list is the set of checked `"provider:model"` ids.
+ * Regular users never see this (they only get the filtered picker).
+ */
+function AllowedModelsSection() {
+  const qc = useQueryClient()
+  const { data: providers = [] } = useProviders()
+  const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: fetchSettings })
+  const [busy, setBusy] = useState(false)
+
+  if (!settings?.is_admin) return null
+
+  const allowed = settings.allowed_models ?? []
+  const allowedSet = new Set(allowed)
+  const restricted = allowed.length > 0
+  const everyKey = providers.flatMap((p) => p.models.map((m) => modelKey(p.id, m.id)))
+
+  const save = async (next: string[]) => {
+    setBusy(true)
+    try {
+      await updateSettings({ allowed_models: next })
+      await qc.invalidateQueries({ queryKey: ["settings"] })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <FieldGroup label="Allowed models" hint="Which models your users may pick">
+      <label className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2.5">
+        <input
+          type="checkbox"
+          checked={!restricted}
+          disabled={busy}
+          onChange={(e) => void save(e.target.checked ? [] : everyKey)}
+          className="size-4 accent-[var(--interactive)]"
+        />
+        <span className="flex min-w-0 flex-col">
+          <span className="text-[13px] font-medium text-foreground/90">Allow all models</span>
+          <span className="text-[11px] text-muted-foreground">
+            {restricted ? "Restricted — only the checked models below are available" : "Every provisioned model is available to your users"}
+          </span>
+        </span>
+      </label>
+
+      {restricted && (
+        <div className="flex flex-col gap-3 pt-1">
+          {providers.map((p) => (
+            <div key={p.id} className="flex flex-col gap-1.5">
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">{p.name}</span>
+              <div className="flex flex-col gap-1">
+                {p.models.map((m) => {
+                  const key = modelKey(p.id, m.id)
+                  const checked = allowedSet.has(key)
+                  return (
+                    <label key={key} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-muted/40">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={busy}
+                        onChange={() =>
+                          void save(checked ? allowed.filter((k) => k !== key) : [...allowed, key])
+                        }
+                        className="size-3.5 accent-[var(--interactive)]"
+                      />
+                      <span className="text-[12.5px] text-foreground/85">{m.displayName}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </FieldGroup>
   )
 }
 

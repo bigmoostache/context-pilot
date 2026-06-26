@@ -125,6 +125,8 @@ export interface AppSettings {
   is_admin: boolean
   auth_enabled: boolean
   providers: ProviderKeyState[]
+  /** Org-wide allowlist of `"provider:model"` ids. Empty ⇒ all models allowed. */
+  allowed_models: string[]
 }
 
 /** Read central settings + onboarding state (any authenticated user). */
@@ -137,6 +139,7 @@ export function updateSettings(patch: {
   default_provider?: string
   default_model?: string
   onboarding_completed?: boolean
+  allowed_models?: string[]
 }): Promise<AppSettings> {
   return request("/api/settings", {
     method: "POST",

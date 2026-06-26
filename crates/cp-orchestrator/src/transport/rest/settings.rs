@@ -23,6 +23,16 @@ const LLM_PROVIDERS: &[&str] = &["anthropic", "deepseek", "xai", "groq"];
 const DEFAULT_PROVIDER: &str = "default_provider";
 const DEFAULT_MODEL: &str = "default_model";
 const ONBOARDING_DONE: &str = "onboarding_completed";
+/// JSON array of `"<providerId>:<modelId>"` the admin permits org-wide. An
+/// **empty** list means *all models allowed* (non-blocking default at delivery).
+const ALLOWED_MODELS: &str = "allowed_models";
+
+/// Read the org-wide allowed-model allowlist (empty when unset / unparsable).
+fn allowed_models() -> Vec<String> {
+    global::get_setting(ALLOWED_MODELS)
+        .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
+        .unwrap_or_default()
+}
 
 /// Is the caller allowed to mutate central settings? Admins always are; when
 /// auth is disabled (single-user appliance) everyone is.
@@ -50,6 +60,9 @@ pub fn get_settings(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpRep
         "is_admin": can_admin(state, auth_user),
         "auth_enabled": auth_enabled,
         "providers": providers,
+        // Org-wide allowlist of "provider:model" ids. Empty ⇒ all allowed.
+        // Returned to every authenticated user so non-admin pickers can filter.
+        "allowed_models": allowed_models(),
     }))
 }
 
@@ -64,10 +77,17 @@ pub fn update_settings(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&U
         default_provider: Option<String>,
         default_model: Option<String>,
         onboarding_completed: Option<bool>,
+        allowed_models: Option<Vec<String>>,
     }
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
         return HttpReply::error(400, "malformed settings body");
     };
+    if let Some(models) = req.allowed_models {
+        let json = serde_json::to_string(&models).unwrap_or_else(|_| "[]".to_owned());
+        if let Err(e) = global::set_setting(ALLOWED_MODELS, &json) {
+            return HttpReply::error(500, &e);
+        }
+    }
     if let Some(p) = req.default_provider.as_deref()
         && let Err(e) = global::set_setting(DEFAULT_PROVIDER, p)
     {

@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/support/auth"
 import { fetchSettings } from "@/lib/api"
 import { LoginPage } from "./LoginPage"
 import { Onboarding } from "./Onboarding"
+import { ForcePasswordChange } from "./ForcePasswordChange"
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   const { authEnabled, user, loading } = useAuth()
@@ -56,6 +57,10 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
   // Auth enabled but no valid session — show login.
   if (!user) return <LoginPage />
+
+  // Provisioned account with an operator-known initial password — force a
+  // rotation before anything else (incl. onboarding).
+  if (user.must_change_password) return <ForcePasswordChange />
 
   // Authenticated — wait for the onboarding probe before deciding.
   if (needsOnboarding === null) {
