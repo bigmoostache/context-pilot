@@ -45,6 +45,9 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
         CommandKind::DeleteThread { thread_id } => {
             apply_delete_thread(&mut app.state, &thread_id);
         }
+        CommandKind::DeleteMessage { thread_id, message_ts } => {
+            apply_delete_message(&mut app.state, &thread_id, message_ts);
+        }
         CommandKind::Stop | CommandKind::InterruptStream => {
             apply_stop(&mut app.state);
         }
@@ -259,6 +262,67 @@ fn apply_delete_thread(state: &mut State, thread_id: &str) {
 
     state.flags.ui.dirty = true;
     log::info!("bridge: permanently deleted thread {thread_id}");
+}
+
+// ── DeleteMessage ───────────────────────────────────────────────────
+
+/// Delete a single message from a thread, identified by its epoch-ms
+/// timestamp (unique within a thread).
+///
+/// **Cascade rule:** when the deleted message is from the assistant,
+/// all *consecutive* `auto: true` messages immediately following it are
+/// also removed (tool-trace cleanup). The cascade stops at the first
+/// non-auto message. One `MessageDeleted` delta is emitted per removed
+/// message so the frontend reducer handles each independently.
+fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
+    let ts = ThreadsState::get_mut(state);
+    let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) else {
+        log::warn!("bridge: DeleteMessage for unknown thread {thread_id}");
+        return;
+    };
+
+    // Find the target message index.
+    let Some(idx) = thread.messages.iter().position(|m| m.timestamp == message_ts) else {
+        log::warn!("bridge: DeleteMessage no message with ts={message_ts} in thread {thread_id}");
+        return;
+    };
+
+    let is_assistant = thread.messages.get(idx).is_some_and(|m| m.author == ThreadAuthor::Assistant);
+
+    // Collect timestamps to delete: the target + any trailing auto messages.
+    let mut to_delete: Vec<u64> = vec![message_ts];
+
+    if is_assistant {
+        // Walk forward from idx+1 collecting consecutive auto messages.
+        for msg in thread.messages.iter().skip(idx.saturating_add(1)) {
+            if msg.auto {
+                to_delete.push(msg.timestamp);
+            } else {
+                break;
+            }
+        }
+    }
+
+    // Remove all collected messages.
+    let delete_set: std::collections::HashSet<u64> = to_delete.iter().copied().collect();
+    thread.messages.retain(|m| !delete_set.contains(&m.timestamp));
+    let new_count = thread.messages.len();
+
+    // Emit one delta per deleted message.
+    let tid = thread_id.to_owned();
+    for &ts_val in &to_delete {
+        emit_roster_delta(state, OpEntryKind::MessageDeleted { thread_id: tid.clone(), message_ts: ts_val });
+    }
+
+    // Update the bridge's message-count memo so `emit_messages` sees the
+    // reduced count and correctly emits `MessageCreated` for any subsequent
+    // append (T418 fix).
+    if let Some(bs) = state.get_ext_mut::<BridgeState>() {
+        let _prev = bs.thread_msg_counts.insert(tid, new_count);
+    }
+
+    state.flags.ui.dirty = true;
+    log::info!("bridge: deleted {} message(s) from thread {thread_id} (target ts={message_ts})", to_delete.len(),);
 }
 
 // ── Stop / Interrupt ────────────────────────────────────────────────────

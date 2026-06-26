@@ -7,13 +7,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// clock spread on read failure (degraded but never panicking — mirrors
 /// `transport::ticket::random_token`).
 pub(super) fn fill_random(buf: &mut [u8]) {
-    if std::fs::File::open("/dev/urandom")
-        .and_then(|mut file| std::io::Read::read_exact(&mut file, buf))
-        .is_err()
-    {
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(0u128, |dur| dur.as_nanos());
+    if std::fs::File::open("/dev/urandom").and_then(|mut file| std::io::Read::read_exact(&mut file, buf)).is_err() {
+        let seed = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0u128, |dur| dur.as_nanos());
         for (idx, slot) in buf.iter_mut().enumerate() {
             let shift = u32::try_from((idx % 16).saturating_mul(8)).unwrap_or(0);
             *slot = u8::try_from(seed.wrapping_shr(shift) & 0xff).unwrap_or(0);
@@ -56,7 +51,5 @@ pub(super) fn format_uuid(bytes: &[u8; 16]) -> String {
 
 /// Milliseconds since the Unix epoch, saturating at 0 on a pre-epoch clock.
 pub(super) fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |dur| u64::try_from(dur.as_millis()).unwrap_or(u64::MAX))
+    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |dur| u64::try_from(dur.as_millis()).unwrap_or(u64::MAX))
 }

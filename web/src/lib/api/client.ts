@@ -1,10 +1,10 @@
 // ── Shared REST client primitives for the orchestration backend ──────
 //
 // Base URL from env (VITE_API_URL) with fallback to localhost:7878.
-// `request` returns typed JSON or throws on non-2xx with the response body.
-// When auth is enabled, every request automatically carries the Bearer token
-// from localStorage; a 401 on a previously-authenticated call clears the
-// token and signals the AuthProvider to show the login page.
+// Token helpers for Bearer auth.  `sdk()` casts the generated client's
+// return type to match the runtime guarantee from setupClient.ts
+// (throwOnError + responseStyle:'data').  `buildCommandEnvelope` wraps
+// a command kind in the wire-protocol envelope.
 
 export const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:7878"
 
@@ -22,26 +22,10 @@ export function setToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY)
 }
 
-/** Typed fetch wrapper — auto-injects Bearer token, throws on non-2xx. */
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getToken()
-  const headers = new Headers(init?.headers)
-  if (token && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${token}`)
-  }
-
-  const res = await fetch(`${BASE}${path}`, { ...init, headers })
-  if (!res.ok) {
-    // Session expired or revoked — clear token and notify AuthProvider.
-    // Only fire when we HAD a token (avoids triggering on login 401s).
-    if (res.status === 401 && token) {
-      setToken(null)
-      window.dispatchEvent(new Event("cp-auth-expired"))
-    }
-    const body = await res.text().catch(() => res.statusText)
-    throw new Error(`${res.status} ${path}: ${body}`)
-  }
-  return res.json() as Promise<T>
+/** SDK calls return `T` at runtime (throwOnError + responseStyle:'data'),
+ *  but the generic defaults produce a wider type.  This cast is safe. */
+export function sdk<T>(call: unknown): Promise<T> {
+  return call as Promise<T>
 }
 
 /** Build a full Command envelope around a Kind payload. */

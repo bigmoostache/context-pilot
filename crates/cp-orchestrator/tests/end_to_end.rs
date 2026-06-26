@@ -44,6 +44,7 @@ use portable_pty as _;
 use rusqlite as _;
 use serde as _;
 use serde_yaml as _;
+use utoipa as _;
 
 use std::os::unix::net::UnixListener;
 use std::path::Path;

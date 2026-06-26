@@ -4,8 +4,8 @@
 
 use std::sync::Mutex;
 
-use super::super::rest::HttpReply;
 use super::super::Backend;
+use super::super::rest::HttpReply;
 use crate::services::auth::types::{User, UserRole};
 
 // ───────────────── per-agent authorization (Phase 6) ─────────────────
@@ -26,29 +26,19 @@ pub(crate) fn extract_agent_id<'a>(segments: &[&'a str]) -> Option<&'a str> {
 /// System admins have implicit god-mode (FR-09). Everyone else needs an
 /// explicit ACL entry (FR-10).  Returns `true` when auth is disabled
 /// (backend.auth is `None`).
-pub(crate) fn authorize_agent(
-    state: &Mutex<Backend>,
-    agent_id: &str,
-    user: &User,
-) -> bool {
+pub(crate) fn authorize_agent(state: &Mutex<Backend>, agent_id: &str, user: &User) -> bool {
     // System admin bypasses ACL entirely (FR-09).
     if user.role == UserRole::Admin {
         return true;
     }
     let Ok(b) = state.lock() else { return false };
     let Some(auth) = b.auth.as_ref() else { return true };
-    auth.check_access(agent_id, &user.id)
-        .map(|role| role.is_some())
-        .unwrap_or(false)
+    auth.check_access(agent_id, &user.id).map(|role| role.is_some()).unwrap_or(false)
 }
 
 /// Check whether the caller can manage ACL on an agent (system admin OR
 /// agent-admin on this specific agent — FR-14b/FR-14c).
-fn can_manage_acl(
-    state: &Mutex<Backend>,
-    agent_id: &str,
-    user: &User,
-) -> bool {
+fn can_manage_acl(state: &Mutex<Backend>, agent_id: &str, user: &User) -> bool {
     if user.role == UserRole::Admin {
         return true;
     }
@@ -61,11 +51,7 @@ fn can_manage_acl(
 
 /// `GET /api/agent/{id}/acl` — list users with access (admin or
 /// agent-admin).
-pub(crate) fn acl_list(
-    state: &Mutex<Backend>,
-    agent_id: &str,
-    auth_user: Option<&User>,
-) -> HttpReply {
+pub(crate) fn acl_list(state: &Mutex<Backend>, agent_id: &str, auth_user: Option<&User>) -> HttpReply {
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
@@ -87,12 +73,7 @@ pub(crate) fn acl_list(
 /// `POST /api/agent/{id}/acl` — grant a user access (with role).
 ///
 /// Body: `{ "user_id": "...", "role": "agent-user" }`
-pub(crate) fn acl_grant(
-    state: &Mutex<Backend>,
-    agent_id: &str,
-    body: &[u8],
-    auth_user: Option<&User>,
-) -> HttpReply {
+pub(crate) fn acl_grant(state: &Mutex<Backend>, agent_id: &str, body: &[u8], auth_user: Option<&User>) -> HttpReply {
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
@@ -194,11 +175,7 @@ pub(crate) fn acl_revoke(
 ///
 /// System admins see everything; regular users see only agents with an ACL
 /// entry. When auth is disabled (`auth_user` is `None`), all agents pass.
-pub(crate) fn filter_fleet(
-    state: &Mutex<Backend>,
-    agent_ids: &[String],
-    auth_user: Option<&User>,
-) -> Vec<String> {
+pub(crate) fn filter_fleet(state: &Mutex<Backend>, agent_ids: &[String], auth_user: Option<&User>) -> Vec<String> {
     let Some(user) = auth_user else {
         return agent_ids.to_vec();
     };
@@ -212,9 +189,5 @@ pub(crate) fn filter_fleet(
         return agent_ids.to_vec();
     };
     let accessible = auth.list_user_agents(&user.id).unwrap_or_default();
-    agent_ids
-        .iter()
-        .filter(|id| accessible.contains(id))
-        .cloned()
-        .collect()
+    agent_ids.iter().filter(|id| accessible.contains(id)).cloned().collect()
 }

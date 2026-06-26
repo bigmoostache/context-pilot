@@ -74,7 +74,6 @@ impl App {
             super::tools::watchdog::beat();
             super::tools::watchdog::mark(super::tools::watchdog::Step::Input);
 
-
             // === INPUT FIRST: Process user input with minimal latency ===
             // Non-blocking check for input - handle immediately for responsive feel
             if event::poll(Duration::ZERO)? {
@@ -244,7 +243,6 @@ impl App {
                 self.state.flags.ui.dirty = false;
                 self.last_render_ms = current_ms;
             }
-
 
             // Adaptive poll: sleep longer when idle, shorter when actively
             // streaming or when the orchestration bridge is connected (a web

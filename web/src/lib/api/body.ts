@@ -1,4 +1,4 @@
-// ── Content-addressed body hydrate ────────────────────────────────────
+// ── Content-addressed body hydrate (SDK) ─────────────────────────────
 //
 // A `MessageCreated` oplog delta carries its body **inline** only when small;
 // a large message spills to the content-addressed store and the delta carries
@@ -8,13 +8,11 @@
 // 500-line file budget; re-exported there so `@/lib/api` stays the single
 // import surface.
 
-import { request } from "./client"
+import type { BodyPayload } from "./generated/types.gen"
+import { getApiAgentByIdBodyByHash } from "./generated"
+import { sdk } from "./client"
 
-/** Raw body payload from `GET /api/agent/{id}/body/{hash}` — the bytes of a
- *  content-addressed message body, serialized as a JSON number array. */
-interface BodyPayload {
-  bytes: number[]
-}
+export type { BodyPayload } from "./generated/types.gen"
 
 /**
  * Hydrate a spilled (large) message body by its content hash and return it as a
@@ -24,7 +22,7 @@ interface BodyPayload {
  * I13 body-before-reference barrier), so this hydrate is race-free.
  */
 export function fetchMessageBody(agentId: string, hash: string): Promise<string> {
-  return request<BodyPayload>(`/api/agent/${agentId}/body/${hash}`).then((p) =>
-    new TextDecoder().decode(new Uint8Array(p.bytes)),
-  )
+  return sdk<BodyPayload>(
+    getApiAgentByIdBodyByHash({ path: { id: agentId, hash } }),
+  ).then((p) => new TextDecoder().decode(new Uint8Array(p.bytes)))
 }

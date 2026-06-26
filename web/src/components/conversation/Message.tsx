@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Check, ChevronDown, Copy, Terminal, User } from "lucide-react"
+import { Check, ChevronDown, Copy, Terminal, Trash2, User } from "lucide-react"
 import type { ChatMessage } from "@/lib/types"
 import { Markdown, type MarkdownVariant } from "@/lib/support/markdown"
 import {
@@ -27,12 +27,14 @@ interface MessageProps {
   onOpenFile?: (file: UploadedFile) => void
   /** navigate the Finder to a file's parent and select it */
   onShowInFinder?: (path: string) => void
+  /** permanently delete this message from the thread */
+  onDelete?: () => void
 }
 
-export function Message({ msg, agentId, onOpenFile, onShowInFinder }: MessageProps) {
+export function Message({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
   if (msg.role === "tool" && msg.tool) return <ToolMessage msg={msg} />
-  if (msg.role === "user") return <UserMessage msg={msg} agentId={agentId} onOpenFile={onOpenFile} onShowInFinder={onShowInFinder} />
-  return <AssistantMessage msg={msg} agentId={agentId} onOpenFile={onOpenFile} onShowInFinder={onShowInFinder} />
+  if (msg.role === "user") return <UserMessage msg={msg} agentId={agentId} onOpenFile={onOpenFile} onShowInFinder={onShowInFinder} onDelete={onDelete} />
+  return <AssistantMessage msg={msg} agentId={agentId} onOpenFile={onOpenFile} onShowInFinder={onShowInFinder} onDelete={onDelete} />
 }
 
 /**
@@ -96,14 +98,30 @@ function MessageBody({
  * `align` mirrors the bubble's side so the control tucks under the message's
  * own edge (user bubbles are right-aligned, assistant left-aligned).
  */
-export function CopyButton({ text, align, className: extra }: { text: string; align: "start" | "end"; className?: string }) {
+export function CopyButton({
+  text,
+  getText,
+  align,
+  label = "Copy",
+  className: extra,
+}: {
+  /** Static text to copy. Ignored when `getText` is provided. */
+  text?: string
+  /** Lazy text extraction — called on click, for DOM-derived content. */
+  getText?: () => string
+  align: "start" | "end"
+  /** Button label shown next to the icon (e.g. "Copy code", "Copy table"). */
+  label?: string
+  className?: string
+}) {
   const [copied, setCopied] = useState(false)
 
   const onCopy = () => {
+    const t = getText ? getText() : text ?? ""
     // `?.` guards environments without the async clipboard API (insecure
     // origin / older browser); a failed write is silently ignored — the worst
     // case is the tick simply doesn't flash, never a thrown error in the UI.
-    navigator.clipboard?.writeText(text).then(
+    navigator.clipboard?.writeText(t).then(
       () => {
         setCopied(true)
         window.setTimeout(() => setCopied(false), 2000)
@@ -116,7 +134,7 @@ export function CopyButton({ text, align, className: extra }: { text: string; al
     <button
       type="button"
       onClick={onCopy}
-      aria-label={copied ? "Copied" : "Copy message"}
+      aria-label={copied ? "Copied" : label}
       className={cn(
         "flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] transition-colors",
         "opacity-50 hover:opacity-100 focus-visible:opacity-100 outline-none",
@@ -125,12 +143,43 @@ export function CopyButton({ text, align, className: extra }: { text: string; al
       )}
     >
       {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-      <span>{copied ? "Copied" : "Copy"}</span>
+      <span>{copied ? "Copied" : label}</span>
     </button>
   )
 }
 
-function UserMessage({ msg, agentId, onOpenFile, onShowInFinder }: MessageProps) {
+/**
+ * Discrete delete affordance shown beside the copy button beneath a message.
+ *
+ * Matches the copy button's quiet style — low opacity, brightening on hover —
+ * but uses the danger colour on hover to signal destructiveness.
+ */
+function DeleteButton({
+  align,
+  onDelete,
+}: {
+  align: "start" | "end"
+  onDelete: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onDelete}
+      aria-label="Delete message"
+      className={cn(
+        "flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] transition-colors",
+        "opacity-50 hover:opacity-100 focus-visible:opacity-100 outline-none",
+        "text-muted-foreground/70 hover:text-[var(--danger)]",
+        align === "end" ? "self-end" : "self-start",
+      )}
+    >
+      <Trash2 className="size-3" />
+      <span>Delete</span>
+    </button>
+  )
+}
+
+function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
   return (
     <div className="rise flex flex-col items-end gap-1 py-2">
       <div className="max-w-[78%] rounded-2xl rounded-br-md bg-[var(--signal)] px-3.5 py-2 text-[13px] leading-relaxed text-[var(--primary-foreground)] card-shadow">
@@ -140,12 +189,15 @@ function UserMessage({ msg, agentId, onOpenFile, onShowInFinder }: MessageProps)
         <User className="size-2.5" />
         {msg.ts}
       </span>
-      <CopyButton text={msg.text ?? ""} align="end" />
+      <div className="flex items-center gap-2">
+        <CopyButton text={msg.text ?? ""} align="end" label="Copy message" />
+        {onDelete && <DeleteButton align="end" onDelete={onDelete} />}
+      </div>
     </div>
   )
 }
 
-function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder }: MessageProps) {
+function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
   return (
     <div className="rise flex flex-col gap-1.5 py-2">
       <div className="flex items-center gap-2">
@@ -162,8 +214,9 @@ function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder }: MessageP
         )}
       </div>
       {!msg.streaming && (
-        <div className="pl-7">
-          <CopyButton text={msg.text ?? ""} align="start" />
+        <div className="flex items-center gap-2 pl-7">
+          <CopyButton text={msg.text ?? ""} align="start" label="Copy message" />
+          {onDelete && <DeleteButton align="start" onDelete={onDelete} />}
         </div>
       )}
     </div>

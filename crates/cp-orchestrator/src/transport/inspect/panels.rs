@@ -15,6 +15,8 @@ use std::sync::Mutex;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
+use super::helpers::{agent_folder, extract_worker_param, unwrap_module_array, yaml_map_to_keyed_array};
+
 /// `GET /api/agent/{id}/panels` — live context panel list read from the
 /// agent's `panels/` directory.
 ///
@@ -97,50 +99,101 @@ fn map_panel_kind(panel_type: &str) -> &'static str {
 }
 
 /// `GET /api/agent/{id}/memory` — memory items from `shared/memories.yaml`.
+///
+/// Transforms the on-disk YAML map (`{M1: {tl_dr, importance, labels}, …}`)
+/// into the spec-compliant `MemoryCard[]` array.
 pub fn memory(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
-    read_shared_yaml(state, &folder, "memories.yaml")
+    let folder_path = Path::new(&folder);
+    let Ok(mut backend) = state.lock() else {
+        return HttpReply::error(500, "backend lock poisoned");
+    };
+    let bytes = backend.inspect_mut().read_shared(folder_path, "memories.yaml");
+    match bytes {
+        Ok(raw) => {
+            let yaml_val: Result<serde_json::Value, _> = serde_yaml::from_slice(&raw);
+            match yaml_val {
+                Ok(serde_json::Value::Object(map)) => {
+                    let cards: Vec<serde_json::Value> = map
+                        .into_iter()
+                        .map(|(id, mut v)| {
+                            v["id"] = serde_json::json!(id);
+                            // Rename tl_dr → tldr for spec compliance.
+                            if let Some(tl) = v.get("tl_dr").cloned() {
+                                v["tldr"] = tl;
+                            }
+                            v
+                        })
+                        .collect();
+                    HttpReply::ok(&cards)
+                }
+                Ok(_) => HttpReply::ok(&serde_json::json!([])),
+                Err(_) => HttpReply::error(502, "YAML parse failed"),
+            }
+        }
+        Err(_) => HttpReply::ok(&serde_json::json!([])),
+    }
 }
 
 /// `GET /api/agent/{id}/todos` — todo items from the worker's module state.
+///
+/// Unwraps `{todos: [...]}` to return a flat `TodoItem[]`.
 pub fn todos(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
-    worker_module(state, agent_id, query, "todo")
+    unwrap_module_array(state, agent_id, query, "todo", "todos")
 }
 
 /// `GET /api/agent/{id}/spine` — spine notifications + config.
+///
+/// Unwraps `{notifications: [...]}` to return a flat `SpineNotif[]`.
 pub fn spine(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
-    worker_module(state, agent_id, query, "spine")
+    unwrap_module_array(state, agent_id, query, "spine", "notifications")
 }
 
 /// `GET /api/agent/{id}/queue` — queue state (active, queued calls).
+///
+/// Unwraps `{queued_calls: [...]}` to return a flat `QueueAction[]`.
 pub fn queue(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
-    worker_module(state, agent_id, query, "queue")
+    unwrap_module_array(state, agent_id, query, "queue", "queued_calls")
 }
 
 /// `GET /api/agent/{id}/scratchpad` — scratchpad cells.
+///
+/// Unwraps `{scratchpad_cells: [...]}` to return a flat `ScratchCell[]`.
 pub fn scratchpad(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
-    worker_module(state, agent_id, query, "scratchpad")
+    unwrap_module_array(state, agent_id, query, "scratchpad", "scratchpad_cells")
 }
 
 /// `GET /api/agent/{id}/tree` — tree descriptions from shared YAML.
+///
+/// Transforms the on-disk YAML map (`{path: description, …}`) into a
+/// `TreeRow[]` array with minimal fields.
 pub fn tree(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
-    read_shared_yaml(state, &folder, "tree-descriptions.yaml")
+    yaml_map_to_keyed_array(state, &folder, "tree-descriptions.yaml", |path, desc| {
+        let kind = if path.ends_with('/') { "dir" } else { "file" };
+        serde_json::json!({ "depth": 0, "name": path, "kind": kind, "desc": desc })
+    })
 }
 
 /// `GET /api/agent/{id}/callbacks` — callback definitions from shared YAML.
+///
+/// Transforms the on-disk YAML map (`{CB1: {name, pattern, …}, …}`) into
+/// a `CallbackRow[]` array with the map key injected as `id`.
 pub fn callbacks(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
-    read_shared_yaml(state, &folder, "callbacks.yaml")
+    yaml_map_to_keyed_array(state, &folder, "callbacks.yaml", |id, mut val| {
+        val["id"] = serde_json::json!(id);
+        val
+    })
 }
 
 /// `GET /api/agent/{id}/usage` — current session cost data from worker state.
@@ -333,94 +386,5 @@ fn parse_frontmatter(content: &str) -> (String, String) {
     (name, description)
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
-
-/// Resolve the agent's working directory from the registry record.
-fn agent_folder(state: &Mutex<Backend>, agent_id: &str) -> Result<String, HttpReply> {
-    let entry = crate::transport::rest::resolve_entry(state, agent_id)?;
-    Ok(entry.folder)
-}
-
-/// Read a per-worker module's persisted state from `states/<worker>.json`.
-///
-/// Extracts `modules.<module_key>` from the worker state. Falls back to the
-/// first discovered worker when no `?worker=` query parameter is given.
-fn worker_module(state: &Mutex<Backend>, agent_id: &str, query: &str, module_key: &str) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
-        Ok(f) => f,
-        Err(reply) => return reply,
-    };
-    let folder_path = Path::new(&folder);
-
-    let worker_id = extract_worker_param(query);
-
-    let Ok(mut backend) = state.lock() else {
-        return HttpReply::error(500, "backend lock poisoned");
-    };
-
-    let wid = match worker_id {
-        Some(id) => id,
-        None => {
-            // Fall back to the first worker found.
-            let workers = match backend.inspect_mut().list_workers(folder_path) {
-                Ok(w) => w,
-                Err(_) => return HttpReply::error(404, "cannot list workers"),
-            };
-            match workers.first() {
-                Some(w) => w.clone(),
-                None => return HttpReply::error(404, "no workers found"),
-            }
-        }
-    };
-
-    let worker_state = backend.inspect_mut().read_worker(folder_path, &wid);
-    match worker_state {
-        Ok(ws) => {
-            let module_data =
-                ws.get("modules").and_then(|m| m.get(module_key)).cloned().unwrap_or(serde_json::Value::Null);
-            HttpReply::ok(&module_data)
-        }
-        Err(_) => HttpReply::error(404, "worker state unavailable"),
-    }
-}
-
-/// Read a shared YAML file, parse it, and return as JSON.
-fn read_shared_yaml(state: &Mutex<Backend>, folder: &str, filename: &str) -> HttpReply {
-    let folder_path = Path::new(folder);
-    let Ok(mut backend) = state.lock() else {
-        return HttpReply::error(500, "backend lock poisoned");
-    };
-    let bytes = backend.inspect_mut().read_shared(folder_path, filename);
-    match bytes {
-        Ok(raw) => {
-            // Parse YAML → serde_json::Value for uniform JSON responses.
-            let yaml_val: Result<serde_json::Value, _> = serde_yaml::from_slice(&raw);
-            match yaml_val {
-                Ok(val) => HttpReply::ok(&val),
-                Err(_) => HttpReply::error(502, "YAML parse failed"),
-            }
-        }
-        Err(_) => HttpReply::error(404, "shared file not found"),
-    }
-}
-
-/// Extract the `worker` query parameter from a raw query string.
-fn extract_worker_param(query: &str) -> Option<String> {
-    query.split('&').filter(|s| !s.is_empty()).find_map(|pair| {
-        let (k, v) = pair.split_once('=')?;
-        if k == "worker" { Some(v.to_owned()) } else { None }
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn extract_worker_param_finds_value() {
-        assert_eq!(extract_worker_param("worker=abc123"), Some("abc123".to_owned()));
-        assert_eq!(extract_worker_param("agent=x&worker=def"), Some("def".to_owned()));
-        assert_eq!(extract_worker_param("agent=x"), None);
-        assert_eq!(extract_worker_param(""), None);
-    }
-}
+// Helpers in super::helpers — agent_folder, worker_module, unwrap_module_array,
+// yaml_map_to_keyed_array, extract_worker_param.

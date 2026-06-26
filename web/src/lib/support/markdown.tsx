@@ -1,4 +1,4 @@
-import { memo, useState, type ReactNode } from "react"
+import { memo, useRef, useState, type ReactNode } from "react"
 import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
@@ -65,6 +65,72 @@ function ClickableCode({ baseClass, children, ...rest }: { baseClass: string; ch
     >
       {children}
     </code>
+  )
+}
+
+/**
+ * Convert a rendered `<table>` DOM element back to a pipe-delimited markdown
+ * table. Used by the "Copy table" button so the clipboard receives the
+ * markdown source — not raw HTML — matching the user's expectation for a
+ * markdown-native application.
+ */
+function tableToMarkdown(table: HTMLTableElement): string {
+  const rows = Array.from(table.rows)
+  if (rows.length === 0) return ""
+  const matrix = rows.map((row) =>
+    Array.from(row.cells).map((cell) => cell.textContent?.trim() ?? ""),
+  )
+  const colCount = Math.max(...matrix.map((r) => r.length))
+  const colWidths = Array.from({ length: colCount }, (_, i) =>
+    Math.max(3, ...matrix.map((r) => (r[i] ?? "").length)),
+  )
+  const fmtRow = (cells: string[]) =>
+    "| " +
+    Array.from({ length: colCount }, (_, i) => (cells[i] ?? "").padEnd(colWidths[i])).join(
+      " | ",
+    ) +
+    " |"
+  const sep =
+    "| " + colWidths.map((w) => "-".repeat(w)).join(" | ") + " |"
+  const [header, ...body] = matrix
+  return [fmtRow(header), sep, ...body.map(fmtRow)].join("\n")
+}
+
+/**
+ * GFM table with a "Copy table" button beneath it. Mirrors the code-block
+ * pattern (`<pre>` + `<CopyButton label="Copy code">`). The table content is
+ * read from the DOM on click via {@link tableToMarkdown} so the clipboard
+ * receives pipe-delimited markdown, not HTML.
+ *
+ * Defined at module scope (stable identity) so `useRef` is safe — the
+ * `components()` factory delegates to this without re-creating it each render.
+ */
+function CopyableTable({
+  children,
+  tableBorder,
+  onAccent,
+}: {
+  children: ReactNode
+  tableBorder: string
+  onAccent: boolean
+}) {
+  const ref = useRef<HTMLTableElement>(null)
+  const getText = () => (ref.current ? tableToMarkdown(ref.current) : "")
+  return (
+    <div className="my-2 max-w-full overflow-x-auto">
+      <table
+        ref={ref}
+        className={cn("w-full border-collapse text-[12.5px]", "border", tableBorder)}
+      >
+        {children}
+      </table>
+      <CopyButton
+        getText={getText}
+        align="start"
+        label="Copy table"
+        className={onAccent ? "text-current/60 hover:text-current" : undefined}
+      />
+    </div>
   )
 }
 
@@ -157,11 +223,23 @@ function components(variant: MarkdownVariant): Components {
     // `pre` neutralises that chip on its direct `code` child (transparent bg, no
     // border/padding, inherit colour) — the `pre` owns the block frame. This is
     // robust regardless of whether a fence declares a language.
-    code: ({ className, children, ...rest }) => (
-      <ClickableCode baseClass={cn(inlineCode, className)} {...rest}>
-        {children}
-      </ClickableCode>
-    ),
+    code: ({ className, children, ...rest }) => {
+      // Bare URLs inside backticks → render as clickable links, not code chips.
+      const raw = typeof children === "string" ? children : extractText(children)
+      const trimmed = raw.trim()
+      if (/^https?:\/\/\S+$/.test(trimmed)) {
+        return (
+          <a href={trimmed} target="_blank" rel="noopener noreferrer" className={linkColor}>
+            {trimmed}
+          </a>
+        )
+      }
+      return (
+        <ClickableCode baseClass={cn(inlineCode, className)} {...rest}>
+          {children}
+        </ClickableCode>
+      )
+    },
     pre: ({ children }) => (
       <div>
         <pre
@@ -172,7 +250,7 @@ function components(variant: MarkdownVariant): Components {
         >
           {children}
         </pre>
-        <CopyButton text={extractText(children)} align="start" className={onAccent ? "text-current/60 hover:text-current" : undefined} />
+        <CopyButton text={extractText(children)} align="start" label="Copy code" className={onAccent ? "text-current/60 hover:text-current" : undefined} />
       </div>
     ),
 
@@ -186,11 +264,9 @@ function components(variant: MarkdownVariant): Components {
 
     // ── Tables (GFM) — wrapped so wide tables scroll instead of overflowing. ──
     table: ({ children }) => (
-      <div className="my-2 max-w-full overflow-x-auto">
-        <table className={cn("w-full border-collapse text-[12.5px]", "border", tableBorder)}>
-          {children}
-        </table>
-      </div>
+      <CopyableTable tableBorder={tableBorder} onAccent={onAccent}>
+        {children}
+      </CopyableTable>
     ),
     thead: ({ children }) => <thead className={tableHeadBg}>{children}</thead>,
     tr: ({ children }) => <tr className={cn("border-b last:border-0", tableBorder)}>{children}</tr>,

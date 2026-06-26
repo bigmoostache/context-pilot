@@ -17,47 +17,12 @@ import { mapRawQuestions } from "../api"
 // ── Oplog delta shape (the push-plane payload) ───────────────────────
 //
 // One rev-numbered oplog entry as carried by an SSE `delta` event. Mirrors
-// cp-wire `OpEntry` — an internally-tagged `kind` discriminant plus rev. We
-// only need a structural subset (the thread-roster + message + phase/cost
-// kinds); every other kind is acknowledged and ignored by the reducers.
+// cp-wire `OpEntry` — an internally-tagged `kind` discriminant plus rev.
+// Types are generated from the OpenAPI spec (schemas_ext.rs) so the SSE
+// protocol contract is mechanically enforced, not hand-maintained.
 
-export interface OpEntry {
-  rev: number
-  timestamp_ms?: number
-  kind: OpEntryKind
-}
-
-export interface OpEntryKind {
-  kind: string
-  thread_id?: string
-  name?: string
-  /** ThreadTurn — snake_case "my_turn" / "their_turn". */
-  status?: string
-  timestamp_ms?: number
-  /** Phase — snake_case "idle" / "streaming" / "tooling" (phase_transition). */
-  phase?: string
-  /** Cumulative spend in USD since boot (cost_aggregate). */
-  cost_usd?: number
-  /** Cumulative input/output tokens since boot (cost_aggregate). */
-  input_tokens?: number
-  output_tokens?: number
-  /** Context-window occupancy triple (context_usage): the agent's own
-   *  used/threshold/budget tokens — folded so the web meter matches ratatui. */
-  used_tokens?: number
-  threshold_tokens?: number
-  budget_tokens?: number
-  /** cache hit/miss split of used_tokens (context_usage) — folded so the HUD's
-   *  `Used (hit)` / `Used (miss)` match ratatui's green/amber bar segments. */
-  hit_tokens?: number
-  miss_tokens?: number
-  /** Stable message id, e.g. "T7-m3" (message_created). */
-  message_id?: string
-  /** Content-addressed body hash, hex (message_created). */
-  head?: string
-  /** UTF-8 JSON message body, inlined when small (message_created). Absent
-   *  when the body spilled to the content-addressed store (hydrate by head). */
-  inline_body?: string
-}
+export type { OpEntry, OpEntryKind } from "../api/generated/types.gen"
+import type { OpEntry, OpEntryKind } from "../api/generated/types.gen"
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -146,6 +111,22 @@ export function applyThreadDelta(
       if (!prev.some((t) => t.id === k.thread_id)) return prev
       return prev.filter((t) => t.id !== k.thread_id)
     }
+    case "message_deleted": {
+      const thread = prev.find((t) => t.id === k.thread_id)
+      if (!thread) return null // unknown thread → hydrate
+      const target = k.message_ts
+      if (target === undefined) return prev
+      // The log's `ts` is epoch-ms (number from REST) or ISO string (from an
+      // SSE-appended message). Normalise both to number for comparison.
+      const filtered = thread.log.filter((m) => {
+        const mTs = typeof m.ts === "number" ? m.ts : new Date(m.ts as string).getTime()
+        return mTs !== target
+      })
+      if (filtered.length === thread.log.length) return prev // no match
+      return prev.map((t) =>
+        t.id === k.thread_id ? { ...t, log: filtered } : t,
+      )
+    }
     case "thread_status_changed": {
       if (!prev.some((t) => t.id === k.thread_id)) return null
       return prev.map((t) =>
@@ -177,10 +158,17 @@ export function applyThreadDelta(
       let raw: {
         id?: string
         author?: string
+        // The SSE inline_body carries the raw ThreadMessage from the TUI agent,
+        // which uses `content`/`timestamp`/`file_path`. The REST /threads
+        // endpoint reshapes these to `text`/`ts`/`fileRef` (thread_shape.rs B8).
+        // Accept BOTH variants so the delta reducer works regardless of source.
         text?: string | null
+        content?: string | null
         ts?: number
+        timestamp?: number
         question?: unknown
         fileRef?: string | null
+        file_path?: string | null
         auto?: boolean
       }
       try {
@@ -196,11 +184,13 @@ export function applyThreadDelta(
       // position — NOT from raw.id (`{thread}-m{n}`) or k.message_id — keeps the
       // two planes' ids identical, so mergeThreadLogs collapses them to one.
       const msgId = `msg_${thread.log.length}`
-      const msgTs = typeof raw.ts === "number" ? raw.ts : ts
+      const msgTs = typeof raw.ts === "number" ? raw.ts : (typeof raw.timestamp === "number" ? raw.timestamp : ts)
+      const msgText = raw.text ?? raw.content ?? undefined
+      const msgFileRef = raw.fileRef ?? raw.file_path ?? undefined
       const candidate = {
         author: raw.author === "user" ? "user" : "assistant",
         ts: new Date(msgTs).toISOString(),
-        text: raw.text ?? undefined,
+        text: msgText,
       }
       // Dedup by positional id OR content signature (T360). The id guard alone
       // misses a message that already landed via the backstop poll under a
@@ -212,10 +202,10 @@ export function applyThreadDelta(
       const appended: ThreadDetail["log"][number] = {
         id: msgId,
         author: raw.author === "user" ? "user" : "assistant",
-        text: raw.text ?? undefined,
+        text: msgText,
         ts: new Date(msgTs).toISOString(),
         questions: mapRawQuestions(raw.question),
-        fileRef: raw.fileRef ?? undefined,
+        fileRef: msgFileRef,
         auto: raw.auto ?? undefined,
       }
       return prev.map((t) =>

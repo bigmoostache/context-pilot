@@ -274,7 +274,9 @@ export function resolveEnter(value: string, selStart: number, selEnd: number): E
  * indenting an ordered item starts a fresh `1.` / `a.` sublist count. Outdenting
  * reverses both. The caret tracks the content as the indent/marker width shifts.
  */
-export function resolveTab(value: string, selStart: number, _selEnd: number, shift: boolean): { value: string; caret: number } | null {
+export function resolveTab(value: string, selStart: number, _selEnd: number, shift: boolean): {
+  value: string; caret: number;
+} | null {
   const { start: lineStart, end: lineEnd } = lineBounds(value, selStart)
   const oldLine = value.slice(lineStart, lineEnd)
   const parsed = parseListLine(oldLine)

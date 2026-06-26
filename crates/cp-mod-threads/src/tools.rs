@@ -242,9 +242,7 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
             },
         );
 
-    let mut result_lines = vec![format!(
-        "Thread {tid} \"{thread_name}\" [{thread_status}] — now focused.\n"
-    )];
+    let mut result_lines = vec![format!("Thread {tid} \"{thread_name}\" [{thread_status}] — now focused.\n")];
     if thread_summaries.is_empty() {
         result_lines.push("No unacknowledged messages across active threads.".to_string());
     } else {

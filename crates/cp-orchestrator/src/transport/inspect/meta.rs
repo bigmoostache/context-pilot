@@ -39,10 +39,7 @@ pub fn agent_meta(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
 /// [`fleet`](crate::transport::rest::fleet) and the endpoint the web dashboard
 /// actually reads, so it must apply the same ACL filter or a regular user would
 /// see every agent's card (T346).
-pub fn fleet_meta(
-    state: &Mutex<Backend>,
-    auth_user: Option<&crate::services::auth::types::User>,
-) -> HttpReply {
+pub fn fleet_meta(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::types::User>) -> HttpReply {
     let dir = {
         let Ok(b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
@@ -64,11 +61,8 @@ pub fn fleet_meta(
     let visible = crate::transport::auth::filter_fleet(state, &active_ids, auth_user);
     let visible: std::collections::HashSet<&str> = visible.iter().map(String::as_str).collect();
 
-    let agents: Vec<serde_json::Value> = active
-        .iter()
-        .filter(|e| visible.contains(e.id.as_str()))
-        .map(|e| build_agent_meta(state, &e.id, e))
-        .collect();
+    let agents: Vec<serde_json::Value> =
+        active.iter().filter(|e| visible.contains(e.id.as_str())).map(|e| build_agent_meta(state, &e.id, e)).collect();
     HttpReply::ok(&agents)
 }
 
@@ -79,10 +73,7 @@ pub fn fleet_meta(
 /// than the live registry (a retired agent has no running process to inspect).
 /// Each carries `status: "retired"` and a `retiredAt` epoch-ms so the frontend
 /// can render and sort the section without a second lookup.
-pub fn fleet_retired(
-    state: &Mutex<Backend>,
-    auth_user: Option<&crate::services::auth::types::User>,
-) -> HttpReply {
+pub fn fleet_retired(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::types::User>) -> HttpReply {
     let records = {
         let Ok(b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
@@ -101,11 +92,8 @@ pub fn fleet_retired(
         .map(|r| {
             // Dashboard name override wins over the folder-basename snapshot
             // captured at retire time — the user may rename a retired agent.
-            let name = state
-                .lock()
-                .ok()
-                .and_then(|b| b.names.get(&r.id).map(str::to_owned))
-                .unwrap_or_else(|| r.name.clone());
+            let name =
+                state.lock().ok().and_then(|b| b.names.get(&r.id).map(str::to_owned)).unwrap_or_else(|| r.name.clone());
             serde_json::json!({
                 "id": r.id,
                 "name": name,

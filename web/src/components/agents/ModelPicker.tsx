@@ -1,6 +1,5 @@
 import { Check } from "lucide-react"
 import {
-  PROVIDERS,
   findProvider,
   defaultModel,
   priceTag,
@@ -16,10 +15,13 @@ import { cn } from "@/lib/utils"
  * defaults pane so both use the same registry and visual language.
  */
 export function ModelPicker({
+  providers,
   provider,
   model,
   onChange,
 }: {
+  /** The provider registry (fetched from backend). */
+  providers: ProviderDef[]
   /** Active provider serde id (e.g. `"claudecodev2"`) */
   provider: string
   /** Active model serde id within the provider (e.g. `"claude-opus48"`) */
@@ -27,13 +29,13 @@ export function ModelPicker({
   /** Fires on user pick — both values always set. */
   onChange: (provider: string, model: string) => void
 }) {
-  const activeProv = findProvider(provider) ?? PROVIDERS[0]
+  const activeProv = findProvider(providers, provider) ?? providers[0]
 
   return (
     <div className="flex flex-col gap-3">
       {/* provider rail */}
       <div className="flex flex-wrap gap-1.5">
-        {PROVIDERS.map((p) => {
+        {providers.map((p) => {
           const on = p.id === activeProv.id
           return (
             <ProviderPill
@@ -41,7 +43,7 @@ export function ModelPicker({
               prov={p}
               active={on}
               onClick={() => {
-                const dm = defaultModel(p.id)
+                const dm = defaultModel(providers, p.id)
                 onChange(p.id, dm?.id ?? p.models[0].id)
               }}
             />

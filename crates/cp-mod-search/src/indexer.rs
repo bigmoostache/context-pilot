@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use notify::{EventKind, PollWatcher, RecursiveMode, Watcher as _};
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher as _};
 
 use crate::meili::api::MeiliClient;
 use crate::splitter::SplitterChain;
@@ -20,15 +20,6 @@ use crate::types::IndexerCmd;
 
 /// Duration to wait after the first event before processing a batch.
 const DEBOUNCE_MS: u64 = 200;
-
-/// Poll interval for the file watcher.
-///
-/// Uses [`PollWatcher`] which periodically walks the directory tree and
-/// diffs against its last known state — **zero kernel-level FDs** needed.
-/// 3 seconds strikes a good balance between responsiveness and CPU overhead.
-/// (The previous `RecommendedWatcher` with kqueue used one FD per file,
-/// exhausting the 256-FD macOS default on any non-trivial project.)
-const POLL_INTERVAL_SECS: u64 = 3;
 
 /// Parameters for starting the background indexer.
 pub(crate) struct IndexerParams {
@@ -45,7 +36,7 @@ pub(crate) struct IndexerParams {
     /// Skip the initial full-project scan.
     ///
     /// Set to `true` on TUI reload — Meilisearch already has data from
-    /// the previous session and the `PollWatcher` picks up incremental
+    /// the previous session and the `RecommendedWatcher` picks up incremental
     /// changes.  Set to `false` on first boot (fresh indexes).
     pub skip_initial_scan: bool,
 }
@@ -64,10 +55,10 @@ struct IndexerCtx {
     metrics: std::sync::Arc<std::sync::Mutex<types::SearchMetrics>>,
     /// Per-file last-indexed mtime (ms since epoch).
     ///
-    /// Used to skip re-indexing files reported by [`PollWatcher`] whose
-    /// content hasn't actually changed.  Without this, phantom watcher
+    /// Used to skip re-indexing files reported by the filesystem watcher
+    /// whose content hasn't actually changed.  Without this, phantom
     /// events trigger a full delete→split→upload→embed cycle on every
-    /// poll interval, keeping Meilisearch at 200 %+ CPU via embedding
+    /// notification, keeping Meilisearch at 200 %+ CPU via embedding
     /// regeneration even when the project is idle.
     last_indexed_mtime: HashMap<String, u64>,
 }
@@ -80,16 +71,17 @@ struct IndexerCtx {
 /// # Errors
 ///
 /// Returns an error if the file watcher cannot be created.
-pub(crate) fn start(params: IndexerParams) -> Result<(mpsc::Sender<IndexerCmd>, PollWatcher), String> {
+pub(crate) fn start(params: IndexerParams) -> Result<(mpsc::Sender<IndexerCmd>, RecommendedWatcher), String> {
     let (tx, rx) = mpsc::channel::<IndexerCmd>();
 
     // Clone sender for the watcher callback
     let watcher_tx = tx.clone();
 
-    // Set up polling file watcher — walks the tree every POLL_INTERVAL_SECS.
-    // Unlike RecommendedWatcher (kqueue), PollWatcher uses ZERO kernel FDs
-    // for watching.  The slight latency (≤3s) is fine for a search index.
-    let mut watcher = PollWatcher::new(
+    // Set up event-driven file watcher — RecommendedWatcher maps to `FSEvents`
+    // on macOS (single kernel FD, event-driven, negligible CPU) and inotify on
+    // Linux.  The previous PollWatcher walked the ENTIRE directory tree every
+    // 3 s doing lstat() on each file, consuming ~50 % CPU at ~3 000 files.
+    let mut watcher = RecommendedWatcher::new(
         move |res: Result<notify::Event, notify::Error>| {
             if let Ok(event) = res {
                 for path in &event.paths {
@@ -102,7 +94,7 @@ pub(crate) fn start(params: IndexerParams) -> Result<(mpsc::Sender<IndexerCmd>, 
                 }
             }
         },
-        notify::Config::default().with_poll_interval(Duration::from_secs(POLL_INTERVAL_SECS)),
+        notify::Config::default(),
     )
     .map_err(|e| format!("Cannot create file watcher: {e}"))?;
 
@@ -113,7 +105,7 @@ pub(crate) fn start(params: IndexerParams) -> Result<(mpsc::Sender<IndexerCmd>, 
     // Spawn initial scan on a helper thread (queues IndexFile commands)
     if params.skip_initial_scan {
         // Reload path: Meilisearch already has data from the previous session.
-        // Mark scan as complete immediately — the PollWatcher handles incremental changes.
+        // Mark scan as complete immediately — the RecommendedWatcher handles incremental changes.
         if let Ok(mut m) = params.metrics.lock() {
             m.scan_complete = true;
         }
@@ -280,10 +272,10 @@ fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
     }
 
     // Compute mtime for deduplication — skip re-indexing unchanged files.
-    // PollWatcher can fire phantom events for files whose content hasn't
-    // changed (metadata updates, macOS quirks). Without this check, each
-    // phantom event triggers delete→split→upload→embed, keeping Meilisearch
-    // pegged at 200%+ CPU from constant embedding regeneration.
+    // FSEvents can fire events for files whose content hasn't changed
+    // (metadata updates, macOS quirks). Without this check, each event
+    // triggers delete→split→upload→embed, keeping Meilisearch pegged at
+    // 200%+ CPU from constant embedding regeneration.
     let last_modified_ms = meta
         .modified()
         .ok()
@@ -368,7 +360,7 @@ fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
         let _prev = m.last_sent_ms.insert(rel_str.to_string(), now_ms);
     }
 
-    // Record mtime so subsequent PollWatcher events for this unchanged
+    // Record mtime so subsequent watcher events for this unchanged
     // file are skipped (the key optimisation that prevents phantom re-indexing).
     let _prev = ctx.last_indexed_mtime.insert(rel_str.to_string(), last_modified_ms);
 }

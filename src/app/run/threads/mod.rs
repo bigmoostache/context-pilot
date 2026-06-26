@@ -6,14 +6,14 @@
 //! sibling [`bridge`] submodule (the two halves split a single file that had
 //! outgrown the 500-line limit).
 
+mod archived;
 mod bridge;
 mod commands;
 mod messages;
-mod archived;
 mod paused;
+pub(super) use archived::emit_thread_archived;
 pub(super) use bridge::{bridge_active, emit_thread_focus, emit_thread_status, emit_vitals, poll_bridge_commands};
 pub(super) use messages::emit_messages;
-pub(super) use archived::emit_thread_archived;
 pub(super) use paused::emit_thread_paused;
 
 use crate::app::App;
@@ -82,7 +82,9 @@ pub(super) fn maybe_inject_auto_read(app: &mut App) -> bool {
     // Archived threads are LLM-invisible (T9) and never auto-read.
     let my_turn = candidate_ids
         .iter()
-        .find_map(|tid| ts.threads.iter().find(|t| t.id == *tid && !t.archived && !t.paused && t.status == ThreadStatus::MyTurn))
+        .find_map(|tid| {
+            ts.threads.iter().find(|t| t.id == *tid && !t.archived && !t.paused && t.status == ThreadStatus::MyTurn)
+        })
         .or_else(|| ts.threads.iter().find(|t| !t.archived && !t.paused && t.status == ThreadStatus::MyTurn));
 
     let Some(thread) = my_turn else {

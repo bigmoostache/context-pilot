@@ -20,6 +20,50 @@ lint-integrity:
   is_global: true
   script_content: bash .github/checks/check-lint-config.sh
   last_edited_ms: 0
+openapi-contract:
+  name: openapi-contract
+  description: 'Full OpenAPI pipeline: regenerate spec + route exhaustiveness + TS client codegen + tsc + manual API audit'
+  pattern: '*.rs'
+  blocking: true
+  timeout_secs: 60
+  success_message: OpenAPI contract OK ✓
+  is_global: true
+  script_content: |
+    echo "▸ Regenerating openapi.json + route exhaustiveness..."
+    cargo test -p cp-orchestrator --test openapi -- --ignored 2>&1
+
+    # ── Step 3: Regenerate TypeScript client ─────────────────────────────
+    echo "▸ Regenerating TS client from openapi.json..."
+    cd web
+    npx @hey-api/openapi-ts -i ../openapi.json -o src/lib/api/generated 2>&1
+
+    # ── Step 4: Type-check frontend ──────────────────────────────────────
+    echo "▸ Type-checking (tsc --noEmit)..."
+    npx tsc --noEmit 2>&1
+
+    # ── Step 5: Audit — no manual API calls ──────────────────────────────
+    # The API layer must use the generated SDK exclusively. The only
+    # acceptable manual patterns are:
+    #   - downloadFile in finder.ts (binary blob, needs manual fetch)
+    #   - rawUrl / avatarUrl (URL builders, not fetch calls)
+    echo "▸ Auditing for manual API calls..."
+    cd src/lib/api
+
+    # Check for raw fetch( calls (excluding downloadFile which is irreducible)
+    MANUAL_FETCH=$(grep -rn 'fetch(' --include='*.ts' . \
+      | grep -v '/generated/' \
+      | grep -v 'downloadFile' \
+      | grep -v '// ok:manual' \
+      || true)
+
+    if [ -n "$MANUAL_FETCH" ]; then
+      echo "::error::Manual fetch() calls found in API layer — use generated SDK instead:"
+      echo "$MANUAL_FETCH"
+      exit 1
+    fi
+
+    echo "✓ All checks passed"
+  last_edited_ms: 0
 rust-check:
   name: rust-check
   description: Run cargo check, clippy, and fmt --check on Rust file edits
@@ -34,11 +78,31 @@ rust-check:
 
     echo ""
     echo "=== cargo clippy (workspace lints) ==="
-    cargo clippy -- -D warnings 2>&1
+    cargo clippy --all-targets -- -D warnings 2>&1
 
     echo ""
     echo "All Rust checks passed."
-  last_edited_ms: 0
+  last_edited_ms: 1782478770168
+ts-contract:
+  name: ts-contract
+  description: Regenerate TypeScript client from openapi.json on TS file edits to catch contract drift
+  pattern: web/src/**/*.ts
+  blocking: true
+  timeout_secs: 30
+  success_message: TS contract OK ✓
+  is_global: true
+  script_content: |-
+    cd web
+    npx @hey-api/openapi-ts -i ../openapi.json -o src/lib/api/generated 2>&1
+
+    # Check for drift in tracked generated files (-- separates paths from revisions)
+    if ! git diff --exit-code --quiet -- web/src/lib/api/generated/ 2>/dev/null; then
+      echo "::error::Generated TypeScript client drifted from openapi.json!"
+      echo "Do not hand-edit generated files."
+      git diff --stat -- web/src/lib/api/generated/
+      exit 1
+    fi
+  last_edited_ms: 1782421737199
 web-structure:
   name: web-structure
   description: Enforce ≤8 entries/dir + ≤500 lines/file under web/src (shadcn ui/ exempt)

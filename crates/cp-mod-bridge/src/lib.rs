@@ -97,30 +97,50 @@ impl MemoSeeds {
 
     /// Messages memo seeded (`emit_messages`).
     #[must_use]
-    pub const fn messages(self) -> bool { self.0 & Self::MESSAGES != 0 }
+    pub const fn messages(self) -> bool {
+        self.0 & Self::MESSAGES != 0
+    }
     /// Thread-status memo seeded (`emit_thread_status`).
     #[must_use]
-    pub const fn statuses(self) -> bool { self.0 & Self::STATUSES != 0 }
+    pub const fn statuses(self) -> bool {
+        self.0 & Self::STATUSES != 0
+    }
     /// Focus memo seeded (`emit_thread_focus`).
     #[must_use]
-    pub const fn focus(self) -> bool { self.0 & Self::FOCUS != 0 }
+    pub const fn focus(self) -> bool {
+        self.0 & Self::FOCUS != 0
+    }
     /// Archived memo seeded (`emit_thread_archived`).
     #[must_use]
-    pub const fn archived(self) -> bool { self.0 & Self::ARCHIVED != 0 }
+    pub const fn archived(self) -> bool {
+        self.0 & Self::ARCHIVED != 0
+    }
     /// Paused memo seeded (`emit_thread_paused`).
     #[must_use]
-    pub const fn paused(self) -> bool { self.0 & Self::PAUSED != 0 }
+    pub const fn paused(self) -> bool {
+        self.0 & Self::PAUSED != 0
+    }
 
     /// Mark messages as seeded.
-    pub const fn seed_messages(&mut self) { self.0 |= Self::MESSAGES; }
+    pub const fn seed_messages(&mut self) {
+        self.0 |= Self::MESSAGES;
+    }
     /// Mark statuses as seeded.
-    pub const fn seed_statuses(&mut self) { self.0 |= Self::STATUSES; }
+    pub const fn seed_statuses(&mut self) {
+        self.0 |= Self::STATUSES;
+    }
     /// Mark focus as seeded.
-    pub const fn seed_focus(&mut self) { self.0 |= Self::FOCUS; }
+    pub const fn seed_focus(&mut self) {
+        self.0 |= Self::FOCUS;
+    }
     /// Mark archived as seeded.
-    pub const fn seed_archived(&mut self) { self.0 |= Self::ARCHIVED; }
+    pub const fn seed_archived(&mut self) {
+        self.0 |= Self::ARCHIVED;
+    }
     /// Mark paused as seeded.
-    pub const fn seed_paused(&mut self) { self.0 |= Self::PAUSED; }
+    pub const fn seed_paused(&mut self) {
+        self.0 |= Self::PAUSED;
+    }
 }
 
 /// Runtime state for the bridge (stored in [`State`]'s `TypeMap`).

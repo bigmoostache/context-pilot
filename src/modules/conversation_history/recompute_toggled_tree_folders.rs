@@ -119,7 +119,7 @@ fn collect_opened_folders_from_messages(messages: &[Message], folders: &mut Hash
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cp_base::state::data::message::{MsgKind, MsgStatus, ToolUseRecord};
+    use cp_base::state::data::message::{MsgStatus, ToolUseRecord};
 
     fn make_tool_call(name: &str, input: serde_json::Value) -> Message {
         Message {
@@ -139,10 +139,8 @@ mod tests {
 
     #[test]
     fn collect_extracts_open_paths() {
-        let msgs = vec![make_tool_call(
-            "tree_toggle",
-            serde_json::json!({"action": "open", "paths": ["src", "src/app"]}),
-        )];
+        let msgs =
+            vec![make_tool_call("tree_toggle", serde_json::json!({"action": "open", "paths": ["src", "src/app"]}))];
         let mut folders = HashSet::new();
         collect_opened_folders_from_messages(&msgs, &mut folders);
         assert!(folders.contains("src"));
