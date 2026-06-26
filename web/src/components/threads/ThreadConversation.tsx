@@ -6,10 +6,51 @@ import { ThreadComposer, type CommandSuggestion } from "./ThreadComposer"
 import { CreateCommandDialog } from "./CreateCommandDialog"
 import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
+import { sendCommand } from "@/lib/api"
 import { zipFiles } from "@/lib/utils"
 import { uploadToNode, type UploadedFile } from "./fileUpload"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
 import type { FinderNode } from "@/lib/types"
+
+/**
+ * Normalise a thread message's `ts` into a human-readable relative age.
+ *
+ * The field arrives as either an epoch-ms number (REST backstop poll), an
+ * ISO 8601 string (SSE delta reducer), or an already-formatted relative
+ * string — this helper collapses all three into a single "Xm ago" label so
+ * the Message renderer never shows a raw timestamp.
+ */
+function formatTs(ts: string | number | undefined): string {
+  if (ts === undefined) return ""
+  const n = typeof ts === "number" ? ts : Number(ts)
+  // Epoch-ms: any number above 2020-01-01 00:00:00 UTC.
+  if (!Number.isNaN(n) && n > 1_577_836_800_000) {
+    const s = Math.max(0, Math.floor((Date.now() - n) / 1000))
+    if (s < 5) return "just now"
+    if (s < 60) return `${s}s ago`
+    const m = Math.floor(s / 60)
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h ago`
+    return `${Math.floor(h / 24)}d ago`
+  }
+  // ISO 8601 string (from SSE reducer).
+  if (typeof ts === "string") {
+    const d = new Date(ts)
+    if (!Number.isNaN(d.getTime()) && d.getTime() > 1_577_836_800_000) {
+      const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000))
+      if (s < 5) return "just now"
+      if (s < 60) return `${s}s ago`
+      const m = Math.floor(s / 60)
+      if (m < 60) return `${m}m ago`
+      const h = Math.floor(m / 60)
+      if (h < 24) return `${h}h ago`
+      return `${Math.floor(h / 24)}d ago`
+    }
+  }
+  // Already formatted or unknown — pass through.
+  return String(ts)
+}
 
 /** Map a thread message onto the shared ChatMessage shape for the renderer. */
 function toChatMessage(m: ThreadMsg): ChatMessage {
@@ -18,7 +59,7 @@ function toChatMessage(m: ThreadMsg): ChatMessage {
     role: m.tool ? "tool" : m.author,
     text: m.text,
     tool: m.tool,
-    ts: m.ts,
+    ts: formatTs(m.ts as string | number),
     streaming: m.streaming,
   }
 }
@@ -205,13 +246,24 @@ export function ThreadConversation({
       .map((item) => ({ command: `/${item.id}`, name: item.name, description: item.description, body: item.body }))
   }, [library])
   // Pin the conversation to the latest message: scroll to the bottom whenever
-  // a thread is opened (id change) or a new message lands (log grows), so the
-  // freshest exchange is always in view — matching the TUI, which keeps the
-  // conversation pinned to the bottom.
+  // a thread is opened (id change) or a new NON-AUTO message lands (user or
+  // assistant text — not tool-activity traces). Auto messages update the tool
+  // counter inside a collapsed <details> and must NOT yank the scroll position
+  // away from the message the user is reading (T414).
   const bottomRef = useRef<HTMLDivElement>(null)
+  const nonAutoCount = useMemo(
+    () => thread.log.filter((m) => !m.auto).length,
+    [thread.log],
+  )
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" })
-  }, [thread.id, thread.log.length])
+  }, [thread.id, nonAutoCount])
+
+  /** Delete a message from this thread via the agent command bridge. */
+  const handleDelete = (msg: ThreadMsg) => {
+    const ts = typeof msg.ts === "number" ? msg.ts : new Date(msg.ts as string).getTime()
+    sendCommand(agentId, { kind: "delete_message", thread_id: thread.id, message_ts: ts })
+  }
 
   return (
     <main
@@ -249,6 +301,7 @@ export function ThreadConversation({
                   agentId={agentId}
                   onOpenFile={setSheetFile}
                   onShowInFinder={onShowInFinder}
+                  onDelete={() => handleDelete(seg.msg)}
                 />
                 {seg.msg.questions?.map((q, i) => (
                   <div key={i} className="pb-1.5 pl-7">

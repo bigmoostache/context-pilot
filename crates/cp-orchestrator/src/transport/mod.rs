@@ -30,8 +30,8 @@
 //! | `POST` | `/api/ticket` | [`rest::mint_ticket`] |
 //! | `GET`  | `/api/stream?agent={id}&ticket={t}` | SSE (this module) |
 
-pub mod inspect;
 mod auth;
+pub mod inspect;
 mod query;
 pub mod rest;
 pub mod sse;
@@ -119,11 +119,7 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
 
     // Extract the Bearer token for auth-aware handlers.
     let auth_token = request.headers().iter().find_map(|h| {
-        if h.field.equiv("Authorization") {
-            h.value.as_str().strip_prefix("Bearer ").map(str::to_owned)
-        } else {
-            None
-        }
+        if h.field.equiv("Authorization") { h.value.as_str().strip_prefix("Bearer ").map(str::to_owned) } else { None }
     });
 
     // Centralised auth gate (Phase 5, NFR-16). Validates the session for
@@ -178,7 +174,8 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
         Vec::new()
     };
 
-    let reply = route_rest(&method, &segments, state, body_bytes.as_slice(), &query, auth_token.as_deref(), auth_user.as_ref());
+    let reply =
+        route_rest(&method, &segments, state, body_bytes.as_slice(), &query, auth_token.as_deref(), auth_user.as_ref());
     respond_json(request, &reply);
 }
 
@@ -201,6 +198,7 @@ fn route_rest(
 ) -> rest::HttpReply {
     match (method, segments) {
         (Method::Get, ["api", "health"]) => rest::HttpReply { status: 200, body: "{\"status\":\"ok\"}".to_owned() },
+        (Method::Get, ["api", "providers"]) => inspect::providers::providers(),
 
         // ── Auth routes (§6 of design doc) ──────────────────────────
         (Method::Get, ["api", "auth", "status"]) => auth::auth_status(state),
@@ -220,7 +218,9 @@ fn route_rest(
         (Method::Get, ["api", "auth", "users"]) => auth::list_users(state, auth_user),
         (Method::Post, ["api", "auth", "users"]) => auth::create_user(state, body_bytes, auth_user),
         (Method::Delete, ["api", "auth", "users", user_id]) => auth::delete_user(state, user_id, auth_user),
-        (Method::Post, ["api", "auth", "users", user_id, "logout"]) => auth::force_logout_user(state, user_id, auth_user),
+        (Method::Post, ["api", "auth", "users", user_id, "logout"]) => {
+            auth::force_logout_user(state, user_id, auth_user)
+        }
 
         // ── ACL routes (Phase 6, §6 of design doc) ─────────────────
         (Method::Get, ["api", "agent", id, "acl"]) => auth::acl_list(state, id, auth_user),
@@ -335,9 +335,7 @@ fn handle_stream(request: Request, state: &Arc<Mutex<Backend>>, query: &str) {
                         if user.role == UserRole::Admin {
                             true
                         } else {
-                            auth.check_access(agent_id, user_id)
-                                .map(|role| role.is_some())
-                                .unwrap_or(false)
+                            auth.check_access(agent_id, user_id).map(|role| role.is_some()).unwrap_or(false)
                         }
                     }
                     _ => false,
@@ -346,7 +344,10 @@ fn handle_stream(request: Request, state: &Arc<Mutex<Backend>>, query: &str) {
             }
         });
         if !authorized {
-            respond_json(request, &rest::HttpReply { status: 403, body: "{\"error\":\"no access to this agent\"}".to_owned() });
+            respond_json(
+                request,
+                &rest::HttpReply { status: 403, body: "{\"error\":\"no access to this agent\"}".to_owned() },
+            );
             return;
         }
     }

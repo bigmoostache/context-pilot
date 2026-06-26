@@ -133,10 +133,8 @@ impl Config {
         };
 
         // Auth configuration (§8 of design doc).
-        let auth_enabled = std::env::var("CP_AUTH_ENABLED")
-            .ok()
-            .map(|s| s.eq_ignore_ascii_case("true") || s == "1")
-            .unwrap_or(false);
+        let auth_enabled =
+            std::env::var("CP_AUTH_ENABLED").ok().map(|s| s.eq_ignore_ascii_case("true") || s == "1").unwrap_or(false);
 
         let session_ttl = std::env::var("CP_SESSION_TTL_SECS")
             .ok()
@@ -150,7 +148,17 @@ impl Config {
                 .unwrap_or_else(|| PathBuf::from("auth.db")),
         };
 
-        Ok(Self { port, agents_dir, budget_usd, scan_interval, agents_root, agent_binary, auth_enabled, session_ttl, auth_db_path })
+        Ok(Self {
+            port,
+            agents_dir,
+            budget_usd,
+            scan_interval,
+            agents_root,
+            agent_binary,
+            auth_enabled,
+            session_ttl,
+            auth_db_path,
+        })
     }
 }
 
@@ -207,11 +215,8 @@ impl Runtime {
         let backend = Arc::clone(&self.backend);
         let agents_dir = self.config.agents_dir.clone();
         let interval = self.config.scan_interval;
-        let backup_scheduler = if self.config.auth_enabled {
-            Some(BackupScheduler::new(self.config.auth_db_path.clone()))
-        } else {
-            None
-        };
+        let backup_scheduler =
+            if self.config.auth_enabled { Some(BackupScheduler::new(self.config.auth_db_path.clone())) } else { None };
 
         thread::spawn(move || driver_loop(backend, agents_dir, interval, backup_scheduler))
     }
@@ -267,7 +272,12 @@ fn oauth_refresh_loop() {
 /// runs every [`TAIL_INTERVAL`] in a tight inner loop, so a freshly-appended
 /// entry becomes visible in the view within ~100 ms rather than the (much
 /// longer) registry-scan cadence.
-fn driver_loop(backend: Arc<Mutex<Backend>>, agents_dir: PathBuf, interval: Duration, mut backup_scheduler: Option<BackupScheduler>) {
+fn driver_loop(
+    backend: Arc<Mutex<Backend>>,
+    agents_dir: PathBuf,
+    interval: Duration,
+    mut backup_scheduler: Option<BackupScheduler>,
+) {
     let mut registry = AgentRegistry::new(agents_dir);
     let mut tailers: HashMap<String, Tailer> = HashMap::new();
     // Per-agent live stream-plane readers (connect each agent's tee.sock and

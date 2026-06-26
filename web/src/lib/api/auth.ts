@@ -1,66 +1,65 @@
-// ── Auth REST endpoints (Phase 9) ────────────────────────────────────
+// ── Auth REST endpoints (SDK) ────────────────────────────────────────
 //
-// Split from index.ts to keep files under the 500-line budget.
-// Re-exported from index.ts so `@/lib/api` remains the single import surface.
+// All 13 auth + ACL endpoints use the generated SDK.  Types are
+// re-exported from generated/types.gen so existing imports keep working.
 
-import { request } from "./client"
+import type {
+  AclEntry,
+  AuthLogin,
+  AuthStatus,
+  AuthUser,
+  CreateUserResponse,
+  ForceLogoutResponse,
+  OkResponse,
+  RegisterResponse,
+} from "./generated/types.gen"
+import {
+  deleteApiAgentByIdAclByUserId,
+  deleteApiAuthUsersByUserId,
+  getApiAgentByIdAcl,
+  getApiAuthMe,
+  getApiAuthStatus,
+  getApiAuthUsers,
+  patchApiAgentByIdAclByUserId,
+  postApiAgentByIdAcl,
+  postApiAuthLogin,
+  postApiAuthLogout,
+  postApiAuthRegister,
+  postApiAuthUsers,
+  postApiAuthUsersByUserIdLogout,
+} from "./generated"
+import { sdk } from "./client"
+
+// ── Type re-exports (preserve import surface) ────────────────────────
+
+export type { AuthUser, AclEntry, AuthStatus } from "./generated/types.gen"
 
 // ── Auth status ──────────────────────────────────────────────────────
 
-/** Backend auth status — always accessible, no Bearer needed.
- *  `bootstrapped` is true when at least one user exists (login mode);
- *  false means the first register will create the admin (bootstrap mode). */
-export function fetchAuthStatus(): Promise<{ enabled: boolean; bootstrapped: boolean }> {
-  return request("/api/auth/status")
-}
-
-// ── Auth types ───────────────────────────────────────────────────────
-
-/** Auth user shape returned by login/me/register. */
-export interface AuthUser {
-  id: string
-  email: string
-  name: string
-  role: "admin" | "user"
-  created_at: number
+export function fetchAuthStatus(): Promise<AuthStatus> {
+  return sdk(getApiAuthStatus())
 }
 
 // ── Auth actions ─────────────────────────────────────────────────────
 
-/** Login with email + password → session token + user profile. */
-export function authLogin(
-  email: string,
-  password: string,
-): Promise<{ token: string; user: AuthUser }> {
-  return request("/api/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  })
+export function authLogin(email: string, password: string): Promise<AuthLogin> {
+  return sdk(postApiAuthLogin({ body: { email, password } }))
 }
 
-/** Register a new user. Bootstrap (zero users) creates admin; otherwise
- *  requires admin session (Bearer auto-injected by client). */
 export function authRegister(
   email: string,
   name: string,
   password: string,
-): Promise<{ user: AuthUser }> {
-  return request("/api/auth/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, name, password }),
-  })
+): Promise<RegisterResponse> {
+  return sdk(postApiAuthRegister({ body: { email, name, password } }))
 }
 
-/** Destroy the current session. */
-export function authLogout(): Promise<{ ok: boolean }> {
-  return request("/api/auth/logout", { method: "POST" })
+export function authLogout(): Promise<OkResponse> {
+  return sdk(postApiAuthLogout())
 }
 
-/** Current user profile (validates the stored token). */
 export function authMe(): Promise<AuthUser> {
-  return request<AuthUser>("/api/auth/me")
+  return sdk(getApiAuthMe())
 }
 
 // ── Self-serve profile (current user) ────────────────────────────────
@@ -177,85 +176,55 @@ export function updateProviderKeys(
 
 // ── Admin: user management ───────────────────────────────────────────
 
-/** List all registered users (admin only). */
 export function fetchUsers(): Promise<AuthUser[]> {
-  return request("/api/auth/users")
+  return sdk(getApiAuthUsers())
 }
 
-/** Admin: create a new user account. */
 export function createUser(
   email: string,
   name: string,
   password: string,
   role: "admin" | "user" = "user",
-): Promise<{ user: AuthUser }> {
-  return request("/api/auth/users", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, name, password, role }),
-  })
+): Promise<CreateUserResponse> {
+  return sdk(postApiAuthUsers({ body: { email, name, password, role } }))
 }
 
-/** Admin: delete a user (cascades sessions + ACL). */
-export function deleteUser(userId: string): Promise<{ ok: boolean }> {
-  return request(`/api/auth/users/${userId}`, { method: "DELETE" })
+export function deleteUser(userId: string): Promise<OkResponse> {
+  return sdk(deleteApiAuthUsersByUserId({ path: { userId } }))
 }
 
-/** Admin: force-logout a user (revoke all their sessions). */
-export function forceLogoutUser(
-  userId: string,
-): Promise<{ ok: boolean; revoked_sessions: number }> {
-  return request(`/api/auth/users/${userId}/logout`, { method: "POST" })
+export function forceLogoutUser(userId: string): Promise<ForceLogoutResponse> {
+  return sdk(postApiAuthUsersByUserIdLogout({ path: { userId } }))
 }
 
 // ── Per-agent ACL management ─────────────────────────────────────────
 
-/** ACL entry returned by the agent ACL endpoints. */
-export interface AclEntry {
-  agent_id: string
-  user_id: string
-  role: "agent-admin" | "agent-user"
-  granted_at: number
-  granted_by: string | null
-  user_email: string
-  user_name: string
-}
-
-/** List users with access to an agent (admin or agent-admin). */
 export function fetchAgentAcl(agentId: string): Promise<AclEntry[]> {
-  return request(`/api/agent/${agentId}/acl`)
+  return sdk(getApiAgentByIdAcl({ path: { id: agentId } }))
 }
 
-/** Grant a user access to an agent. */
 export function grantAccess(
   agentId: string,
   userId: string,
   role: "agent-admin" | "agent-user" = "agent-user",
-): Promise<{ ok: boolean }> {
-  return request(`/api/agent/${agentId}/acl`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId, role }),
-  })
+): Promise<OkResponse> {
+  return sdk(postApiAgentByIdAcl({
+    path: { id: agentId },
+    body: { user_id: userId, role },
+  }))
 }
 
-/** Change a user's per-agent role. */
 export function updateAgentRole(
   agentId: string,
   userId: string,
   role: "agent-admin" | "agent-user",
-): Promise<{ ok: boolean }> {
-  return request(`/api/agent/${agentId}/acl/${userId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role }),
-  })
+): Promise<OkResponse> {
+  return sdk(patchApiAgentByIdAclByUserId({
+    path: { id: agentId, userId },
+    body: { role },
+  }))
 }
 
-/** Revoke a user's access to an agent. */
-export function revokeAccess(
-  agentId: string,
-  userId: string,
-): Promise<{ ok: boolean }> {
-  return request(`/api/agent/${agentId}/acl/${userId}`, { method: "DELETE" })
+export function revokeAccess(agentId: string, userId: string): Promise<OkResponse> {
+  return sdk(deleteApiAgentByIdAclByUserId({ path: { id: agentId, userId } }))
 }

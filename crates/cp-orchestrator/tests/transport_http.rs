@@ -33,6 +33,7 @@ use portable_pty as _;
 use rusqlite as _;
 use serde as _;
 use serde_yaml as _;
+use utoipa as _;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};

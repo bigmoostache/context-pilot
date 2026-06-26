@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: "1.95.0"
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: Rust (fmt · clippy · build · test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust ${{ env.RUST_VERSION }}
+        run: |
+          rustup toolchain install ${{ env.RUST_VERSION }} --profile minimal --component rustfmt,clippy
+          rustup default ${{ env.RUST_VERSION }}
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Clippy lints
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test
+
+  structure:
+    name: Structure (lengths · folders · lints · web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check file lengths (max 500 lines)
+        run: .github/checks/check-file-lengths.sh
+
+      - name: Check folder sizes (max 8 entries)
+        run: .github/checks/check-folder-sizes.sh
+
+      - name: Check lint exception registry
+        run: .github/checks/check-lint-exceptions.sh
+
+      - name: Verify lint config hash chain
+        run: .github/checks/check-lint-config.sh
+
+      - name: Check web structure
+        run: web/scripts/check-web-structure.sh
+
+  contract:
+    name: Contract (OpenAPI · TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust ${{ env.RUST_VERSION }}
+        run: |
+          rustup toolchain install ${{ env.RUST_VERSION }} --profile minimal
+          rustup default ${{ env.RUST_VERSION }}
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install web dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: web
+
+      - name: Check TypeScript contract
+        run: .github/checks/check-typescript-contract.sh

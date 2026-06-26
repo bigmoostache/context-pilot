@@ -90,6 +90,15 @@ pub enum Kind {
         thread_id: String,
     },
 
+    /// Delete a specific message from a thread.
+    #[serde(rename = "delete_message")]
+    DeleteMessage {
+        /// Thread containing the message.
+        thread_id: String,
+        /// Epoch-ms timestamp of the message to delete (unique per thread).
+        message_ts: u64,
+    },
+
     /// Interrupt the agent's current LLM stream.
     #[serde(rename = "interrupt_stream")]
     InterruptStream,

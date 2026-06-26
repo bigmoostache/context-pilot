@@ -38,11 +38,8 @@ impl AuthStore {
     /// schema migration fails.
     pub(crate) fn open(path: &Path) -> Result<Self, AuthError> {
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|_io_err| {
-                AuthError::Database(rusqlite::Error::InvalidPath(
-                    parent.to_path_buf().into(),
-                ))
-            })?;
+            std::fs::create_dir_all(parent)
+                .map_err(|_io_err| AuthError::Database(rusqlite::Error::InvalidPath(parent.to_path_buf().into())))?;
         }
         let conn = Connection::open(path)?;
         let store = Self { conn };
@@ -119,12 +116,9 @@ impl AuthStore {
     pub(crate) fn hash_password(plaintext: &str) -> Result<String, AuthError> {
         let mut salt_bytes = [0u8; 16];
         fill_random(&mut salt_bytes);
-        let salt = SaltString::encode_b64(&salt_bytes)
-            .map_err(|err| AuthError::Hash(err.to_string()))?;
+        let salt = SaltString::encode_b64(&salt_bytes).map_err(|err| AuthError::Hash(err.to_string()))?;
         let argon2 = Argon2::default();
-        let phc = argon2
-            .hash_password(plaintext.as_bytes(), &salt)
-            .map_err(|err| AuthError::Hash(err.to_string()))?;
+        let phc = argon2.hash_password(plaintext.as_bytes(), &salt).map_err(|err| AuthError::Hash(err.to_string()))?;
         Ok(phc.to_string())
     }
 
@@ -138,11 +132,8 @@ impl AuthStore {
     /// Returns [`AuthError::Hash`] only if the stored hash is malformed
     /// (not parseable as a PHC string).
     pub(crate) fn verify_password(stored_hash: &str, plaintext: &str) -> Result<bool, AuthError> {
-        let parsed =
-            PasswordHash::new(stored_hash).map_err(|err| AuthError::Hash(err.to_string()))?;
-        Ok(Argon2::default()
-            .verify_password(plaintext.as_bytes(), &parsed)
-            .is_ok())
+        let parsed = PasswordHash::new(stored_hash).map_err(|err| AuthError::Hash(err.to_string()))?;
+        Ok(Argon2::default().verify_password(plaintext.as_bytes(), &parsed).is_ok())
     }
 
     // ──────────────────── token / UUID generation ────────────────────
@@ -193,7 +184,15 @@ impl AuthStore {
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             rusqlite::params![id, email, name, hash, role.as_str(), now, now],
         )?;
-        Ok(User { id, email: email.to_owned(), name: name.to_owned(), password_hash: hash, role, created_at: now, updated_at: now })
+        Ok(User {
+            id,
+            email: email.to_owned(),
+            name: name.to_owned(),
+            password_hash: hash,
+            role,
+            created_at: now,
+            updated_at: now,
+        })
     }
 
     /// Fetch a user by their UUID, or `None` if not found.
@@ -266,9 +265,7 @@ impl AuthStore {
     ///
     /// Returns [`AuthError::Database`] on SQLite failure.
     pub(crate) fn count_users(&self) -> Result<u64, AuthError> {
-        let count: i64 = self
-            .conn
-            .query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))?;
+        let count: i64 = self.conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))?;
         Ok(u64::try_from(count).unwrap_or(0))
     }
 
@@ -416,16 +413,10 @@ impl AuthStore {
     /// # Errors
     ///
     /// Returns [`AuthError::Database`] on SQLite failure.
-    pub(crate) fn validate_session(
-        &self,
-        token: &str,
-    ) -> Result<Option<User>, AuthError> {
+    pub(crate) fn validate_session(&self, token: &str) -> Result<Option<User>, AuthError> {
         let now = now_ms();
         // Lazy sweep — delete all expired sessions.
-        let _swept = self.conn.execute(
-            "DELETE FROM sessions WHERE expires_at <= ?1",
-            rusqlite::params![now],
-        )?;
+        let _swept = self.conn.execute("DELETE FROM sessions WHERE expires_at <= ?1", rusqlite::params![now])?;
         // Look up the session's user in one query (session columns not needed
         // externally — the Session struct was removed to eliminate dead_code on
         // fields only consumed by tests).
@@ -449,10 +440,7 @@ impl AuthStore {
     ///
     /// Returns [`AuthError::Database`] on SQLite failure.
     pub(crate) fn revoke_session(&self, token: &str) -> Result<bool, AuthError> {
-        let deleted = self.conn.execute(
-            "DELETE FROM sessions WHERE token = ?1",
-            rusqlite::params![token],
-        )?;
+        let deleted = self.conn.execute("DELETE FROM sessions WHERE token = ?1", rusqlite::params![token])?;
         Ok(deleted > 0)
     }
 }

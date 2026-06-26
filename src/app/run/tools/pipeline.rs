@@ -251,9 +251,7 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     // what's still in context (file panels + explicitly-opened folders in
     // surviving conversations), so irrelevant folders auto-collapse.
     if tools.iter().any(|t| t.name == "Close_conversation_history") {
-        crate::modules::conversation_history::recompute_toggled_tree_folders::recompute_tree_folders(
-            &mut app.state,
-        );
+        crate::modules::conversation_history::recompute_toggled_tree_folders::recompute_tree_folders(&mut app.state);
     }
 
     // === LOGS → MEILISEARCH SYNC ===

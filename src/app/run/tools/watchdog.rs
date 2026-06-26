@@ -55,7 +55,7 @@ const WEDGE_STALL_MS: u64 = 15_000;
 const SLOW_STEP_MS: u64 = 12_000;
 /// Window over which process CPU usage is sampled on Linux (busy-loop signal).
 #[cfg(target_os = "linux")]
-const CPU_SAMPLE_MS: u64 = 500;
+const CPU_SAMPLE_MS: u32 = 500;
 
 /// Wall-clock ms of the loop's most recent iteration (0 = never ticked yet).
 static LOOP_HEARTBEAT_MS: AtomicU64 = AtomicU64::new(0);
@@ -216,18 +216,21 @@ fn dump_diagnostic(w: &Wedge) {
     let _mkdir = std::fs::create_dir_all(&errors_dir);
 
     let cpu = cpu_busy_pct();
-    let cpu_line = cpu.map_or_else(
-        || "CPU usage: (unavailable)".to_owned(),
-        |pct| format!("CPU usage: {pct:.0}%"),
-    );
+    let cpu_line = cpu.map_or_else(|| "CPU usage: (unavailable)".to_owned(), |pct| format!("CPU usage: {pct:.0}%"));
     let interpretation = match cpu {
         Some(p) if p >= 70.0 => {
-            format!("→ CPU is HIGH: a busy-loop / runaway computation in step '{}' \
-                     (e.g. tree rehash, infinite loop).", step.name())
+            format!(
+                "→ CPU is HIGH: a busy-loop / runaway computation in step '{}' \
+                     (e.g. tree rehash, infinite loop).",
+                step.name()
+            )
         }
         Some(p) if p <= 15.0 => {
-            format!("→ CPU is LOW: a blocked syscall or lock (network/socket/disk/mutex) \
-                     in step '{}'.", step.name())
+            format!(
+                "→ CPU is LOW: a blocked syscall or lock (network/socket/disk/mutex) \
+                     in step '{}'.",
+                step.name()
+            )
         }
         Some(_) => format!("→ CPU is MODERATE: partial stall in step '{}'.", step.name()),
         None => format!("→ inspect step '{}' (CPU sample unavailable).", step.name()),
@@ -264,7 +267,7 @@ fn dump_diagnostic(w: &Wedge) {
 #[cfg(target_os = "linux")]
 fn cpu_busy_pct() -> Option<f64> {
     /// Linux scheduler tick rate assumed for `/proc` time accounting (the near
-    /// universal value on x86_64; only used for a coarse diagnostic ratio).
+    /// universal value on `x86_64`; only used for a coarse diagnostic ratio).
     const CLK_TCK: f64 = 100.0;
     let ticks = || -> Option<u64> {
         let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
@@ -276,10 +279,11 @@ fn cpu_busy_pct() -> Option<f64> {
         Some(utime.saturating_add(stime))
     };
     let t0 = ticks()?;
-    std::thread::sleep(Duration::from_millis(CPU_SAMPLE_MS));
+    std::thread::sleep(Duration::from_millis(u64::from(CPU_SAMPLE_MS)));
     let t1 = ticks()?;
-    let dticks = t1.saturating_sub(t0) as f64;
-    let secs = CPU_SAMPLE_MS as f64 / 1000.0;
+    let delta = u32::try_from(t1.saturating_sub(t0)).unwrap_or(u32::MAX);
+    let dticks = f64::from(delta);
+    let secs = f64::from(CPU_SAMPLE_MS) / 1000.0;
     Some((dticks / CLK_TCK / secs) * 100.0)
 }
 
@@ -315,7 +319,10 @@ fn thread_states(_errors_dir: &std::path::Path, _now: u64) -> String {
         let comm = std::fs::read_to_string(dir.join("comm")).unwrap_or_default();
         let state = std::fs::read_to_string(dir.join("stat"))
             .ok()
-            .and_then(|s| s.rsplit_once(')').and_then(|(_, r)| r.split_whitespace().next().map(str::to_owned)))
+            .and_then(|s| {
+                let (_, r) = s.rsplit_once(')')?;
+                r.split_whitespace().next().map(str::to_owned)
+            })
             .unwrap_or_else(|| "?".to_owned());
         let wchan = std::fs::read_to_string(dir.join("wchan")).unwrap_or_default();
         lines.push(format!("  tid {tid} [{}] state={state} wchan={}", comm.trim(), wchan.trim()));
@@ -331,9 +338,8 @@ fn thread_states(errors_dir: &std::path::Path, now: u64) -> String {
     // Best-effort: a 2-second `sample` writes a full backtrace of every thread —
     // the single most useful artifact for a wedge — to a sibling file.
     let sample_path = errors_dir.join(format!("watchdog-sample-{now}.txt"));
-    let _sample = std::process::Command::new("sample")
-        .args([&pid, "2", "-file", &sample_path.to_string_lossy()])
-        .output();
+    let _sample =
+        std::process::Command::new("sample").args([&pid, "2", "-file", &sample_path.to_string_lossy()]).output();
     let note = format!("  (macOS: full backtrace written to {})", sample_path.display());
 
     let listing = std::process::Command::new("ps")

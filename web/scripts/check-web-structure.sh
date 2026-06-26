@@ -27,13 +27,16 @@ WEB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$WEB_ROOT/src"
 # shadcn vendored primitives — exempt from both rules.
 EXEMPT="$SRC/components/ui"
+# OpenAPI-generated TypeScript client — machine-generated, not authored here.
+EXEMPT_GENERATED="$SRC/lib/api/generated"
 
 fail=0
 
 is_exempt() {
-  # True when $1 is the exempt dir itself or anything beneath it.
+  # True when $1 is an exempt dir itself or anything beneath it.
   case "$1" in
     "$EXEMPT" | "$EXEMPT"/*) return 0 ;;
+    "$EXEMPT_GENERATED" | "$EXEMPT_GENERATED"/*) return 0 ;;
     *) return 1 ;;
   esac
 }

@@ -49,10 +49,7 @@ fn inject_global_params(schema: &mut Value) {
             ));
         }
         // Ensure `required` array exists, then append intent + verb.
-        let required = obj
-            .entry("required")
-            .or_insert_with(|| json!([]))
-            .as_array_mut();
+        let required = obj.entry("required").or_insert_with(|| json!([])).as_array_mut();
         if let Some(arr) = required {
             arr.push(json!("intent"));
             arr.push(json!("verb"));

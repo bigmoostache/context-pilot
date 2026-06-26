@@ -51,10 +51,7 @@ pub fn agent_metrics(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
 /// (FR-12), mirroring [`fleet_meta`](super::meta::fleet_meta): a regular user
 /// must not be able to enumerate every agent's id, cost, and budget via the
 /// Usage page. System admins see all; auth-disabled passes everything.
-pub fn fleet_metrics(
-    state: &Mutex<Backend>,
-    auth_user: Option<&crate::services::auth::types::User>,
-) -> HttpReply {
+pub fn fleet_metrics(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::types::User>) -> HttpReply {
     let dir = {
         let Ok(b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
@@ -68,11 +65,8 @@ pub fn fleet_metrics(
     let ids: Vec<String> = entries.iter().map(|e| e.id.clone()).collect();
     let visible = crate::transport::auth::filter_fleet(state, &ids, auth_user);
     let visible: std::collections::HashSet<&str> = visible.iter().map(String::as_str).collect();
-    let metrics: Vec<serde_json::Value> = entries
-        .iter()
-        .filter(|e| visible.contains(e.id.as_str()))
-        .map(|e| build_metrics(state, &e.id, e))
-        .collect();
+    let metrics: Vec<serde_json::Value> =
+        entries.iter().filter(|e| visible.contains(e.id.as_str())).map(|e| build_metrics(state, &e.id, e)).collect();
     HttpReply::ok(&metrics)
 }
 

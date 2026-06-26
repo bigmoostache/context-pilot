@@ -112,24 +112,24 @@ impl std::fmt::Debug for SearchState {
     }
 }
 
-/// Newtype wrapper around [`notify::PollWatcher`].
+/// Newtype wrapper around [`notify::RecommendedWatcher`].
 ///
-/// `PollWatcher` periodically walks the directory tree and diffs against
-/// its internal state — **no kernel-level FDs** consumed (unlike the
-/// `RecommendedWatcher` / kqueue backend that uses one FD per file).
+/// `RecommendedWatcher` maps to the platform-native backend (`FSEvents` on
+/// macOS, inotify on Linux) — event-driven, negligible CPU, typically a
+/// single kernel FD.
 ///
-/// `PollWatcher` does not implement `Debug`, so we wrap it
+/// `RecommendedWatcher` does not implement `Debug`, so we wrap it
 /// to satisfy the `Debug` requirement for types stored in the `TypeMap`.
 /// Wrapped in a `Mutex` to satisfy `Sync` without `unsafe`.
 pub(crate) struct WatcherHandle {
     /// The inner watcher, wrapped in a `Mutex` for `Sync`.
-    _inner: Mutex<notify::PollWatcher>,
+    _inner: Mutex<notify::RecommendedWatcher>,
 }
 
 impl WatcherHandle {
     /// Wrap a watcher for storage in the `TypeMap`. The handle
     /// must stay alive — dropping it stops file watching.
-    pub(crate) const fn new(w: notify::PollWatcher) -> Self {
+    pub(crate) const fn new(w: notify::RecommendedWatcher) -> Self {
         Self { _inner: Mutex::new(w) }
     }
 }

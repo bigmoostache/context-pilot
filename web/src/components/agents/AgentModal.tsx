@@ -14,7 +14,7 @@ import type { Agent } from "@/lib/types"
 import { useCreateAgent, useRenameAgent, useRestartAgent, useRetireAgent, useUploadAvatar, sendCommand } from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
 import { useAuth } from "@/lib/support/auth"
-import { PROVIDERS, defaultModel, findModel, resolveSelection } from "@/lib/support/models"
+import { useProviders, defaultModel, findModel, resolveSelection } from "@/lib/support/models"
 import { ModelPicker } from "./ModelPicker"
 import { AgentAclSection } from "../auth/AgentAclSection"
 import { SessionVitals } from "../shell/SessionVitals"
@@ -62,17 +62,19 @@ export function AgentModal({
   const agent = isManage ? modal.agent : undefined
   const [name, setName] = useState(agent?.name ?? "")
 
+  const { data: providers = [] } = useProviders()
+
   // Provider + model — resolve from the agent's authoritative provider id +
   // current api model name (manage) or fall back to persisted global defaults →
   // registry defaults (create). The provider id is decisive: several providers
   // share model api names, so name-only resolution would mislabel (e.g. a
   // Claude Code V2 agent showing as Anthropic).
   const resolved =
-    isManage && agent ? resolveSelection(agent.provider, agent.model) : undefined
+    isManage && agent ? resolveSelection(providers, agent.provider, agent.model) : undefined
   const createDefault = (() => {
-    if (isManage) return { p: resolved?.provider.id ?? PROVIDERS[0].id, m: resolved?.model.id ?? (defaultModel(PROVIDERS[0].id)?.id ?? PROVIDERS[0].models[0].id) }
-    const lsP = localStorage.getItem("cp-default-provider") ?? PROVIDERS[0].id
-    const lsM = localStorage.getItem("cp-default-model") ?? (defaultModel(lsP)?.id ?? PROVIDERS[0].models[0].id)
+    if (isManage) return { p: resolved?.provider.id ?? providers[0]?.id ?? "", m: resolved?.model.id ?? (defaultModel(providers, providers[0]?.id ?? "")?.id ?? providers[0]?.models[0]?.id ?? "") }
+    const lsP = localStorage.getItem("cp-default-provider") ?? providers[0]?.id ?? ""
+    const lsM = localStorage.getItem("cp-default-model") ?? (defaultModel(providers, lsP)?.id ?? providers[0]?.models[0]?.id ?? "")
     return { p: lsP, m: lsM }
   })()
   const [provId, setProvId] = useState(createDefault.p)
@@ -144,7 +146,7 @@ export function AgentModal({
         .then(() => {
           onFlash?.(nameChanged
             ? `Saved changes to ${name.trim()}`
-            : `Model updated to ${findModel(provId, modelId)?.displayName ?? modelId}`)
+            : `Model updated to ${findModel(providers, provId, modelId)?.displayName ?? modelId}`)
           onClose()
         })
         .catch((e: unknown) => {
@@ -155,7 +157,7 @@ export function AgentModal({
     }
     setError(null)
     createAgent.mutate(
-      { name: name.trim(), model: findModel(provId, modelId)?.apiName },
+      { name: name.trim(), model: findModel(providers, provId, modelId)?.apiName },
       {
         onSuccess: (receipt) => {
           onFlash?.(`Spawning “${slugify(name)}” in ${receipt.folder}`)
@@ -308,6 +310,7 @@ export function AgentModal({
               Provider &amp; Model
             </span>
             <ModelPicker
+              providers={providers}
               provider={provId}
               model={modelId}
               onChange={(p, m) => { setProvId(p); setModelId(m) }}

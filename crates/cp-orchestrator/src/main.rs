@@ -30,6 +30,7 @@ use serde_yaml as _;
 #[cfg(test)]
 use tempfile as _;
 use tiny_http as _;
+use utoipa as _;
 
 fn main() {
     eprintln!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION,);

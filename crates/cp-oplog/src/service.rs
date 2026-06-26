@@ -103,6 +103,7 @@ impl Durability {
             OpEntryKind::CommandEffect { .. }
             | OpEntryKind::SeenMark { .. }
             | OpEntryKind::MessageCreated { .. }
+            | OpEntryKind::MessageDeleted { .. }
             | OpEntryKind::ThreadCreated { .. }
             | OpEntryKind::ThreadArchived { .. }
             | OpEntryKind::ThreadRestored { .. }

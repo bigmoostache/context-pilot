@@ -89,6 +89,15 @@ pub enum OpEntryKind {
         inline_body: Option<String>,
     },
 
+    /// A message was deleted from a thread by the user.
+    #[serde(rename = "message_deleted")]
+    MessageDeleted {
+        /// Thread the message was in.
+        thread_id: String,
+        /// Epoch-ms timestamp identifying the deleted message.
+        message_ts: u64,
+    },
+
     /// A new thread was opened.
     ///
     /// Carries enough to materialise the roster entry without a disk read: the

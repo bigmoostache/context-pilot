@@ -27,7 +27,7 @@ import {
 } from "lucide-react"
 import { UsagePage } from "@/components/agents/UsagePage"
 import { ModelPicker } from "@/components/agents/ModelPicker"
-import { PROVIDERS, defaultModel as getDefaultModel, findModel } from "@/lib/support/models"
+import { useProviders, defaultModel, findModel } from "@/lib/support/models"
 import { useFleet, sendCommand } from "@/lib/live"
 import { fetchSettings, updateSettings, fetchEnvKeys, revealEnvKey, updateEnvKey } from "@/lib/api"
 import { OAuthConnect } from "@/components/auth/OAuthConnect"
@@ -39,13 +39,6 @@ import { cn } from "@/lib/utils"
 // ── localStorage keys for global defaults ─────────────────────────────
 const LS_DEFAULT_PROVIDER = "cp-default-provider"
 const LS_DEFAULT_MODEL = "cp-default-model"
-
-/** Read the persisted default provider+model, with registry fallbacks. */
-function readDefaults(): { provider: string; model: string } {
-  const p = localStorage.getItem(LS_DEFAULT_PROVIDER) ?? PROVIDERS[0].id
-  const m = localStorage.getItem(LS_DEFAULT_MODEL) ?? (getDefaultModel(p)?.id ?? PROVIDERS[0].models[0].id)
-  return { provider: p, model: m }
-}
 
 /** Persist the default provider+model to localStorage. */
 function writeDefaults(provider: string, model: string) {
@@ -232,9 +225,13 @@ function ManagedKeysNotice({ reason, company }: { reason: LockReason; company: s
 }
 
 function GeneralPane() {
-  const defaults = readDefaults()
-  const [provId, setProvId] = useState(defaults.provider)
-  const [modelId, setModelId] = useState(defaults.model)
+  const { data: providers = [] } = useProviders()
+  const p0 = providers[0]?.id ?? ""
+  const m0 = defaultModel(providers, p0)?.id ?? providers[0]?.models[0]?.id ?? ""
+  const lsP = localStorage.getItem(LS_DEFAULT_PROVIDER) ?? p0
+  const lsM = localStorage.getItem(LS_DEFAULT_MODEL) ?? (defaultModel(providers, lsP)?.id ?? m0)
+  const [provId, setProvId] = useState(lsP)
+  const [modelId, setModelId] = useState(lsM)
   // Server-side defaults are authoritative; localStorage is a same-machine
   // cache the create-agent dialog reads synchronously. Only admins may write
   // the central defaults.
@@ -292,7 +289,7 @@ function GeneralPane() {
       }
     }
     setApplying(false)
-    const label = findModel(provId, modelId)?.displayName ?? modelId
+    const label = findModel(providers, provId, modelId)?.displayName ?? modelId
     setApplyResult(
       fail === 0
         ? `Applied ${label} to ${ok} agent${ok === 1 ? "" : "s"}`
@@ -303,7 +300,7 @@ function GeneralPane() {
   return (
     <Stack>
       <FieldGroup label="Default model" hint="Used for new agents unless overridden">
-        <ModelPicker provider={provId} model={modelId} onChange={handleChange} />
+        <ModelPicker provider={provId} model={modelId} onChange={handleChange} providers={providers} />
         {/* Apply to all existing agents */}
         <div className="mt-1 flex items-center gap-2">
           <button

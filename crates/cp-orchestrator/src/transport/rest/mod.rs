@@ -376,7 +376,6 @@ struct BodyPayload<'a> {
     bytes: &'a [u8],
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -437,5 +436,4 @@ mod tests {
         let state = backend_with_agent();
         assert_eq!(command(&state, "a1", b"{not json").status, 400);
     }
-
 }

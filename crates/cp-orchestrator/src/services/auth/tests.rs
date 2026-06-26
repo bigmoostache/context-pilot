@@ -1,5 +1,6 @@
 //! Unit tests for the auth store — schema, hashing, CRUD, sessions.
 
+use super::super::types::AgentRole;
 use super::*;
 
 #[test]
@@ -49,10 +50,7 @@ fn generate_uuid_format() {
     assert_eq!(uuid.len(), 36, "UUID = 36 chars with dashes");
     let parts: Vec<&str> = uuid.split('-').collect();
     assert_eq!(parts.len(), 5, "5 groups separated by dashes");
-    assert!(
-        uuid.as_bytes().get(14).copied() == Some(b'4'),
-        "version nibble must be 4, got: {uuid}"
-    );
+    assert!(uuid.as_bytes().get(14).copied() == Some(b'4'), "version nibble must be 4, got: {uuid}");
 }
 
 #[test]
@@ -140,9 +138,7 @@ fn delete_user_cascades() {
         .unwrap_or_else(|err| panic!("session failed: {err}"));
     assert!(store.delete_user(&user.id).unwrap_or(false));
     // Session must be cascade-deleted.
-    let valid = store
-        .validate_session(&token)
-        .unwrap_or_else(|err| panic!("validate failed: {err}"));
+    let valid = store.validate_session(&token).unwrap_or_else(|err| panic!("validate failed: {err}"));
     assert!(valid.is_none(), "session must be gone after user delete");
     assert_eq!(store.count_users().unwrap_or(99), 0);
 }
@@ -179,14 +175,11 @@ fn expired_session_swept() {
         .create_user("exp@x.com", "Exp", "pass1234", UserRole::User)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     // Create a session that's already expired (TTL = 0).
-    let token = store
-        .create_session(&user.id, None, Duration::ZERO)
-        .unwrap_or_else(|err| panic!("session failed: {err}"));
+    let token =
+        store.create_session(&user.id, None, Duration::ZERO).unwrap_or_else(|err| panic!("session failed: {err}"));
     // Tiny sleep to ensure we're past the expiry.
     std::thread::sleep(Duration::from_millis(5));
-    let valid = store
-        .validate_session(&token)
-        .unwrap_or_else(|err| panic!("validate failed: {err}"));
+    let valid = store.validate_session(&token).unwrap_or_else(|err| panic!("validate failed: {err}"));
     assert!(valid.is_none(), "expired session should be swept");
 }
 
@@ -199,17 +192,13 @@ fn grant_and_check_access() {
         .create_user("acl@x.com", "Acl", "pass1234", UserRole::User)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     // No access initially.
-    let access = store
-        .check_access("agent-1", &user.id)
-        .unwrap_or_else(|err| panic!("check failed: {err}"));
+    let access = store.check_access("agent-1", &user.id).unwrap_or_else(|err| panic!("check failed: {err}"));
     assert!(access.is_none(), "no access before grant");
     // Grant agent-user.
     store
         .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
-    let access = store
-        .check_access("agent-1", &user.id)
-        .unwrap_or_else(|err| panic!("check failed: {err}"));
+    let access = store.check_access("agent-1", &user.id).unwrap_or_else(|err| panic!("check failed: {err}"));
     assert_eq!(access, Some(AgentRole::AgentUser));
     assert!(!store.is_agent_admin("agent-1", &user.id).unwrap_or(true));
 }
@@ -270,9 +259,7 @@ fn list_agent_users_and_user_agents() {
         .grant_access("agent-2", &alice.id, AgentRole::AgentUser, None)
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
     // List users on agent-1.
-    let users = store
-        .list_agent_users("agent-1")
-        .unwrap_or_else(|err| panic!("list failed: {err}"));
+    let users = store.list_agent_users("agent-1").unwrap_or_else(|err| panic!("list failed: {err}"));
     assert_eq!(users.len(), 2);
     assert_eq!(users[0].user_name, "Alice");
     assert_eq!(users[0].role, AgentRole::AgentAdmin);
@@ -283,9 +270,7 @@ fn list_agent_users_and_user_agents() {
     assert_eq!(users[1].granted_by.as_deref(), Some(alice.id.as_str()));
     assert!(users[1].granted_at > 0);
     // List agents for alice.
-    let agents = store
-        .list_user_agents(&alice.id)
-        .unwrap_or_else(|err| panic!("list failed: {err}"));
+    let agents = store.list_user_agents(&alice.id).unwrap_or_else(|err| panic!("list failed: {err}"));
     assert_eq!(agents, vec!["agent-1", "agent-2"]);
 }
 
@@ -301,9 +286,7 @@ fn delete_user_cascades_acl() {
         .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
         .unwrap_or_else(|err| panic!("grant failed: {err}"));
     assert!(store.delete_user(&user.id).unwrap_or(false));
-    let users = store
-        .list_agent_users("agent-1")
-        .unwrap_or_else(|err| panic!("list failed: {err}"));
+    let users = store.list_agent_users("agent-1").unwrap_or_else(|err| panic!("list failed: {err}"));
     assert!(users.is_empty(), "ACL entries must cascade on user delete");
 }
 
@@ -322,13 +305,8 @@ fn grant_overwrites_previous() {
     store
         .grant_access("agent-1", &user.id, AgentRole::AgentAdmin, None)
         .unwrap_or_else(|err| panic!("re-grant failed: {err}"));
-    assert_eq!(
-        store.check_access("agent-1", &user.id).unwrap_or(None),
-        Some(AgentRole::AgentAdmin),
-    );
+    assert_eq!(store.check_access("agent-1", &user.id).unwrap_or(None), Some(AgentRole::AgentAdmin),);
     // Only one entry, not two.
-    let users = store
-        .list_agent_users("agent-1")
-        .unwrap_or_else(|err| panic!("list failed: {err}"));
+    let users = store.list_agent_users("agent-1").unwrap_or_else(|err| panic!("list failed: {err}"));
     assert_eq!(users.len(), 1);
 }
