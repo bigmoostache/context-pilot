@@ -9,7 +9,9 @@ use std::time::Duration;
 
 use crate::inspect::StateReader;
 use crate::services::auth::store::AuthStore;
-use crate::services::{AvatarStore, CostBreaker, MaterializedView, NameOverrides, ReleaseStore, RetiredStore, StreamHub};
+use crate::services::{
+    AvatarStore, CostBreaker, MaterializedView, NameOverrides, ReleaseStore, RetiredStore, StreamHub,
+};
 use crate::supervisor::AgentSupervisor;
 
 use super::super::ticket::TicketStore;
@@ -97,9 +99,7 @@ impl Backend {
             retired: RetiredStore::load(&agents_dir),
             names: NameOverrides::load(&agents_dir),
             avatars: AvatarStore::load(&agents_dir),
-            releases: ReleaseStore::load(
-                ReleaseStore::default_dir().unwrap_or_else(|| agents_dir.join("releases")),
-            ),
+            releases: ReleaseStore::load(ReleaseStore::default_dir().unwrap_or_else(|| agents_dir.join("releases"))),
             agents_dir,
             dirty_agents: HashSet::new(),
             supervisor: AgentSupervisor::new(&[agent_binary.clone()]),

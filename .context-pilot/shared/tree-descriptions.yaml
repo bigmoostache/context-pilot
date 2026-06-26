@@ -3842,6 +3842,10 @@
   path: web/e2e/cost.spec.ts
   description: 'Phase 3 e2e cost (2 tests): fleet card + status footer dollar figures match backend /meta costUsd within $5 drift (live agent may spend mid-test). parseDollars helper. Proves cost rides the live CostAggregate→view→meta path, not the $5.41 mock.'
   last_edited_ms: 1781814025156
+5ccd73db30cd3637:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread composer (always-active textarea + turn-status banner). T298 paperclip; T304 draftKey persists unsent text+caret to localStorage; T331 staged pendingFiles; T348/T350 /command suggestion bubbles + create-command pill; T359 Enter/Tab list logic via resolveEnter/resolveTab (@/lib/utils). T371/T429: paused prop → amber Pause-icon banner (''Thread paused — the agent won''t respond until resumed.'') with bg-amber-500/10 tint, distinct from the neutral clock/spinner status hints. T350 unify: file chips + command bubbles now render through ONE shared <ComposerBubbles> (imported from ./fileUpload) in a single transparent row. prefill seeds expanded prompt body.'
+  last_edited_ms: 1782492076876
 5cdab26c33a9dfe6:
   path: web/src/lib/mock/index.ts
   description: 'Mock-data barrel: PROJECT/tokenBudget/panels/cacheStats/messages/threads/spine/stats/status/agents/fileTree/library. Re-exports ./extra + ./threads. Design-only fallback data approximating a live Context Pilot session.'
@@ -4082,6 +4086,10 @@
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
   last_edited_ms: 0
+62dc9b69c6f3e08c:
+  path: .github/workflows/build.yml
+  description: 'Cross-platform build + auto-release workflow. Triggers on push to master. 5-target matrix: linux-x86_64 (native), linux-aarch64 (cross), linux-aarch64-musl (cross), macos-x86_64, macos-aarch64 (all macos-latest). Builds tui + cp-console-server, packages as tarballs. After build, ''release'' job creates a GitHub Release via softprops/action-gh-release with tag v{version}-{sha7}. Pins Rust 1.95.0.'
+  last_edited_ms: 1782492743274
 62fde7fb54d0ece4:
   path: ui/src/components/shell/UserMenu.tsx
   description: 'Account avatar menu (T30) — replaced the old top-right Settings gear. Portaled Base-UI dropdown: avatar trigger (gradient-initials AvatarMark) opens a floating menu with an identity header (name/email + Company/Personal pill via currentUser) and Profile / Settings / Sign-out items. Settings still opens ConfigModal (reversible re-skin). Exports UserMenu + AvatarMark (shared with ProfileModal).'
@@ -9358,6 +9366,10 @@ e12046b8a487c76a:
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: init_state activates Boot when CP_BRIDGE=1, binds tee.sock + spawns Tee publisher. on_stream_chunk publishes Token frames, on_stream_stop publishes PhaseHint(Idle). BridgeState{boot,tee,tee_seq} in TypeMap. setup_tee + publish_frame helpers. is_global=true, no tools/panels.'
   last_edited_ms: 1781697226571
+e142f47a8f0d70e1:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped). T304 draftKey; T331 pendingFiles+onRemoveFile; T334 onShowInFinder; T348 useLibrary command suggestions; T350 createCmdOpen + CreateCommandDialog. T367: OS-file drag-and-drop onto the whole <main>. T414: auto-scroll only on non-auto messages. T416: handleDelete sends delete_message command. T417: formatTs normalises ThreadMsg.ts. T429: wires paused={thread.paused} to ThreadComposer. Takes agentId + onAttach props.'
+  last_edited_ms: 1782492076953
 e15b7f01809d3e02:
   path: ui/src/components/shell/LeftRail.tsx
   description: Cockpit context navigator (width = shared var(--sidebar-w)). Context-budget meter, then a first-class 'Conversation' nav button (MessageSquare, sentinel id 'conversation', with a <Tip> tooltip, triggerClassName='block' to stay full-width) ABOVE the 'Panels' label, then the scrollable panel list. Selection CONTROLLED via props (selected/onSelect), lifted to CockpitView.
@@ -9922,6 +9934,10 @@ f1ac96a7f75011d7:
   path: web/src/lib/api/generated/sdk.gen.ts
   description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
   last_edited_ms: 0
+f1d4b4c541def7ef:
+  path: .github/workflows/release.yml
+  description: 'Release workflow: triggered on push to releases branch. 5-target matrix (linux-x86_64, linux-aarch64, linux-aarch64-musl, macos-x86_64 via macos-latest, macos-aarch64 via macos-latest). Builds tui+cp-console-server, packages as tarballs, creates GitHub Release with softprops/action-gh-release.'
+  last_edited_ms: 1782492077014
 f1db8c64c998169a:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, 50-row inline cap, RETURNING support.

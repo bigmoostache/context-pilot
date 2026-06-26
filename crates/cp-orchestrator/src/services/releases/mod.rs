@@ -230,16 +230,12 @@ impl ReleaseStore {
             return Err(format!("GitHub API returned {}", resp.status()));
         }
 
-        let releases: Vec<GitHubRelease> =
-            resp.json().map_err(|e| format!("failed to parse GitHub response: {e}"))?;
+        let releases: Vec<GitHubRelease> = resp.json().map_err(|e| format!("failed to parse GitHub response: {e}"))?;
 
         let arch = &self.config.arch;
         let mut result = Vec::with_capacity(releases.len());
         for (i, rel) in releases.iter().enumerate() {
-            let matching_asset = rel
-                .assets
-                .iter()
-                .find(|a| a.name.contains(arch) && a.name.ends_with(".tar.gz"));
+            let matching_asset = rel.assets.iter().find(|a| a.name.contains(arch) && a.name.ends_with(".tar.gz"));
             result.push(RemoteRelease {
                 tag: rel.tag_name.clone(),
                 name: rel.name.clone().unwrap_or_else(|| rel.tag_name.clone()),
@@ -396,7 +392,6 @@ pub fn semver_sort_key(tag: &str) -> (u32, u32, u32) {
         .unwrap_or(0);
     (major, minor, patch)
 }
-
 
 #[cfg(test)]
 mod tests;

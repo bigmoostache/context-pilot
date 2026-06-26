@@ -16,7 +16,7 @@ use std::sync::Mutex;
 use serde::Deserialize;
 
 use super::{Backend, HttpReply};
-use crate::services::releases::{semver_sort_key, KNOWN_ARCHS};
+use crate::services::releases::{KNOWN_ARCHS, semver_sort_key};
 
 /// `GET /api/releases` — list all releases (local + remote merged), current
 /// architecture, and selected version.
@@ -161,17 +161,12 @@ pub(crate) fn download_release(state: &Mutex<Backend>, body: &[u8]) -> HttpReply
         let remotes = b.releases.fetch_remote_releases();
         drop(b);
 
-        let url = remotes.ok().and_then(|rs| {
-            rs.into_iter().find(|r| r.tag == req.tag).and_then(|r| r.asset_url)
-        });
+        let url = remotes.ok().and_then(|rs| rs.into_iter().find(|r| r.tag == req.tag).and_then(|r| r.asset_url));
         (arch, url)
     };
 
     let Some(url) = asset_url else {
-        return HttpReply::error(
-            404,
-            &format!("no asset found for tag {} on arch {store_arch}", req.tag),
-        );
+        return HttpReply::error(404, &format!("no asset found for tag {} on arch {store_arch}", req.tag));
     };
 
     // Download + extract (blocking, lock-free).
