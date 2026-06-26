@@ -19,6 +19,23 @@
 
 ---
 
+## Statut d'exécution (2026-06-27)
+
+- [x] **M1–M6 implémentés, relus (agent sans contexte par objectif) et CI verte** sur `auth-rbac`.
+  Commits : M1 `de02fbe6`, M2 `e8a6dbd9`, M3 `2c6a3d51`, M4 `24df9f83`, M5 `0d51ad46`, M6 `04991808`.
+- [ ] **M7 / M8** : différés par conception (V2 — « ne pas implémenter avant qu'un client le réclame »).
+- **Vérifs restantes spécifiques box (matériel réel, non automatisables ici)** : reload Caddy via
+  l'admin API + réémission réelle du leaf (M3.2), bascule `:443` au finalize (M2.3/reboot), libération
+  `:80` du vendor `pcat-manager-web → :8088` (M3.3.1, script `deploy/photonicat/free-port-80.sh`),
+  et le run Ansible sur un parc réel (M6). Le reste (logique Rust + rendu Caddyfile + UI + fingerprint
+  SHA-256) est couvert par les tests unitaires/structure/contrat locaux.
+
+> Note archi appliquée : Caddy termine **tout** le TLS (`tls internal`) et fronte `:443→:7878`
+> (cockpit, une fois provisionné) et `:9090→:9191` (maintenance, toujours) ; le listener maintenance
+> de l'orchestrateur écoute donc en loopback `:9191` sur la box.
+
+---
+
 ## État des lieux (déjà en place — ne pas réimplémenter)
 
 - [x] Seed admin idempotent — `runtime.rs:181 seed_admin_if_empty` (count==0), pose `must_change_password=true`
