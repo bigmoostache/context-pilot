@@ -1938,6 +1938,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor. Selection-aware InputChar/Delete/InsertText/PasteText. 9 cursor/selection action dispatches.'
   last_edited_ms: 0
+308f585bccf1be89:
+  path: web/src/lib/query/sse.ts
+  description: 'Reconnecting SSE client for one agent''s event stream. EventSource with ticket auth, last_rev resume param (T268 fix), exponential backoff (1s→30s). Singleton per agent via getOrCreateSseClient. Named event listeners: delta/stream/resync/invalidate. Wildcard ''*'' subscriber support.'
+  last_edited_ms: 1782467871382
 30ccc9d6b72a4b76:
   path: crates/cp-mod-firecrawl/src/tools.rs
   description: Firecrawl tool dispatch with flame!("firecrawl_scrape"), flame!("firecrawl_search"), flame!("firecrawl_map"). All async via spawn_async_tool. DynPanel creation.
@@ -9208,8 +9212,8 @@ e82421db0781e690:
   last_edited_ms: 1780648767307
 e83afe53297de69e:
   path: src/app/run/threads/commands.rs
-  description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/DeleteMessage(T416 per-message delete by epoch-ms timestamp)/Stop|Interrupt/Configure. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted. DeleteMessage removes single message by timestamp, emits durable MessageDeleted.
-  last_edited_ms: 0
+  description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/DeleteMessage(T416 per-message delete by epoch-ms timestamp)/Stop|Interrupt/Configure. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted. DeleteMessage removes single message by timestamp, emits durable MessageDeleted, updates bridge thread_msg_counts so emit_messages correctly detects subsequent appends (T418 fix).
+  last_edited_ms: 1782467834783
 e8400426f9791225:
   path: docs/talk/slides/1-3.html
   description: 'Slide: What I''d Add — Context/Feedback/LLM-X (WHYs section)'
