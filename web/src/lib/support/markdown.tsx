@@ -223,11 +223,23 @@ function components(variant: MarkdownVariant): Components {
     // `pre` neutralises that chip on its direct `code` child (transparent bg, no
     // border/padding, inherit colour) — the `pre` owns the block frame. This is
     // robust regardless of whether a fence declares a language.
-    code: ({ className, children, ...rest }) => (
-      <ClickableCode baseClass={cn(inlineCode, className)} {...rest}>
-        {children}
-      </ClickableCode>
-    ),
+    code: ({ className, children, ...rest }) => {
+      // Bare URLs inside backticks → render as clickable links, not code chips.
+      const raw = typeof children === "string" ? children : extractText(children)
+      const trimmed = raw.trim()
+      if (/^https?:\/\/\S+$/.test(trimmed)) {
+        return (
+          <a href={trimmed} target="_blank" rel="noopener noreferrer" className={linkColor}>
+            {trimmed}
+          </a>
+        )
+      }
+      return (
+        <ClickableCode baseClass={cn(inlineCode, className)} {...rest}>
+          {children}
+        </ClickableCode>
+      )
+    },
     pre: ({ children }) => (
       <div>
         <pre
