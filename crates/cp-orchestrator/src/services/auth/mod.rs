@@ -13,8 +13,8 @@
 //! * [`store`] — [`AuthStore`] struct: schema init, password hashing,
 //!   token generation, and all CRUD operations.
 
-pub mod types;
-pub mod store;
 pub(crate) mod acl;
 pub(crate) mod backup;
 mod helpers;
+pub mod store;
+pub mod types;

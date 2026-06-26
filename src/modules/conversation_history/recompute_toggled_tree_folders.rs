@@ -139,10 +139,8 @@ mod tests {
 
     #[test]
     fn collect_extracts_open_paths() {
-        let msgs = vec![make_tool_call(
-            "tree_toggle",
-            serde_json::json!({"action": "open", "paths": ["src", "src/app"]}),
-        )];
+        let msgs =
+            vec![make_tool_call("tree_toggle", serde_json::json!({"action": "open", "paths": ["src", "src/app"]}))];
         let mut folders = HashSet::new();
         collect_opened_folders_from_messages(&msgs, &mut folders);
         assert!(folders.contains("src"));

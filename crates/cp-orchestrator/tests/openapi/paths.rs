@@ -1,6 +1,6 @@
 //! OpenAPI path definitions — all REST endpoints.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::{arr, del, err, get, merge, ok, post, r, with_agent};
 

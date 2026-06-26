@@ -21,7 +21,6 @@
 // Linked into this integration-test target but not named directly; acknowledge
 // them for the per-target `unused-crate-dependencies` lint.
 use argon2 as _;
-use utoipa as _;
 use calamine as _;
 use cp_mod_bridge as _;
 use cp_oplog as _;
@@ -33,6 +32,7 @@ use serde as _;
 use serde_json as _;
 use serde_yaml as _;
 use tiny_http as _;
+use utoipa as _;
 
 use std::os::unix::process::ExitStatusExt as _;
 use std::path::{Path, PathBuf};

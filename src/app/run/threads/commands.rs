@@ -287,10 +287,7 @@ fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
         return;
     };
 
-    let is_assistant = thread
-        .messages
-        .get(idx)
-        .is_some_and(|m| m.author == ThreadAuthor::Assistant);
+    let is_assistant = thread.messages.get(idx).is_some_and(|m| m.author == ThreadAuthor::Assistant);
 
     // Collect timestamps to delete: the target + any trailing auto messages.
     let mut to_delete: Vec<u64> = vec![message_ts];
@@ -314,10 +311,7 @@ fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
     // Emit one delta per deleted message.
     let tid = thread_id.to_owned();
     for &ts_val in &to_delete {
-        emit_roster_delta(
-            state,
-            OpEntryKind::MessageDeleted { thread_id: tid.clone(), message_ts: ts_val },
-        );
+        emit_roster_delta(state, OpEntryKind::MessageDeleted { thread_id: tid.clone(), message_ts: ts_val });
     }
 
     // Update the bridge's message-count memo so `emit_messages` sees the
@@ -328,10 +322,7 @@ fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
     }
 
     state.flags.ui.dirty = true;
-    log::info!(
-        "bridge: deleted {} message(s) from thread {thread_id} (target ts={message_ts})",
-        to_delete.len(),
-    );
+    log::info!("bridge: deleted {} message(s) from thread {thread_id} (target ts={message_ts})", to_delete.len(),);
 }
 
 // ── Stop / Interrupt ────────────────────────────────────────────────────

@@ -31,8 +31,7 @@ const EXCLUDED: &[(&str, &str)] = &[("GET", "/api/stream")];
 
 /// Extract all routes from the router source code.
 fn extract_router_routes() -> BTreeSet<Route> {
-    let src_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("src/transport/mod.rs");
+    let src_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/transport/mod.rs");
     let src = std::fs::read_to_string(&src_path).expect("read transport/mod.rs");
 
     let mut routes = BTreeSet::new();
@@ -160,11 +159,7 @@ fn route_exhaustiveness() {
         failures.push(format!(
             "Routes in router but NOT in openapi.json ({}):\n{}",
             router_only.len(),
-            router_only
-                .iter()
-                .map(|(m, p)| format!("  {m} {p}"))
-                .collect::<Vec<_>>()
-                .join("\n")
+            router_only.iter().map(|(m, p)| format!("  {m} {p}")).collect::<Vec<_>>().join("\n")
         ));
     }
 
@@ -172,24 +167,13 @@ fn route_exhaustiveness() {
         failures.push(format!(
             "Routes in openapi.json but NOT in router ({}):\n{}",
             spec_only.len(),
-            spec_only
-                .iter()
-                .map(|(m, p)| format!("  {m} {p}"))
-                .collect::<Vec<_>>()
-                .join("\n")
+            spec_only.iter().map(|(m, p)| format!("  {m} {p}")).collect::<Vec<_>>().join("\n")
         ));
     }
 
-    assert!(
-        failures.is_empty(),
-        "Route exhaustiveness failed!\n\n{}",
-        failures.join("\n\n")
-    );
+    assert!(failures.is_empty(), "Route exhaustiveness failed!\n\n{}", failures.join("\n\n"));
 
-    eprintln!(
-        "Route exhaustiveness OK: {} routes in sync between router and spec",
-        router.len()
-    );
+    eprintln!("Route exhaustiveness OK: {} routes in sync between router and spec", router.len());
 }
 
 #[cfg(test)]
@@ -217,9 +201,6 @@ mod tests {
 
     #[test]
     fn segments_join_to_path() {
-        assert_eq!(
-            segments_to_path(&["api".into(), "agent".into(), "{}".into(), "meta".into()]),
-            "/api/agent/{}/meta"
-        );
+        assert_eq!(segments_to_path(&["api".into(), "agent".into(), "{}".into(), "meta".into()]), "/api/agent/{}/meta");
     }
 }

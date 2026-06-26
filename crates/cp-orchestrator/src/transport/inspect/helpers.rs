@@ -74,8 +74,7 @@ where
             let yaml_val: Result<serde_json::Value, _> = serde_yaml::from_slice(&raw);
             match yaml_val {
                 Ok(serde_json::Value::Object(map)) => {
-                    let items: Vec<serde_json::Value> =
-                        map.into_iter().map(|(k, v)| transform(k, v)).collect();
+                    let items: Vec<serde_json::Value> = map.into_iter().map(|(k, v)| transform(k, v)).collect();
                     HttpReply::ok(&items)
                 }
                 Ok(_) => HttpReply::ok(&serde_json::json!([])),

@@ -46,11 +46,7 @@ impl BackupScheduler {
     ///
     /// The first rolling backup fires on the first tick (no initial delay).
     pub(crate) fn new(db_path: PathBuf) -> Self {
-        Self {
-            db_path,
-            last_rolling_ms: 0,
-            last_daily_tag: String::new(),
-        }
+        Self { db_path, last_rolling_ms: 0, last_daily_tag: String::new() }
     }
 
     /// Check whether a rolling or daily backup is due and perform it.
@@ -102,10 +98,7 @@ impl BackupScheduler {
     /// `<dir>/auth.db.rolling`
     fn rolling_path(&self) -> PathBuf {
         let mut p = self.db_path.clone();
-        let name = format!(
-            "{}.rolling",
-            p.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()
-        );
+        let name = format!("{}.rolling", p.file_name().map(|n| n.to_string_lossy()).unwrap_or_default());
         p.set_file_name(name);
         p
     }
@@ -142,11 +135,8 @@ impl AuthStore {
     /// the backup fails.
     pub(crate) fn backup_to(&self, dest: &Path) -> Result<(), AuthError> {
         if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent).map_err(|_io_err| {
-                AuthError::Database(rusqlite::Error::InvalidPath(
-                    parent.to_path_buf().into(),
-                ))
-            })?;
+            std::fs::create_dir_all(parent)
+                .map_err(|_io_err| AuthError::Database(rusqlite::Error::InvalidPath(parent.to_path_buf().into())))?;
         }
         let mut dst = rusqlite::Connection::open(dest)?;
         let backup = rusqlite::backup::Backup::new(&self.conn, &mut dst)?;
@@ -225,8 +215,7 @@ mod tests {
 
     #[test]
     fn backup_to_creates_consistent_copy() {
-        let store =
-            AuthStore::open(StdPath::new(":memory:")).expect("open in-memory");
+        let store = AuthStore::open(StdPath::new(":memory:")).expect("open in-memory");
         // Seed a user so the backup is non-trivial.
         let _user = store
             .create_user("backup@test.com", "Bak", "password1234", super::super::types::UserRole::User)
@@ -241,9 +230,7 @@ mod tests {
         // The backup file should exist and be a valid SQLite database.
         assert!(tmp.exists(), "backup file should exist");
         let restored = rusqlite::Connection::open(&tmp).expect("open backup");
-        let count: i64 = restored
-            .query_row("SELECT COUNT(*) FROM users", [], |r| r.get(0))
-            .expect("query");
+        let count: i64 = restored.query_row("SELECT COUNT(*) FROM users", [], |r| r.get(0)).expect("query");
         assert_eq!(count, 1, "backup should contain the seeded user");
 
         let _cleaned = std::fs::remove_file(&tmp);
@@ -267,10 +254,7 @@ mod tests {
         assert!(sched.rolling_path().exists(), "rolling backup should exist");
 
         // Daily backup should also have been created.
-        assert!(
-            !sched.last_daily_tag.is_empty(),
-            "daily tag should be set after first tick"
-        );
+        assert!(!sched.last_daily_tag.is_empty(), "daily tag should be set after first tick");
         let daily = sched.daily_path(&sched.last_daily_tag);
         assert!(daily.exists(), "daily backup should exist");
 

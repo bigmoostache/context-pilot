@@ -216,18 +216,21 @@ fn dump_diagnostic(w: &Wedge) {
     let _mkdir = std::fs::create_dir_all(&errors_dir);
 
     let cpu = cpu_busy_pct();
-    let cpu_line = cpu.map_or_else(
-        || "CPU usage: (unavailable)".to_owned(),
-        |pct| format!("CPU usage: {pct:.0}%"),
-    );
+    let cpu_line = cpu.map_or_else(|| "CPU usage: (unavailable)".to_owned(), |pct| format!("CPU usage: {pct:.0}%"));
     let interpretation = match cpu {
         Some(p) if p >= 70.0 => {
-            format!("→ CPU is HIGH: a busy-loop / runaway computation in step '{}' \
-                     (e.g. tree rehash, infinite loop).", step.name())
+            format!(
+                "→ CPU is HIGH: a busy-loop / runaway computation in step '{}' \
+                     (e.g. tree rehash, infinite loop).",
+                step.name()
+            )
         }
         Some(p) if p <= 15.0 => {
-            format!("→ CPU is LOW: a blocked syscall or lock (network/socket/disk/mutex) \
-                     in step '{}'.", step.name())
+            format!(
+                "→ CPU is LOW: a blocked syscall or lock (network/socket/disk/mutex) \
+                     in step '{}'.",
+                step.name()
+            )
         }
         Some(_) => format!("→ CPU is MODERATE: partial stall in step '{}'.", step.name()),
         None => format!("→ inspect step '{}' (CPU sample unavailable).", step.name()),
@@ -331,9 +334,8 @@ fn thread_states(errors_dir: &std::path::Path, now: u64) -> String {
     // Best-effort: a 2-second `sample` writes a full backtrace of every thread —
     // the single most useful artifact for a wedge — to a sibling file.
     let sample_path = errors_dir.join(format!("watchdog-sample-{now}.txt"));
-    let _sample = std::process::Command::new("sample")
-        .args([&pid, "2", "-file", &sample_path.to_string_lossy()])
-        .output();
+    let _sample =
+        std::process::Command::new("sample").args([&pid, "2", "-file", &sample_path.to_string_lossy()]).output();
     let note = format!("  (macOS: full backtrace written to {})", sample_path.display());
 
     let listing = std::process::Command::new("ps")

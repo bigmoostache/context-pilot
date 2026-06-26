@@ -5,10 +5,10 @@
 //! Run: `cargo test -p cp-orchestrator --test openapi generate_openapi -- --ignored`
 //! Writes `openapi.json` at workspace root.
 
+mod exhaustive;
 mod paths;
 mod schemas;
 mod schemas_ext;
-mod exhaustive;
 
 // Acknowledge lib-only deps visible to the integration-test binary.
 use argon2 as _;
@@ -28,7 +28,7 @@ use tempfile as _;
 use tiny_http as _;
 use utoipa as _;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -62,7 +62,10 @@ pub(crate) fn post(tag: &str, summary: &str, body: Option<Value>, response: Valu
     let mut op = json!({ "tags": [tag], "summary": summary, "responses": merge(ok(response), err()) });
     if let Some(b) = body {
         if let Some(obj) = op.as_object_mut() {
-            drop(obj.insert("requestBody".into(), json!({ "required": true, "content": { "application/json": { "schema": b } } })));
+            drop(obj.insert(
+                "requestBody".into(),
+                json!({ "required": true, "content": { "application/json": { "schema": b } } }),
+            ));
         }
     }
     json!({ "post": op })
@@ -129,10 +132,8 @@ fn build_spec() -> Value {
 #[ignore]
 fn generate_openapi() {
     let spec = serde_json::to_string_pretty(&build_spec()).expect("serialize");
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(|p| p.parent())
-        .expect("workspace root");
+    let root =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent().and_then(|p| p.parent()).expect("workspace root");
     std::fs::write(root.join("openapi.json"), &spec).expect("write openapi.json");
     eprintln!("Wrote openapi.json ({} bytes)", spec.len());
 }

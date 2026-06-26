@@ -15,9 +15,7 @@ use std::sync::Mutex;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-use super::helpers::{
-    agent_folder, extract_worker_param, unwrap_module_array, yaml_map_to_keyed_array,
-};
+use super::helpers::{agent_folder, extract_worker_param, unwrap_module_array, yaml_map_to_keyed_array};
 
 /// `GET /api/agent/{id}/panels` — live context panel list read from the
 /// agent's `panels/` directory.

@@ -13,14 +13,13 @@
 mod acl;
 
 pub(crate) use acl::{
-    acl_grant, acl_list, acl_revoke, acl_update_role, authorize_agent,
-    extract_agent_id, filter_fleet,
+    acl_grant, acl_list, acl_revoke, acl_update_role, authorize_agent, extract_agent_id, filter_fleet,
 };
 
 use std::sync::Mutex;
 
-use super::rest::HttpReply;
 use super::Backend;
+use super::rest::HttpReply;
 use crate::services::auth::store::AuthStore;
 use crate::services::auth::types::{User, UserRole};
 
@@ -46,10 +45,7 @@ pub(crate) fn authenticate(
     auth_token: Option<&str>,
 ) -> Result<Option<User>, HttpReply> {
     // Fast path: auth disabled — no-op pass-through (NFR-09).
-    let auth_enabled = state
-        .lock()
-        .map(|b| b.auth.is_some())
-        .unwrap_or(false);
+    let auth_enabled = state.lock().map(|b| b.auth.is_some()).unwrap_or(false);
     if !auth_enabled {
         return Ok(None);
     }
@@ -64,13 +60,8 @@ pub(crate) fn authenticate(
         return Err(HttpReply::error(401, "missing authorization"));
     };
 
-    let b = state
-        .lock()
-        .map_err(|_| HttpReply::error(500, "backend lock poisoned"))?;
-    let auth = b
-        .auth
-        .as_ref()
-        .ok_or_else(|| HttpReply::error(501, "auth not enabled"))?;
+    let b = state.lock().map_err(|_| HttpReply::error(500, "backend lock poisoned"))?;
+    let auth = b.auth.as_ref().ok_or_else(|| HttpReply::error(501, "auth not enabled"))?;
 
     match auth.validate_session(token) {
         Ok(Some(user)) => Ok(Some(user)),
@@ -110,11 +101,7 @@ pub(crate) fn auth_status(state: &Mutex<Backend>) -> HttpReply {
         .lock()
         .map(|b| {
             let enabled = b.auth.is_some();
-            let bootstrapped = b
-                .auth
-                .as_ref()
-                .and_then(|a| a.count_users().ok())
-                .map_or(false, |n| n > 0);
+            let bootstrapped = b.auth.as_ref().and_then(|a| a.count_users().ok()).map_or(false, |n| n > 0);
             (enabled, bootstrapped)
         })
         .unwrap_or((false, false));
@@ -181,11 +168,7 @@ pub(crate) fn login(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
 /// This route is "semi-public": the auth middleware lets it through without
 /// a token so the first-user bootstrap works (FR-03). When users already
 /// exist, the handler requires an admin session (checked via `auth_user`).
-pub(crate) fn register(
-    state: &Mutex<Backend>,
-    body: &[u8],
-    auth_user: Option<&User>,
-) -> HttpReply {
+pub(crate) fn register(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
     #[derive(serde::Deserialize)]
     struct Req {
         email: String,
@@ -294,11 +277,7 @@ pub(crate) fn list_users(state: &Mutex<Backend>, auth_user: Option<&User>) -> Ht
 /// `POST /api/auth/users` — admin-only: create a new user (FR-04).
 ///
 /// Body: `{ "email": "...", "name": "...", "password": "...", "role": "user" }`
-pub(crate) fn create_user(
-    state: &Mutex<Backend>,
-    body: &[u8],
-    auth_user: Option<&User>,
-) -> HttpReply {
+pub(crate) fn create_user(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
@@ -345,11 +324,7 @@ pub(crate) fn create_user(
 
 /// `POST /api/auth/users/{id}/logout` — admin-only: revoke all sessions
 /// for a user (force re-authentication without deleting the account).
-pub(crate) fn force_logout_user(
-    state: &Mutex<Backend>,
-    user_id: &str,
-    auth_user: Option<&User>,
-) -> HttpReply {
+pub(crate) fn force_logout_user(state: &Mutex<Backend>, user_id: &str, auth_user: Option<&User>) -> HttpReply {
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
@@ -362,10 +337,7 @@ pub(crate) fn force_logout_user(
     let Some(auth) = b.auth.as_ref() else {
         return HttpReply::error(501, "auth not enabled");
     };
-    match auth.conn.execute(
-        "DELETE FROM sessions WHERE user_id = ?1",
-        rusqlite::params![user_id],
-    ) {
+    match auth.conn.execute("DELETE FROM sessions WHERE user_id = ?1", rusqlite::params![user_id]) {
         Ok(deleted) => HttpReply::ok(&serde_json::json!({
             "ok": true,
             "revoked_sessions": deleted,
@@ -376,11 +348,7 @@ pub(crate) fn force_logout_user(
 
 /// `DELETE /api/auth/users/{id}` — admin-only: delete a user (FR-17).
 /// Cascades to their sessions and ACL entries.
-pub(crate) fn delete_user(
-    state: &Mutex<Backend>,
-    user_id: &str,
-    auth_user: Option<&User>,
-) -> HttpReply {
+pub(crate) fn delete_user(state: &Mutex<Backend>, user_id: &str, auth_user: Option<&User>) -> HttpReply {
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };

@@ -88,9 +88,7 @@ impl TicketStore {
         let now = now_ms();
         self.sweep(now);
         match self.live.remove(token) {
-            Some(entry) if entry.expiry_ms >= now => {
-                Some(RedeemedTicket { user_id: entry.user_id })
-            }
+            Some(entry) if entry.expiry_ms >= now => Some(RedeemedTicket { user_id: entry.user_id }),
             _ => None,
         }
     }

@@ -13,8 +13,8 @@
 //!   subscribers with overflow-drop, degraded marking, and snapshot reconcile
 //!   (R2-17).
 
-pub mod avatars;
 pub mod auth;
+pub mod avatars;
 pub mod cost_breaker;
 pub mod materialized_view;
 pub mod names;

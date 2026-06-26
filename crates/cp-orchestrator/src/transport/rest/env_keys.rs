@@ -41,10 +41,7 @@ const KNOWN_KEYS: &[(&str, &str)] = &[
 
 /// Resolve an env var's value, checking runtime overrides first.
 fn resolve_env(name: &str, overrides: &HashMap<String, String>) -> Option<String> {
-    overrides
-        .get(name)
-        .cloned()
-        .or_else(|| std::env::var(name).ok())
+    overrides.get(name).cloned().or_else(|| std::env::var(name).ok())
 }
 
 /// `GET /api/env-keys` — list all well-known keys with their status.
@@ -70,11 +67,7 @@ pub(crate) fn env_keys_list(overrides: &HashMap<String, String>) -> HttpReply {
 ///
 /// Rejects unknown key names with `404` to prevent arbitrary env-var
 /// enumeration.
-pub(crate) fn env_key_reveal(
-    name: &str,
-    auth_user: Option<&User>,
-    overrides: &HashMap<String, String>,
-) -> HttpReply {
+pub(crate) fn env_key_reveal(name: &str, auth_user: Option<&User>, overrides: &HashMap<String, String>) -> HttpReply {
     // Admin gate when auth is active.
     if auth_user.is_some_and(|u| u.role != UserRole::Admin) {
         return HttpReply::error(403, "admin required");
@@ -170,8 +163,7 @@ fn persist_to_global_env(name: &str, value: &str) -> Result<(), String> {
     let env_path = env_dir.join(".env");
 
     // Ensure directory exists.
-    std::fs::create_dir_all(&env_dir)
-        .map_err(|e| format!("cannot create {}: {e}", env_dir.display()))?;
+    std::fs::create_dir_all(&env_dir).map_err(|e| format!("cannot create {}: {e}", env_dir.display()))?;
 
     // Read existing content (ok if missing).
     let existing = std::fs::read_to_string(&env_path).unwrap_or_default();
@@ -204,10 +196,8 @@ fn persist_to_global_env(name: &str, value: &str) -> Result<(), String> {
         content.push('\n');
     }
 
-    let mut file = std::fs::File::create(&env_path)
-        .map_err(|e| format!("cannot write {}: {e}", env_path.display()))?;
-    file.write_all(content.as_bytes())
-        .map_err(|e| format!("write failed: {e}"))?;
+    let mut file = std::fs::File::create(&env_path).map_err(|e| format!("cannot write {}: {e}", env_path.display()))?;
+    file.write_all(content.as_bytes()).map_err(|e| format!("write failed: {e}"))?;
 
     Ok(())
 }
@@ -285,28 +275,19 @@ mod tests {
 
     #[test]
     fn format_env_line_quotes_spaces() {
-        assert_eq!(
-            format_env_line("KEY", "has space"),
-            "KEY=\"has space\""
-        );
+        assert_eq!(format_env_line("KEY", "has space"), "KEY=\"has space\"");
     }
 
     #[test]
     fn format_env_line_escapes_inner_quotes() {
-        assert_eq!(
-            format_env_line("KEY", "has\"quote"),
-            "KEY=\"has\\\"quote\""
-        );
+        assert_eq!(format_env_line("KEY", "has\"quote"), "KEY=\"has\\\"quote\"");
     }
 
     #[test]
     fn resolve_env_prefers_override() {
         let mut overrides = HashMap::new();
         drop(overrides.insert("TEST_KEY".to_owned(), "override_val".to_owned()));
-        assert_eq!(
-            resolve_env("TEST_KEY", &overrides),
-            Some("override_val".to_owned())
-        );
+        assert_eq!(resolve_env("TEST_KEY", &overrides), Some("override_val".to_owned()));
     }
 
     #[test]
@@ -321,24 +302,14 @@ mod tests {
             created_at: 0,
             updated_at: 0,
         };
-        let reply = env_key_update(
-            "ANTHROPIC_API_KEY",
-            Some(&user),
-            r#"{"value":"sk-new"}"#,
-            &mut overrides,
-        );
+        let reply = env_key_update("ANTHROPIC_API_KEY", Some(&user), r#"{"value":"sk-new"}"#, &mut overrides);
         assert_eq!(reply.status, 403);
     }
 
     #[test]
     fn update_rejects_unknown_key() {
         let mut overrides = HashMap::new();
-        let reply = env_key_update(
-            "NOT_REAL",
-            None,
-            r#"{"value":"val"}"#,
-            &mut overrides,
-        );
+        let reply = env_key_update("NOT_REAL", None, r#"{"value":"val"}"#, &mut overrides);
         assert_eq!(reply.status, 404);
     }
 }
