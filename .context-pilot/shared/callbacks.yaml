@@ -78,11 +78,11 @@ rust-check:
 
     echo ""
     echo "=== cargo clippy (workspace lints) ==="
-    cargo clippy -- -D warnings 2>&1
+    cargo clippy --all-targets -- -D warnings 2>&1
 
     echo ""
     echo "All Rust checks passed."
-  last_edited_ms: 0
+  last_edited_ms: 1782478770168
 ts-contract:
   name: ts-contract
   description: Regenerate TypeScript client from openapi.json on TS file edits to catch contract drift
