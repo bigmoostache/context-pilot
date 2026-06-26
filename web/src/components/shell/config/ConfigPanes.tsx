@@ -60,20 +60,48 @@ export function CategoryBody({ cat }: { cat: CatId }) {
   }
 }
 
+/** Grouping of the well-known env keys into display categories (by env name). */
+const SERVICE_GROUPS: { label: string; envs: string[] }[] = [
+  { label: "Model providers", envs: ["ANTHROPIC_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "DEEPSEEK_API_KEY", "MINIMAX_API_KEY"] },
+  { label: "Search & embeddings", envs: ["VOYAGE_API_KEY"] },
+  { label: "Document AI", envs: ["DATALAB_API_KEY"] },
+  { label: "Web & scraping", envs: ["BRAVE_API_KEY", "FIRECRAWL_API_KEY"] },
+  { label: "Integrations", envs: ["GITHUB_TOKEN"] },
+]
+
 /**
- * Read-only catalogue of integrations the operator has provisioned. Each known
- * service (LLM providers, search, OCR, web, VCS…) is listed as **Available**
- * when its key is present, or greyed-out "Not configured" otherwise. No keys
- * are shown or editable — provisioning happens out-of-band.
+ * Read-only catalogue of integrations the operator has provisioned, grouped by
+ * category. Each known service is **Available** when its key is present, or
+ * greyed-out "Not configured" otherwise. No keys are shown or editable —
+ * provisioning happens out-of-band.
  */
 function ServicesPane() {
   const { data: services = [] } = useQuery({ queryKey: ["env-keys"], queryFn: fetchEnvKeys })
+  const byEnv = new Map(services.map((s) => [s.env, s]))
+
+  const groups = SERVICE_GROUPS.map((g) => ({
+    label: g.label,
+    items: g.envs.flatMap((e) => {
+      const s = byEnv.get(e)
+      return s ? [s] : []
+    }),
+  })).filter((g) => g.items.length > 0)
+
+  // Catch-all so a newly-added backend key never silently disappears.
+  const known = new Set(SERVICE_GROUPS.flatMap((g) => g.envs))
+  const other = services.filter((s) => !known.has(s.env))
+  if (other.length > 0) groups.push({ label: "Other", items: other })
+
   return (
-    <Stack>
-      {services.map((s) => (
-        <ServiceRow key={s.env} label={s.label} available={s.exists} />
+    <div className="flex flex-col gap-4">
+      {groups.map((g) => (
+        <FieldGroup key={g.label} label={g.label}>
+          {g.items.map((s) => (
+            <ServiceRow key={s.env} label={s.label} available={s.exists} />
+          ))}
+        </FieldGroup>
       ))}
-    </Stack>
+    </div>
   )
 }
 
