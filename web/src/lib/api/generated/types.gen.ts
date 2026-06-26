@@ -65,6 +65,11 @@ export type AgentMetrics = {
     };
 };
 
+export type ArchResponse = {
+    arch: string;
+    archAuto: boolean;
+};
+
 export type AuthLogin = {
     token: string;
     user: AuthUser;
@@ -145,6 +150,11 @@ export type CreateCommandReceipt = {
 
 export type CreateUserResponse = {
     user: AuthUser;
+};
+
+export type DownloadResponse = {
+    status: string;
+    tag: string;
 };
 
 export type EntityTable = {
@@ -327,6 +337,27 @@ export type RegisterResponse = {
     user: AuthUser;
 };
 
+export type ReleaseEntry = {
+    assetSize?: number | null;
+    assetUrl?: string | null;
+    binarySize?: number | null;
+    isLatest?: boolean;
+    local: boolean;
+    name: string;
+    publishedAt?: string | null;
+    selected: boolean;
+    tag: string;
+};
+
+export type ReleasesResponse = {
+    activeTag?: string | null;
+    arch: string;
+    archAuto: boolean;
+    currentBinary: string;
+    knownArchs: Array<string>;
+    releases: Array<ReleaseEntry>;
+};
+
 export type RenameResult = {
     renamed: string;
 };
@@ -347,6 +378,12 @@ export type ScratchCell = {
     id: string;
     preview?: string;
     title: string;
+};
+
+export type SelectResponse = {
+    binaryPath: string;
+    status: string;
+    tag: string;
 };
 
 export type SheetData = {
@@ -2255,6 +2292,140 @@ export type GetApiProvidersResponses = {
 };
 
 export type GetApiProvidersResponse = GetApiProvidersResponses[keyof GetApiProvidersResponses];
+
+export type GetApiReleasesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/releases';
+};
+
+export type GetApiReleasesErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiReleasesError = GetApiReleasesErrors[keyof GetApiReleasesErrors];
+
+export type GetApiReleasesResponses = {
+    /**
+     * Success
+     */
+    200: ReleasesResponse;
+};
+
+export type GetApiReleasesResponse = GetApiReleasesResponses[keyof GetApiReleasesResponses];
+
+export type PutApiReleasesArchData = {
+    body: {
+        arch?: string;
+        auto?: boolean;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/releases/arch';
+};
+
+export type PutApiReleasesArchErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PutApiReleasesArchError = PutApiReleasesArchErrors[keyof PutApiReleasesArchErrors];
+
+export type PutApiReleasesArchResponses = {
+    /**
+     * Success
+     */
+    200: ArchResponse;
+};
+
+export type PutApiReleasesArchResponse = PutApiReleasesArchResponses[keyof PutApiReleasesArchResponses];
+
+export type PostApiReleasesDownloadData = {
+    body: {
+        tag: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/releases/download';
+};
+
+export type PostApiReleasesDownloadErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiReleasesDownloadError = PostApiReleasesDownloadErrors[keyof PostApiReleasesDownloadErrors];
+
+export type PostApiReleasesDownloadResponses = {
+    /**
+     * Success
+     */
+    200: DownloadResponse;
+};
+
+export type PostApiReleasesDownloadResponse = PostApiReleasesDownloadResponses[keyof PostApiReleasesDownloadResponses];
+
+export type PutApiReleasesSelectData = {
+    body: {
+        tag: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/releases/select';
+};
+
+export type PutApiReleasesSelectErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PutApiReleasesSelectError = PutApiReleasesSelectErrors[keyof PutApiReleasesSelectErrors];
+
+export type PutApiReleasesSelectResponses = {
+    /**
+     * Success
+     */
+    200: SelectResponse;
+};
+
+export type PutApiReleasesSelectResponse = PutApiReleasesSelectResponses[keyof PutApiReleasesSelectResponses];
+
+export type DeleteApiReleasesByTagData = {
+    body?: never;
+    path: {
+        tag: string;
+    };
+    query?: never;
+    url: '/api/releases/{tag}';
+};
+
+export type DeleteApiReleasesByTagErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type DeleteApiReleasesByTagError = DeleteApiReleasesByTagErrors[keyof DeleteApiReleasesByTagErrors];
+
+export type DeleteApiReleasesByTagResponses = {
+    /**
+     * Success
+     */
+    200: OkResponse;
+};
+
+export type DeleteApiReleasesByTagResponse = DeleteApiReleasesByTagResponses[keyof DeleteApiReleasesByTagResponses];
 
 export type PostApiTicketData = {
     body?: never;

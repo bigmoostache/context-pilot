@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use crate::inspect::StateReader;
 use crate::services::auth::store::AuthStore;
-use crate::services::{AvatarStore, CostBreaker, MaterializedView, NameOverrides, RetiredStore, StreamHub};
+use crate::services::{AvatarStore, CostBreaker, MaterializedView, NameOverrides, ReleaseStore, RetiredStore, StreamHub};
 use crate::supervisor::AgentSupervisor;
 
 use super::super::ticket::TicketStore;
@@ -67,6 +67,9 @@ pub struct Backend {
     /// on their next launch.  `env_key_reveal` / `env_keys_list` read this
     /// map first, falling back to [`std::env::var`].
     pub(crate) env_overrides: HashMap<String, String>,
+    /// Local release manager — download, select, and delete release binaries
+    /// from `~/.context-pilot/releases/` (T427).
+    pub(crate) releases: ReleaseStore,
 }
 
 impl Backend {
@@ -94,6 +97,9 @@ impl Backend {
             retired: RetiredStore::load(&agents_dir),
             names: NameOverrides::load(&agents_dir),
             avatars: AvatarStore::load(&agents_dir),
+            releases: ReleaseStore::load(
+                ReleaseStore::default_dir().unwrap_or_else(|| agents_dir.join("releases")),
+            ),
             agents_dir,
             dirty_agents: HashSet::new(),
             supervisor: AgentSupervisor::new(&[agent_binary.clone()]),
@@ -157,6 +163,7 @@ impl Backend {
             auth: None,
             session_ttl: Duration::from_secs(3600),
             env_overrides: HashMap::new(),
+            releases: ReleaseStore::load(PathBuf::from("/tmp/cp-test-releases")),
         }
     }
 }

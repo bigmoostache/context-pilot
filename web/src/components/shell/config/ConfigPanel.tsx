@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Check, X } from "lucide-react"
 import { DialogClose } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/lib/support/auth"
 import { type CatId, CATEGORIES, CategoryBody } from "./ConfigPanes"
 
 /**
@@ -25,6 +26,9 @@ export function ConfigPanel({
   variant?: "dialog" | "inline"
 }) {
   const [cat, setCat] = useState<CatId>("general")
+  const { user: authUser, authEnabled } = useAuth()
+  const isAdmin = authEnabled === false || authUser?.role === "admin"
+  const visibleCategories = CATEGORIES.filter((c) => !c.adminOnly || isAdmin)
   const inline = variant === "inline"
 
   return (
@@ -37,7 +41,7 @@ export function ConfigPanel({
         )}
       >
         <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 py-3.5">
-          {CATEGORIES.map((c) => {
+          {visibleCategories.map((c) => {
             const on = c.id === cat
             return (
               <button

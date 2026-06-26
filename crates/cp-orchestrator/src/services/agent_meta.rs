@@ -1,21 +1,96 @@
-//! Orchestrator-owned **agent avatar** store (T338).
+//! Orchestrator-owned **agent metadata** — display-name overrides (T328) and
+//! profile-picture avatars (T338).
 //!
-//! Agents can have a profile picture ("avatar") set via the dashboard. The
-//! image bytes live under `<agents_dir>/agent-avatars/<id>` (no extension —
-//! the content-type is tracked in a sidecar JSON map) and are served inline
-//! by the transport layer with the correct `Content-Type`.
+//! Merged from the former `names.rs` + `avatars.rs` for the directory-entry
+//! budget.  Both stores share the same shape: a `HashMap` index persisted to a
+//! sidecar JSON file under `<agents_dir>/`, loaded at startup, written
+//! atomically on mutation.  They are cosmetic — never a hard dependency for the
+//! backend to boot.
 //!
-//! # Storage layout
+//! # Display names
 //!
-//! ```text
-//! <agents_dir>/
-//!   agent-avatars.json   ← { "agent_id": "image/png", … }
-//!   agent-avatars/
-//!     <agent_id>         ← raw image bytes
-//! ```
+//! By default an agent's display name is the basename of its realm folder
+//! (e.g. `context-pilot` for `/Users/gui/context-pilot`).
+//! [`NameOverrides`] lets the dashboard user set a custom label per agent.
+//!
+//! # Avatars
+//!
+//! Agents can have a profile picture set via the dashboard.  The image bytes
+//! live under `<agents_dir>/agent-avatars/<id>` (no extension — the
+//! content-type is tracked in a sidecar JSON map) and are served inline by the
+//! transport layer with the correct `Content-Type`.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+
+// ── Display-name overrides ──────────────────────────────────────────────
+
+/// In-memory + on-disk map of agent id → custom display name.
+#[derive(Debug, Default)]
+pub struct NameOverrides {
+    /// Agent id → display name.
+    names: HashMap<String, String>,
+    /// The backing file (`<agents_dir>/agent-names.json`).
+    path: PathBuf,
+}
+
+impl NameOverrides {
+    /// Load from `<agents_dir>/agent-names.json`, or start empty.
+    ///
+    /// A missing or corrupt file silently yields an empty map — naming is a
+    /// convenience, never a hard dependency for the backend to boot.
+    #[must_use]
+    pub fn load(agents_dir: &Path) -> Self {
+        let path = agents_dir.join("agent-names.json");
+        let names = std::fs::read(&path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<HashMap<String, String>>(&bytes).ok())
+            .unwrap_or_default();
+        Self { names, path }
+    }
+
+    /// Look up a custom display name for `agent_id`.
+    ///
+    /// Returns `None` when the agent has no override (callers fall back to the
+    /// folder-derived basename).
+    #[must_use]
+    pub fn get(&self, agent_id: &str) -> Option<&str> {
+        self.names.get(agent_id).map(String::as_str)
+    }
+
+    /// Set or clear a display-name override.
+    ///
+    /// An empty or whitespace-only `name` **removes** the override (reverts to
+    /// the folder-derived default).  Returns the previous override, if any.
+    pub fn set(&mut self, agent_id: &str, name: &str) -> Option<String> {
+        let trimmed = name.trim();
+        let prev = if trimmed.is_empty() {
+            self.names.remove(agent_id)
+        } else {
+            self.names.insert(agent_id.to_owned(), trimmed.to_owned())
+        };
+        self.persist();
+        prev
+    }
+
+    /// Atomically write the map to disk (`tmp` → `rename`).
+    fn persist(&self) {
+        let Ok(bytes) = serde_json::to_vec_pretty(&self.names) else {
+            eprintln!("names: serialize failed");
+            return;
+        };
+        let tmp = self.path.with_extension("json.tmp");
+        if std::fs::write(&tmp, &bytes).is_err() {
+            eprintln!("names: write tmp failed: {}", tmp.display());
+            return;
+        }
+        if let Err(e) = std::fs::rename(&tmp, &self.path) {
+            eprintln!("names: rename failed: {e}");
+        }
+    }
+}
+
+// ── Avatars ─────────────────────────────────────────────────────────────
 
 /// Maximum accepted avatar upload size (2 MiB). Generous for a profile
 /// picture; prevents accidental multi-megabyte uploads from ballooning the
@@ -161,7 +236,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn roundtrip_set_get_remove() {
+    fn name_set_get_roundtrip() {
+        let dir = std::env::temp_dir().join(format!("cp-names-test-{}", std::process::id()));
+        drop(std::fs::create_dir_all(&dir));
+
+        let mut store = NameOverrides::load(&dir);
+        assert!(store.get("a").is_none());
+
+        let _prev = store.set("a", "My Agent");
+        assert_eq!(store.get("a"), Some("My Agent"));
+
+        // Reload from disk proves persistence.
+        let reloaded = NameOverrides::load(&dir);
+        assert_eq!(reloaded.get("a"), Some("My Agent"));
+
+        // Empty name clears the override.
+        let _prev = store.set("a", "  ");
+        assert!(store.get("a").is_none());
+        assert!(NameOverrides::load(&dir).get("a").is_none());
+
+        drop(std::fs::remove_dir_all(&dir));
+    }
+
+    #[test]
+    fn avatar_roundtrip_set_get_remove() {
         let dir = std::env::temp_dir().join(format!("cp-avatar-test-{}", std::process::id()));
         drop(std::fs::create_dir_all(&dir));
 
@@ -175,8 +273,8 @@ mod tests {
             0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1×1
             0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, // RGB, CRC
             0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, // IDAT chunk
-            0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01, 0xE2, 0x21, 0xBC, 0x33, 0x00,
-            0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, // IEND chunk
+            0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01, 0xE2, 0x21, 0xBC, 0x33,
+            0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, // IEND chunk
             0x44, 0xAE, 0x42, 0x60, 0x82,
         ];
         store.set("a1", png).expect("set should succeed");
@@ -199,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_oversized() {
+    fn avatar_rejects_oversized() {
         let dir = std::env::temp_dir().join(format!("cp-avatar-big-{}", std::process::id()));
         drop(std::fs::create_dir_all(&dir));
 
