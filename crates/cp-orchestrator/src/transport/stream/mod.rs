@@ -12,6 +12,9 @@
 //! in [`run_stream`]'s seeding block.
 
 pub mod sse;
+// Single-use SSE upgrade tickets (I9b). They exist solely to gate the SSE
+// upgrade `GET`, so they live alongside the stream machinery they protect.
+pub mod ticket;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};

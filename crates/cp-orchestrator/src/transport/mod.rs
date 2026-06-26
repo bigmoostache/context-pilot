@@ -15,7 +15,7 @@
 //!   accessed under a single [`Mutex`].
 //! * [`rest`] — request/response handlers returning a transport-agnostic
 //!   [`HttpReply`](rest::HttpReply).
-//! * [`ticket`] — single-use SSE upgrade tickets (I9b).
+//! * [`stream::ticket`] — single-use SSE upgrade tickets (I9b).
 //! * [`sse`] — the SSE encoder and blocking body reader.
 //! * [`serve`] — the acceptor loop binding it all to a socket.
 //!
@@ -33,12 +33,13 @@
 mod auth;
 mod files;
 pub mod inspect;
+pub mod maint;
 mod query;
 pub mod rest;
-// `pub` so the `sse` submodule it now contains stays as reachable as it was when
-// `sse` lived at the transport root (else its `pub` items trip `unreachable_pub`).
+// `pub` so the `sse` and `ticket` submodules it now contains stay as reachable
+// as they were at the transport root (else their `pub` items trip
+// `unreachable_pub`).
 pub mod stream;
-pub mod ticket;
 
 use std::io::Read as _;
 use std::path::PathBuf;
@@ -64,8 +65,23 @@ pub use rest::Backend;
 /// intake's `MAX_CONNECTION_BUFFER` (the other cap on the same path).
 const MAX_BODY: u64 = 32 * 1024 * 1024;
 
-/// Bind an HTTP server to `addr` and serve transport requests until the process
-/// exits.
+/// Which face of the transport a listener serves.
+///
+/// The orchestrator runs two independent `tiny_http` listeners on two sockets:
+/// the [`Product`](Plane::Product) cockpit (`:7878` — fleet, agents, chat, SPA)
+/// and the [`Maintenance`](Plane::Maintenance) plane (`:9090` — IT provisioning,
+/// TLS, CA; Admin-gated and LAN-only). Each picks its router by its `Plane`, so
+/// no product route is reachable on the maintenance socket and vice-versa.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Plane {
+    /// The product cockpit plane.
+    Product,
+    /// The IT maintenance plane.
+    Maintenance,
+}
+
+/// Bind an HTTP server to `addr` and serve the [`Product`](Plane::Product) plane
+/// until the process exits. Back-compat shim over [`serve_plane`].
 ///
 /// Each request runs on its own thread (`tiny_http`'s blocking model). A
 /// streaming request occupies its thread for the lifetime of the connection;
@@ -75,21 +91,40 @@ const MAX_BODY: u64 = 32 * 1024 * 1024;
 ///
 /// Returns an error string if the address cannot be bound.
 pub fn serve(addr: &str, state: Arc<Mutex<Backend>>) -> Result<(), String> {
+    serve_plane(addr, state, Plane::Product)
+}
+
+/// Bind an HTTP server to `addr` and serve the given [`Plane`] until the process
+/// exits.
+///
+/// # Errors
+///
+/// Returns an error string if the address cannot be bound.
+pub fn serve_plane(addr: &str, state: Arc<Mutex<Backend>>, plane: Plane) -> Result<(), String> {
     let server = Server::http(addr).map_err(|e| e.to_string())?;
-    serve_bound(server, state);
+    serve_bound_plane(server, state, plane);
     Ok(())
 }
 
-/// Serve transport requests on an already-bound [`Server`], thread-per-request,
-/// until the server is dropped.
+/// Serve the [`Product`](Plane::Product) plane on an already-bound [`Server`].
+/// Back-compat shim over [`serve_bound_plane`] used by the integration tests.
 ///
-/// Split out of [`serve`] so a caller that needs the bound address up-front —
-/// notably an integration test binding `127.0.0.1:0` to claim an ephemeral
-/// port — can read [`Server::server_addr`] before handing the server here.
+/// Split out so a caller that needs the bound address up-front — notably a test
+/// binding `127.0.0.1:0` to claim an ephemeral port — can read
+/// [`Server::server_addr`] before handing the server here.
 pub fn serve_bound(server: Server, state: Arc<Mutex<Backend>>) {
+    serve_bound_plane(server, state, Plane::Product);
+}
+
+/// Serve the given [`Plane`] on an already-bound [`Server`], thread-per-request,
+/// until the server is dropped.
+pub fn serve_bound_plane(server: Server, state: Arc<Mutex<Backend>>, plane: Plane) {
     for request in server.incoming_requests() {
         let state = Arc::clone(&state);
-        let _handle = thread::spawn(move || handle(request, &state));
+        let _handle = thread::spawn(move || match plane {
+            Plane::Product => handle(request, &state),
+            Plane::Maintenance => maint::handle(request, &state),
+        });
     }
 }
 

@@ -14,7 +14,7 @@ use crate::services::{
 };
 use crate::supervisor::AgentSupervisor;
 
-use super::super::ticket::TicketStore;
+use super::super::stream::ticket::TicketStore;
 
 /// Default per-agent SSE subscriber buffer capacity.
 const DEFAULT_SUB_CAPACITY: usize = 256;

@@ -31,12 +31,27 @@ start_service() {
     CP_SEED_ENV=/mnt/data/context-pilot/seed.env
     [ -f "$CP_SEED_ENV" ] && . "$CP_SEED_ENV"
 
+    # IT maintenance plane (second listener). The orchestrator's own LAN-only
+    # guard (CP_MAINT_LAN_ONLY, on by default) refuses any non-LAN peer at the
+    # application layer. Defence-in-depth: keep the port off the WAN as well.
+    #   - Preferred: bind it to the LAN interface only by setting
+    #     CP_MAINT_BIND=<lan-ip> (e.g. the br-lan address) below, so the socket
+    #     never listens on the WAN at all.
+    #   - Or leave CP_MAINT_BIND unset (default 0.0.0.0) and add a firewall rule
+    #     dropping inbound :9090 on the WAN zone (uci firewall / nftables).
+    # The paper-admin window is mitigated by all three layers (LAN-only + unit-
+    # unique password + forced change), per the local-tls-onboarding design.
+    CP_MAINT_PORT=9090
+    # CP_MAINT_BIND=192.168.1.1   # uncomment + set to the LAN IP to harden
+
     procd_open_instance
     procd_set_param command "$PROG"
     procd_set_param env \
         HOME="$CP_HOME" \
         CP_AUTH_ENABLED=1 \
         CP_ORCH_PORT=7878 \
+        CP_MAINT_PORT="${CP_MAINT_PORT:-9090}" \
+        CP_MAINT_BIND="${CP_MAINT_BIND:-0.0.0.0}" \
         CP_WEB_ROOT="$CP_WEB" \
         CP_AGENT_BINARY="$CP_AGENT" \
         CP_SEED_ADMIN_EMAIL="${CP_SEED_ADMIN_EMAIL:-}" \

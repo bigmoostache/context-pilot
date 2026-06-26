@@ -18,7 +18,9 @@
 //!
 //! | Env var | Default | Meaning |
 //! |---|---|---|
-//! | `CP_ORCH_PORT` | `7878` | HTTP listen port |
+//! | `CP_ORCH_PORT` | `7878` | Product cockpit HTTP listen port |
+//! | `CP_MAINT_PORT` | `9090` | IT maintenance-plane HTTP listen port |
+//! | `CP_MAINT_BIND` | `0.0.0.0` | Maintenance-plane bind address (LAN IP on the box) |
 //! | `CP_AGENTS_DIR` | `~/.context-pilot/agents` | Registry directory |
 //! | `CP_COST_BUDGET` | `100.0` | Per-agent cost budget (USD) |
 //! | `CP_SCAN_INTERVAL_MS` | `2000` | Registry-discovery + tier-② mtime poll cadence (ms) |
@@ -35,14 +37,24 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
+mod seed;
+
 use crate::channel::Tailer;
 use crate::registry::tee_reader::TeeReader;
 use crate::registry::{AgentRegistry, Event};
 use crate::services::auth::backup::BackupScheduler;
 use crate::transport::Backend;
 
-/// Default HTTP listen port.
+/// Default product cockpit HTTP listen port.
 const DEFAULT_PORT: u16 = 7878;
+
+/// Default IT maintenance-plane HTTP listen port.
+const DEFAULT_MAINT_PORT: u16 = 9090;
+
+/// Default maintenance-plane bind address. `0.0.0.0` here is paired with the
+/// LAN-only application guard ([`transport::maint`]) and, on the appliance, a
+/// bind to the LAN interface / firewall rule (documented in the procd `.init`).
+const DEFAULT_MAINT_BIND: &str = "0.0.0.0";
 
 /// Default per-agent cost budget in USD.
 const DEFAULT_BUDGET: f64 = 100.0;
@@ -63,8 +75,14 @@ const TAIL_INTERVAL: Duration = Duration::from_millis(100);
 /// Parsed runtime configuration, sourced from environment variables.
 #[derive(Debug)]
 pub struct Config {
-    /// HTTP listen port.
+    /// Product cockpit HTTP listen port.
     pub port: u16,
+    /// IT maintenance-plane HTTP listen port (second listener).
+    pub maint_port: u16,
+    /// Maintenance-plane bind address. Defaults to `0.0.0.0`; set to the box's
+    /// LAN IP in deployment so the plane is not reachable off-LAN even before
+    /// the application-level LAN guard.
+    pub maint_bind: String,
     /// Directory holding agent registry records.
     pub agents_dir: PathBuf,
     /// Per-agent cost budget in USD.
@@ -101,6 +119,13 @@ impl Config {
     /// (so the default directory cannot be derived).
     pub fn from_env() -> Result<Self, String> {
         let port = std::env::var("CP_ORCH_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_PORT);
+
+        let maint_port = std::env::var("CP_MAINT_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_MAINT_PORT);
+
+        let maint_bind = std::env::var("CP_MAINT_BIND")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| DEFAULT_MAINT_BIND.to_owned());
 
         let agents_dir = match std::env::var_os("CP_AGENTS_DIR") {
             Some(dir) => PathBuf::from(dir),
@@ -150,6 +175,8 @@ impl Config {
 
         Ok(Self {
             port,
+            maint_port,
+            maint_bind,
             agents_dir,
             budget_usd,
             scan_interval,
@@ -173,60 +200,6 @@ pub struct Runtime {
     config: Config,
 }
 
-/// Boot-time admin seed (provisioning). When auth is enabled and the user table
-/// is empty, create the first **Admin** from `CP_SEED_ADMIN_EMAIL` +
-/// `CP_SEED_ADMIN_PASSWORD` (or `CP_SEED_ADMIN_PASSWORD_FILE`), forcing a
-/// password change on first login. Idempotent: a no-op once any user exists, so
-/// an Ansible provisioning role can re-run safely. Fail-soft — never fatal.
-fn seed_admin_if_empty(store: &crate::services::auth::store::AuthStore) {
-    use crate::services::auth::types::UserRole;
-
-    let Some(email) = std::env::var("CP_SEED_ADMIN_EMAIL").ok().filter(|s| !s.trim().is_empty()) else {
-        return;
-    };
-    let Some(password) = seed_admin_password() else {
-        eprintln!("seed-admin: CP_SEED_ADMIN_EMAIL set but no password provided — skipping");
-        return;
-    };
-    match store.count_users() {
-        Ok(0) => {}
-        Ok(_) => return, // already provisioned — idempotent no-op
-        Err(e) => {
-            eprintln!("seed-admin: cannot count users: {e} — skipping");
-            return;
-        }
-    }
-    let name =
-        std::env::var("CP_SEED_ADMIN_NAME").ok().filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "Admin".to_owned());
-    match store.create_user(email.trim(), name.trim(), &password, UserRole::Admin) {
-        Ok(user) => match store.set_must_change_password(&user.id, true) {
-            Ok(_) => eprintln!(
-                "seed-admin: provisioned initial admin {} (password change required on first login)",
-                user.email
-            ),
-            Err(e) => eprintln!("seed-admin: created {} but could not set must-change flag: {e}", user.email),
-        },
-        Err(e) => eprintln!("seed-admin: failed to create admin {}: {e}", email.trim()),
-    }
-}
-
-/// Resolve the seed admin password from `CP_SEED_ADMIN_PASSWORD_FILE` (preferred
-/// — keeps the secret out of the process environment) or `CP_SEED_ADMIN_PASSWORD`.
-fn seed_admin_password() -> Option<String> {
-    if let Some(path) = std::env::var_os("CP_SEED_ADMIN_PASSWORD_FILE") {
-        match std::fs::read_to_string(&path) {
-            Ok(s) => {
-                let pw = s.trim_end_matches(['\n', '\r']).to_owned();
-                if !pw.is_empty() {
-                    return Some(pw);
-                }
-            }
-            Err(e) => eprintln!("seed-admin: cannot read CP_SEED_ADMIN_PASSWORD_FILE: {e}"),
-        }
-    }
-    std::env::var("CP_SEED_ADMIN_PASSWORD").ok().filter(|s| !s.is_empty())
-}
-
 impl Runtime {
     /// Build a runtime from the given configuration.
     #[must_use]
@@ -238,7 +211,7 @@ impl Runtime {
             match crate::services::auth::store::AuthStore::open(&config.auth_db_path) {
                 Ok(store) => {
                     eprintln!("auth enabled — database at {}", config.auth_db_path.display());
-                    seed_admin_if_empty(&store);
+                    seed::seed_admin_if_empty(&store);
                     Some(store)
                 }
                 Err(err) => {
@@ -276,16 +249,35 @@ impl Runtime {
         thread::spawn(move || driver_loop(backend, agents_dir, interval, backup_scheduler))
     }
 
-    /// Block the calling thread on the HTTP transport, serving requests until
-    /// the process exits.
+    /// Block the calling thread on the product HTTP transport, serving requests
+    /// until the process exits.
+    ///
+    /// Before blocking, spawns the **maintenance plane** on its own thread and
+    /// socket ([`transport::serve_plane`] with [`Plane::Maintenance`]). The two
+    /// listeners are fully independent: a panic or bind failure on one does not
+    /// take down the other (the maintenance bind failure is logged, not fatal —
+    /// the cockpit must still come up).
     ///
     /// # Errors
     ///
-    /// Returns an error string if the address cannot be bound.
+    /// Returns an error string if the product address cannot be bound.
     pub fn serve(&self) -> Result<(), String> {
+        use crate::transport::Plane;
+
+        // Maintenance plane (M1) — second listener, LAN-only + Admin-gated.
+        let maint_addr = format!("{}:{}", self.config.maint_bind, self.config.maint_port);
+        let maint_state = Arc::clone(&self.backend);
+        let maint_addr_log = maint_addr.clone();
+        let _maint = thread::spawn(move || {
+            eprintln!("maintenance plane on http://{maint_addr_log}");
+            if let Err(e) = crate::transport::serve_plane(&maint_addr, maint_state, Plane::Maintenance) {
+                eprintln!("WARN: maintenance plane failed to bind {maint_addr_log}: {e}");
+            }
+        });
+
         let addr = format!("0.0.0.0:{}", self.config.port);
         eprintln!("serving on http://{addr}");
-        crate::transport::serve(&addr, Arc::clone(&self.backend))
+        crate::transport::serve_plane(&addr, Arc::clone(&self.backend), Plane::Product)
     }
 }
 
