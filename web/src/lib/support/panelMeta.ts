@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import type { PanelKind } from "../types"
+import type { AccentToken } from "../api/generated/types.gen"
 
 export const panelIcon: Record<PanelKind, LucideIcon> = {
   tree: FolderTree,
@@ -38,7 +39,7 @@ export const panelIcon: Record<PanelKind, LucideIcon> = {
   radar: Radar,
 }
 
-export type Accent = "signal" | "interactive" | "ok" | "warn" | "danger" | "muted"
+export type Accent = AccentToken | "muted"
 
 export const accentVar: Record<Accent, string> = {
   signal: "var(--signal)",

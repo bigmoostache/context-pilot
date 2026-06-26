@@ -7,6 +7,20 @@ use super::{arr, r};
 /// Agent/thread/panel/tool schemas — the domain model.
 pub(super) fn core() -> Value {
     json!({
+        // ── Shared enums ────────────────────────────────────────
+        "PanelKind": {
+            "type": "string",
+            "enum": [
+                "tree", "memory", "threads", "spine", "stats", "entities",
+                "search", "file", "git", "console", "queue", "todo",
+                "callback", "scratchpad", "tools", "radar"
+            ]
+        },
+        "AccentToken": {
+            "type": "string",
+            "enum": ["signal", "interactive", "ok", "warn", "danger"]
+        },
+        // ── Domain types ────────────────────────────────────────
         "Error": {
             "type": "object",
             "properties": { "error": { "type": "string" } },
@@ -34,7 +48,8 @@ pub(super) fn core() -> Value {
                 "task": { "type": "string" },
                 "threads": { "type": "integer" },
                 "lastActivity": { "type": "string" },
-                "hasAvatar": { "type": "boolean" }
+                "hasAvatar": { "type": "boolean" },
+                "accent": r("AccentToken")
             },
             "required": ["id", "name", "folder", "status", "costUsd", "threads", "lastActivity"]
         },
@@ -146,7 +161,7 @@ pub(super) fn core() -> Value {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
-                "kind": { "type": "string" },
+                "kind": r("PanelKind"),
                 "name": { "type": "string" },
                 "tokens": { "type": "integer" },
                 "costUsd": { "type": "number" },

@@ -20,6 +20,7 @@ pub(super) fn paths() -> Value {
         "/api/health": get("health", "Health check", json!({
             "type": "object", "properties": { "status": { "type": "string" } }
         })),
+        "/api/providers": get("providers", "LLM provider + model registry", arr(r("ProviderDef"))),
         // ── Fleet ───────────────────────────────────────────────────
         "/api/fleet": get("fleet", "Raw fleet view (rev-envelope)", json!({ "type": "object" })),
         "/api/fleet/meta": get("fleet", "List all agents (enriched)", arr(r("Agent"))),

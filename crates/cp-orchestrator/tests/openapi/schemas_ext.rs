@@ -7,6 +7,32 @@ use super::{arr, r};
 /// Receipt, auth, env-key, filesystem, and conversation schemas.
 pub(super) fn transport() -> Value {
     json!({
+        // ── LLM provider registry ────────────────────────────────────
+        "ModelDef": {
+            "type": "object",
+            "properties": {
+                "id": { "type": "string" },
+                "apiName": { "type": "string" },
+                "displayName": { "type": "string" },
+                "contextWindow": { "type": "integer" },
+                "maxOutput": { "type": "integer" },
+                "inputPrice": { "type": "number" },
+                "outputPrice": { "type": "number" },
+                "badge": { "type": "string", "nullable": true },
+                "isDefault": { "type": "boolean" }
+            },
+            "required": ["id", "apiName", "displayName", "contextWindow", "maxOutput", "inputPrice", "outputPrice"]
+        },
+        "ProviderDef": {
+            "type": "object",
+            "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" },
+                "description": { "type": "string" },
+                "models": arr(r("ModelDef"))
+            },
+            "required": ["id", "name", "description", "models"]
+        },
         "CommandReceipt": {
             "type": "object",
             "properties": {
@@ -172,16 +198,22 @@ pub(super) fn transport() -> Value {
             "properties": { "ticket": { "type": "string" } },
             "required": ["ticket"]
         },
+        // ── Shared enums ────────────────────────────────────────
+        "FinderKind": {
+            "type": "string",
+            "enum": [
+                "folder", "code", "doc", "pdf", "sheet", "slides",
+                "image", "markdown", "json", "archive", "audio",
+                "video", "binary"
+            ]
+        },
         // ── Filesystem ──────────────────────────────────────────────
         "FinderNode": {
             "type": "object",
             "properties": {
                 "name": { "type": "string" },
                 "path": { "type": "string" },
-                "kind": { "type": "string", "enum": [
-                    "folder", "file", "image", "pdf", "csv", "xlsx",
-                    "audio", "video", "markdown", "code", "archive"
-                ]},
+                "kind": r("FinderKind"),
                 "modified": { "type": "integer", "description": "Epoch ms" },
                 "size": { "type": "integer", "nullable": true },
                 "count": { "type": "integer", "nullable": true, "description": "Visible children (folders only)" }

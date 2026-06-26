@@ -20,4 +20,5 @@ mod helpers;
 pub mod meta;
 pub mod metrics;
 pub mod panels;
+pub mod providers;
 pub mod vitals;

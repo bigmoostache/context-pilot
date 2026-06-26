@@ -4,6 +4,8 @@ export type ClientOptions = {
     baseUrl: 'http://localhost:7878' | (string & {});
 };
 
+export type AccentToken = 'signal' | 'interactive' | 'ok' | 'warn' | 'danger';
+
 export type AclEntry = {
     agent_id: string;
     granted_at?: number;
@@ -15,6 +17,7 @@ export type AclEntry = {
 };
 
 export type Agent = {
+    accent?: AccentToken;
     branch?: string;
     contextBudget?: number;
     contextHit?: number;
@@ -108,7 +111,7 @@ export type ContextPanel = {
     fixed?: boolean;
     frozen?: number | null;
     id: string;
-    kind: string;
+    kind: PanelKind;
     misses?: number;
     name: string;
     tokens: number;
@@ -176,12 +179,14 @@ export type Error = {
     error: string;
 };
 
+export type FinderKind = 'folder' | 'code' | 'doc' | 'pdf' | 'sheet' | 'slides' | 'image' | 'markdown' | 'json' | 'archive' | 'audio' | 'video' | 'binary';
+
 export type FinderNode = {
     /**
      * Visible children (folders only)
      */
     count?: number | null;
-    kind: 'folder' | 'file' | 'image' | 'pdf' | 'csv' | 'xlsx' | 'audio' | 'video' | 'markdown' | 'code' | 'archive';
+    kind: FinderKind;
     /**
      * Epoch ms
      */
@@ -231,6 +236,18 @@ export type MkdirResult = {
     created: string;
 };
 
+export type ModelDef = {
+    apiName: string;
+    badge?: string | null;
+    contextWindow: number;
+    displayName: string;
+    id: string;
+    inputPrice: number;
+    isDefault?: boolean;
+    maxOutput: number;
+    outputPrice: number;
+};
+
 export type MoveResult = {
     moved: number;
     skipped: number;
@@ -271,6 +288,15 @@ export type OpEntryKind = {
     threshold_tokens?: number;
     timestamp_ms?: number;
     used_tokens?: number;
+};
+
+export type PanelKind = 'tree' | 'memory' | 'threads' | 'spine' | 'stats' | 'entities' | 'search' | 'file' | 'git' | 'console' | 'queue' | 'todo' | 'callback' | 'scratchpad' | 'tools' | 'radar';
+
+export type ProviderDef = {
+    description: string;
+    id: string;
+    models: Array<ModelDef>;
+    name: string;
 };
 
 export type QueueAction = {
@@ -2204,6 +2230,31 @@ export type GetApiMetricsResponses = {
 };
 
 export type GetApiMetricsResponse = GetApiMetricsResponses[keyof GetApiMetricsResponses];
+
+export type GetApiProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/providers';
+};
+
+export type GetApiProvidersErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiProvidersError = GetApiProvidersErrors[keyof GetApiProvidersErrors];
+
+export type GetApiProvidersResponses = {
+    /**
+     * Success
+     */
+    200: Array<ProviderDef>;
+};
+
+export type GetApiProvidersResponse = GetApiProvidersResponses[keyof GetApiProvidersResponses];
 
 export type PostApiTicketData = {
     body?: never;

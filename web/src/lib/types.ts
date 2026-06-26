@@ -13,10 +13,13 @@
 // codegen pipeline, never by hand.
 
 export type {
+  AccentToken,
   CallbackRow,
   EntityTable,
+  FinderKind,
   LibraryItem,
   MemoryCard,
+  PanelKind,
   QueueAction,
   RadarAnchor,
   RadarResult,
@@ -33,6 +36,7 @@ export type {
 // ── Extended re-exports (generated base + UI-only fields) ────────────
 
 import type {
+  AccentToken,
   Agent as GenAgent,
   ContextPanel as GenContextPanel,
   FinderNode as GenFinderNode,
@@ -40,18 +44,13 @@ import type {
   ThreadMsg as GenThreadMsg,
 } from "./api/generated/types.gen"
 
-/** Accent color tokens for dots, avatars, and stat rows. */
-export type AccentToken = "signal" | "interactive" | "ok" | "warn" | "danger"
-
 /** Agent with UI-only `accent` field (computed client-side in reducers). */
 export type Agent = GenAgent & {
   accent: AccentToken
 }
 
-/** ContextPanel with a typed `kind` discriminant (generated uses `string`). */
-export type ContextPanel = Omit<GenContextPanel, "kind"> & {
-  kind: PanelKind
-}
+/** ContextPanel re-exported as-is (kind is already typed as PanelKind in generated). */
+export type ContextPanel = GenContextPanel
 
 /** ThreadMsg with UI-only `streaming` flag (set during active LLM output). */
 export type ThreadMsg = GenThreadMsg & {
@@ -73,25 +72,11 @@ export type LibraryKind = import("./api/generated/types.gen").LibraryItem["kind"
 
 // ── UI-only types (no backend equivalent) ────────────────────────────
 
-export type PanelKind =
-  | "tree"
-  | "memory"
-  | "threads"
-  | "spine"
-  | "stats"
-  | "entities"
-  | "search"
-  | "file"
-  | "git"
-  | "console"
-  | "queue"
-  | "todo"
-  | "callback"
-  | "scratchpad"
-  | "tools"
-  | "radar"
+/** Backend execution phase — linked to generated Agent.phase. */
+type Phase = NonNullable<GenAgent["phase"]>
 
-export type StreamPhase = "ready" | "streaming" | "tooling" | "blocked"
+/** UI phase extends backend Phase: renames idle→ready, adds blocked. */
+export type StreamPhase = Exclude<Phase, "idle"> | "ready" | "blocked"
 
 export type MsgRole = "user" | "assistant" | "tool"
 
@@ -169,21 +154,6 @@ export interface FsNode {
 
 // ── Finder (per-agent file manager) ───────────────────────────────
 
-export type FinderKind =
-  | "folder"
-  | "code"
-  | "doc"
-  | "pdf"
-  | "sheet"
-  | "slides"
-  | "image"
-  | "markdown"
-  | "json"
-  | "archive"
-  | "audio"
-  | "video"
-  | "binary"
-
 /** macOS-style finder tags (colored dots). */
 export type FinderTag = "red" | "orange" | "yellow" | "green" | "blue" | "purple" | "gray"
 
@@ -202,8 +172,7 @@ export interface SlidePreview {
 /** A node in the Finder's realm filesystem — base fields from the generated
  *  OpenAPI type, extended with UI-enriched fields (kind refinement, preview
  *  payloads, tags) that exist only on the client side. */
-export type FinderNode = Omit<GenFinderNode, "modified" | "kind"> & {
-  kind: FinderKind
+export type FinderNode = Omit<GenFinderNode, "modified"> & {
   /** human relative modified time, e.g. "2d ago" */
   modified: string
   /** human relative created time */
