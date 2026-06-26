@@ -264,6 +264,19 @@ impl Runtime {
     pub fn serve(&self) -> Result<(), String> {
         use crate::transport::Plane;
 
+        // Boot-time read of the durable provisioning flag (M2, Obj 2.1.2). The
+        // orchestrator always runs both listeners; the effective cockpit gate
+        // lives in Caddy (M3), which only serves :80/:443 once provisioned. This
+        // log makes the boot state observable in `logread`.
+        if let Ok(b) = self.backend.lock() {
+            let provisioned = crate::transport::maint::is_provisioned(&b.provision_flag_path);
+            eprintln!(
+                "provisioning state: {} (flag: {})",
+                if provisioned { "provisioned — cockpit may serve" } else { "UNPROVISIONED — maintenance only" },
+                b.provision_flag_path.display()
+            );
+        }
+
         // Maintenance plane (M1) — second listener, LAN-only + Admin-gated.
         let maint_addr = format!("{}:{}", self.config.maint_bind, self.config.maint_port);
         let maint_state = Arc::clone(&self.backend);

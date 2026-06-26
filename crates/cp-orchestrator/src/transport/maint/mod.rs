@@ -19,6 +19,10 @@
 //!   whitelist (`login`, `status`) requires a valid session whose user holds the
 //!   [`UserRole::Admin`] role. A `User`-role token is a `403`, no token a `401`.
 
+mod state;
+
+pub(crate) use state::is_provisioned;
+
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
 
@@ -105,6 +109,9 @@ fn route(
         (Method::Patch, ["api", "maint", "me"]) => super::auth::update_me(state, body, auth_user),
         (Method::Post, ["api", "maint", "logout"]) => super::auth::logout(state, auth_token),
 
+        // Provisioning state machine (M2).
+        (Method::Post, ["api", "maint", "finalize"]) => finalize(state, auth_user),
+
         _ => HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },
     }
 }
@@ -155,14 +162,54 @@ fn is_public_route(segments: &[&str]) -> bool {
 }
 
 /// `GET /api/maint/status` — public probe describing the maintenance plane's
-/// readiness. Lets the wizard decide what to render before any login.
+/// readiness. Lets the wizard decide what to render before any login: whether an
+/// admin exists yet (`bootstrapped`) and whether the box is already provisioned
+/// (so a re-visited, live box can show the post-provisioning view).
 fn status(state: &Mutex<Backend>) -> HttpReply {
-    let bootstrapped =
-        state.lock().ok().and_then(|b| b.auth.as_ref().and_then(|a| a.count_users().ok())).map_or(false, |n| n > 0);
+    let (bootstrapped, provisioned) = state
+        .lock()
+        .map(|b| {
+            let bootstrapped = b.auth.as_ref().and_then(|a| a.count_users().ok()).map_or(false, |n| n > 0);
+            (bootstrapped, is_provisioned(&b.provision_flag_path))
+        })
+        .unwrap_or((false, false));
     HttpReply::ok(&serde_json::json!({
         "plane": "maintenance",
         "bootstrapped": bootstrapped,
+        "provisioned": provisioned,
     }))
+}
+
+/// `POST /api/maint/finalize` (Admin) — flip the box to *provisioned*.
+///
+/// Validates the finalize pre-requisites, then persists the durable flag
+/// atomically. Milestone 2 enforces the **password** pre-requisite (the paper
+/// admin password must have been changed); Milestone 3 extends this to also
+/// require the name/IP identity and a ready TLS leaf, and to trigger the Caddy
+/// reload that actually starts serving the cockpit. Idempotent: finalizing an
+/// already-provisioned box re-writes the same flag and succeeds.
+fn finalize(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
+    // The Admin gate guarantees `auth_user` is `Some(Admin)` here.
+    let Some(caller) = auth_user else {
+        return HttpReply::error(401, "admin authorization required");
+    };
+
+    // Pre-requisite (M2): the seeded paper password must have been changed.
+    if caller.must_change_password {
+        return HttpReply::error(412, "change the admin password before finalizing");
+    }
+
+    let flag_path = match state.lock() {
+        Ok(b) => b.provision_flag_path.clone(),
+        Err(_) => return HttpReply::error(500, "backend lock poisoned"),
+    };
+    match state::set_provisioned(&flag_path, true) {
+        Ok(()) => HttpReply::ok(&serde_json::json!({ "provisioned": true })),
+        Err(e) => {
+            eprintln!("finalize: could not persist provisioned flag: {e}");
+            HttpReply::error(500, "could not persist provisioned flag")
+        }
+    }
 }
 
 /// Whether the request's peer is permitted by the LAN-only guard.
@@ -240,6 +287,54 @@ mod tests {
         // Leak the tempdir so the SQLite file outlives the test body.
         std::mem::forget(dir);
         (Mutex::new(backend), admin_tok, user_tok)
+    }
+
+    /// Build a `Mutex<Backend>` with auth enabled, returning the seeded admin
+    /// `User` (whose `must_change_password` is false by default) so the finalize
+    /// pre-requisites can be driven directly (Milestone 2). The provisioned flag
+    /// lives inside the (leaked) temp dir.
+    fn backend_with_admin() -> (Mutex<Backend>, User) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let store = AuthStore::open(&dir.path().join("auth.db")).expect("open auth store");
+        let admin = store.create_user("admin@box", "Admin", "password1", UserRole::Admin).expect("admin");
+        let backend = Backend::new(
+            dir.path().to_path_buf(),
+            100.0,
+            PathBuf::from("/tmp/cp-maint-test-realms"),
+            PathBuf::from("/tmp/cp-maint-test-bin"),
+            Some(store),
+            Duration::from_secs(3600),
+        );
+        std::mem::forget(dir);
+        (Mutex::new(backend), admin)
+    }
+
+    #[test]
+    fn finalize_sets_provisioned_and_is_idempotent() {
+        let (state, admin) = backend_with_admin();
+
+        // Before finalize the box reports unprovisioned.
+        assert!(status(&state).body.contains("\"provisioned\":false"), "fresh box is unprovisioned");
+
+        // Finalize succeeds and persists the flag.
+        let r = finalize(&state, Some(&admin));
+        assert_eq!(r.status, 200, "finalize succeeds for a changed-password admin");
+        assert!(r.body.contains("\"provisioned\":true"));
+
+        // Status now reflects the durable flag, and re-finalizing is idempotent.
+        assert!(status(&state).body.contains("\"provisioned\":true"), "status reflects the flag");
+        assert_eq!(finalize(&state, Some(&admin)).status, 200, "re-finalize is idempotent");
+    }
+
+    #[test]
+    fn finalize_is_blocked_until_the_paper_password_is_changed() {
+        let (state, admin) = backend_with_admin();
+        // An admin who still must change the seeded paper password cannot finalize.
+        let mut unchanged = admin.clone();
+        unchanged.must_change_password = true;
+        let r = finalize(&state, Some(&unchanged));
+        assert_eq!(r.status, 412, "finalize refused until the password is changed");
+        assert!(!status(&state).body.contains("\"provisioned\":true"), "box stays unprovisioned");
     }
 
     #[test]
