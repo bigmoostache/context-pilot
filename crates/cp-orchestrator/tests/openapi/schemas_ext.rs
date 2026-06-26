@@ -274,6 +274,41 @@ pub(super) fn transport() -> Value {
                 }}
             },
             "required": ["id", "uid", "role", "content", "timestamp_ms"]
+        },
+        // ── SSE delta protocol (oplog push plane) ───────────────────
+        "OpEntryKind": {
+            "type": "object",
+            "description": "Discriminated-union payload of a single oplog delta, keyed by `kind`.",
+            "properties": {
+                "kind": { "type": "string" },
+                "thread_id": { "type": "string" },
+                "name": { "type": "string" },
+                "status": { "type": "string" },
+                "timestamp_ms": { "type": "integer" },
+                "phase": { "type": "string" },
+                "cost_usd": { "type": "number" },
+                "input_tokens": { "type": "integer" },
+                "output_tokens": { "type": "integer" },
+                "used_tokens": { "type": "integer" },
+                "threshold_tokens": { "type": "integer" },
+                "budget_tokens": { "type": "integer" },
+                "hit_tokens": { "type": "integer" },
+                "miss_tokens": { "type": "integer" },
+                "message_id": { "type": "string" },
+                "head": { "type": "string" },
+                "inline_body": { "type": "string" }
+            },
+            "required": ["kind"]
+        },
+        "OpEntry": {
+            "type": "object",
+            "description": "One rev-numbered oplog delta carried by an SSE `delta` event.",
+            "properties": {
+                "rev": { "type": "integer" },
+                "timestamp_ms": { "type": "integer" },
+                "kind": r("OpEntryKind")
+            },
+            "required": ["rev", "kind"]
         }
     })
 }

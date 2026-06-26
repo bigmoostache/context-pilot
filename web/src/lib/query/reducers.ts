@@ -17,47 +17,12 @@ import { mapRawQuestions } from "../api"
 // ── Oplog delta shape (the push-plane payload) ───────────────────────
 //
 // One rev-numbered oplog entry as carried by an SSE `delta` event. Mirrors
-// cp-wire `OpEntry` — an internally-tagged `kind` discriminant plus rev. We
-// only need a structural subset (the thread-roster + message + phase/cost
-// kinds); every other kind is acknowledged and ignored by the reducers.
+// cp-wire `OpEntry` — an internally-tagged `kind` discriminant plus rev.
+// Types are generated from the OpenAPI spec (schemas_ext.rs) so the SSE
+// protocol contract is mechanically enforced, not hand-maintained.
 
-export interface OpEntry {
-  rev: number
-  timestamp_ms?: number
-  kind: OpEntryKind
-}
-
-export interface OpEntryKind {
-  kind: string
-  thread_id?: string
-  name?: string
-  /** ThreadTurn — snake_case "my_turn" / "their_turn". */
-  status?: string
-  timestamp_ms?: number
-  /** Phase — snake_case "idle" / "streaming" / "tooling" (phase_transition). */
-  phase?: string
-  /** Cumulative spend in USD since boot (cost_aggregate). */
-  cost_usd?: number
-  /** Cumulative input/output tokens since boot (cost_aggregate). */
-  input_tokens?: number
-  output_tokens?: number
-  /** Context-window occupancy triple (context_usage): the agent's own
-   *  used/threshold/budget tokens — folded so the web meter matches ratatui. */
-  used_tokens?: number
-  threshold_tokens?: number
-  budget_tokens?: number
-  /** cache hit/miss split of used_tokens (context_usage) — folded so the HUD's
-   *  `Used (hit)` / `Used (miss)` match ratatui's green/amber bar segments. */
-  hit_tokens?: number
-  miss_tokens?: number
-  /** Stable message id, e.g. "T7-m3" (message_created). */
-  message_id?: string
-  /** Content-addressed body hash, hex (message_created). */
-  head?: string
-  /** UTF-8 JSON message body, inlined when small (message_created). Absent
-   *  when the body spilled to the content-addressed store (hydrate by head). */
-  inline_body?: string
-}
+export type { OpEntry, OpEntryKind } from "../api/generated/types.gen"
+import type { OpEntry, OpEntryKind } from "../api/generated/types.gen"
 
 // ── Helpers ───────────────────────────────────────────────────────────
 

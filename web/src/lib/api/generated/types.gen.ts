@@ -240,6 +240,38 @@ export type OkResponse = {
     ok: boolean;
 };
 
+/**
+ * One rev-numbered oplog delta carried by an SSE `delta` event.
+ */
+export type OpEntry = {
+    kind: OpEntryKind;
+    rev: number;
+    timestamp_ms?: number;
+};
+
+/**
+ * Discriminated-union payload of a single oplog delta, keyed by `kind`.
+ */
+export type OpEntryKind = {
+    budget_tokens?: number;
+    cost_usd?: number;
+    head?: string;
+    hit_tokens?: number;
+    inline_body?: string;
+    input_tokens?: number;
+    kind: string;
+    message_id?: string;
+    miss_tokens?: number;
+    name?: string;
+    output_tokens?: number;
+    phase?: string;
+    status?: string;
+    thread_id?: string;
+    threshold_tokens?: number;
+    timestamp_ms?: number;
+    used_tokens?: number;
+};
+
 export type QueueAction = {
     index: number;
     intent?: string;

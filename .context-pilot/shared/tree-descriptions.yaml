@@ -4610,6 +4610,10 @@
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
   last_edited_ms: 0
+75358116ebad5f0a:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped). T304 draftKey; T331 pendingFiles+onRemoveFile; T334 onShowInFinder; T348 useLibrary command suggestions; T350 createCmdOpen + CreateCommandDialog. T367: OS-file drag-and-drop onto the whole <main> -> handleDrop zips the dropped file(s) client-side (zipFiles, @/lib/utils) into ONE archive then uploads via onAttach (same paperclip path, staged pendingFiles), falling back to raw files if zipping throws; while a file drag is in flight the surface gets a discrete 2px blur eased 300ms in/out (inline filter blur(2px)/blur(0px)); dragDepth useRef counter avoids child-cross flicker, isFileDrag guards on dataTransfer.types includes ''Files'', gated on onAttach (blur is the ONLY affordance). T414: auto-scroll only on non-auto messages (nonAutoCount dep instead of log.length) so tool counter updates don''t yank scroll. Takes agentId + onAttach props.'
+  last_edited_ms: 1782464696107
 753bc3b64810d965:
   path: src/modules/overview/tools/panel_goto_page.rs
   description: 'panel_goto_page: navigate paginated panels, range validation, recomputes token_count per page'

@@ -755,6 +755,85 @@
         ],
         "type": "object"
       },
+      "OpEntry": {
+        "description": "One rev-numbered oplog delta carried by an SSE `delta` event.",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/OpEntryKind"
+          },
+          "rev": {
+            "type": "integer"
+          },
+          "timestamp_ms": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rev",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "OpEntryKind": {
+        "description": "Discriminated-union payload of a single oplog delta, keyed by `kind`.",
+        "properties": {
+          "budget_tokens": {
+            "type": "integer"
+          },
+          "cost_usd": {
+            "type": "number"
+          },
+          "head": {
+            "type": "string"
+          },
+          "hit_tokens": {
+            "type": "integer"
+          },
+          "inline_body": {
+            "type": "string"
+          },
+          "input_tokens": {
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "message_id": {
+            "type": "string"
+          },
+          "miss_tokens": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "output_tokens": {
+            "type": "integer"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "thread_id": {
+            "type": "string"
+          },
+          "threshold_tokens": {
+            "type": "integer"
+          },
+          "timestamp_ms": {
+            "type": "integer"
+          },
+          "used_tokens": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
       "QueueAction": {
         "properties": {
           "index": {
