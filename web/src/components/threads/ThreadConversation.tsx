@@ -12,6 +12,46 @@ import { uploadToNode, type UploadedFile } from "./fileUpload"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
 import type { FinderNode } from "@/lib/types"
 
+/**
+ * Normalise a thread message's `ts` into a human-readable relative age.
+ *
+ * The field arrives as either an epoch-ms number (REST backstop poll), an
+ * ISO 8601 string (SSE delta reducer), or an already-formatted relative
+ * string — this helper collapses all three into a single "Xm ago" label so
+ * the Message renderer never shows a raw timestamp.
+ */
+function formatTs(ts: string | number | undefined): string {
+  if (ts === undefined) return ""
+  const n = typeof ts === "number" ? ts : Number(ts)
+  // Epoch-ms: any number above 2020-01-01 00:00:00 UTC.
+  if (!Number.isNaN(n) && n > 1_577_836_800_000) {
+    const s = Math.max(0, Math.floor((Date.now() - n) / 1000))
+    if (s < 5) return "just now"
+    if (s < 60) return `${s}s ago`
+    const m = Math.floor(s / 60)
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h ago`
+    return `${Math.floor(h / 24)}d ago`
+  }
+  // ISO 8601 string (from SSE reducer).
+  if (typeof ts === "string") {
+    const d = new Date(ts)
+    if (!Number.isNaN(d.getTime()) && d.getTime() > 1_577_836_800_000) {
+      const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000))
+      if (s < 5) return "just now"
+      if (s < 60) return `${s}s ago`
+      const m = Math.floor(s / 60)
+      if (m < 60) return `${m}m ago`
+      const h = Math.floor(m / 60)
+      if (h < 24) return `${h}h ago`
+      return `${Math.floor(h / 24)}d ago`
+    }
+  }
+  // Already formatted or unknown — pass through.
+  return String(ts)
+}
+
 /** Map a thread message onto the shared ChatMessage shape for the renderer. */
 function toChatMessage(m: ThreadMsg): ChatMessage {
   return {
@@ -19,7 +59,7 @@ function toChatMessage(m: ThreadMsg): ChatMessage {
     role: m.tool ? "tool" : m.author,
     text: m.text,
     tool: m.tool,
-    ts: m.ts,
+    ts: formatTs(m.ts as string | number),
     streaming: m.streaming,
   }
 }
