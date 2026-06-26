@@ -96,14 +96,30 @@ function MessageBody({
  * `align` mirrors the bubble's side so the control tucks under the message's
  * own edge (user bubbles are right-aligned, assistant left-aligned).
  */
-export function CopyButton({ text, align, className: extra }: { text: string; align: "start" | "end"; className?: string }) {
+export function CopyButton({
+  text,
+  getText,
+  align,
+  label = "Copy",
+  className: extra,
+}: {
+  /** Static text to copy. Ignored when `getText` is provided. */
+  text?: string
+  /** Lazy text extraction — called on click, for DOM-derived content. */
+  getText?: () => string
+  align: "start" | "end"
+  /** Button label shown next to the icon (e.g. "Copy code", "Copy table"). */
+  label?: string
+  className?: string
+}) {
   const [copied, setCopied] = useState(false)
 
   const onCopy = () => {
+    const t = getText ? getText() : text ?? ""
     // `?.` guards environments without the async clipboard API (insecure
     // origin / older browser); a failed write is silently ignored — the worst
     // case is the tick simply doesn't flash, never a thrown error in the UI.
-    navigator.clipboard?.writeText(text).then(
+    navigator.clipboard?.writeText(t).then(
       () => {
         setCopied(true)
         window.setTimeout(() => setCopied(false), 2000)
@@ -116,7 +132,7 @@ export function CopyButton({ text, align, className: extra }: { text: string; al
     <button
       type="button"
       onClick={onCopy}
-      aria-label={copied ? "Copied" : "Copy message"}
+      aria-label={copied ? "Copied" : label}
       className={cn(
         "flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] transition-colors",
         "opacity-50 hover:opacity-100 focus-visible:opacity-100 outline-none",
@@ -125,7 +141,7 @@ export function CopyButton({ text, align, className: extra }: { text: string; al
       )}
     >
       {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-      <span>{copied ? "Copied" : "Copy"}</span>
+      <span>{copied ? "Copied" : label}</span>
     </button>
   )
 }
@@ -140,7 +156,7 @@ function UserMessage({ msg, agentId, onOpenFile, onShowInFinder }: MessageProps)
         <User className="size-2.5" />
         {msg.ts}
       </span>
-      <CopyButton text={msg.text ?? ""} align="end" />
+      <CopyButton text={msg.text ?? ""} align="end" label="Copy message" />
     </div>
   )
 }
@@ -163,7 +179,7 @@ function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder }: MessageP
       </div>
       {!msg.streaming && (
         <div className="pl-7">
-          <CopyButton text={msg.text ?? ""} align="start" />
+          <CopyButton text={msg.text ?? ""} align="start" label="Copy message" />
         </div>
       )}
     </div>

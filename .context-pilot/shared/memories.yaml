@@ -557,12 +557,13 @@ b14e6817a83938b5:
     - Doc IDs sanitized to [a-zA-Z0-9_-]
     - OCR cache at ~/.context-pilot/ocr-cache/
     - Boot loads .env before module init
+    - File watcher: RecommendedWatcher (FSEvents on macOS, inotify on Linux) — event-driven, negligible CPU. Former PollWatcher walked entire tree every 3s doing lstat, consumed ~50% CPU at ~3000 files.
   importance: high
   labels:
   - meilisearch
   - search
   - operational
-  last_edited_ms: 0
+  last_edited_ms: 1782461427114
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high

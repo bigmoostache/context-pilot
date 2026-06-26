@@ -1800,8 +1800,8 @@
   last_edited_ms: 0
 2d55ba540f65ffc2:
   path: crates/cp-mod-search/src/indexer.rs
-  description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. 3s poll interval PollWatcher.
-  last_edited_ms: 0
+  description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. RecommendedWatcher (FSEvents/inotify, event-driven, negligible CPU — replaced PollWatcher that consumed ~50% CPU via 3s recursive lstat).
+  last_edited_ms: 1782461441205
 2d7e540182272b0b:
   path: crates/cp-orchestrator/src/services/auth/store.rs
   description: AuthStore — SQLite-backed auth CRUD. Schema init (users/sessions/agent_acl), Argon2id hashing, token/UUID generation. User CRUD, session lifecycle (create/validate/revoke with lazy sweep). ACL ops extracted to sibling acl.rs.
@@ -2588,8 +2588,8 @@
   last_edited_ms: 1781695333858
 413e40ea1abc630e:
   path: crates/cp-mod-search/src/types.rs
-  description: Core types + config constants. SearchPersistData (recompute tracking + task_signals ring), SearchState (SharedRadarCache Arc<Mutex> + T295 watchdog:Option<WatchdogHandle> — dropped on reload to stop the old meili supervisor), Chunk, SearchResult, SearchMetrics, SearchOverlayInfo (meili_cpu_pct/memory_bytes), MeiliLiveStats, IndexerCmd, WatcherHandle. logs_index_settings.
-  last_edited_ms: 0
+  description: Core types + config constants. SearchPersistData (recompute tracking + task_signals ring), SearchState (SharedRadarCache Arc<Mutex> + T295 watchdog:Option<WatchdogHandle> — dropped on reload to stop the old meili supervisor), Chunk, SearchResult, SearchMetrics, SearchOverlayInfo (meili_cpu_pct/memory_bytes), MeiliLiveStats, IndexerCmd, WatcherHandle(RecommendedWatcher). logs_index_settings.
+  last_edited_ms: 1782461441272
 4168b472e3787b38:
   path: crates/cp-orchestrator/src/services/auth/tests.rs
   description: '18 auth unit tests: schema, hashing, token/UUID gen, user CRUD (create/get/list/delete cascade), session lifecycle (create/validate/revoke/expired sweep), ACL (grant/revoke/update role/list/cascade delete/overwrite).'
