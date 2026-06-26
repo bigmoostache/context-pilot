@@ -85,30 +85,3 @@ pub fn update_settings(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&U
     }
     get_settings(state, auth_user)
 }
-
-/// `POST /api/settings/keys` — admin: store one or more provider API keys in
-/// the central config. Body: `{ "keys": { "anthropic": "sk-...", ... } }`. An
-/// empty value clears that provider's key.
-pub fn update_keys(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
-    if !can_admin(state, auth_user) {
-        return HttpReply::error(403, "admin access required");
-    }
-    #[derive(serde::Deserialize)]
-    struct Req {
-        keys: std::collections::HashMap<String, String>,
-    }
-    let Ok(req) = serde_json::from_slice::<Req>(body) else {
-        return HttpReply::error(400, "expected {\"keys\":{\"anthropic\":\"...\"}}");
-    };
-    for (name, value) in &req.keys {
-        // Only accept known canonical provider names to avoid polluting the
-        // central key store with arbitrary client-supplied names.
-        if !LLM_PROVIDERS.contains(&name.as_str()) {
-            continue;
-        }
-        if let Err(e) = global::store_api_key(name, value.trim()) {
-            return HttpReply::error(500, &e);
-        }
-    }
-    get_settings(state, auth_user)
-}

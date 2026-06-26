@@ -61,6 +61,7 @@ impl AuthStore {
                  password_hash TEXT NOT NULL,
                  role         TEXT NOT NULL DEFAULT 'user'
                                   CHECK(role IN ('admin', 'user')),
+                 must_change_password INTEGER NOT NULL DEFAULT 0,
                  created_at   INTEGER NOT NULL,
                  updated_at   INTEGER NOT NULL
              );
@@ -180,8 +181,8 @@ impl AuthStore {
         let hash = Self::hash_password(password)?;
         let now = now_ms();
         let _rows = self.conn.execute(
-            "INSERT INTO users (id, email, name, password_hash, role, created_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO users (id, email, name, password_hash, role, must_change_password, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7)",
             rusqlite::params![id, email, name, hash, role.as_str(), now, now],
         )?;
         Ok(User {
@@ -190,9 +191,26 @@ impl AuthStore {
             name: name.to_owned(),
             password_hash: hash,
             role,
+            must_change_password: false,
             created_at: now,
             updated_at: now,
         })
+    }
+
+    /// Set (or clear) the `must_change_password` flag for a user. Used by the
+    /// boot-time admin seed to force a rotation of the provisioned password.
+    /// Returns `true` if a row changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AuthError::Database`] on SQLite failure.
+    pub(crate) fn set_must_change_password(&self, user_id: &str, value: bool) -> Result<bool, AuthError> {
+        let now = now_ms();
+        let updated = self.conn.execute(
+            "UPDATE users SET must_change_password = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![i64::from(value), now, user_id],
+        )?;
+        Ok(updated > 0)
     }
 
     /// Fetch a user by their UUID, or `None` if not found.
@@ -202,7 +220,7 @@ impl AuthStore {
     /// Returns [`AuthError::Database`] on SQLite failure.
     pub(crate) fn get_user_by_id(&self, id: &str) -> Result<Option<User>, AuthError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, email, name, password_hash, role, created_at, updated_at \
+            "SELECT id, email, name, password_hash, role, created_at, updated_at, must_change_password \
              FROM users WHERE id = ?1",
         )?;
         let mut rows = stmt.query_map(rusqlite::params![id], row_to_user)?;
@@ -219,7 +237,7 @@ impl AuthStore {
     /// Returns [`AuthError::Database`] on SQLite failure.
     pub(crate) fn get_user_by_email(&self, email: &str) -> Result<Option<User>, AuthError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, email, name, password_hash, role, created_at, updated_at \
+            "SELECT id, email, name, password_hash, role, created_at, updated_at, must_change_password \
              FROM users WHERE email = ?1",
         )?;
         let mut rows = stmt.query_map(rusqlite::params![email], row_to_user)?;
@@ -236,7 +254,7 @@ impl AuthStore {
     /// Returns [`AuthError::Database`] on SQLite failure.
     pub(crate) fn list_users(&self) -> Result<Vec<User>, AuthError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, email, name, password_hash, role, created_at, updated_at \
+            "SELECT id, email, name, password_hash, role, created_at, updated_at, must_change_password \
              FROM users ORDER BY created_at ASC",
         )?;
         let rows = stmt.query_map([], row_to_user)?;
@@ -376,8 +394,9 @@ impl AuthStore {
     ) -> Result<bool, AuthError> {
         let hash = Self::hash_password(new_password)?;
         let now = now_ms();
+        // Changing the password always clears the forced-rotation flag.
         let updated = self.conn.execute(
-            "UPDATE users SET password_hash = ?1, updated_at = ?2 WHERE id = ?3",
+            "UPDATE users SET password_hash = ?1, updated_at = ?2, must_change_password = 0 WHERE id = ?3",
             rusqlite::params![hash, now, user_id],
         )?;
         Ok(updated > 0)
@@ -421,7 +440,7 @@ impl AuthStore {
         // externally — the Session struct was removed to eliminate dead_code on
         // fields only consumed by tests).
         let mut stmt = self.conn.prepare(
-            "SELECT u.id, u.email, u.name, u.password_hash, u.role, u.created_at, u.updated_at \
+            "SELECT u.id, u.email, u.name, u.password_hash, u.role, u.created_at, u.updated_at, u.must_change_password \
              FROM sessions s \
              JOIN users u ON u.id = s.user_id \
              WHERE s.token = ?1",

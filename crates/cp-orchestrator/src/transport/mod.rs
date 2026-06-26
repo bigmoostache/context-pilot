@@ -212,7 +212,6 @@ fn route_rest(
         (Method::Delete, ["api", "auth", "sessions", sid]) => auth::revoke_session(state, sid, auth_user),
         (Method::Get, ["api", "settings"]) => rest::get_settings(state, auth_user),
         (Method::Post, ["api", "settings"]) => rest::update_settings(state, body_bytes, auth_user),
-        (Method::Post, ["api", "settings", "keys"]) => rest::update_keys(state, body_bytes, auth_user),
         (Method::Get, ["api", "auth", "users"]) => auth::list_users(state, auth_user),
         (Method::Post, ["api", "auth", "users"]) => auth::create_user(state, body_bytes, auth_user),
         (Method::Delete, ["api", "auth", "users", user_id]) => auth::delete_user(state, user_id, auth_user),

@@ -38,7 +38,7 @@ pub(crate) use env_keys::{env_key_reveal, env_key_update, env_keys_list};
 pub use library::create_command;
 pub use restart::restart_agent;
 pub use retire::{retire_agent, unretire_agent};
-pub use settings::{get_settings, update_keys, update_settings};
+pub use settings::{get_settings, update_settings};
 use thread_shape::{overlay_roster, reshape_thread};
 
 /// A transport-agnostic reply: an HTTP status and a JSON body.

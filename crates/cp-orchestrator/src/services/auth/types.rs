@@ -94,6 +94,10 @@ pub struct User {
     pub(crate) password_hash: String,
     /// System-level role.
     pub(crate) role: UserRole,
+    /// When `true`, the user must change their password before using the app —
+    /// set on seeded/admin-provisioned accounts whose initial password is known
+    /// to the provisioner. Cleared on the next successful password change.
+    pub(crate) must_change_password: bool,
     /// Creation timestamp (ms since Unix epoch).
     pub(crate) created_at: u64,
     /// Last-update timestamp (ms since Unix epoch).
@@ -138,7 +142,7 @@ pub(crate) struct SessionInfo {
 
 /// Map a `rusqlite::Row` from the canonical `SELECT` column order into a
 /// [`User`].  Column indices: 0=id, 1=email, 2=name, 3=password_hash,
-/// 4=role, 5=created_at, 6=updated_at.
+/// 4=role, 5=created_at, 6=updated_at, 7=must_change_password.
 pub(crate) fn row_to_user(row: &rusqlite::Row<'_>) -> Result<User, rusqlite::Error> {
     let role_str: String = row.get(4)?;
     Ok(User {
@@ -149,5 +153,6 @@ pub(crate) fn row_to_user(row: &rusqlite::Row<'_>) -> Result<User, rusqlite::Err
         role: UserRole::from_sql(&role_str),
         created_at: row.get(5)?,
         updated_at: row.get(6)?,
+        must_change_password: row.get::<_, i64>(7)? != 0,
     })
 }

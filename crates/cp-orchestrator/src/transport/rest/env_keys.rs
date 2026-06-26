@@ -261,6 +261,7 @@ mod tests {
             name: "Test".to_owned(),
             password_hash: String::new(),
             role: UserRole::User,
+            must_change_password: false,
             created_at: 0,
             updated_at: 0,
         };
@@ -299,6 +300,7 @@ mod tests {
             name: "Test".to_owned(),
             password_hash: String::new(),
             role: UserRole::User,
+            must_change_password: false,
             created_at: 0,
             updated_at: 0,
         };
