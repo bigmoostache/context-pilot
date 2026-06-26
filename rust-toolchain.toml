@@ -1,3 +1,9 @@
 [toolchain]
-channel = "1.96.0"
+# Pinned to match the CI's RUST_VERSION. This file overrides the toolchain for
+# EVERY cargo invocation (CI and the `cross` appliance build alike), so it must
+# agree with what fmt/clippy and the workspace lint config are tuned for — 1.95.0.
+# (1.95 already supports edition 2024, the only reason `cross` needs a pin; and
+# it sidesteps the soft_unstable lint break that hits rustc 1.96+.)
+channel = "1.95.0"
+components = ["rustfmt", "clippy"]
 targets = ["aarch64-unknown-linux-gnu", "aarch64-unknown-linux-musl"]

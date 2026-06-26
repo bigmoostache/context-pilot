@@ -19,7 +19,7 @@ use std::path::PathBuf;
 
 use serde_json::json;
 
-use super::HttpReply;
+use super::super::HttpReply;
 use crate::services::auth::types::{User, UserRole};
 
 /// Well-known env var names the config panel can query.
@@ -44,11 +44,7 @@ const KNOWN_KEYS: &[(&str, &str)] = &[
 /// no value supplied) counts as **absent** — so the Services pane shows it as
 /// "not configured" rather than "available".
 fn resolve_env(name: &str, overrides: &HashMap<String, String>) -> Option<String> {
-    overrides
-        .get(name)
-        .cloned()
-        .or_else(|| std::env::var(name).ok())
-        .filter(|v| !v.trim().is_empty())
+    overrides.get(name).cloned().or_else(|| std::env::var(name).ok()).filter(|v| !v.trim().is_empty())
 }
 
 /// `GET /api/env-keys` — list all well-known keys with their status.

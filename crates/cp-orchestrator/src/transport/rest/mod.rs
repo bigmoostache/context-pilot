@@ -25,20 +25,19 @@ use serde::Serialize;
 use crate::channel::AgentChannel;
 
 mod backend;
+mod config;
 mod create;
-mod env_keys;
 mod library;
 mod lifecycle;
 mod releases;
-mod settings;
 mod thread_shape;
 pub use backend::Backend;
+pub(crate) use config::env_keys::{env_key_reveal, env_key_update, env_keys_list};
+pub use config::settings::{get_settings, update_settings};
 pub use create::create_agent;
-pub(crate) use env_keys::{env_key_reveal, env_key_update, env_keys_list};
 pub use library::create_command;
 pub use lifecycle::{restart_agent, retire_agent, unretire_agent};
 pub(crate) use releases::{delete_release, download_release, list_releases, select_release, set_arch};
-pub use settings::{get_settings, update_settings};
 use thread_shape::{overlay_roster, reshape_thread};
 
 /// A transport-agnostic reply: an HTTP status and a JSON body.

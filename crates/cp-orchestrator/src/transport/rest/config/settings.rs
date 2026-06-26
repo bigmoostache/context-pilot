@@ -13,7 +13,7 @@ use std::sync::Mutex;
 
 use cp_base::config::global;
 
-use super::{Backend, HttpReply};
+use super::super::{Backend, HttpReply};
 use crate::services::auth::types::{User, UserRole};
 
 /// Canonical LLM provider key names surfaced in the cockpit onboarding/profile.
@@ -29,9 +29,7 @@ const ALLOWED_MODELS: &str = "allowed_models";
 
 /// Read the org-wide allowed-model allowlist (empty when unset / unparsable).
 fn allowed_models() -> Vec<String> {
-    global::get_setting(ALLOWED_MODELS)
-        .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
-        .unwrap_or_default()
+    global::get_setting(ALLOWED_MODELS).and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok()).unwrap_or_default()
 }
 
 /// Is the caller allowed to mutate central settings? Admins always are; when
@@ -49,10 +47,8 @@ fn can_admin(state: &Mutex<Backend>, auth_user: Option<&User>) -> bool {
 /// onboarding gate and the profile/config panes.
 pub fn get_settings(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
     let auth_enabled = state.lock().map(|b| b.auth.is_some()).unwrap_or(false);
-    let providers: Vec<serde_json::Value> = LLM_PROVIDERS
-        .iter()
-        .map(|id| serde_json::json!({ "id": id, "configured": global::has_api_key(id) }))
-        .collect();
+    let providers: Vec<serde_json::Value> =
+        LLM_PROVIDERS.iter().map(|id| serde_json::json!({ "id": id, "configured": global::has_api_key(id) })).collect();
     HttpReply::ok(&serde_json::json!({
         "default_provider": global::get_setting(DEFAULT_PROVIDER),
         "default_model": global::get_setting(DEFAULT_MODEL),

@@ -13,6 +13,7 @@ mod schemas_ext;
 // Acknowledge lib-only deps visible to the integration-test binary.
 use argon2 as _;
 use calamine as _;
+use cp_base as _;
 use cp_mod_bridge as _;
 use cp_oplog as _;
 use cp_orchestrator as _;

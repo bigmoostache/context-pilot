@@ -95,9 +95,7 @@ impl AuthStore {
         // existed — adds it if absent. The duplicate-column error on fresh
         // databases (where the CREATE already includes `id`) is expected and
         // ignored.
-        let _migration = self
-            .conn
-            .execute("ALTER TABLE sessions ADD COLUMN id TEXT", []);
+        let _migration = self.conn.execute("ALTER TABLE sessions ADD COLUMN id TEXT", []);
         Ok(())
     }
 
@@ -360,11 +358,7 @@ impl AuthStore {
     /// # Errors
     ///
     /// Returns [`AuthError::Database`] on SQLite failure.
-    pub(crate) fn revoke_session_by_id(
-        &self,
-        user_id: &str,
-        id: &str,
-    ) -> Result<Option<String>, AuthError> {
+    pub(crate) fn revoke_session_by_id(&self, user_id: &str, id: &str) -> Result<Option<String>, AuthError> {
         let token: Option<String> = self
             .conn
             .query_row(
@@ -373,10 +367,8 @@ impl AuthStore {
                 |row| row.get(0),
             )
             .ok();
-        let deleted = self.conn.execute(
-            "DELETE FROM sessions WHERE id = ?1 AND user_id = ?2",
-            rusqlite::params![id, user_id],
-        )?;
+        let deleted =
+            self.conn.execute("DELETE FROM sessions WHERE id = ?1 AND user_id = ?2", rusqlite::params![id, user_id])?;
         Ok(if deleted > 0 { token } else { None })
     }
 
@@ -387,11 +379,7 @@ impl AuthStore {
     ///
     /// Returns [`AuthError::Hash`] if hashing fails, [`AuthError::Database`] on
     /// SQLite failure.
-    pub(crate) fn update_password(
-        &self,
-        user_id: &str,
-        new_password: &str,
-    ) -> Result<bool, AuthError> {
+    pub(crate) fn update_password(&self, user_id: &str, new_password: &str) -> Result<bool, AuthError> {
         let hash = Self::hash_password(new_password)?;
         let now = now_ms();
         // Changing the password always clears the forced-rotation flag.
@@ -410,12 +398,7 @@ impl AuthStore {
     ///
     /// Returns [`AuthError::Database`] on SQLite failure (incl. duplicate
     /// email).
-    pub(crate) fn update_profile(
-        &self,
-        user_id: &str,
-        name: &str,
-        email: &str,
-    ) -> Result<bool, AuthError> {
+    pub(crate) fn update_profile(&self, user_id: &str, name: &str, email: &str) -> Result<bool, AuthError> {
         let now = now_ms();
         let updated = self.conn.execute(
             "UPDATE users SET name = ?1, email = ?2, updated_at = ?3 WHERE id = ?4",

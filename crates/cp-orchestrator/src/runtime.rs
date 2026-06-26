@@ -196,10 +196,8 @@ fn seed_admin_if_empty(store: &crate::services::auth::store::AuthStore) {
             return;
         }
     }
-    let name = std::env::var("CP_SEED_ADMIN_NAME")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "Admin".to_owned());
+    let name =
+        std::env::var("CP_SEED_ADMIN_NAME").ok().filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "Admin".to_owned());
     match store.create_user(email.trim(), name.trim(), &password, UserRole::Admin) {
         Ok(user) => match store.set_must_change_password(&user.id, true) {
             Ok(_) => eprintln!(
