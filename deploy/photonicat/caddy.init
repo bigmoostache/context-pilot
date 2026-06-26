@@ -1,7 +1,11 @@
 #!/bin/sh /etc/rc.common
-# Caddy reverse proxy + TLS for the Context Pilot cockpit — OpenWrt procd service.
-# Install as /etc/init.d/caddy, then: /etc/init.d/caddy enable
+# Caddy reverse proxy + private-CA TLS for the Context Pilot cockpit — OpenWrt
+# procd service. Install as /etc/init.d/caddy, then: /etc/init.d/caddy enable
 # Logs: logread -e caddy
+#
+# TLS is Caddy's built-in CA (`tls internal`) — no OVH/DNS-01, no public ACME,
+# no API credentials. The orchestrator owns the Caddyfile and regenerates it
+# (name/IP, provisioned gate) then reloads this service via its admin API.
 
 USE_PROCD=1
 START=96
@@ -9,25 +13,18 @@ STOP=09
 
 PROG=/mnt/data/context-pilot/bin/caddy
 CONF=/mnt/data/context-pilot/caddy/Caddyfile
-ENVF=/mnt/data/context-pilot/caddy/ovh.env
 DATA=/mnt/data/context-pilot/caddy
 
 start_service() {
-	# OVH API creds (OVH_ENDPOINT / OVH_APPLICATION_KEY / OVH_APPLICATION_SECRET
-	# / OVH_CONSUMER_KEY) live in a 0600 file, never in the script.
-	[ -f "$ENVF" ] && . "$ENVF"
-
 	procd_open_instance
 	procd_set_param command "$PROG" run --config "$CONF" --adapter caddyfile
-	# Persist certs/account on the big data partition (rootfs overlay is tiny).
+	# Persist the internal CA + certs on the big data partition (rootfs overlay
+	# is tiny). The internal CA root lives under $DATA/data/caddy/pki — that is
+	# what the IT console serves for download (M4).
 	procd_set_param env \
 		HOME="$DATA" \
 		XDG_DATA_HOME="$DATA/data" \
-		XDG_CONFIG_HOME="$DATA/config" \
-		OVH_ENDPOINT="$OVH_ENDPOINT" \
-		OVH_APPLICATION_KEY="$OVH_APPLICATION_KEY" \
-		OVH_APPLICATION_SECRET="$OVH_APPLICATION_SECRET" \
-		OVH_CONSUMER_KEY="$OVH_CONSUMER_KEY"
+		XDG_CONFIG_HOME="$DATA/config"
 	procd_set_param respawn 3600 5 5
 	procd_set_param stdout 1
 	procd_set_param stderr 1

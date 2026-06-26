@@ -45,16 +45,30 @@ pub(crate) fn is_provisioned(flag_path: &Path) -> bool {
 /// Returns the underlying I/O error if the directory cannot be created or the
 /// file cannot be written, synced, or renamed.
 pub(crate) fn set_provisioned(flag_path: &Path, value: bool) -> std::io::Result<()> {
-    if let Some(parent) = flag_path.parent() {
+    write_atomic(flag_path, if value { b"true\n" } else { b"false\n" })
+}
+
+/// Atomically and durably write `bytes` to `path`: create the parent dir,
+/// write-tmp → `fsync` file → rename → `fsync` parent dir. Shared by the
+/// maintenance plane's durable state (provisioned flag, identity, Caddyfile) so
+/// every on-disk mutation has the same crash-safety guarantees. See
+/// [`set_provisioned`] for the rationale on the explicit fsyncs.
+///
+/// # Errors
+///
+/// Returns the underlying I/O error if the directory cannot be created or the
+/// file cannot be written, synced, or renamed.
+pub(super) fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let tmp = flag_path.with_extension("tmp");
+    let tmp = path.with_extension("tmp");
     let mut file = std::fs::File::create(&tmp)?;
-    file.write_all(if value { b"true\n" } else { b"false\n" })?;
+    file.write_all(bytes)?;
     file.sync_all()?;
     drop(file);
-    std::fs::rename(&tmp, flag_path)?;
-    if let Some(parent) = flag_path.parent() {
+    std::fs::rename(&tmp, path)?;
+    if let Some(parent) = path.parent() {
         if let Ok(dir) = std::fs::File::open(parent) {
             let _synced = dir.sync_all(); // best-effort: persist the rename in the dir entry
         }

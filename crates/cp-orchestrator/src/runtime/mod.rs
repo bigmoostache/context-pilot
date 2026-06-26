@@ -277,6 +277,10 @@ impl Runtime {
             );
         }
 
+        // Render + reload Caddy for the current state (M3). No-op unless Caddy is
+        // configured (CP_CADDYFILE); never fatal.
+        crate::transport::maint::apply_caddy_at_boot(&self.backend);
+
         // Maintenance plane (M1) — second listener, LAN-only + Admin-gated.
         let maint_addr = format!("{}:{}", self.config.maint_bind, self.config.maint_port);
         let maint_state = Arc::clone(&self.backend);
