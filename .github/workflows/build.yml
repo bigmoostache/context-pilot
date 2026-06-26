@@ -6,6 +6,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_VERSION: "1.95.0"
 
 jobs:
   build:
@@ -33,10 +34,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust 1.95.0
+      - name: Install Rust ${{ env.RUST_VERSION }}
         run: |
-          rustup toolchain install 1.95.0 --profile minimal
-          rustup default 1.95.0
+          rustup toolchain install ${{ env.RUST_VERSION }} --profile minimal
+          rustup default ${{ env.RUST_VERSION }}
           rustup target add ${{ matrix.target }}
 
       - name: Cargo cache

@@ -574,6 +574,10 @@
   path: web/src/components/panels/cockpit/EntitiesPanel.tsx
   description: Cockpit Entities panel. useEntities(agentId); one card per SQLite table w/ row count + sample rows. On empty, renders InspectionUnavailable notice (entity DB is an open SQLite connection; on-disk file is 0-byte handle).
   last_edited_ms: 1781821687505
+0e9df7de6b5cff79:
+  path: web/src/lib/types.ts
+  description: 'Domain types barrel. Re-exports 18 backend types from generated/types.gen.ts. Extended re-exports: Agent (+accent), ContextPanel, ThreadMsg (+streaming), ThreadDetail (+typed log). Derived aliases: AgentStatus, ThreadStatus, Importance, NotifKind, LibraryKind. UI-only types: StreamPhase, ChatMessage, User, Finder*, ViewMode, Usage*.'
+  last_edited_ms: 1782476421979
 0ef0bd81edb04193:
   path: crates/cp-base/src/config/yaml_sync.rs
   description: YamlSync engine. SyncEntry trait (yaml_key, last_edited_ms, set_last_edited_ms). Generic load/save/upsert/remove/populate/migrate/remove_where. BTreeMap-based, additive merge, latest-wins conflict resolution, .bak backup.
@@ -2230,6 +2234,10 @@
   path: crates/cp-wire/src/framing.rs
   description: 'Oplog record framing: len(4B LE)+CRC32C(4B LE)+JSON payload. encode_raw/decode_raw + encode_entry/decode_entry. Manual u32_to_le (const)/u32_from_le (non-const: From not const-stable). FrameError enum (no std::error::Error — dodges missing_trait_methods). All buffer access via .get() (indexing_slicing forbid). 15 tests.'
   last_edited_ms: 0
+382a69421691e17e:
+  path: .github/workflows/build.yml
+  description: 'Cross-platform build workflow. 4-target matrix: linux-x86_64 (native), linux-aarch64 (cross), macos-x86_64 (macos-13), macos-aarch64 (macos-latest). Pins Rust via RUST_VERSION env var. Builds tui + cp-console-server. 30-day artifact retention.'
+  last_edited_ms: 1782476581810
 3837014b45245668:
   path: crates/cp-mod-console/src/manager.rs
   description: TUI-side session handle. spawn()/reconnect()/kill()/send_input() via console server. FilePoller + StatusPoller background threads per session. Orphan cleanup on startup. server_request() short-lived UnixStream per call. Geometric backoff socket wait (25ms→500ms cap, 3s budget).
@@ -4322,6 +4330,10 @@
   path: ui/src/lib/account.tsx
   description: Shared account context (T30). AccountProvider holds the mutable `managedByCompany` flag (seeded from currentUser mock) + setManaged; useAccount() hook exposes {user, managed, setManaged}. Single source of truth so the ProfileModal account-type toggle drives BOTH the Profile account section AND the ConfigPanel API-key lock in sync. Mounted in App.tsx around the shell.
   last_edited_ms: 1781599152937
+6c05d2e8d4cf4cdc:
+  path: .github/workflows/ci.yml
+  description: 'Unified CI workflow (replaces rust.yml + code_length.yml). 3 jobs: rust (fmt+clippy+build+test), structure (file-lengths, folder-sizes, lint-exceptions, lint-config hash chain, web-structure), contract (OpenAPI+TS drift check). Triggers: push/PR to master. Mirrors ALL 6 local callbacks.'
+  last_edited_ms: 1782476581684
 6c099d35db6e447b:
   path: crates/cp-orchestrator/src/services/materialized_view.rs
   description: 'MaterializedView in-mem fleet projection folded from OpEntry (one AgentView per agent). AgentView{rev,heads,roster,focused_thread_id,phase,lifecycle,cost}. apply: Checkpoint=authoritative heads+roster reset, MessageCreated=set_thread_head + roster bump, ThreadCreated/Archived/Restored/StatusChanged=RosterThread fold helpers, ThreadFocusChanged=focused_thread_id latest-wins (NOT in checkpoint — ephemeral, cold-start None until next emit, /threads falls back to disk FocusState), Phase/Lifecycle/Cost=latest-wins, CommandEffect/SeenMark/Unknown=inert. Tests in sibling materialized_view_tests.rs.'
@@ -7798,6 +7810,10 @@ c053425f2b1e3c58:
   path: web/src/components/shell/TopBar.tsx
   description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit), agent-config gear, account UserMenu. Phase 10: UsersDialog state + onOpenUsers wired to UserMenu for admin user management.'
   last_edited_ms: 1782241802690
+c059a7ee0f8970bf:
+  path: .github/workflows/release.yml
+  description: 'Release workflow: triggered on push to releases branch. 5-target matrix (linux-x86_64, linux-aarch64, linux-aarch64-musl, macos-x86_64, macos-aarch64). Builds tui+cp-console-server, packages as tarballs, creates GitHub Release with softprops/action-gh-release.'
+  last_edited_ms: 1782476581750
 c05cfb30ec6be543:
   path: crates/cp-orchestrator/src/transport/inspect/finder/support.rs
   description: 'Finder shared helpers: agent_folder, confined_path (realm jail), count_visible_children, infer_kind, extract_param, percent_decode + unit tests.'
@@ -9758,6 +9774,10 @@ f4f7ce1b81b33585:
   path: crates/cp-mod-search/src/meili/watchdog.rs
   description: 'Meilisearch supervision (T295 self-heal): SpawnLock (machine-wide single-flight spawn guard = atomic create_new spawn.lock + steal-if-stale 30s, RAII removes on drop) + WatchdogHandle (per-agent supervisor thread, Mutex<stop:Sender,join> so it''s Sync; Drop signals+joins so a reload never stacks two). run() loop: every WATCHDOG_INTERVAL(5s) server::health_ok(port,key); on fail respawn() under SpawnLock (elected spawner calls ensure_server_running; losers defer LOCK_POLL then reconnect_ok); geometric backoff_for() base 2s→cap 60s on consecutive failures. Fixes Gap A (no supervision → dead meili stayed dead until reboot).'
   last_edited_ms: 0
+f4f934429193c22c:
+  path: web/src/lib/support/markdown.tsx
+  description: GFM markdown renderer (react-markdown + remark-gfm + remark-math + rehype-katex) themed to app tokens; default + onAccent variants. Bare URLs inside backtick inline code auto-linked as clickable <a> tags. LaTeX via KaTeX ($...$ inline DISABLED, $$...$$ display). XSS-safe (no raw HTML). Code block copy button, inline code click-to-copy (ClickableCode), CopyableTable (tableToMarkdown for pipe-delimited clipboard). Unicode bullet normalizer (normalizeMarkdown) fixes •◦▪‣ → CommonMark `-`.
+  last_edited_ms: 1782476435878
 f502895e9e495ba8:
   path: crates/cp-orchestrator/tests/registry_channel.rs
   description: 'Phase 27 (X794) backend↔agent seam suite (4 tests, all green). Drives discovery+channel against real cp-mod-bridge artifacts: (1) real Boot→AgentRegistry Appeared+Live→idempotent quiet scan→drop→Disappeared; (2) Stale fires ONLY on Live→non-live transition, first-sight staleness rides Appeared (crafted Entry+Heartbeat); (3) body Store spill→OplogService MessageCreated→Tailer.poll→AgentChannel.hydrate integrity-verified + inlined body hydrate=None; (4) AgentChannel.send→real Intake.handle_connection over UnixListener (Accepted), resend same dedup_token Accepted but replay seen.len==1 (exactly-once). Top `use nix/serde/tiny_http as _;` for per-target unused-crate-dependencies.'
