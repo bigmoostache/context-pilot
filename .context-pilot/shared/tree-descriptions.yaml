@@ -494,6 +494,10 @@
   path: docs/logs.md
   description: Logging system design
   last_edited_ms: 0
+0bce8222a6cbeff0:
+  path: web/src/components/panels/TokenBar.tsx
+  description: A slim, rounded progress bar. Color reflects load via loadColor(ratio) unless overridden. fill-sweep animation on mount. TokenBarProps{value,max,color?,animate?,className?}.
+  last_edited_ms: 1782470512317
 0c0359faadcef86e:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
@@ -658,6 +662,10 @@
   path: web/src/lib/api/body.ts
   description: 'Content-addressed message-body hydrate (T357, split from api/index for <500). fetchMessageBody(agentId,hash): GET /api/agent/{id}/body/{hash} → {bytes:number[]} → TextDecoder UTF-8 string (same JSON a small message rides inline). Race-free: the body is stored before the referencing MessageCreated delta is emitted (I13 body-before-reference barrier). Re-exported from api/index.ts barrel. Consumed by the SSE bridge''s spilled-body hydrate.'
   last_edited_ms: 1782299337406
+10f09d1ac9c39d22:
+  path: web/src/components/finder/preview/codeHighlight.ts
+  description: Syntax highlighting for Finder code previews (T280). highlight.js common bundle + 7 extras (scala/elixir/erlang/haskell/ocaml/dart/fsharp). EXT_LANG map (70+ extensions). HighlightResult{html,language}. highlightCode(code,filename) resolves lang from extension or auto-detects. Class-themed via index.css.
+  last_edited_ms: 1782470458229
 111109570cbe01e9:
   path: src/state/persistence/boot.rs
   description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 3 parallel threads. Loads .env files (project + global).'
@@ -709,6 +717,10 @@
 1220e72b9135b659:
   path: src/ui/ir/sidebar.rs
   description: 'Sidebar IR builders — assemble Sidebar from application state. build_entries: fixed+dynamic entries, badge counts, spinner for running consoles (replaces panel ID), loading spinner (suffix). Token bar, stats, PR card, help hints. Ctrl+C ''copied ✓'' flash (2s) via copied_flash_ms.'
+  last_edited_ms: 0
+122e248772bda621:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 123157596598d710:
   path: crates/cp-mod-prompt/src/seed.rs
@@ -998,6 +1010,10 @@
   path: web/src/lib/sync.ts
   description: 'SSE→QueryClient delta bridge (push plane). ensureSync(agentId): one idempotent per-agent subscription. delta→fold into [''threads'',id]+[''agent'',id] via setQueryData functional updater (applyThreadDelta/applyAgentDelta), rev high-water guard; null→invalidate. qk query-key registry incl qk.fsPreview (T272 Finder live preview cache key). applyThreadDelta folds thread_created/archived/restored/status_changed/focus_changed/message_created (msgId=msg_${log.length} → dedup vs disk poll). mergeThreadLogs non-destructive poll reconcile. Kills T123 burst-clobber + T254 double-render structurally.'
   last_edited_ms: 1781885646421
+19739d846a286c61:
+  path: web/src/components/agents/PromptModal.tsx
+  description: 'Create / view / edit a library prompt modal. Design-only: every field is editable but nothing is persisted — saving just closes. ImportModal: import prompts from other agentic systems (Claude Code, Codex, Cursor, Windsurf, Aider, Continue). Source type defines import sources. KIND record maps LibraryKind to UI metadata.'
+  last_edited_ms: 1782470363484
 197740b32187c3a1:
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (493 LOC after X913 split). Owns view state + derived listings + render; delegates fs mutations/nav to useFinderActions, selection/open/tab/menu to useFinderSelection, keyboard to useFinderKeyboard, external drag to useExternalDragUpload, bottom chrome to FinderOverlays. QuickLook = modal shadcn Sheet (2/3 width, grid+list).
@@ -3126,6 +3142,10 @@
   path: crates/cp-orchestrator/src/services/auth/backup.rs
   description: 'Auth.db backup system (NFR-19/20): BackupScheduler (rolling 5min overwrite + daily AM/PM permanent snapshots). AuthStore::backup_to via SQLite online backup API. epoch_to_ymd_h (Hinnant civil-time algorithm). Wired into runtime.rs slow cadence. 6 tests.'
   last_edited_ms: 1782240566118
+4ececafa55cd3870:
+  path: web/src/lib/support/devMode.tsx
+  description: DevMode context (T301). devMode boolean persisted to localStorage cp-dev-mode. Controls Cockpit tab visibility. Off by default.
+  last_edited_ms: 1782470272977
 4ed07f7796ebdc80:
   path: web/package.json
   description: 'Frontend deps: @base-ui/react 1.5, @tanstack/react-query 5.101, react 19.2, react-markdown 10 + remark-gfm, highlight.js 11.11, tailwindcss 4.3, shadcn 4.11, vite 8, playwright. scripts: dev/build(tsc -b && vite build)/lint/preview.'
@@ -4014,6 +4034,10 @@
   path: crates/cp-wire/src/types/mod.rs
   description: 'ContentHash (SHA-256, Copy, hex serde: of/to_hex/from_hex). Phase enum (Idle/Streaming/Tooling), LifecycleState (Starting/Running/Stopping/Stopped), ThreadTurn (MyTurn/TheirTurn/Unknown, snake_case). All three carry #[cfg_attr(feature="openapi", derive(utoipa::ToSchema))] for OpenAPI spec generation. Declares+re-exports ack/body/command/oplog/registry/snapshot/stream.'
   last_edited_ms: 1782421966339
+6647600ab811b367:
+  path: web/src/components/finder/support/useMarquee.ts
+  description: Finder rubber-band (box) selection hook. MarqueeBand{left,top,width,height}. UseMarqueeArgs. DRAG_THRESHOLD=4px. Pointer handlers, live getBoundingClientRect hit-testing against [data-finder-item] cells. ⌘/Ctrl additive mode. didDrag() one-shot flag.
+  last_edited_ms: 1782470458333
 66489a640f04b66c:
   path: web/src/components/auth/UsersDialog.tsx
   description: Admin user management dialog (Phase 10). Lists all users with RoleBadge, create user form (collapsible), delete user with confirmation, force-logout (revoke all sessions). TanStack Query hooks. Accessible from UserMenu when admin.
@@ -5266,6 +5290,10 @@
   path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
   description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape.'
   last_edited_ms: 1781794520491
+84601269c6406ec9:
+  path: web/src/components/finder/support/macIcons.tsx
+  description: 'macOS-faithful file & folder SVGs (T27). FileIcon→MacFolder/MacDocument. GlyphKind (12 art variants: code/doc/pdf/sheet/slides/photo/markdown/json/zip/audio/video/binary). EXT_COLOR map. KIND_TAG maps FinderKind→{color,ext,glyph}. DocGlyph draws compact vs enlarged variants. useId-scoped gradient/filter ids. LABEL_MIN_SIZE=32.'
+  last_edited_ms: 1782470458299
 847041f59a0204d5:
   path: crates/cp-base/src/config/llm_types.rs
   description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends), per-provider model enums with pricing/context windows
@@ -9086,6 +9114,10 @@ e42f22a6aaede223:
   path: crates/cp-mod-callback/src/tools_upsert.rs
   description: Callback upsert tool. Create/update/delete callback definitions. Script file management. Diff-based script editing (old_string/new_string). YAML sync on every mutation.
   last_edited_ms: 1780497937357
+e4442db2437171a3:
+  path: web/src/lib/theme.tsx
+  description: Theme provider. Theme='light'|'dark', ThemeCtx={theme,setTheme,toggle}. localStorage STORAGE_KEY='cp-theme'. Applies .dark class to document.documentElement.
+  last_edited_ms: 1782470272943
 e445bc97e31d455a:
   path: crates/cp-mod-callback/src/types.rs
   description: Callback types. CallbackDefinition (name, pattern, script, blocking, timeout, success_message, cwd, is_global). CallbackState (definitions, active_set, editor_open).
@@ -9114,6 +9146,10 @@ e519594d12a6f10f:
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+e555f72b364b05ea:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped). T304 draftKey; T331 pendingFiles+onRemoveFile; T334 onShowInFinder; T348 useLibrary command suggestions; T350 createCmdOpen + CreateCommandDialog. T367: OS-file drag-and-drop onto the whole <main> -> handleDrop zips the dropped file(s) client-side (zipFiles, @/lib/utils) into ONE archive then uploads via onAttach (same paperclip path, staged pendingFiles), falling back to raw files if zipping throws; while a file drag is in flight the surface gets a discrete 2px blur eased 300ms in/out (inline filter blur(2px)/blur(0px)); dragDepth useRef counter avoids child-cross flicker, isFileDrag guards on dataTransfer.types includes ''Files'', gated on onAttach (blur is the ONLY affordance). T414: auto-scroll only on non-auto messages (nonAutoCount dep instead of log.length) so tool counter updates don''t yank scroll. T416: handleDelete sends delete_message command via sendCommand(agentId, {kind, thread_id, message_ts}), onDelete threaded to Message component. T417: formatTs normalises ThreadMsg.ts (epoch-ms number from REST, ISO string from SSE, or pre-formatted) into relative time (''Xm ago''). Takes agentId + onAttach props.'
+  last_edited_ms: 1782468696067
 e566b5261513df72:
   path: web/sse_listen.py
   description: SSE listener debug script — prints all deltas with wall-clock timestamps for TUI→frontend latency correlation.
@@ -10122,6 +10158,10 @@ fe93f968075e94d3:
   path: crates/cp-mod-search/src/tools.rs
   description: Search tool execution with flame!("search_exec"). Split keyword+semantic multi-search via MeiliClient. dedup_by_score() merges overlapping results. iso_to_ms() via cp_mod_utilities::time. File/log filters. Async via spawn_async_tool. DynPanel creation. Mandatory semantic_query param.
   last_edited_ms: 0
+fe98735ced910694:
+  path: web/src/lib/support/panelMeta.ts
+  description: Panel UI metadata. panelIcon Record<PanelKind,LucideIcon>, Accent='signal'|'interactive'|'ok'|'warn'|'danger'|'muted' (superset of AccentToken), accentVar Record<Accent,CSSVar>, loadColor(ratio)->var, fmtTokens, fmtCost.
+  last_edited_ms: 1782470273007
 fedf859b9a9edf37:
   path: src/app/run/threads/mod.rs
   description: 'Thread helpers for main loop: maybe_inject_auto_read (synthetic Read on auto-continuation — note: does NOT break tempo, root cause of T322 stale-panel bug per M103), check_my_turn_threads, extract_thread_ids, maybe_append_tool_activity (auto traces).'
