@@ -10,6 +10,9 @@ env:
   CARGO_TERM_COLOR: always
   RUST_VERSION: "1.95.0"
 
+permissions:
+  contents: read
+
 jobs:
   rust:
     name: Rust (fmt · clippy · build · test)
