@@ -29,9 +29,10 @@ pub(super) fn transport() -> Value {
                 "id": { "type": "string" },
                 "name": { "type": "string" },
                 "description": { "type": "string" },
+                "available": { "type": "boolean" },
                 "models": arr(r("ModelDef"))
             },
-            "required": ["id", "name", "description", "models"]
+            "required": ["id", "name", "description", "available", "models"]
         },
         "CommandReceipt": {
             "type": "object",

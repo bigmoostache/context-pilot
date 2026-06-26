@@ -15,7 +15,7 @@ import type { Agent } from "@/lib/types"
 import { useCreateAgent, useRenameAgent, useRestartAgent, useRetireAgent, useUploadAvatar, sendCommand } from "@/lib/live"
 import { avatarUrl, fetchSettings } from "@/lib/api"
 import { useAuth } from "@/lib/support/auth"
-import { useProviders, defaultModel, findModel, resolveSelection, filterAllowed } from "@/lib/support/models"
+import { useProviders, defaultModel, findModel, resolveSelection, filterAllowed, usableProviders } from "@/lib/support/models"
 import { ModelPicker } from "./ModelPicker"
 import { AgentAclSection } from "../auth/AgentAclSection"
 import { SessionVitals } from "../shell/SessionVitals"
@@ -63,11 +63,12 @@ export function AgentModal({
   const agent = isManage ? modal.agent : undefined
   const [name, setName] = useState(agent?.name ?? "")
 
-  // The org allowlist constrains which models can be picked (empty ⇒ all).
+  // Only providers with a configured key are usable, and the org allowlist
+  // further constrains which of those models can be picked (empty ⇒ all).
   const { data: allProviders = [] } = useProviders()
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: fetchSettings })
   const providers = useMemo(
-    () => filterAllowed(allProviders, settings?.allowed_models ?? []),
+    () => filterAllowed(usableProviders(allProviders), settings?.allowed_models ?? []),
     [allProviders, settings],
   )
 

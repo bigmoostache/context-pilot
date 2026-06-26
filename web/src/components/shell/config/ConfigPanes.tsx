@@ -12,7 +12,7 @@ import {
 } from "lucide-react"
 import { UsagePage } from "@/components/agents/UsagePage"
 import { ModelPicker } from "@/components/agents/ModelPicker"
-import { useProviders, defaultModel, findModel, modelKey } from "@/lib/support/models"
+import { useProviders, defaultModel, findModel, modelKey, usableProviders } from "@/lib/support/models"
 import { useFleet, sendCommand } from "@/lib/live"
 import { fetchSettings, updateSettings, fetchEnvKeys } from "@/lib/api"
 import { useDevMode } from "@/lib/support/devMode"
@@ -130,7 +130,8 @@ function ServiceRow({ label, available }: { label: string; available: boolean })
 }
 
 function GeneralPane() {
-  const { data: providers = [] } = useProviders()
+  const { data: allProviders = [] } = useProviders()
+  const providers = usableProviders(allProviders)
   const p0 = providers[0]?.id ?? ""
   const m0 = defaultModel(providers, p0)?.id ?? providers[0]?.models[0]?.id ?? ""
   const lsP = localStorage.getItem(LS_DEFAULT_PROVIDER) ?? p0
@@ -254,7 +255,8 @@ function GeneralPane() {
  */
 function AllowedModelsSection() {
   const qc = useQueryClient()
-  const { data: providers = [] } = useProviders()
+  const { data: allProviders = [] } = useProviders()
+  const providers = usableProviders(allProviders)
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: fetchSettings })
   const [busy, setBusy] = useState(false)
 

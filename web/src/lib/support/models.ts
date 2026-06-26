@@ -126,6 +126,14 @@ export function modelKey(providerId: string, modelId: string): string {
 }
 
 /**
+ * Keep only providers whose API key is configured (`available`) — the only ones
+ * a model can actually run on. Backend computes the flag in `GET /api/providers`.
+ */
+export function usableProviders(providers: ProviderDef[]): ProviderDef[] {
+  return providers.filter((p) => p.available)
+}
+
+/**
  * Restrict providers' models to the org allowlist of `"provider:model"` ids.
  * An **empty** allowlist means everything is allowed (delivery default), so the
  * registry passes through untouched. Providers left with no allowed model are

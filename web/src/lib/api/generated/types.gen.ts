@@ -294,6 +294,7 @@ export type OpEntryKind = {
 export type PanelKind = 'tree' | 'memory' | 'threads' | 'spine' | 'stats' | 'entities' | 'search' | 'file' | 'git' | 'console' | 'queue' | 'todo' | 'callback' | 'scratchpad' | 'tools' | 'radar';
 
 export type ProviderDef = {
+    available: boolean;
     description: string;
     id: string;
     models: Array<ModelDef>;

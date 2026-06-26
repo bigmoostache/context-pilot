@@ -10,6 +10,7 @@
 //! client and fetches the data via `GET /api/providers` — zero hardcoded model
 //! lists in TypeScript.
 
+use cp_base::config::global;
 use serde::Serialize;
 
 use crate::transport::rest::HttpReply;
@@ -354,9 +355,35 @@ fn all_providers() -> Vec<ProviderDef> {
 
 /// `GET /api/providers` — returns the full LLM provider + model registry.
 pub(crate) fn providers() -> HttpReply {
-    let data = all_providers();
-    match serde_json::to_string(&data) {
+    // Annotate each provider with `available` — whether its API key is
+    // configured — so the cockpit only lets users pick models that can run.
+    let enriched: Vec<serde_json::Value> = all_providers()
+        .iter()
+        .map(|p| {
+            let available = provider_key_name(p.id).is_some_and(global::has_api_key);
+            let mut v = serde_json::to_value(p).unwrap_or_default();
+            if let Some(obj) = v.as_object_mut() {
+                drop(obj.insert("available".to_owned(), serde_json::Value::Bool(available)));
+            }
+            v
+        })
+        .collect();
+    match serde_json::to_string(&enriched) {
         Ok(body) => HttpReply { status: 200, body },
         Err(e) => HttpReply::error(500, &format!("serialize: {e}")),
+    }
+}
+
+/// Map a catalogue provider id to the central key name used to check usability.
+/// Returns `None` for providers with no API-key path (the Claude Code OAuth
+/// backends) — they are never "available" now that auth is API-key only.
+fn provider_key_name(id: &str) -> Option<&'static str> {
+    match id {
+        "anthropic" | "claudecodeapikey" => Some("anthropic"),
+        "grok" => Some("xai"),
+        "groq" => Some("groq"),
+        "deepseek" => Some("deepseek"),
+        "minimax" => Some("minimax"),
+        _ => None,
     }
 }

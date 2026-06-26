@@ -924,6 +924,9 @@
       },
       "ProviderDef": {
         "properties": {
+          "available": {
+            "type": "boolean"
+          },
           "description": {
             "type": "string"
           },
@@ -944,6 +947,7 @@
           "id",
           "name",
           "description",
+          "available",
           "models"
         ],
         "type": "object"
