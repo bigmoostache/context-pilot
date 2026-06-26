@@ -6,7 +6,6 @@ import {
   Check,
   CheckCircle2,
   Coins,
-  Cpu,
   Database,
   Eye,
   EyeOff,
@@ -31,7 +30,6 @@ import { useProviders, defaultModel, findModel } from "@/lib/support/models"
 import { useFleet, sendCommand } from "@/lib/live"
 import { fetchSettings, updateSettings, fetchEnvKeys, revealEnvKey, updateEnvKey } from "@/lib/api"
 import { useAccount } from "@/lib/support/account"
-import { useAuth } from "@/lib/support/auth"
 import { useDevMode } from "@/lib/support/devMode"
 import { cn } from "@/lib/utils"
 
@@ -66,18 +64,14 @@ export const CATEGORIES: {
 
 // ── per-category bodies ───────────────────────────────────────────
 export function CategoryBody({ cat }: { cat: CatId }) {
-  // Two independent reasons a key pane can be read-only:
-  //   • company-managed account — the org provisions keys centrally;
-  //   • auth active + caller is NOT a system administrator — only admins
-  //     manage provider/API keys (T346). Regular users still SEE the panes
-  //     (greyed) so they know the integration exists.
-  // The admin reason takes precedence in the copy when both apply.
+  // On this appliance every provider/integration key is provisioned
+  // out-of-band by the operator (vendor, over SSH/Ansible) — never editable
+  // from the cockpit, for admins and users alike. The key panes are always
+  // read-only "managed": they show whether an integration is configured, but
+  // offer no edit/reveal. (Key management left the web surface entirely.)
   const { user } = useAccount()
-  const { user: authUser, authEnabled } = useAuth()
-  const companyManaged = user.managedByCompany
-  const adminLocked = authEnabled === true && authUser !== null && authUser.role !== "admin"
-  const locked = companyManaged || adminLocked
-  const reason: LockReason = adminLocked ? "admin" : "company"
+  const locked = true
+  const reason: LockReason = "company"
   const company = user.company ?? "your organization"
 
   // Live env-key status from the orchestrator (T399).

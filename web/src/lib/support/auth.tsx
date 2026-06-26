@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const status = await fetchAuthStatus()
         if (cancelled) return
         setAuthEnabled(status.enabled)
-        setBootstrapped(status.bootstrapped)
+        setBootstrapped(status.bootstrapped ?? true)
 
         if (!status.enabled) {
           setLoading(false)

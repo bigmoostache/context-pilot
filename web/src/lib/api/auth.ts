@@ -28,7 +28,7 @@ import {
   postApiAuthUsers,
   postApiAuthUsersByUserIdLogout,
 } from "./generated"
-import { sdk } from "./client"
+import { request, sdk } from "./client"
 
 // ── Type re-exports (preserve import surface) ────────────────────────
 
@@ -142,17 +142,6 @@ export function updateSettings(patch: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
-  })
-}
-
-/** Admin: store provider API keys centrally. Empty value clears a key. */
-export function updateProviderKeys(
-  keys: Record<string, string>,
-): Promise<AppSettings> {
-  return request("/api/settings/keys", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ keys }),
   })
 }
 
