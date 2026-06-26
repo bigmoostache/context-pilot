@@ -19,7 +19,9 @@
 //!   whitelist (`login`, `status`) requires a valid session whose user holds the
 //!   [`UserRole::Admin`] role. A `User`-role token is a `403`, no token a `401`.
 
+mod ca;
 mod caddy;
+mod crypto;
 mod identity;
 mod state;
 
@@ -69,6 +71,14 @@ pub(crate) fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
         }
     };
 
+    // Raw-bytes route: the CA root download needs a non-JSON content type, so it
+    // owns the request directly. Admin is already enforced (ca.crt is not in the
+    // public whitelist), and GET carries no body.
+    if method == Method::Get && segments.as_slice() == ["api", "maint", "ca.crt"] {
+        ca::serve_ca_cert(request);
+        return;
+    }
+
     let body_bytes = if matches!(method, Method::Post | Method::Patch | Method::Put) {
         super::read_body(&mut request)
     } else {
@@ -115,6 +125,11 @@ fn route(
         // Box identity + private-CA TLS (M3).
         (Method::Get, ["api", "maint", "identity"]) => identity::get_identity(state),
         (Method::Post, ["api", "maint", "identity"]) => identity::set_identity(state, body),
+
+        // Private-CA root distribution (M4). `ca.crt` itself is served as raw
+        // bytes in `handle` (it needs a non-JSON content type); here is its
+        // fingerprint for out-of-band verification.
+        (Method::Get, ["api", "maint", "ca", "fingerprint"]) => ca::ca_fingerprint(),
 
         // Provisioning state machine (M2).
         (Method::Post, ["api", "maint", "finalize"]) => finalize(state, auth_user),
