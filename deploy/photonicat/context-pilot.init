@@ -22,9 +22,12 @@ start_service() {
     mkdir -p "$CP_HOME"
 
     # Optional provisioning values (templated by Ansible, chmod 600). Sourced
-    # once at boot; the orchestrator seeds the first Admin account only when the
-    # user table is empty (idempotent — safe to re-run). Prefer
-    # CP_SEED_ADMIN_PASSWORD_FILE so the secret stays out of the process env.
+    # once at boot; carries both the admin-seed vars (CP_SEED_ADMIN_*) and the
+    # provider/integration API keys. The orchestrator seeds the first Admin only
+    # when the user table is empty (idempotent). Provider keys placed here land
+    # in the orchestrator's process env, so they (a) make agents able to use the
+    # model and (b) light up the cockpit Services pane. Prefer
+    # CP_SEED_ADMIN_PASSWORD_FILE so the admin secret stays out of the env.
     CP_SEED_ENV=/mnt/data/context-pilot/seed.env
     [ -f "$CP_SEED_ENV" ] && . "$CP_SEED_ENV"
 
@@ -39,7 +42,17 @@ start_service() {
         CP_SEED_ADMIN_EMAIL="${CP_SEED_ADMIN_EMAIL:-}" \
         CP_SEED_ADMIN_NAME="${CP_SEED_ADMIN_NAME:-}" \
         CP_SEED_ADMIN_PASSWORD="${CP_SEED_ADMIN_PASSWORD:-}" \
-        CP_SEED_ADMIN_PASSWORD_FILE="${CP_SEED_ADMIN_PASSWORD_FILE:-}"
+        CP_SEED_ADMIN_PASSWORD_FILE="${CP_SEED_ADMIN_PASSWORD_FILE:-}" \
+        ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
+        DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:-}" \
+        GROQ_API_KEY="${GROQ_API_KEY:-}" \
+        XAI_API_KEY="${XAI_API_KEY:-}" \
+        MINIMAX_API_KEY="${MINIMAX_API_KEY:-}" \
+        VOYAGE_API_KEY="${VOYAGE_API_KEY:-}" \
+        DATALAB_API_KEY="${DATALAB_API_KEY:-}" \
+        BRAVE_API_KEY="${BRAVE_API_KEY:-}" \
+        FIRECRAWL_API_KEY="${FIRECRAWL_API_KEY:-}" \
+        GITHUB_TOKEN="${GITHUB_TOKEN:-}"
     # Restart on crash, but back off if it crash-loops.
     procd_set_param respawn 3600 5 5
     procd_set_param stdout 1
