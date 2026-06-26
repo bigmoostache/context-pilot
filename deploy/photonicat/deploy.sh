@@ -26,6 +26,8 @@ echo "==> building SPA (relative same-origin API URLs)"
 
 echo "==> shipping to $HOST"
 ssh "$HOST" "mkdir -p $ROOT/bin $ROOT/home $ROOT/web"
+# Stop the orchestrator first — a running binary can't be overwritten (ETXTBSY).
+ssh "$HOST" "/etc/init.d/context-pilot stop || true"
 scp -q "$BIN" "$HOST:$ROOT/bin/cp-orchestrator"
 scp -q "target/$TARGET/release/tui" "$HOST:$ROOT/bin/tui"
 scp -qr web/dist/. "$HOST:$ROOT/web/"

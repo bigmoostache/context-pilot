@@ -21,6 +21,13 @@ start_service() {
     # project roots) all live under $HOME on the big data partition.
     mkdir -p "$CP_HOME"
 
+    # Optional provisioning values (templated by Ansible, chmod 600). Sourced
+    # once at boot; the orchestrator seeds the first Admin account only when the
+    # user table is empty (idempotent — safe to re-run). Prefer
+    # CP_SEED_ADMIN_PASSWORD_FILE so the secret stays out of the process env.
+    CP_SEED_ENV=/mnt/data/context-pilot/seed.env
+    [ -f "$CP_SEED_ENV" ] && . "$CP_SEED_ENV"
+
     procd_open_instance
     procd_set_param command "$PROG"
     procd_set_param env \
@@ -28,7 +35,11 @@ start_service() {
         CP_AUTH_ENABLED=1 \
         CP_ORCH_PORT=7878 \
         CP_WEB_ROOT="$CP_WEB" \
-        CP_AGENT_BINARY="$CP_AGENT"
+        CP_AGENT_BINARY="$CP_AGENT" \
+        CP_SEED_ADMIN_EMAIL="${CP_SEED_ADMIN_EMAIL:-}" \
+        CP_SEED_ADMIN_NAME="${CP_SEED_ADMIN_NAME:-}" \
+        CP_SEED_ADMIN_PASSWORD="${CP_SEED_ADMIN_PASSWORD:-}" \
+        CP_SEED_ADMIN_PASSWORD_FILE="${CP_SEED_ADMIN_PASSWORD_FILE:-}"
     # Restart on crash, but back off if it crash-loops.
     procd_set_param respawn 3600 5 5
     procd_set_param stdout 1
