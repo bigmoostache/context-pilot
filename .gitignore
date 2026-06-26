@@ -1,6 +1,11 @@
 **/target
 **/__pycache__
 .env
+# Per-unit provisioning secrets — the admin seed password (M6). NEVER commit.
+seed.env
+**/seed.env
+# Generated per-unit delivery sheets (printable email/password).
+deploy/ansible/out/
 /.context-pilot/*
 snake
 tldr_debug.log
