@@ -1534,6 +1534,10 @@
   path: src/ui/help/config_overlay/builder.rs
   description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
   last_edited_ms: 0
+26228dda4f23fa2e:
+  path: crates/cp-orchestrator/src/transport/inspect/providers.rs
+  description: LLM provider+model registry endpoint (GET /api/providers). ProviderDef/ModelDef structs with camelCase serde. 8 providers (ClaudeCodeV2, Anthropic, ClaudeCode OAuth, ClaudeCode API Key, Grok, Groq, DeepSeek, MiniMax) with full pricing/context data. Single source of truth — frontend fetches, never hardcodes.
+  last_edited_ms: 1782472546318
 2635e1cb5617597c:
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
@@ -8338,6 +8342,10 @@ cdfc00c9108b22e2:
   path: crates/cp-base/src/tools/pre_flight.rs
   description: 'Verdict: blocking errors + non-blocking warnings + activate_queue flag, builder pattern, format_errors()'
   last_edited_ms: 0
+ce09ca62af937d7c:
+  path: web/src/lib/support/models.ts
+  description: LLM provider+model frontend layer. Fetches from GET /api/providers, enriches with Lucide icons (ONLY frontend-maintained data). useProviders() TanStack hook. Lookup helpers (findProvider/findModel/defaultModel/resolveSelection/resolveFromApiName) take providers[] as first arg. ~171 lines (was ~374 hardcoded).
+  last_edited_ms: 1782472546378
 ce122582d572ecd3:
   path: report/wiring-alignment-audit.md
   description: 'Wiring alignment audit (X818 Phase 0.1): invariant-by-invariant gap register implementation⇄design-orchestration-backend.md. Verdicts ABIDES/PARTIAL/VIOLATES per I1-I13/§7/§9/§19. Diagnoses the disk/poll vs oplog-push plane inversion = the latency root cause.'
