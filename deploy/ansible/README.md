@@ -4,9 +4,13 @@ Factory-fresh Photonicat → fully deployed and ready, in one pass.
 
 ## Full deploy — `site.yml`
 
+Prereqs: the box is enrolled on the tailnet (`tag:cp-<client>`, see
+`deploy/PROVISIONING.md`) and **this control node is on the tailnet too**.
+
 ```sh
 cp deploy/ansible/inventory.example.ini deploy/ansible/inventory.ini
-# edit inventory.ini with each box's LAN IP
+# edit inventory.ini with each box's Tailscale MagicDNS name
+# (<hostname>.<tailnet>.ts.net) — not a LAN IP. Auth is Tailscale SSH (no key).
 
 ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/site.yml
 ```
@@ -60,29 +64,34 @@ cockpit up on `:443`.
 
 ## Per-client provider API keys
 
-Each **client** (an inventory group) gets its own keys — not the same for
-everyone. Keys live in `group_vars/<client>/vault.yml`, ansible-vault encrypted,
-and are written to `providers.env` on each of that client's boxes (chmod 600,
-sourced at boot). The orchestrator picks them up so agents can use the models.
+Keys are written to `providers.env` on the box (chmod 600, sourced at boot); the
+orchestrator picks them up so agents can use the models. They come from the var
+`cp_provider_keys` — which you supply **at launch, never committed**.
+
+**Default — runtime injection (nothing secret in the repo):** keep the keys in a
+gitignored local file and pass it with `-e @file`. One file per client; run one
+client at a time with `--limit`.
 
 ```sh
 # 1. group the boxes by client in inventory.ini:  [acme] … / [globex] …
-# 2. create the client's encrypted keys:
-cp deploy/ansible/group_vars/example-client.yml deploy/ansible/group_vars/acme/vault.yml
-$EDITOR deploy/ansible/group_vars/acme/vault.yml      # set acme's keys
-ansible-vault encrypt deploy/ansible/group_vars/acme/vault.yml
+# 2. copy the template to a GITIGNORED local file and fill in acme's keys:
+cp deploy/ansible/secrets.example.yml deploy/ansible/acme.local.yml
+$EDITOR deploy/ansible/acme.local.yml
 # 3. deploy that client (its keys only):
 ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/site.yml \
-  --limit acme --ask-vault-pass -e release=local
+  --limit acme -e @deploy/ansible/acme.local.yml -e release=local
 ```
 
-- **Per client**: `group_vars/<client>/vault.yml`. **Per box / override**:
-  `host_vars/<box>/vault.yml` (wins over the group). **Common default**:
-  `group_vars/all/vault.yml`.
-- Only the keys you list for a client are written — choose providers per client.
-- **Rotate** a client's keys: edit its vault, re-run `--limit <client>`. The
-  admin `seed.env` (per-unit, write-once) is untouched; `providers.env` is
-  rewritten every run.
+- Pass secrets as **`-e @file`**, not `-e KEY=value` — the latter leaks in
+  `ps aux` and shell history; `@file` exposes only the filename.
+- `*.local.yml` under `deploy/ansible/` is gitignored. Keep it `chmod 600`; it
+  lives only on the control node.
+- Only the keys you list are written — choose providers per client. `seed.env`
+  (per-unit admin, write-once) is untouched; `providers.env` is rewritten every run.
+
+**Alternative — ansible-vault** (encrypted secrets versioned in git, if you want
+recovery/audit): put the same `cp_provider_keys` in `group_vars/<client>/vault.yml`,
+`ansible-vault encrypt` it, and run with `--ask-vault-pass` (no `-e @file` needed).
 - The rendered `providers.env` is box-only and git-ignored; commit **only the
   encrypted** `vault.yml`.
 

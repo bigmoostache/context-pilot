@@ -101,3 +101,12 @@ sandbox/
 web/package-lock.json
 
 devis-attali-context-pilot.md
+
+# Python virtualenv (local Ansible control node)
+.venv/
+
+# Ansible working inventory (real client hosts — keep only the .example tracked)
+deploy/ansible/inventory.ini
+
+# Ansible runtime secrets (per-client, passed with -e @file — never committed)
+deploy/ansible/*.local.yml

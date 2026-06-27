@@ -1,10 +1,11 @@
 ---
 # Per-client provider API keys → providers.env on the box (sourced at boot).
 #
-# The keys come from the host's `cp_provider_keys` dict, which is supplied per
-# client via group_vars/<client>/vault.yml (ansible-vault). Different clients →
-# different keys. Rewritten every run (unlike the write-once admin seed.env), so
-# rotating a client's keys is just: edit its vault, re-run with --limit <client>.
+# The keys come from the `cp_provider_keys` dict, supplied at launch and NEVER
+# committed — default: a gitignored local file passed with `-e @<client>.local.yml`
+# (alternative: ansible-vault group_vars/<client>/vault.yml). See README.
+# Rewritten every run (unlike the write-once admin seed.env), so rotating a
+# client's keys is just: edit the file, re-run with --limit <client>.
 
 - name: Write providers.env (per-client API keys, chmod 600)
   ansible.builtin.template:

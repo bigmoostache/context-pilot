@@ -54,7 +54,15 @@
     dest: "{{ cp_root }}/caddy/Caddyfile"
     mode: "0644"
 
-- name: Free TCP :80/:443 from the vendor admin web (→ :8088, Obj 3.3.1)
+- name: Free TCP :80/:443 for Caddy (move LuCI→:8088, disable board dashboard) (Obj 3.3.1)
   ansible.builtin.script: "{{ repo_root }}/deploy/photonicat/free-port-80.sh"
   register: free_port
-  changed_when: "'moved' in free_port.stdout"
+  changed_when: "'now free for Caddy' in free_port.stdout"
+
+- name: Open client-facing services (cockpit :443, maintenance :9090) on the client LAN
+  # The box's uplink (eth0) is OpenWrt's `wan` zone (input REJECT), so the client
+  # reaches :443/:9090 over their corporate/local LAN only once these are opened.
+  # Vendor admin (SSH) stays on the tailnet, not here. Idempotent (named uci rule).
+  ansible.builtin.script: "{{ repo_root }}/deploy/photonicat/open-client-firewall.sh"
+  register: client_fw
+  changed_when: "'applied' in client_fw.stdout"
