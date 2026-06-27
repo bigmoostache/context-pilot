@@ -1,0 +1,20 @@
+# EXAMPLE per-client provider keys. This file is NOT loaded (no inventory group
+# is named "example-client"). To use it for a real client:
+#
+#   1. Create the client's group in inventory.ini, e.g.  [acme]
+#   2. Put the keys in group_vars/<client>/vault.yml (a per-client dir), e.g.:
+#        cp deploy/ansible/group_vars/example-client.yml \
+#           deploy/ansible/group_vars/acme/vault.yml
+#   3. Fill in that client's real keys (only the providers they should have).
+#   4. Encrypt it before committing:
+#        ansible-vault encrypt deploy/ansible/group_vars/acme/vault.yml
+#   5. Run: ansible-playbook -i inventory.ini site.yml --limit acme --ask-vault-pass
+#
+# Each client gets exactly the keys you list here — different clients, different
+# keys (and different providers). Only the keys present are written to the box.
+cp_provider_keys:
+  ANTHROPIC_API_KEY: "sk-ant-REPLACE-ME"
+  DEEPSEEK_API_KEY: "sk-REPLACE-ME"
+  # Add only what this client needs; the orchestrator passes through these names:
+  # GROQ_API_KEY, XAI_API_KEY, MINIMAX_API_KEY, VOYAGE_API_KEY, DATALAB_API_KEY,
+  # BRAVE_API_KEY, FIRECRAWL_API_KEY, GITHUB_TOKEN.

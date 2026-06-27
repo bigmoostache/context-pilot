@@ -2,39 +2,25 @@
 # Full appliance provisioning — factory-fresh Photonicat → ready in one pass,
 # from the pre-built artifacts published on GitHub Releases (no local build).
 #
-#   cp inventory.example.ini inventory.ini   # set each box's LAN IP
-#   ansible-playbook -i inventory.ini deploy/ansible/site.yml
+#   cp inventory.example.ini inventory.ini   # one group per client, set LAN IPs
+#   ansible-playbook -i inventory.ini deploy/ansible/site.yml --ask-vault-pass
+#   # one client only (its keys via group_vars/<client>/):
+#   ansible-playbook -i inventory.ini deploy/ansible/site.yml --limit acme --ask-vault-pass
 #
 # Options:
-#   -e cp_release=v0.1.0-abc1234   # pin a release tag (default: latest)
-#   -e cp_admin_email=ops@x.corp   # override the default admin email
-#   -e cp_admin_password=…         # force a fixed admin password (else random/unit)
+#   -e release=v0.1.0-abc1234   # pin a release tag (default: latest)
+#   -e release=local            # use the bundle from deploy/photonicat/build.sh
+#   -e cp_admin_email=ops@x.corp # override the default admin email
+#   -e cp_admin_password=…       # force a fixed admin password (else random/unit)
 #
-# What it does: fetches the appliance bundle (orchestrator + agent TUI + SPA) and
-# a stock Caddy from GitHub onto the control node, ships them + the procd init
-# scripts + bootstrap Caddyfile to each box, frees :80 from the vendor web, seeds
-# a unique admin (seed.env + printable sheet), then starts the services and waits
-# until they answer. Idempotent.
-
-- name: Fetch appliance artifacts from GitHub (control node)
-  hosts: localhost
-  connection: local
-  gather_facts: false
-  vars:
-    artifacts_dir: "{{ playbook_dir }}/.artifacts"
-    # Source repo + release. `latest` resolves to the most recent release.
-    gh_repo: bigmoostache/context-pilot
-    cp_release: "{{ release | default('latest') }}"
-    appliance_bundle_url: >-
-      https://github.com/{{ gh_repo }}/releases/{{ 'latest/download' if cp_release == 'latest' else 'download/' + cp_release }}/cpilot-appliance-aarch64.tar.gz
-    # Stock Caddy arm64 (static Go, ships tls internal). Pin a version if needed.
-    caddy_url: "https://caddyserver.com/api/download?os=linux&arch=arm64"
-  tasks:
-    - name: Fetch the release bundle + Caddy
-      ansible.builtin.include_tasks: tasks/fetch.yml
+# Per client: each inventory group supplies its own provider keys via
+# group_vars/<client>/vault.yml — different clients get different keys.
 
 - name: Deploy + provision the appliances
-  hosts: appliances
+  # All inventory hosts (every client group). Scope to one client with
+  # --limit <client>. The artifact fetch is delegated to the control node and
+  # run once, so it still happens even under --limit.
+  hosts: all
   become: false
   gather_facts: false
   vars:
@@ -43,9 +29,24 @@
     cp_root: /mnt/data/context-pilot
     cp_seed_admin_email: "{{ cp_admin_email | default('admin@admin.fr') }}"
     sheets_dir: "{{ playbook_dir }}/out"
+    # Artifact source. `local` uses deploy/photonicat/build.sh output; otherwise
+    # a release tag (default latest) is fetched from GitHub.
+    gh_repo: bigmoostache/context-pilot
+    cp_release: "{{ release | default('latest') }}"
+    appliance_bundle_url: >-
+      https://github.com/{{ gh_repo }}/releases/{{ 'latest/download' if cp_release == 'latest' else 'download/' + cp_release }}/cpilot-appliance-aarch64.tar.gz
+    caddy_url: "https://caddyserver.com/api/download?os=linux&arch=arm64"
   tasks:
+    - name: Fetch the release bundle + Caddy (control node, once)
+      ansible.builtin.include_tasks:
+        file: tasks/fetch.yml
+        apply:
+          delegate_to: localhost
+          run_once: true
     - name: Ship binaries, SPA, init scripts, Caddyfile; free :80
       ansible.builtin.include_tasks: tasks/deploy.yml
+    - name: Install this client's provider API keys (providers.env)
+      ansible.builtin.include_tasks: tasks/keys.yml
     - name: Seed the unique admin (seed.env + delivery sheet)
       ansible.builtin.include_tasks: tasks/seed.yml
     - name: Start the services and wait until ready

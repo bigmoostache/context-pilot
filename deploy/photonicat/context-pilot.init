@@ -21,15 +21,18 @@ start_service() {
     # project roots) all live under $HOME on the big data partition.
     mkdir -p "$CP_HOME"
 
-    # Optional provisioning values (templated by Ansible, chmod 600). Sourced
-    # once at boot; carries both the admin-seed vars (CP_SEED_ADMIN_*) and the
-    # provider/integration API keys. The orchestrator seeds the first Admin only
-    # when the user table is empty (idempotent). Provider keys placed here land
-    # in the orchestrator's process env, so they (a) make agents able to use the
-    # model and (b) light up the cockpit Services pane. Prefer
-    # CP_SEED_ADMIN_PASSWORD_FILE so the admin secret stays out of the env.
+    # Provisioning values (templated by Ansible, chmod 600), sourced at boot:
+    #   seed.env      — per-UNIT admin seed (CP_SEED_ADMIN_*); write-once. The
+    #                   orchestrator seeds the first Admin only when the user
+    #                   table is empty (idempotent).
+    #   providers.env — per-CLIENT provider/integration API keys; rewritten on
+    #                   each Ansible run from the client's vault. Placed in the
+    #                   process env so agents can use the model and the cockpit
+    #                   Services pane lights up. Two clients → two key sets.
     CP_SEED_ENV=/mnt/data/context-pilot/seed.env
     [ -f "$CP_SEED_ENV" ] && . "$CP_SEED_ENV"
+    CP_PROVIDERS_ENV=/mnt/data/context-pilot/providers.env
+    [ -f "$CP_PROVIDERS_ENV" ] && . "$CP_PROVIDERS_ENV"
 
     # IT maintenance plane. Caddy terminates TLS and fronts the public :9090
     # (private-CA `tls internal`); the orchestrator's own maintenance listener

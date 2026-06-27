@@ -10,7 +10,8 @@
 # in as root with no sudo, so no privilege escalation (become: false).
 
 - name: Provision Context Pilot admin seed (unique per unit)
-  hosts: appliances
+  # All inventory hosts; scope to one client with --limit <client>.
+  hosts: all
   become: false
   gather_facts: false
   vars:

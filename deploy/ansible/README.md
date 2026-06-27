@@ -58,6 +58,34 @@ cockpit up on `:443`.
 -e cp_admin_password=…          # force a fixed admin password (default: random per unit)
 ```
 
+## Per-client provider API keys
+
+Each **client** (an inventory group) gets its own keys — not the same for
+everyone. Keys live in `group_vars/<client>/vault.yml`, ansible-vault encrypted,
+and are written to `providers.env` on each of that client's boxes (chmod 600,
+sourced at boot). The orchestrator picks them up so agents can use the models.
+
+```sh
+# 1. group the boxes by client in inventory.ini:  [acme] … / [globex] …
+# 2. create the client's encrypted keys:
+cp deploy/ansible/group_vars/example-client.yml deploy/ansible/group_vars/acme/vault.yml
+$EDITOR deploy/ansible/group_vars/acme/vault.yml      # set acme's keys
+ansible-vault encrypt deploy/ansible/group_vars/acme/vault.yml
+# 3. deploy that client (its keys only):
+ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/site.yml \
+  --limit acme --ask-vault-pass -e release=local
+```
+
+- **Per client**: `group_vars/<client>/vault.yml`. **Per box / override**:
+  `host_vars/<box>/vault.yml` (wins over the group). **Common default**:
+  `group_vars/all/vault.yml`.
+- Only the keys you list for a client are written — choose providers per client.
+- **Rotate** a client's keys: edit its vault, re-run `--limit <client>`. The
+  admin `seed.env` (per-unit, write-once) is untouched; `providers.env` is
+  rewritten every run.
+- The rendered `providers.env` is box-only and git-ignored; commit **only the
+  encrypted** `vault.yml`.
+
 ## Seed only — `provision-seed.yml`
 
 Re-seed (or seed) the admin without redeploying binaries:
@@ -68,9 +96,11 @@ ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/provision-seed.y
 
 ## Layout
 
-- `site.yml` — full deploy (fetch → deploy → seed → start).
+- `site.yml` — full deploy (fetch → deploy → keys → seed → start).
 - `provision-seed.yml` — seed only.
-- `tasks/{fetch,deploy,seed,start}.yml` — the steps (seed is shared).
+- `tasks/{fetch,deploy,keys,seed,start}.yml` — the steps (seed is shared).
+- `group_vars/<client>/vault.yml` — per-client provider keys (ansible-vault).
+- `group_vars/example-client.yml` — copy this to make a real client's vault.
 - `templates/{seed.env.j2,admin-sheet.txt.j2}` — the seed file + delivery sheet.
 - `inventory.example.ini` — copy to `inventory.ini`.
 

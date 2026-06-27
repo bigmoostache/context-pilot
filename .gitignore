@@ -4,6 +4,11 @@
 # Per-unit provisioning secrets — the admin seed password (M6). NEVER commit.
 seed.env
 **/seed.env
+# Provider API keys: the rendered env (plaintext) is box-only; never commit it.
+# Per-client vaults (group_vars/<client>/vault.yml) ARE committed, but only
+# ansible-vault-ENCRYPTED — never a plaintext one.
+providers.env
+**/providers.env
 # Generated per-unit delivery sheets (printable email/password).
 deploy/ansible/out/
 # Ansible-built appliance artifacts (downloaded caddy, etc.).
