@@ -1,87 +1,24 @@
 ---
-# Per-unit admin seed provisioning (Milestone 6).
+# Seed-only provisioning (Milestone 6) — write the per-unit admin seed.env +
+# delivery sheet, WITHOUT deploying binaries. Use site.yml for a full deploy.
 #
-# Generates a UNIQUE random admin password for each appliance, writes it to the
-# box's `seed.env` (chmod 600, sourced by the procd service at boot), and emits a
-# printable delivery sheet (email + password) on the control node. The password
-# is never stored in version control and never echoed to the Ansible log.
-#
-# Usage:
 #   ansible-playbook -i inventory.ini deploy/ansible/provision-seed.yml
-#   # override the default admin email for all hosts:
-#   ansible-playbook -i inventory.ini deploy/ansible/provision-seed.yml -e cp_admin_email=ops@acme.corp
+#   # override the default admin email / force a password:
+#   …provision-seed.yml -e cp_admin_email=ops@acme.corp -e cp_admin_password=…
 #
-# Idempotent: a unit that already has seed.env is left untouched (so a re-run
-# never rotates a live unit's password or prints a stale sheet).
+# Idempotent: a unit that already has seed.env is left untouched. OpenWrt logs
+# in as root with no sudo, so no privilege escalation (become: false).
 
 - name: Provision Context Pilot admin seed (unique per unit)
   hosts: appliances
-  # OpenWrt appliances log in as root and have no `sudo` — no privilege
-  # escalation is needed (or possible). Connect as root (ansible_user=root).
   become: false
   gather_facts: false
-
   vars:
     cp_root: /mnt/data/context-pilot
     # Obj 6.2.1 — default admin email; override with -e cp_admin_email=…
     cp_seed_admin_email: "{{ cp_admin_email | default('admin@admin.fr') }}"
     # Where the printable sheets are written, on the CONTROL machine.
     sheets_dir: "{{ playbook_dir }}/out"
-
   tasks:
-    - name: Check whether this unit is already seeded
-      ansible.builtin.stat:
-        path: "{{ cp_root }}/seed.env"
-      register: seed_stat
-
-    - name: Generate a unique admin password for this unit (Obj 6.1.1)
-      ansible.builtin.set_fact:
-        # 20 chars, letters+digits — strong, and avoids shell-unsafe symbols
-        # since seed.env is sourced by /bin/sh in the procd service. A fixed
-        # password may be forced with -e cp_admin_password=… (testing / a
-        # specific unit); otherwise a fresh random one is generated.
-        cp_seed_admin_password: >-
-          {{ cp_admin_password | default(lookup('password', '/dev/null length=20 chars=ascii_letters,digits'), true) }}
-      no_log: true
-      when: not seed_stat.stat.exists
-
-    - name: Ensure the data dir exists
-      ansible.builtin.file:
-        path: "{{ cp_root }}"
-        state: directory
-        mode: "0700"
-      when: not seed_stat.stat.exists
-
-    - name: Write seed.env (chmod 600, Obj 6.1.3)
-      ansible.builtin.template:
-        src: seed.env.j2
-        dest: "{{ cp_root }}/seed.env"
-        owner: root
-        group: root
-        mode: "0600"
-      no_log: true
-      when: not seed_stat.stat.exists
-
-    - name: Ensure the sheets output dir exists on the control node
-      ansible.builtin.file:
-        path: "{{ sheets_dir }}"
-        state: directory
-        mode: "0700"
-      delegate_to: localhost
-      become: false
-      run_once: true
-
-    - name: Write the printable delivery sheet on the control node (Obj 6.1.2)
-      ansible.builtin.template:
-        src: admin-sheet.txt.j2
-        dest: "{{ sheets_dir }}/{{ inventory_hostname }}-admin.txt"
-        mode: "0600"
-      delegate_to: localhost
-      become: false
-      no_log: true
-      when: not seed_stat.stat.exists
-
-    - name: Report units that were already provisioned (skipped)
-      ansible.builtin.debug:
-        msg: "{{ inventory_hostname }} already has seed.env — left untouched."
-      when: seed_stat.stat.exists
+    - name: Seed the unique admin (seed.env + delivery sheet)
+      ansible.builtin.include_tasks: tasks/seed.yml

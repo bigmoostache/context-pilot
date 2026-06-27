@@ -6,6 +6,8 @@ seed.env
 **/seed.env
 # Generated per-unit delivery sheets (printable email/password).
 deploy/ansible/out/
+# Ansible-built appliance artifacts (downloaded caddy, etc.).
+deploy/ansible/.artifacts/
 /.context-pilot/*
 snake
 tldr_debug.log
