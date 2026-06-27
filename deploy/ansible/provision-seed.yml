@@ -16,7 +16,9 @@
 
 - name: Provision Context Pilot admin seed (unique per unit)
   hosts: appliances
-  become: true
+  # OpenWrt appliances log in as root and have no `sudo` — no privilege
+  # escalation is needed (or possible). Connect as root (ansible_user=root).
+  become: false
   gather_facts: false
 
   vars:
@@ -35,8 +37,11 @@
     - name: Generate a unique admin password for this unit (Obj 6.1.1)
       ansible.builtin.set_fact:
         # 20 chars, letters+digits — strong, and avoids shell-unsafe symbols
-        # since seed.env is sourced by /bin/sh in the procd service.
-        cp_seed_admin_password: "{{ lookup('password', '/dev/null length=20 chars=ascii_letters,digits') }}"
+        # since seed.env is sourced by /bin/sh in the procd service. A fixed
+        # password may be forced with -e cp_admin_password=… (testing / a
+        # specific unit); otherwise a fresh random one is generated.
+        cp_seed_admin_password: >-
+          {{ cp_admin_password | default(lookup('password', '/dev/null length=20 chars=ascii_letters,digits'), true) }}
       no_log: true
       when: not seed_stat.stat.exists
 
