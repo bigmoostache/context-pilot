@@ -11,7 +11,6 @@ import type {
 } from "../types"
 
 export * from "./extra"
-export * from "./threads"
 
 // ── Mock data approximating a live Context Pilot session ──
 

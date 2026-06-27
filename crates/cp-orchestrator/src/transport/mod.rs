@@ -15,7 +15,7 @@
 //!   accessed under a single [`Mutex`].
 //! * [`rest`] — request/response handlers returning a transport-agnostic
 //!   [`HttpReply`](rest::HttpReply).
-//! * [`ticket`] — single-use SSE upgrade tickets (I9b).
+//! * [`stream::ticket`] — single-use SSE upgrade tickets (I9b).
 //! * [`sse`] — the SSE encoder and blocking body reader.
 //! * [`serve`] — the acceptor loop binding it all to a socket.
 //!
@@ -31,12 +31,15 @@
 //! | `GET`  | `/api/stream?agent={id}&ticket={t}` | SSE (this module) |
 
 mod auth;
+mod files;
 pub mod inspect;
+pub mod maint;
 mod query;
 pub mod rest;
-pub mod sse;
-mod stream;
-pub mod ticket;
+// `pub` so the `sse` and `ticket` submodules it now contains stay as reachable
+// as they were at the transport root (else their `pub` items trip
+// `unreachable_pub`).
+pub mod stream;
 
 use std::io::Read as _;
 use std::path::PathBuf;
@@ -62,8 +65,23 @@ pub use rest::Backend;
 /// intake's `MAX_CONNECTION_BUFFER` (the other cap on the same path).
 const MAX_BODY: u64 = 32 * 1024 * 1024;
 
-/// Bind an HTTP server to `addr` and serve transport requests until the process
-/// exits.
+/// Which face of the transport a listener serves.
+///
+/// The orchestrator runs two independent `tiny_http` listeners on two sockets:
+/// the [`Product`](Plane::Product) cockpit (`:7878` — fleet, agents, chat, SPA)
+/// and the [`Maintenance`](Plane::Maintenance) plane (`:9090` — IT provisioning,
+/// TLS, CA; Admin-gated and LAN-only). Each picks its router by its `Plane`, so
+/// no product route is reachable on the maintenance socket and vice-versa.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Plane {
+    /// The product cockpit plane.
+    Product,
+    /// The IT maintenance plane.
+    Maintenance,
+}
+
+/// Bind an HTTP server to `addr` and serve the [`Product`](Plane::Product) plane
+/// until the process exits. Back-compat shim over [`serve_plane`].
 ///
 /// Each request runs on its own thread (`tiny_http`'s blocking model). A
 /// streaming request occupies its thread for the lifetime of the connection;
@@ -73,21 +91,40 @@ const MAX_BODY: u64 = 32 * 1024 * 1024;
 ///
 /// Returns an error string if the address cannot be bound.
 pub fn serve(addr: &str, state: Arc<Mutex<Backend>>) -> Result<(), String> {
+    serve_plane(addr, state, Plane::Product)
+}
+
+/// Bind an HTTP server to `addr` and serve the given [`Plane`] until the process
+/// exits.
+///
+/// # Errors
+///
+/// Returns an error string if the address cannot be bound.
+pub fn serve_plane(addr: &str, state: Arc<Mutex<Backend>>, plane: Plane) -> Result<(), String> {
     let server = Server::http(addr).map_err(|e| e.to_string())?;
-    serve_bound(server, state);
+    serve_bound_plane(server, state, plane);
     Ok(())
 }
 
-/// Serve transport requests on an already-bound [`Server`], thread-per-request,
-/// until the server is dropped.
+/// Serve the [`Product`](Plane::Product) plane on an already-bound [`Server`].
+/// Back-compat shim over [`serve_bound_plane`] used by the integration tests.
 ///
-/// Split out of [`serve`] so a caller that needs the bound address up-front —
-/// notably an integration test binding `127.0.0.1:0` to claim an ephemeral
-/// port — can read [`Server::server_addr`] before handing the server here.
+/// Split out so a caller that needs the bound address up-front — notably a test
+/// binding `127.0.0.1:0` to claim an ephemeral port — can read
+/// [`Server::server_addr`] before handing the server here.
 pub fn serve_bound(server: Server, state: Arc<Mutex<Backend>>) {
+    serve_bound_plane(server, state, Plane::Product);
+}
+
+/// Serve the given [`Plane`] on an already-bound [`Server`], thread-per-request,
+/// until the server is dropped.
+pub fn serve_bound_plane(server: Server, state: Arc<Mutex<Backend>>, plane: Plane) {
     for request in server.incoming_requests() {
         let state = Arc::clone(&state);
-        let _handle = thread::spawn(move || handle(request, &state));
+        let _handle = thread::spawn(move || match plane {
+            Plane::Product => handle(request, &state),
+            Plane::Maintenance => maint::handle(request, &state),
+        });
     }
 }
 
@@ -104,6 +141,16 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
             response = response.with_header(header);
         }
         let _sent = request.respond(response);
+        return;
+    }
+
+    // Static SPA serving (P-native): when `CP_WEB_ROOT` is set, every non-`/api`
+    // GET is the web UI — served straight from disk with an index.html fallback
+    // for client-side routes, BEFORE the auth gate (the shell + assets must load
+    // for an unauthenticated visitor to even reach the login screen). API, SSE
+    // and download routes all live under `/api`, so they are untouched.
+    if method == Method::Get && segments.first() != Some(&"api") && files::web_root().is_some() {
+        files::serve_static(request, &path);
         return;
     }
 
@@ -143,15 +190,15 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     // File download — returns raw bytes, not JSON.
     if method == Method::Get {
         if let ["api", "agent", id, "avatar"] = segments.as_slice() {
-            handle_avatar(request, state, id);
+            files::handle_avatar(request, state, id);
             return;
         }
         if let ["api", "agent", id, "fs", "download"] = segments.as_slice() {
-            handle_download(request, state, id, &query);
+            files::handle_download(request, state, id, &query);
             return;
         }
         if let ["api", "agent", id, "fs", "raw"] = segments.as_slice() {
-            handle_raw(request, state, id, &query);
+            files::handle_raw(request, state, id, &query);
             return;
         }
     }
@@ -196,6 +243,12 @@ fn route_rest(
         (Method::Post, ["api", "auth", "register"]) => auth::register(state, body_bytes, auth_user),
         (Method::Post, ["api", "auth", "logout"]) => auth::logout(state, auth_token),
         (Method::Get, ["api", "auth", "me"]) => auth::me(auth_user),
+        (Method::Patch, ["api", "auth", "me"]) => auth::update_me(state, body_bytes, auth_user),
+        (Method::Post, ["api", "auth", "password"]) => auth::change_password(state, body_bytes, auth_user),
+        (Method::Get, ["api", "auth", "sessions"]) => auth::list_sessions(state, auth_token, auth_user),
+        (Method::Delete, ["api", "auth", "sessions", sid]) => auth::revoke_session(state, sid, auth_user),
+        (Method::Get, ["api", "settings"]) => rest::get_settings(state, auth_user),
+        (Method::Post, ["api", "settings"]) => rest::update_settings(state, body_bytes, auth_user),
         (Method::Get, ["api", "auth", "users"]) => auth::list_users(state, auth_user),
         (Method::Post, ["api", "auth", "users"]) => auth::create_user(state, body_bytes, auth_user),
         (Method::Delete, ["api", "auth", "users", user_id]) => auth::delete_user(state, user_id, auth_user),
@@ -349,79 +402,13 @@ fn handle_stream(request: Request, state: &Arc<Mutex<Backend>>, query: &str) {
 
     let last_rev = last_event_id(&request).or_else(|| params.get("last_rev").and_then(|s| s.parse().ok()));
 
-    let (sink, body) = sse::channel();
+    let (sink, body) = stream::sse::channel();
     let producer_state = Arc::clone(state);
     let agent = agent_id.to_owned();
     let oplog_dir = PathBuf::from(&entry.oplog_path);
     let _producer = thread::spawn(move || stream::run_stream(&sink, &producer_state, &agent, &oplog_dir, last_rev));
 
-    sse::stream_to_client(request, body);
-}
-
-/// Serve a raw file download with `Content-Disposition: attachment`.
-fn handle_download(request: Request, state: &Arc<Mutex<Backend>>, id: &str, query: &str) {
-    match inspect::finder::fs_download(state, id, query) {
-        Ok((bytes, filename)) => {
-            let mut response = Response::from_data(bytes).with_status_code(200);
-            if let Ok(h) = Header::from_bytes(
-                &b"Content-Disposition"[..],
-                format!("attachment; filename=\"{filename}\"").as_bytes(),
-            ) {
-                response = response.with_header(h);
-            }
-            if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], &b"application/octet-stream"[..]) {
-                response = response.with_header(h);
-            }
-            for header in cors_headers() {
-                response = response.with_header(header);
-            }
-            let _sent = request.respond(response);
-        }
-        Err(reply) => respond_json(request, &reply),
-    }
-}
-
-/// Serve a file's raw bytes **inline** (Content-Type inferred, no attachment),
-/// so the browser renders it directly — powers the Finder's image (T286) and
-/// PDF (T281) in-pane previews.
-fn handle_raw(request: Request, state: &Arc<Mutex<Backend>>, id: &str, query: &str) {
-    match inspect::finder::fs_raw(state, id, query) {
-        Ok((bytes, ctype)) => {
-            let mut response = Response::from_data(bytes).with_status_code(200);
-            if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], ctype.as_bytes()) {
-                response = response.with_header(h);
-            }
-            if let Ok(h) = Header::from_bytes(&b"Content-Disposition"[..], &b"inline"[..]) {
-                response = response.with_header(h);
-            }
-            for header in cors_headers() {
-                response = response.with_header(header);
-            }
-            let _sent = request.respond(response);
-        }
-        Err(reply) => respond_json(request, &reply),
-    }
-}
-
-/// Serve an agent's avatar image inline (Content-Type from the avatar store).
-fn handle_avatar(request: Request, state: &Arc<Mutex<Backend>>, id: &str) {
-    let avatar = state.lock().ok().and_then(|b| b.avatars.get(id));
-    match avatar {
-        Some((bytes, ctype)) => {
-            let mut response = Response::from_data(bytes).with_status_code(200);
-            if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], ctype.as_bytes()) {
-                response = response.with_header(h);
-            }
-            if let Ok(h) = Header::from_bytes(&b"Cache-Control"[..], &b"public, max-age=3600"[..]) {
-                response = response.with_header(h);
-            }
-            for header in cors_headers() {
-                response = response.with_header(header);
-            }
-            let _sent = request.respond(response);
-        }
-        None => respond_json(request, &rest::HttpReply::error(404, "no avatar")),
-    }
+    stream::sse::stream_to_client(request, body);
 }
 
 /// Load an agent's registry record from the backend's agents directory.

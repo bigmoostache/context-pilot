@@ -28,7 +28,7 @@ import {
   postApiAuthUsers,
   postApiAuthUsersByUserIdLogout,
 } from "./generated"
-import { sdk } from "./client"
+import { request, sdk } from "./client"
 
 // ── Type re-exports (preserve import surface) ────────────────────────
 
@@ -60,6 +60,92 @@ export function authLogout(): Promise<OkResponse> {
 
 export function authMe(): Promise<AuthUser> {
   return sdk(getApiAuthMe())
+}
+
+// ── Self-serve profile (current user) ────────────────────────────────
+
+/** Change the current user's password (verifies the current one). */
+export function changePassword(
+  current: string,
+  next: string,
+): Promise<{ ok: boolean }> {
+  return request("/api/auth/password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ current, new: next }),
+  })
+}
+
+/** Update the current user's display name + email. Returns the refreshed user. */
+export function updateProfile(
+  name: string,
+  email: string,
+): Promise<{ user: AuthUser }> {
+  return request("/api/auth/me", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, email }),
+  })
+}
+
+/** One active device session (no raw token, just an opaque id). */
+export interface DeviceSession {
+  id: string
+  created_at: number
+  expires_at: number
+  user_agent: string | null
+  current: boolean
+}
+
+/** List the current user's active device sessions. */
+export function fetchSessions(): Promise<DeviceSession[]> {
+  return request<{ sessions: DeviceSession[] }>("/api/auth/sessions").then(
+    (r) => r.sessions,
+  )
+}
+
+/** Revoke one of the current user's own sessions by id. */
+export function revokeSession(id: string): Promise<{ ok: boolean }> {
+  return request(`/api/auth/sessions/${id}`, { method: "DELETE" })
+}
+
+// ── Central settings (defaults, onboarding, provider keys) ───────────
+
+/** One provider's key-configured state (never the key value). */
+export interface ProviderKeyState {
+  id: string
+  configured: boolean
+}
+
+/** Central cockpit settings (server-side defaults + onboarding gate). */
+export interface AppSettings {
+  default_provider: string | null
+  default_model: string | null
+  onboarding_completed: boolean
+  is_admin: boolean
+  auth_enabled: boolean
+  providers: ProviderKeyState[]
+  /** Org-wide allowlist of `"provider:model"` ids. Empty ⇒ all models allowed. */
+  allowed_models: string[]
+}
+
+/** Read central settings + onboarding state (any authenticated user). */
+export function fetchSettings(): Promise<AppSettings> {
+  return request("/api/settings")
+}
+
+/** Admin: update new-agent defaults and/or the onboarding flag. */
+export function updateSettings(patch: {
+  default_provider?: string
+  default_model?: string
+  onboarding_completed?: boolean
+  allowed_models?: string[]
+}): Promise<AppSettings> {
+  return request("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  })
 }
 
 // ── Admin: user management ───────────────────────────────────────────

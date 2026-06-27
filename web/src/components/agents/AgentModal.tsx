@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import {
   Archive,
   CornerDownLeft,
@@ -12,9 +13,9 @@ import {
 } from "lucide-react"
 import type { Agent } from "@/lib/types"
 import { useCreateAgent, useRenameAgent, useRestartAgent, useRetireAgent, useUploadAvatar, sendCommand } from "@/lib/live"
-import { avatarUrl } from "@/lib/api"
+import { avatarUrl, fetchSettings } from "@/lib/api"
 import { useAuth } from "@/lib/support/auth"
-import { useProviders, defaultModel, findModel, resolveSelection } from "@/lib/support/models"
+import { useProviders, defaultModel, findModel, resolveSelection, filterAllowed, usableProviders } from "@/lib/support/models"
 import { ModelPicker } from "./ModelPicker"
 import { AgentAclSection } from "../auth/AgentAclSection"
 import { SessionVitals } from "../shell/SessionVitals"
@@ -62,7 +63,14 @@ export function AgentModal({
   const agent = isManage ? modal.agent : undefined
   const [name, setName] = useState(agent?.name ?? "")
 
-  const { data: providers = [] } = useProviders()
+  // Only providers with a configured key are usable, and the org allowlist
+  // further constrains which of those models can be picked (empty ⇒ all).
+  const { data: allProviders = [] } = useProviders()
+  const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: fetchSettings })
+  const providers = useMemo(
+    () => filterAllowed(usableProviders(allProviders), settings?.allowed_models ?? []),
+    [allProviders, settings],
+  )
 
   // Provider + model — resolve from the agent's authoritative provider id +
   // current api model name (manage) or fall back to persisted global defaults →

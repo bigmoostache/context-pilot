@@ -9,8 +9,8 @@
 // After this runs, every SDK function in generated/sdk.gen.ts uses the
 // configured client automatically — no per-call setup needed.
 
-import { client } from "./generated/client.gen"
-import { getToken, setToken } from "./client"
+import { client } from "../generated/client.gen"
+import { getToken, setToken } from "./index"
 
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:7878"
 

@@ -36,6 +36,10 @@ export function UserMenu({
 }) {
   const { user: u } = useAccount()
   const { authEnabled, user: authUser, logout } = useAuth()
+  // Prefer the real signed-in identity when auth is on; fall back to the mock
+  // account otherwise (auth disabled has no real user).
+  const displayName = authEnabled && authUser ? authUser.name : u.name
+  const displayEmail = authEnabled && authUser ? authUser.email : u.email
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -45,18 +49,18 @@ export function UserMenu({
           "ring-1 ring-border hover:brightness-105 focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60",
         )}
       >
-        <AvatarMark user={u} className="size-7 text-[11px]" />
+        <AvatarMark user={u} initials={initialsOf(displayName)} className="size-7 text-[11px]" />
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-[268px]" align="end" sideOffset={8}>
         {/* identity header — non-interactive (plain div: GroupLabel would
             require a Menu.Group ancestor and throws MenuGroupContext otherwise). */}
         <div className="flex items-center gap-2.5 px-2 py-2">
-          <AvatarMark user={u} className="size-9 text-[13px]" />
+          <AvatarMark user={u} initials={initialsOf(displayName)} className="size-9 text-[13px]" />
           <div className="flex min-w-0 flex-col leading-tight">
-            <span className="truncate text-[12.5px] font-semibold text-foreground/90">{u.name}</span>
-            <span className="truncate text-[11px] font-normal text-muted-foreground/75">{u.email}</span>
-            <AccountPill user={u} />
+            <span className="truncate text-[12.5px] font-semibold text-foreground/90">{displayName}</span>
+            <span className="truncate text-[11px] font-normal text-muted-foreground/75">{displayEmail}</span>
+            {(!authEnabled || !authUser) && <AccountPill user={u} />}
           </div>
         </div>
 
@@ -118,7 +122,16 @@ function AccountPill({ user }: { user: User }) {
  * Shared by the trigger and the menu header (and the Profile modal) so the
  * identity reads consistently everywhere. No photo in the design; initials only.
  */
-export function AvatarMark({ user, className }: { user: User; className?: string }) {
+export function AvatarMark({
+  user,
+  initials,
+  className,
+}: {
+  user: User
+  /** Override the disc's initials (e.g. from the real signed-in user). */
+  initials?: string
+  className?: string
+}) {
   const c = accentVar[user.accent]
   return (
     <span
@@ -130,7 +143,19 @@ export function AvatarMark({ user, className }: { user: User; className?: string
         background: `linear-gradient(135deg, ${c}, color-mix(in oklab, ${c} 55%, #000))`,
       }}
     >
-      {user.initials}
+      {initials ?? user.initials}
     </span>
+  )
+}
+
+/** Derive up-to-two-letter initials from a display name. */
+function initialsOf(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "?"
   )
 }

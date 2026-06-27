@@ -29,9 +29,10 @@ pub(super) fn transport() -> Value {
                 "id": { "type": "string" },
                 "name": { "type": "string" },
                 "description": { "type": "string" },
+                "available": { "type": "boolean" },
                 "models": arr(r("ModelDef"))
             },
-            "required": ["id", "name", "description", "models"]
+            "required": ["id", "name", "description", "available", "models"]
         },
         "CommandReceipt": {
             "type": "object",
@@ -104,10 +105,11 @@ pub(super) fn transport() -> Value {
                 "email": { "type": "string" },
                 "name": { "type": "string" },
                 "role": { "type": "string", "enum": ["admin", "user"] },
+                "must_change_password": { "type": "boolean" },
                 "created_at": { "type": "integer" },
                 "updated_at": { "type": "integer" }
             },
-            "required": ["id", "email", "name", "role"]
+            "required": ["id", "email", "name", "role", "must_change_password"]
         },
         "AuthLogin": {
             "type": "object",
@@ -395,6 +397,38 @@ pub(super) fn transport() -> Value {
                 "binaryPath": { "type": "string" }
             },
             "required": ["status", "tag", "binaryPath"]
+        },
+        // ── Settings & profile (auth-rbac) ──────────────────────
+        "AppSettings": {
+            "type": "object",
+            "properties": {
+                "default_provider": { "type": "string", "nullable": true },
+                "default_model": { "type": "string", "nullable": true },
+                "onboarding_completed": { "type": "boolean" },
+                "is_admin": { "type": "boolean" },
+                "auth_enabled": { "type": "boolean" },
+                "providers": arr(json!({
+                    "type": "object",
+                    "properties": {
+                        "id": { "type": "string" },
+                        "configured": { "type": "boolean" }
+                    },
+                    "required": ["id", "configured"]
+                })),
+                "allowed_models": arr(json!({ "type": "string" }))
+            },
+            "required": ["onboarding_completed", "is_admin", "auth_enabled", "providers", "allowed_models"]
+        },
+        "SessionInfo": {
+            "type": "object",
+            "properties": {
+                "id": { "type": "string" },
+                "created_at": { "type": "integer" },
+                "expires_at": { "type": "integer" },
+                "user_agent": { "type": "string", "nullable": true },
+                "current": { "type": "boolean" }
+            },
+            "required": ["id", "created_at", "expires_at", "current"]
         }
     })
 }

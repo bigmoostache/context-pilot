@@ -1,0 +1,57 @@
+---
+# Admin-seed tasks (Obj 6.1/6.2) — shared by site.yml and provision-seed.yml.
+# Idempotent: a unit that already has seed.env is left untouched.
+
+- name: Check whether this unit is already seeded
+  ansible.builtin.stat:
+    path: "{{ cp_root }}/seed.env"
+  register: seed_stat
+
+- name: Generate a unique admin password for this unit (Obj 6.1.1)
+  ansible.builtin.set_fact:
+    # 20 chars, letters+digits — strong, and shell-safe for an sh-sourced env
+    # file. Force a fixed one with -e cp_admin_password=… (testing / a specific
+    # unit); otherwise a fresh random one per unit.
+    cp_seed_admin_password: >-
+      {{ cp_admin_password | default(lookup('password', '/dev/null length=20 chars=ascii_letters,digits'), true) }}
+  no_log: true
+  when: not seed_stat.stat.exists
+
+- name: Ensure the data dir exists
+  ansible.builtin.file:
+    path: "{{ cp_root }}"
+    state: directory
+    mode: "0700"
+  when: not seed_stat.stat.exists
+
+- name: Write seed.env (chmod 600, Obj 6.1.3)
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/seed.env.j2"
+    dest: "{{ cp_root }}/seed.env"
+    mode: "0600"
+  no_log: true
+  when: not seed_stat.stat.exists
+
+- name: Ensure the sheets output dir exists on the control node
+  ansible.builtin.file:
+    path: "{{ sheets_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Write the printable delivery sheet on the control node (Obj 6.1.2)
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/admin-sheet.txt.j2"
+    dest: "{{ sheets_dir }}/{{ inventory_hostname }}-admin.txt"
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  no_log: true
+  when: not seed_stat.stat.exists
+
+- name: Report units that were already provisioned (skipped)
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }} already has seed.env — left untouched."
+  when: seed_stat.stat.exists

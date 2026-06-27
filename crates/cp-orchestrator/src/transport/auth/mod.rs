@@ -11,10 +11,12 @@
 //! authenticated [`User`], which handlers use for role checks.
 
 mod acl;
+mod users;
 
 pub(crate) use acl::{
     acl_grant, acl_list, acl_revoke, acl_update_role, authorize_agent, extract_agent_id, filter_fleet,
 };
+pub(crate) use users::{create_user, delete_user, force_logout_user, list_users};
 
 use std::sync::Mutex;
 
@@ -254,82 +256,28 @@ pub(crate) fn me(auth_user: Option<&User>) -> HttpReply {
     }
 }
 
-/// `GET /api/auth/users` — admin-only: list all users (FR-04).
-pub(crate) fn list_users(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
+/// `POST /api/auth/password` — change the current user's password (self-serve
+/// profile). Body: `{ "current": "...", "new": "..." }`. Verifies the current
+/// password before applying the new one (min length enforced).
+pub(crate) fn change_password(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
-    if caller.role != UserRole::Admin {
-        return HttpReply::error(403, "admin access required");
-    }
-    let Ok(b) = state.lock() else {
-        return HttpReply::error(500, "backend lock poisoned");
-    };
-    let Some(auth) = b.auth.as_ref() else {
-        return HttpReply::error(501, "auth not enabled");
-    };
-    match auth.list_users() {
-        Ok(users) => HttpReply::ok(&users),
-        Err(_) => HttpReply::error(500, "database error"),
-    }
-}
-
-/// `POST /api/auth/users` — admin-only: create a new user (FR-04).
-///
-/// Body: `{ "email": "...", "name": "...", "password": "...", "role": "user" }`
-pub(crate) fn create_user(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
-    let Some(caller) = auth_user else {
-        return HttpReply::error(501, "auth not enabled");
-    };
-    if caller.role != UserRole::Admin {
-        return HttpReply::error(403, "admin access required");
-    }
-
     #[derive(serde::Deserialize)]
     struct Req {
-        email: String,
-        name: String,
-        password: String,
-        #[serde(default = "default_user_role")]
-        role: UserRole,
+        current: String,
+        new: String,
     }
-    fn default_user_role() -> UserRole {
-        UserRole::User
-    }
-
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
-        return HttpReply::error(400, "expected {\"email\":\"...\",\"name\":\"...\",\"password\":\"...\"}");
+        return HttpReply::error(400, "expected {\"current\":\"...\",\"new\":\"...\"}");
     };
-    if req.password.len() < MIN_PASSWORD_LEN {
+    if req.new.len() < MIN_PASSWORD_LEN {
         return HttpReply::error(400, "password must be at least 8 characters");
     }
-
-    let Ok(b) = state.lock() else {
-        return HttpReply::error(500, "backend lock poisoned");
-    };
-    let Some(auth) = b.auth.as_ref() else {
-        return HttpReply::error(501, "auth not enabled");
-    };
-    match auth.create_user(&req.email, &req.name, &req.password, req.role) {
-        Ok(user) => HttpReply::ok(&serde_json::json!({ "user": user })),
-        Err(e) => {
-            let msg = e.to_string();
-            if msg.contains("UNIQUE") {
-                return HttpReply::error(409, "email already registered");
-            }
-            HttpReply::error(500, "user creation failed")
-        }
-    }
-}
-
-/// `POST /api/auth/users/{id}/logout` — admin-only: revoke all sessions
-/// for a user (force re-authentication without deleting the account).
-pub(crate) fn force_logout_user(state: &Mutex<Backend>, user_id: &str, auth_user: Option<&User>) -> HttpReply {
-    let Some(caller) = auth_user else {
-        return HttpReply::error(501, "auth not enabled");
-    };
-    if caller.role != UserRole::Admin {
-        return HttpReply::error(403, "admin access required");
+    match AuthStore::verify_password(&caller.password_hash, &req.current) {
+        Ok(true) => {}
+        Ok(false) => return HttpReply::error(403, "current password is incorrect"),
+        Err(_) => return HttpReply::error(500, "hash verification error"),
     }
     let Ok(b) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
@@ -337,38 +285,89 @@ pub(crate) fn force_logout_user(state: &Mutex<Backend>, user_id: &str, auth_user
     let Some(auth) = b.auth.as_ref() else {
         return HttpReply::error(501, "auth not enabled");
     };
-    match auth.conn.execute("DELETE FROM sessions WHERE user_id = ?1", rusqlite::params![user_id]) {
-        Ok(deleted) => HttpReply::ok(&serde_json::json!({
-            "ok": true,
-            "revoked_sessions": deleted,
-        })),
-        Err(_) => HttpReply::error(500, "database error"),
-    }
-}
-
-/// `DELETE /api/auth/users/{id}` — admin-only: delete a user (FR-17).
-/// Cascades to their sessions and ACL entries.
-pub(crate) fn delete_user(state: &Mutex<Backend>, user_id: &str, auth_user: Option<&User>) -> HttpReply {
-    let Some(caller) = auth_user else {
-        return HttpReply::error(501, "auth not enabled");
-    };
-    if caller.role != UserRole::Admin {
-        return HttpReply::error(403, "admin access required");
-    }
-    // Prevent admin from deleting themselves.
-    if caller.id == user_id {
-        return HttpReply::error(400, "cannot delete yourself");
-    }
-
-    let Ok(b) = state.lock() else {
-        return HttpReply::error(500, "backend lock poisoned");
-    };
-    let Some(auth) = b.auth.as_ref() else {
-        return HttpReply::error(501, "auth not enabled");
-    };
-    match auth.delete_user(user_id) {
+    match auth.update_password(&caller.id, &req.new) {
         Ok(true) => HttpReply::ok(&serde_json::json!({ "ok": true })),
         Ok(false) => HttpReply::error(404, "user not found"),
         Err(_) => HttpReply::error(500, "database error"),
     }
 }
+
+/// `PATCH /api/auth/me` — update the current user's display name and email.
+/// Body: `{ "name": "...", "email": "..." }`. Returns the refreshed profile.
+pub(crate) fn update_me(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
+    let Some(caller) = auth_user else {
+        return HttpReply::error(501, "auth not enabled");
+    };
+    #[derive(serde::Deserialize)]
+    struct Req {
+        name: String,
+        email: String,
+    }
+    let Ok(req) = serde_json::from_slice::<Req>(body) else {
+        return HttpReply::error(400, "expected {\"name\":\"...\",\"email\":\"...\"}");
+    };
+    let name = req.name.trim();
+    let email = req.email.trim();
+    if name.is_empty() || email.is_empty() {
+        return HttpReply::error(400, "name and email are required");
+    }
+    let Ok(b) = state.lock() else {
+        return HttpReply::error(500, "backend lock poisoned");
+    };
+    let Some(auth) = b.auth.as_ref() else {
+        return HttpReply::error(501, "auth not enabled");
+    };
+    match auth.update_profile(&caller.id, name, email) {
+        Ok(_) => match auth.get_user_by_id(&caller.id) {
+            Ok(Some(user)) => HttpReply::ok(&serde_json::json!({ "user": user })),
+            _ => HttpReply::error(500, "database error"),
+        },
+        Err(e) => {
+            if e.to_string().contains("UNIQUE") {
+                return HttpReply::error(409, "email already registered");
+            }
+            HttpReply::error(500, "profile update failed")
+        }
+    }
+}
+
+/// `GET /api/auth/sessions` — list the current user's active device sessions,
+/// flagging the one making this request. Never returns raw tokens.
+pub(crate) fn list_sessions(state: &Mutex<Backend>, auth_token: Option<&str>, auth_user: Option<&User>) -> HttpReply {
+    let Some(caller) = auth_user else {
+        return HttpReply::error(501, "auth not enabled");
+    };
+    let Ok(b) = state.lock() else {
+        return HttpReply::error(500, "backend lock poisoned");
+    };
+    let Some(auth) = b.auth.as_ref() else {
+        return HttpReply::error(501, "auth not enabled");
+    };
+    match auth.list_sessions(&caller.id, auth_token) {
+        Ok(sessions) => HttpReply::ok(&serde_json::json!({ "sessions": sessions })),
+        Err(_) => HttpReply::error(500, "database error"),
+    }
+}
+
+/// `DELETE /api/auth/sessions/{id}` — revoke one of the current user's own
+/// device sessions by its opaque id. Scoped to the caller so a user can only
+/// drop their own devices.
+pub(crate) fn revoke_session(state: &Mutex<Backend>, session_id: &str, auth_user: Option<&User>) -> HttpReply {
+    let Some(caller) = auth_user else {
+        return HttpReply::error(501, "auth not enabled");
+    };
+    let Ok(b) = state.lock() else {
+        return HttpReply::error(500, "backend lock poisoned");
+    };
+    let Some(auth) = b.auth.as_ref() else {
+        return HttpReply::error(501, "auth not enabled");
+    };
+    match auth.revoke_session_by_id(&caller.id, session_id) {
+        Ok(Some(_)) => HttpReply::ok(&serde_json::json!({ "ok": true })),
+        Ok(None) => HttpReply::error(404, "session not found"),
+        Err(_) => HttpReply::error(500, "database error"),
+    }
+}
+
+// Admin-only user-management routes (list/create/force-logout/delete) live in
+// the sibling `users` module and are re-exported above.

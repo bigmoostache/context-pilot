@@ -13,6 +13,7 @@ import type {
   ProviderDef as GenProviderDef,
 } from "../api/generated/types.gen"
 import { getApiProviders } from "../api/generated/sdk.gen"
+import { sdk } from "../api/client"
 
 // ── Types (generated base + frontend icon) ────────────────────────────
 
@@ -80,7 +81,10 @@ let cached: ProviderDef[] | null = null
 /** Fetch the provider registry (cached after first call). */
 export async function fetchProviders(): Promise<ProviderDef[]> {
   if (cached) return cached
-  const { data } = await getApiProviders({ throwOnError: true })
+  // The client runs in responseStyle:"data" (setupClient), so the SDK call
+  // resolves to the array directly — use sdk() like every other consumer
+  // rather than destructuring a `{ data }` wrapper that doesn't exist at runtime.
+  const data = await sdk<GenProviderDef[]>(getApiProviders({ throwOnError: true }))
   cached = enrichProviders(data)
   return cached
 }
@@ -112,6 +116,41 @@ export function priceTag(m: GenModelDef): string {
       ? `${(m.contextWindow / 1_000_000).toFixed(0)}M`
       : `${(m.contextWindow / 1_000).toFixed(0)}K`
   return `$${m.inputPrice} · ${ctx}`
+}
+
+// ── Allowlist ──────────────────────────────────────────────────────────
+
+/** Compound id used by the org allowlist setting: `"<providerId>:<modelId>"`. */
+export function modelKey(providerId: string, modelId: string): string {
+  return `${providerId}:${modelId}`
+}
+
+/**
+ * Keep only providers whose API key is configured (`available`) — the only ones
+ * a model can actually run on. Backend computes the flag in `GET /api/providers`.
+ */
+export function usableProviders(providers: ProviderDef[]): ProviderDef[] {
+  return providers.filter((p) => p.available)
+}
+
+/**
+ * Restrict providers' models to the org allowlist of `"provider:model"` ids.
+ * An **empty** allowlist means everything is allowed (delivery default), so the
+ * registry passes through untouched. Providers left with no allowed model are
+ * dropped so the picker never shows an empty provider.
+ */
+export function filterAllowed(
+  providers: ProviderDef[],
+  allowed: string[],
+): ProviderDef[] {
+  if (allowed.length === 0) return providers
+  const set = new Set(allowed)
+  return providers
+    .map((p) => ({
+      ...p,
+      models: p.models.filter((m) => set.has(modelKey(p.id, m.id))),
+    }))
+    .filter((p) => p.models.length > 0)
 }
 
 // ── Lookup helpers ─────────────────────────────────────────────────────

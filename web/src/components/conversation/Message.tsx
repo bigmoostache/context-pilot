@@ -242,7 +242,7 @@ function ToolMessage({ msg }: { msg: ChatMessage }) {
         </div>
         {/* params */}
         <div className="px-3 py-2">
-          {Object.entries(t.params).map(([k, v]) => (
+          {Object.entries(t.params ?? {}).map(([k, v]) => (
             <div key={k} className="flex gap-2 font-mono text-[11px] leading-relaxed">
               <span className="shrink-0 text-muted-foreground/70">{k}</span>
               <span className="truncate text-foreground/75">{v}</span>

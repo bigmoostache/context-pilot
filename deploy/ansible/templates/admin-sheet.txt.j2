@@ -1,0 +1,20 @@
+==================== Context Pilot — IT delivery sheet ====================
+
+  Unit            : {{ inventory_hostname }}
+  Maintenance URL : https://{{ ansible_host | default(inventory_hostname) }}:9090
+  Admin email     : {{ cp_seed_admin_email }}
+  Admin password  : {{ cp_seed_admin_password }}
+
+  This password is UNIQUE to this unit and is NOT stored anywhere else.
+  Keep this sheet physically secure; shred it once setup is complete.
+
+  First-time setup (over the LAN):
+    1. Open the maintenance console at the URL above.
+       (A browser TLS warning is expected — the box uses a private CA.)
+    2. Sign in with the email + password above; change the password
+       (and set a real admin email) when prompted.
+    3. Give the box a name / IP; download the CA root and push it to your
+       clients (GPO/MDM), verifying the displayed fingerprint.
+    4. Click "Finalize" — the cockpit comes up on https://<name>.
+
+===========================================================================

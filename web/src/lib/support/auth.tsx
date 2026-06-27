@@ -48,6 +48,8 @@ interface AuthContextValue {
   register: (email: string, name: string, password: string) => Promise<void>
   /** End the current session and clear the stored token. */
   logout: () => Promise<void>
+  /** Re-fetch `/me` and refresh the cached user (after a profile edit). */
+  refreshMe: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -69,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const status = await fetchAuthStatus()
         if (cancelled) return
         setAuthEnabled(status.enabled)
-        setBootstrapped(status.bootstrapped)
+        setBootstrapped(status.bootstrapped ?? true)
 
         if (!status.enabled) {
           setLoading(false)
@@ -129,6 +131,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [login],
   )
 
+  const refreshMe = useCallback(async () => {
+    try {
+      const me = await authMe()
+      setUser(me)
+    } catch {
+      // Leave the cached user as-is on a transient failure.
+    }
+  }, [])
+
   const logout = useCallback(async () => {
     try {
       await authLogout()
@@ -151,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        refreshMe,
       }}
     >
       {children}

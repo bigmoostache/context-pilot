@@ -215,10 +215,17 @@ export function useFs(
   agentId: string,
   path: string,
 ): LiveQueryResult<FinderNode[]> {
-  return useLive(qk.fs(agentId, path), () => api.fetchFs(agentId, path), {
-    agentId,
-    enabled: !!agentId,
-  })
+  // `fetchFs` is typed with the generated FinderNode (epoch `modified: number`);
+  // the UI FinderNode is an enriched view over the same payload (relative
+  // `modified` string, optional tags/created). Cast at this single seam.
+  return useLive(
+    qk.fs(agentId, path),
+    () => api.fetchFs(agentId, path) as unknown as Promise<FinderNode[]>,
+    {
+      agentId,
+      enabled: !!agentId,
+    },
+  )
 }
 
 /**

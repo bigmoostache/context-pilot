@@ -11,6 +11,7 @@ use cp_orchestrator::runtime::{Config, Runtime};
 // dev-dependencies linked into the bin-test target.
 use argon2 as _;
 use calamine as _;
+use cp_base as _;
 #[cfg(test)]
 use cp_mod_bridge as _;
 use cp_oplog as _;
