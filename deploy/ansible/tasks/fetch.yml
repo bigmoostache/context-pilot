@@ -17,12 +17,28 @@
     - "{{ artifacts_dir }}"
     - "{{ artifacts_dir }}/bundle"
 
+# `release=local` uses the bundle produced by deploy/photonicat/build.sh (when a
+# GitHub release can't be cut yet); any other value downloads from GitHub.
 - name: Download the appliance bundle from the GitHub release ({{ cp_release }})
   ansible.builtin.get_url:
     url: "{{ appliance_bundle_url }}"
     dest: "{{ artifacts_dir }}/cpilot-appliance-aarch64.tar.gz"
     mode: "0644"
     force: true # always fetch the requested release's bundle
+  when: cp_release != 'local'
+
+- name: Verify an appliance bundle is present
+  ansible.builtin.stat:
+    path: "{{ artifacts_dir }}/cpilot-appliance-aarch64.tar.gz"
+  register: bundle_stat
+
+- name: Fail clearly when no bundle is available
+  ansible.builtin.assert:
+    that: bundle_stat.stat.exists
+    fail_msg: >-
+      No appliance bundle at {{ artifacts_dir }}/cpilot-appliance-aarch64.tar.gz.
+      Either publish a release containing it, or run deploy/photonicat/build.sh
+      and pass -e release=local.
 
 - name: Extract the appliance bundle
   ansible.builtin.unarchive:
@@ -35,4 +51,4 @@
     url: "{{ caddy_url }}"
     dest: "{{ artifacts_dir }}/caddy"
     mode: "0755"
-    force: false
+    force: false # build.sh / a prior run may have already provided it
