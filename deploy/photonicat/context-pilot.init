@@ -50,6 +50,10 @@ start_service() {
     # serving the cockpit on :443.
     CP_CADDYFILE=/mnt/data/context-pilot/caddy/Caddyfile
     CP_CADDY_BIN=/mnt/data/context-pilot/bin/caddy
+    # Caddy's internal-CA root (M4) — served + fingerprinted by the IT console so
+    # the operator can distribute it. Lives under Caddy's data dir
+    # (XDG_DATA_HOME=$DATA/data in caddy.init, DATA=…/caddy).
+    CP_CA_ROOT=/mnt/data/context-pilot/caddy/data/caddy/pki/authorities/local/root.crt
 
     procd_open_instance
     procd_set_param command "$PROG"
@@ -61,6 +65,7 @@ start_service() {
         CP_MAINT_BIND="${CP_MAINT_BIND:-127.0.0.1}" \
         CP_CADDYFILE="$CP_CADDYFILE" \
         CP_CADDY_BIN="$CP_CADDY_BIN" \
+        CP_CA_ROOT="$CP_CA_ROOT" \
         CP_WEB_ROOT="$CP_WEB" \
         CP_AGENT_BINARY="$CP_AGENT" \
         CP_SEED_ADMIN_EMAIL="${CP_SEED_ADMIN_EMAIL:-}" \
