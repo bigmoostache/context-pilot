@@ -47,7 +47,7 @@
    wget "https://pkgs.tailscale.com/stable/tailscale_${V}_arm64.tgz" && tar xzf tailscale_${V}_arm64.tgz
    install -m0755 tailscale_${V}_arm64/tailscale{,d} /usr/sbin/
    ```
-3. Poser le service procd : `scp deploy/photonicat/tailscale.init root@172.16.0.1:/etc/init.d/tailscale`
+3. Poser le service procd : `scp deploy/photonicat/init.d/tailscale.init root@172.16.0.1:/etc/init.d/tailscale`
    puis `chmod +x … && /etc/init.d/tailscale enable && start`.
 4. Enrôler : `tailscale up --authkey=<key> --advertise-tags=tag:cp-<client> --hostname=<unit> --ssh --accept-routes=false`
 5. La box est joignable en `<unit>.<tailnet>.ts.net`. Vérifier (console) : tag OK + **Key expiry disabled**.

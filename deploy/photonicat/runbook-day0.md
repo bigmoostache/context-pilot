@@ -4,7 +4,7 @@
 > via l'AP WiFi de la box, **avant tout Ansible**. Une fois éprouvée, elle devient
 > `bootstrap.sh` (Phase 2), puis est gravée dans l'image via `/etc/uci-defaults`
 > (industrialisation). Réfs : [`../PROVISIONING.md`](../PROVISIONING.md) (procédure complète +
-> décisions & caveats), service procd livré ici : [`tailscale.init`](./tailscale.init).
+> décisions & caveats), service procd livré ici : [`tailscale.init`](./init.d/tailscale.init).
 >
 > Placeholders : `<client>` (ex. `acme`), `<unit>` (ex. `acme-01`),
 > `<tailnet>` (ex. `tail7390da`), `<AUTHKEY>` (`tskey-auth-…`, depuis le Vault).

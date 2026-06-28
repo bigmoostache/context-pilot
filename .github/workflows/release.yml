@@ -106,7 +106,7 @@ jobs:
 
       # Orchestrator (API+SPA server) + agent (tui), fully static musl. These are
       # the two binaries the procd service runs on the box; see
-      # deploy/photonicat/context-pilot.init.
+      # deploy/photonicat/init.d/context-pilot.init.
       - name: Build orchestrator + agent (cross, static musl)
         run: |
           cross build --release --target aarch64-unknown-linux-musl -p cp-orchestrator

@@ -45,8 +45,8 @@
     dest: "/etc/init.d/{{ item.dst }}"
     mode: "0755"
   loop:
-    - { src: context-pilot.init, dst: context-pilot }
-    - { src: caddy.init, dst: caddy }
+    - { src: init.d/context-pilot.init, dst: context-pilot }
+    - { src: init.d/caddy.init, dst: caddy }
 
 - name: Install the bootstrap Caddyfile (the orchestrator regenerates it at boot)
   ansible.builtin.copy:

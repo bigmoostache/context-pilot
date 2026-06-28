@@ -31,7 +31,7 @@ ssh "$HOST" "/etc/init.d/context-pilot stop || true"
 scp -q "$BIN" "$HOST:$ROOT/bin/cp-orchestrator"
 scp -q "target/$TARGET/release/tui" "$HOST:$ROOT/bin/tui"
 scp -qr web/dist/. "$HOST:$ROOT/web/"
-scp -q deploy/photonicat/context-pilot.init "$HOST:/etc/init.d/context-pilot"
+scp -q deploy/photonicat/init.d/context-pilot.init "$HOST:/etc/init.d/context-pilot"
 
 echo "==> installing + (re)starting procd service"
 ssh "$HOST" '
