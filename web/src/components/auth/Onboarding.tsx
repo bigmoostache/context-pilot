@@ -3,42 +3,24 @@
 // Shown by AuthGuard right after first admin login, while the central
 // `onboarding_completed` flag is still false. Provider API keys are
 // provisioned out-of-band by the operator (vendor, over SSH/Ansible) — the
-// client never enters them — so onboarding only asks the admin to pick the
-// default model used for new agents, then flips `onboarding_completed`.
+// client never enters them — and each user picks their own model per agent, so
+// there is nothing for the admin to configure here. Onboarding is just a
+// first-run acknowledgement that flips `onboarding_completed`.
 
-import { useEffect, useState, type FormEvent } from "react"
-import { ModelPicker } from "@/components/agents/ModelPicker"
-import { useProviders, defaultModel } from "@/lib/support/models"
+import { useState, type FormEvent } from "react"
 import { updateSettings } from "@/lib/api"
 
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
-  const { data: providers = [] } = useProviders()
-  const [provider, setProvider] = useState("")
-  const [model, setModel] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  // Seed the initial selection once the provider registry loads.
-  useEffect(() => {
-    if (provider || providers.length === 0) return
-    const p0 = providers[0]
-    setProvider(p0.id)
-    setModel(defaultModel(providers, p0.id)?.id ?? p0.models[0]?.id ?? "")
-  }, [providers, provider])
-
-  const canSubmit = model !== "" && !busy
-
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!canSubmit) return
+    if (busy) return
     setError(null)
     setBusy(true)
     try {
-      await updateSettings({
-        default_provider: provider,
-        default_model: model,
-        onboarding_completed: true,
-      })
+      await updateSettings({ onboarding_completed: true })
       onComplete()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Onboarding failed")
@@ -55,7 +37,8 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
             <span className="text-signal">▌</span> Context Pilot
           </div>
           <p className="text-sm text-muted-foreground">
-            Set up this device — choose the default model for new agents.
+            This device is ready. Your users pick their own model per agent; you
+            can restrict which models are available later in Settings.
           </p>
         </div>
 
@@ -63,25 +46,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
           onSubmit={submit}
           className="flex flex-col gap-6 rounded-lg border border-border bg-card p-6 shadow-md"
         >
-          {/* ── Default model ── */}
-          <section className="flex flex-col gap-3">
-            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Default model
-              <span className="ml-2 normal-case text-muted-foreground/60">
-                Used for new agents
-              </span>
-            </span>
-            <ModelPicker
-              providers={providers}
-              provider={provider}
-              model={model}
-              onChange={(p, m) => {
-                setProvider(p)
-                setModel(m)
-              }}
-            />
-          </section>
-
           {error && (
             <div className="rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">
               {error}
@@ -90,7 +54,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
 
           <button
             type="submit"
-            disabled={!canSubmit}
+            disabled={busy}
             className="w-full rounded-md bg-signal px-4 py-2 text-sm font-semibold text-background
                        transition-opacity hover:opacity-90
                        disabled:cursor-not-allowed disabled:opacity-50"

@@ -1,34 +1,19 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Boxes,
   Check,
-  CheckCircle2,
   Coins,
-  Loader2,
   Lock,
   Package,
-  Send,
   Sliders,
 } from "lucide-react"
 import { UsagePage } from "@/components/agents/UsagePage"
-import { ModelPicker } from "@/components/agents/ModelPicker"
 import { ReleasesPane } from "./ReleasesPane"
-import { useProviders, defaultModel, findModel, modelKey, usableProviders } from "@/lib/support/models"
-import { useFleet, sendCommand } from "@/lib/live"
+import { useProviders, modelKey, usableProviders } from "@/lib/support/models"
 import { fetchSettings, updateSettings, fetchEnvKeys } from "@/lib/api"
 import { useDevMode } from "@/lib/support/devMode"
 import { cn } from "@/lib/utils"
-
-// ── localStorage keys for global defaults ─────────────────────────────
-const LS_DEFAULT_PROVIDER = "cp-default-provider"
-const LS_DEFAULT_MODEL = "cp-default-model"
-
-/** Persist the default provider+model to localStorage. */
-function writeDefaults(provider: string, model: string) {
-  localStorage.setItem(LS_DEFAULT_PROVIDER, provider)
-  localStorage.setItem(LS_DEFAULT_MODEL, model)
-}
 
 // ── categories ────────────────────────────────────────────────────
 export type CatId = "general" | "usage" | "services" | "releases"
@@ -41,7 +26,7 @@ export const CATEGORIES: {
   count?: number
   adminOnly?: boolean
 }[] = [
-  { id: "general", label: "General", blurb: "Defaults & autonomy", icon: Sliders },
+  { id: "general", label: "General", blurb: "Models & autonomy", icon: Sliders },
   { id: "usage", label: "Usage & Cost", blurb: "Spend & token analytics", icon: Coins },
   { id: "services", label: "Services", blurb: "Available integrations", icon: Boxes },
   { id: "releases", label: "Releases", blurb: "Manage binary versions", icon: Package, adminOnly: true },
@@ -135,112 +120,12 @@ function ServiceRow({ label, available }: { label: string; available: boolean })
   )
 }
 
+// The default model is intentionally NOT set here: each user picks their own
+// model per agent in the create/manage dialog. Admins shape that choice via the
+// org-wide allowlist below ({@link AllowedModelsSection}), not a forced default.
 function GeneralPane() {
-  const { data: allProviders = [] } = useProviders()
-  const providers = usableProviders(allProviders)
-  const p0 = providers[0]?.id ?? ""
-  const m0 = defaultModel(providers, p0)?.id ?? providers[0]?.models[0]?.id ?? ""
-  const lsP = localStorage.getItem(LS_DEFAULT_PROVIDER) ?? p0
-  const lsM = localStorage.getItem(LS_DEFAULT_MODEL) ?? (defaultModel(providers, lsP)?.id ?? m0)
-  const [provId, setProvId] = useState(lsP)
-  const [modelId, setModelId] = useState(lsM)
-  // Server-side defaults are authoritative; localStorage is a same-machine
-  // cache the create-agent dialog reads synchronously. Only admins may write
-  // the central defaults.
-  const [isAdmin, setIsAdmin] = useState(false)
-
-  const fleet = useFleet()
-  const [applying, setApplying] = useState(false)
-  const [applyResult, setApplyResult] = useState<string | null>(null)
-
-  // Seed from the server's central defaults on mount (falls back to the
-  // localStorage cache when unset).
-  useEffect(() => {
-    let cancelled = false
-    void fetchSettings()
-      .then((s) => {
-        if (cancelled) return
-        setIsAdmin(s.is_admin)
-        if (s.default_provider) setProvId(s.default_provider)
-        if (s.default_model) setModelId(s.default_model)
-        if (s.default_provider && s.default_model) {
-          writeDefaults(s.default_provider, s.default_model)
-        }
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const handleChange = (p: string, m: string) => {
-    setProvId(p)
-    setModelId(m)
-    writeDefaults(p, m)
-    setApplyResult(null) // clear stale result when selection changes
-    // Persist to the central server-side defaults (admins only; a non-admin
-    // write 403s harmlessly and is ignored).
-    if (isAdmin) {
-      void updateSettings({ default_provider: p, default_model: m }).catch(() => {})
-    }
-  }
-
-  const applyToAll = async () => {
-    const agents = fleet.data ?? []
-    if (agents.length === 0) return
-    setApplying(true)
-    setApplyResult(null)
-    let ok = 0
-    let fail = 0
-    for (const a of agents) {
-      try {
-        await sendCommand(a.id, { kind: "configure", provider: provId, model: modelId })
-        ok++
-      } catch {
-        fail++
-      }
-    }
-    setApplying(false)
-    const label = findModel(providers, provId, modelId)?.displayName ?? modelId
-    setApplyResult(
-      fail === 0
-        ? `Applied ${label} to ${ok} agent${ok === 1 ? "" : "s"}`
-        : `Applied to ${ok}, failed ${fail}`,
-    )
-  }
-
   return (
     <Stack>
-      <FieldGroup label="Default model" hint="Used for new agents unless overridden">
-        <ModelPicker provider={provId} model={modelId} onChange={handleChange} providers={providers} />
-        {/* Apply to all existing agents */}
-        <div className="mt-1 flex items-center gap-2">
-          <button
-            onClick={() => void applyToAll()}
-            disabled={applying || !fleet.data?.length}
-            className={cn(
-              "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12px] font-medium transition-all",
-              applying
-                ? "cursor-wait border-border bg-muted text-muted-foreground"
-                : "border-[var(--interactive)]/30 bg-[var(--interactive)]/[0.06] text-[var(--interactive)] hover:bg-[var(--interactive)]/[0.12]",
-            )}
-          >
-            {applying ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Send className="size-3.5" />
-            )}
-            {applying ? "Applying…" : "Apply to all existing agents"}
-          </button>
-          {applyResult && (
-            <span className="flex items-center gap-1 text-[11px] text-[var(--ok)]">
-              <CheckCircle2 className="size-3.5" />
-              {applyResult}
-            </span>
-          )}
-        </div>
-      </FieldGroup>
-
       <AllowedModelsSection />
 
       <ToggleRow i={0} name="Auto-continuation" detail="Let the agent keep working without a nudge" />
