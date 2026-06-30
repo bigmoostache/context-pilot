@@ -1,0 +1,65 @@
+---
+# Install Claude Code OAuth credentials on ONE client's box — a SPECIAL CASE,
+# deliberately kept OUT of site.yml. Run on demand, per client.
+#
+# Why separate: provisioning is API-key based by default (tasks/keys.yml). OAuth
+# is the exception — a subscription token a human obtains interactively, off the
+# box. The appliance still touches nothing: it only READS the file we drop here
+# (crates/.../llms/claude_code/mod.rs reads ~/.claude/.credentials.json; it does
+# NOT refresh and REJECTS an expired token). So the token must be LONG-LIVED.
+#
+# Prereqs (on YOUR machine, once per client/token):
+#   claude setup-token        # long-lived (~1y). NOT `/login` (token = hours).
+#   # → writes ~/.claude/.credentials.json (or prints a token to wrap in that shape:
+#   #   {"claudeAiOauth":{"accessToken":"sk-ant-oat01-…","expiresAt":<ms-future>}})
+#
+# Run (token stays on your disk only — nothing committed; re-run to rotate):
+#   ansible-playbook -i inventory.ini deploy/ansible/claude-oauth.yml \
+#     --limit acme -e oauth_creds_file=~/.claude/.credentials.json
+#
+# NOTE: surfacing the "Claude Code (OAuth)" provider in the cockpit also needs a
+# small read-only runtime change (provider_key_name in transport/inspect/providers.rs
+# returns None for it today). That is a CODE change, not part of this script.
+- name: Install Claude Code OAuth credentials (special case, manual)
+  hosts: all
+  become: false
+  gather_facts: false
+  vars:
+    cp_root: /mnt/data/context-pilot
+    oauth_creds_file: "~/.claude/.credentials.json"
+  tasks:
+    - name: Read the local credentials file
+      ansible.builtin.set_fact:
+        _oauth_json: "{{ lookup('file', oauth_creds_file) }}"
+      no_log: true
+
+    - name: Reject a wrong-shape or already-expired token
+      ansible.builtin.assert:
+        that:
+          - (_oauth_json | from_json).claudeAiOauth.accessToken | default('') | length > 0
+          - (_oauth_json | from_json).claudeAiOauth.expiresAt | int > (now().timestamp() * 1000) | int
+        fail_msg: >-
+          {{ oauth_creds_file }} has no claudeAiOauth.accessToken or is already
+          expired. Regenerate with `claude setup-token` (long-lived), not `/login`.
+        quiet: true
+      no_log: true
+
+    - name: Ensure ~/.claude exists (chmod 700)
+      ansible.builtin.file:
+        path: "{{ cp_root }}/home/.claude"
+        state: directory
+        mode: "0700"
+
+    - name: Install ~/.claude/.credentials.json (chmod 600)
+      ansible.builtin.copy:
+        content: "{{ _oauth_json }}"
+        dest: "{{ cp_root }}/home/.claude/.credentials.json"
+        mode: "0600"
+      no_log: true
+
+    - name: Report when this token expires (so you know when to rotate)
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: Claude Code OAuth installed; token expires
+          {{ '%Y-%m-%d' | strftime(((_oauth_json | from_json).claudeAiOauth.expiresAt | int / 1000) | int) }}
+          — re-run this playbook before then to rotate.

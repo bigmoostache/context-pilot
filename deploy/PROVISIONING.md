@@ -76,6 +76,39 @@ deploy/photonicat/build.sh        # cross-compile aarch64 + SPA → deploy/ansib
    **ouvre `:80/:443/:9090` côté client** via `open-client-firewall.sh`) → **keys** (`providers.env`)
    → **seed** (admin write-once + fiche `out/<unit>-admin.txt`) → **start** (+ sondes santé).
 
+## Phase 3 bis — (optionnel) Claude Code OAuth par abonnement
+> Cas particulier, **hors `site.yml`** : par défaut les providers sont en clé API
+> (`cp_provider_keys` → `providers.env`). À n'utiliser que si le client paie en
+> **abonnement Claude Pro/Max** plutôt qu'en clé API console. La box ne touche à
+> rien : elle **lit** seulement le fichier déposé (pas de flow OAuth, pas de
+> refresh — le backend **rejette un token expiré**, d'où le token longue durée).
+1. **Générer un token longue durée** (sur ta machine, abonnement Pro/Max requis) :
+   ```sh
+   claude setup-token        # ~1 an. PAS `/login` (access token = quelques heures)
+   ```
+2. **Fabriquer le credentials file** à la forme attendue (`setup-token` affiche le
+   token mais n'écrit pas forcément ce JSON) :
+   ```sh
+   TOKEN='sk-ant-oat01-…'                         # collé depuis setup-token
+   EXP=$(( $(date -d '+1 year' +%s) * 1000 ))     # expiresAt (ms) = vie réelle du token
+   mkdir -p ~/.claude
+   printf '{"claudeAiOauth":{"accessToken":"%s","expiresAt":%s}}\n' "$TOKEN" "$EXP" \
+     > ~/.claude/.credentials.json && chmod 600 ~/.claude/.credentials.json
+   ```
+3. **Déposer sur la box** (token jamais commité, reste sur ta machine) :
+   ```sh
+   ./.venv/bin/ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/claude-oauth.yml \
+     --limit <client> -e oauth_creds_file=$HOME/.claude/.credentials.json
+   ```
+   Écrit `~/.claude/.credentials.json` (0600) sous le `HOME` de l'orchestrateur ;
+   refuse un token mal formé/expiré ; affiche la date d'expiration.
+> **Rotation** : pas de refresh côté box → relancer ce playbook avant l'expiration
+> (modèle identique à la rotation des clés). `expiresAt` n'est qu'une garde locale ;
+> le cale sur la vraie durée du token (le mettre au-delà = tentatives 401 inutiles).
+> **Pré-requis code** : surfacer le provider « Claude Code (OAuth) » dans le cockpit
+> demande un patch lecture-seule (`provider_key_name`, `transport/inspect/providers.rs`),
+> non inclus ici.
+
 ## Phase 4 — Onboarding (IT, depuis le LAN client, à l'IP de la box)
 1. Navigateur → `https://<box-LAN-IP>:9090` (avertissement TLS — CA privée, attendu).
 2. Se connecter (identifiants de la fiche de livraison), changer le mdp, fixer l'email admin réel.
