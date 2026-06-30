@@ -11,12 +11,14 @@
 //! All endpoints are admin-only — the router gates them behind the auth check
 //! before dispatching here.
 
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use serde::Deserialize;
 
 use super::{Backend, HttpReply};
 use crate::services::releases::{KNOWN_ARCHS, semver_sort_key};
+use crate::supervisor;
 
 /// `GET /api/releases` — list all releases (local + remote merged), current
 /// architecture, and selected version.
@@ -213,7 +215,7 @@ pub(crate) fn select_release(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
 
     // Update the agent binary and supervisor allow-list.
     b.agent_binary = binary_path.clone();
-    b.supervisor = crate::supervisor::AgentSupervisor::new(&[binary_path.clone()]);
+    b.supervisor = supervisor::AgentSupervisor::new(&[binary_path.clone()]);
 
     HttpReply::ok(&serde_json::json!({
         "status": "selected",
@@ -232,4 +234,110 @@ pub(crate) fn delete_release(state: &Mutex<Backend>, tag: &str) -> HttpReply {
         Ok(()) => HttpReply::ok(&serde_json::json!({ "status": "deleted", "tag": tag })),
         Err(e) => HttpReply::error(400, &e),
     }
+}
+
+/// `POST /api/releases/deploy` — select a release and restart the entire fleet.
+///
+/// Combines [`select_release`] + a loop of [`restart_agent`](super::restart_agent)
+/// into one atomic deploy action. If `tag` is provided, the release is selected
+/// first; otherwise the currently active release is used (agents are just
+/// restarted on the current binary).
+///
+/// Returns a summary of which agents were restarted and any errors encountered.
+pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
+    #[derive(Deserialize)]
+    struct Req {
+        tag: Option<String>,
+    }
+    let req = serde_json::from_slice::<Req>(body).unwrap_or(Req { tag: None });
+
+    // 1. Select the release if a tag was provided.
+    let active_tag = if let Some(ref tag) = req.tag {
+        let Ok(mut b) = state.lock() else {
+            return HttpReply::error(500, "backend lock poisoned");
+        };
+        let binary_path = match b.releases.select(tag) {
+            Ok(p) => p,
+            Err(e) => return HttpReply::error(400, &e),
+        };
+        b.agent_binary = binary_path.clone();
+        b.supervisor = supervisor::AgentSupervisor::new(&[binary_path]);
+        tag.clone()
+    } else {
+        let Ok(b) = state.lock() else {
+            return HttpReply::error(500, "backend lock poisoned");
+        };
+        b.releases.active_tag().unwrap_or("(current)").to_owned()
+    };
+
+    // 2. Collect running agent IDs + shared config under one lock.
+    let (agent_ids, agents_dir, binary) = {
+        let Ok(b) = state.lock() else {
+            return HttpReply::error(500, "backend lock poisoned");
+        };
+        let ids: Vec<String> = b.view.agent_ids().map(str::to_owned).collect();
+        (ids, b.agents_dir.clone(), b.agent_binary.clone())
+    };
+
+    // 3. Restart each agent (same logic as restart_agent, batched).
+    let mut restarted: Vec<serde_json::Value> = Vec::new();
+    let mut errors: Vec<String> = Vec::new();
+    let agents_dir_str = agents_dir.to_string_lossy().into_owned();
+
+    for id in &agent_ids {
+        let entry = match super::resolve_entry(state, id) {
+            Ok(e) => e,
+            Err(_) => {
+                errors.push(format!("{id}: not found in registry"));
+                continue;
+            }
+        };
+        let folder = PathBuf::from(&entry.folder);
+        let key = folder.to_string_lossy().into_owned();
+
+        // Kill old process (lock-free — may block up to the stop grace).
+        supervisor::kill_pid(entry.pid);
+
+        // Drop stale supervised record.
+        if let Ok(mut b) = state.lock() {
+            if b.supervisor.is_supervised(&key) {
+                let _stopped = b.supervisor.stop(&key);
+            }
+        }
+
+        // Respawn on the same folder with the (potentially new) binary.
+        let env: [(&str, &str); 2] = [("CP_BRIDGE", "1"), ("CP_AGENTS_DIR", &agents_dir_str)];
+        match state.lock() {
+            Ok(mut b) => match b.supervisor.spawn_pty(key, &binary, &folder, &env) {
+                Ok(pid) => restarted.push(serde_json::json!({ "id": id, "pid": pid })),
+                Err(e) => errors.push(format!("{id}: spawn failed: {e}")),
+            },
+            Err(_) => errors.push(format!("{id}: backend lock poisoned")),
+        }
+    }
+
+    HttpReply::ok(&serde_json::json!({
+        "status": "deployed",
+        "tag": active_tag,
+        "restarted": restarted,
+        "errors": errors,
+    }))
+}
+
+/// `POST /api/releases/restart-orchestrator` — gracefully restart the
+/// orchestrator process.
+///
+/// Sends the HTTP response first, then schedules a delayed `SIGTERM` to self so
+/// the process manager (procd on OpenWrt, or the user on a dev machine) can
+/// respawn it. The 200 ms delay ensures the response reaches the client before
+/// the process dies.
+pub(crate) fn restart_orchestrator(_state: &Mutex<Backend>) -> HttpReply {
+    let _delayed_exit = std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        // SIGTERM triggers the default handler (process exit). On procd-managed
+        // deployments the service respawns automatically; on a dev machine the
+        // user relaunches manually.
+        let _sent = nix::sys::signal::kill(nix::unistd::Pid::this(), nix::sys::signal::Signal::SIGTERM);
+    });
+    HttpReply::ok(&serde_json::json!({ "status": "restarting" }))
 }

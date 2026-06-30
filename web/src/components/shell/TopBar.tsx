@@ -2,6 +2,7 @@ import { useState } from "react"
 import { LayoutGrid, MessagesSquare, FolderTree, Home, Settings2 } from "lucide-react"
 import { ThemeToggle } from "./widgets/ThemeToggle"
 import { AgentSwitcher } from "./widgets/AgentSwitcher"
+import { UsageButton } from "./widgets/UsageButton"
 import { ConfigModal } from "./config/ConfigModal"
 import { ProfileModal } from "./widgets/ProfileModal"
 import { UserMenu } from "./widgets/UserMenu"
@@ -140,6 +141,7 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
             </button>
           </Tip>
         )}
+        <UsageButton />
         {/* Account avatar menu (T30) — replaced the old top-right Settings
             gear. The gear's behaviour is preserved: the menu's "Settings" item
             still opens the same ConfigModal, and "Profile" opens the profile

@@ -19,6 +19,7 @@ import {
 import type { ReleaseEntry, ReleasesResponse } from "@/lib/api/generated"
 import { sdk } from "@/lib/api/client"
 import { cn } from "@/lib/utils"
+import { DeploySection } from "./DeploySection"
 
 const PAGE_SIZE = 5
 
@@ -99,6 +100,8 @@ export function ReleasesPane() {
           onChanged={invalidate}
         />
       )}
+
+      <DeploySection activeTag={data.activeTag ?? null} onChanged={invalidate} />
 
       <p className="text-[10.5px] text-muted-foreground/60">
         Current binary: <code className="font-mono text-[10px]">{data.currentBinary}</code>

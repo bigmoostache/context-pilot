@@ -330,7 +330,7 @@ fn route_rest(
         (Method::Post, ["api", "agent", id, "rename"]) => rest::rename_agent(state, id, body_bytes),
         (Method::Post, ["api", "agent", id, "avatar"]) => rest::upload_avatar(state, id, body_bytes),
         (Method::Delete, ["api", "agent", id, "avatar"]) => rest::delete_avatar(state, id),
-        (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes),
+        (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes, auth_user),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state, auth_user),
 
         // ── Release management (T427, admin-only) ──────────────────
@@ -338,7 +338,12 @@ fn route_rest(
         (Method::Put, ["api", "releases", "arch"]) => rest::set_arch(state, body_bytes),
         (Method::Post, ["api", "releases", "download"]) => rest::download_release(state, body_bytes),
         (Method::Put, ["api", "releases", "select"]) => rest::select_release(state, body_bytes),
+        (Method::Post, ["api", "releases", "deploy"]) => rest::deploy_fleet(state, body_bytes),
+        (Method::Post, ["api", "releases", "restart-orchestrator"]) => rest::restart_orchestrator(state),
         (Method::Delete, ["api", "releases", tag]) => rest::delete_release(state, tag),
+
+        // ── Claude Code usage (OAuth) ──────────────────────────────
+        (Method::Get, ["api", "claude-usage"]) => rest::claude_usage(),
 
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },
     }
