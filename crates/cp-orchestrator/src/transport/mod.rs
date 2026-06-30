@@ -277,7 +277,7 @@ fn route_rest(
         (Method::Post, ["api", "agent", id, "rename"]) => rest::rename_agent(state, id, body_bytes),
         (Method::Post, ["api", "agent", id, "avatar"]) => rest::upload_avatar(state, id, body_bytes),
         (Method::Delete, ["api", "agent", id, "avatar"]) => rest::delete_avatar(state, id),
-        (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes),
+        (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes, auth_user),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state, auth_user),
 
         // ── Release management (T427, admin-only) ──────────────────
