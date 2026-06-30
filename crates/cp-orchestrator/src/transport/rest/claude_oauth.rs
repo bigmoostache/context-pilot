@@ -5,9 +5,10 @@
 //! builds the authorize URL, and the user completes authorization in their
 //! browser, then pastes the resulting code back into the frontend dialog.
 
+use std::io::{Read as _, Write as _};
 use std::net::TcpListener;
 use std::sync::Mutex;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
@@ -54,7 +55,7 @@ pub(crate) fn claude_usage() -> HttpReply {
         .header("Content-Type", "application/json")
         .header("User-Agent", "claude-code/2.1.196")
         .header("anthropic-beta", "oauth-2025-04-20")
-        .timeout(std::time::Duration::from_secs(10))
+        .timeout(Duration::from_secs(10))
         .send();
     match resp {
         Ok(r) => match r.json::<serde_json::Value>() {
@@ -95,13 +96,11 @@ pub(crate) fn token_status() -> HttpReply {
 /// authorize URL for the user to open in their browser.
 pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
     // RFC 8252 §7.3: bind a random loopback port for the redirect URI.
-    // Claude's OAuth server requires `http://localhost:{port}/callback`
-    // with an explicit port. We drop the listener immediately — `code=true`
-    // causes the auth page to display the code for manual copy-paste.
-    let port = match TcpListener::bind("127.0.0.1:0") {
-        Ok(l) => l.local_addr().map(|a| a.port()).unwrap_or(18923),
-        Err(_) => 18923,
+    let listener = match TcpListener::bind("127.0.0.1:0") {
+        Ok(l) => l,
+        Err(e) => return HttpReply::error(500, &format!("could not bind loopback port: {e}")),
     };
+    let port = listener.local_addr().map(|a| a.port()).unwrap_or(18923);
     let redirect_uri = format!("http://localhost:{port}/callback");
 
     // Generate code_verifier: 32 random bytes → base64url (43 chars).
@@ -122,25 +121,109 @@ pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
     }
     let state_param = URL_SAFE_NO_PAD.encode(state_bytes);
 
-    // Build the authorize URL.
     let url = format!(
         "{AUTHORIZE_URL}?code=true&client_id={CLIENT_ID}&response_type=code&redirect_uri={}&scope={}&code_challenge={code_challenge}&code_challenge_method=S256&state={state_param}",
         urlencoded(&redirect_uri),
         urlencoded(SCOPES),
     );
 
-    // Store the PKCE session (redirect_uri must match in token exchange).
+    // Store PKCE session (login_complete fallback for manual code-paste).
     if let Ok(mut b) = state.lock() {
-        b.pkce_session = Some(PkceSession { code_verifier, redirect_uri, created_at: Instant::now() });
+        b.pkce_session = Some(PkceSession {
+            code_verifier: code_verifier.clone(),
+            redirect_uri: redirect_uri.clone(),
+            created_at: Instant::now(),
+        });
     }
+
+    // Spawn a background listener that auto-completes the exchange when the
+    // browser redirects to `http://localhost:{port}/callback?code=...`.
+    spawn_callback_listener(listener, code_verifier, redirect_uri);
 
     HttpReply::ok(&LoginStartResponse { url })
 }
+
+// ── Callback listener ────────────────────────────────────────────────
+
+/// Spawn a background thread that accepts the OAuth redirect on the bound port.
+///
+/// When the browser redirects to `http://localhost:{port}/callback?code=...`,
+/// this thread extracts the code, exchanges it for tokens, stores credentials,
+/// and serves a "Login successful" HTML page. Times out after [`PKCE_TTL_SECS`].
+fn spawn_callback_listener(listener: TcpListener, code_verifier: String, redirect_uri: String) {
+    drop(std::thread::spawn(move || {
+        let _nb = listener.set_nonblocking(true);
+        let deadline = Instant::now() + Duration::from_secs(PKCE_TTL_SECS);
+
+        loop {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    // Read the HTTP request (just need the first line).
+                    let mut buf = [0u8; 4096];
+                    let _nb2 = stream.set_nonblocking(false);
+                    let _to = stream.set_read_timeout(Some(Duration::from_secs(5)));
+                    let n = stream.read(&mut buf).unwrap_or(0);
+                    let request = String::from_utf8_lossy(&buf[..n]);
+
+                    // Parse: GET /callback?code=XXX&state=YYY HTTP/1.1
+                    let code = request
+                        .lines()
+                        .next()
+                        .and_then(|line| line.split('?').nth(1))
+                        .and_then(|qs| qs.split_whitespace().next())
+                        .and_then(|qs| {
+                            qs.split('&').find_map(|pair| {
+                                pair.strip_prefix("code=")
+                            })
+                        });
+
+                    let (status_line, body) = match code {
+                        Some(code) => match exchange_and_store(code, &code_verifier, &redirect_uri) {
+                            Ok(_) => ("200 OK", SUCCESS_HTML),
+                            Err(e) => {
+                                eprintln!("OAuth callback exchange failed: {e}");
+                                ("500 Internal Server Error", FAILURE_HTML)
+                            }
+                        },
+                        None => ("400 Bad Request", FAILURE_HTML),
+                    };
+
+                    let response = format!(
+                        "HTTP/1.1 {status_line}\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len(),
+                    );
+                    drop(stream.write_all(response.as_bytes()));
+                    break;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    if Instant::now() > deadline {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(500));
+                }
+                Err(_) => break,
+            }
+        }
+    }));
+}
+
+const SUCCESS_HTML: &str = r#"<!DOCTYPE html><html><head><title>Login Successful</title></head>
+<body style="font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f8f9fa">
+<div style="text-align:center"><h1 style="color:#16a34a">&#x2705; Login Successful</h1>
+<p style="color:#6b7280">You can close this tab and return to Context Pilot.</p></div></body></html>"#;
+
+const FAILURE_HTML: &str = r#"<!DOCTYPE html><html><head><title>Login Failed</title></head>
+<body style="font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f8f9fa">
+<div style="text-align:center"><h1 style="color:#dc2626">&#x274C; Login Failed</h1>
+<p style="color:#6b7280">Please try again from Context Pilot.</p></div></body></html>"#;
 
 // ── Login complete ───────────────────────────────────────────────────
 
 /// `POST /api/claude-login/complete` — exchange the authorization code for
 /// tokens and store them in the macOS Keychain / credentials file.
+///
+/// This is the manual fallback — the user pastes the code from the browser.
+/// Normally the [`spawn_callback_listener`] auto-completes the exchange.
 pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpReply {
     let Ok(req) = serde_json::from_slice::<LoginCompleteRequest>(body_bytes) else {
         return HttpReply::error(400, "expected {\"code\":\"...\"}");
@@ -159,7 +242,19 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
         return HttpReply::error(400, "login session expired — please start again");
     }
 
-    // Exchange the code for tokens.
+    match exchange_and_store(code, &session.code_verifier, &session.redirect_uri) {
+        Ok(expires_at) => HttpReply::ok(&LoginCompleteResponse { status: "ok".to_owned(), expires_at: Some(expires_at) }),
+        Err(e) => HttpReply::error(502, &e),
+    }
+}
+
+// ── Token exchange (shared) ──────────────────────────────────────────
+
+/// Exchange an authorization code for tokens and persist credentials.
+///
+/// Returns `expires_at` (ms since epoch) on success.
+/// Used by both [`spawn_callback_listener`] (auto) and [`login_complete`] (manual).
+fn exchange_and_store(code: &str, code_verifier: &str, redirect_uri: &str) -> Result<i64, String> {
     let client = reqwest::blocking::Client::new();
     let resp = client
         .post(TOKEN_URL)
@@ -167,33 +262,23 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
         .body(format!(
             "grant_type=authorization_code&code={}&code_verifier={}&client_id={CLIENT_ID}&redirect_uri={}",
             urlencoded(code),
-            urlencoded(&session.code_verifier),
-            urlencoded(&session.redirect_uri),
+            urlencoded(code_verifier),
+            urlencoded(redirect_uri),
         ))
-        .timeout(std::time::Duration::from_secs(15))
-        .send();
+        .timeout(Duration::from_secs(15))
+        .send()
+        .map_err(|e| format!("token exchange failed: {e}"))?;
 
-    let token_response = match resp {
-        Ok(r) => {
-            let status = r.status();
-            match r.json::<serde_json::Value>() {
-                Ok(val) => {
-                    if !status.is_success() {
-                        let msg = val.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str()).unwrap_or("token exchange failed");
-                        return HttpReply::error(502, msg);
-                    }
-                    val
-                }
-                Err(e) => return HttpReply::error(502, &format!("invalid token response: {e}")),
-            }
-        }
-        Err(e) => return HttpReply::error(502, &format!("token exchange failed: {e}")),
-    };
+    let status = resp.status();
+    let val: serde_json::Value = resp.json().map_err(|e| format!("invalid token response: {e}"))?;
+    if !status.is_success() {
+        let msg = val.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str()).unwrap_or("token exchange failed");
+        return Err(msg.to_owned());
+    }
 
-    // Build the credentials JSON in the same format Claude CLI uses.
-    let access_token = token_response.get("access_token").and_then(|v| v.as_str()).unwrap_or("");
-    let refresh_token = token_response.get("refresh_token").and_then(|v| v.as_str()).unwrap_or("");
-    let expires_in = token_response.get("expires_in").and_then(|v| v.as_i64()).unwrap_or(0);
+    let access_token = val.get("access_token").and_then(|v| v.as_str()).unwrap_or("");
+    let refresh_token = val.get("refresh_token").and_then(|v| v.as_str()).unwrap_or("");
+    let expires_in = val.get("expires_in").and_then(|v| v.as_i64()).unwrap_or(0);
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
@@ -209,15 +294,8 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
         }
     });
 
-    // Store credentials.
-    if let Err(e) = store_credentials(&creds) {
-        return HttpReply::error(502, &format!("failed to store credentials: {e}"));
-    }
-
-    HttpReply::ok(&LoginCompleteResponse {
-        status: "ok".to_owned(),
-        expires_at: Some(expires_at),
-    })
+    store_credentials(&creds)?;
+    Ok(expires_at)
 }
 
 // ── Credential I/O ───────────────────────────────────────────────────
