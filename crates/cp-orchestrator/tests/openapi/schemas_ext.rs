@@ -12,6 +12,8 @@ pub(super) fn transport() -> Value {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
+                // Canonical "<providerId>:<modelId>" key (server-built; the id the org allowlist is keyed on).
+                "key": { "type": "string" },
                 "apiName": { "type": "string" },
                 "displayName": { "type": "string" },
                 "contextWindow": { "type": "integer" },
@@ -21,7 +23,7 @@ pub(super) fn transport() -> Value {
                 "badge": { "type": "string", "nullable": true },
                 "isDefault": { "type": "boolean" }
             },
-            "required": ["id", "apiName", "displayName", "contextWindow", "maxOutput", "inputPrice", "outputPrice"]
+            "required": ["id", "key", "apiName", "displayName", "contextWindow", "maxOutput", "inputPrice", "outputPrice"]
         },
         "ProviderDef": {
             "type": "object",
@@ -29,10 +31,9 @@ pub(super) fn transport() -> Value {
                 "id": { "type": "string" },
                 "name": { "type": "string" },
                 "description": { "type": "string" },
-                "available": { "type": "boolean" },
                 "models": arr(r("ModelDef"))
             },
-            "required": ["id", "name", "description", "available", "models"]
+            "required": ["id", "name", "description", "models"]
         },
         "CommandReceipt": {
             "type": "object",
@@ -110,6 +111,21 @@ pub(super) fn transport() -> Value {
                 "updated_at": { "type": "integer" }
             },
             "required": ["id", "email", "name", "role", "must_change_password"]
+        },
+        // GET /api/auth/me — the user profile plus the backend-driven next step.
+        "AuthMe": {
+            "type": "object",
+            "properties": {
+                "id": { "type": "string" },
+                "email": { "type": "string" },
+                "name": { "type": "string" },
+                "role": { "type": "string", "enum": ["admin", "user"] },
+                "must_change_password": { "type": "boolean" },
+                "created_at": { "type": "integer" },
+                "updated_at": { "type": "integer" },
+                "next_action": { "type": "string", "enum": ["change_password", "onboarding", "ready"] }
+            },
+            "required": ["id", "email", "name", "role", "must_change_password", "next_action"]
         },
         "AuthLogin": {
             "type": "object",

@@ -20,7 +20,12 @@ pub(super) fn paths() -> Value {
         "/api/health": get("health", "Health check", json!({
             "type": "object", "properties": { "status": { "type": "string" } }
         })),
-        "/api/providers": get("providers", "LLM provider + model registry", arr(r("ProviderDef"))),
+        "/api/providers": json!({ "get": {
+            "tags": ["providers"],
+            "summary": "LLM provider + model registry (usable providers only; ?allowed=1 applies the org model allowlist)",
+            "parameters": [qp_opt("allowed")],
+            "responses": merge(ok(arr(r("ProviderDef"))), err())
+        }}),
         // ── Fleet ───────────────────────────────────────────────────
         "/api/fleet": get("fleet", "Raw fleet view (rev-envelope)", json!({ "type": "object" })),
         "/api/fleet/meta": get("fleet", "List all agents (enriched)", arr(r("Agent"))),
@@ -79,7 +84,7 @@ pub(super) fn paths() -> Value {
         })), r("RegisterResponse")),
         "/api/auth/logout": post("auth", "Logout", None, r("OkResponse")),
         "/api/auth/me": merge(
-            get("auth", "Current user", r("AuthUser")),
+            get("auth", "Current user + post-login next action", r("AuthMe")),
             json!({ "patch": {
                 "tags": ["auth"], "summary": "Update current user profile",
                 "requestBody": { "required": true, "content": { "application/json": { "schema": {

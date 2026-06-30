@@ -78,7 +78,10 @@ function enrichProviders(raw: GenProviderDef[]): ProviderDef[] {
 /** Singleton cache — providers never change during a session. */
 let cached: ProviderDef[] | null = null
 
-/** Fetch the provider registry (cached after first call). */
+/** Fetch the full usable provider registry (cached after first call). The
+ *  backend already drops providers without a configured key and stamps each
+ *  model with its canonical `key`, so this is the admin-facing catalog (every
+ *  usable model, unfiltered by the org allowlist). */
 export async function fetchProviders(): Promise<ProviderDef[]> {
   if (cached) return cached
   // The client runs in responseStyle:"data" (setupClient), so the SDK call
@@ -87,6 +90,18 @@ export async function fetchProviders(): Promise<ProviderDef[]> {
   const data = await sdk<GenProviderDef[]>(getApiProviders({ throwOnError: true }))
   cached = enrichProviders(data)
   return cached
+}
+
+/** Fetch the picker registry — usable providers with the org model allowlist
+ *  already applied server-side (`?allowed=1`). This is what end users pick from;
+ *  it depends on the allowlist, so it's never part of the static singleton and
+ *  is invalidated (query key `["providers", "picker"]`) when the admin edits the
+ *  allowlist. */
+export async function fetchPickerProviders(): Promise<ProviderDef[]> {
+  const data = await sdk<GenProviderDef[]>(
+    getApiProviders({ query: { allowed: "1" }, throwOnError: true }),
+  )
+  return enrichProviders(data)
 }
 
 /**
@@ -107,6 +122,17 @@ export function useProviders() {
   })
 }
 
+/** TanStack Query hook for the allowlist-filtered picker registry. Cached until
+ *  the allowlist changes — `ConfigPanes` invalidates `["providers", "picker"]`
+ *  after a save. */
+export function usePickerProviders() {
+  return useQuery({
+    queryKey: ["providers", "picker"],
+    queryFn: fetchPickerProviders,
+    staleTime: Infinity,
+  })
+}
+
 // ── Compact price formatter ───────────────────────────────────────────
 
 /** `$5 · 200K` style label for the picker card. */
@@ -116,41 +142,6 @@ export function priceTag(m: GenModelDef): string {
       ? `${(m.contextWindow / 1_000_000).toFixed(0)}M`
       : `${(m.contextWindow / 1_000).toFixed(0)}K`
   return `$${m.inputPrice} · ${ctx}`
-}
-
-// ── Allowlist ──────────────────────────────────────────────────────────
-
-/** Compound id used by the org allowlist setting: `"<providerId>:<modelId>"`. */
-export function modelKey(providerId: string, modelId: string): string {
-  return `${providerId}:${modelId}`
-}
-
-/**
- * Keep only providers whose API key is configured (`available`) — the only ones
- * a model can actually run on. Backend computes the flag in `GET /api/providers`.
- */
-export function usableProviders(providers: ProviderDef[]): ProviderDef[] {
-  return providers.filter((p) => p.available)
-}
-
-/**
- * Restrict providers' models to the org allowlist of `"provider:model"` ids.
- * An **empty** allowlist means everything is allowed (delivery default), so the
- * registry passes through untouched. Providers left with no allowed model are
- * dropped so the picker never shows an empty provider.
- */
-export function filterAllowed(
-  providers: ProviderDef[],
-  allowed: string[],
-): ProviderDef[] {
-  if (allowed.length === 0) return providers
-  const set = new Set(allowed)
-  return providers
-    .map((p) => ({
-      ...p,
-      models: p.models.filter((m) => set.has(modelKey(p.id, m.id))),
-    }))
-    .filter((p) => p.models.length > 0)
 }
 
 // ── Lookup helpers ─────────────────────────────────────────────────────

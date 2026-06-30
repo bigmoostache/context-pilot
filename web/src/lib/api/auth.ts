@@ -5,34 +5,43 @@
 
 import type {
   AclEntry,
+  AppSettings,
   AuthLogin,
+  AuthMe,
   AuthStatus,
   AuthUser,
   CreateUserResponse,
   ForceLogoutResponse,
   OkResponse,
   RegisterResponse,
+  SessionInfo,
 } from "./generated/types.gen"
 import {
   deleteApiAgentByIdAclByUserId,
+  deleteApiAuthSessionsById,
   deleteApiAuthUsersByUserId,
   getApiAgentByIdAcl,
   getApiAuthMe,
+  getApiAuthSessions,
   getApiAuthStatus,
   getApiAuthUsers,
+  getApiSettings,
   patchApiAgentByIdAclByUserId,
+  patchApiAuthMe,
   postApiAgentByIdAcl,
   postApiAuthLogin,
   postApiAuthLogout,
+  postApiAuthPassword,
   postApiAuthRegister,
   postApiAuthUsers,
   postApiAuthUsersByUserIdLogout,
+  postApiSettings,
 } from "./generated"
-import { request, sdk } from "./client"
+import { sdk } from "./client"
 
 // ── Type re-exports (preserve import surface) ────────────────────────
 
-export type { AuthUser, AclEntry, AuthStatus } from "./generated/types.gen"
+export type { AuthUser, AuthMe, AclEntry, AuthStatus, AppSettings } from "./generated/types.gen"
 
 // ── Auth status ──────────────────────────────────────────────────────
 
@@ -58,7 +67,8 @@ export function authLogout(): Promise<OkResponse> {
   return sdk(postApiAuthLogout())
 }
 
-export function authMe(): Promise<AuthUser> {
+/** Current user profile + the backend-driven post-login step (`next_action`). */
+export function authMe(): Promise<AuthMe> {
   return sdk(getApiAuthMe())
 }
 
@@ -68,12 +78,8 @@ export function authMe(): Promise<AuthUser> {
 export function changePassword(
   current: string,
   next: string,
-): Promise<{ ok: boolean }> {
-  return request("/api/auth/password", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ current, new: next }),
-  })
+): Promise<OkResponse> {
+  return sdk(postApiAuthPassword({ body: { current, new: next } }))
 }
 
 /** Update the current user's display name + email. Returns the refreshed user. */
@@ -81,57 +87,29 @@ export function updateProfile(
   name: string,
   email: string,
 ): Promise<{ user: AuthUser }> {
-  return request("/api/auth/me", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, email }),
-  })
+  return sdk(patchApiAuthMe({ body: { name, email } }))
 }
 
 /** One active device session (no raw token, just an opaque id). */
-export interface DeviceSession {
-  id: string
-  created_at: number
-  expires_at: number
-  user_agent: string | null
-  current: boolean
-}
+export type DeviceSession = SessionInfo
 
 /** List the current user's active device sessions. */
 export function fetchSessions(): Promise<DeviceSession[]> {
-  return request<{ sessions: DeviceSession[] }>("/api/auth/sessions").then(
+  return sdk<{ sessions: DeviceSession[] }>(getApiAuthSessions()).then(
     (r) => r.sessions,
   )
 }
 
 /** Revoke one of the current user's own sessions by id. */
-export function revokeSession(id: string): Promise<{ ok: boolean }> {
-  return request(`/api/auth/sessions/${id}`, { method: "DELETE" })
+export function revokeSession(id: string): Promise<OkResponse> {
+  return sdk(deleteApiAuthSessionsById({ path: { id } }))
 }
 
 // ── Central settings (defaults, onboarding, provider keys) ───────────
 
-/** One provider's key-configured state (never the key value). */
-export interface ProviderKeyState {
-  id: string
-  configured: boolean
-}
-
-/** Central cockpit settings (server-side defaults + onboarding gate). */
-export interface AppSettings {
-  default_provider: string | null
-  default_model: string | null
-  onboarding_completed: boolean
-  is_admin: boolean
-  auth_enabled: boolean
-  providers: ProviderKeyState[]
-  /** Org-wide allowlist of `"provider:model"` ids. Empty ⇒ all models allowed. */
-  allowed_models: string[]
-}
-
 /** Read central settings + onboarding state (any authenticated user). */
 export function fetchSettings(): Promise<AppSettings> {
-  return request("/api/settings")
+  return sdk(getApiSettings())
 }
 
 /** Admin: update new-agent defaults and/or the onboarding flag. */
@@ -141,11 +119,7 @@ export function updateSettings(patch: {
   onboarding_completed?: boolean
   allowed_models?: string[]
 }): Promise<AppSettings> {
-  return request("/api/settings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  })
+  return sdk(postApiSettings({ body: patch }))
 }
 
 // ── Admin: user management ───────────────────────────────────────────

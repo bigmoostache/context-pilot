@@ -88,6 +88,17 @@ export type AuthLogin = {
     user: AuthUser;
 };
 
+export type AuthMe = {
+    created_at?: number;
+    email: string;
+    id: string;
+    must_change_password: boolean;
+    name: string;
+    next_action: 'change_password' | 'onboarding' | 'ready';
+    role: 'admin' | 'user';
+    updated_at?: number;
+};
+
 export type AuthStatus = {
     bootstrapped?: boolean;
     enabled: boolean;
@@ -268,6 +279,7 @@ export type ModelDef = {
     id: string;
     inputPrice: number;
     isDefault?: boolean;
+    key: string;
     maxOutput: number;
     outputPrice: number;
 };
@@ -317,7 +329,6 @@ export type OpEntryKind = {
 export type PanelKind = 'tree' | 'memory' | 'threads' | 'spine' | 'stats' | 'entities' | 'search' | 'file' | 'git' | 'console' | 'queue' | 'todo' | 'callback' | 'scratchpad' | 'tools' | 'radar';
 
 export type ProviderDef = {
-    available: boolean;
     description: string;
     id: string;
     models: Array<ModelDef>;
@@ -1884,7 +1895,7 @@ export type GetApiAuthMeResponses = {
     /**
      * Success
      */
-    200: AuthUser;
+    200: AuthMe;
 };
 
 export type GetApiAuthMeResponse = GetApiAuthMeResponses[keyof GetApiAuthMeResponses];
@@ -2406,7 +2417,9 @@ export type GetApiMetricsResponse = GetApiMetricsResponses[keyof GetApiMetricsRe
 export type GetApiProvidersData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        allowed?: string;
+    };
     url: '/api/providers';
 };
 

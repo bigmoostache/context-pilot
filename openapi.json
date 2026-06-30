@@ -295,6 +295,52 @@
         ],
         "type": "object"
       },
+      "AuthMe": {
+        "properties": {
+          "created_at": {
+            "type": "integer"
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "must_change_password": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "next_action": {
+            "enum": [
+              "change_password",
+              "onboarding",
+              "ready"
+            ],
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "user"
+            ],
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "role",
+          "must_change_password",
+          "next_action"
+        ],
+        "type": "object"
+      },
       "AuthStatus": {
         "properties": {
           "bootstrapped": {
@@ -858,6 +904,9 @@
           "isDefault": {
             "type": "boolean"
           },
+          "key": {
+            "type": "string"
+          },
           "maxOutput": {
             "type": "integer"
           },
@@ -867,6 +916,7 @@
         },
         "required": [
           "id",
+          "key",
           "apiName",
           "displayName",
           "contextWindow",
@@ -1007,9 +1057,6 @@
       },
       "ProviderDef": {
         "properties": {
-          "available": {
-            "type": "boolean"
-          },
           "description": {
             "type": "string"
           },
@@ -1030,7 +1077,6 @@
           "id",
           "name",
           "description",
-          "available",
           "models"
         ],
         "type": "object"
@@ -4068,7 +4114,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthUser"
+                  "$ref": "#/components/schemas/AuthMe"
                 }
               }
             },
@@ -4085,7 +4131,7 @@
             "description": "Error"
           }
         },
-        "summary": "Current user",
+        "summary": "Current user + post-login next action",
         "tags": [
           "auth"
         ]
@@ -4887,6 +4933,15 @@
     },
     "/api/providers": {
       "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "allowed",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -4912,7 +4967,7 @@
             "description": "Error"
           }
         },
-        "summary": "LLM provider + model registry",
+        "summary": "LLM provider + model registry (usable providers only; ?allowed=1 applies the org model allowlist)",
         "tags": [
           "providers"
         ]

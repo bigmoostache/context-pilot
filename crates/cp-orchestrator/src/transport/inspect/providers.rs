@@ -13,6 +13,7 @@
 use cp_base::config::global;
 use serde::Serialize;
 
+use crate::transport::rest;
 use crate::transport::rest::HttpReply;
 
 // ── Wire types ──────────────────────────────────────────────────────────
@@ -353,25 +354,67 @@ fn all_providers() -> Vec<ProviderDef> {
 
 // ── Handler ─────────────────────────────────────────────────────────────
 
-/// `GET /api/providers` — returns the full LLM provider + model registry.
-pub(crate) fn providers() -> HttpReply {
-    // Annotate each provider with `available` — whether its API key is
-    // configured — so the cockpit only lets users pick models that can run.
-    let enriched: Vec<serde_json::Value> = all_providers()
-        .iter()
-        .map(|p| {
-            let available = provider_key_name(p.id).is_some_and(global::has_api_key);
-            let mut v = serde_json::to_value(p).unwrap_or_default();
-            if let Some(obj) = v.as_object_mut() {
-                drop(obj.insert("available".to_owned(), serde_json::Value::Bool(available)));
-            }
-            v
-        })
-        .collect();
-    match serde_json::to_string(&enriched) {
+/// `GET /api/providers` — the LLM provider + model registry, restricted to the
+/// providers whose API key is configured (so the cockpit only ever offers
+/// models that can actually run). Each model carries a server-built `key`
+/// (`"<providerId>:<modelId>"`) — the canonical id the org allowlist is keyed
+/// on, so the frontend never has to build it.
+///
+/// With `?allowed=1` the org model allowlist is applied as well: models outside
+/// the allowlist are dropped and providers left with no model are omitted (an
+/// **empty** allowlist means *all allowed*). The per-agent model picker uses
+/// this variant; the admin allowlist editor omits it so it can see — and toggle
+/// — every usable model.
+pub(crate) fn providers(query: &str) -> HttpReply {
+    let apply_allowlist = has_param(query, "allowed");
+    let allowlist = if apply_allowlist { rest::allowed_models() } else { Vec::new() };
+    let allow_set: std::collections::HashSet<&str> = allowlist.iter().map(String::as_str).collect();
+    // An empty allowlist (the delivery default) means "everything allowed".
+    let restrict = apply_allowlist && !allow_set.is_empty();
+
+    let mut out: Vec<serde_json::Value> = Vec::new();
+    for p in all_providers() {
+        // Usable = its API key is configured. Drop the rest server-side.
+        if !provider_key_name(p.id).is_some_and(global::has_api_key) {
+            continue;
+        }
+        // Annotate each model with its canonical "<provider>:<model>" key,
+        // applying the org allowlist when this is the picker variant.
+        let models: Vec<serde_json::Value> = p
+            .models
+            .iter()
+            .filter_map(|m| {
+                let key = format!("{}:{}", p.id, m.id);
+                if restrict && !allow_set.contains(key.as_str()) {
+                    return None;
+                }
+                let mut mv = serde_json::to_value(m).unwrap_or_default();
+                if let Some(obj) = mv.as_object_mut() {
+                    drop(obj.insert("key".to_owned(), serde_json::Value::String(key)));
+                }
+                Some(mv)
+            })
+            .collect();
+        // Never surface a provider the allowlist emptied out.
+        if models.is_empty() {
+            continue;
+        }
+        out.push(serde_json::json!({
+            "id": p.id,
+            "name": p.name,
+            "description": p.description,
+            "models": models,
+        }));
+    }
+    match serde_json::to_string(&out) {
         Ok(body) => HttpReply { status: 200, body },
         Err(e) => HttpReply::error(500, &format!("serialize: {e}")),
     }
+}
+
+/// Is `key` present as a query parameter (with or without a value)?
+fn has_param(query: &str, key: &str) -> bool {
+    query.split('&').filter(|s| !s.is_empty()).any(|pair| pair.split_once('=').map_or(pair, |(k, _)| k) == key)
 }
 
 /// Map a catalogue provider id to the central key name used to check usability.

@@ -347,7 +347,7 @@ export const postApiAuthLogin = <ThrowOnError extends boolean = false>(options: 
 export const postApiAuthLogout = <ThrowOnError extends boolean = false>(options?: Options<PostApiAuthLogoutData, ThrowOnError>): RequestResult<PostApiAuthLogoutResponses, PostApiAuthLogoutErrors, ThrowOnError> => (options?.client ?? client).post<PostApiAuthLogoutResponses, PostApiAuthLogoutErrors, ThrowOnError>({ url: '/api/auth/logout', ...options });
 
 /**
- * Current user
+ * Current user + post-login next action
  */
 export const getApiAuthMe = <ThrowOnError extends boolean = false>(options?: Options<GetApiAuthMeData, ThrowOnError>): RequestResult<GetApiAuthMeResponses, GetApiAuthMeErrors, ThrowOnError> => (options?.client ?? client).get<GetApiAuthMeResponses, GetApiAuthMeErrors, ThrowOnError>({ url: '/api/auth/me', ...options });
 
@@ -489,7 +489,7 @@ export const getApiHealth = <ThrowOnError extends boolean = false>(options?: Opt
 export const getApiMetrics = <ThrowOnError extends boolean = false>(options?: Options<GetApiMetricsData, ThrowOnError>): RequestResult<GetApiMetricsResponses, GetApiMetricsErrors, ThrowOnError> => (options?.client ?? client).get<GetApiMetricsResponses, GetApiMetricsErrors, ThrowOnError>({ url: '/api/metrics', ...options });
 
 /**
- * LLM provider + model registry
+ * LLM provider + model registry (usable providers only; ?allowed=1 applies the org model allowlist)
  */
 export const getApiProviders = <ThrowOnError extends boolean = false>(options?: Options<GetApiProvidersData, ThrowOnError>): RequestResult<GetApiProvidersResponses, GetApiProvidersErrors, ThrowOnError> => (options?.client ?? client).get<GetApiProvidersResponses, GetApiProvidersErrors, ThrowOnError>({ url: '/api/providers', ...options });
 

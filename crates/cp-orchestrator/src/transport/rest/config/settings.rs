@@ -28,8 +28,16 @@ const ONBOARDING_DONE: &str = "onboarding_completed";
 const ALLOWED_MODELS: &str = "allowed_models";
 
 /// Read the org-wide allowed-model allowlist (empty when unset / unparsable).
-fn allowed_models() -> Vec<String> {
+/// Shared with the provider registry (`GET /api/providers?allowed=1`) so the
+/// model picker is filtered server-side from this single source of truth.
+pub(crate) fn allowed_models() -> Vec<String> {
     global::get_setting(ALLOWED_MODELS).and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok()).unwrap_or_default()
+}
+
+/// Has the admin completed first-run onboarding? Shared with `GET /api/auth/me`
+/// so the backend can drive the post-login flow (`next_action`).
+pub(crate) fn onboarding_completed() -> bool {
+    global::get_setting(ONBOARDING_DONE).as_deref() == Some("true")
 }
 
 /// Is the caller allowed to mutate central settings? Admins always are; when
@@ -52,7 +60,7 @@ pub fn get_settings(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpRep
     HttpReply::ok(&serde_json::json!({
         "default_provider": global::get_setting(DEFAULT_PROVIDER),
         "default_model": global::get_setting(DEFAULT_MODEL),
-        "onboarding_completed": global::get_setting(ONBOARDING_DONE).as_deref() == Some("true"),
+        "onboarding_completed": onboarding_completed(),
         "is_admin": can_admin(state, auth_user),
         "auth_enabled": auth_enabled,
         "providers": providers,

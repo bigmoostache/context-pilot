@@ -235,7 +235,7 @@ fn route_rest(
 ) -> rest::HttpReply {
     match (method, segments) {
         (Method::Get, ["api", "health"]) => rest::HttpReply { status: 200, body: "{\"status\":\"ok\"}".to_owned() },
-        (Method::Get, ["api", "providers"]) => inspect::providers::providers(),
+        (Method::Get, ["api", "providers"]) => inspect::providers::providers(query),
 
         // ── Auth routes (§6 of design doc) ──────────────────────────
         (Method::Get, ["api", "auth", "status"]) => auth::auth_status(state),

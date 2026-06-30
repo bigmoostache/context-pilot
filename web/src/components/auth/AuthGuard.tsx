@@ -3,43 +3,23 @@
 // Wraps the main application shell. Outcomes:
 //   • Auth disabled → render children immediately (zero overhead, NFR-09).
 //   • Auth enabled, no session → render LoginPage.
-//   • Auth enabled, admin, onboarding not done → render Onboarding.
-//   • Auth enabled, valid session, onboarding done → render children.
+//   • Auth enabled → the backend's `next_action` (on the /me profile) decides
+//     between password rotation, first-run onboarding, and the app itself.
 //   • Still probing → full-screen loading indicator.
+//
+// The post-login step is server-driven: AuthGuard renders whatever
+// `user.next_action` says, never re-deriving the flow client-side. The
+// password-change and onboarding screens call `refreshMe()` on success, which
+// re-pulls /me and advances `next_action`.
 
-import { useCallback, useEffect, useState, type ReactNode } from "react"
+import { type ReactNode } from "react"
 import { useAuth } from "@/lib/support/auth"
-import { fetchSettings } from "@/lib/api"
 import { LoginPage } from "./LoginPage"
 import { Onboarding } from "./Onboarding"
 import { ForcePasswordChange } from "./ForcePasswordChange"
 
 export function AuthGuard({ children }: { children: ReactNode }) {
-  const { authEnabled, user, loading } = useAuth()
-
-  // Onboarding gate: null = not yet known, true/false = whether the admin
-  // still needs to run first-time setup.
-  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null)
-
-  const probeOnboarding = useCallback(async () => {
-    // Only authenticated admins can run (or need) onboarding.
-    if (!authEnabled || !user || user.role !== "admin") {
-      setNeedsOnboarding(false)
-      return
-    }
-    try {
-      const settings = await fetchSettings()
-      setNeedsOnboarding(!settings.onboarding_completed)
-    } catch {
-      // If settings can't be read, don't trap the user behind onboarding.
-      setNeedsOnboarding(false)
-    }
-  }, [authEnabled, user])
-
-  useEffect(() => {
-    if (loading || authEnabled === null) return
-    void probeOnboarding()
-  }, [loading, authEnabled, user, probeOnboarding])
+  const { authEnabled, user, loading, refreshMe } = useAuth()
 
   // Still checking backend status / validating token.
   if (loading || authEnabled === null) {
@@ -58,26 +38,13 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   // Auth enabled but no valid session — show login.
   if (!user) return <LoginPage />
 
-  // Provisioned account with an operator-known initial password — force a
-  // rotation before anything else (incl. onboarding).
-  if (user.must_change_password) return <ForcePasswordChange />
-
-  // Authenticated — wait for the onboarding probe before deciding.
-  if (needsOnboarding === null) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground animate-pulse font-mono text-sm">
-          <span className="text-signal">▌</span> Loading…
-        </div>
-      </div>
-    )
+  // Backend-driven post-login step.
+  switch (user.next_action) {
+    case "change_password":
+      return <ForcePasswordChange />
+    case "onboarding":
+      return <Onboarding onComplete={refreshMe} />
+    default:
+      return <>{children}</>
   }
-
-  // First-run admin setup.
-  if (needsOnboarding) {
-    return <Onboarding onComplete={() => setNeedsOnboarding(false)} />
-  }
-
-  // Authenticated + onboarded — render the app.
-  return <>{children}</>
 }

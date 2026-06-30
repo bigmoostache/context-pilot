@@ -246,13 +246,35 @@ pub(crate) fn logout(state: &Mutex<Backend>, auth_token: Option<&str>) -> HttpRe
     }
 }
 
-/// `GET /api/auth/me` — current user profile (FR-07).
+/// `GET /api/auth/me` — current user profile + the backend-driven post-login
+/// step (FR-07). The profile is the serialized [`User`] plus a `next_action`
+/// field the frontend renders directly (no client-side flow logic):
+///   • `"change_password"` — a provisioned account must rotate its password;
+///   • `"onboarding"` — an admin still has first-run setup to complete;
+///   • `"ready"` — render the app.
 ///
 /// The middleware guarantees `auth_user` is `Some` when auth is enabled.
 pub(crate) fn me(auth_user: Option<&User>) -> HttpReply {
-    match auth_user {
-        Some(user) => HttpReply::ok(user),
-        None => HttpReply::error(501, "auth not enabled"),
+    let Some(user) = auth_user else {
+        return HttpReply::error(501, "auth not enabled");
+    };
+    let mut value = serde_json::to_value(user).unwrap_or_default();
+    if let Some(obj) = value.as_object_mut() {
+        drop(obj.insert("next_action".to_owned(), serde_json::Value::String(next_action(user).to_owned())));
+    }
+    HttpReply::ok(&value)
+}
+
+/// Decide the post-login step the frontend should render for `user`. Password
+/// rotation takes precedence over onboarding, which takes precedence over the
+/// app itself — mirroring the gate order in the web `AuthGuard`.
+fn next_action(user: &User) -> &'static str {
+    if user.must_change_password {
+        "change_password"
+    } else if user.role == UserRole::Admin && !super::rest::onboarding_completed() {
+        "onboarding"
+    } else {
+        "ready"
     }
 }
 

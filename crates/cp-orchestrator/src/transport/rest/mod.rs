@@ -33,6 +33,7 @@ mod releases;
 mod thread_shape;
 pub use backend::Backend;
 pub(crate) use config::env_keys::{env_key_reveal, env_key_update, env_keys_list};
+pub(crate) use config::settings::{allowed_models, onboarding_completed};
 pub use config::settings::{get_settings, update_settings};
 pub use create::create_agent;
 pub use library::create_command;

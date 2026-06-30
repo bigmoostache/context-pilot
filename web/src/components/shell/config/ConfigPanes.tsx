@@ -10,7 +10,7 @@ import {
 } from "lucide-react"
 import { UsagePage } from "@/components/agents/UsagePage"
 import { ReleasesPane } from "./ReleasesPane"
-import { useProviders, modelKey, usableProviders } from "@/lib/support/models"
+import { useProviders } from "@/lib/support/models"
 import { fetchSettings, updateSettings, fetchEnvKeys } from "@/lib/api"
 import { useDevMode } from "@/lib/support/devMode"
 import { cn } from "@/lib/utils"
@@ -146,8 +146,9 @@ function GeneralPane() {
  */
 function AllowedModelsSection() {
   const qc = useQueryClient()
-  const { data: allProviders = [] } = useProviders()
-  const providers = usableProviders(allProviders)
+  // The full usable catalog (every provider with a key) — the admin toggles the
+  // org allowlist over it; each model already carries its server-built `key`.
+  const { data: providers = [] } = useProviders()
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: fetchSettings })
   const [busy, setBusy] = useState(false)
 
@@ -156,13 +157,15 @@ function AllowedModelsSection() {
   const allowed = settings.allowed_models ?? []
   const allowedSet = new Set(allowed)
   const restricted = allowed.length > 0
-  const everyKey = providers.flatMap((p) => p.models.map((m) => modelKey(p.id, m.id)))
+  const everyKey = providers.flatMap((p) => p.models.map((m) => m.key))
 
   const save = async (next: string[]) => {
     setBusy(true)
     try {
       await updateSettings({ allowed_models: next })
+      // The allowlist drives the server-filtered picker registry — refresh both.
       await qc.invalidateQueries({ queryKey: ["settings"] })
+      await qc.invalidateQueries({ queryKey: ["providers", "picker"] })
     } finally {
       setBusy(false)
     }
@@ -193,7 +196,7 @@ function AllowedModelsSection() {
               <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">{p.name}</span>
               <div className="flex flex-col gap-1">
                 {p.models.map((m) => {
-                  const key = modelKey(p.id, m.id)
+                  const key = m.key
                   const checked = allowedSet.has(key)
                   return (
                     <label key={key} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-muted/40">

@@ -25,14 +25,15 @@ import {
   authMe,
   getToken,
   setToken,
-  type AuthUser,
+  type AuthMe,
 } from "@/lib/api"
 
 // ── Context shape ────────────────────────────────────────────────────
 
 interface AuthContextValue {
-  /** The authenticated user, or null when logged out / auth disabled. */
-  user: AuthUser | null
+  /** The authenticated user (+ backend `next_action`), or null when logged
+   *  out / auth disabled. */
+  user: AuthMe | null
   /** Raw session token (mostly for debugging; Bearer injection is automatic). */
   token: string | null
   /** `true` = backend requires auth; `false` = auth disabled; `null` = still probing. */
@@ -57,7 +58,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 // ── Provider ─────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null)
+  const [user, setUser] = useState<AuthMe | null>(null)
   const [token, setTokenState] = useState<string | null>(getToken)
   const [authEnabled, setAuthEnabled] = useState<boolean | null>(null)
   const [bootstrapped, setBootstrapped] = useState(true)
@@ -118,7 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await authLogin(email, password)
     setToken(res.token)
     setTokenState(res.token)
-    setUser(res.user)
+    // Pull /me for the canonical profile + backend-driven next_action (the
+    // login response carries the user but not the post-login step).
+    setUser(await authMe())
   }, [])
 
   const register = useCallback(
