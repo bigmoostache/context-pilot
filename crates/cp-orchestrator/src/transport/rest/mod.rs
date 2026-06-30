@@ -36,7 +36,9 @@ pub use create::create_agent;
 pub(crate) use env_keys::{env_key_reveal, env_key_update, env_keys_list};
 pub use library::create_command;
 pub use lifecycle::{restart_agent, retire_agent, unretire_agent};
-pub(crate) use releases::{delete_release, deploy_fleet, download_release, list_releases, restart_orchestrator, select_release, set_arch};
+pub(crate) use releases::{
+    delete_release, deploy_fleet, download_release, list_releases, restart_orchestrator, select_release, set_arch,
+};
 use thread_shape::{overlay_roster, reshape_thread};
 
 /// A transport-agnostic reply: an HTTP status and a JSON body.
@@ -291,7 +293,8 @@ fn read_claude_oauth_token() -> Option<String> {
         if out.status.success() {
             if let Ok(raw) = std::str::from_utf8(&out.stdout) {
                 if let Ok(val) = serde_json::from_str::<serde_json::Value>(raw.trim()) {
-                    if let Some(t) = val.get("claudeAiOauth").and_then(|o| o.get("accessToken")).and_then(|v| v.as_str())
+                    if let Some(t) =
+                        val.get("claudeAiOauth").and_then(|o| o.get("accessToken")).and_then(|v| v.as_str())
                     {
                         return Some(t.to_owned());
                     }

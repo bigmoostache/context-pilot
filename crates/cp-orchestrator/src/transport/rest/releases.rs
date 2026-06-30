@@ -337,10 +337,7 @@ pub(crate) fn restart_orchestrator(_state: &Mutex<Backend>) -> HttpReply {
         // SIGTERM triggers the default handler (process exit). On procd-managed
         // deployments the service respawns automatically; on a dev machine the
         // user relaunches manually.
-        let _sent = nix::sys::signal::kill(
-            nix::unistd::Pid::this(),
-            nix::sys::signal::Signal::SIGTERM,
-        );
+        let _sent = nix::sys::signal::kill(nix::unistd::Pid::this(), nix::sys::signal::Signal::SIGTERM);
     });
     HttpReply::ok(&serde_json::json!({ "status": "restarting" }))
 }
