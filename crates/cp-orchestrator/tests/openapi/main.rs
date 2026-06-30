@@ -12,6 +12,7 @@ mod schemas_ext;
 
 // Acknowledge lib-only deps visible to the integration-test binary.
 use argon2 as _;
+use base64 as _;
 use calamine as _;
 use cp_mod_bridge as _;
 use cp_oplog as _;
@@ -24,6 +25,7 @@ use openssl as _;
 use portable_pty as _;
 use reqwest as _;
 use rusqlite as _;
+use sha2 as _;
 use serde as _;
 use serde_yaml as _;
 use tempfile as _;

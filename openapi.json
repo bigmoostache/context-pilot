@@ -334,6 +334,66 @@
         ],
         "type": "object"
       },
+      "ClaudeLoginCompleteRequest": {
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "type": "object"
+      },
+      "ClaudeLoginCompleteResponse": {
+        "properties": {
+          "expires_at": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "ClaudeLoginStartResponse": {
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "ClaudeTokenStatus": {
+        "properties": {
+          "expires_at": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "rate_limit_tier": {
+            "nullable": true,
+            "type": "string"
+          },
+          "subscription_type": {
+            "nullable": true,
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid"
+        ],
+        "type": "object"
+      },
       "ClaudeUsageLimit": {
         "properties": {
           "group": {
@@ -4355,6 +4415,106 @@
         "summary": "Force-logout user (admin)",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/claude-login/complete": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaudeLoginCompleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaudeLoginCompleteResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Complete Claude Code OAuth login",
+        "tags": [
+          "usage"
+        ]
+      }
+    },
+    "/api/claude-login/start": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaudeLoginStartResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Start Claude Code OAuth login (PKCE)",
+        "tags": [
+          "usage"
+        ]
+      }
+    },
+    "/api/claude-login/status": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaudeTokenStatus"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Claude Code OAuth token status",
+        "tags": [
+          "usage"
         ]
       }
     },

@@ -440,6 +440,39 @@ pub(super) fn transport() -> Value {
             "properties": {
                 "limits": arr(r("ClaudeUsageLimit"))
             }
+        },
+        // ── Claude Code OAuth login (T451) ──────────────────────────
+        "ClaudeTokenStatus": {
+            "type": "object",
+            "properties": {
+                "valid": { "type": "boolean" },
+                "expires_at": { "type": "integer", "nullable": true },
+                "subscription_type": { "type": "string", "nullable": true },
+                "rate_limit_tier": { "type": "string", "nullable": true }
+            },
+            "required": ["valid"]
+        },
+        "ClaudeLoginStartResponse": {
+            "type": "object",
+            "properties": {
+                "url": { "type": "string" }
+            },
+            "required": ["url"]
+        },
+        "ClaudeLoginCompleteRequest": {
+            "type": "object",
+            "properties": {
+                "code": { "type": "string" }
+            },
+            "required": ["code"]
+        },
+        "ClaudeLoginCompleteResponse": {
+            "type": "object",
+            "properties": {
+                "status": { "type": "string" },
+                "expires_at": { "type": "integer", "nullable": true }
+            },
+            "required": ["status"]
         }
     })
 }

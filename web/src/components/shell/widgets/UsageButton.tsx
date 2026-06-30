@@ -1,9 +1,14 @@
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { Loader2 } from "lucide-react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { Loader2, ExternalLink, CheckCircle2, XCircle, LogIn } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Tip } from "@/components/ui/tip"
-import { fetchClaudeUsage } from "@/lib/api"
+import {
+  fetchClaudeUsage,
+  fetchClaudeTokenStatus,
+  startClaudeLogin,
+  completeClaudeLogin,
+} from "@/lib/api"
 import type { ClaudeUsageLimit } from "@/lib/api/generated/types.gen"
 import { cn } from "@/lib/utils"
 
@@ -49,6 +54,18 @@ function barColor(severity: string, pct: number): string {
   return "bg-emerald-500"
 }
 
+/** Format epoch ms as a short relative expiry string. */
+function formatExpiry(epochMs: number): string {
+  const now = Date.now()
+  const diff = epochMs - now
+  if (diff < 0) return "Expired"
+  const mins = Math.floor(diff / 60_000)
+  if (mins < 60) return `${mins}m left`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ${mins % 60}m left`
+  return `${Math.floor(hrs / 24)}d left`
+}
+
 function LimitRow({ limit }: { limit: ClaudeUsageLimit }) {
   const pct = Math.min(limit.percent ?? 0, 100)
   return (
@@ -70,20 +87,152 @@ function LimitRow({ limit }: { limit: ClaudeUsageLimit }) {
   )
 }
 
-/** Anthropic logo button that opens a popover with live usage bars. */
+type LoginStep = "idle" | "starting" | "waiting_for_code" | "completing" | "done" | "error"
+
+/** Login flow sub-component shown inside the popover. */
+function LoginFlow({ onDone }: { onDone: () => void }) {
+  const [step, setStep] = useState<LoginStep>("idle")
+  const [authorizeUrl, setAuthorizeUrl] = useState("")
+  const [code, setCode] = useState("")
+  const [error, setError] = useState("")
+
+  const startMutation = useMutation({
+    mutationFn: startClaudeLogin,
+    onSuccess: (data) => {
+      setAuthorizeUrl(data.url)
+      setStep("waiting_for_code")
+      window.open(data.url, "_blank")
+    },
+    onError: (e) => {
+      setError(e instanceof Error ? e.message : "Failed to start login")
+      setStep("error")
+    },
+  })
+
+  const completeMutation = useMutation({
+    mutationFn: (authCode: string) => completeClaudeLogin(authCode),
+    onSuccess: () => {
+      setStep("done")
+      setTimeout(onDone, 1500)
+    },
+    onError: (e) => {
+      setError(e instanceof Error ? e.message : "Failed to complete login")
+      setStep("error")
+    },
+  })
+
+  if (step === "idle" || step === "starting") {
+    return (
+      <button
+        onClick={() => { setStep("starting"); startMutation.mutate() }}
+        disabled={startMutation.isPending}
+        className="flex w-full items-center justify-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
+      >
+        {startMutation.isPending
+          ? <><Loader2 className="size-3.5 animate-spin" /> Starting…</>
+          : <><LogIn className="size-3.5" /> Login with Claude</>}
+      </button>
+    )
+  }
+
+  if (step === "waiting_for_code") {
+    return (
+      <div className="space-y-2">
+        <p className="text-[12px] text-muted-foreground">
+          A browser window has been opened. Authorize the app, then paste the code below:
+        </p>
+        <a
+          href={authorizeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-[11px] text-[var(--signal)] hover:underline"
+        >
+          <ExternalLink className="size-3" /> Open authorization page
+        </a>
+        <input
+          type="text"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder="Paste authorization code…"
+          autoFocus
+          className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[var(--signal)]"
+        />
+        <button
+          onClick={() => { setStep("completing"); completeMutation.mutate(code.trim()) }}
+          disabled={!code.trim() || completeMutation.isPending}
+          className="flex w-full items-center justify-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
+        >
+          {completeMutation.isPending
+            ? <><Loader2 className="size-3.5 animate-spin" /> Verifying…</>
+            : "Submit code"}
+        </button>
+      </div>
+    )
+  }
+
+  if (step === "completing") {
+    return (
+      <div className="flex items-center justify-center gap-2 py-3 text-[12px] text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" /> Completing login…
+      </div>
+    )
+  }
+
+  if (step === "done") {
+    return (
+      <div className="flex items-center justify-center gap-2 py-3 text-[12px] text-emerald-500">
+        <CheckCircle2 className="size-4" /> Logged in!
+      </div>
+    )
+  }
+
+  // error
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-[12px] text-red-500">
+        <XCircle className="size-4 shrink-0" />
+        <span>{error}</span>
+      </div>
+      <button
+        onClick={() => { setStep("idle"); setError(""); setCode("") }}
+        className="w-full rounded-md bg-muted px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:bg-muted/80"
+      >
+        Try again
+      </button>
+    </div>
+  )
+}
+
+/** Anthropic logo button that opens a popover with live usage bars + login. */
 export function UsageButton() {
   const [open, setOpen] = useState(false)
+  const queryClient = useQueryClient()
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["claude-usage"],
-    queryFn: fetchClaudeUsage,
+  const tokenStatus = useQuery({
+    queryKey: ["claude-token-status"],
+    queryFn: fetchClaudeTokenStatus,
     enabled: open,
     refetchInterval: open ? 30_000 : false,
     staleTime: 10_000,
     retry: 1,
   })
 
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["claude-usage"],
+    queryFn: fetchClaudeUsage,
+    enabled: open && tokenStatus.data?.valid === true,
+    refetchInterval: open ? 30_000 : false,
+    staleTime: 10_000,
+    retry: 1,
+  })
+
   const limits = (data?.limits ?? []).filter((l) => l.percent != null && l.percent > 0)
+  const isValid = tokenStatus.data?.valid === true
+
+  const handleLoginDone = () => {
+    void queryClient.invalidateQueries({ queryKey: ["claude-token-status"] })
+    void queryClient.invalidateQueries({ queryKey: ["claude-usage"] })
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -96,28 +245,57 @@ export function UsageButton() {
         </PopoverTrigger>
       </Tip>
 
-      <PopoverContent side="bottom" align="end" sideOffset={8} className="w-64 space-y-3 p-4">
+      <PopoverContent side="bottom" align="end" sideOffset={8} className="w-72 space-y-3 p-4">
         <h4 className="text-[13px] font-semibold">Claude Code Usage</h4>
 
-        {isLoading && (
+        {/* ── Token status ─────────────────────────────────── */}
+        {tokenStatus.isLoading && (
+          <div className="flex items-center justify-center py-2">
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {tokenStatus.data && (
+          <div className="flex items-center justify-between rounded-md bg-muted/40 px-2.5 py-1.5">
+            <div className="flex items-center gap-1.5 text-[12px]">
+              <div className={cn("size-2 rounded-full", isValid ? "bg-emerald-500" : "bg-red-500")} />
+              <span className="font-medium text-foreground">
+                {isValid ? "Token valid" : "Token expired"}
+              </span>
+            </div>
+            {isValid && tokenStatus.data.expires_at && (
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                {formatExpiry(tokenStatus.data.expires_at)}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* ── Usage limits (only when token valid) ─────────── */}
+        {isValid && isLoading && (
           <div className="flex items-center justify-center py-4">
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
           </div>
         )}
 
-        {isError && (
+        {isValid && isError && (
           <p className="text-[12px] text-muted-foreground">
-            Could not fetch usage — is Claude Code logged in?
+            Could not fetch usage data.
           </p>
         )}
 
-        {!isLoading && !isError && limits.length === 0 && (
+        {isValid && !isLoading && !isError && limits.length === 0 && (
           <p className="text-[12px] text-muted-foreground">No active usage limits.</p>
         )}
 
-        {limits.map((l) => (
+        {isValid && limits.map((l) => (
           <LimitRow key={l.kind} limit={l} />
         ))}
+
+        {/* ── Login flow (always available) ────────────────── */}
+        <div className="border-t border-border pt-3">
+          <LoginFlow onDone={handleLoginDone} />
+        </div>
       </PopoverContent>
     </Popover>
   )
