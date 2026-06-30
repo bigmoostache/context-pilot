@@ -255,25 +255,30 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
 /// Returns `expires_at` (ms since epoch) on success.
 /// Used by both [`spawn_callback_listener`] (auto) and [`login_complete`] (manual).
 fn exchange_and_store(code: &str, code_verifier: &str, redirect_uri: &str) -> Result<i64, String> {
+    let body = serde_json::json!({
+        "grant_type": "authorization_code",
+        "code": code,
+        "code_verifier": code_verifier,
+        "client_id": CLIENT_ID,
+        "redirect_uri": redirect_uri,
+    });
     let client = reqwest::blocking::Client::new();
     let resp = client
         .post(TOKEN_URL)
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(format!(
-            "grant_type=authorization_code&code={}&code_verifier={}&client_id={CLIENT_ID}&redirect_uri={}",
-            urlencoded(code),
-            urlencoded(code_verifier),
-            urlencoded(redirect_uri),
-        ))
+        .header("Content-Type", "application/json")
+        .body(body.to_string())
         .timeout(Duration::from_secs(15))
         .send()
         .map_err(|e| format!("token exchange failed: {e}"))?;
 
     let status = resp.status();
-    let val: serde_json::Value = resp.json().map_err(|e| format!("invalid token response: {e}"))?;
+    let text = resp.text().map_err(|e| format!("reading token response: {e}"))?;
+    let val: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|e| format!("invalid token JSON: {e} — body: {}", &text[..text.len().min(500)]))?;
     if !status.is_success() {
-        let msg = val.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str()).unwrap_or("token exchange failed");
-        return Err(msg.to_owned());
+        let msg = val.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str())
+            .unwrap_or_else(|| val.get("error").and_then(|e| e.as_str()).unwrap_or("token exchange failed"));
+        return Err(format!("{msg} (HTTP {status})"));
     }
 
     let access_token = val.get("access_token").and_then(|v| v.as_str()).unwrap_or("");
