@@ -419,6 +419,27 @@ pub(super) fn transport() -> Value {
                 "status": { "type": "string" }
             },
             "required": ["status"]
+        },
+        // ── Claude Code usage (T451) ────────────────────────────────
+        "ClaudeUsageLimit": {
+            "type": "object",
+            "properties": {
+                "kind": { "type": "string" },
+                "group": { "type": "string" },
+                "percent": { "type": "integer" },
+                "severity": { "type": "string" },
+                "resets_at": { "type": "string", "nullable": true },
+                "scope": { "type": "string", "nullable": true },
+                "is_active": { "type": "boolean" }
+            },
+            "required": ["kind", "group", "percent", "severity", "is_active"]
+        },
+        "ClaudeUsageResponse": {
+            "type": "object",
+            "description": "Claude Code OAuth usage limits (proxied from Anthropic).",
+            "properties": {
+                "limits": arr(r("ClaudeUsageLimit"))
+            }
         }
     })
 }

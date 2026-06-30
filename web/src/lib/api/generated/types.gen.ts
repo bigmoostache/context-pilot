@@ -103,6 +103,23 @@ export type CallbackRow = {
     timeout?: string;
 };
 
+export type ClaudeUsageLimit = {
+    group: string;
+    is_active: boolean;
+    kind: string;
+    percent: number;
+    resets_at?: string | null;
+    scope?: string | null;
+    severity: string;
+};
+
+/**
+ * Claude Code OAuth usage limits (proxied from Anthropic).
+ */
+export type ClaudeUsageResponse = {
+    limits?: Array<ClaudeUsageLimit>;
+};
+
 export type CommandReceipt = {
     cmd_id: string;
     dedup_token: string;
@@ -2042,6 +2059,31 @@ export type PostApiAuthUsersByUserIdLogoutResponses = {
 };
 
 export type PostApiAuthUsersByUserIdLogoutResponse = PostApiAuthUsersByUserIdLogoutResponses[keyof PostApiAuthUsersByUserIdLogoutResponses];
+
+export type GetApiClaudeUsageData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/claude-usage';
+};
+
+export type GetApiClaudeUsageErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiClaudeUsageError = GetApiClaudeUsageErrors[keyof GetApiClaudeUsageErrors];
+
+export type GetApiClaudeUsageResponses = {
+    /**
+     * Success
+     */
+    200: ClaudeUsageResponse;
+};
+
+export type GetApiClaudeUsageResponse = GetApiClaudeUsageResponses[keyof GetApiClaudeUsageResponses];
 
 export type GetApiEnvKeysData = {
     body?: never;

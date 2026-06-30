@@ -277,6 +277,8 @@ pub(super) fn paths() -> Value {
             "tags": ["releases"], "summary": "Delete downloaded release",
             "parameters": [{ "name": "tag", "in": "path", "required": true, "schema": { "type": "string" } }],
             "responses": merge(ok(r("OkResponse")), err())
-        }})
+        }}),
+        // ── Claude Code usage ───────────────────────────────────────
+        "/api/claude-usage": get("usage", "Claude Code OAuth usage limits", r("ClaudeUsageResponse"))
     })
 }

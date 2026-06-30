@@ -289,6 +289,9 @@ fn route_rest(
         (Method::Post, ["api", "releases", "restart-orchestrator"]) => rest::restart_orchestrator(state),
         (Method::Delete, ["api", "releases", tag]) => rest::delete_release(state, tag),
 
+        // ── Claude Code usage (OAuth) ──────────────────────────────
+        (Method::Get, ["api", "claude-usage"]) => rest::claude_usage(),
+
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },
     }
 }
