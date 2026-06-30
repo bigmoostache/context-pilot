@@ -4418,6 +4418,10 @@
   path: .github/checks/check-file-lengths.sh
   description: File length check script (max 500 lines)
   last_edited_ms: 0
+67f09cfa05b1c9f8:
+  path: web/src/components/shell/widgets/UsageButton.tsx
+  description: 'Claude Code OAuth usage limits button. Anthropic "A" logomark trigger opens popover with token status (valid/expired + expiry), session/weekly usage bars (color-coded by severity), and LoginFlow (PKCE: open browser → auto-detect via polling → fallback manual code paste). Lazy-fetches on open, 30s auto-refresh.'
+  last_edited_ms: 1782847248262
 680ee984a94b15c6:
   path: docs/talk/slides/2-0.html
   description: 'Sub-TOC: HOWs section — left numeral, right slide list'

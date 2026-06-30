@@ -156,14 +156,9 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
   if (step === "waiting_for_code") {
     return (
       <div className="space-y-3">
-        {/* Auto-detection indicator */}
-        <div className="flex items-center gap-2 rounded-md bg-muted/40 px-2.5 py-2">
-          <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
-          <span className="text-[12px] text-muted-foreground">
-            Waiting for browser authorization…
-          </span>
-        </div>
-
+        <p className="text-[12px] text-muted-foreground">
+          Authorize in the browser, then paste the code shown on the confirmation page:
+        </p>
         <a
           href={authorizeUrl}
           target="_blank"
@@ -172,31 +167,23 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
         >
           <ExternalLink className="size-3" /> Re-open authorization page
         </a>
-
-        {/* Manual code-paste fallback */}
-        <details className="group">
-          <summary className="cursor-pointer text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors">
-            Paste code manually instead…
-          </summary>
-          <div className="mt-2 space-y-2">
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="Paste authorization code…"
-              className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[var(--signal)]"
-            />
-            <button
-              onClick={() => { setStep("completing"); completeMutation.mutate(code.trim()) }}
-              disabled={!code.trim() || completeMutation.isPending}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-            >
-              {completeMutation.isPending
-                ? <><Loader2 className="size-3.5 animate-spin" /> Verifying…</>
-                : "Submit code"}
-            </button>
-          </div>
-        </details>
+        <input
+          type="text"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder="Paste authorization code…"
+          autoFocus
+          className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[var(--signal)]"
+        />
+        <button
+          onClick={() => { setStep("completing"); completeMutation.mutate(code.trim()) }}
+          disabled={!code.trim() || completeMutation.isPending}
+          className="flex w-full items-center justify-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
+        >
+          {completeMutation.isPending
+            ? <><Loader2 className="size-3.5 animate-spin" /> Verifying…</>
+            : "Submit code"}
+        </button>
       </div>
     )
   }
