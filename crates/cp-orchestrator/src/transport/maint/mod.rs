@@ -224,6 +224,14 @@ fn status(state: &Mutex<Backend>) -> HttpReply {
 /// loopback and RFC-1918 / link-local / unique-local addresses pass; a public
 /// address is refused. A missing peer address (should not happen on `tiny_http`)
 /// is treated as not-LAN and refused when the guard is on.
+///
+/// IMPORTANT — defense-in-depth only. `remote_addr()` is the *immediate* peer:
+/// in the production topology the maintenance plane sits behind Caddy, so this
+/// reads the reverse proxy's address (`127.0.0.1`), never the real client — the
+/// check then passes for everyone. The actual network isolation is enforced by
+/// Caddy's listener/bind config, not here. This guard only bites when the plane
+/// is exposed directly (dev, or a misconfiguration that drops the proxy), where
+/// it refuses non-LAN peers as a last line of defense.
 fn lan_allowed(request: &Request) -> bool {
     if !lan_only_enabled() {
         return true;
