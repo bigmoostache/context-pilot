@@ -21,6 +21,7 @@ use cp_wire as _;
 use csv as _;
 use nix as _;
 use notify as _;
+use openssl as _;
 use portable_pty as _;
 use reqwest as _;
 use rusqlite as _;

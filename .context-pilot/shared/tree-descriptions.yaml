@@ -798,6 +798,10 @@
   path: src/app/run/threads/bridge.rs
   description: 'Bridge command intake + live-state emission (gated bridge-ON). poll_bridge_commands drains ALL pending commands/tick (Leg 3); apply_command routes SendMessage(K7)/CreateThread/Archive/Restore/Stop. emit_roster_delta = non-blocking DURABLE oplog append on thread mutation (Leg 0). emit_vitals = main-loop CHOKEPOINT: best-effort PhaseTransition (on transition) + CostAggregate (on $ change), emits only on change, never fsyncs the loop (I2). emit_thread_status = observe-on-change chokepoint: diffs each thread''s wire_turn(status) vs BridgeState.thread_statuses memo (seeded no-emit first pass), emits DURABLE ThreadStatusChanged on a flip from ANY source (web SendMessage / Send tool / TUI reply / turn-finish) — fixes T123 (a sent message''s MY_TURN flip never reaching the web roster). wire_phase maps StreamPhase→wire Phase; wire_turn maps ThreadStatus→ThreadTurn IDENTITY-by-name (matches disk reshape + roster_status_value, single conversion site); apply_create_thread routes status through wire_turn + primes the status memo.'
   last_edited_ms: 1781816071221
+13e9efe18d759bbf:
+  path: crates/cp-orchestrator/src/transport/rest/releases.rs
+  description: 'Release management REST handlers (T427). 5 endpoints: list_releases (GET, merged local+remote+arch+active, sorted by published_at desc), set_arch (PUT, manual or auto-detect), download_release (POST, download+extract tarball), select_release (PUT, set active binary+supervisor), delete_release (DELETE). All pub(crate).'
+  last_edited_ms: 1782494060635
 13fd308c36b41576:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
@@ -2158,6 +2162,10 @@
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
   last_edited_ms: 0
+35144361e6ae01d4:
+  path: crates/cp-orchestrator/src/services/agent_meta.rs
+  description: 'Per-agent cosmetic metadata services. NameOverrides (T328): custom display names via agent-names.json. AvatarStore (T338): profile pictures via avatars/{id}.{ext}, magic-byte content-type sniffing, MAX_AVATAR_BYTES 2MiB. Both merged from former names.rs + avatars.rs.'
+  last_edited_ms: 0
 353da16753dc6820:
   path: .github/workflows/ci.yml
   description: 'Unified CI workflow (replaces rust.yml + code_length.yml). 3 jobs: rust (fmt + clippy --all-targets + build --release + test), structure (file-lengths, folder-sizes, lint-exceptions, lint-config hash chain, web-structure), contract (OpenAPI+TS drift check). Triggers: push/PR to master.'
@@ -2482,6 +2490,10 @@
   path: crates/cp-orchestrator/tests/registry_channel.rs
   description: 'Phase 27 (X794) backend↔agent seam suite (4 tests, all green). Drives discovery+channel against real cp-mod-bridge artifacts: (1) real Boot→AgentRegistry Appeared+Live→idempotent quiet scan→drop→Disappeared; (2) Stale fires ONLY on Live→non-live transition, first-sight staleness rides Appeared (crafted Entry+Heartbeat); (3) body Store spill→OplogService MessageCreated→Tailer.poll→AgentChannel.hydrate integrity-verified + inlined body hydrate=None; (4) AgentChannel.send→real Intake.handle_connection over UnixListener (Accepted), resend same dedup_token Accepted but replay seen.len==1 (exactly-once). Top `use nix/serde/tiny_http as _;` for per-target unused-crate-dependencies.'
   last_edited_ms: 1781650132073
+3cf706e6d1a1b881:
+  path: web/src/components/shell/config/ReleasesPane.tsx
+  description: Admin-only release management pane (T427). Architecture selector (auto-detect or manual), paginated release cards (5/page) with tag/date/size + status chips (Latest/Downloaded/Active), download/use/delete actions via generated SDK. Semver sort (newest first) from backend. queryFn uses responseStyle:data pattern.
+  last_edited_ms: 0
 3d00515f14ca732a:
   path: crates/cp-orchestrator/src/transport/rest/library.rs
   description: 'POST /api/agent/{id}/library/command handler (T350). create_command: parse {name,description?,body}, slugify(name) (reused pub(super) from create.rs), write .context-pilot/commands/<slug>.md with YAML frontmatter (name+description via yaml_scalar quote/escape, CR/LF→space so single-line) + body; 409 if file exists (never clobbers), 502 on mkdir/write fail, 404 unknown agent, 400 blank name/body. Agent''s prompt module filesystem-watches commands/ → picks up the new file live (no restart), so the /command becomes invocable + surfaces as a web suggestion bubble on next library refetch. yaml_scalar unit-tested.'
@@ -2806,6 +2818,10 @@
   path: crates/cp-orchestrator/tests/openapi/paths.rs
   description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL).
   last_edited_ms: 1782466343511
+42f99dd8acc5d0e5:
+  path: crates/cp-orchestrator/src/transport/rest/releases.rs
+  description: 'Release management REST handlers (T427). 5 endpoints: list_releases (GET, merged local+remote+arch+active), set_arch (PUT, manual or auto-detect), download_release (POST, download+extract tarball), select_release (PUT, set active binary+supervisor), delete_release (DELETE). All pub(crate).'
+  last_edited_ms: 0
 43098a52aacf72ab:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage (with archived support + `auto` flag — X887 auto tool-activity traces, #[serde(default)]), Thread (archived:bool). ThreadsState + FocusState (viewing_archived). visible_indices(archived) maps a view to real storage indices; has_my_turn filters archived; mark_selected_read resolves selection through visible list.'
@@ -3798,6 +3814,10 @@
   path: ui/src/components/finder/Finder.tsx
   description: Top-level Finder orchestrator. buildRealm(agent) memo, heterogeneous tabs (folder tabs w/ per-tab back/fwd history + file tabs showing one file via FinderPreview variant='full'); double-click file→openInNewTab (reuses tab for same path), double-click folder→navigate; navigating on a file tab converts it back to folder tab. Passes fileActive + file-action handlers (Get Info/Download/Share) to FinderToolbar. Keyboard nav (arrows/Enter/Backspace/Space QuickLook/⌘A/⌘I/type-ahead), additive+range selection, right-click ContextMenu, Get Info modal, 4 view modes, icon-size slider, path bar, drag-drop overlay, status bar, toast.
   last_edited_ms: 1781531576338
+5bf0305d62ba01d7:
+  path: crates/cp-orchestrator/tests/openapi/main.rs
+  description: OpenAPI spec generator (integration test, --ignored). build_spec assembles schemas + paths. generate_openapi writes openapi.json. Acknowledges lib-only deps (incl reqwest, openssl).
+  last_edited_ms: 1782826699110
 5c242bc41fabbaf1:
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread input composer. JS auto-resize (scrollHeight, cap 200px), autoFocus + key={thread.id} remount, submit resets height+refocuses. Enter=submit/Shift+Enter=newline with isComposing guard (IME/dead-key). Agent-busy hint above input is FOCUS-AWARE (T39): focused thread → active spinner (''Agent is streaming…'' ACTIVE / ''Agent is working this thread…'' its turn); agent''s-turn-but-NOT-focused → static Clock ''Agent will pick up this thread soon.'' (queued); THEIR_TURN (user''s turn) → no banner. focused prop rides ThreadDetail.focused.'
@@ -4450,6 +4470,10 @@
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Phase 19/30 + P1-P7: transport hub. Backend shared state + serve/serve_bound + route_rest (22 routes) + handle_stream SSE. CORS headers on all responses + OPTIONS preflight 204. /api/health. stream_to_client uses into_writer() + per-event flush. Invalidation: dirty_agents set, mark_dirty/take_dirty for SSE invalidate events.'
   last_edited_ms: 0
+6bbeeda2ef16ed5b:
+  path: crates/cp-orchestrator/src/lib.rs
+  description: Backend library root. Declares channel+inspect+registry+runtime+services+supervisor+transport. Re-exports registry::{channel,liveness} at crate root. `use openssl as _` acknowledges vendored OpenSSL dep (cross-compilation only).
+  last_edited_ms: 1782826699046
 6bc0a5862f532d29:
   path: crates/cp-mod-todo/src/tools.rs
   description: Todo CRUD tools with flame!("todo_create"), flame!("todo_update"), flame!("todo_move"). Nested parent_id validation. Status propagation (in_progress auto-cascades to parents). Orphan protection on delete. Move reorder with after_id.
@@ -5469,6 +5493,10 @@
 84010ff7379a6553:
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups: Needs you/Active/Working in parallel. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
+  last_edited_ms: 0
+8401b6b7cc1b16c8:
+  path: crates/cp-orchestrator/src/transport/rest/backend.rs
+  description: Backend shared state struct + impl. Extracted from transport/mod.rs. Holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names/avatars/auth/session_ttl/env_overrides(T404)/releases(T427). Accessor methods + for_test.
   last_edited_ms: 0
 8403debfd0f35683:
   path: ui/vite.config.ts
@@ -7554,6 +7582,10 @@ b51575ce38c26f98:
   path: crates/cp-orchestrator/src/transport/inspect/finder/mod.rs
   description: 'Finder module hub: re-exports fs_list/fs_preview/conversation (listing), fs_sheet (sheet — CSV/xlsx→table, T282), fs_upload/write/mkdir/rename/move/trash (mutate), fs_download + fs_raw (download — fs_raw is the inline image/PDF raw-serve, T281/T286). Submodules: listing/sheet/mutate/download/support.'
   last_edited_ms: 1781896321134
+b51d7f2755826fd9:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 b5268aca7b513ca5:
   path: ui/src/components/panels/cockpit/PanelPane.tsx
   description: Cockpit panel router. Given the selected id, renders its bespoke maquette by kind (the center star). Special id "conversation" short-circuits to the full <Conversation/> surface — conversation is just another panel (T24). Unknown kinds → graceful placeholder in PanelFrame.
@@ -8702,6 +8734,10 @@ d030bbfbaa94d000:
   path: web/src/components/shell/TopBar.tsx
   description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit), agent-config gear, account UserMenu. Phase 10: UsersDialog state + onOpenUsers wired to UserMenu for admin user management.'
   last_edited_ms: 1782248431975
+d0341e50a999d14e:
+  path: crates/cp-orchestrator/src/main.rs
+  description: 'Backend entry point. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + X896 new-agent realm root + agent binary, creates Runtime, starts driver thread, serves HTTP (blocking). `use <crate> as _` block acknowledges lib-only deps in the bin target (per-target unused-crate-dependencies forbid): incl argon2, rusqlite, portable_pty, calamine, csv, reqwest, openssl.'
+  last_edited_ms: 1782826554317
 d048006bf0672dc9:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus (MyTurn/TheirTurn), ThreadAuthor (User/Assistant), ThreadMessage (author/content/file_path/question/timestamp), Thread (id/name/status/messages/created_at), ThreadsState + FocusState with TypeMap accessors.'
@@ -9814,6 +9850,10 @@ ee094a5116fc9a90:
   path: ui/src/components/finder/FinderPreview.tsx
   description: 'QuickLook preview pane. Kind-aware bespoke renders: code (line numbers + keyword tint), spreadsheet (A/B/C grid), slide deck (hero + thumbnails), PDF (paper mock), image (gradient), markdown/json/text, folder summary. Metadata footer (kind/size/modified/path).'
   last_edited_ms: 1781516507787
+ee29cdcaaa1ab3e8:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 ee2f4e90cf841383:
   path: crates/cp-orchestrator/src/services/auth/helpers.rs
   description: 'Auth subsystem low-level helpers: fill_random (/dev/urandom with nanosecond fallback), to_hex, random_hex, format_uuid (UUID v4 string with dashes), now_ms (epoch millis). Shared by store.rs.'
