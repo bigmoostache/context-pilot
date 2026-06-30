@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Loader2, ExternalLink, CheckCircle2, XCircle, LogIn } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
@@ -121,6 +121,24 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
     },
   })
 
+  // Auto-detect login completion via the callback listener.
+  // Polls token status every 2s while waiting for the browser redirect.
+  const stableOnDone = useCallback(onDone, [onDone])
+  useEffect(() => {
+    if (step !== "waiting_for_code") return
+    const id = setInterval(async () => {
+      try {
+        const status = await fetchClaudeTokenStatus()
+        if (status.valid) {
+          clearInterval(id)
+          setStep("done")
+          setTimeout(stableOnDone, 1500)
+        }
+      } catch { /* ignore polling errors */ }
+    }, 2000)
+    return () => clearInterval(id)
+  }, [step, stableOnDone])
+
   if (step === "idle" || step === "starting") {
     return (
       <button
@@ -137,35 +155,48 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
 
   if (step === "waiting_for_code") {
     return (
-      <div className="space-y-2">
-        <p className="text-[12px] text-muted-foreground">
-          A browser window has been opened. Authorize the app, then paste the code below:
-        </p>
+      <div className="space-y-3">
+        {/* Auto-detection indicator */}
+        <div className="flex items-center gap-2 rounded-md bg-muted/40 px-2.5 py-2">
+          <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+          <span className="text-[12px] text-muted-foreground">
+            Waiting for browser authorization…
+          </span>
+        </div>
+
         <a
           href={authorizeUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1 text-[11px] text-[var(--signal)] hover:underline"
         >
-          <ExternalLink className="size-3" /> Open authorization page
+          <ExternalLink className="size-3" /> Re-open authorization page
         </a>
-        <input
-          type="text"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          placeholder="Paste authorization code…"
-          autoFocus
-          className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[var(--signal)]"
-        />
-        <button
-          onClick={() => { setStep("completing"); completeMutation.mutate(code.trim()) }}
-          disabled={!code.trim() || completeMutation.isPending}
-          className="flex w-full items-center justify-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-        >
-          {completeMutation.isPending
-            ? <><Loader2 className="size-3.5 animate-spin" /> Verifying…</>
-            : "Submit code"}
-        </button>
+
+        {/* Manual code-paste fallback */}
+        <details className="group">
+          <summary className="cursor-pointer text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors">
+            Paste code manually instead…
+          </summary>
+          <div className="mt-2 space-y-2">
+            <input
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="Paste authorization code…"
+              className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[var(--signal)]"
+            />
+            <button
+              onClick={() => { setStep("completing"); completeMutation.mutate(code.trim()) }}
+              disabled={!code.trim() || completeMutation.isPending}
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
+            >
+              {completeMutation.isPending
+                ? <><Loader2 className="size-3.5 animate-spin" /> Verifying…</>
+                : "Submit code"}
+            </button>
+          </div>
+        </details>
       </div>
     )
   }
