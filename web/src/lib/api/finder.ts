@@ -31,7 +31,7 @@ import {
   postApiAgentByIdFsUploadUnique,
   postApiAgentByIdFsWrite,
 } from "./generated"
-import { BASE, sdk } from "./client"
+import { BASE, getToken, sdk } from "./client"
 
 // ── Type re-exports (preserve import surface) ────────────────────────
 
@@ -122,8 +122,13 @@ export function rawUrl(agentId: string, path: string): string {
 
 /** Trigger a browser download for a file in the agent's realm. */
 export async function downloadFile(agentId: string, path: string): Promise<void> {
+  const headers: Record<string, string> = {}
+  const token = getToken()
+  if (token) headers["Authorization"] = `Bearer ${token}`
+
   const res = await fetch( // ok:manual — binary blob download, irreducible
     `${BASE}/api/agent/${agentId}/fs/download?path=${encodeURIComponent(path)}`,
+    { headers },
   )
   if (!res.ok) {
     const body = await res.text().catch(() => res.statusText)

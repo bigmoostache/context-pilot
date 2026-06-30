@@ -334,6 +334,53 @@
         ],
         "type": "object"
       },
+      "ClaudeUsageLimit": {
+        "properties": {
+          "group": {
+            "type": "string"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "percent": {
+            "type": "integer"
+          },
+          "resets_at": {
+            "nullable": true,
+            "type": "string"
+          },
+          "scope": {
+            "nullable": true,
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "group",
+          "percent",
+          "severity",
+          "is_active"
+        ],
+        "type": "object"
+      },
+      "ClaudeUsageResponse": {
+        "description": "Claude Code OAuth usage limits (proxied from Anthropic).",
+        "properties": {
+          "limits": {
+            "items": {
+              "$ref": "#/components/schemas/ClaudeUsageLimit"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "CommandReceipt": {
         "properties": {
           "cmd_id": {
@@ -485,6 +532,47 @@
         },
         "required": [
           "user"
+        ],
+        "type": "object"
+      },
+      "DeployResponse": {
+        "properties": {
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "restarted": {
+            "items": {
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "pid": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "pid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "tag",
+          "restarted",
+          "errors"
         ],
         "type": "object"
       },
@@ -1158,6 +1246,17 @@
         },
         "required": [
           "renamed"
+        ],
+        "type": "object"
+      },
+      "RestartOrchestratorResponse": {
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
         ],
         "type": "object"
       },
@@ -4259,6 +4358,36 @@
         ]
       }
     },
+    "/api/claude-usage": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaudeUsageResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Claude Code OAuth usage limits",
+        "tags": [
+          "usage"
+        ]
+      }
+    },
     "/api/env-keys": {
       "get": {
         "responses": {
@@ -4717,6 +4846,51 @@
         ]
       }
     },
+    "/api/releases/deploy": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "tag": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Deploy release to fleet",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
     "/api/releases/download": {
       "post": {
         "requestBody": {
@@ -4760,6 +4934,36 @@
           }
         },
         "summary": "Download a release",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
+    "/api/releases/restart-orchestrator": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestartOrchestratorResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Restart orchestrator process",
         "tags": [
           "releases"
         ]

@@ -1,56 +1,19 @@
 import { useCallback, useMemo, useState } from "react"
 import { CheckCircle2, Loader2, Stethoscope, TriangleAlert } from "lucide-react"
-import { usePanels, useAgentMeta } from "@/lib/live"
 import { fetchVitals, type Vital } from "@/lib/api"
-import { accentVar, fmtTokens } from "@/lib/support/panelMeta"
 
 /**
- * Session vitals — the agent's live session summary + on-demand service-health
- * board, as an **embeddable section** (no dialog chrome of its own).
+ * Service vitals — on-demand connectivity board, as an **embeddable section**
+ * (no dialog chrome of its own).
  *
- * This used to be a standalone popup (`StatsPopup`) summoned from a button in
- * the global header. That button + popup were removed (T321); the figures now
- * live inside the Agent Configuration dialog ({@link AgentModal} manage mode),
- * so an agent's budget/cost and its dependency health sit beside the model
- * picker — one place to inspect and tune an agent. Hence this is a plain
- * section component the host lays out; it owns no `Dialog`.
- *
- * Two bands:
- *  - **Session summary** — the context-budget meter (used / budget, cleaning
- *    threshold marker) plus figure chips (Context · Panels · Session cost).
- *  - **Service vitals** — the on-demand (never polling) connectivity probe of
- *    every service the agent depends on. The backend
- *    (`GET /api/agent/{id}/vitals`) runs the checks it can reach; we prepend the
- *    two only the browser can observe (this app is alive, and the measured
- *    round-trip), so the board covers the whole dependency chain end to end.
- *    Healthy rows stay quiet (a coloured dot + latency); a degraded/unreachable
- *    service raises a loud status chip so problems pop.
+ * Rendered inside the Agent Configuration dialog ({@link AgentModal} manage
+ * mode) right column. The backend (`GET /api/agent/{id}/vitals`) runs the checks
+ * it can reach; we prepend the two only the browser can observe (this app is
+ * alive, and the measured round-trip), so the board covers the whole dependency
+ * chain end to end. Healthy rows stay quiet (a coloured dot + latency); a
+ * degraded/unreachable service raises a loud status chip so problems pop.
  */
 export function SessionVitals({ agentId }: { agentId: string }) {
-  const { data: panels = [] } = usePanels(agentId)
-  const { data: agent } = useAgentMeta(agentId)
-  const totalTokens = useMemo(() => panels.reduce((s, p) => s + p.tokens, 0), [panels])
-  const budget = 200_000
-  const threshold = 170_000
-  const pct = Math.round((totalTokens / budget) * 100)
-
-  const stats = useMemo(
-    () => [
-      {
-        label: "Context",
-        value: `${fmtTokens(totalTokens)} / ${fmtTokens(budget)}`,
-        accent: "signal" as const,
-      },
-      { label: "Panels", value: String(panels.length), accent: undefined },
-      {
-        label: "Session cost",
-        value: agent ? `$${agent.costUsd.toFixed(2)}` : "—",
-        accent: "warn" as const,
-      },
-    ],
-    [totalTokens, panels.length, agent],
-  )
-
   // ── Check Vitals (on-demand connectivity probe) ────────────────────
   const [vitals, setVitals] = useState<Vital[] | null>(null)
   const [checking, setChecking] = useState(false)
@@ -89,54 +52,8 @@ export function SessionVitals({ agentId }: { agentId: string }) {
 
   return (
     <div className="flex flex-col">
-      {/* ── session summary band ── */}
-      <div className="flex flex-col gap-4 border-b border-border/70 pb-5">
-        {/* budget meter */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-baseline justify-between">
-            <span className="text-[11.5px] text-muted-foreground">Context budget</span>
-            <span className="font-mono text-[11.5px] tabular-nums text-foreground/85">
-              {fmtTokens(totalTokens)} / {fmtTokens(budget)} · {pct}%
-            </span>
-          </div>
-          <div className="relative h-1.5 overflow-hidden rounded-full bg-muted">
-            <span
-              className="absolute inset-y-0 left-0 rounded-full transition-[width]"
-              style={{ width: `${pct}%`, background: "var(--signal)" }}
-            />
-            <span
-              className="absolute inset-y-0 w-px bg-[var(--warn)]/70"
-              style={{ left: `${(threshold / budget) * 100}%` }}
-            />
-          </div>
-          <span className="text-[10px] text-muted-foreground/55">
-            cleaning threshold at {Math.round((threshold / budget) * 100)}%
-          </span>
-        </div>
-
-        {/* figure chips */}
-        <div className="flex flex-wrap items-stretch gap-2.5">
-          {stats.map((s) => (
-            <div
-              key={s.label}
-              className="flex min-w-[104px] flex-1 flex-col gap-0.5 rounded-lg border border-border/60 bg-surface/50 px-3 py-2"
-            >
-              <span className="text-[10px] uppercase tracking-[0.05em] text-muted-foreground/65">
-                {s.label}
-              </span>
-              <span
-                className="text-[14px] font-semibold tabular-nums"
-                style={{ color: s.accent ? accentVar[s.accent] : "var(--foreground)" }}
-              >
-                {s.value}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* ── service grid band ── */}
-      <div className="flex flex-col gap-3.5 pt-5">
+      <div className="flex flex-col gap-3.5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-col">
             <span className="text-[12.5px] font-medium text-foreground">Service vitals</span>

@@ -9,6 +9,24 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 
 use super::{Backend, HttpReply};
+use crate::services::auth::types::{AgentRole, User};
+
+/// FNV-1a 64-bit offset basis (same constants as the agent-side identity
+/// module in `cp-mod-bridge` — duplicated here to avoid a cross-crate dep
+/// for 7 lines of pure hashing).
+const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+
+/// Derive the agent registry id from a canonical folder path — the same
+/// FNV-1a digest the agent mints at boot.
+fn folder_id(path: &str) -> String {
+    let mut hash = FNV_OFFSET;
+    for byte in path.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    format!("{hash:016x}")
+}
 
 /// `POST /api/fleet/create` — create a new agent and spawn it on a pty.
 ///
@@ -25,11 +43,15 @@ use super::{Backend, HttpReply};
 /// receipt is therefore a 202-style "spawning" acknowledgement, not the agent
 /// itself.
 ///
+/// When auth is enabled the caller is automatically granted `agent-admin` on
+/// the new agent, so the creator has immediate access without admin
+/// intervention.
+///
 /// Returns `400` for a missing/blank name or malformed body, `502` for a
 /// folder it cannot create or a spawn failure (incl. an off-allow-list
 /// binary — which should never happen since the allow-list is seeded from the
 /// configured binary).
-pub fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpReply {
+pub fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8], auth_user: Option<&User>) -> HttpReply {
     let Ok(req) = serde_json::from_slice::<CreateAgentReq>(body_bytes) else {
         return HttpReply::error(400, "malformed create-agent request");
     };
@@ -75,10 +97,24 @@ pub fn create_agent(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpReply {
     };
 
     match spawn_result {
-        Ok(pid) => HttpReply::json(
-            202,
-            &CreateAgentReceipt { status: "spawning", folder: folder.to_string_lossy().into_owned(), pid },
-        ),
+        Ok(pid) => {
+            // Auto-grant the creator agent-admin access so they can
+            // immediately see and manage the agent they just created.
+            if let Some(user) = auth_user {
+                if let Ok(b) = state.lock() {
+                    if let Some(auth) = b.auth.as_ref() {
+                        let canonical = folder.canonicalize().unwrap_or_else(|_| folder.clone());
+                        let agent_id = folder_id(&canonical.to_string_lossy());
+                        let _grant = auth.grant_access(&agent_id, &user.id, AgentRole::AgentAdmin, None);
+                    }
+                }
+            }
+
+            HttpReply::json(
+                202,
+                &CreateAgentReceipt { status: "spawning", folder: folder.to_string_lossy().into_owned(), pid },
+            )
+        }
         Err(e) => {
             eprintln!("create_agent spawn error: {e}");
             HttpReply::error(502, &format!("agent spawn failed: {e}"))

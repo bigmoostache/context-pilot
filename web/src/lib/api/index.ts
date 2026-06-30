@@ -40,7 +40,11 @@ import type {
   UnretireReceipt,
   Vital,
 } from "./generated/types.gen"
+import type {
+  ClaudeUsageResponse,
+} from "./generated/types.gen"
 import {
+  getApiClaudeUsage,
   getApiFleetMeta,
   getApiFleetRetired,
   getApiAgentByIdMeta,
@@ -89,6 +93,7 @@ export type { RadarData } from "./generated/types.gen"
 export type { AgentMetrics } from "./generated/types.gen"
 export type { Vital } from "./generated/types.gen"
 export type { CreateCommandReceipt } from "./generated/types.gen"
+export type { ClaudeUsageResponse, ClaudeUsageLimit } from "./generated/types.gen"
 
 // ── Helper: align TS with runtime (setupClient.ts guarantees) ─────────
 
@@ -319,4 +324,10 @@ export function fetchTree(agentId: string): Promise<TreeRow[]> {
 
 export function fetchCallbacks(agentId: string): Promise<CallbackRow[]> {
   return sdk(getApiAgentByIdCallbacks({ path: { id: agentId } }))
+}
+
+// ── Claude Code usage (SDK) ───────────────────────────────────────────
+
+export function fetchClaudeUsage(): Promise<ClaudeUsageResponse> {
+  return sdk(getApiClaudeUsage())
 }

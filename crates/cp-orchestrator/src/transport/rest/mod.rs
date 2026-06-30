@@ -36,7 +36,9 @@ pub use create::create_agent;
 pub(crate) use env_keys::{env_key_reveal, env_key_update, env_keys_list};
 pub use library::create_command;
 pub use lifecycle::{restart_agent, retire_agent, unretire_agent};
-pub(crate) use releases::{delete_release, download_release, list_releases, select_release, set_arch};
+pub(crate) use releases::{
+    delete_release, deploy_fleet, download_release, list_releases, restart_orchestrator, select_release, set_arch,
+};
 use thread_shape::{overlay_roster, reshape_thread};
 
 /// A transport-agnostic reply: an HTTP status and a JSON body.
@@ -251,6 +253,61 @@ pub fn delete_avatar(state: &Mutex<Backend>, id: &str) -> HttpReply {
     };
     let _existed = b.avatars.remove(id);
     HttpReply::ok(&serde_json::json!({ "ok": true }))
+}
+
+/// `GET /api/claude-usage` — proxy live Claude Code OAuth usage limits.
+///
+/// Reads the user's OAuth token from the macOS Keychain (or
+/// `~/.claude/.credentials.json`) and fetches the session/weekly rate-limit
+/// percentages from Anthropic's `/api/oauth/usage` endpoint.
+pub fn claude_usage() -> HttpReply {
+    let Some(token) = read_claude_oauth_token() else {
+        return HttpReply::error(404, "Claude Code OAuth token not found");
+    };
+    let client = reqwest::blocking::Client::new();
+    let resp = client
+        .get("https://api.anthropic.com/api/oauth/usage")
+        .header("Authorization", format!("Bearer {token}"))
+        .header("Content-Type", "application/json")
+        .header("User-Agent", "claude-code/2.1.196")
+        .header("anthropic-beta", "oauth-2025-04-20")
+        .timeout(std::time::Duration::from_secs(10))
+        .send();
+    match resp {
+        Ok(r) => match r.json::<serde_json::Value>() {
+            Ok(val) => HttpReply { status: 200, body: val.to_string() },
+            Err(e) => HttpReply::error(502, &format!("invalid usage response: {e}")),
+        },
+        Err(e) => HttpReply::error(502, &format!("usage fetch failed: {e}")),
+    }
+}
+
+/// Read the Claude Code OAuth access token from macOS Keychain or the
+/// credentials file (`~/.claude/.credentials.json`).
+fn read_claude_oauth_token() -> Option<String> {
+    // macOS Keychain (preferred).
+    if let Ok(out) = std::process::Command::new("security")
+        .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
+        .output()
+    {
+        if out.status.success() {
+            if let Ok(raw) = std::str::from_utf8(&out.stdout) {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(raw.trim()) {
+                    if let Some(t) =
+                        val.get("claudeAiOauth").and_then(|o| o.get("accessToken")).and_then(|v| v.as_str())
+                    {
+                        return Some(t.to_owned());
+                    }
+                }
+            }
+        }
+    }
+    // Fallback: credentials file.
+    let home = std::env::var("HOME").ok()?;
+    let path = std::path::Path::new(&home).join(".claude/.credentials.json");
+    let data = std::fs::read_to_string(path).ok()?;
+    let val: serde_json::Value = serde_json::from_str(&data).ok()?;
+    val.get("claudeAiOauth")?.get("accessToken")?.as_str().map(str::to_owned)
 }
 
 /// Load an agent's registry [`Entry`] from the configured agents directory.

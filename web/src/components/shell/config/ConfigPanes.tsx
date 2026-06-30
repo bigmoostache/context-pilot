@@ -375,10 +375,10 @@ function KeyRow({
           <button onClick={handleSave} disabled={saving} className="shrink-0 text-[var(--interactive)] transition-colors hover:text-[var(--interactive)]/80 disabled:opacity-50" aria-label="Save">
             {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" strokeWidth={3} />}
           </button>
-        ) : connected && !noReveal &&
+        ) : !noReveal &&
           (managed ? (
             <Lock className="size-3.5 shrink-0 text-muted-foreground/50" aria-label="Locked by organization" />
-          ) : (<>
+          ) : connected ? (<>
             {revealedValue && (
               <button onClick={handleStartEdit} className="shrink-0 text-muted-foreground/55 transition-colors hover:text-foreground" aria-label="Edit">
                 <Pencil className="size-3.5" />
@@ -387,7 +387,11 @@ function KeyRow({
             <button onClick={handleReveal} disabled={loading} className="shrink-0 text-muted-foreground/55 transition-colors hover:text-foreground disabled:opacity-50" aria-label={revealedValue ? "Hide" : "Reveal"}>
               {loading ? <Loader2 className="size-3.5 animate-spin" /> : revealedValue ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
             </button>
-          </>))}
+          </>) : (
+            <button onClick={handleStartEdit} className="shrink-0 text-muted-foreground/55 transition-colors hover:text-[var(--interactive)]" aria-label="Set key">
+              <Pencil className="size-3.5" />
+            </button>
+          ))}
       </div>
       {managed && connected && (
         <span className="flex items-center gap-1 pl-0.5 text-[10.5px] text-muted-foreground/65">
