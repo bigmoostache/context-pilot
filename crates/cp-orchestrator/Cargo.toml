@@ -45,6 +45,10 @@ rusqlite = { workspace = true }
 # HTTP client — GitHub Releases API + binary download for the release manager
 # (services/releases.rs). Reuses the workspace dep (blocking + json features).
 reqwest = { workspace = true }
+# Vendored OpenSSL for cross-compilation (reqwest → native-tls → openssl-sys).
+# Without this, openssl-sys falls back to pkg-config and fails in musl cross
+# containers. Same pattern as the tui crate (8837333).
+openssl = { workspace = true }
 
 [dev-dependencies]
 # Test-only: the integration suite boots a real agent and drives its command

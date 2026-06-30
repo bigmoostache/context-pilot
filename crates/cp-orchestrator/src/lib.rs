@@ -49,6 +49,13 @@ pub use registry::channel;
 // imported `cp_orchestrator::liveness` continue to compile unchanged.
 pub use registry::liveness;
 
+// `openssl` with the `vendored` feature compiles OpenSSL from source during
+// cross-compilation (reqwest → native-tls → openssl-sys). Without a direct
+// reference the per-target `unused-crate-dependencies` lint fires on the lib
+// target. Neither lib nor bin code calls OpenSSL directly — the crate exists
+// solely to activate vendored compilation.
+use openssl as _;
+
 // `cp-mod-bridge` is a dev-dependency the `tests/registry_channel.rs` integration
 // suite uses to boot a real agent across the backend↔agent seam. The library's
 // own `#[cfg(test)]` modules never name it, so the per-target
