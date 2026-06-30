@@ -5,6 +5,7 @@
 //! builds the authorize URL, and the user completes authorization in their
 //! browser, then pastes the resulting code back into the frontend dialog.
 
+use std::net::TcpListener;
 use std::sync::Mutex;
 use std::time::Instant;
 
@@ -19,7 +20,6 @@ use super::{Backend, HttpReply};
 const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const AUTHORIZE_URL: &str = "https://claude.ai/oauth/authorize";
 const TOKEN_URL: &str = "https://platform.claude.com/v1/oauth/token";
-const REDIRECT_URI: &str = "http://localhost/callback";
 const SCOPES: &str = "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
 /// PKCE sessions expire after 5 minutes.
 const PKCE_TTL_SECS: u64 = 300;
@@ -30,6 +30,9 @@ const PKCE_TTL_SECS: u64 = 300;
 #[derive(Debug)]
 pub(crate) struct PkceSession {
     code_verifier: String,
+    /// `http://localhost:{port}/callback` — must match between authorize and
+    /// token-exchange requests (RFC 8252 §7.3 loopback redirect).
+    redirect_uri: String,
     created_at: Instant,
 }
 
@@ -91,6 +94,16 @@ pub(crate) fn token_status() -> HttpReply {
 /// `POST /api/claude-login/start` — generate PKCE pair and return the
 /// authorize URL for the user to open in their browser.
 pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
+    // RFC 8252 §7.3: bind a random loopback port for the redirect URI.
+    // Claude's OAuth server requires `http://localhost:{port}/callback`
+    // with an explicit port. We drop the listener immediately — `code=true`
+    // causes the auth page to display the code for manual copy-paste.
+    let port = match TcpListener::bind("127.0.0.1:0") {
+        Ok(l) => l.local_addr().map(|a| a.port()).unwrap_or(18923),
+        Err(_) => 18923,
+    };
+    let redirect_uri = format!("http://localhost:{port}/callback");
+
     // Generate code_verifier: 32 random bytes → base64url (43 chars).
     let mut verifier_bytes = [0u8; 32];
     if read_random(&mut verifier_bytes).is_err() {
@@ -112,13 +125,13 @@ pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
     // Build the authorize URL.
     let url = format!(
         "{AUTHORIZE_URL}?code=true&client_id={CLIENT_ID}&response_type=code&redirect_uri={}&scope={}&code_challenge={code_challenge}&code_challenge_method=S256&state={state_param}",
-        urlencoded(REDIRECT_URI),
+        urlencoded(&redirect_uri),
         urlencoded(SCOPES),
     );
 
-    // Store the PKCE session.
+    // Store the PKCE session (redirect_uri must match in token exchange).
     if let Ok(mut b) = state.lock() {
-        b.pkce_session = Some(PkceSession { code_verifier, created_at: Instant::now() });
+        b.pkce_session = Some(PkceSession { code_verifier, redirect_uri, created_at: Instant::now() });
     }
 
     HttpReply::ok(&LoginStartResponse { url })
@@ -155,7 +168,7 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
             "grant_type=authorization_code&code={}&code_verifier={}&client_id={CLIENT_ID}&redirect_uri={}",
             urlencoded(code),
             urlencoded(&session.code_verifier),
-            urlencoded(REDIRECT_URI),
+            urlencoded(&session.redirect_uri),
         ))
         .timeout(std::time::Duration::from_secs(15))
         .send();
