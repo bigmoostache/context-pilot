@@ -1,14 +1,15 @@
-//! `POST /api/fleet/create` — create a new agent and spawn it on a pty.
+//! `POST /api/fleet/create` + `POST /api/agent/{id}/library/command` —
+//! create agents and prompt-library commands.
 //!
 //! Split out of [`rest`](super) for the 500-line file budget. Owns the
-//! create-agent handler, its slug derivation, and the request/receipt JSON
-//! shapes.
+//! create-agent handler, its slug derivation, the create-command handler,
+//! and the request/receipt JSON shapes.
 
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
-use super::{Backend, HttpReply};
+use super::{Backend, HttpReply, resolve_entry};
 use crate::services::auth::types::{AgentRole, User};
 
 /// FNV-1a 64-bit offset basis (same constants as the agent-side identity
@@ -180,4 +181,106 @@ mod tests {
         assert_eq!(slugify("!!!"), "untitled");
         assert_eq!(slugify(""), "untitled");
     }
+
+    #[test]
+    fn yaml_scalar_quotes_and_escapes() {
+        assert_eq!(yaml_scalar("Hello"), "\"Hello\"");
+        assert_eq!(yaml_scalar("a \"b\" c"), "\"a \\\"b\\\" c\"");
+        assert_eq!(yaml_scalar("line1\nline2"), "\"line1 line2\"");
+        assert_eq!(yaml_scalar("back\\slash"), "\"back\\\\slash\"");
+    }
+}
+
+// ── Create command (prompt library) ─────────────────────────────────
+
+/// `POST /api/agent/{id}/library/command` — write a new command markdown file.
+///
+/// Body: `{ "name": "...", "description": "...?", "body": "..." }`. `name` and
+/// `body` are required (the slug is derived from `name`, the body is the prompt
+/// the `/command` expands to); `description` is optional (the one-line label
+/// shown on the suggestion bubble).
+///
+/// Returns `201` with `{ "id": <slug>, "status": "created" }` on success,
+/// `400` for a missing/blank name or body or malformed JSON, `404` for an
+/// unknown agent, `409` when a command with that slug already exists (never
+/// clobbers), and `502` if the file cannot be written.
+pub fn create_command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply {
+    let Ok(req) = serde_json::from_slice::<CreateCommandReq>(body_bytes) else {
+        return HttpReply::error(400, "malformed create-command request");
+    };
+    let name = req.name.trim();
+    if name.is_empty() {
+        return HttpReply::error(400, "command name is required");
+    }
+    let body = req.body.trim();
+    if body.is_empty() {
+        return HttpReply::error(400, "command body is required");
+    }
+
+    let entry = match resolve_entry(state, id) {
+        Ok(e) => e,
+        Err(reply) => return reply,
+    };
+
+    let slug = slugify(name);
+    let commands_dir = std::path::Path::new(&entry.folder).join(".context-pilot").join("commands");
+    let file_path = commands_dir.join(format!("{slug}.md"));
+
+    if file_path.exists() {
+        return HttpReply::error(409, "a command with this name already exists");
+    }
+
+    if let Err(e) = std::fs::create_dir_all(&commands_dir) {
+        return HttpReply::error(502, &format!("could not create commands directory: {e}"));
+    }
+
+    let description = req.description.trim();
+    let mut markdown = String::new();
+    markdown.push_str("---\n");
+    markdown.push_str(&format!("name: {}\n", yaml_scalar(name)));
+    markdown.push_str(&format!("description: {}\n", yaml_scalar(description)));
+    markdown.push_str("---\n");
+    markdown.push_str(body);
+    markdown.push('\n');
+
+    if let Err(e) = std::fs::write(&file_path, markdown) {
+        return HttpReply::error(502, &format!("could not write command file: {e}"));
+    }
+
+    HttpReply::json(201, &CreateCommandReceipt { id: slug, status: "created" })
+}
+
+/// Encode a single-line string as a double-quoted YAML scalar.
+///
+/// Backslashes and double quotes are escaped, and any CR/LF is collapsed to a
+/// space so the value stays on one frontmatter line.
+fn yaml_scalar(s: &str) -> String {
+    let mut out = String::with_capacity(s.len().saturating_add(2));
+    out.push('"');
+    for ch in s.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\r' | '\n' => out.push(' '),
+            other => out.push(other),
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// The `POST /api/agent/{id}/library/command` request body.
+#[derive(Deserialize)]
+struct CreateCommandReq {
+    name: String,
+    #[serde(default)]
+    description: String,
+    body: String,
+}
+
+/// The receipt returned when a command file has been created.
+#[derive(Serialize)]
+struct CreateCommandReceipt {
+    id: String,
+    status: &'static str,
 }

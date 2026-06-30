@@ -72,6 +72,9 @@ pub struct Backend {
     /// Local release manager — download, select, and delete release binaries
     /// from `~/.context-pilot/releases/` (T427).
     pub(crate) releases: ReleaseStore,
+    /// In-flight PKCE session for the Claude Code OAuth login flow (T451).
+    /// At most one login can be in progress at a time.
+    pub(crate) pkce_session: Option<super::claude_oauth::PkceSession>,
 }
 
 impl Backend {
@@ -100,6 +103,7 @@ impl Backend {
             names: NameOverrides::load(&agents_dir),
             avatars: AvatarStore::load(&agents_dir),
             releases: ReleaseStore::load(ReleaseStore::default_dir().unwrap_or_else(|| agents_dir.join("releases"))),
+            pkce_session: None,
             agents_dir,
             dirty_agents: HashSet::new(),
             supervisor: AgentSupervisor::new(&[agent_binary.clone()]),
@@ -164,6 +168,7 @@ impl Backend {
             session_ttl: Duration::from_secs(3600),
             env_overrides: HashMap::new(),
             releases: ReleaseStore::load(PathBuf::from("/tmp/cp-test-releases")),
+            pkce_session: None,
         }
     }
 }
