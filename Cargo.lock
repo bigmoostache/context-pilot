@@ -600,6 +600,7 @@ dependencies = [
  "csv",
  "nix 0.30.1",
  "notify",
+ "openssl",
  "portable-pty",
  "reqwest",
  "rusqlite",
