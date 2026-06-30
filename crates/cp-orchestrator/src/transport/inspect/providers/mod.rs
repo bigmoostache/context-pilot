@@ -16,6 +16,8 @@ use serde::Serialize;
 use crate::transport::rest;
 use crate::transport::rest::HttpReply;
 
+mod oauth_creds;
+
 // ── Wire types ──────────────────────────────────────────────────────────
 
 #[derive(Serialize)]
@@ -425,7 +427,7 @@ fn has_param(query: &str, key: &str) -> bool {
 /// `deploy/ansible/claude-oauth.yml`).
 fn provider_usable(id: &str) -> bool {
     match id {
-        "claudecode" | "claudecodev2" => super::oauth_creds::claude_oauth_available(),
+        "claudecode" | "claudecodev2" => oauth_creds::claude_oauth_available(),
         _ => provider_key_name(id).is_some_and(global::has_api_key),
     }
 }

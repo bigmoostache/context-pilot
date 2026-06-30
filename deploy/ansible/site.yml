@@ -2,7 +2,7 @@
 # Full appliance provisioning — factory-fresh Photonicat → ready in one pass,
 # from the pre-built artifacts published on GitHub Releases (no local build).
 #
-#   cp inventory.example.ini inventory.ini   # one group per client, set LAN IPs
+#   cp examples/inventory.example.ini inventory.ini   # one group per client, set LAN IPs
 #   ansible-playbook -i inventory.ini deploy/ansible/site.yml --ask-vault-pass
 #   # one client only (its keys via group_vars/<client>/):
 #   ansible-playbook -i inventory.ini deploy/ansible/site.yml --limit acme --ask-vault-pass

@@ -115,7 +115,7 @@ nœuds tagués ; le JSON de status peut montrer un timestamp trompeur).
 ## 7. Passer la main à Ansible
 
 La box est joignable en `<unit>.<tailnet>.ts.net`. Pointe l'inventaire sur ce nom MagicDNS (cf.
-`deploy/ansible/inventory.example.ini`) — plus de contrainte « même LAN » :
+`deploy/ansible/examples/inventory.example.ini`) — plus de contrainte « même LAN » :
 ```sh
 ansible -i deploy/ansible/inventory.ini <client> -m ping
 ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/site.yml --limit <client> --ask-vault-pass

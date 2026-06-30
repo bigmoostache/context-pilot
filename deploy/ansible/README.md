@@ -8,7 +8,7 @@ Prereqs: the box is enrolled on the tailnet (`tag:cp-<client>`, see
 `deploy/PROVISIONING.md`) and **this control node is on the tailnet too**.
 
 ```sh
-cp deploy/ansible/inventory.example.ini deploy/ansible/inventory.ini
+cp deploy/ansible/examples/inventory.example.ini deploy/ansible/inventory.ini
 # edit inventory.ini with each box's Tailscale MagicDNS name
 # (<hostname>.<tailnet>.ts.net) — not a LAN IP. Auth is Tailscale SSH (no key).
 
@@ -75,7 +75,7 @@ client at a time with `--limit`.
 ```sh
 # 1. group the boxes by client in inventory.ini:  [acme] … / [globex] …
 # 2. copy the template to a GITIGNORED local file and fill in acme's keys:
-cp deploy/ansible/secrets.example.yml deploy/ansible/acme.local.yml
+cp deploy/ansible/examples/secrets.example.yml deploy/ansible/acme.local.yml
 $EDITOR deploy/ansible/acme.local.yml
 # 3. deploy that client (its keys only):
 ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/site.yml \
@@ -111,7 +111,7 @@ ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/provision-seed.y
 - `group_vars/<client>/vault.yml` — per-client provider keys (ansible-vault).
 - `group_vars/example-client.yml` — copy this to make a real client's vault.
 - `templates/{seed.env.j2,admin-sheet.txt.j2}` — the seed file + delivery sheet.
-- `inventory.example.ini` — copy to `inventory.ini`.
+- `examples/inventory.example.ini` — copy to `inventory.ini`.
 
 ## Guarantees & hygiene
 

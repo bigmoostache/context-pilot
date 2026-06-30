@@ -59,11 +59,11 @@ deploy/photonicat/build.sh        # cross-compile aarch64 + SPA → deploy/ansib
 (ou un tag GitHub Release : `-e release=v0.x.y`).
 
 ## Phase 3 — Déployer via Ansible (par le tailnet)
-1. **Inventaire** : `cp inventory.example.ini inventory.ini`, `ansible_host=<unit>.<tailnet>.ts.net`,
+1. **Inventaire** : `cp examples/inventory.example.ini inventory.ini`, `ansible_host=<unit>.<tailnet>.ts.net`,
    un groupe par client. (`inventory.ini` gitignoré.)
 2. **Secrets au lancement** (jamais commités) :
    ```sh
-   cp deploy/ansible/secrets.example.yml deploy/ansible/<client>.local.yml
+   cp deploy/ansible/examples/secrets.example.yml deploy/ansible/<client>.local.yml
    $EDITOR deploy/ansible/<client>.local.yml      # cp_provider_keys + cp_admin_email/password
    chmod 600 deploy/ansible/<client>.local.yml
    ```
@@ -105,9 +105,9 @@ deploy/photonicat/build.sh        # cross-compile aarch64 + SPA → deploy/ansib
 > **Rotation** : pas de refresh côté box → relancer ce playbook avant l'expiration
 > (modèle identique à la rotation des clés). `expiresAt` n'est qu'une garde locale ;
 > le cale sur la vraie durée du token (le mettre au-delà = tentatives 401 inutiles).
-> **Pré-requis code** : surfacer le provider « Claude Code (OAuth) » dans le cockpit
-> demande un patch lecture-seule (`provider_key_name`, `transport/inspect/providers.rs`),
-> non inclus ici.
+> **Côté code** (déjà en place) : le cockpit surface « Claude Code (OAuth) » dès que
+> ce fichier est présent et non expiré — cf. `inspect/providers/oauth_creds.rs`
+> (`claude_oauth_available`), en lecture seule.
 
 ## Phase 4 — Onboarding (IT, depuis le LAN client, à l'IP de la box)
 1. Navigateur → `https://<box-LAN-IP>:9090` (avertissement TLS — CA privée, attendu).

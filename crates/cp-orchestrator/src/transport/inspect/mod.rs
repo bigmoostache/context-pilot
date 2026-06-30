@@ -19,7 +19,6 @@ pub mod finder;
 mod helpers;
 pub mod meta;
 pub mod metrics;
-mod oauth_creds;
 pub mod panels;
 pub mod providers;
 pub mod vitals;
