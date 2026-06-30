@@ -3490,6 +3490,10 @@
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only fsync''d log + running ReplayState fold (heads+seen). open() seeds via replay::replay. append(kind)->rev probes frame size, rolls at 64MiB. roll() stamps leading Checkpoint(Snapshot) as new segment''s first record (GAP1). write_record = sole rev point (frame+write_all+sync_data+fold_entry, announce-after-durable K9). checkpoint()/heads()/seen()/snapshot() public. OplogError{Io,Frame}. 8 tests.'
   last_edited_ms: 1781620292020
+516a49de026799e8:
+  path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
+  description: 'Claude Code OAuth helpers — usage proxy (GET /api/claude-usage), token status (GET /api/claude-login/status), PKCE login flow (POST /start + /complete). Manual code-paste flow: user copies code from Anthropic page or URL bar, pastes in popover. extract_code() parses full callback URLs. Reads/writes macOS Keychain + ~/.claude/.credentials.json. PkceSession stored in Backend.'
+  last_edited_ms: 1782848167256
 516b9052cc0e542b:
   path: docs/search-module.md
   description: Search module documentation. Architecture diagram, component table, server lifecycle, index schemas (files+logs), file pipeline, search tool params, Ctrl+I overlay, log integration, tree-sitter languages.
@@ -5606,6 +5610,10 @@
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
   last_edited_ms: 0
+84165d20a60e299a:
+  path: web/src/components/shell/widgets/UsageButton.tsx
+  description: 'Claude Code OAuth usage limits button. Anthropic "A" logomark trigger opens popover with token status (valid/expired + expiry), session/weekly usage bars (color-coded by severity), and LoginFlow (PKCE: open browser → copy code from URL bar → paste → exchange). Accepts raw code or full callback URL. Lazy-fetches on open, 30s auto-refresh.'
+  last_edited_ms: 1782848167321
 841e3960c476b3b7:
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation. Thread input routing: handle_thread_input_submit resolves selected_thread_idx through ThreadsState::visible_indices(viewing_archived) — the selection is a VISIBLE-slice position (T9 archive refactor), so the virtual ''+ New Thread'' row is detected as selected_idx >= visible.len() (active view only) and message-send maps the visible position back to a real storage index (fixes the regression where typed names were routed as messages into another thread when archived threads existed). handle_thread_create stores the new thread''s VISIBLE index. MAX_THREAD_NAME_LEN=200. Paste sentinel expansion. /command replacement.'
