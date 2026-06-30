@@ -5,7 +5,6 @@
 //! builds the authorize URL, and the user completes authorization in their
 //! browser, then pastes the resulting code back into the frontend dialog.
 
-use std::io::{Read as _, Write as _};
 use std::net::TcpListener;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -136,86 +135,14 @@ pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
         });
     }
 
-    // Spawn a background listener that auto-completes the exchange when the
-    // browser redirects to `http://localhost:{port}/callback?code=...`.
-    spawn_callback_listener(listener, code_verifier, redirect_uri);
+    // Listener is dropped — the redirect will hit a dead port, but the
+    // authorization code is displayed on the Anthropic page (code=true)
+    // and also visible in the browser's URL bar. The user copies it and
+    // pastes it into the frontend dialog.
+    drop(listener);
 
     HttpReply::ok(&LoginStartResponse { url })
 }
-
-// ── Callback listener ────────────────────────────────────────────────
-
-/// Spawn a background thread that accepts the OAuth redirect on the bound port.
-///
-/// When the browser redirects to `http://localhost:{port}/callback?code=...`,
-/// this thread extracts the code, exchanges it for tokens, stores credentials,
-/// and serves a "Login successful" HTML page. Times out after [`PKCE_TTL_SECS`].
-fn spawn_callback_listener(listener: TcpListener, code_verifier: String, redirect_uri: String) {
-    drop(std::thread::spawn(move || {
-        let _nb = listener.set_nonblocking(true);
-        let deadline = Instant::now() + Duration::from_secs(PKCE_TTL_SECS);
-
-        loop {
-            match listener.accept() {
-                Ok((mut stream, _)) => {
-                    // Read the HTTP request (just need the first line).
-                    let mut buf = [0u8; 4096];
-                    let _nb2 = stream.set_nonblocking(false);
-                    let _to = stream.set_read_timeout(Some(Duration::from_secs(5)));
-                    let n = stream.read(&mut buf).unwrap_or(0);
-                    let request = String::from_utf8_lossy(&buf[..n]);
-
-                    // Parse: GET /callback?code=XXX&state=YYY HTTP/1.1
-                    let code = request
-                        .lines()
-                        .next()
-                        .and_then(|line| line.split('?').nth(1))
-                        .and_then(|qs| qs.split_whitespace().next())
-                        .and_then(|qs| {
-                            qs.split('&').find_map(|pair| {
-                                pair.strip_prefix("code=")
-                            })
-                        });
-
-                    let (status_line, body) = match code {
-                        Some(code) => match exchange_and_store(code, &code_verifier, &redirect_uri) {
-                            Ok(_) => ("200 OK", SUCCESS_HTML),
-                            Err(e) => {
-                                eprintln!("OAuth callback exchange failed: {e}");
-                                ("500 Internal Server Error", FAILURE_HTML)
-                            }
-                        },
-                        None => ("400 Bad Request", FAILURE_HTML),
-                    };
-
-                    let response = format!(
-                        "HTTP/1.1 {status_line}\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                        body.len(),
-                    );
-                    drop(stream.write_all(response.as_bytes()));
-                    break;
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    if Instant::now() > deadline {
-                        break;
-                    }
-                    std::thread::sleep(Duration::from_millis(500));
-                }
-                Err(_) => break,
-            }
-        }
-    }));
-}
-
-const SUCCESS_HTML: &str = r#"<!DOCTYPE html><html><head><title>Login Successful</title></head>
-<body style="font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f8f9fa">
-<div style="text-align:center"><h1 style="color:#16a34a">&#x2705; Login Successful</h1>
-<p style="color:#6b7280">You can close this tab and return to Context Pilot.</p></div></body></html>"#;
-
-const FAILURE_HTML: &str = r#"<!DOCTYPE html><html><head><title>Login Failed</title></head>
-<body style="font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f8f9fa">
-<div style="text-align:center"><h1 style="color:#dc2626">&#x274C; Login Failed</h1>
-<p style="color:#6b7280">Please try again from Context Pilot.</p></div></body></html>"#;
 
 // ── Login complete ───────────────────────────────────────────────────
 
