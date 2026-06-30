@@ -104,7 +104,10 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
       window.open(data.url, "_blank")
     },
     onError: (e) => {
-      setError(e instanceof Error ? e.message : "Failed to start login")
+      const msg = e instanceof Error ? e.message
+        : (typeof e === "object" && e && "error" in e) ? String((e as { error: string }).error)
+        : "Failed to start login"
+      setError(msg)
       setStep("error")
     },
   })
@@ -116,7 +119,10 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
       setTimeout(onDone, 1500)
     },
     onError: (e) => {
-      setError(e instanceof Error ? e.message : "Failed to complete login")
+      const msg = e instanceof Error ? e.message
+        : (typeof e === "object" && e && "error" in e) ? String((e as { error: string }).error)
+        : "Failed to complete login"
+      setError(msg)
       setStep("error")
     },
   })
@@ -157,9 +163,8 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
     return (
       <div className="space-y-3">
         <p className="text-[12px] text-muted-foreground">
-          Authorize in the browser. Then copy the code from the URL bar
-          (the <code className="text-[11px] bg-muted px-1 rounded">code=</code> value)
-          and paste it below:
+          After authorizing, your browser will show a <em>"can't connect"</em> page — that's
+          normal! Copy the full URL from the address bar and paste it below:
         </p>
         <a
           href={authorizeUrl}
