@@ -156,6 +156,8 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
         return HttpReply::error(400, "expected {\"code\":\"...\"}");
     };
     let code = req.code.trim();
+    // Accept either a raw code or the full callback URL containing `?code=…`.
+    let code = extract_code(code);
     if code.is_empty() {
         return HttpReply::error(400, "code is required");
     }
@@ -285,6 +287,22 @@ fn store_credentials(creds: &serde_json::Value) -> Result<(), String> {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
+
+/// Extract the authorization code from user input.
+///
+/// Accepts a raw code string **or** the full callback URL
+/// (`http://localhost:PORT/callback?code=XXXX&state=YYYY`).
+fn extract_code(input: &str) -> &str {
+    // If it looks like a URL with `code=`, pull out the code value.
+    if let Some(qs) = input.split('?').nth(1) {
+        for pair in qs.split('&') {
+            if let Some(val) = pair.strip_prefix("code=") {
+                return val;
+            }
+        }
+    }
+    input
+}
 
 /// Minimal percent-encoding for URL query parameters.
 fn urlencoded(s: &str) -> String {

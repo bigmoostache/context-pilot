@@ -157,7 +157,9 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
     return (
       <div className="space-y-3">
         <p className="text-[12px] text-muted-foreground">
-          Authorize in the browser, then paste the code shown on the confirmation page:
+          Authorize in the browser. Then copy the code from the URL bar
+          (the <code className="text-[11px] bg-muted px-1 rounded">code=</code> value)
+          and paste it below:
         </p>
         <a
           href={authorizeUrl}
@@ -171,7 +173,7 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
           type="text"
           value={code}
           onChange={(e) => setCode(e.target.value)}
-          placeholder="Paste authorization code…"
+          placeholder="Paste code or full callback URL…"
           autoFocus
           className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[var(--signal)]"
         />
