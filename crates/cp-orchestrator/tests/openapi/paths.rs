@@ -259,6 +259,11 @@ pub(super) fn paths() -> Value {
             "properties": { "tag": { "type": "string" } },
             "required": ["tag"]
         })), r("DownloadResponse")),
+        "/api/releases/deploy": post("releases", "Deploy release to fleet", Some(json!({
+            "type": "object",
+            "properties": { "tag": { "type": "string" } }
+        })), r("DeployResponse")),
+        "/api/releases/restart-orchestrator": post("releases", "Restart orchestrator process", None, r("RestartOrchestratorResponse")),
         "/api/releases/select": json!({ "put": {
             "tags": ["releases"], "summary": "Select active release",
             "requestBody": { "required": true, "content": { "application/json": { "schema": {

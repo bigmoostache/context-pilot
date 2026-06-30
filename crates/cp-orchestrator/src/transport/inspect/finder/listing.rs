@@ -51,8 +51,8 @@ pub fn fs_descriptions(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     HttpReply::ok(&serde_json::Value::Object(map))
 }
 
-/// Maximum file size returned by the preview endpoint (256 KiB).
-const MAX_PREVIEW_BYTES: u64 = 256 * 1024;
+/// Maximum file size returned by the preview endpoint (1 MiB).
+const MAX_PREVIEW_BYTES: u64 = 1024 * 1024;
 
 /// Maximum number of conversation messages returned per request.
 const MAX_CONVERSATION_MESSAGES: usize = 200;

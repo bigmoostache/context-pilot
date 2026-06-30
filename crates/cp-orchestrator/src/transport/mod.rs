@@ -285,6 +285,8 @@ fn route_rest(
         (Method::Put, ["api", "releases", "arch"]) => rest::set_arch(state, body_bytes),
         (Method::Post, ["api", "releases", "download"]) => rest::download_release(state, body_bytes),
         (Method::Put, ["api", "releases", "select"]) => rest::select_release(state, body_bytes),
+        (Method::Post, ["api", "releases", "deploy"]) => rest::deploy_fleet(state, body_bytes),
+        (Method::Post, ["api", "releases", "restart-orchestrator"]) => rest::restart_orchestrator(state),
         (Method::Delete, ["api", "releases", tag]) => rest::delete_release(state, tag),
 
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },

@@ -8,11 +8,11 @@ use crate::transport::rest::HttpReply;
 
 use super::support::{agent_folder, confined_path, extract_param};
 
-/// Maximum file size for downloads (10 MiB).
-const MAX_DOWNLOAD_BYTES: u64 = 10 * 1024 * 1024;
+/// Maximum file size for downloads (100 MiB).
+const MAX_DOWNLOAD_BYTES: u64 = 100 * 1024 * 1024;
 
-/// Maximum zip archive size for folder downloads (100 MiB).
-const MAX_ZIP_BYTES: u64 = 100 * 1024 * 1024;
+/// Maximum zip archive size for folder downloads (500 MiB).
+const MAX_ZIP_BYTES: u64 = 500 * 1024 * 1024;
 
 /// `GET /api/agent/{id}/fs/download?path=` — file or folder download.
 ///

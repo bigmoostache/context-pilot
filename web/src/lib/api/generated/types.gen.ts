@@ -152,6 +152,16 @@ export type CreateUserResponse = {
     user: AuthUser;
 };
 
+export type DeployResponse = {
+    errors: Array<string>;
+    restarted: Array<{
+        id: string;
+        pid: number;
+    }>;
+    status: string;
+    tag: string;
+};
+
 export type DownloadResponse = {
     status: string;
     tag: string;
@@ -360,6 +370,10 @@ export type ReleasesResponse = {
 
 export type RenameResult = {
     renamed: string;
+};
+
+export type RestartOrchestratorResponse = {
+    status: string;
 };
 
 export type RestartReceipt = {
@@ -2346,6 +2360,33 @@ export type PutApiReleasesArchResponses = {
 
 export type PutApiReleasesArchResponse = PutApiReleasesArchResponses[keyof PutApiReleasesArchResponses];
 
+export type PostApiReleasesDeployData = {
+    body: {
+        tag?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/releases/deploy';
+};
+
+export type PostApiReleasesDeployErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiReleasesDeployError = PostApiReleasesDeployErrors[keyof PostApiReleasesDeployErrors];
+
+export type PostApiReleasesDeployResponses = {
+    /**
+     * Success
+     */
+    200: DeployResponse;
+};
+
+export type PostApiReleasesDeployResponse = PostApiReleasesDeployResponses[keyof PostApiReleasesDeployResponses];
+
 export type PostApiReleasesDownloadData = {
     body: {
         tag: string;
@@ -2372,6 +2413,31 @@ export type PostApiReleasesDownloadResponses = {
 };
 
 export type PostApiReleasesDownloadResponse = PostApiReleasesDownloadResponses[keyof PostApiReleasesDownloadResponses];
+
+export type PostApiReleasesRestartOrchestratorData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/releases/restart-orchestrator';
+};
+
+export type PostApiReleasesRestartOrchestratorErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiReleasesRestartOrchestratorError = PostApiReleasesRestartOrchestratorErrors[keyof PostApiReleasesRestartOrchestratorErrors];
+
+export type PostApiReleasesRestartOrchestratorResponses = {
+    /**
+     * Success
+     */
+    200: RestartOrchestratorResponse;
+};
+
+export type PostApiReleasesRestartOrchestratorResponse = PostApiReleasesRestartOrchestratorResponses[keyof PostApiReleasesRestartOrchestratorResponses];
 
 export type PutApiReleasesSelectData = {
     body: {

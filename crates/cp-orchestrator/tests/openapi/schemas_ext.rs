@@ -395,6 +395,30 @@ pub(super) fn transport() -> Value {
                 "binaryPath": { "type": "string" }
             },
             "required": ["status", "tag", "binaryPath"]
+        },
+        "DeployResponse": {
+            "type": "object",
+            "properties": {
+                "status": { "type": "string" },
+                "tag": { "type": "string" },
+                "restarted": { "type": "array", "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": { "type": "string" },
+                        "pid": { "type": "integer" }
+                    },
+                    "required": ["id", "pid"]
+                }},
+                "errors": arr(json!({ "type": "string" }))
+            },
+            "required": ["status", "tag", "restarted", "errors"]
+        },
+        "RestartOrchestratorResponse": {
+            "type": "object",
+            "properties": {
+                "status": { "type": "string" }
+            },
+            "required": ["status"]
         }
     })
 }

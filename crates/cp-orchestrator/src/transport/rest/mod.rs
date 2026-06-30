@@ -36,7 +36,7 @@ pub use create::create_agent;
 pub(crate) use env_keys::{env_key_reveal, env_key_update, env_keys_list};
 pub use library::create_command;
 pub use lifecycle::{restart_agent, retire_agent, unretire_agent};
-pub(crate) use releases::{delete_release, download_release, list_releases, select_release, set_arch};
+pub(crate) use releases::{delete_release, deploy_fleet, download_release, list_releases, restart_orchestrator, select_release, set_arch};
 use thread_shape::{overlay_roster, reshape_thread};
 
 /// A transport-agnostic reply: an HTTP status and a JSON body.
