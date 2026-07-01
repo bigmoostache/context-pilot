@@ -81,6 +81,35 @@ export function AgentModal({
   const [modelId, setModelId] = useState(createDefault.m)
   const nameRef = useRef<HTMLInputElement>(null)
 
+  // Back-fill the picker once the provider registry loads. On a cold page
+  // refresh `useProviders()` is empty at first render, so the useState
+  // initializers above resolve to "" and the picker shows nothing selected.
+  // This effect syncs the real selection exactly once (guarded by a ref so a
+  // later manual change is never clobbered) as soon as providers arrive.
+  const syncedRef = useRef(false)
+  useEffect(() => {
+    if (syncedRef.current || providers.length === 0) return
+    if (isManage && agent) {
+      const sel = resolveSelection(providers, agent.provider, agent.model)
+      if (sel) {
+        setProvId(sel.provider.id)
+        setModelId(sel.model.id)
+      }
+    } else if (!isManage) {
+      const lsP = localStorage.getItem("cp-default-provider") ?? providers[0]?.id ?? ""
+      if (lsP) {
+        setProvId(lsP)
+        setModelId(
+          localStorage.getItem("cp-default-model") ??
+            defaultModel(providers, lsP)?.id ??
+            providers[0]?.models[0]?.id ??
+            "",
+        )
+      }
+    }
+    syncedRef.current = true
+  }, [providers, isManage, agent])
+
   // Realm folder: in create mode it's derived live from the name (no picker);
   // in manage mode it's the agent's fixed, read-only realm.
   const realm = isManage ? (agent?.folder ?? "") : `~/code/${slugify(name)}`
