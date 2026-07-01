@@ -11,7 +11,7 @@ use cp_base::config::llm_types::LlmProvider;
 use cp_base::config::models::{AnthropicModel, ClaudeCodeV2Model, DeepSeekModel, GrokModel, GroqModel, MiniMaxModel};
 use cp_base::state::runtime::State;
 use cp_mod_bridge::BridgeState;
-use cp_mod_spine::types::SpineState;
+use cp_mod_spine::types::{NotificationType, SpineState};
 use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
 use cp_wire::types::command::{Command, Kind as CommandKind};
 use cp_wire::types::oplog::OpEntryKind;
@@ -85,10 +85,31 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
         auto: false,
     });
     thread.status = ThreadStatus::MyTurn;
+    let thread_name = thread.name.clone();
 
-    // NO instant spine notification — the idle MY_TURN detection
-    // (`check_my_turn_threads`) handles it when the agent finishes its
-    // current work, avoiding mid-task distraction.
+    // No instant spine notification for unfocused threads — the idle
+    // MY_TURN detection (`check_my_turn_threads`) handles it when the
+    // agent finishes, avoiding mid-task distraction.
+    //
+    // Exception: if the message lands on the CURRENTLY FOCUSED thread,
+    // fire immediately — the user is actively talking to the agent in the
+    // thread it's working on and expects a quick acknowledgement.
+    if FocusState::get(state).focused_thread_id.as_deref() == Some(thread_id) {
+        let notif = format!(
+            "The user has just sent a NEW message to your currently focused thread \
+             \"{thread_name}\" ({thread_id}):\n\n\
+             {content}\n\n\
+             Please acknowledge QUICKLY:\n\
+             1. Read(thread_id=\"{thread_id}\") to refresh the conversation\n\
+             2. Send a short acknowledgement (still_my_turn=true)",
+        );
+        let _r = SpineState::create_notification(
+            state,
+            NotificationType::Custom,
+            "focused_thread_input".to_string(),
+            notif,
+        );
+    }
 
     for module in crate::modules::all_modules() {
         module.on_user_message(state);
