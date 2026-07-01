@@ -11,6 +11,33 @@ use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
 // Runtime State
 
+/// Per-tick telemetry captured at stream start, consumed at stream end for TSV logging.
+///
+/// Populated by `prepare_stream_context()` (beginning of tick: culprit detection,
+/// token layout, recent tools). Consumed by cost-tracking append once the stream
+/// finalizes and token costs are known.
+#[derive(Debug, Default)]
+pub struct TickTelemetry {
+    /// Epoch milliseconds when the tick started.
+    pub tick_start_ms: u64,
+    /// Last 3 tool names, comma-separated (most recent first).
+    pub three_last_tools: String,
+    /// Context type of the cache-break culprit panel, or `"none"`.
+    pub culprit_type: String,
+    /// Tokens strictly before the culprit (system + tools + preceding panels).
+    pub tokens_before_culprit: usize,
+    /// Tokens of the culprit panel itself.
+    pub tokens_culprit: usize,
+    /// Tokens strictly after the culprit (trailing panels, excluding conversation).
+    pub tokens_after_culprit: usize,
+    /// Whether the queue module was actively intercepting tools this tick.
+    pub queue_is_active: bool,
+    /// Whether tempo held this tick (no tool broke it last tick → global freeze).
+    pub tempo_is_active: bool,
+    /// `true` when no panel forced a cache break — only the conversation tail changed.
+    pub no_panel_broken: bool,
+}
+
 /// Runtime state (messages loaded in memory)
 pub struct State {
     /// Active context panels (dynamic + fixed), ordered by recency for LLM injection.
@@ -170,6 +197,8 @@ pub struct State {
     /// unless the tool explicitly opts out via `ToolResult::preserves_tempo`. When the next
     /// `prepare_stream_context()` runs with `tempo == true`, ALL panels freeze unconditionally.
     pub tempo: bool,
+    /// Pre-tick telemetry for cost-tracking TSV (populated at stream start, consumed at stream end).
+    pub tick_telemetry: Option<TickTelemetry>,
     /// Number of alive (non-pruned) breakpoints at last tick — for sidebar display only.
     pub tick_alive_breakpoints: usize,
     /// Per-mille positions (0–1000) of alive BPs within the prompt, sorted.
@@ -277,6 +306,7 @@ impl Default for State {
             tool_sleep_until_ms: 0,
             cache_engine_json: None,
             tempo: true,
+            tick_telemetry: None,
             tick_alive_breakpoints: 0,
             tick_alive_bp_positions: vec![],
             last_viewport_width: 0,

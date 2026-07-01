@@ -9,6 +9,6 @@ mod streaming;
 /// Thread-related helpers: auto-Read injection, `MY_TURN` detection.
 pub(super) mod threads;
 /// Tool execution: pipeline, post-execution checks, and watcher-sentinel cleanup.
-mod tools;
+pub(crate) mod tools;
 /// File/GH watcher setup, cache updates, timer-based deprecation, and watcher-event dispatch.
 mod watchers;
