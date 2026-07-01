@@ -538,6 +538,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: macOS title bar. App mark (Home)→fleet. At fleet altitude no agent selected → 'Mission control' caption (switcher + branch/cost hidden); inside an agent shows AgentSwitcher + per-agent segmented switcher Threads·Cockpit·Finder + branch+cost. Far-right Settings gear opens ConfigModal (always-mounted, controlled open). ThemeToggle.
   last_edited_ms: 1781524763692
+0d254e205ae95b23:
+  path: .context-pilot/scripts/rust-check.sh
+  description: 'CB4 callback script. Runs 3 checks on every .rs edit: (1) cargo fmt --check, (2) cargo check -D warnings, (3) cargo clippy --all-targets -D warnings. Matches CI ci.yml steps. Fmt check added T462 (was missing since June 5 consolidation).'
+  last_edited_ms: 1782897541690
 0d51d6ed9f7292b6:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
