@@ -13,6 +13,7 @@ import type {
   ProviderDef as GenProviderDef,
 } from "../api/generated/types.gen"
 import { getApiProviders } from "../api/generated/sdk.gen"
+import { sdk } from "../api/client"
 
 // ── Types (generated base + frontend icon) ────────────────────────────
 
@@ -80,7 +81,7 @@ let cached: ProviderDef[] | null = null
 /** Fetch the provider registry (cached after first call). */
 export async function fetchProviders(): Promise<ProviderDef[]> {
   if (cached) return cached
-  const { data } = await getApiProviders({ throwOnError: true })
+  const data = await sdk<GenProviderDef[]>(getApiProviders())
   cached = enrichProviders(data)
   return cached
 }
