@@ -38,6 +38,10 @@
   path: src/llms/claude_code/stream_types.rs
   description: 'SSE stream types: StreamContentBlock, StreamDelta, StreamMessage, StreamUsage deserialization structs'
   last_edited_ms: 0
+0115d817bb56a646:
+  path: web/src/components/shell/costs/parse.ts
+  description: 'TSV parser for cost-tracking.tsv. CostRow interface (15 fields), parseCostTsv(), aggregation helpers: computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, crossTabToolCulprit (count matrix).'
+  last_edited_ms: 1782922373423
 011ed3fea529d7ed:
   path: src/app/run/threads/bridge.rs
   description: 'Bridge command intake + live-state emission (gated bridge-ON). accept_commands: non-blocking accept off the listener, then set_nonblocking(FALSE) on the accepted stream BEFORE handle_connection — the accepted fd INHERITS the listener''s non-blocking flag (macOS / Linux-without-accept4), so left non-blocking the read loop hits a transient WouldBlock the instant the AF_UNIX socket buffer (~8KiB) drains mid-frame and treats it as fatal → any command larger than the buffer closes the connection → backend BrokenPipe / 502 ''agent unreachable'' (the ''big messages don''t go through'' bug, T274). Forcing blocking makes the 500ms per-read timeout the real wedge-guard. poll_bridge_commands drains ALL pending commands/tick (Leg 3) → super::commands::apply_command, then save_state_async() when ≥1 applied — LOAD-BEARING for config-only mutations with NO oplog delta (chiefly Configure provider+model, T262; else reverts on reload). emit_roster_delta (pub(super)) = non-blocking DURABLE oplog append on thread mutation. emit_vitals = best-effort PhaseTransition+CostAggregate on-change. emit_thread_status = DURABLE ThreadStatusChanged on flip (observe-on-change vs memo). emit_thread_focus = BEST-EFFORT ThreadFocusChanged on change (self-heals from disk FocusState). wire_turn (pub(super)) ThreadStatus→ThreadTurn. Command APPLICATION in sibling commands.rs.'
@@ -2009,6 +2013,10 @@
 2e908756fdf5dd30:
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook, CLI subcommands (typst-compile/recompile-watched). use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
+  last_edited_ms: 0
+2ea64072b5f29138:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 2eaa159c1b88cf0b:
   path: .context-pilot/config.json
@@ -8634,6 +8642,10 @@ c5b9a1c1444e3f7a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
   last_edited_ms: 0
+c5e24e643bbc86ee:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: Cost Analysis dashboard page. Summary cards (total cost, ticks, avg/tick, hit rate), culprit donut, cost timeline, cost/tool bar charts, token distribution breakdown. Tempo/queue AND-filters with toggle pills. Tool×Culprit cross-tabulation table with row/column totals. Uses TanStack useQuery + fetchFsPreview with 15s refetch.
+  last_edited_ms: 1782922373342
 c5e2de2dac312524:
   path: web/src/components/ui/button.tsx
   description: Button with CVA variant system (default/outline/secondary/ghost/destructive/link × 8 sizes incl icon variants). Base UI primitive, group/button data-slot.
