@@ -20,7 +20,8 @@ const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const AUTHORIZE_URL: &str = "https://claude.ai/oauth/authorize";
 const TOKEN_URL: &str = "https://console.anthropic.com/v1/oauth/token";
 const REDIRECT_URI: &str = "https://console.anthropic.com/oauth/code/callback";
-const SCOPES: &str = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
+const SCOPES: &str =
+    "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
 /// PKCE sessions expire after 5 minutes.
 const PKCE_TTL_SECS: u64 = 300;
 
@@ -75,7 +76,8 @@ pub(crate) fn token_status() -> HttpReply {
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis() as i64)
                 .unwrap_or(0);
-            let valid = expires_at > now_ms && oauth.get("accessToken").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
+            let valid =
+                expires_at > now_ms && oauth.get("accessToken").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
             HttpReply::ok(&TokenStatusResponse {
                 valid,
                 expires_at: if expires_at > 0 { Some(expires_at) } else { None },
@@ -83,7 +85,12 @@ pub(crate) fn token_status() -> HttpReply {
                 rate_limit_tier: oauth.get("rateLimitTier").and_then(|v| v.as_str()).map(str::to_owned),
             })
         }
-        None => HttpReply::ok(&TokenStatusResponse { valid: false, expires_at: None, subscription_type: None, rate_limit_tier: None }),
+        None => HttpReply::ok(&TokenStatusResponse {
+            valid: false,
+            expires_at: None,
+            subscription_type: None,
+            rate_limit_tier: None,
+        }),
     }
 }
 
@@ -118,11 +125,8 @@ pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
 
     // Store PKCE session for the /complete step.
     if let Ok(mut b) = state.lock() {
-        b.pkce_session = Some(PkceSession {
-            code_verifier: code_verifier.clone(),
-            state: state_param,
-            created_at: Instant::now(),
-        });
+        b.pkce_session =
+            Some(PkceSession { code_verifier: code_verifier.clone(), state: state_param, created_at: Instant::now() });
     }
 
     HttpReply::ok(&LoginStartResponse { url })
@@ -156,7 +160,9 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
     }
 
     match exchange_and_store(code, &session.code_verifier, &session.state) {
-        Ok(expires_at) => HttpReply::ok(&LoginCompleteResponse { status: "ok".to_owned(), expires_at: Some(expires_at) }),
+        Ok(expires_at) => {
+            HttpReply::ok(&LoginCompleteResponse { status: "ok".to_owned(), expires_at: Some(expires_at) })
+        }
         Err(e) => HttpReply::error(502, &e),
     }
 }
@@ -169,11 +175,7 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
 /// pair at Anthropic's token endpoint, and persists the updated credentials.
 pub(crate) fn refresh_login() -> HttpReply {
     let creds = read_credentials_json();
-    let refresh_token = creds
-        .as_ref()
-        .and_then(|c| c.get("refreshToken"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let refresh_token = creds.as_ref().and_then(|c| c.get("refreshToken")).and_then(|v| v.as_str()).unwrap_or("");
     if refresh_token.is_empty() {
         return HttpReply::error(400, "no refresh token stored — please log in first");
     }
@@ -203,7 +205,10 @@ pub(crate) fn refresh_login() -> HttpReply {
                 Err(e) => return HttpReply::error(502, &format!("invalid refresh JSON: {e}")),
             };
             if !status.is_success() {
-                let msg = val.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str())
+                let msg = val
+                    .get("error")
+                    .and_then(|e| e.get("message"))
+                    .and_then(|m| m.as_str())
                     .unwrap_or_else(|| val.get("error").and_then(|e| e.as_str()).unwrap_or("refresh failed"));
                 return HttpReply::error(502, &format!("{msg} (HTTP {status})"));
             }
@@ -264,7 +269,10 @@ fn exchange_and_store(code: &str, code_verifier: &str, state: &str) -> Result<i6
     let val: serde_json::Value = serde_json::from_str(&text)
         .map_err(|e| format!("invalid token JSON: {e} — body: {}", &text[..text.len().min(500)]))?;
     if !status.is_success() {
-        let msg = val.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str())
+        let msg = val
+            .get("error")
+            .and_then(|e| e.get("message"))
+            .and_then(|m| m.as_str())
             .unwrap_or_else(|| val.get("error").and_then(|e| e.as_str()).unwrap_or("token exchange failed"));
         return Err(format!("{msg} (HTTP {status})"));
     }
@@ -272,10 +280,8 @@ fn exchange_and_store(code: &str, code_verifier: &str, state: &str) -> Result<i6
     let access_token = val.get("access_token").and_then(|v| v.as_str()).unwrap_or("");
     let refresh_token = val.get("refresh_token").and_then(|v| v.as_str()).unwrap_or("");
     let expires_in = val.get("expires_in").and_then(|v| v.as_i64()).unwrap_or(0);
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0);
+    let now_ms =
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
     let expires_at = now_ms + expires_in * 1000;
 
     let creds = serde_json::json!({
@@ -327,7 +333,16 @@ fn store_credentials(creds: &serde_json::Value) -> Result<(), String> {
 
     // Try macOS Keychain first.
     let keychain_ok = std::process::Command::new("security")
-        .args(["add-generic-password", "-U", "-s", "Claude Code-credentials", "-a", "Claude Code-credentials", "-w", &json])
+        .args([
+            "add-generic-password",
+            "-U",
+            "-s",
+            "Claude Code-credentials",
+            "-a",
+            "Claude Code-credentials",
+            "-w",
+            &json,
+        ])
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false);

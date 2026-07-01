@@ -103,12 +103,8 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
              1. Read(thread_id=\"{thread_id}\") to refresh the conversation\n\
              2. Send a short acknowledgement (still_my_turn=true)",
         );
-        let _r = SpineState::create_notification(
-            state,
-            NotificationType::Custom,
-            "focused_thread_input".to_string(),
-            notif,
-        );
+        let _r =
+            SpineState::create_notification(state, NotificationType::Custom, "focused_thread_input".to_string(), notif);
     }
 
     for module in crate::modules::all_modules() {
