@@ -1414,6 +1414,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/helpers.rs
   description: 'Shared helpers for inspection-panel endpoints: agent_folder, unwrap_module_array, yaml_map_to_keyed_array, extract_worker_param.'
   last_edited_ms: 1782466301729
+20cf7bf06af1211b:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 20dc7ba5f120fbaf:
   path: ui/src/components/finder/FinderPreview.tsx
   description: 'QuickLook pane with variant prop: ''pane'' (420px side rail w/ Quick Look header + metadata footer + Get Info) or ''full'' (file-tab main area — BARE content only, no header/footer; actions live in the toolbar). Bespoke kind renders: code (copy btn + line numbers + keyword tint), spreadsheet (zebra + frozen header + tabs), slides, PDF (page strip), image (checkerboard + zoom), audio (waveform), video (poster + scrubber), rendered markdown, json/text, folder summary.'
@@ -3685,6 +3689,10 @@
 54ee2e72311c001b:
   path: src/ui/threads_view/mod.rs
   description: Threads view layout + thread list rendering. Two-pane layout (thread list | messages). Virtual '+ New Thread' entry. IR pipeline for list items (status dots, unread indicators, selection highlight). maybe_activate_thread_question() lazy question form init. truncate_str helper.
+  last_edited_ms: 0
+553095f553590d6c:
+  path: src/llms/mod.rs
+  description: 'LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging. Re-exports split: llm_types (traits) + models (enums).'
   last_edited_ms: 0
 5539010f7f990664:
   path: src/state/persistence/save.rs
@@ -7785,6 +7793,10 @@ b430fe89da0040d6:
 b43754bbbc122964:
   path: crates/cp-mod-console/src/ring_buffer.rs
   description: 'RingBuffer: fixed-capacity circular buffer for console output lines'
+  last_edited_ms: 0
+b45803a00fedbd34:
+  path: src/app/mod.rs
+  description: 'App struct — top-level container. Fields: State, TypewriterBuffer, pending tools/done, cache_tx, file/gh watchers, timers (incl last_bridge_recover_ms throttling the periodic cp_mod_bridge::try_recover self-heal), PersistenceWriter, reverie_streams. Sub-modules: actions, context, events, panels, prompt_builder, reverie, run.'
   last_edited_ms: 0
 b4690dffe1679682:
   path: src/modules/conversation_history/panel.rs

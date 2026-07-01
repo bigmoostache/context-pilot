@@ -129,7 +129,7 @@ pub(crate) fn start_streaming(params: StreamParams, tx: Sender<StreamEvent>) {
     let _r = std::thread::spawn(move || {
         // Assemble the prompt (panels + seed + conversation → api_messages)
         let include_tool_uses = false; // No pending tool results on first stream
-        let api_messages = crate::app::prompt_builder::assemble_prompt(
+        let api_messages = crate::app::prompt::assemble_prompt(
             &params.messages,
             &params.context_items,
             include_tool_uses,
