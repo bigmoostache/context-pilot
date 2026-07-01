@@ -538,6 +538,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: macOS title bar. App mark (Home)→fleet. At fleet altitude no agent selected → 'Mission control' caption (switcher + branch/cost hidden); inside an agent shows AgentSwitcher + per-agent segmented switcher Threads·Cockpit·Finder + branch+cost. Far-right Settings gear opens ConfigModal (always-mounted, controlled open). ThemeToggle.
   last_edited_ms: 1781524763692
+0d254e205ae95b23:
+  path: .context-pilot/scripts/rust-check.sh
+  description: 'CB4 callback script. Runs 3 checks on every .rs edit: (1) cargo fmt --check, (2) cargo check -D warnings, (3) cargo clippy --all-targets -D warnings. Matches CI ci.yml steps. Fmt check added T462 (was missing since June 5 consolidation).'
+  last_edited_ms: 1782897541690
 0d51d6ed9f7292b6:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
@@ -2002,6 +2006,10 @@
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped) opened by any chip. T304: passes draftKey. T331: passes pendingFiles + onRemoveFile to ThreadComposer. T334: onShowInFinder forwarded to Message. T348: useLibrary(agentId) → command suggestions (kind===''command'', /${id}) passed to composer ONLY for an empty thread (thread.log.length===0). Takes agentId + onAttach props.'
   last_edited_ms: 0
+2f9fc47b53a54368:
+  path: web/src/components/agents/AgentModal.tsx
+  description: 'Agent create/manage dialog. useProviders() fetches registry. Manage: 2-col — left name+ModelPicker, right SessionVitals+ACL. T457: syncedRef useEffect back-fills provId/modelId once providers load (cold-refresh race: useState initializers ran while registry empty → picker showed nothing selected on page refresh). Submit sends Configure + rename.'
+  last_edited_ms: 1782900503007
 2fa918f340b5a63e:
   path: crates/cp-wire/src/types/command.rs
   description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, PauseThread, ResumeThread, DeleteThread, DeleteMessage{thread_id,message_ts}, InterruptStream, Stop, Configure{provider,model}, Unknown). Frame{schema_version, auth, command}. PauseThread/ResumeThread added for T371. DeleteThread added for T371 permanent delete. DeleteMessage added for T416 per-message delete.
@@ -5738,6 +5746,10 @@
   path: web/src/components/threads/ThreadsView.tsx
   description: Threads view assembler. Uses useThreads()+useFleet() live. handleArchive/Create/Send via sendCommand, each .catch wired to a breaker-aware flash notice (describeCommandError). Auto-selects newly created threads (pendingSelect ref + ID-set diff on useThreads update). Deselects the current thread on archive so the fallback picks the next available. SIDEBAR ALWAYS RENDERS once an agent is resolved — the early-return only bails for !agent ("Select an agent"); a fresh ZERO-thread realm still shows ThreadList (its New Thread button is the ONLY create affordance) + a center EmptyRealm with its own New Thread button, fixing the dead-end where a new agent's threads view showed no sidebar and no way to create the first thread. Keyed by agentId in App.
   last_edited_ms: 1781874930161
+86cb78afc2bdbc42:
+  path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
+  description: Claude Code OAuth helpers — usage proxy (GET /api/claude-usage), token status (GET /api/claude-login/status, now includes account_email fetched from /api/oauth/profile — T465), PKCE login flow (POST /start + /complete), token refresh (POST /refresh). Reads/writes macOS Keychain + ~/.claude/.credentials.json. PkceSession stored in Backend. fetch_account_email() hits Anthropic's /api/oauth/profile → account.email. Refresh uses grant_type=refresh_token against console.anthropic.com.
+  last_edited_ms: 1782899818578
 86e430b56e1c2543:
   path: crates/cp-orchestrator/src/liveness.rs
   description: 'Phase 15: per-agent liveness verdict (§10). Liveness enum{Live,StalePid,StaleHeartbeat,BootIdMismatch}+is_live(). verdict(entry,Option<&Heartbeat>,now_ms,max_age) pure, cheapest-first: !pid_alive→StalePid, no hb→StaleHeartbeat, !matches_boot→BootIdMismatch (pid-reuse defence), !is_fresh→StaleHeartbeat, else Live. pid_alive via nix kill(pid,None) signal-0 (Ok|EPERM=alive). 5 exhaustive verdict-matrix tests, no process spawning.'
@@ -7254,6 +7266,10 @@ a9bc55981ceaf2b4:
   path: crates/cp-mod-console/src/lib.rs
   description: 'Console module. 5 tools. Dynamic console panels. init: find/create Unix socket server. save/load: session reconnection + orphan cleanup. Leaks stdin on save to prevent EOF. Tool visualizer for colored output.'
   last_edited_ms: 0
+a9c8aed7e2d3bf3f:
+  path: crates/cp-orchestrator/src/transport/inspect/providers.rs
+  description: 'LLM provider+model registry endpoint (GET /api/providers). 8 providers with full pricing/context. Single source of truth. T457: resolve_api_name(provider_id, model_id)→apiName bridges config.json enum ids (claude-opus48) to the picker''s apiName form (claude-opus-4-8) for the shaped agent DTO.'
+  last_edited_ms: 1782900502971
 a9d6bd46b079f53d:
   path: crates/cp-orchestrator/tests/transport_http.rs
   description: Phase 30 transport surface tests over a real tiny_http server (4 tests). ticket_mint_and_command_status_codes now asserts a tripped breaker blocks a cost-incurring send_message (503) but NOT a control-plane stop (≠503, reaches delivery). REST rev-envelope+404, SSE ticket gate single-use, Last-Event-ID replay.
@@ -7482,6 +7498,10 @@ af3dcb89932c06f9:
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
   last_edited_ms: 1781347849843
+af4934af72903cf5:
+  path: src/app/run/threads/commands.rs
+  description: 'Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/DeleteMessage(T416 per-message delete by epoch-ms timestamp)/Stop|Interrupt/Configure. SendMessage fires instant spine notification when message lands on CURRENTLY FOCUSED thread (T460) — user expects quick acknowledgement; unfocused threads rely on idle MY_TURN detection. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted. DeleteMessage removes single message by timestamp, emits durable MessageDeleted, updates bridge thread_msg_counts so emit_messages correctly detects subsequent appends (T418 fix). Cascade: deleting an assistant message also removes all consecutive auto:true messages PRECEDING it (tool-trace cleanup — the tool calls that produced the response), one MessageDeleted delta per removed message.'
+  last_edited_ms: 1782899638522
 af5db61fd6258800:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A warm) + DARK ''Sea'' (#2C3333/#395B64/#A5C9CA/#E7F6F2 cool) via :root/.dark token blocks. SF Pro system font for chrome, IBM Plex Mono for data only. Soft shadows, vibrancy, no phosphor glow.'
@@ -7562,6 +7582,10 @@ b15c976b1b6f7804:
   path: src/llms/claude_code/debug.rs
   description: 'Debug helpers: dump_last_request (writes API request JSON to disk) + StreamErrorContext/build_stream_read_error (verbose stream failure diagnostics).'
   last_edited_ms: 0
+b15f804005644b75:
+  path: web/src/components/shell/widgets/UsageButton.tsx
+  description: 'Claude Code OAuth usage limits button. Anthropic "A" logomark trigger opens popover with account email (T465), token status (valid/expired + expiry + refresh button), session/weekly usage bars (color-coded by severity), and LoginFlow (PKCE: open browser → copy code#state → paste → exchange). Refresh button (RefreshCw icon) next to expiry. Lazy-fetches on open, 30s auto-refresh.'
+  last_edited_ms: 1782899818642
 b18c7caa4f869853:
   path: ui/src/components/finder/FinderViews.tsx
   description: 'Finder main-area views. GridView/ListView/ColumnsView/GalleryView render macOS <FileIcon kind ext size/> (T27). Grid (icon-size slider + finder-pop stagger + TagDots + focus ring), List (zebra + sortable headers + tags), Columns (Miller + metadata preview pane), Gallery (hero + filmstrip). Grid + List buttons carry data-finder-item + data-path for marquee hit-testing (T32). TagDots export. ViewHandlers: onClick(node,{additive,range})/onOpen/onContext.'
@@ -9926,6 +9950,10 @@ ea48175aab4e8b6b:
   path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
   description: 'Claude Code OAuth helpers — usage proxy (GET /api/claude-usage), token status (GET /api/claude-login/status), PKCE login flow (POST /start + /complete). Manual code-paste flow: user copies code from Anthropic page, pastes in popover. Reads/writes macOS Keychain + ~/.claude/.credentials.json. PkceSession stored in Backend.'
   last_edited_ms: 1782847620925
+ea48b9b369e6f45c:
+  path: crates/cp-orchestrator/src/transport/inspect/meta.rs
+  description: 'Enriched agent-meta endpoints. agent_meta/fleet_meta/fleet_retired build maquette Agent: registry record + view phase/lifecycle/cost + tokens + context occupancy + threads + git branch + provider. T457: `model` now resolved from config.json per-provider model field via read_current_model()→providers::resolve_api_name (was stale entry.model=claude-opus-4-6 for all agents); field picked by provider (anthropic-family→anthropic_model, claudecodev2→claude_code_v2_model, etc.), falls back to entry.model. read_provider reads modules.core.llm_provider. Name overrides + derive_status/accent.'
+  last_edited_ms: 1782900502894
 ea6462c730d476d5:
   path: crates/cp-orchestrator/src/transport/sse.rs
   description: 'Phase 19: SSE plumbing. SseMessage{id:Option<rev>,event,data}.encode() → id:/event:/data: lines (multiline data split per SSE grammar). delta(rev)/stream/resync constructors. encode_comment keepalive. SseBody: blocking Read fed by mpsc Receiver<Vec<u8>>, refills on exhaust, Ok(0) EOF when all senders dropped — fits tiny_http pump. SseSink.send/keep_alive (Err = client gone = producer stop signal). channel() pairs them. Reconnect-replay-by-rev native via Last-Event-ID. 7 tests.'

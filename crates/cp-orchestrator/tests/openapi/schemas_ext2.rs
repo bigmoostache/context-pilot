@@ -146,6 +146,7 @@ pub(super) fn deploy() -> Value {
             "type": "object",
             "properties": {
                 "valid": { "type": "boolean" },
+                "account_email": { "type": "string", "nullable": true },
                 "expires_at": { "type": "integer", "nullable": true },
                 "subscription_type": { "type": "string", "nullable": true },
                 "rate_limit_tier": { "type": "string", "nullable": true }

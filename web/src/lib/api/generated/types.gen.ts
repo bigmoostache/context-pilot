@@ -142,6 +142,7 @@ export type ClaudeLoginStartResponse = {
 };
 
 export type ClaudeTokenStatus = {
+    account_email?: string | null;
     expires_at?: number | null;
     rate_limit_tier?: string | null;
     subscription_type?: string | null;

@@ -146,6 +146,13 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
     // it needs this explicit id to select the right provider tab.
     let provider = read_provider(state, folder);
 
+    // The agent's true current model apiName for its ACTIVE provider. The
+    // registry `entry.model` is unreliable (it snapshots the Anthropic model
+    // regardless of the live provider), so prefer the authoritative
+    // `config.json` per-provider model — falling back to `entry.model` only
+    // when config is unreadable or the provider has no dedicated field.
+    let model = read_current_model(state, folder, &provider).unwrap_or_else(|| entry.model.clone());
+
     let status = derive_status(phase, lifecycle, has_my_turn);
     let accent = derive_accent(&status);
     let has_avatar = state.lock().is_ok_and(|b| b.avatars.has(agent_id));
@@ -155,7 +162,7 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
         "name": name,
         "folder": folder,
         "branch": branch,
-        "model": entry.model,
+        "model": model,
         "provider": provider,
         "status": status,
         // Raw execution phase (idle/streaming/tooling) on TOP of the derived
@@ -261,6 +268,36 @@ pub(crate) fn read_provider(state: &Mutex<Backend>, folder: &str) -> String {
         .and_then(serde_json::Value::as_str)
         .unwrap_or_default()
         .to_owned()
+}
+
+/// Read the agent's current model for its ACTIVE provider and return its public
+/// `apiName` (the form the web picker resolves a selection by).
+///
+/// `config.json`'s `modules.core` holds one model field per provider family,
+/// storing the enum id (e.g. `claude-opus48`). The active field is chosen by
+/// `provider` — the three Anthropic-family providers (`anthropic`,
+/// `claudecode`, `claudecodeapikey`) share `anthropic_model`; every other
+/// provider has its own. The stored enum id is mapped to its `apiName` via the
+/// provider registry. Returns `None` when config is unreadable, the field is
+/// absent, or the id is unknown — the caller then falls back to the registry
+/// record's model string.
+fn read_current_model(state: &Mutex<Backend>, folder: &str, provider: &str) -> Option<String> {
+    let field = match provider {
+        "anthropic" | "claudecode" | "claudecodeapikey" => "anthropic_model",
+        "claudecodev2" => "claude_code_v2_model",
+        "grok" => "grok_model",
+        "groq" => "groq_model",
+        "deepseek" => "deepseek_model",
+        "minimax" => "minimax_model",
+        _ => return None,
+    };
+    let folder_path = std::path::Path::new(folder);
+    let config = {
+        let mut b = state.lock().ok()?;
+        b.inspect_mut().read_config(folder_path).ok()?
+    };
+    let model_id = config.get("modules")?.get("core")?.get(field).and_then(serde_json::Value::as_str)?;
+    super::providers::resolve_api_name(provider, model_id).map(str::to_owned)
 }
 
 /// Read the current git branch of an agent's working directory.

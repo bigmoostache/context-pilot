@@ -446,6 +446,23 @@ fn provider_key_name(id: &str) -> Option<&'static str> {
     }
 }
 
+/// Resolve a model's public `apiName` from its provider id + enum id.
+///
+/// `config.json` stores the agent's current model as the per-provider enum id
+/// (kebab-case, e.g. `claude-opus48`), whereas the web picker resolves a
+/// selection by `apiName` (e.g. `claude-opus-4-8`). This bridges the two so the
+/// shaped agent DTO can advertise a model the frontend can match. Returns
+/// `None` when the pair is unknown.
+pub(crate) fn resolve_api_name(provider_id: &str, model_id: &str) -> Option<&'static str> {
+    all_providers()
+        .into_iter()
+        .find(|p| p.id == provider_id)?
+        .models
+        .into_iter()
+        .find(|m| m.id == model_id)
+        .map(|m| m.api_name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
