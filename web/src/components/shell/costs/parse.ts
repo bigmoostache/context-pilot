@@ -15,6 +15,8 @@ export interface CostRow {
   queueActive: boolean
   tempoActive: boolean
   noPanelBroken: boolean
+  /** Configured max_freezes for the culprit panel (0 when no culprit). */
+  culpritMaxFreezes: number
   hitTokens: number
   hitCost: number
   missTokens: number
@@ -31,7 +33,7 @@ export function parseCostTsv(content: string): CostRow[] {
     .slice(1)
     .map((line) => {
       const c = line.split("\t")
-      if (c.length < 15) return null
+      if (c.length < 16) return null
       return {
         epoch: Number(c[0]),
         tools: c[1] ?? "",
@@ -42,12 +44,13 @@ export function parseCostTsv(content: string): CostRow[] {
         queueActive: c[6] === "true",
         tempoActive: c[7] === "true",
         noPanelBroken: c[8] === "true",
-        hitTokens: Number(c[9]),
-        hitCost: Number(c[10]),
-        missTokens: Number(c[11]),
-        missCost: Number(c[12]),
-        outTokens: Number(c[13]),
-        outCost: Number(c[14]),
+        culpritMaxFreezes: Number(c[9]),
+        hitTokens: Number(c[10]),
+        hitCost: Number(c[11]),
+        missTokens: Number(c[12]),
+        missCost: Number(c[13]),
+        outTokens: Number(c[14]),
+        outCost: Number(c[15]),
       } satisfies CostRow
     })
     .filter((r): r is CostRow => r !== null)
@@ -276,6 +279,15 @@ export function buildMarkdownReport(
     push("")
   }
 
+  // Max freeze per culprit
+  const freezes = maxFreezePerCulprit(filtered)
+  if (freezes.length > 0) {
+    push("## Max Freezes per Culprit", "")
+    push("| Culprit | Max Freezes |", "|---------|-------------|")
+    for (const f of freezes) push(`| ${f.label} | ${f.value} |`)
+    push("")
+  }
+
   // Token distribution (panel-based)
   if (filtered.length > 0) {
     const avgBefore = Math.round(filtered.reduce((a, r) => a + r.tokensBefore, 0) / filtered.length)
@@ -320,6 +332,24 @@ export function buildMarkdownReport(
   }
 
   return lines.join("\n")
+}
+
+/** Per-culprit max_freezes (latest recorded value per panel type). */
+export function maxFreezePerCulprit(rows: CostRow[]): Slice[] {
+  const map = new Map<string, number>()
+  for (const r of rows) {
+    if (r.noPanelBroken) continue
+    const key = r.culprit || "unknown"
+    // Always take the latest value (overwrite) — reflects current code config
+    map.set(key, r.culpritMaxFreezes)
+  }
+  return [...map.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, value], i) => ({
+      label,
+      value,
+      color: CULPRIT_PALETTE[i % CULPRIT_PALETTE.length] ?? "#94a3b8",
+    }))
 }
 
 /** Per-culprit cost attribution (break ticks only, grouped by culprit type). */

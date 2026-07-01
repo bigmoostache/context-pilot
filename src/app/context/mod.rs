@@ -179,6 +179,7 @@ pub(super) fn prepare_stream_context(
         // Culprit tracking for tick telemetry
         let mut culprit_type: Option<String> = None;
         let mut culprit_panel_idx: Option<usize> = None;
+        let mut culprit_max_freezes: u8 = 0;
         let mut panel_token_counts: Vec<usize> = Vec::new();
         let mut panel_idx: usize = 0;
 
@@ -201,6 +202,7 @@ pub(super) fn prepare_stream_context(
                 if !cache_broken {
                     culprit_panel_idx = Some(panel_idx);
                     culprit_type = Some(item.id.clone());
+                    culprit_max_freezes = 0; // orphaned panel — no Entry, no max_freezes
                 }
                 cache_broken = true;
                 panel_token_counts.push(crate::state::estimate_tokens(&item.content));
@@ -233,6 +235,7 @@ pub(super) fn prepare_stream_context(
                     if !cache_broken {
                         culprit_panel_idx = Some(panel_idx);
                         culprit_type = Some(entry.context_type.to_string());
+                        culprit_max_freezes = panel.max_freezes();
                     }
                     entry.freeze_count = 0;
                     entry.emitted.hash = Some(fresh_hash.clone());
@@ -309,6 +312,7 @@ pub(super) fn prepare_stream_context(
             queue_is_active: cond.queue_active,
             tempo_is_active: cond.tempo,
             no_panel_broken: !cache_broken,
+            culprit_max_freezes,
         });
     }
 

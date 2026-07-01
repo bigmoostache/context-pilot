@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { fetchFsPreview } from "@/lib/api/finder"
-import { parseCostTsv, computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, crossTabToolCulprit, buildMarkdownReport } from "./parse"
+import { parseCostTsv, computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, maxFreezePerCulprit, crossTabToolCulprit, buildMarkdownReport } from "./parse"
 import { DonutChart, HBarChart, CostTimeline, fmtDollar, fmtTokens } from "./charts"
 
 /**
@@ -37,6 +37,7 @@ export function CostsView({ agentId }: { agentId: string }) {
   const costs = useMemo(() => costBreakdown(filtered), [filtered])
   const tools = useMemo(() => toolCostAttribution(filtered), [filtered])
   const culpritCosts = useMemo(() => culpritCostAttribution(filtered), [filtered])
+  const maxFreezes = useMemo(() => maxFreezePerCulprit(filtered), [filtered])
   const crossTab = useMemo(() => crossTabToolCulprit(filtered), [filtered])
 
   const [copied, setCopied] = useState(false)
@@ -140,6 +141,13 @@ export function CostsView({ agentId }: { agentId: string }) {
         {culpritCosts.length > 0 && (
           <Section>
             <HBarChart data={culpritCosts} title="Top culprits by associated cost" />
+          </Section>
+        )}
+
+        {/* ── Row: Max freeze per culprit ─────────────────────────── */}
+        {maxFreezes.length > 0 && (
+          <Section>
+            <HBarChart data={maxFreezes} title="Max freezes per culprit" />
           </Section>
         )}
 

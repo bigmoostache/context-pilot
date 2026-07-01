@@ -36,6 +36,8 @@ pub struct TickTelemetry {
     pub tempo_is_active: bool,
     /// `true` when no panel forced a cache break — only the conversation tail changed.
     pub no_panel_broken: bool,
+    /// Configured `max_freezes` for the culprit panel (0 when no culprit).
+    pub culprit_max_freezes: u8,
 }
 
 /// Runtime state (messages loaded in memory)
