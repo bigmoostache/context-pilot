@@ -267,6 +267,15 @@ export function buildMarkdownReport(
     push("")
   }
 
+  // Culprit cost attribution
+  const culpritCosts = culpritCostAttribution(filtered)
+  if (culpritCosts.length > 0) {
+    push("## Top Culprits by Associated Cost", "")
+    push("| Culprit | Cost |", "|---------|------|")
+    for (const c of culpritCosts) push(`| ${c.label} | ${md$(c.value)} |`)
+    push("")
+  }
+
   // Token distribution (panel-based)
   if (filtered.length > 0) {
     const avgBefore = Math.round(filtered.reduce((a, r) => a + r.tokensBefore, 0) / filtered.length)
@@ -311,6 +320,25 @@ export function buildMarkdownReport(
   }
 
   return lines.join("\n")
+}
+
+/** Per-culprit cost attribution (break ticks only, grouped by culprit type). */
+export function culpritCostAttribution(rows: CostRow[]): Slice[] {
+  const map = new Map<string, number>()
+  for (const r of rows) {
+    if (r.noPanelBroken) continue
+    const totalCost = r.hitCost + r.missCost + r.outCost
+    const key = r.culprit || "unknown"
+    map.set(key, (map.get(key) ?? 0) + totalCost)
+  }
+  return [...map.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([label, value], i) => ({
+      label,
+      value,
+      color: CULPRIT_PALETTE[i % CULPRIT_PALETTE.length] ?? "#94a3b8",
+    }))
 }
 
 /** Per-tool cost attribution (from the three_last_tools column). */

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { fetchFsPreview } from "@/lib/api/finder"
-import { parseCostTsv, computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, crossTabToolCulprit, buildMarkdownReport } from "./parse"
+import { parseCostTsv, computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, crossTabToolCulprit, buildMarkdownReport } from "./parse"
 import { DonutChart, HBarChart, CostTimeline, fmtDollar, fmtTokens } from "./charts"
 
 /**
@@ -36,6 +36,7 @@ export function CostsView({ agentId }: { agentId: string }) {
   const culprits = useMemo(() => culpritDistribution(filtered), [filtered])
   const costs = useMemo(() => costBreakdown(filtered), [filtered])
   const tools = useMemo(() => toolCostAttribution(filtered), [filtered])
+  const culpritCosts = useMemo(() => culpritCostAttribution(filtered), [filtered])
   const crossTab = useMemo(() => crossTabToolCulprit(filtered), [filtered])
 
   const [copied, setCopied] = useState(false)
@@ -134,6 +135,13 @@ export function CostsView({ agentId }: { agentId: string }) {
             <HBarChart data={tools} title="Top tools by associated cost" />
           </Section>
         </div>
+
+        {/* ── Row: Culprit cost attribution ────────────────────────── */}
+        {culpritCosts.length > 0 && (
+          <Section>
+            <HBarChart data={culpritCosts} title="Top culprits by associated cost" />
+          </Section>
+        )}
 
         {/* ── Token distribution per tick (average) ────────────────── */}
         {filtered.length > 0 && <TokenDistribution rows={filtered} />}
