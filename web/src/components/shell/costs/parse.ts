@@ -145,6 +145,51 @@ export function computeSummary(rows: CostRow[]): Summary {
   }
 }
 
+/** Tool × culprit cross-tabulation (count matrix). */
+export interface CrossTab {
+  /** Sorted unique tool names (rows). */
+  tools: string[]
+  /** Sorted unique culprit types (columns). */
+  culprits: string[]
+  /** Map "tool\tculprit" → count. */
+  cells: Map<string, number>
+}
+
+export function crossTabToolCulprit(rows: CostRow[]): CrossTab {
+  const cells = new Map<string, number>()
+  const toolSet = new Set<string>()
+  const culpritSet = new Set<string>()
+  for (const r of rows) {
+    // First tool in the comma-separated list is the most recent (the one that ran at this tick)
+    const tool = r.tools.split(",")[0] ?? "(none)"
+    if (!tool) continue
+    const culprit = r.culprit || "none"
+    toolSet.add(tool)
+    culpritSet.add(culprit)
+    const key = `${tool}\t${culprit}`
+    cells.set(key, (cells.get(key) ?? 0) + 1)
+  }
+  // Sort tools by total count descending
+  const toolTotals = [...toolSet].map((t) => {
+    let total = 0
+    for (const c of culpritSet) total += cells.get(`${t}\t${c}`) ?? 0
+    return { tool: t, total }
+  })
+  toolTotals.sort((a, b) => b.total - a.total)
+  // Sort culprits by total count descending
+  const culpritTotals = [...culpritSet].map((c) => {
+    let total = 0
+    for (const t of toolSet) total += cells.get(`${t}\t${c}`) ?? 0
+    return { culprit: c, total }
+  })
+  culpritTotals.sort((a, b) => b.total - a.total)
+  return {
+    tools: toolTotals.map((t) => t.tool),
+    culprits: culpritTotals.map((c) => c.culprit),
+    cells,
+  }
+}
+
 /** Per-tool cost attribution (from the three_last_tools column). */
 export function toolCostAttribution(rows: CostRow[]): Slice[] {
   const map = new Map<string, number>()
