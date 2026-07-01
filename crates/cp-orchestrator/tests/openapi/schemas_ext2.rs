@@ -156,7 +156,8 @@ pub(super) fn deploy() -> Value {
         "ClaudeLoginStartResponse": {
             "type": "object",
             "properties": {
-                "url": { "type": "string" }
+                "url": { "type": "string" },
+                "already_valid": { "type": "boolean", "nullable": true }
             },
             "required": ["url"]
         },

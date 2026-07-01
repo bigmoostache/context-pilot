@@ -138,6 +138,7 @@ export type ClaudeLoginCompleteResponse = {
 };
 
 export type ClaudeLoginStartResponse = {
+    already_valid?: boolean | null;
     url: string;
 };
 
