@@ -122,7 +122,7 @@ export function CostsView({ agentId }: { agentId: string }) {
             <DonutChart data={culprits} title="Cache break culprits" />
           </Section>
           <Section>
-            <CostTimeline rows={rows} title="Cost per tick over time" />
+            <CostTimeline rows={filtered} title="Cost per tick over time" />
           </Section>
         </div>
 
