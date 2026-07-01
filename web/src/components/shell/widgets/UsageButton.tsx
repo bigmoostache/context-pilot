@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Loader2, ExternalLink, CheckCircle2, XCircle, LogIn } from "lucide-react"
+import { Loader2, ExternalLink, CheckCircle2, XCircle, LogIn, RefreshCw } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Tip } from "@/components/ui/tip"
 import {
@@ -8,6 +8,7 @@ import {
   fetchClaudeTokenStatus,
   startClaudeLogin,
   completeClaudeLogin,
+  refreshClaudeLogin,
 } from "@/lib/api"
 import type { ClaudeUsageLimit } from "@/lib/api/generated/types.gen"
 import { cn } from "@/lib/utils"
@@ -234,6 +235,14 @@ export function UsageButton() {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
 
+  const refreshMutation = useMutation({
+    mutationFn: refreshClaudeLogin,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["claude-token-status"] })
+      void queryClient.invalidateQueries({ queryKey: ["claude-usage"] })
+    },
+  })
+
   const tokenStatus = useQuery({
     queryKey: ["claude-token-status"],
     queryFn: fetchClaudeTokenStatus,
@@ -289,12 +298,35 @@ export function UsageButton() {
                 {isValid ? "Token valid" : "Token expired"}
               </span>
             </div>
-            {isValid && tokenStatus.data.expires_at && (
-              <span className="text-[11px] tabular-nums text-muted-foreground">
-                {formatExpiry(tokenStatus.data.expires_at)}
-              </span>
-            )}
+            <div className="flex items-center gap-1.5">
+              {isValid && tokenStatus.data.expires_at && (
+                <span className="text-[11px] tabular-nums text-muted-foreground">
+                  {formatExpiry(tokenStatus.data.expires_at)}
+                </span>
+              )}
+              <button
+                onClick={() => refreshMutation.mutate()}
+                disabled={refreshMutation.isPending}
+                title="Refresh token"
+                className="flex size-5 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+              >
+                {refreshMutation.isPending
+                  ? <Loader2 className="size-3 animate-spin" />
+                  : <RefreshCw className="size-3" />}
+              </button>
+            </div>
           </div>
+        )}
+
+        {/* ── Refresh error ──────────────────────────────── */}
+        {refreshMutation.isError && (
+          <p className="text-[11px] text-red-500">
+            Refresh failed: {refreshMutation.error instanceof Error
+              ? refreshMutation.error.message
+              : typeof refreshMutation.error === "object" && refreshMutation.error && "error" in refreshMutation.error
+                ? String((refreshMutation.error as { error: string }).error)
+                : "unknown error"}
+          </p>
         )}
 
         {/* ── Usage limits (only when token valid) ─────────── */}

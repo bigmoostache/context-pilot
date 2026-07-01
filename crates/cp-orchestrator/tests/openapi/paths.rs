@@ -282,6 +282,7 @@ pub(super) fn paths() -> Value {
         "/api/claude-usage": get("usage", "Claude Code OAuth usage limits", r("ClaudeUsageResponse")),
         "/api/claude-login/status": get("usage", "Claude Code OAuth token status", r("ClaudeTokenStatus")),
         "/api/claude-login/start": post("usage", "Start Claude Code OAuth login (PKCE)", None, r("ClaudeLoginStartResponse")),
-        "/api/claude-login/complete": post("usage", "Complete Claude Code OAuth login", Some(r("ClaudeLoginCompleteRequest")), r("ClaudeLoginCompleteResponse"))
+        "/api/claude-login/complete": post("usage", "Complete Claude Code OAuth login", Some(r("ClaudeLoginCompleteRequest")), r("ClaudeLoginCompleteResponse")),
+        "/api/claude-login/refresh": post("usage", "Refresh Claude Code OAuth token", None, r("ClaudeLoginCompleteResponse"))
     })
 }

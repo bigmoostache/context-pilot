@@ -4458,6 +4458,36 @@
         ]
       }
     },
+    "/api/claude-login/refresh": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaudeLoginCompleteResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Refresh Claude Code OAuth token",
+        "tags": [
+          "usage"
+        ]
+      }
+    },
     "/api/claude-login/start": {
       "post": {
         "responses": {

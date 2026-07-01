@@ -48,6 +48,7 @@ import {
   getApiClaudeLoginStatus,
   postApiClaudeLoginStart,
   postApiClaudeLoginComplete,
+  postApiClaudeLoginRefresh,
   getApiFleetMeta,
   getApiFleetRetired,
   getApiAgentByIdMeta,
@@ -346,4 +347,8 @@ export function startClaudeLogin(): Promise<import("./generated/types.gen").Clau
 
 export function completeClaudeLogin(code: string): Promise<import("./generated/types.gen").ClaudeLoginCompleteResponse> {
   return sdk(postApiClaudeLoginComplete({ body: { code } }))
+}
+
+export function refreshClaudeLogin(): Promise<import("./generated/types.gen").ClaudeLoginCompleteResponse> {
+  return sdk(postApiClaudeLoginRefresh())
 }

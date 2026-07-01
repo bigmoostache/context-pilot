@@ -161,6 +161,81 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
     }
 }
 
+// ── Refresh token ────────────────────────────────────────────────────
+
+/// `POST /api/claude-login/refresh` — refresh an expired access token.
+///
+/// Reads the stored refresh token, exchanges it for a new access/refresh
+/// pair at Anthropic's token endpoint, and persists the updated credentials.
+pub(crate) fn refresh_login() -> HttpReply {
+    let creds = read_credentials_json();
+    let refresh_token = creds
+        .as_ref()
+        .and_then(|c| c.get("refreshToken"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if refresh_token.is_empty() {
+        return HttpReply::error(400, "no refresh token stored — please log in first");
+    }
+
+    let body = serde_json::json!({
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": CLIENT_ID,
+    });
+    let client = reqwest::blocking::Client::new();
+    let resp = client
+        .post(TOKEN_URL)
+        .header("Content-Type", "application/json")
+        .body(body.to_string())
+        .timeout(Duration::from_secs(15))
+        .send();
+
+    match resp {
+        Ok(r) => {
+            let status = r.status();
+            let text = match r.text() {
+                Ok(t) => t,
+                Err(e) => return HttpReply::error(502, &format!("reading refresh response: {e}")),
+            };
+            let val: serde_json::Value = match serde_json::from_str(&text) {
+                Ok(v) => v,
+                Err(e) => return HttpReply::error(502, &format!("invalid refresh JSON: {e}")),
+            };
+            if !status.is_success() {
+                let msg = val.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str())
+                    .unwrap_or_else(|| val.get("error").and_then(|e| e.as_str()).unwrap_or("refresh failed"));
+                return HttpReply::error(502, &format!("{msg} (HTTP {status})"));
+            }
+
+            let access_token = val.get("access_token").and_then(|v| v.as_str()).unwrap_or("");
+            let new_refresh = val.get("refresh_token").and_then(|v| v.as_str()).unwrap_or(refresh_token);
+            let expires_in = val.get("expires_in").and_then(|v| v.as_i64()).unwrap_or(0);
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0);
+            let expires_at = now_ms + expires_in * 1000;
+
+            let new_creds = serde_json::json!({
+                "claudeAiOauth": {
+                    "accessToken": access_token,
+                    "refreshToken": new_refresh,
+                    "expiresAt": expires_at,
+                    "scopes": SCOPES.split(' ').collect::<Vec<_>>(),
+                }
+            });
+
+            if let Err(e) = store_credentials(&new_creds) {
+                return HttpReply::error(500, &format!("stored new token but credential write failed: {e}"));
+            }
+
+            HttpReply::ok(&LoginCompleteResponse { status: "ok".to_owned(), expires_at: Some(expires_at) })
+        }
+        Err(e) => HttpReply::error(502, &format!("refresh request failed: {e}")),
+    }
+}
+
 // ── Token exchange (shared) ──────────────────────────────────────────
 
 /// Exchange an authorization code for tokens and persist credentials.
