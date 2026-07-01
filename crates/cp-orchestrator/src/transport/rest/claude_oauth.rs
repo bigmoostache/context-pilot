@@ -18,7 +18,7 @@ use super::{Backend, HttpReply};
 
 const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const AUTHORIZE_URL: &str = "https://claude.ai/oauth/authorize";
-const TOKEN_URL: &str = "https://console.anthropic.com/v1/oauth/token";
+const TOKEN_URL: &str = "https://claude.ai/v1/oauth/token";
 const REDIRECT_URI: &str = "https://console.anthropic.com/oauth/code/callback";
 /// User-Agent required by Anthropic's OAuth token endpoint. The canonical
 /// Claude Code OAuth contract expects a Claude Code identity here; a default
