@@ -33,7 +33,10 @@ export function parseCostTsv(content: string): CostRow[] {
     .slice(1)
     .map((line) => {
       const c = line.split("\t")
-      if (c.length < 16) return null
+      if (c.length < 15) return null
+      // Support both old 15-col and new 16-col format
+      const has16 = c.length >= 16
+      const o = has16 ? 1 : 0
       return {
         epoch: Number(c[0]),
         tools: c[1] ?? "",
@@ -44,13 +47,13 @@ export function parseCostTsv(content: string): CostRow[] {
         queueActive: c[6] === "true",
         tempoActive: c[7] === "true",
         noPanelBroken: c[8] === "true",
-        culpritMaxFreezes: Number(c[9]),
-        hitTokens: Number(c[10]),
-        hitCost: Number(c[11]),
-        missTokens: Number(c[12]),
-        missCost: Number(c[13]),
-        outTokens: Number(c[14]),
-        outCost: Number(c[15]),
+        culpritMaxFreezes: has16 ? Number(c[9]) : 0,
+        hitTokens: Number(c[9 + o]),
+        hitCost: Number(c[10 + o]),
+        missTokens: Number(c[11 + o]),
+        missCost: Number(c[12 + o]),
+        outTokens: Number(c[13 + o]),
+        outCost: Number(c[14 + o]),
       } satisfies CostRow
     })
     .filter((r): r is CostRow => r !== null)
