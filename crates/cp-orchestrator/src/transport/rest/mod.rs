@@ -33,7 +33,7 @@ mod releases;
 mod thread_shape;
 pub use backend::Backend;
 pub use create::{create_agent, create_command};
-pub(crate) use claude_oauth::{claude_usage, login_complete, login_start, token_status};
+pub(crate) use claude_oauth::{claude_usage, login_complete, login_start, refresh_login, token_status};
 pub(crate) use env_keys::{env_key_reveal, env_key_update, env_keys_list};
 pub use lifecycle::{restart_agent, retire_agent, unretire_agent};
 pub(crate) use releases::{

@@ -2105,6 +2105,31 @@ export type PostApiClaudeLoginCompleteResponses = {
 
 export type PostApiClaudeLoginCompleteResponse = PostApiClaudeLoginCompleteResponses[keyof PostApiClaudeLoginCompleteResponses];
 
+export type PostApiClaudeLoginRefreshData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/claude-login/refresh';
+};
+
+export type PostApiClaudeLoginRefreshErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiClaudeLoginRefreshError = PostApiClaudeLoginRefreshErrors[keyof PostApiClaudeLoginRefreshErrors];
+
+export type PostApiClaudeLoginRefreshResponses = {
+    /**
+     * Success
+     */
+    200: ClaudeLoginCompleteResponse;
+};
+
+export type PostApiClaudeLoginRefreshResponse = PostApiClaudeLoginRefreshResponses[keyof PostApiClaudeLoginRefreshResponses];
+
 export type PostApiClaudeLoginStartData = {
     body?: never;
     path?: never;

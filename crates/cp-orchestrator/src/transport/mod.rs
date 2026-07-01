@@ -294,6 +294,7 @@ fn route_rest(
         (Method::Get, ["api", "claude-login", "status"]) => rest::token_status(),
         (Method::Post, ["api", "claude-login", "start"]) => rest::login_start(state),
         (Method::Post, ["api", "claude-login", "complete"]) => rest::login_complete(state, body_bytes),
+        (Method::Post, ["api", "claude-login", "refresh"]) => rest::refresh_login(),
 
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },
     }
