@@ -22,10 +22,10 @@ use openssl as _;
 use portable_pty as _;
 use reqwest as _;
 use rusqlite as _;
-use sha2 as _;
 use serde as _;
 use serde_json as _;
 use serde_yaml as _;
+use sha2 as _;
 #[cfg(test)]
 use tempfile as _;
 use tiny_http as _;
