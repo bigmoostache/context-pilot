@@ -448,7 +448,8 @@ pub(super) fn transport() -> Value {
                 "valid": { "type": "boolean" },
                 "expires_at": { "type": "integer", "nullable": true },
                 "subscription_type": { "type": "string", "nullable": true },
-                "rate_limit_tier": { "type": "string", "nullable": true }
+                "rate_limit_tier": { "type": "string", "nullable": true },
+                "account_email": { "type": "string", "nullable": true }
             },
             "required": ["valid"]
         },
