@@ -377,24 +377,11 @@ function CrossTabTable({ crossTab, totalTicks }: { crossTab: CrossTab; totalTick
 }
 
 function ApiTokenDistribution({ rows }: { rows: CostRow[] }) {
-  const broken = rows.filter((r) => !r.noPanelBroken)
+  if (rows.length === 0) return null
 
-  if (broken.length === 0) {
-    return (
-      <Section>
-        <span className="text-[13px] font-semibold text-foreground/80">
-          API-reported token layout on cache-break ticks
-        </span>
-        <p className="mt-2 text-[12px] text-muted-foreground">
-          No cache-break ticks in the current filter selection.
-        </p>
-      </Section>
-    )
-  }
-
-  const avgHit = Math.round(broken.reduce((s, r) => s + r.hitTokens, 0) / broken.length)
-  const avgMiss = Math.round(broken.reduce((s, r) => s + r.missTokens, 0) / broken.length)
-  const avgOut = Math.round(broken.reduce((s, r) => s + r.outTokens, 0) / broken.length)
+  const avgHit = Math.round(rows.reduce((s, r) => s + r.hitTokens, 0) / rows.length)
+  const avgMiss = Math.round(rows.reduce((s, r) => s + r.missTokens, 0) / rows.length)
+  const avgOut = Math.round(rows.reduce((s, r) => s + r.outTokens, 0) / rows.length)
   const total = avgHit + avgMiss + avgOut
 
   const segments = [
@@ -406,7 +393,7 @@ function ApiTokenDistribution({ rows }: { rows: CostRow[] }) {
   return (
     <Section>
       <span className="text-[13px] font-semibold text-foreground/80">
-        API-reported token layout on cache-break ticks ({broken.length} ticks)
+        API-reported token layout ({rows.length} ticks)
       </span>
       <div className="mt-3 flex h-7 overflow-hidden rounded-lg">
         {segments.map((s) => (
@@ -436,24 +423,11 @@ function ApiTokenDistribution({ rows }: { rows: CostRow[] }) {
 }
 
 function TokenDistribution({ rows }: { rows: CostRow[] }) {
-  const broken = rows.filter((r) => !r.noPanelBroken)
+  if (rows.length === 0) return null
 
-  if (broken.length === 0) {
-    return (
-      <Section>
-        <span className="text-[13px] font-semibold text-foreground/80">
-          Average token layout on cache-break ticks
-        </span>
-        <p className="mt-2 text-[12px] text-muted-foreground">
-          No cache-break ticks in the current filter selection.
-        </p>
-      </Section>
-    )
-  }
-
-  const avgBefore = Math.round(broken.reduce((s, r) => s + r.tokensBefore, 0) / broken.length)
-  const avgCulprit = Math.round(broken.reduce((s, r) => s + r.tokensCulprit, 0) / broken.length)
-  const avgAfter = Math.round(broken.reduce((s, r) => s + r.tokensAfter, 0) / broken.length)
+  const avgBefore = Math.round(rows.reduce((s, r) => s + r.tokensBefore, 0) / rows.length)
+  const avgCulprit = Math.round(rows.reduce((s, r) => s + r.tokensCulprit, 0) / rows.length)
+  const avgAfter = Math.round(rows.reduce((s, r) => s + r.tokensAfter, 0) / rows.length)
   const total = avgBefore + avgCulprit + avgAfter
 
   const segments = [
@@ -465,7 +439,7 @@ function TokenDistribution({ rows }: { rows: CostRow[] }) {
   return (
     <Section>
       <span className="text-[13px] font-semibold text-foreground/80">
-        Average token layout on cache-break ticks ({broken.length} ticks)
+        Average token layout ({rows.length} ticks)
       </span>
       <div className="mt-3 flex h-7 overflow-hidden rounded-lg">
         {segments.map((s) => (

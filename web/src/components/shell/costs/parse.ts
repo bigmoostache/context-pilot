@@ -215,7 +215,6 @@ export function buildMarkdownReport(
   const costs = costBreakdown(filtered)
   const tools = toolCostAttribution(filtered)
   const ct = crossTabToolCulprit(filtered)
-  const broken = filtered.filter((r) => !r.noPanelBroken)
 
   const lines: string[] = []
   const push = (...l: string[]) => lines.push(...l)
@@ -269,11 +268,11 @@ export function buildMarkdownReport(
   }
 
   // Token distribution (panel-based)
-  if (broken.length > 0) {
-    const avgBefore = Math.round(broken.reduce((a, r) => a + r.tokensBefore, 0) / broken.length)
-    const avgCulprit = Math.round(broken.reduce((a, r) => a + r.tokensCulprit, 0) / broken.length)
-    const avgAfter = Math.round(broken.reduce((a, r) => a + r.tokensAfter, 0) / broken.length)
-    push(`## Token Layout — Panel-Estimated (${broken.length} break ticks)`, "")
+  if (filtered.length > 0) {
+    const avgBefore = Math.round(filtered.reduce((a, r) => a + r.tokensBefore, 0) / filtered.length)
+    const avgCulprit = Math.round(filtered.reduce((a, r) => a + r.tokensCulprit, 0) / filtered.length)
+    const avgAfter = Math.round(filtered.reduce((a, r) => a + r.tokensAfter, 0) / filtered.length)
+    push(`## Average Token Layout (${filtered.length} ticks)`, "")
     push("| Segment | Avg tokens |", "|---------|-----------|")
     push(`| Before culprit | ${mdTok(avgBefore)} |`)
     push(`| Culprit panel | ${mdTok(avgCulprit)} |`)
@@ -281,10 +280,10 @@ export function buildMarkdownReport(
     push("")
 
     // Token distribution (API-reported)
-    const avgHit = Math.round(broken.reduce((a, r) => a + r.hitTokens, 0) / broken.length)
-    const avgMiss = Math.round(broken.reduce((a, r) => a + r.missTokens, 0) / broken.length)
-    const avgOut = Math.round(broken.reduce((a, r) => a + r.outTokens, 0) / broken.length)
-    push(`## Token Layout — API-Reported (${broken.length} break ticks)`, "")
+    const avgHit = Math.round(filtered.reduce((a, r) => a + r.hitTokens, 0) / filtered.length)
+    const avgMiss = Math.round(filtered.reduce((a, r) => a + r.missTokens, 0) / filtered.length)
+    const avgOut = Math.round(filtered.reduce((a, r) => a + r.outTokens, 0) / filtered.length)
+    push(`## API-Reported Token Layout (${filtered.length} ticks)`, "")
     push("| Segment | Avg tokens |", "|---------|-----------|")
     push(`| Cache hit | ${mdTok(avgHit)} |`)
     push(`| Cache miss | ${mdTok(avgMiss)} |`)
