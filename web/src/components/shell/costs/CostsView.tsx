@@ -354,7 +354,19 @@ function CrossTabTable({ crossTab, totalTicks }: { crossTab: CrossTab; totalTick
 
 function TokenDistribution({ rows }: { rows: { tokensBefore: number; tokensCulprit: number; tokensAfter: number }[] }) {
   const broken = rows.filter((r) => r.tokensCulprit > 0)
-  if (broken.length === 0) return null
+
+  if (broken.length === 0) {
+    return (
+      <Section>
+        <span className="text-[13px] font-semibold text-foreground/80">
+          Average token layout on cache-break ticks
+        </span>
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          No cache-break ticks in the current filter selection.
+        </p>
+      </Section>
+    )
+  }
 
   const avgBefore = broken.reduce((s, r) => s + r.tokensBefore, 0) / broken.length
   const avgCulprit = broken.reduce((s, r) => s + r.tokensCulprit, 0) / broken.length
