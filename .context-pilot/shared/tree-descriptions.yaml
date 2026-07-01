@@ -1690,6 +1690,10 @@
   path: crates/cp-base/src/ui/render_cache.rs
   description: 'MessageCache/InputCache/FullCache: IR block caching with content hashes for conversation panel perf'
   last_edited_ms: 0
+2743c151f9ad8079:
+  path: crates/cp-base/src/state/runtime.rs
+  description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TickTelemetry struct with culprit_max_freezes field. TypeMap for module_data. Message creation helpers.
+  last_edited_ms: 1782924985066
 276d30267df1b2e0:
   path: crates/cp-orchestrator/tests/end_to_end.rs
   description: Phase 30 end-to-end loopback capstone (3 tests). Backend::new takes 6 args (auth=None, session_ttl). Real agent stack ↔ real backend transport over real sockets. Command journals on agent and re-emerges as SSE delta. Spilled body hydrates over REST. 25 SSE connect/disconnect soak cycles.
@@ -6350,6 +6354,10 @@
   path: ui/src/components/conversation/InputBar.tsx
   description: 'Mock input bar: blinking caret, key hints (send/cycle-view/file). Non-functional (design only).'
   last_edited_ms: 1781458541355
+90a65be3c0758667:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool/culprit-cost bars, two token distribution bars (panel-estimated before/culprit/after + API-reported hit/miss/output for comparison), Tool×Culprit cross-tab with heat-map. Both token bars show ALL filtered ticks (no secondary break filter). Tempo/queue/no-break AND-filters. Copy as Markdown button. TanStack useQuery + fetchFsPreview 15s refetch.
+  last_edited_ms: 1782924703183
 90af66ae846c2c38:
   path: web/src/main.tsx
   description: React entry point. Imports setupClient.ts (hey-api config side-effect), createRoot → StrictMode → QueryClientProvider (TanStack shared queryClient) wrapping <App/>. Activates TanStack Query cache + SSE push-plane.
@@ -6770,6 +6778,10 @@
   path: docs/index.html
   description: Main landing page. Centered hero (blinking cursor, tagline), 2×2 nav grid linking Trust Center, Presentations, Blog (disabled), Documentation (disabled). Grid background + amber glow.
   last_edited_ms: 1782129931134
+9b4cf8c0f12ca9a8:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool/culprit-cost/max-freeze bars, two token distribution bars (panel-estimated + API-reported), Tool×Culprit cross-tab with heat-map. Tempo/queue/no-break AND-filters. Copy as Markdown button. TanStack useQuery + fetchFsPreview 15s refetch.
+  last_edited_ms: 1782925132606
 9b4fc660b76ea801:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send/execute_read/build_panel_content. T353: execute_send AUTO-UNARCHIVES an archived target thread (thread.archived=true → set false) — sending to an archived thread is allowed (AI may remember its id), and the reply makes it visible again, mirroring the web frontend''s unarchive-on-send; surfaced in the tool result as ''[thread was archived — automatically unarchived]''. Archived threads filtered out of LLM-facing context. X887: build_panel_content also filters .filter(|m| !m.auto) (visible Vec, skip/total on non-auto count) so the AI never re-reads its own auto tool-activity traces. T343: tool result only lists threads with unack > 0 (concise). MAX caps on content/file-path/questions/panel-messages.'
@@ -7130,6 +7142,10 @@ a184b233199279b2:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
   last_edited_ms: 0
+a19f718f75092665:
+  path: src/app/context/mod.rs
+  description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. Culprit detection records panel type + max_freezes. flame!("prepare_context"). Reverie path branches.
+  last_edited_ms: 1782924985200
 a1a57238a872a6d6:
   path: crates/cp-wire/src/types/snapshot.rs
   description: 'Bounded replay snapshot: Snapshot{heads,seen,roster}. Heads (per-thread/panel content hashes) + SeenSet (dedup-tokens, evicted by acked-rev) + roster:Vec<RosterThread> (#[serde(default)] for N-1 tolerance). RosterThread{thread_id,name,status:ThreadTurn,archived,last_activity_ms,msg_count} = the live thread list + fold helpers (fold_created via ThreadCreation<''src> carrier struct to keep arg count ≤4, fold_archived/fold_status/fold_message) = single source of truth for the roster fold (agent replay + backend view fold both call them, so a folded roster == a checkpoint-restored roster). Checkpoint carries the whole Snapshot so heads+seen+roster rebuild without folding from offset 0. Replaces old heads.rs. Tests: round-trip, with-roster, tolerant-decode-without-roster, fold-helpers, ThreadCreation idempotent re-fold.'
@@ -8630,6 +8646,10 @@ c499dbd657a61322:
   path: crates/cp-mod-typst/src/lib.rs
   description: 'Typst module. 1 tool: typst_execute. Embedded compiler (no external binary). Depends on core+callback. catch-all watchlist callback recompiles affected docs. Seeds shared templates. @preview/ package support.'
   last_edited_ms: 0
+c4a267881635c41a:
+  path: src/app/run/tools/cost_log.rs
+  description: Per-tick cost-tracking TSV. append_cost_tsv() consumes TickTelemetry (culprit + token layout + culprit_max_freezes from stream start) + tick cost counters (from stream end), appends 16-column row to .context-pilot/logs/cost-tracking.tsv. Best-effort, never blocks pipeline.
+  last_edited_ms: 1782924985134
 c4b3ed6bbcdcf7f0:
   path: crates/cp-orchestrator/src/transport/inspect/finder/listing.rs
   description: 'Finder read views (split from finder.rs): fs_list (confined dir listing, folders-first sort, hidden skipped, per-folder count via count_visible_children, size on files), fs_preview (first 256KiB text, 415 on binary null-byte sniff, {content,size,truncated}), conversation (messages/*.yaml newest 200). Uses support:: helpers.'
@@ -8886,6 +8906,10 @@ c9d4aeb2bf4dfbe4:
   path: crates/cp-mod-search/src/types.rs
   description: Core types + config constants. SearchPersistData (with recompute tracking + task_signals ring buffer), SearchState (with SharedRadarCache Arc<Mutex>), Chunk, SearchResult (no tags), SearchMetrics, SearchOverlayInfo (with meili_cpu_pct/meili_memory_bytes), MeiliLiveStats (with meili_cpu_ticks for delta), IndexerCmd, WatcherHandle. logs_index_settings without tags.
   last_edited_ms: 0
+c9f0b40ec3b201e0:
+  path: web/src/components/shell/costs/parse.ts
+  description: 'TSV parser for cost-tracking.tsv. CostRow interface (16 fields incl culpritMaxFreezes), parseCostTsv(), aggregation helpers: computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, maxFreezePerCulprit, crossTabToolCulprit (count matrix). buildMarkdownReport() serializes current filtered state as clean markdown tables.'
+  last_edited_ms: 1782925132537
 ca0b939ed668eb9c:
   path: crates/cp-orchestrator/src/transport/auth/mod.rs
   description: 'Auth middleware + REST handlers. authenticate(): centralized Bearer gate (no-op when disabled, NFR-09). Public routes: login (FR-05), register (bootstrap FR-03 or admin-creates), auth/status (returns enabled+bootstrapped). Protected: logout, me, list/create/delete users. Re-exports ACL functions from acl.rs.'
