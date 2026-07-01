@@ -40,8 +40,109 @@ function uniqueZipEntry(taken: Record<string, unknown>, name: string): string {
  * fflate fails or a file can't be read.
  */
 export function zipFiles(files: File[]): Promise<File> {
+  return zipDropped(files.map((file) => ({ file, path: file.name })))
+}
+
+// ── Folder-aware drop extraction (T471) ───────────────────────────────
+//
+// `dataTransfer.files` does NOT recurse into dropped folders — a folder drop
+// yields a single unreadable pseudo-`File`, which then uploads as a failed /
+// empty request (the "CORS request did not succeed, status null" a folder drop
+// produced). The HTML5 Entry API (`webkitGetAsEntry`) DOES expose the directory
+// tree, so we walk it, collect every real file with its folder-relative path,
+// and hand back a flat list the caller zips into ONE archive (structure
+// preserved) for a single upload — instead of a burst of per-file requests.
+
+/** A file pulled from a drop, tagged with its path relative to the drop root. */
+export interface DroppedFile {
+  file: File
+  /** e.g. `report/q1/data.csv` for a file inside a dropped `report` folder. */
+  path: string
+}
+
+/** Drain a directory reader fully: `readEntries` is paginated (≈100 entries per
+ *  call) and must be pumped until it returns an empty batch. */
+function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
+  return new Promise((resolve, reject) => {
+    const acc: FileSystemEntry[] = []
+    const pump = () =>
+      reader.readEntries((batch) => {
+        if (batch.length === 0) {
+          resolve(acc)
+        } else {
+          acc.push(...batch)
+          pump()
+        }
+      }, reject)
+    pump()
+  })
+}
+
+/** Recursively collect files under a filesystem entry, prefixing each with its
+ *  path relative to the drop root. */
+async function walkEntry(entry: FileSystemEntry, prefix: string): Promise<DroppedFile[]> {
+  if (entry.isFile) {
+    const fileEntry = entry as FileSystemFileEntry
+    const file = await new Promise<File>((res, rej) => fileEntry.file(res, rej))
+    return [{ file, path: prefix + entry.name }]
+  }
+  if (entry.isDirectory) {
+    const dirEntry = entry as FileSystemDirectoryEntry
+    const children = await readAllEntries(dirEntry.createReader())
+    const out: DroppedFile[] = []
+    for (const child of children) out.push(...(await walkEntry(child, `${prefix}${entry.name}/`)))
+    return out
+  }
+  return []
+}
+
+/**
+ * Flatten a drop's `DataTransfer` into every contained file, recursing into
+ * folders, each tagged with its folder-relative path. The Entry objects are
+ * captured **synchronously** before the first `await` — a `DataTransfer` is
+ * neutered the instant the drop handler returns, but the entries it hands out
+ * stay valid for later async traversal. Falls back to the flat
+ * `dataTransfer.files` when the Entry API is unavailable (older browsers), in
+ * which case folder recursion isn't possible.
+ */
+export async function extractDroppedFiles(dt: DataTransfer): Promise<DroppedFile[]> {
+  const entries = Array.from(dt.items)
+    .filter((it) => it.kind === "file")
+    .map((it) => it.webkitGetAsEntry?.() ?? null)
+    .filter((e): e is FileSystemEntry => e !== null)
+
+  if (entries.length === 0) {
+    return Array.from(dt.files).map((file) => ({ file, path: file.name }))
+  }
+  const all: DroppedFile[] = []
+  for (const entry of entries) all.push(...(await walkEntry(entry, "")))
+  return all
+}
+
+/** Pick the archive name: a single file → `<name>.zip`; a single dropped folder
+ *  → `<folder>.zip`; anything else → `dropped-<n>-files.zip`. */
+function zipName(dropped: DroppedFile[]): string {
+  if (dropped.length === 1 && dropped[0]) {
+    const only = dropped[0].path
+    return `${only.split("/").pop() ?? only}.zip`
+  }
+  const roots = new Set(dropped.map((d) => d.path.split("/")[0]))
+  const [root] = roots
+  if (roots.size === 1 && root && dropped.some((d) => d.path.includes("/"))) {
+    return `${root}.zip`
+  }
+  return `dropped-${dropped.length}-files.zip`
+}
+
+/**
+ * Zip a flat list of {@link DroppedFile}s into one archive `File`, preserving
+ * each entry's folder-relative path so a dropped directory tree round-trips
+ * intact. Built client-side with fflate (DEFLATE level 6). Rejects if fflate
+ * fails or a file can't be read.
+ */
+export function zipDropped(dropped: DroppedFile[]): Promise<File> {
   return Promise.all(
-    files.map(async (f) => [f.name, new Uint8Array(await f.arrayBuffer())] as const),
+    dropped.map(async (d) => [d.path, new Uint8Array(await d.file.arrayBuffer())] as const),
   ).then(
     (entries) =>
       new Promise<File>((resolve, reject) => {
@@ -52,9 +153,7 @@ export function zipFiles(files: File[]): Promise<File> {
             reject(err)
             return
           }
-          const zipName =
-            files.length === 1 && files[0] ? `${files[0].name}.zip` : `dropped-${files.length}-files.zip`
-          resolve(new File([out], zipName, { type: "application/zip" }))
+          resolve(new File([out], zipName(dropped), { type: "application/zip" }))
         })
       }),
   )

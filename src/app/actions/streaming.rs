@@ -91,6 +91,9 @@ pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>)
     };
     apply_token_usage(state, &usage, &cost);
 
+    // Append per-tick cost row (consumes tick_telemetry populated at stream start)
+    crate::app::run::tools::cost_log::append_cost_tsv(state);
+
     // Correct the estimated tokens with actual output tokens on Conversation context and update timestamp
     if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
         // Remove our estimate, add actual

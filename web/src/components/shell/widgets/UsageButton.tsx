@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Loader2, ExternalLink, CheckCircle2, XCircle, LogIn, RefreshCw } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
@@ -130,20 +130,34 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
 
   // Auto-detect login completion via the callback listener.
   // Polls token status every 2s while waiting for the browser redirect.
+  // A pre-existing (possibly stale) token must NOT be mistaken for "just logged
+  // in" — otherwise the flow auto-completes before the user pastes a fresh code
+  // (T472). We snapshot the expiry at the moment login starts and only accept a
+  // token whose expiry has strictly advanced (a genuinely new credential).
   const stableOnDone = useCallback(onDone, [onDone])
+  const baselineExpiryRef = useRef<number | null>(null)
   useEffect(() => {
     if (step !== "waiting_for_code") return
+    let cancelled = false
+    // Record the starting expiry once, before polling begins.
+    if (baselineExpiryRef.current === null) {
+      void fetchClaudeTokenStatus()
+        .then((s) => { if (!cancelled) baselineExpiryRef.current = s.valid ? (s.expires_at ?? 0) : 0 })
+        .catch(() => { if (!cancelled) baselineExpiryRef.current = 0 })
+    }
     const id = setInterval(async () => {
       try {
         const status = await fetchClaudeTokenStatus()
-        if (status.valid) {
+        const baseline = baselineExpiryRef.current ?? 0
+        // Only a valid token with a NEWER expiry than the baseline is a fresh login.
+        if (status.valid && (status.expires_at ?? 0) > baseline) {
           clearInterval(id)
           setStep("done")
           setTimeout(stableOnDone, 1500)
         }
       } catch { /* ignore polling errors */ }
     }, 2000)
-    return () => clearInterval(id)
+    return () => { cancelled = true; clearInterval(id) }
   }, [step, stableOnDone])
 
   if (step === "idle" || step === "starting") {

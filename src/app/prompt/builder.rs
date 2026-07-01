@@ -124,6 +124,15 @@ pub(crate) fn assemble_prompt(
     // Done here (not in providers) so the CSV dump captures the actual wire structure.
     ensure_message_alternation(&mut api_messages);
 
+    // ── Phase 4: Tool-pairing repair ──────────────────────────
+    // Authoritative guarantee of the Anthropic adjacency invariant: every
+    // assistant `tool_use` must be answered by a `tool_result` in the
+    // IMMEDIATELY following user message. Phase 2's guards only check that a
+    // result exists *somewhere* later, which a reshuffled/truncated history can
+    // satisfy while still breaking adjacency. This pass self-heals such cases so
+    // an orphaned `tool_use` can never reach the API.
+    super::repair::repair_tool_pairing(&mut api_messages);
+
     api_messages
 }
 

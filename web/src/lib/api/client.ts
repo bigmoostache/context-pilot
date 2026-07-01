@@ -6,7 +6,14 @@
 // (throwOnError + responseStyle:'data').  `buildCommandEnvelope` wraps
 // a command kind in the wire-protocol envelope.
 
-export const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:7878"
+// Empty default = SAME-ORIGIN relative requests (`/api/...` against the page
+// origin). vite (dev) and the reverse proxy (prod/tailscale) forward `/api`
+// to the orchestrator on :7878. An absolute default (e.g. http://localhost:7878)
+// makes every call cross-origin: harmless for GETs but it forces a CORS
+// preflight on JSON POSTs, and under an HTTPS origin (tailscale) it is
+// mixed-content-blocked — which surfaced as GET-works / POST-404 on the
+// OAuth login+refresh routes. Set VITE_API_URL only to target a remote backend.
+export const BASE = import.meta.env.VITE_API_URL ?? ""
 
 /** localStorage key for the auth session token. */
 const TOKEN_KEY = "cp-auth-token"

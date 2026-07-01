@@ -6,7 +6,8 @@ use crate::infra::tools::ToolDefinition;
 use crate::infra::tools::refresh_conversation_context;
 use crate::modules;
 use crate::state::cache::hash_content;
-use crate::state::{Kind, Message, State};
+use crate::state::{Message, State};
+use cp_base::state::runtime::TickTelemetry;
 
 mod detach;
 
@@ -165,9 +166,22 @@ pub(super) fn prepare_stream_context(
     //
     // This replaces the former two-pass approach (queue freeze → breath freeze)
     // which suffered from snapshot desync between the passes.
+
+    // Pre-compute system + tools token prefix for tick telemetry
+    let system_tokens = crate::state::estimate_tokens(&get_active_agent_content(state));
+    let tools_tokens = modules::overview::context::estimate_tool_definitions_tokens(state);
+    let prompt_prefix_tokens = system_tokens.saturating_add(tools_tokens);
+
     {
         let mut cache_broken = false;
         let mut new_hash_list: Vec<String> = Vec::new();
+
+        // Culprit tracking for tick telemetry
+        let mut culprit_type: Option<String> = None;
+        let mut culprit_panel_idx: Option<usize> = None;
+        let mut culprit_max_freezes: u8 = 0;
+        let mut panel_token_counts: Vec<usize> = Vec::new();
+        let mut panel_idx: usize = 0;
 
         let hit_price = state.cache_hit_price_per_mtok();
         let miss_price = state.cache_miss_price_per_mtok();
@@ -185,7 +199,14 @@ pub(super) fn prepare_stream_context(
             let Some(entry) = entry else {
                 // Orphaned item (no Entry in state) — emit as-is, breaks cache
                 new_hash_list.push(format!("{}:{fresh_hash}", item.id));
+                if !cache_broken {
+                    culprit_panel_idx = Some(panel_idx);
+                    culprit_type = Some(item.id.clone());
+                    culprit_max_freezes = 0; // orphaned panel — no Entry, no max_freezes
+                }
                 cache_broken = true;
+                panel_token_counts.push(crate::state::estimate_tokens(&item.content));
+                panel_idx = panel_idx.saturating_add(1);
                 continue;
             };
 
@@ -211,6 +232,11 @@ pub(super) fn prepare_stream_context(
                     emitted_hash = entry.emitted.hash.clone().unwrap_or(fresh_hash);
                 } else {
                     // FRESH: emit new content (no snapshot, or policy says Fresh)
+                    if !cache_broken {
+                        culprit_panel_idx = Some(panel_idx);
+                        culprit_type = Some(entry.context_type.to_string());
+                        culprit_max_freezes = panel.max_freezes();
+                    }
                     entry.freeze_count = 0;
                     entry.emitted.hash = Some(fresh_hash.clone());
                     entry.total_cache_misses = entry.total_cache_misses.saturating_add(1);
@@ -227,6 +253,10 @@ pub(super) fn prepare_stream_context(
 
             // Cost tracking: build hash list for prefix-match
             new_hash_list.push(format!("{}:{emitted_hash}", item.id));
+
+            // Tick telemetry: track per-panel token counts for culprit decomposition
+            panel_token_counts.push(crate::state::estimate_tokens(&item.content));
+            panel_idx = panel_idx.saturating_add(1);
         }
 
         // Prefix-match for per-panel cache hit/miss cost tracking
@@ -246,6 +276,44 @@ pub(super) fn prepare_stream_context(
         }
 
         state.previous_panel_hash_list = new_hash_list;
+
+        // === Tick telemetry: culprit decomposition + freeze flags ===
+        let (tokens_before, tok_culprit, tokens_after) = culprit_panel_idx.map_or_else(
+            || {
+                let total: usize = panel_token_counts.iter().sum();
+                (total, 0, 0)
+            },
+            |ci| {
+                let before: usize = panel_token_counts.iter().take(ci).sum();
+                let culprit = panel_token_counts.get(ci).copied().unwrap_or(0);
+                let after: usize = panel_token_counts.iter().skip(ci.saturating_add(1)).sum();
+                (before, culprit, after)
+            },
+        );
+
+        // Last 3 tools: scan messages backward for ToolCall entries
+        let three_last_tools: String = state
+            .messages
+            .iter()
+            .rev()
+            .filter(|m| m.msg_type == crate::state::MsgKind::ToolCall)
+            .flat_map(|m| m.tool_uses.iter().map(|t| t.name.as_str()))
+            .take(3)
+            .collect::<Vec<_>>()
+            .join(",");
+
+        state.tick_telemetry = Some(TickTelemetry {
+            tick_start_ms: crate::app::panels::now_ms(),
+            three_last_tools,
+            culprit_type: culprit_type.unwrap_or_else(|| "none".to_string()),
+            tokens_before_culprit: prompt_prefix_tokens.saturating_add(tokens_before),
+            tokens_culprit: tok_culprit,
+            tokens_after_culprit: tokens_after,
+            queue_is_active: cond.queue_active,
+            tempo_is_active: cond.tempo,
+            no_panel_broken: !cache_broken,
+            culprit_max_freezes,
+        });
     }
 
     // Check if context has breached the threshold — may activate the reverie optimizer
@@ -369,86 +437,6 @@ pub(crate) fn build_stream_params(
     }
 }
 
-// ─── Initialization ─────────────────────────────────────────────────────────
-
-// Re-export agent/seed functions from prompt module
-pub(crate) use cp_mod_prompt::seed::{ensure_default_agent, get_active_agent_content};
-
-/// Assign a UID to a panel if it doesn't have one
-fn assign_panel_uid(state: &mut State, context_type: &str) {
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == context_type)
-        && ctx.uid.is_none()
-    {
-        ctx.uid = Some(format!("UID_{}_P", state.global_next_uid));
-        state.global_next_uid = state.global_next_uid.saturating_add(1);
-    }
-}
-
-/// Ensure all default context elements exist with correct IDs.
-/// Uses the module registry to determine which fixed panels to create.
-/// Conversation is special: it's always created but not numbered (no Px ID in sidebar).
-/// P1 = Todo, P2 = Library, P3 = Overview, P4 = Tree, P5 = Memory,
-/// P6 = Spine, P7 = Logs, P8 = Git, P9 = Scratchpad
-pub(crate) fn ensure_default_contexts(state: &mut State) {
-    // Ensure Conversation exists (special: no numbered Px, always first in context list)
-    if !state.context.iter().any(|c| c.context_type.as_str() == Kind::CONVERSATION) {
-        let elem = modules::make_default_entry("chat", Kind::new(Kind::CONVERSATION), "Chat", true);
-        state.context.insert(0, elem);
-    }
-
-    let defaults = modules::all_fixed_panel_defaults();
-
-    for (pos, d) in defaults.iter().enumerate() {
-        // Core modules always get their panels; non-core only if active
-        if !d.is_core && !state.active_modules.contains(d.module_id) {
-            continue;
-        }
-
-        // Skip if panel already exists
-        if state.context.iter().any(|c| c.context_type == d.context_type) {
-            continue;
-        }
-
-        // pos is 0-indexed in FIXED_PANEL_ORDER, but IDs start at P1
-        let id = format!("P{}", pos.saturating_add(1));
-
-        // Evict any dynamic panel squatting on this fixed panel's ID.
-        // This happens when a module is activated after dynamic panels already
-        // claimed the slot (e.g., module was inactive at boot → slot looked free
-        // → `next_available_context_id` assigned it to a dynamic panel → module
-        // activated later → collision). Two panels sharing one ID breaks the
-        // freeze system, cost tracking, and cache prefix matching.
-        let squatter_new_id = state
-            .context
-            .iter()
-            .any(|c| c.id == id && c.context_type != d.context_type)
-            .then(|| state.next_available_context_id());
-        if let Some(new_id) = squatter_new_id
-            && let Some(squatter) = state.context.iter_mut().find(|c| c.id == id && c.context_type != d.context_type)
-        {
-            log::warn!(
-                "Evicting panel '{}' (type={}) from ID {} → {new_id} to make room for fixed panel '{}'",
-                squatter.name,
-                squatter.context_type,
-                id,
-                d.display_name,
-            );
-            squatter.id = new_id;
-        }
-
-        let insert_pos = pos.saturating_add(1).min(state.context.len()); // +1 to account for Conversation at index 0
-        let elem = modules::make_default_entry(&id, d.context_type.clone(), d.display_name, d.cache_deprecated);
-        state.context.insert(insert_pos, elem);
-    }
-
-    // Assign UID to Conversation (needed for panels/ storage — it holds message_uids)
-    assign_panel_uid(state, Kind::CONVERSATION);
-
-    // Assign UIDs to all existing fixed panels (needed for panels/ storage)
-    // Library panels don't need UIDs (rendered from in-memory state)
-    for d in &defaults {
-        if d.context_type.as_str() != Kind::LIBRARY && state.context.iter().any(|c| c.context_type == d.context_type) {
-            assign_panel_uid(state, d.context_type.as_str());
-        }
-    }
-}
+/// Default context initialization (panel creation, UID assignment, agent seeds).
+mod init;
+pub(crate) use init::{ensure_default_agent, ensure_default_contexts, get_active_agent_content};

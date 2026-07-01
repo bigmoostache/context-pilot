@@ -7,7 +7,7 @@ pub(crate) mod events;
 /// Panel trait bridge: rendering, context collection, registry lookup.
 pub(crate) mod panels;
 /// Centralized prompt assembly for all LLM providers.
-pub(crate) mod prompt_builder;
+pub(crate) mod prompt;
 /// Reverie sub-agent: trigger, tools, and lifecycle.
 pub(crate) mod reverie;
 /// Main event loop, streaming, tool pipeline, watchers.
