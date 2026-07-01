@@ -2834,6 +2834,10 @@
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Phase 19: transport hub. Backend{view,breaker,hub,tickets,agents_dir} under Arc<Mutex>. serve(addr,state) = tiny_http acceptor, thread-per-request. route_rest dispatches GET /api/fleet|/agent/{id}|/agent/{id}/body/{hash}, POST /agent/{id}/command|/ticket. handle_stream: GET /api/stream?agent&ticket — redeem single-use ticket, spawn run_stream producer (Tailer.seed(last_rev) replay + gap→resync + hub frame drain + keepalive disconnect-probe, unsubscribe on exit). MAX_BODY 1MiB, STREAM_POLL 200ms. QueryParams + Last-Event-ID parsing. read_body binds _read; respond binds _sent (let-underscore-drop).'
   last_edited_ms: 0
+40aded260ed451e3:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: Cost Analysis dashboard page. Summary cards (total cost, ticks, avg/tick, hit rate), culprit donut, cost timeline, cost/tool bar charts, token distribution breakdown. Tempo/queue AND-filters with toggle pills. Tool×Culprit cross-tabulation table with row/column totals, HSL heat-map (green→red), hover info bar + row/col highlighting. Uses TanStack useQuery + fetchFsPreview with 15s refetch.
+  last_edited_ms: 1782922576475
 40d78bef84f55ac4:
   path: src/infra/mod.rs
   description: 'Re-exports: api, config, constants, flame (inline re-export of cp_base::flame init/flush), gh_watcher, profiler, tools, watcher. Infrastructure layer between app and core crates.'
