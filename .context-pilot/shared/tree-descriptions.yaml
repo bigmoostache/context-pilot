@@ -1966,6 +1966,10 @@
   path: crates/cp-mod-search/src/indexer.rs
   description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. RecommendedWatcher (FSEvents/inotify, event-driven, negligible CPU — replaced PollWatcher that consumed ~50% CPU via 3s recursive lstat).
   last_edited_ms: 1782461441205
+2d75a9ba4b79ab3c:
+  path: web/src/components/shell/TopBar.tsx
+  description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit/Costs), agent-config gear, UsageButton, account UserMenu. Costs tab dev-mode only with BarChart3 icon.'
+  last_edited_ms: 1782919968592
 2d7e540182272b0b:
   path: crates/cp-orchestrator/src/services/auth/store.rs
   description: AuthStore — SQLite-backed auth CRUD. Schema init (users/sessions/agent_acl), Argon2id hashing, token/UUID generation. User CRUD, session lifecycle (create/validate/revoke with lazy sweep). ACL ops extracted to sibling acl.rs.
@@ -5214,6 +5218,10 @@
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
   last_edited_ms: 0
+784d25132e5bb9f1:
+  path: web/src/components/shell/costs/charts.tsx
+  description: 'Pure SVG chart components for cost analysis: DonutChart (ring with legend), HBarChart (horizontal bars), CostTimeline (stacked area). fmtDollar/fmtTokens formatters. No external chart lib.'
+  last_edited_ms: 1782919921630
 785256eee19efadb:
   path: crates/cp-mod-memory/Cargo.toml
   description: 'Memory module deps: cp-base, cp-render, crossterm, serde, serde_json, cp-mod-utilities.'
@@ -6698,6 +6706,10 @@
   path: src/state/mod.rs
   description: 'Re-exports from cp_base (Entry, Kind, State, Message, etc.) + local submodules: cache, persistence'
   last_edited_ms: 0
+9a9606c615810f7a:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: Cost Analysis dashboard page. Summary cards (total cost, ticks, avg/tick, hit rate), culprit donut, cost timeline, cost/tool bar charts, token distribution breakdown. Uses TanStack useQuery + fetchFsPreview with 15s refetch.
+  last_edited_ms: 1782919921493
 9b02dc21e25cfee8:
   path: crates/cp-mod-git/Cargo.toml
   description: 'Git module deps: cp-base, cp-render, crossterm, serde_json, regex.'
@@ -9826,6 +9838,10 @@ e31c48c5949be594:
   path: crates/cp-console-server/src/protocol.rs
   description: JSON-line protocol types. Request (cmd/key/command/cwd/input/log_path). Response (ok/error/pid/status/exit_code/sessions). interpret_escapes() for \n/\t/\xHH.
   last_edited_ms: 0
+e31c517500107ea4:
+  path: web/src/components/shell/costs/parse.ts
+  description: 'TSV parser for cost-tracking.tsv. CostRow interface (15 fields), parseCostTsv(), aggregation helpers: computeSummary, culpritDistribution, costBreakdown, toolCostAttribution.'
+  last_edited_ms: 1782919921565
 e3aeea577e818def:
   path: web/src/components/finder/views/FinderViews.tsx
   description: Finder grid/list/gallery views + Head/Hero. Re-exports FOLDER_DRAG_MIME/MOVE_MIME/TagDots/ViewHandlers from ./shared and ColumnsView from ./ColumnsView (keeps existing importers stable after the <500 split). 273 lines.
@@ -10610,6 +10626,10 @@ f6930563c8606410:
   path: crates/cp-mod-todo/src/types.rs
   description: TodoStatus (Pending/InProgress/Done), TodoItem, TodoState with has_incomplete_todos() + incomplete_todos_summary()
   last_edited_ms: 0
+f6c698112d4c0e92:
+  path: web/src/App.tsx
+  description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) ?? fleetAgent. view/agent persisted to localStorage; effectiveView gates cockpit+costs behind devMode, falls back to fleet when no agent. Routes: fleet/threads/cockpit/costs/finder. T475: CostsView added.'
+  last_edited_ms: 1782919968661
 f6c892b08533ffb6:
   path: src/app/run/streaming.rs
   description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→on_stream_chunk hook (all modules)→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine.
