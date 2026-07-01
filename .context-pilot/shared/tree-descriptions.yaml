@@ -1694,6 +1694,10 @@
   path: crates/cp-mod-spine/Cargo.toml
   description: 'Spine module deps: cp-base, cp-render, cp-mod-utilities, crossterm, serde, serde_json.'
   last_edited_ms: 0
+27b225fd04306e6e:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 27de052b3e6f6387:
   path: crates/cp-mod-threads/src/tools.rs
   description: Thread tool handlers. execute_send/execute_read/build_panel_content. Archived threads filtered out of LLM-facing context (build_panel_content + execute_read summaries) so archived threads are invisible to the model. MAX caps on content/file-path/questions/panel-messages.
@@ -8106,6 +8110,10 @@ ba9dfa7e8b3f443f:
   path: web/src/components/finder/FinderChrome.tsx
   description: 'Finder chrome: tab strip, main toolbar (nav/crumbs/view-switch/search/icon-size slider), left sidebar, path bar. FinderSidebar: Favorites + Locations + Pinned (drag-drop target). No Get Info / Maximize2 / onFileGetInfo. File-active toolbar: Download + Share only.'
   last_edited_ms: 1781875562782
+baa8c6f8b57d2225:
+  path: web/src/lib/api/client.ts
+  description: 'Shared REST client primitives: BASE url (VITE_API_URL ?? "" = SAME-ORIGIN relative /api; absolute default removed — it forced CORS preflight on JSON POSTs and mixed-content-blocked under HTTPS/tailscale, which surfaced as GET-works/POST-404 on OAuth login+refresh). Token helpers getToken/setToken (localStorage cp-auth-token). sdk<T>() cast for generated client. buildCommandEnvelope wraps a Kind in the wire envelope.'
+  last_edited_ms: 1782909311582
 bab9d0cd28f2d236:
   path: ui/src/lib/finderFs.ts
   description: Finder mock fs + helpers. buildRealm grafts one rich tree (src/modules nesting, docs, media/ w/ mp4+m4a, planning) onto an agent folder. tags/created/starred/media payloads + PEAKS waveform. findNode/pathChain/collectStarred/nodeSize/childCounts/fmtBytes/sortNodes.
