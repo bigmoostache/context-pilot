@@ -230,6 +230,10 @@
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread input composer. MY_TURN: real textarea with onSend (Enter=submit, Shift+Enter=newline). Non-MY_TURN: working spinner (ACTIVE green vs THEIR_TURN signal).'
   last_edited_ms: 1781694593910
+05036346122bda2a:
+  path: src/app/context/init.rs
+  description: 'Context initialization: ensure_default_contexts (fixed panel creation, UID assignment, squatter eviction), assign_panel_uid, re-exports ensure_default_agent + get_active_agent_content from prompt module.'
+  last_edited_ms: 1782919010004
 050fc180b0f4e75f:
   path: src/ui/threads_view/mod.rs
   description: Threads view layout + list rendering. Renders over visible_indices(viewing_archived) filtered list; virtual '+ New Thread' only in active view; ARCHIVED header tag + empty-state hint in archived view; view-aware help/confirm hints (Ctrl+A arch/restore, Ctrl+U toggle). maybe_activate_thread_question resolves selection via visible list.
@@ -450,6 +454,10 @@
   path: ui/src/lib/mock.ts
   description: 'Mock session data: panels, tokenBudget, messages, threads, threadDetails (5 convos each with agentId), agents (3 workspaces=folders, each with a task summary), fileTree (agent-badged), activeAgentId.'
   last_edited_ms: 1781519105489
+0a84bb89a9882546:
+  path: src/app/run/tools/pipeline.rs
+  description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. No PendingForm guard or __QUESTION_PENDING__ block. flame!("tool_pipeline") + flame!("callbacks").
+  last_edited_ms: 0
 0a90a19323c4050c:
   path: crates/cp-render/src/markdown.rs
   description: Shared markdown→IR parser. to_blocks() (fenced code blocks, headers, bullets, inline). parse_line() (single line). parse_inline() (bold, code, links). Used by skill panels + conversation renderer.
@@ -1710,6 +1718,10 @@
   path: docs/talk/slides/2-4.html
   description: 'Slide: Feedbacks & Constraints with control theory (HOWs section)'
   last_edited_ms: 1781078806788
+282c1bf19c57aef0:
+  path: src/app/context/mod.rs
+  description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
+  last_edited_ms: 0
 28535222aec6d878:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -4130,6 +4142,10 @@
   path: src/app/context/detach.rs
   description: 'Splits old messages into frozen ConversationHistory panels. flame!("detach"). Turn-boundary detection. Min-messages/tokens constraints for chunk+tip. Freeze-aware: skips detach when queue active or tempo holding. Deletes detached messages from disk. Loop for multi-chunk detach.'
   last_edited_ms: 0
+606dbf0115106230:
+  path: crates/cp-base/src/state/runtime.rs
+  description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
+  last_edited_ms: 0
 607906bc49079830:
   path: crates/cp-base/src/modules.rs
   description: Module trait — pluggable functionality contract. init/save/load state, tool definitions/execution/pre-flight, panel creation, overview delegation, lifecycle hooks (on_user_message/stream_stop/tool_progress), file watcher integration.
@@ -4517,6 +4533,10 @@
 68cbe83e88995a59:
   path: src/ui/input.rs
   description: Renders question form and @autocomplete popup overlays. calculate_question_form_height, render_question_form, calculate_autocomplete_height, render_autocomplete_popup. Consumes QuestionForm/Autocomplete IR data directly.
+  last_edited_ms: 0
+6901f0ab9bfa4b82:
+  path: src/app/actions/streaming.rs
+  description: 'Streaming action handlers: AppendChars (typewriter), StreamDone (token accounting, cache correction), StreamError (logging, truncation). Per-stream/total/tick token accumulation in apply_token_usage().'
   last_edited_ms: 0
 69149eebca7aefd8:
   path: crates/cp-orchestrator/src/services/materialized_view.rs
@@ -5354,6 +5374,10 @@
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
   last_edited_ms: 0
+7bfdf84afc2e98a0:
+  path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
+  description: 'Claude Code OAuth helpers — usage proxy, token status (incl account_email via /api/oauth/profile), PKCE login (start/complete), token refresh. T474 canonical-fix: TOKEN_URL = claude.ai/v1/oauth/token (NOT console.anthropic.com — that returns 404). TOKEN_USER_AGENT ''claude-cli/2.1.196 (external, cli)'' sent on BOTH exchange_and_store + refresh_login.'
+  last_edited_ms: 1782911208462
 7c0e1b66c796df68:
   path: crates/cp-oplog/src/service.rs
   description: 'Phase 8 (X775) GAP2: OplogService off-loop group-commit + asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate=BestEffort, all else (incl 4 thread-roster mutations + Unknown)=Durable. THREE submit paths: append_durable (blocks+awaits sync, returns rev — intake/I11 path), submit_durable (NON-blocking durable, detached ack — I2 main-loop path: enqueue now, group-commit+fdatasync off-loop, never dropped), append_best_effort (try_send drop-on-full — hot phase/cost). commit_loop drains batch, ONE fdatasync, releases acks. 8 tests incl submit_durable_persists_without_awaiting_the_sync.'
@@ -5933,6 +5957,10 @@
 88c3cb1cd35df948:
   path: src/ui/mod.rs
   description: Top-level render() with flame!("render"). IR frame build → sidebar + content panel + status bar + overlays (perf from IR, autocomplete from IR, config from IR, search index from IR). All overlays consume IR data.
+  last_edited_ms: 0
+88c6a0bcc93d1e81:
+  path: src/app/run/mod.rs
+  description: 'Sub-module declarations. 7 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), threads (thread helpers), tools (execution pipeline), watchers (file/GH).'
   last_edited_ms: 0
 88eafab0f0d49a30:
   path: crates/cp-orchestrator/src/services/auth/backup.rs
@@ -6873,6 +6901,10 @@
 9f25040a076276e9:
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. Tabs+history+nav+selection+drag-drop+statusbar+marquee. PinnedFolder type + loadPins/pinsKey localStorage helpers (key cp-finder-pins:<agentId>); pins state persisted via useEffect; addPin/removePin. ColumnsView called with live-Miller props (agentId/agentFolder/chain/currentNodes/onNavigate). FinderSidebar + ContextMenu wired with onPin/onUnpin. Four view modes, keyboard control.
+  last_edited_ms: 0
+9f3e556635dc35c7:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 9f4a2e56b8f9925a:
   path: clippy.toml
@@ -8830,6 +8862,10 @@ cad059175f38fce1:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: MAX_CONTENT_BYTES=100K, MAX_FILE_PATH_BYTES=1K, MAX_STORED_QUESTIONS=50 caps. execute_read: single-pass unack count+previews via inspect(). build_panel_content: MAX_PANEL_MESSAGES=50 cap. format_age helper.'
   last_edited_ms: 0
+caf2ca4d3f48b4d6:
+  path: src/app/run/tools/cost_log.rs
+  description: Per-tick cost-tracking TSV. append_cost_tsv() consumes TickTelemetry (culprit + token layout from stream start) + tick cost counters (from stream end), appends 15-column row to .context-pilot/logs/cost-tracking.tsv. Best-effort, never blocks pipeline.
+  last_edited_ms: 1782919010078
 cb25f09fa3660254:
   path: crates/cp-mod-files/src/tools/write.rs
   description: file_write tool. flame!("file_write"). Creates parent dirs, writes content, updates/creates context Entry. Diff-style preview in result (first 20 lines).
@@ -9378,6 +9414,10 @@ d707bae8d2b9a7b6:
   path: ui/src/components/agents/PromptModal.tsx
   description: 'Prompts page modals (design-only). PromptModal: create (kind picker System/Skill/Command + name/description/body textarea) or view/edit (prefilled, mock .md body, built-in name lock, Delete). ImportModal: import from other agentic systems (Claude Code/Codex/Cursor/Windsurf/Aider/Continue), per-row Imported state. Shared hand-rolled Backdrop (backdrop-fade+modal-pop) + Field. Used by PromptsPage.'
   last_edited_ms: 1781532643659
+d70cd0e34e5cb681:
+  path: src/app/run/tools/mod.rs
+  description: 'Sub-module declarations: checks, cleanup, cost_log, pipeline, queue_flush, watchdog.'
+  last_edited_ms: 1782919010143
 d736a0dc22d9d164:
   path: web/src/components/finder/FinderChrome.tsx
   description: 'Finder chrome: tab strip, main toolbar (nav/crumbs/view-switch/search/icon-size/actions), path bar + NavBtn/SegBtn. FinderSidebar extracted to support/FinderSidebar and re-exported. 372 lines.'
