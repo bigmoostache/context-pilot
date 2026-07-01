@@ -2006,6 +2006,10 @@
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped) opened by any chip. T304: passes draftKey. T331: passes pendingFiles + onRemoveFile to ThreadComposer. T334: onShowInFinder forwarded to Message. T348: useLibrary(agentId) → command suggestions (kind===''command'', /${id}) passed to composer ONLY for an empty thread (thread.log.length===0). Takes agentId + onAttach props.'
   last_edited_ms: 0
+2f9fc47b53a54368:
+  path: web/src/components/agents/AgentModal.tsx
+  description: 'Agent create/manage dialog. useProviders() fetches registry. Manage: 2-col — left name+ModelPicker, right SessionVitals+ACL. T457: syncedRef useEffect back-fills provId/modelId once providers load (cold-refresh race: useState initializers ran while registry empty → picker showed nothing selected on page refresh). Submit sends Configure + rename.'
+  last_edited_ms: 1782900503007
 2fa918f340b5a63e:
   path: crates/cp-wire/src/types/command.rs
   description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, PauseThread, ResumeThread, DeleteThread, DeleteMessage{thread_id,message_ts}, InterruptStream, Stop, Configure{provider,model}, Unknown). Frame{schema_version, auth, command}. PauseThread/ResumeThread added for T371. DeleteThread added for T371 permanent delete. DeleteMessage added for T416 per-message delete.
@@ -7262,6 +7266,10 @@ a9bc55981ceaf2b4:
   path: crates/cp-mod-console/src/lib.rs
   description: 'Console module. 5 tools. Dynamic console panels. init: find/create Unix socket server. save/load: session reconnection + orphan cleanup. Leaks stdin on save to prevent EOF. Tool visualizer for colored output.'
   last_edited_ms: 0
+a9c8aed7e2d3bf3f:
+  path: crates/cp-orchestrator/src/transport/inspect/providers.rs
+  description: 'LLM provider+model registry endpoint (GET /api/providers). 8 providers with full pricing/context. Single source of truth. T457: resolve_api_name(provider_id, model_id)→apiName bridges config.json enum ids (claude-opus48) to the picker''s apiName form (claude-opus-4-8) for the shaped agent DTO.'
+  last_edited_ms: 1782900502971
 a9d6bd46b079f53d:
   path: crates/cp-orchestrator/tests/transport_http.rs
   description: Phase 30 transport surface tests over a real tiny_http server (4 tests). ticket_mint_and_command_status_codes now asserts a tripped breaker blocks a cost-incurring send_message (503) but NOT a control-plane stop (≠503, reaches delivery). REST rev-envelope+404, SSE ticket gate single-use, Last-Event-ID replay.
@@ -9942,6 +9950,10 @@ ea48175aab4e8b6b:
   path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
   description: 'Claude Code OAuth helpers — usage proxy (GET /api/claude-usage), token status (GET /api/claude-login/status), PKCE login flow (POST /start + /complete). Manual code-paste flow: user copies code from Anthropic page, pastes in popover. Reads/writes macOS Keychain + ~/.claude/.credentials.json. PkceSession stored in Backend.'
   last_edited_ms: 1782847620925
+ea48b9b369e6f45c:
+  path: crates/cp-orchestrator/src/transport/inspect/meta.rs
+  description: 'Enriched agent-meta endpoints. agent_meta/fleet_meta/fleet_retired build maquette Agent: registry record + view phase/lifecycle/cost + tokens + context occupancy + threads + git branch + provider. T457: `model` now resolved from config.json per-provider model field via read_current_model()→providers::resolve_api_name (was stale entry.model=claude-opus-4-6 for all agents); field picked by provider (anthropic-family→anthropic_model, claudecodev2→claude_code_v2_model, etc.), falls back to entry.model. read_provider reads modules.core.llm_provider. Name overrides + derive_status/accent.'
+  last_edited_ms: 1782900502894
 ea6462c730d476d5:
   path: crates/cp-orchestrator/src/transport/sse.rs
   description: 'Phase 19: SSE plumbing. SseMessage{id:Option<rev>,event,data}.encode() → id:/event:/data: lines (multiline data split per SSE grammar). delta(rev)/stream/resync constructors. encode_comment keepalive. SseBody: blocking Read fed by mpsc Receiver<Vec<u8>>, refills on exhaust, Ok(0) EOF when all senders dropped — fits tiny_http pump. SseSink.send/keep_alive (Err = client gone = producer stop signal). channel() pairs them. Reconnect-replay-by-rev native via Last-Event-ID. 7 tests.'
