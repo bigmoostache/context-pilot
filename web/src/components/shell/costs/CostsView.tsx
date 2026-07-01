@@ -371,9 +371,9 @@ function ApiTokenDistribution({ rows }: { rows: CostRow[] }) {
     )
   }
 
-  const avgHit = broken.reduce((s, r) => s + r.hitTokens, 0) / broken.length
-  const avgMiss = broken.reduce((s, r) => s + r.missTokens, 0) / broken.length
-  const avgOut = broken.reduce((s, r) => s + r.outTokens, 0) / broken.length
+  const avgHit = Math.round(broken.reduce((s, r) => s + r.hitTokens, 0) / broken.length)
+  const avgMiss = Math.round(broken.reduce((s, r) => s + r.missTokens, 0) / broken.length)
+  const avgOut = Math.round(broken.reduce((s, r) => s + r.outTokens, 0) / broken.length)
   const total = avgHit + avgMiss + avgOut
 
   const segments = [
@@ -414,8 +414,8 @@ function ApiTokenDistribution({ rows }: { rows: CostRow[] }) {
   )
 }
 
-function TokenDistribution({ rows }: { rows: { tokensBefore: number; tokensCulprit: number; tokensAfter: number }[] }) {
-  const broken = rows.filter((r) => r.tokensCulprit > 0)
+function TokenDistribution({ rows }: { rows: CostRow[] }) {
+  const broken = rows.filter((r) => !r.noPanelBroken)
 
   if (broken.length === 0) {
     return (
@@ -430,9 +430,9 @@ function TokenDistribution({ rows }: { rows: { tokensBefore: number; tokensCulpr
     )
   }
 
-  const avgBefore = broken.reduce((s, r) => s + r.tokensBefore, 0) / broken.length
-  const avgCulprit = broken.reduce((s, r) => s + r.tokensCulprit, 0) / broken.length
-  const avgAfter = broken.reduce((s, r) => s + r.tokensAfter, 0) / broken.length
+  const avgBefore = Math.round(broken.reduce((s, r) => s + r.tokensBefore, 0) / broken.length)
+  const avgCulprit = Math.round(broken.reduce((s, r) => s + r.tokensCulprit, 0) / broken.length)
+  const avgAfter = Math.round(broken.reduce((s, r) => s + r.tokensAfter, 0) / broken.length)
   const total = avgBefore + avgCulprit + avgAfter
 
   const segments = [
