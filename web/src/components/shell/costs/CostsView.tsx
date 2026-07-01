@@ -22,13 +22,15 @@ export function CostsView({ agentId }: { agentId: string }) {
   // ── Filters ───────────────────────────────────────────────────────────────
   const [tempoFilter, setTempoFilter] = useState<"all" | "0" | "1">("all")
   const [queueFilter, setQueueFilter] = useState<"all" | "0" | "1">("all")
+  const [breakFilter, setBreakFilter] = useState<"all" | "0" | "1">("all")
 
   const filtered = useMemo(() => {
     let r = rows
     if (tempoFilter !== "all") r = r.filter((x) => (tempoFilter === "1") === x.tempoActive)
     if (queueFilter !== "all") r = r.filter((x) => (queueFilter === "1") === x.queueActive)
+    if (breakFilter !== "all") r = r.filter((x) => (breakFilter === "1") === x.noPanelBroken)
     return r
-  }, [rows, tempoFilter, queueFilter])
+  }, [rows, tempoFilter, queueFilter, breakFilter])
 
   const summary = useMemo(() => computeSummary(filtered), [filtered])
   const culprits = useMemo(() => culpritDistribution(filtered), [filtered])
@@ -65,7 +67,7 @@ export function CostsView({ agentId }: { agentId: string }) {
           <h2 className="text-[17px] font-bold tracking-tight text-foreground">Cost Analysis</h2>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
             Per-tick cache efficiency and spend breakdown · {summary.totalTicks} ticks
-            {(tempoFilter !== "all" || queueFilter !== "all") && ` (filtered from ${rows.length})`}
+            {(tempoFilter !== "all" || queueFilter !== "all" || breakFilter !== "all") && ` (filtered from ${rows.length})`}
           </p>
         </div>
 
@@ -73,6 +75,7 @@ export function CostsView({ agentId }: { agentId: string }) {
         <div className="flex flex-wrap items-center gap-4">
           <FilterGroup label="Tempo" value={tempoFilter} onChange={setTempoFilter} />
           <FilterGroup label="Queue" value={queueFilter} onChange={setQueueFilter} />
+          <FilterGroup label="No break" value={breakFilter} onChange={setBreakFilter} />
         </div>
 
         {/* ── Summary cards ───────────────────────────────────────── */}
