@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { fetchFsPreview } from "@/lib/api/finder"
-import { parseCostTsv, computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, crossTabToolCulprit } from "./parse"
+import { parseCostTsv, computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, crossTabToolCulprit, buildMarkdownReport } from "./parse"
 import { DonutChart, HBarChart, CostTimeline, fmtDollar, fmtTokens } from "./charts"
 
 /**
@@ -38,6 +38,19 @@ export function CostsView({ agentId }: { agentId: string }) {
   const tools = useMemo(() => toolCostAttribution(filtered), [filtered])
   const crossTab = useMemo(() => crossTabToolCulprit(filtered), [filtered])
 
+  const [copied, setCopied] = useState(false)
+  const handleCopy = useCallback(() => {
+    const md = buildMarkdownReport(filtered, rows.length, {
+      tempo: tempoFilter,
+      queue: queueFilter,
+      noBreak: breakFilter,
+    })
+    navigator.clipboard.writeText(md).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }, [filtered, rows.length, tempoFilter, queueFilter, breakFilter])
+
   if (isLoading) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground">
@@ -63,12 +76,20 @@ export function CostsView({ agentId }: { agentId: string }) {
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-6">
         {/* ── Header ──────────────────────────────────────────────── */}
-        <div>
-          <h2 className="text-[17px] font-bold tracking-tight text-foreground">Cost Analysis</h2>
-          <p className="mt-0.5 text-[12px] text-muted-foreground">
-            Per-tick cache efficiency and spend breakdown · {summary.totalTicks} ticks
-            {(tempoFilter !== "all" || queueFilter !== "all" || breakFilter !== "all") && ` (filtered from ${rows.length})`}
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-[17px] font-bold tracking-tight text-foreground">Cost Analysis</h2>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
+              Per-tick cache efficiency and spend breakdown · {summary.totalTicks} ticks
+              {(tempoFilter !== "all" || queueFilter !== "all" || breakFilter !== "all") && ` (filtered from ${rows.length})`}
+            </p>
+          </div>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            {copied ? "✓ Copied" : "Copy as Markdown"}
+          </button>
         </div>
 
         {/* ── Filters ─────────────────────────────────────────────── */}

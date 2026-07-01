@@ -190,6 +190,130 @@ export function crossTabToolCulprit(rows: CostRow[]): CrossTab {
   }
 }
 
+// ── Markdown export ─────────────────────────────────────────────────────────
+
+/** Minimal dollar formatter for markdown. */
+function md$(v: number): string {
+  return v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`
+}
+
+/** Minimal token formatter for markdown. */
+function mdTok(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`
+  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`
+  return String(Math.round(v))
+}
+
+/** Serialize the current filtered view as a clean markdown report. */
+export function buildMarkdownReport(
+  filtered: CostRow[],
+  totalRows: number,
+  filters: { tempo: string; queue: string; noBreak: string },
+): string {
+  const s = computeSummary(filtered)
+  const culprits = culpritDistribution(filtered)
+  const costs = costBreakdown(filtered)
+  const tools = toolCostAttribution(filtered)
+  const ct = crossTabToolCulprit(filtered)
+  const broken = filtered.filter((r) => !r.noPanelBroken)
+
+  const lines: string[] = []
+  const push = (...l: string[]) => lines.push(...l)
+
+  // Header
+  push("# Cost Analysis Report", "")
+  const fParts: string[] = []
+  if (filters.tempo !== "all") fParts.push(`Tempo=${filters.tempo === "1" ? "On" : "Off"}`)
+  if (filters.queue !== "all") fParts.push(`Queue=${filters.queue === "1" ? "On" : "Off"}`)
+  if (filters.noBreak !== "all") fParts.push(`NoBreak=${filters.noBreak === "1" ? "On" : "Off"}`)
+  if (fParts.length > 0) push(`**Filters:** ${fParts.join(", ")}`)
+  push(`**Ticks:** ${s.totalTicks}${s.totalTicks !== totalRows ? ` (filtered from ${totalRows})` : ""}`, "")
+
+  // Summary
+  push("## Summary", "")
+  push("| Metric | Value |", "|--------|-------|")
+  push(`| Total cost | ${md$(s.totalCost)} |`)
+  push(`| LLM ticks | ${s.totalTicks.toLocaleString()} |`)
+  push(`| Avg cost / tick | ${md$(s.avgCostPerTick)} |`)
+  push(`| Cache hit rate | ${(s.cacheHitRate * 100).toFixed(1)}% |`)
+  push(`| Clean ticks | ${s.ticksClean} |`)
+  push(`| Break ticks | ${s.ticksWithBreak} |`)
+  push(`| Total hit tokens | ${mdTok(s.totalHitTokens)} |`)
+  push(`| Total miss tokens | ${mdTok(s.totalMissTokens)} |`)
+  push(`| Total output tokens | ${mdTok(s.totalOutTokens)} |`)
+  push("")
+
+  // Culprit distribution
+  if (culprits.length > 0) {
+    const totalCount = culprits.reduce((a, b) => a + b.value, 0)
+    push("## Cache Break Culprits", "")
+    push("| Culprit | Count | % |", "|---------|-------|---|")
+    for (const c of culprits) {
+      push(`| ${c.label} | ${c.value} | ${((c.value / totalCount) * 100).toFixed(1)}% |`)
+    }
+    push("")
+  }
+
+  // Cost breakdown
+  push("## Cost by Category", "")
+  push("| Category | Cost |", "|----------|------|")
+  for (const c of costs) push(`| ${c.label} | ${md$(c.value)} |`)
+  push("")
+
+  // Tool attribution
+  if (tools.length > 0) {
+    push("## Top Tools by Associated Cost", "")
+    push("| Tool | Cost |", "|------|------|")
+    for (const t of tools) push(`| ${t.label} | ${md$(t.value)} |`)
+    push("")
+  }
+
+  // Token distribution (panel-based)
+  if (broken.length > 0) {
+    const avgBefore = Math.round(broken.reduce((a, r) => a + r.tokensBefore, 0) / broken.length)
+    const avgCulprit = Math.round(broken.reduce((a, r) => a + r.tokensCulprit, 0) / broken.length)
+    const avgAfter = Math.round(broken.reduce((a, r) => a + r.tokensAfter, 0) / broken.length)
+    push(`## Token Layout — Panel-Estimated (${broken.length} break ticks)`, "")
+    push("| Segment | Avg tokens |", "|---------|-----------|")
+    push(`| Before culprit | ${mdTok(avgBefore)} |`)
+    push(`| Culprit panel | ${mdTok(avgCulprit)} |`)
+    push(`| After culprit | ${mdTok(avgAfter)} |`)
+    push("")
+
+    // Token distribution (API-reported)
+    const avgHit = Math.round(broken.reduce((a, r) => a + r.hitTokens, 0) / broken.length)
+    const avgMiss = Math.round(broken.reduce((a, r) => a + r.missTokens, 0) / broken.length)
+    const avgOut = Math.round(broken.reduce((a, r) => a + r.outTokens, 0) / broken.length)
+    push(`## Token Layout — API-Reported (${broken.length} break ticks)`, "")
+    push("| Segment | Avg tokens |", "|---------|-----------|")
+    push(`| Cache hit | ${mdTok(avgHit)} |`)
+    push(`| Cache miss | ${mdTok(avgMiss)} |`)
+    push(`| Output | ${mdTok(avgOut)} |`)
+    push("")
+  }
+
+  // Cross-tab
+  if (ct.tools.length > 0 && ct.culprits.length > 0) {
+    push("## Tool × Culprit Cross-Tab", "")
+    const hdr = ["Tool", ...ct.culprits, "Total"]
+    push(`| ${hdr.join(" | ")} |`)
+    push(`|${hdr.map(() => "------").join("|")}|`)
+    for (const tool of ct.tools) {
+      const cells = ct.culprits.map((c) => String(ct.cells.get(`${tool}\t${c}`) ?? 0))
+      const rowTotal = ct.culprits.reduce((a, c) => a + (ct.cells.get(`${tool}\t${c}`) ?? 0), 0)
+      push(`| ${tool} | ${cells.join(" | ")} | ${rowTotal} |`)
+    }
+    // Totals row
+    const colTotals = ct.culprits.map((c) =>
+      String(ct.tools.reduce((a, t) => a + (ct.cells.get(`${t}\t${c}`) ?? 0), 0)),
+    )
+    push(`| **Total** | ${colTotals.join(" | ")} | **${filtered.length}** |`)
+    push("")
+  }
+
+  return lines.join("\n")
+}
+
 /** Per-tool cost attribution (from the three_last_tools column). */
 export function toolCostAttribution(rows: CostRow[]): Slice[] {
   const map = new Map<string, number>()
