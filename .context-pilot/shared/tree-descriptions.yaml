@@ -4630,6 +4630,10 @@
   path: crates/cp-mod-todo/src/tools.rs
   description: Todo CRUD tools with flame!("todo_create"), flame!("todo_update"), flame!("todo_move"). Nested parent_id validation. Status propagation (in_progress auto-cascades to parents). Orphan protection on delete. Move reorder with after_id.
   last_edited_ms: 0
+6bdca67578588d92:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 6bde556a54d79592:
   path: crates/cp-mod-scratchpad/src/types.rs
   description: ScratchpadCell (id/title/content), ScratchpadState (cells + next_id counter) with ext accessors
