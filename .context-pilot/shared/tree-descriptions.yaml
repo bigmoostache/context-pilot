@@ -3802,6 +3802,10 @@
   path: crates/cp-mod-chat/src/server.rs
   description: Global Tuwunel homeserver lifecycle. PID/socket/config file management. UDS HTTP helpers (get/post/put). pre_start_daemon() for parallel boot. ensure_daemon_running() + start_server(state). Geometric backoff health polling (50ms→500ms cap, 15s budget).
   last_edited_ms: 0
+58411c16ad9a129a:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: 'REST resource handlers. fleet() filtered by ACL. command() dispatches. rename/avatar/threads/body. claude_usage()/token_status()/login_start()/login_complete()/refresh_login() for Claude OAuth (T451). resolve_entry. Submodules: backend, claude_oauth, create, env_keys, lifecycle, releases, thread_shape.'
+  last_edited_ms: 0
 5855c33b276e000e:
   path: ui/src/components/agents/AgentsView.tsx
   description: 'Agents launcher (mission control). 2-pane: FileBrowser | AgentDetail. Holds selected FsNode, defaults to active agent''s folder. findByPath DFS helper.'
@@ -4290,6 +4294,10 @@
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
   last_edited_ms: 0
+654ba9adfc91d9e8:
+  path: crates/cp-orchestrator/tests/openapi/main.rs
+  description: OpenAPI spec generator (integration test, --ignored). build_spec assembles schemas + paths. generate_openapi writes openapi.json. Acknowledges lib-only deps (incl reqwest, openssl).
+  last_edited_ms: 0
 655d8de2d1aa6116:
   path: web/src/components/panels/cockpit/StatsPanel.tsx
   description: Statistics panel — uses usePanels(agentId) for live context elements. Session stats/cache/tokenBudget remain mock (P16).
@@ -4618,6 +4626,10 @@
   path: web/src/components/threads/ThreadsView.tsx
   description: 'Threads view shell (list | conversation). handleSend/handleArchive/handleCreate via sendCommand. T298: handleAttach uploads each picked file to .uploads/ via uploadUnique (dedup) then posts one send_message carrying buildUploadMessage(N file-upload blocks); passes agentId + onAttach to ThreadConversation.'
   last_edited_ms: 1782045499828
+6c48194149979da1:
+  path: openapi.json
+  description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
+  last_edited_ms: 0
 6c4e626883182716:
   path: crates/cp-orchestrator/src/transport/stream.rs
   description: 'SSE producer loop (run_stream), extracted from transport/mod.rs to stay under the line budget. Tails one agent''s oplog (rev-numbered durable deltas) + stream-hub frames, pushes both down the SSE sink until disconnect. T123 cold-connect fix: a fresh subscriber (no Last-Event-ID) seeds the Tailer at the oplog HEAD (oplog_head_rev) so it rides only the live tail instead of replaying the whole history; reconnect seeds at last-seen rev for gap replay. T271 off-by-one fix: oplog_head_rev now returns Option<u64> (was u64 via unwrap_or(0)); on an EMPTY log (rev_head None) the cold-connect path leaves the tailer UNSEEDED rather than seed(0), so the agent''s very first append (rev 0) rides the live tail instead of being silently dropped (seed is an exclusive lower bound). 2 regression unit tests: cold_connect_on_empty_oplog_delivers_first_append + cold_connect_on_nonempty_oplog_skips_backlog. TAIL_REPOLL=5ms backstop (macOS FSEvents), KEEPALIVE=10s.'
@@ -5981,6 +5993,10 @@
 8afd34cd5395dd27:
   path: crates/cp-mod-utilities/src/time.rs
   description: Timestamp formatting/parsing. Hinnant civil_from_days, date +%z cached offset. RFC 3339, epoch conversions, local time. decompose_epoch_secs returns Local struct. Replaces chrono crate.
+  last_edited_ms: 0
+8b35fd94f50e6de7:
+  path: web/src/lib/support/models.ts
+  description: LLM provider+model frontend layer. Fetches from GET /api/providers, enriches with Lucide icons (ONLY frontend-maintained data). useProviders() TanStack hook. Lookup helpers (findProvider/findModel/defaultModel/resolveSelection/resolveFromApiName) take providers[] as first arg. ~171 lines (was ~374 hardcoded).
   last_edited_ms: 0
 8b363c97bebea9c4:
   path: src/modules/overview/mod.rs
@@ -8474,6 +8490,10 @@ c509a5f5c91dc5b3:
   path: ui/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). FleetDashboard at fleet altitude; threads/cockpit/finder per-agent. Cockpit = LeftRail + Conversation (RightInspector removed; stats now in header popup). openAgent switches agent→threads. Finder keyed by agent.id.
   last_edited_ms: 1781526515067
+c556077923349ae0:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 c55dd96275144452:
   path: docs/talk/style.css
   description: 'Slide deck global styles: CSS vars, transitions, dark/light slide themes, sidebar, timer'
@@ -8557,6 +8577,10 @@ c66ec2091c9bc84b:
 c6851a14a7a1ecb2:
   path: src/app/actions/helpers.rs
   description: Utility functions + switch_to_panel (scroll-preserving panel switch). clean_llm_id_prefix, parse_context_pattern, find_context_by_id, eject_cursor_from_sentinel.
+  last_edited_ms: 0
+c6875174eda167da:
+  path: crates/cp-orchestrator/tests/openapi/schemas_ext.rs
+  description: Transport-layer OpenAPI schemas — receipts, auth, env-keys, filesystem, FinderKind enum, LLM registry (ModelDef/ProviderDef), SSE delta protocol, release management, Claude Code usage+login (ClaudeTokenStatus/LoginStart/LoginComplete schemas).
   last_edited_ms: 0
 c6980419a55cfedc:
   path: crates/cp-orchestrator/src/transport/mod.rs
@@ -9797,6 +9821,10 @@ e610e21de8868286:
 e61686972a01c371:
   path: crates/cp-orchestrator/src/runtime.rs
   description: 'Phase P1: Runtime — env-driven Config (port/agents_dir/budget/scan_interval) + Runtime struct (shared Backend + config). start_driver() spawns bg thread: registry scan → per-agent Tailer poll → MaterializedView fold → CostBreaker observe, on configurable cadence. serve() blocks on HTTP transport. driver_loop/process_registry_events/tail_all_agents helpers. 1 test.'
+  last_edited_ms: 0
+e62d724617c344d9:
+  path: crates/cp-orchestrator/src/main.rs
+  description: 'Backend entry point. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + X896 new-agent realm root + agent binary, creates Runtime, starts driver thread, serves HTTP (blocking). `use <crate> as _` block acknowledges lib-only deps in the bin target (per-target unused-crate-dependencies forbid): incl argon2, rusqlite, portable_pty, calamine, csv, reqwest, openssl.'
   last_edited_ms: 0
 e6320611c8e9f107:
   path: ui/src/components/ui/sheet.tsx
