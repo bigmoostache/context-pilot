@@ -163,8 +163,9 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
     return (
       <div className="space-y-3">
         <p className="text-[12px] text-muted-foreground">
-          After authorizing, your browser will show a <em>"can't connect"</em> page — that's
-          normal! Copy the full URL from the address bar and paste it below:
+          After authorizing, Anthropic will show you a code. Copy the
+          full <code className="text-[11px] bg-muted px-1 rounded">code#state</code> string
+          and paste it below:
         </p>
         <a
           href={authorizeUrl}
