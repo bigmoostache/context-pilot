@@ -39,7 +39,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`)
   }
-  const res = await fetch(`${BASE}${path}`, { ...init, headers })
+  const res = await fetch(`${BASE}${path}`, { ...init, headers }) // ok:manual — helper for endpoints whose shapes diverge from the contract
   if (res.status === 401 && token) {
     setToken(null)
     window.dispatchEvent(new Event("cp-auth-expired"))

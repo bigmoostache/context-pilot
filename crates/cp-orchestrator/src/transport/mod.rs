@@ -342,8 +342,12 @@ fn route_rest(
         (Method::Post, ["api", "releases", "restart-orchestrator"]) => rest::restart_orchestrator(state),
         (Method::Delete, ["api", "releases", tag]) => rest::delete_release(state, tag),
 
-        // ── Claude Code usage (OAuth) ──────────────────────────────
+        // ── Claude Code usage + login (OAuth) ───────────────────────
         (Method::Get, ["api", "claude-usage"]) => rest::claude_usage(),
+        (Method::Get, ["api", "claude-login", "status"]) => rest::token_status(),
+        (Method::Post, ["api", "claude-login", "start"]) => rest::login_start(state),
+        (Method::Post, ["api", "claude-login", "complete"]) => rest::login_complete(state, body_bytes),
+        (Method::Post, ["api", "claude-login", "refresh"]) => rest::refresh_login(),
 
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },
     }

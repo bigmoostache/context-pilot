@@ -593,6 +593,7 @@ name = "cp-orchestrator"
 version = "0.1.0"
 dependencies = [
  "argon2",
+ "base64",
  "calamine",
  "cp-base",
  "cp-mod-bridge",
@@ -608,6 +609,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "sha2",
  "tempfile",
  "tiny_http",
  "utoipa",

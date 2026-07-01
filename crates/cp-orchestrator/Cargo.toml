@@ -54,6 +54,12 @@ reqwest = { workspace = true }
 # Without this, openssl-sys falls back to pkg-config and fails in musl cross
 # containers. Same pattern as the tui crate (8837333).
 openssl = { workspace = true }
+# SHA-256 for PKCE code_challenge (S256) in the Claude Code OAuth login flow.
+# Already a transitive dep via argon2 → digest chain.
+sha2 = "0.10"
+# Base64url-no-pad encoding for PKCE code_verifier and code_challenge (RFC
+# 7636 §4.2). Already a transitive dep via reqwest.
+base64 = "0.22"
 
 [dev-dependencies]
 # Test-only: the integration suite boots a real agent and drives its command

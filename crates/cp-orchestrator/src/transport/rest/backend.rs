@@ -78,6 +78,9 @@ pub struct Backend {
     /// `CP_PROVISION_FLAG` for deployments that keep it elsewhere on the data
     /// partition. Kept distinct from the `onboarding_completed` UI setting.
     pub(crate) provision_flag_path: PathBuf,
+    /// In-flight PKCE session for the Claude Code OAuth login flow (T451).
+    /// At most one login can be in progress at a time.
+    pub(crate) pkce_session: Option<super::claude_oauth::PkceSession>,
 }
 
 impl Backend {
@@ -113,6 +116,7 @@ impl Backend {
             avatars: AvatarStore::load(&agents_dir),
             releases: ReleaseStore::load(ReleaseStore::default_dir().unwrap_or_else(|| agents_dir.join("releases"))),
             provision_flag_path,
+            pkce_session: None,
             agents_dir,
             dirty_agents: HashSet::new(),
             supervisor: AgentSupervisor::new(&[agent_binary.clone()]),
@@ -178,6 +182,7 @@ impl Backend {
             env_overrides: HashMap::new(),
             releases: ReleaseStore::load(PathBuf::from("/tmp/cp-test-releases")),
             provision_flag_path: PathBuf::from("/tmp/cp-test-provisioned"),
+            pkce_session: None,
         }
     }
 }

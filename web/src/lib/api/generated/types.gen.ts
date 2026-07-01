@@ -128,6 +128,26 @@ export type CallbackRow = {
     timeout?: string;
 };
 
+export type ClaudeLoginCompleteRequest = {
+    code: string;
+};
+
+export type ClaudeLoginCompleteResponse = {
+    expires_at?: number | null;
+    status: string;
+};
+
+export type ClaudeLoginStartResponse = {
+    url: string;
+};
+
+export type ClaudeTokenStatus = {
+    expires_at?: number | null;
+    rate_limit_tier?: string | null;
+    subscription_type?: string | null;
+    valid: boolean;
+};
+
 export type ClaudeUsageLimit = {
     group: string;
     is_active: boolean;
@@ -2205,6 +2225,106 @@ export type PostApiAuthUsersByUserIdLogoutResponses = {
 };
 
 export type PostApiAuthUsersByUserIdLogoutResponse = PostApiAuthUsersByUserIdLogoutResponses[keyof PostApiAuthUsersByUserIdLogoutResponses];
+
+export type PostApiClaudeLoginCompleteData = {
+    body: ClaudeLoginCompleteRequest;
+    path?: never;
+    query?: never;
+    url: '/api/claude-login/complete';
+};
+
+export type PostApiClaudeLoginCompleteErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiClaudeLoginCompleteError = PostApiClaudeLoginCompleteErrors[keyof PostApiClaudeLoginCompleteErrors];
+
+export type PostApiClaudeLoginCompleteResponses = {
+    /**
+     * Success
+     */
+    200: ClaudeLoginCompleteResponse;
+};
+
+export type PostApiClaudeLoginCompleteResponse = PostApiClaudeLoginCompleteResponses[keyof PostApiClaudeLoginCompleteResponses];
+
+export type PostApiClaudeLoginRefreshData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/claude-login/refresh';
+};
+
+export type PostApiClaudeLoginRefreshErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiClaudeLoginRefreshError = PostApiClaudeLoginRefreshErrors[keyof PostApiClaudeLoginRefreshErrors];
+
+export type PostApiClaudeLoginRefreshResponses = {
+    /**
+     * Success
+     */
+    200: ClaudeLoginCompleteResponse;
+};
+
+export type PostApiClaudeLoginRefreshResponse = PostApiClaudeLoginRefreshResponses[keyof PostApiClaudeLoginRefreshResponses];
+
+export type PostApiClaudeLoginStartData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/claude-login/start';
+};
+
+export type PostApiClaudeLoginStartErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiClaudeLoginStartError = PostApiClaudeLoginStartErrors[keyof PostApiClaudeLoginStartErrors];
+
+export type PostApiClaudeLoginStartResponses = {
+    /**
+     * Success
+     */
+    200: ClaudeLoginStartResponse;
+};
+
+export type PostApiClaudeLoginStartResponse = PostApiClaudeLoginStartResponses[keyof PostApiClaudeLoginStartResponses];
+
+export type GetApiClaudeLoginStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/claude-login/status';
+};
+
+export type GetApiClaudeLoginStatusErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiClaudeLoginStatusError = GetApiClaudeLoginStatusErrors[keyof GetApiClaudeLoginStatusErrors];
+
+export type GetApiClaudeLoginStatusResponses = {
+    /**
+     * Success
+     */
+    200: ClaudeTokenStatus;
+};
+
+export type GetApiClaudeLoginStatusResponse = GetApiClaudeLoginStatusResponses[keyof GetApiClaudeLoginStatusResponses];
 
 export type GetApiClaudeUsageData = {
     body?: never;

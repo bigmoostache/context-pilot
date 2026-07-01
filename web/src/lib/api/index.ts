@@ -45,6 +45,10 @@ import type {
 } from "./generated/types.gen"
 import {
   getApiClaudeUsage,
+  getApiClaudeLoginStatus,
+  postApiClaudeLoginStart,
+  postApiClaudeLoginComplete,
+  postApiClaudeLoginRefresh,
   getApiFleetMeta,
   getApiFleetRetired,
   getApiAgentByIdMeta,
@@ -94,6 +98,7 @@ export type { AgentMetrics } from "./generated/types.gen"
 export type { Vital } from "./generated/types.gen"
 export type { CreateCommandReceipt } from "./generated/types.gen"
 export type { ClaudeUsageResponse, ClaudeUsageLimit } from "./generated/types.gen"
+export type { ClaudeTokenStatus, ClaudeLoginStartResponse, ClaudeLoginCompleteResponse } from "./generated/types.gen"
 
 // ── Helper: align TS with runtime (setupClient.ts guarantees) ─────────
 
@@ -330,4 +335,20 @@ export function fetchCallbacks(agentId: string): Promise<CallbackRow[]> {
 
 export function fetchClaudeUsage(): Promise<ClaudeUsageResponse> {
   return sdk(getApiClaudeUsage())
+}
+
+export function fetchClaudeTokenStatus(): Promise<import("./generated/types.gen").ClaudeTokenStatus> {
+  return sdk(getApiClaudeLoginStatus())
+}
+
+export function startClaudeLogin(): Promise<import("./generated/types.gen").ClaudeLoginStartResponse> {
+  return sdk(postApiClaudeLoginStart())
+}
+
+export function completeClaudeLogin(code: string): Promise<import("./generated/types.gen").ClaudeLoginCompleteResponse> {
+  return sdk(postApiClaudeLoginComplete({ body: { code } }))
+}
+
+export function refreshClaudeLogin(): Promise<import("./generated/types.gen").ClaudeLoginCompleteResponse> {
+  return sdk(postApiClaudeLoginRefresh())
 }

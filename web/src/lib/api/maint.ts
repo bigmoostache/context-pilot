@@ -36,7 +36,7 @@ async function maintFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (init?.body) headers.set("Content-Type", "application/json")
   const token = getToken()
   if (token) headers.set("Authorization", `Bearer ${token}`)
-  const res = await fetch(path, { ...init, headers })
+  const res = await fetch(path, { ...init, headers }) // ok:manual — maintenance plane (:9090), not in OpenAPI contract
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string }
     throw new Error(body.error ?? `HTTP ${res.status}`)
@@ -49,7 +49,7 @@ async function maintFetch<T>(path: string, init?: RequestInit): Promise<T> {
  *  cockpit), which is how the SPA decides whether to render the wizard. */
 export async function probeMaintPlane(): Promise<MaintStatus | null> {
   try {
-    const res = await fetch("/api/maint/status")
+    const res = await fetch("/api/maint/status") // ok:manual — maintenance plane, not in OpenAPI contract
     if (!res.ok) return null
     const data = (await res.json()) as MaintStatus
     return data.plane === "maintenance" ? data : null
@@ -110,7 +110,7 @@ export async function downloadCaCert(): Promise<void> {
   const token = getToken()
   const headers = new Headers()
   if (token) headers.set("Authorization", `Bearer ${token}`)
-  const res = await fetch("/api/maint/ca.crt", { headers })
+  const res = await fetch("/api/maint/ca.crt", { headers }) // ok:manual — maintenance plane binary download, not in OpenAPI contract
   if (!res.ok) throw new Error(`CA download failed (HTTP ${res.status})`)
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)
