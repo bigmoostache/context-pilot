@@ -66,13 +66,17 @@ openapi-contract:
   last_edited_ms: 0
 rust-check:
   name: rust-check
-  description: Run cargo check, clippy, and fmt --check on Rust file edits
+  description: Run cargo fmt --check, cargo check, and clippy on Rust file edits
   pattern: '*.rs'
   blocking: true
   timeout_secs: 60
   success_message: Rust checks passed ✓
   is_global: true
   script_content: |
+    echo "=== cargo fmt (check only) ==="
+    cargo fmt -- --check 2>&1
+
+    echo ""
     echo "=== cargo check (deny warnings) ==="
     RUSTFLAGS="-D warnings" cargo check 2>&1
 
@@ -82,7 +86,7 @@ rust-check:
 
     echo ""
     echo "All Rust checks passed."
-  last_edited_ms: 1782478770168
+  last_edited_ms: 1782897506974
 ts-contract:
   name: ts-contract
   description: Regenerate TypeScript client from openapi.json on TS file edits to catch contract drift
