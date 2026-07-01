@@ -4574,6 +4574,10 @@
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
   last_edited_ms: 0
+691cc457a52d840c:
+  path: web/src/components/shell/costs/parse.ts
+  description: 'TSV parser for cost-tracking.tsv. CostRow interface (15 fields), parseCostTsv(), aggregation helpers: computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, crossTabToolCulprit (count matrix). buildMarkdownReport() serializes current filtered state as clean markdown tables.'
+  last_edited_ms: 1782923787597
 693b6e261eebafe7:
   path: src/app/actions/config.rs
   description: 'Config bar handlers: context budget, cleaning threshold, target proportion, max cost guard rail, theme cycling'
@@ -7398,6 +7402,10 @@ a92dc0d2a7dda185:
   path: web/src/components/finder/codeHighlight.ts
   description: Finder code-preview syntax highlighting (T280). highlight.js common bundle + 7 curated extras (scala/elixir/erlang/haskell/ocaml/dart/fsharp). EXT_LANG ext→lang map; highlightCode(code,filename)→{html,language} resolves by ext else auto-detect, never throws (degrades to escaped text).
   last_edited_ms: 1781905919396
+a98846f59bed0bea:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool bars, two token distribution bars (panel-estimated before/culprit/after + API-reported hit/miss/output for comparison), Tool×Culprit cross-tab with heat-map. Tempo/queue/no-break AND-filters. TanStack useQuery + fetchFsPreview 15s refetch.
+  last_edited_ms: 1782923447670
 a9945ad52fca5540:
   path: crates/cp-base/src/config/constants.rs
   description: Layout/timing constants. SIDEBAR_HELP_HEIGHT=10 (9 help hints + separator). MAX_SIDEBAR_LABEL_LEN, INPUT_RESERVE, TEMPO_*, token thresholds, typing indicator timing.
@@ -10082,6 +10090,10 @@ e88f4b0434a9e625:
   path: crates/cp-orchestrator/src/supervisor/tests.rs
   description: 'Phase 17 supervisor unit tests (9): allow-list accept/reject + symlink/.. canonicalization, spawn_and_stop, dup-id reject, restart yields new pid + kills old, check_liveness reaps exited spawned child (Exited), adopt_and_detect_vanish (reaps external zombie first — unreaped zombie answers kill(pid,0) alive, so must wait() before probe), stop_not_found. use super::* globs parent imports (edition 2024). Entry built with real schema (boot_id/cap_token=String, oplog_path, model/protocol_version/binary_version/started_at_ms).'
   last_edited_ms: 0
+e8981ed3ddb5d20d:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool bars, two token distribution bars (panel-estimated before/culprit/after + API-reported hit/miss/output for comparison), Tool×Culprit cross-tab with heat-map. Both token bars filter on !noPanelBroken. Tempo/queue/no-break AND-filters. Copy as Markdown button. TanStack useQuery + fetchFsPreview 15s refetch.
+  last_edited_ms: 1782923787710
 e89e1f125170586c:
   path: web/e2e/messages.spec.ts
   description: Phase 2 e2e message send (1 test) over the K7 push plane. Composer send→user bubble appears live + roster log grows. Asserts the user message only (agent reply is non-deterministic LLM). roster-log poll timeout 25s to absorb cumulative live-agent command backlog in the serial suite. afterAll archives e2e- threads.
@@ -10530,6 +10542,10 @@ f4536a4a1ca3c32c:
   path: demo/report-france/export_pdf.py
   description: France report PDF exporter (Playwright, A4, CSS-owned margins). Copied per-report from SKILL template.
   last_edited_ms: 1781860834384
+f48f18e6e4e75e59:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool bars, two token distribution bars (panel-estimated before/culprit/after + API-reported hit/miss/output for comparison), Tool×Culprit cross-tab with heat-map. Both token bars filter on !noPanelBroken. Tempo/queue/no-break AND-filters. TanStack useQuery + fetchFsPreview 15s refetch.
+  last_edited_ms: 1782923607904
 f4b138aa30ba5ba5:
   path: crates/cp-orchestrator/src/services/materialized_view.rs
   description: 'Phase 18 + X835/X836b: MaterializedView in-mem fleet projection folded from OpEntry (one AgentView per agent). AgentView{rev,heads,roster,phase,lifecycle,cost}. RosterEntry = cp_wire RosterThread (shared type). apply: Checkpoint=authoritative heads AND roster reset wholesale (clone_from snapshot.heads/roster — roster now rides the snapshot, closing the cold-restart-after-compaction gap), MessageCreated=set_thread_head + bump roster msg_count/last_activity, ThreadCreated=RosterThread::fold_created (insert-or-update idempotent via ThreadCreation carrier), ThreadArchived/Restored=fold_archived toggle, ThreadStatusChanged=fold_status, Phase/Lifecycle/Cost=latest-wins, CommandEffect/SeenMark/Unknown=inert. Tests live in sibling materialized_view_tests.rs (#[cfg(test)] #[path] include, 500-line limit). 206 lines.'
