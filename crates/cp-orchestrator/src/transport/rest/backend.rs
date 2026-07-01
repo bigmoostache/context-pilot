@@ -14,7 +14,7 @@ use crate::services::{
 };
 use crate::supervisor::AgentSupervisor;
 
-use super::super::ticket::TicketStore;
+use super::super::stream::ticket::TicketStore;
 
 /// Default per-agent SSE subscriber buffer capacity.
 const DEFAULT_SUB_CAPACITY: usize = 256;
@@ -72,6 +72,12 @@ pub struct Backend {
     /// Local release manager — download, select, and delete release binaries
     /// from `~/.context-pilot/releases/` (T427).
     pub(crate) releases: ReleaseStore,
+    /// Path to the durable `provisioned` flag file (M2). Read by the maintenance
+    /// plane's `status`/`finalize` and at boot; written atomically on finalize.
+    /// Defaults to `<agents_dir>/.provisioned`, overridable via
+    /// `CP_PROVISION_FLAG` for deployments that keep it elsewhere on the data
+    /// partition. Kept distinct from the `onboarding_completed` UI setting.
+    pub(crate) provision_flag_path: PathBuf,
     /// In-flight PKCE session for the Claude Code OAuth login flow (T451).
     /// At most one login can be in progress at a time.
     pub(crate) pkce_session: Option<super::claude_oauth::PkceSession>,
@@ -93,6 +99,12 @@ impl Backend {
         auth: Option<AuthStore>,
         session_ttl: Duration,
     ) -> Self {
+        // Durable provisioned-flag location: env override, else a dot-file in
+        // the agents dir (on the box that dir lives on the /mnt/data partition,
+        // so the flag survives reboots; the registry scan only reads `*.json`,
+        // so the dot-file is ignored there).
+        let provision_flag_path =
+            std::env::var_os("CP_PROVISION_FLAG").map_or_else(|| agents_dir.join(".provisioned"), PathBuf::from);
         Self {
             view: MaterializedView::new(),
             breaker: CostBreaker::new(budget_usd),
@@ -103,6 +115,7 @@ impl Backend {
             names: NameOverrides::load(&agents_dir),
             avatars: AvatarStore::load(&agents_dir),
             releases: ReleaseStore::load(ReleaseStore::default_dir().unwrap_or_else(|| agents_dir.join("releases"))),
+            provision_flag_path,
             pkce_session: None,
             agents_dir,
             dirty_agents: HashSet::new(),
@@ -168,6 +181,7 @@ impl Backend {
             session_ttl: Duration::from_secs(3600),
             env_overrides: HashMap::new(),
             releases: ReleaseStore::load(PathBuf::from("/tmp/cp-test-releases")),
+            provision_flag_path: PathBuf::from("/tmp/cp-test-provisioned"),
             pkce_session: None,
         }
     }

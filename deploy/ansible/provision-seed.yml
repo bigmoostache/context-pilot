@@ -1,0 +1,25 @@
+---
+# Seed-only provisioning (Milestone 6) — write the per-unit admin seed.env +
+# delivery sheet, WITHOUT deploying binaries. Use site.yml for a full deploy.
+#
+#   ansible-playbook -i inventory.ini deploy/ansible/provision-seed.yml
+#   # override the default admin email / force a password:
+#   …provision-seed.yml -e cp_admin_email=ops@acme.corp -e cp_admin_password=…
+#
+# Idempotent: a unit that already has seed.env is left untouched. OpenWrt logs
+# in as root with no sudo, so no privilege escalation (become: false).
+
+- name: Provision Context Pilot admin seed (unique per unit)
+  # All inventory hosts; scope to one client with --limit <client>.
+  hosts: all
+  become: false
+  gather_facts: false
+  vars:
+    cp_root: /mnt/data/context-pilot
+    # Obj 6.2.1 — default admin email; override with -e cp_admin_email=…
+    cp_seed_admin_email: "{{ cp_admin_email | default('admin@admin.fr') }}"
+    # Where the printable sheets are written, on the CONTROL machine.
+    sheets_dir: "{{ playbook_dir }}/out"
+  tasks:
+    - name: Seed the unique admin (seed.env + delivery sheet)
+      ansible.builtin.include_tasks: tasks/seed.yml

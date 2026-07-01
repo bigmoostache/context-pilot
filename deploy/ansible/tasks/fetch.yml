@@ -1,0 +1,54 @@
+---
+# Fetch pre-built appliance artifacts from a GitHub Release onto the CONTROL
+# node (no local build). The control node has internet; the offline LAN box does
+# not, so we download here and ship over SSH.
+#
+# Pulls the appliance bundle (bin/cp-orchestrator, bin/tui, web/<spa>) published
+# by .github/workflows/release.yml, plus a stock Caddy arm64 binary. The procd
+# init scripts + bootstrap Caddyfile come from the repo (deploy/photonicat), not
+# the release.
+
+- name: Ensure the artifacts dirs exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ artifacts_dir }}"
+    - "{{ artifacts_dir }}/bundle"
+
+# `release=local` uses the bundle produced by deploy/photonicat/build.sh (when a
+# GitHub release can't be cut yet); any other value downloads from GitHub.
+- name: Download the appliance bundle from the GitHub release ({{ cp_release }})
+  ansible.builtin.get_url:
+    url: "{{ appliance_bundle_url }}"
+    dest: "{{ artifacts_dir }}/cpilot-appliance-aarch64.tar.gz"
+    mode: "0644"
+    force: true # always fetch the requested release's bundle
+  when: cp_release != 'local'
+
+- name: Verify an appliance bundle is present
+  ansible.builtin.stat:
+    path: "{{ artifacts_dir }}/cpilot-appliance-aarch64.tar.gz"
+  register: bundle_stat
+
+- name: Fail clearly when no bundle is available
+  ansible.builtin.assert:
+    that: bundle_stat.stat.exists
+    fail_msg: >-
+      No appliance bundle at {{ artifacts_dir }}/cpilot-appliance-aarch64.tar.gz.
+      Either publish a release containing it, or run deploy/photonicat/build.sh
+      and pass -e release=local.
+
+- name: Extract the appliance bundle
+  ansible.builtin.unarchive:
+    src: "{{ artifacts_dir }}/cpilot-appliance-aarch64.tar.gz"
+    dest: "{{ artifacts_dir }}/bundle"
+    remote_src: true # the tarball is on the control node (this play is local)
+
+- name: Download the Caddy arm64 binary (static Go; supports tls internal)
+  ansible.builtin.get_url:
+    url: "{{ caddy_url }}"
+    dest: "{{ artifacts_dir }}/caddy"
+    mode: "0755"
+    force: false # build.sh / a prior run may have already provided it

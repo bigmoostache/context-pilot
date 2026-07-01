@@ -1,0 +1,68 @@
+---
+# Ship binaries + web + init scripts + Caddyfile to the appliance and free :80.
+# Does NOT start anything — services are started after the seed (so the admin is
+# seeded from seed.env on first boot). Idempotent: copies are checksum-compared.
+
+- name: Stop services if already present (factory box won't have them)
+  ansible.builtin.command: "/etc/init.d/{{ item }} stop"
+  loop:
+    - context-pilot
+    - caddy
+  failed_when: false
+  changed_when: false
+
+- name: Create the data tree
+  ansible.builtin.file:
+    path: "{{ cp_root }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - bin
+    - home
+    - web
+    - caddy
+
+- name: Ship the binaries (orchestrator + agent TUI from the release bundle, Caddy)
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ cp_root }}/bin/{{ item | basename }}"
+    mode: "0755"
+  loop:
+    - "{{ artifacts_dir }}/bundle/bin/cp-orchestrator"
+    - "{{ artifacts_dir }}/bundle/bin/tui"
+    - "{{ artifacts_dir }}/caddy"
+
+- name: Ship the SPA bundle (from the release bundle)
+  ansible.builtin.copy:
+    src: "{{ artifacts_dir }}/bundle/web/"
+    dest: "{{ cp_root }}/web/"
+    mode: "0644"
+    directory_mode: "0755"
+
+- name: Install the procd init scripts
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/deploy/photonicat/{{ item.src }}"
+    dest: "/etc/init.d/{{ item.dst }}"
+    mode: "0755"
+  loop:
+    - { src: init.d/context-pilot.init, dst: context-pilot }
+    - { src: init.d/caddy.init, dst: caddy }
+
+- name: Install the bootstrap Caddyfile (the orchestrator regenerates it at boot)
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/deploy/photonicat/Caddyfile"
+    dest: "{{ cp_root }}/caddy/Caddyfile"
+    mode: "0644"
+
+- name: Free TCP :80/:443 for Caddy (move LuCI→:8088, disable board dashboard) (Obj 3.3.1)
+  ansible.builtin.script: "{{ repo_root }}/deploy/photonicat/free-port-80.sh"
+  register: free_port
+  changed_when: "'now free for Caddy' in free_port.stdout"
+
+- name: Open client-facing services (cockpit :443, maintenance :9090) on the client LAN
+  # The box's uplink (eth0) is OpenWrt's `wan` zone (input REJECT), so the client
+  # reaches :443/:9090 over their corporate/local LAN only once these are opened.
+  # Vendor admin (SSH) stays on the tailnet, not here. Idempotent (named uci rule).
+  ansible.builtin.script: "{{ repo_root }}/deploy/photonicat/open-client-firewall.sh"
+  register: client_fw
+  changed_when: "'applied' in client_fw.stdout"

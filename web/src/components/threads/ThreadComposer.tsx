@@ -376,6 +376,13 @@ export function ThreadComposer({
             persistDraft(el.value, el.selectionStart, el.selectionEnd)
           }}
           onKeyDown={handleKeyDown}
+          onPaste={(e) => {
+            const images = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"))
+            if (images.length > 0 && onAttach) {
+              e.preventDefault()
+              onAttach(images)
+            }
+          }}
           placeholder="Reply to this thread…"
           rows={1}
           className="max-h-[200px] min-h-[24px] flex-1 resize-none bg-transparent text-[13.5px] leading-relaxed text-foreground/90 placeholder:text-muted-foreground/60 outline-none"

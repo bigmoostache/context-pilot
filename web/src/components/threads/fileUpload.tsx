@@ -187,7 +187,7 @@ export function MessageFileChip({
   // Real, on-disk size — the listing node's byte count. `undefined` while the
   // listing loads, when there is no agent to query, or when the file is gone;
   // the chip then omits the size label rather than echo the untrusted YAML.
-  const realSize = node?.size
+  const realSize = node?.size ?? undefined
 
   return (
     <FileUploadChip

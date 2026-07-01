@@ -12,6 +12,8 @@ pub(super) fn transport() -> Value {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
+                // Canonical "<providerId>:<modelId>" key (server-built; the id the org allowlist is keyed on).
+                "key": { "type": "string" },
                 "apiName": { "type": "string" },
                 "displayName": { "type": "string" },
                 "contextWindow": { "type": "integer" },
@@ -21,7 +23,7 @@ pub(super) fn transport() -> Value {
                 "badge": { "type": "string", "nullable": true },
                 "isDefault": { "type": "boolean" }
             },
-            "required": ["id", "apiName", "displayName", "contextWindow", "maxOutput", "inputPrice", "outputPrice"]
+            "required": ["id", "key", "apiName", "displayName", "contextWindow", "maxOutput", "inputPrice", "outputPrice"]
         },
         "ProviderDef": {
             "type": "object",
@@ -104,10 +106,26 @@ pub(super) fn transport() -> Value {
                 "email": { "type": "string" },
                 "name": { "type": "string" },
                 "role": { "type": "string", "enum": ["admin", "user"] },
+                "must_change_password": { "type": "boolean" },
                 "created_at": { "type": "integer" },
                 "updated_at": { "type": "integer" }
             },
-            "required": ["id", "email", "name", "role"]
+            "required": ["id", "email", "name", "role", "must_change_password"]
+        },
+        // GET /api/auth/me — the user profile plus the backend-driven next step.
+        "AuthMe": {
+            "type": "object",
+            "properties": {
+                "id": { "type": "string" },
+                "email": { "type": "string" },
+                "name": { "type": "string" },
+                "role": { "type": "string", "enum": ["admin", "user"] },
+                "must_change_password": { "type": "boolean" },
+                "created_at": { "type": "integer" },
+                "updated_at": { "type": "integer" },
+                "next_action": { "type": "string", "enum": ["change_password", "onboarding", "ready"] }
+            },
+            "required": ["id", "email", "name", "role", "must_change_password", "next_action"]
         },
         "AuthLogin": {
             "type": "object",
@@ -342,138 +360,6 @@ pub(super) fn transport() -> Value {
                 "kind": r("OpEntryKind")
             },
             "required": ["rev", "kind"]
-        },
-        // ── Release management (T427) ───────────────────────────────
-        "ReleaseEntry": {
-            "type": "object",
-            "properties": {
-                "tag": { "type": "string" },
-                "name": { "type": "string" },
-                "publishedAt": { "type": "string", "nullable": true },
-                "assetUrl": { "type": "string", "nullable": true },
-                "assetSize": { "type": "integer", "nullable": true },
-                "isLatest": { "type": "boolean" },
-                "local": { "type": "boolean" },
-                "selected": { "type": "boolean" },
-                "binarySize": { "type": "integer", "nullable": true }
-            },
-            "required": ["tag", "name", "local", "selected"]
-        },
-        "ReleasesResponse": {
-            "type": "object",
-            "properties": {
-                "arch": { "type": "string" },
-                "archAuto": { "type": "boolean" },
-                "activeTag": { "type": "string", "nullable": true },
-                "currentBinary": { "type": "string" },
-                "knownArchs": arr(json!({ "type": "string" })),
-                "releases": arr(r("ReleaseEntry"))
-            },
-            "required": ["arch", "archAuto", "currentBinary", "knownArchs", "releases"]
-        },
-        "ArchResponse": {
-            "type": "object",
-            "properties": {
-                "arch": { "type": "string" },
-                "archAuto": { "type": "boolean" }
-            },
-            "required": ["arch", "archAuto"]
-        },
-        "DownloadResponse": {
-            "type": "object",
-            "properties": {
-                "status": { "type": "string" },
-                "tag": { "type": "string" }
-            },
-            "required": ["status", "tag"]
-        },
-        "SelectResponse": {
-            "type": "object",
-            "properties": {
-                "status": { "type": "string" },
-                "tag": { "type": "string" },
-                "binaryPath": { "type": "string" }
-            },
-            "required": ["status", "tag", "binaryPath"]
-        },
-        "DeployResponse": {
-            "type": "object",
-            "properties": {
-                "status": { "type": "string" },
-                "tag": { "type": "string" },
-                "restarted": { "type": "array", "items": {
-                    "type": "object",
-                    "properties": {
-                        "id": { "type": "string" },
-                        "pid": { "type": "integer" }
-                    },
-                    "required": ["id", "pid"]
-                }},
-                "errors": arr(json!({ "type": "string" }))
-            },
-            "required": ["status", "tag", "restarted", "errors"]
-        },
-        "RestartOrchestratorResponse": {
-            "type": "object",
-            "properties": {
-                "status": { "type": "string" }
-            },
-            "required": ["status"]
-        },
-        // ── Claude Code usage (T451) ────────────────────────────────
-        "ClaudeUsageLimit": {
-            "type": "object",
-            "properties": {
-                "kind": { "type": "string" },
-                "group": { "type": "string" },
-                "percent": { "type": "integer" },
-                "severity": { "type": "string" },
-                "resets_at": { "type": "string", "nullable": true },
-                "scope": { "type": "string", "nullable": true },
-                "is_active": { "type": "boolean" }
-            },
-            "required": ["kind", "group", "percent", "severity", "is_active"]
-        },
-        "ClaudeUsageResponse": {
-            "type": "object",
-            "description": "Claude Code OAuth usage limits (proxied from Anthropic).",
-            "properties": {
-                "limits": arr(r("ClaudeUsageLimit"))
-            }
-        },
-        // ── Claude Code OAuth login (T451) ──────────────────────────
-        "ClaudeTokenStatus": {
-            "type": "object",
-            "properties": {
-                "valid": { "type": "boolean" },
-                "expires_at": { "type": "integer", "nullable": true },
-                "subscription_type": { "type": "string", "nullable": true },
-                "rate_limit_tier": { "type": "string", "nullable": true },
-                "account_email": { "type": "string", "nullable": true }
-            },
-            "required": ["valid"]
-        },
-        "ClaudeLoginStartResponse": {
-            "type": "object",
-            "properties": {
-                "url": { "type": "string" }
-            },
-            "required": ["url"]
-        },
-        "ClaudeLoginCompleteRequest": {
-            "type": "object",
-            "properties": {
-                "code": { "type": "string" }
-            },
-            "required": ["code"]
-        },
-        "ClaudeLoginCompleteResponse": {
-            "type": "object",
-            "properties": {
-                "status": { "type": "string" },
-                "expires_at": { "type": "integer", "nullable": true }
-            },
-            "required": ["status"]
         }
     })
 }

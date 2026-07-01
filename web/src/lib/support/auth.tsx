@@ -25,14 +25,15 @@ import {
   authMe,
   getToken,
   setToken,
-  type AuthUser,
+  type AuthMe,
 } from "@/lib/api"
 
 // ── Context shape ────────────────────────────────────────────────────
 
 interface AuthContextValue {
-  /** The authenticated user, or null when logged out / auth disabled. */
-  user: AuthUser | null
+  /** The authenticated user (+ backend `next_action`), or null when logged
+   *  out / auth disabled. */
+  user: AuthMe | null
   /** Raw session token (mostly for debugging; Bearer injection is automatic). */
   token: string | null
   /** `true` = backend requires auth; `false` = auth disabled; `null` = still probing. */
@@ -48,6 +49,8 @@ interface AuthContextValue {
   register: (email: string, name: string, password: string) => Promise<void>
   /** End the current session and clear the stored token. */
   logout: () => Promise<void>
+  /** Re-fetch `/me` and refresh the cached user (after a profile edit). */
+  refreshMe: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -55,7 +58,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 // ── Provider ─────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null)
+  const [user, setUser] = useState<AuthMe | null>(null)
   const [token, setTokenState] = useState<string | null>(getToken)
   const [authEnabled, setAuthEnabled] = useState<boolean | null>(null)
   const [bootstrapped, setBootstrapped] = useState(true)
@@ -69,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const status = await fetchAuthStatus()
         if (cancelled) return
         setAuthEnabled(status.enabled)
-        setBootstrapped(status.bootstrapped)
+        setBootstrapped(status.bootstrapped ?? true)
 
         if (!status.enabled) {
           setLoading(false)
@@ -116,7 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await authLogin(email, password)
     setToken(res.token)
     setTokenState(res.token)
-    setUser(res.user)
+    // Pull /me for the canonical profile + backend-driven next_action (the
+    // login response carries the user but not the post-login step).
+    setUser(await authMe())
   }, [])
 
   const register = useCallback(
@@ -128,6 +133,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [login],
   )
+
+  const refreshMe = useCallback(async () => {
+    try {
+      const me = await authMe()
+      setUser(me)
+    } catch {
+      // Leave the cached user as-is on a transient failure.
+    }
+  }, [])
 
   const logout = useCallback(async () => {
     try {
@@ -151,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        refreshMe,
       }}
     >
       {children}
