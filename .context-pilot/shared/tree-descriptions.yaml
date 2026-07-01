@@ -2134,6 +2134,10 @@
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
   last_edited_ms: 0
+32ac6f83146bab6b:
+  path: crates/cp-orchestrator/tests/openapi/paths.rs
+  description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL, providers, releases, claude-usage+login+refresh). Includes deploy + restart-orchestrator paths.
+  last_edited_ms: 1782895735322
 3319ed35d08f46b9:
   path: crates/cp-mod-tree/src/storage.rs
   description: YAML-backed tree descriptions. FNV-1a content-hash keys via cp-mod-utilities. populate/refresh_stale/migrate via YamlSync.
@@ -2929,6 +2933,10 @@
 43f27c1a84ca77cd:
   path: crates/cp-orchestrator/tests/services_integration.rs
   description: 'Phase 29 (X796) backend services integration suite (4 tests, green, ~0.1s). Drives MaterializedView+CostBreaker+StreamHub TOGETHER against a REAL cp-oplog via channel::Tailer (composition the inline unit tests'' crafted OpEntry literals can''t reach): (1) restart rebuild end-to-end I5+V9: OplogService.append_durable(heads+phase+rising cost)->shutdown->tail_all(Tailer.poll)->view.apply_batch->breaker.rebuild_from_view trips; (2) real segment-roll checkpoint folds to ground-truth head: spawn_with_segment_limit(64) forces rolls (leading authoritative Checkpoint), asserts >=1 Checkpoint rode stream + final head correct; (3) R2-17 reconcile: degraded hub subscriber''s authoritative snapshot = view heads folded from real oplog, mark_reconciled clears degraded+dropped; (4) fleet isolation: 2 agents 2 oplogs -> view 2 isolated projections, breaker trips only overspender, hub fans per-agent. helpers message/cost/token/tail_all. Top `use cp_mod_bridge/nix/serde/serde_json/tiny_http as _;`.'
+  last_edited_ms: 0
+43f7f2b399556b12:
+  path: openapi.json
+  description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
   last_edited_ms: 0
 43fc0d5da0bf3924:
   path: ui/src/components/shell/TopBar.tsx
@@ -5510,6 +5518,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/finder/download.rs
   description: 'Finder file/folder download (split from finder.rs). fs_download: files as raw bytes (10MiB cap, Content-Disposition attachment), folders zipped to /tmp via system `zip -r -q` (100MiB cap) then cleaned up. Confined to realm via support::confined_path.'
   last_edited_ms: 1781889348203
+813c569530d42c3b:
+  path: web/src/lib/api/generated/sdk.gen.ts
+  description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
+  last_edited_ms: 0
 814ded7661832a83:
   path: ui/src/lib/types.ts
   description: Maquette domain types. Agent (id/name/folder/branch/model/status/cost/threads/accent), FsNode (fs tree), ThreadDetail with agentId (thread belongs to one agent realm). ViewMode=agents|cockpit|threads.
@@ -6330,6 +6342,10 @@
   path: ui/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: selected thread''s full conversation. Header = thread name + status pill + agent dot (the ⓘ details button was removed — redundant with the global sidebar info; ThreadDetailsPopup deleted). toChatMessage() maps ThreadMsg→ChatMessage to reuse cockpit Message renderer. Renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'
   last_edited_ms: 1781533385870
+942538f477c01022:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl auth/ACL/env-keys/providers/releases/claude-usage+login+refresh(T451). handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with ticket-based ACL.
+  last_edited_ms: 1782895835304
 94391f323268729b:
   path: src/state/persistence/message.rs
   description: 'Message persistence: save/load/delete individual conversation messages as YAML files. record_prompt_history() appends to prompt-history.jsonl (append-only, cross-conversation).'
@@ -7422,6 +7438,10 @@ ae7544be6efd88b2:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, ≤150 lines AND ≤8000 bytes inline+tempo, bigger entity_result panel+no tempo. 200-row cap. RETURNING support.
   last_edited_ms: 1780606466419
+ae7be475027037fd:
+  path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
+  description: Claude Code OAuth helpers — usage proxy (GET /api/claude-usage), token status (GET /api/claude-login/status), PKCE login flow (POST /start + /complete), token refresh (POST /refresh). Reads/writes macOS Keychain + ~/.claude/.credentials.json. PkceSession stored in Backend. Refresh uses grant_type=refresh_token against console.anthropic.com.
+  last_edited_ms: 1782895708117
 aec5d14317c1423a:
   path: docs/trust-center/trust.css
   description: Shared CSS for all Trust Center pages. Enterprise slate/navy palette, Inter + IBM Plex Mono fonts, fixed sidebar nav, breadcrumbs, cards, tables, badges, policy blocks, FAQ accordion, status dots, CTA buttons, responsive (sidebar hides <960px). Header left-padding aligned with content area. 631 lines.
@@ -7477,6 +7497,10 @@ af63a1c3cc1bf35d:
 af6dd95d8269c492:
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (confined to agent realm). Uses useFs(agentId, relCwd) for live directory listings — converts absolute cwd to relative path for the backend API. Tabs+history+nav+selection+drag-drop+statusbar. buildCrumbs/pathName helpers. Four view modes (grid/list/columns/gallery), keyboard control, marquee selection.
+  last_edited_ms: 0
+af989af82653ce47:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 afd5f6a171e03b31:
   path: website/docs/keyboard.html
@@ -8390,6 +8414,10 @@ c43688c017c015a6:
   path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
   description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape.'
   last_edited_ms: 0
+c438bc0cabc5f5eb:
+  path: src/app/run/threads/commands.rs
+  description: 'Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/DeleteMessage(T416 per-message delete by epoch-ms timestamp)/Stop|Interrupt/Configure. SendMessage fires instant spine notification when message lands on CURRENTLY FOCUSED thread (T460) — user expects quick acknowledgement; unfocused threads rely on idle MY_TURN detection. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted. DeleteMessage removes single message by timestamp, emits durable MessageDeleted, updates bridge thread_msg_counts so emit_messages correctly detects subsequent appends (T418 fix). Cascade: deleting an assistant message also removes all consecutive auto:true messages PRECEDING it (tool-trace cleanup — the tool calls that produced the response), one MessageDeleted delta per removed message.'
+  last_edited_ms: 1782896172587
 c4829069423c1fe6:
   path: crates/cp-mod-tree/src/lib.rs
   description: 'Tree module. 3 tools: filter/toggle/describe (with close_panel param). Fixed TREE panel (fixed_order=3). Watches open folders. Dir-event-only invalidation. Module data: filter+descriptions. Worker data: open_folders. @-path autocomplete.'
@@ -9182,6 +9210,14 @@ d6497a2dad8c0a5c:
   path: web/src/components/conversation/Message.tsx
   description: 'Thread/conversation message renderer (shared by web ThreadConversation + cockpit Conversation). AssistantMessage + UserMessage render text via <Markdown> (assistant=default, user=onAccent); MessageBody splices inline file-upload chips. T311: discrete CopyButton beneath BOTH user & assistant bubbles — low-opacity Copy icon (align mirrors bubble side: user self-end, assistant left under pl-7), click → navigator.clipboard.writeText(text) → flips to green var(--ok) Check ''Copied'' for ~2s then reverts (guarded ?. for insecure-origin/no-clipboard, silent fail); hidden on assistant while streaming. CopyButton: exported, accepts label+getText props for reuse (code blocks, tables). Labels: Copy message (bubbles), Copy code (pre blocks), Copy table (GFM tables). T406: className prop for accent-aware color override. T416: DeleteButton (Trash2 icon, danger colour on hover) beside CopyButton for both user+assistant messages, fires onDelete callback. ToolMessage = collapsible card. Streaming blink cursor preserved. T334: onShowInFinder prop threaded to MessageFileChip for Show in Finder navigation.'
   last_edited_ms: 1782466861296
+d656ca0d947a6c15:
+  path: web/src/lib/api/index.ts
+  description: 'REST API client barrel. SDK layer: 28 endpoints use generated SDK (fleet, panels, tools, lifecycle, avatar, commands, ticket, claude-usage, claude-login/status/start/complete/refresh). Re-exports ./auth + ./finder + ./body + ./env-keys.'
+  last_edited_ms: 1782895708217
+d669d33022d005cd:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: 'REST resource handlers. fleet() filtered by ACL. command() dispatches. rename/avatar/threads/body. claude_usage()/token_status()/login_start()/login_complete()/refresh_login() for Claude OAuth (T451). resolve_entry. Submodules: backend, claude_oauth, create, env_keys, lifecycle, releases, thread_shape.'
+  last_edited_ms: 1782895835348
 d66af40c87661284:
   path: web/src/components/auth/UsersDialog.tsx
   description: Admin user management dialog (Phase 10). Lists all users with RoleBadge, create user form (collapsible), delete user with confirmation, force-logout (revoke all sessions). TanStack Query hooks. Accessible from UserMenu when admin.
@@ -10478,6 +10514,10 @@ f892ce5853334499:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (author/timestamp headers, content, file refs, question indicators). Ctrl+V dispatch.'
   last_edited_ms: 0
+f892f8d383e3e1aa:
+  path: web/src/components/shell/widgets/UsageButton.tsx
+  description: 'Claude Code OAuth usage limits button. Anthropic "A" logomark trigger opens popover with token status (valid/expired + expiry + refresh button), session/weekly usage bars (color-coded by severity), and LoginFlow (PKCE: open browser → copy code#state → paste → exchange). Refresh button (RefreshCw icon) next to expiry. Lazy-fetches on open, 30s auto-refresh.'
+  last_edited_ms: 1782895708181
 f8da9563a5f056ab:
   path: web/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Uses useFleet() for live agents. Persists activeAgentId + view in localStorage (cp-agent, cp-view). Mounts AccountProvider + TooltipProvider. Passes agents to TopBar/FleetShell/StatusBar. Passes activeAgent to StatusBar.
