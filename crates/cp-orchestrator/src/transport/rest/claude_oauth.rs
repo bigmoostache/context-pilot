@@ -5,7 +5,6 @@
 //! builds the authorize URL, and the user completes authorization in their
 //! browser, then pastes the resulting code back into the frontend dialog.
 
-use std::net::TcpListener;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -19,7 +18,8 @@ use super::{Backend, HttpReply};
 
 const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const AUTHORIZE_URL: &str = "https://claude.ai/oauth/authorize";
-const TOKEN_URL: &str = "https://platform.claude.com/v1/oauth/token";
+const TOKEN_URL: &str = "https://console.anthropic.com/v1/oauth/token";
+const REDIRECT_URI: &str = "https://console.anthropic.com/oauth/code/callback";
 const SCOPES: &str = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
 /// PKCE sessions expire after 5 minutes.
 const PKCE_TTL_SECS: u64 = 300;
@@ -30,9 +30,7 @@ const PKCE_TTL_SECS: u64 = 300;
 #[derive(Debug)]
 pub(crate) struct PkceSession {
     code_verifier: String,
-    /// `http://localhost:{port}/callback` — must match between authorize and
-    /// token-exchange requests (RFC 8252 §7.3 loopback redirect).
-    redirect_uri: String,
+    state: String,
     created_at: Instant,
 }
 
@@ -94,14 +92,6 @@ pub(crate) fn token_status() -> HttpReply {
 /// `POST /api/claude-login/start` — generate PKCE pair and return the
 /// authorize URL for the user to open in their browser.
 pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
-    // RFC 8252 §7.3: bind a random loopback port for the redirect URI.
-    let listener = match TcpListener::bind("127.0.0.1:0") {
-        Ok(l) => l,
-        Err(e) => return HttpReply::error(500, &format!("could not bind loopback port: {e}")),
-    };
-    let port = listener.local_addr().map(|a| a.port()).unwrap_or(18923);
-    let redirect_uri = format!("http://localhost:{port}/callback");
-
     // Generate code_verifier: 32 random bytes → base64url (43 chars).
     let mut verifier_bytes = [0u8; 32];
     if read_random(&mut verifier_bytes).is_err() {
@@ -122,24 +112,18 @@ pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
 
     let url = format!(
         "{AUTHORIZE_URL}?code=true&client_id={CLIENT_ID}&response_type=code&redirect_uri={}&scope={}&code_challenge={code_challenge}&code_challenge_method=S256&state={state_param}",
-        urlencoded(&redirect_uri),
+        urlencoded(REDIRECT_URI),
         urlencoded(SCOPES),
     );
 
-    // Store PKCE session (login_complete fallback for manual code-paste).
+    // Store PKCE session for the /complete step.
     if let Ok(mut b) = state.lock() {
         b.pkce_session = Some(PkceSession {
             code_verifier: code_verifier.clone(),
-            redirect_uri: redirect_uri.clone(),
+            state: state_param,
             created_at: Instant::now(),
         });
     }
-
-    // Listener is dropped — the redirect will hit a dead port, but the
-    // authorization code is displayed on the Anthropic page (code=true)
-    // and also visible in the browser's URL bar. The user copies it and
-    // pastes it into the frontend dialog.
-    drop(listener);
 
     HttpReply::ok(&LoginStartResponse { url })
 }
@@ -171,7 +155,7 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
         return HttpReply::error(400, "login session expired — please start again");
     }
 
-    match exchange_and_store(code, &session.code_verifier, &session.redirect_uri) {
+    match exchange_and_store(code, &session.code_verifier, &session.state) {
         Ok(expires_at) => HttpReply::ok(&LoginCompleteResponse { status: "ok".to_owned(), expires_at: Some(expires_at) }),
         Err(e) => HttpReply::error(502, &e),
     }
@@ -182,14 +166,14 @@ pub(crate) fn login_complete(state: &Mutex<Backend>, body_bytes: &[u8]) -> HttpR
 /// Exchange an authorization code for tokens and persist credentials.
 ///
 /// Returns `expires_at` (ms since epoch) on success.
-/// Used by both [`spawn_callback_listener`] (auto) and [`login_complete`] (manual).
-fn exchange_and_store(code: &str, code_verifier: &str, redirect_uri: &str) -> Result<i64, String> {
+fn exchange_and_store(code: &str, code_verifier: &str, state: &str) -> Result<i64, String> {
     let body = serde_json::json!({
         "grant_type": "authorization_code",
         "code": code,
+        "state": state,
         "code_verifier": code_verifier,
         "client_id": CLIENT_ID,
-        "redirect_uri": redirect_uri,
+        "redirect_uri": REDIRECT_URI,
     });
     let client = reqwest::blocking::Client::new();
     let resp = client
@@ -290,8 +274,10 @@ fn store_credentials(creds: &serde_json::Value) -> Result<(), String> {
 
 /// Extract the authorization code from user input.
 ///
-/// Accepts a raw code string **or** the full callback URL
-/// (`http://localhost:PORT/callback?code=XXXX&state=YYYY`).
+/// Accepts:
+/// - Raw code string
+/// - `code#state` format (Anthropic's callback page output)
+/// - Full callback URL (`http://…/callback?code=XXXX&state=YYYY`)
 fn extract_code(input: &str) -> &str {
     // If it looks like a URL with `code=`, pull out the code value.
     if let Some(qs) = input.split('?').nth(1) {
@@ -300,6 +286,10 @@ fn extract_code(input: &str) -> &str {
                 return val;
             }
         }
+    }
+    // Anthropic's callback page returns `code#state` — strip the state part.
+    if let Some(hash_pos) = input.find('#') {
+        return &input[..hash_pos];
     }
     input
 }
