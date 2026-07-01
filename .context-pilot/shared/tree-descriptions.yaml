@@ -1130,6 +1130,10 @@
   path: crates/cp-orchestrator/tests/registry_channel.rs
   description: 'Phase 27 (X794) backend↔agent seam suite (4 tests, all green). Drives discovery+channel against real cp-mod-bridge artifacts: boot→Appeared→quiet scan→Disappeared, Stale transition, body spill→hydrate, command send→exactly-once dedup.'
   last_edited_ms: 0
+1b2d7ac6ff4b46cb:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 1b39bb780a5dd7e0:
   path: crates/cp-mod-threads/src/questions.rs
   description: Thread-embedded interactive question forms. ThreadQuestionForm parses JSON questions (header/question/multiSelect/options[{label,description}]), tracks per-question answer state (cursor/selected/typing_other), cursor navigation, toggle selection, format_answers_yaml(). Used by TUI thread view for interactive Q&A. Max 50 questions × 100 options.
@@ -2286,6 +2290,10 @@
   path: crates/cp-orchestrator/tests/services_integration.rs
   description: 'Phase 29 (X796) backend services integration suite (4 tests, green, ~0.1s). Drives MaterializedView+CostBreaker+StreamHub TOGETHER against a REAL cp-oplog via channel::Tailer (composition the inline unit tests'' crafted OpEntry literals can''t reach): (1) restart rebuild end-to-end I5+V9: OplogService.append_durable(heads+phase+rising cost)->shutdown->tail_all(Tailer.poll)->view.apply_batch->breaker.rebuild_from_view trips; (2) real segment-roll checkpoint folds to ground-truth head: spawn_with_segment_limit(64) forces rolls (leading authoritative Checkpoint), asserts >=1 Checkpoint rode stream + final head correct; (3) R2-17 reconcile: degraded hub subscriber''s authoritative snapshot = view heads folded from real oplog, mark_reconciled clears degraded+dropped; (4) fleet isolation: 2 agents 2 oplogs -> view 2 isolated projections, breaker trips only overspender, hub fans per-agent. helpers message/cost/token/tail_all. Top `use cp_mod_bridge/nix/serde/serde_json/tiny_http as _;`.'
   last_edited_ms: 1781650676137
+368256897a7dcee0:
+  path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
+  description: 'Claude Code OAuth helpers — usage proxy, token status (incl account_email via /api/oauth/profile, T465), PKCE login (start/complete), token refresh (POST /refresh, grant_type=refresh_token). T472: a refresh failure (e.g. invalid_grant — refresh token rotated/expired) DELIBERATELY leaves stored credentials in place; the access token''s lifetime is independent and often has hours of runway, so clearing on refresh failure would strand a still-valid session. Reads/writes macOS Keychain + ~/.claude/.credentials.json. PkceSession stored in Backend.'
+  last_edited_ms: 1782906819378
 36901a27834aff55:
   path: crates/cp-orchestrator/src/transport/inspect/finder/mutate.rs
   description: 'Finder writes: fs_upload/fs_write(X906 editor save-back)/fs_mkdir/fs_rename/fs_move/fs_trash (T285/T294 reversible trash into .context-pilot/trash). T298: fs_upload_unique (POST /fs/upload-unique) — create_dir_all the dest dir on demand + unique_name dedup (` (1)`,` (2)`… extension-preserving) so chat attachments land in .uploads/ without prior mkdir and never clobber. All confined, bare-name guarded.'
@@ -2534,6 +2542,10 @@
   path: web/src/lib/support/auth.tsx
   description: 'Auth context (Phase 9): AuthProvider probes GET /api/auth/status, validates stored token via /me, exposes user/token/authEnabled/bootstrapped/loading + login/register/logout. Listens for cp-auth-expired events from the fetch wrapper. useAuth() hook.'
   last_edited_ms: 1782241219983
+3c59a85f3967b244:
+  path: web/src/components/shell/widgets/UsageButton.tsx
+  description: 'Claude Code OAuth usage button. Anthropic "A" logomark trigger opens popover with account email (T465), token status (valid/expired + expiry + refresh button), session/weekly usage bars (color-coded by severity), and LoginFlow (PKCE: open browser → copy code#state → paste → exchange). T472 login-trap fix: the waiting_for_code auto-poller snapshots the current token''s expiry into baselineExpiryRef at login start and only auto-completes when a token whose expiry STRICTLY exceeds the baseline appears (a genuinely new credential) — so a pre-existing still-valid token no longer short-circuits a deliberate re-login before the user can paste the fresh code. Refresh button next to expiry. Lazy-fetches on open, 30s auto-refresh.'
+  last_edited_ms: 1782906819308
 3c7723e612c9754f:
   path: crates/cp-orchestrator/src/transport/rest/releases.rs
   description: 'Release management REST handlers (T427). 5 endpoints: list_releases (GET, merged local+remote+arch+active), set_arch (PUT, manual or auto-detect), download_release (POST, download+extract tarball), select_release (PUT, set active binary+supervisor), delete_release (DELETE). All pub(crate).'
@@ -4525,6 +4537,10 @@
 69a7d215ea113b10:
   path: crates/cp-mod-callback/src/storage.rs
   description: YAML-backed persistent storage for callback definitions. Keyed by name (BTreeMap alphabetical). upsert/remove/populate/migrate functions. Script file read/write helpers (strip_script_header, write_script_file). cleanup_old_hash_keys migration.
+  last_edited_ms: 0
+6a0014a2e1323874:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 6a16a2fe2dff6921:
   path: .context-pilot/scripts/folder-sizes.sh

@@ -213,6 +213,13 @@ pub(crate) fn refresh_login() -> HttpReply {
                     .and_then(|e| e.get("message"))
                     .and_then(|m| m.as_str())
                     .unwrap_or_else(|| val.get("error").and_then(|e| e.as_str()).unwrap_or("refresh failed"));
+                // A refresh failure (e.g. `invalid_grant`: the refresh token has
+                // rotated/expired) does NOT invalidate the current access token —
+                // the two lifetimes are independent, and the access token often has
+                // hours of runway left. So we DELIBERATELY leave the stored
+                // credentials in place: nuking them here would strand a still-valid
+                // session. Once the access token itself expires, `token_status`
+                // reports invalid and the login flow re-authenticates cleanly.
                 return HttpReply::error(502, &format!("{msg} (HTTP {status})"));
             }
 
