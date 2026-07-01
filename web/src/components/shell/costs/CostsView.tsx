@@ -117,6 +117,9 @@ export function CostsView({ agentId }: { agentId: string }) {
         {/* ── Token distribution per tick (average) ────────────────── */}
         {filtered.length > 0 && <TokenDistribution rows={filtered} />}
 
+        {/* ── API-reported token distribution (comparison) ─────────── */}
+        {filtered.length > 0 && <ApiTokenDistribution rows={filtered} />}
+
         {/* ── Tool × Culprit cross-tab ────────────────────────────── */}
         {crossTab.tools.length > 0 && crossTab.culprits.length > 0 && (
           <CrossTabTable crossTab={crossTab} totalTicks={filtered.length} />
@@ -219,7 +222,7 @@ function heatBgDark(count: number, max: number): string | undefined {
   return `hsl(${hue}, ${sat}%, ${lit}%)`
 }
 
-import type { CrossTab } from "./parse"
+import type { CrossTab, CostRow } from "./parse"
 
 function CrossTabTable({ crossTab, totalTicks }: { crossTab: CrossTab; totalTicks: number }) {
   const [hover, setHover] = useState<{ tool: string; culprit: string } | null>(null)
@@ -347,6 +350,65 @@ function CrossTabTable({ crossTab, totalTicks }: { crossTab: CrossTab; totalTick
             </tr>
           </tfoot>
         </table>
+      </div>
+    </Section>
+  )
+}
+
+function ApiTokenDistribution({ rows }: { rows: CostRow[] }) {
+  const broken = rows.filter((r) => !r.noPanelBroken)
+
+  if (broken.length === 0) {
+    return (
+      <Section>
+        <span className="text-[13px] font-semibold text-foreground/80">
+          API-reported token layout on cache-break ticks
+        </span>
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          No cache-break ticks in the current filter selection.
+        </p>
+      </Section>
+    )
+  }
+
+  const avgHit = broken.reduce((s, r) => s + r.hitTokens, 0) / broken.length
+  const avgMiss = broken.reduce((s, r) => s + r.missTokens, 0) / broken.length
+  const avgOut = broken.reduce((s, r) => s + r.outTokens, 0) / broken.length
+  const total = avgHit + avgMiss + avgOut
+
+  const segments = [
+    { label: "Cache hit", value: avgHit, color: "var(--ok, #4ade80)" },
+    { label: "Cache miss", value: avgMiss, color: "var(--danger, #ef4444)" },
+    { label: "Output", value: avgOut, color: "#60a5fa" },
+  ]
+
+  return (
+    <Section>
+      <span className="text-[13px] font-semibold text-foreground/80">
+        API-reported token layout on cache-break ticks ({broken.length} ticks)
+      </span>
+      <div className="mt-3 flex h-7 overflow-hidden rounded-lg">
+        {segments.map((s) => (
+          <div
+            key={s.label}
+            className="flex items-center justify-center text-[10px] font-medium text-white transition-all duration-500"
+            style={{
+              width: `${(s.value / total) * 100}%`,
+              backgroundColor: s.color,
+              minWidth: s.value > 0 ? "2%" : 0,
+            }}
+          >
+            {(s.value / total) * 100 > 8 ? fmtTokens(s.value) : ""}
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+        {segments.map((s) => (
+          <span key={s.label} className="flex items-center gap-1.5">
+            <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
+            {s.label}: {fmtTokens(s.value)} avg
+          </span>
+        ))}
       </div>
     </Section>
   )
