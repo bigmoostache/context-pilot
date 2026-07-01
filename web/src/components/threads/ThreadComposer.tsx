@@ -84,8 +84,10 @@ export function ThreadComposer({
   /** true when this thread has been paused by the user (T371) */
   paused?: boolean
   onSend?: (text: string) => void
-  /** upload one or more picked files into this thread (paperclip button) */
-  onAttach?: (files: File[]) => void
+  /** upload one or more picked files into this thread (paperclip button). May
+   *  be async so a caller can await it (T471); the composer itself fires and
+   *  forgets. */
+  onAttach?: (files: File[]) => void | Promise<void>
   /** files uploaded but not yet sent — rendered as removable chips (T331) */
   pendingFiles?: UploadedFile[]
   /** remove a staged file by its index in pendingFiles */

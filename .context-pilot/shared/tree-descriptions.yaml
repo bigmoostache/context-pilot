@@ -1610,6 +1610,10 @@
   path: docs/trust-center/logos/openai.svg
   description: 'OpenAI hexagonal flower logomark SVG, fill #334155 (slate monochrome). From simple-icons CDN.'
   last_edited_ms: 1782137224579
+25f0041d0bcffaba:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298 inline FileUploadChip + shared QuickLookSheet; T304 draftKey; T331 pendingFiles+onRemoveFile; T334 onShowInFinder; T348 command suggestions; T350 CreateCommandDialog. T367/T471: OS-file drag-drop onto <main> — handleDrop uses extractDroppedFiles (recurses dropped FOLDERS via webkitGetAsEntry, fixing the folder-drop ''CORS status null'' per-file burst) then zipDropped into ONE archive, single onAttach upload; 2px blur while dragging + centered ''Uploading…'' Loader2 overlay (uploading state) while zip+upload runs; onAttach returns Promise so the loader stays up until upload lands. onAttach widened to void|Promise<void>. T414 auto-scroll non-auto only; T416 handleDelete; T417 formatTs; T429 paused. Takes agentId + onAttach.'
+  last_edited_ms: 1782905617140
 2610b21d60e96425:
   path: src/ui/help/config_overlay/builder.rs
   description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
@@ -2030,6 +2034,10 @@
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules() (incl BridgeModule). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
   last_edited_ms: 1781617163175
+2ffadfaf3375f6b1:
+  path: web/src/lib/utils.ts
+  description: 'Shared web utils. cn() (clsx+tailwind-merge). T367/T471 zip-on-drop: zipFiles(files)/zipDropped(DroppedFile[])->Promise<File> bundle dropped file(s)/folder tree into ONE .zip via fflate (DEFLATE lvl6, structure preserved); zipName picks <file>.zip / <folder>.zip / dropped-N-files.zip; uniqueZipEntry dedups colliding names. T471 folder-aware drop: extractDroppedFiles(DataTransfer)->DroppedFile[] walks webkitGetAsEntry() recursively (readAllEntries drains paginated readEntries, walkEntry recurses dirs) collecting every real file with its folder-relative path — entries captured SYNC before first await (DataTransfer neutered after handler); falls back to flat dataTransfer.files when Entry API absent. T359 list logic: resolveEnter/resolveTab + lineBounds/parseListLine. Consumed by ThreadComposer + ThreadConversation.'
+  last_edited_ms: 1782905617081
 301198d4d7060df0:
   path: crates/cp-wire/src/types/mod.rs
   description: 'ContentHash (SHA-256, Copy, hex serde: of/to_hex/from_hex). Phase enum (Idle/Streaming/Tooling), LifecycleState (Starting/Running/Stopping/Stopped), ThreadTurn (MyTurn/TheirTurn/Unknown, snake_case) — wire mirror of threads ThreadStatus, defined here (not imported from cp-mod-threads) to keep layering one-directional. Declares+re-exports ack/body/command/oplog/registry/snapshot/stream. SHA-256 vector + round-trip + ThreadTurn tolerant-decode tests.'
@@ -5066,6 +5074,10 @@
   path: web/src/components/threads/ThreadComposer.tsx
   description: Thread input composer. JS-driven auto-resize (measure scrollHeight, cap 200px) so the textarea grows line-by-line like the TUI input (replaced experimental field-sizing CSS); autoFocus + key={thread.id} remount refocuses on thread open; submit resets height + refocuses. Working hint above input on AGENT'S TURN — MY_TURN ('working this thread', signal) or ACTIVE ('streaming', green/ok); THEIR_TURN (user turn) shows none. Enter=submit, Shift+Enter=newline.
   last_edited_ms: 1781786644894
+769f554839a5fabd:
+  path: web/src/components/threads/ThreadComposer.tsx
+  description: 'Thread composer (always-active textarea + turn-status banner). T298 paperclip; T304 draftKey; T331 staged pendingFiles; T348/T350 /command bubbles + create pill; T359 Enter/Tab list logic; T371/T429 paused banner. T350 unified ComposerBubbles. T468 paste-to-upload: onPaste reads clipboardData.items+getAsFile() (not .files) for images. onAttach widened to void|Promise<void> (T471). prefill seeds expanded prompt body.'
+  last_edited_ms: 1782905617209
 76b86925b1b74eeb:
   path: web/src/components/threads/ThreadComposer.tsx
   description: Thread input composer. JS-driven auto-resize (measure scrollHeight, cap 200px) so the textarea grows line-by-line like the TUI input; autoFocus + key={thread.id} remount refocuses on thread open; submit resets height + refocuses. Enter=submit, Shift+Enter=newline, with an isComposing guard (reads e.nativeEvent.isComposing) so committing an IME/dead-key composition with Enter does NOT fire a send. Working hint above input on AGENT'S TURN — MY_TURN ('working this thread', signal) or ACTIVE ('streaming', green/ok); THEIR_TURN (user turn) shows none.
@@ -6350,6 +6362,10 @@
   path: ui/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Greeting, AgentCard grid (status badge + one-line task summary + model·cost meta — no git branch, general-user UI; Open→agent threads, Manage→modal), New-agent card. AgentModal (Apple-grade): backdrop-fade+modal-pop, gradient hero header, name-as-star field w/ live slugified realm preview, rich model cards (MODEL_META tier/blurb/price/icon, opt-rise stagger), quiet Archive ghost, name-gated primary, autofocus+Esc+⌘↵.'
   last_edited_ms: 1781530040374
+93faeeb172f57099:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Thread sidebar orchestrator. ThreadsView: selected thread state, handleArchive/handlePause/handleDelete/handleCreate/handleSend. handleAttach uploads picked/dropped files to .uploads/ via uploadUnique (sequential), stages as pendingFiles; T471: returns the upload Promise so ThreadConversation''s drop handler can await it and keep the loader up. Generic describeCommandError. Wires ThreadList + ThreadConversation + NewThreadDialog.'
+  last_edited_ms: 1782905617176
 9400c2d396c4f00a:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first design (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. Ownership checks. Render at ~28fps. Adaptive poll: 8ms streaming, 50ms idle. Time-based spinner dirty tick (100ms).'
