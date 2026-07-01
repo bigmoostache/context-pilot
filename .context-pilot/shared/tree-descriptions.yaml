@@ -5742,6 +5742,10 @@
   path: web/src/components/threads/ThreadsView.tsx
   description: Threads view assembler. Uses useThreads()+useFleet() live. handleArchive/Create/Send via sendCommand, each .catch wired to a breaker-aware flash notice (describeCommandError). Auto-selects newly created threads (pendingSelect ref + ID-set diff on useThreads update). Deselects the current thread on archive so the fallback picks the next available. SIDEBAR ALWAYS RENDERS once an agent is resolved — the early-return only bails for !agent ("Select an agent"); a fresh ZERO-thread realm still shows ThreadList (its New Thread button is the ONLY create affordance) + a center EmptyRealm with its own New Thread button, fixing the dead-end where a new agent's threads view showed no sidebar and no way to create the first thread. Keyed by agentId in App.
   last_edited_ms: 1781874930161
+86cb78afc2bdbc42:
+  path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
+  description: Claude Code OAuth helpers — usage proxy (GET /api/claude-usage), token status (GET /api/claude-login/status, now includes account_email fetched from /api/oauth/profile — T465), PKCE login flow (POST /start + /complete), token refresh (POST /refresh). Reads/writes macOS Keychain + ~/.claude/.credentials.json. PkceSession stored in Backend. fetch_account_email() hits Anthropic's /api/oauth/profile → account.email. Refresh uses grant_type=refresh_token against console.anthropic.com.
+  last_edited_ms: 1782899818578
 86e430b56e1c2543:
   path: crates/cp-orchestrator/src/liveness.rs
   description: 'Phase 15: per-agent liveness verdict (§10). Liveness enum{Live,StalePid,StaleHeartbeat,BootIdMismatch}+is_live(). verdict(entry,Option<&Heartbeat>,now_ms,max_age) pure, cheapest-first: !pid_alive→StalePid, no hb→StaleHeartbeat, !matches_boot→BootIdMismatch (pid-reuse defence), !is_fresh→StaleHeartbeat, else Live. pid_alive via nix kill(pid,None) signal-0 (Ok|EPERM=alive). 5 exhaustive verdict-matrix tests, no process spawning.'
@@ -7486,6 +7490,10 @@ af3dcb89932c06f9:
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
   last_edited_ms: 1781347849843
+af4934af72903cf5:
+  path: src/app/run/threads/commands.rs
+  description: 'Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/DeleteMessage(T416 per-message delete by epoch-ms timestamp)/Stop|Interrupt/Configure. SendMessage fires instant spine notification when message lands on CURRENTLY FOCUSED thread (T460) — user expects quick acknowledgement; unfocused threads rely on idle MY_TURN detection. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted. DeleteMessage removes single message by timestamp, emits durable MessageDeleted, updates bridge thread_msg_counts so emit_messages correctly detects subsequent appends (T418 fix). Cascade: deleting an assistant message also removes all consecutive auto:true messages PRECEDING it (tool-trace cleanup — the tool calls that produced the response), one MessageDeleted delta per removed message.'
+  last_edited_ms: 1782899638522
 af5db61fd6258800:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A warm) + DARK ''Sea'' (#2C3333/#395B64/#A5C9CA/#E7F6F2 cool) via :root/.dark token blocks. SF Pro system font for chrome, IBM Plex Mono for data only. Soft shadows, vibrancy, no phosphor glow.'
@@ -7566,6 +7574,10 @@ b15c976b1b6f7804:
   path: src/llms/claude_code/debug.rs
   description: 'Debug helpers: dump_last_request (writes API request JSON to disk) + StreamErrorContext/build_stream_read_error (verbose stream failure diagnostics).'
   last_edited_ms: 0
+b15f804005644b75:
+  path: web/src/components/shell/widgets/UsageButton.tsx
+  description: 'Claude Code OAuth usage limits button. Anthropic "A" logomark trigger opens popover with account email (T465), token status (valid/expired + expiry + refresh button), session/weekly usage bars (color-coded by severity), and LoginFlow (PKCE: open browser → copy code#state → paste → exchange). Refresh button (RefreshCw icon) next to expiry. Lazy-fetches on open, 30s auto-refresh.'
+  last_edited_ms: 1782899818642
 b18c7caa4f869853:
   path: ui/src/components/finder/FinderViews.tsx
   description: 'Finder main-area views. GridView/ListView/ColumnsView/GalleryView render macOS <FileIcon kind ext size/> (T27). Grid (icon-size slider + finder-pop stagger + TagDots + focus ring), List (zebra + sortable headers + tags), Columns (Miller + metadata preview pane), Gallery (hero + filmstrip). Grid + List buttons carry data-finder-item + data-path for marquee hit-testing (T32). TagDots export. ViewHandlers: onClick(node,{additive,range})/onOpen/onContext.'

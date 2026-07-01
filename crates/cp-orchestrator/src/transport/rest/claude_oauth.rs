@@ -76,13 +76,15 @@ pub(crate) fn token_status() -> HttpReply {
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis() as i64)
                 .unwrap_or(0);
-            let valid =
-                expires_at > now_ms && oauth.get("accessToken").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
+            let token = oauth.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
+            let valid = expires_at > now_ms && !token.is_empty();
+            let account_email = if valid { fetch_account_email(token) } else { None };
             HttpReply::ok(&TokenStatusResponse {
                 valid,
                 expires_at: if expires_at > 0 { Some(expires_at) } else { None },
                 subscription_type: oauth.get("subscriptionType").and_then(|v| v.as_str()).map(str::to_owned),
                 rate_limit_tier: oauth.get("rateLimitTier").and_then(|v| v.as_str()).map(str::to_owned),
+                account_email,
             })
         }
         None => HttpReply::ok(&TokenStatusResponse {
@@ -90,6 +92,7 @@ pub(crate) fn token_status() -> HttpReply {
             expires_at: None,
             subscription_type: None,
             rate_limit_tier: None,
+            account_email: None,
         }),
     }
 }
@@ -406,6 +409,21 @@ fn read_random(buf: &mut [u8]) -> Result<(), std::io::Error> {
     std::fs::File::open("/dev/urandom")?.read_exact(buf)
 }
 
+/// Fetch the account email from Anthropic's OAuth profile endpoint.
+fn fetch_account_email(token: &str) -> Option<String> {
+    let client = reqwest::blocking::Client::new();
+    let resp = client
+        .get("https://api.anthropic.com/api/oauth/profile")
+        .header("Authorization", format!("Bearer {token}"))
+        .header("User-Agent", "claude-code/2.1.196")
+        .header("anthropic-beta", "oauth-2025-04-20")
+        .timeout(Duration::from_secs(5))
+        .send()
+        .ok()?;
+    let val: serde_json::Value = resp.json().ok()?;
+    val.get("account")?.get("email")?.as_str().map(str::to_owned)
+}
+
 // ── Response types ───────────────────────────────────────────────────
 
 #[derive(Serialize)]
@@ -417,6 +435,8 @@ struct TokenStatusResponse {
     subscription_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rate_limit_tier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    account_email: Option<String>,
 }
 
 #[derive(Serialize)]

@@ -373,6 +373,10 @@
       },
       "ClaudeTokenStatus": {
         "properties": {
+          "account_email": {
+            "nullable": true,
+            "type": "string"
+          },
           "expires_at": {
             "nullable": true,
             "type": "integer"

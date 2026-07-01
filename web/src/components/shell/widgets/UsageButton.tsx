@@ -283,6 +283,11 @@ export function UsageButton() {
       <PopoverContent side="bottom" align="end" sideOffset={8} className="w-72 space-y-3 p-4">
         <h4 className="text-[13px] font-semibold">Claude Code Usage</h4>
 
+        {/* ── Account email ────────────────────────────────── */}
+        {tokenStatus.data?.account_email && (
+          <p className="truncate text-[11px] text-muted-foreground">{tokenStatus.data.account_email}</p>
+        )}
+
         {/* ── Token status ─────────────────────────────────── */}
         {tokenStatus.isLoading && (
           <div className="flex items-center justify-center py-2">
