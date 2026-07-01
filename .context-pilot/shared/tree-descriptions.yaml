@@ -558,6 +558,10 @@
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
   last_edited_ms: 0
+0da754c35827adba:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool/culprit-cost bars, two token distribution bars (panel-estimated before/culprit/after + API-reported hit/miss/output for comparison), Tool×Culprit cross-tab with heat-map. Both token bars show ALL filtered ticks (no secondary break filter). Tempo/queue/no-break AND-filters. Copy as Markdown button. TanStack useQuery + fetchFsPreview 15s refetch.
+  last_edited_ms: 1782924538064
 0da920e8196626fc:
   path: crates/cp-orchestrator/tests/services_integration.rs
   description: 'Phase 29 (X796) backend services integration suite (4 tests, green, ~0.1s). Drives MaterializedView+CostBreaker+StreamHub TOGETHER against a REAL cp-oplog via channel::Tailer (composition the inline unit tests'' crafted OpEntry literals can''t reach): (1) restart rebuild end-to-end I5+V9: OplogService.append_durable(heads+phase+rising cost)->shutdown->tail_all(Tailer.poll)->view.apply_batch->breaker.rebuild_from_view trips; (2) real segment-roll checkpoint folds to ground-truth head: spawn_with_segment_limit(64) forces rolls (leading authoritative Checkpoint), asserts >=1 Checkpoint rode stream + final head correct; (3) R2-17 reconcile: degraded hub subscriber''s authoritative snapshot = view heads folded from real oplog, mark_reconciled clears degraded+dropped; (4) fleet isolation: 2 agents 2 oplogs -> view 2 isolated projections, breaker trips only overspender, hub fans per-agent. helpers message/cost/token/tail_all. Top `use cp_mod_bridge/nix/serde/serde_json/tiny_http as _;`.'
@@ -2338,6 +2342,10 @@
   path: crates/cp-orchestrator/src/registry.rs
   description: 'Phase 15 (X782): AgentRegistry — fleet discovery via poll-based scan-and-diff (NOT kernel watch; agents appear/vanish rarely). scan()->Vec<Event>{Appeared(Entry),Disappeared(id),StatusChanged(id,status),Stale(id,Liveness)} reads ~/.context-pilot/agents/*.json, applies liveness verdict, diffs vs prior pass (known:HashMap<id,Snapshot{entry,liveness}>). Stale fires only on Live→non-live transition (first-sight staleness rides Appeared). reap_tmp(grace) deletes *.tmp older than DEFAULT_TMP_GRACE(60s) — GAP3 grace rule applied to registry writes. read_records skips *.tmp+unparseable (half-written/foreign non-fatal). read_heartbeat=None on absent/torn/wrong-len. default_agents_dir=$HOME/.context-pilot/agents. 7 tests. let _previous=fresh.insert (unused_results).'
   last_edited_ms: 1781629188033
+36b485a6462df182:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool bars, two token distribution bars (panel-estimated before/culprit/after + API-reported hit/miss/output for comparison), Tool×Culprit cross-tab with heat-map. Both token bars show ALL filtered ticks (no secondary break filter). Tempo/queue/no-break AND-filters. Copy as Markdown button. TanStack useQuery + fetchFsPreview 15s refetch.
+  last_edited_ms: 1782924009806
 36c52623bdc50f5d:
   path: src/infra/profiler.rs
   description: RAII ProfileGuard macro (profile!) for perf.log (>5ms). log_tool_time() appends ALL tool executions to .context-pilot/logs/tool-times.log — local datetime, elapsed ms, tool name(s).
@@ -3098,6 +3106,10 @@
   path: web/src/components/agents/MarkdownEditor.tsx
   description: 'WYSIWYG markdown editor (contentEditable + execCommand toolbar: bold/italic/strike/h1/h2/quote/code/lists/link). Seeds via mdToHtml on mount (uncontrolled, caret-safe). X906: optional onChange(md) fires htmlToMarkdown (DOM→markdown, inverse of mdToHtml; bounded tag set + degrade) on every edit so a host (FinderPreview EditableMarkdown) can save back. No onChange = pure prompt-library maquette.'
   last_edited_ms: 1781895403678
+4622be0b4e0bba3e:
+  path: web/src/components/shell/costs/parse.ts
+  description: 'TSV parser for cost-tracking.tsv. CostRow interface (15 fields), parseCostTsv(), aggregation helpers: computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, crossTabToolCulprit (count matrix). buildMarkdownReport() serializes current filtered state as clean markdown tables (all ticks, no secondary break filter).'
+  last_edited_ms: 1782924537984
 462da74f3732a8cd:
   path: crates/cp-mod-callback/src/tools.rs
   description: Callback tool dispatch with flame!("cb_dispatch"). Routes upsert/toggle/open_editor/close_editor. Delegates upsert to tools_upsert.rs.
@@ -6346,6 +6358,10 @@
   path: src/app/run/threads/bridge.rs
   description: 'Bridge command intake + live-state emission (gated bridge-ON). accept_commands: non-blocking accept off the listener, then set_nonblocking(FALSE) on the accepted stream BEFORE handle_connection — the accepted fd INHERITS the listener''s non-blocking flag (macOS / Linux-without-accept4), so left non-blocking the read loop hits a transient WouldBlock the instant the AF_UNIX socket buffer (~8KiB) drains mid-frame and treats it as fatal → any command larger than the buffer closes the connection → backend BrokenPipe / 502 ''agent unreachable'' (the ''big messages don''t go through'' bug, T274). Forcing blocking makes the 500ms per-read timeout the real wedge-guard. poll_bridge_commands drains ALL pending commands/tick (Leg 3) → super::commands::apply_command, then save_state_async() when ≥1 applied — LOAD-BEARING for config-only mutations with NO oplog delta (chiefly Configure provider+model, T262; else reverts on reload). emit_roster_delta (pub(super)) = non-blocking DURABLE oplog append on thread mutation. emit_vitals = best-effort PhaseTransition+CostAggregate on-change. emit_thread_status = DURABLE ThreadStatusChanged on flip (observe-on-change vs memo). emit_thread_focus = BEST-EFFORT ThreadFocusChanged on change (self-heals from disk FocusState). wire_turn (pub(super)) ThreadStatus→ThreadTurn. Command APPLICATION in sibling commands.rs.'
   last_edited_ms: 0
+90d5a001b355583b:
+  path: web/src/components/shell/costs/parse.ts
+  description: 'TSV parser for cost-tracking.tsv. CostRow interface (15 fields), parseCostTsv(), aggregation helpers: computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, crossTabToolCulprit (count matrix). buildMarkdownReport() serializes current filtered state as clean markdown tables (all ticks, no secondary break filter).'
+  last_edited_ms: 1782924024331
 90f4eb3e30593ec0:
   path: src/llms/claude_code_v2/mod.rs
   description: 'Claude Code V2 OAuth client. Same OAuth tokens as claude_code but updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API (thinking/effort/context_management would work). Models: claude-opus-4-8, claude-fable-5, claude-sonnet-4-6 (both 1M ctx). Reuses helpers + parse_sse_stream from claude_code_api_key.'
