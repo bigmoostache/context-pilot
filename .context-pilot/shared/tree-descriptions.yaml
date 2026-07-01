@@ -6194,6 +6194,10 @@
   path: crates/cp-mod-brave/src/api.rs
   description: Brave Search HTTP client. BraveClient with retry (3 attempts, 1s delay on 5xx). SearchParams + LLMContextParams structs. Rich callback fetching. Custom URL encoding. 10s request timeout.
   last_edited_ms: 0
+8eca6ee9702372ed:
+  path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
+  description: 'Claude Code OAuth helpers — usage proxy, token status (incl account_email via /api/oauth/profile), PKCE login (start/complete), token refresh. T474 canonical-fix: state param MUST equal code_verifier (independent random state broke authorization_code exchange = login break); TOKEN_USER_AGENT ''claude-cli/2.1.196 (external, cli)'' sent on BOTH exchange_and_store + refresh_login (Anthropic token endpoint rejects/misroutes default reqwest UA). Endpoints per cedws/ben-vargas gists: authorize=claude.ai/oauth/authorize, token=console.anthropic.com/v1/oauth/token, redirect=console.anthropic.com/oauth/code/callback, client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e. Refresh failure still leaves stored creds in place (access-token lifetime independent of refresh token). Reads/writes macOS Keychain + ~/.claude/.credentials.json.'
+  last_edited_ms: 1782908387458
 8ecc8199209ebfed:
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. Manage mode (T321): wider (w-960px) 2-col grid when auth enabled — left = name + provider/model form, right = <AgentAclSection>. Single-col when auth disabled. max-h constrained + scrollable body. Clickable avatar in header uploads profile pic (T338). Submit sends Configure + renameAgent (T328, concurrent Promise.all when name changed). Restart/Retire footer. Create mode: narrower single-col, useCreateAgent.'
@@ -7078,6 +7082,10 @@ a34caa386a8e5450:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. execute() dispatches to execute_select/dml/ddl. dry_run via SAVEPOINT+ROLLBACK. Parsing helpers now imported from crate::parse (moved to sql/parse.rs). request_path reads .sql files. live/output_path routing. ≤150 lines AND ≤8000 bytes inline+tempo, bigger→entity_result panel. 200-row cap. RETURNING support.
   last_edited_ms: 0
+a375d6672418c7f9:
+  path: src/app/prompt/repair.rs
+  description: 'Final-phase tool-pairing repair. Enforces Anthropic ''tool_result immediately after tool_use'' adjacency: prepends synthetic MISSING_TOOL_RESULT placeholders for orphaned tool_use ids, inserts a user msg when none follows, drops stray tool_results with no adjacent call, prunes emptied user msgs. Self-heals reshuffled/truncated (esp. queue-flush) histories to prevent API 400. 6 unit tests (incl interleaving repro) written panic/unwrap/expect/indexing-free via Option-chain asserts (all four are forbid lints, incl in tests).'
+  last_edited_ms: 1782908387516
 a37d1b3869ea7b71:
   path: crates/cp-base/src/tools/async_exec.rs
   description: Async tool execution — spawn_async_tool() runs blocking I/O on worker thread. ToolOutput struct (content, is_error, create_panel, preserves_tempo). BLOCKING_TOOL_SENTINEL constant. ChannelWatcher registration. Error encoding via ASYNC_ERROR_PREFIX in description.

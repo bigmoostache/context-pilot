@@ -138,9 +138,14 @@ mod tests {
         ApiMessage { role: "user".to_string(), content }
     }
 
-    /// Ids of tool_result blocks in a message, in order.
+    /// Ids of `tool_result` blocks in a message, in order.
     fn result_ids(msg: &ApiMessage) -> Vec<String> {
         tool_result_ids_of(msg)
+    }
+
+    /// True if the message carries a text block equal to `needle`.
+    fn has_text(msg: &ApiMessage, needle: &str) -> bool {
+        msg.content.iter().any(|b| matches!(b, ContentBlock::Text { text } if text == needle))
     }
 
     #[test]
@@ -149,9 +154,9 @@ mod tests {
         let mut msgs = vec![asst(vec![tu("A")]), user(vec![text("hi")])];
         repair_tool_pairing(&mut msgs);
         // The following user message now leads with a synthetic result for A.
-        assert_eq!(result_ids(&msgs[1]), vec!["A".to_string()]);
+        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_string()]));
         // Original text is preserved after the injected result.
-        assert!(msgs[1].content.iter().any(|b| matches!(b, ContentBlock::Text { text } if text == "hi")));
+        assert_eq!(msgs.get(1).map(|m| has_text(m, "hi")), Some(true));
     }
 
     #[test]
@@ -167,10 +172,10 @@ mod tests {
         repair_tool_pairing(&mut msgs);
         // flush_1's assistant message (idx 0) must now be immediately followed by a
         // user message carrying flush_1's result.
-        assert_eq!(msgs[0].role, "assistant");
-        assert_eq!(tool_use_ids_of(&msgs[0]), vec!["flush_1".to_string()]);
-        assert_eq!(msgs[1].role, "user");
-        assert!(result_ids(&msgs[1]).contains(&"flush_1".to_string()));
+        assert_eq!(msgs.first().map(|m| m.role.as_str()), Some("assistant"));
+        assert_eq!(msgs.first().map(tool_use_ids_of), Some(vec!["flush_1".to_string()]));
+        assert_eq!(msgs.get(1).map(|m| m.role.as_str()), Some("user"));
+        assert_eq!(msgs.get(1).map(|m| result_ids(m).contains(&"flush_1".to_string())), Some(true));
     }
 
     #[test]
@@ -179,8 +184,8 @@ mod tests {
         let mut msgs = vec![asst(vec![text("done"), tu("A")])];
         repair_tool_pairing(&mut msgs);
         assert_eq!(msgs.len(), 2);
-        assert_eq!(msgs[1].role, "user");
-        assert_eq!(result_ids(&msgs[1]), vec!["A".to_string()]);
+        assert_eq!(msgs.get(1).map(|m| m.role.as_str()), Some("user"));
+        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_string()]));
     }
 
     #[test]
@@ -189,14 +194,14 @@ mod tests {
         let before = msgs.clone();
         repair_tool_pairing(&mut msgs);
         assert_eq!(msgs.len(), before.len());
-        assert_eq!(result_ids(&msgs[1]), vec!["A".to_string(), "B".to_string()]);
+        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_string(), "B".to_string()]));
         // No placeholder content injected.
-        assert!(
-            !msgs[1]
-                .content
+        let has_placeholder = msgs.get(1).map(|m| {
+            m.content
                 .iter()
                 .any(|b| matches!(b, ContentBlock::ToolResult { content, .. } if content == MISSING_TOOL_RESULT))
-        );
+        });
+        assert_eq!(has_placeholder, Some(false));
     }
 
     #[test]
@@ -205,18 +210,19 @@ mod tests {
         let mut msgs = vec![asst(vec![text("hello")]), user(vec![tr("ghost"), text("keep")])];
         repair_tool_pairing(&mut msgs);
         // The ghost result is stripped; the text survives.
-        assert!(result_ids(&msgs[1]).is_empty());
-        assert!(msgs[1].content.iter().any(|b| matches!(b, ContentBlock::Text { text } if text == "keep")));
+        assert_eq!(msgs.get(1).map(|m| result_ids(m).is_empty()), Some(true));
+        assert_eq!(msgs.get(1).map(|m| has_text(m, "keep")), Some(true));
     }
 
     #[test]
     fn placeholder_uses_missing_result_content() {
         let mut msgs = vec![asst(vec![tu("A")]), user(vec![text("x")])];
         repair_tool_pairing(&mut msgs);
-        let injected = msgs[1]
-            .content
-            .iter()
-            .find_map(|b| if let ContentBlock::ToolResult { content, .. } = b { Some(content.clone()) } else { None });
+        let injected = msgs.get(1).and_then(|m| {
+            m.content.iter().find_map(|b| {
+                if let ContentBlock::ToolResult { content, .. } = b { Some(content.clone()) } else { None }
+            })
+        });
         assert_eq!(injected.as_deref(), Some(MISSING_TOOL_RESULT));
     }
 }
