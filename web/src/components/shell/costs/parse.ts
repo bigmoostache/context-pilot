@@ -14,7 +14,8 @@ export interface CostRow {
   tokensAfter: number
   queueActive: boolean
   tempoActive: boolean
-  noPanelBroken: boolean
+  /** Cache break kind: "no_break" | "content_changed" | "panel_appeared" | "panel_disappeared". */
+  breakKind: string
   /** Configured max_freezes for the culprit panel (0 when no culprit). */
   culpritMaxFreezes: number
   hitTokens: number
@@ -46,7 +47,7 @@ export function parseCostTsv(content: string): CostRow[] {
         tokensAfter: Number(c[5]),
         queueActive: c[6] === "true",
         tempoActive: c[7] === "true",
-        noPanelBroken: c[8] === "true",
+        breakKind: c[8] ?? "no_break",
         culpritMaxFreezes: has16 ? Number(c[9]) : 0,
         hitTokens: Number(c[9 + o]),
         hitCost: Number(c[10 + o]),
@@ -80,7 +81,7 @@ const CULPRIT_PALETTE = [
 
 /** Culprit panel type → frequency + total miss cost. */
 export function culpritDistribution(rows: CostRow[]): Slice[] {
-  const broken = rows.filter((r) => !r.noPanelBroken)
+  const broken = rows.filter((r) => r.breakKind !== "no_break")
   const map = new Map<string, number>()
   for (const r of broken) {
     map.set(r.culprit, (map.get(r.culprit) ?? 0) + 1)
@@ -135,7 +136,7 @@ export function computeSummary(rows: CostRow[]): Summary {
     totalHit += r.hitTokens
     totalMiss += r.missTokens
     totalOut += r.outTokens
-    if (r.noPanelBroken) clean++
+    if (r.breakKind === "no_break") clean++
   }
   const totalInput = totalHit + totalMiss
   return {
@@ -214,7 +215,7 @@ function mdTok(v: number): string {
 export function buildMarkdownReport(
   filtered: CostRow[],
   totalRows: number,
-  filters: { tempo: string; queue: string; noBreak: string },
+  filters: { tempo: string; queue: string; breakKind: string },
 ): string {
   const s = computeSummary(filtered)
   const culprits = culpritDistribution(filtered)
@@ -230,7 +231,7 @@ export function buildMarkdownReport(
   const fParts: string[] = []
   if (filters.tempo !== "all") fParts.push(`Tempo=${filters.tempo === "1" ? "On" : "Off"}`)
   if (filters.queue !== "all") fParts.push(`Queue=${filters.queue === "1" ? "On" : "Off"}`)
-  if (filters.noBreak !== "all") fParts.push(`NoBreak=${filters.noBreak === "1" ? "On" : "Off"}`)
+  if (filters.breakKind !== "all") fParts.push(`Break=${filters.breakKind}`)
   if (fParts.length > 0) push(`**Filters:** ${fParts.join(", ")}`)
   push(`**Ticks:** ${s.totalTicks}${s.totalTicks !== totalRows ? ` (filtered from ${totalRows})` : ""}`, "")
 
@@ -341,7 +342,7 @@ export function buildMarkdownReport(
 export function maxFreezePerCulprit(rows: CostRow[]): Slice[] {
   const map = new Map<string, number>()
   for (const r of rows) {
-    if (r.noPanelBroken) continue
+    if (r.breakKind === "no_break") continue
     const key = r.culprit || "unknown"
     // Always take the latest value (overwrite) — reflects current code config
     map.set(key, r.culpritMaxFreezes)
@@ -359,7 +360,7 @@ export function maxFreezePerCulprit(rows: CostRow[]): Slice[] {
 export function culpritCostAttribution(rows: CostRow[]): Slice[] {
   const map = new Map<string, number>()
   for (const r of rows) {
-    if (r.noPanelBroken) continue
+    if (r.breakKind === "no_break") continue
     const totalCost = r.hitCost + r.missCost + r.outCost
     const key = r.culprit || "unknown"
     map.set(key, (map.get(key) ?? 0) + totalCost)

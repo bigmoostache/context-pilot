@@ -7,7 +7,7 @@ use crate::infra::tools::refresh_conversation_context;
 use crate::modules;
 use crate::state::cache::hash_content;
 use crate::state::{Message, State};
-use cp_base::state::runtime::TickTelemetry;
+use cp_base::state::runtime::{CacheBreakKind, TickTelemetry};
 
 mod detach;
 
@@ -180,6 +180,7 @@ pub(super) fn prepare_stream_context(
         let mut culprit_type: Option<String> = None;
         let mut culprit_panel_idx: Option<usize> = None;
         let mut culprit_max_freezes: u8 = 0;
+        let mut culprit_is_new = false;
         let mut panel_token_counts: Vec<usize> = Vec::new();
         let mut panel_idx: usize = 0;
 
@@ -203,6 +204,7 @@ pub(super) fn prepare_stream_context(
                     culprit_panel_idx = Some(panel_idx);
                     culprit_type = Some(item.id.clone());
                     culprit_max_freezes = 0; // orphaned panel — no Entry, no max_freezes
+                    culprit_is_new = true; // orphaned = never emitted
                 }
                 cache_broken = true;
                 panel_token_counts.push(crate::state::estimate_tokens(&item.content));
@@ -236,6 +238,7 @@ pub(super) fn prepare_stream_context(
                         culprit_panel_idx = Some(panel_idx);
                         culprit_type = Some(entry.context_type.to_string());
                         culprit_max_freezes = panel.max_freezes();
+                        culprit_is_new = last_hash.is_none();
                     }
                     entry.freeze_count = 0;
                     entry.emitted.hash = Some(fresh_hash.clone());
@@ -277,6 +280,39 @@ pub(super) fn prepare_stream_context(
 
         state.previous_panel_hash_list = new_hash_list;
 
+        // === Detect disappeared panels ===
+        // A panel from SA that's missing from SB breaks the prompt even though
+        // the freeze loop (which only iterates SB's panels) wouldn't detect it.
+        let break_kind = if cache_broken {
+            if culprit_is_new { CacheBreakKind::PanelAppeared } else { CacheBreakKind::ContentChanged }
+        } else {
+            let current_ids: std::collections::HashSet<&str> =
+                context_items.iter().filter(|item| item.id != "chat").map(|item| item.id.as_str()).collect();
+            let disappeared = state.previous_panel_id_types.iter().find(|(id, _)| !current_ids.contains(id.as_str()));
+            if let Some((_gone_id, gone_type)) = disappeared {
+                culprit_type = Some(gone_type.clone());
+                // No panel_idx — disappeared panel isn't in current items.
+                // Token decomposition: all current tokens go to "before".
+                CacheBreakKind::PanelDisappeared
+            } else {
+                CacheBreakKind::NoBreak
+            }
+        };
+
+        // Save panel (id, context_type) for next tick's disappearance detection
+        state.previous_panel_id_types = context_items
+            .iter()
+            .filter(|item| item.id != "chat")
+            .map(|item| {
+                let ctx_type = state
+                    .context
+                    .iter()
+                    .find(|c| c.id == item.id)
+                    .map_or_else(|| item.id.clone(), |c| c.context_type.to_string());
+                (item.id.clone(), ctx_type)
+            })
+            .collect();
+
         // === Tick telemetry: culprit decomposition + freeze flags ===
         let (tokens_before, tok_culprit, tokens_after) = culprit_panel_idx.map_or_else(
             || {
@@ -311,7 +347,7 @@ pub(super) fn prepare_stream_context(
             tokens_after_culprit: tokens_after,
             queue_is_active: cond.queue_active,
             tempo_is_active: cond.tempo,
-            no_panel_broken: !cache_broken,
+            break_kind,
             culprit_max_freezes,
         });
     }

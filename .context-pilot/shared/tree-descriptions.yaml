@@ -406,6 +406,10 @@
   path: .env
   description: Environment variables (.env)
   last_edited_ms: 0
+09084a0f588dca1b:
+  path: web/src/components/shell/costs/tables.tsx
+  description: Extracted table/distribution components for Cost Analysis. CrossTabTable (tool×culprit heat-map with hover cross-hair), TokenDistribution (before/culprit/after bar), ApiTokenDistribution (hit/miss/output bar). Heat-map helpers (heatBg/heatBgDark HSL interpolation).
+  last_edited_ms: 1782989201879
 09105acc9b71bd0a:
   path: web/src/App.tsx
   description: 'App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Uses useFleet() for live agents. Persists activeAgentId + view in localStorage (cp-agent, cp-view). effectiveView guard: falls back to ''fleet'' when a non-fleet view is persisted but activeAgent is undefined (fleet still loading OR stale localStorage agent id) — fixes the reload crash ''activeAgent is undefined'' at the Finder branch (T29). Mounts AccountProvider + TooltipProvider. Passes agents to TopBar/FleetShell/StatusBar; activeAgent to StatusBar.'
@@ -1338,6 +1342,14 @@
   path: ui/src/components/shell/StatusBar.tsx
   description: 'Bottom status bar: phase badge (READY/STREAMING/TOOLING/BLOCKED), agent/skill chips, git/queue/think, reverie/auto, cost.'
   last_edited_ms: 0
+1edb2285eb8fff89:
+  path: crates/cp-base/src/state/runtime.rs
+  description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. CacheBreakKind enum (NoBreak/ContentChanged/PanelAppeared/PanelDisappeared) + TickTelemetry struct with break_kind field. TypeMap for module_data. Message creation helpers.
+  last_edited_ms: 1782989201950
+1ee40b092f113563:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: 'Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool/culprit-cost/max-freeze bars, two token distribution bars (panel-estimated + API-reported). Tempo/queue/breakKind AND-filters (BreakKindFilter: 5-button group for no_break/content_changed/panel_appeared/panel_disappeared). Copy as Markdown button. TanStack useQuery + fetchFsPreview 15s refetch.'
+  last_edited_ms: 1782989202224
 1f0531e23b9fbbeb:
   path: crates/cp-orchestrator/src/runtime.rs
   description: 'Runtime — env Config (port/agents_dir/budget/scan_interval + X896 agents_root[CP_AGENTS_ROOT ~/code] + agent_binary[CP_AGENT_BINARY <cwd>/target/release/tui]) + driver loop with TWO decoupled cadences: slow scan_interval (2s) registry scan + config.json mtime backstop + tmp reap; fast TAIL_INTERVAL (100ms) tail_all_agents (Tailer.poll→view.apply_batch→breaker.observe). Runtime::new builds Backend with the 4-arg new. serve() blocks on HTTP.'
@@ -3234,6 +3246,10 @@
   path: crates/cp-wire/src/types/snapshot.rs
   description: 'Bounded replay snapshot: Snapshot{heads,seen}. Heads (per-thread/panel content hashes, O(threads+panels)) + SeenSet (dedup-tokens of durable command effects, evicted by acked-rev via evict_through, NEVER time — I4/R2-1). SeenSet.mark idempotent keeps first rev. Checkpoint carries Snapshot (both heads AND seen) so seen rebuild doesn''t fold from offset 0. Replaces old heads.rs (merged to keep types/ ≤ 8 files). 9 tests.'
   last_edited_ms: 0
+496f76b2d8724f6b:
+  path: web/src/components/shell/costs/parse.ts
+  description: 'TSV parser for cost-tracking.tsv. CostRow interface (16 fields incl breakKind string enum + culpritMaxFreezes), parseCostTsv(), aggregation helpers: computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, maxFreezePerCulprit, crossTabToolCulprit (count matrix). buildMarkdownReport() serializes current filtered state as clean markdown tables.'
+  last_edited_ms: 1782989202156
 49743315fcd05fc7:
   path: web/src/components/shell/StatusBar.tsx
   description: 'Bottom status footer. Fleet mode: accepts agents prop for aggregates (count, threads, needs-you, spend). Agent mode: accepts activeAgent prop, derives phase from status, wires cost live. Cache bar (cacheStats/tokenBudget) still mock.'
@@ -3518,6 +3534,10 @@
   path: web/src/components/finder/internal/useFinderKeyboard.ts
   description: 'Finder surface keyboard map hook: arrow nav, type-ahead, Space QuickLook, Enter→rename (⌘/Ctrl+O open), ⌘⌫ Trash, Backspace go-up, ⌘A select-all, Esc clear. Returns onKeyDown.'
   last_edited_ms: 1782038018622
+4f972b6c26ea2d91:
+  path: src/app/context/mod.rs
+  description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. Culprit detection records panel type + max_freezes + break_kind (CacheBreakKind enum). Disappearance detection via previous_panel_id_types. flame!("prepare_context"). Reverie path branches.
+  last_edited_ms: 1782989202018
 4f9b6f05552aa603:
   path: crates/cp-mod-todo/src/lib.rs
   description: 'Todo module. 3 tools: create/update/move. Fixed TODO panel (fixed_order=0, top priority). Nested object params with parent_id nesting. overview shows X/Y done. Drives spine auto-continuation.'
@@ -4746,6 +4766,10 @@
   path: crates/cp-mod-scratchpad/src/types.rs
   description: ScratchpadCell (id/title/content), ScratchpadState (cells + next_id counter) with ext accessors
   last_edited_ms: 0
+6beecdf144c6b9e3:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 6bf1badd5b65fc8c:
   path: src/llms/cache/mod.rs
   description: 'Module declarations: cache_engine, cache_optimizer, density.'
@@ -5562,6 +5586,10 @@
   path: crates/cp-mod-bridge/src/command.rs
   description: 'Intake — agent command intake (authn + journal-then-ack + dedup, I9/I11/I4). MAX_CONNECTION_BUFFER=32MiB (raised from 1MiB, T274): handle_connection accumulates a framed command into a buffer and overflows past this cap; a >1MiB SendMessage frame was rejected as overflow (third of three caps on the big-message path — the agent socket-buffer non-blocking bug in src/app/run/threads/bridge.rs accept_commands was the deeper blocker, this cap the next). Kept in lockstep with the backend transport''s MAX_BODY. new(oplog_dir,cap_token) seeds SeenSet via replay. handle_frame/handle_connection: decode→auth (empty/mismatch→reject)→dedup (seen→accept no re-apply)→append_durable(CommandEffect) fsync-before-accept (fail-closed on journal err). Does NOT apply (caller injects via K7) and does NOT own OplogService (single-writer, Boot-owned). 7 tests incl V2 dedup-survives-deadman-reexec.'
   last_edited_ms: 1781884728399
+7df483b38fecb2c2:
+  path: src/app/run/tools/cost_log.rs
+  description: Per-tick cost-tracking TSV. append_cost_tsv() consumes TickTelemetry (culprit + token layout + break_kind + culprit_max_freezes from stream start) + tick cost counters (from stream end), appends 16-column row to .context-pilot/logs/cost-tracking.tsv. Best-effort, never blocks pipeline.
+  last_edited_ms: 1782989202086
 7e287be06fea8478:
   path: src/app/run/threads/messages.rs
   description: 'Phase 2.2 (X839): live thread-message emission for the main loop. emit_messages = observe-on-change chokepoint diffing each thread''s message vector vs BridgeState.thread_msg_counts (seeded no-emit on first pass so a restarted agent doesn''t replay backlog). build_pending → JSON body {id,author,text,ts,question,fileRef}; emit_one_message stages body in content-addressed Store (I13 barrier: small=Inline rides delta, large=Spilled durable file) BEFORE submit_durable(MessageCreated{thread_id,message_id,head,inline_body}). No-op bridge-OFF. Captures messages from every source (Send tool / TUI reply / web SendMessage) via one uniform path.'

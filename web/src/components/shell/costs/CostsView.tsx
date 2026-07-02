@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { fetchFsPreview } from "@/lib/api/finder"
 import { parseCostTsv, computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, maxFreezePerCulprit, crossTabToolCulprit, buildMarkdownReport } from "./parse"
 import { DonutChart, HBarChart, CostTimeline, fmtDollar, fmtTokens } from "./charts"
+import { CrossTabTable, TokenDistribution, ApiTokenDistribution } from "./tables"
 
 /**
  * Cost Analysis dashboard — developer-only view that reads the per-tick
@@ -22,15 +23,15 @@ export function CostsView({ agentId }: { agentId: string }) {
   // ── Filters ───────────────────────────────────────────────────────────────
   const [tempoFilter, setTempoFilter] = useState<"all" | "0" | "1">("all")
   const [queueFilter, setQueueFilter] = useState<"all" | "0" | "1">("all")
-  const [breakFilter, setBreakFilter] = useState<"all" | "0" | "1">("all")
+  const [breakKindFilter, setBreakKindFilter] = useState<string>("all")
 
   const filtered = useMemo(() => {
     let r = rows
     if (tempoFilter !== "all") r = r.filter((x) => (tempoFilter === "1") === x.tempoActive)
     if (queueFilter !== "all") r = r.filter((x) => (queueFilter === "1") === x.queueActive)
-    if (breakFilter !== "all") r = r.filter((x) => (breakFilter === "1") === x.noPanelBroken)
+    if (breakKindFilter !== "all") r = r.filter((x) => x.breakKind === breakKindFilter)
     return r
-  }, [rows, tempoFilter, queueFilter, breakFilter])
+  }, [rows, tempoFilter, queueFilter, breakKindFilter])
 
   const summary = useMemo(() => computeSummary(filtered), [filtered])
   const culprits = useMemo(() => culpritDistribution(filtered), [filtered])
@@ -45,13 +46,13 @@ export function CostsView({ agentId }: { agentId: string }) {
     const md = buildMarkdownReport(filtered, rows.length, {
       tempo: tempoFilter,
       queue: queueFilter,
-      noBreak: breakFilter,
+      breakKind: breakKindFilter,
     })
     navigator.clipboard.writeText(md).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     })
-  }, [filtered, rows.length, tempoFilter, queueFilter, breakFilter])
+  }, [filtered, rows.length, tempoFilter, queueFilter, breakKindFilter])
 
   if (isLoading) {
     return (
@@ -83,7 +84,7 @@ export function CostsView({ agentId }: { agentId: string }) {
             <h2 className="text-[17px] font-bold tracking-tight text-foreground">Cost Analysis</h2>
             <p className="mt-0.5 text-[12px] text-muted-foreground">
               Per-tick cache efficiency and spend breakdown · {summary.totalTicks} ticks
-              {(tempoFilter !== "all" || queueFilter !== "all" || breakFilter !== "all") && ` (filtered from ${rows.length})`}
+              {(tempoFilter !== "all" || queueFilter !== "all" || breakKindFilter !== "all") && ` (filtered from ${rows.length})`}
             </p>
           </div>
           <button
@@ -98,7 +99,7 @@ export function CostsView({ agentId }: { agentId: string }) {
         <div className="flex flex-wrap items-center gap-4">
           <FilterGroup label="Tempo" value={tempoFilter} onChange={setTempoFilter} />
           <FilterGroup label="Queue" value={queueFilter} onChange={setQueueFilter} />
-          <FilterGroup label="No break" value={breakFilter} onChange={setBreakFilter} />
+          <BreakKindFilter value={breakKindFilter} onChange={setBreakKindFilter} />
         </div>
 
         {/* ── Summary cards ───────────────────────────────────────── */}
@@ -239,247 +240,42 @@ function FilterGroup({
   )
 }
 
-/** HSL heat-map: 0 → transparent, low → green, high → red. */
-function heatBg(count: number, max: number): string | undefined {
-  if (count === 0 || max === 0) return undefined
-  const t = count / max // 0..1
-  const hue = 120 - t * 120 // 120 (green) → 0 (red)
-  const sat = 50 + t * 15 // 50% → 65%
-  const lit = 93 - t * 18 // 93% → 75%
-  return `hsl(${hue}, ${sat}%, ${lit}%)`
-}
+const BREAK_KINDS: { v: string; text: string }[] = [
+  { v: "all", text: "All" },
+  { v: "no_break", text: "No break" },
+  { v: "content_changed", text: "Changed" },
+  { v: "panel_appeared", text: "Appeared" },
+  { v: "panel_disappeared", text: "Disappeared" },
+]
 
-/** Dark-mode heat-map — lower lightness, slightly higher saturation. */
-function heatBgDark(count: number, max: number): string | undefined {
-  if (count === 0 || max === 0) return undefined
-  const t = count / max
-  const hue = 120 - t * 120
-  const sat = 40 + t * 20
-  const lit = 20 + t * 10
-  return `hsl(${hue}, ${sat}%, ${lit}%)`
-}
-
-import type { CrossTab, CostRow } from "./parse"
-
-function CrossTabTable({ crossTab, totalTicks }: { crossTab: CrossTab; totalTicks: number }) {
-  const [hover, setHover] = useState<{ tool: string; culprit: string } | null>(null)
-  const isDark = document.documentElement.classList.contains("dark")
-  const bgFn = isDark ? heatBgDark : heatBg
-
-  // Find max cell value for heat-map normalization
-  const maxCount = useMemo(() => {
-    let mx = 0
-    for (const v of crossTab.cells.values()) if (v > mx) mx = v
-    return mx
-  }, [crossTab.cells])
-
+function BreakKindFilter({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (v: string) => void
+}) {
   return (
-    <Section>
-      <div className="flex items-baseline justify-between">
-        <span className="text-[13px] font-semibold text-foreground/80">
-          Tool × Culprit (occurrence count)
-        </span>
-        {/* Hover info bar */}
-        {hover && (
-          <span className="text-[11px] text-muted-foreground">
-            <strong className="text-foreground/80">{hover.tool}</strong>
-            {" × "}
-            <strong className="text-foreground/80">{hover.culprit}</strong>
-            {" = "}
-            <strong className="tabular-nums text-foreground">
-              {crossTab.cells.get(`${hover.tool}\t${hover.culprit}`) ?? 0}
-            </strong>
-          </span>
-        )}
-      </div>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full border-collapse text-[11px]">
-          <thead>
-            <tr>
-              <th className="sticky left-0 z-10 bg-card px-2 py-1.5 text-left font-medium text-muted-foreground">
-                Tool
-              </th>
-              {crossTab.culprits.map((c) => (
-                <th
-                  key={c}
-                  className={`px-2 py-1.5 text-center font-medium transition-colors ${
-                    hover?.culprit === c ? "text-foreground" : "text-muted-foreground"
-                  }`}
-                >
-                  {c}
-                </th>
-              ))}
-              <th className="px-2 py-1.5 text-center font-semibold text-foreground/70">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {crossTab.tools.map((tool) => {
-              const rowTotal = crossTab.culprits.reduce(
-                (s, c) => s + (crossTab.cells.get(`${tool}\t${c}`) ?? 0),
-                0,
-              )
-              const isRowHovered = hover?.tool === tool
-              return (
-                <tr key={tool} className="border-t border-border/40">
-                  <td
-                    className={`sticky left-0 z-10 bg-card px-2 py-1 font-medium transition-colors ${
-                      isRowHovered ? "text-foreground" : "text-foreground/80"
-                    }`}
-                  >
-                    {tool}
-                  </td>
-                  {crossTab.culprits.map((c) => {
-                    const v = crossTab.cells.get(`${tool}\t${c}`) ?? 0
-                    const isActive = hover?.tool === tool && hover?.culprit === c
-                    const isDimmed = hover !== null && !isActive && hover.tool !== tool && hover.culprit !== c
-                    return (
-                      <td
-                        key={c}
-                        className={`px-2 py-1 text-center tabular-nums transition-all duration-150 ${
-                          isActive
-                            ? "ring-2 ring-foreground/30 ring-inset font-bold text-foreground"
-                            : isDimmed
-                              ? "text-foreground/25"
-                              : "text-foreground/70"
-                        }`}
-                        style={{
-                          backgroundColor: v > 0 ? bgFn(v, maxCount) : undefined,
-                          borderRadius: isActive ? "4px" : undefined,
-                        }}
-                        onMouseEnter={() => setHover({ tool, culprit: c })}
-                        onMouseLeave={() => setHover(null)}
-                      >
-                        {v > 0 ? v : <span className="text-muted-foreground/30">·</span>}
-                      </td>
-                    )
-                  })}
-                  <td className="px-2 py-1 text-center tabular-nums font-semibold text-foreground/70">
-                    {rowTotal}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-border">
-              <td className="sticky left-0 z-10 bg-card px-2 py-1.5 font-semibold text-foreground/70">
-                Total
-              </td>
-              {crossTab.culprits.map((c) => {
-                const colTotal = crossTab.tools.reduce(
-                  (s, t) => s + (crossTab.cells.get(`${t}\t${c}`) ?? 0),
-                  0,
-                )
-                return (
-                  <td
-                    key={c}
-                    className={`px-2 py-1.5 text-center tabular-nums font-semibold transition-colors ${
-                      hover?.culprit === c ? "text-foreground" : "text-foreground/70"
-                    }`}
-                  >
-                    {colTotal}
-                  </td>
-                )
-              })}
-              <td className="px-2 py-1.5 text-center tabular-nums font-bold text-foreground">
-                {totalTicks}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </Section>
-  )
-}
-
-function ApiTokenDistribution({ rows }: { rows: CostRow[] }) {
-  if (rows.length === 0) return null
-
-  const avgHit = Math.round(rows.reduce((s, r) => s + r.hitTokens, 0) / rows.length)
-  const avgMiss = Math.round(rows.reduce((s, r) => s + r.missTokens, 0) / rows.length)
-  const avgOut = Math.round(rows.reduce((s, r) => s + r.outTokens, 0) / rows.length)
-  const total = avgHit + avgMiss + avgOut
-
-  const segments = [
-    { label: "Cache hit", value: avgHit, color: "var(--ok, #4ade80)" },
-    { label: "Cache miss", value: avgMiss, color: "var(--danger, #ef4444)" },
-    { label: "Output", value: avgOut, color: "#60a5fa" },
-  ]
-
-  return (
-    <Section>
-      <span className="text-[13px] font-semibold text-foreground/80">
-        API-reported token layout ({rows.length} ticks)
-      </span>
-      <div className="mt-3 flex h-7 overflow-hidden rounded-lg">
-        {segments.map((s) => (
-          <div
-            key={s.label}
-            className="flex items-center justify-center text-[10px] font-medium text-white transition-all duration-500"
-            style={{
-              width: `${(s.value / total) * 100}%`,
-              backgroundColor: s.color,
-              minWidth: s.value > 0 ? "2%" : 0,
-            }}
+    <div className="flex items-center gap-1.5">
+      <span className="text-[11px] font-medium text-muted-foreground">Break</span>
+      <div className="flex overflow-hidden rounded-lg border border-border">
+        {BREAK_KINDS.map((o) => (
+          <button
+            key={o.v}
+            onClick={() => onChange(o.v)}
+            className={`px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+              value === o.v
+                ? "bg-foreground text-background"
+                : "bg-transparent text-muted-foreground hover:bg-muted"
+            }`}
           >
-            {(s.value / total) * 100 > 8 ? fmtTokens(s.value) : ""}
-          </div>
+            {o.text}
+          </button>
         ))}
       </div>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-        {segments.map((s) => (
-          <span key={s.label} className="flex items-center gap-1.5">
-            <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
-            {s.label}: {fmtTokens(s.value)} avg
-          </span>
-        ))}
-      </div>
-    </Section>
+    </div>
   )
 }
 
-function TokenDistribution({ rows }: { rows: CostRow[] }) {
-  if (rows.length === 0) return null
 
-  const avgBefore = Math.round(rows.reduce((s, r) => s + r.tokensBefore, 0) / rows.length)
-  const avgCulprit = Math.round(rows.reduce((s, r) => s + r.tokensCulprit, 0) / rows.length)
-  const avgAfter = Math.round(rows.reduce((s, r) => s + r.tokensAfter, 0) / rows.length)
-  const total = avgBefore + avgCulprit + avgAfter
 
-  const segments = [
-    { label: "Before culprit", value: avgBefore, color: "var(--ok, #4ade80)" },
-    { label: "Culprit panel", value: avgCulprit, color: "var(--danger, #ef4444)" },
-    { label: "After culprit", value: avgAfter, color: "#60a5fa" },
-  ]
-
-  return (
-    <Section>
-      <span className="text-[13px] font-semibold text-foreground/80">
-        Average token layout ({rows.length} ticks)
-      </span>
-      <div className="mt-3 flex h-7 overflow-hidden rounded-lg">
-        {segments.map((s) => (
-          <div
-            key={s.label}
-            className="flex items-center justify-center text-[10px] font-medium text-white transition-all duration-500"
-            style={{
-              width: `${(s.value / total) * 100}%`,
-              backgroundColor: s.color,
-              minWidth: s.value > 0 ? "2%" : 0,
-            }}
-          >
-            {(s.value / total) * 100 > 8 ? fmtTokens(s.value) : ""}
-          </div>
-        ))}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-        {segments.map((s) => (
-          <span key={s.label} className="flex items-center gap-1.5">
-            <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
-            {s.label}: {fmtTokens(s.value)} avg
-          </span>
-        ))}
-      </div>
-    </Section>
-  )
-}

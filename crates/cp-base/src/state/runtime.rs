@@ -11,6 +11,39 @@ use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
 // Runtime State
 
+/// How the prompt's panel section changed between consecutive streams (SA → SB).
+///
+/// Mutually exclusive, exhaustive partition:
+/// - `NoBreak`: panels identical — cache prefix preserved.
+/// - `ContentChanged`: an existing panel's content mutated.
+/// - `PanelAppeared`: a brand-new panel entered the prompt (no existing panel changed).
+/// - `PanelDisappeared`: a panel from SA was removed from SB (no existing panel changed).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum CacheBreakKind {
+    /// No cache break — all panels unchanged.
+    #[default]
+    NoBreak,
+    /// An existing panel's content changed (culprit = first changed panel).
+    ContentChanged,
+    /// A new panel appeared and no existing panel changed (culprit = new panel).
+    PanelAppeared,
+    /// A panel from the previous prompt was removed (culprit = removed panel).
+    PanelDisappeared,
+}
+
+impl CacheBreakKind {
+    /// TSV-friendly label (lowercase, underscore-separated).
+    #[must_use]
+    pub const fn as_tsv(self) -> &'static str {
+        match self {
+            Self::NoBreak => "no_break",
+            Self::ContentChanged => "content_changed",
+            Self::PanelAppeared => "panel_appeared",
+            Self::PanelDisappeared => "panel_disappeared",
+        }
+    }
+}
+
 /// Per-tick telemetry captured at stream start, consumed at stream end for TSV logging.
 ///
 /// Populated by `prepare_stream_context()` (beginning of tick: culprit detection,
@@ -34,8 +67,8 @@ pub struct TickTelemetry {
     pub queue_is_active: bool,
     /// Whether tempo held this tick (no tool broke it last tick → global freeze).
     pub tempo_is_active: bool,
-    /// `true` when no panel forced a cache break — only the conversation tail changed.
-    pub no_panel_broken: bool,
+    /// How the panel section changed between consecutive streams.
+    pub break_kind: CacheBreakKind,
     /// Configured `max_freezes` for the culprit panel (0 when no culprit).
     pub culprit_max_freezes: u8,
 }
@@ -187,6 +220,8 @@ pub struct State {
     pub previous_panel_hash_list: Vec<String>,
     /// Saved panel ID order from last emitted tick (for queue freeze stability)
     pub previous_panel_order: Vec<String>,
+    /// Panel ID → context type from last emitted tick (for disappearance detection).
+    pub previous_panel_id_types: Vec<(String, String)>,
     /// Sleep timer: tool pipeline waits until this timestamp (ms) before proceeding
     pub tool_sleep_until_ms: u64,
     /// Cache optimization engine: tracks accumulated hashes and breakpoint timestamps
@@ -305,6 +340,7 @@ impl Default for State {
             guard_rail_blocked: None,
             previous_panel_hash_list: vec![],
             previous_panel_order: vec![],
+            previous_panel_id_types: vec![],
             tool_sleep_until_ms: 0,
             cache_engine_json: None,
             tempo: true,
