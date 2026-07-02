@@ -138,9 +138,6 @@ pub const GIT_CMD_TIMEOUT_SECS: u64 = 30;
 /// truncated with a `(Rest hidden, N kB left)` marker.
 const GIT_OVERVIEW_CAP_BYTES: usize = 8 * 1024;
 
-/// Refresh interval for git status (milliseconds)
-pub(crate) const GIT_STATUS_REFRESH_MS: u64 = 2_000; // 2 seconds
-
 use serde_json::json;
 
 use cp_base::modules::ToolVisualizer;

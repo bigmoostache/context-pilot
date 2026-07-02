@@ -50,6 +50,10 @@
   path: docs/design-orchestration-backend.md
   description: 'Orchestration backend design doc, v5 (branch maquette) — CODE-GROUNDED rewrite. Keystone: THREE durability tiers, not two — ① bridge-owned append-only fsync''d OPLOG (authoritative: command effects, rev, seen-marks, phase, lifecycle, cost; O(1) append, never coalesced) + ② existing UNTOUCHED PersistenceWriter as a best-effort coalesced reconstructible state cache + ③ lossy UDS stream plane (live tokens + latency hints). 12 invariants I1-I12: I8 oplog-as-truth (writer.rs NOT modified — honors constraint #7 for real), I11 journal-to-oplog-then-ack (''accepted''=durable, survives deadman re-exec), I12 single inotify watch per agent (no fleet-scale watch exhaustion), I2 fsync confined to oplog (not every state write), I3 content-addressed bodies + bounded heads (not O(S²) manifest enumeration), I4 dedup by semantic token evicted by ack-rev. Command injection via the existing user-message entry (actions/input.rs), NOT the autonomy spine (engine.rs check_spine guards would stall external commands — K7). §24 maps every invariant→real file/function→additive-vs-core change type. §25 fault-injection acceptance matrix (V1-V10). §20 register folds round-3 K1-K9 + round-2 R2. Resolves the round-3 critique that v4 was authored against an imagined persistence layer. Companion: architecture-adversarial-analysis.md. NOT implemented (discussion).'
   last_edited_ms: 1781608697546
+0178fd204dd5fdcb:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 018d296ed9c8d95f:
   path: crates/cp-wire/src/types/ack.rs
   description: 'Command Ack: cmd_id + Status (Accepted/Rejected) + optional rev. Journal-then-ack (I11).'
@@ -294,6 +298,10 @@
   path: crates/cp-mod-bridge/Cargo.toml
   description: 'Bridge module deps: cp-base, cp-render, cp-wire, cp-oplog, nix 0.30 (fs, for Flock RAII), serde_json. dev: tempfile. Workspace lints.'
   last_edited_ms: 1781625056746
+05e518352bf9c346:
+  path: src/app/run/lifecycle.rs
+  description: 'Main event loop with flame!("loop"). Input-first (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. emit_thread_paused wired in main loop (T371). X18 adaptive idle poll. T309: update_spinner_animation gated on has_active_animation.'
+  last_edited_ms: 1782988305636
 05ecc0ce8dac154a:
   path: crates/cp-mod-search/src/meili/server.rs
   description: 'Meilisearch server lifecycle. Download, start, health-check global server (~/.context-pilot/meilisearch/). PID/port/key file mgmt. T295: pick_stable_port() reuses the persisted port if test-bindable (fixes Gap B — random find_free_port on each respawn left agents'' cached ports stale → silent search breakage); falls back to find_free_port on first start/port-stolen. ensure_server_running()/health_ok(port,key)/reconnect_ok()/read_port/read_master_key/is_pid_alive/global_meili_dir now pub(super) for the watchdog. Geometric backoff health polling (50ms→500ms cap, 15s budget).'
@@ -1974,6 +1982,10 @@
   path: crates/cp-mod-tree/src/lib.rs
   description: 'Tree module. 3 tools: filter/toggle/describe (with close_panel param). Fixed TREE panel (fixed_order=3). Watches open folders. Dir-event-only invalidation. Module data: filter+descriptions. Worker data: open_folders. @-path autocomplete.'
   last_edited_ms: 0
+2d354644a3801793:
+  path: src/app/run/watchers.rs
+  description: File/cache watcher loop. flame!("cache_updates") + flame!("watcher_events"). sync_file_watchers (module→inotify/kqueue). timer_based_deprecation (poll intervals). FD cleanup (stale watch removal). suicide() auto-close.
+  last_edited_ms: 1782988305569
 2d55ba540f65ffc2:
   path: crates/cp-mod-search/src/indexer.rs
   description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. RecommendedWatcher (FSEvents/inotify, event-driven, negligible CPU — replaced PollWatcher that consumed ~50% CPU via 3s recursive lstat).
@@ -2190,6 +2202,10 @@
   path: crates/cp-oplog/src/lib.rs
   description: 'Oplog crate root. Doc: durability tier ①, why-separate-crate (agent writes+replays, backend tails), announce-after-durable contract. Declares append + compact + replay + segment modules.'
   last_edited_ms: 1781622185013
+325f8053c0cca2ec:
+  path: src/app/mod.rs
+  description: 'App struct — top-level container. Fields: State, TypewriterBuffer, pending tools/done, cache_tx, file watcher, timers (incl last_bridge_recover_ms), PersistenceWriter, reverie_streams. Sub-modules: actions, context, events, panels, prompt, reverie, run.'
+  last_edited_ms: 1782988305437
 3279dfee597f2c60:
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
@@ -2314,6 +2330,10 @@
   path: web/src/lib/types.ts
   description: Maquette domain types. FinderNode gained count?:number (backend folder child count). ThreadDetail.lastActivityMs now optional (mock fallback lacks it; sort tolerates undefined via ?? 0). User/Agent/Finder/Thread/Library/Usage/cockpit types.
   last_edited_ms: 1781795177871
+361fd8ca3d7de53c:
+  path: crates/cp-mod-git/src/result_panel.rs
+  description: 'GitResultPanel: static read-only command output panel (no auto-refresh). Timeout execution, diff-aware syntax coloring. Refreshes only when explicitly dirtied by mutating commands.'
+  last_edited_ms: 1782988305173
 3626ade6e9ad38d4:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -2582,6 +2602,10 @@
   path: crates/cp-mod-firecrawl/src/tools.rs
   description: 'Firecrawl tool dispatch with flame!("firecrawl_scrape"), flame!("firecrawl_search"), flame!("firecrawl_map"). Crawl delegated to crate::crawl. All async via spawn_async_tool. DynPanel creation with DYN_PANEL_ID_PLACEHOLDER. Shared helpers: get_client, err_result, PANEL_WARNING, timeout/poll constants.'
   last_edited_ms: 1780563343162
+3be6b25b16de3cf7:
+  path: crates/cp-mod-github/src/panel.rs
+  description: 'GithubResultPanel: static gh command output panel (no auto-refresh). Token redaction, tab-delimited PR/issue table rendering. Refreshes only when explicitly dirtied by mutating commands.'
+  last_edited_ms: 1782988305242
 3c51be7f4f0da8db:
   path: web/src/lib/support/auth.tsx
   description: 'Auth context (Phase 9): AuthProvider probes GET /api/auth/status, validates stored token via /me, exposes user/token/authEnabled/bootstrapped/loading + login/register/logout. Listens for cp-auth-expired events from the fetch wrapper. useAuth() hook.'
@@ -3482,6 +3506,10 @@
   path: web/src/components/finder/Finder.tsx
   description: 'Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) live listings. T273 upload (toolbar+drag-drop via useUploadFiles→uploadFiles). T275 internal drag-and-drop (useMoveItems→moveItemsInto). T275 follow-up — EXTERNAL-drag upload overlay lifecycle is now WINDOW-level + robust: a useEffect binds window dragover/drop/dragleave/dragend once; dragover (Files only) raises the overlay + refreshes a heartbeat ts; explicit drop / dragleave-to-outside (relatedTarget null) / dragend clear it; and a 100ms watchdog clears it when no dragover arrived for 250ms — so a silent CANCEL (Esc / release outside, which fires no drop) no longer leaves the overlay stuck blurry. uploadRef holds the latest uploadFiles closure so listeners bind once without going stale. The old element-level onDragOver/onDragLeave/onDrop were removed (window owns the lifecycle; internal MOVE_MIME drags carry no Files so never raise the overlay). T279 empty-space context menu: openEmptyContext on the content <main>; openContext (item) stopPropagation; newFolder() auto-names collision-free then useCreateFolder mutate (toolbar+menu wired); Refresh invalidates qk.fs via useQueryClient. cmd/ctrl+shift multiselect + useMarquee. Both FinderPreview usages pass agentId (T272). Quick Look CLOSED by default.'
   last_edited_ms: 1781888800977
+4f7ed59cc557e94e:
+  path: crates/cp-mod-git/src/lib.rs
+  description: 'Git module. 1 tool: git_execute. refresh_git_status() for overview (branch + numstat). Watches .git/ paths. watcher_immediate_refresh=false to prevent feedback. overview_context_section renders changes table — HARD-CAPPED at GIT_OVERVIEW_CAP_BYTES (8 KiB).'
+  last_edited_ms: 1782988305307
 4f837a4a42f4f2e8:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send: post message, set THEIR_TURN, clear focus, start dangling(5). execute_read: last k messages formatted, MY_TURN sets focus, THEIR_TURN peeks. format_age helper.'
@@ -3606,6 +3634,10 @@
   path: src/modules/pre_flight.rs
   description: 'Pre-flight validation: Phase 0 trap block, Phase 0.25 compulsory intent/verb (blocking), Phase 0.5 duplicate Close_conversation_history queue check, Phase 1 schema validation, Phase 2 module semantic checks. Phase 2 SKIPS the threads module while the history-cleanup trap is active (QueueState.trap_active) — otherwise threads focus enforcement blocks Close_conversation_history and deadlocks the two traps.'
   last_edited_ms: 1781525989192
+51bf1b6553848f93:
+  path: crates/cp-mod-github/src/lib.rs
+  description: 'GitHub module. 1 tool: gh_execute. Dynamic github_result panels. Depends on git module. classify sub-module for read-only vs mutating. Tool visualizer for PR/issue status coloring.'
+  last_edited_ms: 1782988305372
 51e6840ca62b4442:
   path: web/src/components/finder/ContextMenu.tsx
   description: Finder right-click context menu (macOS-style action sheet, decorative actions flash toast). onPin optional prop adds a folder-only 'Pin to Sidebar' item (Pin icon). Open/Get Info/Rename/Duplicate/Download + tag swatches + Move to Trash. On-screen clamping.
@@ -4346,6 +4378,10 @@
   path: crates/cp-mod-logs/Cargo.toml
   description: 'Logs crate deps: cp-base, cp-render, log, serde, serde_json, cp-mod-utilities.'
   last_edited_ms: 0
+63b685b19346de18:
+  path: crates/cp-mod-git/src/tools.rs
+  description: 'Git tool. Unified inline-vs-panel: short/fast results (≤150 lines, ≤8KB, ≤10s) returned inline with tempo; long/slow results create static git_result panels. spawn_async_tool for all commands. GIT_ASKPASS temp script for HTTPS auth. Cache invalidation via regex patterns.'
+  last_edited_ms: 1782988305038
 63ca4aef271bb870:
   path: crates/cp-base/src/ui/mod.rs
   description: 'Shared UI helpers for panel rendering. Align enum + TextCell + render_table_text() (plain-text for LLM context). Tree output parsing helpers (find_size_pattern, find_children_pattern). Sub-modules: render_cache. No question_form module.'
@@ -4577,6 +4613,10 @@
 68cbe83e88995a59:
   path: src/ui/input.rs
   description: Renders question form and @autocomplete popup overlays. calculate_question_form_height, render_question_form, calculate_autocomplete_height, render_autocomplete_popup. Consumes QuestionForm/Autocomplete IR data directly.
+  last_edited_ms: 0
+68ed5a6c0fb77196:
+  path: web/src/components/shell/costs/parse.ts
+  description: 'TSV parser for cost-tracking.tsv. CostRow interface (16 fields incl culpritMaxFreezes), parseCostTsv(), aggregation helpers: computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, maxFreezePerCulprit, crossTabToolCulprit (count matrix). buildMarkdownReport() serializes current filtered state as clean markdown tables.'
   last_edited_ms: 0
 6901f0ab9bfa4b82:
   path: src/app/actions/streaming.rs
@@ -7194,6 +7234,10 @@ a34caa386a8e5450:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. execute() dispatches to execute_select/dml/ddl. dry_run via SAVEPOINT+ROLLBACK. Parsing helpers now imported from crate::parse (moved to sql/parse.rs). request_path reads .sql files. live/output_path routing. ≤150 lines AND ≤8000 bytes inline+tempo, bigger→entity_result panel. 200-row cap. RETURNING support.
   last_edited_ms: 0
+a357f4b3e0037228:
+  path: src/infra/mod.rs
+  description: 'Re-exports: api, config, constants, flame (inline re-export of cp_base::flame init/flush), profiler, tools, watcher. Infrastructure layer between app and core crates.'
+  last_edited_ms: 1782988305702
 a375d6672418c7f9:
   path: src/app/prompt/repair.rs
   description: 'Final-phase tool-pairing repair. Enforces Anthropic ''tool_result immediately after tool_use'' adjacency: prepends synthetic MISSING_TOOL_RESULT placeholders for orphaned tool_use ids, inserts a user msg when none follows, drops stray tool_results with no adjacent call, prunes emptied user msgs. Self-heals reshuffled/truncated (esp. queue-flush) histories to prevent API 400. 6 unit tests (incl interleaving repro) written panic/unwrap/expect/indexing-free via Option-chain asserts (all four are forbid lints, incl in tests).'
@@ -7498,6 +7542,10 @@ aa61792fb982b436:
   path: .github/workflows/code_length.yml
   description: 'CI: file/folder length enforcement'
   last_edited_ms: 0
+aa7d4bb60801af69:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool/culprit-cost/max-freeze bars, two token distribution bars (panel-estimated + API-reported), Tool×Culprit cross-tab with heat-map. Tempo/queue/no-break AND-filters. Copy as Markdown button. TanStack useQuery + fetchFsPreview 15s refetch.
+  last_edited_ms: 1782925615866
 aa88d97c8df48765:
   path: crates/cp-mod-spine/src/coucou.rs
   description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601 via cp_mod_utilities::time). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper. MIN_RECURRENCE_MS=60s floor for custom recurrence.
@@ -7762,6 +7810,10 @@ b12087a3ac44a2de:
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only log + running ReplayState fold (heads+seen). open() seeds via replay. append(kind)=append_buffered+sync (announce-after-durable K9). append_buffered(kind)=frame+write_all+fold, NO sync (group-commit primitive). sync()=single fdatasync (the amortised group-commit point, I2). roll() fdatasyncs old segment BEFORE switching (batch spanning a roll loses nothing), stamps leading Checkpoint(Snapshot) on new seg (GAP1). write_record=sole rev point (no sync). checkpoint()/heads()/seen()/snapshot() public. 7 tests.'
   last_edited_ms: 0
+b14647cdbc400559:
+  path: src/app/run/input.rs
+  description: App::new() constructor (inits timers incl last_bridge_recover_ms), save_state/message_async(), handle_autocomplete/palette events.
+  last_edited_ms: 1782988305502
 b15c976b1b6f7804:
   path: src/llms/claude_code/debug.rs
   description: 'Debug helpers: dump_last_request (writes API request JSON to disk) + StreamErrorContext/build_stream_read_error (verbose stream failure diagnostics).'
@@ -11082,6 +11134,10 @@ fe98735ced910694:
   path: web/src/lib/support/panelMeta.ts
   description: Panel UI metadata. panelIcon Record<PanelKind,LucideIcon>, Accent='signal'|'interactive'|'ok'|'warn'|'danger'|'muted' (superset of AccentToken), accentVar Record<Accent,CSSVar>, loadColor(ratio)->var, fmtTokens, fmtCost.
   last_edited_ms: 1782470273007
+feb21f8c666420fe:
+  path: crates/cp-mod-github/src/tools.rs
+  description: 'GitHub CLI tool. Unified inline-vs-panel: short/fast results (≤150 lines, ≤8KB, ≤10s) returned inline with tempo; long/slow results create static github_result panels. spawn_async_tool for all commands. Token redaction. Cache invalidation of affected panels.'
+  last_edited_ms: 1782988305105
 fedf859b9a9edf37:
   path: src/app/run/threads/mod.rs
   description: 'Thread helpers for main loop: maybe_inject_auto_read (synthetic Read on auto-continuation — note: does NOT break tempo, root cause of T322 stale-panel bug per M103), check_my_turn_threads, extract_thread_ids, maybe_append_tool_activity (auto traces).'
