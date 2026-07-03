@@ -7,69 +7,12 @@ use crate::infra::tools::refresh_conversation_context;
 use crate::modules;
 use crate::state::cache::hash_content;
 use crate::state::{Message, State};
-use cp_base::state::runtime::{CacheBreakKind, TickTelemetry};
+use cp_base::state::data::{CacheBreakKind, TickTelemetry};
 
 mod detach;
-
-// ─── Unified Freeze Backend ─────────────────────────────────────────────────
-
-/// Whether a panel's content should be frozen (emit last-known) or fresh (emit current).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FreezeDecision {
-    /// Emit fresh content — cache may break at this point.
-    Fresh,
-    /// Freeze: emit the last-emitted snapshot — cache prefix preserved.
-    Freeze,
-}
-
-/// Snapshot of tick-level freeze conditions, shared across all panels.
-#[derive(Debug, Clone, Copy)]
-struct FreezeConditions {
-    /// Queue module is actively intercepting — infinite freeze budget.
-    queue_active: bool,
-    /// Tempo survived last tick (no tool broke it) — global freeze.
-    tempo: bool,
-}
-
-/// Single source of truth: should panel ORDERING be frozen this tick?
-///
-/// When true, panels keep their previous sorted positions (no reordering
-/// from `last_refresh_ms` changes). Prevents cache prefix breaks due to
-/// panels shuffling positions between ticks.
-fn freeze_conditions(state: &State) -> FreezeConditions {
-    FreezeConditions { queue_active: cp_mod_queue::types::QueueState::get(state).active, tempo: state.tempo }
-}
-
-impl FreezeConditions {
-    /// Whether panel ordering should be frozen this tick.
-    const fn freeze_order(self) -> bool {
-        self.queue_active || self.tempo
-    }
-
-    /// Whether a specific panel's content should be frozen this tick.
-    ///
-    /// Priority (first match wins):
-    /// 1. Queue active → always Freeze (infinite budget, overrides everything)
-    /// 2. Tempo = true → Freeze (no tool broke tempo last tick — global freeze)
-    /// 3. Cache already broken upstream → Fresh (update is "free", no prefix to save)
-    /// 4. Breath budget remaining → Freeze (preserve prefix for a few more ticks)
-    /// 5. No budget left (or `max_freezes=0`) → Fresh
-    const fn freeze_panel(self, cache_broken: bool, freeze_count: u8, max_freezes: u8) -> FreezeDecision {
-        if self.queue_active {
-            return FreezeDecision::Freeze;
-        }
-        if self.tempo {
-            return FreezeDecision::Freeze;
-        }
-        if cache_broken {
-            return FreezeDecision::Fresh;
-        }
-        if max_freezes > 0 && freeze_count < max_freezes {
-            return FreezeDecision::Freeze;
-        }
-        FreezeDecision::Fresh
-    }
-}
+/// Freeze policy: per-panel and ordering freeze decisions (queue, tempo, breath budget).
+mod freeze;
+use freeze::{FreezeDecision, freeze_conditions};
 
 /// Context data prepared for streaming
 pub(super) struct StreamContext {
@@ -156,21 +99,69 @@ pub(super) fn prepare_stream_context(
 
     // === Unified freeze pass (queue + breath + cost tracking) ═══════════════
     //
-    // Single pass over all panels. For each one:
-    //   1. Hash fresh content
-    //   2. Detect whether content changed since last emission
-    //   3. If changed: consult should_freeze_panel() → Freeze or Fresh
-    //   4. Apply decision (restore snapshot OR emit fresh)
-    //   5. Snapshot what was ACTUALLY emitted (post-decision)
-    //   6. Track cache cost (prefix-match against previous tick)
+    // Two paths: full-freeze (snapshot replay) or normal (per-panel decisions).
     //
-    // This replaces the former two-pass approach (queue freeze → breath freeze)
-    // which suffered from snapshot desync between the passes.
+    // Full-freeze activates when the freeze engine is active (queue OR tempo)
+    // AND a snapshot from a previous unfrozen tick exists. It replays the exact
+    // panel content from that snapshot, eliminating cache breaks from panel
+    // disappearance, appearance, or missing emitted snapshots.
+    //
+    // Normal path: single pass over all panels — hash, detect changes, consult
+    // freeze policy, apply decision, snapshot what was emitted, track cost.
 
     // Pre-compute system + tools token prefix for tick telemetry
     let system_tokens = crate::state::estimate_tokens(&get_active_agent_content(state));
     let tools_tokens = modules::overview::context::estimate_tool_definitions_tokens(state);
     let prompt_prefix_tokens = system_tokens.saturating_add(tools_tokens);
+
+    let full_freeze = cond.freeze_order() && state.frozen_context_snapshot.is_some();
+
+    if let (true, Some(snapshot)) = (full_freeze, &state.frozen_context_snapshot) {
+        // ═══ FULL FREEZE: replay exact previous prompt ═══════════════════════
+        //
+        // Replace all panel items with the stored snapshot. The "chat" item
+        // (conversation body) is preserved from the fresh context — new messages
+        // are naturally appended at the tail where they don't break the panel
+        // cache prefix.
+        let chat_item = context_items.iter().find(|i| i.id == "chat").cloned();
+        context_items.clone_from(snapshot);
+        if let Some(chat) = chat_item {
+            context_items.push(chat);
+        }
+
+        // Simplified telemetry — everything is a cache hit, no break
+        let three_last_tools: String = state
+            .messages
+            .iter()
+            .rev()
+            .filter(|m| m.msg_type == crate::state::MsgKind::ToolCall)
+            .flat_map(|m| m.tool_uses.iter().map(|t| t.name.as_str()))
+            .filter(|name| *name != "Tool_execution")
+            .take(3)
+            .collect::<Vec<_>>()
+            .join(",");
+
+        let total_panel_tokens: usize = context_items
+            .iter()
+            .filter(|i| i.id != "chat")
+            .map(|i| crate::state::estimate_tokens(&i.content))
+            .sum();
+
+        state.tick_telemetry = Some(TickTelemetry {
+            tick_start_ms: crate::app::panels::now_ms(),
+            three_last_tools,
+            culprit_type: "none".to_string(),
+            tokens_before_culprit: prompt_prefix_tokens.saturating_add(total_panel_tokens),
+            tokens_culprit: 0,
+            tokens_after_culprit: 0,
+            queue_is_active: cond.queue_active,
+            tempo_is_active: cond.tempo,
+            break_kind: CacheBreakKind::NoBreak,
+            culprit_max_freezes: 0,
+        });
+        // previous_panel_hash_list and previous_panel_id_types stay unchanged
+    } else {
+        // ═══ Normal path: per-panel freeze decisions ═════════════════════════
 
     {
         let mut cache_broken = false;
@@ -351,6 +342,12 @@ pub(super) fn prepare_stream_context(
             break_kind,
             culprit_max_freezes,
         });
+    }
+
+        // Save snapshot for next frozen tick (panels only, no "chat")
+        state.frozen_context_snapshot = Some(
+            context_items.iter().filter(|i| i.id != "chat").cloned().collect(),
+        );
     }
 
     // Check if context has breached the threshold — may activate the reverie optimizer

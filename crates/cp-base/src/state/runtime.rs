@@ -4,74 +4,14 @@ use std::collections::HashMap;
 use super::context::{Entry, Kind};
 use super::data::config::ViewMode;
 use super::data::message::Message;
+use super::data::TickTelemetry;
 use super::flags::{ConfigOverlay, HighlightIrFn, StatusBools, StreamPhase, StreamingTool, UiState};
 use crate::config::llm_types::LlmProvider;
+use crate::panels::ContextItem;
 use crate::tools::ToolDefinition;
 use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
 // Runtime State
-
-/// How the prompt's panel section changed between consecutive streams (SA → SB).
-///
-/// Mutually exclusive, exhaustive partition:
-/// - `NoBreak`: panels identical — cache prefix preserved.
-/// - `ContentChanged`: an existing panel's content mutated.
-/// - `PanelAppeared`: a brand-new panel entered the prompt (no existing panel changed).
-/// - `PanelDisappeared`: a panel from SA was removed from SB (no existing panel changed).
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum CacheBreakKind {
-    /// No cache break — all panels unchanged.
-    #[default]
-    NoBreak,
-    /// An existing panel's content changed (culprit = first changed panel).
-    ContentChanged,
-    /// A new panel appeared and no existing panel changed (culprit = new panel).
-    PanelAppeared,
-    /// A panel from the previous prompt was removed (culprit = removed panel).
-    PanelDisappeared,
-}
-
-impl CacheBreakKind {
-    /// TSV-friendly label (lowercase, underscore-separated).
-    #[must_use]
-    pub const fn as_tsv(self) -> &'static str {
-        match self {
-            Self::NoBreak => "no_break",
-            Self::ContentChanged => "content_changed",
-            Self::PanelAppeared => "panel_appeared",
-            Self::PanelDisappeared => "panel_disappeared",
-        }
-    }
-}
-
-/// Per-tick telemetry captured at stream start, consumed at stream end for TSV logging.
-///
-/// Populated by `prepare_stream_context()` (beginning of tick: culprit detection,
-/// token layout, recent tools). Consumed by cost-tracking append once the stream
-/// finalizes and token costs are known.
-#[derive(Debug, Default)]
-pub struct TickTelemetry {
-    /// Epoch milliseconds when the tick started.
-    pub tick_start_ms: u64,
-    /// Last 3 tool names, comma-separated (most recent first).
-    pub three_last_tools: String,
-    /// Context type of the cache-break culprit panel, or `"none"`.
-    pub culprit_type: String,
-    /// Tokens strictly before the culprit (system + tools + preceding panels).
-    pub tokens_before_culprit: usize,
-    /// Tokens of the culprit panel itself.
-    pub tokens_culprit: usize,
-    /// Tokens strictly after the culprit (trailing panels, excluding conversation).
-    pub tokens_after_culprit: usize,
-    /// Whether the queue module was actively intercepting tools this tick.
-    pub queue_is_active: bool,
-    /// Whether tempo held this tick (no tool broke it last tick → global freeze).
-    pub tempo_is_active: bool,
-    /// How the panel section changed between consecutive streams.
-    pub break_kind: CacheBreakKind,
-    /// Configured `max_freezes` for the culprit panel (0 when no culprit).
-    pub culprit_max_freezes: u8,
-}
 
 /// Runtime state (messages loaded in memory)
 pub struct State {
@@ -222,6 +162,13 @@ pub struct State {
     pub previous_panel_order: Vec<String>,
     /// Panel ID → context type from last emitted tick (for disappearance detection).
     pub previous_panel_id_types: Vec<(String, String)>,
+    /// Full snapshot of panel `ContextItem`s from the last unfrozen tick.
+    ///
+    /// During tempo/queue freeze, this snapshot is replayed verbatim — guaranteeing
+    /// byte-identical panel content and eliminating cache breaks from panel
+    /// disappearance, appearance, or missing emitted snapshots.
+    /// Not persisted across reloads (runtime-only).
+    pub frozen_context_snapshot: Option<Vec<ContextItem>>,
     /// Sleep timer: tool pipeline waits until this timestamp (ms) before proceeding
     pub tool_sleep_until_ms: u64,
     /// Cache optimization engine: tracks accumulated hashes and breakpoint timestamps
@@ -341,6 +288,7 @@ impl Default for State {
             previous_panel_hash_list: vec![],
             previous_panel_order: vec![],
             previous_panel_id_types: vec![],
+            frozen_context_snapshot: None,
             tool_sleep_until_ms: 0,
             cache_engine_json: None,
             tempo: true,
