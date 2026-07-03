@@ -327,13 +327,14 @@ pub(super) fn prepare_stream_context(
             },
         );
 
-        // Last 3 tools: scan messages backward for ToolCall entries
+        // Last 3 tools: scan messages backward for ToolCall entries, skip synthetic Tool_execution stubs
         let three_last_tools: String = state
             .messages
             .iter()
             .rev()
             .filter(|m| m.msg_type == crate::state::MsgKind::ToolCall)
             .flat_map(|m| m.tool_uses.iter().map(|t| t.name.as_str()))
+            .filter(|name| *name != "Tool_execution")
             .take(3)
             .collect::<Vec<_>>()
             .join(",");

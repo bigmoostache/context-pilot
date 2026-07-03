@@ -2158,6 +2158,10 @@
   path: src/app/run/threads/bridge.rs
   description: Bridge command intake + live-state emission (gated bridge-ON). accept_commands forces the accepted stream BLOCKING before handle_connection (the inherited non-blocking flag broke >8KiB commands, T274). poll_bridge_commands drains all pending/tick + save_state_async (Configure has no oplog delta, T262). emit_roster_delta=durable on thread mutation. emit_vitals=best-effort PhaseTransition+CostAggregate+ContextUsage (used/threshold/budget + hit/miss via the canonical context_usage+context_hit_miss helpers, T297) on-change. emit_thread_status=durable on flip. emit_thread_focus=best-effort. wire_turn. Command APPLICATION in sibling commands.rs.
   last_edited_ms: 0
+312e9fab701162a2:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 314623cb270425ba:
   path: crates/cp-mod-utilities/src/secret.rs
   description: Redacted newtype — Debug/Display print [REDACTED]. expose_secret() for access. Replaces secrecy crate.
@@ -4217,6 +4221,10 @@
 5fd2582ff47e11a2:
   path: crates/cp-oplog/tests/crash_replay.rs
   description: 'Phase 9 (X776) MILESTONE M0 crash-replay harness. Unix-only (#![cfg(unix)]). Self-re-exec pattern: env-gated #[test] crash_child_entrypoint re-runs the test binary as a child via current_exe(); parent/child handshake through a fdatasync''d marker file (libtest stdout is noisy). V1 v1_real_sigkill_leaves_a_clean_replayable_oplog: child spams durable MessageCreated appends, parent kill()s (real SIGKILL), fresh process replay() never errors + every announced-durable rev survives + torn tail truncated (announce-after-durable K9 across real crash). V2 v2_journalled_command_is_exactly_once_after_deadman_reexec: child journals CommandEffect then dies, fresh process recovers seen-set token, duplicate SeenMark delivery folds to no-op (exactly-once across process boundary). V12 v12_barrier_is_pending_the_body_store: asserts body_gc_eligible rule, explicit placeholder until body store lands Phase 14. 4 tests green.'
+  last_edited_ms: 0
+5fe334c8b3a02622:
+  path: src/app/context/mod.rs
+  description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. Culprit detection records panel type + max_freezes + break_kind (CacheBreakKind enum). Disappearance detection via previous_panel_id_types. flame!("prepare_context"). Reverie path branches.
   last_edited_ms: 0
 5feb13b4d88e1b1a:
   path: web/src/lib/types.ts
