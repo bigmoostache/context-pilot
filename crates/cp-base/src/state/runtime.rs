@@ -2,9 +2,9 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 use super::context::{Entry, Kind};
+use super::data::TickTelemetry;
 use super::data::config::ViewMode;
 use super::data::message::Message;
-use super::data::TickTelemetry;
 use super::flags::{ConfigOverlay, HighlightIrFn, StatusBools, StreamPhase, StreamingTool, UiState};
 use crate::config::llm_types::LlmProvider;
 use crate::panels::ContextItem;
