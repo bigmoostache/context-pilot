@@ -566,6 +566,10 @@
   path: .context-pilot/scripts/rust-check.sh
   description: 'CB4 callback script. Runs 3 checks on every .rs edit: (1) cargo fmt --check, (2) cargo check -D warnings, (3) cargo clippy --all-targets -D warnings. Matches CI ci.yml steps. Fmt check added T462 (was missing since June 5 consolidation).'
   last_edited_ms: 1782897541690
+0d4dc8120783b03d:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 0d51d6ed9f7292b6:
   path: crates/cp-base/src/state/actions.rs
   description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
@@ -3458,6 +3462,10 @@
   path: web/src/components/shell/config/ReleasesPane.tsx
   description: Admin-only release management pane (T427). Architecture selector (auto-detect or manual), release cards with tag/date/size + status chips (Latest/Downloaded/Active), download/use/delete actions via generated SDK. Data from GET /api/releases → ReleaseStore backend.
   last_edited_ms: 1782486352070
+4e8bf79ae6f15e8b:
+  path: crates/cp-mod-search/src/radar.rs
+  description: Context Radar with flame!("radar_refresh") and flame!("radar_push_signal"). Adaptive log-count-based decay scoring, Meilisearch log queries via background thread. format_timestamp_ms via cp_mod_utilities::time. Recent logs (10) deterministic + semantic top 40.
+  last_edited_ms: 0
 4ea144f928ecd2db:
   path: crates/cp-oplog/src/segment.rs
   description: 'Segment files: seg-{n}.log zero-padded sortable naming. Scan{entries,valid_len,torn_tail}. path/parse_index/indices/read/scan_bytes — torn-tail-aware frame walk (decode until first CRC/length failure, report clean boundary for truncation, V1). T309: scan_bytes made pub so the backend Tailer can decode only a segment''s appended TAIL (slice past the last consumed byte offset) instead of re-scanning the whole file each poll.'

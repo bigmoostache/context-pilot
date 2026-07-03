@@ -468,7 +468,7 @@ impl Panel for ContextRadarPanel {
     }
 
     fn max_freezes(&self) -> u8 {
-        3
+        8
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
