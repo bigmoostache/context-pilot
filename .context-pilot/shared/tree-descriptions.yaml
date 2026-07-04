@@ -730,6 +730,10 @@
   path: web/src/components/finder/preview/codeHighlight.ts
   description: Syntax highlighting for Finder code previews (T280). highlight.js common bundle + 7 extras (scala/elixir/erlang/haskell/ocaml/dart/fsharp). EXT_LANG map (70+ extensions). HighlightResult{html,language}. highlightCode(code,filename) resolves lang from extension or auto-detects. Class-themed via index.css.
   last_edited_ms: 1782470458229
+10f5b1cf960fddad:
+  path: src/app/context/mod.rs
+  description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
+  last_edited_ms: 0
 111109570cbe01e9:
   path: src/state/persistence/boot.rs
   description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 3 parallel threads. Loads .env files (project + global).'
@@ -3081,6 +3085,10 @@
 4400bfc4fbc9c1d5:
   path: ui/src/components/conversation/InputBar.tsx
   description: 'Mock input bar: blinking caret, key hints (send/cycle-view/file). Non-functional (design only).'
+  last_edited_ms: 0
+441f5794e68a75e6:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 44284c135428f1f1:
   path: crates/cp-render/src/lib.rs
