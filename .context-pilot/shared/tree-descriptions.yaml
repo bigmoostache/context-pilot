@@ -120,8 +120,8 @@
   last_edited_ms: 1782311327193
 027d4f1e52c47921:
   path: src/llms/cache/density.rs
-  description: 'Divergence density distributions. Production: ConversationTailDensity (zeros out assistant blocks, quadratic on user-side panels + last user turn). Test-only: Uniform, Quadratic, PowerLaw, Empirical.'
-  last_edited_ms: 0
+  description: 'Divergence density distributions. Production: ConversationTailDensity (uniform weight for hot blocks — panel user-side + last user turn, zero for cold). Test-only: Uniform, Quadratic, PowerLaw, Empirical.'
+  last_edited_ms: 1783186007483
 02c91735e81cafcf:
   path: crates/cp-orchestrator/tests/end_to_end.rs
   description: Phase 30 end-to-end loopback capstone (3 tests). Backend::new takes 6 args (auth=None, session_ttl). Real agent stack ↔ real backend transport over real sockets. Command journals on agent and re-emerges as SSE delta. Spilled body hydrates over REST. 25 SSE connect/disconnect soak cycles.
