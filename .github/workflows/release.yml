@@ -2,7 +2,8 @@ name: Release
 
 on:
   push:
-    branches: [releases]
+    tags:
+      - 'v*'
 
 env:
   CARGO_TERM_COLOR: always
@@ -83,9 +84,77 @@ jobs:
           path: ${{ matrix.artifact }}.tar.gz
           retention-days: 5
 
+  appliance:
+    name: Build appliance bundle (Photonicat, aarch64 musl)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust ${{ env.RUST_VERSION }}
+        run: |
+          rustup toolchain install ${{ env.RUST_VERSION }} --profile minimal
+          rustup default ${{ env.RUST_VERSION }}
+          rustup target add aarch64-unknown-linux-musl
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: appliance-aarch64-musl
+
+      - name: Install cross
+        uses: taiki-e/install-action@cross
+
+      # Orchestrator (API+SPA server) + agent (tui), fully static musl. These are
+      # the two binaries the procd service runs on the box; see
+      # deploy/photonicat/init.d/context-pilot.init.
+      - name: Build orchestrator + agent (cross, static musl)
+        run: |
+          cross build --release --target aarch64-unknown-linux-musl -p cp-orchestrator
+          cross build --release --target aarch64-unknown-linux-musl --bin tui
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install web dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: web
+
+      # Relative same-origin API URLs so the SPA talks to the orchestrator that
+      # serves it (one binary, one port). Runs tsc -b && vite build.
+      - name: Build SPA (relative same-origin)
+        run: pnpm run build
+        working-directory: web
+        env:
+          VITE_API_URL: ""
+
+      # Layout matches what the procd service expects under /mnt/data/context-pilot:
+      #   bin/cp-orchestrator, bin/tui, web/<spa dist>
+      - name: Package appliance bundle
+        run: |
+          mkdir -p staging/bin staging/web
+          cp target/aarch64-unknown-linux-musl/release/cp-orchestrator staging/bin/
+          cp target/aarch64-unknown-linux-musl/release/tui staging/bin/
+          chmod 755 staging/bin/*
+          cp -r web/dist/. staging/web/
+          tar -czf cpilot-appliance-aarch64.tar.gz -C staging .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpilot-appliance-aarch64
+          path: cpilot-appliance-aarch64.tar.gz
+          retention-days: 5
+
   release:
     name: Create Release
-    needs: build
+    needs: [build, appliance]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

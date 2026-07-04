@@ -595,6 +595,7 @@ dependencies = [
  "argon2",
  "base64",
  "calamine",
+ "cp-base",
  "cp-mod-bridge",
  "cp-oplog",
  "cp-wire",

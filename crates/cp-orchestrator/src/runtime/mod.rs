@@ -18,7 +18,9 @@
 //!
 //! | Env var | Default | Meaning |
 //! |---|---|---|
-//! | `CP_ORCH_PORT` | `7878` | HTTP listen port |
+//! | `CP_ORCH_PORT` | `7878` | Product cockpit HTTP listen port |
+//! | `CP_MAINT_PORT` | `9090` | IT maintenance-plane HTTP listen port |
+//! | `CP_MAINT_BIND` | `0.0.0.0` | Maintenance-plane bind address (LAN IP on the box) |
 //! | `CP_AGENTS_DIR` | `~/.context-pilot/agents` | Registry directory |
 //! | `CP_COST_BUDGET` | `100.0` | Per-agent cost budget (USD) |
 //! | `CP_SCAN_INTERVAL_MS` | `2000` | Registry-discovery + tier-② mtime poll cadence (ms) |
@@ -35,14 +37,24 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
+mod seed;
+
 use crate::channel::Tailer;
 use crate::registry::tee_reader::TeeReader;
 use crate::registry::{AgentRegistry, Event};
 use crate::services::auth::backup::BackupScheduler;
 use crate::transport::Backend;
 
-/// Default HTTP listen port.
+/// Default product cockpit HTTP listen port.
 const DEFAULT_PORT: u16 = 7878;
+
+/// Default IT maintenance-plane HTTP listen port.
+const DEFAULT_MAINT_PORT: u16 = 9090;
+
+/// Default maintenance-plane bind address. `0.0.0.0` here is paired with the
+/// LAN-only application guard ([`transport::maint`]) and, on the appliance, a
+/// bind to the LAN interface / firewall rule (documented in the procd `.init`).
+const DEFAULT_MAINT_BIND: &str = "0.0.0.0";
 
 /// Default per-agent cost budget in USD.
 const DEFAULT_BUDGET: f64 = 100.0;
@@ -63,8 +75,14 @@ const TAIL_INTERVAL: Duration = Duration::from_millis(100);
 /// Parsed runtime configuration, sourced from environment variables.
 #[derive(Debug)]
 pub struct Config {
-    /// HTTP listen port.
+    /// Product cockpit HTTP listen port.
     pub port: u16,
+    /// IT maintenance-plane HTTP listen port (second listener).
+    pub maint_port: u16,
+    /// Maintenance-plane bind address. Defaults to `0.0.0.0`; set to the box's
+    /// LAN IP in deployment so the plane is not reachable off-LAN even before
+    /// the application-level LAN guard.
+    pub maint_bind: String,
     /// Directory holding agent registry records.
     pub agents_dir: PathBuf,
     /// Per-agent cost budget in USD.
@@ -101,6 +119,13 @@ impl Config {
     /// (so the default directory cannot be derived).
     pub fn from_env() -> Result<Self, String> {
         let port = std::env::var("CP_ORCH_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_PORT);
+
+        let maint_port = std::env::var("CP_MAINT_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_MAINT_PORT);
+
+        let maint_bind = std::env::var("CP_MAINT_BIND")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| DEFAULT_MAINT_BIND.to_owned());
 
         let agents_dir = match std::env::var_os("CP_AGENTS_DIR") {
             Some(dir) => PathBuf::from(dir),
@@ -150,6 +175,8 @@ impl Config {
 
         Ok(Self {
             port,
+            maint_port,
+            maint_bind,
             agents_dir,
             budget_usd,
             scan_interval,
@@ -184,6 +211,7 @@ impl Runtime {
             match crate::services::auth::store::AuthStore::open(&config.auth_db_path) {
                 Ok(store) => {
                     eprintln!("auth enabled — database at {}", config.auth_db_path.display());
+                    seed::seed_admin_if_empty(&store);
                     Some(store)
                 }
                 Err(err) => {
@@ -221,16 +249,52 @@ impl Runtime {
         thread::spawn(move || driver_loop(backend, agents_dir, interval, backup_scheduler))
     }
 
-    /// Block the calling thread on the HTTP transport, serving requests until
-    /// the process exits.
+    /// Block the calling thread on the product HTTP transport, serving requests
+    /// until the process exits.
+    ///
+    /// Before blocking, spawns the **maintenance plane** on its own thread and
+    /// socket ([`transport::serve_plane`] with [`Plane::Maintenance`]). The two
+    /// listeners are fully independent: a panic or bind failure on one does not
+    /// take down the other (the maintenance bind failure is logged, not fatal —
+    /// the cockpit must still come up).
     ///
     /// # Errors
     ///
-    /// Returns an error string if the address cannot be bound.
+    /// Returns an error string if the product address cannot be bound.
     pub fn serve(&self) -> Result<(), String> {
+        use crate::transport::Plane;
+
+        // Boot-time read of the durable provisioning flag (M2, Obj 2.1.2). The
+        // orchestrator always runs both listeners; the effective cockpit gate
+        // lives in Caddy (M3), which only serves :80/:443 once provisioned. This
+        // log makes the boot state observable in `logread`.
+        if let Ok(b) = self.backend.lock() {
+            let provisioned = crate::transport::maint::is_provisioned(&b.provision_flag_path);
+            eprintln!(
+                "provisioning state: {} (flag: {})",
+                if provisioned { "provisioned — cockpit may serve" } else { "UNPROVISIONED — maintenance only" },
+                b.provision_flag_path.display()
+            );
+        }
+
+        // Render + reload Caddy for the current state (M3). No-op unless Caddy is
+        // configured (CP_CADDYFILE); never fatal.
+        crate::transport::maint::apply_caddy_at_boot(&self.backend);
+
+        // Maintenance plane (M1) — second listener, LAN-only + Admin-gated.
+        let maint_addr = format!("{}:{}", self.config.maint_bind, self.config.maint_port);
+        let maint_state = Arc::clone(&self.backend);
+        let maint_addr_log = maint_addr.clone();
+        let _maint = thread::spawn(move || {
+            eprintln!("maintenance plane on http://{maint_addr_log}");
+            if let Err(e) = crate::transport::serve_plane(&maint_addr, maint_state, Plane::Maintenance) {
+                eprintln!("WARN: maintenance plane failed to bind {maint_addr_log}: {e}");
+            }
+        });
+
         let addr = format!("0.0.0.0:{}", self.config.port);
         eprintln!("serving on http://{addr}");
-        crate::transport::serve(&addr, Arc::clone(&self.backend))
+        crate::transport::serve_plane(&addr, Arc::clone(&self.backend), Plane::Product)
     }
 }
 

@@ -1,6 +1,18 @@
 **/target
 **/__pycache__
 .env
+# Per-unit provisioning secrets — the admin seed password (M6). NEVER commit.
+seed.env
+**/seed.env
+# Provider API keys: the rendered env (plaintext) is box-only; never commit it.
+# Per-client vaults (group_vars/<client>/vault.yml) ARE committed, but only
+# ansible-vault-ENCRYPTED — never a plaintext one.
+providers.env
+**/providers.env
+# Generated per-unit delivery sheets (printable email/password).
+deploy/ansible/out/
+# Ansible-built appliance artifacts (downloaded caddy, etc.).
+deploy/ansible/.artifacts/
 /.context-pilot/*
 snake
 tldr_debug.log
@@ -82,4 +94,19 @@ docs/test.xlsx
 sandbox/
 /.uploads
 *.sourced_pdf
+# Playwright MCP browser session dumps (generated per run, never commit)
+.playwright-mcp/
+
+# Stray npm lockfile — the web/ project uses pnpm (pnpm-lock.yaml)
+web/package-lock.json
+
 devis-attali-context-pilot.md
+
+# Python virtualenv (local Ansible control node)
+.venv/
+
+# Ansible working inventory (real client hosts — keep only the .example tracked)
+deploy/ansible/inventory.ini
+
+# Ansible runtime secrets (per-client, passed with -e @file — never committed)
+deploy/ansible/*.local.yml

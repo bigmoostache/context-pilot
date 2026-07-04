@@ -16,7 +16,8 @@ import {
   putApiReleasesArch,
   putApiReleasesSelect,
 } from "@/lib/api/generated"
-import type { ReleaseEntry } from "@/lib/api/generated"
+import type { ReleaseEntry, ReleasesResponse } from "@/lib/api/generated"
+import { sdk } from "@/lib/api/client"
 import { cn } from "@/lib/utils"
 import { DeploySection } from "./DeploySection"
 
@@ -34,14 +35,7 @@ export function ReleasesPane() {
   const [page, setPage] = useState(0)
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["releases"],
-    queryFn: () => getApiReleases() as Promise<{
-      arch: string
-      archAuto: boolean
-      activeTag: string | null
-      currentBinary: string
-      knownArchs: string[]
-      releases: ReleaseEntry[]
-    }>,
+    queryFn: () => sdk<ReleasesResponse>(getApiReleases()),
   })
 
   const invalidate = () => void qc.invalidateQueries({ queryKey: ["releases"] })
@@ -107,7 +101,7 @@ export function ReleasesPane() {
         />
       )}
 
-      <DeploySection activeTag={data.activeTag} onChanged={invalidate} />
+      <DeploySection activeTag={data.activeTag ?? null} onChanged={invalidate} />
 
       <p className="text-[10.5px] text-muted-foreground/60">
         Current binary: <code className="font-mono text-[10px]">{data.currentBinary}</code>

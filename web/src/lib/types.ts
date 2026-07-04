@@ -52,8 +52,16 @@ export type Agent = GenAgent & {
 /** ContextPanel re-exported as-is (kind is already typed as PanelKind in generated). */
 export type ContextPanel = GenContextPanel
 
-/** ThreadMsg with UI-only `streaming` flag (set during active LLM output). */
-export type ThreadMsg = GenThreadMsg & {
+/**
+ * ThreadMsg with UI-only `streaming` flag (set during active LLM output).
+ *
+ * `ts` is widened from the generated `number` (epoch ms from REST) to also
+ * accept an ISO string: SSE-appended messages carry their timestamp as an ISO
+ * string (see reducers `message_created`), and the mock fixtures use display
+ * strings. Consumers normalise both (`typeof ts === "number" ? … : new Date(ts)`).
+ */
+export type ThreadMsg = Omit<GenThreadMsg, "ts"> & {
+  ts?: number | string
   streaming?: boolean
 }
 

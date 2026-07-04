@@ -11,6 +11,11 @@
 //! subscriber rides the live tail instead of replaying the whole oplog) lives
 //! in [`run_stream`]'s seeding block.
 
+pub mod sse;
+// Single-use SSE upgrade tickets (I9b). They exist solely to gate the SSE
+// upgrade `GET`, so they live alongside the stream machinery they protect.
+pub mod ticket;
+
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -19,7 +24,6 @@ use std::time::Duration;
 use cp_wire::types::stream::Frame;
 
 use super::Backend;
-use super::sse;
 use crate::channel::Tailer;
 
 /// Tight tail re-poll cadence for the SSE producer.

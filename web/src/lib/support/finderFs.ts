@@ -408,8 +408,8 @@ export function collectStarred(root: FinderNode): FinderNode[] {
 }
 
 /** Human-readable byte size. */
-export function fmtBytes(n?: number): string {
-  if (n === undefined) return "—"
+export function fmtBytes(n?: number | null): string {
+  if (n == null) return "—"
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
   if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`

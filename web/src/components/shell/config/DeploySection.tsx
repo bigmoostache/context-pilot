@@ -5,6 +5,8 @@ import {
   postApiReleasesDeploy,
   postApiReleasesRestartOrchestrator,
 } from "@/lib/api/generated"
+import type { DeployResponse } from "@/lib/api/generated"
+import { sdk } from "@/lib/api/client"
 import { cn } from "@/lib/utils"
 
 /**
@@ -25,14 +27,9 @@ export function DeploySection({
 
   const deployFleet = useMutation({
     mutationFn: async () => {
-      return postApiReleasesDeploy({
+      return sdk<DeployResponse>(postApiReleasesDeploy({
         body: { tag: activeTag ?? undefined },
-      }) as Promise<{
-        status: string
-        tag: string
-        restarted: { id: string; pid: number }[]
-        errors: string[]
-      }>
+      }))
     },
     onSuccess: () => onChanged(),
   })

@@ -94,6 +94,7 @@ type LoginStep = "idle" | "starting" | "waiting_for_code" | "completing" | "done
 function LoginFlow({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState<LoginStep>("idle")
   const [authorizeUrl, setAuthorizeUrl] = useState("")
+  const [alreadyValid, setAlreadyValid] = useState(false)
   const [code, setCode] = useState("")
   const [error, setError] = useState("")
 
@@ -101,6 +102,7 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
     mutationFn: startClaudeLogin,
     onSuccess: (data) => {
       setAuthorizeUrl(data.url)
+      setAlreadyValid(data.already_valid === true)
       setStep("waiting_for_code")
       window.open(data.url, "_blank")
     },

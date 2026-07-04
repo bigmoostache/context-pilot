@@ -19,7 +19,7 @@ use std::path::PathBuf;
 
 use serde_json::json;
 
-use super::HttpReply;
+use super::super::HttpReply;
 use crate::services::auth::types::{User, UserRole};
 
 /// Well-known env var names the config panel can query.
@@ -39,9 +39,12 @@ const KNOWN_KEYS: &[(&str, &str)] = &[
     ("GITHUB_TOKEN", "GitHub"),
 ];
 
-/// Resolve an env var's value, checking runtime overrides first.
+/// Resolve an env var's value, checking runtime overrides first. A var that is
+/// *set but empty* (e.g. a `KEY="${KEY:-}"` passthrough in the procd unit with
+/// no value supplied) counts as **absent** — so the Services pane shows it as
+/// "not configured" rather than "available".
 fn resolve_env(name: &str, overrides: &HashMap<String, String>) -> Option<String> {
-    overrides.get(name).cloned().or_else(|| std::env::var(name).ok())
+    overrides.get(name).cloned().or_else(|| std::env::var(name).ok()).filter(|v| !v.trim().is_empty())
 }
 
 /// `GET /api/env-keys` — list all well-known keys with their status.
@@ -261,6 +264,7 @@ mod tests {
             name: "Test".to_owned(),
             password_hash: String::new(),
             role: UserRole::User,
+            must_change_password: false,
             created_at: 0,
             updated_at: 0,
         };
@@ -299,6 +303,7 @@ mod tests {
             name: "Test".to_owned(),
             password_hash: String::new(),
             role: UserRole::User,
+            must_change_password: false,
             created_at: 0,
             updated_at: 0,
         };

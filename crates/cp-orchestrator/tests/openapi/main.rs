@@ -9,11 +9,13 @@ mod exhaustive;
 mod paths;
 mod schemas;
 mod schemas_ext;
+mod schemas_ext2;
 
 // Acknowledge lib-only deps visible to the integration-test binary.
 use argon2 as _;
 use base64 as _;
 use calamine as _;
+use cp_base as _;
 use cp_mod_bridge as _;
 use cp_oplog as _;
 use cp_orchestrator as _;
@@ -122,7 +124,7 @@ pub(crate) fn with_agent(mut path_item: Value) -> Value {
 // ── Build ───────────────────────────────────────────────────────────
 
 fn build_spec() -> Value {
-    let all_schemas = merge(schemas::core(), schemas_ext::transport());
+    let all_schemas = merge(merge(schemas::core(), schemas_ext::transport()), schemas_ext2::deploy());
     json!({
         "openapi": "3.0.3",
         "info": { "title": "Context Pilot Orchestrator", "version": "1.0.0" },
