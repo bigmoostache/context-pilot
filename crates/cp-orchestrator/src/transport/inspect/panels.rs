@@ -168,16 +168,24 @@ pub fn scratchpad(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpRe
 
 /// `GET /api/agent/{id}/tree` — tree descriptions from shared YAML.
 ///
-/// Transforms the on-disk YAML map (`{path: description, …}`) into a
-/// `TreeRow[]` array with minimal fields.
+/// Transforms the on-disk YAML map (`{hash: {path, description, …}}`) into a
+/// `TreeRow[]` array with minimal fields. The heavy `description` text is
+/// truncated to a short preview — the full text is available via
+/// `GET /api/agent/{id}/fs/descriptions`.
 pub fn tree(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let folder = match agent_folder(state, agent_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
-    yaml_map_to_keyed_array(state, &folder, "tree-descriptions.yaml", |path, desc| {
+    yaml_map_to_keyed_array(state, &folder, "tree-descriptions.yaml", |_hash, desc| {
+        let path = desc.get("path").and_then(serde_json::Value::as_str).unwrap_or("");
         let kind = if path.ends_with('/') { "dir" } else { "file" };
-        serde_json::json!({ "depth": 0, "name": path, "kind": kind, "desc": desc })
+        // Truncate the description to a short preview (saves ~1 MB on large trees).
+        let short_desc = desc
+            .get("description")
+            .and_then(serde_json::Value::as_str)
+            .map(|d| if d.len() > 120 { format!("{}…", &d[..d.floor_char_boundary(120)]) } else { d.to_owned() });
+        serde_json::json!({ "depth": 0, "name": path, "kind": kind, "desc": short_desc })
     })
 }
 

@@ -186,6 +186,30 @@ function invalidateInspection(client: QueryClient, agentId: string): void {
   })
 }
 
+// ── Throttled invalidation (T492 performance fix) ─────────────────────
+//
+// During active agent work the orchestrator's 2s config.json mtime scan fires
+// an SSE `invalidate` on every cycle, causing ALL inspection resources to
+// refetch. With a large tree (~544 KB) + conversation (~214 KB) + memory
+// (~53 KB), JSON.parse on the main thread takes ~400 ms per burst. At 2–3s
+// cadence this creates a visible freeze.
+//
+// Throttle: allow the FIRST invalidation through immediately (fast first
+// paint), then suppress subsequent ones for MIN_INVALIDATE_GAP_MS. The 15s
+// backstop poll (BACKSTOP_POLL_MS) ensures no stale data persists longer than
+// one poll cycle even if a throttled invalidation is dropped.
+
+const MIN_INVALIDATE_GAP_MS = 10_000
+const lastInvalidateMs = new Map<string, number>()
+
+function throttledInvalidateInspection(client: QueryClient, agentId: string): void {
+  const now = Date.now()
+  const last = lastInvalidateMs.get(agentId) ?? 0
+  if (now - last < MIN_INVALIDATE_GAP_MS) return
+  lastInvalidateMs.set(agentId, now)
+  invalidateInspection(client, agentId)
+}
+
 /**
  * Ensure the SSE→cache bridge is live for `agentId`. Idempotent: wires the
  * subscription exactly once per agent for the app lifetime (the SSE client is a
@@ -211,10 +235,11 @@ export function ensureSync(agentId: string): void {
     }
     applyDelta(queryClient, agentId, entry)
   })
-  client.subscribe("invalidate", () => invalidateInspection(queryClient, agentId))
+  client.subscribe("invalidate", () => throttledInvalidateInspection(queryClient, agentId))
   client.subscribe("resync", () => {
     // Catastrophic gap (rev beyond the replay buffer): refresh everything for
     // this agent — live caches AND inspection — to re-anchor on ground truth.
+    // Bypass the throttle: resync is rare and must not be suppressed.
     invalidateLiveCaches(agentId)
     invalidateInspection(queryClient, agentId)
   })
