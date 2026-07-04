@@ -1482,6 +1482,10 @@
   path: crates/cp-mod-search/src/meili/mod.rs
   description: 'Meilisearch sub-module hub: bootstrap, client, download, overlay, server, tasks.'
   last_edited_ms: 0
+2128b9118374ec74:
+  path: src/app/context/mod.rs
+  description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
+  last_edited_ms: 0
 213dc6c50609c3ef:
   path: crates/cp-mod-chat/src/client/download.rs
   description: Tuwunel binary download. Pinned version, GitHub release download + zstd decompress. 24h failure caching via .download-failed marker to avoid wasted HTTP roundtrips on boot.
@@ -2753,6 +2757,10 @@
 3ec1b87f514754b8:
   path: crates/cp-console-server/src/main.rs
   description: Standalone daemon binary. Unix socket + JSON-line protocol (create/send/kill/status/list). BTreeMap<String, Session> for ordered iteration. Thread-per-connection. Signal-driven graceful shutdown. Background reaper. 'stats' diagnostic command.
+  last_edited_ms: 0
+3ec2d0ef856f72fb:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 3ed10b6110dcc61b:
   path: web/src/components/agents/AgentModal.tsx
@@ -4218,6 +4226,10 @@
   path: crates/cp-mod-entities/src/tools.rs
   description: 'SQL execution engine. execute() dispatches to execute_select/dml/ddl. execute_dml_stmts is row-aware: dispatches per-statement on prep.column_count()>0 so a DML batch can end in a plain SELECT (not just RETURNING) without rusqlite ''Execute returned results'' error. dry_run via SAVEPOINT+ROLLBACK. Parsing from crate::parse. request_path reads .sql. live/output_path routing. ≤150 lines AND ≤8000 bytes inline, bigger→entity_result panel. 200-row cap. 4 DML-dispatch regression tests.'
   last_edited_ms: 1781123413461
+5f629135d3d36ae0:
+  path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
+  description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/paused/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape. MAX_LOG_ENTRIES=20 truncation keeps /threads response bounded (T492). paused field included in overlay and reshape (T371).'
+  last_edited_ms: 1783182573161
 5f94336085c495f4:
   path: crates/cp-oplog/tests/oplog_core.rs
   description: 'Phase 22 (X789): cp-oplog append/segment/replay public-API black-box suite (7 tests). rev strictly-monotonic + never-reused across 60 appends/tiny-limit rolls + reopen; reopen resumes at exact next_rev; EVERY rolled segment (index>0) opens with leading Checkpoint while seg-0 does NOT (GAP1/I5); segment::indices ascending-contiguous-from-0; replay() rebuilds ground-truth heads (last-byte-per-thread, 3 threads) + seen-set (committed dedup tokens) over rolled+reopened log tracked independently; torn-tail recovery correct at EVERY byte offset (truncate seg-0 to each length 0..=len, reopen never errors, rev_head = highest fully-written rev via expected_rev_head boundary helper, next_rev resumes); mid-frame-truncation reissues torn rev to fresh append no-reuse. No access to pub(crate) replay_full/fold_entry — pure black-box. tempfile+cp_wire used directly (no as _ needed).'
@@ -6946,6 +6958,10 @@
   path: ui/src/lib/mock.ts
   description: 'Mock session data: panels, tokenBudget, messages, threads, threadDetails, agents, fileTree, library, usagePoints+USAGE_RATES, cockpit panel maquette data (T16), and currentUser (T30 — company-managed account for the avatar menu/Profile modal).'
   last_edited_ms: 1781596817778
+9cdf151641317d79:
+  path: crates/cp-orchestrator/src/transport/inspect/panels.rs
+  description: 'Cockpit inspection-panel endpoints: memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list = tier-③ disk reads reshaped to maquette JSON. Tree descriptions truncated to 120-char preview (T492 perf fix, full text via /fs/descriptions). library() returns command body for /cmd suggestion (T350). tools/radar/entities = DERIVED-state endpoints returning normal empty shape by design.'
+  last_edited_ms: 1783182573237
 9cff048fd5ba62b3:
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: all Module trait methods implemented (stubs). is_global=true, no tools, no panels. cp-wire dep for future oplog/stream types.'
@@ -9658,6 +9674,10 @@ d8359ab8b810ded8:
   path: crates/cp-mod-spine/src/panel.rs
   description: 'Spine panel UI. Notifications rendered as Block::Table (ID/Time/Type/Content columns) with 60-char content truncation. Sections: Unprocessed, Blocked, Recent Processed. Config as KeyValue. Active Watchers list. Context: text format for LLM.'
   last_edited_ms: 0
+d8431722d474f862:
+  path: web/src/lib/query/sync.ts
+  description: 'SSE→QueryClient delta bridge (push plane Leg-2 frontend). Owns qk (query-key registry), ensureSync (idempotent per-agent SSE subscription), applyDelta (functional-updater setQueryData fold), hydrateSpilledMessage (T357). T492 fix: throttledInvalidateInspection (10s min gap) prevents refetch storms during active agent work. Re-exports applyThreadDelta/applyAgentDelta/mergeThreadLogs/OpEntry.'
+  last_edited_ms: 1783182573305
 d88af953077b8048:
   path: src/modules/conversation/mod.rs
   description: 'Conversation display module. Core/global. Context types: ''conversation'' + ''system''. No tools — purely display/rendering. Sub-modules: list, markdown_ir, panel, refresh, render_blocks, render_input_blocks, render_json.'
@@ -10577,6 +10597,10 @@ f1a5f3c3f8848be3:
 f1ac96a7f75011d7:
   path: web/src/lib/api/generated/sdk.gen.ts
   description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
+  last_edited_ms: 0
+f1ca79626e88b4c1:
+  path: crates/cp-base/src/state/runtime.rs
+  description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
   last_edited_ms: 0
 f1d4b4c541def7ef:
   path: .github/workflows/release.yml
