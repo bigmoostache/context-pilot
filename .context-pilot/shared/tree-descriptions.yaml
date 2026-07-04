@@ -2685,7 +2685,7 @@
 3d3c4d8cc125ce49:
   path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
   description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/paused/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape. paused field included in overlay and reshape (T371).'
-  last_edited_ms: 0
+  last_edited_ms: 1783183898319
 3d3d40f549d551f5:
   path: crates/cp-wire/src/types/command.rs
   description: Command envelope (id, seq, dedup_token) + Kind (SendMessage, CreateThread, ArchiveThread, RestoreThread, InterruptStream, Stop, Configure{provider,model}, Unknown). Frame{schema_version, auth, command} bearer-checked before payload. 5 tests incl configure round-trip + tolerant decode.
