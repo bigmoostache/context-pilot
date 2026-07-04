@@ -21,13 +21,29 @@ pub(crate) fn append_cost_tsv(state: &mut State) {
     // Epoch-millisecond timestamp (raw, unambiguous, sortable — consumer formats)
     let datetime = tel.tick_start_ms;
 
+    // Rescale proxy token segments by API-reported totals.
+    //
+    // The proxy (estimate_tokens — chars/4) and the API tokenizer disagree, but
+    // both describe the same request.  Scale the proxy segments so they sum to
+    // the API-reported total input (hit + miss), preserving their proportions.
+    let proxy_total =
+        tel.tokens_before_culprit.saturating_add(tel.tokens_culprit).saturating_add(tel.tokens_after_culprit);
+    let api_total = state.tick_cache_hit_tokens.saturating_add(state.tick_cache_miss_tokens);
+
+    let (before, culp_tok, after) = if proxy_total > 0 && api_total > 0 {
+        let before = tel.tokens_before_culprit.saturating_mul(api_total).checked_div(proxy_total).unwrap_or(0);
+        let culprit = tel.tokens_culprit.saturating_mul(api_total).checked_div(proxy_total).unwrap_or(0);
+        // Remainder goes to `after` to avoid rounding drift.
+        let after = api_total.saturating_sub(before).saturating_sub(culprit);
+        (before, culprit, after)
+    } else {
+        (tel.tokens_before_culprit, tel.tokens_culprit, tel.tokens_after_culprit)
+    };
+
     let line = format!(
         "{datetime}\t{tools}\t{culprit}\t{before}\t{culp_tok}\t{after}\t{queue}\t{tempo}\t{break_kind}\t{max_freezes}\t{hit_tok}\t{hit_cost:.6}\t{miss_tok}\t{miss_cost:.6}\t{out_tok}\t{out_cost:.6}",
         tools = tel.three_last_tools,
         culprit = tel.culprit_type,
-        before = tel.tokens_before_culprit,
-        culp_tok = tel.tokens_culprit,
-        after = tel.tokens_after_culprit,
         queue = tel.queue_is_active,
         tempo = tel.tempo_is_active,
         break_kind = tel.break_kind.as_tsv(),
