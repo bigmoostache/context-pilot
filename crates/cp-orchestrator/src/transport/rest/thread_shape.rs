@@ -70,13 +70,6 @@ fn roster_status_value(status: ThreadTurn) -> serde_json::Value {
     serde_json::Value::String(s.to_owned())
 }
 
-/// Maximum log entries returned per thread in the `/threads` response.
-///
-/// Keeps the payload bounded (~100 bytes/msg × 50 = ~5 KB/thread) while still
-/// providing enough context for the conversation view. Older messages are
-/// available via SSE delta history or dedicated per-thread endpoint.
-const MAX_LOG_ENTRIES: usize = 20;
-
 /// Reshape one raw thread from agent state to the maquette `ThreadDetail`
 /// shape: snake_case → camelCase, computed fields (`messageCount`, `unread`,
 /// `lastMessage`, `lastActivity`), and messages mapped to `log`.
@@ -97,14 +90,8 @@ pub(super) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_j
         .and_then(serde_json::Value::as_u64)
         .unwrap_or(0);
 
-    // Truncate the log to the last MAX_LOG_ENTRIES — keeps the /threads
-    // response bounded while preserving recent conversation context.
-    let log: Vec<serde_json::Value> = messages
-        .map(|msgs| {
-            let start = msgs.len().saturating_sub(MAX_LOG_ENTRIES);
-            msgs[start..].iter().enumerate().map(|(i, m)| reshape_message(m, start + i)).collect()
-        })
-        .unwrap_or_default();
+    let log: Vec<serde_json::Value> =
+        messages.map(|msgs| msgs.iter().enumerate().map(|(i, m)| reshape_message(m, i)).collect()).unwrap_or_default();
 
     let status_str = match raw.get("status").and_then(serde_json::Value::as_str).unwrap_or("TheirTurn") {
         "MyTurn" => "MY_TURN",
