@@ -3,6 +3,7 @@ import { MaintWizard } from "@/components/auth/maint/MaintWizard"
 import { probeMaintPlane, type MaintStatus } from "@/lib/api/maint"
 import { TopBar } from "@/components/shell/TopBar"
 import { CockpitView } from "@/components/shell/CockpitView"
+import { CostsView } from "@/components/shell/costs/CostsView"
 import { StatusBar } from "@/components/shell/StatusBar"
 import { ThreadsView } from "@/components/threads/ThreadsView"
 import { FleetShell } from "@/components/agents/FleetShell"
@@ -107,11 +108,11 @@ function AppShell() {
   // Fall back to the fleet view in that case (private windows never hit this
   // because they start with empty localStorage → default "fleet").
   //
-  // Cockpit is a DEVELOPER-only surface (T301): when dev mode is off, a
-  // persisted (or stale) "cockpit" selection resolves to "threads" so the view
-  // can never render a tab the TopBar deliberately hides.
+  // Cockpit and Costs are DEVELOPER-only surfaces (T301): when dev mode is off,
+  // a persisted (or stale) selection resolves to "threads" so the view can
+  // never render a tab the TopBar deliberately hides.
   const effectiveView: ViewMode =
-    view === "cockpit" && !devMode
+    (view === "cockpit" || view === "costs") && !devMode
       ? activeAgent
         ? "threads"
         : "fleet"
@@ -159,6 +160,8 @@ function AppShell() {
             />
           ) : effectiveView === "cockpit" ? (
             <CockpitView agentId={activeAgentId} />
+          ) : effectiveView === "costs" ? (
+            <CostsView agentId={activeAgentId} />
           ) : effectiveView === "finder" ? (
             <Finder key={activeAgent.id} agent={activeAgent} revealPath={finderRevealPath} onRevealConsumed={() => setFinderRevealPath(null)} />
           ) : (

@@ -18,8 +18,13 @@ use super::{Backend, HttpReply};
 
 const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const AUTHORIZE_URL: &str = "https://claude.ai/oauth/authorize";
-const TOKEN_URL: &str = "https://console.anthropic.com/v1/oauth/token";
+const TOKEN_URL: &str = "https://claude.ai/v1/oauth/token";
 const REDIRECT_URI: &str = "https://console.anthropic.com/oauth/code/callback";
+/// User-Agent required by Anthropic's OAuth token endpoint. The canonical
+/// Claude Code OAuth contract expects a Claude Code identity here; a default
+/// `reqwest/x.y` UA is rejected/misrouted by the edge, breaking both the
+/// authorization_code exchange and refresh.
+const TOKEN_USER_AGENT: &str = "claude-cli/2.1.196 (external, cli)";
 const SCOPES: &str =
     "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
 /// PKCE sessions expire after 5 minutes.
@@ -113,12 +118,12 @@ pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
     let challenge_hash = Sha256::digest(code_verifier.as_bytes());
     let code_challenge = URL_SAFE_NO_PAD.encode(challenge_hash);
 
-    // State parameter (CSRF protection).
-    let mut state_bytes = [0u8; 32];
-    if read_random(&mut state_bytes).is_err() {
-        return HttpReply::error(500, "could not generate random bytes");
-    }
-    let state_param = URL_SAFE_NO_PAD.encode(state_bytes);
+    // State parameter MUST equal the code_verifier — this is the canonical
+    // Claude Code OAuth contract (Anthropic's token endpoint cross-checks the
+    // `state` echoed back in `code#state` against the PKCE verifier). Using an
+    // independent random `state` here caused the authorization_code exchange to
+    // be rejected → the "pasted the code but not logged in" failure.
+    let state_param = code_verifier.clone();
 
     let url = format!(
         "{AUTHORIZE_URL}?code=true&client_id={CLIENT_ID}&response_type=code&redirect_uri={}&scope={}&code_challenge={code_challenge}&code_challenge_method=S256&state={state_param}",
@@ -207,6 +212,7 @@ pub(crate) fn refresh_login() -> HttpReply {
     let resp = client
         .post(TOKEN_URL)
         .header("Content-Type", "application/json")
+        .header("User-Agent", TOKEN_USER_AGENT)
         .body(body.to_string())
         .timeout(Duration::from_secs(15))
         .send();
@@ -228,6 +234,13 @@ pub(crate) fn refresh_login() -> HttpReply {
                     .and_then(|e| e.get("message"))
                     .and_then(|m| m.as_str())
                     .unwrap_or_else(|| val.get("error").and_then(|e| e.as_str()).unwrap_or("refresh failed"));
+                // A refresh failure (e.g. `invalid_grant`: the refresh token has
+                // rotated/expired) does NOT invalidate the current access token —
+                // the two lifetimes are independent, and the access token often has
+                // hours of runway left. So we DELIBERATELY leave the stored
+                // credentials in place: nuking them here would strand a still-valid
+                // session. Once the access token itself expires, `token_status`
+                // reports invalid and the login flow re-authenticates cleanly.
                 return HttpReply::error(502, &format!("{msg} (HTTP {status})"));
             }
 
@@ -277,6 +290,7 @@ fn exchange_and_store(code: &str, code_verifier: &str, state: &str) -> Result<i6
     let resp = client
         .post(TOKEN_URL)
         .header("Content-Type", "application/json")
+        .header("User-Agent", TOKEN_USER_AGENT)
         .body(body.to_string())
         .timeout(Duration::from_secs(15))
         .send()

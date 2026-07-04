@@ -9,7 +9,6 @@ use cp_base::state::context::{Entry, Kind, compute_total_pages, estimate_tokens}
 use cp_base::state::runtime::State;
 
 use super::GIT_CMD_TIMEOUT_SECS;
-use super::GIT_STATUS_REFRESH_MS;
 use crate::types::GitResultRequest;
 use cp_base::panels::scroll_key_action;
 
@@ -18,11 +17,11 @@ pub(crate) struct GitResultPanel;
 
 impl Panel for GitResultPanel {
     fn needs_cache(&self) -> bool {
-        true
+        false
     }
 
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
-        Some(GIT_STATUS_REFRESH_MS)
+        None
     }
 
     fn build_cache_request(&self, ctx: &Entry, _state: &State) -> Option<CacheRequest> {

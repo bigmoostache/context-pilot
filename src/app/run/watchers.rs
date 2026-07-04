@@ -2,34 +2,14 @@ use std::sync::mpsc::Receiver;
 
 use crate::app::panels::now_ms;
 use crate::infra::watcher::WatchEvent;
+use crate::state::State;
 use crate::state::cache::{CacheRequest, CacheUpdate, process_cache_request};
-use crate::state::{Kind, State};
 
 use crate::app::App;
 
 /// Set up file watchers from all modules' `watch_paths()`.
 pub(super) fn setup_file_watchers(app: &mut App) {
     sync_file_watchers(app);
-}
-
-/// Sync `GhWatcher` with current `GithubResult` panels
-pub(super) fn sync_gh_watches(app: &App) {
-    let token = match &cp_mod_github::types::GithubState::get(&app.state).github_token {
-        Some(t) => t.clone(),
-        None => return,
-    };
-    let panels: Vec<(String, String, String)> = app
-        .state
-        .context
-        .iter()
-        .filter(|c| c.context_type.as_str() == Kind::GITHUB_RESULT)
-        .filter_map(|c| c.get_meta_str("result_command").map(|cmd| (c.id.clone(), cmd.to_string(), token.clone())))
-        .collect();
-    app.gh_watcher.sync_watches(&panels);
-
-    // Sync branch PR watch — poll for PRs on the current git branch
-    let branch = cp_mod_git::types::GitState::get(&app.state).branch.as_deref();
-    app.gh_watcher.sync_branch_pr(branch, Some(&token));
 }
 
 /// Schedule initial cache refreshes for fixed context elements only.
@@ -78,18 +58,7 @@ fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpda
         }
 
         // ModuleSpecific: match by context_type
-        if let CacheUpdate::ModuleSpecific { ref context_type, ref data, .. } = update {
-            // Special case: BranchPrUpdate targets GithubState, not a panel
-            if context_type.as_str() == Kind::GITHUB_RESULT && data.is::<cp_mod_github::watcher::BranchPrUpdate>() {
-                if let CacheUpdate::ModuleSpecific { data: owned_data, .. } = update
-                    && let Ok(pr_update) = owned_data.downcast::<cp_mod_github::watcher::BranchPrUpdate>()
-                {
-                    cp_mod_github::types::GithubState::get_mut(state).branch_pr = pr_update.pr_info;
-                    state.flags.ui.dirty = true;
-                }
-                continue;
-            }
-
+        if let CacheUpdate::ModuleSpecific { ref context_type, .. } = update {
             let idx = state.context.iter().position(|c| c.context_type == *context_type);
             let Some(idx) = idx else { continue };
             let mut ctx = state.context.remove(idx);

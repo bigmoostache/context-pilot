@@ -464,6 +464,9 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     // Accumulate token stats from intermediate stream before discarding pending_done
     accumulate_pending_token_stats(app);
 
+    // Append per-tick cost row (consumes tick_telemetry populated at stream start)
+    super::cost_log::append_cost_tsv(&mut app.state);
+
     app.save_state_async();
 
     // Check if any tool requested a sleep (e.g., console send_keys delay)

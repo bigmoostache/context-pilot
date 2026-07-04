@@ -378,23 +378,12 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
 
     app.state.streaming_estimated_tokens = 0;
 
-    // Accumulate token stats from intermediate stream
-    if let Some((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, _, _, _, _)) = app.pending_done {
-        // Fold uncached input into cache_miss for correct cost accounting
-        let effective_miss = cache_miss_tokens.saturating_add(input_tokens);
-        app.state.tick_cache_hit_tokens = cache_hit_tokens;
-        app.state.tick_cache_miss_tokens = effective_miss;
-        app.state.tick_output_tokens = output_tokens;
-        app.state.tick_uncached_input_tokens = input_tokens;
-        app.state.stream_cache_hit_tokens = app.state.stream_cache_hit_tokens.saturating_add(cache_hit_tokens);
-        app.state.stream_cache_miss_tokens = app.state.stream_cache_miss_tokens.saturating_add(effective_miss);
-        app.state.stream_output_tokens = app.state.stream_output_tokens.saturating_add(output_tokens);
-        app.state.stream_uncached_input_tokens = app.state.stream_uncached_input_tokens.saturating_add(input_tokens);
-        app.state.cache_hit_tokens = app.state.cache_hit_tokens.saturating_add(cache_hit_tokens);
-        app.state.cache_miss_tokens = app.state.cache_miss_tokens.saturating_add(effective_miss);
-        app.state.total_output_tokens = app.state.total_output_tokens.saturating_add(output_tokens);
-        app.state.uncached_input_tokens = app.state.uncached_input_tokens.saturating_add(input_tokens);
-    }
+    // Accumulate token stats + costs from intermediate stream (same logic as
+    // the non-blocking path in pipeline.rs — includes $ computation).
+    super::pipeline::accumulate_pending_token_stats(app);
+
+    // Append per-tick cost row (consumes tick_telemetry populated at stream start)
+    super::cost_log::append_cost_tsv(&mut app.state);
 
     app.save_state_async();
     app.state.flags.ui.dirty = true;

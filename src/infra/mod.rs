@@ -11,8 +11,6 @@ pub(crate) mod constants;
 pub(crate) mod flame {
     pub(crate) use cp_base::flame::{flush, init};
 }
-/// GitHub webhook / event watcher.
-pub(crate) mod gh_watcher;
 /// Simple profiler for identifying slow operations.
 pub(crate) mod profiler;
 /// Tool definition helpers.

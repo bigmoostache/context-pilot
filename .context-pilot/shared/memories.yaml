@@ -583,22 +583,20 @@ bfd5725c88443a6a:
   - task
   last_edited_ms: 0
 bfff572081f9301e:
-  tl_dr: X520+X521 headless COMPLETE + verified. `tui --headless` boots terminal-free, drives background_tick() until quiescence/guard rail. Exit 0/1/2. JSONL trajectory. --provider/--model flags; container default ClaudeCodeApiKey + Sonnet 4.5 (env-only). Smoke-tested.
+  tl_dr: 'HISTORICAL: X520/X521 headless mode REMOVED from tree (confirmed T475 2026-07-01). No headless.rs / TrajectoryWriter / run_headless. Only watchdog.rs sibling remains.'
   contents: |-
-    Files: src/app/run/headless.rs (new ~360 lines), src/app/run/lifecycle.rs (background_tick extracted, returns TickStatus Continue/Reload/OwnershipLost), src/main.rs (run_headless_main branch before terminal setup), src/app/run/mod.rs (pub(crate) mod headless).
+    Confirmed T475 2026-07-01: grep for headless/Headless/TrajectoryWriter/run_headless/LAST_PROGRESS in src/ returns only src/app/run/tools/watchdog.rs. The headless trajectory + deadman tick-telemetry path (per-event {status,messages,output_tokens,total_cost_usd,duration_secs} + LOOP_HEARTBEAT_MS/LAST_PROGRESS_MS) no longer exists. Original headless notes below are kept for history only.
 
-    Behaviour: instruction injected as UserMessage spine notification -> check_spine -> apply_continuation -> start_streaming. Quiescence = stream idle + typewriter drained + no pending tools/done + no reverie + no deferred sleep + no unprocessed notifications, sustained 2.5s settle window. Guard rails: --max-cost $5, --max-messages 150 defaults; --max-duration-secs optional; --instruction-file fallback; --trajectory path (default .context-pilot/trajectory.jsonl). disable_interactive_tools drops ONLY ask_user_question; system_reload kept (self-exec re-execs with --headless intact). Trajectory flushed per-event + [cp-headless] stdout mirror.
+    ---
 
-    Clippy notes: tool.enabled is a public field (enabled() is a consuming builder, no set_enabled). multiple_inherent_impl on App requires #[expect(...reason=...)] (registered pattern). No println! allowed -> writeln!(io::stdout()).
-
-    Default model in headless was claude-opus-4-6 (State default); provider/model selection for the container is X521's scope. macOS has no `timeout` -> use bg PID + sleep + kill for smoke tests.
-  importance: high
+    Files: src/app/run/headless.rs (new ~360 lines), src/app/run/lifecycle.rs (background_tick extracted), src/main.rs (run_headless_main branch), src/app/run/mod.rs (pub(crate) mod headless). Behaviour: instruction injected as UserMessage; quiescence detection; guard rails --max-cost/--max-messages/--max-duration-secs; JSONL trajectory.
+  importance: low
   labels:
   - terminal-bench
   - headless
   - x520
   - complete
-  last_edited_ms: 0
+  last_edited_ms: 1782908683633
 caf6de1cb65ac661:
   tl_dr: 'DEMAQUETTING COMPLETE: branch merged to master (f1de2e65) and deleted (local + remote). Working on master from now on. All demaquetting work is on master.'
   contents: '18-phase plan, 4 workstreams: backend runtime, inspection REST, bridge activation, web client. Stack: orchestrator :7878, web dev :5174.'

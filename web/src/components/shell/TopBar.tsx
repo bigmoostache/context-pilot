@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { LayoutGrid, MessagesSquare, FolderTree, Home, Settings2 } from "lucide-react"
+import { LayoutGrid, MessagesSquare, FolderTree, Home, Settings2, BarChart3 } from "lucide-react"
 import { ThemeToggle } from "./widgets/ThemeToggle"
 import { AgentSwitcher } from "./widgets/AgentSwitcher"
 import { UsageButton } from "./widgets/UsageButton"
@@ -109,6 +109,19 @@ export function TopBar({ view, onViewChange, activeAgentId, onSwitchAgent, onNew
                 onClick={() => onViewChange("cockpit")}
                 icon={LayoutGrid}
                 label="Cockpit"
+              />
+            </Tip>
+          )}
+          {devMode && (
+            <Tip
+              title="Cost Analysis"
+              body="Per-tick cache efficiency, culprit attribution, and spend breakdown charts."
+            >
+              <ViewTab
+                active={view === "costs"}
+                onClick={() => onViewChange("costs")}
+                icon={BarChart3}
+                label="Costs"
               />
             </Tip>
           )}

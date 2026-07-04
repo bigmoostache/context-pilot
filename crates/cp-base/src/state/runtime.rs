@@ -2,10 +2,12 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 use super::context::{Entry, Kind};
+use super::data::TickTelemetry;
 use super::data::config::ViewMode;
 use super::data::message::Message;
 use super::flags::{ConfigOverlay, HighlightIrFn, StatusBools, StreamPhase, StreamingTool, UiState};
 use crate::config::llm_types::LlmProvider;
+use crate::panels::ContextItem;
 use crate::tools::ToolDefinition;
 use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
@@ -158,6 +160,15 @@ pub struct State {
     pub previous_panel_hash_list: Vec<String>,
     /// Saved panel ID order from last emitted tick (for queue freeze stability)
     pub previous_panel_order: Vec<String>,
+    /// Panel ID → context type from last emitted tick (for disappearance detection).
+    pub previous_panel_id_types: Vec<(String, String)>,
+    /// Full snapshot of panel `ContextItem`s from the last unfrozen tick.
+    ///
+    /// During tempo/queue freeze, this snapshot is replayed verbatim — guaranteeing
+    /// byte-identical panel content and eliminating cache breaks from panel
+    /// disappearance, appearance, or missing emitted snapshots.
+    /// Not persisted across reloads (runtime-only).
+    pub frozen_context_snapshot: Option<Vec<ContextItem>>,
     /// Sleep timer: tool pipeline waits until this timestamp (ms) before proceeding
     pub tool_sleep_until_ms: u64,
     /// Cache optimization engine: tracks accumulated hashes and breakpoint timestamps
@@ -170,6 +181,8 @@ pub struct State {
     /// unless the tool explicitly opts out via `ToolResult::preserves_tempo`. When the next
     /// `prepare_stream_context()` runs with `tempo == true`, ALL panels freeze unconditionally.
     pub tempo: bool,
+    /// Pre-tick telemetry for cost-tracking TSV (populated at stream start, consumed at stream end).
+    pub tick_telemetry: Option<TickTelemetry>,
     /// Number of alive (non-pruned) breakpoints at last tick — for sidebar display only.
     pub tick_alive_breakpoints: usize,
     /// Per-mille positions (0–1000) of alive BPs within the prompt, sorted.
@@ -274,9 +287,12 @@ impl Default for State {
             guard_rail_blocked: None,
             previous_panel_hash_list: vec![],
             previous_panel_order: vec![],
+            previous_panel_id_types: vec![],
+            frozen_context_snapshot: None,
             tool_sleep_until_ms: 0,
             cache_engine_json: None,
             tempo: true,
+            tick_telemetry: None,
             tick_alive_breakpoints: 0,
             tick_alive_bp_positions: vec![],
             last_viewport_width: 0,

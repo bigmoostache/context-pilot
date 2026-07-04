@@ -18,11 +18,11 @@ pub(crate) struct GithubResultPanel;
 
 impl Panel for GithubResultPanel {
     fn needs_cache(&self) -> bool {
-        true
+        false
     }
 
     fn cache_refresh_interval_ms(&self) -> Option<u64> {
-        Some(120_000) // Fallback timer; GhWatcher also polls via ETag/hash every 60s
+        None
     }
 
     fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
