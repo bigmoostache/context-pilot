@@ -6242,6 +6242,10 @@
   path: .github/checks/lint-config.chain
   description: Cryptographic hash chain protecting 12 critical lint/config files
   last_edited_ms: 0
+8b506421d40884c9:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 8b59e50385c1b936:
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage, Thread (with archived:bool), ThreadQuestionForm. ThreadsState + FocusState (with viewing_archived flag). visible_indices(archived) maps a view to real storage indices; has_my_turn filters archived; mark_selected_read resolves selection through visible list.'
@@ -10166,6 +10170,10 @@ e61686972a01c371:
   path: crates/cp-orchestrator/src/runtime.rs
   description: 'Phase P1: Runtime — env-driven Config (port/agents_dir/budget/scan_interval) + Runtime struct (shared Backend + config). start_driver() spawns bg thread: registry scan → per-agent Tailer poll → MaterializedView fold → CostBreaker observe, on configurable cadence. serve() blocks on HTTP transport. driver_loop/process_registry_events/tail_all_agents helpers. 1 test.'
   last_edited_ms: 0
+e6180126816cb598:
+  path: src/app/context/freeze.rs
+  description: 'Freeze policy: per-panel and ordering freeze decisions (queue, tempo, breath budget). T493 fix: tempo gated on frozen_context_snapshot.is_some() so telemetry only reports tempo=ON when the full-freeze path can actually protect the prompt.'
+  last_edited_ms: 1783183419721
 e62d724617c344d9:
   path: crates/cp-orchestrator/src/main.rs
   description: 'Backend entry point. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + X896 new-agent realm root + agent binary, creates Runtime, starts driver thread, serves HTTP (blocking). `use <crate> as _` block acknowledges lib-only deps in the bin target (per-target unused-crate-dependencies forbid): incl argon2, rusqlite, portable_pty, calamine, csv, reqwest, openssl.'
