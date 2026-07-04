@@ -118,6 +118,10 @@
   path: src/app/run/threads/mod.rs
   description: 'Thread helpers for main loop: maybe_inject_auto_read (filters paused threads — T371), check_my_turn_threads (filters paused threads — T371), extract_thread_ids, maybe_append_tool_activity. emit_thread_paused re-exported from paused.rs.'
   last_edited_ms: 1782311327193
+027d4f1e52c47921:
+  path: src/llms/cache/density.rs
+  description: 'Divergence density distributions. Production: ConversationTailDensity (zeros out assistant blocks, quadratic on user-side panels + last user turn). Test-only: Uniform, Quadratic, PowerLaw, Empirical.'
+  last_edited_ms: 0
 02c91735e81cafcf:
   path: crates/cp-orchestrator/tests/end_to_end.rs
   description: Phase 30 end-to-end loopback capstone (3 tests). Backend::new takes 6 args (auth=None, session_ttl). Real agent stack ↔ real backend transport over real sockets. Command journals on agent and re-emerges as SSE delta. Spilled body hydrates over REST. 25 SSE connect/disconnect soak cycles.
@@ -4318,6 +4322,10 @@
   path: crates/cp-mod-bridge/src/error.rs
   description: 'Bridge boot error: Error{AlreadyRunning{folder}, Io{context,source}} + BootResult + Error::io(context,source) helper. NO std::error::Error (dodges missing_trait_methods). Distinguishes ''folder already owned'' (recoverable) from ''disk broken'' (fatal).'
   last_edited_ms: 1781625056693
+60f04922b435e734:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 60facb61f2ae4c7a:
   path: .uploads/sourced_pdf/sourced_pdf/render.py
   description: Jetable PDF view renderer using PyMuPDF (fitz). Highlights subject values on target PDF by ref type (blue=BG, mauve=N-1, teal=internal, orange=arithmetic, gray=unassigned). Adds tooltips, pastilles, écart frames. Generates summary pages with GoTo links.
