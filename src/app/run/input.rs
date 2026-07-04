@@ -4,7 +4,6 @@ use crossterm::event;
 
 use crate::app::App;
 use crate::app::actions::Action;
-use crate::infra::gh_watcher::GhWatcher;
 use crate::infra::watcher::FileWatcher;
 use crate::state::cache::CacheUpdate;
 use crate::state::persistence::{build_message_op, build_save_batch};
@@ -17,7 +16,6 @@ impl App {
     /// Create a new `App` with the given state, cache channel, and resume flag.
     pub(crate) fn new(state: State, cache_tx: Sender<CacheUpdate>, resume_stream: bool) -> Self {
         let file_watcher = FileWatcher::new().ok();
-        let gh_watcher = GhWatcher::new(cache_tx.clone());
 
         Self {
             state,
@@ -26,7 +24,6 @@ impl App {
             pending_tools: Vec::new(),
             cache_tx,
             file_watcher,
-            gh_watcher,
             watched_file_paths: std::collections::HashSet::new(),
             watched_dir_paths: std::collections::HashSet::new(),
             last_timer_check_ms: now_ms(),
@@ -34,7 +31,6 @@ impl App {
             pending_retry_error: None,
             last_render_ms: 0,
             last_spinner_ms: 0,
-            last_gh_sync_ms: 0,
             last_bridge_recover_ms: 0,
             last_chat_drain_ms: 0,
             api_check_rx: None,

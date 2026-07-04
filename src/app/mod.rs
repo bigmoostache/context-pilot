@@ -7,7 +7,7 @@ pub(crate) mod events;
 /// Panel trait bridge: rendering, context collection, registry lookup.
 pub(crate) mod panels;
 /// Centralized prompt assembly for all LLM providers.
-pub(crate) mod prompt_builder;
+pub(crate) mod prompt;
 /// Reverie sub-agent: trigger, tools, and lifecycle.
 pub(crate) mod reverie;
 /// Main event loop, streaming, tool pipeline, watchers.
@@ -17,7 +17,6 @@ pub(crate) use context::{ensure_default_agent, ensure_default_contexts};
 
 use std::sync::mpsc::{Receiver, Sender};
 
-use crate::infra::gh_watcher::GhWatcher;
 use crate::infra::tools::{ToolResult, ToolUse};
 use crate::infra::watcher::FileWatcher;
 use crate::state::State;
@@ -53,8 +52,6 @@ pub(crate) struct App {
     pub cache_tx: Sender<CacheUpdate>,
     /// Optional file-system watcher for auto-refresh on file changes.
     pub file_watcher: Option<FileWatcher>,
-    /// GitHub event watcher for PR/issue notifications.
-    pub gh_watcher: GhWatcher,
     /// Tracks which file paths are being watched
     pub watched_file_paths: std::collections::HashSet<String>,
     /// Tracks which directory paths are being watched
@@ -69,8 +66,6 @@ pub(crate) struct App {
     pub last_render_ms: u64,
     /// Last spinner animation update time
     pub last_spinner_ms: u64,
-    /// Last gh watcher sync time
-    pub last_gh_sync_ms: u64,
     /// Last bridge-recovery retry time — throttles the periodic
     /// `cp_mod_bridge::try_recover` attempt that self-heals a bridge whose boot
     /// lost the `flock` race on a fast relaunch (no-op once the bridge is live).

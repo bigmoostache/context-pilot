@@ -15,8 +15,6 @@ pub mod parse;
 mod tools;
 /// GitHub state types: `GithubState`, `GhCommand`, `GhWatch`.
 pub mod types;
-/// Background watcher: polls `gh` for PR/issue updates, auto-refreshes panels.
-pub mod watcher;
 
 use types::GithubState;
 

@@ -41,7 +41,6 @@ impl App {
     ) -> io::Result<()> {
         // Initial cache setup - watch files and schedule initial refreshes
         super::watchers::setup_file_watchers(self);
-        super::watchers::sync_gh_watches(self);
         super::watchers::schedule_initial_cache_refreshes(self);
 
         // Claim ownership immediately
@@ -167,11 +166,6 @@ impl App {
             super::tools::checks::check_deferred_sleep(self, ch.tx);
             // Check watchers (blocking sentinel replacement + async → spine notifications)
             super::tools::cleanup::check_watchers(self, ch.tx);
-            // Throttle gh watcher sync to every 5 seconds (mutex lock + iteration)
-            if current_ms.saturating_sub(self.last_gh_sync_ms) >= 5_000 {
-                self.last_gh_sync_ms = current_ms;
-                super::watchers::sync_gh_watches(self);
-            }
             // Bridge self-heal: if CP_BRIDGE=1 but boot lost the flock race on a
             // fast relaunch, the bridge sits PENDING and the agent is silently
             // unreachable to web sends. Retry boot every ~2s — a fail-fast,

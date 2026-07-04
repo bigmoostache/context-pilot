@@ -6,69 +6,13 @@ use crate::infra::tools::ToolDefinition;
 use crate::infra::tools::refresh_conversation_context;
 use crate::modules;
 use crate::state::cache::hash_content;
-use crate::state::{Kind, Message, State};
+use crate::state::{Message, State};
+use cp_base::state::data::{CacheBreakKind, TickTelemetry};
 
 mod detach;
-
-// ─── Unified Freeze Backend ─────────────────────────────────────────────────
-
-/// Whether a panel's content should be frozen (emit last-known) or fresh (emit current).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FreezeDecision {
-    /// Emit fresh content — cache may break at this point.
-    Fresh,
-    /// Freeze: emit the last-emitted snapshot — cache prefix preserved.
-    Freeze,
-}
-
-/// Snapshot of tick-level freeze conditions, shared across all panels.
-#[derive(Debug, Clone, Copy)]
-struct FreezeConditions {
-    /// Queue module is actively intercepting — infinite freeze budget.
-    queue_active: bool,
-    /// Tempo survived last tick (no tool broke it) — global freeze.
-    tempo: bool,
-}
-
-/// Single source of truth: should panel ORDERING be frozen this tick?
-///
-/// When true, panels keep their previous sorted positions (no reordering
-/// from `last_refresh_ms` changes). Prevents cache prefix breaks due to
-/// panels shuffling positions between ticks.
-fn freeze_conditions(state: &State) -> FreezeConditions {
-    FreezeConditions { queue_active: cp_mod_queue::types::QueueState::get(state).active, tempo: state.tempo }
-}
-
-impl FreezeConditions {
-    /// Whether panel ordering should be frozen this tick.
-    const fn freeze_order(self) -> bool {
-        self.queue_active || self.tempo
-    }
-
-    /// Whether a specific panel's content should be frozen this tick.
-    ///
-    /// Priority (first match wins):
-    /// 1. Queue active → always Freeze (infinite budget, overrides everything)
-    /// 2. Tempo = true → Freeze (no tool broke tempo last tick — global freeze)
-    /// 3. Cache already broken upstream → Fresh (update is "free", no prefix to save)
-    /// 4. Breath budget remaining → Freeze (preserve prefix for a few more ticks)
-    /// 5. No budget left (or `max_freezes=0`) → Fresh
-    const fn freeze_panel(self, cache_broken: bool, freeze_count: u8, max_freezes: u8) -> FreezeDecision {
-        if self.queue_active {
-            return FreezeDecision::Freeze;
-        }
-        if self.tempo {
-            return FreezeDecision::Freeze;
-        }
-        if cache_broken {
-            return FreezeDecision::Fresh;
-        }
-        if max_freezes > 0 && freeze_count < max_freezes {
-            return FreezeDecision::Freeze;
-        }
-        FreezeDecision::Fresh
-    }
-}
+/// Freeze policy: per-panel and ordering freeze decisions (queue, tempo, breath budget).
+mod freeze;
+use freeze::{FreezeDecision, freeze_conditions};
 
 /// Context data prepared for streaming
 pub(super) struct StreamContext {
@@ -155,97 +99,251 @@ pub(super) fn prepare_stream_context(
 
     // === Unified freeze pass (queue + breath + cost tracking) ═══════════════
     //
-    // Single pass over all panels. For each one:
-    //   1. Hash fresh content
-    //   2. Detect whether content changed since last emission
-    //   3. If changed: consult should_freeze_panel() → Freeze or Fresh
-    //   4. Apply decision (restore snapshot OR emit fresh)
-    //   5. Snapshot what was ACTUALLY emitted (post-decision)
-    //   6. Track cache cost (prefix-match against previous tick)
+    // Two paths: full-freeze (snapshot replay) or normal (per-panel decisions).
     //
-    // This replaces the former two-pass approach (queue freeze → breath freeze)
-    // which suffered from snapshot desync between the passes.
-    {
-        let mut cache_broken = false;
-        let mut new_hash_list: Vec<String> = Vec::new();
+    // Full-freeze activates when the freeze engine is active (queue OR tempo)
+    // AND a snapshot from a previous unfrozen tick exists. It replays the exact
+    // panel content from that snapshot, eliminating cache breaks from panel
+    // disappearance, appearance, or missing emitted snapshots.
+    //
+    // Normal path: single pass over all panels — hash, detect changes, consult
+    // freeze policy, apply decision, snapshot what was emitted, track cost.
 
-        let hit_price = state.cache_hit_price_per_mtok();
-        let miss_price = state.cache_miss_price_per_mtok();
+    // Pre-compute system + tools token prefix for tick telemetry
+    let system_tokens = crate::state::estimate_tokens(&get_active_agent_content(state));
+    let tools_tokens = modules::overview::context::estimate_tool_definitions_tokens(state);
+    let prompt_prefix_tokens = system_tokens.saturating_add(tools_tokens);
 
-        for item in &mut context_items {
-            // The conversation panel flows through messages, not the freeze system
-            if item.id == "chat" {
-                continue;
+    let full_freeze = cond.freeze_order() && state.frozen_context_snapshot.is_some();
+
+    if let (true, Some(snapshot)) = (full_freeze, &state.frozen_context_snapshot) {
+        // ═══ FULL FREEZE: replay exact previous prompt ═══════════════════════
+        //
+        // Replace all panel items with the stored snapshot. The "chat" item
+        // (conversation body) is preserved from the fresh context — new messages
+        // are naturally appended at the tail where they don't break the panel
+        // cache prefix.
+        let chat_item = context_items.iter().find(|i| i.id == "chat").cloned();
+        context_items.clone_from(snapshot);
+        if let Some(chat) = chat_item {
+            context_items.push(chat);
+        }
+
+        // Simplified telemetry — everything is a cache hit, no break
+        let three_last_tools: String = state
+            .messages
+            .iter()
+            .rev()
+            .filter(|m| m.msg_type == crate::state::MsgKind::ToolCall)
+            .flat_map(|m| m.tool_uses.iter().map(|t| t.name.as_str()))
+            .filter(|name| *name != "Tool_execution")
+            .take(3)
+            .collect::<Vec<_>>()
+            .join(",");
+
+        let total_panel_tokens: usize =
+            context_items.iter().filter(|i| i.id != "chat").map(|i| crate::state::estimate_tokens(&i.content)).sum();
+
+        state.tick_telemetry = Some(TickTelemetry {
+            tick_start_ms: crate::app::panels::now_ms(),
+            three_last_tools,
+            culprit_type: "none".to_string(),
+            tokens_before_culprit: prompt_prefix_tokens.saturating_add(total_panel_tokens),
+            tokens_culprit: 0,
+            tokens_after_culprit: 0,
+            queue_is_active: cond.queue_active,
+            tempo_is_active: cond.tempo,
+            break_kind: CacheBreakKind::NoBreak,
+            culprit_max_freezes: 0,
+        });
+        // previous_panel_hash_list and previous_panel_id_types stay unchanged
+    } else {
+        // ═══ Normal path: per-panel freeze decisions ═════════════════════════
+
+        {
+            let mut cache_broken = false;
+            let mut new_hash_list: Vec<String> = Vec::new();
+
+            // Culprit tracking for tick telemetry
+            let mut culprit_type: Option<String> = None;
+            let mut culprit_panel_idx: Option<usize> = None;
+            let mut culprit_max_freezes: u8 = 0;
+            let mut culprit_is_new = false;
+            let mut panel_token_counts: Vec<usize> = Vec::new();
+            let mut panel_idx: usize = 0;
+
+            let hit_price = state.cache_hit_price_per_mtok();
+            let miss_price = state.cache_miss_price_per_mtok();
+
+            for item in &mut context_items {
+                // The conversation panel flows through messages, not the freeze system
+                if item.id == "chat" {
+                    continue;
+                }
+
+                let fresh_hash = hash_content(&item.content);
+
+                // Look up this panel's Entry
+                let entry = state.context.iter_mut().find(|c| c.id == item.id);
+                let Some(entry) = entry else {
+                    // Orphaned item (no Entry in state) — emit as-is, breaks cache
+                    new_hash_list.push(format!("{}:{fresh_hash}", item.id));
+                    if !cache_broken {
+                        culprit_panel_idx = Some(panel_idx);
+                        culprit_type = Some(item.id.clone());
+                        culprit_max_freezes = 0; // orphaned panel — no Entry, no max_freezes
+                        culprit_is_new = true; // orphaned = never emitted
+                    }
+                    cache_broken = true;
+                    panel_token_counts.push(crate::state::estimate_tokens(&item.content));
+                    panel_idx = panel_idx.saturating_add(1);
+                    continue;
+                };
+
+                // Detect change: compare fresh content hash to what was last emitted
+                let last_hash = entry.emitted.hash.as_deref();
+                let content_changed = last_hash.is_none_or(|lh| lh != fresh_hash);
+
+                // The hash we'll record (may differ from fresh_hash if we freeze)
+                let emitted_hash;
+
+                if content_changed {
+                    // Content differs from last emission — consult freeze policy
+                    let panel = crate::app::panels::get_panel(&entry.context_type);
+                    let decision = cond.freeze_panel(cache_broken, entry.freeze_count, panel.max_freezes());
+
+                    if decision == FreezeDecision::Freeze
+                        && let Some(ref frozen) = entry.emitted.context
+                    {
+                        // FREEZE: restore the full snapshot (content + header + timestamp)
+                        *item = frozen.clone();
+                        entry.freeze_count = entry.freeze_count.saturating_add(1);
+                        entry.total_freezes = entry.total_freezes.saturating_add(1);
+                        emitted_hash = entry.emitted.hash.clone().unwrap_or(fresh_hash);
+                    } else {
+                        // FRESH: emit new content (no snapshot, or policy says Fresh)
+                        if !cache_broken {
+                            culprit_panel_idx = Some(panel_idx);
+                            culprit_type = Some(entry.context_type.to_string());
+                            culprit_max_freezes = panel.max_freezes();
+                            culprit_is_new = last_hash.is_none();
+                        }
+                        entry.freeze_count = 0;
+                        entry.emitted.hash = Some(fresh_hash.clone());
+                        entry.total_cache_misses = entry.total_cache_misses.saturating_add(1);
+                        emitted_hash = fresh_hash;
+                        cache_broken = true;
+                    }
+                } else {
+                    // Content unchanged — cache preserved naturally, no action needed
+                    emitted_hash = fresh_hash;
+                }
+
+                // Snapshot what was ACTUALLY emitted (post-decision)
+                entry.emitted.context = Some(item.clone());
+
+                // Cost tracking: build hash list for prefix-match
+                new_hash_list.push(format!("{}:{emitted_hash}", item.id));
+
+                // Tick telemetry: track per-panel token counts for culprit decomposition
+                panel_token_counts.push(crate::state::estimate_tokens(&item.content));
+                panel_idx = panel_idx.saturating_add(1);
             }
 
-            let fresh_hash = hash_content(&item.content);
+            // Prefix-match for per-panel cache hit/miss cost tracking
+            let prev = &state.previous_panel_hash_list;
+            let prefix_len = new_hash_list.iter().zip(prev.iter()).take_while(|(a, b)| a == b).count();
 
-            // Look up this panel's Entry
-            let entry = state.context.iter_mut().find(|c| c.id == item.id);
-            let Some(entry) = entry else {
-                // Orphaned item (no Entry in state) — emit as-is, breaks cache
-                new_hash_list.push(format!("{}:{fresh_hash}", item.id));
-                cache_broken = true;
-                continue;
+            for (i, entry_str) in new_hash_list.iter().enumerate() {
+                let panel_id = entry_str.split(':').next().unwrap_or("");
+                let is_hit = i < prefix_len;
+                let price = if is_hit { hit_price } else { miss_price };
+
+                if let Some(ctx) = state.context.iter_mut().find(|c| c.id == panel_id) {
+                    let cost = ctx.token_count.to_f64() * f64::from(price) / 1_000_000.0;
+                    ctx.panel_cache_hit = is_hit;
+                    ctx.panel_total_cost += cost;
+                }
+            }
+
+            state.previous_panel_hash_list = new_hash_list;
+
+            // === Detect disappeared panels ===
+            // A panel from SA that's missing from SB breaks the prompt even though
+            // the freeze loop (which only iterates SB's panels) wouldn't detect it.
+            let break_kind = if cache_broken {
+                if culprit_is_new { CacheBreakKind::PanelAppeared } else { CacheBreakKind::ContentChanged }
+            } else {
+                let current_ids: std::collections::HashSet<&str> =
+                    context_items.iter().filter(|item| item.id != "chat").map(|item| item.id.as_str()).collect();
+                let disappeared =
+                    state.previous_panel_id_types.iter().find(|(id, _)| !current_ids.contains(id.as_str()));
+                if let Some((_gone_id, gone_type)) = disappeared {
+                    culprit_type = Some(gone_type.clone());
+                    // No panel_idx — disappeared panel isn't in current items.
+                    // Token decomposition: all current tokens go to "before".
+                    CacheBreakKind::PanelDisappeared
+                } else {
+                    CacheBreakKind::NoBreak
+                }
             };
 
-            // Detect change: compare fresh content hash to what was last emitted
-            let last_hash = entry.emitted.hash.as_deref();
-            let content_changed = last_hash.is_none_or(|lh| lh != fresh_hash);
+            // Save panel (id, context_type) for next tick's disappearance detection
+            state.previous_panel_id_types = context_items
+                .iter()
+                .filter(|item| item.id != "chat")
+                .map(|item| {
+                    let ctx_type = state
+                        .context
+                        .iter()
+                        .find(|c| c.id == item.id)
+                        .map_or_else(|| item.id.clone(), |c| c.context_type.to_string());
+                    (item.id.clone(), ctx_type)
+                })
+                .collect();
 
-            // The hash we'll record (may differ from fresh_hash if we freeze)
-            let emitted_hash;
+            // === Tick telemetry: culprit decomposition + freeze flags ===
+            let (tokens_before, tok_culprit, tokens_after) = culprit_panel_idx.map_or_else(
+                || {
+                    let total: usize = panel_token_counts.iter().sum();
+                    (total, 0, 0)
+                },
+                |ci| {
+                    let before: usize = panel_token_counts.iter().take(ci).sum();
+                    let culprit = panel_token_counts.get(ci).copied().unwrap_or(0);
+                    let after: usize = panel_token_counts.iter().skip(ci.saturating_add(1)).sum();
+                    (before, culprit, after)
+                },
+            );
 
-            if content_changed {
-                // Content differs from last emission — consult freeze policy
-                let panel = crate::app::panels::get_panel(&entry.context_type);
-                let decision = cond.freeze_panel(cache_broken, entry.freeze_count, panel.max_freezes());
+            // Last 3 tools: scan messages backward for ToolCall entries, skip synthetic Tool_execution stubs
+            let three_last_tools: String = state
+                .messages
+                .iter()
+                .rev()
+                .filter(|m| m.msg_type == crate::state::MsgKind::ToolCall)
+                .flat_map(|m| m.tool_uses.iter().map(|t| t.name.as_str()))
+                .filter(|name| *name != "Tool_execution")
+                .take(3)
+                .collect::<Vec<_>>()
+                .join(",");
 
-                if decision == FreezeDecision::Freeze
-                    && let Some(ref frozen) = entry.emitted.context
-                {
-                    // FREEZE: restore the full snapshot (content + header + timestamp)
-                    *item = frozen.clone();
-                    entry.freeze_count = entry.freeze_count.saturating_add(1);
-                    entry.total_freezes = entry.total_freezes.saturating_add(1);
-                    emitted_hash = entry.emitted.hash.clone().unwrap_or(fresh_hash);
-                } else {
-                    // FRESH: emit new content (no snapshot, or policy says Fresh)
-                    entry.freeze_count = 0;
-                    entry.emitted.hash = Some(fresh_hash.clone());
-                    entry.total_cache_misses = entry.total_cache_misses.saturating_add(1);
-                    emitted_hash = fresh_hash;
-                    cache_broken = true;
-                }
-            } else {
-                // Content unchanged — cache preserved naturally, no action needed
-                emitted_hash = fresh_hash;
-            }
-
-            // Snapshot what was ACTUALLY emitted (post-decision)
-            entry.emitted.context = Some(item.clone());
-
-            // Cost tracking: build hash list for prefix-match
-            new_hash_list.push(format!("{}:{emitted_hash}", item.id));
+            state.tick_telemetry = Some(TickTelemetry {
+                tick_start_ms: crate::app::panels::now_ms(),
+                three_last_tools,
+                culprit_type: culprit_type.unwrap_or_else(|| "none".to_string()),
+                tokens_before_culprit: prompt_prefix_tokens.saturating_add(tokens_before),
+                tokens_culprit: tok_culprit,
+                tokens_after_culprit: tokens_after,
+                queue_is_active: cond.queue_active,
+                tempo_is_active: cond.tempo,
+                break_kind,
+                culprit_max_freezes,
+            });
         }
 
-        // Prefix-match for per-panel cache hit/miss cost tracking
-        let prev = &state.previous_panel_hash_list;
-        let prefix_len = new_hash_list.iter().zip(prev.iter()).take_while(|(a, b)| a == b).count();
-
-        for (i, entry_str) in new_hash_list.iter().enumerate() {
-            let panel_id = entry_str.split(':').next().unwrap_or("");
-            let is_hit = i < prefix_len;
-            let price = if is_hit { hit_price } else { miss_price };
-
-            if let Some(ctx) = state.context.iter_mut().find(|c| c.id == panel_id) {
-                let cost = ctx.token_count.to_f64() * f64::from(price) / 1_000_000.0;
-                ctx.panel_cache_hit = is_hit;
-                ctx.panel_total_cost += cost;
-            }
-        }
-
-        state.previous_panel_hash_list = new_hash_list;
+        // Save snapshot for next frozen tick (panels only, no "chat")
+        state.frozen_context_snapshot = Some(context_items.iter().filter(|i| i.id != "chat").cloned().collect());
     }
 
     // Check if context has breached the threshold — may activate the reverie optimizer
@@ -369,86 +467,6 @@ pub(crate) fn build_stream_params(
     }
 }
 
-// ─── Initialization ─────────────────────────────────────────────────────────
-
-// Re-export agent/seed functions from prompt module
-pub(crate) use cp_mod_prompt::seed::{ensure_default_agent, get_active_agent_content};
-
-/// Assign a UID to a panel if it doesn't have one
-fn assign_panel_uid(state: &mut State, context_type: &str) {
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == context_type)
-        && ctx.uid.is_none()
-    {
-        ctx.uid = Some(format!("UID_{}_P", state.global_next_uid));
-        state.global_next_uid = state.global_next_uid.saturating_add(1);
-    }
-}
-
-/// Ensure all default context elements exist with correct IDs.
-/// Uses the module registry to determine which fixed panels to create.
-/// Conversation is special: it's always created but not numbered (no Px ID in sidebar).
-/// P1 = Todo, P2 = Library, P3 = Overview, P4 = Tree, P5 = Memory,
-/// P6 = Spine, P7 = Logs, P8 = Git, P9 = Scratchpad
-pub(crate) fn ensure_default_contexts(state: &mut State) {
-    // Ensure Conversation exists (special: no numbered Px, always first in context list)
-    if !state.context.iter().any(|c| c.context_type.as_str() == Kind::CONVERSATION) {
-        let elem = modules::make_default_entry("chat", Kind::new(Kind::CONVERSATION), "Chat", true);
-        state.context.insert(0, elem);
-    }
-
-    let defaults = modules::all_fixed_panel_defaults();
-
-    for (pos, d) in defaults.iter().enumerate() {
-        // Core modules always get their panels; non-core only if active
-        if !d.is_core && !state.active_modules.contains(d.module_id) {
-            continue;
-        }
-
-        // Skip if panel already exists
-        if state.context.iter().any(|c| c.context_type == d.context_type) {
-            continue;
-        }
-
-        // pos is 0-indexed in FIXED_PANEL_ORDER, but IDs start at P1
-        let id = format!("P{}", pos.saturating_add(1));
-
-        // Evict any dynamic panel squatting on this fixed panel's ID.
-        // This happens when a module is activated after dynamic panels already
-        // claimed the slot (e.g., module was inactive at boot → slot looked free
-        // → `next_available_context_id` assigned it to a dynamic panel → module
-        // activated later → collision). Two panels sharing one ID breaks the
-        // freeze system, cost tracking, and cache prefix matching.
-        let squatter_new_id = state
-            .context
-            .iter()
-            .any(|c| c.id == id && c.context_type != d.context_type)
-            .then(|| state.next_available_context_id());
-        if let Some(new_id) = squatter_new_id
-            && let Some(squatter) = state.context.iter_mut().find(|c| c.id == id && c.context_type != d.context_type)
-        {
-            log::warn!(
-                "Evicting panel '{}' (type={}) from ID {} → {new_id} to make room for fixed panel '{}'",
-                squatter.name,
-                squatter.context_type,
-                id,
-                d.display_name,
-            );
-            squatter.id = new_id;
-        }
-
-        let insert_pos = pos.saturating_add(1).min(state.context.len()); // +1 to account for Conversation at index 0
-        let elem = modules::make_default_entry(&id, d.context_type.clone(), d.display_name, d.cache_deprecated);
-        state.context.insert(insert_pos, elem);
-    }
-
-    // Assign UID to Conversation (needed for panels/ storage — it holds message_uids)
-    assign_panel_uid(state, Kind::CONVERSATION);
-
-    // Assign UIDs to all existing fixed panels (needed for panels/ storage)
-    // Library panels don't need UIDs (rendered from in-memory state)
-    for d in &defaults {
-        if d.context_type.as_str() != Kind::LIBRARY && state.context.iter().any(|c| c.context_type == d.context_type) {
-            assign_panel_uid(state, d.context_type.as_str());
-        }
-    }
-}
+/// Default context initialization (panel creation, UID assignment, agent seeds).
+mod init;
+pub(crate) use init::{ensure_default_agent, ensure_default_contexts, get_active_agent_content};

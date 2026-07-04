@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import { Loader2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
 import { QuestionForm } from "./QuestionForm"
@@ -7,7 +8,7 @@ import { CreateCommandDialog } from "./CreateCommandDialog"
 import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
-import { zipFiles } from "@/lib/utils"
+import { extractDroppedFiles, zipDropped } from "@/lib/utils"
 import { uploadToNode, type UploadedFile } from "./fileUpload"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
 import type { FinderNode } from "@/lib/types"
@@ -156,8 +157,9 @@ export function ThreadConversation({
   /** owning agent — needed to open the shared Quick Look drawer for an attachment */
   agentId: string
   onSend?: (text: string) => void
-  /** upload picked files into this thread (composer paperclip) */
-  onAttach?: (files: File[]) => void
+  /** upload picked files into this thread (composer paperclip). May be async so
+   *  callers can `await` it to keep an in-flight loader up (T471). */
+  onAttach?: (files: File[]) => void | Promise<void>
   /** files uploaded but not yet sent — shown as chips in the composer (T331) */
   pendingFiles?: UploadedFile[]
   /** remove a pending file by index */
@@ -179,6 +181,9 @@ export function ThreadConversation({
   // dashed border. The whole feature is gated on `onAttach`: with no upload sink
   // the surface neither blurs nor accepts a drop.
   const [dragging, setDragging] = useState(false)
+  // True while a dropped folder/files are being zipped + uploaded — drives the
+  // "Uploading…" overlay so a large folder drop shows clear progress (T471).
+  const [uploading, setUploading] = useState(false)
   // dragenter/dragleave fire for every child crossed, so a plain boolean would
   // flicker; a depth counter tracks "is the cursor still somewhere inside".
   const dragDepth = useRef(0)
@@ -208,20 +213,26 @@ export function ThreadConversation({
     e.preventDefault()
     dragDepth.current = 0
     setDragging(false)
-    // Capture the File list synchronously — dataTransfer is cleared once the
-    // handler returns, so the array must be built before any await.
-    const files = Array.from(e.dataTransfer.files)
-    if (files.length === 0) return
-    // Zip the dropped file(s) client-side into one archive, then upload that
-    // single zip via the same paperclip path (T367). The paperclip picker is
-    // unchanged — only drag-and-drop compresses.
+    // Recurse into any dropped FOLDERS (plain `dataTransfer.files` can't — a
+    // folder drop otherwise yields one unreadable pseudo-file that uploaded as a
+    // failed "CORS … status null" request). extractDroppedFiles captures the
+    // Entry objects synchronously before its first await, so the neutered
+    // DataTransfer doesn't matter (T471).
+    const dropped = await extractDroppedFiles(e.dataTransfer)
+    if (dropped.length === 0) return
+    setUploading(true)
     try {
-      const archive = await zipFiles(files)
-      onAttach?.([archive])
+      // Zip the whole drop (folder structure preserved) into ONE archive and
+      // upload it in a single request — no more per-file burst. Awaiting
+      // onAttach keeps the loader up until the upload actually lands.
+      const archive = await zipDropped(dropped)
+      await onAttach?.([archive])
     } catch {
       // Zipping failed (unreadable file / fflate error) — fall back to
       // uploading the raw files so a drop is never silently lost.
-      onAttach?.(files)
+      await onAttach?.(dropped.map((d) => d.file))
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -267,7 +278,7 @@ export function ThreadConversation({
 
   return (
     <main
-      className="flex min-w-0 flex-1 flex-col bg-background"
+      className="relative flex min-w-0 flex-1 flex-col bg-background"
       // Discrete drag affordance (T367): a subtle 2px blur over the whole
       // surface while an OS file drag is in flight, eased 300ms in and out. The
       // baseline blur(0px) is kept so the OUT direction interpolates too.
@@ -280,6 +291,16 @@ export function ThreadConversation({
       onDragLeave={onAttach ? handleDragLeave : undefined}
       onDrop={onAttach ? handleDrop : undefined}
     >
+      {/* Upload progress (T471) — a discrete centered spinner over the surface
+          while a dropped folder/files are zipped + uploaded. */}
+      {uploading && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/40 backdrop-blur-[1px]">
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[12.5px] text-foreground/90 card-shadow">
+            <Loader2 className="size-4 animate-spin text-[var(--signal)]" />
+            Uploading…
+          </div>
+        </div>
+      )}
       {/* messages */}
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">

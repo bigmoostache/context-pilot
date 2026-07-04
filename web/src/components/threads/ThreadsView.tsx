@@ -205,7 +205,9 @@ export function ThreadsView({
   const handleAttach = useCallback(
     (files: File[]) => {
       if (!effectiveSelectedId || files.length === 0) return
-      void (async () => {
+      // Return the promise so the conversation's drop handler can `await` the
+      // upload and keep its loader up until it lands (T471).
+      return (async () => {
         try {
           const uploaded: UploadedFile[] = []
           for (const f of files) {

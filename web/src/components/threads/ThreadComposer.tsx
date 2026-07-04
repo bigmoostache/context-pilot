@@ -84,8 +84,10 @@ export function ThreadComposer({
   /** true when this thread has been paused by the user (T371) */
   paused?: boolean
   onSend?: (text: string) => void
-  /** upload one or more picked files into this thread (paperclip button) */
-  onAttach?: (files: File[]) => void
+  /** upload one or more picked files into this thread (paperclip button). May
+   *  be async so a caller can await it (T471); the composer itself fires and
+   *  forgets. */
+  onAttach?: (files: File[]) => void | Promise<void>
   /** files uploaded but not yet sent — rendered as removable chips (T331) */
   pendingFiles?: UploadedFile[]
   /** remove a staged file by its index in pendingFiles */
@@ -376,6 +378,17 @@ export function ThreadComposer({
             persistDraft(el.value, el.selectionStart, el.selectionEnd)
           }}
           onKeyDown={handleKeyDown}
+          onPaste={(e) => {
+            const items = Array.from(e.clipboardData.items)
+            const images = items
+              .filter((i) => i.kind === "file" && i.type.startsWith("image/"))
+              .map((i) => i.getAsFile())
+              .filter((f): f is File => f !== null)
+            if (images.length > 0 && onAttach) {
+              e.preventDefault()
+              onAttach(images)
+            }
+          }}
           placeholder="Reply to this thread…"
           rows={1}
           className="max-h-[200px] min-h-[24px] flex-1 resize-none bg-transparent text-[13.5px] leading-relaxed text-foreground/90 placeholder:text-muted-foreground/60 outline-none"
