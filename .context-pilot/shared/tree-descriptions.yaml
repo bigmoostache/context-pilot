@@ -458,6 +458,10 @@
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. Error enrichment with Levenshtein fuzzy matching. Markdown table formatting, ≤5 rows inline+tempo, >5 rows entity_result panel+no tempo. 200-row cap. RETURNING support.
   last_edited_ms: 1780606076253
+09f4dd7424aec29e:
+  path: crates/cp-vault/Cargo.toml
+  description: 'Crate manifest. Deps: serde, serde_json, zeroize, fs2. Optional reqwest behind ''bridge'' feature flag.'
+  last_edited_ms: 1783251966572
 0a11f97b7c738ae2:
   path: src/modules/conversation/mod.rs
   description: 'Conversation display module. Core/global. Context types: ''conversation'' + ''system''. No tools — purely display/rendering. Sub-modules: list, markdown_ir, panel, refresh, render_blocks, render_input_blocks, render_json.'
@@ -3670,6 +3674,10 @@
   path: src/modules/conversation/mod.rs
   description: 'Conversation display module. Core/global. Context types: ''conversation'' + ''system''. No tools — purely display/rendering. Sub-modules: list, markdown_ir, panel, refresh, render_blocks, render_input_blocks, render_json.'
   last_edited_ms: 0
+51517c37295cce68:
+  path: crates/cp-vault/src/registry.rs
+  description: Key registry — ALL_KEYS static array with 17 KeyDefinitions. Single source of truth replacing 3 prior registries. resolve_definition() for dual-name lookup.
+  last_edited_ms: 1783251966229
 5163a5f8d270c77e:
   path: web/src/lib/finderFs.ts
   description: Finder mock fs + helpers. buildRealm grafts one rich tree onto an agent folder. findNode/pathChain/collectStarred/nodeSize/childCounts/fmtBytes/sortNodes. Used by Finder.tsx for sortNodes/fmtBytes only (live mode).
@@ -3966,6 +3974,10 @@
   path: web/src/lib/api/finder.ts
   description: Finder filesystem REST endpoints (SDK). 12 SDK + 2 manual (rawUrl/downloadFile irreducible). T298 uploadUnique. Re-exports FinderNode/FsPreview/SheetData/ConversationMsg from generated.
   last_edited_ms: 1782836346156
+57a1fa11f206fc3e:
+  path: crates/cp-vault/src/local.rs
+  description: 'Backend struct — standalone vault. Resolution cascade: in-memory overrides → env::var → Keychain/file. RwLock for thread safety. Persists to ~/.context-pilot/.env via flock.'
+  last_edited_ms: 1783251966366
 57b7952a9cbf9b7e:
   path: src/ui/perf/mod.rs
   description: 'In-memory perf system. LazyLock PerfMetrics: per-op AtomicU64 stats + RingBuffer<u64> samples, frame times, CPU/RAM, open FDs + rlimit. Platform-specific read_proc_stat(): Linux /proc/self/stat, macOS via ps command, fallback None. snapshot() for overlay. F12 toggle.'
@@ -4206,6 +4218,10 @@
   path: crates/cp-mod-logs/src/tools.rs
   description: Log tool execution. flame!("log_create") and flame!("close_history"). push_log() helper. execute_log_create() creates entries from array. execute_close_conversation_history() processes panels array — per-panel logs (strings), timestamp from panel's last message, panel removal.
   last_edited_ms: 0
+5e8960d85404b945:
+  path: crates/cp-vault/src/lib.rs
+  description: Crate root. LazyLock global vault instance, vault() accessor. Auto-initializes on first access.
+  last_edited_ms: 1783251966158
 5ea5dea550672135:
   path: web/src/components/threads/ThreadsView.tsx
   description: 'Threads view shell (list | conversation). handleSend/handleArchive/handleCreate via sendCommand. T331: handleAttach now STAGES files as pendingFiles (upload to .uploads/ but DON''T send) — pending chips shown in composer, merged into message content only on explicit Send. T298: buildUploadMessage. T303: per-agent thread persistence to localStorage. T334: accepts onShowInFinder prop from App, forwards to ThreadConversation.'
@@ -7682,6 +7698,10 @@ abb19777c1034743:
   path: web/src/components/finder/preview/sourcedPdfTypes.ts
   description: Types, color map, and ZIP-bundle parser for the .sourced_pdf format. Domain types (Metadata/Value/Ref/Arrow), REF_COLORS/REF_LABELS palettes, docType() helper (pdf/xlsx/unknown from extension), parseSourcedBundle() decompresses ZIP → metadata + ALL document bytes (docBytes Map) + values + refs. Handles both v0 (generated) and v1 (production spdf-toolkit) formats. ~210 lines.
   last_edited_ms: 1782148473713
+ac02a19418bc0655:
+  path: crates/cp-vault/src/types.rs
+  description: 'Core types: SecretString (zeroized), VaultError, KeyStatus, Vault trait (get/require/set/delete/list/health).'
+  last_edited_ms: 1783251966298
 ac4a7fbbfcf664e7:
   path: crates/cp-mod-brave/Cargo.toml
   description: 'Brave module deps: cp-base, cp-render, crossterm, serde, serde_json, serde_yaml, reqwest.'
@@ -8846,6 +8866,10 @@ c577fd87e0690b02:
   path: crates/cp-orchestrator/tests/common/mod.rs
   description: 'Phase 30 shared test harness (a tests/ submodule, NOT an auto-run integration binary, no #[test]). Hand-rolled dependency-free blocking HTTP/1.1 client + SSE reader over raw TcpStream: request/get/post_json (Connection: close, read-to-EOF, status+body parse) + sse_collect(addr,path,headers,want,deadline)->(status,Vec<SseEvent>) (200ms read-timeout poll loop, parses id:/event:/data: blocks split by blank line, ignores comment/keepalive). SseEvent{id:Option<u64>,event,data}. Proves real tiny_http server bytes round-trip on the wire without an async HTTP stack. pub(crate) visibility (unreachable_pub in test crate).'
   last_edited_ms: 1781679569012
+c59af9dad419dad1:
+  path: crates/cp-vault/src/oauth.rs
+  description: Claude OAuth token loading — consolidated from 3 duplicates. Keychain (macOS security CLI) → ~/.claude/.credentials.json. Expiry check.
+  last_edited_ms: 1783251966434
 c5b9a1c1444e3f7a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
@@ -9746,6 +9770,10 @@ d9bdcd97a1132a47:
   path: src/state/persistence/save.rs
   description: 'Save operations: flame!("save_batch") + flame!("save_state"). build_save_batch() serializes config/worker/panels/messages/logs into WriteBatch. save_state() blocking sync persist. check_ownership(). log_error() to disk.'
   last_edited_ms: 0
+d9c659004cbd2aa2:
+  path: crates/cp-vault/src/dotenv.rs
+  description: .env file read/write utilities. flock-based exclusive locking for concurrent writes. Upsert semantics for key=value lines.
+  last_edited_ms: 1783251966504
 d9d97e2ecb7ff2e6:
   path: web/src/lib/mock/extra.ts
   description: 'Mock data (split from mock/index for <500): usage analytics (USAGE_RATES, genUsage 12-month history) + cockpit panel payloads (treeRows/memoryCards/radar/todoItems/entityTables/toolGroups/callbackRows/scratchCells/queueActions) + currentUser.'
@@ -10374,6 +10402,10 @@ ea7f17025c7f4e2c:
   path: web/src/components/auth/AgentAclSection.tsx
   description: Per-agent ACL management section (Phase 10). Embedded in AgentModal manage mode. Lists access entries with AgentRoleBadge, grant form (select user + role), role toggle (agent-admin ↔ agent-user), revoke access. TanStack Query hooks.
   last_edited_ms: 1782241802425
+ea8814891ff42e3d:
+  path: Cargo.toml
+  description: Workspace root. 26 crate members (incl cp-vault). Binary 'tui'. Edition 2024. Strict lint config (980 forbid, 21 deny). openssl vendored.
+  last_edited_ms: 1783251300861
 eacc3390f37b15c0:
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent (T328) + avatar CRUD (T338) + createCommand (T350). Re-exports ./auth + ./finder + ./body (T357 fetchMessageBody, split out for <500) + shares ./client request/BASE/envelope. The @/lib/api single import surface.'
