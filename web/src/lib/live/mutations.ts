@@ -39,8 +39,13 @@ export const MAX_UPLOAD_BYTES = 32 * 1024 * 1024
 /**
  * Mutation to upload one or more files into a realm directory. Files are sent
  * concurrently (one POST each); any over {@link MAX_UPLOAD_BYTES} are rejected
- * before sending. On success the destination directory's `useFs` listing is
- * invalidated so the uploads surface at once.
+ * before sending.
+ *
+ * Uploads ride `Promise.allSettled`, not `Promise.all`, so one failure no longer
+ * hides the files that DID land — the listing is invalidated in `onSettled`
+ * (success OR partial failure) so every succeeded upload surfaces immediately
+ * instead of waiting on the 15s backstop, and a partial failure names exactly
+ * which files were rejected (M7).
  */
 export function useUploadFiles(agentId: string) {
   const client = useQueryClient()
@@ -50,10 +55,22 @@ export function useUploadFiles(agentId: string) {
       if (tooBig.length > 0) {
         throw new Error(`${tooBig.map((f) => f.name).join(", ")} exceeds the 32 MB upload limit`)
       }
-      await Promise.all(files.map((f) => api.uploadFile(agentId, dir, f)))
+      const results = await Promise.allSettled(
+        files.map((f) => api.uploadFile(agentId, dir, f)),
+      )
+      const failed = results
+        .map((r, i) => (r.status === "rejected" ? files[i].name : null))
+        .filter((n): n is string => n !== null)
+      if (failed.length > 0) {
+        throw new Error(
+          `Failed to upload ${failed.join(", ")} (${files.length - failed.length} of ${files.length} succeeded)`,
+        )
+      }
       return { count: files.length, dir }
     },
-    onSuccess: ({ dir }) => {
+    // Invalidate on settle — succeeded uploads must appear even when a sibling
+    // failed, without waiting on the backstop poll.
+    onSettled: (_data, _err, { dir }) => {
       void client.invalidateQueries({ queryKey: qk.fs(agentId, dir) })
     },
   })

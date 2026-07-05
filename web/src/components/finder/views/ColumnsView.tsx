@@ -2,7 +2,7 @@ import type { DragEvent as ReactDragEvent } from "react"
 import { useState } from "react"
 import { ChevronRight } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
-import { fmtBytes, sortNodes } from "@/lib/support/finderFs"
+import { fmtBytes, fmtModified, sortNodes } from "@/lib/support/finderFs"
 import { useFs } from "@/lib/live"
 import { extOf, kindMeta } from "../support/kind"
 import { FileIcon } from "../support/macIcons"
@@ -72,7 +72,7 @@ export function ColumnsView({
           <dl className="mt-1 flex w-full flex-col gap-1 text-[11px]">
             <PaneRow k="Kind" v={kindMeta[previewNode.kind].label} />
             <PaneRow k="Size" v={fmtBytes(previewNode.size)} />
-            <PaneRow k="Modified" v={previewNode.modified} />
+            <PaneRow k="Modified" v={fmtModified(previewNode.modified)} />
           </dl>
         </div>
       )}
@@ -184,7 +184,9 @@ function MillerColumn({
         return (
           <button
             key={n.path}
-            draggable
+            // Disable drag during rename so text-selection in the field doesn't
+            // start an element drag of the row (L11).
+            draggable={h.renamingPath !== n.path}
             onDragStart={(e) => startItemDrag(e, n, h.selected)}
             {...folderDropProps(n, dropOver, setDragOver, h.onMove)}
             onClick={(e) => {

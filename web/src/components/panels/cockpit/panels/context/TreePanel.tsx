@@ -20,11 +20,11 @@ export function TreePanel({ panel, agentId }: { panel: ContextPanel; agentId: st
       cost={panel.costUsd}
     >
       <ul className="font-mono text-[12px]">
-        {treeRows.map((r, i) => {
+        {treeRows.map((r) => {
           const Glyph = r.kind === "dir" ? (r.open ? FolderOpen : Folder) : File
           return (
             <li
-              key={i}
+              key={`${r.depth}-${r.name}-${r.desc ?? r.size ?? ""}`}
               className="group flex items-start gap-2 rounded-md px-1.5 py-1 hover:bg-muted/50"
               style={{ paddingLeft: `${r.depth * 16 + 6}px` }}
             >

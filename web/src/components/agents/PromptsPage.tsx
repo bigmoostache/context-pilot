@@ -46,7 +46,11 @@ const TABS: (LibraryKind | "all")[] = ["all", "agent", "skill", "command"]
 
 export function PromptsPage({ agentId }: { agentId?: string | undefined }) {
   const { data: liveLibrary } = useLibrary(agentId ?? "")
-  const library = agentId && liveLibrary ? liveLibrary : mockLibrary
+  // When there's no agent (or the live library hasn't loaded) we fall back to a
+  // mock library purely to illustrate the layout. It must NOT read as the user's
+  // real prompts, so we flag the fallback with a visible sample banner below.
+  const usingMock = !(agentId && liveLibrary)
+  const library = usingMock ? mockLibrary : liveLibrary
   const [tab, setTab] = useState<LibraryKind | "all">("all")
   const [editing, setEditing] = useState<LibraryItem | "new" | null>(null)
   const [importing, setImporting] = useState(false)
@@ -83,6 +87,13 @@ export function PromptsPage({ agentId }: { agentId?: string | undefined }) {
             </button>
           </div>
         </header>
+
+        {usingMock && (
+          <div className="flex items-center gap-2 rounded-lg border border-[var(--warn)]/30 bg-[var(--warn)]/10 px-3 py-2 text-[11.5px] text-[var(--warn)]">
+            Sample library — these are illustrative prompts, not your saved ones.
+            Open an agent to see its real library.
+          </div>
+        )}
 
         {/* filter tabs */}
         <div className="flex items-center gap-0.5 self-start rounded-lg border border-border bg-muted/60 p-0.5">

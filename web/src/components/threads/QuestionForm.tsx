@@ -19,7 +19,17 @@ export function QuestionForm({
   const [submitted, setSubmitted] = useState(false)
   const options = q.options
   const isAnswered = submitted || !!q.answered
-  const answeredLabels = q.answered ?? picked.map((i) => options[i] ?? "")
+  // A backend-provided answer arrives as label strings (indices aren't sent
+  // back), so it can only be matched by label; a locally-submitted answer is
+  // still keyed by the option INDEX we selected, so duplicate option labels
+  // no longer light up together (L18).
+  const backendAnswers = q.answered ?? null
+  const isSelected = (opt: string, i: number): boolean =>
+    isAnswered
+      ? backendAnswers && !submitted
+        ? backendAnswers.includes(opt)
+        : picked.includes(i)
+      : picked.includes(i)
 
   const toggle = (i: number) => {
     if (isAnswered) return
@@ -60,10 +70,10 @@ export function QuestionForm({
 
         <div className="flex flex-col gap-1.5">
           {options.map((opt, i) => {
-            const on = isAnswered ? answeredLabels.includes(opt) : picked.includes(i)
+            const on = isSelected(opt, i)
             return (
               <button
-                key={i}
+                key={`${i}:${opt}`}
                 onClick={() => toggle(i)}
                 disabled={isAnswered}
                 className={cn(

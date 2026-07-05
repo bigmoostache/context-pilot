@@ -3,7 +3,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { TokenBar } from "@/components/panels/TokenBar"
 import { Tip } from "@/components/ui/tip"
 import { usePanels } from "@/lib/live"
-import { panelIcon, fmtTokens, loadColor } from "@/lib/support/panelMeta"
+import { panelIcon, fmtTokens, loadColor, REF_BUDGET } from "@/lib/support/panelMeta"
 import { cn } from "@/lib/utils"
 
 /**
@@ -31,7 +31,6 @@ export function LeftRail({
   // against a reference model budget. This reflects how heavy the *visible
   // panels* are — not the agent's private live context-window occupancy, which
   // the read-only inspection plane cannot serve (surfaced honestly elsewhere).
-  const REF_BUDGET = 200_000
   const usedTokens = panels.reduce((sum, p) => sum + p.tokens, 0)
   const usedRatio = Math.min(1, usedTokens / REF_BUDGET)
 

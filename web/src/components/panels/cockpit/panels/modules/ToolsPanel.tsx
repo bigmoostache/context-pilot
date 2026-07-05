@@ -17,7 +17,7 @@ export function ToolsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
     <PanelFrame
       icon={Wrench}
       name="Tools"
-      subtitle={`${on} of ${total} enabled in view · 53 total`}
+      subtitle={`${on} of ${total} enabled`}
       tokens={panel.tokens}
       cost={panel.costUsd}
     >

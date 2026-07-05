@@ -54,8 +54,9 @@ export function FinderOverlays(d: OverlaysDeps) {
           </>
         )}
         <span className="ml-auto capitalize">{d.viewMode} view</span>
-        <span className="h-3 w-px bg-border" />
-        <span className="hidden sm:inline">128 GB available</span>
+        {/* Removed a hard-coded "128 GB available" — it was a fictitious figure
+            (the backend reports no free-space stat), so it's dropped rather than
+            shown as if it were real (M28). */}
         <span className="h-3 w-px bg-border" />
         <span className="font-mono text-[10.5px]">{d.cwd}</span>
       </div>
@@ -65,7 +66,6 @@ export function FinderOverlays(d: OverlaysDeps) {
         <ContextMenu
           pos={d.menu}
           onClose={() => d.setMenu(null)}
-          onAction={(label) => d.flash(label)}
           onOpen={d.open}
           onDownload={(n) => {
             downloadFile(d.agentId, n.path).catch(() => d.flash(`Failed to download ${n.name}`))

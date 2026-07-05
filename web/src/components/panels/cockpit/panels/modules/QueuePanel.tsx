@@ -14,7 +14,7 @@ export function QueuePanel({ panel, agentId }: { panel: ContextPanel; agentId: s
     <PanelFrame
       icon={Layers}
       name="Queue"
-      subtitle={`${queueActions.length} actions staged · active`}
+      subtitle={`${queueActions.length} actions staged`}
       tokens={panel.tokens}
       cost={panel.costUsd}
     >

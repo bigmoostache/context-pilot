@@ -62,6 +62,11 @@ export function fmtTokens(n: number): string {
   return String(n)
 }
 
+// Reference context-window budget used to render token-usage ratios/bars.
+// Single source of truth shared by the LeftRail and the cockpit StatsPanel
+// (was duplicated as a literal in each — L21).
+export const REF_BUDGET = 200_000
+
 export function fmtCost(n: number): string {
   return `$${n.toFixed(2)}`
 }

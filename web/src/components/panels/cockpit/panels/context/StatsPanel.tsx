@@ -1,7 +1,7 @@
 import { Gauge } from "lucide-react"
 import type { ContextPanel } from "@/lib/types"
 import { useAgentMeta, useMetrics, usePanels } from "@/lib/live"
-import { fmtTokens, fmtCost, loadColor } from "@/lib/support/panelMeta"
+import { fmtTokens, fmtCost, loadColor, REF_BUDGET } from "@/lib/support/panelMeta"
 import { PanelFrame, PanelSection, InspectionUnavailable } from "../../PanelFrame"
 
 /**
@@ -31,7 +31,6 @@ export function StatsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
   const maxTokens = panels.length > 0 ? Math.max(...panels.map((p) => p.tokens)) : 1
   // A sensible reference ceiling for the meter (the common model budget); the
   // bar reflects how heavy the *visible panels* are, not a hard agent limit.
-  const REF_BUDGET = 200_000
   const usedRatio = Math.min(1, panelTokens / REF_BUDGET)
 
   const inTok = metrics?.tokens?.input ?? 0

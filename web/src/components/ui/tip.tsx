@@ -41,7 +41,14 @@ export function Tip({
     <TooltipPrimitive.Root>
       <TooltipPrimitive.Trigger
         render={(props) => (
-          <span {...props} className={cn(props.className, triggerClassName)}>
+          // `tabIndex={0}` keeps the tooltip reachable by keyboard even when the
+          // wrapped content is non-interactive (e.g. a plain label/icon). Placed
+          // before the spread so an explicit tabIndex on `props` still wins.
+          <span
+            tabIndex={0}
+            {...props}
+            className={cn(props.className, triggerClassName)}
+          >
             {children}
           </span>
         )}

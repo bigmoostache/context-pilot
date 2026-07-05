@@ -24,7 +24,7 @@ export function TodoPanel({ panel, agentId }: { panel: ContextPanel; agentId: st
     <PanelFrame
       icon={ListTodo}
       name="Todo List"
-      subtitle={`${done} of ${todoItems.length} done in view · 142 / 145 total`}
+      subtitle={`${done} of ${todoItems.length} done`}
       tokens={panel.tokens}
       cost={panel.costUsd}
     >

@@ -15,7 +15,7 @@ export function MemoryPanel({ panel, agentId }: { panel: ContextPanel; agentId: 
     <PanelFrame
       icon={Brain}
       name="Memories"
-      subtitle={`${memoryCards.length} of 52 · long-term recall`}
+      subtitle={`${memoryCards.length} · long-term recall`}
       tokens={panel.tokens}
       cost={panel.costUsd}
       accent="var(--interactive)"
