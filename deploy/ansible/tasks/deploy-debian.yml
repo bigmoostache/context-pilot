@@ -1,0 +1,62 @@
+---
+# Debian/systemd counterpart of tasks/deploy.yml (which is OpenWrt/procd).
+# Ship binaries + web + systemd units + Caddyfile to an Armbian box. Does NOT
+# start anything — services start after the seed (tasks/start-debian.yml).
+#
+# vs the OpenWrt path: systemd units instead of procd init.d, cp_root under /opt
+# instead of /mnt/data, and NO free-port-80 / firewall juggling — Armbian has no
+# LuCI/pcat-manager-web fighting for :80/:443 and no default REJECT wan zone.
+
+- name: Stop services if already present (factory box won't have them)
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: stopped
+  loop:
+    - context-pilot
+    - caddy
+  failed_when: false
+
+- name: Create the data tree
+  ansible.builtin.file:
+    path: "{{ cp_root }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - bin
+    - home
+    - web
+    - caddy
+
+- name: Ship + extract the appliance bundle (bin/cp-orchestrator, bin/tui, web/<spa>)
+  # One 19 MB transfer + a local untar on the box — vastly faster and more robust
+  # than a recursive per-file copy of the SPA's hundreds of font/asset files
+  # (Ansible's copy does a separate SFTP round-trip + checksum per file).
+  ansible.builtin.unarchive:
+    src: "{{ artifacts_dir }}/cpilot-appliance-aarch64.tar.gz"
+    dest: "{{ cp_root }}/"
+    remote_src: false
+
+- name: Ship the Caddy binary (not part of the appliance bundle)
+  ansible.builtin.copy:
+    src: "{{ artifacts_dir }}/caddy"
+    dest: "{{ cp_root }}/bin/caddy"
+    mode: "0755"
+
+- name: Install the systemd units (templated with cp_root)
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/{{ item }}.service.j2"
+    dest: "/etc/systemd/system/{{ item }}.service"
+    mode: "0644"
+  loop:
+    - context-pilot
+    - caddy
+
+- name: Install the bootstrap Caddyfile (the orchestrator regenerates it at boot)
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/deploy/photonicat/Caddyfile"
+    dest: "{{ cp_root }}/caddy/Caddyfile"
+    mode: "0644"
+
+- name: Reload systemd so it picks up the new units
+  ansible.builtin.systemd_service:
+    daemon_reload: true

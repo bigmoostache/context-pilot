@@ -1,0 +1,28 @@
+# Caddy reverse proxy + private-CA TLS for the Context Pilot cockpit — systemd
+# unit (Armbian/Debian). Debian counterpart of deploy/photonicat/init.d/caddy.init.
+#
+# TLS is Caddy's built-in CA (`tls internal`) — no public ACME, no DNS-01. The
+# orchestrator owns the Caddyfile and regenerates it, then reloads via admin API.
+[Unit]
+Description=Caddy (reverse proxy + private-CA TLS) for Context Pilot
+Documentation=https://github.com/bigmoostache/context-pilot
+# Start after the orchestrator so it has written the Caddyfile (name/IP,
+# provisioned gate) before Caddy reads it — mirrors procd START 95 vs 96.
+After=network-online.target context-pilot.service
+Wants=network-online.target
+StartLimitIntervalSec=3600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# Persist the internal CA + certs under the data tree. The internal CA root
+# lives at $XDG_DATA_HOME/caddy/pki/... — that is what the IT console serves.
+Environment=HOME={{ cp_root }}/caddy
+Environment=XDG_DATA_HOME={{ cp_root }}/caddy/data
+Environment=XDG_CONFIG_HOME={{ cp_root }}/caddy/config
+ExecStart={{ cp_root }}/bin/caddy run --config {{ cp_root }}/caddy/Caddyfile --adapter caddyfile
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

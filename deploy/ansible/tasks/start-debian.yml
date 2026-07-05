@@ -1,0 +1,48 @@
+---
+# Debian/systemd counterpart of tasks/start.yml. Enable + start the services
+# (after the seed) and verify they answer. The orchestrator starts first — it
+# seeds the admin from seed.env and writes the Caddyfile — then Caddy serves it.
+
+- name: Enable the systemd services
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+  loop:
+    - context-pilot
+    - caddy
+
+- name: (Re)start the orchestrator
+  ansible.builtin.systemd_service:
+    name: context-pilot
+    state: restarted
+
+- name: Wait for the product API to answer
+  ansible.builtin.uri:
+    url: http://127.0.0.1:7878/api/health
+    status_code: 200
+  register: health
+  retries: 15
+  delay: 1
+  until: health.status == 200
+
+- name: (Re)start Caddy (now that the orchestrator wrote the Caddyfile)
+  ansible.builtin.systemd_service:
+    name: caddy
+    state: restarted
+
+- name: Wait for the maintenance plane to answer (via the orchestrator loopback)
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9191/api/maint/status
+    status_code: 200
+  register: maint
+  retries: 15
+  delay: 1
+  until: maint.status == 200
+
+- name: Report readiness
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }} ready —
+      cockpit http://{{ ansible_host | default(inventory_hostname) }}:7878 ,
+      maintenance https://{{ ansible_host | default(inventory_hostname) }}:9090
+      (provisioned={{ (maint.json.provisioned | default(false)) }}).
