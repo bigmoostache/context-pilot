@@ -3558,10 +3558,6 @@
   path: web/src/lib/query/reducers.ts
   description: 'SSE delta reducers: applyThreadDelta folds thread_created/archived/restored/paused/resumed/deleted/status_changed/focus_changed/message_created into TanStack cache. mergeThreadLogs reconciles poll+delta. applyAgentDelta folds phase/cost/context.'
   last_edited_ms: 1782315774800
-4dafa9cacf4ef3a8:
-  path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
-  description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/paused/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape. paused field included in overlay and reshape (T371). T498: MAX_MSG_TEXT_PREVIEW (500 chars) + MAX_MESSAGES_PER_THREAD (30) truncation to prevent multi-MB payloads.'
-  last_edited_ms: 1783257682485
 4dbb8631408985d3:
   path: crates/cp-mod-github/src/lib.rs
   description: 'GitHub module. 1 tool: gh_execute. Dynamic github_result panels. Depends on git module. classify sub-module for read-only vs mutating. Tool visualizer for PR/issue status coloring.'
@@ -7382,10 +7378,6 @@ a09757b61a0a55ed:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
-a09aaae205c7c2b8:
-  path: web/src/lib/query/queryClient.ts
-  description: TanStack Query client config. staleTime:Infinity (SSE push plane owns freshness). BACKSTOP_POLL_MS=15s last-resort safety net. No refetchOnWindowFocus/Reconnect/Mount (prevents delta-race bugs like T123). gcTime 5min.
-  last_edited_ms: 1783257760939
 a09bd2cf1845c3a9:
   path: crates/cp-mod-spine/Cargo.toml
   description: 'Spine module deps: cp-base, cp-render, chrono, crossterm, serde, serde_json.'
