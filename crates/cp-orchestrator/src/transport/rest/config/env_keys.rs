@@ -12,7 +12,7 @@
 
 use serde_json::json;
 
-use super::HttpReply;
+use super::super::HttpReply;
 use crate::services::auth::types::{User, UserRole};
 
 /// `GET /api/vault/snapshot` — bulk-fetch all set key values.
@@ -162,6 +162,7 @@ mod tests {
             name: "Test".to_owned(),
             password_hash: String::new(),
             role: UserRole::User,
+            must_change_password: false,
             created_at: 0,
             updated_at: 0,
         };
@@ -177,6 +178,7 @@ mod tests {
             name: "Test".to_owned(),
             password_hash: String::new(),
             role: UserRole::User,
+            must_change_password: false,
             created_at: 0,
             updated_at: 0,
         };

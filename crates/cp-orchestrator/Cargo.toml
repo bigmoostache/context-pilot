@@ -14,6 +14,11 @@ cp-wire = { path = "../cp-wire", features = ["openapi"] }
 cp-oplog = { path = "../cp-oplog" }
 cp-vault = { path = "../cp-vault" }
 dotenvy = "0.15"
+# Shared config — central API-key + settings store at
+# ~/.config/context-pilot/config.json. The cockpit writes provider keys and
+# new-agent defaults here (admin onboarding); agents read them via the same
+# module, so both sides agree on one source of truth.
+cp-base.workspace = true
 utoipa = "5"
 nix = { version = "0.30", features = ["signal"] }
 serde = { version = "1", features = ["derive"] }

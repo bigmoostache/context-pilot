@@ -216,10 +216,10 @@ function HealthBadge({ agentId }: { agentId: string }) {
 
   const { breaker, stream, rev } = data
   const condition = breaker.tripped
-    ? { label: "Over budget", tone: "var(--danger)", title: `Cost breaker tripped — spent $${breaker.spendUsd.toFixed(2)} of $${breaker.budgetUsd.toFixed(2)} budget. Sends are blocked until the budget is raised or the run is stopped.` }
+    ? { label: "Over budget", tone: "var(--danger)", title: `Cost breaker tripped — spent $${(breaker.spendUsd ?? 0).toFixed(2)} of $${(breaker.budgetUsd ?? 0).toFixed(2)} budget. Sends are blocked until the budget is raised or the run is stopped.` }
     : stream.degraded
       ? { label: "Stream degraded", tone: "var(--warn)", title: `Live token stream dropped ${stream.droppedFrames} frame(s) — a slow consumer is being shed (the durable record is unaffected).` }
-      : rev.lag > REV_LAG_WARN
+      : (rev.lag ?? 0) > REV_LAG_WARN
         ? { label: "Projection lagging", tone: "var(--warn)", title: `Backend view is ${rev.lag} revs behind the oplog head (view ${rev.view} / head ${rev.oplogHead ?? "?"}). The projection is falling behind the durable log.` }
         : null
 

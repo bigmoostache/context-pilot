@@ -137,7 +137,22 @@ pub(crate) fn login_start(state: &Mutex<Backend>) -> HttpReply {
             Some(PkceSession { code_verifier: code_verifier.clone(), state: state_param, created_at: Instant::now() });
     }
 
-    HttpReply::ok(&LoginStartResponse { url })
+    // Check whether there's already a valid token (multi-account scenario).
+    // When `already_valid` is true, the auto-poller MUST stay disabled — the
+    // user intends to switch accounts and needs to paste the new code.
+    let already_valid = read_credentials_json()
+        .map(|c| {
+            let expires_at = c.get("expiresAt").and_then(|v| v.as_i64()).unwrap_or(0);
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0);
+            let token = c.get("accessToken").and_then(|v| v.as_str()).unwrap_or("");
+            expires_at > now_ms && !token.is_empty()
+        })
+        .unwrap_or(false);
+
+    HttpReply::ok(&LoginStartResponse { url, already_valid: Some(already_valid) })
 }
 
 // ── Login complete ───────────────────────────────────────────────────
@@ -440,6 +455,9 @@ struct TokenStatusResponse {
 #[derive(Serialize)]
 struct LoginStartResponse {
     url: String,
+    /// `true` when there is already a still-valid token on disk — the
+    /// auto-polling must stay OFF so the user can paste the new code.
+    already_valid: Option<bool>,
 }
 
 #[derive(Deserialize)]

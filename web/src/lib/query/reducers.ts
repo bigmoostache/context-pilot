@@ -22,7 +22,7 @@ import { mapRawQuestions } from "../api"
 // protocol contract is mechanically enforced, not hand-maintained.
 
 export type { OpEntry, OpEntryKind } from "../api/generated/types.gen"
-import type { OpEntry, OpEntryKind } from "../api/generated/types.gen"
+import type { OpEntry } from "../api/generated/types.gen"
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@ function turnToStatus(turn: string | undefined): ThreadDetail["status"] {
  * `ThreadMessage`, so the strings are identical, while two genuinely distinct
  * messages can't share an exact-millisecond `ts` AND identical text AND author.
  */
-function msgSignature(m: { author?: string; ts?: string; text?: string }): string {
+function msgSignature(m: { author?: string; ts?: string | number; text?: string }): string {
   return `${m.author ?? ""}|${m.ts ?? ""}|${m.text ?? ""}`
 }
 

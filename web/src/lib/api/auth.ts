@@ -5,34 +5,43 @@
 
 import type {
   AclEntry,
+  AppSettings,
   AuthLogin,
+  AuthMe,
   AuthStatus,
   AuthUser,
   CreateUserResponse,
   ForceLogoutResponse,
   OkResponse,
   RegisterResponse,
+  SessionInfo,
 } from "./generated/types.gen"
 import {
   deleteApiAgentByIdAclByUserId,
+  deleteApiAuthSessionsById,
   deleteApiAuthUsersByUserId,
   getApiAgentByIdAcl,
   getApiAuthMe,
+  getApiAuthSessions,
   getApiAuthStatus,
   getApiAuthUsers,
+  getApiSettings,
   patchApiAgentByIdAclByUserId,
+  patchApiAuthMe,
   postApiAgentByIdAcl,
   postApiAuthLogin,
   postApiAuthLogout,
+  postApiAuthPassword,
   postApiAuthRegister,
   postApiAuthUsers,
   postApiAuthUsersByUserIdLogout,
+  postApiSettings,
 } from "./generated"
 import { sdk } from "./client"
 
 // ── Type re-exports (preserve import surface) ────────────────────────
 
-export type { AuthUser, AclEntry, AuthStatus } from "./generated/types.gen"
+export type { AuthUser, AuthMe, AclEntry, AuthStatus, AppSettings } from "./generated/types.gen"
 
 // ── Auth status ──────────────────────────────────────────────────────
 
@@ -58,8 +67,59 @@ export function authLogout(): Promise<OkResponse> {
   return sdk(postApiAuthLogout())
 }
 
-export function authMe(): Promise<AuthUser> {
+/** Current user profile + the backend-driven post-login step (`next_action`). */
+export function authMe(): Promise<AuthMe> {
   return sdk(getApiAuthMe())
+}
+
+// ── Self-serve profile (current user) ────────────────────────────────
+
+/** Change the current user's password (verifies the current one). */
+export function changePassword(
+  current: string,
+  next: string,
+): Promise<OkResponse> {
+  return sdk(postApiAuthPassword({ body: { current, new: next } }))
+}
+
+/** Update the current user's display name + email. Returns the refreshed user. */
+export function updateProfile(
+  name: string,
+  email: string,
+): Promise<{ user: AuthUser }> {
+  return sdk(patchApiAuthMe({ body: { name, email } }))
+}
+
+/** One active device session (no raw token, just an opaque id). */
+export type DeviceSession = SessionInfo
+
+/** List the current user's active device sessions. */
+export function fetchSessions(): Promise<DeviceSession[]> {
+  return sdk<{ sessions: DeviceSession[] }>(getApiAuthSessions()).then(
+    (r) => r.sessions,
+  )
+}
+
+/** Revoke one of the current user's own sessions by id. */
+export function revokeSession(id: string): Promise<OkResponse> {
+  return sdk(deleteApiAuthSessionsById({ path: { id } }))
+}
+
+// ── Central settings (defaults, onboarding, provider keys) ───────────
+
+/** Read central settings + onboarding state (any authenticated user). */
+export function fetchSettings(): Promise<AppSettings> {
+  return sdk(getApiSettings())
+}
+
+/** Admin: update new-agent defaults and/or the onboarding flag. */
+export function updateSettings(patch: {
+  default_provider?: string
+  default_model?: string
+  onboarding_completed?: boolean
+  allowed_models?: string[]
+}): Promise<AppSettings> {
+  return sdk(postApiSettings({ body: patch }))
 }
 
 // ── Admin: user management ───────────────────────────────────────────

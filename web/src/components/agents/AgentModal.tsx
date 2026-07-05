@@ -14,7 +14,7 @@ import type { Agent } from "@/lib/types"
 import { useCreateAgent, useRenameAgent, useRestartAgent, useRetireAgent, useUploadAvatar, sendCommand } from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
 import { useAuth } from "@/lib/support/auth"
-import { useProviders, defaultModel, findModel, resolveSelection } from "@/lib/support/models"
+import { usePickerProviders, defaultModel, findModel, resolveSelection } from "@/lib/support/models"
 import { ModelPicker } from "./ModelPicker"
 import { AgentAclSection } from "../auth/AgentAclSection"
 import { SessionVitals } from "../shell/SessionVitals"
@@ -62,7 +62,9 @@ export function AgentModal({
   const agent = isManage ? modal.agent : undefined
   const [name, setName] = useState(agent?.name ?? "")
 
-  const { data: providers = [] } = useProviders()
+  // The picker list is computed server-side: only providers with a configured
+  // key, with the org model allowlist already applied (empty ⇒ all).
+  const { data: providers = [] } = usePickerProviders()
 
   // Provider + model — resolve from the agent's authoritative provider id +
   // current api model name (manage) or fall back to persisted global defaults →

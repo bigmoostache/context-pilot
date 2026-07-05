@@ -78,12 +78,30 @@ function enrichProviders(raw: GenProviderDef[]): ProviderDef[] {
 /** Singleton cache — providers never change during a session. */
 let cached: ProviderDef[] | null = null
 
-/** Fetch the provider registry (cached after first call). */
+/** Fetch the full usable provider registry (cached after first call). The
+ *  backend already drops providers without a configured key and stamps each
+ *  model with its canonical `key`, so this is the admin-facing catalog (every
+ *  usable model, unfiltered by the org allowlist). */
 export async function fetchProviders(): Promise<ProviderDef[]> {
   if (cached) return cached
-  const data = await sdk<GenProviderDef[]>(getApiProviders())
+  // The client runs in responseStyle:"data" (setupClient), so the SDK call
+  // resolves to the array directly — use sdk() like every other consumer
+  // rather than destructuring a `{ data }` wrapper that doesn't exist at runtime.
+  const data = await sdk<GenProviderDef[]>(getApiProviders({ throwOnError: true }))
   cached = enrichProviders(data)
   return cached
+}
+
+/** Fetch the picker registry — usable providers with the org model allowlist
+ *  already applied server-side (`?allowed=1`). This is what end users pick from;
+ *  it depends on the allowlist, so it's never part of the static singleton and
+ *  is invalidated (query key `["providers", "picker"]`) when the admin edits the
+ *  allowlist. */
+export async function fetchPickerProviders(): Promise<ProviderDef[]> {
+  const data = await sdk<GenProviderDef[]>(
+    getApiProviders({ query: { allowed: "1" }, throwOnError: true }),
+  )
+  return enrichProviders(data)
 }
 
 /**
@@ -100,6 +118,17 @@ export function useProviders() {
   return useQuery({
     queryKey: ["providers"],
     queryFn: fetchProviders,
+    staleTime: Infinity,
+  })
+}
+
+/** TanStack Query hook for the allowlist-filtered picker registry. Cached until
+ *  the allowlist changes — `ConfigPanes` invalidates `["providers", "picker"]`
+ *  after a save. */
+export function usePickerProviders() {
+  return useQuery({
+    queryKey: ["providers", "picker"],
+    queryFn: fetchPickerProviders,
     staleTime: Infinity,
   })
 }

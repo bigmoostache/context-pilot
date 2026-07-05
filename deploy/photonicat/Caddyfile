@@ -1,0 +1,28 @@
+# Context Pilot — Caddy reverse proxy + private-CA TLS (tls internal).
+#
+# "Tout local, rien sur le web": this box has NO public DNS and NO public ACME.
+# Caddy terminates all TLS with its built-in CA (`tls internal`); the root is
+# distributed to clients out-of-band (see the IT maintenance console on :9090).
+#
+# IMPORTANT: this file is a BOOTSTRAP fallback only. The orchestrator REGENERATES
+# it at boot and on every identity/finalize change — rendering explicit name/IP
+# site addresses, the cockpit on :443 once provisioned, and the :80→:443 redirect
+# (see crates/cp-orchestrator/src/transport/maint/caddy.rs). The orchestrator
+# starts before Caddy (procd START 95 vs 96), so by the time Caddy reads this it
+# has usually been replaced. Until then we serve only the maintenance plane.
+{
+	# LAN appliance: private CA only, never reach out to public ACME.
+	auto_https disable_redirects
+}
+
+# IT maintenance plane — reachable on the LAN before the box is named.
+# Caddy fronts the public :9090 and proxies to the orchestrator's loopback
+# maintenance listener (CP_MAINT_PORT=9191, CP_MAINT_BIND=127.0.0.1).
+:9090 {
+	tls internal
+	reverse_proxy 127.0.0.1:9191
+}
+
+# The product cockpit (:443) and the :80→:443 redirect are intentionally ABSENT
+# here: an unprovisioned box must not serve the cockpit. The orchestrator adds
+# those blocks only after `finalize` flips the box to provisioned.

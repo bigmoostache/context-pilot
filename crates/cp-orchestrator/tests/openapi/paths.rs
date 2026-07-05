@@ -20,7 +20,12 @@ pub(super) fn paths() -> Value {
         "/api/health": get("health", "Health check", json!({
             "type": "object", "properties": { "status": { "type": "string" } }
         })),
-        "/api/providers": get("providers", "LLM provider + model registry", arr(r("ProviderDef"))),
+        "/api/providers": json!({ "get": {
+            "tags": ["providers"],
+            "summary": "LLM provider + model registry (usable providers only; ?allowed=1 applies the org model allowlist)",
+            "parameters": [qp_opt("allowed")],
+            "responses": merge(ok(arr(r("ProviderDef"))), err())
+        }}),
         // ── Fleet ───────────────────────────────────────────────────
         "/api/fleet": get("fleet", "Raw fleet view (rev-envelope)", json!({ "type": "object" })),
         "/api/fleet/meta": get("fleet", "List all agents (enriched)", arr(r("Agent"))),
@@ -54,6 +59,19 @@ pub(super) fn paths() -> Value {
         "/api/vault/snapshot": get("env", "Bulk-fetch all set key values (BridgeVault cache)", json!({
             "type": "object", "additionalProperties": { "type": "string" }
         })),
+        // ── Settings ────────────────────────────────────────────────
+        "/api/settings": merge(
+            get("settings", "Central defaults, onboarding state & configured providers", r("AppSettings")),
+            post("settings", "Update new-agent defaults / onboarding flag (admin)", Some(json!({
+                "type": "object",
+                "properties": {
+                    "default_provider": { "type": "string" },
+                    "default_model": { "type": "string" },
+                    "onboarding_completed": { "type": "boolean" },
+                    "allowed_models": arr(json!({ "type": "string" }))
+                }
+            })), r("AppSettings"))
+        ),
         // ── Ticket ──────────────────────────────────────────────────
         "/api/ticket": post("ticket", "Mint SSE upgrade ticket", None, r("TicketResponse")),
         // ── Auth ────────────────────────────────────────────────────
@@ -69,7 +87,37 @@ pub(super) fn paths() -> Value {
             "required": ["email", "name", "password"]
         })), r("RegisterResponse")),
         "/api/auth/logout": post("auth", "Logout", None, r("OkResponse")),
-        "/api/auth/me": get("auth", "Current user", r("AuthUser")),
+        "/api/auth/me": merge(
+            get("auth", "Current user + post-login next action", r("AuthMe")),
+            json!({ "patch": {
+                "tags": ["auth"], "summary": "Update current user profile",
+                "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                    "type": "object",
+                    "properties": { "name": { "type": "string" }, "email": { "type": "string" } },
+                    "required": ["name", "email"]
+                } } } },
+                "responses": merge(ok(json!({
+                    "type": "object",
+                    "properties": { "user": r("AuthUser") },
+                    "required": ["user"]
+                })), err())
+            }})
+        ),
+        "/api/auth/password": post("auth", "Change current user's password", Some(json!({
+            "type": "object",
+            "properties": { "current": { "type": "string" }, "new": { "type": "string" } },
+            "required": ["current", "new"]
+        })), r("OkResponse")),
+        "/api/auth/sessions": get("auth", "List active device sessions", json!({
+            "type": "object",
+            "properties": { "sessions": arr(r("SessionInfo")) },
+            "required": ["sessions"]
+        })),
+        "/api/auth/sessions/{id}": json!({ "delete": {
+            "tags": ["auth"], "summary": "Revoke one of the caller's device sessions",
+            "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+            "responses": merge(ok(r("OkResponse")), err())
+        }}),
         "/api/auth/users": merge(
             get("auth", "List users (admin)", arr(r("AuthUser"))),
             post("auth", "Create user (admin)", Some(json!({
