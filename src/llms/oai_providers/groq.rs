@@ -3,7 +3,6 @@
 //! Groq uses an OpenAI-compatible API format.
 //! Message building is delegated to the shared `openai_compat` module.
 
-use std::env;
 use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
@@ -24,15 +23,15 @@ const GROQ_API_ENDPOINT: &str = "https://api.groq.com/openai/v1/chat/completions
 
 /// Groq client
 pub(crate) struct GroqClient {
-    /// API key loaded from the `GROQ_API_KEY` environment variable.
+    /// Groq API key, resolved from vault (`"groq"`).
     api_key: Option<Redacted>,
 }
 
 impl GroqClient {
-    /// Create a new `GroqClient`, reading the API key from the environment.
+    /// Create a new `GroqClient`, reading the API key from the vault.
     pub(crate) fn new() -> Self {
         let _r = dotenvy::dotenv().ok();
-        Self { api_key: env::var("GROQ_API_KEY").ok().map(Redacted::new) }
+        Self { api_key: cp_vault::vault().get("groq").map(|s| Redacted::new(s.expose().to_owned())) }
     }
 }
 

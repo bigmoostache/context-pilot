@@ -498,6 +498,10 @@
   path: crates/cp-mod-console/src/tools.rs
   description: 'Console tools: create, send_keys, wait (blocking watcher), watch (async watcher), easy_bash (blocking exit watcher). Each instrumented with flame!(). CONSOLE_WAIT_BLOCKING_SENTINEL const. Git/gh guardrails.'
   last_edited_ms: 1780568982727
+0ad08e50b19466b1:
+  path: src/llms/oai_providers/grok.rs
+  description: xAI Grok client. OpenAI-compatible API. Shared openai_compat message building. API key from vault ("xai").
+  last_edited_ms: 1783253450442
 0b0d51702ded0dee:
   path: crates/cp-mod-search/src/indexer.rs
   description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. 3s poll interval PollWatcher.
@@ -3006,6 +3010,10 @@
   path: src/app/run/threads/messages.rs
   description: 'Phase 2.2 (X839): live thread-message emission for the main loop. emit_messages = observe-on-change chokepoint diffing each thread''s message vector vs BridgeState.thread_msg_counts (seeded no-emit on first pass so a restarted agent doesn''t replay backlog). build_pending → JSON body {id,author,text,ts,question,fileRef}; emit_one_message stages body in content-addressed Store (I13 barrier: small=Inline rides delta, large=Spilled durable file) BEFORE submit_durable(MessageCreated{thread_id,message_id,head,inline_body}). No-op bridge-OFF. Captures messages from every source (Send tool / TUI reply / web SendMessage) via one uniform path.'
   last_edited_ms: 1781796484248
+425a3b83819a9003:
+  path: src/llms/oai_providers/deepseek.rs
+  description: DeepSeek client. OpenAI-compatible with reasoning_content for deepseek-reasoner. DsMessage wrapper. Cache hit/miss tokens. API key from vault ("deepseek").
+  last_edited_ms: 1783253450512
 425ed53956de6dab:
   path: crates/cp-mod-firecrawl/src/crawl.rs
   description: Recursive site crawling — firecrawl_crawl tool. flame!("firecrawl_crawl"). Start async crawl job + poll loop (5s interval, 60 max polls, 310s timeout). write_crawl_output writes combined markdown to disk. No panel created.
@@ -3178,6 +3186,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/panels.rs
   description: 'Cockpit inspection-panel endpoints (in inspect/): memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list = tier-② disk reads reshaped to maquette JSON. PLUS tools/radar/entities = DERIVED-state endpoints that return their NORMAL EMPTY shape by design (200 [] / {anchors:[],results:[]}, NOT 404): the inspection plane structurally can''t rebuild them from tier-② files (tools catalog=compile-time module YAMLs in the agent binary; radar=live half-life log ranking; entities=open SQLite, on-disk db is 0 bytes) — agent_folder guard so an unknown id still 404s; frontend renders an honest ''unavailable over web inspection plane'' notice. Absolute crate::transport:: paths.'
   last_edited_ms: 1781820973406
+45bf5cbdde7d1a21:
+  path: src/llms/claude_code_api_key/mod.rs
+  description: Claude Code API Key implementation. API key from vault ("anthropic") with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
+  last_edited_ms: 1783253450371
 45f26bd593f5eb21:
   path: crates/cp-mod-console/src/lib.rs
   description: 'Console module. 5 tools. Dynamic console panels. init: find/create Unix socket server. save/load: session reconnection + orphan cleanup. Leaks stdin on save to prevent EOF. Tool visualizer for colored output.'
@@ -6966,6 +6978,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+9bcbcfa5e5979284:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 9bdf3a19a684f6a4:
   path: crates/cp-wire/src/lib.rs
   description: 'Versioning primitives: PROTOCOL_VERSION const + accepts(their_major) N-1 compat check. Declares framing + types modules. 4 tests.'
@@ -8054,6 +8070,10 @@ b336c882172fe193:
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups in order: User turn (THEIR_TURN/ACTIVE) FIRST, then Agent''s turn (MY_TURN) — reordered per T28. Sorted by lastActivityMs descending within each group. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
   last_edited_ms: 1781783492018
+b3470e5a0408ce3d:
+  path: src/llms/anthropic/mod.rs
+  description: Direct Anthropic Messages API client. SSE stream parsing (content_block_start/delta/stop, message_delta/stop). API key from vault ("anthropic"). No cache breakpoints. timeout(None) for long streams.
+  last_edited_ms: 1783253450301
 b3831f3e391cdcc6:
   path: crates/cp-mod-scratchpad/src/lib.rs
   description: 'Scratchpad module. 3 tools: create_cell/edit_cell/wipe. Fixed SCRATCHPAD panel. Per-worker cells. Visualizer: colored create/update/delete. fixed_order=8.'
@@ -8414,6 +8434,10 @@ bab9d0cd28f2d236:
   path: ui/src/lib/finderFs.ts
   description: Finder mock fs + helpers. buildRealm grafts one rich tree (src/modules nesting, docs, media/ w/ mp4+m4a, planning) onto an agent folder. tags/created/starred/media payloads + PEAKS waveform. findNode/pathChain/collectStarred/nodeSize/childCounts/fmtBytes/sortNodes.
   last_edited_ms: 1781518321292
+bad0babd2f7479ca:
+  path: src/llms/minimax/mod.rs
+  description: MiniMax provider — Anthropic-compatible API via Token Plan. SSE streaming identical to Anthropic protocol. API key from vault ("minimax").
+  last_edited_ms: 1783253450648
 bb05e2336216163a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
@@ -8742,6 +8766,10 @@ c2baaa90fec05e51:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block on Send, count positive. Focus enforcement with dangling/escalation. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
   last_edited_ms: 1781448934515
+c2cf88c5f7477e1f:
+  path: src/llms/oai_providers/groq.rs
+  description: Groq client. OpenAI-compatible with built-in tools (browser_search, code_interpreter) for GPT-OSS models. API key from vault ("groq").
+  last_edited_ms: 1783253450580
 c2d3bc4f0fcb2a16:
   path: web/src/components/panels/cockpit/PanelPane.tsx
   description: Cockpit panel router. Accepts agentId, uses usePanels() for lookup. Routes to 11 panel components by kind (threads removed — T11), each receiving agentId. 'conversation' sentinel renders Conversation. EmptyState fallback.
