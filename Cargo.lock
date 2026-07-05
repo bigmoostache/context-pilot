@@ -325,6 +325,7 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "cp-render",
+ "cp-vault",
  "crossterm",
  "reqwest",
  "serde",
@@ -403,6 +404,7 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "cp-render",
+ "cp-vault",
  "crossterm",
  "reqwest",
  "serde",
@@ -464,6 +466,7 @@ dependencies = [
  "cp-base",
  "cp-mod-utilities",
  "cp-render",
+ "cp-vault",
  "log",
  "reqwest",
  "serde_json",
@@ -511,6 +514,7 @@ dependencies = [
  "cp-mod-logs",
  "cp-mod-utilities",
  "cp-render",
+ "cp-vault",
  "crossterm",
  "log",
  "notify",

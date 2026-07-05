@@ -19,10 +19,10 @@ pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
     }
 }
 
-/// Build a `FirecrawlClient` from the `FIRECRAWL_API_KEY` env var.
+/// Build a `FirecrawlClient` using the credential vault.
 pub(crate) fn get_client() -> Result<FirecrawlClient, String> {
-    let key = std::env::var("FIRECRAWL_API_KEY").map_err(|_e| "FIRECRAWL_API_KEY not set".to_string())?;
-    FirecrawlClient::new(key)
+    let secret = cp_vault::vault().require("firecrawl").map_err(|e| e.to_string())?;
+    FirecrawlClient::new(secret.expose().to_owned())
 }
 
 /// Build an error `ToolResult` for sync validation failures.

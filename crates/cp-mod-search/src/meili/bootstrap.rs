@@ -154,14 +154,14 @@ const VOYAGE_MODEL: &str = "voyage-code-3";
 /// Configure embedders on the files and logs indexes if not already set.
 ///
 /// Uses the Voyage AI REST API for embeddings — zero local CPU usage.
-/// Requires `VOYAGE_API_KEY` environment variable. If the key is missing,
+/// Requires the `voyage` key in the credential vault. If missing,
 /// embedders are skipped and search falls back to keyword-only mode.
 ///
 /// This is a fire-and-forget operation: Meilisearch will call the Voyage API
 /// in the background to generate embeddings for all documents.
 fn configure_embedders(meili: &api::MeiliClient, files_uid: &str, logs_uid: &str) {
     let Some(api_key) = read_voyage_api_key() else {
-        log::info!("VOYAGE_API_KEY not set — skipping embedder configuration (keyword-only search)");
+        log::info!("Voyage API key not configured — skipping embedder setup (keyword-only search)");
         return;
     };
 
@@ -190,11 +190,12 @@ fn configure_embedders(meili: &api::MeiliClient, files_uid: &str, logs_uid: &str
     }
 }
 
-/// Read the Voyage AI API key from environment.
+/// Read the Voyage AI API key from the credential vault.
 ///
-/// Checks `VOYAGE_API_KEY` env var. Returns `None` if not set or empty.
+/// Returns `None` if not configured. Embedders are skipped and search
+/// falls back to keyword-only mode.
 fn read_voyage_api_key() -> Option<String> {
-    std::env::var("VOYAGE_API_KEY").ok().filter(|k| !k.is_empty())
+    cp_vault::vault().get("voyage").map(|s| s.expose().to_owned())
 }
 
 /// Embedder settings for the files index.

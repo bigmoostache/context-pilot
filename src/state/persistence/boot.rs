@@ -77,7 +77,8 @@ pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData,
         state.tools = crate::modules::active_tool_definitions(&state.active_modules);
     }
 
-    cp_mod_github::types::GithubState::get_mut(state).github_token = std::env::var("GITHUB_TOKEN").ok();
+    cp_mod_github::types::GithubState::get_mut(state).github_token =
+        cp_vault::vault().get("github").map(|s| s.expose().to_owned());
 
     set_active_theme(&state.active_theme);
 }

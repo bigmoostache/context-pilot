@@ -308,9 +308,9 @@ fn write_cache(key: &str, text: &str) {
     }
 }
 
-/// Read `DATALAB_API_KEY` from the environment.
+/// Read the Datalab API key from the credential vault.
 pub(crate) fn api_key_from_env() -> Option<String> {
-    std::env::var("DATALAB_API_KEY").ok().filter(|k| !k.is_empty())
+    cp_vault::vault().get("datalab").map(|s| s.expose().to_owned())
 }
 
 /// Check whether a file extension is a supported OCR format.

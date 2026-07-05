@@ -1462,6 +1462,10 @@
   path: web/src/components/finder/FinderPreview.tsx
   description: 'QuickLook preview pane — kind-aware. T272: live .md/code/json/doc fetch via useFsPreview→LivePreview (markdown=GFM Markdown, code=HighlightedCode hljs, else preformatted). T281/T286: live image+PDF render straight from the backend inline raw-serve (rawUrl→/fs/raw) — LiveImagePreview (<img>, onLoad captures natural dims, onError→Generic fallback, checker backing + zoom) and LivePdfPreview (<object type=application/pdf> with an ''Open PDF in new tab'' fallback child). Body() routes live image/pdf BEFORE the TEXT_KINDS fetch when agentId is present. Mock path (inline node.text/image/pdf) unchanged. Enriched Meta footer; agentId prop threads the realm.'
   last_edited_ms: 1781894241203
+207bb69869da90e9:
+  path: crates/cp-mod-ocr/src/client.rs
+  description: Datalab OCR API client. Multipart upload, exponential backoff polling, disk cache keyed by FNV-1a hash. api_key_from_env() reads from vault ("datalab").
+  last_edited_ms: 1783253850231
 2081231103220bef:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
@@ -1850,6 +1854,10 @@
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Thread input routing: handle_thread_input_submit. Thread creation: MAX_THREAD_NAME_LEN=200 cap. Paste sentinel expansion. /command replacement.'
   last_edited_ms: 0
+2a5e55561a2870ad:
+  path: crates/cp-mod-firecrawl/src/tools.rs
+  description: 'Firecrawl tool dispatch. get_client() reads key from vault ("firecrawl"). All async via spawn_async_tool. Shared helpers: err_result, PANEL_WARNING, timeout/poll constants.'
+  last_edited_ms: 1783253850163
 2a76ebc68096b534:
   path: docs/talk/script.js
   description: 'Slide deck nav: 2D grid (sections×slides), keyboard arrows, sidebar, TOC clicks, persistent timer'
@@ -1866,6 +1874,10 @@
   path: src/ui/mod.rs
   description: Top-level render() with flame!("render"). IR frame build → sidebar + content panel + status bar + overlays (perf from IR, autocomplete from IR, config from IR, search index from IR). All overlays consume IR data.
   last_edited_ms: 0
+2aa79950e0e3f3a0:
+  path: crates/cp-mod-firecrawl/Cargo.toml
+  description: 'Firecrawl module deps: cp-base, cp-vault, cp-render, crossterm, reqwest, serde, serde_json, serde_yaml.'
+  last_edited_ms: 1783253850505
 2aae70c7c2959553:
   path: src/modules/conversation_history/trap.rs
   description: History cleanup trap. check_and_trigger_trap() activates when ≥4 history panels on Queue_execute. trap_blocks_tool() blocks all except Close_conversation_history and Think. would_defuse_trap() projects remaining after queued closes. force_deactivate_trap() for auto-flush path. maybe_deactivate_trap() lifts when <4 remain. OPTIONAL_KEEP=1 (AI may keep 1 most-recent panel). Shared project_remaining_panels() helper.
@@ -3698,6 +3710,10 @@
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only fsync''d log + running ReplayState fold (heads+seen). open() seeds via replay::replay. append(kind)->rev probes frame size, rolls at 64MiB. roll() stamps leading Checkpoint(Snapshot) as new segment''s first record (GAP1). write_record = sole rev point (frame+write_all+sync_data+fold_entry, announce-after-durable K9). checkpoint()/heads()/seen()/snapshot() public. OplogError{Io,Frame}. 8 tests.'
   last_edited_ms: 1781620292020
+5167754f1b7c741a:
+  path: src/state/persistence/boot.rs
+  description: 'Phase 5 boot: module init + data loading. Vault health check after dotenvy. GitHub token from vault ("github"). pre_start_daemons() spawns 2 parallel threads.'
+  last_edited_ms: 1783253850367
 516a49de026799e8:
   path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
   description: 'Claude Code OAuth helpers — usage proxy (GET /api/claude-usage), token status (GET /api/claude-login/status), PKCE login flow (POST /start + /complete). Manual code-paste flow: user copies code from Anthropic page or URL bar, pastes in popover. extract_code() parses full callback URLs. Reads/writes macOS Keychain + ~/.claude/.credentials.json. PkceSession stored in Backend.'
@@ -4786,6 +4802,10 @@
   path: web/src/lib/support/markdown.tsx
   description: GFM markdown renderer (react-markdown + remark-gfm + remark-math + rehype-katex) themed to app tokens; default + onAccent variants. LaTeX via KaTeX ($...$ inline DISABLED, $$...$$ display). XSS-safe (no raw HTML). Code block copy button via CopyButton + extractText helper; onAccent variant passes text-current/60 for dark-mode contrast. Inline code click-to-copy via ClickableCode (green flash feedback, closest('pre') guard).
   last_edited_ms: 0
+6a683a85bc83914e:
+  path: crates/cp-mod-brave/Cargo.toml
+  description: 'Brave module deps: cp-base, cp-vault, cp-render, crossterm, serde, serde_json, serde_yaml, reqwest.'
+  last_edited_ms: 1783253850437
 6a80600c66d89e02:
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only fsync''d log + running Heads fold. open() seeds heads via replay. append(kind)->rev probes frame size, rolls at 64MiB. roll() stamps leading Checkpoint(heads) as new segment''s first record (GAP1). write_record = sole rev-assignment point (frame+write_all+sync_data+fold_entry, announce-after-durable K9). checkpoint() public. seg-0 has no leading cp. OplogError{Io,Frame}. 7 tests.'
@@ -5122,6 +5142,10 @@
   path: ui/src/lib/types.ts
   description: 'Maquette domain types: ContextPanel, ChatMessage/ToolCall, Thread (summary), SpineNotif, StatRow, StatusModel, PanelKind. Thread-view types: ViewMode, ThreadQuestion, ThreadMsg, ThreadDetail (full conversation log).'
   last_edited_ms: 1781459201208
+721208c9faaf6966:
+  path: crates/cp-mod-brave/src/tools.rs
+  description: Brave tool dispatch. get_client() reads key from vault ("brave"). Both tools async via spawn_async_tool. DynPanel creation with DYN_PANEL_ID_PLACEHOLDER.
+  last_edited_ms: 1783253850091
 721fde9f0e9fd7ff:
   path: crates/cp-orchestrator/tests/openapi/paths.rs
   description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL, providers, releases). Includes deploy + restart-orchestrator paths.
@@ -7178,6 +7202,10 @@
   path: web/src/App.tsx
   description: App shell. ViewMode = fleet|threads|cockpit|finder (default fleet). Uses useFleet() for live agents. Mounts AccountProvider + TooltipProvider. Passes agents to TopBar/FleetShell/StatusBar. Passes activeAgent to StatusBar.
   last_edited_ms: 1781695982811
+9f729027d5333854:
+  path: crates/cp-mod-ocr/Cargo.toml
+  description: 'OCR module deps: cp-base, cp-vault, cp-render, serde_json, reqwest, cp-mod-utilities, log.'
+  last_edited_ms: 1783253850573
 9f76facc7ed4b07d:
   path: crates/cp-mod-memory/src/storage.rs
   description: YAML-backed memory storage. FNV-1a keys via cp-mod-utilities. generate_yaml_key, ensure_yaml_key. populate/migrate via YamlSync.
@@ -7718,6 +7746,10 @@ abb19777c1034743:
   path: web/src/components/finder/preview/sourcedPdfTypes.ts
   description: Types, color map, and ZIP-bundle parser for the .sourced_pdf format. Domain types (Metadata/Value/Ref/Arrow), REF_COLORS/REF_LABELS palettes, docType() helper (pdf/xlsx/unknown from extension), parseSourcedBundle() decompresses ZIP → metadata + ALL document bytes (docBytes Map) + values + refs. Handles both v0 (generated) and v1 (production spdf-toolkit) formats. ~210 lines.
   last_edited_ms: 1782148473713
+abcbb068e38203ca:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 ac02a19418bc0655:
   path: crates/cp-vault/src/types.rs
   description: 'Core types: SecretString (zeroized), VaultError, KeyStatus, Vault trait (get/require/set/delete/list/health).'
@@ -8438,6 +8470,10 @@ bad0babd2f7479ca:
   path: src/llms/minimax/mod.rs
   description: MiniMax provider — Anthropic-compatible API via Token Plan. SSE streaming identical to Anthropic protocol. API key from vault ("minimax").
   last_edited_ms: 1783253450648
+bad82da22b56b69e:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 bb05e2336216163a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
@@ -9962,6 +9998,10 @@ ddb88a39a9ca2038:
   path: crates/cp-wire/src/lib.rs
   description: 'Versioning primitives: PROTOCOL_VERSION const + accepts(their_major) N-1 compat check. Declares framing + types modules. 4 tests.'
   last_edited_ms: 0
+ddc5dfaedd2baef1:
+  path: crates/cp-mod-search/Cargo.toml
+  description: 'Search module deps: cp-base, cp-vault, cp-mod-logs, cp-render, crossterm, serde, serde_json, cp-mod-utilities, reqwest, notify, tree-sitter (9 langs), serde_yaml, log.'
+  last_edited_ms: 1783253850642
 dddb27db9c06fd79:
   path: web/src/lib/types.ts
   description: 'Maquette domain types. Agent now carries live vitals: phase?(idle|streaming|tooling) + inputTokens?/outputTokens? folded from the PhaseTransition/CostAggregate SSE deltas (T297) alongside status/costUsd. ContextPanel, ThreadDetail (log:ThreadMsg[] with auto flag), Finder/Library/Usage shapes.'
@@ -10986,6 +11026,10 @@ f767b719075902b7:
   path: src/ui/ir/render_conversation.rs
   description: 'IR-controlled chrome: border, title, scrollbar, auto-scroll. Delegates content to build_content_cached(). Question form + autocomplete overlay rendering via IR data.'
   last_edited_ms: 0
+f76e5cbdeac7b32a:
+  path: crates/cp-mod-search/src/meili/bootstrap.rs
+  description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config via vault ("voyage"), project path hashing, initial metrics population.'
+  last_edited_ms: 1783253850298
 f7792dcfbce6cd68:
   path: web/src/components/shell/config/ReleasesPane.tsx
   description: Admin-only release management pane (T427). Architecture selector (auto-detect or manual), release cards with tag/date/size + status chips (Latest/Downloaded/Active), download/use/delete actions via generated SDK. Error state with retry button. Data from GET /api/releases → ReleaseStore backend.
