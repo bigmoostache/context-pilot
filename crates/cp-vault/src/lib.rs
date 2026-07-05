@@ -21,7 +21,7 @@
 
 mod dotenv;
 pub mod local;
-mod oauth;
+pub mod oauth;
 pub mod registry;
 pub mod types;
 

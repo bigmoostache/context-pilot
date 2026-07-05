@@ -317,31 +317,15 @@ fn exchange_and_store(code: &str, code_verifier: &str, state: &str) -> Result<i6
 // ── Credential I/O ───────────────────────────────────────────────────
 
 /// Read the `claudeAiOauth` object from Keychain or credentials file.
+///
+/// Delegates to [`cp_vault::oauth::load_claude_oauth_raw`].
 fn read_credentials_json() -> Option<serde_json::Value> {
-    // macOS Keychain (preferred).
-    if let Ok(out) = std::process::Command::new("security")
-        .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
-        .output()
-    {
-        if out.status.success() {
-            if let Ok(raw) = std::str::from_utf8(&out.stdout) {
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(raw.trim()) {
-                    return val.get("claudeAiOauth").cloned();
-                }
-            }
-        }
-    }
-    // Fallback: credentials file.
-    let home = std::env::var("HOME").ok()?;
-    let path = std::path::Path::new(&home).join(".claude/.credentials.json");
-    let data = std::fs::read_to_string(path).ok()?;
-    let val: serde_json::Value = serde_json::from_str(&data).ok()?;
-    val.get("claudeAiOauth").cloned()
+    cp_vault::oauth::load_claude_oauth_raw()
 }
 
-/// Read the OAuth access token (convenience wrapper over [`read_credentials_json`]).
+/// Read the OAuth access token (convenience wrapper).
 fn read_access_token() -> Option<String> {
-    read_credentials_json()?.get("accessToken")?.as_str().map(str::to_owned)
+    cp_vault::vault().get("claude_oauth").map(|s| s.expose().to_owned())
 }
 
 /// Store credentials in macOS Keychain (primary) and `~/.claude/.credentials.json` (fallback).

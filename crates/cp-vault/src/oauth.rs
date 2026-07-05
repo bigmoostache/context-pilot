@@ -37,7 +37,8 @@ struct OAuthCredentials {
 /// Load the Claude OAuth token from Keychain (macOS) or credential file.
 ///
 /// Returns `None` if no valid, unexpired token is found.
-pub(crate) fn load_claude_oauth_token() -> Option<SecretString> {
+#[must_use]
+pub fn load_claude_oauth_token() -> Option<SecretString> {
     if cfg!(target_os = "macos")
         && let Some(token) = load_from_keychain()
     {
@@ -85,6 +86,47 @@ fn parse_credentials_json(content: &str) -> Option<SecretString> {
     }
 
     Some(SecretString::new(creds.claude_ai_oauth.access_token))
+}
+
+/// Load the full Claude OAuth credentials JSON from Keychain or file.
+///
+/// Returns the raw `claudeAiOauth` object (with `accessToken`, `refreshToken`,
+/// `expiresAt`, etc.) without expiry filtering.  Used by the orchestrator for
+/// token-status inspection and refresh flows.
+#[must_use]
+pub fn load_claude_oauth_raw() -> Option<serde_json::Value> {
+    if cfg!(target_os = "macos")
+        && let Some(val) = raw_from_keychain()
+    {
+        return Some(val);
+    }
+    raw_from_file()
+}
+
+/// Read raw credentials JSON from macOS Keychain.
+fn raw_from_keychain() -> Option<serde_json::Value> {
+    let output = Command::new("security")
+        .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let content = String::from_utf8(output.stdout).ok()?;
+    let val: serde_json::Value = serde_json::from_str(content.trim()).ok()?;
+    val.get("claudeAiOauth").cloned()
+}
+
+/// Read raw credentials JSON from `~/.claude/.credentials.json`.
+fn raw_from_file() -> Option<serde_json::Value> {
+    let home = std::env::var("HOME").ok()?;
+    let home_path = PathBuf::from(&home);
+    let primary = home_path.join(".claude").join(".credentials.json");
+    let fallback = home_path.join(".claude").join("credentials.json");
+    let path = if primary.exists() { primary } else { fallback };
+    let content = fs::read_to_string(&path).ok()?;
+    let val: serde_json::Value = serde_json::from_str(&content).ok()?;
+    val.get("claudeAiOauth").cloned()
 }
 
 #[cfg(test)]
