@@ -138,7 +138,7 @@ fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
     let mut msg = serde_json::json!({
         "id": format!("msg_{index}"),
         "author": role,
-        "text": truncate_text(raw.get("content").and_then(serde_json::Value::as_str).unwrap_or("")),
+        "text": raw.get("content").and_then(serde_json::Value::as_str).unwrap_or(""),
         "ts": raw.get("timestamp").and_then(serde_json::Value::as_u64).unwrap_or(0),
         "auto": raw.get("auto").and_then(serde_json::Value::as_bool).unwrap_or(false),
     });
