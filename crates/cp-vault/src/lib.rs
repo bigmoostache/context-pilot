@@ -25,16 +25,26 @@ pub mod oauth;
 pub mod registry;
 pub mod types;
 
+#[cfg(feature = "bridge")]
+pub mod bridge;
+
 use std::sync::{Arc, LazyLock};
 
 use types::Vault;
 
 /// Global vault instance, auto-initialized on first access.
 ///
-/// Backend selection reads `CP_BRIDGE` at initialization time.
-/// Currently always creates a [`local::Backend`]; `BridgeVault` will be added
-/// behind the `bridge` feature flag.
-static VAULT: LazyLock<Arc<dyn Vault>> = LazyLock::new(|| Arc::new(local::Backend::new()));
+/// Backend selection reads `CP_BRIDGE` at initialization time:
+/// - `CP_BRIDGE=1` (with `bridge` feature) → [`bridge::BridgeVault`]
+///   (orchestrator-backed with cache fallback).
+/// - Otherwise → [`local::Backend`] (env vars, Keychain, `.env` files).
+static VAULT: LazyLock<Arc<dyn Vault>> = LazyLock::new(|| {
+    #[cfg(feature = "bridge")]
+    if std::env::var("CP_BRIDGE").is_ok() {
+        return Arc::new(bridge::BridgeVault::new());
+    }
+    Arc::new(local::Backend::new())
+});
 
 /// Access the global vault instance.
 ///

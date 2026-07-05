@@ -632,6 +632,7 @@ name = "cp-vault"
 version = "0.1.0"
 dependencies = [
  "fs2",
+ "log",
  "reqwest",
  "serde",
  "serde_json",

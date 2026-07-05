@@ -225,6 +225,9 @@ fn route_rest(
             rest::env_key_update(name, auth_user, &body)
         }
 
+        // ── Vault snapshot (BridgeVault cache warm-up) ──────────────
+        (Method::Get, ["api", "vault", "snapshot"]) => rest::vault_snapshot(auth_user),
+
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
         (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent_meta(state, id),
         (Method::Get, ["api", "agent", id, "metrics"]) => inspect::metrics::agent_metrics(state, id),

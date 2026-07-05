@@ -15,6 +15,30 @@ use serde_json::json;
 use super::HttpReply;
 use crate::services::auth::types::{User, UserRole};
 
+/// `GET /api/vault/snapshot` — bulk-fetch all set key values.
+///
+/// Returns a JSON object `{ "canonical_name": "value", ... }` containing every
+/// key that currently resolves to a value.  Designed for [`BridgeVault`] cache
+/// warm-up.  Keys without a value are omitted (not `null`).
+///
+/// Admin-only when auth is enabled.
+pub(crate) fn vault_snapshot(auth_user: Option<&User>) -> HttpReply {
+    if auth_user.is_some_and(|u| u.role != UserRole::Admin) {
+        return HttpReply::error(403, "admin required");
+    }
+
+    let snapshot: serde_json::Map<String, serde_json::Value> = cp_vault::registry::ALL_KEYS
+        .iter()
+        .filter(|k| !k.env_var.is_empty())
+        .filter_map(|k| {
+            cp_vault::vault()
+                .get(k.canonical)
+                .map(|s| (k.canonical.to_owned(), serde_json::Value::String(s.expose().to_owned())))
+        })
+        .collect();
+    HttpReply::ok(&snapshot)
+}
+
 /// `GET /api/env-keys` — list all known keys with their status.
 ///
 /// Returns a JSON array of `{ env, label, exists }` objects.  Keys without an
