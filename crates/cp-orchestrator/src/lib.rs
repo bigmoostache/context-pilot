@@ -56,6 +56,10 @@ pub use registry::liveness;
 // solely to activate vendored compilation.
 use openssl as _;
 
+// `dotenvy` loads `.env` files in the binary's `main()` — the lib half never
+// calls it directly, so the per-target lint needs this acknowledgement.
+use dotenvy as _;
+
 // `cp-mod-bridge` is a dev-dependency the `tests/registry_channel.rs` integration
 // suite uses to boot a real agent across the backend↔agent seam. The library's
 // own `#[cfg(test)]` modules never name it, so the per-target

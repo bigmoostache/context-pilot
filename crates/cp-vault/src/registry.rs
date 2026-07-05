@@ -178,7 +178,7 @@ pub static ALL_KEYS: &[KeyDefinition] = &[
 ///
 /// Accepts either form: `"anthropic"` or `"ANTHROPIC_API_KEY"`.
 #[must_use]
-pub(crate) fn resolve_definition(key: &str) -> Option<&'static KeyDefinition> {
+pub fn resolve_definition(key: &str) -> Option<&'static KeyDefinition> {
     ALL_KEYS.iter().find(|k| k.canonical == key || k.env_var == key)
 }
 

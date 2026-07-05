@@ -12,6 +12,8 @@ readme.workspace = true
 [dependencies]
 cp-wire = { path = "../cp-wire", features = ["openapi"] }
 cp-oplog = { path = "../cp-oplog" }
+cp-vault = { path = "../cp-vault" }
+dotenvy = "0.15"
 utoipa = "5"
 nix = { version = "0.30", features = ["signal"] }
 serde = { version = "1", features = ["derive"] }

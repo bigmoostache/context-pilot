@@ -734,6 +734,10 @@
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. MODELS + MODEL_META (rich picker). slugify(name) derives realm folder. AgentModalMode: create or manage{agent}. X896: create-mode submit() now LIVE — useCreateAgent() mutation (POST /api/fleet/create), pending spinner ''Creating…'', inline role=alert error banner, onSuccess flash+close. Manage mode stays cosmetic (rename/archive not backend-wired). Shared by TopBar + FleetDashboard.'
   last_edited_ms: 1781878131896
+10c49f7829f0c098:
+  path: crates/cp-orchestrator/src/transport/rest/env_keys.rs
+  description: On-demand env-key inspection (T399) and editing (T404). Delegates to cp_vault for key resolution and persistence. env_keys_list/reveal/update all use vault().get()/set() + registry::ALL_KEYS. mask_key helper. 7 tests.
+  last_edited_ms: 1783254600959
 10dda8b63fda92d9:
   path: web/src/lib/api/body.ts
   description: 'Content-addressed message-body hydrate (T357, split from api/index for <500). fetchMessageBody(agentId,hash): GET /api/agent/{id}/body/{hash} → {bytes:number[]} → TextDecoder UTF-8 string (same JSON a small message rides inline). Race-free: the body is stored before the referencing MessageCreated delta is emitted (I13 body-before-reference barrier). Re-exported from api/index.ts barrel. Consumed by the SSE bridge''s spilled-body hydrate.'
@@ -2530,6 +2534,10 @@
   path: src/app/run/threads/mod.rs
   description: 'Thread helpers for main loop: maybe_inject_auto_read (synthetic Read on auto-continuation), check_my_turn_threads (idle MY_TURN nudge, debounced), extract_thread_ids. Re-exports bridge::{bridge_active,emit_vitals,poll_bridge_commands}. Split from threads.rs (500-line limit); intake+emit live in sibling bridge.rs.'
   last_edited_ms: 1781794327710
+3904c3672c2fb6cf:
+  path: crates/cp-orchestrator/Cargo.toml
+  description: 'Backend deps: cp-wire (openapi) + cp-oplog + cp-vault + dotenvy + utoipa 5 + nix (signal) + serde + tiny_http + notify + portable-pty + calamine+csv (spreadsheet) + argon2 (auth) + rusqlite + reqwest + openssl vendored + sha2 (PKCE) + base64 (PKCE). dev: cp-mod-bridge + tempfile.'
+  last_edited_ms: 1783254601301
 39056915756877d9:
   path: crates/cp-base/src/lib.rs
   description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (19 tool + 6 config YAML files) with #[expect(clippy::panic)].'
@@ -3334,6 +3342,10 @@
   path: src/app/run/tools/queue_flush.rs
   description: Queue flush execution — dequeues and runs all queued tool calls. FlushedTool struct + execute_queue_flush(). save_flushed_tool_call_message() creates compact Tool_execution stubs. augment_remaining_history_panels() appends remaining panel info. Extracted from pipeline.rs for file-length limit.
   last_edited_ms: 0
+49c436b84357722a:
+  path: crates/cp-orchestrator/tests/openapi/main.rs
+  description: OpenAPI spec generator (integration test, --ignored). build_spec assembles schemas + paths. generate_openapi writes openapi.json. Acknowledges lib-only deps (incl reqwest, openssl).
+  last_edited_ms: 0
 49cfd515bbe97d6d:
   path: web/src/components/shell/StatusBar.tsx
   description: 'Bottom status footer. Fleet mode: accepts agents prop for aggregates (count, threads, needs-you, spend). Agent mode: accepts activeAgent prop, derives phase from status, wires cost live. Cache bar (cacheStats/tokenBudget) still mock.'
@@ -3422,6 +3434,10 @@
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, count positive. Send to a THEIR_TURN thread is ALLOWED (status stays THEIR_TURN) — no block. Focus enforcement with dangling/escalation. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
   last_edited_ms: 0
+4c5107d5be905ef5:
+  path: crates/cp-orchestrator/src/main.rs
+  description: Backend entry point. Loads .env via dotenvy (project-local + global fallback) before config. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + agents_root + agent_binary, creates Runtime, starts driver thread, serves HTTP (blocking).
+  last_edited_ms: 1783254601165
 4c51ec80adb606dc:
   path: crates/cp-mod-tree/src/types.rs
   description: Tree state types. TreeFileDescription (path, description, file_hash). TreeState (filter, open_folders, descriptions). DEFAULT_TREE_FILTER constant.
@@ -3542,6 +3558,10 @@
   path: crates/cp-orchestrator/src/services/auth/backup.rs
   description: 'Auth.db backup system (NFR-19/20): BackupScheduler (rolling 5min overwrite + daily AM/PM permanent snapshots). AuthStore::backup_to via SQLite online backup API. epoch_to_ymd_h (Hinnant civil-time algorithm). Wired into runtime.rs slow cadence. 6 tests.'
   last_edited_ms: 1782240566118
+4ec70989c3f9ef8c:
+  path: crates/cp-vault/src/registry.rs
+  description: Key registry — ALL_KEYS static array with 17 KeyDefinitions. Single source of truth replacing 3 prior registries. resolve_definition() pub for dual-name lookup.
+  last_edited_ms: 1783254601369
 4ececafa55cd3870:
   path: web/src/lib/support/devMode.tsx
   description: DevMode context (T301). devMode boolean persisted to localStorage cp-dev-mode. Controls Cockpit tab visibility. Off by default.
@@ -5190,6 +5210,10 @@
   path: crates/cp-mod-github/src/watcher.rs
   description: Background polling watcher for GithubResult panels. ETag-based API polling + output-hash CLI polling. Per-panel GhWatch state with adaptive X-Poll-Interval. Branch PR watch for sidebar. Spawns background thread. DueWatch snapshot pattern avoids long mutex holds.
   last_edited_ms: 0
+733a90e32f30a732:
+  path: crates/cp-orchestrator/src/lib.rs
+  description: Backend library root. Declares channel+inspect+registry+runtime+services+supervisor+transport. Re-exports registry::{channel,liveness} at crate root. Acknowledges openssl + dotenvy deps (bin-only).
+  last_edited_ms: 1783254601233
 7351e3147fa3275f:
   path: ui/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view (collapsible, width=var(--sidebar-w), w-0 collapsed). NO agent header, NO collapse button (rail lives in ThreadsView). Working search <input> filters by name+last-preview. Groups: ''Needs you'' (MY_TURN, signal), ''Active'' (ACTIVE, green/ok, the one streaming), ''Working in parallel'' (THEIR_TURN). Per-row hover Archive/Restore action. Footer ''Archived (N)'' toggles a read-only archived view. New Thread button → onNewThread. Header pill counts agent-owned working threads.'
@@ -6378,6 +6402,10 @@
   path: src/app/run/threads.rs
   description: 'Thread-related helpers for the main event loop. maybe_inject_auto_read (synthetic Read on auto-continuation), check_my_turn_threads (idle MY_TURN detection + spine notification), extract_thread_ids (parse thread IDs from notification content). Bridge command polling: poll_bridge_commands + accept_commands (non-blocking accept, 500ms read timeout) + apply_command dispatch (SendMessage/CreateThread/Archive/Restore/Stop/Interrupt via K7 path). Free functions taking &mut App.'
   last_edited_ms: 1781698223834
+8ce4dcd0a3a44456:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 8cfaebee8ddb98ad:
   path: crates/cp-oplog/src/service.rs
   description: 'OplogService — off-loop group-commit thread + GAP2/I2 asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate|ThreadFocusChanged=BestEffort (disposable/self-healing), all else (roster mutations + Lifecycle + Unknown)=Durable. THREE submit paths: append_durable (blocks+awaits sync — intake/I11), submit_durable (non-blocking durable, detached ack — I2 main loop), append_best_effort (try_send drop-on-full — phase/cost/focus). commit_loop drains batch, ONE fdatasync. Tests in sibling service_tests.rs.'
@@ -7082,6 +7110,10 @@
   path: crates/cp-mod-memory/src/lib.rs
   description: 'Memory module. 2 tools: memory_create/update. Fixed MEMORY panel. Global, not core. 80-token tl_dr cap. Module data: memories + next_id + open_ids. Importance-gradient visualizer (critical→low).'
   last_edited_ms: 0
+9d6efab52aff3c57:
+  path: crates/cp-orchestrator/src/transport/rest/backend.rs
+  description: Backend shared state struct + impl. Holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names/avatars/auth/session_ttl/releases/pkce_session(T451). Accessor methods + for_test.
+  last_edited_ms: 1783254601030
 9da326be0375a737:
   path: web/src/components/ui/dropdown-menu.tsx
   description: shadcn dropdown-menu (base-ui Menu) primitives + theme-token highlight overrides.
@@ -8598,6 +8630,10 @@ bdb821c68ede0ffb:
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. MODELS + MODEL_META (rich picker). slugify(name) derives realm folder. AgentModalMode: create or manage{agent}. onFlash optional (fleet supplies, TopBar omits). submit() decorative (no API call).'
   last_edited_ms: 1781775130157
+bddc1f965aae8bca:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl auth/ACL/env-keys/providers/releases/claude-usage+login+refresh(T451). handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with ticket-based ACL.
+  last_edited_ms: 1783254601098
 bddf74016a26a659:
   path: src/llms/cache/cache_engine.rs
   description: Cache breakpoint engine. Hash chain (acc_hash = sha256(block + prev)). Tracks alive BPs via hash match. Places beacon at frontier+20. Runs DP optimizer for 3 additional BPs (4 total). 5-min TTL matching Anthropic.
@@ -9790,6 +9826,10 @@ d7e7cba0c5500a70:
   path: web/src/App.tsx
   description: Root shell. activeAgent = useAgentMeta(activeAgentId) (delta-folded per-agent meta) ?? fleetAgent (polled-fleet identity fallback) so the always-visible TopBar + StatusBar ride the push plane for phase/cost/tokens instead of the 15s fleet poll (T297). view/agent persisted to localStorage; effectiveView falls back to fleet when no live agent.
   last_edited_ms: 1782044317140
+d7ee202a9ba81334:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 d7f947737a248243:
   path: crates/cp-orchestrator/tests/openapi/main.rs
   description: OpenAPI spec generator (integration test, --ignored). build_spec assembles schemas + paths. generate_openapi writes openapi.json. Acknowledges lib-only deps (incl reqwest).

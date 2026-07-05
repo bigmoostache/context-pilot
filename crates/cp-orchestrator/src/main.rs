@@ -15,6 +15,7 @@ use calamine as _;
 #[cfg(test)]
 use cp_mod_bridge as _;
 use cp_oplog as _;
+use cp_vault as _;
 use csv as _;
 use nix as _;
 use notify as _;
@@ -32,6 +33,13 @@ use tiny_http as _;
 use utoipa as _;
 
 fn main() {
+    // Load .env files — project-local first, then global fallback.
+    let _local = dotenvy::dotenv().ok();
+    if let Some(home) = std::env::var_os("HOME") {
+        let global_env = std::path::PathBuf::from(home).join(".context-pilot/.env");
+        let _global = dotenvy::from_path(&global_env).ok();
+    }
+
     eprintln!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION,);
 
     let config = match Config::from_env() {
