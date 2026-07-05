@@ -107,6 +107,16 @@ ts-contract:
       exit 1
     fi
   last_edited_ms: 1782421737199
+vault-bypass:
+  name: vault-bypass
+  description: Catch direct env::var calls for vault-managed credential keys (delegates to .github/checks/check-vault-bypass.sh)
+  pattern: '*.rs'
+  blocking: true
+  timeout_secs: 5
+  success_message: Vault bypass check OK ✓
+  is_global: true
+  script_content: .github/checks/check-vault-bypass.sh $CP_CHANGED_FILES
+  last_edited_ms: 1783256066883
 web-structure:
   name: web-structure
   description: Enforce ≤8 entries/dir + ≤500 lines/file under web/src (shadcn ui/ exempt)

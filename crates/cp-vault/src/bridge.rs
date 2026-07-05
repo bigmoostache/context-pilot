@@ -1,4 +1,4 @@
-//! [`BridgeVault`] — orchestrator-backed credential backend with local cache
+//! [`Backend`] — orchestrator-backed credential backend with local cache
 //! fallback.
 //!
 //! Used by agents running in bridge mode (`CP_BRIDGE=1`).  On boot the vault
@@ -15,6 +15,7 @@
 //! last-good disk cache (`~/.context-pilot/vault-cache.json`), then to env
 //! vars loaded by dotenvy.
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::thread;
@@ -42,7 +43,7 @@ const CACHE_FILENAME: &str = "vault-cache.json";
 /// Orchestrator-backed credential vault with cache fallback.
 ///
 /// See [module docs](self) for the full resolution cascade.
-pub struct BridgeVault {
+pub struct Backend {
     /// Key→value cache populated from orchestrator snapshot.
     cache: Arc<RwLock<HashMap<String, SecretString>>>,
     /// Fallback backend for keys not in the orchestrator.
@@ -51,13 +52,19 @@ pub struct BridgeVault {
     orch_url: String,
 }
 
-impl std::fmt::Debug for BridgeVault {
+impl std::fmt::Debug for Backend {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BridgeVault").field("orch_url", &self.orch_url).finish_non_exhaustive()
+        f.debug_struct("Backend").field("orch_url", &self.orch_url).finish_non_exhaustive()
     }
 }
 
-impl BridgeVault {
+impl Default for Backend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Backend {
     /// Create a new bridge vault, warm cache from orchestrator, and start
     /// the background refresh thread.
     ///
@@ -89,13 +96,10 @@ impl BridgeVault {
     /// Returns `true` on success, `false` on any failure (network, parse).
     fn refresh_from_orchestrator(&self) -> bool {
         let url = format!("{}/api/vault/snapshot", self.orch_url);
-        let client = match reqwest::blocking::Client::builder()
-            .connect_timeout(CONNECT_TIMEOUT)
-            .timeout(REQUEST_TIMEOUT)
-            .build()
-        {
-            Ok(c) => c,
-            Err(_) => return false,
+        let Ok(client) =
+            reqwest::blocking::Client::builder().connect_timeout(CONNECT_TIMEOUT).timeout(REQUEST_TIMEOUT).build()
+        else {
+            return false;
         };
 
         let response = match client.get(&url).send() {
@@ -110,7 +114,7 @@ impl BridgeVault {
             }
         };
 
-        let snapshot: HashMap<String, String> = match response.json() {
+        let snapshot: BTreeMap<String, String> = match response.json() {
             Ok(m) => m,
             Err(e) => {
                 log::warn!("vault snapshot: bad JSON: {e}");
@@ -127,7 +131,7 @@ impl BridgeVault {
         }
 
         // Persist to disk for offline fallback.
-        self.save_disk_cache(&snapshot);
+        save_disk_cache(&snapshot);
         log::info!("vault snapshot: {} keys cached from orchestrator", snapshot.len());
         true
     }
@@ -135,11 +139,8 @@ impl BridgeVault {
     /// Load cached keys from `~/.context-pilot/vault-cache.json`.
     fn load_disk_cache(&self) {
         let Some(path) = cache_path() else { return };
-        let content = match std::fs::read_to_string(&path) {
-            Ok(c) => c,
-            Err(_) => return,
-        };
-        let map: HashMap<String, String> = match serde_json::from_str(&content) {
+        let Ok(content) = std::fs::read_to_string(&path) else { return };
+        let map: BTreeMap<String, String> = match serde_json::from_str(&content) {
             Ok(m) => m,
             Err(e) => {
                 log::warn!("vault cache corrupt, ignoring: {e}");
@@ -157,45 +158,29 @@ impl BridgeVault {
         log::info!("vault disk cache: loaded {} keys from {}", map.len(), path.display());
     }
 
-    /// Write the current snapshot to disk with restrictive permissions.
-    fn save_disk_cache(&self, snapshot: &HashMap<String, String>) {
-        let Some(path) = cache_path() else { return };
-        if let Some(parent) = path.parent() {
-            let _created = std::fs::create_dir_all(parent);
-        }
-        let json = match serde_json::to_string_pretty(snapshot) {
-            Ok(j) => j,
-            Err(_) => return,
-        };
-        if std::fs::write(&path, &json).is_ok() {
-            secure_file(&path);
-        }
-    }
-
     /// Spawn a daemon thread that refreshes the cache every
     /// [`REFRESH_INTERVAL`].
     fn spawn_refresh_thread(&self) {
         let cache = Arc::clone(&self.cache);
         let orch_url = self.orch_url.clone();
 
-        let _handle = thread::Builder::new().name("vault-refresh".to_owned()).spawn(move || {
+        let _handle = thread::Builder::new().name("vault-refresh".to_owned()).spawn(move || -> ! {
             loop {
                 thread::sleep(REFRESH_INTERVAL);
 
                 let url = format!("{orch_url}/api/vault/snapshot");
-                let client = match reqwest::blocking::Client::builder()
+                let Ok(client) = reqwest::blocking::Client::builder()
                     .connect_timeout(CONNECT_TIMEOUT)
                     .timeout(REQUEST_TIMEOUT)
                     .build()
-                {
-                    Ok(c) => c,
-                    Err(_) => continue,
+                else {
+                    continue;
                 };
                 let response = match client.get(&url).send() {
                     Ok(r) if r.status().is_success() => r,
                     _ => continue,
                 };
-                let snapshot: HashMap<String, String> = match response.json() {
+                let snapshot: BTreeMap<String, String> = match response.json() {
                     Ok(m) => m,
                     Err(_) => continue,
                 };
@@ -206,23 +191,14 @@ impl BridgeVault {
                     }
                 }
                 // Also persist to disk.
-                if let Some(path) = cache_path() {
-                    if let Some(parent) = path.parent() {
-                        let _created = std::fs::create_dir_all(parent);
-                    }
-                    if let Ok(json) = serde_json::to_string_pretty(&snapshot) {
-                        if std::fs::write(&path, &json).is_ok() {
-                            secure_file(&path);
-                        }
-                    }
-                }
+                save_disk_cache(&snapshot);
                 log::debug!("vault refresh: {} keys updated", snapshot.len());
             }
         });
     }
 }
 
-impl Vault for BridgeVault {
+impl Vault for Backend {
     fn get(&self, key: &str) -> Option<SecretString> {
         let def = resolve_definition(key)?;
 
@@ -236,6 +212,10 @@ impl Vault for BridgeVault {
 
         // 2. Local fallback (env vars, Keychain).
         self.local.get(key)
+    }
+
+    fn require(&self, key: &str) -> Result<SecretString, VaultError> {
+        self.get(key).ok_or_else(|| VaultError::MissingKey(key.to_owned()))
     }
 
     fn set(&self, key: &str, value: &str) -> Result<(), VaultError> {
@@ -297,6 +277,18 @@ impl Vault for BridgeVault {
     }
 }
 
+/// Write the snapshot to disk with restrictive permissions.
+fn save_disk_cache(snapshot: &BTreeMap<String, String>) {
+    let Some(path) = cache_path() else { return };
+    if let Some(parent) = path.parent() {
+        let _created = std::fs::create_dir_all(parent);
+    }
+    let Ok(json) = serde_json::to_string_pretty(snapshot) else { return };
+    if std::fs::write(&path, &json).is_ok() {
+        secure_file(&path);
+    }
+}
+
 /// Resolve the disk cache path: `~/.context-pilot/vault-cache.json`.
 fn cache_path() -> Option<std::path::PathBuf> {
     let home = std::env::var("HOME").ok()?;
@@ -306,9 +298,10 @@ fn cache_path() -> Option<std::path::PathBuf> {
 /// Set file permissions to 0600 (owner read/write only).
 #[cfg(unix)]
 fn secure_file(path: &std::path::Path) {
-    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::fs::PermissionsExt as _;
     let _set = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
 }
 
+/// No-op on non-unix platforms.
 #[cfg(not(unix))]
 fn secure_file(_path: &std::path::Path) {}

@@ -76,7 +76,7 @@ pub struct KeyStatus {
 
 /// Unified credential access — the single API every module uses for secrets.
 ///
-/// Implementations: [`crate::local::Backend`] (standalone), `BridgeVault`
+/// Implementations: [`crate::local::Backend`] (standalone), `bridge::Backend`
 /// (orchestrator-backed with cache fallback, feature-gated).
 pub trait Vault: Send + Sync + fmt::Debug {
     /// Resolve a key by canonical name or env var name.

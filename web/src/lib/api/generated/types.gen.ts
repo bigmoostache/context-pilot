@@ -2680,3 +2680,30 @@ export type PostApiTicketResponses = {
 };
 
 export type PostApiTicketResponse = PostApiTicketResponses[keyof PostApiTicketResponses];
+
+export type GetApiVaultSnapshotData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/vault/snapshot';
+};
+
+export type GetApiVaultSnapshotErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiVaultSnapshotError = GetApiVaultSnapshotErrors[keyof GetApiVaultSnapshotErrors];
+
+export type GetApiVaultSnapshotResponses = {
+    /**
+     * Success
+     */
+    200: {
+        [key: string]: string;
+    };
+};
+
+export type GetApiVaultSnapshotResponse = GetApiVaultSnapshotResponses[keyof GetApiVaultSnapshotResponses];

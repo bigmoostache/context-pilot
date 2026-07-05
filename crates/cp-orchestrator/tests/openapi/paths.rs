@@ -50,6 +50,10 @@ pub(super) fn paths() -> Value {
                 "responses": merge(ok(r("EnvKeyUpdateResult")), err())
             }})
         ),
+        // ── Vault snapshot (BridgeVault cache warm-up) ──────────────
+        "/api/vault/snapshot": get("env", "Bulk-fetch all set key values (BridgeVault cache)", json!({
+            "type": "object", "additionalProperties": { "type": "string" }
+        })),
         // ── Ticket ──────────────────────────────────────────────────
         "/api/ticket": post("ticket", "Mint SSE upgrade ticket", None, r("TicketResponse")),
         // ── Auth ────────────────────────────────────────────────────

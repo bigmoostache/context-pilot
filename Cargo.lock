@@ -418,6 +418,7 @@ version = "0.1.0"
 dependencies = [
  "cp-base",
  "cp-render",
+ "cp-vault",
  "crossterm",
  "regex",
  "serde_json",

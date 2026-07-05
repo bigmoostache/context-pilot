@@ -6,7 +6,7 @@
 //! - [`Backend`](local::Backend) — resolves keys from environment variables,
 //!   macOS Keychain, and credential files.  Used by standalone agents and the
 //!   orchestrator.
-//! - `BridgeVault` (feature-gated) — fetches from the orchestrator with local
+//! - [`Backend`](bridge::Backend) (feature-gated) — fetches from the orchestrator with local
 //!   cache fallback.  Used by agents in bridge mode.
 //!
 //! # Initialization
@@ -35,13 +35,13 @@ use types::Vault;
 /// Global vault instance, auto-initialized on first access.
 ///
 /// Backend selection reads `CP_BRIDGE` at initialization time:
-/// - `CP_BRIDGE=1` (with `bridge` feature) → [`bridge::BridgeVault`]
+/// - `CP_BRIDGE=1` (with `bridge` feature) → [`bridge::Backend`]
 ///   (orchestrator-backed with cache fallback).
 /// - Otherwise → [`local::Backend`] (env vars, Keychain, `.env` files).
 static VAULT: LazyLock<Arc<dyn Vault>> = LazyLock::new(|| {
     #[cfg(feature = "bridge")]
     if std::env::var("CP_BRIDGE").is_ok() {
-        return Arc::new(bridge::BridgeVault::new());
+        return Arc::new(bridge::Backend::new());
     }
     Arc::new(local::Backend::new())
 });

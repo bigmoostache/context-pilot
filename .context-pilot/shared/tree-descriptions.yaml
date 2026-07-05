@@ -330,6 +330,10 @@
   path: crates/cp-mod-typst/src/tools_execute.rs
   description: Typst tool. flame!("typst_exec"). Unified gateway for compile/init/fonts/query/update/watch/unwatch/watchlist. Entry type creation for font/query results.
   last_edited_ms: 0
+06e558f30139f9e5:
+  path: .github/workflows/ci.yml
+  description: 'Unified CI workflow (replaces rust.yml + code_length.yml). 3 jobs: rust (fmt + clippy --all-targets + build --release + test), structure (file-lengths, folder-sizes, lint-exceptions, lint-config hash chain, web-structure), contract (OpenAPI+TS drift check). Triggers: push/PR to master.'
+  last_edited_ms: 0
 06f0e5000eadc0fa:
   path: crates/cp-base/src/state/runtime.rs
   description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
@@ -1118,6 +1122,10 @@
   path: crates/cp-mod-github/src/cache_invalidation.rs
   description: 'Cache invalidation: 15 regex rules with backreferences for issues/PRs/releases/labels/repo/API, find_invalidations()'
   last_edited_ms: 0
+193868878d7984de:
+  path: crates/cp-mod-git/src/tools.rs
+  description: 'Git tool. Unified inline-vs-panel: short/fast results (≤150 lines, ≤8KB, ≤10s) returned inline with tempo; long/slow results create static git_result panels. spawn_async_tool for all commands. GIT_ASKPASS temp script for HTTPS auth. Cache invalidation via regex patterns.'
+  last_edited_ms: 0
 193ade609d357d84:
   path: .github/checks/lint-config.chain
   description: 'Hash chain for protected lint configuration files. Each entry: prev_hash:content_hash:chain_hash. Verified by check-lint-config.sh. Currently 15 entries.'
@@ -1314,6 +1322,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation, threads. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread actions extracted to threads.rs.'
   last_edited_ms: 1781447353339
+1def72d21c33b16b:
+  path: crates/cp-orchestrator/tests/openapi/paths.rs
+  description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL, providers, releases, claude-usage+login+refresh). Includes deploy + restart-orchestrator paths.
+  last_edited_ms: 0
 1dff7b8ca6a2e0d1:
   path: crates/cp-orchestrator/src/services/auth/tests.rs
   description: '21 auth unit tests: schema, hashing, token/UUID gen, user CRUD (create/get/list/delete cascade), session lifecycle (create/validate/revoke/expired sweep), ACL (grant/revoke/update role/list/auto-grant creator/cascade delete/overwrite).'
@@ -1726,6 +1738,10 @@
   path: crates/cp-mod-entities/src/db.rs
   description: SQLite connection factory, bootstrap, introspection, dump/restore. open() with PRAGMAs (WAL, FK, busy_timeout, journal_size_limit). introspect() for SchemaCache. dump_to_file/restore_from_file with 1MB cap. sample_rows for panel. has_user_tables. checkpoint.
   last_edited_ms: 0
+26462a6ad4405f68:
+  path: .github/checks/check-vault-bypass.sh
+  description: 'Vault bypass check script (CI+callback shared). Catches std::env::var calls for vault-managed credential keys (_API_KEY, _BOT_TOKEN, GITHUB_TOKEN, _API_HASH, _API_ID) outside cp-vault. Dual-mode: no args=full repo scan (CI), with args=check specific files (callback).'
+  last_edited_ms: 1783256671457
 265b29e3fe7ecde8:
   path: yamls/tools/threads.yaml
   description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
@@ -2598,6 +2614,10 @@
   path: ui/src/components/agents/UsagePage.tsx
   description: 'Cost & token analytics page (fleet ''Usage''). Reads mock usagePoints + USAGE_RATES. Controls: agent filter chips, 3M/6M/12M range, $/tokens unit lens. Always bucketed by calendar month, decomposed into 3 canonical sections (cache hits/misses/output) everywhere. Hero cards (total + 3 sections), forecast callout (partial month → full run-rate), CSS stacked bar chart w/ dashed forecast ghost, shadcn monthly table w/ Δ, per-agent breakdown bars. CSS-only charts.'
   last_edited_ms: 1781534744529
+39d1f92c56ed1308:
+  path: openapi.json
+  description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
+  last_edited_ms: 0
 39e07c2dd8ae1401:
   path: crates/cp-mod-ocr/src/lib.rs
   description: 'OCR module. 1 tool: ocr. Datalab API integration. Non-blocking: returns immediately, fires spine notification on completion. Global, non-core.'
@@ -3182,6 +3202,10 @@
   path: .uploads/sourced_pdf/sourced_pdf/model.py
   description: 'Core sourced_pdf model library. Bundle class: open ZIP/dir, load metadata+values+refs, validate integrity (hashes, ids, arrows, roles, écarts). Value/Ref dataclasses. compute_ecart recalculates from values. init_bundle creates new bundles. parse_amount handles French number formatting.'
   last_edited_ms: 1782145700578
+44c6bb0ae93f1541:
+  path: crates/cp-mod-git/Cargo.toml
+  description: 'Git module deps: cp-base, cp-render, cp-vault, crossterm, serde_json, regex.'
+  last_edited_ms: 1783256671551
 44caef253819f02f:
   path: .git/index
   description: Git index (binary). Not source.
@@ -5302,6 +5326,10 @@
   path: crates/cp-oplog/src/service.rs
   description: 'OplogService — off-loop group-commit thread + GAP2/I2 asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate|ThreadFocusChanged=BestEffort (disposable/self-healing), all else (roster mutations + Lifecycle + Unknown)=Durable. THREE submit paths: append_durable (blocks+awaits sync — intake/I11), submit_durable (non-blocking durable, detached ack — I2 main loop), append_best_effort (try_send drop-on-full — phase/cost/focus). commit_loop drains batch, ONE fdatasync. Tests in sibling service_tests.rs.'
   last_edited_ms: 1781869236457
+743cbcce98d42e87:
+  path: crates/cp-vault/src/types.rs
+  description: 'Core types: SecretString (zeroized), VaultError, KeyStatus, Vault trait (get/require/set/delete/list/health).'
+  last_edited_ms: 0
 74417e72884dafd9:
   path: docs/rust-static-analysis-tools.md
   description: 'Comprehensive listing of Rust static analysis tools, modeled after Holzmann''s classic C tools page. Covers: compiler (rustc/clippy), commercial (CodeQL/Semgrep/Coverity/Klocwork/SonarQube/TrustInSoft), academic (Miri/Rudra/MIRAI/MirChecker/lockbud/Yuga), formal verification (Kani/Prusti/Verus/Creusot/Flux/Aeneas/hax), theory (RustBelt/Stacked Borrows), fuzzing (cargo-fuzz/bolero/proptest/loom), supply chain (cargo-audit/deny/geiger/vet/crev), CI pipeline recommendations, textbooks.'
@@ -7994,6 +8022,10 @@ af4934af72903cf5:
   path: src/app/run/threads/commands.rs
   description: 'Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/DeleteMessage(T416 per-message delete by epoch-ms timestamp)/Stop|Interrupt/Configure. SendMessage fires instant spine notification when message lands on CURRENTLY FOCUSED thread (T460) — user expects quick acknowledgement; unfocused threads rely on idle MY_TURN detection. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted. DeleteMessage removes single message by timestamp, emits durable MessageDeleted, updates bridge thread_msg_counts so emit_messages correctly detects subsequent appends (T418 fix). Cascade: deleting an assistant message also removes all consecutive auto:true messages PRECEDING it (tool-trace cleanup — the tool calls that produced the response), one MessageDeleted delta per removed message.'
   last_edited_ms: 1782899638522
+af59321d2fa3f0ce:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 af5db61fd6258800:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A warm) + DARK ''Sea'' (#2C3333/#395B64/#A5C9CA/#E7F6F2 cool) via :root/.dark token blocks. SF Pro system font for chrome, IBM Plex Mono for data only. Soft shadows, vibrancy, no phosphor glow.'
@@ -8049,6 +8081,10 @@ b054ebaa2c1e6ccd:
 b05803356f877031:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
+  last_edited_ms: 0
+b0d8927ecd59f0fd:
+  path: crates/cp-vault/src/lib.rs
+  description: 'Crate root. LazyLock global vault instance, vault() accessor. pub modules: local, oauth, registry, types. bridge module behind cfg(feature=bridge). Backend selection: CP_BRIDGE → BridgeVault, else LocalVault.'
   last_edited_ms: 0
 b0ef0be513a36e65:
   path: crates/cp-orchestrator/src/runtime.rs
@@ -9249,6 +9285,10 @@ c9ac09516e364b7f:
 c9d4aeb2bf4dfbe4:
   path: crates/cp-mod-search/src/types.rs
   description: Core types + config constants. SearchPersistData (with recompute tracking + task_signals ring buffer), SearchState (with SharedRadarCache Arc<Mutex>), Chunk, SearchResult (no tags), SearchMetrics, SearchOverlayInfo (with meili_cpu_pct/meili_memory_bytes), MeiliLiveStats (with meili_cpu_ticks for delta), IndexerCmd, WatcherHandle. logs_index_settings without tags.
+  last_edited_ms: 0
+c9db2309503b21b0:
+  path: web/src/lib/api/generated/sdk.gen.ts
+  description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
   last_edited_ms: 0
 c9f0b40ec3b201e0:
   path: web/src/components/shell/costs/parse.ts
@@ -11042,6 +11082,10 @@ f59fd0d6353947f8:
   path: src/app/mod.rs
   description: 'App struct — top-level container. Fields: State, TypewriterBuffer, pending tools/done, cache_tx, file/gh watchers, timers (incl last_bridge_recover_ms throttling the periodic cp_mod_bridge::try_recover self-heal), PersistenceWriter, reverie_streams. Sub-modules: actions, context, events, panels, prompt_builder, reverie, run.'
   last_edited_ms: 1781910990335
+f5aa9c6a9f46b100:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 f5c068f0c1248c19:
   path: src/infra/gh_watcher.rs
   description: 'Re-export: cp_mod_github::watcher::Watcher as GhWatcher'
@@ -11390,6 +11434,10 @@ fd0c02612d3b123c:
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread composer (always-active textarea + turn-status banner). T298 paperclip; T304 draftKey persists unsent text+caret to localStorage; T331 removable pendingFiles chips; T348/T350 /command suggestion bubbles (empty composer only) + create-command pill. T359: Enter handler is a faithful TUI port via resolveEnter (imported from @/lib/utils) — plain Enter does send/list-continue/empty-item-remove/newline; Shift+Enter newline; IME-guarded; applyEdit splices value+caret keeping draft+auto-grow in sync. List helpers extracted to lib/utils.ts to stay under the 500-line cap.'
   last_edited_ms: 1782302494835
+fd0e94b56e78bc12:
+  path: crates/cp-vault/src/bridge.rs
+  description: 'BridgeVault — orchestrator-backed credential backend. Boot: GET /api/vault/snapshot → warm cache. Background refresh every 5min. Disk cache at ~/.context-pilot/vault-cache.json (0600 perms). get() always local: cache → LocalVault fallback. set() pushes to orchestrator + caches locally. Feature-gated behind ''bridge''.'
+  last_edited_ms: 0
 fd1e3cc5db6b4c53:
   path: crates/cp-orchestrator/src/transport/inspect/finder/support.rs
   description: 'Finder shared helpers: agent_folder, confined_path (realm jail), count_visible_children, infer_kind, extract_param, percent_decode + unit tests.'

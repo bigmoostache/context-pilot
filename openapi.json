@@ -5280,6 +5280,39 @@
           "ticket"
         ]
       }
+    },
+    "/api/vault/snapshot": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Bulk-fetch all set key values (BridgeVault cache)",
+        "tags": [
+          "env"
+        ]
+      }
     }
   },
   "servers": [
