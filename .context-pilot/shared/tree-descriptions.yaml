@@ -514,6 +514,10 @@
   path: crates/cp-mod-search/src/indexer.rs
   description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. 3s poll interval PollWatcher.
   last_edited_ms: 0
+0b0eb5fb8e5f5b31:
+  path: crates/cp-orchestrator/src/transport/rest/thread_shape.rs
+  description: 'Pure thread-list shaping: overlay_roster merges live view roster into disk threads (refresh status/archived/paused/lastActivity; synthesize log-less ThreadDetail for view-only threads = instant appearance), reshape_thread/reshape_message snake_case→camelCase maquette shape. paused field included in overlay and reshape (T371). T498: MAX_MSG_TEXT_PREVIEW (500 chars) on lastMessage only + MAX_MESSAGES_PER_THREAD (30). Log message text NOT truncated (frontend reads as conversation).'
+  last_edited_ms: 1783258766825
 0b3a3989d17e3599:
   path: docs/talk/slides/3-1.html
   description: 'Slide: WOWs Showcase — 7 domain slider (Medicine/Chemistry/Hardware/Maths/Finance/Education/Misc)'
