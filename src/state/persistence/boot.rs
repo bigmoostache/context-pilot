@@ -40,6 +40,12 @@ pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData,
         let _global = dotenvy::from_path(&global_env).ok();
     }
 
+    // Trigger vault initialization (reads env vars loaded above) and warn
+    // about missing credentials before any module tries to use them.
+    for def in cp_vault::vault().health() {
+        log::warn!("Missing credential: {} ({})", def.display, def.env_var);
+    }
+
     // Pre-start heavy daemons in parallel — the biggest boot perf win.
     // Meilisearch and Console server start concurrently.
     // When module init_state() runs, each daemon is already healthy and

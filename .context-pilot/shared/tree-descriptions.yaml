@@ -5918,6 +5918,10 @@
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation. Thread input routing: handle_thread_input_submit resolves selected_thread_idx through ThreadsState::visible_indices(viewing_archived) — the selection is a VISIBLE-slice position (T9 archive refactor), so the virtual ''+ New Thread'' row is detected as selected_idx >= visible.len() (active view only) and message-send maps the visible position back to a real storage index (fixes the regression where typed names were routed as messages into another thread when archived threads existed). handle_thread_create stores the new thread''s VISIBLE index. MAX_THREAD_NAME_LEN=200. Paste sentinel expansion. /command replacement.'
   last_edited_ms: 0
+843a96a4f0527ec2:
+  path: src/state/persistence/boot.rs
+  description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 2 parallel threads (Meilisearch + Console). Loads .env files (project + global).'
+  last_edited_ms: 0
 843e49cf0a8afa42:
   path: .git/index
   description: Git index (binary). Not source.
@@ -8602,6 +8606,10 @@ bf372e93d15d115a:
   path: crates/cp-base/src/config/llm_types.rs
   description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends), per-provider model enums with pricing/context windows
   last_edited_ms: 0
+bf5a3da8659cb26e:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 bf6550700db6c73b:
   path: crates/cp-mod-git/Cargo.toml
   description: 'Git module deps: cp-base, cp-render, crossterm, serde_json, regex.'
@@ -9750,6 +9758,10 @@ d8c40a18ed60bb7d:
   path: web/e2e/t287_probe.spec.ts
   description: 'T287 regression: synthetic-DnD e2e — dispatches dragstart→drop with shared DataTransfer(MOVE_MIME) on Miller-column rows, asserts backend /fs reflects move. Proved drop wiring works (failure was native drag-START).'
   last_edited_ms: 1781892894829
+d8e6bdd59c5b59e7:
+  path: Cargo.toml
+  description: Workspace root. 26 crate members (incl cp-vault). Binary 'tui'. Edition 2024. Strict lint config (980 forbid, 21 deny). openssl vendored.
+  last_edited_ms: 0
 d8f43c4c8cae6abd:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
@@ -9778,6 +9790,10 @@ d9d97e2ecb7ff2e6:
   path: web/src/lib/mock/extra.ts
   description: 'Mock data (split from mock/index for <500): usage analytics (USAGE_RATES, genUsage 12-month history) + cockpit panel payloads (treeRows/memoryCards/radar/todoItems/entityTables/toolGroups/callbackRows/scratchCells/queueActions) + currentUser.'
   last_edited_ms: 1782040975380
+da01b65fcffa00b3:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 da1e497617676b58:
   path: crates/cp-base/src/state/data/model_helpers.rs
   description: 'ModelPricing trait: model selection, pricing, context budget, cleaning thresholds — impl for State + token_cost()'

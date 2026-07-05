@@ -3292,6 +3292,7 @@ dependencies = [
  "cp-mod-utilities",
  "cp-oplog",
  "cp-render",
+ "cp-vault",
  "cp-wire",
  "crossterm",
  "dotenvy",
