@@ -12,6 +12,16 @@ use cp_wire::types::ThreadTurn;
 
 use crate::services::materialized_view::RosterEntry;
 
+/// Hard cap on message `text` in the thread listing — full bodies live in the
+/// conversation endpoint (`/conversation`). Prevents multi-MB messages from
+/// bloating the listing payload (T498: 5 MB messages → 17.9 MB response → main
+/// thread freeze on JSON.parse).
+const MAX_MSG_TEXT_PREVIEW: usize = 500;
+
+/// Maximum messages per thread in the listing response. Older messages are
+/// dropped (available via the conversation endpoint).
+const MAX_MESSAGES_PER_THREAD: usize = 30;
+
 /// Merge the live view roster into the disk-derived thread list (X848).
 ///
 /// For each roster entry: if a disk thread with that id exists, refresh its
@@ -79,19 +89,25 @@ pub(super) fn reshape_thread(raw: &serde_json::Value, agent_id: &str) -> serde_j
     let unread = messages.map_or(0, |msgs| {
         msgs.iter().filter(|m| m.get("acknowledged") == Some(&serde_json::Value::Bool(false))).count()
     });
-    let last_msg = messages
-        .and_then(|msgs| msgs.last())
-        .and_then(|m| m.get("content"))
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("");
+    let last_msg = truncate_text(
+        messages
+            .and_then(|msgs| msgs.last())
+            .and_then(|m| m.get("content"))
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or(""),
+    );
     let last_activity = messages
         .and_then(|msgs| msgs.last())
         .and_then(|m| m.get("timestamp"))
         .and_then(serde_json::Value::as_u64)
         .unwrap_or(0);
 
-    let log: Vec<serde_json::Value> =
-        messages.map(|msgs| msgs.iter().enumerate().map(|(i, m)| reshape_message(m, i)).collect()).unwrap_or_default();
+    let log: Vec<serde_json::Value> = messages
+        .map(|msgs| {
+            let start = msgs.len().saturating_sub(MAX_MESSAGES_PER_THREAD);
+            msgs[start..].iter().enumerate().map(|(i, m)| reshape_message(m, start + i)).collect()
+        })
+        .unwrap_or_default();
 
     let status_str = match raw.get("status").and_then(serde_json::Value::as_str).unwrap_or("TheirTurn") {
         "MyTurn" => "MY_TURN",
@@ -122,7 +138,7 @@ fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
     let mut msg = serde_json::json!({
         "id": format!("msg_{index}"),
         "author": role,
-        "text": raw.get("content").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "text": truncate_text(raw.get("content").and_then(serde_json::Value::as_str).unwrap_or("")),
         "ts": raw.get("timestamp").and_then(serde_json::Value::as_u64).unwrap_or(0),
         "auto": raw.get("auto").and_then(serde_json::Value::as_bool).unwrap_or(false),
     });
@@ -138,6 +154,16 @@ fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
         }
     }
     msg
+}
+
+/// Truncate a message body to [`MAX_MSG_TEXT_PREVIEW`] chars, appending `…` if
+/// cut. The truncation boundary is char-aligned (no partial UTF-8).
+fn truncate_text(s: &str) -> String {
+    if s.len() <= MAX_MSG_TEXT_PREVIEW {
+        return s.to_owned();
+    }
+    let boundary = s.floor_char_boundary(MAX_MSG_TEXT_PREVIEW);
+    format!("{}…", &s[..boundary])
 }
 
 #[cfg(test)]
