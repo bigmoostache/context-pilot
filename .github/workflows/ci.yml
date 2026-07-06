@@ -86,7 +86,12 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          # Pinned to the version that generates the committed pnpm-lock.yaml
+          # (lockfileVersion 9.0) locally. pnpm 11 introduced the workspace-root
+          # `packages:` requirement and the `allowBuilds` build-script
+          # adjudication model that web/pnpm-workspace.yaml relies on; running an
+          # older major here diverged the environment from the lockfile's origin.
+          version: 11.6.0
 
       - name: Install web dependencies
         run: pnpm install --frozen-lockfile

@@ -1,4 +1,22 @@
+# pnpm workspace config (single-package — the `web/` frontend is its own root).
+#
+# `packages` is REQUIRED once this file exists: pnpm 11 treats a present
+# pnpm-workspace.yaml as a workspace root and aborts `install` with "packages
+# field missing or empty" on a clean checkout (one of the two CI failures)
+# without it. This repo is a single package, so the sole member is the root.
+packages:
+  - .
+
+# `unrs-resolver` (pulled by eslint-import-resolver-x / unrs) ships a postinstall
+# that builds/links its native N-API resolver binary. pnpm 11 refuses to run any
+# dependency build script that isn't EXPLICITLY adjudicated, and — critically —
+# aborts the whole install with `ERR_PNPM_IGNORED_BUILDS` (exit 1) when an
+# un-adjudicated build script is merely IGNORED. That hard-failed CI's
+# `pnpm install --frozen-lockfile` (the second CI failure) even though the
+# prebuilt platform binary was present. Neither `onlyBuiltDependencies` nor
+# `ignoredBuiltDependencies` silences it in pnpm 11.6 — the `allowBuilds` map
+# (written by `pnpm approve-builds`, value resolved from its placeholder to
+# `true`) is the mechanism that actually authorises the script and lets a clean
+# `--frozen-lockfile` install finish green.
 allowBuilds:
-  unrs-resolver: set this to true or false
-onlyBuiltDependencies:
-  - unrs-resolver
+  unrs-resolver: true
