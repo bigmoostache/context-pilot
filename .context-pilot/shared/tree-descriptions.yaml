@@ -546,6 +546,10 @@
   path: web/src/lib/types.ts
   description: 'Maquette domain types. User (T30: name/email/initials/accent/managedByCompany/company/role for avatar menu + Profile modal). Agent, FsNode, Finder types, ThreadDetail+agentId, ThreadStatus (MY_TURN/ACTIVE/THEIR_TURN), ViewMode=fleet|cockpit|threads|finder, Library/Usage types. Cockpit panel maquette types (T16).'
   last_edited_ms: 1781694654401
+0b7f3aaf9d922f80:
+  path: web/src/lib/api/generated/sdk.gen.ts
+  description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
+  last_edited_ms: 0
 0b8167f69a61443b:
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Search filters by name+last-preview. Groups: User turn (THEIR_TURN/ACTIVE) then Agent''s turn (MY_TURN, focused-first via byFocusThenRecent). X887: previewOf skips auto:true traces (backward loop to last non-auto msg) so a tool breadcrumb never becomes the row preview. Per-row hover Archive/Restore; Archived toggle; New Thread.'
@@ -625,6 +629,10 @@
 0e3797b0710562ff:
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
+  last_edited_ms: 0
+0e3b6390ee0e0303:
+  path: web/src/App.tsx
+  description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) ?? fleetAgent. view/agent persisted to localStorage; effectiveView gates cockpit+costs behind devMode, falls back to fleet when no agent. Routes: fleet/threads/cockpit/costs/finder. T475: CostsView added.'
   last_edited_ms: 0
 0e439ae1c8f5575f:
   path: crates/cp-mod-search/src/meili/bootstrap.rs
@@ -1810,6 +1818,10 @@
   path: crates/cp-mod-threads/src/tools.rs
   description: Thread tool handlers. execute_send/execute_read/build_panel_content. Archived threads filtered out of LLM-facing context (build_panel_content + execute_read summaries) so archived threads are invisible to the model. MAX caps on content/file-path/questions/panel-messages.
   last_edited_ms: 1781786109341
+27df98e2d4ffbd45:
+  path: web/src/lib/types.ts
+  description: 'Domain types barrel. Re-exports 18 backend types from generated/types.gen.ts. Extended re-exports: Agent (+accent), ContextPanel, ThreadMsg (+streaming), ThreadDetail (+typed log). Derived aliases: AgentStatus, ThreadStatus, Importance, NotifKind, LibraryKind. UI-only types: StreamPhase, ChatMessage, User, Finder*, ViewMode, Usage*.'
+  last_edited_ms: 0
 27e02466fb70db0f:
   path: crates/cp-wire/src/framing.rs
   description: 'Oplog record framing: len(4B LE)+CRC32C(4B LE)+JSON payload. encode_raw/decode_raw + encode_entry/decode_entry. Manual u32_to_le (const)/u32_from_le (non-const: From not const-stable). FrameError enum (no std::error::Error — dodges missing_trait_methods). All buffer access via .get() (indexing_slicing forbid). 15 tests.'
@@ -1878,6 +1890,10 @@
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet mission-control shell. Owns fleetPage + collapsed state. Renders FleetSidebar + clickable border RAIL (shadcn Sidebar pattern): thin full-height hit area at x=var(--sidebar-w), x=0 collapsed, brightens to interactive on hover — click toggles collapse (no buttons). Active page: agents/prompts/usage/settings(ConfigPanel inline).'
   last_edited_ms: 1781533961635
+29d315e216a079ee:
+  path: crates/cp-orchestrator/src/transport/auth/mod.rs
+  description: 'Auth middleware + REST handlers. authenticate(): centralized Bearer gate (no-op when disabled, NFR-09). Public routes: login (FR-05), register (bootstrap FR-03 or admin-creates), auth/status, SSE (ticket-based), and agent avatar (T345 — loaded by plain <img src> which can''t send Bearer; non-sensitive profile pic, public-safe, also skips ACL since auth_user=None). Protected: logout, me, list/create/delete users, force-logout user (Phase 10). Re-exports ACL functions from acl.rs.'
+  last_edited_ms: 0
 29ef3fa71352cb81:
   path: crates/cp-orchestrator/src/transport/rest/create.rs
   description: 'POST /api/fleet/create + POST /api/agent/{id}/library/command handlers. create_agent: parse {name,folder?,model?}, slugify, mkdir, supervisor.spawn_pty → 202. Auto-grants agent-admin ACL (T447). create_command: write .md file to commands dir. yaml_scalar helper. slugify is pub(super).'
@@ -2154,6 +2170,10 @@
   path: web/src/components/finder/preview/previewParts.tsx
   description: 'Shared Finder preview leaf renderers: IconBtn, PreviewStatus, TruncatedNote, MarkdownPreview, TextPreview, FolderPreview, Generic, Meta/Row, Empty. T329: card chrome (rounded-lg/border/card-shadow) stripped from TextPreview and MarkdownPreview. 173 lines.'
   last_edited_ms: 1782130584537
+2f219605084295a8:
+  path: web/src/components/auth/AuthGuard.tsx
+  description: Auth gate wrapper (Phase 9). Shows LoginPage when auth enabled + no session, passes through when disabled or authenticated. Loading spinner while probing.
+  last_edited_ms: 0
 2f549657a1b2300b:
   path: src/app/actions/cursor.rs
   description: Cursor movement, text editing, selection management, command expansion. Selection helpers (delete/clear/extend). Sentinel detection + skip. Single-char and word movement with selection variants. handle_command_expansion, handle_input_backspace, handle_delete_word_left.
@@ -2390,9 +2410,17 @@
   path: crates/cp-mod-threads/src/panel.rs
   description: 'ThreadsPanel: thread list with [MY_TURN]/[THEIR_TURN] badges, last 5 messages per thread, message count. Context: MY_TURN threads with messages, THEIR_TURN summary only. max_freeze=3.'
   last_edited_ms: 0
+34f962a27705ed75:
+  path: web/src/components/shell/config/ReleasesPane.tsx
+  description: Admin-only release management pane (T427). Architecture selector (auto-detect or manual), paginated release cards (5/page) with tag/date/size + status chips (Latest/Downloaded/Active), download/use/delete actions via generated SDK. DeploySection for fleet restart + orchestrator restart. queryFn uses responseStyle:data pattern.
+  last_edited_ms: 0
 35144361e6ae01d4:
   path: crates/cp-orchestrator/src/services/agent_meta.rs
   description: 'Per-agent cosmetic metadata services. NameOverrides (T328): custom display names via agent-names.json. AvatarStore (T338): profile pictures via avatars/{id}.{ext}, magic-byte content-type sniffing, MAX_AVATAR_BYTES 2MiB. Both merged from former names.rs + avatars.rs.'
+  last_edited_ms: 0
+352e9ad84f0cac0b:
+  path: crates/cp-orchestrator/src/transport/rest/backend.rs
+  description: Backend shared state struct + impl. Holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names/avatars/auth/session_ttl/releases/pkce_session(T451). Accessor methods + for_test.
   last_edited_ms: 0
 353da16753dc6820:
   path: .github/workflows/ci.yml
@@ -2454,6 +2482,10 @@
   path: crates/cp-orchestrator/tests/services_integration.rs
   description: 'Phase 29 (X796) backend services integration suite (4 tests, green, ~0.1s). Drives MaterializedView+CostBreaker+StreamHub TOGETHER against a REAL cp-oplog via channel::Tailer (composition the inline unit tests'' crafted OpEntry literals can''t reach): (1) restart rebuild end-to-end I5+V9: OplogService.append_durable(heads+phase+rising cost)->shutdown->tail_all(Tailer.poll)->view.apply_batch->breaker.rebuild_from_view trips; (2) real segment-roll checkpoint folds to ground-truth head: spawn_with_segment_limit(64) forces rolls (leading authoritative Checkpoint), asserts >=1 Checkpoint rode stream + final head correct; (3) R2-17 reconcile: degraded hub subscriber''s authoritative snapshot = view heads folded from real oplog, mark_reconciled clears degraded+dropped; (4) fleet isolation: 2 agents 2 oplogs -> view 2 isolated projections, breaker trips only overspender, hub fans per-agent. helpers message/cost/token/tail_all. Top `use cp_mod_bridge/nix/serde/serde_json/tiny_http as _;`.'
   last_edited_ms: 1781650676137
+367df640927a4e33:
+  path: crates/cp-orchestrator/src/transport/rest/mod.rs
+  description: 'REST resource handlers. fleet() filtered by ACL. command() dispatches. rename/avatar/threads/body. vault_snapshot + env_keys + settings exports. claude_usage()/token_status()/login_start()/login_complete()/refresh_login() for Claude OAuth (T451). resolve_entry. Submodules: backend, claude_oauth, config, create, lifecycle, releases, thread_shape.'
+  last_edited_ms: 1783286500514
 368256897a7dcee0:
   path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
   description: 'Claude Code OAuth helpers — usage proxy, token status (incl account_email via /api/oauth/profile, T465), PKCE login (start/complete), token refresh (POST /refresh, grant_type=refresh_token). T472: a refresh failure (e.g. invalid_grant — refresh token rotated/expired) DELIBERATELY leaves stored credentials in place; the access token''s lifetime is independent and often has hours of runway, so clearing on refresh failure would strand a still-valid session. Reads/writes macOS Keychain + ~/.claude/.credentials.json. PkceSession stored in Backend.'
@@ -2890,6 +2922,10 @@
   path: openapi.json
   description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
   last_edited_ms: 0
+3f1802cb7c5ef4b8:
+  path: web/src/components/shell/config/ConfigPanes.tsx
+  description: 'Config category panes + building blocks: CATEGORIES, CategoryBody, GeneralPane (useProviders() hook + ModelPicker + apply-to-all via sendCommand configure), KeyRow (live reveal/edit via API, T446: pencil button for unset keys), StatusRow, ToggleRow, DevModeToggle. Key panes lock when company-managed OR non-admin.'
+  last_edited_ms: 0
 3f6424f8b005fcf0:
   path: ui/src/components/shell/ProfileModal.tsx
   description: 'Profile modal (T30) — opened from the avatar menu, on the portaled Base-UI Dialog primitive. Reads {user, managed, setManaged} from the shared account context (useAccount). Editable display-name + email (email locks when company-managed), large AvatarMark + camera change-badge. Account section switches on managed: ManagedAccount org callout (locked, SSO) vs PersonalAccount self-service rows. An AccountTypeSwitch (Company/Personal segmented control) in the Account header flips the shared managed flag — updating both this modal AND the Settings key-lock so you can compare states. All decorative.'
@@ -3270,6 +3306,10 @@
   path: web/src/components/agents/MarkdownEditor.tsx
   description: 'WYSIWYG markdown editor (contentEditable + execCommand toolbar: bold/italic/strike/h1/h2/quote/code/lists/link). Seeds via mdToHtml on mount (uncontrolled, caret-safe). X906: optional onChange(md) fires htmlToMarkdown (DOM→markdown, inverse of mdToHtml; bounded tag set + degrade) on every edit so a host (FinderPreview EditableMarkdown) can save back. No onChange = pure prompt-library maquette.'
   last_edited_ms: 1781895403678
+461b15c636a0dda3:
+  path: .github/workflows/release.yml
+  description: 'Release workflow: triggered on push to releases branch. 5-target matrix (linux-x86_64, linux-aarch64, linux-aarch64-musl, macos-x86_64 via macos-latest, macos-aarch64 via macos-latest). Builds tui+cp-console-server, packages as tarballs, creates GitHub Release with softprops/action-gh-release.'
+  last_edited_ms: 0
 4622be0b4e0bba3e:
   path: web/src/components/shell/costs/parse.ts
   description: 'TSV parser for cost-tracking.tsv. CostRow interface (15 fields), parseCostTsv(), aggregation helpers: computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, crossTabToolCulprit (count matrix). buildMarkdownReport() serializes current filtered state as clean markdown tables (all ticks, no secondary break filter).'
@@ -3325,6 +3365,10 @@
 480d0b99c9c60078:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
+484c8d2183d5aee3:
+  path: web/src/components/shell/config/DeploySection.tsx
+  description: 'Deploy actions for Releases settings pane. Two buttons: "Deploy to Fleet" (POST /api/releases/deploy, select+restart all agents) and "Restart Orchestrator" (POST /api/releases/restart-orchestrator, delayed SIGTERM, auto-reload after 3s). Click-to-confirm guard on orchestrator restart. Uses generated SDK.'
   last_edited_ms: 0
 4865df1f21234493:
   path: docs/trust-center/subprocessors.html
@@ -3454,6 +3498,10 @@
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet mission-control shell. Owns fleetPage + collapsed state, renders collapsible FleetSidebar (floating PanelLeft re-open when collapsed) + active page: agents (FleetDashboard) / prompts (PromptsPage) / usage (UsagePage) / settings (ConfigPanel variant=''inline''). App.tsx renders this at fleet altitude.'
   last_edited_ms: 1781532231563
+4b9ab36b6fe8c807:
+  path: crates/cp-base/src/config/global.rs
+  description: 'Global config at ~/.config/context-pilot/config.json. API key resolution cascade: env var → config file. KEY_ENV_MAP for canonical names. store_api_key/resolve_api_key/env_var_for_key.'
+  last_edited_ms: 0
 4bb896637366abe2:
   path: crates/cp-mod-spine/src/guard_rail.rs
   description: 'Guard rail implementations: MaxOutputTokens, MaxCost (stream/burst-based), MaxDuration, MaxMessages, MaxAutoRetries. GuardRailStopLogic trait. all_guard_rails() static list.'
@@ -3629,6 +3677,10 @@
 4edf2c15604eca07:
   path: crates/cp-base/src/tools/mod.rs
   description: 'Tool system. ToolUse/ToolResult (display, tldr, preserves_tempo). ToolDefinition + ToolDefBuilder (schema in Rust, descriptions from YAML). ParamType recursive JSON Schema. build_api() generates LLM tool array. Sub-modules: pre_flight, async_exec.'
+  last_edited_ms: 0
+4f084614e1699d9e:
+  path: web/src/main.tsx
+  description: React entry point. Imports setupClient.ts (hey-api config side-effect), createRoot → StrictMode → QueryClientProvider (TanStack shared queryClient) wrapping <App/>. Activates TanStack Query cache + SSE push-plane.
   last_edited_ms: 0
 4f0c3856f531e291:
   path: crates/cp-mod-bridge/src/lib.rs
@@ -4018,6 +4070,10 @@
   path: web/e2e/smoke.spec.ts
   description: 'Phase 0 e2e smoke (4 tests): live pipe end-to-end. Orchestrator REST /api/fleet/meta returns the real agent; fleet dashboard renders the real agent card; Open→threads view; footer shows live cost. Agent id f3a993c0ff357b41, web :5175, API :7878.'
   last_edited_ms: 1781814025119
+5646600f6964201b:
+  path: web/src/components/agents/AgentModal.tsx
+  description: 'Agent create/manage dialog. useProviders() fetches registry. Manage: 2-col — left name+ModelPicker, right SessionVitals+ACL. T457: syncedRef useEffect back-fills provId/modelId once providers load (cold-refresh race: useState initializers ran while registry empty → picker showed nothing selected on page refresh). Submit sends Configure + rename.'
+  last_edited_ms: 0
 56583ad3ac10e102:
   path: docs/trust-center/index.html
   description: 'Trust Center overview/landing page. Enterprise multi-page design (Inter font, slate/navy palette, sidebar nav). At-a-Glance Q&A table (12 procurement questions), Project Statistics cards (6 metrics: LOC, commits, lint rules, crates, protected files, telemetry), Security posture summary cards, 4 nav cards to sub-pages (security/privacy/compliance/subprocessors), contact CTAs. No emojis. Version 2.1.'
@@ -4101,6 +4157,10 @@
 581ea00f4be2d58b:
   path: crates/cp-mod-chat/src/server.rs
   description: Global Tuwunel homeserver lifecycle. PID/socket/config file management. UDS HTTP helpers (get/post/put). pre_start_daemon() for parallel boot. ensure_daemon_running() + start_server(state). Geometric backoff health polling (50ms→500ms cap, 15s budget).
+  last_edited_ms: 0
+582bcc5d8e495309:
+  path: web/src/lib/mock/index.ts
+  description: 'Mock-data barrel: PROJECT/tokenBudget/panels/cacheStats/messages/threads/spine/stats/status/agents/fileTree/library. Re-exports ./extra + ./threads. Design-only fallback data approximating a live Context Pilot session.'
   last_edited_ms: 0
 58411c16ad9a129a:
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
@@ -4902,6 +4962,10 @@
   path: crates/cp-oplog/src/error.rs
   description: 'OplogError{Io,Frame} + Display + From<io::Error>/From<FrameError> + OplogResult alias. Extracted from append.rs (folder-size: append.rs hit 501 lines). Deliberately NO std::error::Error impl (dodges missing_trait_methods on unstable provide()).'
   last_edited_ms: 1781623192148
+6ac6732b8f76046f:
+  path: crates/cp-orchestrator/src/transport/rest/config/env_keys.rs
+  description: 'On-demand env-key inspection and editing (T399, T404). Delegates to cp-vault. 4 endpoints: GET /api/env-keys (list), GET /api/env-keys/{name} (reveal, admin-only), PUT /api/env-keys/{name} (update, admin-only), GET /api/vault/snapshot (bulk-fetch for BridgeVault). mask_key helper.'
+  last_edited_ms: 1783286500307
 6b048f2f5d4a57a4:
   path: report/wiring-alignment-audit.md
   description: 'Wiring alignment audit (X818 Phase 0.1): invariant-by-invariant gap register implementation⇄design-orchestration-backend.md. Verdicts ABIDES/PARTIAL/VIOLATES per I1-I13/§7/§9/§19. Diagnoses the disk/poll vs oplog-push plane inversion = the latency root cause.'
@@ -5018,6 +5082,10 @@
   path: src/modules/overview/tools/close_context.rs
   description: 'Close_panel execution. Partial close: valid panels close, undescribed/stale-description file panels are skipped (not blocked). Module on_close_context hooks. Output: closed/skipped/not_found/errors sections. T355: the describe-before-close gate now also requires Path::exists(file_path) — a file that''s gone from disk is EXEMPT from the gate (tree_describe rejects ''path not found'', so demanding a description would block the close forever), making deleted/branch-switched file panels freely closable. Also owns has_pending_tree_describe(state,rel_path) — the queue-introspection helper (queued tree_describe in flight ⇒ allow close) used both locally and re-exported to the overview module''s pre_flight.'
   last_edited_ms: 1782296816078
+6ca15fb1bd2ff28f:
+  path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
+  description: Claude Code OAuth helpers — usage proxy, token status (incl account_email via /api/oauth/profile), PKCE login (start/complete), token refresh. Delegates read_credentials_json to cp_vault::oauth::load_claude_oauth_raw, read_access_token to vault().get("claude_oauth"). store_credentials writes to Keychain + ~/.claude/.credentials.json.
+  last_edited_ms: 0
 6ca310966523a17c:
   path: src/ui/markdown.rs
   description: Markdown table rendering — render_markdown_table() and parse_inline_markdown() return cp_render::Span (IR-native). No ratatui/theme imports. Border/accent/bold/code semantic styling.
@@ -5217,6 +5285,10 @@
 719c4d62303fbaae:
   path: crates/cp-mod-spine/src/coucou.rs
   description: Coucou tool — scheduled notifications via Watcher system. Timer mode (delay string parsing) + datetime mode (ISO 8601). CoucouData for persistence across reloads. CoucouWatcher impl with fire_at_ms. format_duration helper.
+  last_edited_ms: 0
+71c66f2db2c64dbf:
+  path: crates/cp-orchestrator/src/services/auth/store.rs
+  description: AuthStore — SQLite-backed auth CRUD. Schema init (users/sessions/agent_acl), Argon2id hashing, token/UUID generation. User CRUD, session lifecycle (create/validate/revoke with lazy sweep). ACL ops extracted to sibling acl.rs.
   last_edited_ms: 0
 71e2df32cfa54e06:
   path: crates/cp-mod-memory/src/tools.rs
@@ -5902,6 +5974,10 @@
   path: ui/src/components/ui/dialog.tsx
   description: shadcn-style Dialog on Base UI primitive. Portals to document.body (escapes ancestor backdrop-filter/transform containing blocks that trap position:fixed — the ConfigModal half-off-screen bug). Focus-trap, scroll-lock, Esc, backdrop fade + modal-pop spring. Exports Dialog/Trigger/Close/Content/Backdrop/Title/Description.
   last_edited_ms: 1781524763661
+80894efcfffcedd8:
+  path: web/src/components/shell/widgets/UserMenu.tsx
+  description: 'Account avatar menu (T30). Gradient AvatarMark trigger + portaled dropdown: identity header div, Profile/Settings/Manage Users (Phase 10, admin-only)/Sign-out. Sign out wired to useAuth().logout when auth enabled. onOpenUsers callback triggers admin UsersDialog.'
+  last_edited_ms: 0
 80a907dd70658073:
   path: crates/cp-mod-search/src/indexer.rs
   description: Background file indexer with flame!("index_file"). Mtime-based dedup skips unchanged files. Initial scan thread + debounced mpsc event loop. 3s poll interval PollWatcher.
@@ -6118,6 +6194,10 @@
   path: ui/src/components/shell/LeftRail.tsx
   description: 'Context navigator: token-budget meter, scrollable panel list (icon+name+token-bar+freeze/miss), cache economics footer (hit/miss/out + cost).'
   last_edited_ms: 1781458541308
+85772adaf2cec2f4:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 85971804402f4042:
   path: crates/cp-orchestrator/tests/services_integration.rs
   description: 'Phase 29 (X796) backend services integration suite (4 tests, green, ~0.1s). Drives MaterializedView+CostBreaker+StreamHub TOGETHER against real cp-oplog via Tailer: restart rebuild, real segment-roll checkpoint, R2-17 reconcile, fleet isolation.'
@@ -6430,6 +6510,10 @@
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage, Thread (with archived:bool), ThreadQuestionForm. ThreadsState + FocusState (with viewing_archived flag). visible_indices(archived) maps a view to real storage indices; has_my_turn filters archived; mark_selected_read resolves selection through visible list.'
   last_edited_ms: 1781786109325
+8b8b4525622fe2c2:
+  path: web/src/lib/live/index.ts
+  description: Live data hooks (TanStack Query + SSE). useAgentMeta/useThreads/useConversation/useStreamingTokens/useLibrary/useFleet/useFleetMetrics/useMetrics. ensureSync SSE watcher. sendCommand dispatches to REST. useFsPreview/useFsSheet for Finder.
+  last_edited_ms: 0
 8ba9c57e812408bc:
   path: src/app/actions/input.rs
   description: InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation (clears selection). Paste sentinel expansion. /command replacement.
@@ -6790,6 +6874,10 @@
   path: web/src/components/panels/cockpit/ToolsPanel.tsx
   description: Tools panel — uses useTools(agentId) for live tool registry. Grouped by category, enabled/disabled status.
   last_edited_ms: 1781695333947
+93cebd1cfaa73e01:
+  path: web/src/components/shell/TopBar.tsx
+  description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit/Costs), agent-config gear, UsageButton, account UserMenu. Costs tab dev-mode only with BarChart3 icon.'
+  last_edited_ms: 0
 93f2a0cb0233f725:
   path: ui/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Greeting, AgentCard grid (status badge + one-line task summary + model·cost meta — no git branch, general-user UI; Open→agent threads, Manage→modal), New-agent card. AgentModal (Apple-grade): backdrop-fade+modal-pop, gradient hero header, name-as-star field w/ live slugified realm preview, rich model cards (MODEL_META tier/blurb/price/icon, opt-rise stagger), quiet Archive ghost, name-gated primary, autofocus+Esc+⌘↵.'
@@ -7066,6 +7154,10 @@
   path: web/src/components/shell/costs/CostsView.tsx
   description: Cost Analysis dashboard page. Summary cards (total cost, ticks, avg/tick, hit rate), culprit donut, cost timeline, cost/tool bar charts, token distribution breakdown. Uses TanStack useQuery + fetchFsPreview with 15s refetch.
   last_edited_ms: 1782919921493
+9adb916e38ea7180:
+  path: openapi.json
+  description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
+  last_edited_ms: 0
 9b02dc21e25cfee8:
   path: crates/cp-mod-git/Cargo.toml
   description: 'Git module deps: cp-base, cp-render, crossterm, serde_json, regex.'
@@ -7214,6 +7306,10 @@
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
   last_edited_ms: 0
+9deb574eabb9e104:
+  path: web/src/components/threads/fileUpload.tsx
+  description: 'Threads chat file-upload (T298) + the shared composer bubble abstraction (T350). Types: UploadedFile, CommandSuggestion (moved here from ThreadComposer so both pill families share ONE module). buildUploadMessage (```file-upload YAML blocks) + splitMessageSegments (interleave prose + inline chips) + uploadToNode (kindOf→FinderNode for Quick Look). MessageFileChip existence-checks via useFs(parent): greys ''moved/deleted'' on absent file OR any 4xx (/^4\d\d/, the 403 a vanished parent returns), shows REAL on-disk size. FileUploadChip = clickable mac-icon chip → QuickLookSheet (3 states present-interactive/present-static/greyed-missing) + Show-in-Finder button (T334). ComposerBubbles (T350) = the SINGLE unified row rendering file chips + /command suggestion bubbles + create-command pill together in one TRANSPARENT normal-flow container (opaque bg-card pills) between conversation and textarea — replaces the old mutually-exclusive two-row layout so a staged file no longer hides the slash bubbles.'
+  last_edited_ms: 0
 9e01430ac7cfc462:
   path: web/src/components/panels/cockpit/SpinePanel.tsx
   description: Spine panel — uses useSpine(agentId) for live notifications. Kind-colored dots, config section (mock).
@@ -7306,6 +7402,10 @@
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
   last_edited_ms: 0
+9f55f73be0c6dd2e:
+  path: web/src/lib/support/auth.tsx
+  description: 'Auth context (Phase 9): AuthProvider probes GET /api/auth/status, validates stored token via /me, exposes user/token/authEnabled/bootstrapped/loading + login/register/logout. Listens for cp-auth-expired events from the fetch wrapper. useAuth() hook.'
+  last_edited_ms: 0
 9f5ea5f349e9c1d0:
   path: docs/trust-center/index.html
   description: Trust Center overview/landing page. Enterprise multi-page design (Inter font, slate/navy palette, sidebar nav). Security posture summary cards, 4 nav cards to sub-pages (security/privacy/compliance/subprocessors), contact CTAs. No emojis. Version 2.0.
@@ -7382,6 +7482,10 @@ a09757b61a0a55ed:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
   last_edited_ms: 0
+a09aaae205c7c2b8:
+  path: web/src/lib/query/queryClient.ts
+  description: TanStack Query client config. staleTime:Infinity (SSE push plane owns freshness). BACKSTOP_POLL_MS=15s last-resort safety net. No refetchOnWindowFocus/Reconnect/Mount (prevents delta-race bugs like T123). gcTime 5min.
+  last_edited_ms: 0
 a09bd2cf1845c3a9:
   path: crates/cp-mod-spine/Cargo.toml
   description: 'Spine module deps: cp-base, cp-render, chrono, crossterm, serde, serde_json.'
@@ -7421,6 +7525,10 @@ a12420afe30fa1d5:
 a128756ff810873f:
   path: crates/cp-console-server/src/protocol.rs
   description: JSON-line protocol types. Request (cmd/key/command/cwd/input/log_path). Response (ok/error/pid/status/exit_code/sessions). interpret_escapes() for \n/\t/\xHH.
+  last_edited_ms: 0
+a130435cf71f6da5:
+  path: web/src/lib/api/auth.ts
+  description: 'Auth REST endpoints (Phase 9+10, split from index.ts): fetchAuthStatus, AuthUser type, authLogin, authRegister, authLogout, authMe + admin endpoints (fetchUsers, createUser, deleteUser, forceLogoutUser) + per-agent ACL (AclEntry type, fetchAgentAcl, grantAccess, updateAgentRole, revokeAccess). Re-exported via index.ts.'
   last_edited_ms: 0
 a13895d03474acd9:
   path: web/src/lib/api/auth.ts
@@ -8009,6 +8117,10 @@ af13794d333a0e9f:
 af14c600c0042c99:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
+  last_edited_ms: 0
+af196c5e39c0b0a8:
+  path: crates/cp-orchestrator/src/transport/mod.rs
+  description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl auth/ACL/env-keys/providers/releases/claude-usage+login+refresh(T451). handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with ticket-based ACL.
   last_edited_ms: 0
 af2359efd17eff41:
   path: src/modules/overview/visualizers.rs
@@ -8666,6 +8778,10 @@ bc6c0b44ae58604e:
   path: ui/src/components/shell/StatusBar.tsx
   description: 'Bottom status bar: phase badge (READY/STREAMING/TOOLING/BLOCKED), agent/skill chips, git/queue/think, reverie/auto, cost.'
   last_edited_ms: 1781458541327
+bc83ee2e870816a9:
+  path: crates/cp-orchestrator/tests/transport_http.rs
+  description: Phase 30 transport surface tests over a real tiny_http server (4 tests). Backend::new takes 6 args (auth=None, session_ttl). ticket_mint_and_command_status_codes asserts tripped breaker blocks cost-incurring send_message (503) but NOT control-plane stop (≠503). REST rev-envelope+404, SSE ticket gate single-use, Last-Event-ID replay.
+  last_edited_ms: 0
 bc984e2b55facad0:
   path: ui/src/App.css
   description: App root sizing (#root full width/height).
@@ -8686,6 +8802,10 @@ bce4ff74fb4de2b0:
   path: web/src/components/finder/views/shared.tsx
   description: 'Shared Finder view helpers: MOVE/FOLDER_DRAG MIME consts, startItemDrag/readMovePayload/isMoveDrag/folderDropProps drag-drop, relOf, ViewHandlers interface, RenameInput, TagDots, mods, itemCount. Imported by FinderViews + ColumnsView. 199 lines.'
   last_edited_ms: 1782037375245
+bd217dcc3a74f32b:
+  path: crates/cp-orchestrator/tests/openapi/schemas_ext.rs
+  description: Transport-layer OpenAPI schemas — receipts, auth, env-keys, filesystem, FinderKind enum, LLM registry (ModelDef/ProviderDef), SSE delta protocol, release management, Claude Code usage+login (ClaudeTokenStatus/LoginStart/LoginComplete schemas).
+  last_edited_ms: 0
 bd2f1faa83138934:
   path: crates/cp-mod-callback/src/panel.rs
   description: Callback panel. Table view of all definitions (ID/name/pattern/blocking/timeout/scope/success_msg/cwd). Editor sub-view shows script content for one callback. No Active column.
@@ -8754,6 +8874,10 @@ be6175462cb20642:
   path: crates/cp-orchestrator/src/transport/inspect/meta.rs
   description: 'Enriched agent-meta endpoints. agent_meta + fleet_meta build maquette Agent objects: registry record + view phase/lifecycle/cost + thread inspection (count, any-MY_TURN, last activity, task) + git branch. derive_status maps phase/lifecycle/has_my_turn → working/needs-you/idle.'
   last_edited_ms: 0
+be74da417f55b42e:
+  path: web/src/components/threads/ThreadList.tsx
+  description: 'Thread sidebar list. ThreadList (search/filter/new-thread) + ThreadRow (dot/name/focused+paused badges/preview + hover-swap: timestamp fades out on row hover, Archive+Pause/Play buttons fade in at same position). Groups: User turn / Agent''s turn / Archived. Pause button only in active view (T371). Delete (Trash2) button in archived view (T371). T401: outer row element is <div> not <button> to avoid nested-button hydration error.'
+  last_edited_ms: 0
 be74fee6c3c07eb8:
   path: crates/cp-wire/src/types/registry.rs
   description: 'Entry: agent registration record (id, folder, pid, boot_id, cap_token, paths, status) + AgentStatus.'
@@ -8765,6 +8889,10 @@ be777a91ba2ba95b:
 be7f334a4c01d1a6:
   path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
   description: Claude Code OAuth helpers — usage proxy (GET /api/claude-usage), token status (GET /api/claude-login/status), PKCE login flow (POST /start + /complete). Reads/writes macOS Keychain + ~/.claude/.credentials.json. PkceSession stored in Backend.
+  last_edited_ms: 0
+be97f47f7fe768fb:
+  path: crates/cp-orchestrator/tests/openapi/main.rs
+  description: OpenAPI spec generator (integration test, --ignored). build_spec assembles schemas + paths. generate_openapi writes openapi.json. Acknowledges lib-only deps (incl reqwest, openssl).
   last_edited_ms: 0
 becb5cb633a92422:
   path: crates/cp-mod-callback/src/trigger.rs
@@ -8805,6 +8933,10 @@ bf6550700db6c73b:
 bf721ed9cc1a06a3:
   path: crates/cp-mod-prompt/src/lib.rs
   description: 'Prompt library module. 3 tools: Behaviour_create, agent_load, skill_load. 2 panels: Library (fixed) + Skill (dynamic). Core, global. Edit pre-flight validates YAML frontmatter on prompt .md files. is_prompt_file() with canonicalize() for abs/rel path matching.'
+  last_edited_ms: 0
+bf7d1a38f03499fc:
+  path: web/src/components/agents/FleetDashboard.tsx
+  description: Fleet welcome dashboard (live). AgentCard reads useAgentMeta(agent.id) (delta-folded; ensureSync fires per card) for the live status dot + cost, falling back to the polled fleet row (T297) — every card's vitals now push-fed. Shows agent avatar (T338) when hasAvatar is true, fallback to FolderGit2 icon. §19 HealthBadge (useMetrics) surfaces first non-nominal condition. RetiredSection/RetiredCard (T271 unretire). Create/manage via AgentModal.
   last_edited_ms: 0
 bf9b1230765dc041:
   path: web/src/components/finder/preview/pdfViewer.tsx
@@ -8853,6 +8985,10 @@ c05cfb30ec6be543:
 c07395815ca8865e:
   path: crates/cp-mod-firecrawl/Cargo.toml
   description: 'Firecrawl module deps: cp-base, cp-render, crossterm, reqwest, serde, serde_json, serde_yaml.'
+  last_edited_ms: 0
+c091d39afdf4a05c:
+  path: web/src/components/conversation/Message.tsx
+  description: 'Thread/conversation message renderer (shared by web ThreadConversation + cockpit Conversation). AssistantMessage + UserMessage render text via <Markdown> (assistant=default, user=onAccent); MessageBody splices inline file-upload chips. T311: discrete CopyButton beneath BOTH user & assistant bubbles — low-opacity Copy icon (align mirrors bubble side: user self-end, assistant left under pl-7), click → navigator.clipboard.writeText(text) → flips to green var(--ok) Check ''Copied'' for ~2s then reverts (guarded ?. for insecure-origin/no-clipboard, silent fail); hidden on assistant while streaming. CopyButton: exported, accepts label+getText props for reuse (code blocks, tables). Labels: Copy message (bubbles), Copy code (pre blocks), Copy table (GFM tables). T406: className prop for accent-aware color override. T416: DeleteButton (Trash2 icon, danger colour on hover) beside CopyButton for both user+assistant messages, fires onDelete callback. ToolMessage = collapsible card. Streaming blink cursor preserved. T334: onShowInFinder prop threaded to MessageFileChip for Show in Finder navigation.'
   last_edited_ms: 0
 c09b5ee39c60f5c7:
   path: src/modules/questions/mod.rs
@@ -8965,6 +9101,10 @@ c338519b09352739:
 c3654cabfad1eb8d:
   path: web/scripts/check-web-structure.sh
   description: 'Frontend structural guardrail (CB4): enforces ≤8 entries/dir + ≤500 lines/.ts(x)-file under web/src, mirroring the Rust workspace policy. shadcn web/src/components/ui is the ONLY exemption. Invocation-cwd independent (resolves paths from its own location). Exit 0 clean, 1 listing offenders.'
+  last_edited_ms: 0
+c36a5be3260c0bb0:
+  path: .gitignore
+  description: Git ignore rules. Includes *.sourced_pdf, .uploads, bridge runtime artifacts, harbor outputs, mitmproxy captures, .DS_Store, docs/slides build artifacts. devis-attali-context-pilot.md added after security incident. .context-pilot/* blocks messages/ (116K conversation YAMLs) from accidental commit.
   last_edited_ms: 0
 c36f538911736530:
   path: web/src/lib/sync.ts
@@ -9406,6 +9546,10 @@ cc8f6b0d2172a5b6:
   path: crates/cp-mod-tree/src/tools.rs
   description: Tree tools with flame!("tree_toggle"), flame!("tree_describe"), flame!("tree_filter"). Toggle open/close with children. Describe with auto-close (close_panel default true). File hash for stale [!] markers.
   last_edited_ms: 0
+cc9555881f539442:
+  path: web/src/components/agents/ModelPicker.tsx
+  description: Shared two-level LLM provider+model picker. Receives providers[] as prop (pure component). Provider rail (pills) above model cards. Guards against empty providers (returns null while API loading). Used by AgentModal (manage) and ConfigPanel (defaults).
+  last_edited_ms: 0
 cc9832f572a98466:
   path: crates/cp-base/src/config/mod.rs
   description: 'YAML config loader. 6 LazyLock statics (Prompts/Library/Injections/Reverie/Ui/Themes) from include_str!. Theme system: 6 themes × 16 RGB colors + icons. invariant_panic() for compile-time violations.'
@@ -9566,6 +9710,10 @@ d072e4b6897feccc:
   path: crates/cp-mod-entities/src/tools.rs
   description: SQL execution engine. classify() (SELECT/DML/DDL/CTE), split_statements() with string literal awareness. execute() dispatches to execute_select/dml/ddl. dry_run via SAVEPOINT+ROLLBACK. request_path reads .sql files. live/output_path routing. Error enrichment with Levenshtein fuzzy matching. ≤150 lines AND ≤8000 bytes inline+tempo, bigger entity_result panel+no tempo. 200-row cap. RETURNING support.
   last_edited_ms: 1780609410327
+d07e22b476f55c3e:
+  path: crates/cp-orchestrator/tests/openapi/paths.rs
+  description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL, providers, releases, settings, vault/snapshot, claude-usage+login+refresh). Includes deploy + restart-orchestrator paths.
+  last_edited_ms: 1783286500446
 d0849e3f0c19a9d4:
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
@@ -10402,6 +10550,10 @@ e555f72b364b05ea:
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped). T304 draftKey; T331 pendingFiles+onRemoveFile; T334 onShowInFinder; T348 useLibrary command suggestions; T350 createCmdOpen + CreateCommandDialog. T367: OS-file drag-and-drop onto the whole <main> -> handleDrop zips the dropped file(s) client-side (zipFiles, @/lib/utils) into ONE archive then uploads via onAttach (same paperclip path, staged pendingFiles), falling back to raw files if zipping throws; while a file drag is in flight the surface gets a discrete 2px blur eased 300ms in/out (inline filter blur(2px)/blur(0px)); dragDepth useRef counter avoids child-cross flicker, isFileDrag guards on dataTransfer.types includes ''Files'', gated on onAttach (blur is the ONLY affordance). T414: auto-scroll only on non-auto messages (nonAutoCount dep instead of log.length) so tool counter updates don''t yank scroll. T416: handleDelete sends delete_message command via sendCommand(agentId, {kind, thread_id, message_ts}), onDelete threaded to Message component. T417: formatTs normalises ThreadMsg.ts (epoch-ms number from REST, ISO string from SSE, or pre-formatted) into relative time (''Xm ago''). Takes agentId + onAttach props.'
   last_edited_ms: 1782468696067
+e5571b21a5d744e7:
+  path: web/src/components/shell/widgets/UsageButton.tsx
+  description: 'Claude Code OAuth usage button. Anthropic "A" logomark trigger opens popover with account email (T465), token status (valid/expired + expiry + refresh button), session/weekly usage bars (color-coded by severity), and LoginFlow (PKCE: open browser → copy code#state → paste → exchange). T472 login-trap fix: the waiting_for_code auto-poller snapshots the current token''s expiry into baselineExpiryRef at login start and only auto-completes when a token whose expiry STRICTLY exceeds the baseline appears (a genuinely new credential) — so a pre-existing still-valid token no longer short-circuits a deliberate re-login before the user can paste the fresh code. Refresh button next to expiry. Lazy-fetches on open, 30s auto-refresh.'
+  last_edited_ms: 0
 e566b5261513df72:
   path: web/sse_listen.py
   description: SSE listener debug script — prints all deltas with wall-clock timestamps for TUI→frontend latency correlation.
@@ -10762,6 +10914,10 @@ ee094a5116fc9a90:
   path: ui/src/components/finder/FinderPreview.tsx
   description: 'QuickLook preview pane. Kind-aware bespoke renders: code (line numbers + keyword tint), spreadsheet (A/B/C grid), slide deck (hero + thumbnails), PDF (paper mock), image (gradient), markdown/json/text, folder summary. Metadata footer (kind/size/modified/path).'
   last_edited_ms: 1781516507787
+ee110577b062c7b6:
+  path: web/src/lib/support/models.ts
+  description: LLM provider+model frontend layer. Fetches from GET /api/providers, enriches with Lucide icons (ONLY frontend-maintained data). useProviders() TanStack hook. Lookup helpers (findProvider/findModel/defaultModel/resolveSelection/resolveFromApiName) take providers[] as first arg. ~171 lines (was ~374 hardcoded).
+  last_edited_ms: 0
 ee29cdcaaa1ab3e8:
   path: .git/index
   description: Git index (binary). Not source.
@@ -10842,6 +10998,10 @@ efce4dbfcda0de38:
   path: crates/cp-orchestrator/src/services/mod.rs
   description: 'services/ hub: declares + re-exports MaterializedView/AgentView/CostSnapshot, CostBreaker/Verdict, StreamHub/Subscriber, and RetiredRecord/RetiredStore (T271 retire).'
   last_edited_ms: 1781882909771
+efdd8aadf8ae4a0c:
+  path: Cargo.lock
+  description: Workspace lockfile
+  last_edited_ms: 0
 f0084294a9bef3c2:
   path: web/src/lib/sse.ts
   description: 'Reconnecting SSE client. Singleton per-agent via getOrCreateSseClient(). EventSource to /api/stream with ticket auth. RESUME via the `last_rev` QUERY param (T268 fix): native EventSource auto-reconnect is disabled (es.close() in onerror + manual scheduleReconnect), so the Last-Event-ID HEADER is never sent — the query param is the ONLY resume channel, and the backend reads `last_rev`. The old `last_event_id` name mismatch made every reconnect a cold seed at oplog HEAD, dropping deltas emitted during the disconnect window (they surfaced only on the 15s backstop poll = the 5-10s TUI→frontend delay). lastEventId captured from each event''s e.lastEventId. Exponential backoff with jitter. Named events: delta/stream/resync/invalidate.'
@@ -11090,6 +11250,10 @@ f5aa9c6a9f46b100:
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+f5b19c178bbfe405:
+  path: web/src/lib/query/reducers.ts
+  description: 'SSE delta reducers: applyThreadDelta folds thread_created/archived/restored/paused/resumed/deleted/status_changed/focus_changed/message_created/message_deleted into TanStack cache. mergeThreadLogs reconciles poll+delta. applyAgentDelta folds phase/cost/context. OpEntry/OpEntryKind re-exported from generated types (zero manual SEV).'
+  last_edited_ms: 0
 f5c068f0c1248c19:
   path: src/infra/gh_watcher.rs
   description: 'Re-export: cp_mod_github::watcher::Watcher as GhWatcher'
@@ -11110,6 +11274,10 @@ f5ea978699a78842:
   path: ui/src/components/threads/ThreadComposer.tsx
   description: 'Thread input composer. MY_TURN: active prompt w/ attach + send + key hints. THEIR_TURN: subdued ''agent is working'' spinner state. Design-only.'
   last_edited_ms: 1781459201169
+f5f7c1759f67398a:
+  path: crates/cp-orchestrator/src/main.rs
+  description: Backend entry point. Loads .env via dotenvy (project-local + global fallback) before config. Reads Config from env, prints version/protocol/agents-dir/budget/scan-interval + agents_root + agent_binary, creates Runtime, starts driver thread, serves HTTP (blocking).
+  last_edited_ms: 0
 f60552a56b821833:
   path: web/src/components/shell/StatsPopup.tsx
   description: 'Session ''vitals'' popup — accepts agentId, uses usePanels()+useAgentMeta() for live token budget + cost. Hosts the T269 Check Vitals action: on-demand (never polling) fetchVitals(agentId) → renders a status table (colored dot ok=--ok/error=--danger/unavailable=--muted-foreground + name + honest detail line + latency badge). Prepends 2 browser-observed rows (Frontend self ok + Frontend→Orchestrator round-trip ms measured via performance.now). Local useState (vitals/checking/vitalsErr), Stethoscope/Loader2 button. Portaled Dialog.'
@@ -11129,6 +11297,10 @@ f61e3df67e228736:
 f62063a3417a112a:
   path: crates/cp-base/src/config/behavioral.rs
   description: 'Extracted injection types: RedirectInjections (conversation_history_close redirect) + TrapInjections (history_cleanup_triggered, history_cleanup_blocked). Moved from config/mod.rs for line-count limit.'
+  last_edited_ms: 0
+f63ca4afe5030291:
+  path: web/src/components/conversation/Conversation.tsx
+  description: 'Cockpit conversation surface — LIVE (§7). useConversation(agentId) for the durable record + useStreamingTokens(agentId) for the ephemeral stream plane, overlaid: buildMessages maps durable msgs→ChatMessage (text user/assistant; tool_call→tool card from tool_uses[0]; tool_result folded/skipped) then shows the longer of (live buffer, durable text) + blinking cursor while the live buffer leads, and synthesises a trailing assistant bubble for a streaming turn not yet flushed. Reconciles (live stops leading) once durable text catches up. Accepts agentId prop.'
   last_edited_ms: 0
 f6414d247fc53079:
   path: .git/index
@@ -11226,6 +11398,10 @@ f8583c1fe89c00a1:
   path: web/src/components/finder/FinderViews.tsx
   description: 'Finder view modes: grid/list/columns(Miller)/gallery. T275 internal drag-and-drop: MOVE_MIME (''application/x-cp-move'') carries {paths} of the dragged selection; startItemDrag makes EVERY row draggable (drags whole multi-select if the row is selected, else just it; a lone folder also sets FOLDER_DRAG_MIME for sidebar pinning). folderDropProps = reusable drop-target handlers on FOLDER rows (grid/list/Miller): highlight on hover, can''t-drop-onto-self guard, onDrop→onMove(paths,folder). isMoveDrag/readMovePayload helpers. ViewHandlers gained onMove?. Per-view dragOver useState drives the drop highlight. itemCount() uses backend count. ColumnsView = live Miller (per-ancestor useFs). relOf strips agent-folder prefix.'
   last_edited_ms: 1781887805168
+f86f125a6ea1ed38:
+  path: crates/cp-orchestrator/Cargo.toml
+  description: 'Backend deps: cp-wire (openapi) + cp-oplog + cp-vault + dotenvy + cp-base + utoipa 5 + nix (signal) + serde + tiny_http + notify + portable-pty + calamine+csv (spreadsheet) + argon2 (auth) + rusqlite + reqwest + openssl vendored + sha2 (PKCE) + base64 (PKCE). dev: cp-mod-bridge + tempfile.'
+  last_edited_ms: 1783286500381
 f892ce5853334499:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (author/timestamp headers, content, file refs, question indicators). Ctrl+V dispatch.'
@@ -11350,6 +11526,10 @@ fb451ee02de061c4:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. Backend re-exported from rest::Backend. route_rest dispatches all /api routes incl auth/ACL/env-keys (T399/T404: GET list/reveal + PUT update with env_overrides). handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with Phase 7 ticket-based ACL. PUT in CORS Allow-Methods + body reading. serve/serve_bound acceptor loop.'
   last_edited_ms: 1782342442955
+fb5ab49478538b25:
+  path: crates/cp-orchestrator/src/services/auth/types.rs
+  description: 'Auth domain types: AuthError, UserRole (admin/user, serde lowercase), AgentRole (agent-admin/agent-user, serde kebab-case), User (pub, serde skip password_hash), AclEntry. Session struct removed (dead_code — fields only consumed by tests, validate_session now returns User directly). row_to_user helper.'
+  last_edited_ms: 0
 fb5f6b73cd86340a:
   path: crates/cp-orchestrator/src/services/stream_hub.rs
   description: 'Phase 18: StreamHub — per-agent stream fan-out to N bounded subscribers (R2-17). Subscriber{id,buffer:VecDeque<Frame>,capacity,degraded,dropped}: admit() evicts OLDEST on full + sets degraded + bumps dropped; cap 0 drops all. agent_stream_health(id)->(subscribers,total_dropped,any_degraded) aggregate accessor for §19 metrics. publish/drain/subscribe/unsubscribe/mark_reconciled. Single-owner lock-free. 9 tests.'
