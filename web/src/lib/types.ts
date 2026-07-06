@@ -42,6 +42,7 @@ import type {
   FinderNode as GenFinderNode,
   ThreadDetail as GenThreadDetail,
   ThreadMsg as GenThreadMsg,
+  ThreadQuestion,
 } from "./api/generated/types.gen"
 
 /** Agent with UI-only `accent` field (computed client-side in reducers). */
@@ -60,9 +61,10 @@ export type ContextPanel = GenContextPanel
  * string (see reducers `message_created`), and the mock fixtures use display
  * strings. Consumers normalise both (`typeof ts === "number" ? … : new Date(ts)`).
  */
-export type ThreadMsg = Omit<GenThreadMsg, "ts"> & {
-  ts?: number | string
-  streaming?: boolean
+export type ThreadMsg = Omit<GenThreadMsg, "ts" | "questions"> & {
+  ts?: number | string | undefined
+  streaming?: boolean | undefined
+  questions?: ThreadQuestion[] | undefined
 }
 
 /** ThreadDetail re-exported as-is (field optionality matches backend). */
@@ -92,11 +94,11 @@ export interface ChatMessage {
   id: string
   role: MsgRole
   /** rich text (markdown-ish) for user/assistant */
-  text?: string
+  text?: string | undefined
   /** present when role === "tool" */
-  tool?: import("./api/generated/types.gen").ToolCall
+  tool?: import("./api/generated/types.gen").ToolCall | undefined
   ts: string
-  streaming?: boolean
+  streaming?: boolean | undefined
 }
 
 export interface Thread {
@@ -143,9 +145,9 @@ export interface User {
   /** true → account is provisioned & managed by an organization (SSO/org) */
   managedByCompany: boolean
   /** the managing organization (present when managedByCompany) */
-  company?: string
+  company?: string | undefined
   /** the user's role label */
-  role?: string
+  role?: string | undefined
 }
 
 // ── Filesystem browser ───────────────────────────────────────────

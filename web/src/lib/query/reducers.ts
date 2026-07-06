@@ -46,7 +46,7 @@ function turnToStatus(turn: string | undefined): ThreadDetail["status"] {
  * `ThreadMessage`, so the strings are identical, while two genuinely distinct
  * messages can't share an exact-millisecond `ts` AND identical text AND author.
  */
-function msgSignature(m: { author?: string; ts?: string | number; text?: string }): string {
+function msgSignature(m: { author?: string | undefined; ts?: string | number | undefined; text?: string | undefined }): string {
   return `${m.author ?? ""}|${m.ts ?? ""}|${m.text ?? ""}`
 }
 
@@ -199,14 +199,19 @@ export function applyThreadDelta(
       // closes that gap so a just-sent message can't be appended a second time.
       const sig = msgSignature(candidate)
       if (thread.log.some((m) => m.id === msgId || msgSignature(m) === sig)) return prev
+      // Build with conditional spreads for the optional fields: under
+      // exactOptionalPropertyTypes an explicit `x: undefined` is NOT assignable
+      // to an `x?: T` slot, so omit each optional field when its value is
+      // absent rather than writing `undefined` into it.
+      const questions = mapRawQuestions(raw.question)
       const appended: ThreadDetail["log"][number] = {
         id: msgId,
         author: raw.author === "user" ? "user" : "assistant",
-        text: msgText,
         ts: new Date(msgTs).toISOString(),
-        questions: mapRawQuestions(raw.question),
-        fileRef: msgFileRef,
-        auto: raw.auto ?? undefined,
+        ...(msgText !== undefined ? { text: msgText } : {}),
+        ...(questions !== undefined ? { questions } : {}),
+        ...(msgFileRef !== undefined ? { fileRef: msgFileRef } : {}),
+        ...(raw.auto !== undefined ? { auto: raw.auto } : {}),
       }
       return prev.map((t) =>
         t.id === k.thread_id

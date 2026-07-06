@@ -13,7 +13,7 @@
 // preflight on JSON POSTs, and under an HTTPS origin (tailscale) it is
 // mixed-content-blocked — which surfaced as GET-works / POST-404 on the
 // OAuth login+refresh routes. Set VITE_API_URL only to target a remote backend.
-export const BASE = import.meta.env.VITE_API_URL ?? ""
+export const BASE = import.meta.env["VITE_API_URL"] ?? ""
 
 /** localStorage key for the auth session token. */
 const TOKEN_KEY = "cp-auth-token"

@@ -164,7 +164,7 @@ function AppShell() {
           ) : effectiveView === "costs" ? (
             <CostsView agentId={activeAgentId} />
           ) : effectiveView === "finder" ? (
-            <Finder key={activeAgent.id} agent={activeAgent} revealPath={finderRevealPath} onRevealConsumed={() => setFinderRevealPath(null)} />
+            <Finder key={activeAgent!.id} agent={activeAgent!} revealPath={finderRevealPath} onRevealConsumed={() => setFinderRevealPath(null)} />
           ) : (
             <ThreadsView key={activeAgentId} activeAgentId={activeAgentId} onShowInFinder={showInFinder} />
           )}

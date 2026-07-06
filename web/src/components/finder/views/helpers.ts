@@ -95,19 +95,19 @@ export interface ViewHandlers {
   onContext: (e: ReactMouseEvent, node: FinderNode) => void
   /** Move the given realm-relative paths into the destination folder (internal
    *  drag-and-drop). Absent in views that don't support drop targets. */
-  onMove?: (paths: string[], destFolder: FinderNode) => void
+  onMove?: ((paths: string[], destFolder: FinderNode) => void) | undefined
   /** path of the entry currently being inline-renamed (its name cell renders an
    *  editable field instead of a label). Null when nothing is being renamed. */
-  renamingPath?: string | null
+  renamingPath?: string | null | undefined
   /** commit a rename to `newName` (Enter / blur). Trim + no-op handling lives in
    *  the parent; an empty/unchanged name should be treated as a cancel there. */
-  onRenameCommit?: (node: FinderNode, newName: string) => void
+  onRenameCommit?: ((node: FinderNode, newName: string) => void) | undefined
   /** abandon the in-progress rename (Esc). */
-  onRenameCancel?: () => void
+  onRenameCancel?: (() => void) | undefined
   /** realm-relative path → tree-description map (the agent's tree-describe
    *  output). A node whose `path` is a key shows an info badge revealing the
    *  description on hover/click. Absent when the realm has no descriptions. */
-  descriptions?: Record<string, string>
+  descriptions?: Record<string, string> | undefined
 }
 
 /** Extract click modifier flags (additive = cmd/ctrl, range = shift). */

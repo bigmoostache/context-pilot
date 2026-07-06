@@ -156,16 +156,16 @@ export function ThreadConversation({
   thread: ThreadDetail
   /** owning agent — needed to open the shared Quick Look drawer for an attachment */
   agentId: string
-  onSend?: (text: string) => void
+  onSend?: ((text: string) => void) | undefined
   /** upload picked files into this thread (composer paperclip). May be async so
    *  callers can `await` it to keep an in-flight loader up (T471). */
-  onAttach?: (files: File[]) => void | Promise<void>
+  onAttach?: ((files: File[]) => void | Promise<void>) | undefined
   /** files uploaded but not yet sent — shown as chips in the composer (T331) */
-  pendingFiles?: UploadedFile[]
+  pendingFiles?: UploadedFile[] | undefined
   /** remove a pending file by index */
-  onRemoveFile?: (index: number) => void
+  onRemoveFile?: ((index: number) => void) | undefined
   /** navigate the Finder to a file's parent directory and select it (T334) */
-  onShowInFinder?: (path: string) => void
+  onShowInFinder?: ((path: string) => void) | undefined
 }) {
   // The attachment whose Quick Look drawer is open (null = closed). A
   // `file-upload` chip in any message sets it; the shared QuickLookSheet renders
@@ -314,7 +314,7 @@ export function ThreadConversation({
 
           {segmentLog(thread.log).map((seg) =>
             seg.type === "auto" ? (
-              <AutoRun key={`auto-${seg.msgs[0].id}`} msgs={seg.msgs} />
+              <AutoRun key={`auto-${seg.msgs[0]!.id}`} msgs={seg.msgs} />
             ) : (
               <div key={seg.msg.id}>
                 <Message

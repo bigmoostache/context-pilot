@@ -26,7 +26,7 @@ const KIND_META: Record<
 
 const TABS: (LibraryKind | "all")[] = ["all", "agent", "skill", "command"]
 
-export function PromptsPage({ agentId }: { agentId?: string }) {
+export function PromptsPage({ agentId }: { agentId?: string | undefined }) {
   const { data: liveLibrary } = useLibrary(agentId ?? "")
   const library = agentId && liveLibrary ? liveLibrary : mockLibrary
   const [tab, setTab] = useState<LibraryKind | "all">("all")

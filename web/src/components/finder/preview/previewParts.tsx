@@ -15,7 +15,7 @@ export function IconBtn({
 }: {
   icon: typeof X
   title: string
-  onClick?: () => void
+  onClick?: (() => void) | undefined
 }) {
   return (
     <button

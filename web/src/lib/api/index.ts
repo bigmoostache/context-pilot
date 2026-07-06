@@ -159,7 +159,7 @@ export function deleteAvatar(agentId: string): Promise<{ ok: boolean }> {
 
 /** Build the URL to an agent's avatar image (for use as `<img src>`). */
 export function avatarUrl(agentId: string, cacheBust?: number): string {
-  const base = import.meta.env.VITE_API_URL || ""
+  const base = import.meta.env["VITE_API_URL"] || ""
   const v = cacheBust ? `?v=${cacheBust}` : ""
   return `${base}/api/agent/${agentId}/avatar${v}`
 }
@@ -256,14 +256,14 @@ export function mapRawQuestions(raw: unknown): ThreadDetail["log"][number]["ques
   let arr = Array.isArray(raw) ? raw : [raw]
   if (arr.length === 1 && Array.isArray(arr[0])) arr = arr[0]
   return arr.map((q: Record<string, unknown>) => ({
-    header: (q.header as string) ?? undefined,
-    prompt: (q.question as string) ?? (q.prompt as string) ?? "",
-    options: Array.isArray(q.options)
-      ? q.options.map((o: unknown) =>
-          typeof o === "string" ? o : (o as Record<string, string>)?.label ?? "")
+    header: (q["header"] as string) ?? undefined,
+    prompt: (q["question"] as string) ?? (q["prompt"] as string) ?? "",
+    options: Array.isArray(q["options"])
+      ? q["options"].map((o: unknown) =>
+          typeof o === "string" ? o : (o as Record<string, string>)?.["label"] ?? "")
       : [],
-    multi: (q.multiSelect as boolean) ?? (q.multi as boolean) ?? false,
-    allowOther: (q.allowOther as boolean) ?? false,
+    multi: (q["multiSelect"] as boolean) ?? (q["multi"] as boolean) ?? false,
+    allowOther: (q["allowOther"] as boolean) ?? false,
   }))
 }
 

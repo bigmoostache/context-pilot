@@ -187,8 +187,9 @@ export function AgentModal({
       return
     }
     setError(null)
+    const apiName = findModel(providers, provId, modelId)?.apiName
     createAgent.mutate(
-      { name: name.trim(), model: findModel(providers, provId, modelId)?.apiName },
+      { name: name.trim(), ...(apiName ? { model: apiName } : {}) },
       {
         onSuccess: (receipt) => {
           onFlash?.(`Spawning “${slugify(name)}” in ${receipt.folder}`)

@@ -21,10 +21,10 @@ export function PanelFrame({
 }: {
   icon: LucideIcon
   name: string
-  subtitle?: string
-  tokens?: number
-  cost?: number
-  accent?: string
+  subtitle?: string | undefined
+  tokens?: number | undefined
+  cost?: number | undefined
+  accent?: string | undefined
   children: ReactNode
 }) {
   return (
@@ -92,7 +92,7 @@ export function ImportanceDot({ level }: { level: string }) {
 }
 
 /** A subtle rounded chip for labels/tags. */
-export function Chip({ children, accent }: { children: ReactNode; accent?: string }) {
+export function Chip({ children, accent }: { children: ReactNode; accent?: string | undefined }) {
   return (
     <span
       className="rounded-md px-1.5 py-0.5 text-[10px] font-medium"

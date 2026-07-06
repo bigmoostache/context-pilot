@@ -30,11 +30,11 @@ export function Tip({
   children,
 }: {
   title: ReactNode
-  body?: ReactNode
-  side?: "top" | "bottom" | "left" | "right"
-  sideOffset?: number
+  body?: ReactNode | undefined
+  side?: "top" | "bottom" | "left" | "right" | undefined
+  sideOffset?: number | undefined
   /** Class for the trigger wrapper span — e.g. `block` to preserve full-width children. */
-  triggerClassName?: string
+  triggerClassName?: string | undefined
   children: ReactNode
 }) {
   return (

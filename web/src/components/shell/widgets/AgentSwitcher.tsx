@@ -37,7 +37,7 @@ export function AgentSwitcher({
   onNewAgent,
 }: {
   agents: Agent[]
-  activeId?: string
+  activeId?: string | undefined
   onSwitch: (id: string) => void
   /** Jump to the fleet dashboard — the only place agents are managed. */
   onFleet: () => void
@@ -160,8 +160,8 @@ function AgentDot({
 }: {
   accent: Agent["accent"]
   status: AgentStatus
-  agentId?: string
-  hasAvatar?: boolean
+  agentId?: string | undefined
+  hasAvatar?: boolean | undefined
   /** trigger variant — a smaller 20px glyph so the switcher matches the
    *  view-toggle pill height; the menu rows keep the default 28px dot. */
   compact?: boolean

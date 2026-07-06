@@ -288,7 +288,7 @@ export function ThreadsView({
  *  realm is empty, or nothing is picked yet. When `onNewThread` is supplied it
  *  offers a primary action so an empty realm can bootstrap its first thread
  *  without hunting for the sidebar button. */
-function EmptyRealm({ agentName, onNewThread }: { agentName?: string; onNewThread?: () => void }) {
+function EmptyRealm({ agentName, onNewThread }: { agentName?: string | undefined; onNewThread?: (() => void) | undefined }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-background text-center">
       <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground/60">

@@ -86,14 +86,14 @@ function tableToMarkdown(table: HTMLTableElement): string {
   )
   const fmtRow = (cells: string[]) =>
     "| " +
-    Array.from({ length: colCount }, (_, i) => (cells[i] ?? "").padEnd(colWidths[i])).join(
+    Array.from({ length: colCount }, (_, i) => (cells[i] ?? "").padEnd(colWidths[i] ?? 3)).join(
       " | ",
     ) +
     " |"
   const sep =
     "| " + colWidths.map((w) => "-".repeat(w)).join(" | ") + " |"
   const [header, ...body] = matrix
-  return [fmtRow(header), sep, ...body.map(fmtRow)].join("\n")
+  return [fmtRow(header ?? []), sep, ...body.map(fmtRow)].join("\n")
 }
 
 /**

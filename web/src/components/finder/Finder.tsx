@@ -45,7 +45,7 @@ export type { PinnedFolder } from "./internal/helpers"
  * {@link useExternalDragUpload}. This file owns view state, derived listings,
  * and the render.
  */
-export function Finder({ agent, revealPath, onRevealConsumed }: { agent: Agent; revealPath?: string | null; onRevealConsumed?: () => void }) {
+export function Finder({ agent, revealPath, onRevealConsumed }: { agent: Agent; revealPath?: string | null | undefined; onRevealConsumed?: (() => void) | undefined }) {
   const root: FinderNode = useMemo(
     () => ({ name: agent.name, path: agent.folder, kind: "folder" as const, modified: "" }),
     [agent],
@@ -92,7 +92,10 @@ export function Finder({ agent, revealPath, onRevealConsumed }: { agent: Agent; 
     setPins((cur) => (cur.some((x) => x.path === p.path) ? cur : [...cur, p]))
   const removePin = (path: string) => setPins((cur) => cur.filter((x) => x.path !== path))
 
-  const active = tabs.find((t) => t.id === activeId) ?? tabs[0]
+  // `tabs` is seeded with one tab and closeTab never empties it, so index 0 is
+  // always present — assert it so `active` is `Tab`, not `Tab | undefined`
+  // (noUncheckedIndexedAccess widens a bare `tabs[0]`).
+  const active = tabs.find((t) => t.id === activeId) ?? tabs[0]!
   const cwd = active.cwd
 
   // Live directory listing for the current working directory. The API expects a

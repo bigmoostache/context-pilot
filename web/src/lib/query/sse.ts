@@ -13,13 +13,13 @@
 
 import { mintTicket } from "../api"
 
-const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:7878"
+const BASE = import.meta.env["VITE_API_URL"] ?? "http://localhost:7878"
 
 export type SseEventType = "delta" | "stream" | "resync" | "invalidate" | "error"
 
 export interface SseEvent {
   type: SseEventType
-  id?: string
+  id?: string | undefined
   data: string
 }
 

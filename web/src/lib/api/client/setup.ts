@@ -12,7 +12,7 @@
 import { client } from "../generated/client.gen"
 import { getToken, setToken } from "./index"
 
-const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:7878"
+const BASE = import.meta.env["VITE_API_URL"] ?? "http://localhost:7878"
 
 client.setConfig({
   baseUrl: BASE,

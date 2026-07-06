@@ -345,7 +345,7 @@ function EditableMarkdown({
             </button>
           )}
         </div>
-        <MarkdownPreview text={content} truncated={truncated} />
+        <MarkdownPreview text={content} truncated={truncated ?? false} />
       </div>
     )
   }

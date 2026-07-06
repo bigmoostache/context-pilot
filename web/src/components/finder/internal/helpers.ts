@@ -7,7 +7,7 @@ export interface Tab extends FinderTab {
   back: string[]
   fwd: string[]
   /** when set, this is a file tab showing one file instead of a folder */
-  fileNode?: FinderNode
+  fileNode?: FinderNode | undefined
 }
 
 /** A folder the user has pinned to the sidebar (persisted in localStorage). */

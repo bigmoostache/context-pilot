@@ -10,7 +10,7 @@ const FONT = "system-ui, -apple-system, sans-serif"
 interface DonutProps {
   data: Slice[]
   size?: number
-  title?: string
+  title?: string | undefined
 }
 
 /**
@@ -89,7 +89,7 @@ export function DonutChart({ data, size = 220, title }: DonutProps) {
 
 interface HBarProps {
   data: Slice[]
-  title?: string
+  title?: string | undefined
   format?: (v: number) => string
 }
 
@@ -128,7 +128,7 @@ export function HBarChart({ data, title, format = fmtDollar }: HBarProps) {
 
 interface TimelineProps {
   rows: CostRow[]
-  title?: string
+  title?: string | undefined
   width?: number
   height?: number
 }
@@ -235,7 +235,7 @@ export function CostTimeline({ rows, title, width = 600, height = 200 }: Timelin
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function EmptyChart({ title }: { title?: string }) {
+function EmptyChart({ title }: { title?: string | undefined }) {
   return (
     <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
       {title && <span className="text-[13px] font-semibold text-foreground/80">{title}</span>}

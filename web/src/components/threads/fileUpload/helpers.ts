@@ -33,7 +33,7 @@ export interface CommandSuggestion {
   description: string
   /** the prompt body the `/command` expands to; seeded into the composer on
    *  click. Falls back to the bare `command` literal when absent. */
-  body?: string
+  body?: string | undefined
 }
 
 /**
@@ -64,7 +64,7 @@ const BLOCK_RE = /```file-upload\n([\s\S]*?)```/g
 /** Pull one `key: value` out of a `file-upload` block body (indented under `file:`). */
 function field(body: string, key: string): string {
   const m = body.match(new RegExp(`^\\s*${key}:\\s*(.*)$`, "m"))
-  return m ? m[1].trim() : ""
+  return m?.[1]?.trim() ?? ""
 }
 
 /** Parse one `file-upload` block body into an {@link UploadedFile} (tolerant:
@@ -105,7 +105,7 @@ export function splitMessageSegments(text: string): MessageSegment[] {
   while ((match = BLOCK_RE.exec(text)) !== null) {
     const before = text.slice(last, match.index)
     if (before.trim().length > 0) out.push({ type: "text", text: before })
-    const file = parseBlock(match[1])
+    const file = parseBlock(match[1] ?? "")
     if (file) out.push({ type: "file", file })
     last = match.index + match[0].length
   }

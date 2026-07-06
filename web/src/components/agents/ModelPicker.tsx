@@ -55,7 +55,7 @@ export function ModelPicker({
               active={on}
               onClick={() => {
                 const dm = defaultModel(providers, p.id)
-                onChange(p.id, dm?.id ?? p.models[0].id)
+                onChange(p.id, dm?.id ?? p.models[0]?.id ?? "")
               }}
             />
           )

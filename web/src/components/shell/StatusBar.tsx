@@ -20,7 +20,7 @@ const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
  *   spend (clearly labelled). A "Needs you" count surfaces how many agents are
  *   waiting on input, so the footer doubles as a glanceable fleet pulse.
  */
-export function StatusBar({ fleet = false, agents = [], activeAgent }: { fleet?: boolean; agents?: Agent[]; activeAgent?: Agent }) {
+export function StatusBar({ fleet = false, agents = [], activeAgent }: { fleet?: boolean; agents?: Agent[]; activeAgent?: Agent | undefined }) {
   return fleet ? <FleetStatus agents={agents} /> : <AgentStatus agent={activeAgent} />
 }
 
@@ -56,7 +56,7 @@ function FleetStatus({ agents }: { agents: Agent[] }) {
 }
 
 /** Single-agent session vitals — shown while an agent is focused. */
-function AgentStatus({ agent }: { agent?: Agent }) {
+function AgentStatus({ agent }: { agent?: Agent | undefined }) {
   // Use the LIVE execution phase folded from the PhaseTransition delta (T297)
   // so the footer distinguishes streaming · tooling · ready instead of the old
   // 2-state projection of `status`. Falls back to `status` only before the

@@ -49,7 +49,7 @@ export function FinderPreview({
   variant?: "pane" | "full"
   /** agent realm the file lives in — enables live content fetch for files
    *  whose preview payload isn't inlined (the live Finder). Omit for the mock. */
-  agentId?: string
+  agentId?: string | undefined
 }) {
   const full = variant === "full"
   return (
@@ -107,7 +107,7 @@ export function FinderPreview({
  * backend (images + PDFs from the inline raw-serve endpoint, text-like kinds via
  * the preview/sheet endpoints). Folders + unpreviewable binaries fall back.
  */
-function Body({ node, agentId }: { node: FinderNode; agentId?: string }) {
+function Body({ node, agentId }: { node: FinderNode; agentId?: string | undefined }) {
   if (node.kind === "folder") return <FolderPreview node={node} />
   if (node.code) return <CodePreview lang={node.code.lang} lines={node.code.lines} />
   if (node.sheet) return <SheetPreview sheet={node.sheet} />

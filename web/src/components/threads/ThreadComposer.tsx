@@ -81,18 +81,18 @@ export function ThreadComposer({
 }: {
   status: ThreadStatus
   /** true when this is the single thread the agent is currently focused on */
-  focused?: boolean
+  focused?: boolean | undefined
   /** true when this thread has been paused by the user (T371) */
-  paused?: boolean
-  onSend?: (text: string) => void
+  paused?: boolean | undefined
+  onSend?: ((text: string) => void) | undefined
   /** upload one or more picked files into this thread (paperclip button). May
    *  be async so a caller can await it (T471); the composer itself fires and
    *  forgets. */
-  onAttach?: (files: File[]) => void | Promise<void>
+  onAttach?: ((files: File[]) => void | Promise<void>) | undefined
   /** files uploaded but not yet sent — rendered as removable chips (T331) */
-  pendingFiles?: UploadedFile[]
+  pendingFiles?: UploadedFile[] | undefined
   /** remove a staged file by its index in pendingFiles */
-  onRemoveFile?: (index: number) => void
+  onRemoveFile?: ((index: number) => void) | undefined
   /**
    * `/command` first-message suggestions (T348). When non-empty, each renders
    * as a clickable bubble above the textarea; clicking prefills the composer
@@ -100,7 +100,7 @@ export function ThreadComposer({
    * Callers pass these only for an EMPTY thread — the suggestions are a
    * jumping-off point for the first message, not a persistent palette.
    */
-  suggestions?: CommandSuggestion[]
+  suggestions?: CommandSuggestion[] | undefined
   /**
    * True when the thread has no messages yet (T350). Scopes the *empty-composer*
    * auto-show of the suggestion bubbles to a first message only — on a
@@ -114,7 +114,7 @@ export function ThreadComposer({
    * even when there are no commands yet, so the first one can be bootstrapped);
    * clicking it invokes this callback. Omit to hide the pill.
    */
-  onCreateCommand?: () => void
+  onCreateCommand?: (() => void) | undefined
   /**
    * localStorage key under which the UNSENT draft is persisted (T304). When
    * provided, what you type — and **where your caret is** — survives a reload,
@@ -126,7 +126,7 @@ export function ThreadComposer({
    * legacy bare-string draft is still read, caret at end). Omit for an
    * ephemeral composer.
    */
-  draftKey?: string
+  draftKey?: string | undefined
 }) {
   // Seed text + caret from the persisted draft ONCE per mount so a remount
   // (thread switch / return from another view) or a full reload restores both

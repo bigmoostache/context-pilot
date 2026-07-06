@@ -40,12 +40,12 @@ export function MessageFileChip({
   onAccent = false,
 }: {
   file: UploadedFile
-  agentId?: string
-  onOpen?: () => void
+  agentId?: string | undefined
+  onOpen?: (() => void) | undefined
   /** navigate the Finder to this file's parent and select it */
-  onShowInFinder?: () => void
+  onShowInFinder?: (() => void) | undefined
   /** style for the coloured user bubble (translucent chrome over the accent) */
-  onAccent?: boolean
+  onAccent?: boolean | undefined
 }) {
   const parent = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : ""
   // No agent → can't verify; assume present rather than cry wolf.
@@ -101,15 +101,15 @@ export function FileUploadChip({
   size,
 }: {
   file: UploadedFile
-  onOpen?: () => void
+  onOpen?: (() => void) | undefined
   /** navigate the Finder to this file's parent and select it */
-  onShowInFinder?: () => void
-  missing?: boolean
-  onAccent?: boolean
+  onShowInFinder?: (() => void) | undefined
+  missing?: boolean | undefined
+  onAccent?: boolean | undefined
   /** the file's REAL on-disk byte size (from the listing node), or `undefined`
    *  when unknown — the chip shows the size label only when this is a finite
    *  number, never the untrusted YAML `file.size`. */
-  size?: number
+  size?: number | undefined
 }) {
   // ── Missing: greyed, non-interactive, with an explicit warning. ──
   if (missing) {
@@ -223,15 +223,15 @@ export function ComposerBubbles({
   onCreateCommand,
 }: {
   /** staged-but-unsent uploads, rendered as removable chips */
-  files?: UploadedFile[]
+  files?: UploadedFile[] | undefined
   /** remove a staged file by its index in `files` */
-  onRemoveFile?: (index: number) => void
+  onRemoveFile?: ((index: number) => void) | undefined
   /** `/command` suggestions to offer (empty unless in slash / first-message mode) */
-  suggestions?: CommandSuggestion[]
+  suggestions?: CommandSuggestion[] | undefined
   /** seed the composer from a picked suggestion */
-  onPick?: (s: CommandSuggestion) => void
+  onPick?: ((s: CommandSuggestion) => void) | undefined
   /** open the create-command dialog (omit to hide the pill) */
-  onCreateCommand?: () => void
+  onCreateCommand?: (() => void) | undefined
 }) {
   const showCommands = suggestions.length > 0 || !!onCreateCommand
   return (

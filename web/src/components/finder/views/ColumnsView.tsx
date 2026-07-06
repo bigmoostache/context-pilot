@@ -98,9 +98,9 @@ function MillerColumn({
   agentId: string
   agentFolder: string
   path: string
-  nextPath?: string
+  nextPath?: string | undefined
   /** present for the deepest column (current dir) — skips the fetch */
-  nodes?: FinderNode[]
+  nodes?: FinderNode[] | undefined
   onNavigate: (path: string) => void
 }) {
   // Hook is always called (rules of hooks); its data is ignored when `provided`.

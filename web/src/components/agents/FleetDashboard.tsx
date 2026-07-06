@@ -41,8 +41,8 @@ export function FleetDashboard({
   onOpenAgent: (id: string) => void
   /** When flipped true (e.g. via the TopBar "New agent" entry), open the
    *  create dialog immediately and signal back so the flag can be cleared. */
-  autoCreate?: boolean
-  onAutoCreateConsumed?: () => void
+  autoCreate?: boolean | undefined
+  onAutoCreateConsumed?: (() => void) | undefined
 }) {
   const [modal, setModal] = useState<Modal>(null)
   const [toast, setToast] = useState<string | null>(null)

@@ -19,13 +19,13 @@ import { cn } from "@/lib/utils"
 interface MessageProps {
   msg: ChatMessage
   /** owning agent — enables the inline attachment chip's existence check */
-  agentId?: string
+  agentId?: string | undefined
   /** open the shared Quick Look drawer for an inline attachment */
-  onOpenFile?: (file: UploadedFile) => void
+  onOpenFile?: ((file: UploadedFile) => void) | undefined
   /** navigate the Finder to a file's parent and select it */
-  onShowInFinder?: (path: string) => void
+  onShowInFinder?: ((path: string) => void) | undefined
   /** permanently delete this message from the thread */
-  onDelete?: () => void
+  onDelete?: (() => void) | undefined
 }
 
 export function Message({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
@@ -53,9 +53,9 @@ function MessageBody({
 }: {
   text: string
   variant: MarkdownVariant
-  agentId?: string
-  onOpenFile?: (file: UploadedFile) => void
-  onShowInFinder?: (path: string) => void
+  agentId?: string | undefined
+  onOpenFile?: ((file: UploadedFile) => void) | undefined
+  onShowInFinder?: ((path: string) => void) | undefined
 }) {
   const segments = splitMessageSegments(text)
   // Fast path: no attachment block → a single markdown render.
@@ -103,13 +103,13 @@ export function CopyButton({
   className: extra,
 }: {
   /** Static text to copy. Ignored when `getText` is provided. */
-  text?: string
+  text?: string | undefined
   /** Lazy text extraction — called on click, for DOM-derived content. */
-  getText?: () => string
+  getText?: (() => string) | undefined
   align: "start" | "end"
   /** Button label shown next to the icon (e.g. "Copy code", "Copy table"). */
-  label?: string
-  className?: string
+  label?: string | undefined
+  className?: string | undefined
 }) {
   const [copied, setCopied] = useState(false)
 

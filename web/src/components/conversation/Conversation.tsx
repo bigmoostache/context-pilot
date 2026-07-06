@@ -72,8 +72,8 @@ function buildMessages(durable: ConversationMsg[], live: LiveTokens): ChatMessag
         ts: ago(m.timestamp_ms),
         tool: {
           name: use.name ?? "tool",
-          intent: (use.input?.intent as string) ?? "",
-          verb: (use.input?.verb as string) ?? "",
+          intent: (use.input?.["intent"] as string) ?? "",
+          verb: (use.input?.["verb"] as string) ?? "",
           params: toParams(use.input),
         },
       })

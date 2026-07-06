@@ -28,7 +28,7 @@ export function DeploySection({
   const deployFleet = useMutation({
     mutationFn: async () => {
       return sdk<DeployResponse>(postApiReleasesDeploy({
-        body: { tag: activeTag ?? undefined },
+        body: activeTag ? { tag: activeTag } : {},
       }))
     },
     onSuccess: () => onChanged(),

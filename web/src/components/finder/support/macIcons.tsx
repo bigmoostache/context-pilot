@@ -89,16 +89,16 @@ export function FileIcon({
 }: {
   kind: FinderKind
   /** real file extension (overrides the kind's default tag text) */
-  ext?: string
-  size?: number
-  className?: string
+  ext?: string | undefined
+  size?: number | undefined
+  className?: string | undefined
 }) {
   if (kind === "folder") return <MacFolder size={size} className={className} />
   return <MacDocument kind={kind} ext={ext} size={size} className={className} />
 }
 
 // ── Folder ────────────────────────────────────────────────────────
-function MacFolder({ size, className }: { size: number; className?: string }) {
+function MacFolder({ size, className }: { size: number; className?: string | undefined }) {
   const id = useId().replace(/:/g, "")
   return (
     <svg width={size} height={size} viewBox="0 0 28 28" className={className} aria-hidden>
@@ -154,9 +154,9 @@ function MacDocument({
   className,
 }: {
   kind: FinderKind
-  ext?: string
+  ext?: string | undefined
   size: number
-  className?: string
+  className?: string | undefined
 }) {
   const id = useId().replace(/:/g, "")
   const meta = KIND_TAG[kind]
