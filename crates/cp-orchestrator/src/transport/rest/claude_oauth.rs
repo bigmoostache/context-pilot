@@ -348,6 +348,22 @@ fn store_credentials(creds: &serde_json::Value) -> Result<(), String> {
     let json = serde_json::to_string(creds).map_err(|e| e.to_string())?;
 
     // Try macOS Keychain first.
+    //
+    // Delete-then-add (not `-U`): every consumer — the orchestrator usage
+    // proxy AND the agent LLM clients — reads the token Keychain-FIRST, only
+    // falling back to the file when the Keychain lookup returns nothing. So the
+    // Keychain is the authoritative source, and it MUST reflect the newest
+    // login. `add-generic-password -U` is unreliable for that here: if a prior
+    // item exists under the same service (e.g. one created by the real Claude
+    // Code CLI, whose ACL is scoped to the CLI binary), the in-place update can
+    // silently no-op or diverge, leaving a STALE token that reads keep
+    // returning. The symptom is exactly an account switch that "succeeds" yet
+    // every request still hits the old account (T504). Deleting first
+    // guarantees a clean item, owned by this process, holding the new token.
+    // The delete is best-effort (no item to remove on first login is fine).
+    let _del = std::process::Command::new("security")
+        .args(["delete-generic-password", "-s", "Claude Code-credentials"])
+        .output();
     let keychain_ok = std::process::Command::new("security")
         .args([
             "add-generic-password",

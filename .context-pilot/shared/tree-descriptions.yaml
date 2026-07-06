@@ -10434,6 +10434,10 @@ e142f47a8f0d70e1:
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped). T304 draftKey; T331 pendingFiles+onRemoveFile; T334 onShowInFinder; T348 useLibrary command suggestions; T350 createCmdOpen + CreateCommandDialog. T367: OS-file drag-and-drop onto the whole <main>. T414: auto-scroll only on non-auto messages. T416: handleDelete sends delete_message command. T417: formatTs normalises ThreadMsg.ts. T429: wires paused={thread.paused} to ThreadComposer. Takes agentId + onAttach props.'
   last_edited_ms: 1782492076953
+e1475c1002e26f63:
+  path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
+  description: 'Claude Code OAuth helpers — usage proxy, token status (incl account_email via /api/oauth/profile), PKCE login (start/complete), token refresh. Delegates read_credentials_json to cp_vault::oauth::load_claude_oauth_raw, read_access_token to vault().get("claude_oauth"). store_credentials writes Keychain (DELETE-then-add, not -U — T504: -U no-ops/diverges on ACL-locked stale item, leaving readers on the old account) + ~/.claude/.credentials.json. All consumers read Keychain-first, so it must reflect the newest login.'
+  last_edited_ms: 1783346272659
 e1595d6e8fbb3fb5:
   path: .git/index
   description: Git index (binary). Not source.
