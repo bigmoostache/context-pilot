@@ -7,14 +7,14 @@
 // there is nothing for the admin to configure here. Onboarding is just a
 // first-run acknowledgement that flips `onboarding_completed`.
 
-import { useState, type FormEvent } from "react"
+import { useState, type SyntheticEvent } from "react"
 import { updateSettings } from "@/lib/api"
 
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const submit = async (e: FormEvent) => {
+  const submit = async (e: SyntheticEvent) => {
     e.preventDefault()
     if (busy) return
     setError(null)
@@ -43,7 +43,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         </div>
 
         <form
-          onSubmit={submit}
+          onSubmit={(e) => void submit(e)}
           className="flex flex-col gap-6 rounded-lg border border-border bg-card p-6 shadow-md"
         >
           {error && (

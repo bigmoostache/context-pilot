@@ -67,3 +67,20 @@ export function pathName(p: string): string {
   const parts = p.split("/")
   return parts[parts.length - 1] || p
 }
+
+/**
+ * Return element `i` of `arr` (negative indexes count from the end, like
+ * {@link Array.at}), throwing if it is absent.
+ *
+ * Used at call sites where a nearby length guard already proves the element is
+ * present (e.g. `t.back.length ? … req(t.back, -1) …`). Under
+ * `noUncheckedIndexedAccess` a bare `arr[i]` widens to `T | undefined`; this
+ * encodes the real invariant with a runtime check instead of a non-null
+ * assertion (`!`, banned by the P3 lint) — so a genuinely violated invariant
+ * fails loudly at its source rather than surfacing as a downstream `undefined`.
+ */
+export function req<T>(arr: readonly T[], i: number): T {
+  const v = arr.at(i)
+  if (v === undefined) throw new Error(`index ${i} out of bounds (length ${arr.length})`)
+  return v
+}

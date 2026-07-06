@@ -84,7 +84,7 @@ export function useLive<T>(
   return {
     data: q.data,
     loading: q.isLoading,
-    error: q.error instanceof Error ? q.error : q.error ? new Error(String(q.error)) : null,
+    error: q.error instanceof Error ? q.error : null,
     refetch: () => {
       void q.refetch()
     },
@@ -349,7 +349,7 @@ export function useStreamingTokens(agentId: string): LiveTokens {
         kind?: { kind?: string; text?: string }
       }
       try {
-        frame = JSON.parse(event.data)
+        frame = JSON.parse(event.data) as typeof frame
       } catch {
         return
       }

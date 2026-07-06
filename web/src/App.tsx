@@ -74,7 +74,7 @@ function AppShell() {
   const { devMode } = useDevMode()
   const { data: agents = [] } = useFleet()
   const [view, setViewRaw] = useState<ViewMode>(
-    () => (localStorage.getItem("cp-view") as ViewMode) ?? "fleet",
+    () => (localStorage.getItem("cp-view") as ViewMode | null) ?? "fleet",
   )
   const [activeAgentId, setActiveAgentIdRaw] = useState(
     () => localStorage.getItem("cp-agent") ?? "",
@@ -163,10 +163,10 @@ function AppShell() {
         <CockpitView agentId={activeAgentId} />
       ) : effectiveView === "costs" ? (
         <CostsView agentId={activeAgentId} />
-      ) : effectiveView === "finder" ? (
+      ) : effectiveView === "finder" && activeAgent ? (
         <Finder
-          key={activeAgent!.id}
-          agent={activeAgent!}
+          key={activeAgent.id}
+          agent={activeAgent}
           revealPath={finderRevealPath}
           onRevealConsumed={() => setFinderRevealPath(null)}
         />

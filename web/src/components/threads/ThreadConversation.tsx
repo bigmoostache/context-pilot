@@ -11,7 +11,6 @@ import { sendCommand } from "@/lib/api"
 import { extractDroppedFiles, zipDropped } from "@/lib/utils"
 import { uploadToNode, type UploadedFile } from "./fileUpload/helpers"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
-import type { FinderNode } from "@/lib/types"
 
 /**
  * Normalise a thread message's `ts` into a human-readable relative age.
@@ -60,7 +59,7 @@ function toChatMessage(m: ThreadMsg): ChatMessage {
     role: m.tool ? "tool" : m.author,
     text: m.text,
     tool: m.tool,
-    ts: formatTs(m.ts as string | number),
+    ts: formatTs(m.ts),
     streaming: m.streaming,
   }
 }
@@ -190,7 +189,7 @@ export function ThreadConversation({
   // flicker; a depth counter tracks "is the cursor still somewhere inside".
   const dragDepth = useRef(0)
   // True only for an actual OS *file* drag — a text/selection drag must not blur.
-  const isFileDrag = (e: React.DragEvent) => e.dataTransfer?.types?.includes("Files")
+  const isFileDrag = (e: React.DragEvent) => e.dataTransfer.types.includes("Files")
 
   const handleDragEnter = (e: React.DragEvent) => {
     if (!isFileDrag(e)) return
@@ -276,8 +275,8 @@ export function ThreadConversation({
 
   /** Delete a message from this thread via the agent command bridge. */
   const handleDelete = (msg: ThreadMsg) => {
-    const ts = typeof msg.ts === "number" ? msg.ts : new Date(msg.ts as string).getTime()
-    sendCommand(agentId, { kind: "delete_message", thread_id: thread.id, message_ts: ts })
+    const ts = typeof msg.ts === "number" ? msg.ts : new Date(msg.ts ?? "").getTime()
+    void sendCommand(agentId, { kind: "delete_message", thread_id: thread.id, message_ts: ts })
   }
 
   return (
@@ -293,7 +292,7 @@ export function ThreadConversation({
       onDragEnter={onAttach ? handleDragEnter : undefined}
       onDragOver={onAttach ? handleDragOver : undefined}
       onDragLeave={onAttach ? handleDragLeave : undefined}
-      onDrop={onAttach ? handleDrop : undefined}
+      onDrop={onAttach ? (e) => void handleDrop(e) : undefined}
     >
       {/* Upload progress (T471) — a discrete centered spinner over the surface
           while a dropped folder/files are zipped + uploaded. */}
@@ -318,7 +317,7 @@ export function ThreadConversation({
 
           {segmentLog(thread.log).map((seg) =>
             seg.type === "auto" ? (
-              <AutoRun key={`auto-${seg.msgs[0]!.id}`} msgs={seg.msgs} />
+              <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
             ) : (
               <div key={seg.msg.id}>
                 <Message
@@ -366,7 +365,7 @@ export function ThreadConversation({
       </div>
 
       <QuickLookSheet
-        node={sheetFile ? (uploadToNode(sheetFile) as FinderNode) : null}
+        node={sheetFile ? uploadToNode(sheetFile) : null}
         agentId={agentId}
         open={sheetFile !== null}
         onClose={() => setSheetFile(null)}

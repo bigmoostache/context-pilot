@@ -72,7 +72,7 @@ export function ProvisionedView({
           Open the cockpit
         </a>
       )}
-      <GhostButton onClick={download}>Re-download CA root</GhostButton>
+      <GhostButton onClick={() => void download()}>Re-download CA root</GhostButton>
       <GhostButton onClick={onReconfigure}>Change name / IP &amp; re-issue certificate</GhostButton>
       <GhostButton onClick={onLogout}>Sign out</GhostButton>
     </div>

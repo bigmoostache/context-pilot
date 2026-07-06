@@ -47,7 +47,7 @@ export function MarkdownEditor({
   useEffect(() => {
     if (ref.current) {
       ref.current.innerHTML = mdToHtml(initialMarkdown)
-      setEmpty(ref.current.textContent?.trim().length === 0)
+      setEmpty(ref.current.textContent.trim().length === 0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -138,7 +138,7 @@ export function MarkdownEditor({
           suppressContentEditableWarning
           spellCheck={false}
           onInput={() => {
-            setEmpty(ref.current?.textContent?.trim().length === 0)
+            setEmpty(ref.current?.textContent.trim().length === 0)
             emit()
           }}
           onKeyUp={() => force((n) => n + 1)}
@@ -314,7 +314,7 @@ function serializeBlock(node: ChildNode): string {
         .map((l) => `> ${l}`)
         .join("\n")
     case "pre":
-      return `\`\`\`\n${node.textContent ?? ""}\n\`\`\``
+      return `\`\`\`\n${node.textContent}\n\`\`\``
     case "ul":
       return listItems(node)
         .map((li) => `- ${serializeInline(li)}`)

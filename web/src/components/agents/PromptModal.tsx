@@ -190,7 +190,7 @@ export function PromptModal({ item, onClose }: { item: LibraryItem | "new"; onCl
             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
               <FileCode2 className="size-3.5" />
               Edits open{" "}
-              <code className="font-mono">{`.context-pilot/${kind === "agent" ? "agents" : kind === "skill" ? "skills" : "commands"}/${!isNew ? item.id : ""}.md`}</code>
+              <code className="font-mono">{`.context-pilot/${kind === "agent" ? "agents" : kind === "skill" ? "skills" : "commands"}/${item.id}.md`}</code>
               .
             </p>
           )}

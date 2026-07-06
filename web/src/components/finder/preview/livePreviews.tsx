@@ -200,7 +200,7 @@ export function LiveSheetPreview({ agentId, node }: { agentId: string; node: Fin
           <div className="flex items-center gap-1 overflow-x-auto border-t border-border bg-muted/40 px-2 py-1">
             {data.sheets.map((s, i) => (
               <button
-                key={s.name + i}
+                key={`${s.name}${i}`}
                 onClick={() => setActive(i)}
                 className={cn(
                   "shrink-0 rounded-t-md px-2.5 py-0.5 text-[10.5px] transition-colors",
@@ -249,7 +249,9 @@ function HighlightedCode({
   const lines = useMemo(() => html.split("\n"), [html])
   const [copied, setCopied] = useState(false)
   const copy = () => {
-    navigator.clipboard?.writeText(code).catch(() => {})
+    ;(navigator.clipboard as Clipboard | undefined)?.writeText(code).catch(() => {
+      /* clipboard write may reject on insecure origin — ignore, the tick just won't flash */
+    })
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1400)
   }

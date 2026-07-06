@@ -43,7 +43,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     case "change_password":
       return <ForcePasswordChange />
     case "onboarding":
-      return <Onboarding onComplete={refreshMe} />
+      return <Onboarding onComplete={() => void refreshMe()} />
     default:
       return <>{children}</>
   }

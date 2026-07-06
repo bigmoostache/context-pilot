@@ -122,7 +122,7 @@ async function hydrateSpilledMessage(
   const synthetic: OpEntry = { ...entry, kind: { ...entry.kind, inline_body: bodyStr } }
   const prev = client.getQueryData<ThreadDetail[]>(tk)
   const next = applyThreadDelta(prev, synthetic)
-  if (next === null || next === undefined) {
+  if (next === null) {
     if (prev !== undefined) void client.invalidateQueries({ queryKey: tk })
   } else if (next !== prev) {
     client.setQueryData(tk, next)
@@ -156,7 +156,7 @@ function applyDelta(client: QueryClient, agentId: string, entry: OpEntry): void 
   const tk = qk.threads(agentId)
   const tPrev = client.getQueryData<ThreadDetail[]>(tk)
   const tNext = applyThreadDelta(tPrev, entry)
-  if (tNext === null || tNext === undefined) {
+  if (tNext === null) {
     if (tPrev !== undefined) void client.invalidateQueries({ queryKey: tk })
   } else if (tNext !== tPrev) {
     client.setQueryData(tk, tNext)
@@ -166,7 +166,7 @@ function applyDelta(client: QueryClient, agentId: string, entry: OpEntry): void 
   const ak = qk.agent(agentId)
   const aPrev = client.getQueryData<Agent>(ak)
   const aNext = applyAgentDelta(aPrev, entry)
-  if (aNext === null || aNext === undefined) {
+  if (aNext === null) {
     if (aPrev !== undefined) void client.invalidateQueries({ queryKey: ak })
   } else if (aNext !== aPrev) {
     client.setQueryData(ak, aNext)

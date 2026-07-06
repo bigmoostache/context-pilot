@@ -93,7 +93,7 @@ export function UserMenu({
           <DropdownMenuItem
             variant="destructive"
             className="gap-2.5 py-1.5 text-[12.5px]"
-            onClick={authEnabled ? () => logout() : undefined}
+            onClick={authEnabled ? () => void logout() : undefined}
           >
             <LogOut className="size-4" />
             Sign out

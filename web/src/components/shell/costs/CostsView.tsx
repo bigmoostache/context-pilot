@@ -59,7 +59,7 @@ export function CostsView({ agentId }: { agentId: string }) {
       queue: queueFilter,
       breakKind: breakKindFilter,
     })
-    navigator.clipboard.writeText(md).then(() => {
+    void navigator.clipboard.writeText(md).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     })

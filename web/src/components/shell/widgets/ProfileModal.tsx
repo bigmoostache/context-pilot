@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react"
+import { useEffect, useState, type SyntheticEvent } from "react"
 import { KeyRound, Loader2, Monitor, Trash2 } from "lucide-react"
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/providers/auth"
@@ -107,7 +107,7 @@ function IdentitySection({
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("")
 
-  const save = async (e: FormEvent) => {
+  const save = async (e: SyntheticEvent) => {
     e.preventDefault()
     if (!dirty || busy) return
     setBusy(true)
@@ -124,7 +124,7 @@ function IdentitySection({
   }
 
   return (
-    <form onSubmit={save} className="flex flex-col gap-4">
+    <form onSubmit={(e) => void save(e)} className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
         <span className="flex size-[60px] shrink-0 items-center justify-center rounded-full bg-signal/15 text-[20px] font-semibold text-signal">
           {initials || "?"}
@@ -178,7 +178,7 @@ function PasswordSection() {
   const match = next.length > 0 && next === confirm
   const canSubmit = current.length > 0 && next.length >= 8 && match && !busy
 
-  const submit = async (e: FormEvent) => {
+  const submit = async (e: SyntheticEvent) => {
     e.preventDefault()
     if (!canSubmit) return
     setBusy(true)
@@ -197,7 +197,10 @@ function PasswordSection() {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3 border-t border-border/60 pt-5">
+    <form
+      onSubmit={(e) => void submit(e)}
+      className="flex flex-col gap-3 border-t border-border/60 pt-5"
+    >
       <span className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
         <KeyRound className="size-3.5" /> Change password
       </span>
@@ -262,7 +265,7 @@ function SessionsSection({ open }: { open: boolean }) {
         setSessions(s)
         setError(null)
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load sessions"))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load sessions"))
   }
 
   useEffect(() => {
@@ -298,7 +301,7 @@ function SessionsSection({ open }: { open: boolean }) {
               <Monitor className="size-4 shrink-0 text-muted-foreground" />
               <div className="flex min-w-0 flex-1 flex-col leading-tight">
                 <span className="truncate text-[12.5px] font-medium text-foreground/90">
-                  {s.user_agent || "Unknown device"}
+                  {s.user_agent ?? "Unknown device"}
                   {s.current && (
                     <span className="ml-2 rounded bg-signal/15 px-1.5 py-px text-[10px] font-medium text-signal">
                       This device
@@ -312,7 +315,7 @@ function SessionsSection({ open }: { open: boolean }) {
               {!s.current && (
                 <button
                   type="button"
-                  onClick={() => revoke(s.id)}
+                  onClick={() => void revoke(s.id)}
                   title="Revoke session"
                   className="shrink-0 rounded-md p-1.5 text-muted-foreground/60 transition-colors hover:bg-danger/10 hover:text-danger"
                 >

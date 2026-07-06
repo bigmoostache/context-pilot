@@ -188,7 +188,7 @@ export function AgentModal({
       const tasks: Promise<unknown>[] = [
         sendCommand(agent.id, { kind: "configure", provider: provId, model: modelId }),
       ]
-      const nameChanged = name.trim() !== (agent.name ?? "")
+      const nameChanged = name.trim() !== agent.name
       if (nameChanged) {
         tasks.push(renameAgent.mutateAsync({ agentId: agent.id, name: name.trim() }))
       }

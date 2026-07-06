@@ -123,7 +123,7 @@ export function applyThreadDelta(
       // The log's `ts` is epoch-ms (number from REST) or ISO string (from an
       // SSE-appended message). Normalise both to number for comparison.
       const filtered = thread.log.filter((m) => {
-        const mTs = typeof m.ts === "number" ? m.ts : new Date(m.ts as string).getTime()
+        const mTs = typeof m.ts === "number" ? m.ts : new Date(m.ts ?? "").getTime()
         return mTs !== target
       })
       if (filtered.length === thread.log.length) return prev // no match
@@ -172,7 +172,7 @@ export function applyThreadDelta(
         auto?: boolean
       }
       try {
-        raw = JSON.parse(k.inline_body)
+        raw = JSON.parse(k.inline_body) as typeof raw
       } catch {
         return null // malformed → ground-truth hydrate
       }

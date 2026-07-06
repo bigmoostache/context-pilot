@@ -107,7 +107,7 @@ export function CrossTabTable({
                   </td>
                   {crossTab.culprits.map((c) => {
                     const v = crossTab.cells.get(`${tool}\t${c}`) ?? 0
-                    const isActive = hover?.tool === tool && hover?.culprit === c
+                    const isActive = hover !== null && hover.tool === tool && hover.culprit === c
                     const isDimmed =
                       hover !== null && !isActive && hover.tool !== tool && hover.culprit !== c
                     return (

@@ -30,10 +30,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Probe backend on mount: is auth enabled? If yes, validate stored token.
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+    // Read `cancelled` through a getter: its only mutation is in the deferred
+    // cleanup return, so a direct `!cancelled` inside this async body is narrowed
+    // by control-flow analysis to the literal `false` (always-true guard). A
+    // function call is opaque to CFA — the honest way to express "may flip".
+    const isCancelled = () => cancelled
+    void (async () => {
       try {
         const status = await fetchAuthStatus()
-        if (cancelled) return
+        if (isCancelled()) return
         setAuthEnabled(status.enabled)
         setBootstrapped(status.bootstrapped ?? true)
 
@@ -47,22 +52,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (stored) {
           try {
             const me = await authMe()
-            if (!cancelled) {
+            if (!isCancelled()) {
               setUser(me)
               setTokenState(stored)
             }
           } catch {
             // Token invalid or expired — clear it silently.
             setToken(null)
-            if (!cancelled) setTokenState(null)
+            if (!isCancelled()) setTokenState(null)
           }
         }
       } catch {
         // Backend unreachable — assume auth disabled so the app doesn't
         // permanently lock the user out when the server is down.
-        if (!cancelled) setAuthEnabled(false)
+        if (!isCancelled()) setAuthEnabled(false)
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!isCancelled()) setLoading(false)
       }
     })()
     return () => {

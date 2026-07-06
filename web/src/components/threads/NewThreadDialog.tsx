@@ -25,7 +25,7 @@ export function NewThreadDialog({
     onClose()
   }
 
-  const submit = (e: React.FormEvent) => {
+  const submit = (e: React.SyntheticEvent) => {
     e.preventDefault()
     if (!canCreate) return
     onCreate(title)

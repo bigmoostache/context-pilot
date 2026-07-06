@@ -6,6 +6,21 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * The async Clipboard API, honestly typed as possibly-absent.
+ *
+ * `navigator.clipboard` is typed `Clipboard` (always-present) by lib.dom, but it
+ * is genuinely `undefined` on an insecure origin or an older browser. Returning
+ * it through a function whose declared type is `Clipboard | undefined` keeps that
+ * truth visible to callers: a direct `navigator.clipboard?.` reads as a dead
+ * guard (control-flow analysis narrows the always-present type), whereas a call
+ * result is opaque to CFA — so `clipboard()?.writeText(…)` stays an honest guard
+ * (a failed/absent clipboard is a silent no-op, never a thrown TypeError).
+ */
+export function clipboard(): Clipboard | undefined {
+  return navigator.clipboard
+}
+
 // ── Client-side zip-on-drop (T367) ────────────────────────────────────
 //
 // Bundle the file(s) a user drops onto the thread conversation into a SINGLE
@@ -108,7 +123,7 @@ async function walkEntry(entry: FileSystemEntry, prefix: string): Promise<Droppe
 export async function extractDroppedFiles(dt: DataTransfer): Promise<DroppedFile[]> {
   const entries = Array.from(dt.items)
     .filter((it) => it.kind === "file")
-    .map((it) => it.webkitGetAsEntry?.() ?? null)
+    .map((it) => it.webkitGetAsEntry() ?? null)
     .filter((e): e is FileSystemEntry => e !== null)
 
   if (entries.length === 0) {

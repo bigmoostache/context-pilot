@@ -74,18 +74,18 @@ function formatExpiry(epochMs: number): string {
 }
 
 function LimitRow({ limit }: { limit: ClaudeUsageLimit }) {
-  const pct = Math.min(limit.percent ?? 0, 100)
+  const pct = Math.min(limit.percent, 100)
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-[12px]">
-        <span className="font-medium text-foreground">{limitLabel(limit.kind ?? "")}</span>
+        <span className="font-medium text-foreground">{limitLabel(limit.kind)}</span>
         <span className="tabular-nums text-muted-foreground">{pct}%</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-muted">
         <div
           className={cn(
             "h-full rounded-full transition-all duration-500",
-            barColor(limit.severity ?? "normal", pct),
+            barColor(limit.severity, pct),
           )}
           style={{ width: `${pct}%` }}
         />
@@ -114,13 +114,10 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
       window.open(data.url, "_blank")
     },
     onError: (e) => {
-      const msg =
-        e instanceof Error
-          ? e.message
-          : typeof e === "object" && e && "error" in e
-            ? String((e as { error: string }).error)
-            : "Failed to start login"
-      setError(msg)
+      // The SDK client always throws an `Error` whose message already carries
+      // the backend `error` field (client.ts extracts it), so no object-shape
+      // fallback is needed — the else-branch would be unreachable (`never`).
+      setError(e instanceof Error ? e.message : "Failed to start login")
       setStep("error")
     },
   })
@@ -132,13 +129,7 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
       setTimeout(onDone, 1500)
     },
     onError: (e) => {
-      const msg =
-        e instanceof Error
-          ? e.message
-          : typeof e === "object" && e && "error" in e
-            ? String((e as { error: string }).error)
-            : "Failed to complete login"
-      setError(msg)
+      setError(e instanceof Error ? e.message : "Failed to complete login")
       setStep("error")
     },
   })
@@ -319,7 +310,7 @@ export function UsageButton() {
     retry: 1,
   })
 
-  const limits = (data?.limits ?? []).filter((l) => l.percent != null && l.percent > 0)
+  const limits = (data?.limits ?? []).filter((l) => l.percent > 0)
   const isValid = tokenStatus.data?.valid === true
 
   const handleLoginDone = () => {
@@ -393,11 +384,7 @@ export function UsageButton() {
             Refresh failed:{" "}
             {refreshMutation.error instanceof Error
               ? refreshMutation.error.message
-              : typeof refreshMutation.error === "object" &&
-                  refreshMutation.error &&
-                  "error" in refreshMutation.error
-                ? String((refreshMutation.error as { error: string }).error)
-                : "unknown error"}
+              : "unknown error"}
           </p>
         )}
 

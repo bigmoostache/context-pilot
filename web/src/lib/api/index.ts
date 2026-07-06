@@ -154,7 +154,7 @@ export function deleteAvatar(agentId: string): Promise<{ ok: boolean }> {
 
 /** Build the URL to an agent's avatar image (for use as `<img src>`). */
 export function avatarUrl(agentId: string, cacheBust?: number): string {
-  const base = import.meta.env["VITE_API_URL"] || ""
+  const base = (import.meta.env["VITE_API_URL"] as string | undefined) || ""
   const v = cacheBust ? `?v=${cacheBust}` : ""
   return `${base}/api/agent/${agentId}/avatar${v}`
 }
@@ -252,17 +252,27 @@ export function mapRawQuestions(raw: unknown): ThreadDetail["log"][number]["ques
   if (!raw) return undefined
   let arr = Array.isArray(raw) ? raw : [raw]
   if (arr.length === 1 && Array.isArray(arr[0])) arr = arr[0]
-  return arr.map((q: Record<string, unknown>) => ({
-    header: (q["header"] as string) ?? undefined,
-    prompt: (q["question"] as string) ?? (q["prompt"] as string) ?? "",
-    options: Array.isArray(q["options"])
-      ? q["options"].map((o: unknown) =>
-          typeof o === "string" ? o : ((o as Record<string, string>)?.["label"] ?? ""),
-        )
-      : [],
-    multi: (q["multiSelect"] as boolean) ?? (q["multi"] as boolean) ?? false,
-    allowOther: (q["allowOther"] as boolean) ?? false,
-  }))
+  return arr.map((q: Record<string, unknown>) => {
+    // `header` is optional on ThreadQuestion (`header?: string`); under
+    // exactOptionalPropertyTypes an explicit `header: undefined` is NOT
+    // assignable to that slot, so OMIT it when absent via a conditional spread
+    // rather than writing `undefined` into it.
+    const header = q["header"] as string | undefined
+    return {
+      ...(header !== undefined ? { header } : {}),
+      prompt: (q["question"] as string | undefined) ?? (q["prompt"] as string | undefined) ?? "",
+      options: Array.isArray(q["options"])
+        ? q["options"].map((o: unknown) =>
+            typeof o === "string"
+              ? o
+              : ((o as Record<string, string> | undefined)?.["label"] ?? ""),
+          )
+        : [],
+      multi:
+        (q["multiSelect"] as boolean | undefined) ?? (q["multi"] as boolean | undefined) ?? false,
+      allowOther: (q["allowOther"] as boolean | undefined) ?? false,
+    }
+  })
 }
 
 export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
@@ -272,7 +282,7 @@ export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
   const focusedId = res.focusedThreadId ?? null
   return res.threads.map((t) => ({
     ...t,
-    agentId: t.agentId ?? agentId,
+    agentId: t.agentId,
     lastActivity:
       typeof t.lastActivity === "number"
         ? formatAge(t.lastActivity as unknown as number)
@@ -284,7 +294,7 @@ export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
           ? (t.lastActivity as unknown as number)
           : 0,
     focused: focusedId != null && t.id === focusedId,
-    log: (t.log ?? []).map((m) => ({
+    log: t.log.map((m) => ({
       ...m,
       questions: mapRawQuestions(m.questions),
     })),

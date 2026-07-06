@@ -16,6 +16,7 @@ import {
   pinsKey,
   type PinnedFolder,
   type Tab,
+  req,
 } from "./internal/helpers"
 import { useExternalDragUpload } from "./internal/useExternalDragUpload"
 import { useFinderActions } from "./internal/useFinderActions"
@@ -98,7 +99,7 @@ export function Finder({
   // `tabs` is seeded with one tab and closeTab never empties it, so index 0 is
   // always present — assert it so `active` is `Tab`, not `Tab | undefined`
   // (noUncheckedIndexedAccess widens a bare `tabs[0]`).
-  const active = tabs.find((t) => t.id === activeId) ?? tabs[0]!
+  const active = tabs.find((t) => t.id === activeId) ?? req(tabs, 0)
   const cwd = active.cwd
 
   // Live directory listing for the current working directory. The API expects a

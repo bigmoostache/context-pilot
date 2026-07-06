@@ -52,7 +52,7 @@ export function TrustStep({ onDone }: { onDone: () => void }) {
 
       <ErrorNote error={error} />
 
-      <PrimaryButton onClick={download} busy={busy}>
+      <PrimaryButton onClick={() => void download()} busy={busy}>
         Download CA root (root.crt)
       </PrimaryButton>
       <p className="text-xs text-muted-foreground">

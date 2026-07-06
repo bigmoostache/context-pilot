@@ -6,7 +6,7 @@ import rehypeKatex from "rehype-katex"
 import "katex/dist/katex.min.css"
 
 import { CopyButton } from "@/components/conversation/Message"
-import { cn } from "@/lib/utils"
+import { cn, clipboard } from "@/lib/utils"
 
 /**
  * Full GitHub-flavored markdown renderer for chat/thread messages.
@@ -68,13 +68,20 @@ function ClickableCode({
       onClick={(ev) => {
         if ((ev.target as HTMLElement).closest("pre")) return
         const text = typeof children === "string" ? children : extractText(children)
-        navigator.clipboard?.writeText(text).then(
-          () => {
-            setCopied(true)
-            window.setTimeout(() => setCopied(false), 1500)
-          },
-          () => {},
-        )
+        // `clipboard()` is honestly typed `Clipboard | undefined` (absent on an
+        // insecure origin), so the `?.` guard is real — a missing clipboard is a
+        // silent no-op, not a throw.
+        void clipboard()
+          ?.writeText(text)
+          .then(
+            () => {
+              setCopied(true)
+              window.setTimeout(() => setCopied(false), 1500)
+            },
+            () => {
+              /* clipboard write rejected — ignore, the copy tick simply won't flash */
+            },
+          )
       }}
       {...rest}
     >
@@ -92,9 +99,7 @@ function ClickableCode({
 function tableToMarkdown(table: HTMLTableElement): string {
   const rows = Array.from(table.rows)
   if (rows.length === 0) return ""
-  const matrix = rows.map((row) =>
-    Array.from(row.cells).map((cell) => cell.textContent?.trim() ?? ""),
-  )
+  const matrix = rows.map((row) => Array.from(row.cells).map((cell) => cell.textContent.trim()))
   const colCount = Math.max(...matrix.map((r) => r.length))
   const colWidths = Array.from({ length: colCount }, (_, i) =>
     Math.max(3, ...matrix.map((r) => (r[i] ?? "").length)),

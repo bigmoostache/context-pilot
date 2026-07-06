@@ -41,9 +41,14 @@ function parseDraft(key: string | undefined): Draft {
   try {
     const o: unknown = JSON.parse(raw)
     if (o && typeof o === "object" && typeof (o as Draft).text === "string") {
-      const t = (o as Draft).text
-      const s = clampRange((o as Draft).selStart ?? t.length, 0, t.length)
-      const e = clampRange((o as Draft).selEnd ?? s, 0, t.length)
+      // A legacy/hand-rolled draft may carry `text` without the cursor fields,
+      // so read the numeric offsets through a Partial view: `selStart`/`selEnd`
+      // are genuinely `number | undefined` at runtime and fall back to the text
+      // end. (The full `as Draft` cast would type them as always-present.)
+      const d = o as Partial<Draft> & { text: string }
+      const t = d.text
+      const s = clampRange(d.selStart ?? t.length, 0, t.length)
+      const e = clampRange(d.selEnd ?? s, 0, t.length)
       return { text: t, selStart: s, selEnd: e }
     }
   } catch {
@@ -133,7 +138,7 @@ export function ThreadComposer({
   // what was being typed and where the cursor sat (T304). The ref is read by
   // the mount effect below to apply the saved selection range.
   const seedRef = useRef<Draft | null>(null)
-  if (seedRef.current === null) seedRef.current = parseDraft(draftKey)
+  seedRef.current ??= parseDraft(draftKey)
   const [text, setText] = useState(() => seedRef.current?.text ?? "")
   // Caret offset, tracked so we can tell which line the user is editing — used
   // to surface the /command bubbles when the current line is exactly `/` (T350).
@@ -158,7 +163,7 @@ export function ThreadComposer({
   useEffect(() => {
     const el = textareaRef.current
     const seed = seedRef.current
-    if (!el || !seed || !seed.text) return
+    if (!el || !seed?.text) return
     el.focus()
     el.setSelectionRange(seed.selStart, seed.selEnd)
   }, [])
@@ -363,7 +368,7 @@ export function ThreadComposer({
           className="hidden"
           onChange={(e) => {
             const files = Array.from(e.target.files ?? [])
-            if (files.length > 0) onAttach?.(files)
+            if (files.length > 0) void onAttach?.(files)
             // Reset so picking the same file again re-fires onChange.
             e.target.value = ""
           }}
@@ -402,7 +407,7 @@ export function ThreadComposer({
               .filter((f): f is File => f !== null)
             if (images.length > 0 && onAttach) {
               e.preventDefault()
-              onAttach(images)
+              void onAttach(images)
             }
           }}
           placeholder="Reply to this thread…"

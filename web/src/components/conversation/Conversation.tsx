@@ -70,8 +70,8 @@ function buildMessages(durable: ConversationMsg[], live: LiveTokens): ChatMessag
         ts: ago(m.timestamp_ms),
         tool: {
           name: use.name ?? "tool",
-          intent: (use.input?.["intent"] as string) ?? "",
-          verb: (use.input?.["verb"] as string) ?? "",
+          intent: (use.input?.["intent"] as string | undefined) ?? "",
+          verb: (use.input?.["verb"] as string | undefined) ?? "",
           params: toParams(use.input),
         },
       })
@@ -81,9 +81,8 @@ function buildMessages(durable: ConversationMsg[], live: LiveTokens): ChatMessag
 
     // Plain user / assistant text. Overlay live buffer when it leads.
     const liveText = live[m.id]
-    const text =
-      liveText != null && liveText.length > (m.content?.length ?? 0) ? liveText : m.content
-    const streaming = liveText != null && liveText.length > (m.content?.length ?? 0)
+    const text = liveText != null && liveText.length > m.content.length ? liveText : m.content
+    const streaming = liveText != null && liveText.length > m.content.length
     out.push({
       id: m.id,
       role: m.role === "assistant" ? "assistant" : "user",

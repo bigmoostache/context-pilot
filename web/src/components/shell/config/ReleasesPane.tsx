@@ -36,7 +36,7 @@ export function ReleasesPane() {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
         <span className="text-[12px] text-[var(--danger)]">
-          Failed to load releases{error?.message ? `: ${error.message}` : ""}
+          Failed to load releases{error.message ? `: ${error.message}` : ""}
         </span>
         <button
           onClick={() => void refetch()}

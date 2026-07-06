@@ -89,7 +89,7 @@ export function SessionVitals({ agentId }: { agentId: string }) {
               ))}
             <button
               type="button"
-              onClick={runChecks}
+              onClick={() => void runChecks()}
               disabled={checking}
               className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface/70 px-3 py-1.5 text-[12px] font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60"
             >

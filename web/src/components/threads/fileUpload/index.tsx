@@ -178,7 +178,7 @@ export function FileUploadChip({
     return (
       <span className="inline-flex items-center gap-1">
         <span className={`${base} ${skin} cursor-default`}>{body}</span>
-        {onShowInFinder && !missing && (
+        {onShowInFinder && (
           <button
             onClick={onShowInFinder}
             title="Show in Finder"
@@ -199,7 +199,7 @@ export function FileUploadChip({
       <button onClick={onOpen} className={`${base} ${skin}`}>
         {body}
       </button>
-      {onShowInFinder && !missing && (
+      {onShowInFinder && (
         <button
           onClick={onShowInFinder}
           title="Show in Finder"

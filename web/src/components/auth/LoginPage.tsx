@@ -5,7 +5,7 @@
 //   • Bootstrap (no users yet) → "Create Admin Account" register form.
 //   • Normal → "Sign In" login form.
 
-import { useState, type FormEvent } from "react"
+import { useState, type SyntheticEvent } from "react"
 import { useAuth } from "@/lib/providers/auth"
 
 export function LoginPage() {
@@ -19,7 +19,7 @@ export function LoginPage() {
 
   const isRegister = !bootstrapped
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault()
     setError("")
     setSubmitting(true)
@@ -62,7 +62,7 @@ export function LoginPage() {
 
         {/* ── Form card ───────────────────────────────────────── */}
         <form
-          onSubmit={handleSubmit}
+          onSubmit={(e) => void handleSubmit(e)}
           className="rounded-lg border border-border bg-card p-6 shadow-md"
         >
           {/* Email */}

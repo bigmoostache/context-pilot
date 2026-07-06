@@ -151,7 +151,7 @@ function AllowedModelsSection() {
 
   if (!settings?.is_admin) return null
 
-  const allowed = settings.allowed_models ?? []
+  const allowed = settings.allowed_models
   const allowedSet = new Set(allowed)
   const restricted = allowed.length > 0
   const everyKey = providers.flatMap((p) => p.models.map((m) => m.key))

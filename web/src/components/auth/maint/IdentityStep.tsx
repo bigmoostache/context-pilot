@@ -3,7 +3,7 @@
 // Setting the identity re-issues the private-CA leaf for the chosen name/IP
 // (backend regenerates the Caddyfile + reloads Caddy).
 
-import { useState, type FormEvent } from "react"
+import { useState, type SyntheticEvent } from "react"
 import { setIdentity, type Identity } from "@/lib/api/maint"
 import { Field, ErrorNote, PrimaryButton } from "./parts"
 
@@ -19,7 +19,7 @@ export function IdentityStep({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const submit = async (e: FormEvent) => {
+  const submit = async (e: SyntheticEvent) => {
     e.preventDefault()
     if (ip.trim() === "" || busy) return
     setError(null)
@@ -34,7 +34,7 @@ export function IdentityStep({
   }
 
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={(e) => void submit(e)}>
       <Field
         label="DNS name"
         value={name}

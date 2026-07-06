@@ -64,7 +64,7 @@ export function ColumnsView({
         />
       ))}
 
-      {showPreviewPane && previewNode && (
+      {showPreviewPane && (
         <div className="flex w-[230px] shrink-0 flex-col items-center gap-3 px-5 py-7 text-center">
           <FileIcon kind={previewNode.kind} ext={extOf(previewNode.name)} size={84} />
           <span className="text-[13px] font-semibold text-foreground/90">{previewNode.name}</span>

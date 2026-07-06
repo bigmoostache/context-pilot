@@ -74,7 +74,7 @@ export function AgentAclSection({ agentId }: { agentId: string }) {
           agentId={agentId}
           existingUserIds={entries.map((e) => e.user_id)}
           onGranted={() => {
-            qc.invalidateQueries({ queryKey: key })
+            void qc.invalidateQueries({ queryKey: key })
             setShowGrant(false)
           }}
           onCancel={() => setShowGrant(false)}

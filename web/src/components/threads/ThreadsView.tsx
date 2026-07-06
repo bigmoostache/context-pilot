@@ -146,7 +146,7 @@ export function ThreadsView({
       // Deselect the thread being archived so the view falls through to the
       // next available thread instead of sticking on a now-invisible row.
       if (!t.archived && id === selectedId) setSelectedId("")
-      sendCommand(activeAgentId, { kind, thread_id: id }).catch((e) =>
+      sendCommand(activeAgentId, { kind, thread_id: id }).catch((e: unknown) =>
         flash(describeCommandError(verb, e)),
       )
     },
@@ -159,7 +159,7 @@ export function ThreadsView({
       if (!t) return
       const kind = t.paused ? "resume_thread" : "pause_thread"
       const verb = t.paused ? "resume the thread" : "pause the thread"
-      sendCommand(activeAgentId, { kind, thread_id: id }).catch((e) =>
+      sendCommand(activeAgentId, { kind, thread_id: id }).catch((e: unknown) =>
         flash(describeCommandError(verb, e)),
       )
     },
@@ -169,7 +169,7 @@ export function ThreadsView({
   const handleDelete = useCallback(
     (id: string) => {
       if (id === selectedId) setSelectedId("")
-      sendCommand(activeAgentId, { kind: "delete_thread", thread_id: id }).catch((e) =>
+      sendCommand(activeAgentId, { kind: "delete_thread", thread_id: id }).catch((e: unknown) =>
         flash(describeCommandError("delete the thread", e)),
       )
     },
@@ -182,7 +182,7 @@ export function ThreadsView({
       sendCommand(activeAgentId, {
         kind: "create_thread",
         name: title.trim() || "Untitled thread",
-      }).catch((e) => {
+      }).catch((e: unknown) => {
         pendingSelect.current = false
         flash(describeCommandError("create the thread", e))
       })
@@ -202,7 +202,7 @@ export function ThreadsView({
         kind: "send_message",
         thread_id: effectiveSelectedId,
         content,
-      }).catch((e) => flash(describeCommandError("send your message", e)))
+      }).catch((e: unknown) => flash(describeCommandError("send your message", e)))
       setPendingFiles([])
     },
     [activeAgentId, effectiveSelectedId, flash, pendingFiles],

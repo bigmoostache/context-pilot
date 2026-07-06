@@ -1,6 +1,6 @@
 import type { RefObject } from "react"
 import type { Agent, FinderNode, FinderSortKey, FinderViewMode } from "@/lib/types"
-import { CLICK_SETTLE_MS, type Tab } from "./helpers"
+import { CLICK_SETTLE_MS, req, type Tab } from "./helpers"
 import type { MenuPos } from "../ContextMenu"
 
 let tabSeq = 1
@@ -151,7 +151,7 @@ export function useFinderSelection(d: SelectionDeps) {
   const closeTab = (id: string) => {
     d.setTabs((ts) => {
       const next = ts.filter((t) => t.id !== id)
-      if (id === d.activeId && next.length) d.setActiveId(next[next.length - 1]!.id)
+      if (id === d.activeId && next.length) d.setActiveId(req(next, -1).id)
       return next.length ? next : ts
     })
   }
@@ -165,7 +165,7 @@ export function useFinderSelection(d: SelectionDeps) {
   }
 
   const goUp = () => {
-    if (d.crumbs.length > 1) d.navigate(d.crumbs[d.crumbs.length - 2]!.path)
+    if (d.crumbs.length > 1) d.navigate(req(d.crumbs, -2).path)
   }
 
   // Trash a node, expanding to the whole selection when the node is selected.

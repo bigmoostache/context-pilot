@@ -154,7 +154,7 @@ export function FinderToolbar({
   const collapsed = crumbs.length > 4
   // `collapsed` is only true when crumbs.length > 4, so index 0 is present —
   // assert it (noUncheckedIndexedAccess widens a bare `crumbs[0]`).
-  const shown = collapsed ? [crumbs[0]!, ...crumbs.slice(-2)] : crumbs
+  const shown = collapsed ? [...crumbs.slice(0, 1), ...crumbs.slice(-2)] : crumbs
 
   return (
     <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">

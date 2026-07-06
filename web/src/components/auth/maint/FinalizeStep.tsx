@@ -78,7 +78,7 @@ export function FinalizeStep({
         off this setup flow for normal use (the maintenance console stays reachable on :9090).
       </p>
       <ErrorNote error={error} />
-      <PrimaryButton onClick={finalize} disabled={!ready} busy={busy}>
+      <PrimaryButton onClick={() => void finalize()} disabled={!ready} busy={busy}>
         Finalize &amp; launch the cockpit
       </PrimaryButton>
     </div>

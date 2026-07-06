@@ -4,6 +4,7 @@ import reactHooks from "eslint-plugin-react-hooks"
 import reactRefresh from "eslint-plugin-react-refresh"
 import tseslint from "typescript-eslint"
 import { defineConfig, globalIgnores } from "eslint/config"
+import type { ESLint } from "eslint"
 
 /**
  * Frontend ESLint flat config — the Rust-parity strict stack (branch `web-lint`).
@@ -18,11 +19,26 @@ import { defineConfig, globalIgnores } from "eslint/config"
  * generated bindings. It must never be hand-edited to satisfy a lint.
  */
 export default defineConfig([
-  // Build artifacts + machine-generated code are never linted.
-  globalIgnores(["dist", "src/lib/api/generated/**"]),
+  // Build artifacts + machine-generated code are never linted. Playwright e2e
+  // specs + their config are a separate surface (test-runner globals, their own
+  // idioms); they get a dedicated lint profile in P8 (test tooling), not the
+  // app's type-aware pass — ignore them here so `projectService` doesn't fault
+  // on files absent from the app/node tsconfigs.
+  globalIgnores(["dist", "src/lib/api/generated/**", "e2e/**", "playwright.config.ts"]),
   {
     files: ["**/*.{ts,tsx}"],
-    extends: [js.configs.recommended, tseslint.configs.recommended, reactRefresh.configs.vite],
+    // P3 — the clippy-semantic twin. `strictTypeChecked` (superset of
+    // recommended + recommendedTypeChecked) adds the whole type-aware rule set
+    // — the analogue of clippy's `all + pedantic + nursery` correctness lints —
+    // and `stylisticTypeChecked` the type-informed stylistic pass. Both land at
+    // `error`; the gate runs `--max-warnings 0`. Type-aware rules require a
+    // TypeScript program, wired below via `parserOptions.projectService`.
+    extends: [
+      js.configs.recommended,
+      tseslint.configs.strictTypeChecked,
+      tseslint.configs.stylisticTypeChecked,
+      reactRefresh.configs.vite,
+    ],
     plugins: {
       // react-hooks is pinned to its CLASSIC rule pair for the P0 baseline
       // (rules-of-hooks + exhaustive-deps) — the exact effective ruleset before
@@ -30,10 +46,23 @@ export default defineConfig([
       // compiler-aware rules (set-state-in-effect, refs, immutability,
       // static-components, use-memo); those land deliberately in P6 (React
       // stack) with proper per-site fixes, not front-loaded into P0.
-      "react-hooks": reactHooks,
+      // eslint-plugin-react-hooks ships its ESLint-9 flat presets under a
+      // `.configs.flat` key whose shape ESLint's own `Plugin` type does not yet
+      // model — a known upstream type-definition gap. The plugin is
+      // runtime-correct (its rules load and run); bridge the declaration gap
+      // with a typed cast so `tsc` type-checks the config file cleanly.
+      "react-hooks": reactHooks as unknown as ESLint.Plugin,
     },
     languageOptions: {
       globals: globals.browser,
+      // `projectService` gives every linted file its TypeScript program so the
+      // type-aware rules can query types. Config files not in a source tsconfig
+      // (eslint.config.ts, vite.config.ts) are covered by tsconfig.node.json's
+      // `include`. `tsconfigRootDir` anchors project discovery to this folder.
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
     rules: {
       // Classic react-hooks pair (see the plugins note above).
@@ -44,6 +73,41 @@ export default defineConfig([
       // Refresh, so permit them; hooks/functions co-exported with components
       // still error and get factored into sibling modules.
       "react-refresh/only-export-components": ["error", { allowConstantExport: true }],
+      // ── Two type-aware rules carry a codebase-contract OPTION (the twin of a
+      //    clippy.toml threshold — a calibration, NOT a suppression; the rule
+      //    stays at `error`): ──
+      //
+      // JSX event handlers are overwhelmingly `onClick={() => setState(x)}` —
+      // an arrow whose void return is deliberately discarded by the prop. The
+      // default forbids that shorthand, which would force noisy `{ … }` braces
+      // on ~240 handlers for zero safety gain. `ignoreArrowShorthand` permits
+      // exactly that shape while STILL flagging a void expression used as a
+      // value (`const x = doVoid()`, `return doVoid()`) — the genuinely
+      // confusing cases.
+      "@typescript-eslint/no-confusing-void-expression": ["error", { ignoreArrowShorthand: true }],
+      // Interpolating a `number` into a template literal is unambiguous and
+      // universal (`${count}`, `${size}px`). `allowNumber` (the conventional
+      // setting) permits it; a possibly-`undefined`/object/boolean interpolation
+      // still errors and gets a real fix (guard / `String(x)` / `?? fallback`).
+      "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
+      // Third calibration (same clippy.toml-threshold spirit — NOT a blanket
+      // suppression; the rule stays at `error`). The rule's safety concern is a
+      // `x || fallback` that silently swallows a VALID falsy value (a real `0`,
+      // `""`, or `false` that carried meaning). That danger is real for
+      // **numbers** — a legitimate `0` must not be replaced — so `number`
+      // stays flagged (→ genuine `?? ` fixes). But for **strings** and
+      // **booleans** every `||` site in this codebase is a deliberate
+      // truthy-or-fallback idiom where an empty string / `false` is *meant* to
+      // take the fallback (display-name chains `name || ip || ""`, path-segment
+      // fallbacks `split("/").pop() || path` where a trailing-slash `""` must
+      // use the whole path, and boolean OR like `disabled || busy` where `||`
+      // is the correct logical operator, not a fallback). Ignoring those two
+      // primitives keeps `||` where it expresses intent while still forcing
+      // `??` for the nullable-object and number cases the rule exists to catch.
+      "@typescript-eslint/prefer-nullish-coalescing": [
+        "error",
+        { ignorePrimitives: { string: true, boolean: true } },
+      ],
     },
   },
   {
@@ -53,6 +117,22 @@ export default defineConfig([
     files: ["src/components/ui/**/*.{ts,tsx}"],
     rules: {
       "react-refresh/only-export-components": "off",
+    },
+  },
+  {
+    // The WYSIWYG markdown editor drives a `contentEditable` surface through
+    // `document.execCommand` / `queryCommandState`. Both are marked deprecated
+    // by MDN, yet they remain the ONLY browser API for rich-text editing of a
+    // contentEditable region — there is no standardised replacement (the
+    // proposed `EditContext`/Input Events level 2 don't cover formatting
+    // commands, and every WYSIWYG library still relies on `execCommand`). This
+    // is a genuine irreducible-exception, scoped to this one file and this one
+    // rule — the config-level analog of the Rust `allowed-lint-exceptions.yaml`
+    // registry (never an inline `eslint-disable`, which the P4 anti-cheat layer
+    // forbids). It is NOT a blanket downgrade: every other rule stays at error.
+    files: ["src/components/agents/MarkdownEditor.tsx"],
+    rules: {
+      "@typescript-eslint/no-deprecated": "off",
     },
   },
 ])

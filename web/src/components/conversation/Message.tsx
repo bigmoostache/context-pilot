@@ -4,7 +4,7 @@ import type { ChatMessage } from "@/lib/types"
 import { Markdown, type MarkdownVariant } from "@/lib/support/markdown"
 import { MessageFileChip } from "@/components/threads/fileUpload"
 import { splitMessageSegments, type UploadedFile } from "@/components/threads/fileUpload/helpers"
-import { cn } from "@/lib/utils"
+import { cn, clipboard } from "@/lib/utils"
 
 /**
  * Props every message renderer accepts.
@@ -132,16 +132,20 @@ export function CopyButton({
 
   const onCopy = () => {
     const t = getText ? getText() : (text ?? "")
-    // `?.` guards environments without the async clipboard API (insecure
-    // origin / older browser); a failed write is silently ignored — the worst
-    // case is the tick simply doesn't flash, never a thrown error in the UI.
-    navigator.clipboard?.writeText(t).then(
-      () => {
-        setCopied(true)
-        window.setTimeout(() => setCopied(false), 2000)
-      },
-      () => {},
-    )
+    // `clipboard()` returns the API honestly typed as `Clipboard | undefined`
+    // (it is genuinely absent on an insecure origin / older browser). The `?.`
+    // guard is real — a missing clipboard is a silent no-op, never a throw.
+    void clipboard()
+      ?.writeText(t)
+      .then(
+        () => {
+          setCopied(true)
+          window.setTimeout(() => setCopied(false), 2000)
+        },
+        () => {
+          /* clipboard write rejected (insecure origin / no API) — ignore: the confirmation tick simply won't flash */
+        },
+      )
   }
 
   return (
@@ -246,7 +250,8 @@ function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }
 }
 
 function ToolMessage({ msg }: { msg: ChatMessage }) {
-  const t = msg.tool!
+  if (!msg.tool) return null
+  const t = msg.tool
   return (
     <div className="rise py-2 pl-7">
       <div

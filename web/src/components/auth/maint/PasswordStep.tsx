@@ -4,7 +4,7 @@
 // set a real email) before anything else. The finalize pre-req (backend) blocks
 // provisioning until this is done.
 
-import { useState, type FormEvent } from "react"
+import { useState, type SyntheticEvent } from "react"
 import { maintChangePassword, maintUpdateProfile, type MaintUser } from "@/lib/api/maint"
 import { Field, ErrorNote, PrimaryButton } from "./parts"
 
@@ -21,7 +21,7 @@ export function PasswordStep({ user, onDone }: { user: MaintUser; onDone: () => 
   const passwordsOk = next.length >= MIN_PASSWORD_LEN && next === confirm
   const canSubmit = current !== "" && passwordsOk && email.trim() !== "" && !busy
 
-  const submit = async (e: FormEvent) => {
+  const submit = async (e: SyntheticEvent) => {
     e.preventDefault()
     if (!canSubmit) return
     setError(null)
@@ -41,7 +41,7 @@ export function PasswordStep({ user, onDone }: { user: MaintUser; onDone: () => 
   }
 
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={(e) => void submit(e)}>
       <Field
         label="Admin email"
         type="email"

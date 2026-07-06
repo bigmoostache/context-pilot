@@ -33,7 +33,9 @@ const KEYWORDS = new Set([
 export function CodePreview({ lang, lines }: { lang: string; lines: string[] }) {
   const [copied, setCopied] = useState(false)
   const copy = () => {
-    navigator.clipboard?.writeText(lines.join("\n")).catch(() => {})
+    ;(navigator.clipboard as Clipboard | undefined)?.writeText(lines.join("\n")).catch(() => {
+      /* clipboard write may reject on insecure origin — ignore, the tick just won't flash */
+    })
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1400)
   }

@@ -17,7 +17,7 @@ export function QuestionForm({
 }) {
   const [picked, setPicked] = useState<number[]>([])
   const [submitted, setSubmitted] = useState(false)
-  const options = q.options ?? []
+  const options = q.options
   const isAnswered = submitted || !!q.answered
   const answeredLabels = q.answered ?? picked.map((i) => options[i] ?? "")
 

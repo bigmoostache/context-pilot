@@ -3,7 +3,7 @@
 // Accessible from the UserMenu when the authenticated user is a system
 // admin. Lists all users, allows creation and deletion, force-logout.
 
-import { useState, type FormEvent } from "react"
+import { useState, type SyntheticEvent } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { LogOut, Plus, Shield, Trash2, Users } from "lucide-react"
 import { fetchUsers, createUser, deleteUser, forceLogoutUser } from "@/lib/api"
@@ -42,7 +42,7 @@ export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => v
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteUser(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["auth-users"] })
+      void qc.invalidateQueries({ queryKey: ["auth-users"] })
       setConfirm(null)
     },
   })
@@ -85,7 +85,7 @@ export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => v
         {showCreate && (
           <CreateUserForm
             onCreated={() => {
-              qc.invalidateQueries({ queryKey: ["auth-users"] })
+              void qc.invalidateQueries({ queryKey: ["auth-users"] })
               setShowCreate(false)
             }}
           />
@@ -202,7 +202,7 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
       ),
   })
 
-  const submit = (e: FormEvent) => {
+  const submit = (e: SyntheticEvent) => {
     e.preventDefault()
     setError("")
     create.mutate()

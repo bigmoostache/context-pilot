@@ -22,7 +22,7 @@ export function useExternalDragUpload(
   onFilesRef.current = onFiles
   const lastDragOverRef = useRef(0)
   useEffect(() => {
-    const isFileDrag = (e: DragEvent) => !!e.dataTransfer?.types?.includes("Files")
+    const isFileDrag = (e: DragEvent) => !!e.dataTransfer?.types.includes("Files")
     const onOver = (e: DragEvent) => {
       if (!isFileDrag(e)) return
       e.preventDefault() // allow the drop

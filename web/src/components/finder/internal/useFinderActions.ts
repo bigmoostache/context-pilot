@@ -7,7 +7,7 @@ import {
   useTrashItems,
   useUploadFiles,
 } from "@/lib/live"
-import { NEW_FOLDER_SENTINEL, pathName, type Tab } from "./helpers"
+import { NEW_FOLDER_SENTINEL, pathName, req, type Tab } from "./helpers"
 
 interface ActionDeps {
   agentId: string
@@ -188,9 +188,9 @@ export function useFinderActions(d: ActionDeps) {
         ? {
             ...t,
             fwd: [t.cwd, ...t.fwd],
-            cwd: t.back[t.back.length - 1]!,
+            cwd: req(t.back, -1),
             back: t.back.slice(0, -1),
-            label: pathName(t.back[t.back.length - 1]!),
+            label: pathName(req(t.back, -1)),
           }
         : t,
     )
@@ -200,9 +200,9 @@ export function useFinderActions(d: ActionDeps) {
         ? {
             ...t,
             back: [...t.back, t.cwd],
-            cwd: t.fwd[0]!,
+            cwd: req(t.fwd, 0),
             fwd: t.fwd.slice(1),
-            label: pathName(t.fwd[0]!),
+            label: pathName(req(t.fwd, 0)),
           }
         : t,
     )
