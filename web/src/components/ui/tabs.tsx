@@ -71,4 +71,6 @@ function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
   )
 }
 
-export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants }
+// `tabsListVariants` stays module-local (no external consumer) so this file only
+// exports components — required for React Fast Refresh.
+export { Tabs, TabsList, TabsTrigger, TabsContent }

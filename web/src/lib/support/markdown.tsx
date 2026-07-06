@@ -334,7 +334,7 @@ function components(variant: MarkdownVariant): Components {
 
 // ── Pre-processor ─────────────────────────────────────────────────────
 //
-// The thread composer's Tab-nesting (`resolveTab` in utils.ts) emits Unicode
+// The thread composer's Tab-nesting (`resolveTab` in listInput.ts) emits Unicode
 // bullet characters `• ◦ ▪ ‣` as depth-styled list markers. CommonMark only
 // recognises `-`, `*`, `+` — so the Unicode bullets land as plain inline text
 // and collapse onto a single line (the "bullets on one line" bug, T369).
