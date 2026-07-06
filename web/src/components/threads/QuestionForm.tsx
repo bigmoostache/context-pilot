@@ -8,7 +8,13 @@ import { cn } from "@/lib/utils"
  * user a structured question inside a conversation. Shows the header + prompt,
  * interactive option selection, and a read-only "answered" state after submit.
  */
-export function QuestionForm({ q, onSubmit }: { q: ThreadQuestion; onSubmit?: (answer: string) => void }) {
+export function QuestionForm({
+  q,
+  onSubmit,
+}: {
+  q: ThreadQuestion
+  onSubmit?: (answer: string) => void
+}) {
   const [picked, setPicked] = useState<number[]>([])
   const [submitted, setSubmitted] = useState(false)
   const options = q.options ?? []

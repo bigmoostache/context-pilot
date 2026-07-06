@@ -62,7 +62,10 @@ function Row({ k, v, accent }: { k: string; v: string; accent?: string }) {
   return (
     <div className="flex items-center justify-between border-b border-border/50 py-1 last:border-0">
       <span className="font-mono text-[11px] text-muted-foreground/80">{k}</span>
-      <span className="font-mono text-[11px] tabular-nums" style={{ color: accent ?? "var(--foreground)" }}>
+      <span
+        className="font-mono text-[11px] tabular-nums"
+        style={{ color: accent ?? "var(--foreground)" }}
+      >
         {v}
       </span>
     </div>

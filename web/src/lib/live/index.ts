@@ -211,10 +211,7 @@ export function useEntities(agentId: string): LiveQueryResult<EntityTable[]> {
 
 // ── Finder hooks ──────────────────────────────────────────────────────
 
-export function useFs(
-  agentId: string,
-  path: string,
-): LiveQueryResult<FinderNode[]> {
+export function useFs(agentId: string, path: string): LiveQueryResult<FinderNode[]> {
   // `fetchFs` is typed with the generated FinderNode (epoch `modified: number`);
   // the UI FinderNode is an enriched view over the same payload (relative
   // `modified` string, optional tags/created). Cast at this single seam.

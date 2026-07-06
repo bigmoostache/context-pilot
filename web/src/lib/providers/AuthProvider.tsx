@@ -7,12 +7,7 @@
 //   3. Exposes login / register / logout + the current user to children via
 //      the shared {@link AuthContext} (defined in `./auth`).
 
-import {
-  useCallback,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
 import {
   fetchAuthStatus,
   authLogin,
@@ -70,7 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setLoading(false)
       }
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // Listen for 401 "session expired" events from the fetch wrapper.

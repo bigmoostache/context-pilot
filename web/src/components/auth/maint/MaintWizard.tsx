@@ -86,7 +86,10 @@ export function MaintWizard({ initialStatus }: { initialStatus: MaintStatus }) {
 
   if (phase === "password" && me) {
     return (
-      <Shell title="Secure the admin account" subtitle="Change the delivered password before continuing.">
+      <Shell
+        title="Secure the admin account"
+        subtitle="Change the delivered password before continuing."
+      >
         <PasswordStep user={me} onDone={() => void load()} />
       </Shell>
     )

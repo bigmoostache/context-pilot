@@ -19,5 +19,11 @@ export const CATEGORIES: {
   { id: "general", label: "General", blurb: "Models & autonomy", icon: Sliders },
   { id: "usage", label: "Usage & Cost", blurb: "Spend & token analytics", icon: Coins },
   { id: "services", label: "Services", blurb: "Available integrations", icon: Boxes },
-  { id: "releases", label: "Releases", blurb: "Manage binary versions", icon: Package, adminOnly: true },
+  {
+    id: "releases",
+    label: "Releases",
+    blurb: "Manage binary versions",
+    icon: Package,
+    adminOnly: true,
+  },
 ]

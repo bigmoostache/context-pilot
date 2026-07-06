@@ -271,25 +271,28 @@
   - forbidden
   last_edited_ms: 0
 45b9baa7eb6b3f01:
-  tl_dr: 'T506 web-lint P0 COMPLETE (green baseline). eslint.config.ts typed-flat ratchet, generated/**+dist ignored, plugin roster installed. Full-tree eslint 0 err/1 warn, tsc 0, structure clean. NEXT: P1 tsc maximal strict (X1128).'
+  tl_dr: 'T506 web-lint P0+P1+P2 COMPLETE. P0: eslint typed-flat ratchet. P1: tsc maximal strict (106→0). P2: Prettier (rustfmt twin, printWidth 100, tree formatted, 2 files split to stay ≤500). NEXT: P3 core type-aware eslint (X1130).'
   contents: |-
-    P0 = scaffold + ignores + green baseline (X1127).
+    P0 = scaffold + ignores + green baseline (X1127). P1 (X1128) = tsc maximal strict, pushed 743d2bfe on web-lint.
 
-    CONFIG: eslint.config.ts (typed flat, defineConfig): js.recommended + tseslint.recommended + reactHooks CLASSIC pair (rules-of-hooks:error + exhaustive-deps:WARN — v7 compiler-aware rules DEFERRED to P6) + reactRefresh.vite (allowConstantExport:true, ui/** react-refresh OFF). globalIgnores(dist, src/lib/api/generated/**).
+    P1 FIX PATTERNS (106 errors → 0):
+    - exactOptionalPropertyTypes (73 TS2375/TS2379): widen shared optional prop interfaces `x?: T` → `x?: T | undefined` across ~30 files. Function-typed props MUST be parenthesized: `((f: X) => void) | undefined` (bare `=> void | undefined` changes the return type, not optionality). This clears many at once via shared interfaces (ThreadConversation/ThreadComposer/ComposerBubbles props, ViewHandlers, PanelFrame, Tip, FileIcon, charts, etc).
+    - possibly-undefined (22 TS18048/TS2532): guard at source — `?? fallback`, or non-null `!` on PROVABLY length-guarded array indexes (tabs[0]!, crumbs[0]! where a prior length check guarantees presence), or `m?.[1]?.trim() ?? ""`.
+    - conditional spreads to OMIT undefined optional fields rather than write them: `...(x !== undefined ? { x } : {})` (reducers message_created append, DeploySection tag, AgentModal model).
+    - types.ts: ThreadQuestion had to be ADDED to the `import type` block — it was only RE-exported (`export type {...}`), not imported into module scope, so using it in the ThreadMsg redecl threw TS2304. ThreadMsg = Omit<GenThreadMsg,'ts'|'questions'> & {...}.
 
-    DEPS: full plugin roster in package.json (~30, unwired — lands P1-P13). .npmrc verify-deps-before-run=false (pnpm 11.6 verify runs `pnpm install` exits 1 on ignored unrs-resolver build). Run eslint authoritatively by BYPASSING pnpm: node node_modules/eslint/bin/eslint.js .
+    GENERATED-BINDINGS EXCEPTION: all 16 generated/*.ts carry a `// @ts-nocheck` GEN_HEADER (mirrors Rust generated-code allowance). check-typescript-contract.sh (CB5) RE-STAMPS them after every codegen with the EXACT GEN_HEADER via `printf '%s\n%s' "$HEADER" "$(cat file)"` (strips trailing newline → matches hey-api output) so the committed tree stays byte-identical to a fresh codegen+stamp for the drift diff. CB5 fires on web/src/**/*.ts edits (NOT .tsx) and wipes stamps — must re-stamp before every tsc run following a .ts edit AND before every commit.
 
-    REACT-REFRESH FIX (16 violations, 6 clusters): (A) providers theme/account/auth/devMode split context+hook vs Provider component, all 8 relocated to NEW src/lib/providers/; ~13 consumers repointed; App.tsx→providers/*Provider. (B) finder/views shared.tsx split → helpers.ts + shared.tsx (RenameInput/TagDots); dead kindTint dropped. (C) threads/fileUpload.tsx FOLDERIZED → fileUpload/{helpers.ts,index.tsx}. (D) AgentModal slugify unexported. (E) TEXT_KINDS→preview/kinds.ts. (F) CATEGORIES/CatId→config/categories.ts; fmtDollar/fmtTokens→costs/format.ts.
-
-    Baseline BEFORE was RED (45 eslint+1 tsc; 4 in generated/, now ignored).
+    SAILING NOTE: Edits auto-reactivate the Queue; console_easy_bash gets intercepted into the queue when active — pause or flush deliberately.
   importance: high
   labels:
   - web-lint
   - T506
   - P0
+  - P1
   - complete
   - milestone
-  last_edited_ms: 1783350236995
+  last_edited_ms: 1783371503953
 48f2140d3c2dee0e:
   tl_dr: Entities module COMPLETE — all 151 stress tests passed (12 categories, 4 difficulty levels). 9 bugs found/fixed. Committed on 'entities' branch. Production-quality.
   contents: |-

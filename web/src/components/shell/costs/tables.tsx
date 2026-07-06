@@ -27,16 +27,18 @@ function heatBgDark(count: number, max: number): string | undefined {
 // ── Section wrapper (shared) ────────────────────────────────────────────────
 
 function Section({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-5 card-shadow">
-      {children}
-    </div>
-  )
+  return <div className="rounded-xl border border-border bg-card p-5 card-shadow">{children}</div>
 }
 
 // ── Cross-tab table ─────────────────────────────────────────────────────────
 
-export function CrossTabTable({ crossTab, totalTicks }: { crossTab: CrossTab; totalTicks: number }) {
+export function CrossTabTable({
+  crossTab,
+  totalTicks,
+}: {
+  crossTab: CrossTab
+  totalTicks: number
+}) {
   const [hover, setHover] = useState<{ tool: string; culprit: string } | null>(null)
   const isDark = document.documentElement.classList.contains("dark")
   const bgFn = isDark ? heatBgDark : heatBg
@@ -106,7 +108,8 @@ export function CrossTabTable({ crossTab, totalTicks }: { crossTab: CrossTab; to
                   {crossTab.culprits.map((c) => {
                     const v = crossTab.cells.get(`${tool}\t${c}`) ?? 0
                     const isActive = hover?.tool === tool && hover?.culprit === c
-                    const isDimmed = hover !== null && !isActive && hover.tool !== tool && hover.culprit !== c
+                    const isDimmed =
+                      hover !== null && !isActive && hover.tool !== tool && hover.culprit !== c
                     return (
                       <td
                         key={c}
@@ -206,7 +209,10 @@ export function ApiTokenDistribution({ rows }: { rows: CostRow[] }) {
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
         {segments.map((s) => (
           <span key={s.label} className="flex items-center gap-1.5">
-            <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
+            <span
+              className="inline-block size-2.5 rounded-sm"
+              style={{ backgroundColor: s.color }}
+            />
             {s.label}: {fmtTokens(s.value)} avg
           </span>
         ))}
@@ -252,7 +258,10 @@ export function TokenDistribution({ rows }: { rows: CostRow[] }) {
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
         {segments.map((s) => (
           <span key={s.label} className="flex items-center gap-1.5">
-            <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
+            <span
+              className="inline-block size-2.5 rounded-sm"
+              style={{ backgroundColor: s.color }}
+            />
             {s.label}: {fmtTokens(s.value)} avg
           </span>
         ))}

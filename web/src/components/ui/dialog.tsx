@@ -50,11 +50,7 @@ function DialogBackdrop({ className, ...props }: DialogPrimitive.Backdrop.Props)
  * padding/scroll so this can host both the compact details popup and the large
  * settings sheet.
  */
-function DialogContent({
-  className,
-  children,
-  ...props
-}: DialogPrimitive.Popup.Props) {
+function DialogContent({ className, children, ...props }: DialogPrimitive.Popup.Props) {
   return (
     <DialogPrimitive.Portal>
       <DialogBackdrop />
@@ -86,10 +82,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
   )
 }
 
-function DialogDescription({
-  className,
-  ...props
-}: DialogPrimitive.Description.Props) {
+function DialogDescription({ className, ...props }: DialogPrimitive.Description.Props) {
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"

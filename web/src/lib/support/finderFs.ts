@@ -93,7 +93,11 @@ const DECK_SLIDES = [
   },
   {
     title: "The Self-Improving Loop",
-    bullets: ["The tool builds the tool", "Every commit sharpens the next", "Compound returns, daily"],
+    bullets: [
+      "The tool builds the tool",
+      "Every commit sharpens the next",
+      "Compound returns, daily",
+    ],
   },
   {
     title: "Where it's going",
@@ -113,8 +117,9 @@ const SPEC_PDF = {
 }
 
 // Pseudo-random but deterministic waveform peaks for the audio preview.
-const PEAKS = Array.from({ length: 64 }, (_, i) =>
-  0.25 + 0.7 * Math.abs(Math.sin(i * 0.7) * Math.cos(i * 0.31) + Math.sin(i * 1.9) * 0.4),
+const PEAKS = Array.from(
+  { length: 64 },
+  (_, i) => 0.25 + 0.7 * Math.abs(Math.sin(i * 0.7) * Math.cos(i * 0.31) + Math.sin(i * 1.9) * 0.4),
 )
 
 /** Build the realm tree for an agent, rooted at its folder. */
@@ -233,7 +238,11 @@ export function buildRealm(folder: string, name: string): FinderNode {
             size: 88_400,
             modified: "1mo ago",
             created: "2mo ago",
-            image: { gradient: "radial-gradient(circle at 35% 30%,#6fb585,#222831 75%)", w: 512, h: 512 },
+            image: {
+              gradient: "radial-gradient(circle at 35% 30%,#6fb585,#222831 75%)",
+              w: 512,
+              h: 512,
+            },
           },
           {
             name: "talk-deck.key",

@@ -1,10 +1,7 @@
 import { useState } from "react"
 import type { CatId } from "./categories"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import {
-  Check,
-  Lock,
-} from "lucide-react"
+import { Check, Lock } from "lucide-react"
 import { UsagePage } from "@/components/agents/UsagePage"
 import { ReleasesPane } from "./ReleasesPane"
 import { useProviders } from "@/lib/support/models"
@@ -33,7 +30,16 @@ export function CategoryBody({ cat }: { cat: CatId }) {
 
 /** Grouping of the well-known env keys into display categories (by env name). */
 const SERVICE_GROUPS: { label: string; envs: string[] }[] = [
-  { label: "Model providers", envs: ["ANTHROPIC_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "DEEPSEEK_API_KEY", "MINIMAX_API_KEY"] },
+  {
+    label: "Model providers",
+    envs: [
+      "ANTHROPIC_API_KEY",
+      "GROQ_API_KEY",
+      "XAI_API_KEY",
+      "DEEPSEEK_API_KEY",
+      "MINIMAX_API_KEY",
+    ],
+  },
   { label: "Search & embeddings", envs: ["VOYAGE_API_KEY"] },
   { label: "Document AI", envs: ["DATALAB_API_KEY"] },
   { label: "Web & scraping", envs: ["BRAVE_API_KEY", "FIRECRAWL_API_KEY"] },
@@ -94,7 +100,9 @@ function ServiceRow({ label, available }: { label: string; available: boolean })
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-[13px] font-medium text-foreground/90">{label}</span>
-        <span className="text-[11px] text-muted-foreground">{available ? "Available" : "Not configured"}</span>
+        <span className="text-[11px] text-muted-foreground">
+          {available ? "Available" : "Not configured"}
+        </span>
       </span>
     </div>
   )
@@ -108,8 +116,17 @@ function GeneralPane() {
     <Stack>
       <AllowedModelsSection />
 
-      <ToggleRow i={0} name="Auto-continuation" detail="Let the agent keep working without a nudge" />
-      <ToggleRow i={1} name="Reverie (context optimizer)" detail="Background cleaner reshapes context when it grows" on />
+      <ToggleRow
+        i={0}
+        name="Auto-continuation"
+        detail="Let the agent keep working without a nudge"
+      />
+      <ToggleRow
+        i={1}
+        name="Reverie (context optimizer)"
+        detail="Background cleaner reshapes context when it grows"
+        on
+      />
       <ToggleRow i={2} name="Think reminders" detail="Periodic nudge to reason before acting" on />
       <DevModeToggle i={3} />
     </Stack>
@@ -164,7 +181,9 @@ function AllowedModelsSection() {
         <span className="flex min-w-0 flex-col">
           <span className="text-[13px] font-medium text-foreground/90">Allow all models</span>
           <span className="text-[11px] text-muted-foreground">
-            {restricted ? "Restricted — only the checked models below are available" : "Every provisioned model is available to your users"}
+            {restricted
+              ? "Restricted — only the checked models below are available"
+              : "Every provisioned model is available to your users"}
           </span>
         </span>
       </label>
@@ -173,13 +192,18 @@ function AllowedModelsSection() {
         <div className="flex flex-col gap-3 pt-1">
           {providers.map((p) => (
             <div key={p.id} className="flex flex-col gap-1.5">
-              <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">{p.name}</span>
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                {p.name}
+              </span>
               <div className="flex flex-col gap-1">
                 {p.models.map((m) => {
                   const key = m.key
                   const checked = allowedSet.has(key)
                   return (
-                    <label key={key} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-muted/40">
+                    <label
+                      key={key}
+                      className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-muted/40"
+                    >
                       <input
                         type="checkbox"
                         checked={checked}
@@ -239,7 +263,9 @@ function FieldGroup({
   return (
     <div className="flex flex-col gap-2 pb-1">
       <div className="flex items-baseline gap-2">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">{label}</span>
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+          {label}
+        </span>
         {hint && <span className="text-[11px] text-muted-foreground/60">{hint}</span>}
       </div>
       {children}
@@ -298,4 +324,3 @@ function ToggleRow({
     </button>
   )
 }
-

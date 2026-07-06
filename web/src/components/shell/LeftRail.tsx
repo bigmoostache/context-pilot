@@ -77,7 +77,9 @@ export function LeftRail({
           >
             <MessageSquare
               className="size-4 shrink-0"
-              style={{ color: selected === "conversation" ? "var(--signal)" : "var(--muted-foreground)" }}
+              style={{
+                color: selected === "conversation" ? "var(--signal)" : "var(--muted-foreground)",
+              }}
             />
             <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium">Conversation</span>
           </button>

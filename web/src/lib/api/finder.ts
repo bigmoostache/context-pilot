@@ -69,11 +69,13 @@ export function writeFile(agentId: string, path: string, content: string): Promi
 }
 
 export function uploadFile(agentId: string, dir: string, file: File): Promise<UploadResult> {
-  return sdk(postApiAgentByIdFsUpload({
-    path: { id: agentId },
-    query: { path: dir, name: file.name },
-    body: file,
-  }))
+  return sdk(
+    postApiAgentByIdFsUpload({
+      path: { id: agentId },
+      query: { path: dir, name: file.name },
+      body: file,
+    }),
+  )
 }
 
 export function uploadUnique(
@@ -81,30 +83,24 @@ export function uploadUnique(
   dir: string,
   file: File,
 ): Promise<UploadUniqueResult> {
-  return sdk(postApiAgentByIdFsUploadUnique({
-    path: { id: agentId },
-    query: { path: dir, name: file.name },
-    body: file,
-  }))
+  return sdk(
+    postApiAgentByIdFsUploadUnique({
+      path: { id: agentId },
+      query: { path: dir, name: file.name },
+      body: file,
+    }),
+  )
 }
 
 export function createFolder(agentId: string, dir: string, name: string): Promise<MkdirResult> {
   return sdk(postApiAgentByIdFsMkdir({ path: { id: agentId }, query: { path: dir, name } }))
 }
 
-export function renameItem(
-  agentId: string,
-  path: string,
-  newName: string,
-): Promise<RenameResult> {
+export function renameItem(agentId: string, path: string, newName: string): Promise<RenameResult> {
   return sdk(postApiAgentByIdFsRename({ path: { id: agentId }, query: { path, name: newName } }))
 }
 
-export function moveItems(
-  agentId: string,
-  items: string[],
-  dest: string,
-): Promise<MoveResult> {
+export function moveItems(agentId: string, items: string[], dest: string): Promise<MoveResult> {
   return sdk(postApiAgentByIdFsMove({ path: { id: agentId }, body: { items, dest } }))
 }
 
@@ -126,7 +122,8 @@ export async function downloadFile(agentId: string, path: string): Promise<void>
   const token = getToken()
   if (token) headers["Authorization"] = `Bearer ${token}`
 
-  const res = await fetch( // ok:manual — binary blob download, irreducible
+  const res = await fetch(
+    // ok:manual — binary blob download, irreducible
     `${BASE}/api/agent/${agentId}/fs/download?path=${encodeURIComponent(path)}`,
     { headers },
   )
@@ -136,9 +133,9 @@ export async function downloadFile(agentId: string, path: string): Promise<void>
   }
   const blob = await res.blob()
   const filename =
-    res.headers
-      .get("Content-Disposition")
-      ?.match(/filename="?([^"]+)"?/)?.[1] ?? path.split("/").pop() ?? "download"
+    res.headers.get("Content-Disposition")?.match(/filename="?([^"]+)"?/)?.[1] ??
+    path.split("/").pop() ??
+    "download"
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url

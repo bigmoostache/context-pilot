@@ -43,7 +43,7 @@ async function rawThreads(req: APIRequestContext): Promise<RawThread[]> {
   const res = await req.get(`${API}/api/agent/${AGENT_ID}/threads`)
   expect(res.ok()).toBeTruthy()
   const raw = await res.json()
-  return Array.isArray(raw) ? raw : raw.threads ?? []
+  return Array.isArray(raw) ? raw : (raw.threads ?? [])
 }
 
 /** Wait until `name` exists in the roster (non-archived) and return its id. */

@@ -143,34 +143,43 @@ function AppShell() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
-          <TopBar
-            view={effectiveView}
-            onViewChange={setView}
-            activeAgentId={activeAgentId}
-            onSwitchAgent={setActiveAgentId}
-            onNewAgent={newAgent}
-            agents={agents}
-          />
+      <TopBar
+        view={effectiveView}
+        onViewChange={setView}
+        activeAgentId={activeAgentId}
+        onSwitchAgent={setActiveAgentId}
+        onNewAgent={newAgent}
+        agents={agents}
+      />
 
-          {effectiveView === "fleet" ? (
-            <FleetShell
-              agents={agents}
-              onOpenAgent={openAgent}
-              openCreate={createAgent}
-              onCreateConsumed={() => setCreateAgent(false)}
-            />
-          ) : effectiveView === "cockpit" ? (
-            <CockpitView agentId={activeAgentId} />
-          ) : effectiveView === "costs" ? (
-            <CostsView agentId={activeAgentId} />
-          ) : effectiveView === "finder" ? (
-            <Finder key={activeAgent!.id} agent={activeAgent!} revealPath={finderRevealPath} onRevealConsumed={() => setFinderRevealPath(null)} />
-          ) : (
-            <ThreadsView key={activeAgentId} activeAgentId={activeAgentId} onShowInFinder={showInFinder} />
-          )}
+      {effectiveView === "fleet" ? (
+        <FleetShell
+          agents={agents}
+          onOpenAgent={openAgent}
+          openCreate={createAgent}
+          onCreateConsumed={() => setCreateAgent(false)}
+        />
+      ) : effectiveView === "cockpit" ? (
+        <CockpitView agentId={activeAgentId} />
+      ) : effectiveView === "costs" ? (
+        <CostsView agentId={activeAgentId} />
+      ) : effectiveView === "finder" ? (
+        <Finder
+          key={activeAgent!.id}
+          agent={activeAgent!}
+          revealPath={finderRevealPath}
+          onRevealConsumed={() => setFinderRevealPath(null)}
+        />
+      ) : (
+        <ThreadsView
+          key={activeAgentId}
+          activeAgentId={activeAgentId}
+          onShowInFinder={showInFinder}
+        />
+      )}
 
-          <StatusBar fleet={effectiveView === "fleet"} agents={agents} activeAgent={activeAgent} />
-        </div>
+      <StatusBar fleet={effectiveView === "fleet"} agents={agents} activeAgent={activeAgent} />
+    </div>
   )
 }
 

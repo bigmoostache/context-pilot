@@ -59,7 +59,10 @@ export function StatsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
           <span className="text-[12px] text-muted-foreground">
             {fmtTokens(panelTokens)} across {panels.length} panel{panels.length === 1 ? "" : "s"}
           </span>
-          <span className="text-[12px] font-semibold tabular-nums" style={{ color: loadColor(usedRatio) }}>
+          <span
+            className="text-[12px] font-semibold tabular-nums"
+            style={{ color: loadColor(usedRatio) }}
+          >
             {(usedRatio * 100).toFixed(0)}%
           </span>
         </div>
@@ -75,11 +78,16 @@ export function StatsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
         <ul className="flex flex-col gap-1">
           {panels.map((p) => (
             <li key={p.id} className="flex items-center gap-2">
-              <span className="w-28 shrink-0 truncate text-[11.5px] text-foreground/80">{p.name}</span>
+              <span className="w-28 shrink-0 truncate text-[11.5px] text-foreground/80">
+                {p.name}
+              </span>
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full"
-                  style={{ width: `${(p.tokens / maxTokens) * 100}%`, background: "var(--signal-dim)" }}
+                  style={{
+                    width: `${(p.tokens / maxTokens) * 100}%`,
+                    background: "var(--signal-dim)",
+                  }}
                 />
               </div>
               <span className="w-12 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground/70">

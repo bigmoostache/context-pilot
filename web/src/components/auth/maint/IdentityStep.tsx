@@ -7,7 +7,13 @@ import { useState, type FormEvent } from "react"
 import { setIdentity, type Identity } from "@/lib/api/maint"
 import { Field, ErrorNote, PrimaryButton } from "./parts"
 
-export function IdentityStep({ initial, onDone }: { initial: Identity | null; onDone: () => void }) {
+export function IdentityStep({
+  initial,
+  onDone,
+}: {
+  initial: Identity | null
+  onDone: () => void
+}) {
   const [name, setName] = useState(initial?.name ?? "")
   const [ip, setIp] = useState(initial?.ip ?? "")
   const [error, setError] = useState<string | null>(null)
@@ -40,7 +46,8 @@ export function IdentityStep({ initial, onDone }: { initial: Identity | null; on
       <Field label="LAN IP address" value={ip} onChange={setIp} placeholder="192.168.1.116" />
       <ErrorNote error={error} />
       <p className="mb-3 text-xs text-muted-foreground">
-        Saving re-issues the TLS certificate for this name/IP. Use a static lease so the address doesn't change.
+        Saving re-issues the TLS certificate for this name/IP. Use a static lease so the address
+        doesn't change.
       </p>
       <PrimaryButton type="submit" disabled={ip.trim() === ""} busy={busy}>
         Save name &amp; re-issue certificate

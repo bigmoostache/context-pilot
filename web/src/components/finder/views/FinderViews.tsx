@@ -5,13 +5,7 @@ import { extOf, kindMeta } from "../support/kind"
 import { FileIcon } from "../support/macIcons"
 import { InfoBadge } from "../support/InfoBadge"
 import { cn } from "@/lib/utils"
-import {
-  folderDropProps,
-  mods,
-  startItemDrag,
-  itemCount,
-  type ViewHandlers,
-} from "./helpers"
+import { folderDropProps, mods, startItemDrag, itemCount, type ViewHandlers } from "./helpers"
 import { RenameInput, TagDots } from "./shared"
 
 // Column view is a sibling component; re-exported so `views/FinderViews` stays
@@ -57,7 +51,8 @@ export function GridView({
                 ? "border-[var(--signal)]/55 bg-[var(--signal)]/10 card-shadow"
                 : "border-transparent hover:border-border hover:bg-muted/45",
               focus && !sel && "ring-2 ring-[var(--signal)]/45",
-              dropOver && "border-[var(--signal)] bg-[var(--signal)]/15 ring-2 ring-[var(--signal)]/60",
+              dropOver &&
+                "border-[var(--signal)] bg-[var(--signal)]/15 ring-2 ring-[var(--signal)]/60",
             )}
           >
             {h.descriptions?.[n.path] && (
@@ -161,7 +156,10 @@ export function ListView({
             <span className="tabular-nums text-muted-foreground">
               {n.kind === "folder" ? itemCount(n) : fmtBytes(n.size)}
             </span>
-            <span className="truncate text-muted-foreground" title={n.created ? `Created ${n.created}` : undefined}>
+            <span
+              className="truncate text-muted-foreground"
+              title={n.created ? `Created ${n.created}` : undefined}
+            >
               {n.modified}
             </span>
           </button>
@@ -206,7 +204,11 @@ export function GalleryView({
     <div className="flex h-full min-h-0 flex-col">
       {/* hero */}
       <div className="flex min-h-0 flex-1 items-center justify-center p-8">
-        {node ? <Hero node={node} /> : <span className="text-[13px] text-muted-foreground">Empty</span>}
+        {node ? (
+          <Hero node={node} />
+        ) : (
+          <span className="text-[13px] text-muted-foreground">Empty</span>
+        )}
       </div>
 
       {/* filmstrip */}
@@ -222,7 +224,9 @@ export function GalleryView({
               onContextMenu={(e) => h.onContext(e, n)}
               className={cn(
                 "flex shrink-0 flex-col items-center gap-1 rounded-lg p-1.5 transition-all",
-                active ? "bg-[var(--signal)]/14 ring-1 ring-[var(--signal)]/50" : "hover:bg-muted/50",
+                active
+                  ? "bg-[var(--signal)]/14 ring-1 ring-[var(--signal)]/50"
+                  : "hover:bg-muted/50",
               )}
             >
               {n.image ? (
@@ -233,7 +237,9 @@ export function GalleryView({
               ) : (
                 <FileIcon kind={n.kind} ext={extOf(n.name)} size={48} />
               )}
-              <span className="max-w-[68px] truncate text-[10px] text-muted-foreground">{n.name}</span>
+              <span className="max-w-[68px] truncate text-[10px] text-muted-foreground">
+                {n.name}
+              </span>
             </button>
           )
         })}
@@ -255,12 +261,12 @@ function Hero({ node }: { node: FinderNode }) {
         <FileIcon kind={node.kind} ext={extOf(node.name)} size={132} className="card-shadow" />
       )}
       <div className="flex flex-col items-center gap-1.5 text-center">
-        <span className="text-[17px] font-semibold tracking-tight text-foreground">{node.name}</span>
+        <span className="text-[17px] font-semibold tracking-tight text-foreground">
+          {node.name}
+        </span>
         <TagDots tags={node.tags} />
         <span className="text-[12px] tabular-nums text-muted-foreground">
-          {node.kind === "folder"
-            ? itemCount(node)
-            : `${M.label} · ${fmtBytes(node.size)}`}
+          {node.kind === "folder" ? itemCount(node) : `${M.label} · ${fmtBytes(node.size)}`}
           {node.media ? ` · ${node.media.duration}` : ""}
           {node.image ? ` · ${node.image.w}×${node.image.h}` : ""}
         </span>
@@ -268,5 +274,3 @@ function Hero({ node }: { node: FinderNode }) {
     </div>
   )
 }
-
-

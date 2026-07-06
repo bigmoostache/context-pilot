@@ -170,9 +170,7 @@ export function useFinderSelection(d: SelectionDeps) {
 
   // Trash a node, expanding to the whole selection when the node is selected.
   const trashNode = (node: FinderNode) =>
-    d.trashPaths(
-      d.selected.has(node.path) && d.selected.size > 0 ? [...d.selected] : [node.path],
-    )
+    d.trashPaths(d.selected.has(node.path) && d.selected.size > 0 ? [...d.selected] : [node.path])
 
   return {
     select,

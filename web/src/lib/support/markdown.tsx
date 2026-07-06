@@ -48,18 +48,33 @@ function extractText(node: ReactNode): string {
  * `--ok` green as confirmation. Clicks inside a `<pre>` (fenced code blocks)
  * are ignored — those have a dedicated CopyButton beneath them.
  */
-function ClickableCode({ baseClass, children, ...rest }: { baseClass: string; children?: ReactNode; [k: string]: unknown }) {
+function ClickableCode({
+  baseClass,
+  children,
+  ...rest
+}: {
+  baseClass: string
+  children?: ReactNode
+  [k: string]: unknown
+}) {
   const [copied, setCopied] = useState(false)
   return (
     <code
-      className={cn(baseClass, "cursor-pointer transition-colors duration-150", copied && "!border-[var(--ok)] !text-[var(--ok)]")}
+      className={cn(
+        baseClass,
+        "cursor-pointer transition-colors duration-150",
+        copied && "!border-[var(--ok)] !text-[var(--ok)]",
+      )}
       onClick={(ev) => {
         if ((ev.target as HTMLElement).closest("pre")) return
         const text = typeof children === "string" ? children : extractText(children)
-        navigator.clipboard?.writeText(text).then(() => {
-          setCopied(true)
-          window.setTimeout(() => setCopied(false), 1500)
-        }, () => {})
+        navigator.clipboard?.writeText(text).then(
+          () => {
+            setCopied(true)
+            window.setTimeout(() => setCopied(false), 1500)
+          },
+          () => {},
+        )
       }}
       {...rest}
     >
@@ -90,8 +105,7 @@ function tableToMarkdown(table: HTMLTableElement): string {
       " | ",
     ) +
     " |"
-  const sep =
-    "| " + colWidths.map((w) => "-".repeat(w)).join(" | ") + " |"
+  const sep = "| " + colWidths.map((w) => "-".repeat(w)).join(" | ") + " |"
   const [header, ...body] = matrix
   return [fmtRow(header ?? []), sep, ...body.map(fmtRow)].join("\n")
 }
@@ -176,7 +190,9 @@ function components(variant: MarkdownVariant): Components {
       <h2 className="mt-3 mb-1.5 text-[15px] font-semibold leading-snug first:mt-0">{children}</h2>
     ),
     h3: ({ children }) => (
-      <h3 className="mt-2.5 mb-1 text-[13.5px] font-semibold leading-snug first:mt-0">{children}</h3>
+      <h3 className="mt-2.5 mb-1 text-[13.5px] font-semibold leading-snug first:mt-0">
+        {children}
+      </h3>
     ),
     h4: ({ children }) => (
       <h4 className="mt-2 mb-1 text-[12.5px] font-semibold uppercase tracking-wide opacity-80 first:mt-0">
@@ -250,7 +266,12 @@ function components(variant: MarkdownVariant): Components {
         >
           {children}
         </pre>
-        <CopyButton text={extractText(children)} align="start" label="Copy code" className={onAccent ? "text-current/60 hover:text-current" : undefined} />
+        <CopyButton
+          text={extractText(children)}
+          align="start"
+          label="Copy code"
+          className={onAccent ? "text-current/60 hover:text-current" : undefined}
+        />
       </div>
     ),
 
@@ -260,7 +281,9 @@ function components(variant: MarkdownVariant): Components {
     ),
 
     // ── Horizontal rule ──
-    hr: () => <hr className={cn("my-3 border-t", onAccent ? "border-white/25" : "border-border")} />,
+    hr: () => (
+      <hr className={cn("my-3 border-t", onAccent ? "border-white/25" : "border-border")} />
+    ),
 
     // ── Tables (GFM) — wrapped so wide tables scroll instead of overflowing. ──
     table: ({ children }) => (
@@ -322,7 +345,11 @@ export const Markdown = memo(function Markdown({
 }): ReactNode {
   return (
     <div className={cn("break-words", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]} rehypePlugins={[rehypeKatex]} components={components(variant)}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
+        rehypePlugins={[rehypeKatex]}
+        components={components(variant)}
+      >
         {normalizeMarkdown(text)}
       </ReactMarkdown>
     </div>

@@ -19,9 +19,27 @@ const KIND_META: Record<
   LibraryKind,
   { label: string; plural: string; icon: typeof Bot; accent: string; blurb: string }
 > = {
-  agent: { label: "System prompt", plural: "System", icon: Bot, accent: "var(--signal)", blurb: "System prompts — a personality & operating contract." },
-  skill: { label: "Skill", plural: "Skills", icon: Zap, accent: "var(--interactive)", blurb: "Reference material loaded into context on demand." },
-  command: { label: "Command", plural: "Commands", icon: TerminalSquare, accent: "var(--ok)", blurb: "Slash-commands that expand into a prompt." },
+  agent: {
+    label: "System prompt",
+    plural: "System",
+    icon: Bot,
+    accent: "var(--signal)",
+    blurb: "System prompts — a personality & operating contract.",
+  },
+  skill: {
+    label: "Skill",
+    plural: "Skills",
+    icon: Zap,
+    accent: "var(--interactive)",
+    blurb: "Reference material loaded into context on demand.",
+  },
+  command: {
+    label: "Command",
+    plural: "Commands",
+    icon: TerminalSquare,
+    accent: "var(--ok)",
+    blurb: "Slash-commands that expand into a prompt.",
+  },
 }
 
 const TABS: (LibraryKind | "all")[] = ["all", "agent", "skill", "command"]
@@ -77,7 +95,9 @@ export function PromptsPage({ agentId }: { agentId?: string | undefined }) {
                 onClick={() => setTab(t)}
                 className={cn(
                   "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium transition-all",
-                  tab === t ? "bg-card text-foreground card-shadow" : "text-muted-foreground hover:text-foreground",
+                  tab === t
+                    ? "bg-card text-foreground card-shadow"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {label}
@@ -93,7 +113,12 @@ export function PromptsPage({ agentId }: { agentId?: string | undefined }) {
         {tab === "all" ? (
           <div className="flex flex-col gap-6">
             {(["agent", "skill", "command"] as LibraryKind[]).map((k) => (
-              <KindSection key={k} kind={k} items={library.filter((i) => i.kind === k)} onOpen={setEditing} />
+              <KindSection
+                key={k}
+                kind={k}
+                items={library.filter((i) => i.kind === k)}
+                onOpen={setEditing}
+              />
             ))}
           </div>
         ) : (
@@ -159,15 +184,25 @@ function LibraryCard({
       <div className="flex items-center gap-2.5">
         <span
           className="flex size-8 shrink-0 items-center justify-center rounded-lg"
-          style={{ background: `color-mix(in oklab, ${M.accent} 15%, transparent)`, color: M.accent }}
+          style={{
+            background: `color-mix(in oklab, ${M.accent} 15%, transparent)`,
+            color: M.accent,
+          }}
         >
           <M.icon className="size-[18px]" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className={cn("truncate text-[13.5px] font-semibold text-foreground/90", mono && "font-mono text-[13px]")}>
+          <span
+            className={cn(
+              "truncate text-[13.5px] font-semibold text-foreground/90",
+              mono && "font-mono text-[13px]",
+            )}
+          >
             {item.name}
           </span>
-          {item.meta && <span className="truncate text-[10.5px] text-muted-foreground/65">{item.meta}</span>}
+          {item.meta && (
+            <span className="truncate text-[10.5px] text-muted-foreground/65">{item.meta}</span>
+          )}
         </div>
         {item.builtin && (
           <span className="shrink-0 rounded-full bg-muted/70 px-1.5 py-0.5 text-[9.5px] font-medium text-muted-foreground/70">
@@ -175,7 +210,9 @@ function LibraryCard({
           </span>
         )}
       </div>
-      <p className="line-clamp-2 min-h-[2.4em] text-[12px] leading-snug text-foreground/70">{item.description}</p>
+      <p className="line-clamp-2 min-h-[2.4em] text-[12px] leading-snug text-foreground/70">
+        {item.description}
+      </p>
     </button>
   )
 }

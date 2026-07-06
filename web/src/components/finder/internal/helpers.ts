@@ -46,16 +46,10 @@ export function loadPins(agentId: string): PinnedFolder[] {
 }
 
 /** Build breadcrumbs from a path relative to the agent's folder. */
-export function buildCrumbs(
-  agentFolder: string,
-  agentName: string,
-  cwd: string,
-): FinderNode[] {
+export function buildCrumbs(agentFolder: string, agentName: string, cwd: string): FinderNode[] {
   if (cwd === agentFolder)
     return [{ name: agentName, path: agentFolder, kind: "folder", modified: "" }]
-  const rel = cwd.startsWith(agentFolder + "/")
-    ? cwd.slice(agentFolder.length + 1)
-    : ""
+  const rel = cwd.startsWith(agentFolder + "/") ? cwd.slice(agentFolder.length + 1) : ""
   const parts = rel.split("/").filter(Boolean)
   const crumbs: FinderNode[] = [
     { name: agentName, path: agentFolder, kind: "folder", modified: "" },

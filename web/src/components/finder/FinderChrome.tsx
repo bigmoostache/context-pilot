@@ -61,7 +61,9 @@ export function FinderTabs({
             onClick={() => onSelect(t.id)}
             className={cn(
               "group flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors",
-              on ? "bg-card text-foreground card-shadow" : "text-muted-foreground hover:bg-muted/60",
+              on
+                ? "bg-card text-foreground card-shadow"
+                : "text-muted-foreground hover:bg-muted/60",
             )}
           >
             <FileIcon kind={t.kind} ext={extOf(t.label)} size={15} className="shrink-0" />
@@ -179,7 +181,9 @@ export function FinderToolbar({
                 onClick={() => onCrumb(c.path)}
                 className={cn(
                   "rounded px-1.5 py-0.5 text-[12px] transition-colors hover:bg-muted/70",
-                  i === shown.length - 1 ? "font-semibold text-foreground" : "text-muted-foreground",
+                  i === shown.length - 1
+                    ? "font-semibold text-foreground"
+                    : "text-muted-foreground",
                 )}
               >
                 {isFirst ? (
@@ -228,7 +232,9 @@ export function FinderToolbar({
                   onClick={() => onViewMode(m)}
                   className={cn(
                     "relative z-[1] flex size-7 items-center justify-center rounded-md transition-colors",
-                    viewMode === m ? "text-[var(--signal)]" : "text-muted-foreground hover:text-foreground",
+                    viewMode === m
+                      ? "text-[var(--signal)]"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   <Icon className="size-4" />
@@ -250,7 +256,10 @@ export function FinderToolbar({
             className="w-full bg-transparent text-[12px] text-foreground outline-none placeholder:text-muted-foreground/50"
           />
           {query && (
-            <button onClick={() => onQuery("")} className="text-muted-foreground/50 hover:text-foreground">
+            <button
+              onClick={() => onQuery("")}
+              className="text-muted-foreground/50 hover:text-foreground"
+            >
               <X className="size-3.5" />
             </button>
           )}
@@ -267,7 +276,12 @@ export function FinderToolbar({
           <NavBtn icon={Upload} onClick={onUpload} title="Upload" />
           <NavBtn icon={Download} onClick={onDownload} title="Download" />
           <SegBtn icon={PanelBottom} on={pathBarOpen} onClick={onTogglePathBar} title="Path bar" />
-          <SegBtn icon={SidebarIcon} on={previewOpen} onClick={onTogglePreview} title="Quick Look pane" />
+          <SegBtn
+            icon={SidebarIcon}
+            on={previewOpen}
+            onClick={onTogglePreview}
+            title="Quick Look pane"
+          />
         </>
       )}
     </div>
@@ -326,7 +340,9 @@ function SegBtn({
         onClick={onClick}
         className={cn(
           "flex size-8 items-center justify-center rounded-md transition-colors",
-          on ? "bg-muted text-[var(--signal)]" : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+          on
+            ? "bg-muted text-[var(--signal)]"
+            : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
         )}
       >
         <Icon className="size-4" />

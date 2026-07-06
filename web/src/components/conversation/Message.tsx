@@ -30,8 +30,25 @@ interface MessageProps {
 
 export function Message({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: MessageProps) {
   if (msg.role === "tool" && msg.tool) return <ToolMessage msg={msg} />
-  if (msg.role === "user") return <UserMessage msg={msg} agentId={agentId} onOpenFile={onOpenFile} onShowInFinder={onShowInFinder} onDelete={onDelete} />
-  return <AssistantMessage msg={msg} agentId={agentId} onOpenFile={onOpenFile} onShowInFinder={onShowInFinder} onDelete={onDelete} />
+  if (msg.role === "user")
+    return (
+      <UserMessage
+        msg={msg}
+        agentId={agentId}
+        onOpenFile={onOpenFile}
+        onShowInFinder={onShowInFinder}
+        onDelete={onDelete}
+      />
+    )
+  return (
+    <AssistantMessage
+      msg={msg}
+      agentId={agentId}
+      onOpenFile={onOpenFile}
+      onShowInFinder={onShowInFinder}
+      onDelete={onDelete}
+    />
+  )
 }
 
 /**
@@ -114,7 +131,7 @@ export function CopyButton({
   const [copied, setCopied] = useState(false)
 
   const onCopy = () => {
-    const t = getText ? getText() : text ?? ""
+    const t = getText ? getText() : (text ?? "")
     // `?.` guards environments without the async clipboard API (insecure
     // origin / older browser); a failed write is silently ignored — the worst
     // case is the tick simply doesn't flash, never a thrown error in the UI.
@@ -135,7 +152,9 @@ export function CopyButton({
       className={cn(
         "flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] transition-colors",
         "opacity-50 hover:opacity-100 focus-visible:opacity-100 outline-none",
-        copied ? "text-[var(--ok)] opacity-100" : cn("text-muted-foreground/70 hover:text-foreground", extra),
+        copied
+          ? "text-[var(--ok)] opacity-100"
+          : cn("text-muted-foreground/70 hover:text-foreground", extra),
         align === "end" ? "self-end" : "self-start",
       )}
     >
@@ -151,13 +170,7 @@ export function CopyButton({
  * Matches the copy button's quiet style — low opacity, brightening on hover —
  * but uses the danger colour on hover to signal destructiveness.
  */
-function DeleteButton({
-  align,
-  onDelete,
-}: {
-  align: "start" | "end"
-  onDelete: () => void
-}) {
+function DeleteButton({ align, onDelete }: { align: "start" | "end"; onDelete: () => void }) {
   return (
     <button
       type="button"
@@ -180,7 +193,13 @@ function UserMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }: Mes
   return (
     <div className="rise flex flex-col items-end gap-1 py-2">
       <div className="max-w-[78%] rounded-2xl rounded-br-md bg-[var(--signal)] px-3.5 py-2 text-[13px] leading-relaxed text-[var(--primary-foreground)] card-shadow">
-        <MessageBody text={msg.text ?? ""} variant="onAccent" agentId={agentId} onOpenFile={onOpenFile} onShowInFinder={onShowInFinder} />
+        <MessageBody
+          text={msg.text ?? ""}
+          variant="onAccent"
+          agentId={agentId}
+          onOpenFile={onOpenFile}
+          onShowInFinder={onShowInFinder}
+        />
       </div>
       <span className="flex items-center gap-1 pr-1 text-[10px] text-muted-foreground/60">
         <User className="size-2.5" />
@@ -205,7 +224,13 @@ function AssistantMessage({ msg, agentId, onOpenFile, onShowInFinder, onDelete }
         <span className="text-[10px] text-muted-foreground/60">{msg.ts}</span>
       </div>
       <div className="max-w-[88%] pl-7 text-[13.5px] leading-relaxed text-foreground/90">
-        <MessageBody text={msg.text ?? ""} variant="default" agentId={agentId} onOpenFile={onOpenFile} onShowInFinder={onShowInFinder} />
+        <MessageBody
+          text={msg.text ?? ""}
+          variant="default"
+          agentId={agentId}
+          onOpenFile={onOpenFile}
+          onShowInFinder={onShowInFinder}
+        />
         {msg.streaming && (
           <span className="cursor-blink ml-0.5 inline-block h-3.5 w-[7px] translate-y-0.5 bg-[var(--signal)]" />
         )}

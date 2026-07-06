@@ -32,7 +32,5 @@ export default defineConfig({
     trace: "off",
     actionTimeout: 10_000,
   },
-  projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-  ],
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 })

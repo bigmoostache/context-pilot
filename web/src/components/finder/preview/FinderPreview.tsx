@@ -10,12 +10,7 @@ import {
   MarkdownPreview,
   TextPreview,
 } from "./previewParts"
-import {
-  LiveImagePreview,
-  LivePdfPreview,
-  LivePreview,
-  LiveSheetPreview,
-} from "./livePreviews"
+import { LiveImagePreview, LivePdfPreview, LivePreview, LiveSheetPreview } from "./livePreviews"
 import { TEXT_KINDS } from "./kinds"
 import {
   AudioPreview,
@@ -26,7 +21,6 @@ import {
   SlidesPreview,
   VideoPreview,
 } from "./mockPreviews"
-
 
 /**
  * QuickLook preview pane — the Finder's centerpiece. Renders a rich, kind-aware
@@ -76,9 +70,7 @@ export function FinderPreview({
                 <IconBtn
                   icon={Download}
                   title="Download"
-                  onClick={
-                    agentId ? () => void downloadFile(agentId, node.path) : undefined
-                  }
+                  onClick={agentId ? () => void downloadFile(agentId, node.path) : undefined}
                 />
               </>
             )}

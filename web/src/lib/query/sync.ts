@@ -102,7 +102,11 @@ const wired = new Set<string>()
  * body-before-reference barrier), so the fetch is race-free. A fetch failure
  * falls back to invalidating the threads query so a refetch still surfaces it.
  */
-async function hydrateSpilledMessage(client: QueryClient, agentId: string, entry: OpEntry): Promise<void> {
+async function hydrateSpilledMessage(
+  client: QueryClient,
+  agentId: string,
+  entry: OpEntry,
+): Promise<void> {
   const head = entry.kind.head
   if (!head) return
   const tk = qk.threads(agentId)

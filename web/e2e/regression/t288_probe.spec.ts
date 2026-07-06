@@ -59,7 +59,10 @@ test("quick look is a modal shadcn drawer: backdrop, ~2/3 width, flush-right", a
 
   expect(report.overflowsRight, "drawer must not spill past the right edge").toBeFalsy()
   expect(Math.abs(report.rightEdge - vw), "drawer flush to viewport").toBeLessThanOrEqual(2)
-  expect(Math.abs(report.drawer.w - expectedW), "drawer width ~2/3 of viewport").toBeLessThanOrEqual(4)
+  expect(
+    Math.abs(report.drawer.w - expectedW),
+    "drawer width ~2/3 of viewport",
+  ).toBeLessThanOrEqual(4)
 })
 
 test("Esc closes the drawer", async ({ page }) => {

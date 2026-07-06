@@ -121,7 +121,13 @@ function MacFolder({ size, className }: { size: number; className?: string | und
           <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
         </linearGradient>
         <filter id={`ds${id}`} x="-30%" y="-30%" width="160%" height="160%">
-          <feDropShadow dx="0" dy="0.5" stdDeviation="0.65" floodColor="#0A4FA0" floodOpacity="0.32" />
+          <feDropShadow
+            dx="0"
+            dy="0.5"
+            stdDeviation="0.65"
+            floodColor="#0A4FA0"
+            floodOpacity="0.32"
+          />
         </filter>
       </defs>
       <g filter={`url(#ds${id})`}>
@@ -180,7 +186,13 @@ function MacDocument({
           <stop offset="1" stopColor={tagColor} stopOpacity="0.88" />
         </linearGradient>
         <filter id={`ds${id}`} x="-30%" y="-30%" width="160%" height="160%">
-          <feDropShadow dx="0" dy="0.5" stdDeviation="0.55" floodColor="#485060" floodOpacity="0.5" />
+          <feDropShadow
+            dx="0"
+            dy="0.5"
+            stdDeviation="0.55"
+            floodColor="#485060"
+            floodOpacity="0.5"
+          />
         </filter>
       </defs>
       <g filter={`url(#ds${id})`}>

@@ -58,8 +58,12 @@ export function UserMenu({
         <div className="flex items-center gap-2.5 px-2 py-2">
           <AvatarMark user={u} initials={initialsOf(displayName)} className="size-9 text-[13px]" />
           <div className="flex min-w-0 flex-col leading-tight">
-            <span className="truncate text-[12.5px] font-semibold text-foreground/90">{displayName}</span>
-            <span className="truncate text-[11px] font-normal text-muted-foreground/75">{displayEmail}</span>
+            <span className="truncate text-[12.5px] font-semibold text-foreground/90">
+              {displayName}
+            </span>
+            <span className="truncate text-[11px] font-normal text-muted-foreground/75">
+              {displayEmail}
+            </span>
             {(!authEnabled || !authUser) && <AccountPill user={u} />}
           </div>
         </div>

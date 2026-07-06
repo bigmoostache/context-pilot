@@ -20,8 +20,7 @@ export function ForcePasswordChange() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const canSubmit =
-    current !== "" && next.length >= MIN_PASSWORD_LEN && next === confirm && !busy
+  const canSubmit = current !== "" && next.length >= MIN_PASSWORD_LEN && next === confirm && !busy
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -56,7 +55,12 @@ export function ForcePasswordChange() {
           className="flex flex-col gap-4 rounded-lg border border-border bg-card p-6 shadow-md"
         >
           <Field label="Current password" value={current} onChange={setCurrent} autoFocus />
-          <Field label="New password" value={next} onChange={setNext} hint={`At least ${MIN_PASSWORD_LEN} characters`} />
+          <Field
+            label="New password"
+            value={next}
+            onChange={setNext}
+            hint={`At least ${MIN_PASSWORD_LEN} characters`}
+          />
           <Field label="Confirm new password" value={confirm} onChange={setConfirm} />
 
           {confirm !== "" && next !== confirm && (

@@ -462,6 +462,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+09881ed90d401989:
+  path: web/.prettierrc.json
+  description: Prettier config (web-lint P2, rustfmt twin). printWidth 100 (= rustfmt max_width), tabWidth 2, semi false, double quotes, trailingComma all, arrowParens always, lf. No plugins (tailwind class-order deferred to eslint-plugin-better-tailwindcss in P10).
+  last_edited_ms: 1783371465077
 09986e5bc21c125a:
   path: crates/cp-base/src/config/models.rs
   description: Per-provider model enums (Anthropic, Grok, Groq, DeepSeek, MiniMax, ClaudeCodeV2) with ModelInfo impls. Pricing, context windows, API names, display names.
@@ -1830,6 +1834,10 @@
   path: crates/cp-mod-bridge/src/boot/lock.rs
   description: 'bridge.lock flock acquisition (split from boot.rs, X951). acquire_lock(folder,max_retries): non-blocking LockExclusiveNonblock with bounded retry (LOCK_RETRY_ATTEMPTS=25 × LOCK_RETRY_BACKOFF=80ms ~2s) so a reload''s replacement wins once predecessor exits; 0 retries=fail-fast recovery path. EAGAIN/EWOULDBLOCK→AlreadyRunning, other→Io. pub(super). 135 lines.'
   last_edited_ms: 1782117938971
+26b7b6379070e470:
+  path: web/src/components/finder/internal/useFinderDownloads.ts
+  description: Finder download actions hook (downloadSelected + downloadActiveFile), split from Finder.tsx (web-lint P2) to hold it ≤500 lines after Prettier reflow. Streams files via downloadFile from the orchestration plane; failures surface through the shared flash toast. Matches the useFinderActions/Selection/Keyboard hook-per-concern pattern.
+  last_edited_ms: 1783371465296
 26d1771dd382f3ab:
   path: web/src/components/shell/StatusBar.tsx
   description: 'Bottom status footer. Fleet mode: aggregates (count, threads, needs-you, spend). Agent mode: AgentStatus reads the LIVE agent.phase (streaming/tooling/ready distinct, T297) + cost folded from deltas. ContextBar meter is fully push-fed from the agent''s authoritative ContextUsage delta (contextUsed/Threshold/Budget + contextHit/contextMiss); draws ratatui''s two-segment green-hit/amber-miss bar (falls back to a single proximity-coloured fill pre-split) + threshold tick + hover tooltip Used(hit)/Used(miss)/Threshold/Free. T297: bar segments + fallback fill + threshold tick ease to new widths over 1s (transition-[width|left] duration-1000 ease-out); tooltip Used/budget row uses gap-8 + shrink-0 label so the two columns never crowd.'
@@ -7774,6 +7782,10 @@ a20374514cb825df:
   path: Cargo.lock
   description: Workspace lockfile
   last_edited_ms: 0
+a21f7bc97ff6fafb:
+  path: web/src/components/finder/Finder.tsx
+  description: Per-agent Finder file manager (493 LOC). Owns view state + derived listings + render; delegates fs mutations/nav to useFinderActions, selection/open/tab/menu to useFinderSelection, keyboard to useFinderKeyboard, external drag to useExternalDragUpload, DOWNLOADS to useFinderDownloads (web-lint P2 split), bottom chrome to FinderOverlays. QuickLook = modal shadcn Sheet (grid+list). T334 revealPath navigates to a file's parent + selects it.
+  last_edited_ms: 1783371465438
 a24b9289bfb608c4:
   path: web/src/components/auth/UsersDialog.tsx
   description: Admin user management dialog (Phase 10). Lists all users with RoleBadge, create user form (collapsible), delete user with confirmation, force-logout (revoke all sessions). TanStack Query hooks. Accessible from UserMenu when admin.
@@ -7906,6 +7918,10 @@ a5a78837f6116e83:
   path: crates/cp-orchestrator/src/registry/tee_reader.rs
   description: 'TeeReader — backend consumer of an agent''s live stream plane (§7). One reader per agent (spawned on Appeared, stopped on Disappeared): connects <folder>/tee.sock, reads len+CRC framed StreamFrames, republishes each into the shared StreamHub for SSE fan-out. Lossy by design (tier-③): corrupt frame resyncs the buffer, absent socket retries, EOF (agent restart) reconnects. 3 tests (republish, absent-then-connect, corrupt-resync). Backend::new takes 6 args (auth added).'
   last_edited_ms: 1782236757049
+a5a97618291ea9c5:
+  path: web/src/lib/mock/fileTree.ts
+  description: Mock filesystem FsNode literal for the workspace browser. Extracted from mock/index.ts (web-lint P2) so the barrel stays ≤500 lines after the Prettier reflow expanded its object literals; re-exported via ./index (export * from ./fileTree) so @/lib/mock importers are unchanged.
+  last_edited_ms: 1783371465224
 a5d638c214989600:
   path: src/app/run/mod.rs
   description: 'Sub-module declarations. 6 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), tools (execution pipeline), watchers (file/GH).'
@@ -9186,6 +9202,10 @@ bfe9a6a3b1b653bb:
   path: web/src/components/shell/ConfigModal.tsx
   description: Settings dialog wrapping shared ConfigPanel in a portaled Base UI Dialog (TopBar gear entry). Portal renders into document.body to escape the TopBar .vibrancy backdrop-filter containing block (the prior 'half off-screen' fixed-overlay bug) + brings focus trap/scroll-lock/Esc. Fleet dashboard renders ConfigPanel inline instead; two entry points share one body.
   last_edited_ms: 1781885516055
+bfff90409ced5db9:
+  path: web/package.json
+  description: 'Frontend deps. scripts: dev/build(tsc -b && vite build)/lint/preview + web-lint P2: format (prettier --write .) + format:check (prettier --check .). @tanstack/react-query, react 19.2, react-markdown+remark+katex, tailwindcss 4.3, shadcn, vite 8, playwright, full eslint ratchet plugin roster + prettier.'
+  last_edited_ms: 1783371465508
 c008e19f49f44419:
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: 'Phase 19: transport hub. Backend{view,breaker,hub,tickets,agents_dir} under Arc<Mutex>. serve(addr,state) = tiny_http acceptor, thread-per-request. route_rest dispatches GET /api/fleet|/agent/{id}|/agent/{id}/body/{hash}, POST /agent/{id}/command|/ticket. handle_stream: GET /api/stream?agent&ticket — redeem single-use ticket, spawn run_stream producer (Tailer.seed(last_rev) replay + gap→resync + hub frame drain + keepalive disconnect-probe, unsubscribe on exit). MAX_BODY 1MiB, STREAM_POLL 200ms. QueryParams + Last-Event-ID parsing. read_body binds _read; respond binds _sent (let-underscore-drop).'
@@ -11310,6 +11330,10 @@ f0e1cef017b6f0f7:
   path: web/src/components/threads/ThreadsView.tsx
   description: 'Thread sidebar orchestrator. ThreadsView: selected thread state, handleArchive (archive/restore command), handlePause (pause/resume command, T371), handleSend. Wires ThreadList + ThreadConversation + NewThreadDialog.'
   last_edited_ms: 1782311620240
+f13efb695f77b0fe:
+  path: web/src/lib/mock/index.ts
+  description: 'Mock-data barrel: PROJECT/tokenBudget/panels/cacheStats/messages/threads/spine/stats/status/agents/library. Re-exports ./extra + ./fileTree. web-lint P2: fileTree literal moved to ./fileTree.ts + FsNode import dropped to stay ≤500 after Prettier reflow. Design-only fallback data approximating a live Context Pilot session.'
+  last_edited_ms: 1783371465367
 f156d809f3ca7d6c:
   path: crates/cp-mod-ocr/Cargo.toml
   description: 'OCR module deps: cp-base, cp-render, serde_json, reqwest, cp-mod-utilities, log.'
@@ -11754,6 +11778,10 @@ f9c0502308e9a92e:
   path: web/src/lib/api/env-keys.ts
   description: Env-key inspection + editing REST endpoints (T399/T404). EnvKeyStatus/EnvKeyReveal types (value field for full reveal). fetchEnvKeys() lists status, revealEnvKey(name) fetches full+masked value, updateEnvKey(name,value) PUTs new value. Re-exported via index.ts barrel.
   last_edited_ms: 1782342443013
+f9dfea2606f394df:
+  path: web/.prettierignore
+  description: 'Prettier ignore (web-lint P2). Mirrors eslint globalIgnores: dist + src/lib/api/generated (byte-identical-to-codegen invariant — NEVER format or the @ts-nocheck drift check breaks) + node_modules + pnpm-lock + Playwright e2e artefacts.'
+  last_edited_ms: 1783371465150
 fa07059c45a476ab:
   path: crates/cp-mod-memory/src/panel.rs
   description: Memory panel. Sorts by importance (critical→low). format_memories_for_context() YAML output for LLM. blocks() renders KeyValue with importance-colored labels. refresh() updates context entry. context() returns ContextItem. needs_cache=false.

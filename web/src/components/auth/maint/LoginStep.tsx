@@ -25,7 +25,14 @@ export function LoginStep({ onSuccess }: { onSuccess: (user: MaintUser) => void 
 
   return (
     <form onSubmit={submit}>
-      <Field label="Email" type="email" value={email} onChange={setEmail} autoFocus autoComplete="username" />
+      <Field
+        label="Email"
+        type="email"
+        value={email}
+        onChange={setEmail}
+        autoFocus
+        autoComplete="username"
+      />
       <Field
         label="Password"
         type="password"

@@ -11,7 +11,14 @@ import {
   X,
 } from "lucide-react"
 import type { Agent } from "@/lib/types"
-import { useCreateAgent, useRenameAgent, useRestartAgent, useRetireAgent, useUploadAvatar, sendCommand } from "@/lib/live"
+import {
+  useCreateAgent,
+  useRenameAgent,
+  useRestartAgent,
+  useRetireAgent,
+  useUploadAvatar,
+  sendCommand,
+} from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
 import { useAuth } from "@/lib/providers/auth"
 import { usePickerProviders, defaultModel, findModel, resolveSelection } from "@/lib/support/models"
@@ -74,9 +81,21 @@ export function AgentModal({
   const resolved =
     isManage && agent ? resolveSelection(providers, agent.provider, agent.model) : undefined
   const createDefault = (() => {
-    if (isManage) return { p: resolved?.provider.id ?? providers[0]?.id ?? "", m: resolved?.model.id ?? (defaultModel(providers, providers[0]?.id ?? "")?.id ?? providers[0]?.models[0]?.id ?? "") }
+    if (isManage)
+      return {
+        p: resolved?.provider.id ?? providers[0]?.id ?? "",
+        m:
+          resolved?.model.id ??
+          defaultModel(providers, providers[0]?.id ?? "")?.id ??
+          providers[0]?.models[0]?.id ??
+          "",
+      }
     const lsP = localStorage.getItem("cp-default-provider") ?? providers[0]?.id ?? ""
-    const lsM = localStorage.getItem("cp-default-model") ?? (defaultModel(providers, lsP)?.id ?? providers[0]?.models[0]?.id ?? "")
+    const lsM =
+      localStorage.getItem("cp-default-model") ??
+      defaultModel(providers, lsP)?.id ??
+      providers[0]?.models[0]?.id ??
+      ""
     return { p: lsP, m: lsM }
   })()
   const [provId, setProvId] = useState(createDefault.p)
@@ -175,9 +194,11 @@ export function AgentModal({
       }
       Promise.all(tasks)
         .then(() => {
-          onFlash?.(nameChanged
-            ? `Saved changes to ${name.trim()}`
-            : `Model updated to ${findModel(providers, provId, modelId)?.displayName ?? modelId}`)
+          onFlash?.(
+            nameChanged
+              ? `Saved changes to ${name.trim()}`
+              : `Model updated to ${findModel(providers, provId, modelId)?.displayName ?? modelId}`,
+          )
           onClose()
         })
         .catch((e: unknown) => {
@@ -196,9 +217,7 @@ export function AgentModal({
           onClose()
         },
         onError: (e) => {
-          setError(
-            e instanceof Error ? e.message : "Could not create the agent. Please try again.",
-          )
+          setError(e instanceof Error ? e.message : "Could not create the agent. Please try again.")
         },
       },
     )
@@ -273,10 +292,14 @@ export function AgentModal({
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 if (!file || !agent) return
-                uploadAvatar.mutate({ agentId: agent.id, file }, {
-                  onSuccess: () => setAvatarBust(Date.now()),
-                  onError: (err) => setError(err instanceof Error ? err.message : "Avatar upload failed"),
-                })
+                uploadAvatar.mutate(
+                  { agentId: agent.id, file },
+                  {
+                    onSuccess: () => setAvatarBust(Date.now()),
+                    onError: (err) =>
+                      setError(err instanceof Error ? err.message : "Avatar upload failed"),
+                  },
+                )
                 e.target.value = ""
               }}
             />
@@ -308,46 +331,49 @@ export function AgentModal({
         >
           {/* left column — the agent form (name + provider/model) */}
           <div className="flex flex-col gap-5">
-          {/* name — the star field, with a leading glyph + live realm preview */}
-          <div className="flex flex-col gap-2">
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
-              Agent name
-            </span>
-            <div className="group flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 transition-colors focus-within:border-[var(--interactive)]/70 focus-within:ring-2 focus-within:ring-[var(--interactive)]/15">
-              <FolderGit2 className="size-[18px] shrink-0 text-muted-foreground/55 transition-colors group-focus-within:text-[var(--interactive)]" />
-              <input
-                ref={nameRef}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="my-project"
-                className="w-full bg-transparent text-[15px] font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground/45"
+            {/* name — the star field, with a leading glyph + live realm preview */}
+            <div className="flex flex-col gap-2">
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+                Agent name
+              </span>
+              <div className="group flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 transition-colors focus-within:border-[var(--interactive)]/70 focus-within:ring-2 focus-within:ring-[var(--interactive)]/15">
+                <FolderGit2 className="size-[18px] shrink-0 text-muted-foreground/55 transition-colors group-focus-within:text-[var(--interactive)]" />
+                <input
+                  ref={nameRef}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="my-project"
+                  className="w-full bg-transparent text-[15px] font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground/45"
+                />
+              </div>
+              {/* live-derived realm — the ergonomic replacement for the folder picker */}
+              <div className="flex items-center gap-1.5 pl-0.5 text-[11.5px]">
+                <span className="text-muted-foreground/60">Realm</span>
+                <span className="text-muted-foreground/40">→</span>
+                <code className="rounded-md bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] text-foreground/75">
+                  {realm}
+                </code>
+                {!isManage && (
+                  <span className="text-muted-foreground/45">· created automatically</span>
+                )}
+              </div>
+            </div>
+
+            {/* provider + model — two-level picker like the TUI's Ctrl+H */}
+            <div className="flex flex-col gap-2">
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+                Provider &amp; Model
+              </span>
+              <ModelPicker
+                providers={providers}
+                provider={provId}
+                model={modelId}
+                onChange={(p, m) => {
+                  setProvId(p)
+                  setModelId(m)
+                }}
               />
             </div>
-            {/* live-derived realm — the ergonomic replacement for the folder picker */}
-            <div className="flex items-center gap-1.5 pl-0.5 text-[11.5px]">
-              <span className="text-muted-foreground/60">Realm</span>
-              <span className="text-muted-foreground/40">→</span>
-              <code className="rounded-md bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] text-foreground/75">
-                {realm}
-              </code>
-              {!isManage && (
-                <span className="text-muted-foreground/45">· created automatically</span>
-              )}
-            </div>
-          </div>
-
-          {/* provider + model — two-level picker like the TUI's Ctrl+H */}
-          <div className="flex flex-col gap-2">
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
-              Provider &amp; Model
-            </span>
-            <ModelPicker
-              providers={providers}
-              provider={provId}
-              model={modelId}
-              onChange={(p, m) => { setProvId(p); setModelId(m) }}
-            />
-          </div>
           </div>
 
           {/* right column — vitals (always) + ACL (auth only) */}
@@ -390,9 +416,7 @@ export function AgentModal({
               title="Kill and respawn the agent's process from the current binary — fixes a stale agent that rejects commands with 'agent unreachable'."
               className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-medium text-foreground/80 transition-colors hover:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <RefreshCw
-                className={cn("size-3.5", restartAgent.isPending && "animate-spin")}
-              />
+              <RefreshCw className={cn("size-3.5", restartAgent.isPending && "animate-spin")} />
               Restart
             </button>
           )}
@@ -413,7 +437,13 @@ export function AgentModal({
             ) : (
               <Sparkles className="size-4" />
             )}
-            {pending ? (saving ? "Saving…" : "Creating…") : isManage ? "Save changes" : "Create agent"}
+            {pending
+              ? saving
+                ? "Saving…"
+                : "Creating…"
+              : isManage
+                ? "Save changes"
+                : "Create agent"}
             <kbd className="ml-1 hidden items-center gap-0.5 rounded bg-black/15 px-1 py-px font-mono text-[9.5px] opacity-80 sm:flex">
               <CornerDownLeft className="size-2.5" />⌘
             </kbd>

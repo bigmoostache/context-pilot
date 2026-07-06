@@ -22,9 +22,7 @@
 */
 
 @theme inline {
-  --font-sans:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui,
-    sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
   --color-background: var(--background);
@@ -98,8 +96,8 @@
   --danger: #c0685c;
 
   --shadow-color: 30deg 30% 60%;
-  --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.12),
-    0 4px 12px hsl(var(--shadow-color) / 0.08);
+  --shadow-card:
+    0 1px 2px hsl(var(--shadow-color) / 0.12), 0 4px 12px hsl(var(--shadow-color) / 0.08);
   --shadow-pop: 0 8px 28px hsl(var(--shadow-color) / 0.18);
 
   color-scheme: light;
@@ -140,8 +138,8 @@
   --danger: #c85050; /* blood red (TUI error) */
 
   --shadow-color: 45deg 10% 3%;
-  --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.55),
-    0 4px 14px hsl(var(--shadow-color) / 0.45);
+  --shadow-card:
+    0 1px 2px hsl(var(--shadow-color) / 0.55), 0 4px 14px hsl(var(--shadow-color) / 0.45);
   --shadow-pop: 0 10px 34px hsl(var(--shadow-color) / 0.6);
 
   color-scheme: dark;
@@ -310,18 +308,42 @@
 /* checkerboard — transparency backing for image previews */
 .checker {
   background-image:
-    linear-gradient(45deg, color-mix(in oklab, var(--muted-foreground) 22%, transparent) 25%, transparent 25%),
-    linear-gradient(-45deg, color-mix(in oklab, var(--muted-foreground) 22%, transparent) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, color-mix(in oklab, var(--muted-foreground) 22%, transparent) 75%),
-    linear-gradient(-45deg, transparent 75%, color-mix(in oklab, var(--muted-foreground) 22%, transparent) 75%);
+    linear-gradient(
+      45deg,
+      color-mix(in oklab, var(--muted-foreground) 22%, transparent) 25%,
+      transparent 25%
+    ),
+    linear-gradient(
+      -45deg,
+      color-mix(in oklab, var(--muted-foreground) 22%, transparent) 25%,
+      transparent 25%
+    ),
+    linear-gradient(
+      45deg,
+      transparent 75%,
+      color-mix(in oklab, var(--muted-foreground) 22%, transparent) 75%
+    ),
+    linear-gradient(
+      -45deg,
+      transparent 75%,
+      color-mix(in oklab, var(--muted-foreground) 22%, transparent) 75%
+    );
   background-size: 16px 16px;
-  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
 }
 
 /* marching-ants drag border */
 @keyframes ants {
   to {
-    background-position: 16px 0, -16px 100%, 0 -16px, 100% 16px;
+    background-position:
+      16px 0,
+      -16px 100%,
+      0 -16px,
+      100% 16px;
   }
 }
 .ants {
@@ -331,8 +353,16 @@
     linear-gradient(0deg, var(--signal) 50%, transparent 0),
     linear-gradient(0deg, var(--signal) 50%, transparent 0);
   background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
-  background-size: 16px 2px, 16px 2px, 2px 16px, 2px 16px;
-  background-position: 0 0, 0 100%, 0 0, 100% 0;
+  background-size:
+    16px 2px,
+    16px 2px,
+    2px 16px,
+    2px 16px;
+  background-position:
+    0 0,
+    0 100%,
+    0 0,
+    100% 0;
   animation: ants 0.6s linear infinite;
 }
 

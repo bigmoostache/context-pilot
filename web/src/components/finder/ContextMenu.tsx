@@ -111,7 +111,9 @@ export function ContextMenu({
     >
       <Icon className="size-3.5 shrink-0 opacity-80" />
       <span className="flex-1">{label}</span>
-      {shortcut && <span className="text-[10.5px] tabular-nums text-muted-foreground/50">{shortcut}</span>}
+      {shortcut && (
+        <span className="text-[10.5px] tabular-nums text-muted-foreground/50">{shortcut}</span>
+      )}
     </button>
   )
 
@@ -181,7 +183,9 @@ export function ContextMenu({
           >
             <FolderOpen className="size-3.5 shrink-0 opacity-80" />
             <span className="flex-1">{isFolder ? "Open" : "Open Quick Look"}</span>
-            <span className="text-[10.5px] tabular-nums text-muted-foreground/50">{isFolder ? "↵" : "Space"}</span>
+            <span className="text-[10.5px] tabular-nums text-muted-foreground/50">
+              {isFolder ? "↵" : "Space"}
+            </span>
           </button>
 
           {isFolder && onPin && (
@@ -259,7 +263,9 @@ function EmptyItem({
     >
       <Icon className="size-3.5 shrink-0 opacity-80" />
       <span className="flex-1">{label}</span>
-      {shortcut && <span className="text-[10.5px] tabular-nums text-muted-foreground/50">{shortcut}</span>}
+      {shortcut && (
+        <span className="text-[10.5px] tabular-nums text-muted-foreground/50">{shortcut}</span>
+      )}
     </button>
   )
 }

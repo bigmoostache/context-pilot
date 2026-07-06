@@ -52,7 +52,11 @@ export function TodoPanel({ panel, agentId }: { panel: ContextPanel; agentId: st
               </span>
               <span
                 className="text-[12.5px] leading-snug text-foreground/85"
-                style={t.status === "done" ? { textDecoration: "line-through", opacity: 0.55 } : undefined}
+                style={
+                  t.status === "done"
+                    ? { textDecoration: "line-through", opacity: 0.55 }
+                    : undefined
+                }
               >
                 {t.name}
               </span>

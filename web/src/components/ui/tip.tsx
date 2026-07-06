@@ -61,9 +61,7 @@ export function Tip({
               <span className="block size-2.5 rotate-45 rounded-[2px] border-b border-r border-border bg-popover" />
             </TooltipPrimitive.Arrow>
             <span className="text-[12px] font-semibold leading-tight text-foreground">{title}</span>
-            {body && (
-              <span className="text-[11px] leading-snug text-muted-foreground">{body}</span>
-            )}
+            {body && <span className="text-[11px] leading-snug text-muted-foreground">{body}</span>}
           </TooltipPrimitive.Popup>
         </TooltipPrimitive.Positioner>
       </TooltipPrimitive.Portal>

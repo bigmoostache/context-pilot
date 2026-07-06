@@ -46,7 +46,11 @@ function turnToStatus(turn: string | undefined): ThreadDetail["status"] {
  * `ThreadMessage`, so the strings are identical, while two genuinely distinct
  * messages can't share an exact-millisecond `ts` AND identical text AND author.
  */
-function msgSignature(m: { author?: string | undefined; ts?: string | number | undefined; text?: string | undefined }): string {
+function msgSignature(m: {
+  author?: string | undefined
+  ts?: string | number | undefined
+  text?: string | undefined
+}): string {
   return `${m.author ?? ""}|${m.ts ?? ""}|${m.text ?? ""}`
 }
 
@@ -123,15 +127,11 @@ export function applyThreadDelta(
         return mTs !== target
       })
       if (filtered.length === thread.log.length) return prev // no match
-      return prev.map((t) =>
-        t.id === k.thread_id ? { ...t, log: filtered } : t,
-      )
+      return prev.map((t) => (t.id === k.thread_id ? { ...t, log: filtered } : t))
     }
     case "thread_status_changed": {
       if (!prev.some((t) => t.id === k.thread_id)) return null
-      return prev.map((t) =>
-        t.id === k.thread_id ? { ...t, status: turnToStatus(k.status) } : t,
-      )
+      return prev.map((t) => (t.id === k.thread_id ? { ...t, status: turnToStatus(k.status) } : t))
     }
     case "thread_focus_changed": {
       // Focus moved to k.thread_id (or was released when undefined). Set the
@@ -184,7 +184,8 @@ export function applyThreadDelta(
       // position — NOT from raw.id (`{thread}-m{n}`) or k.message_id — keeps the
       // two planes' ids identical, so mergeThreadLogs collapses them to one.
       const msgId = `msg_${thread.log.length}`
-      const msgTs = typeof raw.ts === "number" ? raw.ts : (typeof raw.timestamp === "number" ? raw.timestamp : ts)
+      const msgTs =
+        typeof raw.ts === "number" ? raw.ts : typeof raw.timestamp === "number" ? raw.timestamp : ts
       const msgText = raw.text ?? raw.content ?? undefined
       const msgFileRef = raw.fileRef ?? raw.file_path ?? undefined
       const candidate = {

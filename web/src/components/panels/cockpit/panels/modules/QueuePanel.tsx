@@ -29,17 +29,24 @@ export function QueuePanel({ panel, agentId }: { panel: ContextPanel; agentId: s
 
       <ol className="flex flex-col gap-2">
         {queueActions.map((a) => (
-          <li key={a.index} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 card-shadow">
+          <li
+            key={a.index}
+            className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 card-shadow"
+          >
             <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold tabular-nums text-foreground/70">
               {a.index}
             </span>
             <div className="flex min-w-0 flex-1 flex-col leading-tight">
               <div className="flex items-center gap-1.5">
-                <span className="font-mono text-[12px] font-medium text-[var(--signal)]">{a.tool}</span>
+                <span className="font-mono text-[12px] font-medium text-[var(--signal)]">
+                  {a.tool}
+                </span>
                 <ArrowRight className="size-3 text-muted-foreground/50" />
                 <span className="truncate text-[11.5px] text-foreground/80">{a.intent}</span>
               </div>
-              <span className="truncate font-mono text-[10.5px] text-muted-foreground/65">{a.preview}</span>
+              <span className="truncate font-mono text-[10.5px] text-muted-foreground/65">
+                {a.preview}
+              </span>
             </div>
           </li>
         ))}

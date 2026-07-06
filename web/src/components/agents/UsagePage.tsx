@@ -93,7 +93,11 @@ export function UsagePage() {
   const fmtUsd = (v: number) =>
     `$${v < 10 ? v.toFixed(2) : v < 1000 ? v.toFixed(0) : `${(v / 1000).toFixed(1)}K`}`
   const fmtTok = (v: number) =>
-    v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(0)}K` : `${Math.round(v)}`
+    v >= 1e6
+      ? `${(v / 1e6).toFixed(2)}M`
+      : v >= 1e3
+        ? `${(v / 1e3).toFixed(0)}K`
+        : `${Math.round(v)}`
   const fmt = unit === "usd" ? fmtUsd : fmtTok
   // The active-unit fleet total (drives the sr-only live announcement).
   const totalValue = unit === "usd" ? totals.spendUsd : totals.inputTokens + totals.outputTokens
@@ -126,8 +130,18 @@ export function UsagePage() {
             </select>
             {/* unit lens */}
             <div className="flex items-center rounded-lg border border-border bg-muted/60 p-0.5">
-              <UnitTab active={unit === "usd"} onClick={() => setUnit("usd")} icon={Coins} label="$" />
-              <UnitTab active={unit === "tokens"} onClick={() => setUnit("tokens")} icon={Hash} label="Tokens" />
+              <UnitTab
+                active={unit === "usd"}
+                onClick={() => setUnit("usd")}
+                icon={Coins}
+                label="$"
+              />
+              <UnitTab
+                active={unit === "tokens"}
+                onClick={() => setUnit("tokens")}
+                icon={Hash}
+                label="Tokens"
+              />
             </div>
           </div>
         </header>
@@ -135,8 +149,16 @@ export function UsagePage() {
         {/* summary cards */}
         <section className="grid grid-cols-3 gap-3">
           <SummaryCard label="Total spend" value={fmtUsd(totals.spendUsd)} accent="var(--signal)" />
-          <SummaryCard label="Input tokens" value={fmtTok(totals.inputTokens)} accent="var(--interactive)" />
-          <SummaryCard label="Output tokens" value={fmtTok(totals.outputTokens)} accent="var(--ok)" />
+          <SummaryCard
+            label="Input tokens"
+            value={fmtTok(totals.inputTokens)}
+            accent="var(--interactive)"
+          />
+          <SummaryCard
+            label="Output tokens"
+            value={fmtTok(totals.outputTokens)}
+            accent="var(--ok)"
+          />
         </section>
 
         {/* per-agent table */}
@@ -155,7 +177,9 @@ export function UsagePage() {
                     <TableHead className="text-right">Input</TableHead>
                     <TableHead className="text-right">Output</TableHead>
                     <TableHead className="text-right">Spend</TableHead>
-                    <TableHead className="text-right">{unit === "usd" ? "% budget" : "Total"}</TableHead>
+                    <TableHead className="text-right">
+                      {unit === "usd" ? "% budget" : "Total"}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -165,7 +189,10 @@ export function UsagePage() {
                       <TableRow key={r.agent.id}>
                         <TableCell className="font-medium text-foreground/85">
                           <span className="flex items-center gap-2">
-                            <span className="size-2 shrink-0 rounded-full" style={{ background: agentAccent(r.agent) }} />
+                            <span
+                              className="size-2 shrink-0 rounded-full"
+                              style={{ background: agentAccent(r.agent) }}
+                            />
                             {r.agent.name}
                             {r.tripped && (
                               <span className="rounded-full bg-[var(--danger)]/14 px-1.5 py-px text-[9.5px] font-medium text-[var(--danger)]">
@@ -174,11 +201,21 @@ export function UsagePage() {
                             )}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right tabular-nums text-foreground/75">{fmtTok(r.inputTokens)}</TableCell>
-                        <TableCell className="text-right tabular-nums text-foreground/75">{fmtTok(r.outputTokens)}</TableCell>
-                        <TableCell className="text-right font-semibold tabular-nums text-foreground/90">{fmtUsd(r.spendUsd)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-foreground/75">
+                          {fmtTok(r.inputTokens)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-foreground/75">
+                          {fmtTok(r.outputTokens)}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums text-foreground/90">
+                          {fmtUsd(r.spendUsd)}
+                        </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground/80">
-                          {unit === "usd" ? (pct != null ? `${pct.toFixed(0)}%` : "—") : fmtTok(r.inputTokens + r.outputTokens)}
+                          {unit === "usd"
+                            ? pct != null
+                              ? `${pct.toFixed(0)}%`
+                              : "—"
+                            : fmtTok(r.inputTokens + r.outputTokens)}
                         </TableCell>
                       </TableRow>
                     )
@@ -187,9 +224,15 @@ export function UsagePage() {
                 <TableFooter>
                   <TableRow className="hover:bg-transparent">
                     <TableCell className="font-semibold text-foreground/90">Total</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-foreground/85">{fmtTok(totals.inputTokens)}</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-foreground/85">{fmtTok(totals.outputTokens)}</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-foreground">{fmtUsd(totals.spendUsd)}</TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums text-foreground/85">
+                      {fmtTok(totals.inputTokens)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums text-foreground/85">
+                      {fmtTok(totals.outputTokens)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums text-foreground">
+                      {fmtUsd(totals.spendUsd)}
+                    </TableCell>
                     <TableCell className="text-right font-semibold tabular-nums text-foreground/85">
                       {unit === "usd" ? "" : fmtTok(totals.inputTokens + totals.outputTokens)}
                     </TableCell>
@@ -247,7 +290,9 @@ function UnitTab({
       onClick={onClick}
       className={cn(
         "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
-        active ? "bg-card text-foreground card-shadow" : "text-muted-foreground hover:text-foreground/80",
+        active
+          ? "bg-card text-foreground card-shadow"
+          : "text-muted-foreground hover:text-foreground/80",
       )}
     >
       <Icon className="size-3.5" />

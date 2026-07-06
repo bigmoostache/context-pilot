@@ -22,9 +22,24 @@ const KIND: Record<
   LibraryKind,
   { label: string; icon: typeof Bot; accent: string; blurb: string }
 > = {
-  agent: { label: "System prompt", icon: Bot, accent: "var(--signal)", blurb: "A personality & operating contract." },
-  skill: { label: "Skill", icon: Zap, accent: "var(--interactive)", blurb: "Reference material loaded on demand." },
-  command: { label: "Command", icon: TerminalSquare, accent: "var(--ok)", blurb: "A slash-command that expands into a prompt." },
+  agent: {
+    label: "System prompt",
+    icon: Bot,
+    accent: "var(--signal)",
+    blurb: "A personality & operating contract.",
+  },
+  skill: {
+    label: "Skill",
+    icon: Zap,
+    accent: "var(--interactive)",
+    blurb: "Reference material loaded on demand.",
+  },
+  command: {
+    label: "Command",
+    icon: TerminalSquare,
+    accent: "var(--ok)",
+    blurb: "A slash-command that expands into a prompt.",
+  },
 }
 
 const KIND_ORDER: LibraryKind[] = ["agent", "skill", "command"]
@@ -48,13 +63,7 @@ function mockBody(item: LibraryItem): string {
  * (backdrop-fade + modal-pop). `item === "new"` opens an empty create form;
  * passing a {@link LibraryItem} opens it prefilled for view/edit.
  */
-export function PromptModal({
-  item,
-  onClose,
-}: {
-  item: LibraryItem | "new"
-  onClose: () => void
-}) {
+export function PromptModal({ item, onClose }: { item: LibraryItem | "new"; onClose: () => void }) {
   const isNew = item === "new"
   const [kind, setKind] = useState<LibraryKind>(isNew ? "agent" : item.kind)
   const [name, setName] = useState(isNew ? "" : item.name)
@@ -70,11 +79,16 @@ export function PromptModal({
         {/* hero header */}
         <header
           className="relative flex items-center gap-3 px-6 py-5"
-          style={{ background: `linear-gradient(135deg, color-mix(in oklab, ${M.accent} 16%, transparent), transparent)` }}
+          style={{
+            background: `linear-gradient(135deg, color-mix(in oklab, ${M.accent} 16%, transparent), transparent)`,
+          }}
         >
           <span
             className="flex size-11 shrink-0 items-center justify-center rounded-xl"
-            style={{ background: `color-mix(in oklab, ${M.accent} 18%, transparent)`, color: M.accent }}
+            style={{
+              background: `color-mix(in oklab, ${M.accent} 18%, transparent)`,
+              color: M.accent,
+            }}
           >
             <M.icon className="size-[22px]" />
           </span>
@@ -114,15 +128,15 @@ export function PromptModal({
                       )}
                     >
                       <KM.icon className="size-4 shrink-0" style={{ color: KM.accent }} />
-                      <span className="text-[12.5px] font-medium text-foreground/85">{KM.label}</span>
+                      <span className="text-[12.5px] font-medium text-foreground/85">
+                        {KM.label}
+                      </span>
                     </button>
                   )
                 })}
               </div>
             ) : (
-              <span
-                className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[12px] font-medium text-foreground/80"
-              >
+              <span className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[12px] font-medium text-foreground/80">
                 <M.icon className="size-3.5" style={{ color: M.accent }} />
                 {M.label}
                 {builtin && (
@@ -175,7 +189,9 @@ export function PromptModal({
           {!isNew && (
             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
               <FileCode2 className="size-3.5" />
-              Edits open <code className="font-mono">{`.context-pilot/${kind === "agent" ? "agents" : kind === "skill" ? "skills" : "commands"}/${!isNew ? item.id : ""}.md`}</code>.
+              Edits open{" "}
+              <code className="font-mono">{`.context-pilot/${kind === "agent" ? "agents" : kind === "skill" ? "skills" : "commands"}/${!isNew ? item.id : ""}.md`}</code>
+              .
             </p>
           )}
         </div>
@@ -217,12 +233,42 @@ interface Source {
 }
 
 const SOURCES: Source[] = [
-  { id: "claude-code", name: "Claude Code", file: "CLAUDE.md · .claude/agents/", icon: Sparkles, accent: "var(--signal)" },
-  { id: "codex", name: "Codex (OpenAI)", file: "AGENTS.md", icon: Bot, accent: "var(--interactive)" },
-  { id: "cursor", name: "Cursor", file: ".cursor/rules · .cursorrules", icon: Code2, accent: "var(--ok)" },
+  {
+    id: "claude-code",
+    name: "Claude Code",
+    file: "CLAUDE.md · .claude/agents/",
+    icon: Sparkles,
+    accent: "var(--signal)",
+  },
+  {
+    id: "codex",
+    name: "Codex (OpenAI)",
+    file: "AGENTS.md",
+    icon: Bot,
+    accent: "var(--interactive)",
+  },
+  {
+    id: "cursor",
+    name: "Cursor",
+    file: ".cursor/rules · .cursorrules",
+    icon: Code2,
+    accent: "var(--ok)",
+  },
   { id: "windsurf", name: "Windsurf", file: ".windsurfrules", icon: Wind, accent: "var(--warn)" },
-  { id: "aider", name: "Aider", file: "CONVENTIONS.md", icon: Terminal, accent: "var(--interactive)" },
-  { id: "continue", name: "Continue", file: ".continue/", icon: Boxes, accent: "var(--muted-foreground)" },
+  {
+    id: "aider",
+    name: "Aider",
+    file: "CONVENTIONS.md",
+    icon: Terminal,
+    accent: "var(--interactive)",
+  },
+  {
+    id: "continue",
+    name: "Continue",
+    file: ".continue/",
+    icon: Boxes,
+    accent: "var(--muted-foreground)",
+  },
 ]
 
 /**
@@ -241,7 +287,9 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
             <Download className="size-[18px]" />
           </span>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="text-[15px] font-semibold tracking-tight text-foreground">Import prompts</span>
+            <span className="text-[15px] font-semibold tracking-tight text-foreground">
+              Import prompts
+            </span>
             <span className="text-[11.5px] text-muted-foreground">
               Bring rules & agents over from other tools into your global library.
             </span>
@@ -265,13 +313,20 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
               >
                 <span
                   className="flex size-8 shrink-0 items-center justify-center rounded-lg"
-                  style={{ background: `color-mix(in oklab, ${s.accent} 15%, transparent)`, color: s.accent }}
+                  style={{
+                    background: `color-mix(in oklab, ${s.accent} 15%, transparent)`,
+                    color: s.accent,
+                  }}
                 >
                   <s.icon className="size-[17px]" />
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col leading-tight">
-                  <span className="truncate text-[13px] font-medium text-foreground/90">{s.name}</span>
-                  <span className="truncate font-mono text-[10.5px] text-muted-foreground/65">{s.file}</span>
+                  <span className="truncate text-[13px] font-medium text-foreground/90">
+                    {s.name}
+                  </span>
+                  <span className="truncate font-mono text-[10.5px] text-muted-foreground/65">
+                    {s.file}
+                  </span>
                 </div>
                 <button
                   onClick={() => setDone((d) => new Set(d).add(s.id))}
@@ -283,7 +338,11 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
                       : "border border-border text-foreground/75 hover:border-[var(--interactive)]/50 hover:text-foreground active:scale-[0.97]",
                   )}
                 >
-                  {imported ? <Check className="size-3.5" strokeWidth={2.5} /> : <Download className="size-3.5" />}
+                  {imported ? (
+                    <Check className="size-3.5" strokeWidth={2.5} />
+                  ) : (
+                    <Download className="size-3.5" />
+                  )}
                   {imported ? "Imported" : "Import"}
                 </button>
               </div>
@@ -292,7 +351,9 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <footer className="flex h-[56px] shrink-0 items-center border-t border-border bg-muted/25 px-6">
-          <span className="text-[11px] text-muted-foreground/65">Import rules &amp; agents from your other tools.</span>
+          <span className="text-[11px] text-muted-foreground/65">
+            Import rules &amp; agents from your other tools.
+          </span>
           <button
             onClick={onClose}
             className="ml-auto rounded-lg bg-[var(--interactive)] px-4 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-all hover:brightness-105 active:scale-[0.98]"
@@ -331,7 +392,9 @@ function Field({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline gap-2">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">{label}</span>
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+          {label}
+        </span>
         {hint && <span className="text-[11px] text-muted-foreground/55">{hint}</span>}
       </div>
       {children}

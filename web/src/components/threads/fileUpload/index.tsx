@@ -62,8 +62,7 @@ export function MessageFileChip({
   // A statusless error (a real network blip → `TypeError: Failed to fetch`)
   // does NOT match, so a transient fault never greys a genuinely-present file.
   const parentUnservable = /^4\d\d/.test(error?.message ?? "")
-  const missing =
-    !!agentId && !loading && (parentUnservable || (!!data && !node))
+  const missing = !!agentId && !loading && (parentUnservable || (!!data && !node))
   // Real, on-disk size — the listing node's byte count. `undefined` while the
   // listing loads, when there is no agent to query, or when the file is gone;
   // the chip then omits the size label rather than echo the untrusted YAML.
@@ -122,7 +121,9 @@ export function FileUploadChip({
         }
         title="This file does not exist or has been moved elsewhere."
       >
-        <AlertTriangle className={onAccent ? "size-3.5 shrink-0" : "size-3.5 shrink-0 text-[var(--warn)]"} />
+        <AlertTriangle
+          className={onAccent ? "size-3.5 shrink-0" : "size-3.5 shrink-0 text-[var(--warn)]"}
+        />
         <span className="min-w-0 flex-col">
           <span className="block truncate font-medium line-through opacity-90">{file.name}</span>
           <span className="block truncate text-[10.5px] opacity-75">
@@ -144,15 +145,31 @@ export function FileUploadChip({
       <span className="shrink-0">
         <FileIcon kind={kindOf(file.name)} ext={extOf(file.name)} size={18} />
       </span>
-      <span className={onAccent ? "min-w-0 truncate font-medium" : "min-w-0 truncate font-medium text-foreground/90"}>
+      <span
+        className={
+          onAccent
+            ? "min-w-0 truncate font-medium"
+            : "min-w-0 truncate font-medium text-foreground/90"
+        }
+      >
         {file.name}
       </span>
       {typeof size === "number" && (
-        <span className={onAccent ? "shrink-0 text-[10.5px] tabular-nums opacity-75" : "shrink-0 text-[10.5px] tabular-nums text-muted-foreground/70"}>
+        <span
+          className={
+            onAccent
+              ? "shrink-0 text-[10.5px] tabular-nums opacity-75"
+              : "shrink-0 text-[10.5px] tabular-nums text-muted-foreground/70"
+          }
+        >
           {fmtSize(size)}
         </span>
       )}
-      <Paperclip className={onAccent ? "size-3 shrink-0 opacity-60" : "size-3 shrink-0 text-muted-foreground/50"} />
+      <Paperclip
+        className={
+          onAccent ? "size-3 shrink-0 opacity-60" : "size-3 shrink-0 text-muted-foreground/50"
+        }
+      />
     </>
   )
 
@@ -165,9 +182,10 @@ export function FileUploadChip({
           <button
             onClick={onShowInFinder}
             title="Show in Finder"
-            className={onAccent
-              ? "flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100"
-              : "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted/60 hover:text-foreground/80"
+            className={
+              onAccent
+                ? "flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100"
+                : "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted/60 hover:text-foreground/80"
             }
           >
             <FolderOpen className="size-3.5" />
@@ -185,9 +203,10 @@ export function FileUploadChip({
         <button
           onClick={onShowInFinder}
           title="Show in Finder"
-          className={onAccent
-            ? "flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100"
-            : "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted/60 hover:text-foreground/80"
+          className={
+            onAccent
+              ? "flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100"
+              : "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted/60 hover:text-foreground/80"
           }
         >
           <FolderOpen className="size-3.5" />
@@ -264,7 +283,9 @@ export function ComposerBubbles({
               {s.command}
             </span>
             {s.description && (
-              <span className="max-w-[180px] truncate text-muted-foreground/70">{s.description}</span>
+              <span className="max-w-[180px] truncate text-muted-foreground/70">
+                {s.description}
+              </span>
             )}
           </button>
         ))}
@@ -277,7 +298,10 @@ export function ComposerBubbles({
           title="Create a new /command"
           className="group inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-card px-2.5 py-1 text-[11.5px] text-muted-foreground/80 transition-colors hover:border-[var(--signal)]/60 hover:text-[var(--signal)]"
         >
-          <Plus className="size-3 text-muted-foreground/70 group-hover:text-[var(--signal)]" strokeWidth={2.5} />
+          <Plus
+            className="size-3 text-muted-foreground/70 group-hover:text-[var(--signal)]"
+            strokeWidth={2.5}
+          />
           <span className="font-medium">create command</span>
         </button>
       )}

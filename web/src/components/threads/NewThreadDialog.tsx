@@ -1,11 +1,6 @@
 import { useState } from "react"
 import { MessagesSquare } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 /**
  * New Thread dialog — the maquette for starting a thread. A focused little

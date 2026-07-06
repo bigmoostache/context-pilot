@@ -22,7 +22,9 @@ export function CallbacksPanel({ panel, agentId }: { panel: ContextPanel; agentI
         {callbackRows.map((c) => (
           <li key={c.id} className="rounded-lg border border-border bg-card p-3 card-shadow">
             <div className="mb-1.5 flex items-center gap-2">
-              <span className="font-mono text-[11px] font-semibold text-[var(--signal)]">{c.id}</span>
+              <span className="font-mono text-[11px] font-semibold text-[var(--signal)]">
+                {c.id}
+              </span>
               <span className="text-[12.5px] font-medium text-foreground/90">{c.name}</span>
               {c.blocking && (
                 <span className="ml-auto rounded-md bg-[var(--warn)]/15 px-1.5 py-0.5 text-[10px] font-medium text-[var(--warn)]">

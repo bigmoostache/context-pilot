@@ -8,15 +8,25 @@ import { useEffect, useState } from "react"
 import { downloadCaCert, fetchCaFingerprint, fetchIdentity, type Identity } from "@/lib/api/maint"
 import { ErrorNote, GhostButton } from "./parts"
 
-export function ProvisionedView({ onReconfigure, onLogout }: { onReconfigure: () => void; onLogout: () => void }) {
+export function ProvisionedView({
+  onReconfigure,
+  onLogout,
+}: {
+  onReconfigure: () => void
+  onLogout: () => void
+}) {
   const [identity, setIdentity] = useState<Identity | null>(null)
   const [fingerprint, setFingerprint] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let live = true
-    fetchIdentity().then((r) => live && setIdentity(r.identity)).catch(() => undefined)
-    fetchCaFingerprint().then((r) => live && setFingerprint(r.fingerprint)).catch(() => undefined)
+    fetchIdentity()
+      .then((r) => live && setIdentity(r.identity))
+      .catch(() => undefined)
+    fetchCaFingerprint()
+      .then((r) => live && setFingerprint(r.fingerprint))
+      .catch(() => undefined)
     return () => {
       live = false
     }
@@ -47,7 +57,9 @@ export function ProvisionedView({ onReconfigure, onLogout }: { onReconfigure: ()
             <span className="text-muted-foreground">IP:</span> {identity.ip}
           </div>
           {fingerprint && (
-            <div className="mt-1 break-all font-mono text-[11px] text-muted-foreground">CA: {fingerprint}</div>
+            <div className="mt-1 break-all font-mono text-[11px] text-muted-foreground">
+              CA: {fingerprint}
+            </div>
           )}
         </div>
       )}

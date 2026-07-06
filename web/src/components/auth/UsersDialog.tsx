@@ -6,17 +6,8 @@
 import { useState, type FormEvent } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { LogOut, Plus, Shield, Trash2, Users } from "lucide-react"
-import {
-  fetchUsers,
-  createUser,
-  deleteUser,
-  forceLogoutUser,
-} from "@/lib/api"
-import {
-  Dialog,
-  DialogContent,
-  DialogClose,
-} from "@/components/ui/dialog"
+import { fetchUsers, createUser, deleteUser, forceLogoutUser } from "@/lib/api"
+import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
 // ── Role badge ───────────────────────────────────────────────────────
@@ -27,9 +18,7 @@ export function RoleBadge({ role }: { role: string }) {
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        isAdmin
-          ? "bg-[var(--signal)]/15 text-[var(--signal)]"
-          : "bg-muted text-muted-foreground",
+        isAdmin ? "bg-[var(--signal)]/15 text-[var(--signal)]" : "bg-muted text-muted-foreground",
       )}
     >
       {isAdmin && <Shield className="size-2.5" />}
@@ -52,7 +41,10 @@ export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => v
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteUser(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["auth-users"] }); setConfirm(null) },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["auth-users"] })
+      setConfirm(null)
+    },
   })
   const logoutMut = useMutation({
     mutationFn: (id: string) => forceLogoutUser(id),
@@ -132,9 +124,7 @@ export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => v
                     </span>
                     <RoleBadge role={u.role} />
                   </div>
-                  <span className="truncate text-[11px] text-muted-foreground">
-                    {u.email}
-                  </span>
+                  <span className="truncate text-[11px] text-muted-foreground">{u.email}</span>
                 </div>
                 {/* actions */}
                 <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -163,8 +153,8 @@ export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => v
         {confirm && (
           <div className="border-t border-border/70 bg-[var(--danger)]/5 px-5 py-3">
             <p className="mb-2 text-[12px] text-[var(--danger)]">
-              Delete <strong>{confirm.name}</strong>? This cascades to all their
-              sessions and agent access entries. This cannot be undone.
+              Delete <strong>{confirm.name}</strong>? This cascades to all their sessions and agent
+              access entries. This cannot be undone.
             </p>
             <div className="flex gap-2">
               <button
@@ -199,8 +189,17 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
 
   const create = useMutation({
     mutationFn: () => createUser(email, name, password, role),
-    onSuccess: () => { setEmail(""); setName(""); setPassword(""); setError(""); onCreated() },
-    onError: (e) => setError(e instanceof Error ? e.message.replace(/^\d+\s+\/api\/auth\/\w+:\s*/, "") : "Failed"),
+    onSuccess: () => {
+      setEmail("")
+      setName("")
+      setPassword("")
+      setError("")
+      onCreated()
+    },
+    onError: (e) =>
+      setError(
+        e instanceof Error ? e.message.replace(/^\d+\s+\/api\/auth\/\w+:\s*/, "") : "Failed",
+      ),
   })
 
   const submit = (e: FormEvent) => {
@@ -246,9 +245,7 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
           <option value="admin">Admin</option>
         </select>
       </div>
-      {error && (
-        <p className="mb-2 text-[11px] text-[var(--danger)]">{error}</p>
-      )}
+      {error && <p className="mb-2 text-[11px] text-[var(--danger)]">{error}</p>}
       <button
         type="submit"
         disabled={create.isPending}

@@ -1,10 +1,7 @@
 import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { Loader2, Power, Rocket } from "lucide-react"
-import {
-  postApiReleasesDeploy,
-  postApiReleasesRestartOrchestrator,
-} from "@/lib/api/generated"
+import { postApiReleasesDeploy, postApiReleasesRestartOrchestrator } from "@/lib/api/generated"
 import type { DeployResponse } from "@/lib/api/generated"
 import { sdk } from "@/lib/api/client"
 import { cn } from "@/lib/utils"
@@ -27,9 +24,11 @@ export function DeploySection({
 
   const deployFleet = useMutation({
     mutationFn: async () => {
-      return sdk<DeployResponse>(postApiReleasesDeploy({
-        body: activeTag ? { tag: activeTag } : {},
-      }))
+      return sdk<DeployResponse>(
+        postApiReleasesDeploy({
+          body: activeTag ? { tag: activeTag } : {},
+        }),
+      )
     },
     onSuccess: () => onChanged(),
   })
@@ -106,8 +105,8 @@ export function DeploySection({
 
       {hasDeploy && (
         <div className="rounded-lg border border-[var(--ok)]/30 bg-[var(--ok)]/[0.06] px-3 py-2 text-[11px] text-[var(--ok)]">
-          ✓ Deployed <strong>{deployFleet.data.tag}</strong> —{" "}
-          {deployFleet.data.restarted.length} agent(s) restarted
+          ✓ Deployed <strong>{deployFleet.data.tag}</strong> — {deployFleet.data.restarted.length}{" "}
+          agent(s) restarted
           {deployFleet.data.errors.length > 0 && (
             <span className="text-[var(--danger)]">
               {" "}

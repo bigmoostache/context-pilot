@@ -67,9 +67,7 @@ export function FleetDashboard({
         <div className={cn("mx-auto flex w-full flex-col gap-7 px-8 py-9", FLEET_MAX_W)}>
           <header className="flex items-end justify-between gap-4">
             <div className="flex flex-col gap-1.5">
-              <h1 className="text-[24px] font-semibold tracking-tight text-foreground">
-                Agents
-              </h1>
+              <h1 className="text-[24px] font-semibold tracking-tight text-foreground">Agents</h1>
             </div>
             <button
               onClick={() => setModal({ mode: "create" })}
@@ -96,9 +94,7 @@ export function FleetDashboard({
         </div>
       </ScrollArea>
 
-      {modal && (
-        <AgentModal modal={modal} onClose={() => setModal(null)} onFlash={flash} />
-      )}
+      {modal && <AgentModal modal={modal} onClose={() => setModal(null)} onFlash={flash} />}
 
       {toast && (
         <div className="absolute bottom-6 left-1/2 z-30 -translate-x-1/2 rounded-lg border border-border bg-card px-4 py-2 text-[12px] text-foreground/90 pop-shadow">
@@ -144,7 +140,9 @@ function AgentCard({
           </span>
         )}
         <div className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className="truncate text-[14px] font-semibold text-foreground/90">{agent.name}</span>
+          <span className="truncate text-[14px] font-semibold text-foreground/90">
+            {agent.name}
+          </span>
         </div>
         <span
           className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
@@ -216,11 +214,23 @@ function HealthBadge({ agentId }: { agentId: string }) {
 
   const { breaker, stream, rev } = data
   const condition = breaker.tripped
-    ? { label: "Over budget", tone: "var(--danger)", title: `Cost breaker tripped — spent $${(breaker.spendUsd ?? 0).toFixed(2)} of $${(breaker.budgetUsd ?? 0).toFixed(2)} budget. Sends are blocked until the budget is raised or the run is stopped.` }
+    ? {
+        label: "Over budget",
+        tone: "var(--danger)",
+        title: `Cost breaker tripped — spent $${(breaker.spendUsd ?? 0).toFixed(2)} of $${(breaker.budgetUsd ?? 0).toFixed(2)} budget. Sends are blocked until the budget is raised or the run is stopped.`,
+      }
     : stream.degraded
-      ? { label: "Stream degraded", tone: "var(--warn)", title: `Live token stream dropped ${stream.droppedFrames} frame(s) — a slow consumer is being shed (the durable record is unaffected).` }
+      ? {
+          label: "Stream degraded",
+          tone: "var(--warn)",
+          title: `Live token stream dropped ${stream.droppedFrames} frame(s) — a slow consumer is being shed (the durable record is unaffected).`,
+        }
       : (rev.lag ?? 0) > REV_LAG_WARN
-        ? { label: "Projection lagging", tone: "var(--warn)", title: `Backend view is ${rev.lag} revs behind the oplog head (view ${rev.view} / head ${rev.oplogHead ?? "?"}). The projection is falling behind the durable log.` }
+        ? {
+            label: "Projection lagging",
+            tone: "var(--warn)",
+            title: `Backend view is ${rev.lag} revs behind the oplog head (view ${rev.view} / head ${rev.oplogHead ?? "?"}). The projection is falling behind the durable log.`,
+          }
         : null
 
   if (!condition) return null
@@ -289,7 +299,9 @@ function RetiredCard({ agent, onFlash }: { agent: Agent; onFlash: (m: string) =>
           <FolderGit2 className="size-5" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className="truncate text-[14px] font-semibold text-foreground/75">{agent.name}</span>
+          <span className="truncate text-[14px] font-semibold text-foreground/75">
+            {agent.name}
+          </span>
           <span className="truncate text-[11px] text-muted-foreground/60">{agent.folder}</span>
         </div>
         <span className="inline-flex shrink-0 items-center rounded-full bg-muted/60 px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground/70">
@@ -336,4 +348,3 @@ function NewAgentCard({ onClick }: { onClick: () => void }) {
     </button>
   )
 }
-

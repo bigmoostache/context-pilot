@@ -178,8 +178,6 @@ export function ThreadComposer({
   }
   useEffect(autoResize, [text])
 
-
-
   const userTurn = status === "THEIR_TURN"
   const streaming = status === "ACTIVE"
   // The agent owes a response on this thread (its turn, or actively streaming).
@@ -187,14 +185,29 @@ export function ThreadComposer({
   // Only the FOCUSED thread is being worked right now; any other agent-turn
   // thread is queued and will be picked up soon (T39).
   const banner = paused
-    ? { working: false, paused: true, color: undefined, text: "Thread paused — the agent won't respond until resumed." }
+    ? {
+        working: false,
+        paused: true,
+        color: undefined,
+        text: "Thread paused — the agent won't respond until resumed.",
+      }
     : !agentBusy
       ? null
       : streaming
         ? { working: true, paused: false, color: "var(--ok)", text: "Agent is streaming…" }
         : focused
-          ? { working: true, paused: false, color: "var(--signal)", text: "Agent is working this thread…" }
-          : { working: false, paused: false, color: undefined, text: "Agent will pick up this thread soon." }
+          ? {
+              working: true,
+              paused: false,
+              color: "var(--signal)",
+              text: "Agent is working this thread…",
+            }
+          : {
+              working: false,
+              paused: false,
+              color: undefined,
+              text: "Agent will pick up this thread soon.",
+            }
 
   const canSend = text.trim().length > 0 || pendingFiles.length > 0
 
@@ -325,7 +338,9 @@ export function ThreadComposer({
         />
       )}
       {banner && (
-        <div className={`mb-2 flex items-center justify-center gap-2 rounded-xl px-3 py-1.5 text-[11.5px] ${banner.paused ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted/40 text-muted-foreground"}`}>
+        <div
+          className={`mb-2 flex items-center justify-center gap-2 rounded-xl px-3 py-1.5 text-[11.5px] ${banner.paused ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted/40 text-muted-foreground"}`}
+        >
           {banner.paused ? (
             <Pause className="size-3.5" />
           ) : banner.working ? (

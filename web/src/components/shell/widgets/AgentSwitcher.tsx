@@ -60,7 +60,13 @@ export function AgentSwitcher({
             Threads/Finder/Cockpit view-toggle pill group (also `h-8`). */}
         {active ? (
           <>
-            <AgentDot accent={active.accent} status={active.status} agentId={active.id} hasAvatar={active.hasAvatar} compact />
+            <AgentDot
+              accent={active.accent}
+              status={active.status}
+              agentId={active.id}
+              hasAvatar={active.hasAvatar}
+              compact
+            />
             <span className="truncate text-[12.5px] font-semibold text-foreground/90">
               {active.name}
             </span>
@@ -78,7 +84,9 @@ export function AgentSwitcher({
 
       <DropdownMenuContent className="w-[280px]" align="start" sideOffset={6}>
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-[11px]">Workspaces · one agent per folder</DropdownMenuLabel>
+          <DropdownMenuLabel className="text-[11px]">
+            Workspaces · one agent per folder
+          </DropdownMenuLabel>
           {agents.map((a) => (
             <DropdownMenuItem
               key={a.id}
@@ -97,7 +105,12 @@ export function AgentSwitcher({
                 "data-[highlighted]:!bg-[color-mix(in_oklab,var(--signal)_11%,transparent)] data-[highlighted]:!text-foreground",
               )}
             >
-              <AgentDot accent={a.accent} status={a.status} agentId={a.id} hasAvatar={a.hasAvatar} />
+              <AgentDot
+                accent={a.accent}
+                status={a.status}
+                agentId={a.id}
+                hasAvatar={a.hasAvatar}
+              />
               <div className="flex min-w-0 flex-1 leading-tight">
                 {/* base-ui's DropdownMenuItem ships a `focus:**:text-accent-foreground`
                     rule that recolours EVERY descendant on highlight — in light
@@ -177,10 +190,7 @@ function AgentDot({
         <img
           src={avatarUrl(agentId)}
           alt=""
-          className={cn(
-            "rounded-md object-cover",
-            compact ? "size-5" : "size-7",
-          )}
+          className={cn("rounded-md object-cover", compact ? "size-5" : "size-7")}
         />
       ) : (
         <span

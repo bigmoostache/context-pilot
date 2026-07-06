@@ -20,7 +20,15 @@ const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
  *   spend (clearly labelled). A "Needs you" count surfaces how many agents are
  *   waiting on input, so the footer doubles as a glanceable fleet pulse.
  */
-export function StatusBar({ fleet = false, agents = [], activeAgent }: { fleet?: boolean; agents?: Agent[]; activeAgent?: Agent | undefined }) {
+export function StatusBar({
+  fleet = false,
+  agents = [],
+  activeAgent,
+}: {
+  fleet?: boolean
+  agents?: Agent[]
+  activeAgent?: Agent | undefined
+}) {
   return fleet ? <FleetStatus agents={agents} /> : <AgentStatus agent={activeAgent} />
 }
 
@@ -220,8 +228,12 @@ function TipRow({
   return (
     <div className="flex items-center gap-2 py-0.5">
       <span className="size-2 shrink-0 rounded-[3px]" style={{ background: color }} />
-      <span className={`text-[11px] ${dim ? "text-muted-foreground" : "text-foreground/80"}`}>{label}</span>
-      <span className="ml-auto font-mono text-[10.5px] tabular-nums text-foreground/85">{value}</span>
+      <span className={`text-[11px] ${dim ? "text-muted-foreground" : "text-foreground/80"}`}>
+        {label}
+      </span>
+      <span className="ml-auto font-mono text-[10.5px] tabular-nums text-foreground/85">
+        {value}
+      </span>
     </div>
   )
 }

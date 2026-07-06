@@ -25,12 +25,18 @@ function AnthropicMark({ className }: { className?: string }) {
 /** Human label for a usage-limit `kind`. */
 function limitLabel(kind: string): string {
   switch (kind) {
-    case "session": return "Session"
-    case "weekly_all": return "Weekly (all)"
-    case "weekly_sonnet": return "Sonnet"
-    case "weekly_opus": return "Opus"
-    case "weekly_cowork": return "Cowork"
-    default: return kind.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    case "session":
+      return "Session"
+    case "weekly_all":
+      return "Weekly (all)"
+    case "weekly_sonnet":
+      return "Sonnet"
+    case "weekly_opus":
+      return "Opus"
+    case "weekly_cowork":
+      return "Cowork"
+    default:
+      return kind.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
   }
 }
 
@@ -77,7 +83,10 @@ function LimitRow({ limit }: { limit: ClaudeUsageLimit }) {
       </div>
       <div className="h-1.5 w-full rounded-full bg-muted">
         <div
-          className={cn("h-full rounded-full transition-all duration-500", barColor(limit.severity ?? "normal", pct))}
+          className={cn(
+            "h-full rounded-full transition-all duration-500",
+            barColor(limit.severity ?? "normal", pct),
+          )}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -105,9 +114,12 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
       window.open(data.url, "_blank")
     },
     onError: (e) => {
-      const msg = e instanceof Error ? e.message
-        : (typeof e === "object" && e && "error" in e) ? String((e as { error: string }).error)
-        : "Failed to start login"
+      const msg =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e && "error" in e
+            ? String((e as { error: string }).error)
+            : "Failed to start login"
       setError(msg)
       setStep("error")
     },
@@ -120,9 +132,12 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
       setTimeout(onDone, 1500)
     },
     onError: (e) => {
-      const msg = e instanceof Error ? e.message
-        : (typeof e === "object" && e && "error" in e) ? String((e as { error: string }).error)
-        : "Failed to complete login"
+      const msg =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e && "error" in e
+            ? String((e as { error: string }).error)
+            : "Failed to complete login"
       setError(msg)
       setStep("error")
     },
@@ -142,8 +157,12 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
     // Record the starting expiry once, before polling begins.
     if (baselineExpiryRef.current === null) {
       void fetchClaudeTokenStatus()
-        .then((s) => { if (!cancelled) baselineExpiryRef.current = s.valid ? (s.expires_at ?? 0) : 0 })
-        .catch(() => { if (!cancelled) baselineExpiryRef.current = 0 })
+        .then((s) => {
+          if (!cancelled) baselineExpiryRef.current = s.valid ? (s.expires_at ?? 0) : 0
+        })
+        .catch(() => {
+          if (!cancelled) baselineExpiryRef.current = 0
+        })
     }
     const id = setInterval(async () => {
       try {
@@ -155,21 +174,35 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
           setStep("done")
           setTimeout(stableOnDone, 1500)
         }
-      } catch { /* ignore polling errors */ }
+      } catch {
+        /* ignore polling errors */
+      }
     }, 2000)
-    return () => { cancelled = true; clearInterval(id) }
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
   }, [step, stableOnDone])
 
   if (step === "idle" || step === "starting") {
     return (
       <button
-        onClick={() => { setStep("starting"); startMutation.mutate() }}
+        onClick={() => {
+          setStep("starting")
+          startMutation.mutate()
+        }}
         disabled={startMutation.isPending}
         className="flex w-full items-center justify-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
       >
-        {startMutation.isPending
-          ? <><Loader2 className="size-3.5 animate-spin" /> Starting…</>
-          : <><LogIn className="size-3.5" /> Login with Claude</>}
+        {startMutation.isPending ? (
+          <>
+            <Loader2 className="size-3.5 animate-spin" /> Starting…
+          </>
+        ) : (
+          <>
+            <LogIn className="size-3.5" /> Login with Claude
+          </>
+        )}
       </button>
     )
   }
@@ -178,9 +211,9 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
     return (
       <div className="space-y-3">
         <p className="text-[12px] text-muted-foreground">
-          After authorizing, Anthropic will show you a code. Copy the
-          full <code className="text-[11px] bg-muted px-1 rounded">code#state</code> string
-          and paste it below:
+          After authorizing, Anthropic will show you a code. Copy the full{" "}
+          <code className="text-[11px] bg-muted px-1 rounded">code#state</code> string and paste it
+          below:
         </p>
         <a
           href={authorizeUrl}
@@ -199,13 +232,20 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
           className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[var(--signal)]"
         />
         <button
-          onClick={() => { setStep("completing"); completeMutation.mutate(code.trim()) }}
+          onClick={() => {
+            setStep("completing")
+            completeMutation.mutate(code.trim())
+          }}
           disabled={!code.trim() || completeMutation.isPending}
           className="flex w-full items-center justify-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
         >
-          {completeMutation.isPending
-            ? <><Loader2 className="size-3.5 animate-spin" /> Verifying…</>
-            : "Submit code"}
+          {completeMutation.isPending ? (
+            <>
+              <Loader2 className="size-3.5 animate-spin" /> Verifying…
+            </>
+          ) : (
+            "Submit code"
+          )}
         </button>
       </div>
     )
@@ -235,7 +275,11 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
         <span>{error}</span>
       </div>
       <button
-        onClick={() => { setStep("idle"); setError(""); setCode("") }}
+        onClick={() => {
+          setStep("idle")
+          setError("")
+          setCode("")
+        }}
         className="w-full rounded-md bg-muted px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:bg-muted/80"
       >
         Try again
@@ -299,7 +343,9 @@ export function UsageButton() {
 
         {/* ── Account email ────────────────────────────────── */}
         {tokenStatus.data?.account_email && (
-          <p className="truncate text-[11px] text-muted-foreground">{tokenStatus.data.account_email}</p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {tokenStatus.data.account_email}
+          </p>
         )}
 
         {/* ── Token status ─────────────────────────────────── */}
@@ -312,7 +358,9 @@ export function UsageButton() {
         {tokenStatus.data && (
           <div className="flex items-center justify-between rounded-md bg-muted/40 px-2.5 py-1.5">
             <div className="flex items-center gap-1.5 text-[12px]">
-              <div className={cn("size-2 rounded-full", isValid ? "bg-emerald-500" : "bg-red-500")} />
+              <div
+                className={cn("size-2 rounded-full", isValid ? "bg-emerald-500" : "bg-red-500")}
+              />
               <span className="font-medium text-foreground">
                 {isValid ? "Token valid" : "Token expired"}
               </span>
@@ -329,9 +377,11 @@ export function UsageButton() {
                 title="Refresh token"
                 className="flex size-5 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
               >
-                {refreshMutation.isPending
-                  ? <Loader2 className="size-3 animate-spin" />
-                  : <RefreshCw className="size-3" />}
+                {refreshMutation.isPending ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3" />
+                )}
               </button>
             </div>
           </div>
@@ -340,9 +390,12 @@ export function UsageButton() {
         {/* ── Refresh error ──────────────────────────────── */}
         {refreshMutation.isError && (
           <p className="text-[11px] text-red-500">
-            Refresh failed: {refreshMutation.error instanceof Error
+            Refresh failed:{" "}
+            {refreshMutation.error instanceof Error
               ? refreshMutation.error.message
-              : typeof refreshMutation.error === "object" && refreshMutation.error && "error" in refreshMutation.error
+              : typeof refreshMutation.error === "object" &&
+                  refreshMutation.error &&
+                  "error" in refreshMutation.error
                 ? String((refreshMutation.error as { error: string }).error)
                 : "unknown error"}
           </p>
@@ -356,18 +409,14 @@ export function UsageButton() {
         )}
 
         {isValid && isError && (
-          <p className="text-[12px] text-muted-foreground">
-            Could not fetch usage data.
-          </p>
+          <p className="text-[12px] text-muted-foreground">Could not fetch usage data.</p>
         )}
 
         {isValid && !isLoading && !isError && limits.length === 0 && (
           <p className="text-[12px] text-muted-foreground">No active usage limits.</p>
         )}
 
-        {isValid && limits.map((l) => (
-          <LimitRow key={l.kind} limit={l} />
-        ))}
+        {isValid && limits.map((l) => <LimitRow key={l.kind} limit={l} />)}
 
         {/* ── Login flow (always available) ────────────────── */}
         <div className="border-t border-border pt-3">

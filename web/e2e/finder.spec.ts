@@ -90,7 +90,9 @@ test.describe("finder / live realm browsing", () => {
       { timeout: 15_000 },
     )
     // And the listing count matches the subfolder's backend listing.
-    await expect(page.getByText(`${childListing.length} items`).first()).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(`${childListing.length} items`).first()).toBeVisible({
+      timeout: 15_000,
+    })
 
     // Back to the realm root via the keyboard (Backspace → goUp), avoiding the
     // breadcrumb crumb whose "context-pilot" label collides with the TopBar

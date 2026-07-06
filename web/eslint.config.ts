@@ -1,9 +1,9 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint from 'typescript-eslint'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import js from "@eslint/js"
+import globals from "globals"
+import reactHooks from "eslint-plugin-react-hooks"
+import reactRefresh from "eslint-plugin-react-refresh"
+import tseslint from "typescript-eslint"
+import { defineConfig, globalIgnores } from "eslint/config"
 
 /**
  * Frontend ESLint flat config — the Rust-parity strict stack (branch `web-lint`).
@@ -19,14 +19,10 @@ import { defineConfig, globalIgnores } from 'eslint/config'
  */
 export default defineConfig([
   // Build artifacts + machine-generated code are never linted.
-  globalIgnores(['dist', 'src/lib/api/generated/**']),
+  globalIgnores(["dist", "src/lib/api/generated/**"]),
   {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      js.configs.recommended,
-      tseslint.configs.recommended,
-      reactRefresh.configs.vite,
-    ],
+    files: ["**/*.{ts,tsx}"],
+    extends: [js.configs.recommended, tseslint.configs.recommended, reactRefresh.configs.vite],
     plugins: {
       // react-hooks is pinned to its CLASSIC rule pair for the P0 baseline
       // (rules-of-hooks + exhaustive-deps) — the exact effective ruleset before
@@ -34,29 +30,29 @@ export default defineConfig([
       // compiler-aware rules (set-state-in-effect, refs, immutability,
       // static-components, use-memo); those land deliberately in P6 (React
       // stack) with proper per-site fixes, not front-loaded into P0.
-      'react-hooks': reactHooks,
+      "react-hooks": reactHooks,
     },
     languageOptions: {
       globals: globals.browser,
     },
     rules: {
       // Classic react-hooks pair (see the plugins note above).
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
       // `cva()` variant tables and other module-level `const` exports sit
       // beside their component (the shadcn/vite idiom). They don't break Fast
       // Refresh, so permit them; hooks/functions co-exported with components
       // still error and get factored into sibling modules.
-      'react-refresh/only-export-components': ['error', { allowConstantExport: true }],
+      "react-refresh/only-export-components": ["error", { allowConstantExport: true }],
     },
   },
   {
     // Vendored shadcn primitives (`components/ui/**`) ship component + variant
     // table per file by design — the upstream canonical shape we don't rewrite.
     // Treated like generated code: Fast-Refresh purity is not enforced here.
-    files: ['src/components/ui/**/*.{ts,tsx}'],
+    files: ["src/components/ui/**/*.{ts,tsx}"],
     rules: {
-      'react-refresh/only-export-components': 'off',
+      "react-refresh/only-export-components": "off",
     },
   },
 ])

@@ -18,5 +18,9 @@ export function DevModeProvider({ children }: { children: React.ReactNode }) {
 
   const toggle = () => setDevMode((d) => !d)
 
-  return <DevModeContext.Provider value={{ devMode, setDevMode, toggle }}>{children}</DevModeContext.Provider>
+  return (
+    <DevModeContext.Provider value={{ devMode, setDevMode, toggle }}>
+      {children}
+    </DevModeContext.Provider>
+  )
 }

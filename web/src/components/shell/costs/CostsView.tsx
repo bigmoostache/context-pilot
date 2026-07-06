@@ -1,7 +1,17 @@
 import { useCallback, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { fetchFsPreview } from "@/lib/api/finder"
-import { parseCostTsv, computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, maxFreezePerCulprit, crossTabToolCulprit, buildMarkdownReport } from "./parse"
+import {
+  parseCostTsv,
+  computeSummary,
+  culpritDistribution,
+  costBreakdown,
+  toolCostAttribution,
+  culpritCostAttribution,
+  maxFreezePerCulprit,
+  crossTabToolCulprit,
+  buildMarkdownReport,
+} from "./parse"
 import { DonutChart, HBarChart, CostTimeline } from "./charts"
 import { fmtDollar, fmtTokens } from "./format"
 import { CrossTabTable, TokenDistribution, ApiTokenDistribution } from "./tables"
@@ -68,9 +78,11 @@ export function CostsView({ agentId }: { agentId: string }) {
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
         <span className="text-[15px] font-semibold">No cost data yet</span>
         <span className="max-w-sm text-center text-[12px]">
-          Cost telemetry appears after the agent completes its first LLM tick.
-          The file <code className="rounded bg-muted px-1 py-0.5 text-[11px]">.context-pilot/logs/cost-tracking.tsv</code> will
-          be created automatically.
+          Cost telemetry appears after the agent completes its first LLM tick. The file{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+            .context-pilot/logs/cost-tracking.tsv
+          </code>{" "}
+          will be created automatically.
         </span>
       </div>
     )
@@ -85,7 +97,8 @@ export function CostsView({ agentId }: { agentId: string }) {
             <h2 className="text-[17px] font-bold tracking-tight text-foreground">Cost Analysis</h2>
             <p className="mt-0.5 text-[12px] text-muted-foreground">
               Per-tick cache efficiency and spend breakdown · {summary.totalTicks} ticks
-              {(tempoFilter !== "all" || queueFilter !== "all" || breakKindFilter !== "all") && ` (filtered from ${rows.length})`}
+              {(tempoFilter !== "all" || queueFilter !== "all" || breakKindFilter !== "all") &&
+                ` (filtered from ${rows.length})`}
             </p>
           </div>
           <button
@@ -108,13 +121,25 @@ export function CostsView({ agentId }: { agentId: string }) {
           <Card label="Total cost" value={fmtDollar(summary.totalCost)} />
           <Card label="LLM ticks" value={summary.totalTicks.toLocaleString()} />
           <Card label="Avg cost / tick" value={fmtDollar(summary.avgCostPerTick)} />
-          <Card label="Cache hit rate" value={`${(summary.cacheHitRate * 100).toFixed(1)}%`} accent={summary.cacheHitRate > 0.5} />
+          <Card
+            label="Cache hit rate"
+            value={`${(summary.cacheHitRate * 100).toFixed(1)}%`}
+            accent={summary.cacheHitRate > 0.5}
+          />
         </div>
 
         {/* ── Row: ticks with/without cache breaks ────────────────── */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Card label="Clean ticks" value={summary.ticksClean.toLocaleString()} sub="no panel broke" />
-          <Card label="Break ticks" value={summary.ticksWithBreak.toLocaleString()} sub="cache broken" />
+          <Card
+            label="Clean ticks"
+            value={summary.ticksClean.toLocaleString()}
+            sub="no panel broke"
+          />
+          <Card
+            label="Break ticks"
+            value={summary.ticksWithBreak.toLocaleString()}
+            sub="cache broken"
+          />
           <Card label="Hit tokens" value={fmtTokens(summary.totalHitTokens)} />
           <Card label="Miss tokens" value={fmtTokens(summary.totalMissTokens)} />
         </div>
@@ -149,7 +174,11 @@ export function CostsView({ agentId }: { agentId: string }) {
         {/* ── Row: Max freeze per culprit ─────────────────────────── */}
         {maxFreezes.length > 0 && (
           <Section>
-            <HBarChart data={maxFreezes} title="Max freezes per culprit" format={(v) => String(v)} />
+            <HBarChart
+              data={maxFreezes}
+              title="Max freezes per culprit"
+              format={(v) => String(v)}
+            />
           </Section>
         )}
 
@@ -196,11 +225,7 @@ function Card({
 }
 
 function Section({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-5 card-shadow">
-      {children}
-    </div>
-  )
+  return <div className="rounded-xl border border-border bg-card p-5 card-shadow">{children}</div>
 }
 
 type FilterValue = "all" | "0" | "1"
@@ -249,13 +274,7 @@ const BREAK_KINDS: { v: string; text: string }[] = [
   { v: "panel_disappeared", text: "Disappeared" },
 ]
 
-function BreakKindFilter({
-  value,
-  onChange,
-}: {
-  value: string
-  onChange: (v: string) => void
-}) {
+function BreakKindFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex items-center gap-1.5">
       <span className="text-[11px] font-medium text-muted-foreground">Break</span>
@@ -277,6 +296,3 @@ function BreakKindFilter({
     </div>
   )
 }
-
-
-

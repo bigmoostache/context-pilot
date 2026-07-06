@@ -82,9 +82,7 @@ function parseAutoLine(m: ThreadMsg): { verb: string; tool: string; intent: stri
  * A rendered segment of the conversation: either a single normal message, or a
  * *run* of consecutive auto tool-activity traces collapsed into one block.
  */
-type Segment =
-  | { type: "msg"; msg: ThreadMsg }
-  | { type: "auto"; msgs: ThreadMsg[] }
+type Segment = { type: "msg"; msg: ThreadMsg } | { type: "auto"; msgs: ThreadMsg[] }
 
 /**
  * Fold the flat message log into render segments, collapsing every maximal run
@@ -117,8 +115,12 @@ function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
   return (
     <details className="group/auto mb-2 ml-7">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-muted-foreground/75 transition-colors hover:bg-muted/40 hover:text-muted-foreground">
-        <span className="text-muted-foreground/60 transition-transform group-open/auto:rotate-90">▸</span>
-        <span>⚙ {n} tool action{n === 1 ? "" : "s"}</span>
+        <span className="text-muted-foreground/60 transition-transform group-open/auto:rotate-90">
+          ▸
+        </span>
+        <span>
+          ⚙ {n} tool action{n === 1 ? "" : "s"}
+        </span>
       </summary>
       <div className="mt-1 grid grid-cols-[auto_auto_1fr] gap-x-3 gap-y-0.5 border-l border-border/60 pl-3 font-mono text-[11px]">
         {msgs.map((m) => {
@@ -254,7 +256,12 @@ export function ThreadConversation({
   const suggestions = useMemo<CommandSuggestion[]>(() => {
     return library
       .filter((item) => item.kind === "command")
-      .map((item) => ({ command: `/${item.id}`, name: item.name, description: item.description, body: item.body }))
+      .map((item) => ({
+        command: `/${item.id}`,
+        name: item.name,
+        description: item.description,
+        body: item.body,
+      }))
   }, [library])
   // Pin the conversation to the latest message: scroll to the bottom whenever
   // a thread is opened (id change) or a new NON-AUTO message lands (user or
@@ -262,10 +269,7 @@ export function ThreadConversation({
   // counter inside a collapsed <details> and must NOT yank the scroll position
   // away from the message the user is reading (T414).
   const bottomRef = useRef<HTMLDivElement>(null)
-  const nonAutoCount = useMemo(
-    () => thread.log.filter((m) => !m.auto).length,
-    [thread.log],
-  )
+  const nonAutoCount = useMemo(() => thread.log.filter((m) => !m.auto).length, [thread.log])
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" })
   }, [thread.id, nonAutoCount])

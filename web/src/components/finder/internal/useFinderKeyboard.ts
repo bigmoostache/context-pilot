@@ -68,11 +68,7 @@ export function useFinderKeyboard(d: KeyboardDeps) {
     } else if ((e.metaKey || e.ctrlKey) && e.key === "Backspace") {
       // ⌘⌫ — move the current selection to Trash.
       e.preventDefault()
-      const paths = d.selected.size
-        ? [...d.selected]
-        : d.focusPath
-          ? [d.focusPath]
-          : []
+      const paths = d.selected.size ? [...d.selected] : d.focusPath ? [d.focusPath] : []
       if (paths.length) d.trashPaths(paths)
     } else if (e.key === "Backspace" || ((e.metaKey || e.ctrlKey) && e.key === "ArrowUp")) {
       e.preventDefault()

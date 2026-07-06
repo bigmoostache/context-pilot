@@ -120,7 +120,9 @@ export function MarkdownEditor({
             if (url) exec("createLink", url)
           }}
         />
-        <span className="ml-auto pr-1 text-[10.5px] text-muted-foreground/55">Markdown · WYSIWYG</span>
+        <span className="ml-auto pr-1 text-[10.5px] text-muted-foreground/55">
+          Markdown · WYSIWYG
+        </span>
       </div>
 
       {/* editing surface */}
@@ -285,7 +287,12 @@ function htmlToMarkdown(root: HTMLElement): string {
     const md = serializeBlock(node)
     if (md.trim().length > 0) blocks.push(md)
   }
-  return blocks.join("\n\n").replace(/\n{3,}/g, "\n\n").trim() + "\n"
+  return (
+    blocks
+      .join("\n\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim() + "\n"
+  )
 }
 
 /** Serialize one top-level (block) node to its markdown line(s). */
@@ -309,9 +316,13 @@ function serializeBlock(node: ChildNode): string {
     case "pre":
       return `\`\`\`\n${node.textContent ?? ""}\n\`\`\``
     case "ul":
-      return listItems(node).map((li) => `- ${serializeInline(li)}`).join("\n")
+      return listItems(node)
+        .map((li) => `- ${serializeInline(li)}`)
+        .join("\n")
     case "ol":
-      return listItems(node).map((li, i) => `${i + 1}. ${serializeInline(li)}`).join("\n")
+      return listItems(node)
+        .map((li, i) => `${i + 1}. ${serializeInline(li)}`)
+        .join("\n")
     case "br":
       return ""
     default:

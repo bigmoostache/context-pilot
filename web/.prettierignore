@@ -1,0 +1,23 @@
+# ── Prettier ignore ─────────────────────────────────────────────────
+# Mirrors the ESLint globalIgnores (dist + generated bindings) plus build
+# and transient run artefacts. Prettier owns formatting for hand-written
+# source; anything machine-generated or vendored is left untouched.
+
+# Build output
+dist
+
+# Auto-generated OpenAPI client — regenerated verbatim by hey-api and kept
+# byte-identical to a fresh codegen (the @ts-nocheck-stamped tree the
+# contract-drift check diffs against). Formatting it here would break that
+# invariant, so it is NEVER touched — exactly like the Rust generated-code
+# lint allowance.
+src/lib/api/generated
+
+# Dependencies + lockfile
+node_modules
+pnpm-lock.yaml
+
+# Playwright e2e run artefacts
+test-results
+playwright-report
+.playwright

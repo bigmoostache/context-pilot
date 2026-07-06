@@ -5,9 +5,29 @@ import { cn } from "@/lib/utils"
 
 // ── code (mock) ───────────────────────────────────────────────────
 const KEYWORDS = new Set([
-  "pub", "fn", "let", "mut", "if", "else", "for", "match", "struct", "enum",
-  "impl", "use", "return", "const", "import", "export", "function", "interface",
-  "type", "from", "members", "name", "edition",
+  "pub",
+  "fn",
+  "let",
+  "mut",
+  "if",
+  "else",
+  "for",
+  "match",
+  "struct",
+  "enum",
+  "impl",
+  "use",
+  "return",
+  "const",
+  "import",
+  "export",
+  "function",
+  "interface",
+  "type",
+  "from",
+  "members",
+  "name",
+  "edition",
 ])
 
 export function CodePreview({ lang, lines }: { lang: string; lines: string[] }) {
@@ -39,7 +59,9 @@ export function CodePreview({ lang, lines }: { lang: string; lines: string[] }) 
       <pre className="overflow-x-auto px-3 py-2.5 font-mono text-[11px] leading-relaxed">
         {lines.map((line, i) => (
           <div key={i} className="group flex gap-3 rounded hover:bg-[var(--signal)]/6">
-            <span className="w-6 shrink-0 select-none text-right text-muted-foreground/35">{i + 1}</span>
+            <span className="w-6 shrink-0 select-none text-right text-muted-foreground/35">
+              {i + 1}
+            </span>
             <code className="whitespace-pre text-foreground/85">{tint(line)}</code>
           </div>
         ))}
@@ -51,10 +73,24 @@ export function CodePreview({ lang, lines }: { lang: string; lines: string[] }) 
 /** Cheap, decorative keyword tinting — not a real tokenizer. */
 function tint(line: string) {
   return line.split(/(\s+|[(){}<>;:,])/).map((tok, i) => {
-    if (KEYWORDS.has(tok)) return <span key={i} style={{ color: "var(--signal)" }}>{tok}</span>
+    if (KEYWORDS.has(tok))
+      return (
+        <span key={i} style={{ color: "var(--signal)" }}>
+          {tok}
+        </span>
+      )
     if (/^".*"$/.test(tok) || /^'.*'$/.test(tok))
-      return <span key={i} style={{ color: "var(--ok)" }}>{tok}</span>
-    if (/^\d+$/.test(tok)) return <span key={i} style={{ color: "var(--interactive)" }}>{tok}</span>
+      return (
+        <span key={i} style={{ color: "var(--ok)" }}>
+          {tok}
+        </span>
+      )
+    if (/^\d+$/.test(tok))
+      return (
+        <span key={i} style={{ color: "var(--interactive)" }}>
+          {tok}
+        </span>
+      )
     return <span key={i}>{tok}</span>
   })
 }
@@ -94,7 +130,10 @@ export function SheetPreview({ sheet }: { sheet: NonNullable<FinderNode["sheet"]
           </thead>
           <tbody>
             {sheet.rows.map((row, r) => (
-              <tr key={r} className={cn(r % 2 === 1 && "bg-muted/20", "hover:bg-[var(--signal)]/8")}>
+              <tr
+                key={r}
+                className={cn(r % 2 === 1 && "bg-muted/20", "hover:bg-[var(--signal)]/8")}
+              >
                 <td className="border border-border bg-muted/50 px-1 py-1 text-center text-[10px] text-muted-foreground/50">
                   {r + 2}
                 </td>
@@ -153,10 +192,14 @@ export function SlidesPreview({ slides }: { slides: NonNullable<FinderNode["slid
             onClick={() => setActive(i)}
             className={cn(
               "flex aspect-video flex-col gap-0.5 rounded-md border p-1.5 text-left text-[8px] transition-colors",
-              i === active ? "border-[var(--signal)]/70 bg-card" : "border-border bg-muted/40 hover:border-border",
+              i === active
+                ? "border-[var(--signal)]/70 bg-card"
+                : "border-border bg-muted/40 hover:border-border",
             )}
           >
-            <span className="font-semibold leading-tight text-foreground/80 line-clamp-3">{s.title}</span>
+            <span className="font-semibold leading-tight text-foreground/80 line-clamp-3">
+              {s.title}
+            </span>
           </button>
         ))}
       </div>
@@ -173,7 +216,9 @@ export function PdfPreview({ pdf }: { pdf: NonNullable<FinderNode["pdf"]> }) {
         <h3 className="text-[14px] font-bold leading-snug text-neutral-800">{pdf.title}</h3>
         <div className="mt-1 flex flex-col gap-2">
           {pdf.excerpt.map((line, i) => (
-            <p key={i} className="text-[9.5px] leading-relaxed text-neutral-600">{line}</p>
+            <p key={i} className="text-[9.5px] leading-relaxed text-neutral-600">
+              {line}
+            </p>
           ))}
         </div>
         <div className="mt-auto h-px bg-neutral-200" />
@@ -190,7 +235,9 @@ export function PdfPreview({ pdf }: { pdf: NonNullable<FinderNode["pdf"]> }) {
             )}
           />
         ))}
-        {pdf.pages > 8 && <span className="text-[10px] text-muted-foreground/60">+{pdf.pages - 8}</span>}
+        {pdf.pages > 8 && (
+          <span className="text-[10px] text-muted-foreground/60">+{pdf.pages - 8}</span>
+        )}
       </div>
       <span className="text-center text-[11px] text-muted-foreground">{pdf.pages} pages · PDF</span>
     </div>
@@ -211,7 +258,9 @@ export function ImagePreview({ image }: { image: NonNullable<FinderNode["image"]
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[11px] text-muted-foreground">{image.w} × {image.h}</span>
+        <span className="font-mono text-[11px] text-muted-foreground">
+          {image.w} × {image.h}
+        </span>
         <div className="ml-auto flex items-center gap-1.5">
           <button
             onClick={() => setZoom((z) => Math.max(50, z - 25))}
@@ -219,7 +268,9 @@ export function ImagePreview({ image }: { image: NonNullable<FinderNode["image"]
           >
             −
           </button>
-          <span className="w-9 text-center text-[11px] tabular-nums text-muted-foreground">{zoom}%</span>
+          <span className="w-9 text-center text-[11px] tabular-nums text-muted-foreground">
+            {zoom}%
+          </span>
           <button
             onClick={() => setZoom((z) => Math.min(200, z + 25))}
             className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -245,7 +296,10 @@ export function AudioPreview({ media }: { media: NonNullable<FinderNode["media"]
             className="w-[3px] rounded-full"
             style={{
               height: `${Math.max(8, p * 100)}%`,
-              background: i < peaks.length * 0.35 ? "var(--signal)" : "color-mix(in oklab, var(--muted-foreground) 50%, transparent)",
+              background:
+                i < peaks.length * 0.35
+                  ? "var(--signal)"
+                  : "color-mix(in oklab, var(--muted-foreground) 50%, transparent)",
             }}
           />
         ))}
@@ -260,7 +314,9 @@ export function AudioPreview({ media }: { media: NonNullable<FinderNode["media"]
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
           <div className="h-full w-[35%] rounded-full bg-[var(--signal)]" />
         </div>
-        <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{media.duration}</span>
+        <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+          {media.duration}
+        </span>
       </div>
     </div>
   )
@@ -286,7 +342,9 @@ export function VideoPreview({ media }: { media: NonNullable<FinderNode["media"]
         <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
           <div className="h-full w-[15%] rounded-full bg-[var(--signal)]" />
         </div>
-        <span className="font-mono text-[10.5px] text-muted-foreground">0:20 / {media.duration}</span>
+        <span className="font-mono text-[10.5px] text-muted-foreground">
+          0:20 / {media.duration}
+        </span>
       </div>
     </div>
   )

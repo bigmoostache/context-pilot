@@ -147,10 +147,7 @@ export function priceTag(m: GenModelDef): string {
 // ── Lookup helpers ─────────────────────────────────────────────────────
 
 /** Find a provider by its serde id. */
-export function findProvider(
-  providers: ProviderDef[],
-  id: string,
-): ProviderDef | undefined {
+export function findProvider(providers: ProviderDef[], id: string): ProviderDef | undefined {
   return providers.find((p) => p.id === id)
 }
 
@@ -160,16 +157,11 @@ export function findModel(
   providerId: string,
   modelId: string,
 ): ModelDef | undefined {
-  return findProvider(providers, providerId)?.models.find(
-    (m) => m.id === modelId,
-  )
+  return findProvider(providers, providerId)?.models.find((m) => m.id === modelId)
 }
 
 /** Get the default model for a provider. */
-export function defaultModel(
-  providers: ProviderDef[],
-  providerId: string,
-): ModelDef | undefined {
+export function defaultModel(providers: ProviderDef[], providerId: string): ModelDef | undefined {
   const p = findProvider(providers, providerId)
   return p?.models.find((m) => m.isDefault) ?? p?.models[0]
 }
@@ -198,9 +190,7 @@ export function resolveSelection(
   providerId: string | undefined,
   apiName: string | undefined,
 ): { provider: ProviderDef; model: ModelDef } | undefined {
-  const provider = providerId
-    ? findProvider(providers, providerId)
-    : undefined
+  const provider = providerId ? findProvider(providers, providerId) : undefined
   if (provider) {
     const model =
       (apiName && provider.models.find((m) => m.apiName === apiName)) ||

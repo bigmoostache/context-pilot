@@ -32,9 +32,7 @@ export function GetInfo({ node, onClose }: { node: FinderNode; onClose: () => vo
       >
         {/* header */}
         <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
-          <span className="text-[12px] font-semibold text-foreground/80">
-            {node.name} Info
-          </span>
+          <span className="text-[12px] font-semibold text-foreground/80">{node.name} Info</span>
           <button
             onClick={onClose}
             className="ml-auto flex size-6 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted/60 hover:text-foreground"
@@ -102,7 +100,11 @@ function Row({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
   return (
     <>
       <dt className="text-right text-muted-foreground">{k}</dt>
-      <dd className={"min-w-0 break-words text-foreground/85 " + (mono ? "font-mono text-[10.5px]" : "")}>
+      <dd
+        className={
+          "min-w-0 break-words text-foreground/85 " + (mono ? "font-mono text-[10.5px]" : "")
+        }
+      >
         {v}
       </dd>
     </>

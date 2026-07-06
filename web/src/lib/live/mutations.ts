@@ -35,9 +35,7 @@ export function useUploadFiles(agentId: string) {
     mutationFn: async ({ dir, files }: { dir: string; files: File[] }) => {
       const tooBig = files.filter((f) => f.size > MAX_UPLOAD_BYTES)
       if (tooBig.length > 0) {
-        throw new Error(
-          `${tooBig.map((f) => f.name).join(", ")} exceeds the 32 MB upload limit`,
-        )
+        throw new Error(`${tooBig.map((f) => f.name).join(", ")} exceeds the 32 MB upload limit`)
       }
       await Promise.all(files.map((f) => api.uploadFile(agentId, dir, f)))
       return { count: files.length, dir }
@@ -169,8 +167,7 @@ export function useRenameAgent() {
 export function useCreateAgent() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (body: { name: string; folder?: string; model?: string }) =>
-      api.createAgent(body),
+    mutationFn: (body: { name: string; folder?: string; model?: string }) => api.createAgent(body),
     onSuccess: () => {
       const refetchFleet = () => {
         void client.invalidateQueries({ queryKey: qk.fleet() })

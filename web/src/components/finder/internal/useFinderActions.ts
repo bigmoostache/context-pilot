@@ -51,8 +51,7 @@ export function useFinderActions(d: ActionDeps) {
     upload.mutate(
       { dir: d.relCwd, files },
       {
-        onSuccess: ({ count }) =>
-          d.flash(`Uploaded ${count} file${count === 1 ? "" : "s"}.`),
+        onSuccess: ({ count }) => d.flash(`Uploaded ${count} file${count === 1 ? "" : "s"}.`),
         onError: (err) => d.flash(err instanceof Error ? err.message : "Upload failed"),
       },
     )
@@ -111,8 +110,7 @@ export function useFinderActions(d: ActionDeps) {
       {
         onSuccess: ({ trashed }) =>
           d.flash(`Moved ${trashed} item${trashed === 1 ? "" : "s"} to Trash.`),
-        onError: (err) =>
-          d.flash(err instanceof Error ? err.message : "Move to Trash failed"),
+        onError: (err) => d.flash(err instanceof Error ? err.message : "Move to Trash failed"),
       },
     )
     d.setSelected(new Set())
@@ -135,8 +133,7 @@ export function useFinderActions(d: ActionDeps) {
         { dir: d.relCwd, name },
         {
           onSuccess: () => d.flash(`Created “${name}”.`),
-          onError: (err) =>
-            d.flash(err instanceof Error ? err.message : "Could not create folder"),
+          onError: (err) => d.flash(err instanceof Error ? err.message : "Could not create folder"),
         },
       )
       return
@@ -200,7 +197,13 @@ export function useFinderActions(d: ActionDeps) {
   const forward = () =>
     d.patchTab((t) =>
       t.fwd.length
-        ? { ...t, back: [...t.back, t.cwd], cwd: t.fwd[0]!, fwd: t.fwd.slice(1), label: pathName(t.fwd[0]!) }
+        ? {
+            ...t,
+            back: [...t.back, t.cwd],
+            cwd: t.fwd[0]!,
+            fwd: t.fwd.slice(1),
+            label: pathName(t.fwd[0]!),
+          }
         : t,
     )
 

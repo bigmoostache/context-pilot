@@ -33,11 +33,19 @@ export function ThreadsPanel({ panel, agentId }: { panel: ContextPanel; agentId:
             <li key={t.id} className="rounded-lg border border-border bg-card p-3 card-shadow">
               <div className="mb-1 flex items-center gap-2">
                 <span
-                  className={cn("size-2 shrink-0 rounded-full", t.status === "ACTIVE" && "animate-pulse")}
+                  className={cn(
+                    "size-2 shrink-0 rounded-full",
+                    t.status === "ACTIVE" && "animate-pulse",
+                  )}
                   style={{ background: meta.color }}
                 />
-                <span className="truncate text-[12.5px] font-medium text-foreground/90">{t.name}</span>
-                <span className="ml-auto shrink-0 text-[10px] font-medium" style={{ color: meta.color }}>
+                <span className="truncate text-[12.5px] font-medium text-foreground/90">
+                  {t.name}
+                </span>
+                <span
+                  className="ml-auto shrink-0 text-[10px] font-medium"
+                  style={{ color: meta.color }}
+                >
                   {meta.label}
                 </span>
               </div>

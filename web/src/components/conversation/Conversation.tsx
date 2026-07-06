@@ -62,9 +62,7 @@ function buildMessages(durable: ConversationMsg[], live: LiveTokens): ChatMessag
       // Generated `tool_uses` is `Array<{ [key: string]: unknown }>` (the
       // OpenAPI spec can't express the per-tool shape), so name it the shape we
       // actually read off it.
-      const use = m.tool_uses?.[0] as
-        | { name?: string; input?: Record<string, unknown> }
-        | undefined
+      const use = m.tool_uses?.[0] as { name?: string; input?: Record<string, unknown> } | undefined
       if (!use) continue
       out.push({
         id: m.id,

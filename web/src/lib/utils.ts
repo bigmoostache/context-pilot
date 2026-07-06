@@ -297,7 +297,11 @@ function incrementOrderedMarker(marker: string): string {
  * Walks upward skipping deeper (nested-child) lines; stops the moment it leaves
  * the enclosing context so numbering never bleeds across separate lists.
  */
-function siblingOrderedMarkerAtDepth(value: string, lineStart: number, targetIndentLen: number): string | null {
+function siblingOrderedMarkerAtDepth(
+  value: string,
+  lineStart: number,
+  targetIndentLen: number,
+): string | null {
   if (lineStart === 0) return null // current line is the first — no sibling above
   const before = value.slice(0, lineStart - 1) // drop the \n preceding the current line
   const lines = before.split("\n")
@@ -373,8 +377,14 @@ export function resolveEnter(value: string, selStart: number, selEnd: number): E
  * indenting an ordered item starts a fresh `1.` / `a.` sublist count. Outdenting
  * reverses both. The caret tracks the content as the indent/marker width shifts.
  */
-export function resolveTab(value: string, selStart: number, _selEnd: number, shift: boolean): {
-  value: string; caret: number;
+export function resolveTab(
+  value: string,
+  selStart: number,
+  _selEnd: number,
+  shift: boolean,
+): {
+  value: string
+  caret: number
 } | null {
   const { start: lineStart, end: lineEnd } = lineBounds(value, selStart)
   const oldLine = value.slice(lineStart, lineEnd)

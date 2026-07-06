@@ -3,16 +3,8 @@
 // On-demand API key status + masked reveal.  Types are re-exported from
 // generated/types.gen so existing imports keep working.
 
-import type {
-  EnvKeyReveal,
-  EnvKeyStatus,
-  EnvKeyUpdateResult,
-} from "./generated/types.gen"
-import {
-  getApiEnvKeys,
-  getApiEnvKeysByName,
-  putApiEnvKeysByName,
-} from "./generated"
+import type { EnvKeyReveal, EnvKeyStatus, EnvKeyUpdateResult } from "./generated/types.gen"
+import { getApiEnvKeys, getApiEnvKeysByName, putApiEnvKeysByName } from "./generated"
 import { sdk } from "./client"
 
 // ── Type re-exports (preserve import surface) ────────────────────────

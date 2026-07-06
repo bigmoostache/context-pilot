@@ -30,7 +30,13 @@ export function SessionVitals({ agentId }: { agentId: string }) {
       // (we are executing) and the measured round-trip to the orchestrator.
       const frontendRows: Vital[] = [
         { name: "Frontend", category: "frontend", status: "ok", detail: "this app is running" },
-        { name: "Frontend → Orchestrator", category: "frontend", status: "ok", latencyMs: rtt, detail: `round-trip ${rtt}ms` },
+        {
+          name: "Frontend → Orchestrator",
+          category: "frontend",
+          status: "ok",
+          latencyMs: rtt,
+          detail: `round-trip ${rtt}ms`,
+        },
       ]
       setVitals([...frontendRows, ...rows])
     } catch (e) {

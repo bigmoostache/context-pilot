@@ -97,7 +97,11 @@ export function useMarquee({
       const d = drag.current
       const root = containerRef.current
       if (!d || !root) return
-      if (!d.moved && Math.abs(e.clientX - d.ox) < DRAG_THRESHOLD && Math.abs(e.clientY - d.oy) < DRAG_THRESHOLD) {
+      if (
+        !d.moved &&
+        Math.abs(e.clientX - d.ox) < DRAG_THRESHOLD &&
+        Math.abs(e.clientY - d.oy) < DRAG_THRESHOLD
+      ) {
         return
       }
       d.moved = true
@@ -134,7 +138,12 @@ export function useMarquee({
     band,
     didDrag,
     handlers: enabled
-      ? { onMouseDown: onPointerDown, onMouseMove: onPointerMove, onMouseUp: finish, onMouseLeave: finish }
+      ? {
+          onMouseDown: onPointerDown,
+          onMouseMove: onPointerMove,
+          onMouseUp: finish,
+          onMouseLeave: finish,
+        }
       : {},
   }
 }

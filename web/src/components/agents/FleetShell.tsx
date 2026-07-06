@@ -58,8 +58,18 @@ export function FleetShell({
       <div className="shrink-0 border-b border-border">
         <div className={cn("mx-auto flex h-[52px] w-full items-center px-8", FLEET_MAX_W)}>
           <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
-            <ToggleTab active={tab === "agents"} onClick={() => setTab("agents")} icon={LayoutGrid} label="Agents" />
-            <ToggleTab active={tab === "prompts"} onClick={() => setTab("prompts")} icon={Library} label="Prompts" />
+            <ToggleTab
+              active={tab === "agents"}
+              onClick={() => setTab("agents")}
+              icon={LayoutGrid}
+              label="Agents"
+            />
+            <ToggleTab
+              active={tab === "prompts"}
+              onClick={() => setTab("prompts")}
+              icon={Library}
+              label="Prompts"
+            />
           </div>
         </div>
       </div>
@@ -95,7 +105,9 @@ function ToggleTab({
       onClick={onClick}
       className={cn(
         "flex items-center gap-1.5 rounded-md px-3 py-1 text-[12.5px] font-medium transition-all",
-        active ? "bg-card text-foreground card-shadow" : "text-muted-foreground hover:text-foreground",
+        active
+          ? "bg-card text-foreground card-shadow"
+          : "text-muted-foreground hover:text-foreground",
       )}
     >
       <Icon className="size-3.5" />

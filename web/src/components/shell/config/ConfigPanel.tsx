@@ -21,11 +21,7 @@ import { type CatId, CATEGORIES } from "./categories"
  * The category panes + presentational building blocks live in `./ConfigPanes`
  * (split out for the file-size limit); this file owns only the rail + chrome.
  */
-export function ConfigPanel({
-  variant = "dialog",
-}: {
-  variant?: "dialog" | "inline"
-}) {
+export function ConfigPanel({ variant = "dialog" }: { variant?: "dialog" | "inline" }) {
   const [cat, setCat] = useState<CatId>("general")
   const { user: authUser, authEnabled } = useAuth()
   const isAdmin = authEnabled === false || authUser?.role === "admin"
@@ -50,13 +46,17 @@ export function ConfigPanel({
                 onClick={() => setCat(c.id)}
                 className={cn(
                   "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12.5px] transition-colors",
-                  on ? "bg-card font-medium text-foreground card-shadow" : "text-foreground/75 hover:bg-muted/60",
+                  on
+                    ? "bg-card font-medium text-foreground card-shadow"
+                    : "text-foreground/75 hover:bg-muted/60",
                 )}
               >
                 <span
                   className={cn(
                     "flex size-6 shrink-0 items-center justify-center rounded-md transition-colors",
-                    on ? "bg-[var(--interactive)]/15 text-[var(--interactive)]" : "text-muted-foreground/70",
+                    on
+                      ? "bg-[var(--interactive)]/15 text-[var(--interactive)]"
+                      : "text-muted-foreground/70",
                   )}
                 >
                   <c.icon className="size-[15px]" />
@@ -100,9 +100,7 @@ export function ConfigPanel({
         )}
 
         <footer className="flex h-[58px] shrink-0 items-center border-t border-border/70 bg-muted/25 px-6">
-          <span className="text-[11.5px] text-muted-foreground/70">
-            Changes apply on save.
-          </span>
+          <span className="text-[11.5px] text-muted-foreground/70">Changes apply on save.</span>
           {inline ? (
             <button className="ml-auto flex items-center gap-2 rounded-lg bg-[var(--interactive)] px-4 py-2 text-[13px] font-medium text-[var(--primary-foreground)] transition-all hover:brightness-105 active:scale-[0.98]">
               <Check className="size-4" strokeWidth={2.5} />

@@ -233,7 +233,10 @@ export function buildMarkdownReport(
   if (filters.queue !== "all") fParts.push(`Queue=${filters.queue === "1" ? "On" : "Off"}`)
   if (filters.breakKind !== "all") fParts.push(`Break=${filters.breakKind}`)
   if (fParts.length > 0) push(`**Filters:** ${fParts.join(", ")}`)
-  push(`**Ticks:** ${s.totalTicks}${s.totalTicks !== totalRows ? ` (filtered from ${totalRows})` : ""}`, "")
+  push(
+    `**Ticks:** ${s.totalTicks}${s.totalTicks !== totalRows ? ` (filtered from ${totalRows})` : ""}`,
+    "",
+  )
 
   // Summary
   push("## Summary", "")
@@ -295,7 +298,9 @@ export function buildMarkdownReport(
   // Token distribution (panel-based)
   if (filtered.length > 0) {
     const avgBefore = Math.round(filtered.reduce((a, r) => a + r.tokensBefore, 0) / filtered.length)
-    const avgCulprit = Math.round(filtered.reduce((a, r) => a + r.tokensCulprit, 0) / filtered.length)
+    const avgCulprit = Math.round(
+      filtered.reduce((a, r) => a + r.tokensCulprit, 0) / filtered.length,
+    )
     const avgAfter = Math.round(filtered.reduce((a, r) => a + r.tokensAfter, 0) / filtered.length)
     push(`## Average Token Layout (${filtered.length} ticks)`, "")
     push("| Segment | Avg tokens |", "|---------|-----------|")

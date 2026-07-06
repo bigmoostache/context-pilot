@@ -9,4 +9,8 @@ export const fmtDollar = (v: number): string => (v < 0.01 ? `$${v.toFixed(4)}` :
 
 /** Format a token count with K/M suffixes. */
 export const fmtTokens = (v: number): string =>
-  v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `${(v / 1_000).toFixed(1)}K` : `${v}`
+  v >= 1_000_000
+    ? `${(v / 1_000_000).toFixed(1)}M`
+    : v >= 1_000
+      ? `${(v / 1_000).toFixed(1)}K`
+      : `${v}`

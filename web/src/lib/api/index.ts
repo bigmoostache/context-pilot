@@ -14,11 +14,7 @@
 // `ThrowOnError = false`, hence the `as` casts below — they align the
 // compile-time type with the runtime guarantee.
 
-import type {
-  Agent,
-  ContextPanel,
-  ThreadDetail,
-} from "../types"
+import type { Agent, ContextPanel, ThreadDetail } from "../types"
 import type {
   AgentMetrics,
   CallbackRow,
@@ -40,9 +36,7 @@ import type {
   UnretireReceipt,
   Vital,
 } from "./generated/types.gen"
-import type {
-  ClaudeUsageResponse,
-} from "./generated/types.gen"
+import type { ClaudeUsageResponse } from "./generated/types.gen"
 import {
   getApiClaudeUsage,
   getApiClaudeLoginStatus,
@@ -98,7 +92,11 @@ export type { AgentMetrics } from "./generated/types.gen"
 export type { Vital } from "./generated/types.gen"
 export type { CreateCommandReceipt } from "./generated/types.gen"
 export type { ClaudeUsageResponse, ClaudeUsageLimit } from "./generated/types.gen"
-export type { ClaudeTokenStatus, ClaudeLoginStartResponse, ClaudeLoginCompleteResponse } from "./generated/types.gen"
+export type {
+  ClaudeTokenStatus,
+  ClaudeLoginStartResponse,
+  ClaudeLoginCompleteResponse,
+} from "./generated/types.gen"
 
 // ── Helper: align TS with runtime (setupClient.ts guarantees) ─────────
 
@@ -134,10 +132,7 @@ export function unretireAgent(agentId: string): Promise<UnretireReceipt> {
   return sdk(postApiAgentByIdUnretire({ path: { id: agentId } }))
 }
 
-export function renameAgent(
-  agentId: string,
-  name: string,
-): Promise<{ ok: boolean }> {
+export function renameAgent(agentId: string, name: string): Promise<{ ok: boolean }> {
   return sdk(postApiAgentByIdRename({ path: { id: agentId }, body: { name } }))
 }
 
@@ -216,10 +211,12 @@ export async function sendCommand(
   agentId: string,
   kind: Record<string, unknown>,
 ): Promise<CommandReceipt> {
-  return sdk(postApiAgentByIdCommand({
-    path: { id: agentId },
-    body: buildCommandEnvelope(kind) as Record<string, unknown>,
-  }))
+  return sdk(
+    postApiAgentByIdCommand({
+      path: { id: agentId },
+      body: buildCommandEnvelope(kind) as Record<string, unknown>,
+    }),
+  )
 }
 
 export function createCommand(
@@ -260,7 +257,8 @@ export function mapRawQuestions(raw: unknown): ThreadDetail["log"][number]["ques
     prompt: (q["question"] as string) ?? (q["prompt"] as string) ?? "",
     options: Array.isArray(q["options"])
       ? q["options"].map((o: unknown) =>
-          typeof o === "string" ? o : (o as Record<string, string>)?.["label"] ?? "")
+          typeof o === "string" ? o : ((o as Record<string, string>)?.["label"] ?? ""),
+        )
       : [],
     multi: (q["multiSelect"] as boolean) ?? (q["multi"] as boolean) ?? false,
     allowOther: (q["allowOther"] as boolean) ?? false,
@@ -275,12 +273,16 @@ export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
   return res.threads.map((t) => ({
     ...t,
     agentId: t.agentId ?? agentId,
-    lastActivity: typeof t.lastActivity === "number"
-      ? formatAge(t.lastActivity as unknown as number)
-      : (t.lastActivity ?? ""),
-    lastActivityMs: typeof t.lastActivityMs === "number"
-      ? t.lastActivityMs
-      : (typeof t.lastActivity === "number" ? (t.lastActivity as unknown as number) : 0),
+    lastActivity:
+      typeof t.lastActivity === "number"
+        ? formatAge(t.lastActivity as unknown as number)
+        : (t.lastActivity ?? ""),
+    lastActivityMs:
+      typeof t.lastActivityMs === "number"
+        ? t.lastActivityMs
+        : typeof t.lastActivity === "number"
+          ? (t.lastActivity as unknown as number)
+          : 0,
     focused: focusedId != null && t.id === focusedId,
     log: (t.log ?? []).map((m) => ({
       ...m,
@@ -337,18 +339,26 @@ export function fetchClaudeUsage(): Promise<ClaudeUsageResponse> {
   return sdk(getApiClaudeUsage())
 }
 
-export function fetchClaudeTokenStatus(): Promise<import("./generated/types.gen").ClaudeTokenStatus> {
+export function fetchClaudeTokenStatus(): Promise<
+  import("./generated/types.gen").ClaudeTokenStatus
+> {
   return sdk(getApiClaudeLoginStatus())
 }
 
-export function startClaudeLogin(): Promise<import("./generated/types.gen").ClaudeLoginStartResponse> {
+export function startClaudeLogin(): Promise<
+  import("./generated/types.gen").ClaudeLoginStartResponse
+> {
   return sdk(postApiClaudeLoginStart())
 }
 
-export function completeClaudeLogin(code: string): Promise<import("./generated/types.gen").ClaudeLoginCompleteResponse> {
+export function completeClaudeLogin(
+  code: string,
+): Promise<import("./generated/types.gen").ClaudeLoginCompleteResponse> {
   return sdk(postApiClaudeLoginComplete({ body: { code } }))
 }
 
-export function refreshClaudeLogin(): Promise<import("./generated/types.gen").ClaudeLoginCompleteResponse> {
+export function refreshClaudeLogin(): Promise<
+  import("./generated/types.gen").ClaudeLoginCompleteResponse
+> {
   return sdk(postApiClaudeLoginRefresh())
 }

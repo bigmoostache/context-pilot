@@ -75,7 +75,7 @@ test.describe("cockpit / inspection panels over the live plane", () => {
     request,
   }) => {
     const todosRaw = await (await request.get(`${API}/api/agent/${AGENT_ID}/todos`)).json()
-    const todos = Array.isArray(todosRaw) ? todosRaw : todosRaw.todos ?? []
+    const todos = Array.isArray(todosRaw) ? todosRaw : (todosRaw.todos ?? [])
     expect(todos.length, "agent has todos to display").toBeGreaterThan(0)
 
     await openCockpit(page)

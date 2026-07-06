@@ -1,13 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { Agent, FinderNode, FinderSortKey, FinderViewMode } from "@/lib/types"
 import { sortNodes } from "@/lib/support/finderFs"
-import { downloadFile, useFs, useFsDescriptions } from "@/lib/live"
-import {
-  FinderPathBar,
-  FinderSidebar,
-  FinderTabs,
-  FinderToolbar,
-} from "./FinderChrome"
+import { useFs, useFsDescriptions } from "@/lib/live"
+import { FinderPathBar, FinderSidebar, FinderTabs, FinderToolbar } from "./FinderChrome"
 import { ColumnsView, GalleryView, GridView, ListView } from "./views/FinderViews"
 import { FinderPreview } from "./preview/FinderPreview"
 import { type MenuPos } from "./ContextMenu"
@@ -24,6 +19,7 @@ import {
 } from "./internal/helpers"
 import { useExternalDragUpload } from "./internal/useExternalDragUpload"
 import { useFinderActions } from "./internal/useFinderActions"
+import { useFinderDownloads } from "./internal/useFinderDownloads"
 import { useFinderKeyboard } from "./internal/useFinderKeyboard"
 import { useFinderSelection } from "./internal/useFinderSelection"
 import { FinderOverlays } from "./internal/FinderOverlays"
@@ -45,14 +41,21 @@ export type { PinnedFolder } from "./internal/helpers"
  * {@link useExternalDragUpload}. This file owns view state, derived listings,
  * and the render.
  */
-export function Finder({ agent, revealPath, onRevealConsumed }: { agent: Agent; revealPath?: string | null | undefined; onRevealConsumed?: (() => void) | undefined }) {
+export function Finder({
+  agent,
+  revealPath,
+  onRevealConsumed,
+}: {
+  agent: Agent
+  revealPath?: string | null | undefined
+  onRevealConsumed?: (() => void) | undefined
+}) {
   const root: FinderNode = useMemo(
     () => ({ name: agent.name, path: agent.folder, kind: "folder" as const, modified: "" }),
     [agent],
   )
   const surfaceRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
 
   const [tabs, setTabs] = useState<Tab[]>(() => [
     { id: "t0", cwd: agent.folder, label: agent.name, kind: "folder", back: [], fwd: [] },
@@ -123,7 +126,13 @@ export function Finder({ agent, revealPath, onRevealConsumed }: { agent: Agent; 
     () =>
       pendingFolderName != null
         ? [
-            { name: pendingFolderName, path: NEW_FOLDER_SENTINEL, kind: "folder", modified: "", count: 0 },
+            {
+              name: pendingFolderName,
+              path: NEW_FOLDER_SENTINEL,
+              kind: "folder",
+              modified: "",
+              count: 0,
+            },
             ...sorted,
           ]
         : sorted,
@@ -133,7 +142,8 @@ export function Finder({ agent, revealPath, onRevealConsumed }: { agent: Agent; 
     () => buildCrumbs(agent.folder, agent.name, cwd),
     [agent.folder, agent.name, cwd],
   )
-  const previewNode = preview ?? (focusPath ? children.find((c) => c.path === focusPath) ?? null : null)
+  const previewNode =
+    preview ?? (focusPath ? (children.find((c) => c.path === focusPath) ?? null) : null)
 
   // Pending single-click settle timer (see CLICK_SETTLE_MS). Cleared by a
   // double-click / open / navigate so those win over the deferred single-click
@@ -220,6 +230,15 @@ export function Finder({ agent, revealPath, onRevealConsumed }: { agent: Agent; 
 
   // ── external-file drag overlay (window-level lifecycle) ─────────
   useExternalDragUpload(setDragging, uploadFiles)
+
+  // ── download actions (selected files / the active file tab) ─────
+  const { downloadSelected, downloadActiveFile } = useFinderDownloads({
+    agentId: agent.id,
+    children,
+    selected,
+    activeFileNode: active.fileNode ?? null,
+    flash,
+  })
 
   const onKeyDown = useFinderKeyboard({
     sorted,
@@ -332,32 +351,11 @@ export function Finder({ agent, revealPath, onRevealConsumed }: { agent: Agent; 
         onQuery={setQuery}
         onNewFolder={newFolder}
         onUpload={() => fileInputRef.current?.click()}
-        onDownload={() => {
-          if (!selected.size) {
-            flash("Select files to download.")
-            return
-          }
-          const files = [...selected]
-            .map((p) => children.find((c) => c.path === p))
-            .filter((n) => n && n.kind !== "folder")
-          if (files.length === 0) {
-            flash("Select files (not folders) to download.")
-            return
-          }
-          for (const node of files) {
-            if (node) downloadFile(agent.id, node.path).catch(() => flash(`Failed to download ${node.name}`))
-          }
-          flash(`Downloading ${files.length} file(s)…`)
-        }}
+        onDownload={downloadSelected}
         onTogglePreview={() => setPreviewOpen((o) => !o)}
         onTogglePathBar={() => setPathBarOpen((o) => !o)}
         fileActive={!!active.fileNode}
-        onFileDownload={() => {
-          if (active.fileNode) {
-            downloadFile(agent.id, active.fileNode.path).catch(() => flash("Download failed"))
-            flash(`Downloading ${active.fileNode.name}…`)
-          }
-        }}
+        onFileDownload={downloadActiveFile}
       />
 
       <div className="flex min-h-0 flex-1">

@@ -30,8 +30,7 @@ export function LoginPage() {
         await login(email, password)
       }
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "An unexpected error occurred"
+      const msg = err instanceof Error ? err.message : "An unexpected error occurred"
       // Extract the human-readable part after the status code.
       const clean = msg.replace(/^\d+\s+\/api\/auth\/\w+:\s*/, "")
       setError(clean || msg)
@@ -57,9 +56,7 @@ export function LoginPage() {
             <span className="text-signal">▌</span> Context Pilot
           </div>
           <p className="text-sm text-muted-foreground">
-            {isRegister
-              ? "Create the admin account to get started"
-              : "Sign in to continue"}
+            {isRegister ? "Create the admin account to get started" : "Sign in to continue"}
           </p>
         </div>
 
@@ -141,11 +138,7 @@ export function LoginPage() {
                        transition-opacity hover:opacity-90
                        disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submitting
-              ? "…"
-              : isRegister
-                ? "Create Admin Account"
-                : "Sign In"}
+            {submitting ? "…" : isRegister ? "Create Admin Account" : "Sign In"}
           </button>
         </form>
 

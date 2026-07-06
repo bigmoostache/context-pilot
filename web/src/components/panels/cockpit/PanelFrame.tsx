@@ -127,9 +127,7 @@ export function InspectionUnavailable({ reason }: { reason: string }) {
       <span className="text-[12.5px] font-medium text-foreground/80">
         Unavailable over the web inspection plane
       </span>
-      <span className="max-w-sm text-[11.5px] leading-relaxed text-muted-foreground">
-        {reason}
-      </span>
+      <span className="max-w-sm text-[11.5px] leading-relaxed text-muted-foreground">{reason}</span>
     </div>
   )
 }

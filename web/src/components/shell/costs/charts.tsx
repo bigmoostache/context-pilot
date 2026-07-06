@@ -80,7 +80,9 @@ export function DonutChart({ data, size = 220, title }: DonutProps) {
           total
         </text>
       </svg>
-      <Legend items={arcs.map((a) => ({ label: a.label, color: a.color, value: a.value, pct: a.ratio }))} />
+      <Legend
+        items={arcs.map((a) => ({ label: a.label, color: a.color, value: a.value, pct: a.ratio }))}
+      />
     </div>
   )
 }
@@ -92,7 +94,6 @@ interface HBarProps {
   title?: string | undefined
   format?: (v: number) => string
 }
-
 
 export function HBarChart({ data, title, format = fmtDollar }: HBarProps) {
   const max = Math.max(...data.map((d) => d.value), 1)
@@ -106,7 +107,9 @@ export function HBarChart({ data, title, format = fmtDollar }: HBarProps) {
           const pct = (d.value / max) * 100
           return (
             <div key={d.label} className="flex items-center gap-2">
-              <span className="w-28 shrink-0 truncate text-right text-[11px] text-muted-foreground">{d.label}</span>
+              <span className="w-28 shrink-0 truncate text-right text-[11px] text-muted-foreground">
+                {d.label}
+              </span>
               <div className="relative h-5 min-w-0 flex-1 overflow-hidden rounded-md bg-muted/40">
                 <div
                   className="absolute inset-y-0 left-0 rounded-md transition-all duration-500"
@@ -217,15 +220,24 @@ export function CostTimeline({ rows, title, width = 600, height = 200 }: Timelin
       </svg>
       <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1">
-          <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: "var(--ok, #4ade80)" }} />
+          <span
+            className="inline-block size-2.5 rounded-sm"
+            style={{ backgroundColor: "var(--ok, #4ade80)" }}
+          />
           Hit
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: "var(--warn, #fbbf24)" }} />
+          <span
+            className="inline-block size-2.5 rounded-sm"
+            style={{ backgroundColor: "var(--warn, #fbbf24)" }}
+          />
           Miss
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: "#60a5fa" }} />
+          <span
+            className="inline-block size-2.5 rounded-sm"
+            style={{ backgroundColor: "#60a5fa" }}
+          />
           Output
         </span>
       </div>
@@ -252,8 +264,14 @@ function Legend({
   return (
     <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
       {items.map((it) => (
-        <span key={it.label} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span className="inline-block size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: it.color }} />
+        <span
+          key={it.label}
+          className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+        >
+          <span
+            className="inline-block size-2.5 shrink-0 rounded-sm"
+            style={{ backgroundColor: it.color }}
+          />
           <span className="truncate">{it.label}</span>
           <span className="tabular-nums text-foreground/60">{(it.pct * 100).toFixed(0)}%</span>
         </span>

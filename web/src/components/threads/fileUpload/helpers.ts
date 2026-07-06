@@ -82,9 +82,7 @@ function parseBlock(body: string): UploadedFile | null {
 
 /** An ordered render segment of a message body: a run of prose, or one attached
  *  file parsed from a ` ```file-upload ` block at the exact position it appeared. */
-export type MessageSegment =
-  | { type: "text"; text: string }
-  | { type: "file"; file: UploadedFile }
+export type MessageSegment = { type: "text"; text: string } | { type: "file"; file: UploadedFile }
 
 /**
  * Split a message body into ordered segments, replacing each ` ```file-upload `

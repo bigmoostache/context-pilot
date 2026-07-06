@@ -55,7 +55,13 @@ export function RenameInput({
 }
 
 /** Colored macOS finder tag dots. */
-export function TagDots({ tags, className }: { tags?: FinderTag[] | undefined; className?: string | undefined }) {
+export function TagDots({
+  tags,
+  className,
+}: {
+  tags?: FinderTag[] | undefined
+  className?: string | undefined
+}) {
   if (!tags || tags.length === 0) return null
   return (
     <span className={cn("flex items-center gap-0.5", className)}>

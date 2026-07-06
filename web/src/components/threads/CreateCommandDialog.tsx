@@ -1,11 +1,6 @@
 import { useState } from "react"
 import { TerminalSquare, Loader2 } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -88,8 +83,8 @@ export function CreateCommandDialog({
             <div className="flex flex-col gap-0.5">
               <DialogTitle>New command</DialogTitle>
               <DialogDescription>
-                Author a <span className="font-mono text-foreground/70">/command</span> for this agent's
-                library — it appears as a suggestion the moment you save it.
+                Author a <span className="font-mono text-foreground/70">/command</span> for this
+                agent's library — it appears as a suggestion the moment you save it.
               </DialogDescription>
             </div>
           </div>
@@ -105,8 +100,7 @@ export function CreateCommandDialog({
                 placeholder="e.g. Boss Hunt"
               />
               <span className="text-[11px] text-muted-foreground/70">
-                Invoked as{" "}
-                <span className="font-mono text-[var(--interactive)]">/{slug}</span>
+                Invoked as <span className="font-mono text-[var(--interactive)]">/{slug}</span>
               </span>
             </label>
 
@@ -144,9 +138,7 @@ export function CreateCommandDialog({
               </span>
             </div>
 
-            {error && (
-              <p className="text-[12px] text-destructive">{error}</p>
-            )}
+            {error && <p className="text-[12px] text-destructive">{error}</p>}
           </div>
 
           {/* Footer */}

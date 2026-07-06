@@ -53,8 +53,9 @@ export function FinalizeStep({
     return (
       <div className="flex flex-col gap-3">
         <p className="text-sm text-foreground">
-          ✓ Provisioned. The cockpit is now served on <span className="font-mono">{cockpitUrl}</span>. It may take a
-          few seconds for TLS to come up.
+          ✓ Provisioned. The cockpit is now served on{" "}
+          <span className="font-mono">{cockpitUrl}</span>. It may take a few seconds for TLS to come
+          up.
         </p>
         <a
           className="w-full rounded-md bg-signal px-4 py-2 text-center text-sm font-semibold text-background hover:opacity-90"
@@ -73,8 +74,8 @@ export function FinalizeStep({
         <Check ok={status.identity_set}>Box name / IP set</Check>
       </ul>
       <p className="text-xs text-muted-foreground">
-        Finalizing starts the cockpit on <span className="font-mono">{cockpitUrl}</span> and turns off this setup flow
-        for normal use (the maintenance console stays reachable on :9090).
+        Finalizing starts the cockpit on <span className="font-mono">{cockpitUrl}</span> and turns
+        off this setup flow for normal use (the maintenance console stays reachable on :9090).
       </p>
       <ErrorNote error={error} />
       <PrimaryButton onClick={finalize} disabled={!ready} busy={busy}>
@@ -87,7 +88,8 @@ export function FinalizeStep({
 function Check({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
     <li className={ok ? "text-foreground" : "text-muted-foreground"}>
-      <span className={ok ? "text-signal" : "text-muted-foreground"}>{ok ? "✓" : "○"}</span> {children}
+      <span className={ok ? "text-signal" : "text-muted-foreground"}>{ok ? "✓" : "○"}</span>{" "}
+      {children}
     </li>
   )
 }

@@ -93,7 +93,10 @@ export function fetchIdentity(): Promise<{ identity: Identity | null }> {
   return maintFetch<{ identity: Identity | null }>("/api/maint/identity")
 }
 
-export function setIdentity(name: string, ip: string): Promise<{ identity: Identity; reloaded: boolean }> {
+export function setIdentity(
+  name: string,
+  ip: string,
+): Promise<{ identity: Identity; reloaded: boolean }> {
   return maintFetch("/api/maint/identity", {
     method: "POST",
     body: JSON.stringify({ name, ip }),

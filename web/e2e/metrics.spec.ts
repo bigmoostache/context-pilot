@@ -18,10 +18,7 @@ import { test, expect } from "@playwright/test"
 //     budget, which never trips on its own.
 
 /** Force every agent's metrics poll to answer with a fixed snapshot. */
-async function routeMetrics(
-  page: import("@playwright/test").Page,
-  body: Record<string, unknown>,
-) {
+async function routeMetrics(page: import("@playwright/test").Page, body: Record<string, unknown>) {
   await page.route("**/api/agent/*/metrics", (route) =>
     route.fulfill({
       status: 200,
@@ -44,7 +41,10 @@ test.describe("§19 fleet health badge surfacing", () => {
       breaker: { tripped: true, spendUsd: 580.8, budgetUsd: 100 },
     })
     await page.goto("/")
-    const badge = page.getByRole("status").filter({ hasText: /Over budget/i }).first()
+    const badge = page
+      .getByRole("status")
+      .filter({ hasText: /Over budget/i })
+      .first()
     await expect(badge).toBeVisible({ timeout: 10_000 })
   })
 
@@ -54,7 +54,10 @@ test.describe("§19 fleet health badge surfacing", () => {
       stream: { subscribers: 1, droppedFrames: 7, degraded: true },
     })
     await page.goto("/")
-    const badge = page.getByRole("status").filter({ hasText: /Stream degraded/i }).first()
+    const badge = page
+      .getByRole("status")
+      .filter({ hasText: /Stream degraded/i })
+      .first()
     await expect(badge).toBeVisible({ timeout: 10_000 })
   })
 
@@ -64,7 +67,10 @@ test.describe("§19 fleet health badge surfacing", () => {
       rev: { view: 100, oplogHead: 400, lag: 300 },
     })
     await page.goto("/")
-    const badge = page.getByRole("status").filter({ hasText: /Projection lagging/i }).first()
+    const badge = page
+      .getByRole("status")
+      .filter({ hasText: /Projection lagging/i })
+      .first()
     await expect(badge).toBeVisible({ timeout: 10_000 })
   })
 
@@ -77,7 +83,9 @@ test.describe("§19 fleet health badge surfacing", () => {
       timeout: 10_000,
     })
     await expect(
-      page.getByRole("status").filter({ hasText: /Over budget|Stream degraded|Projection lagging/i }),
+      page
+        .getByRole("status")
+        .filter({ hasText: /Over budget|Stream degraded|Projection lagging/i }),
     ).toHaveCount(0)
   })
 })

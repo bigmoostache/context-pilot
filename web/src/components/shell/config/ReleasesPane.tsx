@@ -1,14 +1,6 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import {
-  Check,
-  ChevronDown,
-  Download,
-  Loader2,
-  Package,
-  RefreshCw,
-  Trash2,
-} from "lucide-react"
+import { Check, ChevronDown, Download, Loader2, Package, RefreshCw, Trash2 } from "lucide-react"
 import {
   deleteApiReleasesByTag,
   getApiReleases,
@@ -144,14 +136,22 @@ function ArchSection({
           >
             <Package className="size-4 text-muted-foreground/70" />
             {arch}
-            <ChevronDown className={cn("size-3.5 text-muted-foreground/60 transition-transform", open && "rotate-180")} />
+            <ChevronDown
+              className={cn(
+                "size-3.5 text-muted-foreground/60 transition-transform",
+                open && "rotate-180",
+              )}
+            />
           </button>
           {open && (
             <div className="absolute left-0 top-full z-10 mt-1 min-w-[200px] rounded-lg border border-border bg-card py-1 card-shadow">
               {knownArchs.map((a) => (
                 <button
                   key={a}
-                  onClick={() => { setArch.mutate({ arch: a }); setOpen(false) }}
+                  onClick={() => {
+                    setArch.mutate({ arch: a })
+                    setOpen(false)
+                  }}
                   className={cn(
                     "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12.5px] transition-colors hover:bg-muted/50",
                     a === arch ? "font-medium text-[var(--interactive)]" : "text-foreground/80",
@@ -174,13 +174,15 @@ function ArchSection({
               : "border-border bg-card text-foreground/75 hover:bg-muted/40 card-shadow",
           )}
         >
-          {setArch.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+          {setArch.isPending ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="size-3.5" />
+          )}
           Auto-detect
         </button>
         {archAuto && (
-          <span className="text-[10.5px] text-[var(--interactive)]">
-            ✓ auto-detected
-          </span>
+          <span className="text-[10.5px] text-[var(--interactive)]">✓ auto-detected</span>
         )}
       </div>
     </div>
@@ -207,12 +209,7 @@ function PaginatedReleases({
   return (
     <div className="flex flex-col gap-2">
       {slice.map((r, i) => (
-        <ReleaseCard
-          key={r.tag}
-          release={r}
-          index={i}
-          onChanged={onChanged}
-        />
+        <ReleaseCard key={r.tag} release={r} index={i} onChanged={onChanged} />
       ))}
 
       {totalPages > 1 && (
@@ -252,15 +249,21 @@ function ReleaseCard({
   onChanged: () => void
 }) {
   const dl = useMutation({
-    mutationFn: async () => { await postApiReleasesDownload({ body: { tag: r.tag } }) },
+    mutationFn: async () => {
+      await postApiReleasesDownload({ body: { tag: r.tag } })
+    },
     onSuccess: onChanged,
   })
   const sel = useMutation({
-    mutationFn: async () => { await putApiReleasesSelect({ body: { tag: r.tag } }) },
+    mutationFn: async () => {
+      await putApiReleasesSelect({ body: { tag: r.tag } })
+    },
     onSuccess: onChanged,
   })
   const del = useMutation({
-    mutationFn: async () => { await deleteApiReleasesByTag({ path: { tag: r.tag } }) },
+    mutationFn: async () => {
+      await deleteApiReleasesByTag({ path: { tag: r.tag } })
+    },
     onSuccess: onChanged,
   })
 
@@ -306,9 +309,7 @@ function ReleaseCard({
           />
         )}
         {!r.local && !r.assetUrl && (
-          <span className="text-[10px] italic text-muted-foreground/50">
-            no asset
-          </span>
+          <span className="text-[10px] italic text-muted-foreground/50">no asset</span>
         )}
         {r.local && !r.selected && (
           <ActionBtn
@@ -338,11 +339,17 @@ function ReleaseCard({
 // ── Tiny helpers ──────────────────────────────────────────────────
 
 function Chip({ color, label }: { color: "interactive" | "ok"; label: string }) {
-  const cls = color === "ok"
-    ? "bg-[var(--ok)]/12 text-[var(--ok)]"
-    : "bg-[var(--interactive)]/12 text-[var(--interactive)]"
+  const cls =
+    color === "ok"
+      ? "bg-[var(--ok)]/12 text-[var(--ok)]"
+      : "bg-[var(--interactive)]/12 text-[var(--interactive)]"
   return (
-    <span className={cn("inline-flex shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold", cls)}>
+    <span
+      className={cn(
+        "inline-flex shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold",
+        cls,
+      )}
+    >
       {label}
     </span>
   )
@@ -372,8 +379,10 @@ function ActionBtn({
       title={label}
       className={cn(
         "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-all disabled:opacity-50",
-        accent && "border-[var(--interactive)]/30 bg-[var(--interactive)]/[0.06] text-[var(--interactive)] hover:bg-[var(--interactive)]/[0.12]",
-        danger && "border-[var(--danger)]/30 bg-[var(--danger)]/[0.06] text-[var(--danger)] hover:bg-[var(--danger)]/[0.12]",
+        accent &&
+          "border-[var(--interactive)]/30 bg-[var(--interactive)]/[0.06] text-[var(--interactive)] hover:bg-[var(--interactive)]/[0.12]",
+        danger &&
+          "border-[var(--danger)]/30 bg-[var(--danger)]/[0.06] text-[var(--danger)] hover:bg-[var(--danger)]/[0.12]",
         !accent && !danger && "border-border bg-card text-foreground/75 hover:bg-muted/40",
       )}
     >
@@ -385,7 +394,11 @@ function ActionBtn({
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    return new Date(iso).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
   } catch {
     return iso
   }

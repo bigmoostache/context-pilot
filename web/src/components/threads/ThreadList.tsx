@@ -1,4 +1,14 @@
-import { Plus, Search, X, Archive, ArchiveRestore, ChevronLeft, Pause, Play, Trash2 } from "lucide-react"
+import {
+  Plus,
+  Search,
+  X,
+  Archive,
+  ArchiveRestore,
+  ChevronLeft,
+  Pause,
+  Play,
+  Trash2,
+} from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ThreadDetail } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -119,7 +129,9 @@ export function ThreadList({
   }
 
   const mine = visible.filter((t) => t.status === "MY_TURN").sort(byFocusThenRecent)
-  const working = visible.filter((t) => t.status === "THEIR_TURN" || t.status === "ACTIVE").sort(byRecent)
+  const working = visible
+    .filter((t) => t.status === "THEIR_TURN" || t.status === "ACTIVE")
+    .sort(byRecent)
   // agent-owned, actively-or-parallel working count (for the header pill)
   const workingCount = live.filter((t) => t.status !== "MY_TURN").length
 
@@ -204,7 +216,11 @@ export function ThreadList({
           <div className="px-2 py-1">
             {visible.length === 0 && (
               <p className="px-2.5 py-6 text-center text-[11.5px] text-muted-foreground/55">
-                {q ? "No threads match your search." : showArchived ? "No archived threads." : "No threads yet."}
+                {q
+                  ? "No threads match your search."
+                  : showArchived
+                    ? "No archived threads."
+                    : "No threads yet."}
               </p>
             )}
 
@@ -212,21 +228,45 @@ export function ThreadList({
               <>
                 {working.length > 0 && <Group label="User turn" count={working.length} />}
                 {working.map((t) => (
-                  <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} onPause={onPause} />
+                  <ThreadRow
+                    key={t.id}
+                    t={t}
+                    selected={t.id === selectedId}
+                    onSelect={onSelect}
+                    onArchive={onArchive}
+                    onPause={onPause}
+                  />
                 ))}
 
                 {mine.length > 0 && <Group label="Agent's turn" count={mine.length} />}
                 {mine.map((t) => (
-                  <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} onPause={onPause} />
+                  <ThreadRow
+                    key={t.id}
+                    t={t}
+                    selected={t.id === selectedId}
+                    onSelect={onSelect}
+                    onArchive={onArchive}
+                    onPause={onPause}
+                  />
                 ))}
               </>
             )}
 
             {showArchived &&
               // Latest-archived first (T277) — most recently active on top.
-              [...visible].sort(byRecent).map((t) => (
-                <ThreadRow key={t.id} t={t} selected={t.id === selectedId} onSelect={onSelect} onArchive={onArchive} onDelete={onDelete} archived />
-              ))}
+              [...visible]
+                .sort(byRecent)
+                .map((t) => (
+                  <ThreadRow
+                    key={t.id}
+                    t={t}
+                    selected={t.id === selectedId}
+                    onSelect={onSelect}
+                    onArchive={onArchive}
+                    onDelete={onDelete}
+                    archived
+                  />
+                ))}
           </div>
         </ScrollArea>
 
@@ -280,14 +320,13 @@ function ThreadRow({
   const preview = previewOf(t)
   const isFocused = !archived && t.focused
   const isPaused = !archived && t.paused
-  const dot =
-    isFocused
-      ? "var(--ok)"
-      : t.status === "MY_TURN"
-        ? "var(--signal)"
-        : t.status === "ACTIVE"
-          ? "var(--ok)"
-          : "var(--muted-foreground)"
+  const dot = isFocused
+    ? "var(--ok)"
+    : t.status === "MY_TURN"
+      ? "var(--signal)"
+      : t.status === "ACTIVE"
+        ? "var(--ok)"
+        : "var(--muted-foreground)"
   const pulse = isFocused || t.status === "MY_TURN" || t.status === "ACTIVE"
 
   return (
@@ -301,8 +340,13 @@ function ThreadRow({
         {/* line 1 — dot + name + time + overflow menu */}
         <div className="flex items-center gap-2">
           <span
-            className={cn("size-2 shrink-0 rounded-full", pulse && !archived && !isPaused && "animate-pulse")}
-            style={{ background: archived ? "var(--muted-foreground)" : isPaused ? "var(--warn)" : dot }}
+            className={cn(
+              "size-2 shrink-0 rounded-full",
+              pulse && !archived && !isPaused && "animate-pulse",
+            )}
+            style={{
+              background: archived ? "var(--muted-foreground)" : isPaused ? "var(--warn)" : dot,
+            }}
           />
           <span className="truncate text-[13px] font-medium text-foreground/90">{t.name}</span>
           <span className="relative ml-auto shrink-0">
@@ -311,7 +355,10 @@ function ThreadRow({
             </span>
             <span className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
               <button
-                onClick={(e) => { e.stopPropagation(); onArchive(t.id) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onArchive(t.id)
+                }}
                 className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground"
                 title={archived ? "Restore" : "Archive"}
               >
@@ -319,7 +366,10 @@ function ThreadRow({
               </button>
               {archived && onDelete && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); onDelete(t.id) }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete(t.id)
+                  }}
                   className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-[var(--danger)]"
                   title="Delete permanently"
                 >
@@ -328,7 +378,10 @@ function ThreadRow({
               )}
               {!archived && onPause && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); onPause(t.id) }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onPause(t.id)
+                  }}
                   className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground"
                   title={isPaused ? "Resume" : "Pause"}
                 >
@@ -343,7 +396,10 @@ function ThreadRow({
           {isFocused && (
             <span
               className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide"
-              style={{ background: "color-mix(in oklab, var(--ok) 18%, transparent)", color: "var(--ok)" }}
+              style={{
+                background: "color-mix(in oklab, var(--ok) 18%, transparent)",
+                color: "var(--ok)",
+              }}
             >
               focused
             </span>
@@ -351,7 +407,10 @@ function ThreadRow({
           {isPaused && (
             <span
               className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide"
-              style={{ background: "color-mix(in oklab, var(--warn) 18%, transparent)", color: "var(--warn)" }}
+              style={{
+                background: "color-mix(in oklab, var(--warn) 18%, transparent)",
+                color: "var(--warn)",
+              }}
             >
               paused
             </span>
@@ -367,7 +426,6 @@ function ThreadRow({
           )}
         </div>
       </div>
-
     </div>
   )
 }

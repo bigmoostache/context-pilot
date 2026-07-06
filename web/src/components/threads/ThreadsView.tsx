@@ -64,9 +64,7 @@ export function ThreadsView({
   // store; kept in sync by the persist effect below. Keyed by agent so each
   // realm remembers its own thread.
   const threadKey = `cp-thread-${activeAgentId}`
-  const [selectedId, setSelectedId] = useState(
-    () => localStorage.getItem(threadKey) ?? "",
-  )
+  const [selectedId, setSelectedId] = useState(() => localStorage.getItem(threadKey) ?? "")
   const [query, setQuery] = useState("")
   const [showArchived, setShowArchived] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
@@ -120,7 +118,7 @@ export function ThreadsView({
   const validSelection = threads.some((t) => t.id === selectedId)
   const effectiveSelectedId = validSelection
     ? selectedId
-    : threads.find((t) => !t.archived)?.id ?? threads[0]?.id ?? ""
+    : (threads.find((t) => !t.archived)?.id ?? threads[0]?.id ?? "")
 
   const thread = threads.find((t) => t.id === effectiveSelectedId)
 
@@ -139,59 +137,76 @@ export function ThreadsView({
     setPendingFiles([])
   }, [effectiveSelectedId])
 
-  const handleArchive = useCallback((id: string) => {
-    const t = threads.find((th) => th.id === id)
-    if (!t) return
-    const kind = t.archived ? "restore_thread" : "archive_thread"
-    const verb = t.archived ? "restore the thread" : "archive the thread"
-    // Deselect the thread being archived so the view falls through to the
-    // next available thread instead of sticking on a now-invisible row.
-    if (!t.archived && id === selectedId) setSelectedId("")
-    sendCommand(activeAgentId, { kind, thread_id: id }).catch((e) =>
-      flash(describeCommandError(verb, e)),
-    )
-  }, [threads, activeAgentId, flash, selectedId])
+  const handleArchive = useCallback(
+    (id: string) => {
+      const t = threads.find((th) => th.id === id)
+      if (!t) return
+      const kind = t.archived ? "restore_thread" : "archive_thread"
+      const verb = t.archived ? "restore the thread" : "archive the thread"
+      // Deselect the thread being archived so the view falls through to the
+      // next available thread instead of sticking on a now-invisible row.
+      if (!t.archived && id === selectedId) setSelectedId("")
+      sendCommand(activeAgentId, { kind, thread_id: id }).catch((e) =>
+        flash(describeCommandError(verb, e)),
+      )
+    },
+    [threads, activeAgentId, flash, selectedId],
+  )
 
-  const handlePause = useCallback((id: string) => {
-    const t = threads.find((th) => th.id === id)
-    if (!t) return
-    const kind = t.paused ? "resume_thread" : "pause_thread"
-    const verb = t.paused ? "resume the thread" : "pause the thread"
-    sendCommand(activeAgentId, { kind, thread_id: id }).catch((e) =>
-      flash(describeCommandError(verb, e)),
-    )
-  }, [threads, activeAgentId, flash])
+  const handlePause = useCallback(
+    (id: string) => {
+      const t = threads.find((th) => th.id === id)
+      if (!t) return
+      const kind = t.paused ? "resume_thread" : "pause_thread"
+      const verb = t.paused ? "resume the thread" : "pause the thread"
+      sendCommand(activeAgentId, { kind, thread_id: id }).catch((e) =>
+        flash(describeCommandError(verb, e)),
+      )
+    },
+    [threads, activeAgentId, flash],
+  )
 
-  const handleDelete = useCallback((id: string) => {
-    if (id === selectedId) setSelectedId("")
-    sendCommand(activeAgentId, { kind: "delete_thread", thread_id: id }).catch((e) =>
-      flash(describeCommandError("delete the thread", e)),
-    )
-  }, [activeAgentId, flash, selectedId])
+  const handleDelete = useCallback(
+    (id: string) => {
+      if (id === selectedId) setSelectedId("")
+      sendCommand(activeAgentId, { kind: "delete_thread", thread_id: id }).catch((e) =>
+        flash(describeCommandError("delete the thread", e)),
+      )
+    },
+    [activeAgentId, flash, selectedId],
+  )
 
-  const handleCreate = useCallback((title: string) => {
-    pendingSelect.current = true
-    sendCommand(activeAgentId, { kind: "create_thread", name: title.trim() || "Untitled thread" })
-      .catch((e) => {
+  const handleCreate = useCallback(
+    (title: string) => {
+      pendingSelect.current = true
+      sendCommand(activeAgentId, {
+        kind: "create_thread",
+        name: title.trim() || "Untitled thread",
+      }).catch((e) => {
         pendingSelect.current = false
         flash(describeCommandError("create the thread", e))
       })
-    setNewOpen(false)
-    setQuery("")
-    setShowArchived(false)
-  }, [activeAgentId, flash])
+      setNewOpen(false)
+      setQuery("")
+      setShowArchived(false)
+    },
+    [activeAgentId, flash],
+  )
 
-  const handleSend = useCallback((text: string) => {
-    if (!effectiveSelectedId) return
-    const content = buildCombinedContent(text, pendingFiles)
-    if (!content) return
-    sendCommand(activeAgentId, {
-      kind: "send_message",
-      thread_id: effectiveSelectedId,
-      content,
-    }).catch((e) => flash(describeCommandError("send your message", e)))
-    setPendingFiles([])
-  }, [activeAgentId, effectiveSelectedId, flash, pendingFiles])
+  const handleSend = useCallback(
+    (text: string) => {
+      if (!effectiveSelectedId) return
+      const content = buildCombinedContent(text, pendingFiles)
+      if (!content) return
+      sendCommand(activeAgentId, {
+        kind: "send_message",
+        thread_id: effectiveSelectedId,
+        content,
+      }).catch((e) => flash(describeCommandError("send your message", e)))
+      setPendingFiles([])
+    },
+    [activeAgentId, effectiveSelectedId, flash, pendingFiles],
+  )
 
   /**
    * Upload one or more picked files into this thread's staging area (T331).
@@ -288,7 +303,13 @@ export function ThreadsView({
  *  realm is empty, or nothing is picked yet. When `onNewThread` is supplied it
  *  offers a primary action so an empty realm can bootstrap its first thread
  *  without hunting for the sidebar button. */
-function EmptyRealm({ agentName, onNewThread }: { agentName?: string | undefined; onNewThread?: (() => void) | undefined }) {
+function EmptyRealm({
+  agentName,
+  onNewThread,
+}: {
+  agentName?: string | undefined
+  onNewThread?: (() => void) | undefined
+}) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-background text-center">
       <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground/60">
@@ -297,8 +318,8 @@ function EmptyRealm({ agentName, onNewThread }: { agentName?: string | undefined
       <p className="max-w-[320px] text-[13px] text-muted-foreground">
         {agentName ? (
           <>
-            <span className="font-medium text-foreground/80">{agentName}</span> has no
-            threads yet — start one to put it to work in its folder.
+            <span className="font-medium text-foreground/80">{agentName}</span> has no threads yet —
+            start one to put it to work in its folder.
           </>
         ) : (
           "Select an agent to see its threads."

@@ -1,11 +1,6 @@
 import { Info } from "lucide-react"
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 /**
  * The Finder's per-node **info badge** — a small ⓘ affordance shown on a file or

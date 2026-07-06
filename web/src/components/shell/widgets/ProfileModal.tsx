@@ -26,13 +26,7 @@ const INPUT_CLS =
  * When auth is disabled there is no account to manage, so the modal shows a
  * short note instead.
  */
-export function ProfileModal({
-  open,
-  onClose,
-}: {
-  open: boolean
-  onClose: () => void
-}) {
+export function ProfileModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, authEnabled, refreshMe } = useAuth()
 
   return (
@@ -41,7 +35,9 @@ export function ProfileModal({
         <header className="flex items-start gap-3 border-b border-border/70 px-6 pb-4 pt-5">
           <div className="flex flex-1 flex-col gap-0.5">
             <h2 className="text-[17px] font-semibold tracking-tight text-foreground">Profile</h2>
-            <p className="text-[12px] text-muted-foreground">Your account and personal information.</p>
+            <p className="text-[12px] text-muted-foreground">
+              Your account and personal information.
+            </p>
           </div>
           <DialogClose
             aria-label="Close"
@@ -142,11 +138,7 @@ function IdentitySection({
       </div>
 
       <Field label="Display name">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className={INPUT_CLS}
-        />
+        <input value={name} onChange={(e) => setName(e.target.value)} className={INPUT_CLS} />
       </Field>
       <Field label="Email">
         <input
@@ -210,17 +202,47 @@ function PasswordSection() {
         <KeyRound className="size-3.5" /> Change password
       </span>
       <Field label="Current password">
-        <input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} className={INPUT_CLS} />
+        <input
+          type="password"
+          autoComplete="current-password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          className={INPUT_CLS}
+        />
       </Field>
-      <Field label="New password" hint={next.length > 0 && next.length < 8 ? "Min 8 characters" : undefined}>
-        <input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} className={INPUT_CLS} />
+      <Field
+        label="New password"
+        hint={next.length > 0 && next.length < 8 ? "Min 8 characters" : undefined}
+      >
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+          className={INPUT_CLS}
+        />
       </Field>
-      <Field label="Confirm new password" hint={confirm.length > 0 && !match ? "Doesn't match" : undefined}>
-        <input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={INPUT_CLS} />
+      <Field
+        label="Confirm new password"
+        hint={confirm.length > 0 && !match ? "Doesn't match" : undefined}
+      >
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          className={INPUT_CLS}
+        />
       </Field>
-      {msg && <p className={cn("text-[12px]", msg.ok ? "text-signal" : "text-danger")}>{msg.text}</p>}
+      {msg && (
+        <p className={cn("text-[12px]", msg.ok ? "text-signal" : "text-danger")}>{msg.text}</p>
+      )}
       <div className="flex justify-end">
-        <button type="submit" disabled={!canSubmit} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50">
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
+        >
           {busy && <Loader2 className="size-3.5 animate-spin" />}
           Update password
         </button>
@@ -236,7 +258,10 @@ function SessionsSection({ open }: { open: boolean }) {
 
   const load = () => {
     fetchSessions()
-      .then((s) => { setSessions(s); setError(null) })
+      .then((s) => {
+        setSessions(s)
+        setError(null)
+      })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load sessions"))
   }
 
@@ -266,12 +291,19 @@ function SessionsSection({ open }: { open: boolean }) {
       ) : (
         <div className="overflow-hidden rounded-xl border border-border">
           {sessions.map((s) => (
-            <div key={s.id} className="flex items-center gap-3 border-b border-border/60 bg-card px-3.5 py-2.5 last:border-0">
+            <div
+              key={s.id}
+              className="flex items-center gap-3 border-b border-border/60 bg-card px-3.5 py-2.5 last:border-0"
+            >
               <Monitor className="size-4 shrink-0 text-muted-foreground" />
               <div className="flex min-w-0 flex-1 flex-col leading-tight">
                 <span className="truncate text-[12.5px] font-medium text-foreground/90">
                   {s.user_agent || "Unknown device"}
-                  {s.current && <span className="ml-2 rounded bg-signal/15 px-1.5 py-px text-[10px] font-medium text-signal">This device</span>}
+                  {s.current && (
+                    <span className="ml-2 rounded bg-signal/15 px-1.5 py-px text-[10px] font-medium text-signal">
+                      This device
+                    </span>
+                  )}
                 </span>
                 <span className="text-[11px] text-muted-foreground/70">
                   Signed in {new Date(s.created_at).toLocaleString()}
@@ -308,7 +340,11 @@ function Field({
     <label className="flex flex-col gap-1.5">
       <span className="flex items-center justify-between text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
         {label}
-        {hint && <span className="text-[10px] font-medium normal-case tracking-normal text-muted-foreground/70">{hint}</span>}
+        {hint && (
+          <span className="text-[10px] font-medium normal-case tracking-normal text-muted-foreground/70">
+            {hint}
+          </span>
+        )}
       </span>
       {children}
     </label>

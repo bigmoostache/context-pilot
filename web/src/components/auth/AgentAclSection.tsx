@@ -24,9 +24,7 @@ function AgentRoleBadge({ role }: { role: string }) {
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[9.5px] font-semibold",
-        isAdmin
-          ? "bg-[var(--signal)]/15 text-[var(--signal)]"
-          : "bg-muted text-muted-foreground",
+        isAdmin ? "bg-[var(--signal)]/15 text-[var(--signal)]" : "bg-muted text-muted-foreground",
       )}
     >
       {isAdmin ? <ShieldCheck className="size-2.5" /> : <Shield className="size-2.5" />}
@@ -47,11 +45,7 @@ export function AgentAclSection({ agentId }: { agentId: string }) {
 
   const toggleRole = useMutation({
     mutationFn: (e: AclEntry) =>
-      updateAgentRole(
-        agentId,
-        e.user_id,
-        e.role === "agent-admin" ? "agent-user" : "agent-admin",
-      ),
+      updateAgentRole(agentId, e.user_id, e.role === "agent-admin" ? "agent-user" : "agent-admin"),
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   })
 
@@ -88,9 +82,7 @@ export function AgentAclSection({ agentId }: { agentId: string }) {
       )}
 
       {isLoading && (
-        <p className="py-3 text-center text-[11px] text-muted-foreground animate-pulse">
-          Loading…
-        </p>
+        <p className="py-3 text-center text-[11px] text-muted-foreground animate-pulse">Loading…</p>
       )}
 
       {!isLoading && entries.length === 0 && (
@@ -117,9 +109,7 @@ export function AgentAclSection({ agentId }: { agentId: string }) {
               <span className="truncate text-[12px] font-medium text-foreground">
                 {e.user_name}
               </span>
-              <span className="truncate text-[10px] text-muted-foreground">
-                {e.user_email}
-              </span>
+              <span className="truncate text-[10px] text-muted-foreground">{e.user_email}</span>
             </div>
             <button
               title="Toggle role"
@@ -176,9 +166,7 @@ function GrantForm({
   return (
     <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
       {available.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">
-          All users already have access.
-        </p>
+        <p className="text-[11px] text-muted-foreground">All users already have access.</p>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           <select
@@ -202,7 +190,10 @@ function GrantForm({
             <option value="agent-admin">agent-admin</option>
           </select>
           <button
-            onClick={() => { setError(""); grant.mutate() }}
+            onClick={() => {
+              setError("")
+              grant.mutate()
+            }}
             disabled={!selected || grant.isPending}
             className="rounded-md bg-signal px-2.5 py-1.5 text-[11px] font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
           >

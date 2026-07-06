@@ -38,13 +38,16 @@ export function TrustStep({ onDone }: { onDone: () => void }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-muted-foreground">
-        Download the certificate authority root and install it as a trusted root on every client (push it via Group
-        Policy or your MDM). Verify the fingerprint below against this screen out-of-band before trusting it.
+        Download the certificate authority root and install it as a trusted root on every client
+        (push it via Group Policy or your MDM). Verify the fingerprint below against this screen
+        out-of-band before trusting it.
       </p>
 
       <div className="rounded-md border border-border bg-background p-3">
         <div className="mb-1 text-xs font-medium text-foreground/90">SHA-256 fingerprint</div>
-        <div className="break-all font-mono text-xs text-foreground">{fingerprint ?? "loading…"}</div>
+        <div className="break-all font-mono text-xs text-foreground">
+          {fingerprint ?? "loading…"}
+        </div>
       </div>
 
       <ErrorNote error={error} />
@@ -53,8 +56,9 @@ export function TrustStep({ onDone }: { onDone: () => void }) {
         Download CA root (root.crt)
       </PrimaryButton>
       <p className="text-xs text-muted-foreground">
-        Windows: import into “Trusted Root Certification Authorities”. macOS: add to the System keychain and mark as
-        Always Trust. Linux: drop into <span className="font-mono">/usr/local/share/ca-certificates</span> and run{" "}
+        Windows: import into “Trusted Root Certification Authorities”. macOS: add to the System
+        keychain and mark as Always Trust. Linux: drop into{" "}
+        <span className="font-mono">/usr/local/share/ca-certificates</span> and run{" "}
         <span className="font-mono">update-ca-certificates</span>.
       </p>
 

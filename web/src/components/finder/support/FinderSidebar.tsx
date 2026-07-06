@@ -33,8 +33,7 @@ export function FinderSidebar({
   const starred = collectStarred(root)
   const [dropActive, setDropActive] = useState(false)
 
-  const acceptsFolder = (e: React.DragEvent) =>
-    e.dataTransfer.types.includes(FOLDER_DRAG_MIME)
+  const acceptsFolder = (e: React.DragEvent) => e.dataTransfer.types.includes(FOLDER_DRAG_MIME)
 
   return (
     <aside className="flex w-[var(--sidebar-w)] shrink-0 flex-col gap-3.5 overflow-y-auto border-r border-border bg-surface px-2.5 py-3">
@@ -179,7 +178,9 @@ function Place({
       className={cn(
         "flex items-center gap-2 rounded-md py-1.5 pr-2 text-left text-[12.5px] transition-colors",
         indent ? "pl-5" : "pl-2",
-        active ? "bg-card font-medium text-foreground card-shadow" : "text-foreground/75 hover:bg-muted/60",
+        active
+          ? "bg-card font-medium text-foreground card-shadow"
+          : "text-foreground/75 hover:bg-muted/60",
         muted && "cursor-default opacity-70",
       )}
     >

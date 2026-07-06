@@ -42,7 +42,13 @@ export function PasswordStep({ user, onDone }: { user: MaintUser; onDone: () => 
 
   return (
     <form onSubmit={submit}>
-      <Field label="Admin email" type="email" value={email} onChange={setEmail} autoComplete="email" />
+      <Field
+        label="Admin email"
+        type="email"
+        value={email}
+        onChange={setEmail}
+        autoComplete="email"
+      />
       <Field
         label="Current (paper) password"
         type="password"
