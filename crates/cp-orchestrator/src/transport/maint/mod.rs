@@ -13,8 +13,8 @@
 //! * **LAN-only** ([`lan_allowed`]) — the maintenance plane is meant to be
 //!   reached over the local network only. A request whose peer address is a
 //!   public IP is refused before any handler runs. Controlled by
-//!   `CP_MAINT_LAN_ONLY` (default on); the box additionally binds/firewalls the
-//!   listener to its LAN interface (documented in the procd `.init`).
+//!   `CP_MAINT_LAN_ONLY` (default on); on the box the network perimeter (the
+//!   client LAN) is the additional reachability boundary.
 //! * **Admin-gated** ([`authenticate`]) — every route except the unauthenticated
 //!   whitelist (`login`, `status`) requires a valid session whose user holds the
 //!   [`UserRole::Admin`] role. A `User`-role token is a `403`, no token a `401`.

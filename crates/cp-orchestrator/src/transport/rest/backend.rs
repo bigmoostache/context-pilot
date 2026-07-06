@@ -93,9 +93,9 @@ impl Backend {
         session_ttl: Duration,
     ) -> Self {
         // Durable provisioned-flag location: env override, else a dot-file in
-        // the agents dir (on the box that dir lives on the /mnt/data partition,
-        // so the flag survives reboots; the registry scan only reads `*.json`,
-        // so the dot-file is ignored there).
+        // the agents dir (on the box that dir lives under /opt/context-pilot on
+        // the persistent rootfs, so the flag survives reboots; the registry scan
+        // only reads `*.json`, so the dot-file is ignored there).
         let provision_flag_path =
             std::env::var_os("CP_PROVISION_FLAG").map_or_else(|| agents_dir.join(".provisioned"), PathBuf::from);
         Self {

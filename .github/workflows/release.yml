@@ -105,8 +105,8 @@ jobs:
         uses: taiki-e/install-action@cross
 
       # Orchestrator (API+SPA server) + agent (tui), fully static musl. These are
-      # the two binaries the procd service runs on the box; see
-      # deploy/photonicat/init.d/context-pilot.init.
+      # the two binaries the context-pilot.service systemd unit runs on the box;
+      # see deploy/ansible/templates/context-pilot.service.j2.
       - name: Build orchestrator + agent (cross, static musl)
         run: |
           cross build --release --target aarch64-unknown-linux-musl -p cp-orchestrator
@@ -137,8 +137,8 @@ jobs:
         env:
           VITE_API_URL: ""
 
-      # Layout matches what the procd service expects under /mnt/data/context-pilot:
-      #   bin/cp-orchestrator, bin/tui, web/<spa dist>
+      # Layout matches what the context-pilot systemd unit expects under
+      # /opt/context-pilot:  bin/cp-orchestrator, bin/tui, web/<spa dist>
       - name: Package appliance bundle
         run: |
           mkdir -p staging/bin staging/web

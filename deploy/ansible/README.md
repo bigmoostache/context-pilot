@@ -1,6 +1,7 @@
 # Appliance provisioning (Ansible)
 
-Factory-fresh Photonicat → fully deployed and ready, in one pass.
+Freshly-installed Armbian/Debian 13 box (systemd) → fully deployed and ready, in
+one pass.
 
 ## Full deploy — `site.yml`
 
@@ -22,10 +23,10 @@ What it does, end to end:
    `web/<spa>`) from GitHub Releases — produced by
    `.github/workflows/release.yml` — plus a stock `caddy` arm64 binary. No local
    build/toolchain needed. Pin a tag with `-e release=v0.1.0-abc1234` (default:
-   `latest`). The procd init scripts + bootstrap Caddyfile come from this repo.
-2. **Deploy** (each box): ships the binaries + SPA + procd init scripts +
-   bootstrap Caddyfile, and frees TCP `:80`/`:443` from the vendor admin web
-   (moves it to `:8088`).
+   `latest`). The systemd units + bootstrap Caddyfile come from this repo.
+2. **Deploy** (each box): ships the binaries + SPA + the `context-pilot` and
+   `caddy` systemd units + bootstrap Caddyfile under `/opt/context-pilot`. A stock
+   Armbian box has nothing on `:80`/`:443`, so no port juggling is needed.
 3. **Seed** (Obj 6): writes a unique per-unit admin `seed.env` (chmod 600) and a
    printable delivery sheet on the control node (`out/<unit>-admin.txt`).
 4. **Start**: enables + starts the orchestrator (which seeds the admin and writes
@@ -110,7 +111,10 @@ ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/provision-seed.y
 - `tasks/{fetch,deploy,keys,seed,start}.yml` — the steps (seed is shared).
 - `group_vars/<client>/vault.yml` — per-client provider keys (ansible-vault).
 - `group_vars/example-client.yml` — copy this to make a real client's vault.
-- `templates/{seed.env.j2,admin-sheet.txt.j2}` — the seed file + delivery sheet.
+- `templates/{context-pilot,caddy}.service.j2` — the systemd units.
+- `templates/{seed.env.j2,providers.env.j2,admin-sheet.txt.j2}` — the seed/keys
+  env files + delivery sheet.
+- `../photonicat/Caddyfile` — bootstrap Caddyfile (the orchestrator regenerates it).
 - `examples/inventory.example.ini` — copy to `inventory.ini`.
 
 ## Guarantees & hygiene
@@ -121,12 +125,13 @@ ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/provision-seed.y
 - **Secret hygiene** (6.1.3): `seed.env` is `0600`; the password is `no_log`
   throughout; `seed.env`, `out/`, and `.artifacts/` are all git-ignored.
 - **Default email** (6.2.1): `admin@admin.fr`, changed during the wizard.
-- **OpenWrt**: root login, no sudo → `become: false`. The box needs `python3`
-  (present on photonicatWrt) for the Ansible modules.
+- **Armbian/Debian**: we log in as root and a minimal image may lack sudo →
+  `become: false`. The box needs `python3` (present on the Armbian image) for the
+  Ansible modules.
 
 ## Idempotence
 
-Re-running is safe: binaries are checksum-compared (re-copied only when changed),
-`:80` freeing is a no-op once done, and a unit that already has `seed.env` keeps
-its password (never rotated, no stale sheet). To re-provision a unit from scratch,
-wipe `/mnt/data/context-pilot` on the box first.
+Re-running is safe: the appliance bundle is re-shipped and re-extracted, and a
+unit that already has `seed.env` keeps its password (never rotated, no stale
+sheet). To re-provision a unit from scratch, wipe `/opt/context-pilot` on the box
+first.

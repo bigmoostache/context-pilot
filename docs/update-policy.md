@@ -16,7 +16,7 @@
 
 ## §1 — Context & Problem
 
-Context Pilot ships as an appliance (Photonicat 2 — OpenWrt / musl / procd) deployed
+Context Pilot ships as an appliance (Photonicat 2 — Armbian/Debian 13 / musl / systemd) deployed
 at client sites and reachable over a Tailscale/Headscale overlay. The runtime is a
 single static binary plus the console server, with a `ReleaseStore`
 (`crates/cp-orchestrator/src/services/releases/`) that already keeps N downloaded
@@ -336,5 +336,11 @@ decoupled from the OTA epic.
 - `deploy/PROVISIONING.md` — canonical provisioning / fleet doc (Tailscale overlay,
   day-0 manual, push→pull updates).
 - `docs/design-auth.md` — auth & RBAC (the `can_admin()` pattern referenced in §1/§6).
-- `deploy/photonicat/init.d/context-pilot.init` — the procd service (`PROG`,
-  `CP_AGENT_BINARY`, `respawn 3600 5 5`) the wrapper plugs into.
+- `deploy/ansible/templates/context-pilot.service.j2` — the systemd unit
+  (`ExecStart`, `Restart=`) the update wrapper plugs into.
+
+> ⚠️ This doc's §2/§5/§6 self-update *mechanism* is still written against procd
+> (`respawn 3600 5 5`, `PROG` wrapper, init.d). The appliance now runs
+> Armbian/Debian 13 + systemd, so that mechanism needs a systemd re-derivation
+> (`Restart=`, `StartLimitIntervalSec`/`StartLimitBurst` for the crash-loop
+> backoff, a wrapper as `ExecStart`). Tracked as a follow-up — not yet done.

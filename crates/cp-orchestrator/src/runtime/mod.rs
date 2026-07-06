@@ -52,8 +52,8 @@ const DEFAULT_PORT: u16 = 7878;
 const DEFAULT_MAINT_PORT: u16 = 9090;
 
 /// Default maintenance-plane bind address. `0.0.0.0` here is paired with the
-/// LAN-only application guard ([`transport::maint`]) and, on the appliance, a
-/// bind to the LAN interface / firewall rule (documented in the procd `.init`).
+/// LAN-only application guard ([`transport::maint`]) and, on the appliance, the
+/// network perimeter (the box only listens on the client LAN).
 const DEFAULT_MAINT_BIND: &str = "0.0.0.0";
 
 /// Default per-agent cost budget in USD.

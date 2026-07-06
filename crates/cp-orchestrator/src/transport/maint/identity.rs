@@ -26,7 +26,7 @@ pub(crate) struct Identity {
 }
 
 /// On-disk location of the identity record, beside the provisioned flag in the
-/// agents dir (on `/mnt/data` on the box).
+/// agents dir (under `/opt/context-pilot` on the box).
 pub(crate) fn identity_path(agents_dir: &Path) -> PathBuf {
     agents_dir.join(".identity.json")
 }

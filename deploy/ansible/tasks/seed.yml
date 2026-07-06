@@ -1,5 +1,6 @@
 ---
 # Admin-seed tasks (Obj 6.1/6.2) — shared by site.yml and provision-seed.yml.
+# Path-agnostic via cp_root.
 # Idempotent: a unit that already has seed.env is left untouched.
 
 - name: Check whether this unit is already seeded

@@ -10,7 +10,7 @@
 //!   `openssl x509 -in root.crt -noout -fingerprint -sha256`.
 //!
 //! The root lives in Caddy's data dir (`…/pki/authorities/local/root.crt`); its
-//! path is given by `CP_CA_ROOT` (set in the procd `.init`). Until Caddy has
+//! path is given by `CP_CA_ROOT` (set in the systemd unit). Until Caddy has
 //! generated it (first TLS handshake), both routes report `404`.
 
 use std::path::PathBuf;

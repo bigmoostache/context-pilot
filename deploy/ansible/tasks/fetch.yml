@@ -4,9 +4,9 @@
 # not, so we download here and ship over SSH.
 #
 # Pulls the appliance bundle (bin/cp-orchestrator, bin/tui, web/<spa>) published
-# by .github/workflows/release.yml, plus a stock Caddy arm64 binary. The procd
-# init scripts + bootstrap Caddyfile come from the repo (deploy/photonicat), not
-# the release.
+# by .github/workflows/release.yml, plus a stock Caddy arm64 binary. The systemd
+# units + bootstrap Caddyfile come from the repo (deploy/ansible/templates,
+# deploy/photonicat/Caddyfile), not the release.
 
 - name: Ensure the artifacts dirs exist
   ansible.builtin.file:

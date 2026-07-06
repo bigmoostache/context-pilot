@@ -8,8 +8,9 @@
 # it at boot and on every identity/finalize change — rendering explicit name/IP
 # site addresses, the cockpit on :443 once provisioned, and the :80→:443 redirect
 # (see crates/cp-orchestrator/src/transport/maint/caddy.rs). The orchestrator
-# starts before Caddy (procd START 95 vs 96), so by the time Caddy reads this it
-# has usually been replaced. Until then we serve only the maintenance plane.
+# starts before Caddy (the caddy.service unit has After=context-pilot.service), so
+# by the time Caddy reads this it has usually been replaced. Until then we serve
+# only the maintenance plane.
 {
 	# LAN appliance: private CA only, never reach out to public ACME.
 	auto_https disable_redirects

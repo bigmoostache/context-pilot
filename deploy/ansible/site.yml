@@ -1,36 +1,30 @@
 ---
-# Full appliance provisioning — factory-fresh Photonicat → ready in one pass,
-# from the pre-built artifacts published on GitHub Releases (no local build).
+# Deploy Context Pilot onto an ALREADY-INSTALLED Armbian/Debian box (systemd),
+# over the LAN.
 #
-#   cp examples/inventory.example.ini inventory.ini   # one group per client, set LAN IPs
-#   ansible-playbook -i inventory.ini deploy/ansible/site.yml --ask-vault-pass
-#   # one client only (its keys via group_vars/<client>/):
-#   ansible-playbook -i inventory.ini deploy/ansible/site.yml --limit acme --ask-vault-pass
+# Layout: systemd units (context-pilot + caddy), cp_root=/opt/context-pilot (the
+# Debian rootfs is the whole disk). A stock Armbian box has nothing fighting for
+# :80/:443 and no default REJECT zone, so there is no port/firewall juggling.
 #
-# Options:
-#   -e release=v0.1.0-abc1234   # pin a release tag (default: latest)
-#   -e release=local            # use the bundle from deploy/photonicat/build.sh
-#   -e cp_admin_email=ops@x.corp # override the default admin email
-#   -e cp_admin_password=…       # force a fixed admin password (else random/unit)
+# Pipeline: fetch (artifact, control node) → deploy (binaries/SPA/units/Caddyfile)
+# → keys (providers.env) → seed (admin write-once + delivery sheet) → start.
 #
-# Per client: each inventory group supplies its own provider keys via
-# group_vars/<client>/vault.yml — different clients get different keys.
+# Usage (LAN, key auth):
+#   ./.venv/bin/ansible-playbook -i <inventory> deploy/ansible/site.yml \
+#       -e release=latest -e cp_admin_email=you@example.com
+#   # provider keys (optional): -e @deploy/ansible/<name>.local.yml  (cp_provider_keys dict)
+#   # use the local build bundle instead of a GitHub release: -e release=local
 
-- name: Deploy + provision the appliances
-  # All inventory hosts (every client group). Scope to one client with
-  # --limit <client>. The artifact fetch is delegated to the control node and
-  # run once, so it still happens even under --limit.
+- name: Deploy + provision Context Pilot on Armbian/Debian 13 (systemd, LAN)
   hosts: all
-  become: false
+  become: false            # we log in as root; minimal Armbian may lack sudo
   gather_facts: false
   vars:
     repo_root: "{{ playbook_dir | dirname | dirname }}"
     artifacts_dir: "{{ playbook_dir }}/.artifacts"
-    cp_root: /mnt/data/context-pilot
+    cp_root: /opt/context-pilot
     cp_seed_admin_email: "{{ cp_admin_email | default('admin@admin.fr') }}"
     sheets_dir: "{{ playbook_dir }}/out"
-    # Artifact source. `local` uses deploy/photonicat/build.sh output; otherwise
-    # a release tag (default latest) is fetched from GitHub.
     gh_repo: bigmoostache/context-pilot
     cp_release: "{{ release | default('latest') }}"
     appliance_bundle_url: >-
@@ -43,7 +37,7 @@
         apply:
           delegate_to: localhost
           run_once: true
-    - name: Ship binaries, SPA, init scripts, Caddyfile; free :80
+    - name: Ship binaries, SPA, systemd units, Caddyfile
       ansible.builtin.include_tasks: tasks/deploy.yml
     - name: Install this client's provider API keys (providers.env)
       ansible.builtin.include_tasks: tasks/keys.yml

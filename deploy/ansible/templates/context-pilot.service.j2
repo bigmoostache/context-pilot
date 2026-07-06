@@ -1,13 +1,12 @@
 # Context Pilot orchestrator — systemd unit (Armbian/Debian, glibc).
-# Debian counterpart of deploy/photonicat/init.d/context-pilot.init (procd).
-# Templated by Ansible; cp_root defaults to /opt/context-pilot on Debian
-# (there is no /mnt/data big-partition split as on the OpenWrt board).
+# Templated by Ansible; cp_root defaults to /opt/context-pilot (the Debian rootfs
+# is the whole disk).
 [Unit]
 Description=Context Pilot orchestrator (cockpit :7878 + loopback maintenance :9191)
 Documentation=https://github.com/bigmoostache/context-pilot
 After=network-online.target
 Wants=network-online.target
-# Crash-loop backoff, akin to procd `respawn 3600 5 5`.
+# Crash-loop backoff: at most 5 restarts per hour before systemd gives up.
 StartLimitIntervalSec=3600
 StartLimitBurst=5
 
