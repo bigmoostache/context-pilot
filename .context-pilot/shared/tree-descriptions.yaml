@@ -502,6 +502,10 @@
   path: crates/cp-mod-queue/src/lib.rs
   description: 'Queue module. 3 tools: pause/execute/undo. Fixed QUEUE panel. Not core. QueueState: active, queued_calls, next_index. Trap state (trap_active/panel_ids/optional_ids) persisted in save/load. Queue_execute handled in pipeline.rs (needs dispatch). Reverie-allowed.'
   last_edited_ms: 0
+0ac95ecca3ffddfe:
+  path: web/tsconfig.json
+  description: 'Root TS project references config — points to tsconfig.app.json + tsconfig.node.json, sets @/* path alias. T505 target: this is where the maximal strict-flag set will be enforced (via app config).'
+  last_edited_ms: 1783348132220
 0acace4fa5eba3dd:
   path: crates/cp-mod-console/src/tools.rs
   description: 'Console tools: create, send_keys, wait (blocking watcher), watch (async watcher), easy_bash (blocking exit watcher). Each instrumented with flame!(). CONSOLE_WAIT_BLOCKING_SENTINEL const. Git/gh guardrails.'
@@ -7026,6 +7030,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: 'Cockpit header strip: app mark, view switcher (Threads/Cockpit segmented control), project breadcrumb, branch chip, global cost, status dot.'
   last_edited_ms: 0
+963cc7a3acd5aaee:
+  path: web/eslint.config.js
+  description: 'Frontend ESLint flat config. CURRENTLY MINIMAL: js.recommended + tseslint.recommended + react-hooks + react-refresh (~the ''a few lints'' baseline). T505 target: replace with the ultra-strict Rust-parity stack (~15 plugins, ~1100-1400 rules all at error, strictTypeChecked, anti-suppression, boundaries). Spec in scratchpad C48.'
+  last_edited_ms: 1783348132324
 965292c5106e02e5:
   path: crates/cp-render/src/frame.rs
   description: Frame-level IR types. Frame (sidebar/active_panel/status_bar/conversation/overlays), Sidebar (entries/token_bar/stats/pr_card/help), StatusBar (badge/agent/skills/git/auto_continue/reverie/queue/think), PanelContent (title/blocks).
@@ -7682,6 +7690,10 @@ a445c40881ecc32a:
   path: src/ui/help/mod.rs
   description: Re-exports CommandPalette, config_overlay module
   last_edited_ms: 0
+a467728cf80828fe:
+  path: web/tsconfig.app.json
+  description: 'App-scope TS compiler config (bundler mode, react-jsx, es2023). Current strictness: noUnusedLocals/Parameters, erasableSyntaxOnly, noFallthroughCasesInSwitch, verbatimModuleSyntax. T505 target: add the full maximal strict superset (noUncheckedIndexedAccess, exactOptionalPropertyTypes, noImplicitReturns/Override, noPropertyAccessFromIndexSignature, etc.) — the rustc-forbid twin.'
+  last_edited_ms: 1783348132288
 a488c97d4419511a:
   path: web/src/lib/live/index.ts
   description: Live data hooks (TanStack Query + SSE). useAgentMeta/useThreads/useConversation/useStreamingTokens/useLibrary/useFleet/useFleetMetrics/useMetrics. ensureSync SSE watcher. sendCommand dispatches to REST. useFsPreview/useFsSheet for Finder.
