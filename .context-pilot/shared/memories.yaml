@@ -419,6 +419,21 @@
   - minimax
   - llm-provider
   last_edited_ms: 0
+7208259eeb2a67b6:
+  tl_dr: 'CI web-install fix: web/pnpm-workspace.yaml needs `packages: [.]` + `allowBuilds: {unrs-resolver: true}`; pin CI+release pnpm to 11.6.0.'
+  contents: |-
+    CI 'Contract' + release web install failed on clean `pnpm install --frozen-lockfile` (web-lint P0 auto-created a malformed pnpm-workspace.yaml). Two pnpm-11 hard failures:
+    1. 'packages field missing or empty' — pnpm 11 treats a present workspace file as a workspace root; needs a packages field. Single-package repo → `packages: [.]`.
+    2. ERR_PNPM_IGNORED_BUILDS exit 1 — unrs-resolver postinstall (native N-API resolver). Neither onlyBuiltDependencies nor ignoredBuiltDependencies silences it in pnpm 11.6; only `allowBuilds:\n  unrs-resolver: true` (what `pnpm approve-builds` writes) authorises the script so a clean install finishes.
+    ALSO: ci.yml + release.yml pinned pnpm action-setup to `version: 9` but the committed lockfile is pnpm-11.6-generated and allowBuilds is a pnpm-11 mechanism — bumped both to `version: 11.6.0` to match the lockfile origin. Verified from-scratch clean install EXIT 0 in a temp dir.
+  importance: medium
+  labels:
+  - ci
+  - pnpm
+  - web-lint
+  - gotcha
+  - ops
+  last_edited_ms: 1783373708167
 72815d89ebb8cd4b:
   tl_dr: 'User preference: factor code out into new files rather than trimming comments to stay under line limits.'
   importance: medium

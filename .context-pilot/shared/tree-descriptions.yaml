@@ -1030,6 +1030,10 @@
   path: web/src/components/threads/ThreadsView.tsx
   description: Threads view assembler. Uses useThreads()+useFleet() live. handleArchive/Create/Send via sendCommand. Auto-selects first valid thread. EmptyRealm fallback. Keyed by agentId in App.
   last_edited_ms: 1781694593894
+15d3667123f97c56:
+  path: web/pnpm-workspace.yaml
+  description: 'pnpm workspace config (single-package). packages: [.] (pnpm 11 requires a packages field once this file exists, else ''packages field missing'' aborts clean install). allowBuilds: unrs-resolver:true — authorises its native-resolver postinstall so a clean --frozen-lockfile install doesn''t hard-fail with ERR_PNPM_IGNORED_BUILDS (neither onlyBuiltDependencies nor ignoredBuiltDependencies silences it in pnpm 11.6; allowBuilds, what `pnpm approve-builds` writes, does). Both were the CI Contract-job install failures.'
+  last_edited_ms: 1783373686049
 15e60dedf6c3d23b:
   path: web/src/components/threads/fileUpload/helpers.ts
   description: 'Pure file-upload helpers + types: UploadedFile/CommandSuggestion/MessageSegment interfaces, buildUploadMessage (compose ```file-upload YAML blocks), splitMessageSegments (parse blocks in-place), uploadToNode. No JSX — importable without tripping Fast Refresh.'
@@ -2066,6 +2070,10 @@
   path: src/ui/ir/render_sidebar.rs
   description: 'Sidebar ratatui renderer — render_sidebar_from_ir(). Normal mode: token bar box, fixed/dynamic entries with pagination, PR card, token stats. Collapsed mode: icon strip. Entry rendering: indicator+icon+shortcut+label+tokens. Token color gradient (grey→red).'
   last_edited_ms: 0
+2b936766d75f78c5:
+  path: .github/workflows/release.yml
+  description: 'Release workflow (push tags v*). 5-target build matrix (tui+cp-console-server) + appliance bundle (aarch64 musl: cp-orchestrator+tui+SPA) + GitHub Release. pnpm action-setup pinned to 11.6.0 (matches lockfile origin, see ci.yml).'
+  last_edited_ms: 1783373686162
 2b948093f93711a1:
   path: crates/cp-orchestrator/src/transport/rest/lifecycle.rs
   description: Agent lifecycle REST handlers. restart_agent (POST, kill+respawn via supervisor), retire_agent (POST, mark retired+stop), unretire_agent (POST, unmark+respawn). Merged from former restart.rs + retire.rs.
@@ -8246,6 +8254,10 @@ acea7c56e7b9669a:
   path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
   description: Claude Code OAuth helpers — usage proxy (GET /api/claude-usage), token status (GET /api/claude-login/status), PKCE login flow (POST /start + /complete). Reads/writes macOS Keychain + ~/.claude/.credentials.json. PkceSession stored in Backend.
   last_edited_ms: 1782845560588
+acedbe05174d9df3:
+  path: .github/workflows/ci.yml
+  description: 'Unified CI: 3 jobs — rust (fmt+clippy+build+test), structure (file-lengths/folder-sizes/lint-exceptions/lint-config-hashchain/web-structure/vault-bypass), contract (OpenAPI+TS drift via check-typescript-contract.sh). Contract job installs web deps via pnpm; action-setup pinned to pnpm 11.6.0 (matches the pnpm-11-generated lockfile + web/pnpm-workspace.yaml''s allowBuilds/packages mechanisms). Triggers: push/PR to master.'
+  last_edited_ms: 1783373686125
 ad227afdb78366f4:
   path: crates/cp-mod-files/src/tools/write.rs
   description: file_write tool. flame!("file_write"). Creates parent dirs, writes content, updates/creates context Entry. Diff-style preview in result (first 20 lines).
