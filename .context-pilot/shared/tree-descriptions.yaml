@@ -1754,6 +1754,10 @@
   path: crates/cp-mod-ocr/src/tools.rs
   description: OCR tool dispatch. flame!("ocr_exec"). Validates params, spawns background thread for Datalab API, registers OcrWatcher (non-blocking). Returns immediately with spine notification on completion.
   last_edited_ms: 0
+25470571e6f1a870:
+  path: web/src/lib/query/reducers.ts
+  description: 'SSE delta reducers: applyThreadDelta folds thread lifecycle + message_created/deleted into TanStack cache; applyAgentDelta folds phase/cost/context. mergeThreadLogs reconciles poll+delta (T123/T360). web-lint P1: msgSignature param widened to accept `|undefined` fields; message_created appended object uses conditional spreads (`...(x!==undefined?{x}:{})`) so no explicit undefined violates exactOptionalPropertyTypes. OpEntry/OpEntryKind re-exported from generated.'
+  last_edited_ms: 1783354821082
 25698a54abb15919:
   path: crates/cp-mod-entities/src/sql/parse.rs
   description: 'SQL statement parsing: SqlKind classify (SELECT/DML/DDL/CTE), strip_leading_comments, split_statements. split_statements is a SQLite-aware mini-tokenizer (skips ''/"/`/[] quoted spans + --/* */ comments) so ; inside them never mis-splits. Byte-offset-correct via str::char_indices() (fixes #113 multi-byte truncation). 15 regression tests.'
@@ -4828,8 +4832,8 @@
   last_edited_ms: 0
 65a3c6ab921aefdf:
   path: web/tsconfig.app.json
-  description: 'App-scope TS compiler config (bundler mode, react-jsx, es2023). Current strictness: noUnusedLocals/Parameters, erasableSyntaxOnly, noFallthroughCasesInSwitch, verbatimModuleSyntax. T505 target: add the full maximal strict superset (noUncheckedIndexedAccess, exactOptionalPropertyTypes, noImplicitReturns/Override, noPropertyAccessFromIndexSignature, etc.) — the rustc-forbid twin.'
-  last_edited_ms: 0
+  description: 'App-scope TS compiler config (bundler mode, react-jsx, es2023). web-lint P1 LANDED: full maximal strict superset active (strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes + noImplicitReturns/Override + noPropertyAccessFromIndexSignature + noUncheckedSideEffectImports + allowUnreachableCode:false + allowUnusedLabels:false + forceConsistentCasingInFileNames + noUnusedLocals/Parameters + erasableSyntaxOnly). tsc app = 0 errors. The rustc-forbid twin.'
+  last_edited_ms: 1783354820946
 65a9d71765d25bce:
   path: crates/cp-mod-console/src/tools.rs
   description: 'Console tools: create, send_keys, wait (blocking watcher), watch (async watcher), easy_bash (blocking exit watcher). Each instrumented with flame!(). CONSOLE_WAIT_BLOCKING_SENTINEL const. Git/gh/typst guardrails.'
@@ -6666,6 +6670,10 @@
   path: crates/cp-mod-threads/src/types.rs
   description: 'Thread types: ThreadStatus, ThreadAuthor, ThreadMessage, Thread (with archived:bool), ThreadQuestionForm. ThreadsState + FocusState (with viewing_archived flag). visible_indices(archived) maps a view to real storage indices; has_my_turn filters archived; mark_selected_read resolves selection through visible list.'
   last_edited_ms: 1781786109325
+8b6b7433b0b67f14:
+  path: web/tsconfig.node.json
+  description: 'Node-scope TS config (vite.config.ts). web-lint P1: same maximal strict superset as tsconfig.app.json. tsc node = 0 errors.'
+  last_edited_ms: 1783354820874
 8b8b4525622fe2c2:
   path: web/src/lib/live/index.ts
   description: Live data hooks (TanStack Query + SSE). useAgentMeta/useThreads/useConversation/useStreamingTokens/useLibrary/useFleet/useFleetMetrics/useMetrics. ensureSync SSE watcher. sendCommand dispatches to REST. useFsPreview/useFsSheet for Finder.
@@ -6736,8 +6744,8 @@
   last_edited_ms: 0
 8d154c6ea82d1d95:
   path: .github/checks/check-typescript-contract.sh
-  description: 'CI guard: regenerates openapi.json from Rust + TypeScript client from openapi.json, then git diff --exit-code catches any drift. Ensures backend types and frontend client stay in sync.'
-  last_edited_ms: 0
+  description: 'TS contract check: regenerate hey-api client from openapi.json → re-stamp @ts-nocheck GEN_HEADER onto all 16 generated/*.ts (web-lint P1 generated-bindings exception, mirrors Rust generated-code allowance; keeps committed tree byte-identical to fresh codegen+stamp for the drift diff) → git diff --exit-code detects drift. NOT hash-chained.'
+  last_edited_ms: 1783354821014
 8d253bf1fb5903d8:
   path: crates/cp-orchestrator/src/services/auth/acl.rs
   description: Per-agent access-control operations on AuthStore. Extracted from store.rs. grant/revoke/update_role/check_access/list_agent_users/list_user_agents/is_agent_admin.
@@ -10606,6 +10614,10 @@ e0229a3d3514645e:
   path: ui/src/components/agents/MarkdownEditor.tsx
   description: WYSIWYG markdown editor for the prompt library (design-only). contentEditable surface + sticky formatting toolbar (bold/italic/strike, H1/H2, quote, code-block, bulleted/numbered lists, link) via document.execCommand. mdToHtml() seeds initial content once on mount (headings/lists/fences/**bold**/`code`); uncontrolled thereafter so the caret never jumps. Prose-styled via tailwind arbitrary [&_h1]/[&_ul]/... variants. Used by PromptModal.
   last_edited_ms: 1781533682103
+e02c11ea99a4480a:
+  path: web/src/lib/types.ts
+  description: 'Domain types barrel. Re-exports backend types from generated/types.gen. web-lint P1: ThreadQuestion ADDED to the `import type` block (was only re-exported, causing TS2304 when used in ThreadMsg redecl); ThreadMsg = Omit<GenThreadMsg,''ts''|''questions''> & { ts?, streaming?, questions?: ThreadQuestion[]|undefined }. Optional props widened to `| undefined` throughout for exactOptionalPropertyTypes.'
+  last_edited_ms: 1783354821150
 e0352c6a703737b4:
   path: src/app/run/watchers.rs
   description: File/cache watcher loop. flame!("cache_updates") + flame!("watcher_events"). sync_file_watchers (module→inotify/kqueue). timer_based_deprecation (poll intervals). GH sync every 5s. FD cleanup (stale watch removal). suicide() auto-close.
