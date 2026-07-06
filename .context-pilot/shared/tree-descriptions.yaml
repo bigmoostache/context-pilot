@@ -8170,6 +8170,10 @@ af6dd95d8269c492:
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (confined to agent realm). Uses useFs(agentId, relCwd) for live directory listings — converts absolute cwd to relative path for the backend API. Tabs+history+nav+selection+drag-drop+statusbar. buildCrumbs/pathName helpers. Four view modes (grid/list/columns/gallery), keyboard control, marquee selection.
   last_edited_ms: 0
+af7c0b400c7291c6:
+  path: deploy/photonicat/docs/runbook-day0.md
+  description: 'Manual day-0 runbook (FR): factory Photonicat box → joined to tailnet, ready for Ansible. Prereqs (saved policy file, tagged reusable auth-key, control node on tailnet). Steps: join factory AP WiFi, optional break-glass SSH key, install Tailscale (static binary Method A recommended vs opkg 1.76.1 CVE Method B), install procd service, enroll with tags/hostname/--ssh, verify remote access. Troubleshooting table + later-upgrade self-cut warning.'
+  last_edited_ms: 1783346382261
 af989af82653ce47:
   path: .git/index
   description: Git index (binary). Not source.
@@ -9086,6 +9090,10 @@ c2d3bc4f0fcb2a16:
   path: web/src/components/panels/cockpit/PanelPane.tsx
   description: Cockpit panel router. Accepts agentId, uses usePanels() for lookup. Routes to 11 panel components by kind (threads removed — T11), each receiving agentId. 'conversation' sentinel renders Conversation. EmptyState fallback.
   last_edited_ms: 1781776806596
+c2e8c973155c9387:
+  path: deploy/PROVISIONING.md
+  description: 'Full Context Pilot box provisioning procedure (FR). Factory box → prod cockpit. Two access planes (vendor→tailnet, client→LAN). Port allocation (:443 cockpit, :9090 maint, :8088 LuCI, :22 SSH). Phases 0–4: Tailscale control-plane + control node, day-0 (AP WiFi + static Tailscale binary + procd service + enroll), build artifact, Ansible deploy, IT onboarding. Phase 3bis: optional Claude Code OAuth subscription creds (read-only, no refresh). Decisions + operational caveats (self-cut on Tailscale upgrade, key-expiry, firewall, /mnt/data).'
+  last_edited_ms: 1783346382185
 c2e8ce0b2cd68b7c:
   path: src/ui/ir/mod.rs
   description: IR-to-ratatui adapter. semantic_to_style (pub(crate)) + ir_span_to_ratatui (with reversed support). blocks_to_lines converts IR Block vec to ratatui Lines. Table/ProgressBar/Tree/KeyValue renderers. build_frame + build_active_panel frame assembly.
@@ -10742,6 +10750,10 @@ e8c87aefe7be8bef:
   path: src/ui/search_overlay/text.rs
   description: Plain-text export of Ctrl+I overlay for clipboard copy. Includes process CPU%/RAM stats for Meilisearch.
   last_edited_ms: 0
+e92e87ea2731d5d7:
+  path: deploy/photonicat/init.d/tailscale.init
+  description: OpenWrt procd init script for tailscaled on Photonicat. START=90 STOP=11. State persists at /mnt/data/context-pilot/tailscale (survives reboot, rejoins tailnet). Kernel TUN mode. respawn 3600 5 5. NO `tailscale down` in stop_service (would persist wantRunning=false and break auto-rejoin) — relies on procd SIGTERM.
+  last_edited_ms: 1783346382330
 e92f540548fee6a0:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, pipeline, queue_flush.'
@@ -11654,6 +11666,10 @@ fd2cc3a6e7f7a05b:
   path: ui/src/components/threads/ThreadsView.tsx
   description: Threads view assembler, scoped to ACTIVE AGENT's realm (filters threadDetails by agentId, EmptyRealm when none). 2-pane (collapsible ThreadList | ThreadConversation). Owns collapsed state; floating PanelLeft Button re-opens the rail when collapsed. No onOpenCockpit (details popup removed).
   last_edited_ms: 1781533385882
+fd3e6c8949725418:
+  path: deploy/photonicat/bootstrap.sh
+  description: 'Single-file day-0 provisioning script for Photonicat (WiFi → Tailscale install + persistent procd service → tailscale up --ssh). Interactive: prompts WiFi SSID/pass (UCI wwan+sta config, retry loop with connectivity check), installs tailscale via opkg, writes /etc/init.d/tailscale, enrolls with authkey/hostname/tag. uci deletes guarded with || true; radio device resolved before use.'
+  last_edited_ms: 1783346382399
 fd5552b880f42277:
   path: web/src/components/finder/preview/mockPreviews.tsx
   description: 'Decorative maquette Finder previews (inline node payloads): CodePreview/SheetPreview/SlidesPreview/PdfPreview/ImagePreview/AudioPreview/VideoPreview + tint helper. 293 lines.'
