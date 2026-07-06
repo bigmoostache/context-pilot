@@ -3,8 +3,8 @@
 > Procédure **manuelle** (Phase 1), à dérouler une fois par box neuve, à la main,
 > via l'AP WiFi de la box, **avant tout Ansible**. Une fois éprouvée, elle devient
 > `bootstrap.sh` (Phase 2), puis est gravée dans l'image via `/etc/uci-defaults`
-> (industrialisation). Réfs : [`../PROVISIONING.md`](../PROVISIONING.md) (procédure complète +
-> décisions & caveats), service procd livré ici : [`tailscale.init`](./init.d/tailscale.init).
+> (industrialisation). Réfs : [`../../PROVISIONING.md`](../../PROVISIONING.md) (procédure complète +
+> décisions & caveats), service procd livré ici : [`tailscale.init`](../init.d/tailscale.init).
 >
 > Placeholders : `<client>` (ex. `acme`), `<unit>` (ex. `acme-01`),
 > `<tailnet>` (ex. `tail7390da`), `<AUTHKEY>` (`tskey-auth-…`, depuis le Vault).
@@ -73,7 +73,7 @@ le nôtre (étape 4). Maintenir Tailscale à jour est lui-même une instance de 
 
 Le package ne livre pas d'init script. Copie le nôtre depuis le control node :
 ```sh
-scp deploy/photonicat/tailscale.init root@172.16.0.1:/etc/init.d/tailscale
+scp deploy/photonicat/init.d/tailscale.init root@172.16.0.1:/etc/init.d/tailscale
 ```
 Puis sur la box :
 ```sh
@@ -142,7 +142,7 @@ Pour upgrader une box **déjà en prod, joignable seulement par le tailnet**, at
 - Faire le swap **détaché de la session** : `start-stop-daemon -b -x /path/script` (double-fork,
   survit), ou se connecter par une voie indépendante (LAN break-glass / dropbear).
 - À évaluer comme voie propre : `tailscale update` (le binaire statique le supporte et gère le
-  self-replace + restart correctement). Voir la stratégie d'update dans `../PROVISIONING.md`.
+  self-replace + restart correctement). Voir la stratégie d'update dans [`../../PROVISIONING.md`](../../PROVISIONING.md).
 
 Swap manuel (depuis une session **indépendante de tailscaled**, ex. LAN) :
 ```sh

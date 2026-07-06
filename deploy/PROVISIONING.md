@@ -1,7 +1,7 @@
 # Provisionnement d'une box Context Pilot — procédure complète
 
 > De la box d'usine au cockpit en prod. Validé end-to-end sur `cp-test-01` (2026-06-27).
-> Détails : [`photonicat/runbook-day0.md`](./photonicat/runbook-day0.md) (Phase 1 pas à pas),
+> Détails : [`photonicat/docs/runbook-day0.md`](./photonicat/docs/runbook-day0.md) (Phase 1 pas à pas),
 > [`ansible/README.md`](./ansible/README.md) (playbook). Décisions & caveats : sections en bas.
 
 ## Deux plans d'accès (à garder en tête)
@@ -38,7 +38,7 @@
 - Sur le tailnet. Venv + Ansible : `python3 -m venv .venv && ./.venv/bin/pip install ansible` (`.venv` gitignoré).
 
 ## Phase 1 — Day-0 sur la box (manuel, via l'AP WiFi `172.16.0.1`)
-> Runbook détaillé : [`photonicat/runbook-day0.md`](./photonicat/runbook-day0.md).
+> Runbook détaillé : [`photonicat/docs/runbook-day0.md`](./photonicat/docs/runbook-day0.md).
 1. `ssh root@172.16.0.1` (creds d'usine).
 2. **Installer Tailscale — binaire statique officiel** (le feed opkg fige 1.76.1 = CVE) :
    ```sh

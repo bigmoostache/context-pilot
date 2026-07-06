@@ -4522,6 +4522,10 @@
   path: deploy_local.sh
   description: 'Local deploy script. 4 steps: build release, install to /usr/local/bin/cpilot, setup global gitignore (.context-pilot/* with shared/agents/skills/commands negations), export API keys from .env to ~/.bashrc. Guards against running as root.'
   last_edited_ms: 0
+6126cf06d0f53c13:
+  path: deploy/photonicat/docs/debian2-flash-protocol.md
+  description: 'Full Photonicat 2 (RK3576) → Debian 13 flashing runbook (macOS host). 3 paths: SD (Path A, reversible/recommended), eMMC via maskrom+rkdeveloptool (Path B, Linux/Windows), SD→eMMC dd-copy from inside running Debian (Path C, macOS-friendly). Verified button combos (burn mode = OFF→short×3→long≥10s, FAST blink), SHA256s, prebuilt-image URLs. Default Debian creds unconfirmed.'
+  last_edited_ms: 1783340701841
 612722dbfd4a8f10:
   path: src/llms/claude_code_api_key/mod.rs
   description: Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
@@ -4850,10 +4854,6 @@
   path: docs/talk/slides/2-0.html
   description: 'Sub-TOC: HOWs section — left numeral, right slide list'
   last_edited_ms: 1781078806902
-68133707bf6ec962:
-  path: deploy/photonicat/debian2-flash-protocol.md
-  description: 'Full Photonicat 2 (RK3576) → Debian 13 flashing runbook (macOS host). 3 paths: SD (Path A, reversible/recommended), eMMC via maskrom+rkdeveloptool (Path B, Linux/Windows), SD→eMMC dd-copy from inside running Debian (Path C, macOS-friendly). Verified button combos (burn mode = OFF→short×3→long≥10s, FAST blink), SHA256s, prebuilt-image URLs. Default Debian creds unconfirmed.'
-  last_edited_ms: 1783338716024
 68264957736ab25e:
   path: crates/cp-orchestrator/src/transport/inspect/panels.rs
   description: 'Cockpit inspection-panel endpoints (in inspect/): memory/todos/spine/queue/scratchpad/tree/callbacks/usage/library/panel_list = tier-② disk reads reshaped to maquette JSON. library() scans .context-pilot/{agents,skills,commands}/*.md frontmatter; for COMMAND-kind entries it ALSO returns the prompt `body` (text after frontmatter via parse_command_body, T350) so the web composer can seed the real prompt when a /cmd suggestion bubble is clicked — agents/skills omit it (large bodies, unused). PLUS tools/radar/entities = DERIVED-state endpoints returning NORMAL EMPTY shape by design (200 [] / {anchors,results}, NOT 404). agent_folder guard so an unknown id still 404s.'
@@ -5981,6 +5981,10 @@
 80894efcfffcedd8:
   path: web/src/components/shell/widgets/UserMenu.tsx
   description: 'Account avatar menu (T30). Gradient AvatarMark trigger + portaled dropdown: identity header div, Profile/Settings/Manage Users (Phase 10, admin-only)/Sign-out. Sign out wired to useAuth().logout when auth enabled. onOpenUsers callback triggers admin UsersDialog.'
+  last_edited_ms: 0
+80984ee085e6656c:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 80a907dd70658073:
   path: crates/cp-mod-search/src/indexer.rs
