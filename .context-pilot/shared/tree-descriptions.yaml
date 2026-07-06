@@ -1450,6 +1450,10 @@
   path: crates/cp-mod-tree/src/lib.rs
   description: 'Tree module. 3 tools: filter/toggle/describe (with close_panel param). Fixed TREE panel (fixed_order=3). Watches open folders. Module data: filter+descriptions. Worker data: open_folders. @-path autocomplete. T309: should_invalidate_on_fs_change now ALSO requires !path_under_control_dir(changed_path) — CONTROL_DIRS (.git/.context-pilot/oplog/target/node_modules/__pycache__/.venv/venv/dist/build/.uploads) are matched component-wise via Path::components; a change under any of them is dropped before it can invalidate+full-rebuild+rehash the whole tree, killing the self-sustaining idle busy-loop driven by the agent''s own oplog/config churn.'
   last_edited_ms: 1782060739475
+1fb0838ab0bc6466:
+  path: src/llms/claude_code_v2/mod.rs
+  description: 'Claude Code V2 OAuth client. new() loads the token via cp_vault::vault().get("claude_oauth") (single vault entry point, overrides→Keychain→file, T504 unification). Updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API. Reuses helpers + parse_sse_stream from claude_code_api_key.'
+  last_edited_ms: 1783347063932
 1fb10ea87409018b:
   path: crates/cp-wire/src/types/mod.rs
   description: 'ContentHash (SHA-256, Copy, custom hex serde). NEW Phase14: ContentHash::of(&[u8])->SHA-256 (sha2 dep) is the canonical content address (vs FNV folder naming); to_hex(self) self-by-value (wrong_self_convention on Copy). Serialize reuses to_hex. Phase (Idle/Streaming/Tooling), LifecycleState. Re-exports submodules. Known-vector SHA-256 tests.'
@@ -4190,6 +4194,10 @@
   path: crates/cp-orchestrator/tests/fleet_soak.rs
   description: Phase 9.4 (X869) multi-agent soak + fleet-scale fault-matrix slice (2 tests). 16 agents concurrent contended workloads, gap-free+isolated projections. Flooded reordered subscriber coalesces then reconciles.
   last_edited_ms: 0
+591068e662f804d3:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 59586f088a534ae1:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread select resets scroll to bottom.'
@@ -4278,6 +4286,10 @@
   path: crates/cp-orchestrator/tests/openapi/main.rs
   description: OpenAPI spec generator (integration test, --ignored). build_spec assembles schemas + paths. generate_openapi writes openapi.json. Acknowledges lib-only deps (incl reqwest, openssl).
   last_edited_ms: 1782826699110
+5c040946bf598130:
+  path: crates/cp-vault/src/oauth.rs
+  description: 'Claude OAuth loading — consolidated from 3 duplicates. load_claude_oauth_token() is pub(crate) (T504): it''s the mechanism behind AuthMechanism::KeychainThenFile, called ONLY by the vault resolve() cascade — external consumers must use vault().get("claude_oauth") so overrides are honored (bypass = compile error). Keychain (macOS security CLI) → ~/.claude/.credentials.json, expiry check. load_claude_oauth_raw() stays pub — returns full JSON blob for orchestrator status/refresh (needs refreshToken/expiresAt fields the trait doesn''t model).'
+  last_edited_ms: 1783347064000
 5c242bc41fabbaf1:
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread input composer. JS auto-resize (scrollHeight, cap 200px), autoFocus + key={thread.id} remount, submit resets height+refocuses. Enter=submit/Shift+Enter=newline with isComposing guard (IME/dead-key). Agent-busy hint above input is FOCUS-AWARE (T39): focused thread → active spinner (''Agent is streaming…'' ACTIVE / ''Agent is working this thread…'' its turn); agent''s-turn-but-NOT-focused → static Clock ''Agent will pick up this thread soon.'' (queued); THEIR_TURN (user''s turn) → no banner. focused prop rides ThreadDetail.focused.'
@@ -5626,6 +5638,10 @@
   path: crates/cp-wire/src/types/oplog.rs
   description: 'OpEntry (schema_version,rev,timestamp_ms) + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated, ThreadCreated{thread_id,name,status:ThreadTurn,timestamp_ms}, ThreadArchived{thread_id}, ThreadRestored{thread_id}, ThreadStatusChanged{thread_id,status}, Lifecycle, CostAggregate, Checkpoint{snapshot}, Unknown catch-all. Roster variants (Phase 1.1) carry enough to materialise a roster entry without disk read; msg_count+last_activity DERIVED by folding MessageCreated. Framed payload (len+CRC). round-trip + tolerant-decode + roster-round-trip + stable-tag tests.'
   last_edited_ms: 1781787267804
+7873f92541eabed1:
+  path: src/llms/claude_code/mod.rs
+  description: Claude Code OAuth client. new() loads the token via cp_vault::vault().get("claude_oauth") — the SINGLE vault entry point (overrides → Keychain → file cascade), identical to the orchestrator usage proxy (T504 unification). Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
+  last_edited_ms: 1783347063858
 7893c6f6ee3ced9a:
   path: src/llms/cache/cache_optimizer.rs
   description: 'Exact two-level DP optimizer. Minimizes expected recompute cost. Phase 1: per-super-block split DP. Phase 2: knapsack across super-blocks. O(N²·K) time. Prefix sums for O(1) block_cost. Backtracks for positions.'
