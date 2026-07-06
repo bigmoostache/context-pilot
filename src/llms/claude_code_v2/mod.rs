@@ -56,8 +56,13 @@ pub(crate) struct ClaudeCodeV2Client {
 
 impl ClaudeCodeV2Client {
     /// Create a new V2 client, loading the OAuth token from the vault.
+    ///
+    /// Resolves through the [`cp_vault::vault()`] singleton — the single entry
+    /// point for every credential — so the full cascade applies (in-memory
+    /// overrides → Keychain → credential file), identical to `claude_code` and
+    /// the orchestrator usage proxy.
     pub(crate) fn new() -> Self {
-        let access_token = cp_vault::oauth::load_claude_oauth_token().map(|s| Redacted::new(s.expose().to_owned()));
+        let access_token = cp_vault::vault().get("claude_oauth").map(|s| Redacted::new(s.expose().to_owned()));
         Self { access_token }
     }
 

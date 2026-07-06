@@ -502,6 +502,10 @@
   path: crates/cp-mod-queue/src/lib.rs
   description: 'Queue module. 3 tools: pause/execute/undo. Fixed QUEUE panel. Not core. QueueState: active, queued_calls, next_index. Trap state (trap_active/panel_ids/optional_ids) persisted in save/load. Queue_execute handled in pipeline.rs (needs dispatch). Reverie-allowed.'
   last_edited_ms: 0
+0ac95ecca3ffddfe:
+  path: web/tsconfig.json
+  description: 'Root TS project references config — points to tsconfig.app.json + tsconfig.node.json, sets @/* path alias. T505 target: this is where the maximal strict-flag set will be enforced (via app config).'
+  last_edited_ms: 1783348132220
 0acace4fa5eba3dd:
   path: crates/cp-mod-console/src/tools.rs
   description: 'Console tools: create, send_keys, wait (blocking watcher), watch (async watcher), easy_bash (blocking exit watcher). Each instrumented with flame!(). CONSOLE_WAIT_BLOCKING_SENTINEL const. Git/gh guardrails.'
@@ -1450,6 +1454,10 @@
   path: crates/cp-mod-tree/src/lib.rs
   description: 'Tree module. 3 tools: filter/toggle/describe (with close_panel param). Fixed TREE panel (fixed_order=3). Watches open folders. Module data: filter+descriptions. Worker data: open_folders. @-path autocomplete. T309: should_invalidate_on_fs_change now ALSO requires !path_under_control_dir(changed_path) — CONTROL_DIRS (.git/.context-pilot/oplog/target/node_modules/__pycache__/.venv/venv/dist/build/.uploads) are matched component-wise via Path::components; a change under any of them is dropped before it can invalidate+full-rebuild+rehash the whole tree, killing the self-sustaining idle busy-loop driven by the agent''s own oplog/config churn.'
   last_edited_ms: 1782060739475
+1fb0838ab0bc6466:
+  path: src/llms/claude_code_v2/mod.rs
+  description: 'Claude Code V2 OAuth client. new() loads the token via cp_vault::vault().get("claude_oauth") (single vault entry point, overrides→Keychain→file, T504 unification). Updated headers from CLI v2.1.170: 9 beta flags, billing cc_version=2.1.170, ua claude-cli/2.1.170. Body = clean V1 structure; only ''diagnostics'' field is rejected by public API. Reuses helpers + parse_sse_stream from claude_code_api_key.'
+  last_edited_ms: 1783347063932
 1fb10ea87409018b:
   path: crates/cp-wire/src/types/mod.rs
   description: 'ContentHash (SHA-256, Copy, custom hex serde). NEW Phase14: ContentHash::of(&[u8])->SHA-256 (sha2 dep) is the canonical content address (vs FNV folder naming); to_hex(self) self-by-value (wrong_self_convention on Copy). Serialize reuses to_hex. Phase (Idle/Streaming/Tooling), LifecycleState. Re-exports submodules. Known-vector SHA-256 tests.'
@@ -4190,6 +4198,10 @@
   path: crates/cp-orchestrator/tests/fleet_soak.rs
   description: Phase 9.4 (X869) multi-agent soak + fleet-scale fault-matrix slice (2 tests). 16 agents concurrent contended workloads, gap-free+isolated projections. Flooded reordered subscriber coalesces then reconciles.
   last_edited_ms: 0
+591068e662f804d3:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 59586f088a534ae1:
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration. Thread select resets scroll to bottom.'
@@ -4278,6 +4290,10 @@
   path: crates/cp-orchestrator/tests/openapi/main.rs
   description: OpenAPI spec generator (integration test, --ignored). build_spec assembles schemas + paths. generate_openapi writes openapi.json. Acknowledges lib-only deps (incl reqwest, openssl).
   last_edited_ms: 1782826699110
+5c040946bf598130:
+  path: crates/cp-vault/src/oauth.rs
+  description: 'Claude OAuth loading — consolidated from 3 duplicates. load_claude_oauth_token() is pub(crate) (T504): it''s the mechanism behind AuthMechanism::KeychainThenFile, called ONLY by the vault resolve() cascade — external consumers must use vault().get("claude_oauth") so overrides are honored (bypass = compile error). Keychain (macOS security CLI) → ~/.claude/.credentials.json, expiry check. load_claude_oauth_raw() stays pub — returns full JSON blob for orchestrator status/refresh (needs refreshToken/expiresAt fields the trait doesn''t model).'
+  last_edited_ms: 1783347064000
 5c242bc41fabbaf1:
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread input composer. JS auto-resize (scrollHeight, cap 200px), autoFocus + key={thread.id} remount, submit resets height+refocuses. Enter=submit/Shift+Enter=newline with isComposing guard (IME/dead-key). Agent-busy hint above input is FOCUS-AWARE (T39): focused thread → active spinner (''Agent is streaming…'' ACTIVE / ''Agent is working this thread…'' its turn); agent''s-turn-but-NOT-focused → static Clock ''Agent will pick up this thread soon.'' (queued); THEIR_TURN (user''s turn) → no banner. focused prop rides ThreadDetail.focused.'
@@ -5626,6 +5642,10 @@
   path: crates/cp-wire/src/types/oplog.rs
   description: 'OpEntry (schema_version,rev,timestamp_ms) + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated, ThreadCreated{thread_id,name,status:ThreadTurn,timestamp_ms}, ThreadArchived{thread_id}, ThreadRestored{thread_id}, ThreadStatusChanged{thread_id,status}, Lifecycle, CostAggregate, Checkpoint{snapshot}, Unknown catch-all. Roster variants (Phase 1.1) carry enough to materialise a roster entry without disk read; msg_count+last_activity DERIVED by folding MessageCreated. Framed payload (len+CRC). round-trip + tolerant-decode + roster-round-trip + stable-tag tests.'
   last_edited_ms: 1781787267804
+7873f92541eabed1:
+  path: src/llms/claude_code/mod.rs
+  description: Claude Code OAuth client. new() loads the token via cp_vault::vault().get("claude_oauth") — the SINGLE vault entry point (overrides → Keychain → file cascade), identical to the orchestrator usage proxy (T504 unification). Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
+  last_edited_ms: 1783347063858
 7893c6f6ee3ced9a:
   path: src/llms/cache/cache_optimizer.rs
   description: 'Exact two-level DP optimizer. Minimizes expected recompute cost. Phase 1: per-super-block split DP. Phase 2: knapsack across super-blocks. O(N²·K) time. Prefix sums for O(1) block_cost. Backtracks for positions.'
@@ -7010,6 +7030,10 @@
   path: ui/src/components/shell/TopBar.tsx
   description: 'Cockpit header strip: app mark, view switcher (Threads/Cockpit segmented control), project breadcrumb, branch chip, global cost, status dot.'
   last_edited_ms: 0
+963cc7a3acd5aaee:
+  path: web/eslint.config.js
+  description: 'Frontend ESLint flat config. CURRENTLY MINIMAL: js.recommended + tseslint.recommended + react-hooks + react-refresh (~the ''a few lints'' baseline). T505 target: replace with the ultra-strict Rust-parity stack (~15 plugins, ~1100-1400 rules all at error, strictTypeChecked, anti-suppression, boundaries). Spec in scratchpad C48.'
+  last_edited_ms: 1783348132324
 965292c5106e02e5:
   path: crates/cp-render/src/frame.rs
   description: Frame-level IR types. Frame (sidebar/active_panel/status_bar/conversation/overlays), Sidebar (entries/token_bar/stats/pr_card/help), StatusBar (badge/agent/skills/git/auto_continue/reverie/queue/think), PanelContent (title/blocks).
@@ -7666,6 +7690,10 @@ a445c40881ecc32a:
   path: src/ui/help/mod.rs
   description: Re-exports CommandPalette, config_overlay module
   last_edited_ms: 0
+a467728cf80828fe:
+  path: web/tsconfig.app.json
+  description: 'App-scope TS compiler config (bundler mode, react-jsx, es2023). Current strictness: noUnusedLocals/Parameters, erasableSyntaxOnly, noFallthroughCasesInSwitch, verbatimModuleSyntax. T505 target: add the full maximal strict superset (noUncheckedIndexedAccess, exactOptionalPropertyTypes, noImplicitReturns/Override, noPropertyAccessFromIndexSignature, etc.) — the rustc-forbid twin.'
+  last_edited_ms: 1783348132288
 a488c97d4419511a:
   path: web/src/lib/live/index.ts
   description: Live data hooks (TanStack Query + SSE). useAgentMeta/useThreads/useConversation/useStreamingTokens/useLibrary/useFleet/useFleetMetrics/useMetrics. ensureSync SSE watcher. sendCommand dispatches to REST. useFsPreview/useFsSheet for Finder.
@@ -8170,6 +8198,10 @@ af6dd95d8269c492:
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (confined to agent realm). Uses useFs(agentId, relCwd) for live directory listings — converts absolute cwd to relative path for the backend API. Tabs+history+nav+selection+drag-drop+statusbar. buildCrumbs/pathName helpers. Four view modes (grid/list/columns/gallery), keyboard control, marquee selection.
   last_edited_ms: 0
+af7c0b400c7291c6:
+  path: deploy/photonicat/docs/runbook-day0.md
+  description: 'Manual day-0 runbook (FR): factory Photonicat box → joined to tailnet, ready for Ansible. Prereqs (saved policy file, tagged reusable auth-key, control node on tailnet). Steps: join factory AP WiFi, optional break-glass SSH key, install Tailscale (static binary Method A recommended vs opkg 1.76.1 CVE Method B), install procd service, enroll with tags/hostname/--ssh, verify remote access. Troubleshooting table + later-upgrade self-cut warning.'
+  last_edited_ms: 1783346382261
 af989af82653ce47:
   path: .git/index
   description: Git index (binary). Not source.
@@ -9086,6 +9118,10 @@ c2d3bc4f0fcb2a16:
   path: web/src/components/panels/cockpit/PanelPane.tsx
   description: Cockpit panel router. Accepts agentId, uses usePanels() for lookup. Routes to 11 panel components by kind (threads removed — T11), each receiving agentId. 'conversation' sentinel renders Conversation. EmptyState fallback.
   last_edited_ms: 1781776806596
+c2e8c973155c9387:
+  path: deploy/PROVISIONING.md
+  description: 'Full Context Pilot box provisioning procedure (FR). Factory box → prod cockpit. Two access planes (vendor→tailnet, client→LAN). Port allocation (:443 cockpit, :9090 maint, :8088 LuCI, :22 SSH). Phases 0–4: Tailscale control-plane + control node, day-0 (AP WiFi + static Tailscale binary + procd service + enroll), build artifact, Ansible deploy, IT onboarding. Phase 3bis: optional Claude Code OAuth subscription creds (read-only, no refresh). Decisions + operational caveats (self-cut on Tailscale upgrade, key-expiry, firewall, /mnt/data).'
+  last_edited_ms: 1783346382185
 c2e8ce0b2cd68b7c:
   path: src/ui/ir/mod.rs
   description: IR-to-ratatui adapter. semantic_to_style (pub(crate)) + ir_span_to_ratatui (with reversed support). blocks_to_lines converts IR Block vec to ratatui Lines. Table/ProgressBar/Tree/KeyValue renderers. build_frame + build_active_panel frame assembly.
@@ -10434,6 +10470,10 @@ e142f47a8f0d70e1:
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped). T304 draftKey; T331 pendingFiles+onRemoveFile; T334 onShowInFinder; T348 useLibrary command suggestions; T350 createCmdOpen + CreateCommandDialog. T367: OS-file drag-and-drop onto the whole <main>. T414: auto-scroll only on non-auto messages. T416: handleDelete sends delete_message command. T417: formatTs normalises ThreadMsg.ts. T429: wires paused={thread.paused} to ThreadComposer. Takes agentId + onAttach props.'
   last_edited_ms: 1782492076953
+e1475c1002e26f63:
+  path: crates/cp-orchestrator/src/transport/rest/claude_oauth.rs
+  description: 'Claude Code OAuth helpers — usage proxy, token status (incl account_email via /api/oauth/profile), PKCE login (start/complete), token refresh. Delegates read_credentials_json to cp_vault::oauth::load_claude_oauth_raw, read_access_token to vault().get("claude_oauth"). store_credentials writes Keychain (DELETE-then-add, not -U — T504: -U no-ops/diverges on ACL-locked stale item, leaving readers on the old account) + ~/.claude/.credentials.json. All consumers read Keychain-first, so it must reflect the newest login.'
+  last_edited_ms: 1783346272659
 e1595d6e8fbb3fb5:
   path: .git/index
   description: Git index (binary). Not source.
@@ -10738,6 +10778,10 @@ e8c87aefe7be8bef:
   path: src/ui/search_overlay/text.rs
   description: Plain-text export of Ctrl+I overlay for clipboard copy. Includes process CPU%/RAM stats for Meilisearch.
   last_edited_ms: 0
+e92e87ea2731d5d7:
+  path: deploy/photonicat/init.d/tailscale.init
+  description: OpenWrt procd init script for tailscaled on Photonicat. START=90 STOP=11. State persists at /mnt/data/context-pilot/tailscale (survives reboot, rejoins tailnet). Kernel TUN mode. respawn 3600 5 5. NO `tailscale down` in stop_service (would persist wantRunning=false and break auto-rejoin) — relies on procd SIGTERM.
+  last_edited_ms: 1783346382330
 e92f540548fee6a0:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, pipeline, queue_flush.'
@@ -11650,6 +11694,10 @@ fd2cc3a6e7f7a05b:
   path: ui/src/components/threads/ThreadsView.tsx
   description: Threads view assembler, scoped to ACTIVE AGENT's realm (filters threadDetails by agentId, EmptyRealm when none). 2-pane (collapsible ThreadList | ThreadConversation). Owns collapsed state; floating PanelLeft Button re-opens the rail when collapsed. No onOpenCockpit (details popup removed).
   last_edited_ms: 1781533385882
+fd3e6c8949725418:
+  path: deploy/photonicat/bootstrap.sh
+  description: 'Single-file day-0 provisioning script for Photonicat (WiFi → Tailscale install + persistent procd service → tailscale up --ssh). Interactive: prompts WiFi SSID/pass (UCI wwan+sta config, retry loop with connectivity check), installs tailscale via opkg, writes /etc/init.d/tailscale, enrolls with authkey/hostname/tag. uci deletes guarded with || true; radio device resolved before use.'
+  last_edited_ms: 1783346382399
 fd5552b880f42277:
   path: web/src/components/finder/preview/mockPreviews.tsx
   description: 'Decorative maquette Finder previews (inline node payloads): CodePreview/SheetPreview/SlidesPreview/PdfPreview/ImagePreview/AudioPreview/VideoPreview + tint helper. 293 lines.'

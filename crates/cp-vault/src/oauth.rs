@@ -37,8 +37,16 @@ struct OAuthCredentials {
 /// Load the Claude OAuth token from Keychain (macOS) or credential file.
 ///
 /// Returns `None` if no valid, unexpired token is found.
+///
+/// `pub(crate)` by design: this is the *mechanism* behind
+/// [`AuthMechanism::KeychainThenFile`](crate::registry::AuthMechanism) and is
+/// called only by the vault's own [`resolve`](crate::local) cascade. Every
+/// external consumer (agents, orchestrator) MUST go through
+/// [`vault().get("claude_oauth")`](crate::types::Vault::get) instead, so the
+/// in-memory overrides layer is always honored. The restricted visibility makes
+/// bypassing the vault a compile error rather than a convention.
 #[must_use]
-pub fn load_claude_oauth_token() -> Option<SecretString> {
+pub(crate) fn load_claude_oauth_token() -> Option<SecretString> {
     if cfg!(target_os = "macos")
         && let Some(token) = load_from_keychain()
     {

@@ -623,6 +623,27 @@ d1e512c8273ba340:
   tl_dr: Thinking blocks echoed as ContentBlock::Text (prefix '🧠 [Thinking]') in prompt_builder, NOT native Thinking. Signatures removed — prefix changes break them.
   importance: high
   last_edited_ms: 0
+d421b9943691f60e:
+  tl_dr: 'OAuth architecture (T504 final): ALL consumers read the Claude token via vault().get("claude_oauth") — single entry, overrides→Keychain→file. Bypass is now a compile error. Commits dd9d2c54 + d2dde2cc.'
+  contents: |-
+    ALL consumers read the Claude token through cp_vault::vault().get("claude_oauth") — the single vault entry point (cascade: in-memory overrides → Keychain → ~/.claude/.credentials.json). Agent providers claude_code + claude_code_v2 (src/llms/*/mod.rs new()) AND orchestrator usage/status all use this one path.
+
+    cp_vault::oauth::load_claude_oauth_token() is now pub(crate) — the mechanism behind AuthMechanism::KeychainThenFile, called ONLY by the vault resolve() cascade; bypassing the vault for OAuth is a COMPILE ERROR, not a convention.
+
+    load_claude_oauth_raw() stays pub (orchestrator status/refresh needs the full JSON blob: refreshToken/expiresAt fields the trait get() doesn't model).
+
+    WRITE authority: store_credentials in cp-orchestrator/src/transport/rest/claude_oauth.rs uses delete-then-add on the Keychain item (not -U) so re-login always replaces the token cleanly (the -U in-place update no-ops/diverges on an ACL-locked stale item created by the real Claude Code CLI, which was the original T504 bug).
+
+    Net: single write authority + single read path = zero bypass point.
+    Commits: dd9d2c54 (keychain delete-then-add fix), d2dde2cc (vault() unification + pub(crate) enforcement).
+  importance: high
+  labels:
+  - architecture
+  - oauth
+  - vault
+  - credentials
+  - T504
+  last_edited_ms: 1783347116387
 d76e1f4576d9458a:
   tl_dr: 'Context Pilot is a SIDE PROJECT. In <3 months: became #1 tool for all professional + personal life, enables 2-4 simultaneous projects, helps family gain weeks of time.'
   contents: |-
