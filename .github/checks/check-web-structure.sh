@@ -2,28 +2,33 @@
 #
 # check-web-structure.sh — frontend structural guardrail for web/src.
 #
-# Mirrors the Rust workspace's folder-size / file-length policy (.github/checks
-# enforce ≤8 entries per directory and ≤500 lines per source file) for the
-# TypeScript frontend, which those hash-chain-protected Rust scripts do not
-# cover.
+# Mirrors the Rust workspace's folder-size / file-length policy (the sibling
+# .github/checks/check-file-lengths.sh + check-folder-sizes.sh enforce ≤8
+# entries per directory and ≤500 lines per source file) for the TypeScript
+# frontend, which those hash-chain-protected Rust scripts do not cover.
 #
 # Rules (applied to every directory + every .ts/.tsx file under web/src):
 #   • a directory may hold at most MAX_ENTRIES (8) immediate children;
 #   • a source file may be at most MAX_LINES (500) lines long.
 #
-# The ONLY exception is web/src/components/ui — the shadcn primitives, which
-# are vendored (not authored here) and are exempt from both rules.
+# Exceptions:
+#   • web/src/components/ui       — shadcn primitives, vendored (not authored here);
+#   • web/src/lib/api/generated   — OpenAPI-generated client, machine-generated.
 #
 # Exit 0 when clean, 1 (listing every offender) otherwise. Invocation-cwd
-# independent: paths are resolved from this script's own location.
+# independent: the repo root is resolved via `git rev-parse --show-toplevel`,
+# so it runs identically from a callback (project root), CI, or any subdir.
 
 set -euo pipefail
 
 MAX_ENTRIES=8
 MAX_LINES=500
 
-# web/ root = parent of this script's scripts/ dir.
-WEB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Repo root — resolved independently of the caller's cwd, matching the other
+# .github/checks/ scripts (this one lives here after being moved out of
+# web/scripts/).
+ROOT="$(git rev-parse --show-toplevel)"
+WEB_ROOT="$ROOT/web"
 SRC="$WEB_ROOT/src"
 # shadcn vendored primitives — exempt from both rules.
 EXEMPT="$SRC/components/ui"
@@ -62,7 +67,7 @@ while IFS= read -r d; do
 done < <(find "$SRC" -type d)
 
 if [ "$fail" -eq 0 ]; then
-  echo "web structure OK ✓ (≤$MAX_ENTRIES entries/dir, ≤$MAX_LINES lines/file; shadcn ui/ exempt)"
+  echo "web structure OK ✓ (≤$MAX_ENTRIES entries/dir, ≤$MAX_LINES lines/file; shadcn ui/ + generated/ exempt)"
 fi
 
 exit "$fail"

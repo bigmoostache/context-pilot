@@ -59,7 +59,7 @@ jobs:
         run: .github/checks/check-lint-config.sh
 
       - name: Check web structure
-        run: web/scripts/check-web-structure.sh
+        run: .github/checks/check-web-structure.sh
 
       - name: Check vault bypass
         run: .github/checks/check-vault-bypass.sh

@@ -125,5 +125,5 @@ web-structure:
   timeout_secs: 15
   success_message: Web structure OK ✓
   is_global: true
-  script_content: bash web/scripts/check-web-structure.sh
-  last_edited_ms: 1782039392004
+  script_content: bash .github/checks/check-web-structure.sh
+  last_edited_ms: 1783352256371
