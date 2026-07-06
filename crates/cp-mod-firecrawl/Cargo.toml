@@ -11,6 +11,7 @@ readme.workspace = true
 
 [dependencies]
 cp-base.workspace = true
+cp-vault = { path = "../cp-vault" }
 cp-render.workspace = true
 crossterm.workspace = true
 reqwest = { workspace = true }

@@ -6,7 +6,6 @@
 pub(crate) mod helpers;
 pub(crate) mod streaming;
 
-use std::env;
 use std::sync::mpsc::Sender;
 
 use cp_mod_utilities::secret::Redacted;
@@ -26,21 +25,21 @@ use helpers::{
 
 /// Claude Code API Key client
 pub(crate) struct ClaudeCodeApiKeyClient {
-    /// Anthropic API key loaded from the `ANTHROPIC_API_KEY` environment variable
+    /// Anthropic API key, resolved from vault (`"anthropic"`).
     api_key: Option<Redacted>,
 }
 
 impl ClaudeCodeApiKeyClient {
-    /// Create a new client, loading the API key from environment.
+    /// Create a new client, loading the API key from the vault.
     pub(crate) fn new() -> Self {
         let api_key = Self::load_api_key();
         Self { api_key }
     }
 
-    /// Load the API key from the `ANTHROPIC_API_KEY` environment variable.
+    /// Load the API key via the credential vault.
     pub(crate) fn load_api_key() -> Option<Redacted> {
-        let key = env::var("ANTHROPIC_API_KEY").ok()?;
-        Some(Redacted::new(key))
+        let secret = cp_vault::vault().get("anthropic")?;
+        Some(Redacted::new(secret.expose().to_owned()))
     }
 
     /// Run sequential API health checks: auth, streaming, and tool calling.

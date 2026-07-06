@@ -4,7 +4,6 @@ use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::env;
 use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
@@ -21,15 +20,14 @@ use messages::{log_sse_error, messages_to_api};
 
 /// Anthropic Claude client
 pub(crate) struct AnthropicClient {
-    /// API key loaded from `ANTHROPIC_API_KEY` environment variable
+    /// Anthropic API key, resolved from vault (`"anthropic"`).
     api_key: Option<Redacted>,
 }
 
 impl AnthropicClient {
-    /// Create a new Anthropic client, loading the API key from the environment.
+    /// Create a new Anthropic client, loading the API key from the vault.
     pub(crate) fn new() -> Self {
-        let _r = dotenvy::dotenv().ok();
-        Self { api_key: env::var("ANTHROPIC_API_KEY").ok().map(Redacted::new) }
+        Self { api_key: cp_vault::vault().get("anthropic").map(|s| Redacted::new(s.expose().to_owned())) }
     }
 }
 

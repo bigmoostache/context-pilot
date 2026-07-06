@@ -4,7 +4,6 @@
 //! Message building is delegated to the shared `openai_compat` module,
 //! with a thin wrapper to add `reasoning_content` for deepseek-reasoner.
 
-use std::env;
 use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
@@ -22,15 +21,15 @@ const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
 
 /// `DeepSeek` client
 pub(crate) struct DeepSeekClient {
-    /// API key loaded from the `DEEPSEEK_API_KEY` environment variable.
+    /// `DeepSeek` API key, resolved from vault (`"deepseek"`).
     api_key: Option<Redacted>,
 }
 
 impl DeepSeekClient {
-    /// Create a new `DeepSeekClient`, reading the API key from the environment.
+    /// Create a new `DeepSeekClient`, reading the API key from the vault.
     pub(crate) fn new() -> Self {
         let _r = dotenvy::dotenv().ok();
-        Self { api_key: env::var("DEEPSEEK_API_KEY").ok().map(Redacted::new) }
+        Self { api_key: cp_vault::vault().get("deepseek").map(|s| Redacted::new(s.expose().to_owned())) }
     }
 }
 

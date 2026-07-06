@@ -12,6 +12,8 @@ readme.workspace = true
 [dependencies]
 cp-wire = { path = "../cp-wire", features = ["openapi"] }
 cp-oplog = { path = "../cp-oplog" }
+cp-vault = { path = "../cp-vault" }
+dotenvy = "0.15"
 # Shared config — central API-key + settings store at
 # ~/.config/context-pilot/config.json. The cockpit writes provider keys and
 # new-agent defaults here (admin onboarding); agents read them via the same

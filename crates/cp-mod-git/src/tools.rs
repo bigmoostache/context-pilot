@@ -62,7 +62,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
 
     // All commands: run async, decide inline vs panel on completion.
     let command_owned = command.to_string();
-    let github_token = std::env::var("GITHUB_TOKEN").ok();
+    let github_token = cp_vault::vault().get("github").map(|s| s.expose().to_owned());
 
     spawn_async_tool(state, tool, GIT_CMD_TIMEOUT_SECS.saturating_add(5), move || {
         let start = Instant::now();

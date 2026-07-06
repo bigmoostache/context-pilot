@@ -25,8 +25,20 @@ pub(super) struct FreezeConditions {
 /// When true, panels keep their previous sorted positions (no reordering
 /// from `last_refresh_ms` changes). Prevents cache prefix breaks due to
 /// panels shuffling positions between ticks.
+///
+/// **Tempo gating** (T493): `tempo` is only reported as `true` when a
+/// `frozen_context_snapshot` exists to replay.  On cold start / after reload
+/// the snapshot is `None` (runtime-only, not persisted), so the freeze engine
+/// has nothing to restore — reporting `tempo = true` would be misleading
+/// (the user expects tempo=ON → zero cache breaks, but new panels would
+/// still fall through to Fresh).  Gating on the snapshot makes telemetry
+/// match reality: `tempo_is_active = true` iff the full-freeze path can
+/// actually protect the prompt prefix.
 pub(super) fn freeze_conditions(state: &State) -> FreezeConditions {
-    FreezeConditions { queue_active: cp_mod_queue::types::QueueState::get(state).active, tempo: state.tempo }
+    FreezeConditions {
+        queue_active: cp_mod_queue::types::QueueState::get(state).active,
+        tempo: state.tempo && state.frozen_context_snapshot.is_some(),
+    }
 }
 
 impl FreezeConditions {

@@ -7,7 +7,6 @@ use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
 use serde::Serialize;
 use serde_json::Value;
-use std::env;
 use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
@@ -26,15 +25,15 @@ const MINIMAX_API_VERSION: &str = "2023-06-01";
 
 /// `MiniMax` client backed by the Token Plan API.
 pub(crate) struct MiniMaxClient {
-    /// API key loaded from `MINIMAX_API_KEY` environment variable.
+    /// `MiniMax` API key, resolved from vault (`"minimax"`).
     api_key: Option<Redacted>,
 }
 
 impl MiniMaxClient {
-    /// Create a new `MiniMax` client, loading the API key from the environment.
+    /// Create a new `MiniMax` client, loading the API key from the vault.
     pub(crate) fn new() -> Self {
         let _r = dotenvy::dotenv().ok();
-        Self { api_key: env::var("MINIMAX_API_KEY").ok().map(Redacted::new) }
+        Self { api_key: cp_vault::vault().get("minimax").map(|s| Redacted::new(s.expose().to_owned())) }
     }
 }
 

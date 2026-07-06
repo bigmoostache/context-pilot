@@ -271,21 +271,15 @@ fn route_rest(
         (Method::Get, ["api", "metrics"]) => inspect::metrics::fleet_metrics(state, auth_user),
 
         // ── Env-key inspection (T399) + editing (T404) ────────────
-        (Method::Get, ["api", "env-keys"]) => {
-            let overrides = state.lock().map_or_else(|_| std::collections::HashMap::new(), |b| b.env_overrides.clone());
-            rest::env_keys_list(&overrides)
-        }
-        (Method::Get, ["api", "env-keys", name]) => {
-            let overrides = state.lock().map_or_else(|_| std::collections::HashMap::new(), |b| b.env_overrides.clone());
-            rest::env_key_reveal(name, auth_user, &overrides)
-        }
+        (Method::Get, ["api", "env-keys"]) => rest::env_keys_list(),
+        (Method::Get, ["api", "env-keys", name]) => rest::env_key_reveal(name, auth_user),
         (Method::Put, ["api", "env-keys", name]) => {
             let body = String::from_utf8_lossy(body_bytes);
-            match state.lock() {
-                Ok(mut b) => rest::env_key_update(name, auth_user, &body, &mut b.env_overrides),
-                Err(_) => rest::HttpReply::error(500, "internal error"),
-            }
+            rest::env_key_update(name, auth_user, &body)
         }
+
+        // ── Vault snapshot (BridgeVault cache warm-up) ──────────────
+        (Method::Get, ["api", "vault", "snapshot"]) => rest::vault_snapshot(auth_user),
 
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
         (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent_meta(state, id),

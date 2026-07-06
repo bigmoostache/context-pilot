@@ -16,9 +16,10 @@
 
 use std::fmt::Debug;
 
-use cp_base::cast::Safe as _;
-
 use super::super::ApiMessage;
+
+#[cfg(test)]
+use cp_base::cast::Safe as _;
 
 // ─── Trait ──────────────────────────────────────────────────────────────────
 
@@ -145,15 +146,22 @@ impl ConversationTailDensity {
 
 impl DivergenceDensity for ConversationTailDensity {
     fn weights(&self, num_blocks: usize) -> Vec<f64> {
-        (1..=num_blocks)
+        // Uniform weight for all hot blocks (panel results + last user message).
+        //
+        // Previous i² weighting created a 1000×+ ratio between early panel blocks
+        // and the conversation tail, causing the DP optimizer to cluster ALL BPs
+        // near the end of the prompt — leaving the entire panel section (60–80K
+        // tokens) without a single breakpoint. On break ticks (panel content
+        // changed), this produced total cache misses (0 hits).
+        //
+        // Uniform weighting spreads BPs evenly across all hot positions. Since
+        // panel results outnumber the last user message ~27:1, ~3 of the K=3
+        // optimizer BPs land in the panel section — exactly where divergence
+        // actually occurs.
+        (0..num_blocks)
             .map(|i| {
-                let is_hot = self.hot_blocks.get(i.saturating_sub(1)).copied().unwrap_or(false);
-                if is_hot {
-                    let val = i.to_f64();
-                    val * val
-                } else {
-                    0.0
-                }
+                let is_hot = self.hot_blocks.get(i).copied().unwrap_or(false);
+                if is_hot { 1.0 } else { 0.0 }
             })
             .collect()
     }

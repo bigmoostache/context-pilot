@@ -1,0 +1,28 @@
+[package]
+name = "cp-vault"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Unified credential vault — single source of truth for all API keys and secrets"
+repository = "https://github.com/guillaumeMusic/context-pilot"
+readme = "README.md"
+keywords = ["credentials", "vault", "secrets"]
+categories = ["authentication"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+zeroize = { version = "1.8", features = ["derive"] }
+fs2 = "0.4"
+log = { version = "0.4", optional = true }
+
+[features]
+bridge = ["dep:reqwest", "dep:log"]
+
+[dependencies.reqwest]
+version = "0.12"
+features = ["blocking", "json"]
+optional = true
+
+[lints]
+workspace = true

@@ -15,10 +15,10 @@ pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
     }
 }
 
-/// Build a `BraveClient` from the `BRAVE_API_KEY` env var.
+/// Build a `BraveClient` using the credential vault.
 fn get_client() -> Result<BraveClient, String> {
-    let api_key = std::env::var("BRAVE_API_KEY").map_err(|_e| "BRAVE_API_KEY not set".to_string())?;
-    BraveClient::new(api_key)
+    let secret = cp_vault::vault().require("brave").map_err(|e| e.to_string())?;
+    BraveClient::new(secret.expose().to_owned())
 }
 
 /// Build an error `ToolResult`.

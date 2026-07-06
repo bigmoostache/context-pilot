@@ -3,7 +3,6 @@
 //! Grok uses an OpenAI-compatible API format.
 //! Message building is delegated to the shared `openai_compat` module.
 
-use std::env;
 use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
@@ -21,15 +20,15 @@ const GROK_API_ENDPOINT: &str = "https://api.x.ai/v1/chat/completions";
 
 /// xAI Grok client
 pub(crate) struct GrokClient {
-    /// API key loaded from the `XAI_API_KEY` environment variable.
+    /// xAI API key, resolved from vault (`"xai"`).
     api_key: Option<Redacted>,
 }
 
 impl GrokClient {
-    /// Create a new `GrokClient`, reading the API key from the environment.
+    /// Create a new `GrokClient`, reading the API key from the vault.
     pub(crate) fn new() -> Self {
         let _r = dotenvy::dotenv().ok();
-        Self { api_key: env::var("XAI_API_KEY").ok().map(Redacted::new) }
+        Self { api_key: cp_vault::vault().get("xai").map(|s| Redacted::new(s.expose().to_owned())) }
     }
 }
 

@@ -249,14 +249,19 @@
   - forbidden
   last_edited_ms: 0
 3f7ea7b0cdf9397d:
-  tl_dr: 'Cache optimizer: K=3 always (4th BP reserved for conversation tail). Optimizer runs on panels only — caching conversation body is useless.'
-  contents: 'The 4th Anthropic cache breakpoint is always placed at the tail of the conversation (last message). It is NEVER part of the optimization budget. The optimizer receives budget=3 and operates exclusively on the panels section of the prompt. Rationale: the conversation body changes every turn, so caching anything but the very tail is pointless. Only panels (which are relatively stable between turns) benefit from intelligent breakpoint placement.'
+  tl_dr: 'Cache optimizer: K=3 + beacon (4th). ConversationTailDensity uses UNIFORM weight (1.0) for hot blocks, zero for cold. Previous i² was catastrophic (1350:1 ratio, all BPs at tail).'
+  contents: |-
+    The DP optimizer receives budget=3 and places BPs across the full prompt. The 4th breakpoint is the beacon (frontier + LOOKBACK_WINDOW). ConversationTailDensity marks panel user-side blocks (ToolResult with panel_* id) and the last user message as 'hot'. All hot blocks get weight 1.0, cold blocks get 0.0.
+
+    Previous i² weighting created a 1350:1 ratio between the last user block (position ~147, weight 21609) and early panel blocks (position ~4, weight 16). The DP optimizer placed ALL 3 BPs at the conversation tail, leaving the panel section (60-80K tokens) without any breakpoint. On break ticks, the hash chain diverged at the panel position with no BP before it → frontier=0 → total miss.
+
+    Uniform weighting spreads BPs evenly. With ~27 panel hot blocks vs 1 conversation hot block, ~3 of K=3 BPs land in the panel section where divergence actually occurs. Fix committed ed83c9df.
   importance: critical
   labels:
   - cache-optimizer
   - architecture
   - constraint
-  last_edited_ms: 0
+  last_edited_ms: 1783186000589
 42962fefaa6ee609:
   tl_dr: 'FORBIDDEN: #[allow(...)] is BANNED in this project. Always use #[expect(...)] instead. Only in exceptional cases. This applies to all clippy and rustc lint suppression.'
   importance: critical

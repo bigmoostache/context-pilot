@@ -143,6 +143,8 @@ pub(super) fn prepare_stream_context(
 
         let total_panel_tokens: usize =
             context_items.iter().filter(|i| i.id != "chat").map(|i| crate::state::estimate_tokens(&i.content)).sum();
+        let conversation_tokens: usize =
+            context_items.iter().find(|i| i.id == "chat").map_or(0, |i| crate::state::estimate_tokens(&i.content));
 
         state.tick_telemetry = Some(TickTelemetry {
             tick_start_ms: crate::app::panels::now_ms(),
@@ -150,7 +152,7 @@ pub(super) fn prepare_stream_context(
             culprit_type: "none".to_string(),
             tokens_before_culprit: prompt_prefix_tokens.saturating_add(total_panel_tokens),
             tokens_culprit: 0,
-            tokens_after_culprit: 0,
+            tokens_after_culprit: conversation_tokens,
             queue_is_active: cond.queue_active,
             tempo_is_active: cond.tempo,
             break_kind: CacheBreakKind::NoBreak,
@@ -303,6 +305,9 @@ pub(super) fn prepare_stream_context(
                 .collect();
 
             // === Tick telemetry: culprit decomposition + freeze flags ===
+            let conversation_tokens: usize =
+                context_items.iter().find(|i| i.id == "chat").map_or(0, |i| crate::state::estimate_tokens(&i.content));
+
             let (tokens_before, tok_culprit, tokens_after) = culprit_panel_idx.map_or_else(
                 || {
                     let total: usize = panel_token_counts.iter().sum();
@@ -334,7 +339,7 @@ pub(super) fn prepare_stream_context(
                 culprit_type: culprit_type.unwrap_or_else(|| "none".to_string()),
                 tokens_before_culprit: prompt_prefix_tokens.saturating_add(tokens_before),
                 tokens_culprit: tok_culprit,
-                tokens_after_culprit: tokens_after,
+                tokens_after_culprit: tokens_after.saturating_add(conversation_tokens),
                 queue_is_active: cond.queue_active,
                 tempo_is_active: cond.tempo,
                 break_kind,

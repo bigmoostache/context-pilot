@@ -1,22 +1,18 @@
 //! Claude Code V2 OAuth API implementation.
 //!
-//! Uses the same OAuth tokens as `claude_code` (macOS Keychain / credentials file)
-//! but with the updated request format captured from Claude Code CLI v2.1.170:
+//! Uses the same OAuth tokens as `claude_code`, loaded via the [`cp_vault`]
+//! credential vault, but with the updated request format captured from Claude
+//! Code CLI v2.1.170:
 //! - Adaptive thinking (`"thinking": { "type": "adaptive" }`)
 //! - High effort output (`"output_config": { "effort": "high" }`)
 //! - Context management with thinking preservation
 //! - Updated beta flags (14 flags vs original 5)
 //! - Updated billing header and user-agent strings
 
-use std::env;
-use std::fs;
-use std::path::PathBuf;
-use std::process::Command;
 use std::sync::mpsc::Sender;
 
 use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
-use serde::Deserialize;
 use serde_json::Value;
 
 use super::claude_code_api_key::helpers;
@@ -25,7 +21,6 @@ use super::error::LlmError;
 use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::constants::{API_VERSION, library};
 use crate::infra::tools::build_api;
-use cp_base::cast::Safe as _;
 
 /// API endpoint with beta query parameter.
 const ENDPOINT: &str = "https://api.anthropic.com/v1/messages?beta=true";
@@ -55,77 +50,15 @@ const BILLING_HEADER: &str =
 
 /// Claude Code V2 OAuth client.
 pub(crate) struct ClaudeCodeV2Client {
-    /// OAuth access token from macOS Keychain or credentials file.
+    /// OAuth access token from the vault (Keychain or credentials file).
     access_token: Option<Redacted>,
 }
 
-/// On-disk credentials file structure for Claude Code OAuth.
-#[derive(Deserialize)]
-struct CredentialsFile {
-    /// OAuth credentials section.
-    #[serde(rename = "claudeAiOauth")]
-    claude_ai_oauth: OAuthCredentials,
-}
-
-/// OAuth credential fields.
-#[derive(Deserialize)]
-struct OAuthCredentials {
-    /// Bearer access token.
-    #[serde(rename = "accessToken")]
-    access_token: String,
-    /// Token expiry timestamp in milliseconds since UNIX epoch.
-    #[serde(rename = "expiresAt")]
-    expires_at: u64,
-}
-
 impl ClaudeCodeV2Client {
-    /// Create a new V2 client, loading the OAuth token.
+    /// Create a new V2 client, loading the OAuth token from the vault.
     pub(crate) fn new() -> Self {
-        let access_token = Self::load_oauth_token();
+        let access_token = cp_vault::oauth::load_claude_oauth_token().map(|s| Redacted::new(s.expose().to_owned()));
         Self { access_token }
-    }
-
-    /// Load OAuth token from macOS Keychain (preferred) or credentials file.
-    fn load_oauth_token() -> Option<Redacted> {
-        if cfg!(target_os = "macos")
-            && let Some(token) = Self::load_from_keychain()
-        {
-            return Some(token);
-        }
-        Self::load_from_file()
-    }
-
-    /// Read from macOS Keychain via `security` CLI.
-    fn load_from_keychain() -> Option<Redacted> {
-        let output = Command::new("security")
-            .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
-            .output()
-            .ok()?;
-        if !output.status.success() {
-            return None;
-        }
-        let content = String::from_utf8(output.stdout).ok()?;
-        Self::parse_credentials(content.trim())
-    }
-
-    /// Read from `~/.claude/.credentials.json`.
-    fn load_from_file() -> Option<Redacted> {
-        let home = env::var("HOME").ok()?;
-        let home_path = PathBuf::from(&home);
-        let creds_path = home_path.join(".claude").join(".credentials.json");
-        let path = if creds_path.exists() { creds_path } else { home_path.join(".claude").join("credentials.json") };
-        let content = fs::read_to_string(&path).ok()?;
-        Self::parse_credentials(&content)
-    }
-
-    /// Parse credentials JSON and return access token if not expired.
-    fn parse_credentials(content: &str) -> Option<Redacted> {
-        let creds: CredentialsFile = serde_json::from_str(content).ok()?;
-        let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis().to_u64();
-        if now_ms > creds.claude_ai_oauth.expires_at {
-            return None;
-        }
-        Some(Redacted::new(creds.claude_ai_oauth.access_token))
     }
 
     /// Execute a streaming request with the V2 request format.
