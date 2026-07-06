@@ -3058,6 +3058,10 @@
   path: src/app/run/threads/archived.rs
   description: 'Live thread-archived emission chokepoint: diffs each thread''s archived flag vs memo, emits durable ThreadArchived/ThreadRestored deltas. Seeds from oplog roster on first pass. MemoSeeds bitfield accessors (seeded.archived()/seed_archived()).'
   last_edited_ms: 0
+3ff3c68809cf9e3d:
+  path: web/src/lib/utils.ts
+  description: 'Shared web utils. cn() (clsx+tailwind-merge). clipboard() (web-lint P3): returns navigator.clipboard honestly typed Clipboard|undefined via a function-indirection helper — a CALL result is opaque to TS control-flow-analysis, so clipboard()?.writeText stays an honest guard (navigator.clipboard is typed non-null by lib.dom but is genuinely undefined on insecure origin; an aliased const would be CFA-narrowed to non-null → dead ?.). Used by Message.tsx + markdown.tsx. T367/T471 zip-on-drop: zipFiles/zipDropped bundle dropped file(s)/folder tree into ONE .zip via fflate; extractDroppedFiles walks webkitGetAsEntry recursively (entries captured SYNC before first await). T359 list logic: resolveEnter/resolveTab + lineBounds/parseListLine. Consumed by ThreadComposer + ThreadConversation.'
+  last_edited_ms: 1783376840455
 3ffcdfcd3170e1ea:
   path: crates/cp-mod-utilities/src/hash.rs
   description: FNV-1a 128-bit content hashing. compute(bytes) and compute_str(str) return 32-char hex. Replaces sha2 crate.
@@ -3854,6 +3858,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+503fb0af9cebe68b:
+  path: web/eslint.config.ts
+  description: 'Frontend ESLint flat config — the Rust-parity strict stack (branch web-lint), a RATCHET (P0→P13, one plugin group per phase, each at error). P3 LANDED: extends js.recommended + typescript-eslint strictTypeChecked + stylisticTypeChecked + reactRefresh.vite, all error, gate runs --max-warnings 0, parserOptions.projectService (tsconfigRootDir=import.meta.dirname) for type-aware rules. THREE calibrations (clippy.toml-threshold spirit, rule stays error): no-confusing-void-expression{ignoreArrowShorthand}, restrict-template-expressions{allowNumber}, prefer-nullish-coalescing{ignorePrimitives:string,boolean}. Two scoped file-overrides (config-level exception registry, analog of allowed-lint-exceptions.yaml, NEVER inline eslint-disable): ui/** react-refresh off (shadcn), MarkdownEditor.tsx no-deprecated off (execCommand/queryCommandState = only contentEditable WYSIWYG API). react-hooks pinned to classic pair (rules-of-hooks error + exhaustive-deps warn), plugin type bridged reactHooks as unknown as ESLint.Plugin. globalIgnores dist + generated/** + e2e/** + playwright.config.ts.'
+  last_edited_ms: 1783376840528
 5051f0f56f88879c:
   path: web/src/components/panels/cockpit/MemoryPanel.tsx
   description: Memories panel — uses useMemory(agentId) for live recall cards. ImportanceDot + labels + tl;dr.
@@ -4046,6 +4054,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 1780563355099
+53cb141bae692733:
+  path: web/src/lib/query/sse.ts
+  description: 'Reconnecting SSE client for one agent''s event stream. EventSource with ticket auth, last_rev resume param (T268 fix), exponential backoff (1s→30s). Singleton per agent via getOrCreateSseClient. Named event listeners: delta/stream/resync/invalidate. Wildcard ''*'' subscriber support. web-lint P3: `closed` flag read through an isClosed() getter at the onerror + catch sites — a direct !closed is CFA-narrowed to always-true (its only mutation is in the deferred close()), a function call is opaque to CFA.'
+  last_edited_ms: 1783376840672
 53cdc65b102546ba:
   path: ui/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Centred on shared FLEET_MAX_W (T18). Greeting, AgentCard grid (status badge + one-line task + model·cost meta — no git branch; Open→threads, Manage→modal), New-agent card. AgentModal (Apple-grade): gradient hero, name-as-star w/ live slugified realm preview, rich model cards, autofocus+Esc+⌘↵. Footer caption design-only (total spend now lives in the status footer).'
@@ -5846,6 +5858,10 @@
   path: src/ui/help/mod.rs
   description: Re-exports CommandPalette, config_overlay module
   last_edited_ms: 0
+7988433458e080dd:
+  path: web/src/components/finder/internal/helpers.ts
+  description: 'Finder shared types + pure helpers: Tab/PinnedFolder interfaces, CLICK_SETTLE_MS, NEW_FOLDER_SENTINEL, pinsKey/loadPins (localStorage), buildCrumbs, pathName. web-lint P3: req<T>(arr,i) invariant accessor (arr.at(i), throws on absent) — encodes a length-guard-proven invariant with a runtime check instead of a banned non-null assertion (!); used by useFinderActions back/forward.'
+  last_edited_ms: 1783376840602
 79bf65e8f8e43a82:
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): Recovered{rev_head,heads,seen}. fold_entry: Checkpoint=authoritative clone_from, MessageCreated=set_thread_head, CommandEffect|SeenMark=seen.mark, others (incl 4 thread-roster variants) no-op — agent replay rebuilds only heads+seen; roster is recovered by tier-② load + folded by the BACKEND MaterializedView, not agent replay. Fast-path reads only newest checkpoint-bearing segment. 10 tests.'
