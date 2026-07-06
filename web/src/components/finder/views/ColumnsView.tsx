@@ -14,11 +14,10 @@ import {
   mods,
   readMovePayload,
   relOf,
-  RenameInput,
   startItemDrag,
-  TagDots,
   type ViewHandlers,
-} from "./shared"
+} from "./helpers"
+import { RenameInput, TagDots } from "./shared"
 
 /**
  * Miller-columns browser over LIVE data. One column per ancestor in the path

@@ -5,7 +5,7 @@ import type { FinderNode } from "@/lib/types"
 import { collectStarred } from "@/lib/support/finderFs"
 import { extOf, kindMeta } from "./kind"
 import { FileIcon } from "./macIcons"
-import { FOLDER_DRAG_MIME } from "../views/FinderViews"
+import { FOLDER_DRAG_MIME } from "../views/helpers"
 import type { PinnedFolder } from "../Finder"
 import { cn } from "@/lib/utils"
 

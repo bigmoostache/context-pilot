@@ -270,6 +270,26 @@
   - lints
   - forbidden
   last_edited_ms: 0
+45b9baa7eb6b3f01:
+  tl_dr: 'T506 web-lint P0 COMPLETE (green baseline). eslint.config.ts typed-flat ratchet, generated/**+dist ignored, plugin roster installed. Full-tree eslint 0 err/1 warn, tsc 0, structure clean. NEXT: P1 tsc maximal strict (X1128).'
+  contents: |-
+    P0 = scaffold + ignores + green baseline (X1127).
+
+    CONFIG: eslint.config.ts (typed flat, defineConfig): js.recommended + tseslint.recommended + reactHooks CLASSIC pair (rules-of-hooks:error + exhaustive-deps:WARN — v7 compiler-aware rules DEFERRED to P6) + reactRefresh.vite (allowConstantExport:true, ui/** react-refresh OFF). globalIgnores(dist, src/lib/api/generated/**).
+
+    DEPS: full plugin roster in package.json (~30, unwired — lands P1-P13). .npmrc verify-deps-before-run=false (pnpm 11.6 verify runs `pnpm install` exits 1 on ignored unrs-resolver build). Run eslint authoritatively by BYPASSING pnpm: node node_modules/eslint/bin/eslint.js .
+
+    REACT-REFRESH FIX (16 violations, 6 clusters): (A) providers theme/account/auth/devMode split context+hook vs Provider component, all 8 relocated to NEW src/lib/providers/; ~13 consumers repointed; App.tsx→providers/*Provider. (B) finder/views shared.tsx split → helpers.ts + shared.tsx (RenameInput/TagDots); dead kindTint dropped. (C) threads/fileUpload.tsx FOLDERIZED → fileUpload/{helpers.ts,index.tsx}. (D) AgentModal slugify unexported. (E) TEXT_KINDS→preview/kinds.ts. (F) CATEGORIES/CatId→config/categories.ts; fmtDollar/fmtTokens→costs/format.ts.
+
+    Baseline BEFORE was RED (45 eslint+1 tsc; 4 in generated/, now ignored).
+  importance: high
+  labels:
+  - web-lint
+  - T506
+  - P0
+  - complete
+  - milestone
+  last_edited_ms: 1783350236995
 48f2140d3c2dee0e:
   tl_dr: Entities module COMPLETE — all 151 stress tests passed (12 categories, 4 difficulty levels). 9 bugs found/fixed. Committed on 'entities' branch. Production-quality.
   contents: |-

@@ -2,8 +2,9 @@ import { useState } from "react"
 import { Check, X } from "lucide-react"
 import { DialogClose } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-import { useAuth } from "@/lib/support/auth"
-import { type CatId, CATEGORIES, CategoryBody } from "./ConfigPanes"
+import { useAuth } from "@/lib/providers/auth"
+import { CategoryBody } from "./ConfigPanes"
+import { type CatId, CATEGORIES } from "./categories"
 
 /**
  * Context Pilot settings surface — a macOS System-Settings-style layout with a

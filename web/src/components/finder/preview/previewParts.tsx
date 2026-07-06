@@ -4,7 +4,7 @@ import { fmtBytes } from "@/lib/support/finderFs"
 import { Markdown } from "@/lib/support/markdown"
 import { extOf, kindMeta, TAG_META } from "../support/kind"
 import { FileIcon } from "../support/macIcons"
-import { TagDots } from "../views/FinderViews"
+import { TagDots } from "../views/shared"
 import { cn } from "@/lib/utils"
 
 /** A small icon-only button used in the Quick Look pane header. */

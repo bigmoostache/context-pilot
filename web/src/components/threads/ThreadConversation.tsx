@@ -9,7 +9,7 @@ import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
 import { extractDroppedFiles, zipDropped } from "@/lib/utils"
-import { uploadToNode, type UploadedFile } from "./fileUpload"
+import { uploadToNode, type UploadedFile } from "./fileUpload/helpers"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
 import type { FinderNode } from "@/lib/types"
 

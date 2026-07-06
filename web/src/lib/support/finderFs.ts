@@ -436,7 +436,7 @@ export function sortNodes(nodes: FinderNode[], key: FinderSortKey, asc: boolean)
     const ad = a.kind === "folder"
     const bd = b.kind === "folder"
     if (ad !== bd) return ad ? -1 : 1
-    let cmp = 0
+    let cmp: number
     if (key === "name") cmp = a.name.localeCompare(b.name)
     else if (key === "size") cmp = (a.size ?? 0) - (b.size ?? 0)
     else if (key === "kind") cmp = a.kind.localeCompare(b.kind)

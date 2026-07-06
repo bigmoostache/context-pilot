@@ -1,36 +1,16 @@
 import { useState } from "react"
+import type { CatId } from "./categories"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  Boxes,
   Check,
-  Coins,
   Lock,
-  Package,
-  Sliders,
 } from "lucide-react"
 import { UsagePage } from "@/components/agents/UsagePage"
 import { ReleasesPane } from "./ReleasesPane"
 import { useProviders } from "@/lib/support/models"
 import { fetchSettings, updateSettings, fetchEnvKeys } from "@/lib/api"
-import { useDevMode } from "@/lib/support/devMode"
+import { useDevMode } from "@/lib/providers/devMode"
 import { cn } from "@/lib/utils"
-
-// ── categories ────────────────────────────────────────────────────
-export type CatId = "general" | "usage" | "services" | "releases"
-
-export const CATEGORIES: {
-  id: CatId
-  label: string
-  blurb: string
-  icon: typeof Sliders
-  count?: number
-  adminOnly?: boolean
-}[] = [
-  { id: "general", label: "General", blurb: "Models & autonomy", icon: Sliders },
-  { id: "usage", label: "Usage & Cost", blurb: "Spend & token analytics", icon: Coins },
-  { id: "services", label: "Services", blurb: "Available integrations", icon: Boxes },
-  { id: "releases", label: "Releases", blurb: "Manage binary versions", icon: Package, adminOnly: true },
-]
 
 // ── per-category bodies ───────────────────────────────────────────
 //

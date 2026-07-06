@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { KeyRound, Loader2, Monitor, Trash2 } from "lucide-react"
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
-import { useAuth } from "@/lib/support/auth"
+import { useAuth } from "@/lib/providers/auth"
 import {
   changePassword,
   fetchSessions,

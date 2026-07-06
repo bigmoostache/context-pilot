@@ -1,4 +1,5 @@
 import type { Slice, CostRow } from "./parse"
+import { fmtDollar } from "./format"
 
 // ── Shared constants ────────────────────────────────────────────────────────
 
@@ -92,11 +93,6 @@ interface HBarProps {
   format?: (v: number) => string
 }
 
-const fmtDollar = (v: number) => (v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`)
-const fmtTokens = (v: number) =>
-  v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `${(v / 1_000).toFixed(1)}K` : `${v}`
-
-export { fmtDollar, fmtTokens }
 
 export function HBarChart({ data, title, format = fmtDollar }: HBarProps) {
   const max = Math.max(...data.map((d) => d.value), 1)

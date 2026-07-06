@@ -1,24 +1,24 @@
 import { useState } from "react"
 import type { FinderNode, FinderSortKey } from "@/lib/types"
 import { fmtBytes } from "@/lib/support/finderFs"
-import { extOf, kindMeta, kindTint } from "../support/kind"
+import { extOf, kindMeta } from "../support/kind"
 import { FileIcon } from "../support/macIcons"
 import { InfoBadge } from "../support/InfoBadge"
 import { cn } from "@/lib/utils"
 import {
   folderDropProps,
   mods,
-  RenameInput,
   startItemDrag,
-  TagDots,
   itemCount,
   type ViewHandlers,
-} from "./shared"
+} from "./helpers"
+import { RenameInput, TagDots } from "./shared"
 
-// Re-export the shared surface so existing importers (Finder.tsx, FinderChrome,
-// FinderPreview) keep resolving FOLDER_DRAG_MIME / TagDots / ViewHandlers / the
-// column view from `views/FinderViews` after the split.
-export { FOLDER_DRAG_MIME, MOVE_MIME, TagDots, type ViewHandlers } from "./shared"
+// Column view is a sibling component; re-exported so `views/FinderViews` stays
+// the single import surface for the four Finder views (Finder.tsx). Non-component
+// shared symbols (MIME consts, ViewHandlers, TagDots) are imported directly from
+// `./helpers` / `./shared` by their consumers — re-exporting them here would
+// break Fast Refresh (a component module must export components only).
 export { ColumnsView } from "./ColumnsView"
 
 // ── Grid (icon) view ──────────────────────────────────────────────
@@ -269,5 +269,4 @@ function Hero({ node }: { node: FinderNode }) {
   )
 }
 
-export { kindTint }
 

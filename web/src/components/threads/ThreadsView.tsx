@@ -5,7 +5,7 @@ import { ThreadConversation } from "./ThreadConversation"
 import { NewThreadDialog } from "./NewThreadDialog"
 import { useThreads, useFleet, sendCommand } from "@/lib/live"
 import { uploadUnique } from "@/lib/api"
-import { buildUploadMessage, type UploadedFile } from "./fileUpload"
+import { buildUploadMessage, type UploadedFile } from "./fileUpload/helpers"
 
 /**
  * Build a combined message body from user text and pending file attachments.

@@ -9,9 +9,6 @@ import { FileIcon } from "../support/macIcons"
 import { cn } from "@/lib/utils"
 import { Generic, MarkdownPreview, PreviewStatus, TextPreview, TruncatedNote } from "./previewParts"
 
-/** File kinds whose content is plain text and can be fetched + rendered live
- *  (markdown gets the rich GFM renderer; the rest a preformatted block). */
-export const TEXT_KINDS = new Set<FinderNode["kind"]>(["markdown", "code", "json", "doc"])
 
 /**
  * Fetch a live file's text content and render it: markdown through the rich GFM

@@ -6,7 +6,7 @@
 //   • Normal → "Sign In" login form.
 
 import { useState, type FormEvent } from "react"
-import { useAuth } from "@/lib/support/auth"
+import { useAuth } from "@/lib/providers/auth"
 
 export function LoginPage() {
   const { login, register, bootstrapped, loading: authLoading } = useAuth()

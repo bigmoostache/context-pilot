@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import type { CrossTab, CostRow } from "./parse"
-import { fmtTokens } from "./charts"
+import { fmtTokens } from "./format"
 
 // ── Heat-map helpers ────────────────────────────────────────────────────────
 

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { lineBounds, resolveEnter, resolveTab } from "@/lib/utils"
 import { ArrowUp, Paperclip, Loader2, Clock, Pause } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
-import { ComposerBubbles, type UploadedFile, type CommandSuggestion } from "./fileUpload"
+import { ComposerBubbles } from "./fileUpload"
+import type { UploadedFile, CommandSuggestion } from "./fileUpload/helpers"
 
 /** A persisted composer draft: the unsent text plus the caret/selection range
  *  to restore (T304). Stored as JSON under the composer's `draftKey`. */
@@ -21,7 +22,7 @@ function clampRange(n: number, lo: number, hi: number): number {
 // (both composer pill families share ONE module + ONE rendered row). Re-exported
 // here for the existing `import { type CommandSuggestion } from "./ThreadComposer"`
 // consumers (ThreadConversation).
-export type { CommandSuggestion } from "./fileUpload"
+export type { CommandSuggestion } from "./fileUpload/helpers"
 
 /**
  * Read and parse a persisted {@link Draft} from localStorage.

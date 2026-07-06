@@ -9,7 +9,7 @@ import { UserMenu } from "./widgets/UserMenu"
 import { UsersDialog } from "@/components/auth/UsersDialog"
 import { AgentModal } from "@/components/agents/AgentModal"
 import { Tip } from "@/components/ui/tip"
-import { useDevMode } from "@/lib/support/devMode"
+import { useDevMode } from "@/lib/providers/devMode"
 import type { Agent, ViewMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 

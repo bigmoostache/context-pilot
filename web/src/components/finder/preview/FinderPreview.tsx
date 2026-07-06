@@ -15,8 +15,8 @@ import {
   LivePdfPreview,
   LivePreview,
   LiveSheetPreview,
-  TEXT_KINDS,
 } from "./livePreviews"
+import { TEXT_KINDS } from "./kinds"
 import {
   AudioPreview,
   CodePreview,

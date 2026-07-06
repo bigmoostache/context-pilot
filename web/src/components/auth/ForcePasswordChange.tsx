@@ -8,7 +8,7 @@
 
 import { useState, type FormEvent } from "react"
 import { changePassword } from "@/lib/api"
-import { useAuth } from "@/lib/support/auth"
+import { useAuth } from "@/lib/providers/auth"
 
 const MIN_PASSWORD_LEN = 8
 
@@ -103,7 +103,6 @@ function Field({
       <input
         type="password"
         value={value}
-        // eslint-disable-next-line jsx-a11y/no-autofocus
         autoFocus={autoFocus}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="new-password"

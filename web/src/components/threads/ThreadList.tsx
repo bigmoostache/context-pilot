@@ -297,7 +297,6 @@ function ThreadRow({
         selected ? "bg-card card-shadow" : "hover:bg-muted/60",
       )}
     >
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- row select; inner buttons need real <button> so outer cannot be one */}
       <div onClick={() => onSelect(t.id)} className="flex cursor-pointer flex-col gap-1 text-left">
         {/* line 1 — dot + name + time + overflow menu */}
         <div className="flex items-center gap-2">

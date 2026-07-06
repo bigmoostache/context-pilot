@@ -7,8 +7,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useAccount } from "@/lib/support/account"
-import { useAuth } from "@/lib/support/auth"
+import { useAccount } from "@/lib/providers/account"
+import { useAuth } from "@/lib/providers/auth"
 import { accentVar } from "@/lib/support/panelMeta"
 import type { User } from "@/lib/types"
 import { cn } from "@/lib/utils"

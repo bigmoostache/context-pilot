@@ -2,7 +2,8 @@ import { useCallback, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { fetchFsPreview } from "@/lib/api/finder"
 import { parseCostTsv, computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, maxFreezePerCulprit, crossTabToolCulprit, buildMarkdownReport } from "./parse"
-import { DonutChart, HBarChart, CostTimeline, fmtDollar, fmtTokens } from "./charts"
+import { DonutChart, HBarChart, CostTimeline } from "./charts"
+import { fmtDollar, fmtTokens } from "./format"
 import { CrossTabTable, TokenDistribution, ApiTokenDistribution } from "./tables"
 
 /**

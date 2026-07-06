@@ -2,11 +2,8 @@ import { useState } from "react"
 import { Check, ChevronDown, Copy, Terminal, Trash2, User } from "lucide-react"
 import type { ChatMessage } from "@/lib/types"
 import { Markdown, type MarkdownVariant } from "@/lib/support/markdown"
-import {
-  splitMessageSegments,
-  MessageFileChip,
-  type UploadedFile,
-} from "@/components/threads/fileUpload"
+import { MessageFileChip } from "@/components/threads/fileUpload"
+import { splitMessageSegments, type UploadedFile } from "@/components/threads/fileUpload/helpers"
 import { cn } from "@/lib/utils"
 
 /**

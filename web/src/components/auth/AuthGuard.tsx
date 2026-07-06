@@ -13,7 +13,7 @@
 // re-pulls /me and advances `next_action`.
 
 import { type ReactNode } from "react"
-import { useAuth } from "@/lib/support/auth"
+import { useAuth } from "@/lib/providers/auth"
 import { LoginPage } from "./LoginPage"
 import { Onboarding } from "./Onboarding"
 import { ForcePasswordChange } from "./ForcePasswordChange"

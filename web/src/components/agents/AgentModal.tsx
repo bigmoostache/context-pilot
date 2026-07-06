@@ -13,7 +13,7 @@ import {
 import type { Agent } from "@/lib/types"
 import { useCreateAgent, useRenameAgent, useRestartAgent, useRetireAgent, useUploadAvatar, sendCommand } from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
-import { useAuth } from "@/lib/support/auth"
+import { useAuth } from "@/lib/providers/auth"
 import { usePickerProviders, defaultModel, findModel, resolveSelection } from "@/lib/support/models"
 import { ModelPicker } from "./ModelPicker"
 import { AgentAclSection } from "../auth/AgentAclSection"
@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils"
  */
 
 /** Derive the realm folder name from the agent name (replaces the folder picker). */
-export function slugify(name: string): string {
+function slugify(name: string): string {
   const s = name
     .trim()
     .toLowerCase()

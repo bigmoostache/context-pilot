@@ -77,7 +77,6 @@ export function Field({
         type={type}
         value={value}
         placeholder={placeholder}
-        // eslint-disable-next-line jsx-a11y/no-autofocus
         autoFocus={autoFocus}
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}

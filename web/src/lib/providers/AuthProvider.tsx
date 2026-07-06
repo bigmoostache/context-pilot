@@ -1,18 +1,14 @@
-// ── Auth context — session lifecycle for the web frontend (Phase 9) ──
+// ── AuthProvider — session lifecycle driver (Phase 9) ──
 //
-// AuthProvider sits near the root of the React tree. It:
+// Sits near the root of the React tree. It:
 //   1. Probes `GET /api/auth/status` to know whether the backend has auth
 //      enabled at all (NFR-09: zero overhead when disabled).
 //   2. If enabled, validates any persisted localStorage token via `/me`.
-//   3. Exposes login / register / logout + the current user to children.
-//
-// The companion AuthGuard component (components/auth/) renders the login
-// page when auth is required but no valid session exists.
+//   3. Exposes login / register / logout + the current user to children via
+//      the shared {@link AuthContext} (defined in `./auth`).
 
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useState,
   type ReactNode,
@@ -27,35 +23,7 @@ import {
   setToken,
   type AuthMe,
 } from "@/lib/api"
-
-// ── Context shape ────────────────────────────────────────────────────
-
-interface AuthContextValue {
-  /** The authenticated user (+ backend `next_action`), or null when logged
-   *  out / auth disabled. */
-  user: AuthMe | null
-  /** Raw session token (mostly for debugging; Bearer injection is automatic). */
-  token: string | null
-  /** `true` = backend requires auth; `false` = auth disabled; `null` = still probing. */
-  authEnabled: boolean | null
-  /** True when ≥1 user exists (login mode); false = bootstrap-register mode. */
-  bootstrapped: boolean
-  /** True while the initial status + token validation is in flight. */
-  loading: boolean
-  /** Authenticate with email + password. Throws on failure. */
-  login: (email: string, password: string) => Promise<void>
-  /** Bootstrap-register the first user (admin). Throws on failure.
-   *  After success, auto-logs in and sets `bootstrapped` to true. */
-  register: (email: string, name: string, password: string) => Promise<void>
-  /** End the current session and clear the stored token. */
-  logout: () => Promise<void>
-  /** Re-fetch `/me` and refresh the cached user (after a profile edit). */
-  refreshMe: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null)
-
-// ── Provider ─────────────────────────────────────────────────────────
+import { AuthContext } from "./auth"
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthMe | null>(null)
@@ -171,13 +139,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   )
-}
-
-// ── Hook ─────────────────────────────────────────────────────────────
-
-/** Read the auth context. Must be called inside an AuthProvider. */
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider")
-  return ctx
 }
