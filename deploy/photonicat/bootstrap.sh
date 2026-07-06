@@ -28,22 +28,19 @@ while true; do
     echo "Configuring UCI..."
 
     # Create wwan network interface (DHCP client on the WiFi STA)
-    uci -q delete network.wwan 2>/dev/null
+    uci -q delete network.wwan 2>/dev/null || true
     uci set network.wwan=interface
     uci set network.wwan.proto=dhcp
     uci commit network
 
+    # Find the radio device name (e.g. "radio0")
+    RADIO=$(uci show wireless 2>/dev/null | grep -F "=wifi-device" | head -1 | cut -d= -f1 | cut -d. -f2)
+    RADIO="${RADIO:-radio0}"
+
     # Add STA wifi-iface (keep existing AP iface untouched)
-    uci -q delete wireless.sta 2>/dev/null
+    uci -q delete wireless.sta 2>/dev/null || true
     uci set wireless.sta=wifi-iface
-    uci set wireless.sta.device="$(uci -q get wireless.@wifi-device[0].type 2>/dev/null && uci get wireless.@wifi-device[0].type && echo 'radio0' | head -1)"
-    # Find the actual radio device name
-    RADIO=$(uci show wireless | grep "=wifi-device" | head -1 | cut -d= -f1 | cut -d. -f2)
-    if [ -n "$RADIO" ]; then
-        uci set wireless.sta.device="$RADIO"
-    else
-        uci set wireless.sta.device="radio0"
-    fi
+    uci set wireless.sta.device="$RADIO"
     uci set wireless.sta.mode=sta
     uci set wireless.sta.network=wwan
     uci set wireless.sta.ssid="$WIFI_SSID"
@@ -73,7 +70,7 @@ while true; do
             echo "  STA interface $STA_IFACE — check: iwinfo $STA_IFACE info"
         fi
         # Clean up failed attempt
-        uci -q delete wireless.sta 2>/dev/null
+        uci -q delete wireless.sta 2>/dev/null || true
         uci commit wireless
         wifi reload
     fi
