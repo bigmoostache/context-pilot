@@ -1,5 +1,37 @@
 import type { FinderNode } from "@/lib/types"
+import { downloadFile } from "@/lib/live"
 import type { FinderTab } from "../FinderChrome"
+
+/** Download every selected file (folders skipped) from the current listing,
+ *  flashing a progress toast and a per-file error toast on failure. */
+export function downloadSelected(
+  agentId: string,
+  selected: Set<string>,
+  children: FinderNode[],
+  flash: (msg: string) => void,
+) {
+  if (!selected.size) {
+    flash("Select files to download.")
+    return
+  }
+  const files = [...selected]
+    .map((p) => children.find((c) => c.path === p))
+    .filter((n): n is FinderNode => !!n && n.kind !== "folder")
+  if (files.length === 0) {
+    flash("Select files (not folders) to download.")
+    return
+  }
+  for (const node of files) {
+    downloadFile(agentId, node.path).catch(() => flash(`Failed to download ${node.name}`))
+  }
+  flash(`Downloading ${files.length} file(s)…`)
+}
+
+/** Download a single file node, flashing progress + an error toast on failure. */
+export function downloadNode(agentId: string, node: FinderNode, flash: (msg: string) => void) {
+  downloadFile(agentId, node.path).catch(() => flash("Download failed"))
+  flash(`Downloading ${node.name}…`)
+}
 
 /** A Finder tab: a folder browse context (with back/forward history) or, when
  *  `fileNode` is set, a single-file tab showing one file instead of a folder. */
