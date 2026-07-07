@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useReducer, useRef, useState } from "react"
 import {
   Bold,
   Code2,
@@ -51,23 +51,28 @@ export function MarkdownEditor({
   onChange?: (markdown: string) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [, force] = useState(0)
+  // A monotonic reducer whose only job is to force a re-render so the toolbar's
+  // active-state re-reads queryCommandState after a command or caret move. The
+  // value is intentionally discarded (the canonical force-update idiom); a
+  // useState pair would leave an unread state variable.
+  const [, force] = useReducer((n: number) => n + 1, 0)
   const [empty, setEmpty] = useState(false)
 
-  // Seed the surface once — re-seeding would fight the caret. Intentionally a
-  // mount-only effect: `initialMarkdown` is deliberately NOT a dependency (a
-  // prop change must not re-seed and blow away in-progress edits). The
-  // exhaustive-deps warning this raises is a known, roadmapped react-hooks item
-  // (P6) — the inline `eslint-disable` that used to silence it is banned by the
-  // P4 anti-suppression layer, so the honest warning stands until P6 restructures.
+  // Seed the surface once — re-seeding would fight the caret. A ref guard makes
+  // the seed run only on first mount while keeping `initialMarkdown` an honest
+  // dependency: a later prop change re-runs the effect but the guard no-ops, so
+  // in-progress edits are never blown away. (A fresh item remounts the editor
+  // via its `key`, resetting the guard.) This replaces the old empty-dep +
+  // inline eslint-disable, which the P4 anti-suppression layer bans.
+  const seededRef = useRef(false)
   useEffect(() => {
-    if (!ref.current) {
+    if (seededRef.current || !ref.current) {
       return
     }
-
+    seededRef.current = true
     ref.current.innerHTML = mdToHtml(initialMarkdown)
     setEmpty(ref.current.textContent.trim().length === 0)
-  }, [])
+  }, [initialMarkdown])
 
   // Serialize the live DOM back to markdown and report it (when a host wants to
   // save). Cheap (a read-only walk of a small doc) and never touches the DOM, so
@@ -79,7 +84,7 @@ export function MarkdownEditor({
   const exec = (cmd: string, arg?: string) => {
     ref.current?.focus()
     document.execCommand(cmd, false, arg)
-    force((n) => n + 1)
+    force()
     emit()
   }
 
@@ -146,12 +151,16 @@ export function MarkdownEditor({
           contentEditable
           suppressContentEditableWarning
           spellCheck={false}
+          role="textbox"
+          aria-multiline
+          aria-label="Markdown editor"
+          tabIndex={0}
           onInput={() => {
             setEmpty(ref.current?.textContent.trim().length === 0)
             emit()
           }}
-          onKeyUp={() => force((n) => n + 1)}
-          onMouseUp={() => force((n) => n + 1)}
+          onKeyUp={() => force()}
+          onMouseUp={() => force()}
           className={cn(
             "prose-editor min-h-full px-5 py-4 text-[13.5px] leading-relaxed text-foreground/90 outline-none",
             "[&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:text-[20px] [&_h1]:font-bold [&_h1]:tracking-tight [&_h1]:text-foreground",

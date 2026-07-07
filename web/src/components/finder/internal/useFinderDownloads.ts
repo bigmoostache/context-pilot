@@ -18,8 +18,12 @@ interface DownloadDeps {
  * reflow. Both handlers stream files straight from the orchestration plane via
  * {@link downloadFile}; failures surface through the shared `flash` toast rather
  * than throwing.
+ *
+ * Named without a `use` prefix (web-lint P6): it calls no React hooks — it is a
+ * pure handler factory invoked in render, not a hook — so the `use` prefix would
+ * falsely imply rules-of-hooks apply (@eslint-react/no-unnecessary-use-prefix).
  */
-export function useFinderDownloads(d: DownloadDeps) {
+export function finderDownloads(d: DownloadDeps) {
   // Toolbar "Download": stream every selected *file* (folders are skipped —
   // there's no archive-a-folder affordance here). No selection, or a
   // folders-only selection, is a no-op with an explanatory toast.

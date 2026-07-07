@@ -14,15 +14,15 @@ interface UseMarqueeArgs {
   containerRef: React.RefObject<HTMLElement | null>
   /** Whether to arm the marquee (grid / list only). */
   enabled: boolean
-  /** Snapshot of the current selection — read at drag start for additive (⌘/Ctrl) unions. */
+  /** Snapshot of the current selection — read at dragRef start for additive (⌘/Ctrl) unions. */
   getSelected: () => Set<string>
   /** Replace the selection with the absolute set computed for the current band. */
   onChange: (next: Set<string>) => void
-  /** Empty-space click (press→release with no drag) — clears the selection. */
+  /** Empty-space click (press→release with no dragRef) — clears the selection. */
   onEmptyClick: () => void
 }
 
-/** Pixels the pointer must travel before a press is promoted to a marquee drag. */
+/** Pixels the pointer must travel before a press is promoted to a marquee dragRef. */
 const DRAG_THRESHOLD = 4
 
 /**
@@ -30,14 +30,14 @@ const DRAG_THRESHOLD = 4
  *
  * Spread `handlers` onto the grid/list scroll surface (which must be
  * `position: relative`) and render `band` as an absolutely-positioned child.
- * A drag that begins on empty space — not on a `[data-finder-item]` cell —
+ * A dragRef that begins on empty space — not on a `[data-finder-item]` cell —
  * sweeps a marquee; every cell whose box intersects it is selected live.
  * Holding ⌘/Ctrl unions the swept cells onto the selection that existed when
- * the drag began; otherwise the marquee replaces the selection. A press with
- * no drag clears the selection.
+ * the dragRef began; otherwise the marquee replaces the selection. A press with
+ * no dragRef clears the selection.
  *
  * Uses pointer handlers (no window listeners) and live `getBoundingClientRect()`
- * hit-testing, so it stays correct as the surface scrolls mid-drag. `didDrag()`
+ * hit-testing, so it stays correct as the surface scrolls mid-dragRef. `didDrag()`
  * lets the host suppress the background-click clear that would otherwise fire on
  * release after a sweep (it returns — and resets — a one-shot "just dragged" flag).
  */
@@ -49,7 +49,7 @@ export function useMarquee({
   onEmptyClick,
 }: UseMarqueeArgs) {
   const [band, setBand] = useState<MarqueeBand | null>(null)
-  const drag = useRef<{
+  const dragRef = useRef<{
     ox: number
     oy: number
     additive: boolean
@@ -57,7 +57,7 @@ export function useMarquee({
     moved: boolean
   } | null>(null)
   // One-shot: set on a completed sweep, consumed by the host's click handler.
-  const justDragged = useRef(false)
+  const justDraggedRef = useRef(false)
 
   const hitTest = useCallback(
     (l: number, t: number, r: number, b: number): string[] => {
@@ -81,7 +81,7 @@ export function useMarquee({
       if (!enabled || e.button !== 0) return
       if ((e.target as HTMLElement).closest("[data-finder-item]")) return // press on a cell → click
       const additive = e.metaKey || e.ctrlKey
-      drag.current = {
+      dragRef.current = {
         ox: e.clientX,
         oy: e.clientY,
         additive,
@@ -94,7 +94,7 @@ export function useMarquee({
 
   const onPointerMove = useCallback(
     (e: ReactMouseEvent) => {
-      const d = drag.current
+      const d = dragRef.current
       const root = containerRef.current
       if (!d || !root) return
       if (
@@ -119,18 +119,18 @@ export function useMarquee({
   )
 
   const finish = useCallback(() => {
-    const d = drag.current
-    drag.current = null
+    const d = dragRef.current
+    dragRef.current = null
     setBand(null)
     if (!d) return
-    if (d.moved) justDragged.current = true
+    if (d.moved) justDraggedRef.current = true
     else if (!d.additive) onEmptyClick()
   }, [onEmptyClick])
 
   /** Consume the one-shot "a sweep just completed" flag; the host skips its click-clear when true. */
   const didDrag = useCallback(() => {
-    const was = justDragged.current
-    justDragged.current = false
+    const was = justDraggedRef.current
+    justDraggedRef.current = false
     return was
   }, [])
 

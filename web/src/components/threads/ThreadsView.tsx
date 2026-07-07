@@ -81,16 +81,16 @@ export function ThreadsView({
   // "pending select" flag on create; on the next `threads` update we diff the
   // ID set and select the newcomer. This closes the UX gap where the user had
   // to manually click the new thread after creating it.
-  const pendingSelect = useRef(false)
+  const pendingSelectRef = useRef(false)
   const prevThreadIdsRef = useRef<Set<string>>(new Set())
 
   const currentIds = useMemo(() => new Set(threads.map((t) => t.id)), [threads])
   useEffect(() => {
-    if (pendingSelect.current && threads.length > 0) {
+    if (pendingSelectRef.current && threads.length > 0) {
       const newId = threads.find((t) => !prevThreadIdsRef.current.has(t.id))?.id
       if (newId) {
         setSelectedId(newId)
-        pendingSelect.current = false
+        pendingSelectRef.current = false
       }
     }
     prevThreadIdsRef.current = currentIds
@@ -101,15 +101,15 @@ export function ThreadsView({
   // old silent `.catch(console.error)` swallow (T121). One pending timer at a
   // time; cleared on unmount so a late tick can't setState a dead component.
   const [notice, setNotice] = useState<string | null>(null)
-  const noticeTimer = useRef<number | null>(null)
+  const noticeTimerRef = useRef<number | null>(null)
   const flash = useCallback((msg: string) => {
-    if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
+    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
     setNotice(msg)
-    noticeTimer.current = window.setTimeout(() => setNotice(null), 6000)
+    noticeTimerRef.current = window.setTimeout(() => setNotice(null), 6000)
   }, [])
   useEffect(
     () => () => {
-      if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
+      if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
     },
     [],
   )
@@ -131,11 +131,17 @@ export function ThreadsView({
   }, [effectiveSelectedId, threadKey])
 
   // Clear pending file attachments when switching threads — the files are
-  // already persisted on disk (`.uploads/`), but they belong to the thread
-  // the user was composing in; carrying them over would be confusing.
-  useEffect(() => {
+  // already persisted on disk (`.uploads/`), but they belong to the thread the
+  // user was composing in; carrying them over would be confusing. This resets
+  // state DURING RENDER (React's documented "adjust state when a prop changes"
+  // pattern) rather than in an effect — the effect form calls setState
+  // synchronously on every selection change, which the compiler-aware
+  // set-state-in-effect rule (correctly) flags as a cascading-render smell.
+  const [pendingThread, setPendingThread] = useState(effectiveSelectedId)
+  if (pendingThread !== effectiveSelectedId) {
+    setPendingThread(effectiveSelectedId)
     setPendingFiles([])
-  }, [effectiveSelectedId])
+  }
 
   const handleArchive = useCallback(
     (id: string) => {
@@ -178,12 +184,12 @@ export function ThreadsView({
 
   const handleCreate = useCallback(
     (title: string) => {
-      pendingSelect.current = true
+      pendingSelectRef.current = true
       sendCommand(activeAgentId, {
         kind: "create_thread",
         name: title.trim() || "Untitled thread",
       }).catch((e: unknown) => {
-        pendingSelect.current = false
+        pendingSelectRef.current = false
         flash(describeCommandError("create the thread", e))
       })
       setNewOpen(false)

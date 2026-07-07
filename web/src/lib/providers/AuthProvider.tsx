@@ -22,7 +22,7 @@ import { AuthContext } from "./auth"
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthMe | null>(null)
-  const [token, setTokenState] = useState<string | null>(getToken)
+  const [tokenState, setTokenState] = useState<string | null>(getToken)
   const [authEnabled, setAuthEnabled] = useState<boolean | null>(null)
   const [bootstrapped, setBootstrapped] = useState(true)
   const [loading, setLoading] = useState(true)
@@ -125,10 +125,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider
+    <AuthContext
       value={{
         user,
-        token,
+        token: tokenState,
         authEnabled,
         bootstrapped,
         loading,
@@ -139,6 +139,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-    </AuthContext.Provider>
+    </AuthContext>
   )
 }

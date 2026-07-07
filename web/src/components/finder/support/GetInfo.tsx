@@ -22,14 +22,17 @@ export function GetInfo({ node, onClose }: { node: FinderNode; onClose: () => vo
   const counts = childCounts(node)
 
   return (
-    <div
-      className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-[2px]"
-      onClick={onClose}
-    >
-      <div
-        className="ql-pop flex w-[340px] flex-col rounded-2xl border border-border bg-popover/95 backdrop-blur-xl pop-shadow"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="absolute inset-0 z-40 flex items-center justify-center">
+      {/* Click-to-dismiss backdrop as a keyboard-focusable sibling button
+          (behind the card) — a full-screen dismiss target that stays
+          accessible without wrapping the card in an interactive element. */}
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0 -z-[1] cursor-default bg-black/30 backdrop-blur-[2px]"
+      />
+      <div className="ql-pop flex w-[340px] flex-col rounded-2xl border border-border bg-popover/95 backdrop-blur-xl pop-shadow">
         {/* header */}
         <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
           <span className="text-[12px] font-semibold text-foreground/80">{node.name} Info</span>

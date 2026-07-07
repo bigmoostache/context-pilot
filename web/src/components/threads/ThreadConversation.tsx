@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
@@ -9,6 +9,7 @@ import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
 import { extractDroppedFiles, zipDropped } from "@/lib/utils"
+import { measure } from "@/lib/support/telemetry"
 import { uploadToNode, type UploadedFile } from "./fileUpload/helpers"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
 
@@ -121,11 +122,17 @@ function segmentLog(log: ThreadMsg[]): Segment[] {
  * three-column grid (verb · tool · intent) so the agent's live work is easy to
  * scan at a glance. Verbs and tool names carry distinct accent colours from the
  * app palette; intents are dimmed context.
+ *
+ * `memo`-wrapped: an auto-run re-renders only when its `msgs` array reference
+ * changes. `segmentLog` is memoized on `thread.log` in the parent, so the
+ * segment objects (hence this `msgs` array) stay reference-stable across the
+ * renders an unrelated SSE delta triggers — the shallow prop compare then skips
+ * this whole subtree. Part of the T510 render-storm fix.
  */
-function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
+const AutoRun = memo(function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
   const n = msgs.length
   return (
-    <details className="group/auto mb-2 ml-7">
+    <details className="group/auto mb-2 ml-7 [contain-intrinsic-size:auto_2rem] [content-visibility:auto]">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-muted-foreground/75 transition-colors hover:bg-muted/40 hover:text-muted-foreground">
         <span className="text-muted-foreground/60 transition-transform group-open/auto:rotate-90">
           ▸
@@ -148,7 +155,77 @@ function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
       </div>
     </details>
   )
-}
+})
+
+/**
+ * One rendered NON-auto message row — the memoized boundary that kills the
+ * T510 render storm.
+ *
+ * `ThreadConversation` re-renders on every SSE delta / backstop poll (the
+ * threads cache hands it a new `thread` object each time). Without a memo
+ * boundary React would re-render — and re-parse the markdown/KaTeX of — every
+ * one of a huge thread's (T508 = 1690) message bodies on each of those renders,
+ * the 100–238 ms `threads·update` commits the telemetry named. TanStack Query's
+ * structural sharing already keeps each unchanged message OBJECT reference
+ * stable across renders (a delta append reuses the prior 1689 refs; a poll's
+ * fresh-but-deep-equal objects are collapsed back to the old refs), so a
+ * `memo` keyed on `msg` identity skips every row but the one that actually
+ * changed — turning a 1690-row re-render into a 1-row one.
+ *
+ * The comparator intentionally ignores the callback props: messages are
+ * immutable by `id`, so `msg`-reference equality is the sole correctness
+ * signal, and the handlers (`onDelete`/`onSend`/…) are behaviourally stable
+ * (they close over the same `agentId`/thread), so a skipped row safely keeps
+ * its prior closures rather than re-rendering on callback churn.
+ */
+const MessageRow = memo(
+  function MessageRow({
+    msg,
+    agentId,
+    onOpenFile,
+    onShowInFinder,
+    onDelete,
+    onSend,
+  }: {
+    msg: ThreadMsg
+    agentId: string
+    onOpenFile: (file: UploadedFile) => void
+    onShowInFinder: ((path: string) => void) | undefined
+    onDelete: (msg: ThreadMsg) => void
+    onSend: ((text: string) => void) | undefined
+  }) {
+    return (
+      <div
+        // THE freeze fix (layout half): `content-visibility:auto` lets the
+        // browser SKIP layout + paint for any message row scrolled out of view;
+        // the memo boundary above is the COMMIT half (skip re-rendering
+        // unchanged rows). Together they collapse both costs on a huge thread.
+        className="[contain-intrinsic-size:auto_5rem] [content-visibility:auto]"
+      >
+        <Message
+          msg={toChatMessage(msg)}
+          agentId={agentId}
+          onOpenFile={onOpenFile}
+          onShowInFinder={onShowInFinder}
+          onDelete={() => onDelete(msg)}
+        />
+        {msg.questions?.map((q, i) => (
+          <div key={i} className="pb-1.5 pl-7">
+            <QuestionForm q={q} onSubmit={(answer) => onSend?.(answer)} />
+          </div>
+        ))}
+        {msg.fileRef && (
+          <div className="pb-1.5 pl-7">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[11.5px] text-[var(--interactive)] card-shadow">
+              📎 {msg.fileRef}
+            </span>
+          </div>
+        )}
+      </div>
+    )
+  },
+  (a, b) => a.msg === b.msg && a.agentId === b.agentId,
+)
 
 /**
  * Center pane — the selected thread's full conversation + composer.
@@ -200,23 +277,23 @@ export function ThreadConversation({
   const [uploading, setUploading] = useState(false)
   // dragenter/dragleave fire for every child crossed, so a plain boolean would
   // flicker; a depth counter tracks "is the cursor still somewhere inside".
-  const dragDepth = useRef(0)
+  const dragDepthRef = useRef(0)
 
   const handleDragEnter = (e: React.DragEvent) => {
     if (!isFileDrag(e)) return
     e.preventDefault()
-    dragDepth.current += 1
+    dragDepthRef.current += 1
     setDragging(true)
   }
   const handleDragLeave = (e: React.DragEvent) => {
     if (!isFileDrag(e)) return
-    dragDepth.current = Math.max(0, dragDepth.current - 1)
-    if (dragDepth.current === 0) setDragging(false)
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+    if (dragDepthRef.current === 0) setDragging(false)
   }
   const handleDrop = async (e: React.DragEvent) => {
     if (!isFileDrag(e)) return
     e.preventDefault()
-    dragDepth.current = 0
+    dragDepthRef.current = 0
     setDragging(false)
     // Recurse into any dropped FOLDERS (plain `dataTransfer.files` can't — a
     // folder drop otherwise yields one unreadable pseudo-file that uploaded as a
@@ -274,14 +351,47 @@ export function ThreadConversation({
   const bottomRef = useRef<HTMLDivElement>(null)
   const nonAutoCount = useMemo(() => thread.log.filter((m) => !m.auto).length, [thread.log])
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" })
+    const el = bottomRef.current
+    if (!el) return
+    // Pin the conversation to the bottom on thread-open / new message. This must
+    // CONVERGE, not fire once: the `content-visibility:auto` on each row (the
+    // T510 layout fix) gives every OFF-SCREEN row only its `contain-intrinsic-
+    // size` placeholder height (5rem) until it's scrolled into view. On open all
+    // rows are off-screen, so the container's scrollHeight is an ESTIMATE — a
+    // single `scrollIntoView` lands short of the true bottom (real rows are
+    // usually taller than 5rem), which was the T512 "opens not scrolled down"
+    // regression. Re-scrolling across a few animation frames fixes it: each
+    // scroll reveals the next chunk's REAL heights, the estimate corrects, and
+    // the position converges on the actual bottom within a handful of frames.
+    // `scrollIntoView` forces a synchronous layout, so it's wrapped in measure()
+    // for freeze attribution; a bounded 6-frame loop on thread-open is
+    // imperceptible (~100ms) and not on any hot path.
+    let raf = 0
+    let tries = 0
+    const settle = () => {
+      measure("threads:scrollIntoView", () => el.scrollIntoView({ block: "end" }))
+      tries += 1
+      if (tries < 6) raf = requestAnimationFrame(settle)
+    }
+    raf = requestAnimationFrame(settle)
+    return () => cancelAnimationFrame(raf)
   }, [thread.id, nonAutoCount])
 
-  /** Delete a message from this thread via the agent command bridge. */
-  const handleDelete = (msg: ThreadMsg) => {
-    const ts = typeof msg.ts === "number" ? msg.ts : new Date(msg.ts ?? "").getTime()
-    void sendCommand(agentId, { kind: "delete_message", thread_id: thread.id, message_ts: ts })
-  }
+  /** Delete a message from this thread via the agent command bridge. Stable
+   *  across renders (deps: agentId + thread.id) so it doesn't defeat the
+   *  {@link MessageRow} memo boundary. */
+  const handleDelete = useCallback(
+    (msg: ThreadMsg) => {
+      const ts = typeof msg.ts === "number" ? msg.ts : new Date(msg.ts ?? "").getTime()
+      void sendCommand(agentId, { kind: "delete_message", thread_id: thread.id, message_ts: ts })
+    },
+    [agentId, thread.id],
+  )
+
+  // Fold the flat log into render segments ONCE per log change (not per
+  // render). Memoizing keeps each segment object reference-stable across the
+  // renders an SSE delta triggers, so the memoized AutoRun rows hold too.
+  const segments = useMemo(() => segmentLog(thread.log), [thread.log])
 
   return (
     <main
@@ -319,31 +429,19 @@ export function ThreadConversation({
             <span className="h-px flex-1 bg-border/60" />
           </div>
 
-          {segmentLog(thread.log).map((seg) =>
+          {segments.map((seg) =>
             seg.type === "auto" ? (
               <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
             ) : (
-              <div key={seg.msg.id}>
-                <Message
-                  msg={toChatMessage(seg.msg)}
-                  agentId={agentId}
-                  onOpenFile={setSheetFile}
-                  onShowInFinder={onShowInFinder}
-                  onDelete={() => handleDelete(seg.msg)}
-                />
-                {seg.msg.questions?.map((q, i) => (
-                  <div key={i} className="pb-1.5 pl-7">
-                    <QuestionForm q={q} onSubmit={(answer) => onSend?.(answer)} />
-                  </div>
-                ))}
-                {seg.msg.fileRef && (
-                  <div className="pb-1.5 pl-7">
-                    <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[11.5px] text-[var(--interactive)] card-shadow">
-                      📎 {seg.msg.fileRef}
-                    </span>
-                  </div>
-                )}
-              </div>
+              <MessageRow
+                key={seg.msg.id}
+                msg={seg.msg}
+                agentId={agentId}
+                onOpenFile={setSheetFile}
+                onShowInFinder={onShowInFinder}
+                onDelete={handleDelete}
+                onSend={onSend}
+              />
             ),
           )}
           {/* scroll anchor — keeps the latest message in view */}

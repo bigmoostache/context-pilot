@@ -12,6 +12,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ThreadDetail } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { clickable } from "@/lib/support/a11y"
 
 interface ThreadListProps {
   /** all of the realm's threads (archived included) — filtering happens here */
@@ -340,7 +341,10 @@ function ThreadRow({
         selected ? "bg-card card-shadow" : "hover:bg-muted/60",
       )}
     >
-      <div onClick={() => onSelect(t.id)} className="flex cursor-pointer flex-col gap-1 text-left">
+      <div
+        {...clickable(() => onSelect(t.id))}
+        className="flex cursor-pointer flex-col gap-1 text-left"
+      >
         {/* line 1 — dot + name + time + overflow menu */}
         <div className="flex items-center gap-2">
           <span

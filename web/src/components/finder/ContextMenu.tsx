@@ -86,37 +86,6 @@ export function ContextMenu({
   const left = Math.min(pos.x, window.innerWidth - 230)
   const top = Math.min(pos.y, window.innerHeight - 320)
 
-  const Item = ({
-    icon: Icon,
-    label,
-    danger,
-    shortcut,
-  }: {
-    icon: typeof Copy
-    label: string
-    danger?: boolean
-    shortcut?: string
-  }) => (
-    <button
-      onClick={() => {
-        onAction(label)
-        onClose()
-      }}
-      className={
-        "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] transition-colors " +
-        (danger
-          ? "text-[var(--danger)] hover:bg-[var(--danger)]/12"
-          : "text-foreground/85 hover:bg-[var(--signal)]/14 hover:text-foreground")
-      }
-    >
-      <Icon className="size-3.5 shrink-0 opacity-80" />
-      <span className="flex-1">{label}</span>
-      {shortcut && (
-        <span className="text-[10.5px] tabular-nums text-muted-foreground/50">{shortcut}</span>
-      )}
-    </button>
-  )
-
   return (
     <div
       ref={ref}
@@ -164,7 +133,7 @@ export function ContextMenu({
             <PencilLine className="size-3.5 shrink-0 opacity-80" />
             <span className="flex-1">Rename</span>
           </button>
-          <Item icon={Copy} label="Duplicate" shortcut="⌘D" />
+          <Item icon={Copy} label="Duplicate" shortcut="⌘D" onAction={onAction} onClose={onClose} />
           <button
             onClick={() => {
               onDownload(node)
@@ -244,6 +213,47 @@ export function ContextMenu({
   )
 }
 
+/** A generic (toast-only) icon+label action row. Hoisted to module scope (not
+ *  defined inside ContextMenu) so React never treats it as a fresh component per
+ *  render (@eslint-react/no-nested-component-definitions); the two callbacks it
+ *  used to close over are now explicit props. */
+function Item({
+  icon: Icon,
+  label,
+  danger,
+  shortcut,
+  onAction,
+  onClose,
+}: {
+  icon: typeof Copy
+  label: string
+  danger?: boolean
+  shortcut?: string
+  onAction: (label: string) => void
+  onClose: () => void
+}) {
+  return (
+    <button
+      onClick={() => {
+        onAction(label)
+        onClose()
+      }}
+      className={
+        "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] transition-colors " +
+        (danger
+          ? "text-[var(--danger)] hover:bg-[var(--danger)]/12"
+          : "text-foreground/85 hover:bg-[var(--signal)]/14 hover:text-foreground")
+      }
+    >
+      <Icon className="size-3.5 shrink-0 opacity-80" />
+      <span className="flex-1">{label}</span>
+      {shortcut ? (
+        <span className="text-[10.5px] tabular-nums text-muted-foreground/50">{shortcut}</span>
+      ) : null}
+    </button>
+  )
+}
+
 /** A plain icon+label row for the empty-space menu (no node, direct onClick). */
 function EmptyItem({
   icon: Icon,
@@ -263,9 +273,9 @@ function EmptyItem({
     >
       <Icon className="size-3.5 shrink-0 opacity-80" />
       <span className="flex-1">{label}</span>
-      {shortcut && (
+      {shortcut ? (
         <span className="text-[10.5px] tabular-nums text-muted-foreground/50">{shortcut}</span>
-      )}
+      ) : null}
     </button>
   )
 }

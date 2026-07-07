@@ -32,6 +32,7 @@ import { getOrCreateSseClient } from "./sse"
 import { queryClient } from "./queryClient"
 import { fetchMessageBody } from "../api"
 import { applyAgentDelta, applyThreadDelta, type OpEntry } from "./reducers"
+import { measure } from "../support/telemetry"
 import type { Agent, ThreadDetail } from "../types"
 
 // Re-export the pure folds + delta type so existing `@/lib/query/sync`
@@ -231,13 +232,17 @@ export function ensureSync(agentId: string): void {
   client.subscribe("delta", (event) => {
     let entry: OpEntry
     try {
-      entry = JSON.parse(event.data) as OpEntry
+      // Instrument the two synchronous suspects on the SSE hot path so a freeze
+      // here is NAMED in the HUD (Firefox has no LoAF to name it): the raw
+      // frame parse (a big spilled body can be a fat JSON.parse) and the fold
+      // that applies it to the cache (both thread + agent reducers).
+      entry = measure("sse:parse", () => JSON.parse(event.data) as OpEntry)
     } catch {
       // Malformed frame → fall back to a ground-truth refresh of live caches.
       invalidateLiveCaches(agentId)
       return
     }
-    applyDelta(queryClient, agentId, entry)
+    measure("sse:apply", () => applyDelta(queryClient, agentId, entry))
   })
   client.subscribe("invalidate", () => throttledInvalidateInspection(queryClient, agentId))
   client.subscribe("resync", () => {

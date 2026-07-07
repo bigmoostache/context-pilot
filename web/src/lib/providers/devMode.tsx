@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react"
+import { createContext, use } from "react"
 
 /**
  * Global **dev-mode** preference (T301).
@@ -23,7 +23,7 @@ export interface DevModeCtx {
 export const DevModeContext = createContext<DevModeCtx | null>(null)
 
 export function useDevMode(): DevModeCtx {
-  const ctx = useContext(DevModeContext)
+  const ctx = use(DevModeContext)
   if (!ctx) throw new Error("useDevMode must be used within DevModeProvider")
   return ctx
 }

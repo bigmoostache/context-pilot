@@ -1,4 +1,3 @@
-import type { RefObject } from "react"
 import type { FinderNode, FinderViewMode } from "@/lib/types"
 import {
   useCreateFolder,
@@ -19,7 +18,8 @@ interface ActionDeps {
   hasFileTab: boolean
   flash: (msg: string) => void
   patchTab: (fn: (t: Tab) => Tab) => void
-  clickTimer: RefObject<number | undefined>
+  /** Clear the pending click-settle timer, if any (navigation pre-empts it). */
+  clearClickSettle: () => void
   setSelected: (s: Set<string>) => void
   setAnchor: (p: string | null) => void
   setFocusPath: (p: string | null) => void
@@ -165,7 +165,7 @@ export function useFinderActions(d: ActionDeps) {
     p === d.agentFolder || p.startsWith(d.agentFolder + "/") ? p : `${d.agentFolder}/${p}`
 
   const navigate = (rawPath: string) => {
-    window.clearTimeout(d.clickTimer.current)
+    d.clearClickSettle()
     const path = toAbs(rawPath)
     if (path === d.cwd && !d.hasFileTab) return
     d.patchTab((t) => ({

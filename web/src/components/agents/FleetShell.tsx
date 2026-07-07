@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { LayoutGrid, Library } from "lucide-react"
 import { FleetDashboard } from "./FleetDashboard"
 import { PromptsPage } from "./PromptsPage"
@@ -43,11 +43,15 @@ export function FleetShell({
 }) {
   const [tab, setTab] = useState<HomeTab>("agents")
 
-  // A "new agent" request must surface on the Agents tab — snap to it before
-  // the dashboard opens its create dialog.
-  useEffect(() => {
+  // A "new agent" request must surface on the Agents tab — snap to it whenever
+  // `openCreate` transitions to true. React's canonical "adjust state when a
+  // prop changes" pattern (a render-phase compare against the previously-seen
+  // value), not an effect that would trip @eslint-react/set-state-in-effect.
+  const [prevOpen, setPrevOpen] = useState(openCreate)
+  if (openCreate !== prevOpen) {
+    setPrevOpen(openCreate)
     if (openCreate) setTab("agents")
-  }, [openCreate])
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background">

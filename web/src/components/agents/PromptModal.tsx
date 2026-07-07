@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Bot,
   Boxes,
@@ -68,13 +68,18 @@ export function PromptModal({ item, onClose }: { item: LibraryItem | "new"; onCl
   const [kind, setKind] = useState<LibraryKind>(isNew ? "agent" : item.kind)
   const [name, setName] = useState(isNew ? "" : item.name)
   const [description, setDescription] = useState(isNew ? "" : item.description)
-  const [body] = useState(isNew ? "" : mockBody(item))
+  const [body] = useState(() => (isNew ? "" : mockBody(item)))
   const builtin = !isNew && item.builtin
   const M = KIND[kind]
 
   return (
     <Backdrop onClose={onClose}>
-      <div className="backdrop-fade fixed inset-0 bg-black/40" onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="backdrop-fade fixed inset-0 cursor-default bg-black/40"
+      />
       <div className="modal-pop relative z-10 flex h-[90vh] w-[1180px] max-w-[96vw] flex-col overflow-hidden rounded-2xl border border-border bg-card pop-shadow">
         {/* hero header */}
         <header
@@ -276,11 +281,16 @@ const SOURCES: Source[] = [
  * Design-only: scanning each source flips the row to an "Imported ✓" state.
  */
 export function ImportModal({ onClose }: { onClose: () => void }) {
-  const [done, setDone] = useState<Set<string>>(new Set())
+  const [done, setDone] = useState<Set<string>>(() => new Set())
 
   return (
     <Backdrop onClose={onClose}>
-      <div className="backdrop-fade fixed inset-0 bg-black/40" onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="backdrop-fade fixed inset-0 cursor-default bg-black/40"
+      />
       <div className="modal-pop relative z-10 flex max-h-[88vh] w-[520px] max-w-[94vw] flex-col overflow-hidden rounded-2xl border border-border bg-card pop-shadow">
         <header className="flex items-center gap-3 border-b border-border px-6 py-4">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--interactive)]/14 text-[var(--interactive)]">
@@ -368,10 +378,20 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
 
 // ── shared chrome ─────────────────────────────────────────────────
 function Backdrop({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  // Escape-to-close as a document listener rather than an onKeyDown on the
+  // dialog container: the container carries the (non-interactive) `dialog` role,
+  // so a JSX key handler on it trips jsx-a11y — and a document listener closes
+  // regardless of where focus sits inside the modal.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [onClose])
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onKeyDown={(e) => e.key === "Escape" && onClose()}
       role="dialog"
       aria-modal
     >

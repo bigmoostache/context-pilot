@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react"
+import { createContext, use } from "react"
 import type { User } from "../types"
 
 /**
@@ -23,7 +23,7 @@ export interface AccountCtx {
 export const AccountContext = createContext<AccountCtx | null>(null)
 
 export function useAccount(): AccountCtx {
-  const ctx = useContext(AccountContext)
+  const ctx = use(AccountContext)
   if (!ctx) throw new Error("useAccount must be used within an AccountProvider")
   return ctx
 }

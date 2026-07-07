@@ -20,6 +20,7 @@ import { extOf } from "./support/kind"
 import { FileIcon } from "./support/macIcons"
 import { Tip } from "@/components/ui/tip"
 import { cn } from "@/lib/utils"
+import { clickable } from "@/lib/support/a11y"
 
 // Per-view-mode tooltip copy — the segmented control's icons aren't obvious.
 const VIEW_TIP: Record<FinderViewMode, { title: string; body: string }> = {
@@ -58,7 +59,7 @@ export function FinderTabs({
         return (
           <div
             key={t.id}
-            onClick={() => onSelect(t.id)}
+            {...clickable(() => onSelect(t.id))}
             className={cn(
               "group flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors",
               on

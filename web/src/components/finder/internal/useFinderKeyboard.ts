@@ -26,8 +26,8 @@ interface KeyboardDeps {
  * bound to the surface; a type-ahead buffer is kept in a private ref.
  */
 export function useFinderKeyboard(d: KeyboardDeps) {
-  const typeBuf = useRef("")
-  const typeTimer = useRef<number | undefined>(undefined)
+  const typeBufRef = useRef("")
+  const typeTimerRef = useRef<number | undefined>(undefined)
 
   return (e: React.KeyboardEvent) => {
     const tag = (e.target as HTMLElement).tagName
@@ -100,10 +100,10 @@ export function useFinderKeyboard(d: KeyboardDeps) {
           }
         } else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
           // type-ahead
-          typeBuf.current += e.key.toLowerCase()
-          window.clearTimeout(typeTimer.current)
-          typeTimer.current = window.setTimeout(() => (typeBuf.current = ""), 700)
-          const hit = d.sorted.find((n) => n.name.toLowerCase().startsWith(typeBuf.current))
+          typeBufRef.current += e.key.toLowerCase()
+          window.clearTimeout(typeTimerRef.current)
+          typeTimerRef.current = window.setTimeout(() => (typeBufRef.current = ""), 700)
+          const hit = d.sorted.find((n) => n.name.toLowerCase().startsWith(typeBufRef.current))
           if (hit) {
             d.setFocusPath(hit.path)
             d.setSelected(new Set([hit.path]))

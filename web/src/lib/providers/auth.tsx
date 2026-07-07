@@ -9,7 +9,7 @@
 // The companion AuthGuard component (components/auth/) renders the login page
 // when auth is required but no valid session exists.
 
-import { createContext, useContext } from "react"
+import { createContext, use } from "react"
 import type { AuthMe } from "@/lib/api"
 
 // ── Context shape ────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ export const AuthContext = createContext<AuthContextValue | null>(null)
 
 /** Read the auth context. Must be called inside an AuthProvider. */
 export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext)
+  const ctx = use(AuthContext)
   if (!ctx) throw new Error("useAuth must be used within AuthProvider")
   return ctx
 }

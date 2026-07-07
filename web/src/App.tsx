@@ -16,6 +16,8 @@ import { AuthProvider } from "@/lib/providers/AuthProvider"
 import { DevModeProvider } from "@/lib/providers/DevModeProvider"
 import { useDevMode } from "@/lib/providers/devMode"
 import { useFleet, useAgentMeta } from "@/lib/live"
+import { TelemetryProfiler } from "@/lib/support/telemetry"
+import { TelemetryHud } from "@/components/shell/widgets/TelemetryHud"
 import type { ViewMode } from "@/lib/types"
 import "./App.css"
 
@@ -73,25 +75,22 @@ function App() {
 function AppShell() {
   const { devMode } = useDevMode()
   const { data: agents = [] } = useFleet()
-  const [view, setViewRaw] = useState<ViewMode>(
+  const [view, setView] = useState<ViewMode>(
     () => (localStorage.getItem("cp-view") as ViewMode | null) ?? "fleet",
   )
-  const [activeAgentId, setActiveAgentIdRaw] = useState(
-    () => localStorage.getItem("cp-agent") ?? "",
-  )
+  const [activeAgentId, setActiveAgentId] = useState(() => localStorage.getItem("cp-agent") ?? "")
   // One-shot request to pop the "create agent" dialog on the fleet dashboard
   // (raised by the workspace switcher's "New agent" entry).
   const [createAgent, setCreateAgent] = useState(false)
 
-  // Persist view + agent selection across reloads.
-  const setView = (v: ViewMode) => {
-    setViewRaw(v)
-    localStorage.setItem("cp-view", v)
-  }
-  const setActiveAgentId = (id: string) => {
-    setActiveAgentIdRaw(id)
-    localStorage.setItem("cp-agent", id)
-  }
+  // Persist view + agent selection across reloads (write-through effects rather
+  // than setter wrappers, so the useState setters keep their canonical names).
+  useEffect(() => {
+    localStorage.setItem("cp-view", view)
+  }, [view])
+  useEffect(() => {
+    localStorage.setItem("cp-agent", activeAgentId)
+  }, [activeAgentId])
 
   // Identity + roster come from the polled fleet list; the LIVE vitals (phase,
   // cost, tokens, status) come from the per-agent meta cache, which the SSE
@@ -186,9 +185,12 @@ function AppShell() {
         agents={agents}
       />
 
-      {renderView()}
+      <TelemetryProfiler id={effectiveView}>{renderView()}</TelemetryProfiler>
 
       <StatusBar fleet={effectiveView === "fleet"} agents={agents} activeAgent={activeAgent} />
+
+      {/* Dev-mode performance HUD (gated on the Developer-mode flag inside). */}
+      <TelemetryHud />
     </div>
   )
 }

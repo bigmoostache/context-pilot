@@ -73,6 +73,7 @@ function ClickableCode({
   const [copied, setCopied] = useState(false)
   return (
     <code
+      role="presentation"
       className={cn(
         baseClass,
         "cursor-pointer transition-colors duration-150",

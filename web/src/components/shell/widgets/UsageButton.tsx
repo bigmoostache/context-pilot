@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Loader2, ExternalLink, CheckCircle2, XCircle, LogIn, RefreshCw } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
@@ -146,7 +146,15 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
   // in" — otherwise the flow auto-completes before the user pastes a fresh code
   // (T472). We snapshot the expiry at the moment login starts and only accept a
   // token whose expiry has strictly advanced (a genuinely new credential).
-  const stableOnDone = useCallback(onDone, [onDone])
+  // Keep the latest onDone in a ref so the polling effect below can bind ONCE
+  // (deps [step]) without re-subscribing whenever the parent recreates onDone —
+  // and without `useCallback(onDone, …)`, which react-hooks/use-memo rejects
+  // (its first arg must be an inline function). The ref is read only inside the
+  // deferred setTimeout (a handler), never during render.
+  const onDoneRef = useRef(onDone)
+  useEffect(() => {
+    onDoneRef.current = onDone
+  })
   const baselineExpiryRef = useRef<number | null>(null)
   useEffect(() => {
     if (step !== "waiting_for_code") return
@@ -161,6 +169,7 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
           if (!cancelled) baselineExpiryRef.current = 0
         })
     }
+    let doneTimer: number | undefined
     const id = setInterval(async () => {
       try {
         const status = await fetchClaudeTokenStatus()
@@ -169,7 +178,7 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
         if (status.valid && (status.expires_at ?? 0) > baseline) {
           clearInterval(id)
           setStep("done")
-          setTimeout(stableOnDone, 1500)
+          doneTimer = window.setTimeout(() => onDoneRef.current(), 1500)
         }
       } catch {
         /* ignore polling errors */
@@ -178,8 +187,9 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
     return () => {
       cancelled = true
       clearInterval(id)
+      if (doneTimer !== undefined) window.clearTimeout(doneTimer)
     }
-  }, [step, stableOnDone])
+  }, [step])
 
   if (step === "idle" || step === "starting") {
     return (
@@ -363,7 +373,7 @@ export function UsageButton() {
               </span>
             </div>
             <div className="flex items-center gap-1.5">
-              {isValid && tokenStatus.data.expires_at && (
+              {isValid && tokenStatus.data.expires_at != null && (
                 <span className="text-[11px] tabular-nums text-muted-foreground">
                   {formatExpiry(tokenStatus.data.expires_at)}
                 </span>

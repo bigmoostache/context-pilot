@@ -188,3 +188,112 @@ exceptions:
       mock-data file; the rule stays at error everywhere else.
     strategy: >
       Re-evaluate if the mock code samples are ever replaced by real data.
+
+  # ── hey-api codegen config — conventional hyphenated tool filename ────────
+  - path: "web/openapi-ts.config.ts"
+    rule: "unicorn/filename-case"
+    reason: >
+      hey-api's codegen config carries the tool's CONVENTIONAL filename
+      (openapi-ts.config.ts, hyphenated) — referenced verbatim by
+      `npx @hey-api/openapi-ts -f openapi-ts.config.ts` in CB5 +
+      check-typescript-contract.sh and by tsconfig.node.json's include, so it is
+      not ours to rename. The tree-wide filename-case calibration (camel/pascal)
+      flags the hyphen; scoped off for this single external-tool config file.
+    strategy: >
+      Irreducible while hey-api's config discovery expects this filename.
+
+  # ── P6 React stack — deliberate-UX / false-positive-only disables ─────────
+  - path: "web/**"
+    rule: "jsx-a11y/no-autofocus"
+    reason: >
+      autoFocus is a deliberate UX choice throughout this power-user cockpit —
+      the primary thread composer and every modal's sole first field (login
+      email, inline rename, New-Thread / Create-Command title, the maintenance
+      wizard steps, the OAuth login popup) auto-focuses so the keyboard is ready
+      the instant the surface opens. jsx-a11y flags it as a screen-reader
+      disorientation risk (a real concern on content pages), but every autoFocus
+      here sits on the lone input of a just-opened focused dialog or the app's
+      central composer — the canonical exception to the rule.
+    strategy: >
+      Re-evaluate if any autoFocus is ever added to a non-dialog, multi-input,
+      or content surface where it could steal focus disorientingly.
+
+  - path: "web/**"
+    rule: "@eslint-react/no-array-index-key"
+    reason: >
+      The rule guards against index keys on a list that REORDERS / INSERTS
+      mid-stream (React reuses the wrong child instance/state). Every dynamic,
+      reorderable list in this app already keys by a stable domain id
+      (fleet → agent.id, threads → thread.id, finder → node.path). Every
+      remaining `key={i}` site is a STATIC, wholesale-rerendered presentational
+      list with no per-item state — syntax-highlighted code lines, spreadsheet
+      cells, PDF-page thumbnails, audio waveform bars, parsed markdown/message
+      segments, and read-only inspector rows (tree, radar, entities, vitals) —
+      where the index IS the stable identity and reconciliation is never wrong.
+      The rule yields only false positives against this codebase's actual usage.
+      (The two genuinely interactive lists — question options, upload chips —
+      are additionally keyed by a natural id so they stay correct regardless.)
+    strategy: >
+      Re-evaluate if a reorderable/insertable list with stateful children is
+      ever introduced; such a list would need a stable per-item key and the rule
+      would correctly catch a bare index key there.
+
+  # ── P6 Finder root — keyboard-widget surface + settle-timer ref factory ───
+  - path: "web/src/components/finder/Finder.tsx"
+    rule: "react-hooks/refs"
+    reason: >
+      The Finder threads its single-click settle-timer ref into the extracted
+      pure handler factory finderSelection (a function invoked during render).
+      finderSelection reads/writes that ref ONLY inside deferred event handlers
+      (the setTimeout armed by onRowClick), never during render — safe by
+      construction — but the react-compiler's conservative taint analysis can't
+      see through the function boundary and flags it. Every other ref in the
+      file (surfaceRef / fileInputRef / mainRef) is passed to a JSX ref= prop or
+      a hook, never read in render, so this file-scoped disable masks no real
+      ref-in-render bug.
+    strategy: >
+      Re-evaluate if the react-compiler's ref taint analysis learns to prove a
+      ref is only touched in deferred handlers across a function boundary, or if
+      the settle timer is restructured to not cross into a render-called factory.
+
+  - path: "web/src/components/finder/Finder.tsx"
+    rule: "jsx-a11y/no-noninteractive-element-interactions"
+    reason: >
+      The Finder root is a keyboard-driven WIDGET surface (arrow navigation,
+      type-ahead, Space Quick-Look, Enter rename, ⌘⌫ trash) that owns its key
+      handling, so it carries role="application" + tabIndex + onKeyDown.
+      `application` is the honest ARIA role for a keystroke-capturing region, but
+      jsx-a11y models it as a structural (non-interactive) role and
+      false-positives on the handler. The correct-looking alternative
+      role="grid" would be DISHONEST — the container wraps a toolbar + sidebar +
+      main + path bar, not a literal grid of rows/cells. Scoped to this file.
+    strategy: >
+      Re-evaluate if the surface is ever restructured into a genuine ARIA grid
+      with rows/gridcells, or jsx-a11y treats `application` as interactive.
+
+  - path: "web/src/components/finder/Finder.tsx"
+    rule: "jsx-a11y/no-noninteractive-tabindex"
+    reason: >
+      Same role="application" keyboard-widget surface as above — a focusable
+      region that captures keystrokes legitimately holds tabIndex={0}, but
+      jsx-a11y models `application` as non-interactive and flags the tabIndex.
+      Scoped to this one file.
+    strategy: >
+      Re-evaluate alongside no-noninteractive-element-interactions if the
+      surface adopts genuine grid semantics or jsx-a11y recognises `application`.
+
+  # ── P6 highlight.js code preview — dangerouslySetInnerHTML is irreducible ──
+  - path: "web/src/components/finder/preview/livePreviews.tsx"
+    rule: "@eslint-react/dom-no-dangerously-set-innerhtml"
+    reason: >
+      The live code preview (HighlightedCode) renders per-line syntax-highlighted
+      HTML produced by highlight.js. highlight.js ESCAPES the source text and
+      emits only class-tagged <span>s — there is no user-controlled HTML in the
+      injected string. Rendering a pre-highlighted HTML fragment is the ONLY way
+      to display syntax colours (React cannot reconstruct highlight.js's span
+      tree from JSX). Scoped to this one file + this one rule; every other rule
+      stays at error. The exact analog of the MarkdownEditor execCommand
+      exception (an irreducible browser/library-shaped need).
+    strategy: >
+      Re-evaluate if a JSX-native syntax highlighter (one that returns a React
+      element tree instead of an HTML string) replaces highlight.js.

@@ -93,11 +93,18 @@ function IdentitySection({
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
-  // Re-sync when the underlying user changes (e.g. after a refresh).
-  useEffect(() => {
+  // Re-sync the editable fields when the underlying user changes (e.g. after a
+  // profile refresh). React's canonical "adjust state when a prop changes"
+  // pattern — a render-phase compare against the previously-seen values — rather
+  // than an effect that would trip @eslint-react/set-state-in-effect (and cost
+  // an extra commit). Setting state during render re-renders immediately, before
+  // the browser paints, so there is no flash.
+  const [seen, setSeen] = useState({ name: initialName, email: initialEmail })
+  if (seen.name !== initialName || seen.email !== initialEmail) {
+    setSeen({ name: initialName, email: initialEmail })
     setName(initialName)
     setEmail(initialEmail)
-  }, [initialName, initialEmail])
+  }
 
   const dirty = name.trim() !== initialName || email.trim() !== initialEmail
   const initials = initialName
@@ -343,11 +350,11 @@ function Field({
     <label className="flex flex-col gap-1.5">
       <span className="flex items-center justify-between text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
         {label}
-        {hint && (
+        {hint ? (
           <span className="text-[10px] font-medium normal-case tracking-normal text-muted-foreground/70">
             {hint}
           </span>
-        )}
+        ) : null}
       </span>
       {children}
     </label>

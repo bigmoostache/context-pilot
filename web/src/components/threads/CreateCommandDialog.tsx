@@ -91,9 +91,10 @@ export function CreateCommandDialog({
 
           {/* Body */}
           <div className="flex flex-col gap-4 px-5 py-4">
-            <label className="flex flex-col gap-1.5">
+            <label htmlFor="cmd-name" className="flex flex-col gap-1.5">
               <span className="text-[12px] font-medium text-foreground/80">Name</span>
               <Input
+                id="cmd-name"
                 autoFocus
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -104,20 +105,22 @@ export function CreateCommandDialog({
               </span>
             </label>
 
-            <label className="flex flex-col gap-1.5">
+            <label htmlFor="cmd-desc" className="flex flex-col gap-1.5">
               <span className="text-[12px] font-medium text-foreground/80">
                 Description <span className="text-muted-foreground/60">(optional)</span>
               </span>
               <Input
+                id="cmd-desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Shown on the suggestion bubble"
               />
             </label>
 
-            <label className="flex flex-col gap-1.5">
+            <label htmlFor="cmd-body" className="flex flex-col gap-1.5">
               <span className="text-[12px] font-medium text-foreground/80">Prompt</span>
               <Textarea
+                id="cmd-body"
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 placeholder="The prompt this command expands to when clicked…"

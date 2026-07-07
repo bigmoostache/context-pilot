@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { lineBounds, resolveEnter, resolveTab } from "@/lib/utils"
+import { measure } from "@/lib/support/telemetry"
 import { ArrowUp, Paperclip, Loader2, Clock, Pause } from "lucide-react"
 import type { ThreadStatus } from "@/lib/types"
 import { ComposerBubbles } from "./fileUpload"
@@ -135,14 +136,15 @@ export function ThreadComposer({
 }) {
   // Seed text + caret from the persisted draft ONCE per mount so a remount
   // (thread switch / return from another view) or a full reload restores both
-  // what was being typed and where the cursor sat (T304). The ref is read by
-  // the mount effect below to apply the saved selection range.
-  const seedRef = useRef<Draft | null>(null)
-  seedRef.current ??= parseDraft(draftKey)
-  const [text, setText] = useState(() => seedRef.current?.text ?? "")
+  // what was being typed and where the cursor sat (T304). The draft is parsed a
+  // single time via a lazy `useState` initializer (a stable value, not a ref
+  // written during render — which would trip @eslint-react/no-access-ref-during-
+  // render); the mount effect below reads it to apply the saved selection range.
+  const [seed] = useState(() => parseDraft(draftKey))
+  const [text, setText] = useState(() => seed.text)
   // Caret offset, tracked so we can tell which line the user is editing — used
   // to surface the /command bubbles when the current line is exactly `/` (T350).
-  const [caret, setCaret] = useState(() => seedRef.current?.selStart ?? 0)
+  const [caret, setCaret] = useState(() => seed.selStart)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -162,11 +164,10 @@ export function ThreadComposer({
   // overrides it with the persisted range. Skipped when there is no draft.
   useEffect(() => {
     const el = textareaRef.current
-    const seed = seedRef.current
-    if (!el || !seed?.text) return
+    if (!el || !seed.text) return
     el.focus()
     el.setSelectionRange(seed.selStart, seed.selEnd)
-  }, [])
+  }, [seed])
 
   /**
    * Grow the textarea to fit its content, just like the TUI input area which
@@ -178,8 +179,13 @@ export function ThreadComposer({
   const autoResize = () => {
     const el = textareaRef.current
     if (!el) return
-    el.style.height = "auto"
-    el.style.height = `${Math.min(el.scrollHeight, MAX_H)}px`
+    // Reading `scrollHeight` forces a synchronous reflow — instrument it so a
+    // stall triggered by textarea autosize is named (bounded to the textarea,
+    // but kept in the broad net).
+    measure("composer:autosize", () => {
+      el.style.height = "auto"
+      el.style.height = `${Math.min(el.scrollHeight, MAX_H)}px`
+    })
   }
   useEffect(autoResize, [text])
 

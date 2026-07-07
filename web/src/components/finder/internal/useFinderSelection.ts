@@ -1,6 +1,5 @@
-import type { RefObject } from "react"
 import type { Agent, FinderNode, FinderSortKey, FinderViewMode } from "@/lib/types"
-import { CLICK_SETTLE_MS, req, type Tab } from "./helpers"
+import { req, type Tab } from "./helpers"
 import type { MenuPos } from "../ContextMenu"
 
 // Monotonic tab-id counter. Held in an object so the increments below are
@@ -19,7 +18,10 @@ interface SelectionDeps {
   crumbs: FinderNode[]
   sortKey: FinderSortKey
   activeId: string
-  clickTimer: RefObject<number | undefined>
+  /** Arm the click-settle timer with `fn` (clears any pending one first). */
+  armClickSettle: (fn: () => void) => void
+  /** Clear the pending click-settle timer, if any. */
+  clearClickSettle: () => void
   setSelected: React.Dispatch<React.SetStateAction<Set<string>>>
   setAnchor: (p: string | null) => void
   setFocusPath: (p: string | null) => void
@@ -46,8 +48,12 @@ interface SelectionDeps {
  * INSTANTLY (never reflowing) then defers — by {@link CLICK_SETTLE_MS} — either
  * slow-second-click-to-rename or opening the (non-reflowing Sheet) Quick Look,
  * so a double-click can cancel them first.
+ *
+ * Named without a `use` prefix (web-lint P6): it calls no React hooks — it is a
+ * pure handler factory invoked in render, not a hook — so the `use` prefix would
+ * falsely imply rules-of-hooks apply (@eslint-react/no-unnecessary-use-prefix).
  */
-export function useFinderSelection(d: SelectionDeps) {
+export function finderSelection(d: SelectionDeps) {
   // Apply selection + focus + preview-target for a node. INSTANT and reflow-free
   // (it never opens the Quick Look pane), so selection feedback is immediate
   // while the layout-affecting open is deferred to onRowClick's timer.
@@ -89,13 +95,15 @@ export function useFinderSelection(d: SelectionDeps) {
       d.selected.has(node.path) &&
       d.focusPath === node.path
     select(node, m)
-    window.clearTimeout(d.clickTimer.current)
-    if (m.additive || m.range) return
+    if (m.additive || m.range) {
+      d.clearClickSettle()
+      return
+    }
     const inlineCapable = d.viewMode !== "gallery"
-    d.clickTimer.current = window.setTimeout(() => {
+    d.armClickSettle(() => {
       if (wasSole && inlineCapable) d.startRename(node)
       else if (!wasSole) d.setPreviewOpen(true)
-    }, CLICK_SETTLE_MS)
+    })
   }
 
   /** Open a file in its own tab (reuse an existing tab for the same file). */
@@ -116,7 +124,7 @@ export function useFinderSelection(d: SelectionDeps) {
   const open = (node: FinderNode) => {
     // A double-click / explicit open must pre-empt the deferred single-click
     // effect (no stray preview-open or rename after the item is opened).
-    window.clearTimeout(d.clickTimer.current)
+    d.clearClickSettle()
     if (node.kind === "folder") d.navigate(node.path)
     else openInNewTab(node)
   }

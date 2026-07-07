@@ -4,9 +4,11 @@ import reactHooks from "eslint-plugin-react-hooks"
 import reactRefresh from "eslint-plugin-react-refresh"
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments"
 import unicorn from "eslint-plugin-unicorn"
+import eslintReact from "@eslint-react/eslint-plugin"
+import jsxA11y from "eslint-plugin-jsx-a11y"
 import tseslint from "typescript-eslint"
 import { defineConfig, globalIgnores } from "eslint/config"
-import type { ESLint } from "eslint"
+import type { Linter } from "eslint"
 
 /**
  * Frontend ESLint flat config — the Rust-parity strict stack (branch `web-lint`).
@@ -41,20 +43,48 @@ export default defineConfig([
       tseslint.configs.stylisticTypeChecked,
       reactRefresh.configs.vite,
       unicorn.configs.recommended,
+      // ── P6 React stack ──────────────────────────────────────────────────
+      // The frontend twin of clippy's React-domain correctness lints. Three
+      // presets, each landing at `error`:
+      //   • @eslint-react recommended-type-checked — the modern successor to
+      //     eslint-plugin-react (component/JSX correctness: unstable defaults,
+      //     unused/invalid props, context/effect misuse). Type-aware, so it
+      //     rides the projectService program wired below.
+      //   • react-hooks recommended-latest (v7) — the classic hooks pair PLUS
+      //     the compiler-aware rules (set-state-in-effect/render, immutability,
+      //     refs, purity, static-components). Replaces the P0 manual pinning;
+      //     exhaustive-deps is bumped from its recommended `warn` to `error` in
+      //     the rules block below (the P0→P6 deferral now comes due).
+      //   • jsx-a11y recommended — accessibility (alt text, roles, labels).
+      eslintReact.configs["recommended-type-checked"],
+      // `.configs.flat` is the flat-config surface of eslint-plugin-react-hooks
+      // v7 (the bare `.configs["recommended-latest"]` is the legacy eslintrc
+      // form — an array-of-strings `plugins`, which flat config rejects). The
+      // plugin types `.flat` as `any`, so cast it to an object with the SINGLE
+      // named key we read — a named-property cast (not a `Record<string, …>`
+      // index signature) so the access yields `Linter.Config` directly, without
+      // the `| undefined` that `noUncheckedIndexedAccess` adds to index-signature
+      // reads (and without a `!` assertion, banned here). This also clears the
+      // type-aware `no-unsafe-member-access` / `no-unsafe-assignment` rules that
+      // would otherwise flag reading a member off an `any` and spreading it in.
+      (reactHooks.configs.flat as { "recommended-latest": Linter.Config })["recommended-latest"],
+      // eslint-plugin-jsx-a11y ships no bundled types (its module is declared
+      // ambiently in types.d.ts to satisfy the strict `tsc` program), so its
+      // default export is `any`. Cast to an object with exactly the nested named
+      // property we use — again a named-property shape, not an index signature,
+      // so `.flatConfigs.recommended` is `Linter.Config` (no `| undefined`, no
+      // `noPropertyAccessFromIndexSignature` violation) and the surrounding
+      // `no-unsafe-*` rules stay clear.
+      (jsxA11y as { flatConfigs: { recommended: Linter.Config } }).flatConfigs.recommended,
     ],
     plugins: {
-      // react-hooks is pinned to its CLASSIC rule pair for the P0 baseline
-      // (rules-of-hooks + exhaustive-deps) — the exact effective ruleset before
-      // this branch. The plugin's v7 `flat.recommended` additionally ships the
-      // compiler-aware rules (set-state-in-effect, refs, immutability,
-      // static-components, use-memo); those land deliberately in P6 (React
-      // stack) with proper per-site fixes, not front-loaded into P0.
-      // eslint-plugin-react-hooks ships its ESLint-9 flat presets under a
-      // `.configs.flat` key whose shape ESLint's own `Plugin` type does not yet
-      // model — a known upstream type-definition gap. The plugin is
-      // runtime-correct (its rules load and run); bridge the declaration gap
-      // with a typed cast so `tsc` type-checks the config file cleanly.
-      "react-hooks": reactHooks as unknown as ESLint.Plugin,
+      // react-hooks is now registered via its v7 `recommended-latest` flat
+      // preset in `extends` above (P6) — the manual P0 pinning to the classic
+      // rules-of-hooks + exhaustive-deps pair (and the `ESLint.Plugin` cast that
+      // bridged the plugin's then-unmodelled `.configs.flat` typing gap) is
+      // gone. The preset ships the compiler-aware rule set and the plugin key,
+      // so registering it here again would throw "Cannot redefine plugin".
+      //
       // P4 anti-cheat layer: the eslint-comments plugin powers the ban on
       // suppression directives (its `no-use` rule reports EVERY `eslint-disable`
       // / `eslint-enable` comment). This is the frontend twin of the Rust
@@ -110,8 +140,14 @@ export default defineConfig([
         },
       ],
       // Classic react-hooks pair (see the plugins note above).
-      "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn",
+      // ── P6: exhaustive-deps comes due ──────────────────────────────────
+      // react-hooks/recommended-latest (extends) sets rules-of-hooks + the
+      // compiler-aware rules at error, but leaves exhaustive-deps at its
+      // recommended `warn`. The P0→P5 deferral of the 3 known warnings
+      // (CreateCommandDialog, MarkdownEditor, Finder — intentional mount-once
+      // effects) now comes due: bump it to `error` and restructure each site
+      // (a ref-captured seed / stable callback), never an inline disable (P4).
+      "react-hooks/exhaustive-deps": "error",
       // `cva()` variant tables and other module-level `const` exports sit
       // beside their component (the shadcn/vite idiom). They don't break Fast
       // Refresh, so permit them; hooks/functions co-exported with components
@@ -211,6 +247,35 @@ export default defineConfig([
       // StatusBar.resolvePhase, FleetDashboard.healthCondition,
       // ThreadComposer banner, ThreadList.dotColor) on readability grounds.
       "unicorn/no-nested-ternary": "off",
+
+      // ── P6 React-stack justified disables (registered in
+      //    .github/checks/allowed-eslint-exceptions.yaml; each a
+      //    deliberate-UX or false-positive-only rule, config-level channel,
+      //    never an inline eslint-disable) ──
+      //
+      // autoFocus is a DELIBERATE UX choice throughout this power-user cockpit:
+      // the primary thread composer, every modal's first field (login email,
+      // inline rename, New-Thread / Create-Command titles, the maintenance
+      // wizard steps, the OAuth login popup) auto-focuses so the keyboard is
+      // ready the instant the surface opens. jsx-a11y flags it as a screen-
+      // reader-disorientation risk, a real concern for content pages — but here
+      // every autoFocus sits on the sole input of a just-opened focused dialog
+      // or the app's central composer, the canonical exception. Off tree-wide.
+      "jsx-a11y/no-autofocus": "off",
+      // @eslint-react/no-array-index-key guards against index keys on a list
+      // that REORDERS/INSERTS mid-stream (React then reuses the wrong child
+      // instance/state). Every dynamic, reorderable list in this app already
+      // keys by a stable domain id (fleet→agent.id, threads→thread.id,
+      // finder→node.path). The remaining `key={i}` sites are all STATIC,
+      // wholesale-rerendered presentational lists with no per-item state —
+      // syntax-highlighted code lines, sheet cells, PDF-page thumbnails,
+      // waveform bars, parsed markdown/message segments, read-only inspector
+      // rows (tree, radar, entities, vitals) — where the index IS the stable
+      // identity and reconciliation is never wrong. The rule yields only
+      // false positives against this codebase's actual usage; off tree-wide.
+      // (The two genuinely interactive lists — question options, upload chips —
+      // are ALSO keyed by a natural id so they stay correct regardless.)
+      "@eslint-react/no-array-index-key": "off",
     },
   },
   {
@@ -246,15 +311,75 @@ export default defineConfig([
   {
     // The Finder mock filesystem embeds Rust + JSX code SAMPLES as multiline
     // template literals for the preview pane (e.g. `format!("Sent to {tid}")`,
-    // `<Finder root={root} />`). Those `{tid}` / `{root}` braces are LITERAL
-    // text in the displayed foreign-language code, not JS interpolation —
-    // unicorn/no-incorrect-template-string-interpolation can't tell display
-    // text from a typo'd `${…}` and false-positives on every one. Scoped off
-    // for this single mock-data file (the rule stays at error everywhere else,
-    // where it genuinely catches a missing `$`).
+    // `<Finder root={root} cwd={cwd} setCwd={setCwd} />`). Those `{tid}` /
+    // `{root}` braces are LITERAL text in the displayed foreign-language code,
+    // not JS interpolation — unicorn/no-incorrect-template-string-interpolation
+    // can't tell display text from a typo'd `${…}` and false-positives on every
+    // one. Scoped off for this single mock-data file (the rule stays at error
+    // everywhere else, where it genuinely catches a missing `$`).
     files: ["src/lib/support/finderFs.ts"],
     rules: {
       "unicorn/no-incorrect-template-string-interpolation": "off",
+    },
+  },
+  {
+    // hey-api's codegen config file carries the tool's CONVENTIONAL filename
+    // (`openapi-ts.config.ts`, hyphenated) — it's referenced verbatim by
+    // `npx @hey-api/openapi-ts -f openapi-ts.config.ts` in CB5 +
+    // check-typescript-contract.sh and by tsconfig.node.json's include, so it
+    // is not ours to rename. unicorn/filename-case (calibrated to camel/pascal)
+    // flags the hyphen; scoped off for this single external-tool config file.
+    files: ["openapi-ts.config.ts"],
+    rules: {
+      "unicorn/filename-case": "off",
+    },
+  },
+  {
+    // Two irreducible tooling false-positives on the Finder root, scoped to this
+    // one file + these rules (the config-level exception channel, registered in
+    // allowed-eslint-exceptions.yaml — never an inline eslint-disable):
+    //
+    // • react-hooks/refs — the Finder threads its single-click SETTLE-TIMER ref
+    //   into the extracted pure handler factory `finderSelection` (a function
+    //   invoked during render). finderSelection reads/writes that ref ONLY
+    //   inside deferred event handlers (the setTimeout armed by onRowClick),
+    //   NEVER during render, so the pass is safe by construction — but the
+    //   react-compiler's conservative taint analysis can't see through the
+    //   function boundary and flags it. Every other ref in the file
+    //   (surfaceRef / fileInputRef / mainRef) is passed to a JSX `ref=` prop or
+    //   a hook, never read in render, so the file-scoped disable masks no real
+    //   ref-in-render bug.
+    //
+    // • jsx-a11y/no-noninteractive-{element-interactions,tabindex} — the surface
+    //   is a keyboard-driven WIDGET (arrow nav, type-ahead, Space Quick-Look,
+    //   Enter rename, ⌘⌫ trash) that owns its key handling, so it carries
+    //   `role="application"` + `tabIndex={0}` + `onKeyDown`. `application` is the
+    //   honest ARIA role for a keystroke-capturing region, but jsx-a11y models it
+    //   as STRUCTURAL (non-interactive) and false-positives; the correct-looking
+    //   alternative `role="grid"` would be DISHONEST (the container wraps a
+    //   toolbar + sidebar + main + path bar, not a literal grid of rows/cells).
+    //
+    // Every other rule stays at error.
+    files: ["src/components/finder/Finder.tsx"],
+    rules: {
+      "react-hooks/refs": "off",
+      "jsx-a11y/no-noninteractive-element-interactions": "off",
+      "jsx-a11y/no-noninteractive-tabindex": "off",
+    },
+  },
+  {
+    // The live code preview injects highlight.js output through
+    // `dangerouslySetInnerHTML`. highlight.js ESCAPES the source text and emits
+    // only class-tagged `<span>`s — there is no user-controlled HTML in the
+    // string, and rendering a pre-highlighted HTML fragment is the ONLY way to
+    // show syntax colours (React can't re-create highlight.js's span tree from
+    // JSX). A genuine irreducible use, scoped to this one file + this one rule
+    // (the config-level exception channel, registered in
+    // allowed-eslint-exceptions.yaml — never an inline eslint-disable, which the
+    // P4 anti-cheat layer forbids). Every other rule stays at error.
+    files: ["src/components/finder/preview/livePreviews.tsx"],
+    rules: {
+      "@eslint-react/dom-no-dangerously-set-innerhtml": "off",
     },
   },
 ])

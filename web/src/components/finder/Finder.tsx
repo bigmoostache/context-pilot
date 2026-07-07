@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import type { Agent, FinderNode, FinderSortKey, FinderViewMode } from "@/lib/types"
 import { sortNodes } from "@/lib/support/finderFs"
 import { useFs, useFsDescriptions } from "@/lib/live"
@@ -7,23 +7,22 @@ import { ColumnsView, GalleryView, GridView, ListView } from "./views/FinderView
 import { FinderPreview } from "./preview/FinderPreview"
 import { type MenuPos } from "./ContextMenu"
 import { QuickLookSheet } from "./QuickLookSheet"
-import { useMarquee } from "./support/useMarquee"
 import { cn } from "@/lib/utils"
-import {
-  buildCrumbs,
-  loadPins,
-  NEW_FOLDER_SENTINEL,
-  pinsKey,
-  type PinnedFolder,
-  type Tab,
-  req,
-} from "./internal/helpers"
+import { buildCrumbs, NEW_FOLDER_SENTINEL, type Tab, req } from "./internal/helpers"
 import { useExternalDragUpload } from "./internal/useExternalDragUpload"
 import { useFinderActions } from "./internal/useFinderActions"
-import { useFinderDownloads } from "./internal/useFinderDownloads"
+import { finderDownloads } from "./internal/useFinderDownloads"
 import { useFinderKeyboard } from "./internal/useFinderKeyboard"
-import { useFinderSelection } from "./internal/useFinderSelection"
+import { finderSelection } from "./internal/useFinderSelection"
 import { FinderOverlays } from "./internal/FinderOverlays"
+import {
+  useFinderMount,
+  useFinderPins,
+  useRevealPath,
+  useFinderMarquee,
+  useClickSettle,
+  finderSelectionSize,
+} from "./internal/useFinderState"
 
 export type { PinnedFolder } from "./internal/helpers"
 
@@ -62,7 +61,7 @@ export function Finder({
     { id: "t0", cwd: agent.folder, label: agent.name, kind: "folder", back: [], fwd: [] },
   ])
   const [activeId, setActiveId] = useState("t0")
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [anchor, setAnchor] = useState<string | null>(null)
   const [focusPath, setFocusPath] = useState<string | null>(null)
   const [preview, setPreview] = useState<FinderNode | null>(null)
@@ -81,20 +80,7 @@ export function Finder({
   // fires when the user commits the name. Null = not creating.
   const [pendingFolderName, setPendingFolderName] = useState<string | null>(null)
   const [pathBarOpen, setPathBarOpen] = useState(false)
-  const [pins, setPins] = useState<PinnedFolder[]>(() => loadPins(agent.id))
-
-  // Persist pins per-agent whenever they change.
-  useEffect(() => {
-    try {
-      localStorage.setItem(pinsKey(agent.id), JSON.stringify(pins))
-    } catch {
-      /* storage full / unavailable — pins stay in-session only */
-    }
-  }, [pins, agent.id])
-
-  const addPin = (p: PinnedFolder) =>
-    setPins((cur) => (cur.some((x) => x.path === p.path) ? cur : [...cur, p]))
-  const removePin = (path: string) => setPins((cur) => cur.filter((x) => x.path !== path))
+  const { pins, addPin, removePin } = useFinderPins(agent.id)
 
   // `tabs` is seeded with one tab and closeTab never empties it, so index 0 is
   // always present — assert it so `active` is `Tab`, not `Tab | undefined`
@@ -139,17 +125,17 @@ export function Finder({
           ],
     [pendingFolderName, sorted],
   )
-  const crumbs = useMemo(
-    () => buildCrumbs(agent.folder, agent.name, cwd),
-    [agent.folder, agent.name, cwd],
-  )
+  // Cheap derivation (a path split); left un-memoized so React Compiler owns
+  // the memoization. A manual useMemo here tripped preserve-manual-memoization
+  // (the compiler couldn't prove `cwd` stable across the dep array).
+  const crumbs = buildCrumbs(agent.folder, agent.name, cwd)
   const previewNode =
     preview ?? (focusPath ? (children.find((c) => c.path === focusPath) ?? null) : null)
 
-  // Pending single-click settle timer (see CLICK_SETTLE_MS). Cleared by a
-  // double-click / open / navigate so those win over the deferred single-click
-  // effect.
-  const clickTimer = useRef<number | undefined>(undefined)
+  // Single-click settle timer — armed on row click, pre-empted by
+  // double-click / open / navigate. Owned by useClickSettle (ref never touches
+  // render here); the handler factories receive the arm/clear closures.
+  const { armClickSettle, clearClickSettle } = useClickSettle()
 
   const patchTab = (fn: (t: Tab) => Tab) =>
     setTabs((ts) => ts.map((t) => (t.id === activeId ? fn(t) : t)))
@@ -181,7 +167,7 @@ export function Finder({
     hasFileTab: !!active.fileNode,
     flash,
     patchTab,
-    clickTimer,
+    clearClickSettle,
     setSelected,
     setAnchor,
     setFocusPath,
@@ -202,7 +188,7 @@ export function Finder({
     onSort,
     goUp,
     trashNode,
-  } = useFinderSelection({
+  } = finderSelection({
     agent,
     sorted,
     anchor,
@@ -213,7 +199,8 @@ export function Finder({
     crumbs,
     sortKey,
     activeId,
-    clickTimer,
+    armClickSettle,
+    clearClickSettle,
     setSelected,
     setAnchor,
     setFocusPath,
@@ -233,7 +220,7 @@ export function Finder({
   useExternalDragUpload(setDragging, uploadFiles)
 
   // ── download actions (selected files / the active file tab) ─────
-  const { downloadSelected, downloadActiveFile } = useFinderDownloads({
+  const { downloadSelected, downloadActiveFile } = finderDownloads({
     agentId: agent.id,
     children,
     selected,
@@ -259,30 +246,21 @@ export function Finder({
     trashPaths,
   })
 
-  // focus the surface on mount + when the agent changes, so keys work
-  useEffect(() => {
-    surfaceRef.current?.focus()
-  }, [])
+  // focus the surface on mount
+  useFinderMount(surfaceRef)
 
-  // Cancel any pending single-click settle timer on unmount.
-  useEffect(() => () => window.clearTimeout(clickTimer.current), [])
-
-  // T334: "Show in Finder" — navigate to a file's parent and select it.
-  useEffect(() => {
-    if (!revealPath) return
-    const lastSlash = revealPath.lastIndexOf("/")
-    const parentRel = lastSlash === -1 ? "" : revealPath.slice(0, lastSlash)
-    const parentAbs = parentRel ? `${agent.folder}/${parentRel}` : agent.folder
-    navigate(parentAbs)
-    setSelected(new Set([revealPath]))
-    setFocusPath(revealPath)
-    onRevealConsumed?.()
-  }, [revealPath])
+  // T334 "Show in Finder" — navigate to a revealed file's parent + select it.
+  useRevealPath({
+    revealPath,
+    agentFolder: agent.folder,
+    navigate,
+    onRevealConsumed,
+    setSelected,
+    setFocusPath,
+  })
 
   // ── status bar figures ──────────────────────────────────────────
-  const selSize = [...selected]
-    .map((p) => children.find((c) => c.path === p))
-    .reduce((sum, n) => sum + (n?.size ?? 0), 0)
+  const selSize = finderSelectionSize(selected, children)
 
   const viewProps = {
     selected,
@@ -298,14 +276,11 @@ export function Finder({
   }
 
   // ── box (marquee) selection ─────────────────────────────────────
-  const mainRef = useRef<HTMLElement>(null)
-  const marqueeOn = viewMode === "grid" || viewMode === "list"
-  const marquee = useMarquee({
-    containerRef: mainRef,
-    enabled: marqueeOn,
+  const { mainRef, marqueeOn, band, handlers } = useFinderMarquee({
+    viewMode,
     getSelected: () => selected,
     onChange: setSelected,
-    onEmptyClick: () => {
+    onClear: () => {
       setSelected(new Set())
       setFocusPath(null)
     },
@@ -314,6 +289,12 @@ export function Finder({
   return (
     <div
       ref={surfaceRef}
+      // The Finder is a custom keyboard-driven widget (arrow nav, type-ahead,
+      // Space/Enter/⌘⌫ shortcuts), so it takes focus and owns its key handling.
+      // role="application" is the honest ARIA role for such a surface — it tells
+      // assistive tech to pass keystrokes through — and satisfies the a11y rules
+      // for a focusable element with an onKeyDown (interactive role + tabIndex).
+      role="application"
       tabIndex={0}
       onKeyDown={onKeyDown}
       className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background outline-none"
@@ -389,15 +370,25 @@ export function Finder({
           <div className="relative flex min-w-0 flex-1">
             <main
               ref={mainRef}
-              {...marquee.handlers}
+              {...handlers}
               onContextMenu={openEmptyContext}
-              onClick={(e) => {
-                if (marquee.didDrag()) return
-                if (e.currentTarget === e.target) {
-                  setSelected(new Set())
-                  setFocusPath(null)
-                }
-              }}
+              // Empty-space click clears the selection. In grid/list the marquee
+              // hook already fires this on a no-drag mouse-up (its onEmptyClick);
+              // columns/gallery disable the marquee, so bind a plain mouse-up
+              // there. Using onMouseUp (not onClick) matches the marquee's own
+              // pointer handlers and stays clear of the jsx-a11y click-handler
+              // rules — a background scroll surface must not become a tab stop,
+              // and the keyboard equivalent (Esc → clear) already lives on the
+              // role="application" surface above.
+              onMouseUp={
+                marqueeOn
+                  ? undefined
+                  : (e) => {
+                      if (e.currentTarget !== e.target) return
+                      setSelected(new Set())
+                      setFocusPath(null)
+                    }
+              }
               className={cn(
                 "relative min-w-0 flex-1",
                 viewMode === "columns" || viewMode === "gallery"
@@ -406,14 +397,14 @@ export function Finder({
                 marqueeOn && "select-none",
               )}
             >
-              {marquee.band && (
+              {band && (
                 <div
                   className="pointer-events-none absolute z-10 rounded-[2px] border border-[var(--signal)] bg-[var(--signal)]/12"
                   style={{
-                    left: marquee.band.left,
-                    top: marquee.band.top,
-                    width: marquee.band.width,
-                    height: marquee.band.height,
+                    left: band.left,
+                    top: band.top,
+                    width: band.width,
+                    height: band.height,
                   }}
                 />
               )}

@@ -19,7 +19,13 @@ export function useExternalDragUpload(
   onFiles: (files: File[]) => void,
 ) {
   const onFilesRef = useRef(onFiles)
-  onFilesRef.current = onFiles
+  // Keep the latest `onFiles` in a ref so the window listeners (bound once
+  // below) never go stale. Assigning in an effect — not during render — keeps
+  // render pure (@eslint-react/no-access-ref-during-render); the effect commits
+  // before any user drag can fire, so the ref is never observably behind.
+  useEffect(() => {
+    onFilesRef.current = onFiles
+  }, [onFiles])
   const lastDragOverRef = useRef(0)
   useEffect(() => {
     const isFileDrag = (e: DragEvent) => !!e.dataTransfer?.types.includes("Files")

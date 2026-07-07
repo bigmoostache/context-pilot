@@ -40,9 +40,5 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     () => ({ ...baseUser, managedByCompany: managed }),
     [baseUser, managed],
   )
-  return (
-    <AccountContext.Provider value={{ user, managed, setManaged }}>
-      {children}
-    </AccountContext.Provider>
-  )
+  return <AccountContext value={{ user, managed, setManaged }}>{children}</AccountContext>
 }

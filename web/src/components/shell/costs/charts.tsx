@@ -26,12 +26,15 @@ export function DonutChart({ data, size = 220, title }: DonutProps) {
   const stroke = size * 0.16
   const circumference = 2 * Math.PI * r
 
-  let offset = 0
-  const arcs = data.map((d) => {
+  // Cumulative arc offset computed purely per segment (a prefix-sum of prior
+  // ratios) rather than mutating a running `let` across the map — reassigning an
+  // outer binding after render trips react-hooks/immutability, and the segment
+  // count is tiny so the O(n²) prefix scan is free.
+  const arcs = data.map((d, i) => {
     const ratio = d.value / total
+    const offset = data.slice(0, i).reduce((sum, x) => sum + x.value / total, 0) * circumference
     const dashArray = `${circumference * ratio} ${circumference * (1 - ratio)}`
     const dashOffset = -offset
-    offset += circumference * ratio
     return { ...d, dashArray, dashOffset, ratio }
   })
 

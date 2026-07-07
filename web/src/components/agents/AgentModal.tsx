@@ -80,7 +80,20 @@ export function AgentModal({
   // Claude Code V2 agent showing as Anthropic).
   const resolved =
     isManage && agent ? resolveSelection(providers, agent.provider, agent.model) : undefined
-  const createDefault = (() => {
+  // The persisted global picker defaults, read from localStorage exactly ONCE
+  // at mount (a lazy state initializer — the only place @eslint-react/purity
+  // permits a side-effecting read). Both the initial seed below and the
+  // `synced` back-fill consume these captured strings instead of re-reading
+  // localStorage during render (which the purity rule forbids).
+  const [lsDefaults] = useState(() => ({
+    provider: localStorage.getItem("cp-default-provider"),
+    model: localStorage.getItem("cp-default-model"),
+  }))
+  // Seed the provider/model picker ONCE, in a lazy state initializer. The
+  // providers registry is empty on a cold first render, so this resolves to the
+  // localStorage/registry fallbacks; the `synced` back-fill below corrects the
+  // selection once providers arrive.
+  const [createDefault] = useState(() => {
     if (isManage)
       return {
         p: resolved?.provider.id ?? providers[0]?.id ?? "",
@@ -90,14 +103,11 @@ export function AgentModal({
           providers[0]?.models[0]?.id ??
           "",
       }
-    const lsP = localStorage.getItem("cp-default-provider") ?? providers[0]?.id ?? ""
+    const lsP = lsDefaults.provider ?? providers[0]?.id ?? ""
     const lsM =
-      localStorage.getItem("cp-default-model") ??
-      defaultModel(providers, lsP)?.id ??
-      providers[0]?.models[0]?.id ??
-      ""
+      lsDefaults.model ?? defaultModel(providers, lsP)?.id ?? providers[0]?.models[0]?.id ?? ""
     return { p: lsP, m: lsM }
-  })()
+  })
   const [provId, setProvId] = useState(createDefault.p)
   const [modelId, setModelId] = useState(createDefault.m)
   const nameRef = useRef<HTMLInputElement>(null)
@@ -105,11 +115,14 @@ export function AgentModal({
   // Back-fill the picker once the provider registry loads. On a cold page
   // refresh `useProviders()` is empty at first render, so the useState
   // initializers above resolve to "" and the picker shows nothing selected.
-  // This effect syncs the real selection exactly once (guarded by a ref so a
-  // later manual change is never clobbered) as soon as providers arrive.
-  const syncedRef = useRef(false)
-  useEffect(() => {
-    if (syncedRef.current || providers.length === 0) return
+  // This syncs the real selection exactly once — React's canonical "adjust
+  // state when a prop changes" pattern (a render-phase compare against a
+  // `synced` sentinel), NOT an effect that would trip
+  // @eslint-react/set-state-in-effect and cost an extra commit. A later manual
+  // change is never clobbered because the guard flips permanently after the
+  // first providers arrival.
+  const [synced, setSynced] = useState(false)
+  if (!synced && providers.length > 0) {
     if (isManage && agent) {
       const sel = resolveSelection(providers, agent.provider, agent.model)
       if (sel) {
@@ -117,19 +130,16 @@ export function AgentModal({
         setModelId(sel.model.id)
       }
     } else if (!isManage) {
-      const lsP = localStorage.getItem("cp-default-provider") ?? providers[0]?.id ?? ""
+      const lsP = lsDefaults.provider ?? providers[0]?.id ?? ""
       if (lsP) {
         setProvId(lsP)
         setModelId(
-          localStorage.getItem("cp-default-model") ??
-            defaultModel(providers, lsP)?.id ??
-            providers[0]?.models[0]?.id ??
-            "",
+          lsDefaults.model ?? defaultModel(providers, lsP)?.id ?? providers[0]?.models[0]?.id ?? "",
         )
       }
     }
-    syncedRef.current = true
-  }, [providers, isManage, agent])
+    setSynced(true)
+  }
 
   // Realm folder: in create mode it's derived live from the name (no picker);
   // in manage mode it's the agent's fixed, read-only realm.
@@ -140,7 +150,6 @@ export function AgentModal({
   const retireAgent = useRetireAgent()
   const renameAgent = useRenameAgent()
   const uploadAvatar = useUploadAvatar()
-  const avatarInputRef = useRef<HTMLInputElement>(null)
   const [avatarBust, setAvatarBust] = useState(0)
   const { authEnabled } = useAuth()
   const [error, setError] = useState<string | null>(null)
@@ -223,37 +232,48 @@ export function AgentModal({
     )
   }
 
-  // Ergonomy: autofocus the name, Esc closes, ⌘/Ctrl+Enter submits.
+  // Ergonomy: autofocus the name, Esc closes, ⌘/Ctrl+Enter submits. The
+  // listener binds ONCE on mount (empty deps — the correct behaviour: it must
+  // not re-focus the field or re-bind on every keystroke). `submit`/`onClose`
+  // are recreated every render, so they're read through latest-refs kept fresh
+  // by the assignment effect below — the canonical way to reference live values
+  // from a mount-only effect without listing them (which would re-bind) and
+  // without an inline eslint-disable (banned by the P4 anti-suppression layer).
+  const submitRef = useRef(submit)
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    submitRef.current = submit
+    onCloseRef.current = onClose
+  })
   useEffect(() => {
     const t = window.setTimeout(() => nameRef.current?.focus(), 60)
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose()
-      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit()
+      if (e.key === "Escape") onCloseRef.current()
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitRef.current()
     }
     window.addEventListener("keydown", onKey)
     return () => {
       window.clearTimeout(t)
       window.removeEventListener("keydown", onKey)
     }
-    // `submit`/`onClose` are intentionally excluded: they are recreated every
-    // render, so listing them would re-bind the keydown listener on every
-    // render. The effect re-runs only when the form values it closes over change
-    // (name/provId/modelId/isManage). The exhaustive-deps warning this raises is
-    // a roadmapped react-hooks item (P6); the inline `eslint-disable` that used
-    // to silence it is banned by the P4 anti-suppression layer.
-  }, [name, provId, modelId, isManage])
+  }, [])
 
   return (
-    <div
-      className="backdrop-fade absolute inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-[3px]"
-      onClick={onClose}
-    >
+    <div className="absolute inset-0 z-40 flex items-center justify-center">
+      {/* Click-to-dismiss backdrop as a keyboard-focusable sibling button
+          (behind the card), so the card need not be wrapped in an interactive
+          element nor carry a stopPropagation onClick. */}
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="backdrop-fade absolute inset-0 -z-[1] cursor-default bg-black/40 backdrop-blur-[3px]"
+      />
       <div
         className={cn(
           "modal-pop relative flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover pop-shadow",
           isManage ? "w-[960px] max-w-[calc(100vw-3rem)]" : "w-[460px]",
         )}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* hero header — a soft accent wash + grain */}
         <div className="relative flex items-start gap-3.5 border-b border-border/70 px-6 pb-5 pt-6">
@@ -265,35 +285,40 @@ export function AgentModal({
                 : "radial-gradient(120% 100% at 0% 0%, color-mix(in oklab, var(--interactive) 18%, transparent), transparent 60%)",
             }}
           />
-          <span
-            className={cn(
-              "relative flex size-11 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset",
-              isManage
-                ? "bg-[var(--signal)]/14 text-[var(--signal)] ring-[var(--signal)]/25"
-                : "bg-[var(--interactive)]/14 text-[var(--interactive)] ring-[var(--interactive)]/25",
-              isManage && "cursor-pointer overflow-hidden transition-opacity hover:opacity-80",
-            )}
-            onClick={isManage ? () => avatarInputRef.current?.click() : undefined}
-            title={isManage ? "Click to change avatar" : undefined}
-          >
-            {isManage && agent?.hasAvatar ? (
-              <img
-                src={avatarUrl(agent.id, avatarBust || undefined)}
-                alt={agent.name}
-                className="size-11 rounded-xl object-cover"
-              />
-            ) : isManage ? (
-              <Settings2 className="size-[22px]" />
-            ) : (
+          {/* The avatar wrapper is a native <label> in manage mode: clicking
+              (or keyboard-activating the visually-hidden, still-focusable file
+              input it points at) opens the picker — no ref, no onClick closure,
+              accessible for free. In create mode it's a plain decorative span. */}
+          {isManage ? (
+            <label
+              htmlFor="agent-avatar-input"
+              title="Click to change avatar"
+              className={cn(
+                "relative flex size-11 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl ring-1 ring-inset transition-opacity hover:opacity-80",
+                "bg-[var(--signal)]/14 text-[var(--signal)] ring-[var(--signal)]/25",
+              )}
+            >
+              {agent?.hasAvatar ? (
+                <img
+                  src={avatarUrl(agent.id, avatarBust || undefined)}
+                  alt={agent.name}
+                  className="size-11 rounded-xl object-cover"
+                />
+              ) : (
+                <Settings2 className="size-[22px]" />
+              )}
+            </label>
+          ) : (
+            <span className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--interactive)]/14 text-[var(--interactive)] ring-1 ring-inset ring-[var(--interactive)]/25">
               <Wand2 className="size-[22px]" />
-            )}
-          </span>
+            </span>
+          )}
           {isManage && (
             <input
-              ref={avatarInputRef}
+              id="agent-avatar-input"
               type="file"
               accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
-              className="hidden"
+              className="sr-only"
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 if (!file || !agent) return

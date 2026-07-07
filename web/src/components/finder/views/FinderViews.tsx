@@ -67,7 +67,11 @@ export function GridView({
               className="transition-transform duration-150 group-hover:scale-[1.06] group-active:scale-95"
             />
             {h.renamingPath === n.path && h.onRenameCommit && h.onRenameCancel ? (
-              <span className="flex w-full px-0.5" onClick={(e) => e.stopPropagation()}>
+              <span
+                className="flex w-full px-0.5"
+                role="presentation"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <RenameInput
                   node={n}
                   onCommit={(name) => h.onRenameCommit?.(n, name)}

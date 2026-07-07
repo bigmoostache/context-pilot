@@ -174,9 +174,14 @@ function AllowedModelsSection() {
 
   return (
     <FieldGroup label="Allowed models" hint="Which models your users may pick">
-      <label className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2.5">
+      <label
+        htmlFor="allow-all-models"
+        className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2.5"
+      >
         <input
+          id="allow-all-models"
           type="checkbox"
+          aria-label="Allow all models"
           checked={!restricted}
           disabled={busy}
           onChange={(e) => void save(e.target.checked ? [] : everyKey)}

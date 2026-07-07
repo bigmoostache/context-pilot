@@ -25,6 +25,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { BACKSTOP_POLL_MS } from "../query/queryClient"
 import { ensureSync, mergeThreadLogs, qk } from "../query/sync"
 import { getOrCreateSseClient } from "../query/sse"
+import { measure, measureAsync } from "../support/telemetry"
 import { useRef, useState } from "react"
 import * as api from "../api"
 
@@ -76,7 +77,14 @@ export function useLive<T>(
 
   const q = useQuery({
     queryKey,
-    queryFn,
+    // Auto-attribute every polled load: time the whole fetch+parse+reshape span
+    // and record it under `load:<resource>` (the queryKey head). On this
+    // same-origin 127.0.0.1 cockpit the network wait is sub-ms, so a multi-
+    // second span is the synchronous payload parse/reshape — the freeze suspect
+    // that lands OUTSIDE the SSE fold and React render (both already
+    // instrumented). A `load:*` entry coinciding with a main-thread stall names
+    // exactly which endpoint's parse burned it, on every browser.
+    queryFn: () => measureAsync(`load:${String(queryKey[0])}`, queryFn),
     enabled,
     refetchInterval: pollMs > 0 ? pollMs : false,
   })
@@ -117,7 +125,10 @@ export function useThreads(agentId: string): LiveQueryResult<ThreadDetail[]> {
     async () => {
       const next = await api.fetchThreads(agentId)
       const prev = client.getQueryData<ThreadDetail[]>(qk.threads(agentId))
-      return mergeThreadLogs(prev, next)
+      // The poll reconcile is O(threads × messages) and runs on the main thread
+      // on every backstop tick — a prime periodic-freeze suspect on a huge
+      // roster. Name it so the HUD attributes a stall landing here.
+      return measure("threads:merge", () => mergeThreadLogs(prev, next))
     },
     { agentId, enabled: !!agentId },
   )
@@ -328,7 +339,11 @@ export function useStreamingTokens(agentId: string): LiveTokens {
       rafRef.current = null
       if (!dirtyRef.current) return
       dirtyRef.current = false
-      setTokens({ ...bufRef.current }) // one snapshot per frame
+      // The per-frame token flush spreads the whole accumulation buffer and
+      // triggers a conversation re-render. On a very long streamed message this
+      // is a live-updating suspect the SSE-delta/poll probes don't cover — name
+      // it so a stall landing here is attributed to token streaming.
+      measure("stream:flush", () => setTokens({ ...bufRef.current })) // one snapshot per frame
     }
     const schedule = () => {
       if (rafRef.current != null) return
@@ -349,7 +364,7 @@ export function useStreamingTokens(agentId: string): LiveTokens {
         kind?: { kind?: string; text?: string }
       }
       try {
-        frame = JSON.parse(event.data) as typeof frame
+        frame = measure("stream:parse", () => JSON.parse(event.data) as typeof frame)
       } catch {
         return
       }

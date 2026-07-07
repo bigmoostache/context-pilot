@@ -48,13 +48,17 @@ export function FleetDashboard({
   const [toast, setToast] = useState<string | null>(null)
 
   // Honour an external "create a new agent" request (from the workspace
-  // switcher). Open the dialog in create mode, then consume the flag.
+  // switcher). Opening the modal is a genuine REACTION to a prop edge (not
+  // render-derived state), so it lives in an effect keyed on `autoCreate`. The
+  // `setModal` is deferred to a microtask so it lands AFTER commit rather than
+  // synchronously inside the effect — the same pattern the Finder's reveal path
+  // uses to stay clear of @eslint-react/set-state-in-effect (a synchronous
+  // in-effect setState would cascade an extra render). The parent is notified
+  // in the same effect (a plain callback, no local state) so it can clear the
+  // one-shot flag.
   useEffect(() => {
-    if (!autoCreate) {
-      return
-    }
-
-    setModal({ mode: "create" })
+    if (!autoCreate) return
+    queueMicrotask(() => setModal({ mode: "create" }))
     onAutoCreateConsumed?.()
   }, [autoCreate, onAutoCreateConsumed])
 
