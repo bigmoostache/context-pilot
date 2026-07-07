@@ -18,24 +18,16 @@ cargo test -p cp-orchestrator --test openapi generate_openapi -- --ignored --qui
 
 echo "▸ Regenerating TypeScript client from openapi.json…"
 cd "$ROOT/web"
-npx @hey-api/openapi-ts -i ../openapi.json -o src/lib/api/generated 2>&1
-
-# The hey-api runtime core files are vendored verbatim and are not
-# exactOptionalPropertyTypes-clean under the maximal-strict tsconfig
-# (web-lint P1). Generated bindings are a contract BOUNDARY: our
-# hand-written lib/api consumers type-check against the exported types,
-# but the generated internals are excluded from strict internal checking —
-# the exact analogue of a relaxed lint profile over Rust generated bindings.
-# Re-stamp a `// @ts-nocheck` header onto every generated file after each
-# regeneration so the committed tree and a fresh codegen stay byte-identical
-# (the drift check below compares them).
-echo "▸ Stamping @ts-nocheck onto generated bindings…"
-GEN_HEADER='// @ts-nocheck — hey-api generated client. Type-checked at the contract boundary (our hand-written lib/api consumers validate against the exported types); the vendored runtime internals are not exactOptionalPropertyTypes-clean and regenerate verbatim, so they are excluded from strict internal checking (web-lint P1, generated-bindings exception).'
-while IFS= read -r gen_file; do
-  if ! head -1 "$gen_file" | grep -q "@ts-nocheck"; then
-    printf '%s\n%s' "$GEN_HEADER" "$(cat "$gen_file")" > "$gen_file"
-  fi
-done < <(find src/lib/api/generated -name '*.ts')
+# Codegen is driven by web/openapi-ts.config.ts, whose `output.header` emits the
+# `// @ts-nocheck` generated-bindings header NATIVELY into every file (web-lint
+# P1). No post-codegen stamping step: the committed tree is byte-identical to a
+# plain config-driven run, so the drift check below is a clean regenerate +
+# `git diff --exit-code`. The @ts-nocheck excludes the vendored runtime
+# internals (not exactOptionalPropertyTypes-clean) from strict internal
+# checking, while our hand-written lib/api consumers still type-check against the
+# exported types — the exact analogue of a relaxed lint profile over Rust
+# generated bindings.
+npx @hey-api/openapi-ts -f openapi-ts.config.ts 2>&1
 
 echo "▸ Checking for uncommitted drift…"
 cd "$ROOT"
@@ -46,7 +38,7 @@ if ! git diff --exit-code -- openapi.json web/src/lib/api/generated/; then
   echo "out of sync with the Rust backend types. Run:"
   echo ""
   echo "  cargo test -p cp-orchestrator --test openapi generate_openapi -- --ignored"
-  echo "  cd web && npx @hey-api/openapi-ts -i ../openapi.json -o src/lib/api/generated"
+  echo "  cd web && npx @hey-api/openapi-ts -f openapi-ts.config.ts"
   echo "  git add openapi.json web/src/lib/api/generated/"
   echo ""
   exit 1
