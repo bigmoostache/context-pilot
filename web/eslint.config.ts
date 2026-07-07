@@ -9,6 +9,10 @@ import jsxA11y from "eslint-plugin-jsx-a11y"
 import regexp from "eslint-plugin-regexp"
 import promise from "eslint-plugin-promise"
 import importX from "eslint-plugin-import-x"
+import n from "eslint-plugin-n"
+import security from "eslint-plugin-security"
+import noUnsanitized from "eslint-plugin-no-unsanitized"
+import noSecrets from "eslint-plugin-no-secrets"
 import tseslint from "typescript-eslint"
 import { defineConfig, globalIgnores } from "eslint/config"
 import type { Linter } from "eslint"
@@ -109,6 +113,38 @@ export default defineConfig([
       // relaxed in the rules block (tsc already proves them).
       importX.flatConfigs.recommended,
       importX.flatConfigs.typescript,
+      // eslint-plugin-security — heuristic detectors for injection/ReDoS/eval/
+      // unsafe-buffer classes of bug. Its `recommended` is flat-native and
+      // ships every rule at `warn`; the gate runs `--max-warnings 0`, and each
+      // kept rule is bumped to `error` in the rules block below (with the
+      // Node-only detectors staying inert here — no child_process/fs/require in
+      // a browser app — and the notorious detect-object-injection turned off,
+      // registered, as a pure-noise false-positive on typed record access).
+      // eslint-plugin-security ships no bundled types (declared ambiently in
+      // types.d.ts), so its default export is `any`. Cast to the single named
+      // config we read — a named-property shape (not an index signature) so
+      // `.configs.recommended` is `Linter.Config` directly (no `| undefined`
+      // under noUncheckedIndexedAccess, no `noPropertyAccessFromIndexSignature`
+      // violation) and the surrounding type-aware `no-unsafe-member-access` /
+      // `no-unsafe-assignment` rules stay clear — exactly the jsxA11y / promise
+      // cast idiom above.
+      (security as { configs: { recommended: Linter.Config } }).configs.recommended,
+      // eslint-plugin-no-unsanitized — bans assigning an unsanitized (non-
+      // literal, non-trusted) string to a DOM HTML sink: the `property` rule
+      // guards `.innerHTML`/`.outerHTML`/`.insertAdjacentHTML`-style property
+      // writes, the `method` rule guards `document.write`/`insertAdjacentHTML`/
+      // `DOMParser`-style calls. This is the raw-DOM XSS guard (distinct from
+      // @eslint-react's dangerouslySetInnerHTML rule wired in P6 — that one
+      // covers React's JSX prop; this one covers imperative DOM manipulation).
+      // Its `recommended` is flat-native (a `{ plugins, rules }` object, not the
+      // eslintrc `recommended-legacy`) and ships both rules at error. No bundled
+      // types (declared ambiently in types.d.ts) → its default export is `any`;
+      // cast to the single named config we read — a named-property shape (not an
+      // index signature) so `.configs.recommended` is `Linter.Config` directly
+      // (no `| undefined` under noUncheckedIndexedAccess) and the surrounding
+      // type-aware `no-unsafe-*` rules stay clear, the jsxA11y / promise /
+      // security cast idiom.
+      (noUnsanitized as { configs: { recommended: Linter.Config } }).configs.recommended,
     ],
     plugins: {
       // react-hooks is now registered via its v7 `recommended-latest` flat
@@ -128,6 +164,15 @@ export default defineConfig([
       // ESLint's `Plugin` type, so no cast is needed (one would be flagged
       // unnecessary by @typescript-eslint/no-unnecessary-type-assertion).
       "@eslint-community/eslint-comments": eslintComments,
+      // P7 eslint-plugin-no-secrets — no preset ships (empty `configs`), so the
+      // plugin is registered here and its rule enabled explicitly in the rules
+      // block below. Its default export satisfies ESLint's `Plugin` type (it
+      // bundles its own `.d.ts`), so — like eslint-comments above — no cast is
+      // needed. This is the frontend twin of the Rust vault-bypass guard: a
+      // hardcoded credential in the dumb render layer is an architecture
+      // violation (M141 — all secrets live server-side in cp-vault), and this
+      // rule catches a high-entropy literal before it can ever ship.
+      "no-secrets": noSecrets,
     },
     languageOptions: {
       globals: globals.browser,
@@ -158,6 +203,15 @@ export default defineConfig([
       // catches a bare `eslint-disable` with no rule list.
       "@eslint-community/eslint-comments/no-use": "error",
       "@eslint-community/eslint-comments/no-unlimited-disable": "error",
+      // ── P7 no-secrets: hardcoded high-entropy string guard ──────────────
+      // Flags string literals whose Shannon entropy exceeds `tolerance` (or that
+      // match a known key pattern) — a hardcoded API key / token / secret. The
+      // frontend is the dumb render layer (M141): every credential is resolved
+      // server-side through cp-vault and reaches the browser only via an
+      // authenticated request, never as a literal. So any hit is either a real
+      // leak (fix at source — remove it) or a benign high-entropy constant
+      // (calibrated per-site). Default tolerance (4.0) is kept.
+      "no-secrets/no-secrets": "error",
       // ban-ts-comment is already error via strictTypeChecked, but its default
       // still permits `@ts-expect-error` with a ≥10-char description. Harden it:
       // ALL four TS directive comments are forbidden outright, no description
@@ -216,6 +270,31 @@ export default defineConfig([
       // style noise with no correctness value; off tree-wide.
       "import-x/no-named-as-default": "off",
       "import-x/no-named-as-default-member": "off",
+      // ── P7 eslint-plugin-security calibration ──────────────────────────
+      // detect-object-injection is pure noise in a typed codebase: it flags
+      // EVERY computed-key member access (obj[k], arr[i]) irrespective of
+      // provenance — 38 hits here, all on type-constrained record/array reads
+      // whose key space is fixed by the type. TypeScript already proves them
+      // safe, and the genuine sink the rule targets (a user-controlled key
+      // reaching a prototype-mutable object) cannot arise from these lookups.
+      // Off tree-wide (registered in allowed-eslint-exceptions.yaml — the
+      // config-level channel, never an inline eslint-disable).
+      "security/detect-object-injection": "off",
+      // The browser-relevant detectors are hardened from recommended's `warn`
+      // to `error` (real bug classes reachable in frontend code): catastrophic-
+      // backtracking regexes, dynamic `new RegExp(x)`, `eval`-with-expression,
+      // trojan-source bidi characters, and secret-comparison timing attacks.
+      // (The remaining recommended rules — detect-child-process / non-literal-
+      // fs-filename / non-literal-require / buffer-noassert / new-buffer /
+      // pseudoRandomBytes / no-csrf / disable-mustache-escape — target Node
+      // APIs absent from this browser app, so they are inert; they stay at
+      // recommended's `warn`, which the `--max-warnings 0` gate would still
+      // fail on the impossible day one fired.)
+      "security/detect-unsafe-regex": "error",
+      "security/detect-non-literal-regexp": "error",
+      "security/detect-eval-with-expression": "error",
+      "security/detect-bidi-characters": "error",
+      "security/detect-possible-timing-attacks": "error",
       // ── P6: exhaustive-deps comes due ──────────────────────────────────
       // react-hooks/recommended-latest (extends) sets rules-of-hooks + the
       // compiler-aware rules at error, but leaves exhaustive-deps at its
@@ -382,6 +461,21 @@ export default defineConfig([
     files: ["src/components/agents/MarkdownEditor.tsx"],
     rules: {
       "@typescript-eslint/no-deprecated": "off",
+      // The editor SEEDS its contentEditable surface once on mount via
+      // `ref.current.innerHTML = mdToHtml(initialMarkdown)`. no-unsanitized/
+      // property flags every non-literal innerHTML write, but this string is
+      // provably injection-free: mdToHtml runs esc() (escapes &, <, >) over ALL
+      // text before wrapping it in a FIXED literal tag vocabulary (h1/h2/p/
+      // blockquote/pre/ul/ol/li + inline strong/code), so no user character can
+      // form a tag or attribute and there is no user-controlled attribute value
+      // anywhere. Seeding via innerHTML is also irreducible for a contentEditable
+      // WYSIWYG: React cannot own the surface's children (it fights the browser's
+      // own execCommand mutations → caret jumps + reconciliation clobbering live
+      // edits — the very reason the surface is deliberately uncontrolled). Scoped
+      // to this one file + this one rule (registered in
+      // allowed-eslint-exceptions.yaml, never an inline eslint-disable). The
+      // sibling no-unsanitized/method rule stays at error, as does every other.
+      "no-unsanitized/property": "off",
     },
   },
   {
@@ -456,6 +550,42 @@ export default defineConfig([
     files: ["src/components/finder/preview/livePreviews.tsx"],
     rules: {
       "@eslint-react/dom-no-dangerously-set-innerhtml": "off",
+    },
+  },
+  {
+    // ── P7 eslint-plugin-n — Node.js correctness, scoped to the ONLY Node
+    //    code in this repo: the three build/tooling config files that run
+    //    under Node (not the browser app). ──
+    //
+    // This is a browser React app, so n/flat/recommended tree-wide would be
+    // nonsense (it would judge browser code by Node's rulebook). Instead the
+    // `recommended-module` preset (ESM variant — these files use `import`)
+    // lands at error on exactly `eslint.config.ts`, `vite.config.ts` and
+    // `openapi-ts.config.ts`: it catches deprecated Node APIs, process.exit
+    // misuse, missing `node:` protocol and unsupported-feature usage in the
+    // code that actually executes in Node. (`playwright.config.ts` is
+    // globally-ignored above; the app source has no Node code.)
+    files: ["eslint.config.ts", "vite.config.ts", "openapi-ts.config.ts"],
+    extends: [n.configs["flat/recommended-module"]],
+  },
+  {
+    // ── P7 no-secrets — off for THIS lint config's own doc comments ─────────
+    //
+    // eslint-plugin-no-secrets scans comment text as well as string literals.
+    // This config file's extensive rationale comments cite long, high-entropy
+    // API / compiler-flag IDENTIFIERS by name — `dangerouslySetInnerHTML`
+    // (entropy 4.02) and `noPropertyAccessFromIndexSignature` (4.24) — which the
+    // Shannon-entropy heuristic mistakes for hardcoded secrets. They are neither
+    // secrets nor even literals: they are documentation prose naming the very
+    // rules/flags this config governs, and this file is build tooling that never
+    // ships to the browser. Scoped to this one file + this one rule (registered
+    // in allowed-eslint-exceptions.yaml, never an inline eslint-disable); the
+    // rule stays at error across ALL app source — literals AND comments — where a
+    // genuine leaked credential would actually matter (M141: the browser is the
+    // dumb render layer, every secret resolves server-side via cp-vault).
+    files: ["eslint.config.ts"],
+    rules: {
+      "no-secrets/no-secrets": "off",
     },
   },
 ])

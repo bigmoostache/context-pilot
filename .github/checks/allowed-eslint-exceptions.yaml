@@ -333,3 +333,64 @@ exceptions:
       pure noise here with no correctness value.
     strategy: >
       Irreducible stylistic caution against the standard flat-config idiom.
+
+  # ── P7 eslint-plugin-security — detect-object-injection off tree-wide ──────
+  - path: "web/**"
+    rule: "security/detect-object-injection"
+    reason: >
+      Pure noise in a typed codebase: the rule flags EVERY computed-key member
+      access (obj[k], arr[i]) irrespective of provenance — 38 hits here, all on
+      type-constrained record/array reads whose key space is fixed by the type.
+      TypeScript already proves them safe, and the genuine sink the rule targets
+      (a user-controlled key reaching a prototype-mutable object) cannot arise
+      from these lookups. The single dynamic-RegExp hit its sibling rule flagged
+      was fixed at source (fileUpload/helpers.ts field parser rewritten to one
+      literal regex + a Map, no computed-key object sink); the browser-relevant
+      security detectors (unsafe-regex, non-literal-regexp, eval-with-expression,
+      bidi-characters, possible-timing-attacks) stay at error.
+    strategy: >
+      Irreducible while the rule cannot see that TypeScript's type system fixes
+      the key space; re-evaluate if a type-aware object-injection rule appears.
+
+  # ── P7 no-unsanitized — contentEditable seeding is injection-free ─────────
+  - path: "web/src/components/agents/MarkdownEditor.tsx"
+    rule: "no-unsanitized/property"
+    reason: >
+      The WYSIWYG editor seeds its contentEditable surface once on mount via
+      `ref.current.innerHTML = mdToHtml(initialMarkdown)`. no-unsanitized/property
+      flags every non-literal innerHTML write, but this string is provably
+      injection-free: mdToHtml runs esc() (escapes &, <, >) over ALL text before
+      wrapping it in a FIXED literal tag vocabulary (h1/h2/p/blockquote/pre/
+      ul/ol/li + inline strong/code), so no user character can form a tag or
+      attribute, and there is no user-controlled attribute value anywhere.
+      Seeding via innerHTML is additionally IRREDUCIBLE for a contentEditable
+      WYSIWYG: React cannot own the surface's children without fighting the
+      browser's own execCommand mutations (caret jumps + reconciliation
+      clobbering live edits — the exact reason the surface is deliberately
+      uncontrolled). Scoped to this one file + this one rule; the sibling
+      no-unsanitized/method rule and every other rule stay at error. The analog
+      of the livePreviews highlight.js dangerouslySetInnerHTML exception.
+    strategy: >
+      Re-evaluate if a trusted-types / sanitizer API the rule recognises can
+      seed a contentEditable region, or if the editor is ever rebuilt on a
+      DOM-builder (createElement) seed instead of an HTML string.
+
+  # ── P7 no-secrets — off for the lint config's own documentation comments ──
+  - path: "web/eslint.config.ts"
+    rule: "no-secrets/no-secrets"
+    reason: >
+      eslint-plugin-no-secrets scans comment text as well as string literals.
+      This config file's extensive rationale comments cite long, high-entropy API
+      / compiler-flag IDENTIFIERS by name — `dangerouslySetInnerHTML` (Shannon
+      entropy 4.02) and `noPropertyAccessFromIndexSignature` (4.24) — which the
+      entropy heuristic mistakes for hardcoded secrets. They are neither secrets
+      nor even string literals: they are documentation prose naming the very
+      rules/flags this config governs, and this file is build tooling that never
+      ships to the browser. The rule stays at error across ALL app source
+      (literals AND comments) where a genuine leaked credential would actually
+      matter — the frontend being the dumb render layer (M141), every secret
+      resolves server-side through cp-vault and never appears as a literal.
+    strategy: >
+      Re-evaluate if a comment-skipping option lands upstream (then the rule can
+      be re-enabled here with comments excluded), or if the cited identifiers are
+      ever moved out of inline prose.

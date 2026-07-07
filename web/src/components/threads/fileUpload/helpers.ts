@@ -61,22 +61,42 @@ export function buildUploadMessage(files: UploadedFile[]): string {
 
 const BLOCK_RE = /```file-upload\n([\s\S]*?)```/g
 
-/** Pull one `key: value` out of a `file-upload` block body (indented under `file:`). */
-function field(body: string, key: string): string {
-  const m = new RegExp(String.raw`^\s*${key}:\s*(.*)$`, "m").exec(body)
-  return m?.[1]?.trim() ?? ""
+/** One `key: value` line inside a `file-upload` block body (indented under
+ *  `file:`). A SINGLE literal regex, applied per line — no per-key dynamic
+ *  `new RegExp(key)` (which the source keys are trusted-literal but the pattern
+ *  the security detector rightly flags), and a `Map` sink rather than a plain
+ *  object so there is no computed-key object-injection surface either. */
+// `\w+` (the key) and `\s` (the indent) share no characters, and the value is
+// an unanchored `(.*)` with NO leading `\s*` — dropping that post-colon `\s*`
+// removes the only overlapping quantifier pair (`\s*`↔`.*` could both eat the
+// value's leading spaces, the polynomial-backtracking window regexp/no-super-
+// linear-backtracking rightly flags); the value is `.trim()`d anyway.
+const FIELD_RE = /^\s*(\w+):(.*)$/
+
+/** Parse the indented `key: value` lines of a `file-upload` block body into a
+ *  first-wins lookup (one literal-regex scan). */
+function fields(body: string): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const line of body.split("\n")) {
+    const m = FIELD_RE.exec(line)
+    if (m === null) continue
+    const key = m[1]
+    if (key !== undefined && !out.has(key)) out.set(key, (m[2] ?? "").trim())
+  }
+  return out
 }
 
 /** Parse one `file-upload` block body into an {@link UploadedFile} (tolerant:
  *  a missing `name` falls back to the path's basename, a missing `size` to 0). */
 function parseBlock(body: string): UploadedFile | null {
-  const path = field(body, "path")
+  const f = fields(body)
+  const path = f.get("path") ?? ""
   if (!path) return null
   return {
     path,
-    name: field(body, "name") || path.split("/").pop() || path,
-    size: Number(field(body, "size")) || 0,
-    note: field(body, "note"),
+    name: (f.get("name") ?? "") || path.split("/").pop() || path,
+    size: Number(f.get("size") ?? "") || 0,
+    note: f.get("note") ?? "",
   }
 }
 

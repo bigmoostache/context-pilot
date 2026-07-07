@@ -306,6 +306,10 @@
   path: crates/cp-mod-firecrawl/src/crawl.rs
   description: Recursive site crawling — firecrawl_crawl tool. flame!("firecrawl_crawl"). Start async crawl job + poll loop (5s interval, 60 max polls, 310s timeout). write_crawl_output writes combined markdown to disk. No panel created.
   last_edited_ms: 1780563343157
+054d843bab13dd04:
+  path: web/eslint.config.ts
+  description: 'Frontend ESLint flat config — Rust-parity strict stack (branch web-lint), RATCHET P0→P13. P3 strictTypeChecked+stylisticTypeChecked. P4 anti-cheat (eslint-comments no-use, ban-ts-comment). P5 unicorn. P6 React stack (@eslint-react/react-hooks/jsx-a11y). P7 correctness & security COMPLETE (all 7 plugins): regexp flat/recommended, promise flat/recommended (+always-return ignoreLastCallback, catch-or-return allowFinally), import-x recommended+typescript+no-cycle:error{ignoreExternal} (+default/no-named-as-default(-member) OFF tree-wide), n flat/recommended-module scoped to Node config trio (eslint/vite/openapi-ts.config.ts), security flat recommended (detect-object-injection OFF tree-wide; browser detectors unsafe-regex/non-literal-regexp/eval/bidi/timing→error), no-unsanitized recommended (property scoped-off on MarkdownEditor contentEditable seed), no-secrets registered manually at error (scoped-off on this config''s own doc-comment prose). Untyped plugins (jsx-a11y/promise/security/no-unsanitized) cast to named-property shape at use site + declared in types.d.ts. globalIgnores dist+generated/**+e2e/**+playwright.config.ts.'
+  last_edited_ms: 1783438902399
 055355d8a7d97b43:
   path: crates/cp-mod-search/src/lib.rs
   description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. sync_logs_to_meilisearch() fire-and-forget (no tags). Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
@@ -626,6 +630,10 @@
   path: web/src/components/panels/TokenBar.tsx
   description: A slim, rounded progress bar. Color reflects load via loadColor(ratio) unless overridden. fill-sweep animation on mount. TokenBarProps{value,max,color?,animate?,className?}.
   last_edited_ms: 1782470512317
+0bf52a617ce4b821:
+  path: web/src/components/agents/PromptsPage.tsx
+  description: 'Global prompt library — accepts optional agentId, uses useLibrary() with mockLibrary fallback. Cards for agents/skills/commands. Create/edit decorative. web-lint P7: FLEET_MAX_W imported from lib/support/panelMeta (was ./FleetShell) — cycle break.'
+  last_edited_ms: 1783437499558
 0c0359faadcef86e:
   path: increment.txt
   description: Throwaway test file for queue/preflight testing
@@ -3426,6 +3434,10 @@
   path: crates/cp-orchestrator/tests/openapi/schemas_ext.rs
   description: Transport-layer OpenAPI schemas — receipts, auth, env-keys, filesystem types, FinderKind enum, LLM registry (ModelDef/ProviderDef), SSE delta protocol (OpEntry/OpEntryKind), release management (ReleaseEntry/ReleasesResponse/ArchResponse/DownloadResponse/SelectResponse).
   last_edited_ms: 1782486063148
+41645cd7ca559dd9:
+  path: web/src/lib/support/telemetry/store.ts
+  description: In-memory telemetry sink (useSyncExternalStore observable store). Bounded ring buffer + live aggregates answering 'where does wall-time go during lag?'. record() funnels all producer events; snapshot read by HUD + reporter. Notifications COALESCED 300ms so a burst can't make the HUD self-pollute. TaskAgg per-label count/total/max = the burst-catcher (storm of sub-threshold ops). All state on one const holder, mutated by property assignment (unicorn no-top-level-assignment).
+  last_edited_ms: 1783437499162
 4168b472e3787b38:
   path: crates/cp-orchestrator/src/services/auth/tests.rs
   description: '18 auth unit tests: schema, hashing, token/UUID gen, user CRUD (create/get/list/delete cascade), session lifecycle (create/validate/revoke/expired sweep), ACL (grant/revoke/update role/list/cascade delete/overwrite).'
@@ -3710,6 +3722,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/finder/listing.rs
   description: 'Finder read views (split from finder.rs): fs_list (confined dir listing, folders-first sort, hidden skipped, per-folder count via count_visible_children, size on files), fs_preview (first 256KiB text, 415 on binary null-byte sniff, {content,size,truncated}), conversation (messages/*.yaml newest 200). Uses support:: helpers.'
   last_edited_ms: 1781889348282
+46f4f5fdd9816aa7:
+  path: web/types.d.ts
+  description: Ambient module declarations for build/lint tooling shipping no types (tsconfig.node.json scope). Declares eslint-plugin-jsx-a11y (P6) + eslint-plugin-promise + eslint-plugin-security + eslint-plugin-no-unsanitized (P7) as untyped (any) — eslint.config.ts casts each to its minimal used shape at the use site (the real type contract). no-secrets is NOT here (it ships its own index.d.ts).
+  last_edited_ms: 1783438902488
 4738062cca95779a:
   path: src/app/run/tools/cost_log.rs
   description: Per-tick cost-tracking TSV. append_cost_tsv() consumes TickTelemetry (culprit + token layout + break_kind + culprit_max_freezes from stream start) + tick cost counters (from stream end), rescales proxy token segments by API-reported total input (T495), appends 16-column row to .context-pilot/logs/cost-tracking.tsv. Best-effort, never blocks pipeline.
@@ -4418,6 +4434,10 @@
   path: web/src/lib/api/generated/sdk.gen.ts
   description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
   last_edited_ms: 0
+5406503ee340482c:
+  path: web/package.json
+  description: 'Frontend deps. scripts: dev/build(tsc -b && vite build)/lint/preview + P2 format/format:check (prettier). engines.node ''^22.16.0 || >=24.0.0'' (P7 n/no-unsupported-features: exact code-driven floor for import.meta.dirname — n credits the ^22.16 backport + >=24, the 23.x gap is dead). @tanstack/react-query, react 19.2, tailwindcss 4.3, shadcn, vite 8, playwright, full eslint ratchet plugin roster + prettier + web-vitals.'
+  last_edited_ms: 1783438902568
 5414bbb7443c9e15:
   path: devis-attali-context-pilot.md
   description: 'Commercial brief for DF: Context Pilot as-a-Service deployment to cabinet Attali. 7 sections: service description, pricing grid (750€ setup / 250€/month / 500€/day support), financial summary, cost transparency (1/4 sub-service mutualization, 48% margin), scope, contractual terms (12-month auto-renew), DF notes.'
@@ -5946,6 +5966,10 @@
   path: Cargo.toml
   description: Workspace root. 26 crate members (incl cp-vault). Binary 'tui'. Edition 2024. Strict lint config (980 forbid, 21 deny). openssl vendored.
   last_edited_ms: 0
+724772c85d80151d:
+  path: web/src/lib/support/telemetry/index.ts
+  description: Telemetry public surface. Wires the producers (web-vitals, LoAF, rAF stall monitor, Web-Worker heartbeat) into the shared store via idempotent initTelemetry() (called once from main.tsx). Exposes useTelemetry() read hook (useSyncExternalStore) + re-exports measure/measureAsync/TelemetryProfiler/reset + event types.
+  last_edited_ms: 1783437499085
 724b961e89a4a1d9:
   path: crates/cp-mod-callback/src/types.rs
   description: Callback types. CallbackDefinition (name, pattern, script, blocking, timeout, success_message, cwd, is_global). CallbackState (definitions, editor_open). No active_set — all callbacks always active.
@@ -7026,6 +7050,10 @@
   path: ui/src/components/agents/FleetSidebar.tsx
   description: Mission-control left nav rail (fleet dashboard), collapsible. FleetPage type = agents|prompts|usage|settings. NO identity header (lives in TopBar). Top strip = PanelLeftClose collapse trigger; then 4 nav items (icon+label+hint, active=card-shadow). collapsed prop animates aside width 212→0 (fixed-width inner shell). page/onSelect/collapsed/onToggleCollapse props.
   last_edited_ms: 1781532231552
+87b697158e689e7a:
+  path: web/src/lib/support/telemetry/heartbeat.ts
+  description: Web-Worker heartbeat — the DEFINITIVE throttle-immune main-thread freeze detector. A worker posts a tick every BEAT_INTERVAL_MS on its own never-throttled thread; the main thread records the gap between heartbeats it PROCESSES — a balloon = genuine block (records BlockEvent). Immune to Firefox rAF focus-throttling (which fools the rAF stall watchdog). Worker built from an inline Blob URL (no separate asset). Degrades to no-op if Worker/Blob unavailable.
+  last_edited_ms: 1783437499240
 87c9c3f805064c63:
   path: crates/cp-mod-entities/src/errors.rs
   description: 'SQL error enrichment: fuzzy suggestions (Levenshtein ≤2) for unknown table/column names + schema context appended to all errors.'
@@ -7710,6 +7738,10 @@
   path: docs/trust-center/subprocessors.html
   description: 'Subprocessor Register page. 9 sections: LLM providers table (7 providers incl MiniMax with logos), auxiliary services table (5 services with logos), local services table (4 services), compliance matrix (11 providers: trust center links, SOC 2, ISO 27001, DPA, retention, training, location, risk level), detailed compliance notes (per-provider risk paragraphs), change log table (6 entries), operator responsibility notice, vendor risk assessment criteria (8 criteria), data flow summary (HTML/CSS architecture diagram with real brand logos in pills). All subprocessor logos are real brand assets (local SVGs or SimpleIcons CDN). Independent compliance research conducted June 2026. Version SR-3.0.'
   last_edited_ms: 1782138959312
+949ea7a68ce4e5d0:
+  path: web/src/components/threads/fileUpload/helpers.ts
+  description: 'Pure file-upload helpers + types: UploadedFile/CommandSuggestion/MessageSegment interfaces, buildUploadMessage (compose ```file-upload YAML blocks), splitMessageSegments (parse blocks in-place), uploadToNode. P7 security: the block-body parser is fields()→Map via ONE literal FIELD_RE (/^\s*(\w+):(.*)$/, no post-colon \s* to avoid regexp/no-super-linear-backtracking, value .trim()d) — no per-key new RegExp (detect-non-literal-regexp) and a Map sink (no computed-key object-injection surface). No JSX — importable without tripping Fast Refresh.'
+  last_edited_ms: 1783438902727
 94a5320bb61a1ca6:
   path: src/app/actions/threads.rs
   description: 'Thread action handlers. Dispatches Thread* action variants (select/create/archive/question navigation). Question form: cursor movement, toggle selection, Enter submit (YAML answers with escaped other_text -> ThreadMessage -> MY_TURN + spine notification), dismiss, char/backspace for Other field.'
@@ -8510,6 +8542,10 @@ a4dcb0bb3c50969a:
   path: web/src/components/finder/internal/useExternalDragUpload.ts
   description: 'Window-level external-file drag-upload lifecycle hook: shows ''Drop to upload'' overlay while an OS-file drag hovers, clears on drop/leave/cancel (heartbeat watchdog), hands dropped files to onFiles. Internal MOVE drags (no Files type) never raise it.'
   last_edited_ms: 0
+a4ec33a2b1c3785a:
+  path: web/src/lib/support/inline.tsx
+  description: 'Minimal inline renderer — handles **bold**, `code`, and line breaks without a markdown dep. renderInline(text) tokenizes on ** and ` ; code chips use theme-aware bg-muted (T23 light-mode fix). web-lint P7: regexp fix (non-capturing group).'
+  last_edited_ms: 1783437499398
 a518e4ca051d1d28:
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. segmentLog folds consecutive auto traces into AutoRun blocks. T298: per-message splitMessageSegments interleaves prose + inline FileUploadChip; hosts ONE shared QuickLookSheet (agentId-scoped) opened by any chip. T304: passes draftKey. T331: passes pendingFiles + onRemoveFile to ThreadComposer. Takes agentId + onAttach props.'
@@ -10686,6 +10722,10 @@ ce41457001145d47:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
   last_edited_ms: 0
+ce468771f6a31466:
+  path: web/src/components/shell/widgets/TelemetryHud.tsx
+  description: 'Dev-mode performance HUD (corner-docked, gated behind Developer-mode). Live readout of the telemetry snapshot: Real blocks (worker heartbeat, authoritative freeze signal), Task totals Σ (burst-catcher), Main-thread stalls (rAF), Named tasks (attribution), Web Vitals, Long frames, slow React commits. Copy-as-markdown button emits a richer report (all worst-list entries + userAgent) for pasting into a thread. Reads coalesced snapshot so the HUD never sources the churn it measures.'
+  last_edited_ms: 1783437499318
 ce4ce60e0bd4a007:
   path: crates/cp-mod-todo/src/lib.rs
   description: 'Todo module. 3 tools: create/update/move. Fixed TODO panel (fixed_order=0, top priority). Nested object params with parent_id nesting. overview shows X/Y done. Drives spine auto-continuation.'
@@ -11122,6 +11162,10 @@ d70cd0e34e5cb681:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, cost_log, pipeline, queue_flush, watchdog.'
   last_edited_ms: 1782919010143
+d719a41b2729f23a:
+  path: web/src/lib/support/telemetry/stall.ts
+  description: 'Main-thread stall monitor (rAF event-loop-lag heartbeat). Universal freeze detector: records a StallEvent when the gap between animation frames exceeds STALL_THRESHOLD_MS (150) while page visible AND window focused. Browser-agnostic (unlike LoAF/LongTask which are Chromium-only). Guards document.hidden + hasFocus to drop Firefox focus-throttling artifacts (the throttle-immune signal is the worker heartbeat).'
+  last_edited_ms: 1783437498926
 d736a0dc22d9d164:
   path: web/src/components/finder/FinderChrome.tsx
   description: 'Finder chrome: tab strip, main toolbar (nav/crumbs/view-switch/search/icon-size/actions), path bar + NavBtn/SegBtn. FinderSidebar extracted to support/FinderSidebar and re-exported. 372 lines.'
@@ -11134,6 +11178,10 @@ d794e0ca2d6b10ae:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. overview_context_section. Depends on search. Dynamic entity_result panels.
   last_edited_ms: 1780609410314
+d79de73bfd8737d6:
+  path: .github/checks/allowed-eslint-exceptions.yaml
+  description: Registry of allowed CONFIG-LEVEL ESLint exceptions (web-lint P4, frontend twin of allowed-lint-exceptions.yaml). Inline suppression BANNED; only legal escape is a config-level scoped rules:{off} override in eslint.config.ts, each registered here with reason+strategy, enforced bidirectionally by check-frontend-suppressions.sh. Covers P4 (generated/**, ui/**, MarkdownEditor no-deprecated), P5 unicorn (8 tree-wide + scoped), P6 React (jsx-a11y/no-autofocus, no-array-index-key, Finder, livePreviews), P7 (import-x default/no-named-as-default(-member) tree-wide; security/detect-object-injection tree-wide; no-unsanitized/property MarkdownEditor; no-secrets eslint.config.ts). Hash-lock deferred to P12.
+  last_edited_ms: 1783438902648
 d7aa8388ab374455:
   path: crates/cp-orchestrator/src/services/materialized_view.rs
   description: 'MaterializedView in-mem fleet projection folded from OpEntry (one AgentView per agent). AgentView{rev,heads,roster,focused_thread_id,phase,lifecycle,cost}. apply: Checkpoint=authoritative heads+roster reset, MessageCreated=set_thread_head + roster bump, ThreadCreated/Archived/Restored/StatusChanged=RosterThread fold helpers, ThreadFocusChanged=focused_thread_id latest-wins (NOT in checkpoint — ephemeral, cold-start None until next emit, /threads falls back to disk FocusState), Phase/Lifecycle/Cost=latest-wins, CommandEffect/SeenMark/Unknown=inert. Tests in sibling materialized_view_tests.rs.'
@@ -12162,6 +12210,10 @@ eec3c55348ffe829:
   path: web/src/components/finder/InfoBadge.tsx
   description: Finder per-node info badge (T289) — a small ⓘ shown on a file/folder that has a tree description; hover (delay 120) or click opens a Popover with the description. PopoverTrigger render={<span/>} so it nests inside a row/cell <button> without button-in-button; stopPropagation on click/dblclick/pointerdown so the badge never selects/opens/drags the node. max-w-340px.
   last_edited_ms: 1781908494786
+eec62ae7dc09a2b2:
+  path: web/src/components/agents/FleetDashboard.tsx
+  description: 'Fleet welcome dashboard (live). AgentCard reads useAgentMeta(agent.id) (delta-folded; ensureSync per card) for live status dot + cost, falling back to the polled fleet row (T297). Shows agent avatar (T338) or FolderGit2 fallback. §19 HealthBadge (useMetrics) surfaces first non-nominal condition. RetiredSection/RetiredCard (T271 unretire). Create/manage via AgentModal. web-lint P7: FLEET_MAX_W imported from lib/support/panelMeta (was ./FleetShell) — cycle break.'
+  last_edited_ms: 1783437499478
 eecc4deca2426af9:
   path: Cargo.lock
   description: Workspace lockfile
@@ -12306,6 +12358,10 @@ f212eee88adf98ea:
   path: crates/cp-orchestrator/Cargo.toml
   description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal) + serde + serde_json + serde_yaml + tiny_http (0.12) + notify (oplog inotify) + portable-pty 0.9 (X896 safe pty) + calamine 0.26 & csv 1 (T282 Finder spreadsheet→table preview). dev: cp-mod-bridge + tempfile. lib+bin. Workspace lints.'
   last_edited_ms: 1781896321218
+f21914571e686b00:
+  path: web/src/lib/support/telemetry/task.ts
+  description: Named block-timing (stall ATTRIBUTION layer). measure(label, fn) times a synchronous hot path and records a TaskEvent for EVERY call (no min-duration gate — a burst of cheap ops must sum in the store's TaskAgg). measureAsync twin brackets an awaited span (load:* poll parses). Names WHICH instrumented path burned a stall on browsers with no LoAF (Firefox/Safari).
+  last_edited_ms: 1783437499008
 f2416d7f3fc53dce:
   path: crates/cp-mod-firecrawl/src/api.rs
   description: Firecrawl v2 HTTP client. FirecrawlClient with 5xx retry (3 attempts, 1s delay). ScrapeParams/SearchParams/MapParams/CrawlParams structs. post_json() + get_json() generic helpers. start_crawl() + poll_crawl() for async crawl jobs. 30s timeout. Bearer auth. Rate limit + forbidden error handling.

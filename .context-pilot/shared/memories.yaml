@@ -271,25 +271,26 @@
   - forbidden
   last_edited_ms: 0
 45b9baa7eb6b3f01:
-  tl_dr: 'T506 web-lint P0-P6 COMPLETE + committed. P7 (X1134 correctness/security) IN PROGRESS: regexp+promise+import-x plugins GREEN (3/7); n, security, no-unsanitized, no-secrets remain. See contents for P7 detail.'
+  tl_dr: 'T506 web-lint P0-P7 COMPLETE + committed. P7 (X1134 correctness/security) DONE: all 7 plugins green (regexp, promise, import-x, n, security, no-unsanitized, no-secrets). Next: P8 structure/complexity budgets (X1135). See contents.'
   contents: |-
-    P0 scaffold+baseline (X1127). P1 tsc maximal strict 743d2bfe. P2 Prettier 0531ab4f. P3 type-aware eslint b25a5c37. P4 anti-cheat b96f9c47. P5 unicorn (calibrations+8 disables+~90 fixes). P6 React stack (@eslint-react/react-hooks/jsx-a11y) committed bcb2747e.
+    P0 scaffold+baseline (X1127). P1 tsc maximal strict 743d2bfe. P2 Prettier 0531ab4f. P3 type-aware eslint b25a5c37. P4 anti-cheat b96f9c47. P5 unicorn. P6 React stack committed bcb2747e.
 
-    P7 (X1134) correctness & security — wire import-x/promise/n/regexp/security/no-unsanitized/no-secrets at error, one plugin at a time (ratchet, M143).
+    P7 (X1134) correctness & security — ALL 7 PLUGINS GREEN (tsc0/eslint0/prettier0/guard0):
+    1. regexp flat/recommended: 5 fixes.
+    2. promise flat/recommended: always-return{ignoreLastCallback} + catch-or-return{allowFinally}; executor params resolve/reject.
+    3. import-x recommended+typescript(+eslint-import-resolver-typescript@4.4.5)+no-cycle:error{ignoreExternal}. default+no-named-as-default(-member) OFF tree-wide. 8 no-cycle broken via 3 leaf-extractions (CopyButton, live/core.ts, panelMeta FLEET_MAX_W).
+    4. n flat/recommended-module scoped to Node config trio (eslint/vite/openapi-ts.config.ts). Fixed import.meta.dirname finding by declaring engines.node '^22.16.0 || >=24.0.0' in package.json (exact code floor, no suppression).
+    5. security (eslint-plugin-security v4) flat recommended: detect-object-injection OFF tree-wide (38 universal TS FPs). Fixed the 1 detect-non-literal-regexp at SOURCE: rewrote fileUpload/helpers.ts field()→fields() Map parser w/ one literal FIELD_RE (also removed regexp/no-super-linear-backtracking by dropping post-colon \s*). Browser detectors (unsafe-regex, non-literal-regexp, eval-with-expression, bidi-characters, possible-timing-attacks)→error.
+    6. no-unsanitized recommended (flat): 1 hit = MarkdownEditor.tsx:73 innerHTML contentEditable seed. Scoped-off no-unsanitized/property (esc()-escaped text + fixed literal tag vocab = injection-free; contentEditable seeding irreducible). method rule stays error.
+    7. no-secrets: NO preset, registered plugin+rule manually at error (ships own types, no cast). 4 FPs, all doc-comment prose in eslint.config.ts citing API identifiers (dangerouslySetInnerHTML, noPropertyAccessFromIndexSignature). Scoped-off no-secrets/no-secrets on eslint.config.ts only; rule stays error on all app source.
 
-    DONE (3/7, all green tsc0/eslint0/prettier0):
-    - regexp flat/recommended: 5 fixes (no-unused-capturing-group, prefer-character-class, use-ignore-case, no-useless-non-capturing-group) in ThreadList/inline/utils.
-    - promise flat/recommended: calibrations always-return{ignoreLastCallback} + catch-or-return{allowFinally}; utils.ts Promise executor params resolve/reject; eslint.config promise cast. types.d.ts declares eslint-plugin-promise untyped (no @types) — P7 tsc fix.
-    - import-x recommended+typescript(+eslint-import-resolver-typescript@4.4.5 pure-JS)+no-cycle:error{ignoreExternal}. Relaxed tree-wide (registered in allowed-eslint-exceptions.yaml): import-x/default (CJS-plugin false-positive, tsc-redundant) + no-named-as-default + no-named-as-default-member (flat-config plugin idiom). no-duplicates fixed (api/index dup type import, live/index dup react import). 8 no-cycle errors BROKEN via 3 architectural leaf-extractions:
-      1. Message↔markdown: CopyButton → new web/src/components/conversation/CopyButton.tsx leaf; Message + markdown both import from it, neither from the other.
-      2. index↔mutations barrel: useLive+LiveQueryResult → new web/src/lib/live/core.ts leaf; index re-exports, mutations imports from core (not the index barrel).
-      3. FleetShell↔{FleetDashboard,PromptsPage}: FLEET_MAX_W → lib/support/panelMeta.ts (existing leaf); all three import from there. No new file (agents/ was at the 8-entry cap).
+    Untyped plugins declared in types.d.ts: jsx-a11y, promise, security, no-unsanitized (each cast at use site). no-secrets NOT declared (has index.d.ts).
 
-    NEXT (4/7): n (scope Node config files only — browser app), security (flat-native, register-off browser-N/A + detect-object-injection FP), no-unsanitized (livePreviews dangerouslySetInnerHTML scoped-off like P6), no-secrets (NO preset, register rule manually, watch base64/hash FPs). Then P8+ structure/boundaries/deadcode/type-coverage/lockdown/docs.
+    All config-level offs registered in allowed-eslint-exceptions.yaml (bidirectional guard balance holds). Hash-lock DEFERRED to P12 (X1139).
 
-    allowed-eslint-exceptions.yaml hash-lock still DEFERRED to P12 (X1139) — editing it now needs NO chain.sh --update; check-frontend-suppressions.sh bidirectional balance is satisfied (config offs ⇄ registry entries).
+    COMMIT PENDING: stage the 6 P7 files + tree-descriptions.yaml, EXCLUDE root .gitignore (+86 gaia bundle, M143 never-commit). generated/ = no drift.
 
-    NEVER commit root .gitignore +86 (gaia bundle) — unrelated, keep uncommitted.
+    NEXT (P8, X1135): ESLint max-lines:500, max-lines-per-function, complexity, max-depth, max-params, max-statements, max-nested-callbacks + eslint-plugin-project-structure. Coordinate with CB7. Exempt ui/ (shadcn).
   importance: high
   labels:
   - web-lint
@@ -297,7 +298,7 @@
   - P7
   - in-progress
   - resume
-  last_edited_ms: 1783437402637
+  last_edited_ms: 1783438922599
 48f2140d3c2dee0e:
   tl_dr: Entities module COMPLETE — all 151 stress tests passed (12 categories, 4 difficulty levels). 9 bugs found/fixed. Committed on 'entities' branch. Production-quality.
   contents: |-
