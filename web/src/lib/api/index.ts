@@ -35,8 +35,8 @@ import type {
   TreeRow,
   UnretireReceipt,
   Vital,
+  ClaudeUsageResponse,
 } from "./generated/types.gen"
-import type { ClaudeUsageResponse } from "./generated/types.gen"
 import {
   getApiClaudeUsage,
   getApiClaudeLoginStatus,

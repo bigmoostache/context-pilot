@@ -52,8 +52,8 @@ function flattenMarkdown(md: string): string {
     .replaceAll(/!\[([^\]]*)\]\([^)]*\)/g, "$1") // image → alt text
     .replaceAll(/\[([^\]]*)\]\([^)]*\)/g, "$1") // link → label
     .replaceAll(/<[^>]+>/g, " ") // strip HTML tags
-    .replaceAll(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "") // heading/quote/bullet markers
-    .replaceAll(/(\*\*|\*|__|~~|`)/g, "") // emphasis / code / strike markers
+    .replaceAll(/^\s{0,3}(?:#{1,6}|[-*+>]|\d+\.)\s+/gm, "") // heading/quote/bullet markers
+    .replaceAll(/\*\*|\*|__|~~|`/g, "") // emphasis / code / strike markers
     .replaceAll(/\s+/g, " ")
     .trim()
 }

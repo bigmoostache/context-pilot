@@ -9,7 +9,7 @@ import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-q
 import { qk } from "../query/sync"
 import * as api from "../api"
 import type { Agent } from "../types"
-import { useLive, type LiveQueryResult } from "./index"
+import { useLive, type LiveQueryResult } from "./core"
 
 /** Invalidate the active-fleet query — refetches the dashboard roster. Hoisted
  *  to module scope so the timeout-retry closures don't re-create it per call. */

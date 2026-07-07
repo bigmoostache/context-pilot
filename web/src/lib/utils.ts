@@ -98,7 +98,7 @@ function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEn
 async function walkEntry(entry: FileSystemEntry, prefix: string): Promise<DroppedFile[]> {
   if (entry.isFile) {
     const fileEntry = entry as FileSystemFileEntry
-    const file = await new Promise<File>((res, rej) => fileEntry.file(res, rej))
+    const file = await new Promise<File>((resolve, reject) => fileEntry.file(resolve, reject))
     return [{ file, path: prefix + entry.name }]
   }
   if (entry.isDirectory) {
@@ -273,7 +273,7 @@ function parseListLine(line: string): ParsedLine | null {
   if (dot > 0) {
     const marker = trimmed.slice(0, dot)
     const isNumeric = /^\d+$/.test(marker)
-    const isAlpha = marker.length === 1 && /^[a-zA-Z]$/.test(marker)
+    const isAlpha = marker.length === 1 && /^[a-z]$/i.test(marker)
     if (isNumeric || isAlpha) {
       return { indent, depth, kind: "ol", marker, rest: trimmed.slice(dot + 2) }
     }

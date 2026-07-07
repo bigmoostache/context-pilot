@@ -2186,6 +2186,10 @@
   path: crates/cp-mod-firecrawl/Cargo.toml
   description: 'Firecrawl module deps: cp-base, cp-vault, cp-render, crossterm, reqwest, serde, serde_json, serde_yaml.'
   last_edited_ms: 1783253850505
+2aac1c7be3f6b9f8:
+  path: web/src/lib/live/index.ts
+  description: 'Live data hooks (TanStack Query + SSE). useAgentMeta/useThreads/useConversation/useStreamingTokens/useLibrary/useFleet/useFleetMetrics/useMetrics. ensureSync SSE watcher. sendCommand→REST. web-lint P7: useLive+LiveQueryResult extracted to ./core (re-exported here) so ./mutations imports them from the leaf, breaking the index↔mutations barrel cycle.'
+  last_edited_ms: 1783437378784
 2aae70c7c2959553:
   path: src/modules/conversation_history/trap.rs
   description: History cleanup trap. check_and_trigger_trap() activates when ≥4 history panels on Queue_execute. trap_blocks_tool() blocks all except Close_conversation_history and Think. would_defuse_trap() projects remaining after queued closes. force_deactivate_trap() for auto-flush path. maybe_deactivate_trap() lifts when <4 remain. OPTIONAL_KEEP=1 (AI may keep 1 most-recent panel). Shared project_remaining_panels() helper.
@@ -2858,6 +2862,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+37d52361a755e011:
+  path: web/types.d.ts
+  description: Ambient module declarations for build/lint tooling shipping no types (tsconfig.node.json scope). Declares eslint-plugin-jsx-a11y (P6) AND eslint-plugin-promise (P7) as untyped (any) — eslint.config.ts casts each to its minimal used shape at the use site, which is the real type contract.
+  last_edited_ms: 1783437378933
 37e04c9835793229:
   path: web/src/lib/providers/DevModeProvider.tsx
   description: 'DevModeProvider component: dev-mode boolean persisted to localStorage ''cp-dev-mode''. web-lint P6: <DevModeContext value=> (React-19 provider idiom).'
@@ -2994,6 +3002,10 @@
   path: yamls/tools/firecrawl.yaml
   description: 'Firecrawl tools YAML. 4 tools: firecrawl_scrape (single URL), firecrawl_search (search+scrape), firecrawl_map (URL discovery), firecrawl_crawl (recursive crawl to file).'
   last_edited_ms: 1780560886866
+3a60eef8500935d0:
+  path: .github/checks/allowed-eslint-exceptions.yaml
+  description: Registry of allowed CONFIG-LEVEL ESLint exceptions (web-lint P4, frontend twin of allowed-lint-exceptions.yaml). Inline suppression BANNED; only legal escape is a config-level scoped rules:{off} override in eslint.config.ts, each registered here with reason+strategy, enforced bidirectionally by check-frontend-suppressions.sh. Now covers P4 (generated/**, ui/**, MarkdownEditor), P5 unicorn (8 tree-wide + scoped), P6 React stack (jsx-a11y/no-autofocus, no-array-index-key, Finder, livePreviews), P7 import-x (default, no-named-as-default, no-named-as-default-member tree-wide). Hash-lock deferred to P12.
+  last_edited_ms: 1783437379087
 3a64a36115de0521:
   path: crates/cp-orchestrator/src/transport/sse.rs
   description: 'SSE plumbing. SseMessage{id:Option<rev>,event,data}.encode()→id:/event:/data: lines. delta(rev)/stream/resync/invalidate constructors. SseBody: blocking Read fed by mpsc, Ok(0) EOF when senders dropped. SseSink.send/keep_alive (Err=client gone). channel() pairs them. OplogWaiter (X18 latency): notify RecommendedWatcher (kqueue/inotify) on oplog dir, wait(timeout) parks on mpsc coalescing bursts — wakes the SSE producer the instant the agent appends (sub-ms Linux). Manual Debug impl (RecommendedWatcher not Debug). stream_to_client: raw into_writer() + per-event flush (tiny_http BufWriter would never flush an unbounded stream). Reconnect-replay-by-rev native via Last-Event-ID.'
@@ -3825,6 +3837,10 @@
 49e0cd52dad75287:
   path: crates/cp-base/src/state/data/config.rs
   description: SidebarMode, Shared (config.json), WorkerState (per-worker), PanelData (panel persistence) — all serde structs
+  last_edited_ms: 0
+49ea74f97dd99e4e:
+  path: web/src/lib/utils.ts
+  description: 'Shared web utils. cn() (clsx+tailwind-merge). clipboard() (web-lint P3): returns navigator.clipboard honestly typed Clipboard|undefined via a function-indirection helper — a CALL result is opaque to TS control-flow-analysis, so clipboard()?.writeText stays an honest guard (navigator.clipboard is typed non-null by lib.dom but is genuinely undefined on insecure origin; an aliased const would be CFA-narrowed to non-null → dead ?.). Used by Message.tsx + markdown.tsx. T367/T471 zip-on-drop: zipFiles/zipDropped bundle dropped file(s)/folder tree into ONE .zip via fflate; extractDroppedFiles walks webkitGetAsEntry recursively (entries captured SYNC before first await). T359 list logic: resolveEnter/resolveTab + lineBounds/parseListLine. Consumed by ThreadComposer + ThreadConversation.'
   last_edited_ms: 0
 49f43f5e9718e31f:
   path: .github/checks/allowed-lint-exceptions.yaml
@@ -5470,6 +5486,10 @@
   path: web/src/components/shell/costs/parse.ts
   description: 'TSV parser for cost-tracking.tsv. CostRow interface (15 fields), parseCostTsv(), aggregation helpers: computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, crossTabToolCulprit (count matrix). buildMarkdownReport() serializes current filtered state as clean markdown tables.'
   last_edited_ms: 1782923787597
+6927df6e3ccb95bc:
+  path: web/src/lib/live/mutations.ts
+  description: 'Live imperative mutations (split from live/index): finder writes + agent lifecycle + avatar + useCreateCommand. One-shot POSTs → useMutation, invalidate the affected query family on success. web-lint P7: imports useLive/LiveQueryResult from ./core (not the ./index barrel) to break the index↔mutations import cycle.'
+  last_edited_ms: 1783437378858
 693b6e261eebafe7:
   path: src/app/actions/config.rs
   description: 'Config bar handlers: context budget, cleaning threshold, target proportion, max cost guard rail, theme cycling'
@@ -5534,6 +5554,10 @@
   path: crates/cp-oplog/src/replay.rs
   description: 'Oplog replay (GAP1/I5): Recovered{rev_head,heads,seen,roster}. fold_entry: Checkpoint=authoritative clone_from heads+seen+roster, MessageCreated=set_thread_head + RosterThread::fold_message, ThreadCreated/Archived/Restored/Paused/Resumed/Deleted/StatusChanged=RosterThread fold helpers (roster rebuilt from deltas), CommandEffect|SeenMark=seen.mark, others no-op. Fast-path reads only newest checkpoint-bearing segment; roster survives compaction because the checkpoint Snapshot carries it. Tests incl replay_rebuilds_roster_from_thread_deltas + roster_survives_compaction_via_checkpoint.'
   last_edited_ms: 1782315774643
+6aa1bb0cafe85297:
+  path: web/src/components/agents/FleetShell.tsx
+  description: 'Fleet shell — sidebar-less Agents⇄Prompts toggle. Accepts agents prop, forwards to FleetDashboard. Passes agents[0]?.id to PromptsPage for live library. web-lint P7: FLEET_MAX_W moved OUT to lib/support/panelMeta (imported from there now) to break the FleetShell↔{FleetDashboard,PromptsPage} import cycle.'
+  last_edited_ms: 1783437378558
 6ac2dc94e8071e0e:
   path: crates/cp-oplog/src/error.rs
   description: 'OplogError{Io,Frame} + Display + From<io::Error>/From<FrameError> + OplogResult alias. Extracted from append.rs (folder-size: append.rs hit 501 lines). Deliberately NO std::error::Error impl (dodges missing_trait_methods on unstable provide()).'
@@ -5714,6 +5738,10 @@
   path: src/infra/constants.rs
   description: API/layout/loop/persistence constants + theme color accessors (from YAML themes) + card design tokens (card_text, card_agent_bg, card_reverie_bg, card_queue_bg, card_think_bg) + icons + prompts.
   last_edited_ms: 0
+6dabab8d5027982e:
+  path: web/src/components/conversation/Message.tsx
+  description: 'Thread/conversation message renderer. Markdown body, inline file-upload chips, CopyButton(imported from ./CopyButton)+DeleteButton, ToolMessage card. web-lint P7: CopyButton definition extracted to its own module (cycle break); Message no longer exports it.'
+  last_edited_ms: 1783437378634
 6db299c6de39a2b9:
   path: crates/cp-orchestrator/src/transport/rest/env_keys.rs
   description: 'On-demand env-key inspection (T399) and editing (T404). KNOWN_KEYS whitelist prevents arbitrary env-var enum. resolve_env() checks runtime overrides before std::env. env_keys_list(): GET /api/env-keys returns [{env,label,exists}]. env_key_reveal(name): GET /api/env-keys/{name} returns full value + masked — admin-only when auth active. env_key_update(name): PUT /api/env-keys/{name} persists to ~/.context-pilot/.env + in-memory override for immediate visibility. mask_key helper. persist_to_global_env + format_env_line. 10 unit tests.'
@@ -5826,6 +5854,10 @@
   path: ui/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Greeting, aggregate stat strip, AgentCard grid (status badge Working/Needs input/Standby + one-line task summary + branch·model·cost, Open→agent threads, Manage→modal), New-agent card. AgentModal (Apple-grade): backdrop-fade+modal-pop entrance, gradient hero header, name-as-star field with focus-within ring + live slugified realm preview (folder picker dropped — realm derived from name), rich model cards (MODEL_META: tier/blurb/price/icon, radio-check, opt-rise stagger), quiet Archive ghost, name-gated primary, autofocus+Esc+⌘↵ keyboard.'
   last_edited_ms: 0
+7055c8216e2a22d9:
+  path: web/src/lib/live/core.ts
+  description: Live-query core — the shared useLive wrapper + LiveQueryResult shape. Extracted from ./index in web-lint P7 so ./mutations can import useLive/LiveQueryResult from this leaf instead of reaching back through the ./index barrel (which closed an index→mutations→index cycle import-x/no-cycle rejects). Wraps TanStack useQuery into the legacy result shape, fires ensureSync(agentId) for the SSE push plane, and auto-attributes each polled load via measureAsync(load:<resource>). index re-exports these for the public @/lib/live surface.
+  last_edited_ms: 1783437378406
 70bc7b703e57dd0b:
   path: .uploads/sourced_pdf/sourced_pdf/extract.py
   description: Value extractors for PDF (PyMuPDF word fusion with millier grouping) and XLSX (openpyxl numeric cells). Writes values/doc_K.yaml.
@@ -6350,6 +6382,10 @@
   path: crates/cp-orchestrator/src/transport/mod.rs
   description: Frontend transport REST+SSE over tiny_http. MAX_BODY=32MiB. route_rest dispatches all /api routes incl auth/ACL/env-keys/providers/releases/claude-usage+login+refresh(T451). handle() has centralized Bearer gate + per-agent ACL check. handle_stream = SSE with ticket-based ACL.
   last_edited_ms: 0
+7a53064bb0dd1dbb:
+  path: web/src/lib/live/index.ts
+  description: Live data hooks (TanStack Query + SSE). useAgentMeta/useThreads/useConversation/useStreamingTokens/useLibrary/useFleet/useFleetMetrics/useMetrics. ensureSync SSE watcher. sendCommand→REST. (P5 mutations refetch closures hoisted in mutations.ts.)
+  last_edited_ms: 0
 7a58a0162754f062:
   path: web/src/lib/api/finder.ts
   description: 'Finder filesystem REST endpoints (list/descriptions/preview/sheet/write/upload/mkdir/rename/move/trash/raw/download/conversation). T298: added uploadUnique (POST /fs/upload-unique — auto-creates dir, never overwrites, returns stored path/name/size) powering the chat composer attachment flow.'
@@ -6362,6 +6398,10 @@
   path: crates/cp-orchestrator/tests/openapi/paths.rs
   description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL, providers, releases, claude-usage). Includes deploy + restart-orchestrator paths.
   last_edited_ms: 1782843187327
+7aa0879b01e1bd89:
+  path: web/src/components/threads/ThreadList.tsx
+  description: 'Thread sidebar list. ThreadList (search/filter/new-thread) + ThreadRow (dot/name/focused+paused badges/preview + hover-swap Archive/Pause buttons). Groups: User turn / Agent''s turn / Archived. flattenMarkdown + previewOf for one-line row previews. Outer row is <div> not <button> (T401 nested-button fix); inner clickable row uses clickable() from lib/support/a11y (web-lint P6: role=button + Enter/Space keyboard, since it wraps nested archive/pause/delete buttons).'
+  last_edited_ms: 0
 7aa7e7fd61179722:
   path: .gitignore
   description: Git ignore rules. Includes *.sourced_pdf, .uploads, bridge runtime artifacts, harbor outputs, mitmproxy captures, .DS_Store, docs/slides build artifacts. devis-attali-context-pilot.md added after security incident. .context-pilot/* blocks messages/ (116K conversation YAMLs) from accidental commit.
@@ -6662,6 +6702,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/finder/download.rs
   description: 'Finder file/folder download (split from finder.rs). fs_download: files as raw bytes (10MiB cap, Content-Disposition attachment), folders zipped to /tmp via system `zip -r -q` (100MiB cap) then cleaned up. Confined to realm via support::confined_path.'
   last_edited_ms: 1781889348203
+812b7c40c1588866:
+  path: web/src/components/threads/ThreadConversation.tsx
+  description: 'Center pane: thread conversation + composer. segmentLog folds auto traces into AutoRun. T367/T471 OS-file drag-drop+zip. T510 FREEZE FIX (two halves): (1) LAYOUT — content-visibility:auto + contain-intrinsic-size on each message-row + AutoRun so Firefox skips off-screen layout/paint; (2) COMMIT — MessageRow extracted as React.memo (comparator msg===+agentId===) + AutoRun memo + useMemo(segmentLog) + useCallback(handleDelete): TanStack structural sharing keeps unchanged message refs stable, so a delta/poll re-renders only the changed row, not all 1690 — kills the 92-commit/3933ms threads·update render storm. scrollIntoView wrapped in measure(threads:scrollIntoView).'
+  last_edited_ms: 0
 813c569530d42c3b:
   path: web/src/lib/api/generated/sdk.gen.ts
   description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
@@ -7046,6 +7090,10 @@
   path: src/app/run/mod.rs
   description: 'Sub-module declarations. 7 modules: input (constructor/autocomplete), lifecycle (main loop), reverie (sub-agent), streaming (LLM responses), threads (thread helpers), tools (execution pipeline), watchers (file/GH).'
   last_edited_ms: 0
+88d64b5f80cb8b31:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 88eafab0f0d49a30:
   path: crates/cp-orchestrator/src/services/auth/backup.rs
   description: 'Auth.db backup system (NFR-19/20): BackupScheduler (rolling 5min overwrite + daily AM/PM permanent snapshots). AuthStore::backup_to via SQLite online backup API. epoch_to_ymd_h (Hinnant civil-time algorithm). Wired into runtime.rs slow cadence. 6 tests.'
@@ -7370,6 +7418,10 @@
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. Manage mode (T321): wider (w-960px) 2-col grid when auth enabled — left = name + provider/model form, right = <AgentAclSection>. Single-col when auth disabled. max-h constrained + scrollable body. Clickable avatar in header uploads profile pic (T338). Submit sends Configure + renameAgent (T328, concurrent Promise.all when name changed). Restart/Retire footer. Create mode: narrower single-col, useCreateAgent.'
   last_edited_ms: 1782249265726
+8eeb31ef835ea0c1:
+  path: web/src/components/conversation/CopyButton.tsx
+  description: 'Discrete click-to-copy button (green-tick-for-2s feedback) beneath message bubbles + reused by the markdown renderer''s code/table Copy controls. Extracted into its OWN leaf module in web-lint P7 to break the Message↔markdown import cycle (import-x/no-cycle): Message imports Markdown, markdown imports CopyButton — routing the button through a shared leaf keeps that edge acyclic. clipboard() guard for insecure-origin no-op. align mirrors bubble side.'
+  last_edited_ms: 1783437378316
 8efe5d62fef92d68:
   path: web/src/components/shell/config/categories.ts
   description: 'Settings category identifiers (CatId enum: general/usage/services/releases) + CATEGORIES metadata. Split out of ConfigPanes in web-lint P0 (no component export → Fast-Refresh clean).'
@@ -8586,6 +8638,10 @@ a7d58ceded63cdd3:
   path: crates/cp-orchestrator/tests/openapi/schemas_ext.rs
   description: Transport-layer OpenAPI schemas — receipts, auth, env-keys, filesystem types, FinderKind enum, LLM registry (ModelDef/ProviderDef), SSE delta protocol (OpEntry/OpEntryKind), release management (ReleaseEntry/ReleasesResponse/ArchResponse/DownloadResponse/SelectResponse/DeployResponse/RestartOrchestratorResponse).
   last_edited_ms: 1782836346020
+a7dc15f61fd14a84:
+  path: web/src/lib/support/panelMeta.ts
+  description: 'Panel UI metadata. panelIcon Record<PanelKind,LucideIcon>, Accent=AccentToken|''muted'', accentVar Record<Accent,CSSVar>, loadColor(ratio)->var, fmtTokens, fmtCost. web-lint P7: now also owns FLEET_MAX_W (the fleet-home shared content width) — moved here from FleetShell so FleetDashboard+PromptsPage import it from this leaf without cycling with the shell that renders them (import-x/no-cycle).'
+  last_edited_ms: 1783437378483
 a80704251bc77c86:
   path: crates/cp-wire/src/types/oplog.rs
   description: 'OpEntry (schema_version, rev, timestamp_ms) + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated, Lifecycle, CostAggregate, Checkpoint{heads}, Unknown catch-all. Framed payload (len+CRC) on wire. 3 round-trip + tolerant-decode tests.'
@@ -9634,6 +9690,10 @@ bb62ba986c3f2a2d:
   path: web/src/components/finder/views/ColumnsView.tsx
   description: Miller-columns view (ColumnsView + MillerColumn + PaneRow). Per-ancestor useFs fetch, traversed-path highlight (onTrail via relOf-normalized nextPath), folder-row + column-body drop targets (relOf realm-relative dest — T293), select-none for native drag-start (T287).
   last_edited_ms: 1782040975608
+bb847d51c1897703:
+  path: web/package.json
+  description: 'Frontend deps. scripts: dev/build(tsc -b && vite build)/lint/preview + web-lint P2: format (prettier --write .) + format:check (prettier --check .). @tanstack/react-query, react 19.2, react-markdown+remark+katex, tailwindcss 4.3, shadcn, vite 8, playwright, full eslint ratchet plugin roster + prettier.'
+  last_edited_ms: 0
 bb8a674ef6c1a158:
   path: web/vite.config.ts
   description: 'Vite config: react + tailwind v4 plugins, @ alias to src. Dev server on port 5174.'
@@ -10338,6 +10398,10 @@ c86f42eaf477c5e2:
   path: yamls/reverie.yaml
   description: 'Reverie sub-agent prompts: kickoff, tool restrictions, report instructions, nudge, error messages'
   last_edited_ms: 0
+c8760c3befde4ba0:
+  path: web/tsconfig.app.json
+  description: 'App-scope TS compiler config (bundler mode, react-jsx, es2023). web-lint P1 LANDED: full maximal strict superset active (strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes + noImplicitReturns/Override + noPropertyAccessFromIndexSignature + noUncheckedSideEffectImports + allowUnreachableCode:false + allowUnusedLabels:false + forceConsistentCasingInFileNames + noUnusedLocals/Parameters + erasableSyntaxOnly). tsc app = 0 errors. The rustc-forbid twin.'
+  last_edited_ms: 0
 c89410cd290ef513:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/clay-rose #be7a6e + teal #4e7a82) + DARK ''Nordic Tide'' (#213448 deep navy bg / #547792 steel-blue accent / #94B4C1 seafoam primary+signal / #EAE0CF warm beige ''ink'' text; cool ground + warm ink, intermediate surfaces derived) via :root/.dark token blocks. SF Pro chrome, IBM Plex Mono for data. Soft shadows, vibrancy, no glow. Keyframes: finder-pop/ql-pop/menu-pop/ants/checker (Finder), modal-pop/backdrop-fade/opt-rise (modals), finder-slider.'
@@ -10486,6 +10550,10 @@ cbe3798af576ea90:
   path: crates/cp-orchestrator/src/transport/inspect/metrics.rs
   description: '§19 observability metrics endpoints. agent_metrics + fleet_metrics build per-agent snapshot: durable cost-breaker state (tripped/spend/budget), stream health (subs/dropped/degraded), view-vs-oplog rev lag (oplog_head_rev read fresh outside the lock), phase+lifecycle. Only figures the backend genuinely holds — latency histograms deliberately not synthesised.'
   last_edited_ms: 1781858603043
+cbe3d73fc13c6d3d:
+  path: web/src/lib/support/markdown.tsx
+  description: 'GFM markdown renderer (react-markdown+remark-gfm+math+katex). onAccent/default variants. clipboard() guard. extractText iterative. web-lint P7: CopyButton now imported from @/components/conversation/CopyButton (its own leaf module) instead of Message — breaks the Message↔markdown import-x/no-cycle.'
+  last_edited_ms: 1783437378709
 cbeaa3dfd0701f21:
   path: src/llms/mod.rs
   description: LLM abstraction layer. LlmClient trait (stream + check_api). 7 providers via get_client(). Unified LlmRequest/ApiMessage/ContentBlock types. start_streaming() assembles prompt + spawns thread. api_messages_to_cc_json() places cache breakpoints. SSE error logging.
@@ -11886,6 +11954,10 @@ eacc3390f37b15c0:
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent (T328) + avatar CRUD (T338) + createCommand (T350). Re-exports ./auth + ./finder + ./body (T357 fetchMessageBody, split out for <500) + shares ./client request/BASE/envelope. The @/lib/api single import surface.'
   last_edited_ms: 0
+eae2be382da4b80c:
+  path: web/eslint.config.ts
+  description: 'Frontend ESLint flat config — Rust-parity strict stack (branch web-lint), RATCHET P0→P13. P3 strictTypeChecked+stylisticTypeChecked. P4 anti-cheat (eslint-comments no-use, ban-ts-comment). P5 unicorn. P6 React stack (@eslint-react/react-hooks/jsx-a11y). P7 correctness (partial): regexp flat/recommended, promise flat/recommended (+always-return ignoreLastCallback, catch-or-return allowFinally), import-x recommended+typescript+no-cycle:error{ignoreExternal} — with import-x/default + no-named-as-default(-member) OFF tree-wide (tsc-redundant/flat-config idiom). globalIgnores dist+generated/**+e2e/**+playwright.config.ts.'
+  last_edited_ms: 1783437379010
 eb0038bd66de3fa0:
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook, CLI subcommands (typst-compile/recompile-watched). use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
@@ -12970,6 +13042,10 @@ feeba821ce42dd7e:
   path: crates/cp-base/src/config/yaml_sync.rs
   description: YamlSync engine. SyncEntry trait (yaml_key, last_edited_ms, set_last_edited_ms). Generic load/save/upsert/remove/populate/migrate/remove_where. BTreeMap-based, additive merge, latest-wins conflict resolution, .bak backup.
   last_edited_ms: 1780497937366
+feefd83921c29132:
+  path: web/src/lib/api/index.ts
+  description: 'REST API client barrel. SDK layer: 28 endpoints via generated SDK. Re-exports ./auth+./finder+./body+./envKeys (env-keys.ts renamed envKeys.ts in web-lint P5 filename-case).'
+  last_edited_ms: 0
 fef3821b37ad53f0:
   path: .git/index
   description: Git index (binary). Not source.

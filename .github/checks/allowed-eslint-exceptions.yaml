@@ -297,3 +297,39 @@ exceptions:
     strategy: >
       Re-evaluate if a JSX-native syntax highlighter (one that returns a React
       element tree instead of an HTML string) replaces highlight.js.
+
+  # ── P7 import-x tsc-redundant / flat-config-idiom rules — off tree-wide ────
+  - path: "web/**"
+    rule: "import-x/default"
+    reason: >
+      import-x/default walks a module for a `default` export and FALSE-POSITIVES
+      on CJS-authored ESLint plugins (e.g. @eslint-community/eslint-plugin-eslint-
+      comments) whose module.exports is consumed via esModuleInterop's synthetic
+      default. tsc already proves every `import x from "…"` default binding is
+      valid, so the rule is pure tsc-redundant noise here — import-x's own
+      TypeScript guidance drops the resolution rules tsc subsumes.
+    strategy: >
+      Irreducible while tsc (not import-x) is the authority on module resolution.
+
+  - path: "web/**"
+    rule: "import-x/no-named-as-default"
+    reason: >
+      Cautions when a DEFAULT import shares a name with one of the module's NAMED
+      exports (e.g. `import reactRefresh …` / `import importX …` while the module
+      also exports named members). That is the UNIVERSAL flat-config plugin
+      import idiom — every ESLint flat config imports the plugin's default and
+      reads `.configs`/`.flatConfigs` off it. Pure style caution, zero
+      correctness value; fires only on correct, conventional code.
+    strategy: >
+      Irreducible stylistic caution against the standard flat-config idiom.
+
+  - path: "web/**"
+    rule: "import-x/no-named-as-default-member"
+    reason: >
+      Cautions when a member access on a default import (`tseslint.configs`,
+      `regexp.configs`, `importX.flatConfigs`) collides with a same-named NAMED
+      export of that module. Exactly how every ESLint flat config is written —
+      `tseslint.configs.recommended` is the documented usage — so the rule is
+      pure noise here with no correctness value.
+    strategy: >
+      Irreducible stylistic caution against the standard flat-config idiom.

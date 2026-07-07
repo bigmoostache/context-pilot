@@ -10,12 +10,11 @@ import {
   Settings2,
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { accentVar, fmtCost } from "@/lib/support/panelMeta"
+import { accentVar, fmtCost, FLEET_MAX_W } from "@/lib/support/panelMeta"
 import { useMetrics, useRetiredFleet, useUnretireAgent, useAgentMeta } from "@/lib/live"
 import { avatarUrl } from "@/lib/api"
 import type { Agent, AgentStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { FLEET_MAX_W } from "./FleetShell"
 import { AgentModal } from "./AgentModal"
 
 const statusMeta: Record<AgentStatus, { label: string; color: string }> = {

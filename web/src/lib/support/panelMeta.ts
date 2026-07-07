@@ -65,3 +65,12 @@ export function fmtTokens(n: number): string {
 export function fmtCost(n: number): string {
   return `$${n.toFixed(2)}`
 }
+
+/**
+ * Shared content width for the whole fleet home (the Agents ⇄ Prompts shell and
+ * both its sub-pages centre on this so their left/right edges line up as you
+ * flip between tabs). Lives here — a leaf presentation-token module — rather
+ * than in FleetShell so the two sub-pages (FleetDashboard, PromptsPage) can
+ * import it without forming an import cycle with the shell that renders them.
+ */
+export const FLEET_MAX_W = "max-w-[960px]"

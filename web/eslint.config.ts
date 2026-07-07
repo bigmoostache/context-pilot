@@ -6,6 +6,9 @@ import eslintComments from "@eslint-community/eslint-plugin-eslint-comments"
 import unicorn from "eslint-plugin-unicorn"
 import eslintReact from "@eslint-react/eslint-plugin"
 import jsxA11y from "eslint-plugin-jsx-a11y"
+import regexp from "eslint-plugin-regexp"
+import promise from "eslint-plugin-promise"
+import importX from "eslint-plugin-import-x"
 import tseslint from "typescript-eslint"
 import { defineConfig, globalIgnores } from "eslint/config"
 import type { Linter } from "eslint"
@@ -76,6 +79,36 @@ export default defineConfig([
       // `noPropertyAccessFromIndexSignature` violation) and the surrounding
       // `no-unsafe-*` rules stay clear.
       (jsxA11y as { flatConfigs: { recommended: Linter.Config } }).flatConfigs.recommended,
+      // ── P7 correctness & security stack (added one plugin at a time) ────
+      // eslint-plugin-regexp — catches genuinely-buggy regular expressions
+      // (unused capture groups, super-linear backtracking, redundant/dead
+      // alternations, control-char confusables). Its `flat/recommended` lands
+      // at error; violations are real bugs, fixed at the source.
+      regexp.configs["flat/recommended"],
+      // eslint-plugin-promise — enforces correct Promise usage (every chain
+      // ends in a `.catch()` or is returned, no accidentally-swallowed
+      // rejections, no `return` inside `finally`, valid executor/`Promise.*`
+      // arg shapes). Its `flat/recommended` lands at error; violations are
+      // genuine async-correctness bugs or fixed with an explicit sink.
+      // eslint-plugin-promise ships an untyped default export (its `.configs`
+      // resolves to `any`), so — exactly like the jsxA11y cast above — narrow it
+      // to the single named config we read. A named-property cast (not an index
+      // signature) yields `Linter.Config` directly, so `noUncheckedIndexedAccess`
+      // adds no `| undefined` and the surrounding type-aware `no-unsafe-member-
+      // access` / `no-unsafe-assignment` rules stay clear.
+      (promise as { configs: { "flat/recommended": Linter.Config } }).configs["flat/recommended"],
+      // eslint-plugin-import-x — module-graph hygiene: no import cycles
+      // (import-x/no-cycle, wired at error in the rules block — the structural
+      // payoff of this plugin, the M141 layering guard's precursor), no
+      // duplicate imports, no self-import, valid named/default bindings. Two
+      // presets: `recommended` (the rule set) + `typescript` (wires
+      // eslint-import-resolver-typescript so the `@/*` tsconfig path aliases +
+      // extensionless `.ts`/`.tsx`/`.gen.ts` imports RESOLVE — without it
+      // no-cycle would silently under-trace the graph and no-unresolved would
+      // false-positive on every alias). The tsc-redundant resolution rules are
+      // relaxed in the rules block (tsc already proves them).
+      importX.flatConfigs.recommended,
+      importX.flatConfigs.typescript,
     ],
     plugins: {
       // react-hooks is now registered via its v7 `recommended-latest` flat
@@ -140,6 +173,49 @@ export default defineConfig([
         },
       ],
       // Classic react-hooks pair (see the plugins note above).
+      // ── P7 promise calibrations (option-relaxations — the rule stays at
+      //    `error`, the clippy.toml-threshold twin; NOT registry disables) ──
+      //
+      // A TERMINAL `.then(() => { …side-effect… })` legitimately returns nothing
+      // — its whole job is the effect (setState, onClose, a toast). The rule's
+      // real value is catching a MIDDLE `.then()` that forgets to return and so
+      // silently breaks the chain's value flow; `ignoreLastCallback` keeps that
+      // teeth while permitting the terminal side-effect callback that pervades
+      // React handlers. A non-terminal miss still errors.
+      "promise/always-return": ["error", { ignoreLastCallback: true }],
+      // A chain that ends `.catch(…).finally(() => setSaving(false))` IS fully
+      // handled — the rejection has a sink; the `.finally()` is just cleanup
+      // after it. The default requires the LAST call to be `.catch()`, which a
+      // trailing `.finally()` violates. `allowFinally` recognises the
+      // catch-then-finally idiom; a chain with NO catch at all still errors.
+      "promise/catch-or-return": ["error", { allowFinally: true }],
+      // ── P7 import-x: no-cycle comes on ─────────────────────────────────
+      // import-x/recommended ships no-cycle OFF (it's resolution-heavy). Turn
+      // it on at error: a circular import between modules is a real
+      // maintainability + init-order hazard and the structural precursor to the
+      // P9 boundaries layering guard (M141). `maxDepth: Infinity` traces the
+      // full graph; `ignoreExternal` skips node_modules cycles we don't own.
+      "import-x/no-cycle": ["error", { ignoreExternal: true }],
+      // ── P7 import-x tsc-redundant / flat-config-idiom relaxations
+      //    (registered in allowed-eslint-exceptions.yaml — the config-level
+      //    channel, never an inline disable) ──
+      //
+      // import-x/default walks a module for a `default` export. It FALSE-
+      // POSITIVES on CJS-authored ESLint plugins (e.g. eslint-comments) whose
+      // `module.exports` is consumed via esModuleInterop's synthetic default —
+      // tsc already proves every `import x from "…"` binding is valid, so this
+      // rule is pure tsc-redundant noise here. Off tree-wide (the plugin's own
+      // TS guidance drops the resolution rules tsc subsumes).
+      "import-x/default": "off",
+      // no-named-as-default / -member CAUTION when a default import shares a
+      // name with one of the module's NAMED exports (`import tseslint …` while
+      // the module also exports `configs`). That is the UNIVERSAL flat-config
+      // plugin idiom — `tseslint.configs.*`, `regexp.configs.*`,
+      // `importX.flatConfigs.*` are exactly how every ESLint flat config is
+      // written — so the rule fires only on correct, conventional code. Pure
+      // style noise with no correctness value; off tree-wide.
+      "import-x/no-named-as-default": "off",
+      "import-x/no-named-as-default-member": "off",
       // ── P6: exhaustive-deps comes due ──────────────────────────────────
       // react-hooks/recommended-latest (extends) sets rules-of-hooks + the
       // compiler-aware rules at error, but leaves exhaustive-deps at its

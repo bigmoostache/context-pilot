@@ -20,13 +20,12 @@
 // The imperative finder/agent mutations live in ./mutations and are re-exported
 // here so `@/lib/live` stays the single import surface.
 
-import { useEffect } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { BACKSTOP_POLL_MS } from "../query/queryClient"
-import { ensureSync, mergeThreadLogs, qk } from "../query/sync"
+import { useEffect, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { mergeThreadLogs, qk } from "../query/sync"
 import { getOrCreateSseClient } from "../query/sse"
-import { measure, measureAsync } from "../support/telemetry"
-import { useRef, useState } from "react"
+import { measure } from "../support/telemetry"
+import { useLive, type LiveQueryResult } from "./core"
 import * as api from "../api"
 
 import type {
@@ -48,56 +47,13 @@ import type {
 
 export * from "./mutations"
 
-// ── Result shape (unchanged — consumers depend on this) ──────────────
+// ── Live-query core (re-exported for the public `@/lib/live` surface) ─
+//
+// `useLive` + `LiveQueryResult` moved to ./core so ./mutations can import them
+// without cycling back through this barrel (import-x/no-cycle). Re-exported here
+// so every existing `@/lib/live` consumer keeps its import path unchanged.
 
-export interface LiveQueryResult<T> {
-  data: T | undefined
-  loading: boolean
-  error: Error | null
-  refetch: () => void
-}
-
-/**
- * Wrap a TanStack `useQuery` into the legacy `LiveQueryResult` shape and ensure
- * the agent's SSE→cache bridge is live. `agentId` is optional: fleet-level
- * resources pass none (no bridge), agent-scoped ones pass theirs.
- */
-export function useLive<T>(
-  queryKey: readonly unknown[],
-  queryFn: () => Promise<T>,
-  opts: { agentId?: string; enabled?: boolean; pollMs?: number } = {},
-): LiveQueryResult<T> {
-  const { agentId, enabled = true, pollMs = BACKSTOP_POLL_MS } = opts
-
-  // Guarantee the push plane is running for this agent whenever its data is
-  // observed. Idempotent + no teardown (one long-lived subscription per agent).
-  useEffect(() => {
-    if (agentId) ensureSync(agentId)
-  }, [agentId])
-
-  const q = useQuery({
-    queryKey,
-    // Auto-attribute every polled load: time the whole fetch+parse+reshape span
-    // and record it under `load:<resource>` (the queryKey head). On this
-    // same-origin 127.0.0.1 cockpit the network wait is sub-ms, so a multi-
-    // second span is the synchronous payload parse/reshape — the freeze suspect
-    // that lands OUTSIDE the SSE fold and React render (both already
-    // instrumented). A `load:*` entry coinciding with a main-thread stall names
-    // exactly which endpoint's parse burned it, on every browser.
-    queryFn: () => measureAsync(`load:${String(queryKey[0])}`, queryFn),
-    enabled,
-    refetchInterval: pollMs > 0 ? pollMs : false,
-  })
-
-  return {
-    data: q.data,
-    loading: q.isLoading,
-    error: q.error instanceof Error ? q.error : null,
-    refetch: () => {
-      void q.refetch()
-    },
-  }
-}
+export { useLive, type LiveQueryResult } from "./core"
 
 // ── Fleet hooks ───────────────────────────────────────────────────────
 

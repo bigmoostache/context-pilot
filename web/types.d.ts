@@ -9,3 +9,10 @@
 // an untyped (`any`) module here is deliberate and safe — the cast at the use
 // site is the actual type contract.
 declare module "eslint-plugin-jsx-a11y"
+
+// eslint-plugin-promise (P7 correctness stack) likewise ships no bundled types
+// and has no `@types/*` package. eslint.config.ts imports its default export
+// and casts it to the minimal `{ configs: { "flat/recommended" } }` shape it
+// uses at the use site — so an untyped (`any`) module here is deliberate and
+// safe, the cast being the real type contract.
+declare module "eslint-plugin-promise"

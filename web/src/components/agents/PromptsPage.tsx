@@ -6,7 +6,7 @@ import { useLibrary } from "@/lib/live"
 import type { LibraryItem, LibraryKind } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { ImportModal, PromptModal } from "./PromptModal"
-import { FLEET_MAX_W } from "./FleetShell"
+import { FLEET_MAX_W } from "@/lib/support/panelMeta"
 
 /**
  * Global prompt library — the fleet dashboard's "Prompts" page. Manages the

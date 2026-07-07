@@ -19,7 +19,7 @@ export function renderInline(text: string): ReactNode {
 function parseSegments(line: string): ReactNode[] {
   const out: ReactNode[] = []
   // tokenize on ** and `
-  const re = /(\*\*[^*]+\*\*|`[^`]+`)/g
+  const re = /\*\*[^*]+\*\*|`[^`]+`/g
   let last = 0
   let m: RegExpExecArray | null
   let k = 0

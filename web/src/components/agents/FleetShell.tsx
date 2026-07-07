@@ -3,6 +3,7 @@ import { LayoutGrid, Library } from "lucide-react"
 import { FleetDashboard } from "./FleetDashboard"
 import { PromptsPage } from "./PromptsPage"
 import { cn } from "@/lib/utils"
+import { FLEET_MAX_W } from "@/lib/support/panelMeta"
 import type { Agent } from "@/lib/types"
 
 /**
@@ -20,13 +21,6 @@ import type { Agent } from "@/lib/types"
  * toggle; both sub-pages are rendered full-bleed and untouched below it.
  */
 type HomeTab = "agents" | "prompts"
-
-/**
- * Shared content width for the whole fleet home — the toggle bar, the agent
- * grid and the prompt library all centre on this so their left/right edges
- * line up perfectly as you flip between tabs. Single source of truth.
- */
-export const FLEET_MAX_W = "max-w-[960px]"
 
 export function FleetShell({
   agents,
