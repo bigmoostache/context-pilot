@@ -1,0 +1,66 @@
+# Curated registry of allowed CONFIG-LEVEL ESLint exceptions (web frontend).
+#
+# The frontend twin of .github/checks/allowed-lint-exceptions.yaml (Rust).
+#
+# PHILOSOPHY — stricter than Rust's per-site #[allow] model:
+#   Inline lint/type suppression is BANNED OUTRIGHT in hand-written source.
+#   There is no such thing as a legal inline `eslint-disable`, `@ts-ignore`,
+#   `@ts-nocheck`, `@ts-expect-error`, or `@ts-check` — the P4 anti-cheat layer
+#   (eslint-comments/no-use + ban-ts-comment + reportUnusedDisableDirectives,
+#   plus the CI grep-guard check-frontend-suppressions.sh) forbids them all.
+#
+#   The ONLY way to relax a rule is a CONFIG-LEVEL scoped override — a
+#   `files: [...] rules: { "<rule>": "off" }` block in web/eslint.config.ts —
+#   and every such override MUST be registered here with a justification.
+#   check-frontend-suppressions.sh enforces this bidirectionally (a config
+#   "off" with no entry fails; an entry with no config "off" fails). This file
+#   is hash-locked (protected-files.yaml + the lint chain) so no exception can
+#   be added silently.
+#
+# Fields:
+#   path    — file glob the scoped override targets (matches eslint.config.ts).
+#   rule    — the ESLint rule id disabled, or '*' to document a whole-tree
+#             globalIgnore (codegen output ESLint never sees).
+#   reason  — why the exception is currently accepted.
+#   strategy— how it could eventually be eliminated.
+
+exceptions:
+  # ── Generated OpenAPI bindings — globally ignored (never linted) ──────────
+  - path: "web/src/lib/api/generated/**"
+    rule: "*"
+    reason: >
+      hey-api OpenAPI codegen output, regenerated verbatim from openapi.json by
+      CB3/CB5. Globally ignored by ESLint (globalIgnores in eslint.config.ts)
+      and carries a // @ts-nocheck header — the generated-bindings exception,
+      the exact analog of the Rust generated-code allowance. Hand-editing it to
+      satisfy a lint is forbidden; the committed tree must stay byte-identical
+      to a fresh codegen for the @ts-nocheck drift check to pass.
+    strategy: >
+      Irreducible — machine-generated. Regenerate, never hand-fix.
+
+  # ── Vendored shadcn primitives — Fast-Refresh purity not enforceable ──────
+  - path: "web/src/components/ui/**"
+    rule: "react-refresh/only-export-components"
+    reason: >
+      Vendored shadcn/ui primitives ship a component plus its cva() variant
+      table per file by design — the upstream canonical shape we don't rewrite.
+      The mixed component+constant export trips react-refresh purity, which is
+      irrelevant for vendored code we never author.
+    strategy: >
+      Irreducible without forking every shadcn primitive. Re-evaluate if the
+      upstream files are ever restructured to component-only exports.
+
+  # ── MarkdownEditor — contentEditable WYSIWYG has no non-deprecated API ────
+  - path: "web/src/components/agents/MarkdownEditor.tsx"
+    rule: "@typescript-eslint/no-deprecated"
+    reason: >
+      The WYSIWYG editor drives a contentEditable surface through
+      document.execCommand / queryCommandState. Both are marked deprecated by
+      MDN, yet they remain the ONLY browser API for rich-text formatting of a
+      contentEditable region — there is no standardised replacement (EditContext
+      / Input Events L2 don't cover formatting commands, and every WYSIWYG
+      library still relies on execCommand). Scoped to this one file + this one
+      rule; every other rule stays at error.
+    strategy: >
+      Re-evaluate when a standardised formatting API (e.g. a matured
+      EditContext) covers bold/italic/list/heading commands for contentEditable.

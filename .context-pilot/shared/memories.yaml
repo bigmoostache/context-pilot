@@ -271,7 +271,7 @@
   - forbidden
   last_edited_ms: 0
 45b9baa7eb6b3f01:
-  tl_dr: 'T506 web-lint P0+P1+P2+P3 COMPLETE. P3: core type-aware eslint (strictTypeChecked+stylisticTypeChecked, all error, --max-warnings 0), 562 raw→0 (3 calibrations + burn-down). NEXT: P4 anti-cheat layer (X1131).'
+  tl_dr: 'T506 web-lint P0-P4 COMPLETE. P4 anti-cheat DONE: banned eslint-disable + hardened ban-ts-comment + check-frontend-suppressions.sh grep-guard (CI-wired) + allowed-eslint-exceptions.yaml registry. NEXT: P5 opinion engines (X1132).'
   contents: |-
     P0 = scaffold + ignores + green baseline (X1127). P1 (X1128) = tsc maximal strict, pushed 743d2bfe on web-lint.
 
@@ -292,7 +292,7 @@
   - P1
   - complete
   - milestone
-  last_edited_ms: 1783376767937
+  last_edited_ms: 1783411469975
 48f2140d3c2dee0e:
   tl_dr: Entities module COMPLETE — all 151 stress tests passed (12 categories, 4 difficulty levels). 9 bugs found/fixed. Committed on 'entities' branch. Production-quality.
   contents: |-

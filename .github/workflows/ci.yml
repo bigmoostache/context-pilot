@@ -64,6 +64,9 @@ jobs:
       - name: Check vault bypass
         run: .github/checks/check-vault-bypass.sh
 
+      - name: Check frontend suppressions (P4 anti-cheat)
+        run: .github/checks/check-frontend-suppressions.sh
+
   contract:
     name: Contract (OpenAPI · TypeScript)
     runs-on: ubuntu-latest

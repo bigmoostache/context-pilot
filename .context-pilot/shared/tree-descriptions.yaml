@@ -3758,6 +3758,10 @@
   path: crates/cp-orchestrator/src/services/auth/backup.rs
   description: 'Auth.db backup system (NFR-19/20): BackupScheduler (rolling 5min overwrite + daily AM/PM permanent snapshots). AuthStore::backup_to via SQLite online backup API. epoch_to_ymd_h (Hinnant civil-time algorithm). Wired into runtime.rs slow cadence. 6 tests.'
   last_edited_ms: 1782240566118
+4ec220d0ce208288:
+  path: .github/checks/check-frontend-suppressions.sh
+  description: 'Frontend anti-suppression guard (web-lint P4, twin of check-vault-bypass.sh). Two invariants, CI-side, independent of ESLint config: (1) STOWAWAY — no inline eslint-disable/@ts-ignore/@ts-nocheck/@ts-expect-error/@ts-check in web/src (excl generated/**); the BANNED regex anchors to real directive position `(//|/*)<ws>keyword` so backtick-wrapped mentions in prose don''t false-positive. (2) bidirectional config⇄registry audit — every `"<rule>": "off"` scoped override in eslint.config.ts must have a matching entry in allowed-eslint-exceptions.yaml and vice-versa (the ''*'' wildcard globalIgnore doc is exempt). Dual-mode: no args = full CI scan (both invariants); with args = callback stowaway-grep on given files. BSD/macOS-safe ([[:space:]] not \s). Wired in ci.yml Structure job.'
+  last_edited_ms: 1783411415593
 4ec70989c3f9ef8c:
   path: crates/cp-vault/src/registry.rs
   description: Key registry — ALL_KEYS static array with 17 KeyDefinitions. Single source of truth replacing 3 prior registries. resolve_definition() pub for dual-name lookup.
@@ -6226,6 +6230,10 @@
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
   last_edited_ms: 0
+81c4b37233abbe17:
+  path: .github/checks/allowed-eslint-exceptions.yaml
+  description: 'Registry of allowed CONFIG-LEVEL ESLint exceptions (web-lint P4, frontend twin of allowed-lint-exceptions.yaml). Philosophy stricter than Rust''s per-site #[allow]: inline suppression is BANNED OUTRIGHT; the ONLY legal escape is a config-level scoped `rules:{"<rule>":"off"}` override in eslint.config.ts, each registered here with reason+strategy. 3 entries: generated/** (''*'' globalIgnore + @ts-nocheck), ui/** (react-refresh/only-export-components, shadcn vendored), MarkdownEditor.tsx (@typescript-eslint/no-deprecated, execCommand/queryCommandState = only contentEditable WYSIWYG API). Enforced bidirectionally by check-frontend-suppressions.sh. Hash-lock deferred to P12.'
+  last_edited_ms: 1783411415668
 81c771a7fc9e5ac0:
   path: ui/src/components/shell/TopBar.tsx
   description: 'Cockpit header strip: app mark, view switcher (Threads/Cockpit segmented control), project breadcrumb, branch chip, global cost, status dot.'
@@ -9850,6 +9858,10 @@ ccee0da7019e157a:
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+cd0e9912a3ef3beb:
+  path: .github/workflows/ci.yml
+  description: 'Unified CI: 3 jobs — rust (fmt+clippy+build+test), structure (file-lengths/folder-sizes/lint-exceptions/lint-config-hashchain/web-structure/vault-bypass/frontend-suppressions), contract (OpenAPI+TS drift). web-lint P4 added the ''Check frontend suppressions'' step (check-frontend-suppressions.sh) to the Structure job after vault-bypass. Contract job installs web deps via pnpm; action-setup pinned to pnpm 11.6.0 (matches pnpm-11 lockfile + web/pnpm-workspace.yaml allowBuilds/packages). Triggers: push/PR to master.'
+  last_edited_ms: 1783411432139
 cd119edce88e0ed4:
   path: crates/cp-orchestrator/tests/end_to_end.rs
   description: Phase 30 end-to-end loopback capstone (3 tests). Backend::new takes 6 args (auth=None, session_ttl). Real agent stack ↔ real backend transport over real sockets. Command journals on agent and re-emerges as SSE delta. Spilled body hydrates over REST. 25 SSE connect/disconnect soak cycles.
@@ -11198,6 +11210,10 @@ ed11d32eca739db4:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
   last_edited_ms: 0
+ed5732f0e0824973:
+  path: web/eslint.config.ts
+  description: 'Frontend ESLint flat config — Rust-parity strict stack (branch web-lint), RATCHET P0→P13 (one plugin group per phase, each at error, --max-warnings 0). P3: js.recommended + typescript-eslint strictTypeChecked + stylisticTypeChecked + reactRefresh.vite, projectService type-aware. P4 anti-cheat layer LANDED: @eslint-community/eslint-comments plugin registered (bare, no cast — its default export satisfies ESLint.Plugin) with no-use + no-unlimited-disable at error (bans ALL eslint-disable/enable directives), ban-ts-comment HARDENED to {ts-expect-error/ts-ignore/ts-nocheck/ts-check all true} (no description escape), linterOptions.reportUnusedDisableDirectives error. 3 calibrations (clippy.toml-threshold spirit, rule stays error): no-confusing-void-expression{ignoreArrowShorthand}, restrict-template-expressions{allowNumber}, prefer-nullish-coalescing{ignorePrimitives:string,boolean}. 2 scoped config-level exceptions (registered in allowed-eslint-exceptions.yaml, NEVER inline): ui/** react-refresh off, MarkdownEditor.tsx no-deprecated off. react-hooks classic pair (rules-of-hooks error + exhaustive-deps warn), reactHooks cast via `as unknown as ESLint.Plugin` (real .configs.flat type gap). globalIgnores dist+generated/**+e2e/**+playwright.config.ts.'
+  last_edited_ms: 1783411432221
 ed64c4eef51b64b7:
   path: ui/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: selected thread''s full conversation + composer. Header-less by design (thread identity already in the highlighted ThreadList row — the old name+status+agent header was removed per T15). Starts at the ''thread opened'' divider. toChatMessage() maps ThreadMsg→ChatMessage to reuse the cockpit Message renderer; renders embedded QuestionForm + fileRef chips. ThreadComposer at bottom.'

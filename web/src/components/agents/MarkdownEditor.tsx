@@ -43,13 +43,17 @@ export function MarkdownEditor({
   const [, force] = useState(0)
   const [empty, setEmpty] = useState(false)
 
-  // Seed the surface once — re-seeding would fight the caret.
+  // Seed the surface once — re-seeding would fight the caret. Intentionally a
+  // mount-only effect: `initialMarkdown` is deliberately NOT a dependency (a
+  // prop change must not re-seed and blow away in-progress edits). The
+  // exhaustive-deps warning this raises is a known, roadmapped react-hooks item
+  // (P6) — the inline `eslint-disable` that used to silence it is banned by the
+  // P4 anti-suppression layer, so the honest warning stands until P6 restructures.
   useEffect(() => {
     if (ref.current) {
       ref.current.innerHTML = mdToHtml(initialMarkdown)
       setEmpty(ref.current.textContent.trim().length === 0)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Serialize the live DOM back to markdown and report it (when a host wants to

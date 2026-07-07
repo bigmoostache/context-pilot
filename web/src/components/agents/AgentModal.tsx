@@ -235,7 +235,12 @@ export function AgentModal({
       window.clearTimeout(t)
       window.removeEventListener("keydown", onKey)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `submit`/`onClose` are intentionally excluded: they are recreated every
+    // render, so listing them would re-bind the keydown listener on every
+    // render. The effect re-runs only when the form values it closes over change
+    // (name/provId/modelId/isManage). The exhaustive-deps warning this raises is
+    // a roadmapped react-hooks item (P6); the inline `eslint-disable` that used
+    // to silence it is banned by the P4 anti-suppression layer.
   }, [name, provId, modelId, isManage])
 
   return (

@@ -2,6 +2,7 @@ import js from "@eslint/js"
 import globals from "globals"
 import reactHooks from "eslint-plugin-react-hooks"
 import reactRefresh from "eslint-plugin-react-refresh"
+import eslintComments from "@eslint-community/eslint-plugin-eslint-comments"
 import tseslint from "typescript-eslint"
 import { defineConfig, globalIgnores } from "eslint/config"
 import type { ESLint } from "eslint"
@@ -52,6 +53,16 @@ export default defineConfig([
       // runtime-correct (its rules load and run); bridge the declaration gap
       // with a typed cast so `tsc` type-checks the config file cleanly.
       "react-hooks": reactHooks as unknown as ESLint.Plugin,
+      // P4 anti-cheat layer: the eslint-comments plugin powers the ban on
+      // suppression directives (its `no-use` rule reports EVERY `eslint-disable`
+      // / `eslint-enable` comment). This is the frontend twin of the Rust
+      // `#[allow]`/`#[expect]` ban — lint suppression is forbidden inline; the
+      // only legal escape is a config-level scoped override, registered and
+      // justified in `.github/checks/allowed-eslint-exceptions.yaml`. Unlike
+      // react-hooks above, this plugin's default export already satisfies
+      // ESLint's `Plugin` type, so no cast is needed (one would be flagged
+      // unnecessary by @typescript-eslint/no-unnecessary-type-assertion).
+      "@eslint-community/eslint-comments": eslintComments,
     },
     languageOptions: {
       globals: globals.browser,
@@ -64,7 +75,38 @@ export default defineConfig([
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    // P4 anti-cheat: a stale `eslint-disable` that suppresses nothing is itself
+    // an error (belt-and-suspenders alongside the outright no-use ban below).
+    linterOptions: {
+      reportUnusedDisableDirectives: "error",
+    },
     rules: {
+      // ── P4 anti-suppression layer (the crown jewel — Rust #[allow]-ban twin) ──
+      // Inline lint suppression is FORBIDDEN. The only legal escape is a
+      // config-level scoped override registered in
+      // .github/checks/allowed-eslint-exceptions.yaml (hash-locked) — never an
+      // inline comment. A grep-guard (check-frontend-suppressions.sh) enforces
+      // the same ban CI-side, independent of ESLint's own config.
+      //
+      // no-use bans EVERY eslint-disable/eslint-enable directive comment (any
+      // form: line, next-line, block, whole-file). no-unlimited-disable also
+      // catches a bare `eslint-disable` with no rule list.
+      "@eslint-community/eslint-comments/no-use": "error",
+      "@eslint-community/eslint-comments/no-unlimited-disable": "error",
+      // ban-ts-comment is already error via strictTypeChecked, but its default
+      // still permits `@ts-expect-error` with a ≥10-char description. Harden it:
+      // ALL four TS directive comments are forbidden outright, no description
+      // escape hatch (the generated bindings that legitimately carry @ts-nocheck
+      // are globally-ignored above, so this never touches them).
+      "@typescript-eslint/ban-ts-comment": [
+        "error",
+        {
+          "ts-expect-error": true,
+          "ts-ignore": true,
+          "ts-nocheck": true,
+          "ts-check": true,
+        },
+      ],
       // Classic react-hooks pair (see the plugins note above).
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
