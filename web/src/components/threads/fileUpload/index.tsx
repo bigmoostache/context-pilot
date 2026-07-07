@@ -140,7 +140,62 @@ export function FileUploadChip({
     ? "border-white/25 bg-white/15 hover:bg-white/25"
     : "border-border bg-card card-shadow hover:border-[var(--signal)]/60 hover:bg-muted/40"
 
-  const body = (
+  const body = <FileChipBody file={file} size={size} onAccent={onAccent} />
+  // Static (no opener) vs. interactive trigger — same content, one wrapper each.
+  const trigger = onOpen ? (
+    <button onClick={onOpen} className={`${base} ${skin}`}>
+      {body}
+    </button>
+  ) : (
+    <span className={`${base} ${skin} cursor-default`}>{body}</span>
+  )
+  return (
+    <span className="inline-flex items-center gap-1">
+      {trigger}
+      <ShowInFinderButton onShowInFinder={onShowInFinder} onAccent={onAccent} />
+    </span>
+  )
+}
+
+/** The "Show in Finder" affordance beside a chip — renders nothing when no
+ *  navigation handler is supplied. Extracted so {@link FileUploadChip} isn't
+ *  duplicated across the static/interactive tails (each copy cost the chip two
+ *  branches toward the P8 complexity budget). */
+function ShowInFinderButton({
+  onShowInFinder,
+  onAccent,
+}: {
+  onShowInFinder?: (() => void) | undefined
+  onAccent: boolean
+}) {
+  if (!onShowInFinder) return null
+  return (
+    <button
+      onClick={onShowInFinder}
+      title="Show in Finder"
+      className={
+        onAccent
+          ? "flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100"
+          : "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted/60 hover:text-foreground/80"
+      }
+    >
+      <FolderOpen className="size-3.5" />
+    </button>
+  )
+}
+
+/** A chip's inner content (icon · name · size · paperclip), shared by the static
+ *  and interactive triggers. */
+function FileChipBody({
+  file,
+  size,
+  onAccent,
+}: {
+  file: UploadedFile
+  size?: number | undefined
+  onAccent: boolean
+}) {
+  return (
     <>
       <span className="shrink-0">
         <FileIcon kind={kindOf(file.name)} ext={extOf(file.name)} size={18} />
@@ -171,48 +226,6 @@ export function FileUploadChip({
         }
       />
     </>
-  )
-
-  // ── Static (no opener) vs. interactive button. ──
-  if (!onOpen) {
-    return (
-      <span className="inline-flex items-center gap-1">
-        <span className={`${base} ${skin} cursor-default`}>{body}</span>
-        {onShowInFinder && (
-          <button
-            onClick={onShowInFinder}
-            title="Show in Finder"
-            className={
-              onAccent
-                ? "flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100"
-                : "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted/60 hover:text-foreground/80"
-            }
-          >
-            <FolderOpen className="size-3.5" />
-          </button>
-        )}
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex items-center gap-1">
-      <button onClick={onOpen} className={`${base} ${skin}`}>
-        {body}
-      </button>
-      {onShowInFinder && (
-        <button
-          onClick={onShowInFinder}
-          title="Show in Finder"
-          className={
-            onAccent
-              ? "flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100"
-              : "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted/60 hover:text-foreground/80"
-          }
-        >
-          <FolderOpen className="size-3.5" />
-        </button>
-      )}
-    </span>
   )
 }
 

@@ -238,25 +238,8 @@ exceptions:
       ever introduced; such a list would need a stable per-item key and the rule
       would correctly catch a bare index key there.
 
-  # ── P6 Finder root — keyboard-widget surface + settle-timer ref factory ───
-  - path: "web/src/components/finder/Finder.tsx"
-    rule: "react-hooks/refs"
-    reason: >
-      The Finder threads its single-click settle-timer ref into the extracted
-      pure handler factory finderSelection (a function invoked during render).
-      finderSelection reads/writes that ref ONLY inside deferred event handlers
-      (the setTimeout armed by onRowClick), never during render — safe by
-      construction — but the react-compiler's conservative taint analysis can't
-      see through the function boundary and flags it. Every other ref in the
-      file (surfaceRef / fileInputRef / mainRef) is passed to a JSX ref= prop or
-      a hook, never read in render, so this file-scoped disable masks no real
-      ref-in-render bug.
-    strategy: >
-      Re-evaluate if the react-compiler's ref taint analysis learns to prove a
-      ref is only touched in deferred handlers across a function boundary, or if
-      the settle timer is restructured to not cross into a render-called factory.
-
-  - path: "web/src/components/finder/Finder.tsx"
+  # ── P6 Finder shell — keyboard-widget surface (role="application") ────────
+  - path: "web/src/components/finder/Finder/shell.tsx"
     rule: "jsx-a11y/no-noninteractive-element-interactions"
     reason: >
       The Finder root is a keyboard-driven WIDGET surface (arrow navigation,
@@ -266,12 +249,14 @@ exceptions:
       jsx-a11y models it as a structural (non-interactive) role and
       false-positives on the handler. The correct-looking alternative
       role="grid" would be DISHONEST — the container wraps a toolbar + sidebar +
-      main + path bar, not a literal grid of rows/cells. Scoped to this file.
+      main + path bar, not a literal grid of rows/cells. The surface lives in the
+      Finder shell render since the P8 split (Finder.tsx → Finder/{index,state,
+      controller,shell,body}). Scoped to this file.
     strategy: >
       Re-evaluate if the surface is ever restructured into a genuine ARIA grid
       with rows/gridcells, or jsx-a11y treats `application` as interactive.
 
-  - path: "web/src/components/finder/Finder.tsx"
+  - path: "web/src/components/finder/Finder/shell.tsx"
     rule: "jsx-a11y/no-noninteractive-tabindex"
     reason: >
       Same role="application" keyboard-widget surface as above — a focusable
@@ -394,3 +379,22 @@ exceptions:
       Re-evaluate if a comment-skipping option lands upstream (then the rule can
       be re-enabled here with comments excluded), or if the cited identifiers are
       ever moved out of inline prose.
+
+  # ── P8 max-lines — off for the lint config file itself ────────────────────
+  - path: "web/eslint.config.ts"
+    rule: "max-lines"
+    reason: >
+      The structural line cap (500, the CB7 web-structure twin) governs APP
+      SOURCE — CB7 itself scopes its ≤500-lines/file check to web/src/**,
+      deliberately exempting build tooling at the repo/web root. This flat ESLint
+      config is exactly that: build tooling, not shipped code, and the bulk of
+      its length is the per-rule rationale prose the project's documentation
+      standard mandates (every calibration/disable explains WHY, in place).
+      Capping a config whose value IS its documentation at 500 lines would force
+      either terse, unexplained rules or an artificial split scattering one
+      coherent ruleset across files — both worse than one fully-documented
+      config. Scoped to this one file + this one rule; every other file stays
+      under the 500-line cap (all app source is currently ≤485 raw lines).
+    strategy: >
+      Re-evaluate if the config is ever split for other reasons (e.g. a shared
+      base preset extracted), or if a config-file-aware line budget is adopted.

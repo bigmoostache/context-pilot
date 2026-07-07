@@ -1,4 +1,5 @@
 import { useId } from "react"
+import type { ReactElement } from "react"
 import type { FinderKind } from "@/lib/types"
 
 /**
@@ -238,22 +239,18 @@ function MacDocument({
 }
 
 /**
- * Type-identity art. `compact` (large icon) draws a small glyph in the upper
- * region above the tag; non-compact (small icon) draws an enlarged centered
- * glyph that fills the sheet for instant recognition in list rows.
+ * Type-identity art, one builder per glyph kind. `compact` (large icon) draws a
+ * small glyph in the upper region above the tag; non-compact (small icon) draws
+ * an enlarged centered glyph that fills the sheet for instant recognition in
+ * list rows. Photo / video / audio render their own framed thumbnail; the rest
+ * are stroke/fill glyphs tinted by `color`. Keeping each kind as its own small
+ * function (dispatched through GLYPHS) holds DocGlyph within the P8 budgets.
  */
-function DocGlyph({
-  glyph,
-  color,
-  compact,
-}: {
-  glyph: GlyphKind
-  color: string
-  compact: boolean
-}) {
-  // Photo / video render their own framed thumbnail at both sizes.
-  if (glyph === "photo") {
-    return compact ? (
+type GlyphDraw = (compact: boolean, color: string) => ReactElement
+
+const GLYPHS: Record<GlyphKind, GlyphDraw> = {
+  photo: (compact) =>
+    compact ? (
       <g>
         <rect x="7.4" y="6.6" width="9.4" height="7.2" rx="1" fill="#EAF4FB" />
         <circle cx="9.9" cy="9" r="1.05" fill="#F5C24B" />
@@ -265,10 +262,9 @@ function DocGlyph({
         <circle cx="10.6" cy="10.5" r="1.6" fill="#F5C24B" />
         <path d="M7.4 16.8l3.6-4 2.7 2.6 2.6-3.2 3.5 4.6H7.4Z" fill="#5CB85C" />
       </g>
-    )
-  }
-  if (glyph === "video") {
-    return compact ? (
+    ),
+  video: (compact) =>
+    compact ? (
       <g>
         <rect x="7.4" y="6.6" width="9.4" height="7.2" rx="1" fill="#E7ECF6" />
         <path d="M10.9 8.6l3.5 1.9-3.5 1.9V8.6Z" fill="#4B7BEC" />
@@ -278,10 +274,9 @@ function DocGlyph({
         <rect x="6.8" y="7" width="14.4" height="11" rx="1.4" fill="#E7ECF6" />
         <path d="M12 10l4.6 2.5L12 15z" fill="#4B7BEC" />
       </g>
-    )
-  }
-  if (glyph === "audio") {
-    return compact ? (
+    ),
+  audio: (compact) =>
+    compact ? (
       <g fill="#FF2D55">
         <rect x="10.9" y="6.7" width="1.3" height="5.6" rx="0.45" />
         <path d="M10.9 6.7l3.9-.9v1.5l-3.9.9V6.7Z" />
@@ -295,13 +290,9 @@ function DocGlyph({
         <circle cx="11.3" cy="15.2" r="2.1" />
         <circle cx="17.3" cy="13.8" r="2.1" />
       </g>
-    )
-  }
-
-  // Stroke / fill glyphs colored by type.
-  const c = color
-  if (glyph === "code") {
-    return compact ? (
+    ),
+  code: (compact, c) =>
+    compact ? (
       <g fill="none" stroke={c} strokeWidth="1.15" strokeLinecap="round" strokeLinejoin="round">
         <path d="M10.3 7.6 8 10.2l2.3 2.6" />
         <path d="M13.9 7.6l2.3 2.6-2.3 2.6" />
@@ -311,10 +302,9 @@ function DocGlyph({
         <path d="M11 8.5 7.6 12l3.4 3.5" />
         <path d="M16 8.5 19.4 12 16 15.5" />
       </g>
-    )
-  }
-  if (glyph === "pdf") {
-    return compact ? (
+    ),
+  pdf: (compact, c) =>
+    compact ? (
       <g fill={c} opacity="0.9">
         <rect x="8" y="7.2" width="8" height="1.5" rx="0.4" />
         <rect x="8" y="9.6" width="8" height="1.5" rx="0.4" />
@@ -326,10 +316,9 @@ function DocGlyph({
         <rect x="8" y="11.5" width="11" height="2" rx="0.6" />
         <rect x="8" y="15" width="7" height="2" rx="0.6" />
       </g>
-    )
-  }
-  if (glyph === "markdown") {
-    return compact ? (
+    ),
+  markdown: (compact, c) =>
+    compact ? (
       <g fill="none" stroke={c} strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round">
         <path d="M7.6 12.4V7.8l2 2.3 2-2.3v4.6" />
         <path d="M14.6 7.8v4.6M13.2 11l1.4 1.6 1.4-1.6" />
@@ -339,10 +328,9 @@ function DocGlyph({
         <path d="M7.5 16V9l2.6 3 2.6-3v7" />
         <path d="M17 9v7M14.8 13.5 17 16l2.2-2.5" />
       </g>
-    )
-  }
-  if (glyph === "sheet") {
-    return compact ? (
+    ),
+  sheet: (compact, c) =>
+    compact ? (
       <g fill="none" stroke={c} strokeWidth="0.9">
         <rect x="7.6" y="7.2" width="8.8" height="6.4" rx="0.6" />
         <path d="M7.6 9.5h8.8M7.6 11.4h8.8M10.5 7.2v6.4M13.5 7.2v6.4" />
@@ -352,10 +340,9 @@ function DocGlyph({
         <rect x="7.5" y="8" width="13" height="9" rx="0.8" />
         <path d="M7.5 11.3h13M7.5 14h13M11.8 8v9M16 8v9" />
       </g>
-    )
-  }
-  if (glyph === "slides") {
-    return compact ? (
+    ),
+  slides: (compact, c) =>
+    compact ? (
       <g fill="none" stroke={c} strokeWidth="1">
         <rect x="7.6" y="7.2" width="8.8" height="6" rx="0.8" />
         <path d="M9.4 10.2h5.2" strokeWidth="1.2" />
@@ -365,10 +352,9 @@ function DocGlyph({
         <rect x="7.4" y="8" width="13.2" height="9" rx="1" />
         <path d="M10 12.5h7.4" strokeWidth="1.8" />
       </g>
-    )
-  }
-  if (glyph === "json") {
-    return compact ? (
+    ),
+  json: (compact, c) =>
+    compact ? (
       <g fill="none" stroke={c} strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round">
         <path d="M10.4 7.4c-1.2 0-1.2 1.4-1.2 2.4 0 .8-.6 1-1 1 .4 0 1 .2 1 1 0 1 0 2.4 1.2 2.4" />
         <path d="M13.6 7.4c1.2 0 1.2 1.4 1.2 2.4 0 .8.6 1 1 1-.4 0-1 .2-1 1 0 1 0 2.4-1.2 2.4" />
@@ -378,10 +364,9 @@ function DocGlyph({
         <path d="M11 7.5c-1.8 0-1.8 2-1.8 3.5 0 1.2-.9 1.5-1.5 1.5.6 0 1.5.3 1.5 1.5 0 1.5 0 3.5 1.8 3.5" />
         <path d="M17 7.5c1.8 0 1.8 2 1.8 3.5 0 1.2.9 1.5 1.5 1.5-.6 0-1.5.3-1.5 1.5 0 1.5 0 3.5-1.8 3.5" />
       </g>
-    )
-  }
-  if (glyph === "zip") {
-    return compact ? (
+    ),
+  zip: (compact, c) =>
+    compact ? (
       <g fill={c}>
         <rect x="11.4" y="6.4" width="1.4" height="1.4" />
         <rect x="11.4" y="9" width="1.4" height="1.4" />
@@ -393,10 +378,9 @@ function DocGlyph({
         <rect x="13" y="10.5" width="2" height="2" />
         <rect x="13" y="14" width="2" height="2" />
       </g>
-    )
-  }
-  if (glyph === "binary") {
-    return compact ? (
+    ),
+  binary: (compact, c) =>
+    compact ? (
       <g fill="none" stroke={c} strokeWidth="1">
         <circle cx="12" cy="10.2" r="2.1" />
         <path d="M12 6.6v1.2M12 12.6v1.2M8.4 10.2h1.2M14.4 10.2h1.2" />
@@ -406,21 +390,31 @@ function DocGlyph({
         <circle cx="14" cy="12.5" r="3" />
         <path d="M14 6.5v2M14 16.5v2M8 12.5h2M18 12.5h2M9.8 8.3l1.4 1.4M16.8 15.3l1.4 1.4M18.2 8.3l-1.4 1.4M11.2 15.3l-1.4 1.4" />
       </g>
-    )
-  }
+    ),
+  doc: (compact) =>
+    compact ? (
+      <g fill="#CDD2DA">
+        <rect x="7.6" y="7.2" width="9.2" height="1" rx="0.5" />
+        <rect x="7.6" y="9.4" width="9.2" height="1" rx="0.5" />
+        <rect x="7.6" y="11.6" width="6.2" height="1" rx="0.5" />
+      </g>
+    ) : (
+      <g fill="#C2C8D2">
+        <rect x="8" y="8" width="11" height="1.4" rx="0.6" />
+        <rect x="8" y="11" width="11" height="1.4" rx="0.6" />
+        <rect x="8" y="14" width="7.5" height="1.4" rx="0.6" />
+      </g>
+    ),
+}
 
-  // generic document: faint text lines
-  return compact ? (
-    <g fill="#CDD2DA">
-      <rect x="7.6" y="7.2" width="9.2" height="1" rx="0.5" />
-      <rect x="7.6" y="9.4" width="9.2" height="1" rx="0.5" />
-      <rect x="7.6" y="11.6" width="6.2" height="1" rx="0.5" />
-    </g>
-  ) : (
-    <g fill="#C2C8D2">
-      <rect x="8" y="8" width="11" height="1.4" rx="0.6" />
-      <rect x="8" y="11" width="11" height="1.4" rx="0.6" />
-      <rect x="8" y="14" width="7.5" height="1.4" rx="0.6" />
-    </g>
-  )
+function DocGlyph({
+  glyph,
+  color,
+  compact,
+}: {
+  glyph: GlyphKind
+  color: string
+  compact: boolean
+}) {
+  return GLYPHS[glyph](compact, color)
 }

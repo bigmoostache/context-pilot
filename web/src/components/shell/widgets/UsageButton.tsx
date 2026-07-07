@@ -105,6 +105,61 @@ function LimitRow({ limit }: { limit: ClaudeUsageLimit }) {
 
 type LoginStep = "idle" | "starting" | "waiting_for_code" | "completing" | "done" | "error"
 
+/** The paste-your-code step of the login flow — the largest LoginFlow branch,
+ *  extracted so LoginFlow stays within the P8 line budget. */
+function WaitingForCode({
+  authorizeUrl,
+  code,
+  setCode,
+  onSubmit,
+  submitting,
+}: {
+  authorizeUrl: string
+  code: string
+  setCode: (v: string) => void
+  onSubmit: () => void
+  submitting: boolean
+}) {
+  return (
+    <div className="space-y-3">
+      <p className="text-[12px] text-muted-foreground">
+        After authorizing, Anthropic will show you a code. Copy the full{" "}
+        <code className="text-[11px] bg-muted px-1 rounded">code#state</code> string and paste it
+        below:
+      </p>
+      <a
+        href={authorizeUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-1 text-[11px] text-[var(--signal)] hover:underline"
+      >
+        <ExternalLink className="size-3" /> Re-open authorization page
+      </a>
+      <input
+        type="text"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        placeholder="Paste code or full callback URL…"
+        autoFocus
+        className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[var(--signal)]"
+      />
+      <button
+        onClick={onSubmit}
+        disabled={!code.trim() || submitting}
+        className="flex w-full items-center justify-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
+      >
+        {submitting ? (
+          <>
+            <Loader2 className="size-3.5 animate-spin" /> Verifying…
+          </>
+        ) : (
+          "Submit code"
+        )}
+      </button>
+    </div>
+  )
+}
+
 /** Login flow sub-component shown inside the popover. */
 function LoginFlow({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState<LoginStep>("idle")
@@ -216,45 +271,16 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
 
   if (step === "waiting_for_code") {
     return (
-      <div className="space-y-3">
-        <p className="text-[12px] text-muted-foreground">
-          After authorizing, Anthropic will show you a code. Copy the full{" "}
-          <code className="text-[11px] bg-muted px-1 rounded">code#state</code> string and paste it
-          below:
-        </p>
-        <a
-          href={authorizeUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 text-[11px] text-[var(--signal)] hover:underline"
-        >
-          <ExternalLink className="size-3" /> Re-open authorization page
-        </a>
-        <input
-          type="text"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          placeholder="Paste code or full callback URL…"
-          autoFocus
-          className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[var(--signal)]"
-        />
-        <button
-          onClick={() => {
-            setStep("completing")
-            completeMutation.mutate(code.trim())
-          }}
-          disabled={!code.trim() || completeMutation.isPending}
-          className="flex w-full items-center justify-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-        >
-          {completeMutation.isPending ? (
-            <>
-              <Loader2 className="size-3.5 animate-spin" /> Verifying…
-            </>
-          ) : (
-            "Submit code"
-          )}
-        </button>
-      </div>
+      <WaitingForCode
+        authorizeUrl={authorizeUrl}
+        code={code}
+        setCode={setCode}
+        submitting={completeMutation.isPending}
+        onSubmit={() => {
+          setStep("completing")
+          completeMutation.mutate(code.trim())
+        }}
+      />
     )
   }
 
@@ -292,6 +318,109 @@ function LoginFlow({ onDone }: { onDone: () => void }) {
         Try again
       </button>
     </div>
+  )
+}
+
+type TokenStatus = Awaited<ReturnType<typeof fetchClaudeTokenStatus>>
+
+/** Account email + token valid/expired row (with the refresh control) + refresh
+ *  error — the top half of the popover, extracted so {@link UsageButton} stays
+ *  within the P8 complexity budget. */
+function TokenStatusRow({
+  data,
+  isLoading,
+  isValid,
+  refreshPending,
+  refreshError,
+  onRefresh,
+}: {
+  data: TokenStatus | undefined
+  isLoading: boolean
+  isValid: boolean
+  refreshPending: boolean
+  refreshError: unknown
+  onRefresh: () => void
+}) {
+  return (
+    <>
+      {data?.account_email && (
+        <p className="truncate text-[11px] text-muted-foreground">{data.account_email}</p>
+      )}
+      {isLoading && (
+        <div className="flex items-center justify-center py-2">
+          <Loader2 className="size-4 animate-spin text-muted-foreground" />
+        </div>
+      )}
+      {data && (
+        <div className="flex items-center justify-between rounded-md bg-muted/40 px-2.5 py-1.5">
+          <div className="flex items-center gap-1.5 text-[12px]">
+            <div className={cn("size-2 rounded-full", isValid ? "bg-emerald-500" : "bg-red-500")} />
+            <span className="font-medium text-foreground">
+              {isValid ? "Token valid" : "Token expired"}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {isValid && data.expires_at != null && (
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                {formatExpiry(data.expires_at)}
+              </span>
+            )}
+            <button
+              onClick={onRefresh}
+              disabled={refreshPending}
+              title="Refresh token"
+              className="flex size-5 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            >
+              {refreshPending ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3" />
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+      {refreshError != null && (
+        <p className="text-[11px] text-red-500">
+          Refresh failed: {refreshError instanceof Error ? refreshError.message : "unknown error"}
+        </p>
+      )}
+    </>
+  )
+}
+
+/** The usage-limit bars (or the loading / error / empty placeholder), gated on a
+ *  valid token — extracted so {@link UsageButton} stays within the P8 budget. */
+function UsageLimits({
+  isValid,
+  isLoading,
+  isError,
+  limits,
+}: {
+  isValid: boolean
+  isLoading: boolean
+  isError: boolean
+  limits: ClaudeUsageLimit[]
+}) {
+  if (!isValid) return null
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-4">
+        <Loader2 className="size-4 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+  if (isError)
+    return <p className="text-[12px] text-muted-foreground">Could not fetch usage data.</p>
+  if (limits.length === 0) {
+    return <p className="text-[12px] text-muted-foreground">No active usage limits.</p>
+  }
+  return (
+    <>
+      {limits.map((l) => (
+        <LimitRow key={l.kind} limit={l} />
+      ))}
+    </>
   )
 }
 
@@ -348,78 +477,18 @@ export function UsageButton() {
       <PopoverContent side="bottom" align="end" sideOffset={8} className="w-72 space-y-3 p-4">
         <h4 className="text-[13px] font-semibold">Claude Code Usage</h4>
 
-        {/* ── Account email ────────────────────────────────── */}
-        {tokenStatus.data?.account_email && (
-          <p className="truncate text-[11px] text-muted-foreground">
-            {tokenStatus.data.account_email}
-          </p>
-        )}
-
-        {/* ── Token status ─────────────────────────────────── */}
-        {tokenStatus.isLoading && (
-          <div className="flex items-center justify-center py-2">
-            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-          </div>
-        )}
-
-        {tokenStatus.data && (
-          <div className="flex items-center justify-between rounded-md bg-muted/40 px-2.5 py-1.5">
-            <div className="flex items-center gap-1.5 text-[12px]">
-              <div
-                className={cn("size-2 rounded-full", isValid ? "bg-emerald-500" : "bg-red-500")}
-              />
-              <span className="font-medium text-foreground">
-                {isValid ? "Token valid" : "Token expired"}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {isValid && tokenStatus.data.expires_at != null && (
-                <span className="text-[11px] tabular-nums text-muted-foreground">
-                  {formatExpiry(tokenStatus.data.expires_at)}
-                </span>
-              )}
-              <button
-                onClick={() => refreshMutation.mutate()}
-                disabled={refreshMutation.isPending}
-                title="Refresh token"
-                className="flex size-5 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-              >
-                {refreshMutation.isPending ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <RefreshCw className="size-3" />
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Refresh error ──────────────────────────────── */}
-        {refreshMutation.isError && (
-          <p className="text-[11px] text-red-500">
-            Refresh failed:{" "}
-            {refreshMutation.error instanceof Error
-              ? refreshMutation.error.message
-              : "unknown error"}
-          </p>
-        )}
+        {/* ── Account email · token status · refresh ───────── */}
+        <TokenStatusRow
+          data={tokenStatus.data}
+          isLoading={tokenStatus.isLoading}
+          isValid={isValid}
+          refreshPending={refreshMutation.isPending}
+          refreshError={refreshMutation.isError ? refreshMutation.error : null}
+          onRefresh={() => refreshMutation.mutate()}
+        />
 
         {/* ── Usage limits (only when token valid) ─────────── */}
-        {isValid && isLoading && (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-          </div>
-        )}
-
-        {isValid && isError && (
-          <p className="text-[12px] text-muted-foreground">Could not fetch usage data.</p>
-        )}
-
-        {isValid && !isLoading && !isError && limits.length === 0 && (
-          <p className="text-[12px] text-muted-foreground">No active usage limits.</p>
-        )}
-
-        {isValid && limits.map((l) => <LimitRow key={l.kind} limit={l} />)}
+        <UsageLimits isValid={isValid} isLoading={isLoading} isError={isError} limits={limits} />
 
         {/* ── Login flow (always available) ────────────────── */}
         <div className="border-t border-border pt-3">

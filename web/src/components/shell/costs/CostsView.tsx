@@ -116,33 +116,8 @@ export function CostsView({ agentId }: { agentId: string }) {
           <BreakKindFilter value={breakKindFilter} onChange={setBreakKindFilter} />
         </div>
 
-        {/* ── Summary cards ───────────────────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Card label="Total cost" value={fmtDollar(summary.totalCost)} />
-          <Card label="LLM ticks" value={summary.totalTicks.toLocaleString()} />
-          <Card label="Avg cost / tick" value={fmtDollar(summary.avgCostPerTick)} />
-          <Card
-            label="Cache hit rate"
-            value={`${(summary.cacheHitRate * 100).toFixed(1)}%`}
-            accent={summary.cacheHitRate > 0.5}
-          />
-        </div>
-
-        {/* ── Row: ticks with/without cache breaks ────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Card
-            label="Clean ticks"
-            value={summary.ticksClean.toLocaleString()}
-            sub="no panel broke"
-          />
-          <Card
-            label="Break ticks"
-            value={summary.ticksWithBreak.toLocaleString()}
-            sub="cache broken"
-          />
-          <Card label="Hit tokens" value={fmtTokens(summary.totalHitTokens)} />
-          <Card label="Miss tokens" value={fmtTokens(summary.totalMissTokens)} />
-        </div>
+        {/* ── Summary cards (spend + cache efficiency + break split) ─ */}
+        <SummaryCards summary={summary} />
 
         {/* ── Row: Culprit donut + Cost timeline ──────────────────── */}
         <div className="grid gap-6 lg:grid-cols-2">
@@ -194,6 +169,39 @@ export function CostsView({ agentId }: { agentId: string }) {
 }
 
 // ── Micro-components ────────────────────────────────────────────────────────
+
+/** The two summary-card rows (spend + cache efficiency, then the break split).
+ *  Extracted so {@link CostsView}'s render body stays within the P8 line budget. */
+function SummaryCards({ summary }: { summary: ReturnType<typeof computeSummary> }) {
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Card label="Total cost" value={fmtDollar(summary.totalCost)} />
+        <Card label="LLM ticks" value={summary.totalTicks.toLocaleString()} />
+        <Card label="Avg cost / tick" value={fmtDollar(summary.avgCostPerTick)} />
+        <Card
+          label="Cache hit rate"
+          value={`${(summary.cacheHitRate * 100).toFixed(1)}%`}
+          accent={summary.cacheHitRate > 0.5}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Card
+          label="Clean ticks"
+          value={summary.ticksClean.toLocaleString()}
+          sub="no panel broke"
+        />
+        <Card
+          label="Break ticks"
+          value={summary.ticksWithBreak.toLocaleString()}
+          sub="cache broken"
+        />
+        <Card label="Hit tokens" value={fmtTokens(summary.totalHitTokens)} />
+        <Card label="Miss tokens" value={fmtTokens(summary.totalMissTokens)} />
+      </div>
+    </>
+  )
+}
 
 function Card({
   label,

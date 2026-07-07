@@ -69,7 +69,7 @@ export function PromptModal({ item, onClose }: { item: LibraryItem | "new"; onCl
   const [name, setName] = useState(isNew ? "" : item.name)
   const [description, setDescription] = useState(isNew ? "" : item.description)
   const [body] = useState(() => (isNew ? "" : mockBody(item)))
-  const builtin = !isNew && item.builtin
+  const builtin = !isNew && item.builtin === true
   const M = KIND[kind]
 
   return (
@@ -116,41 +116,7 @@ export function PromptModal({ item, onClose }: { item: LibraryItem | "new"; onCl
         <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-5">
           {/* kind */}
           <Field label="Kind">
-            {isNew ? (
-              <div className="flex gap-2">
-                {KIND_ORDER.map((k) => {
-                  const on = k === kind
-                  const KM = KIND[k]
-                  return (
-                    <button
-                      key={k}
-                      onClick={() => setKind(k)}
-                      className={cn(
-                        "flex flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all",
-                        on
-                          ? "border-[var(--interactive)] bg-[var(--interactive)]/[0.07] ring-2 ring-[var(--interactive)]/15"
-                          : "border-border bg-card hover:border-[var(--interactive)]/40 hover:bg-muted/30",
-                      )}
-                    >
-                      <KM.icon className="size-4 shrink-0" style={{ color: KM.accent }} />
-                      <span className="text-[12.5px] font-medium text-foreground/85">
-                        {KM.label}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            ) : (
-              <span className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[12px] font-medium text-foreground/80">
-                <M.icon className="size-3.5" style={{ color: M.accent }} />
-                {M.label}
-                {builtin && (
-                  <span className="ml-1 rounded-full bg-muted/70 px-1.5 py-px text-[9.5px] text-muted-foreground/70">
-                    Built-in
-                  </span>
-                )}
-              </span>
-            )}
+            <KindField isNew={isNew} kind={kind} setKind={setKind} builtin={builtin} />
           </Field>
 
           {/* name + description */}
@@ -194,37 +160,118 @@ export function PromptModal({ item, onClose }: { item: LibraryItem | "new"; onCl
           {!isNew && (
             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
               <FileCode2 className="size-3.5" />
-              Edits open{" "}
-              <code className="font-mono">{`.context-pilot/${kind === "agent" ? "agents" : kind === "skill" ? "skills" : "commands"}/${item.id}.md`}</code>
-              .
+              Edits open <code className="font-mono">{mdPath(kind, item.id)}</code>.
             </p>
           )}
         </div>
 
         {/* footer */}
-        <footer className="flex h-[60px] shrink-0 items-center gap-2 border-t border-border bg-muted/25 px-6">
-          {!isNew && !builtin && (
-            <button className="text-[12px] font-medium text-[var(--danger)]/80 transition-colors hover:text-[var(--danger)]">
-              Delete
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="ml-auto rounded-lg border border-border px-3.5 py-2 text-[12.5px] font-medium text-foreground/75 transition-colors hover:bg-muted/50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onClose}
-            disabled={!name.trim()}
-            className="flex items-center gap-2 rounded-lg bg-[var(--interactive)] px-4 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-all hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            <Check className="size-4" strokeWidth={2.5} />
-            {isNew ? "Create" : "Save"}
-          </button>
-        </footer>
+        <PromptFooter
+          isNew={isNew}
+          builtin={builtin}
+          canSubmit={name.trim().length > 0}
+          onClose={onClose}
+        />
       </div>
     </Backdrop>
+  )
+}
+
+/** The `.context-pilot/<dir>/<id>.md` path a library item edits. */
+function mdPath(kind: LibraryKind, id: string): string {
+  const dir = kind === "agent" ? "agents" : kind === "skill" ? "skills" : "commands"
+  return `.context-pilot/${dir}/${id}.md`
+}
+
+/** The Kind selector: a three-way picker in create mode, or a read-only badge
+ *  (with a Built-in chip) in view/edit mode. Extracted so {@link PromptModal}
+ *  stays within the P8 complexity budget. */
+function KindField({
+  isNew,
+  kind,
+  setKind,
+  builtin,
+}: {
+  isNew: boolean
+  kind: LibraryKind
+  setKind: (k: LibraryKind) => void
+  builtin: boolean
+}) {
+  const M = KIND[kind]
+  if (!isNew) {
+    return (
+      <span className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[12px] font-medium text-foreground/80">
+        <M.icon className="size-3.5" style={{ color: M.accent }} />
+        {M.label}
+        {builtin && (
+          <span className="ml-1 rounded-full bg-muted/70 px-1.5 py-px text-[9.5px] text-muted-foreground/70">
+            Built-in
+          </span>
+        )}
+      </span>
+    )
+  }
+  return (
+    <div className="flex gap-2">
+      {KIND_ORDER.map((k) => {
+        const on = k === kind
+        const KM = KIND[k]
+        return (
+          <button
+            key={k}
+            onClick={() => setKind(k)}
+            className={cn(
+              "flex flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all",
+              on
+                ? "border-[var(--interactive)] bg-[var(--interactive)]/[0.07] ring-2 ring-[var(--interactive)]/15"
+                : "border-border bg-card hover:border-[var(--interactive)]/40 hover:bg-muted/30",
+            )}
+          >
+            <KM.icon className="size-4 shrink-0" style={{ color: KM.accent }} />
+            <span className="text-[12.5px] font-medium text-foreground/85">{KM.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** The modal's footer actions (Delete / Cancel / Create-or-Save). Design-only:
+ *  every button just closes. Extracted so {@link PromptModal} stays within the
+ *  P8 budgets. */
+function PromptFooter({
+  isNew,
+  builtin,
+  canSubmit,
+  onClose,
+}: {
+  isNew: boolean
+  builtin: boolean
+  canSubmit: boolean
+  onClose: () => void
+}) {
+  return (
+    <footer className="flex h-[60px] shrink-0 items-center gap-2 border-t border-border bg-muted/25 px-6">
+      {!isNew && !builtin && (
+        <button className="text-[12px] font-medium text-[var(--danger)]/80 transition-colors hover:text-[var(--danger)]">
+          Delete
+        </button>
+      )}
+      <button
+        onClick={onClose}
+        className="ml-auto rounded-lg border border-border px-3.5 py-2 text-[12.5px] font-medium text-foreground/75 transition-colors hover:bg-muted/50"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={onClose}
+        disabled={!canSubmit}
+        className="flex items-center gap-2 rounded-lg bg-[var(--interactive)] px-4 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-all hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45"
+      >
+        <Check className="size-4" strokeWidth={2.5} />
+        {isNew ? "Create" : "Save"}
+      </button>
+    </footer>
   )
 }
 

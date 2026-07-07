@@ -81,7 +81,6 @@ export function ContextMenu({
   }, [onClose])
 
   const node = pos.node
-  const isFolder = node?.kind === "folder"
   // keep the menu on-screen
   const left = Math.min(pos.x, window.innerWidth - 230)
   const top = Math.min(pos.y, window.innerHeight - 320)
@@ -93,123 +92,187 @@ export function ContextMenu({
       style={{ left, top }}
     >
       {node ? (
-        <>
-          <button
-            onClick={() => {
-              onOpen(node)
-              onClose()
-            }}
-            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
-          >
-            <FolderOpen className="size-3.5 shrink-0 opacity-80" />
-            <span className="flex-1">{isFolder ? "Open" : "Open Quick Look"}</span>
-            <span className="text-[10.5px] tabular-nums text-muted-foreground/50">
-              {isFolder ? "↵" : "Space"}
-            </span>
-          </button>
-
-          {isFolder && onPin && (
-            <button
-              onClick={() => {
-                onPin(node)
-                onClose()
-              }}
-              className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
-            >
-              <Pin className="size-3.5 shrink-0 opacity-80" />
-              <span className="flex-1">Pin to Sidebar</span>
-            </button>
-          )}
-
-          <Separator />
-
-          <button
-            onClick={() => {
-              onRenameStart(node)
-              onClose()
-            }}
-            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
-          >
-            <PencilLine className="size-3.5 shrink-0 opacity-80" />
-            <span className="flex-1">Rename</span>
-          </button>
-          <Item icon={Copy} label="Duplicate" shortcut="⌘D" onAction={onAction} onClose={onClose} />
-          <button
-            onClick={() => {
-              onDownload(node)
-              onClose()
-            }}
-            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
-          >
-            <Download className="size-3.5 shrink-0 opacity-80" />
-            <span className="flex-1">Download</span>
-          </button>
-
-          <Separator />
-
-          <button
-            onClick={() => {
-              onTrash(node)
-              onClose()
-            }}
-            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/12"
-          >
-            <Trash2 className="size-3.5 shrink-0 opacity-80" />
-            <span className="flex-1">Move to Trash</span>
-            <span className="text-[10.5px] tabular-nums text-muted-foreground/50">⌘⌫</span>
-          </button>
-        </>
+        <ItemMenu
+          node={node}
+          onClose={onClose}
+          onAction={onAction}
+          onOpen={onOpen}
+          onDownload={onDownload}
+          onTrash={onTrash}
+          onPin={onPin}
+          onRenameStart={onRenameStart}
+        />
       ) : (
-        // ── Empty-space (content-area) menu — realm-level actions ──
-        <>
-          <EmptyItem
-            icon={FolderPlus}
-            label="New Folder"
-            onClick={() => {
-              onNewFolder()
-              onClose()
-            }}
-            shortcut="⇧⌘N"
-          />
-          <EmptyItem
-            icon={Upload}
-            label="Upload…"
-            onClick={() => {
-              onUpload()
-              onClose()
-            }}
-          />
-          <Separator />
-          <EmptyItem
-            icon={CheckSquare}
-            label="Select All"
-            onClick={() => {
-              onSelectAll()
-              onClose()
-            }}
-            shortcut="⌘A"
-          />
-          <EmptyItem
-            icon={PanelRight}
-            label="Toggle Quick Look"
-            onClick={() => {
-              onTogglePreview()
-              onClose()
-            }}
-            shortcut="Space"
-          />
-          <Separator />
-          <EmptyItem
-            icon={RefreshCw}
-            label="Refresh"
-            onClick={() => {
-              onRefresh()
-              onClose()
-            }}
-          />
-        </>
+        <EmptyMenu
+          onClose={onClose}
+          onNewFolder={onNewFolder}
+          onUpload={onUpload}
+          onSelectAll={onSelectAll}
+          onTogglePreview={onTogglePreview}
+          onRefresh={onRefresh}
+        />
       )}
     </div>
+  )
+}
+
+/** The item (right-clicked node) menu: Open/Quick-Look, Pin (folders), Rename,
+ *  Duplicate, Download, and the danger Move-to-Trash action. */
+function ItemMenu({
+  node,
+  onClose,
+  onAction,
+  onOpen,
+  onDownload,
+  onTrash,
+  onPin,
+  onRenameStart,
+}: {
+  node: FinderNode
+  onClose: () => void
+  onAction: (label: string) => void
+  onOpen: (node: FinderNode) => void
+  onDownload: (node: FinderNode) => void
+  onTrash: (node: FinderNode) => void
+  onPin?: ((node: FinderNode) => void) | undefined
+  onRenameStart: (node: FinderNode) => void
+}) {
+  const isFolder = node.kind === "folder"
+  return (
+    <>
+      <button
+        onClick={() => {
+          onOpen(node)
+          onClose()
+        }}
+        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
+      >
+        <FolderOpen className="size-3.5 shrink-0 opacity-80" />
+        <span className="flex-1">{isFolder ? "Open" : "Open Quick Look"}</span>
+        <span className="text-[10.5px] tabular-nums text-muted-foreground/50">
+          {isFolder ? "↵" : "Space"}
+        </span>
+      </button>
+
+      {isFolder && onPin && (
+        <button
+          onClick={() => {
+            onPin(node)
+            onClose()
+          }}
+          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
+        >
+          <Pin className="size-3.5 shrink-0 opacity-80" />
+          <span className="flex-1">Pin to Sidebar</span>
+        </button>
+      )}
+
+      <Separator />
+
+      <button
+        onClick={() => {
+          onRenameStart(node)
+          onClose()
+        }}
+        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
+      >
+        <PencilLine className="size-3.5 shrink-0 opacity-80" />
+        <span className="flex-1">Rename</span>
+      </button>
+      <Item icon={Copy} label="Duplicate" shortcut="⌘D" onAction={onAction} onClose={onClose} />
+      <button
+        onClick={() => {
+          onDownload(node)
+          onClose()
+        }}
+        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
+      >
+        <Download className="size-3.5 shrink-0 opacity-80" />
+        <span className="flex-1">Download</span>
+      </button>
+
+      <Separator />
+
+      <button
+        onClick={() => {
+          onTrash(node)
+          onClose()
+        }}
+        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/12"
+      >
+        <Trash2 className="size-3.5 shrink-0 opacity-80" />
+        <span className="flex-1">Move to Trash</span>
+        <span className="text-[10.5px] tabular-nums text-muted-foreground/50">⌘⌫</span>
+      </button>
+    </>
+  )
+}
+
+/** The empty-space (content-area) menu: realm-level actions — New Folder,
+ *  Upload, Select All, Toggle Quick Look, Refresh. */
+function EmptyMenu({
+  onClose,
+  onNewFolder,
+  onUpload,
+  onSelectAll,
+  onTogglePreview,
+  onRefresh,
+}: {
+  onClose: () => void
+  onNewFolder: () => void
+  onUpload: () => void
+  onSelectAll: () => void
+  onTogglePreview: () => void
+  onRefresh: () => void
+}) {
+  return (
+    <>
+      <EmptyItem
+        icon={FolderPlus}
+        label="New Folder"
+        onClick={() => {
+          onNewFolder()
+          onClose()
+        }}
+        shortcut="⇧⌘N"
+      />
+      <EmptyItem
+        icon={Upload}
+        label="Upload…"
+        onClick={() => {
+          onUpload()
+          onClose()
+        }}
+      />
+      <Separator />
+      <EmptyItem
+        icon={CheckSquare}
+        label="Select All"
+        onClick={() => {
+          onSelectAll()
+          onClose()
+        }}
+        shortcut="⌘A"
+      />
+      <EmptyItem
+        icon={PanelRight}
+        label="Toggle Quick Look"
+        onClick={() => {
+          onTogglePreview()
+          onClose()
+        }}
+        shortcut="Space"
+      />
+      <Separator />
+      <EmptyItem
+        icon={RefreshCw}
+        label="Refresh"
+        onClick={() => {
+          onRefresh()
+          onClose()
+        }}
+      />
+    </>
   )
 }
 

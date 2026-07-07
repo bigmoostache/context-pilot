@@ -151,11 +151,6 @@ export function FinderToolbar({
   onFileDownload: () => void
 }) {
   const idx = VIEW_ORDER.indexOf(viewMode)
-  // collapse a deep breadcrumb: first · … · last two
-  const collapsed = crumbs.length > 4
-  // `collapsed` is only true when crumbs.length > 4, so index 0 is present —
-  // assert it (noUncheckedIndexedAccess widens a bare `crumbs[0]`).
-  const shown = collapsed ? [...crumbs.slice(0, 1), ...crumbs.slice(-2)] : crumbs
 
   return (
     <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
@@ -164,42 +159,7 @@ export function FinderToolbar({
         <NavBtn icon={ArrowRight} disabled={!canForward} onClick={onForward} title="Forward" />
       </div>
 
-      {/* breadcrumb */}
-      <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto rounded-lg border border-border bg-card px-2 py-1 card-shadow">
-        {shown.map((c, i) => {
-          const isFirst = i === 0
-          const showEllipsis = collapsed && i === 1
-          return (
-            <span key={c.path} className="flex shrink-0 items-center">
-              {i > 0 && <ChevronRight className="size-3.5 text-muted-foreground/40" />}
-              {showEllipsis && (
-                <span className="flex items-center">
-                  <MoreHorizontal className="size-3.5 text-muted-foreground/50" />
-                  <ChevronRight className="size-3.5 text-muted-foreground/40" />
-                </span>
-              )}
-              <button
-                onClick={() => onCrumb(c.path)}
-                className={cn(
-                  "rounded px-1.5 py-0.5 text-[12px] transition-colors hover:bg-muted/70",
-                  i === shown.length - 1
-                    ? "font-semibold text-foreground"
-                    : "text-muted-foreground",
-                )}
-              >
-                {isFirst ? (
-                  <span className="flex items-center gap-1">
-                    <FileIcon kind="folder" size={15} />
-                    {c.name}
-                  </span>
-                ) : (
-                  c.name
-                )}
-              </button>
-            </span>
-          )
-        })}
-      </div>
+      <ToolbarCrumbs crumbs={crumbs} onCrumb={onCrumb} />
 
       {/* icon-size slider (grid only) */}
       {!fileActive && viewMode === "grid" && (
@@ -285,6 +245,58 @@ export function FinderToolbar({
           />
         </>
       )}
+    </div>
+  )
+}
+
+/** The toolbar breadcrumb trail. A deep path collapses to first · … · last-two
+ *  so it never overflows the bar; the leading crumb carries a folder glyph and
+ *  the trailing crumb is emphasised as the current directory. */
+function ToolbarCrumbs({
+  crumbs,
+  onCrumb,
+}: {
+  crumbs: FinderNode[]
+  onCrumb: (path: string) => void
+}) {
+  // collapse a deep breadcrumb: first · … · last two
+  const collapsed = crumbs.length > 4
+  // `collapsed` is only true when crumbs.length > 4, so index 0 is present —
+  // assert it (noUncheckedIndexedAccess widens a bare `crumbs[0]`).
+  const shown = collapsed ? [...crumbs.slice(0, 1), ...crumbs.slice(-2)] : crumbs
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto rounded-lg border border-border bg-card px-2 py-1 card-shadow">
+      {shown.map((c, i) => {
+        const isFirst = i === 0
+        const showEllipsis = collapsed && i === 1
+        return (
+          <span key={c.path} className="flex shrink-0 items-center">
+            {i > 0 && <ChevronRight className="size-3.5 text-muted-foreground/40" />}
+            {showEllipsis && (
+              <span className="flex items-center">
+                <MoreHorizontal className="size-3.5 text-muted-foreground/50" />
+                <ChevronRight className="size-3.5 text-muted-foreground/40" />
+              </span>
+            )}
+            <button
+              onClick={() => onCrumb(c.path)}
+              className={cn(
+                "rounded px-1.5 py-0.5 text-[12px] transition-colors hover:bg-muted/70",
+                i === shown.length - 1 ? "font-semibold text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {isFirst ? (
+                <span className="flex items-center gap-1">
+                  <FileIcon kind="folder" size={15} />
+                  {c.name}
+                </span>
+              ) : (
+                c.name
+              )}
+            </button>
+          </span>
+        )
+      })}
     </div>
   )
 }

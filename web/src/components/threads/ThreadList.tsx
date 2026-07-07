@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ThreadDetail } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { clickable } from "@/lib/support/a11y"
+import { previewOf } from "@/lib/support/threadMessages"
 
 interface ThreadListProps {
   /** all of the realm's threads (archived included) — filtering happens here */
@@ -35,46 +36,6 @@ interface ThreadListProps {
   onNewThread: () => void
 }
 
-/**
- * Flatten markdown to a one-line plain-text snippet for a list-row preview.
- *
- * A thread row shows a single truncated line, so rendering rich markdown there
- * is wrong (headings/lists/code blocks would break the layout) — every chat
- * client shows a flattened text snippet instead. This strips the syntax that
- * would otherwise leak through as literal characters (`## `, `**bold**`, list
- * bullets, links, fenced code, stray HTML tags) and collapses all whitespace
- * to single spaces. Intentionally lightweight (a preview, not a parser): a
- * stray `_` inside an identifier is left alone rather than risk mangling words.
- */
-function flattenMarkdown(md: string): string {
-  return md
-    .replaceAll(/```[\s\S]*?```/g, " ") // drop fenced code blocks
-    .replaceAll(/!\[([^\]]*)\]\([^)]*\)/g, "$1") // image → alt text
-    .replaceAll(/\[([^\]]*)\]\([^)]*\)/g, "$1") // link → label
-    .replaceAll(/<[^>]+>/g, " ") // strip HTML tags
-    .replaceAll(/^\s{0,3}(?:#{1,6}|[-*+>]|\d+\.)\s+/gm, "") // heading/quote/bullet markers
-    .replaceAll(/\*\*|\*|__|~~|`/g, "") // emphasis / code / strike markers
-    .replaceAll(/\s+/g, " ")
-    .trim()
-}
-
-/** Last-message preview text for a thread row + search matching. */
-function previewOf(t: ThreadDetail): string {
-  // Auto tool-activity traces are collapsed noise — never surface one as the
-  // row preview; show the last real message instead.
-  let last: ThreadDetail["log"][number] | undefined
-  for (let i = t.log.length - 1; i >= 0; i--) {
-    const m = t.log[i]
-    if (m && !m.auto) {
-      last = m
-      break
-    }
-  }
-  if (!last) return ""
-  if (last.text) return flattenMarkdown(last.text)
-  return last.tool ? `⛭ ${last.tool.name}` : last.questions ? "asked a question" : ""
-}
-
 /** Sort threads by most recent activity first. */
 function byRecent(a: ThreadDetail, b: ThreadDetail): number {
   return (b.lastActivityMs ?? 0) - (a.lastActivityMs ?? 0)
@@ -92,6 +53,11 @@ function byRecent(a: ThreadDetail, b: ThreadDetail): number {
  * green thread the agent is streaming right now), **Working in parallel**
  * (THEIR_TURN) — with an on-demand **Archived** view. Its width is the shared
  * `--sidebar-w` CSS variable so it lines up with every other rail.
+ *
+ * Structure (P8): the context-sensitive top bar and the empty placeholder are
+ * factored into {@link ListHeader} / {@link EmptyState}, and each row's hover
+ * actions + badges into {@link RowActions} / {@link RowMeta}, so this component
+ * and {@link ThreadRow} both stay within the complexity/line budgets.
  */
 export function ThreadList({
   threads,
@@ -137,6 +103,19 @@ export function ThreadList({
   // agent-owned, actively-or-parallel working count (for the header pill)
   const workingCount = live.filter((t) => t.status !== "MY_TURN").length
 
+  const row = (t: ThreadDetail, archivedRow?: boolean) => (
+    <ThreadRow
+      key={t.id}
+      t={t}
+      selected={t.id === selectedId}
+      onSelect={onSelect}
+      onArchive={onArchive}
+      onPause={archivedRow ? undefined : onPause}
+      onDelete={archivedRow ? onDelete : undefined}
+      archived={archivedRow}
+    />
+  )
+
   return (
     <aside className="flex w-[var(--sidebar-w)] shrink-0 flex-col overflow-hidden border-r border-border bg-surface">
       {/* fixed-width inner shell pinned to the rail width */}
@@ -144,40 +123,13 @@ export function ThreadList({
         className="flex h-full flex-col"
         style={{ width: "var(--sidebar-w)", minWidth: "var(--sidebar-w)" }}
       >
-        {/* top bar — context-sensitive: live count + parallelism, or Archived header */}
-        <div className="flex items-center gap-2 px-3 pb-2.5 pt-3">
-          {showArchived ? (
-            <button
-              onClick={() => onToggleArchived(false)}
-              className="flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:text-foreground"
-            >
-              <ChevronLeft className="size-3.5" />
-              Archived
-              <span className="tabular-nums text-muted-foreground/50">{archivedCount}</span>
-            </button>
-          ) : (
-            <>
-              <span className="text-[11px] tabular-nums text-muted-foreground">
-                {live.length} thread{live.length === 1 ? "" : "s"}
-              </span>
-              {workingCount > 0 && (
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
-                  style={{
-                    background: "color-mix(in oklab, var(--interactive) 14%, transparent)",
-                    color: "var(--interactive)",
-                  }}
-                >
-                  <span className="relative flex size-1.5">
-                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--interactive)] opacity-70" />
-                    <span className="relative inline-flex size-1.5 rounded-full bg-[var(--interactive)]" />
-                  </span>
-                  {workingCount} working
-                </span>
-              )}
-            </>
-          )}
-        </div>
+        <ListHeader
+          showArchived={showArchived}
+          onToggleArchived={onToggleArchived}
+          liveCount={live.length}
+          archivedCount={archivedCount}
+          workingCount={workingCount}
+        />
 
         {/* new thread + search (hidden in archived view — archived is read-only) */}
         {!showArchived && (
@@ -216,59 +168,21 @@ export function ThreadList({
 
         <ScrollArea className="min-h-0 flex-1">
           <div className="px-2 py-1">
-            {visible.length === 0 && (
-              <p className="px-2.5 py-6 text-center text-[11.5px] text-muted-foreground/55">
-                {q
-                  ? "No threads match your search."
-                  : showArchived
-                    ? "No archived threads."
-                    : "No threads yet."}
-              </p>
-            )}
+            {visible.length === 0 && <EmptyState hasQuery={q !== ""} showArchived={showArchived} />}
 
             {!showArchived && (
               <>
                 {working.length > 0 && <Group label="User turn" count={working.length} />}
-                {working.map((t) => (
-                  <ThreadRow
-                    key={t.id}
-                    t={t}
-                    selected={t.id === selectedId}
-                    onSelect={onSelect}
-                    onArchive={onArchive}
-                    onPause={onPause}
-                  />
-                ))}
+                {working.map((t) => row(t))}
 
                 {mine.length > 0 && <Group label="Agent's turn" count={mine.length} />}
-                {mine.map((t) => (
-                  <ThreadRow
-                    key={t.id}
-                    t={t}
-                    selected={t.id === selectedId}
-                    onSelect={onSelect}
-                    onArchive={onArchive}
-                    onPause={onPause}
-                  />
-                ))}
+                {mine.map((t) => row(t))}
               </>
             )}
 
             {showArchived &&
               // Latest-archived first (T277) — most recently active on top.
-              [...visible]
-                .toSorted(byRecent)
-                .map((t) => (
-                  <ThreadRow
-                    key={t.id}
-                    t={t}
-                    selected={t.id === selectedId}
-                    onSelect={onSelect}
-                    onArchive={onArchive}
-                    onDelete={onDelete}
-                    archived
-                  />
-                ))}
+              [...visible].toSorted(byRecent).map((t) => row(t, true))}
           </div>
         </ScrollArea>
 
@@ -286,6 +200,69 @@ export function ThreadList({
       </div>
     </aside>
   )
+}
+
+/** Context-sensitive top bar: the live thread count + parallelism pill, or an
+ *  "Archived ‹back›" header while viewing the archived set. */
+function ListHeader({
+  showArchived,
+  onToggleArchived,
+  liveCount,
+  archivedCount,
+  workingCount,
+}: {
+  showArchived: boolean
+  onToggleArchived: (v: boolean) => void
+  liveCount: number
+  archivedCount: number
+  workingCount: number
+}) {
+  return (
+    <div className="flex items-center gap-2 px-3 pb-2.5 pt-3">
+      {showArchived ? (
+        <button
+          onClick={() => onToggleArchived(false)}
+          className="flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:text-foreground"
+        >
+          <ChevronLeft className="size-3.5" />
+          Archived
+          <span className="tabular-nums text-muted-foreground/50">{archivedCount}</span>
+        </button>
+      ) : (
+        <>
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            {liveCount} thread{liveCount === 1 ? "" : "s"}
+          </span>
+          {workingCount > 0 && (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
+              style={{
+                background: "color-mix(in oklab, var(--interactive) 14%, transparent)",
+                color: "var(--interactive)",
+              }}
+            >
+              <span className="relative flex size-1.5">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--interactive)] opacity-70" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-[var(--interactive)]" />
+              </span>
+              {workingCount} working
+            </span>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+/** The empty placeholder shown when no thread is visible — copy adapts to
+ *  whether a search is active and which set (live/archived) is on screen. */
+function EmptyState({ hasQuery, showArchived }: { hasQuery: boolean; showArchived: boolean }) {
+  const message = hasQuery
+    ? "No threads match your search."
+    : showArchived
+      ? "No archived threads."
+      : "No threads yet."
+  return <p className="px-2.5 py-6 text-center text-[11.5px] text-muted-foreground/55">{message}</p>
 }
 
 function Group({ label, count, accent }: { label: string; count: number; accent?: string }) {
@@ -324,11 +301,10 @@ function ThreadRow({
   selected: boolean
   onSelect: (id: string) => void
   onArchive: (id: string) => void
-  onPause?: (id: string) => void
-  onDelete?: (id: string) => void
-  archived?: boolean
+  onPause?: ((id: string) => void) | undefined
+  onDelete?: ((id: string) => void) | undefined
+  archived?: boolean | undefined
 }) {
-  const preview = previewOf(t)
   const isFocused = !archived && t.focused
   const isPaused = !archived && t.paused
   const dot = dotColor(Boolean(isFocused), t.status)
@@ -345,7 +321,7 @@ function ThreadRow({
         {...clickable(() => onSelect(t.id))}
         className="flex cursor-pointer flex-col gap-1 text-left"
       >
-        {/* line 1 — dot + name + time + overflow menu */}
+        {/* line 1 — dot + name + time + hover actions */}
         <div className="flex items-center gap-2">
           <span
             className={cn(
@@ -361,79 +337,133 @@ function ThreadRow({
             <span className="text-[10.5px] tabular-nums text-muted-foreground/50 transition-opacity group-hover:opacity-0">
               {t.lastActivity}
             </span>
-            <span className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onArchive(t.id)
-                }}
-                className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground"
-                title={archived ? "Restore" : "Archive"}
-              >
-                {archived ? <ArchiveRestore className="size-3" /> : <Archive className="size-3" />}
-              </button>
-              {archived && onDelete && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDelete(t.id)
-                  }}
-                  className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-[var(--danger)]"
-                  title="Delete permanently"
-                >
-                  <Trash2 className="size-3" />
-                </button>
-              )}
-              {!archived && onPause && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onPause(t.id)
-                  }}
-                  className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground"
-                  title={isPaused ? "Resume" : "Pause"}
-                >
-                  {isPaused ? <Play className="size-3" /> : <Pause className="size-3" />}
-                </button>
-              )}
-            </span>
+            <RowActions
+              id={t.id}
+              archived={Boolean(archived)}
+              isPaused={Boolean(isPaused)}
+              onArchive={onArchive}
+              onDelete={onDelete}
+              onPause={onPause}
+            />
           </span>
         </div>
-        {/* line 2 — badges + preview */}
-        <div className="flex items-center gap-1.5 pl-4">
-          {isFocused && (
-            <span
-              className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide"
-              style={{
-                background: "color-mix(in oklab, var(--ok) 18%, transparent)",
-                color: "var(--ok)",
-              }}
-            >
-              focused
-            </span>
-          )}
-          {isPaused && (
-            <span
-              className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide"
-              style={{
-                background: "color-mix(in oklab, var(--warn) 18%, transparent)",
-                color: "var(--warn)",
-              }}
-            >
-              paused
-            </span>
-          )}
-          <span className="truncate text-[11.5px] text-muted-foreground/70">{preview}</span>
-          {!archived && (t.unread ?? 0) > 0 && (
-            <span
-              className="ml-auto shrink-0 rounded-full px-1.5 text-[10px] font-semibold tabular-nums text-[var(--primary-foreground)]"
-              style={{ background: "var(--signal)" }}
-            >
-              {t.unread}
-            </span>
-          )}
-        </div>
+        {/* line 2 — badges + preview + unread */}
+        <RowMeta
+          t={t}
+          archived={Boolean(archived)}
+          isFocused={Boolean(isFocused)}
+          isPaused={Boolean(isPaused)}
+        />
       </div>
+    </div>
+  )
+}
+
+/** The hover-revealed action cluster on a row's first line: archive/restore,
+ *  optional permanent-delete (archived rows) and optional pause/resume (live
+ *  rows). Each button stops propagation so it doesn't also select the row. */
+function RowActions({
+  id,
+  archived,
+  isPaused,
+  onArchive,
+  onDelete,
+  onPause,
+}: {
+  id: string
+  archived: boolean
+  isPaused: boolean
+  onArchive: (id: string) => void
+  onDelete?: ((id: string) => void) | undefined
+  onPause?: ((id: string) => void) | undefined
+}) {
+  return (
+    <span className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onArchive(id)
+        }}
+        className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+        title={archived ? "Restore" : "Archive"}
+      >
+        {archived ? <ArchiveRestore className="size-3" /> : <Archive className="size-3" />}
+      </button>
+      {archived && onDelete && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete(id)
+          }}
+          className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-[var(--danger)]"
+          title="Delete permanently"
+        >
+          <Trash2 className="size-3" />
+        </button>
+      )}
+      {!archived && onPause && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onPause(id)
+          }}
+          className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+          title={isPaused ? "Resume" : "Pause"}
+        >
+          {isPaused ? <Play className="size-3" /> : <Pause className="size-3" />}
+        </button>
+      )}
+    </span>
+  )
+}
+
+/** A row's second line: focused / paused status badges, the flattened preview
+ *  snippet, and the unread-count pill. */
+function RowMeta({
+  t,
+  archived,
+  isFocused,
+  isPaused,
+}: {
+  t: ThreadDetail
+  archived: boolean
+  isFocused: boolean
+  isPaused: boolean
+}) {
+  const preview = previewOf(t)
+  return (
+    <div className="flex items-center gap-1.5 pl-4">
+      {isFocused && (
+        <span
+          className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide"
+          style={{
+            background: "color-mix(in oklab, var(--ok) 18%, transparent)",
+            color: "var(--ok)",
+          }}
+        >
+          focused
+        </span>
+      )}
+      {isPaused && (
+        <span
+          className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide"
+          style={{
+            background: "color-mix(in oklab, var(--warn) 18%, transparent)",
+            color: "var(--warn)",
+          }}
+        >
+          paused
+        </span>
+      )}
+      <span className="truncate text-[11.5px] text-muted-foreground/70">{preview}</span>
+      {!archived && (t.unread ?? 0) > 0 && (
+        <span
+          className="ml-auto shrink-0 rounded-full px-1.5 text-[10px] font-semibold tabular-nums text-[var(--primary-foreground)]"
+          style={{ background: "var(--signal)" }}
+        >
+          {t.unread}
+        </span>
+      )}
     </div>
   )
 }

@@ -84,61 +84,8 @@ export function TopBar({
           onNewAgent={onNewAgent}
         />
 
-        {/* per-agent view switcher (hidden at fleet altitude). Order: Threads ·
-          Finder · Cockpit (T25). Each tab carries a tooltip explaining the view
-          since the names aren't obvious to a first-time user. */}
-        {!inFleet && (
-          <div className="ml-2 flex h-8 items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
-            <Tip
-              title="Threads"
-              body="Chat with this agent. Each thread is a separate conversation or task it can run in parallel."
-            >
-              <ViewTab
-                active={view === "threads"}
-                onClick={() => onViewChange("threads")}
-                icon={MessagesSquare}
-                label="Threads"
-              />
-            </Tip>
-            <Tip
-              title="Finder"
-              body="Browse this agent's files — the project folder it lives in and is confined to."
-            >
-              <ViewTab
-                active={view === "finder"}
-                onClick={() => onViewChange("finder")}
-                icon={FolderTree}
-                label="Finder"
-              />
-            </Tip>
-            {devMode && (
-              <Tip
-                title="Cockpit"
-                body="Look inside the agent's mind: its live context panels — memory, todos, stats and more."
-              >
-                <ViewTab
-                  active={view === "cockpit"}
-                  onClick={() => onViewChange("cockpit")}
-                  icon={LayoutGrid}
-                  label="Cockpit"
-                />
-              </Tip>
-            )}
-            {devMode && (
-              <Tip
-                title="Cost Analysis"
-                body="Per-tick cache efficiency, culprit attribution, and spend breakdown charts."
-              >
-                <ViewTab
-                  active={view === "costs"}
-                  onClick={() => onViewChange("costs")}
-                  icon={BarChart3}
-                  label="Costs"
-                />
-              </Tip>
-            )}
-          </div>
-        )}
+        {/* per-agent view switcher (hidden at fleet altitude). */}
+        {!inFleet && <ViewTabs view={view} onViewChange={onViewChange} devMode={devMode} />}
 
         <div className="ml-auto flex items-center gap-3">
           <Tip title="Appearance" body="Switch between light and dark." side="bottom">
@@ -223,5 +170,72 @@ function ViewTab({
       <Icon className="size-3.5" />
       {label}
     </button>
+  )
+}
+
+/** Per-agent view switcher (Threads · Finder · Cockpit · Costs). Cockpit + Costs
+ *  are dev-mode only. Extracted from {@link TopBar} so its tab cluster + the two
+ *  `devMode` gates don't count against the bar's complexity budget. Each tab
+ *  carries a tooltip since the names aren't obvious to a first-time user. */
+function ViewTabs({
+  view,
+  onViewChange,
+  devMode,
+}: {
+  view: ViewMode
+  onViewChange: (v: ViewMode) => void
+  devMode: boolean
+}) {
+  return (
+    <div className="ml-2 flex h-8 items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
+      <Tip
+        title="Threads"
+        body="Chat with this agent. Each thread is a separate conversation or task it can run in parallel."
+      >
+        <ViewTab
+          active={view === "threads"}
+          onClick={() => onViewChange("threads")}
+          icon={MessagesSquare}
+          label="Threads"
+        />
+      </Tip>
+      <Tip
+        title="Finder"
+        body="Browse this agent's files — the project folder it lives in and is confined to."
+      >
+        <ViewTab
+          active={view === "finder"}
+          onClick={() => onViewChange("finder")}
+          icon={FolderTree}
+          label="Finder"
+        />
+      </Tip>
+      {devMode && (
+        <Tip
+          title="Cockpit"
+          body="Look inside the agent's mind: its live context panels — memory, todos, stats and more."
+        >
+          <ViewTab
+            active={view === "cockpit"}
+            onClick={() => onViewChange("cockpit")}
+            icon={LayoutGrid}
+            label="Cockpit"
+          />
+        </Tip>
+      )}
+      {devMode && (
+        <Tip
+          title="Cost Analysis"
+          body="Per-tick cache efficiency, culprit attribution, and spend breakdown charts."
+        >
+          <ViewTab
+            active={view === "costs"}
+            onClick={() => onViewChange("costs")}
+            icon={BarChart3}
+            label="Costs"
+          />
+        </Tip>
+      )}
+    </div>
   )
 }

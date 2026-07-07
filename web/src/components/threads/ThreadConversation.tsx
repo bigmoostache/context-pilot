@@ -11,7 +11,8 @@ import { sendCommand } from "@/lib/api"
 import { extractDroppedFiles, zipDropped } from "@/lib/utils"
 import { measure } from "@/lib/support/telemetry"
 import { uploadToNode, type UploadedFile } from "./fileUpload/helpers"
-import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
+import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
+import type { ThreadDetail, ThreadMsg } from "@/lib/types"
 
 /** True only for an actual OS *file* drag — a text/selection drag must not blur. */
 function isFileDrag(e: React.DragEvent): boolean {
@@ -26,95 +27,82 @@ function handleDragOver(e: React.DragEvent) {
   e.dataTransfer.dropEffect = "copy"
 }
 
+/** The drag-event handler set spread onto the conversation surface. Each is
+ *  `undefined` when uploads are disabled so the surface neither blurs nor drops. */
+interface DropHandlers {
+  onDragEnter: ((e: React.DragEvent) => void) | undefined
+  onDragOver: ((e: React.DragEvent) => void) | undefined
+  onDragLeave: ((e: React.DragEvent) => void) | undefined
+  onDrop: ((e: React.DragEvent) => void) | undefined
+}
+
 /**
- * Normalise a thread message's `ts` into a human-readable relative age.
+ * OS-file drag-and-drop onto the conversation surface (T367/T471). Returns the
+ * `dragging` blur flag, the `uploading` overlay flag, and the drag handler set
+ * — all inert (`undefined`) when `onAttach` is omitted. Extracted from
+ * {@link ThreadConversation} so its body stays within the P8 line budget.
  *
- * The field arrives as either an epoch-ms number (REST backstop poll), an
- * ISO 8601 string (SSE delta reducer), or an already-formatted relative
- * string — this helper collapses all three into a single "Xm ago" label so
- * the Message renderer never shows a raw timestamp.
+ * dragenter/dragleave fire for every child crossed, so a depth counter tracks
+ * "is the cursor still somewhere inside" rather than a flicker-prone boolean.
  */
-function formatTs(ts: string | number | undefined): string {
-  if (ts === undefined) return ""
-  const n = typeof ts === "number" ? ts : Number(ts)
-  // Epoch-ms: any number above 2020-01-01 00:00:00 UTC.
-  if (!Number.isNaN(n) && n > 1_577_836_800_000) {
-    const s = Math.max(0, Math.floor((Date.now() - n) / 1000))
-    if (s < 5) return "just now"
-    if (s < 60) return `${s}s ago`
-    const m = Math.floor(s / 60)
-    if (m < 60) return `${m}m ago`
-    const h = Math.floor(m / 60)
-    if (h < 24) return `${h}h ago`
-    return `${Math.floor(h / 24)}d ago`
+function useConversationDrop(onAttach: ((files: File[]) => void | Promise<void>) | undefined): {
+  dragging: boolean
+  uploading: boolean
+  dropHandlers: DropHandlers
+} {
+  const [dragging, setDragging] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const dragDepthRef = useRef(0)
+
+  const onDragEnter = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    e.preventDefault()
+    dragDepthRef.current += 1
+    setDragging(true)
   }
-  // ISO 8601 string (from SSE reducer).
-  if (typeof ts === "string") {
-    const d = new Date(ts)
-    if (!Number.isNaN(d.getTime()) && d.getTime() > 1_577_836_800_000) {
-      const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000))
-      if (s < 5) return "just now"
-      if (s < 60) return `${s}s ago`
-      const m = Math.floor(s / 60)
-      if (m < 60) return `${m}m ago`
-      const h = Math.floor(m / 60)
-      if (h < 24) return `${h}h ago`
-      return `${Math.floor(h / 24)}d ago`
+  const onDragLeave = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+    if (dragDepthRef.current === 0) setDragging(false)
+  }
+  const runDrop = async (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    e.preventDefault()
+    dragDepthRef.current = 0
+    setDragging(false)
+    // Recurse into any dropped FOLDERS (plain `dataTransfer.files` can't — a
+    // folder drop otherwise yields one unreadable pseudo-file that uploaded as a
+    // failed "CORS … status null" request). extractDroppedFiles captures the
+    // Entry objects synchronously before its first await, so the neutered
+    // DataTransfer doesn't matter (T471).
+    const dropped = await extractDroppedFiles(e.dataTransfer)
+    if (dropped.length === 0) return
+    setUploading(true)
+    try {
+      // Zip the whole drop (folder structure preserved) into ONE archive and
+      // upload it in a single request — no per-file burst; awaiting keeps the
+      // loader up until it lands.
+      const archive = await zipDropped(dropped)
+      await onAttach?.([archive])
+    } catch {
+      // Zipping failed (unreadable file / fflate error) — fall back to the raw
+      // files so a drop is never silently lost.
+      await onAttach?.(dropped.map((d) => d.file))
+    } finally {
+      setUploading(false)
     }
   }
-  // Already formatted or unknown — pass through.
-  return String(ts)
-}
 
-/** Map a thread message onto the shared ChatMessage shape for the renderer. */
-function toChatMessage(m: ThreadMsg): ChatMessage {
-  return {
-    id: m.id,
-    role: m.tool ? "tool" : m.author,
-    text: m.text,
-    tool: m.tool,
-    ts: formatTs(m.ts),
-    streaming: m.streaming,
-  }
-}
+  const dropHandlers: DropHandlers = onAttach
+    ? {
+        onDragEnter,
+        onDragOver: handleDragOver,
+        onDragLeave,
+        onDrop: (e) => void runDrop(e),
+      }
+    : { onDragEnter: undefined, onDragOver: undefined, onDragLeave: undefined, onDrop: undefined }
 
-/** Parse an auto-trace message into its three columns: verb, tool, intent. */
-function parseAutoLine(m: ThreadMsg): { verb: string; tool: string; intent: string } {
-  const raw = m.text ?? ""
-  const t = raw.startsWith("/* auto */ ") ? raw.slice("/* auto */ ".length) : raw
-  const dotIdx = t.indexOf(" · ")
-  if (dotIdx === -1) return { verb: t, tool: "", intent: "" }
-  const verb = t.slice(0, dotIdx)
-  const rest = t.slice(dotIdx + 3)
-  const dashIdx = rest.indexOf(" — ")
-  if (dashIdx === -1) return { verb, tool: rest, intent: "" }
-  return { verb, tool: rest.slice(0, dashIdx), intent: rest.slice(dashIdx + 3) }
-}
-
-/**
- * A rendered segment of the conversation: either a single normal message, or a
- * *run* of consecutive auto tool-activity traces collapsed into one block.
- */
-type Segment = { type: "msg"; msg: ThreadMsg } | { type: "auto"; msgs: ThreadMsg[] }
-
-/**
- * Fold the flat message log into render segments, collapsing every maximal run
- * of consecutive `auto` traces into a single {@link Segment} so the live
- * tool-activity stream renders as one quiet, expandable group instead of a wall
- * of bubbles.
- */
-function segmentLog(log: ThreadMsg[]): Segment[] {
-  const out: Segment[] = []
-  for (const m of log) {
-    if (m.auto) {
-      const tail = out.at(-1)
-      if (tail?.type === "auto") tail.msgs.push(m)
-      else out.push({ type: "auto", msgs: [m] })
-    } else {
-      out.push({ type: "msg", msg: m })
-    }
-  }
-  return out
+  return { dragging, uploading, dropHandlers }
 }
 
 /**
@@ -264,59 +252,11 @@ export function ThreadConversation({
   const [sheetFile, setSheetFile] = useState<UploadedFile | null>(null)
 
   // ── OS-file drag-and-drop onto the whole conversation (T367) ──────────
-  //
   // Dragging files from the OS anywhere over the <main> uploads them exactly as
   // the composer's paperclip does (the SAME `onAttach` path → staged pending
   // chips), and the entire surface gets a discrete blur while a drag is in
-  // flight (300ms ease in AND out) as the only affordance — no overlay, no
-  // dashed border. The whole feature is gated on `onAttach`: with no upload sink
-  // the surface neither blurs nor accepts a drop.
-  const [dragging, setDragging] = useState(false)
-  // True while a dropped folder/files are being zipped + uploaded — drives the
-  // "Uploading…" overlay so a large folder drop shows clear progress (T471).
-  const [uploading, setUploading] = useState(false)
-  // dragenter/dragleave fire for every child crossed, so a plain boolean would
-  // flicker; a depth counter tracks "is the cursor still somewhere inside".
-  const dragDepthRef = useRef(0)
-
-  const handleDragEnter = (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    e.preventDefault()
-    dragDepthRef.current += 1
-    setDragging(true)
-  }
-  const handleDragLeave = (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
-    if (dragDepthRef.current === 0) setDragging(false)
-  }
-  const handleDrop = async (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    e.preventDefault()
-    dragDepthRef.current = 0
-    setDragging(false)
-    // Recurse into any dropped FOLDERS (plain `dataTransfer.files` can't — a
-    // folder drop otherwise yields one unreadable pseudo-file that uploaded as a
-    // failed "CORS … status null" request). extractDroppedFiles captures the
-    // Entry objects synchronously before its first await, so the neutered
-    // DataTransfer doesn't matter (T471).
-    const dropped = await extractDroppedFiles(e.dataTransfer)
-    if (dropped.length === 0) return
-    setUploading(true)
-    try {
-      // Zip the whole drop (folder structure preserved) into ONE archive and
-      // upload it in a single request — no more per-file burst. Awaiting
-      // onAttach keeps the loader up until the upload actually lands.
-      const archive = await zipDropped(dropped)
-      await onAttach?.([archive])
-    } catch {
-      // Zipping failed (unreadable file / fflate error) — fall back to
-      // uploading the raw files so a drop is never silently lost.
-      await onAttach?.(dropped.map((d) => d.file))
-    } finally {
-      setUploading(false)
-    }
-  }
+  // flight (300ms ease in AND out). The whole feature is gated on `onAttach`.
+  const { dragging, uploading, dropHandlers } = useConversationDrop(onAttach)
 
   // Whether the "create command" dialog (T350) is open — toggled by the pill
   // the composer renders beside the /command suggestion bubbles.
@@ -403,10 +343,10 @@ export function ThreadConversation({
         filter: dragging ? "blur(2px)" : "blur(0px)",
         transition: "filter 300ms ease",
       }}
-      onDragEnter={onAttach ? handleDragEnter : undefined}
-      onDragOver={onAttach ? handleDragOver : undefined}
-      onDragLeave={onAttach ? handleDragLeave : undefined}
-      onDrop={onAttach ? (e) => void handleDrop(e) : undefined}
+      onDragEnter={dropHandlers.onDragEnter}
+      onDragOver={dropHandlers.onDragOver}
+      onDragLeave={dropHandlers.onDragLeave}
+      onDrop={dropHandlers.onDrop}
     >
       {/* Upload progress (T471) — a discrete centered spinner over the surface
           while a dropped folder/files are zipped + uploaded. */}

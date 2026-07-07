@@ -213,73 +213,78 @@ function Sep() {
   return <span className="mx-1 h-4 w-px bg-border" />
 }
 
+/** Mutable accumulator threaded through the line-by-line markdown scan. */
+interface MdState {
+  out: string[]
+  list: "ul" | "ol" | null
+  fence: string[] | null
+}
+
+/** Close the currently-open list, if any. */
+function closeMdList(st: MdState): void {
+  if (!st.list) return
+  st.out.push(`</${st.list}>`)
+  st.list = null
+}
+
+/** Open `kind` as the current list (closing a different one first), so the
+ *  caller can push a `<li>` into it. */
+function openMdList(st: MdState, kind: "ul" | "ol"): void {
+  if (st.list === kind) return
+  closeMdList(st)
+  st.out.push(`<${kind}>`)
+  st.list = kind
+}
+
+/** Classify and emit a single markdown line into the accumulator — the branch
+ *  chain lifted out of {@link mdToHtml} so that function stays a thin scan under
+ *  the P8 statement budget. Handles fenced code blocks (open/close), the block
+ *  prefixes (#/##, >, -/*, ordered) and paragraphs; blank lines close any list. */
+function emitMdLine(line: string, st: MdState): void {
+  if (line.trim().startsWith("```")) {
+    if (st.fence) {
+      st.out.push(`<pre>${esc(st.fence.join("\n"))}</pre>`)
+      st.fence = null
+    } else {
+      closeMdList(st)
+      st.fence = []
+    }
+    return
+  }
+  if (st.fence) {
+    st.fence.push(line)
+    return
+  }
+  if (line.startsWith("## ")) {
+    closeMdList(st)
+    st.out.push(`<h2>${inline(line.slice(3))}</h2>`)
+  } else if (line.startsWith("# ")) {
+    closeMdList(st)
+    st.out.push(`<h1>${inline(line.slice(2))}</h1>`)
+  } else if (line.startsWith("> ")) {
+    closeMdList(st)
+    st.out.push(`<blockquote>${inline(line.slice(2))}</blockquote>`)
+  } else if (/^[-*] /.test(line)) {
+    openMdList(st, "ul")
+    st.out.push(`<li>${inline(line.slice(2))}</li>`)
+  } else if (/^\d+\. /.test(line)) {
+    openMdList(st, "ol")
+    st.out.push(`<li>${inline(line.replace(/^\d+\. /, ""))}</li>`)
+  } else if (line.trim() === "") {
+    closeMdList(st)
+  } else {
+    closeMdList(st)
+    st.out.push(`<p>${inline(line)}</p>`)
+  }
+}
+
 /** Minimal markdown → HTML for seeding the editable surface (design-only). */
 function mdToHtml(md: string): string {
-  const lines = md.replaceAll("\r", "").split("\n")
-  const out: string[] = []
-  let list: "ul" | "ol" | null = null
-  let fence: string[] | null = null
-
-  const closeList = () => {
-    if (!list) {
-      return
-    }
-
-    out.push(`</${list}>`)
-    list = null
-  }
-
-  for (const raw of lines) {
-    const line = raw
-
-    if (line.trim().startsWith("```")) {
-      if (fence) {
-        out.push(`<pre>${esc(fence.join("\n"))}</pre>`)
-        fence = null
-      } else {
-        closeList()
-        fence = []
-      }
-      continue
-    }
-    if (fence) {
-      fence.push(line)
-      continue
-    }
-
-    if (line.startsWith("## ")) {
-      closeList()
-      out.push(`<h2>${inline(line.slice(3))}</h2>`)
-    } else if (line.startsWith("# ")) {
-      closeList()
-      out.push(`<h1>${inline(line.slice(2))}</h1>`)
-    } else if (line.startsWith("> ")) {
-      closeList()
-      out.push(`<blockquote>${inline(line.slice(2))}</blockquote>`)
-    } else if (/^[-*] /.test(line)) {
-      if (list !== "ul") {
-        closeList()
-        out.push("<ul>")
-        list = "ul"
-      }
-      out.push(`<li>${inline(line.slice(2))}</li>`)
-    } else if (/^\d+\. /.test(line)) {
-      if (list !== "ol") {
-        closeList()
-        out.push("<ol>")
-        list = "ol"
-      }
-      out.push(`<li>${inline(line.replace(/^\d+\. /, ""))}</li>`)
-    } else if (line.trim() === "") {
-      closeList()
-    } else {
-      closeList()
-      out.push(`<p>${inline(line)}</p>`)
-    }
-  }
-  if (fence) out.push(`<pre>${esc(fence.join("\n"))}</pre>`)
-  closeList()
-  return out.join("")
+  const st: MdState = { out: [], list: null, fence: null }
+  for (const line of md.replaceAll("\r", "").split("\n")) emitMdLine(line, st)
+  if (st.fence) st.out.push(`<pre>${esc(st.fence.join("\n"))}</pre>`)
+  closeMdList(st)
+  return st.out.join("")
 }
 
 function inline(s: string): string {
@@ -367,43 +372,40 @@ function listItems(list: HTMLElement): HTMLElement[] {
   )
 }
 
-/** Serialize a single inline node to markdown — the per-node switch, lifted out
- *  of {@link serializeInline}'s loop so its `break`s no longer nest inside a
- *  for-of (unicorn/no-break-in-nested-loop). Recurses through element children
- *  via serializeInline. */
+// Symmetric inline wrappers: an element whose markdown is just `delim + inner +
+// delim`. Folding these eight tags into a lookup keeps serializeInlineNode below
+// the P8 complexity budget (the switch was 16 branches); `execCommand` emits
+// either semantic (<strong>/<em>/<del>) or presentational (<b>/<i>/<s>/<strike>)
+// tags depending on the browser, so both spellings of each map to one delimiter.
+const INLINE_WRAP: Record<string, string> = {
+  strong: "**",
+  b: "**",
+  em: "*",
+  i: "*",
+  code: "`",
+  del: "~~",
+  s: "~~",
+  strike: "~~",
+}
+
+/** Serialize a single inline node to markdown — lifted out of
+ *  {@link serializeInline}'s loop so its branches no longer nest inside a for-of
+ *  (unicorn/no-break-in-nested-loop). Symmetric wrappers go through INLINE_WRAP;
+ *  the asymmetric `a`/`br` cases are handled explicitly. Recurses through element
+ *  children via serializeInline. */
 function serializeInlineNode(node: ChildNode): string {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
   if (!(node instanceof HTMLElement)) return ""
   const tag = node.tagName.toLowerCase()
   const inner = serializeInline(node)
-  switch (tag) {
-    case "strong":
-    case "b": {
-      return `**${inner}**`
-    }
-    case "em":
-    case "i": {
-      return `*${inner}*`
-    }
-    case "code": {
-      return `\`${inner}\``
-    }
-    case "del":
-    case "s":
-    case "strike": {
-      return `~~${inner}~~`
-    }
-    case "a": {
-      const href = node.getAttribute("href") ?? ""
-      return href ? `[${inner}](${href})` : inner
-    }
-    case "br": {
-      return "\n"
-    }
-    default: {
-      return inner
-    }
+  const wrap = INLINE_WRAP[tag]
+  if (wrap !== undefined) return `${wrap}${inner}${wrap}`
+  if (tag === "a") {
+    const href = node.getAttribute("href") ?? ""
+    return href ? `[${inner}](${href})` : inner
   }
+  if (tag === "br") return "\n"
+  return inner
 }
 
 /** Serialize an element's inline content (recursively) to markdown. */

@@ -1,3 +1,4 @@
+import type { ReactElement } from "react"
 import { Download, X } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { downloadFile } from "@/lib/api"
@@ -93,13 +94,12 @@ export function FinderPreview({
 }
 
 /**
- * Route a node to its bespoke preview. Inlined maquette payloads (node.code /
- * sheet / slides / pdf / image / media / text) render the decorative mock
- * previews; otherwise, given an agentId, live files fetch their content from the
- * backend (images + PDFs from the inline raw-serve endpoint, text-like kinds via
- * the preview/sheet endpoints). Folders + unpreviewable binaries fall back.
+ * Render an inlined-payload preview for a node that carries its own maquette
+ * content (the decorative Finder mock): code / sheet / slides / pdf / image /
+ * media / markdown / text. Returns null when the node has no inline payload, so
+ * {@link Body} can fall through to the live-fetch or generic path.
  */
-function Body({ node, agentId }: { node: FinderNode; agentId?: string | undefined }) {
+function inlinePreview(node: FinderNode): ReactElement | null {
   if (node.kind === "folder") return <FolderPreview node={node} />
   if (node.code) return <CodePreview lang={node.code.lang} lines={node.code.lines} />
   if (node.sheet) return <SheetPreview sheet={node.sheet} />
@@ -110,12 +110,29 @@ function Body({ node, agentId }: { node: FinderNode; agentId?: string | undefine
   if (node.media?.kind === "video") return <VideoPreview media={node.media} />
   if (node.kind === "markdown" && node.text) return <MarkdownPreview text={node.text} />
   if (node.text) return <TextPreview kind={node.kind} text={node.text} />
-  // No inlined payload (the live Finder): images and PDFs render straight from
-  // the backend's inline raw-serve endpoint; text-like kinds fetch their
-  // content. Folders/binary/media files keep the no-preview state.
-  if (agentId && node.kind === "image") return <LiveImagePreview agentId={agentId} node={node} />
-  if (agentId && node.kind === "pdf") return <LivePdfPreview agentId={agentId} node={node} />
-  if (agentId && node.kind === "sheet") return <LiveSheetPreview agentId={agentId} node={node} />
-  if (agentId && TEXT_KINDS.has(node.kind)) return <LivePreview agentId={agentId} node={node} />
-  return <Generic node={node} />
+  return null
+}
+
+/**
+ * Render a live-fetched preview for a node whose payload isn't inlined (the live
+ * Finder): images + PDFs stream straight from the backend's inline raw-serve
+ * endpoint, text-like kinds fetch their content via the preview/sheet endpoints.
+ * Returns null without an agentId (no realm to fetch from) or for an
+ * unpreviewable kind, so {@link Body} falls through to {@link Generic}.
+ */
+function livePreview(node: FinderNode, agentId: string | undefined): ReactElement | null {
+  if (!agentId) return null
+  if (node.kind === "image") return <LiveImagePreview agentId={agentId} node={node} />
+  if (node.kind === "pdf") return <LivePdfPreview agentId={agentId} node={node} />
+  if (node.kind === "sheet") return <LiveSheetPreview agentId={agentId} node={node} />
+  if (TEXT_KINDS.has(node.kind)) return <LivePreview agentId={agentId} node={node} />
+  return null
+}
+
+/**
+ * Route a node to its bespoke preview: an inlined maquette payload first, then a
+ * live backend fetch (given an agentId), then the generic no-preview fallback.
+ */
+function Body({ node, agentId }: { node: FinderNode; agentId?: string | undefined }) {
+  return inlinePreview(node) ?? livePreview(node, agentId) ?? <Generic node={node} />
 }

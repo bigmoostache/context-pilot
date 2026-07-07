@@ -122,239 +122,248 @@ const PEAKS = Array.from(
   (_, i) => 0.25 + 0.7 * Math.abs(Math.sin(i * 0.7) * Math.cos(i * 0.31) + Math.sin(i * 1.9) * 0.4),
 )
 
-/** Build the realm tree for an agent, rooted at its folder. */
-export function buildRealm(folder: string, name: string): FinderNode {
-  const p = (rel: string) => `${folder}/${rel}`
+/** `src/` subtree — code, config, nested modules. */
+function srcDir(p: (rel: string) => string): FinderNode {
   return {
-    name,
-    path: folder,
+    name: "src",
+    path: p("src"),
     kind: "folder",
-    modified: "just now",
+    modified: "12m ago",
     created: "3 months ago",
+    starred: true,
     children: [
       {
-        name: "src",
-        path: p("src"),
-        kind: "folder",
+        name: "lib.rs",
+        path: p("src/lib.rs"),
+        kind: "code",
+        size: 18_432,
         modified: "12m ago",
-        created: "3 months ago",
+        created: "2 months ago",
+        tags: ["green"],
         starred: true,
-        children: [
-          {
-            name: "lib.rs",
-            path: p("src/lib.rs"),
-            kind: "code",
-            size: 18_432,
-            modified: "12m ago",
-            created: "2 months ago",
-            tags: ["green"],
-            starred: true,
-            code: { lang: "rust", lines: SAMPLE_RS },
-          },
-          {
-            name: "workspace.tsx",
-            path: p("src/workspace.tsx"),
-            kind: "code",
-            size: 2104,
-            modified: "1h ago",
-            created: "1w ago",
-            tags: ["blue"],
-            code: { lang: "tsx", lines: SAMPLE_TS },
-          },
-          {
-            name: "config.json",
-            path: p("src/config.json"),
-            kind: "json",
-            size: 642,
-            modified: "3h ago",
-            created: "2 months ago",
-            text: `{
+        code: { lang: "rust", lines: SAMPLE_RS },
+      },
+      {
+        name: "workspace.tsx",
+        path: p("src/workspace.tsx"),
+        kind: "code",
+        size: 2104,
+        modified: "1h ago",
+        created: "1w ago",
+        tags: ["blue"],
+        code: { lang: "tsx", lines: SAMPLE_TS },
+      },
+      {
+        name: "config.json",
+        path: p("src/config.json"),
+        kind: "json",
+        size: 642,
+        modified: "3h ago",
+        created: "2 months ago",
+        text: `{
   "model": "claude-opus-4-8",
   "max_tokens": 64000,
   "thinking": { "type": "adaptive" },
   "cache": { "breakpoints": 4, "ttl_secs": 300 }
 }`,
-          },
-          {
-            name: "modules",
-            path: p("src/modules"),
-            kind: "folder",
-            modified: "2d ago",
-            created: "2 months ago",
-            children: [
-              {
-                name: "threads.rs",
-                path: p("src/modules/threads.rs"),
-                kind: "code",
-                size: 9210,
-                modified: "2d ago",
-                created: "2 months ago",
-                code: { lang: "rust", lines: SAMPLE_RS },
-              },
-              {
-                name: "cache.rs",
-                path: p("src/modules/cache.rs"),
-                kind: "code",
-                size: 14_004,
-                modified: "5d ago",
-                created: "2 months ago",
-                code: { lang: "rust", lines: SAMPLE_RS },
-              },
-            ],
-          },
-        ],
       },
       {
-        name: "docs",
-        path: p("docs"),
+        name: "modules",
+        path: p("src/modules"),
         kind: "folder",
         modified: "2d ago",
-        created: "3 months ago",
+        created: "2 months ago",
         children: [
           {
-            name: "threads-spec.pdf",
-            path: p("docs/threads-spec.pdf"),
-            kind: "pdf",
-            size: 284_900,
+            name: "threads.rs",
+            path: p("src/modules/threads.rs"),
+            kind: "code",
+            size: 9210,
             modified: "2d ago",
-            created: "2w ago",
-            tags: ["red"],
-            pdf: SPEC_PDF,
+            created: "2 months ago",
+            code: { lang: "rust", lines: SAMPLE_RS },
           },
           {
-            name: "architecture.png",
-            path: p("docs/architecture.png"),
-            kind: "image",
-            size: 1_204_233,
+            name: "cache.rs",
+            path: p("src/modules/cache.rs"),
+            kind: "code",
+            size: 14_004,
             modified: "5d ago",
-            created: "1mo ago",
-            tags: ["orange"],
-            image: { gradient: "linear-gradient(135deg,#FFD369,#393E46 70%)", w: 1600, h: 900 },
-          },
-          {
-            name: "logo.png",
-            path: p("docs/logo.png"),
-            kind: "image",
-            size: 88_400,
-            modified: "1mo ago",
-            created: "2mo ago",
-            image: {
-              gradient: "radial-gradient(circle at 35% 30%,#6fb585,#222831 75%)",
-              w: 512,
-              h: 512,
-            },
-          },
-          {
-            name: "talk-deck.key",
-            path: p("docs/talk-deck.key"),
-            kind: "slides",
-            size: 4_882_010,
-            modified: "1w ago",
-            created: "1mo ago",
-            tags: ["purple"],
-            slides: DECK_SLIDES,
-          },
-          {
-            name: "CHANGELOG.md",
-            path: p("docs/CHANGELOG.md"),
-            kind: "markdown",
-            size: 2410,
-            modified: "1d ago",
-            created: "3 months ago",
-            text: CHANGELOG_MD,
+            created: "2 months ago",
+            code: { lang: "rust", lines: SAMPLE_RS },
           },
         ],
       },
+    ],
+  }
+}
+
+/** `docs/` subtree — spec PDF, images, deck, changelog. */
+function docsDir(p: (rel: string) => string): FinderNode {
+  return {
+    name: "docs",
+    path: p("docs"),
+    kind: "folder",
+    modified: "2d ago",
+    created: "3 months ago",
+    children: [
       {
-        name: "media",
-        path: p("media"),
-        kind: "folder",
-        modified: "6h ago",
-        created: "1w ago",
-        children: [
-          {
-            name: "demo.mp4",
-            path: p("media/demo.mp4"),
-            kind: "video",
-            size: 18_442_200,
-            modified: "6h ago",
-            created: "1w ago",
-            tags: ["blue"],
-            media: {
-              kind: "video",
-              duration: "2:14",
-              poster: "linear-gradient(135deg,#393E46,#222831)",
-            },
-          },
-          {
-            name: "voice-note.m4a",
-            path: p("media/voice-note.m4a"),
-            kind: "audio",
-            size: 1_002_400,
-            modified: "1d ago",
-            created: "1d ago",
-            media: { kind: "audio", duration: "0:48", peaks: PEAKS },
-          },
-        ],
+        name: "threads-spec.pdf",
+        path: p("docs/threads-spec.pdf"),
+        kind: "pdf",
+        size: 284_900,
+        modified: "2d ago",
+        created: "2w ago",
+        tags: ["red"],
+        pdf: SPEC_PDF,
       },
       {
-        name: "planning",
-        path: p("planning"),
-        kind: "folder",
-        modified: "4h ago",
+        name: "architecture.png",
+        path: p("docs/architecture.png"),
+        kind: "image",
+        size: 1_204_233,
+        modified: "5d ago",
+        created: "1mo ago",
+        tags: ["orange"],
+        image: { gradient: "linear-gradient(135deg,#FFD369,#393E46 70%)", w: 1600, h: 900 },
+      },
+      {
+        name: "logo.png",
+        path: p("docs/logo.png"),
+        kind: "image",
+        size: 88_400,
+        modified: "1mo ago",
         created: "2mo ago",
-        children: [
-          {
-            name: "roadmap.xlsx",
-            path: p("planning/roadmap.xlsx"),
-            kind: "sheet",
-            size: 38_220,
-            modified: "4h ago",
-            created: "2mo ago",
-            tags: ["blue", "yellow"],
-            starred: true,
-            sheet: ROADMAP_SHEET,
-          },
-          {
-            name: "budget.xlsx",
-            path: p("planning/budget.xlsx"),
-            kind: "sheet",
-            size: 21_004,
-            modified: "1d ago",
-            created: "2mo ago",
-            tags: ["green"],
-            sheet: {
-              columns: ["Month", "API", "Infra", "Total"],
-              rows: [
-                ["April", "$142", "$30", "$172"],
-                ["May", "$210", "$30", "$240"],
-                ["June", "$318", "$45", "$363"],
-                ["July", "$402", "$45", "$447"],
-              ],
-            },
-          },
-        ],
+        image: {
+          gradient: "radial-gradient(circle at 35% 30%,#6fb585,#222831 75%)",
+          w: 512,
+          h: 512,
+        },
       },
       {
-        name: "README.md",
-        path: p("README.md"),
+        name: "talk-deck.key",
+        path: p("docs/talk-deck.key"),
+        kind: "slides",
+        size: 4_882_010,
+        modified: "1w ago",
+        created: "1mo ago",
+        tags: ["purple"],
+        slides: DECK_SLIDES,
+      },
+      {
+        name: "CHANGELOG.md",
+        path: p("docs/CHANGELOG.md"),
         kind: "markdown",
-        size: 1842,
-        modified: "6h ago",
-        created: "3 months ago",
-        starred: true,
-        text: README_MD,
-      },
-      {
-        name: "Cargo.toml",
-        path: p("Cargo.toml"),
-        kind: "code",
-        size: 3201,
+        size: 2410,
         modified: "1d ago",
         created: "3 months ago",
-        code: {
-          lang: "toml",
-          lines: `[package]
+        text: CHANGELOG_MD,
+      },
+    ],
+  }
+}
+
+/** `media/` subtree — video + audio previews. */
+function mediaDir(p: (rel: string) => string): FinderNode {
+  return {
+    name: "media",
+    path: p("media"),
+    kind: "folder",
+    modified: "6h ago",
+    created: "1w ago",
+    children: [
+      {
+        name: "demo.mp4",
+        path: p("media/demo.mp4"),
+        kind: "video",
+        size: 18_442_200,
+        modified: "6h ago",
+        created: "1w ago",
+        tags: ["blue"],
+        media: {
+          kind: "video",
+          duration: "2:14",
+          poster: "linear-gradient(135deg,#393E46,#222831)",
+        },
+      },
+      {
+        name: "voice-note.m4a",
+        path: p("media/voice-note.m4a"),
+        kind: "audio",
+        size: 1_002_400,
+        modified: "1d ago",
+        created: "1d ago",
+        media: { kind: "audio", duration: "0:48", peaks: PEAKS },
+      },
+    ],
+  }
+}
+
+/** `planning/` subtree — the two budget/roadmap spreadsheets. */
+function planningDir(p: (rel: string) => string): FinderNode {
+  return {
+    name: "planning",
+    path: p("planning"),
+    kind: "folder",
+    modified: "4h ago",
+    created: "2mo ago",
+    children: [
+      {
+        name: "roadmap.xlsx",
+        path: p("planning/roadmap.xlsx"),
+        kind: "sheet",
+        size: 38_220,
+        modified: "4h ago",
+        created: "2mo ago",
+        tags: ["blue", "yellow"],
+        starred: true,
+        sheet: ROADMAP_SHEET,
+      },
+      {
+        name: "budget.xlsx",
+        path: p("planning/budget.xlsx"),
+        kind: "sheet",
+        size: 21_004,
+        modified: "1d ago",
+        created: "2mo ago",
+        tags: ["green"],
+        sheet: {
+          columns: ["Month", "API", "Infra", "Total"],
+          rows: [
+            ["April", "$142", "$30", "$172"],
+            ["May", "$210", "$30", "$240"],
+            ["June", "$318", "$45", "$363"],
+            ["July", "$402", "$45", "$447"],
+          ],
+        },
+      },
+    ],
+  }
+}
+
+/** Loose files at the realm root (README, Cargo.toml, archive). */
+function rootFiles(p: (rel: string) => string): FinderNode[] {
+  return [
+    {
+      name: "README.md",
+      path: p("README.md"),
+      kind: "markdown",
+      size: 1842,
+      modified: "6h ago",
+      created: "3 months ago",
+      starred: true,
+      text: README_MD,
+    },
+    {
+      name: "Cargo.toml",
+      path: p("Cargo.toml"),
+      kind: "code",
+      size: 3201,
+      modified: "1d ago",
+      created: "3 months ago",
+      code: {
+        lang: "toml",
+        lines: `[package]
 name = "context-pilot"
 edition = "2024"
 
@@ -364,18 +373,30 @@ members = ["crates/*"]
 [lints.clippy]
 all = "deny"
 pedantic = "deny"`.split("\n"),
-        },
       },
-      {
-        name: "assets.zip",
-        path: p("assets.zip"),
-        kind: "archive",
-        size: 9_004_882,
-        modified: "2w ago",
-        created: "2w ago",
-        tags: ["gray"],
-      },
-    ],
+    },
+    {
+      name: "assets.zip",
+      path: p("assets.zip"),
+      kind: "archive",
+      size: 9_004_882,
+      modified: "2w ago",
+      created: "2w ago",
+      tags: ["gray"],
+    },
+  ]
+}
+
+/** Build the realm tree for an agent, rooted at its folder. */
+export function buildRealm(folder: string, name: string): FinderNode {
+  const p = (rel: string) => `${folder}/${rel}`
+  return {
+    name,
+    path: folder,
+    kind: "folder",
+    modified: "just now",
+    created: "3 months ago",
+    children: [srcDir(p), docsDir(p), mediaDir(p), planningDir(p), ...rootFiles(p)],
   }
 }
 

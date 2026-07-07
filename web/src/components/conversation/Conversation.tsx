@@ -44,52 +44,61 @@ function toParams(input: Record<string, unknown> | undefined): Record<string, st
   return out
 }
 
+/** Map a `tool_call` durable row → a tool `ChatMessage`, or null when it
+ *  carries no usable tool_use payload. */
+function toolCallMsg(m: ConversationMsg): ChatMessage | null {
+  // Generated `tool_uses` is `Array<{ [key: string]: unknown }>` (the OpenAPI
+  // spec can't express the per-tool shape), so name it the shape we read.
+  const use = m.tool_uses?.[0] as { name?: string; input?: Record<string, unknown> } | undefined
+  if (!use) return null
+  return {
+    id: m.id,
+    role: "tool",
+    ts: ago(m.timestamp_ms),
+    tool: {
+      name: use.name ?? "tool",
+      intent: (use.input?.["intent"] as string | undefined) ?? "",
+      verb: (use.input?.["verb"] as string | undefined) ?? "",
+      params: toParams(use.input),
+    },
+  }
+}
+
+/** Map a plain user/assistant text row → a `ChatMessage`, overlaying the live
+ *  token buffer while it leads the not-yet-flushed durable content. */
+function textMsg(m: ConversationMsg, live: LiveTokens): ChatMessage {
+  const liveText = live[m.id]
+  const streaming = liveText != null && liveText.length > m.content.length
+  return {
+    id: m.id,
+    role: m.role === "assistant" ? "assistant" : "user",
+    text: streaming ? liveText : m.content,
+    ts: ago(m.timestamp_ms),
+    streaming,
+  }
+}
+
 /**
  * Map durable conversation messages → renderer `ChatMessage`s, then overlay the
  * live token buffers. `tool_result` rows are folded into their matching
  * `tool_call` card rather than rendered as empty user bubbles.
  */
 function buildMessages(durable: ConversationMsg[], live: LiveTokens): ChatMessage[] {
-  // Index tool results by the tool name so a tool_call can attach its result.
   const out: ChatMessage[] = []
   const renderedIds = new Set<string>()
 
   for (const m of durable) {
     const kind = m.message_type ?? "text"
     if (kind === "tool_result") continue // folded into its tool_call card
-
     if (kind === "tool_call") {
-      // Generated `tool_uses` is `Array<{ [key: string]: unknown }>` (the
-      // OpenAPI spec can't express the per-tool shape), so name it the shape we
-      // actually read off it.
-      const use = m.tool_uses?.[0] as { name?: string; input?: Record<string, unknown> } | undefined
-      if (!use) continue
-      out.push({
-        id: m.id,
-        role: "tool",
-        ts: ago(m.timestamp_ms),
-        tool: {
-          name: use.name ?? "tool",
-          intent: (use.input?.["intent"] as string | undefined) ?? "",
-          verb: (use.input?.["verb"] as string | undefined) ?? "",
-          params: toParams(use.input),
-        },
-      })
-      renderedIds.add(m.id)
+      const card = toolCallMsg(m)
+      if (card) {
+        out.push(card)
+        renderedIds.add(m.id)
+      }
       continue
     }
-
-    // Plain user / assistant text. Overlay live buffer when it leads.
-    const liveText = live[m.id]
-    const text = liveText != null && liveText.length > m.content.length ? liveText : m.content
-    const streaming = liveText != null && liveText.length > m.content.length
-    out.push({
-      id: m.id,
-      role: m.role === "assistant" ? "assistant" : "user",
-      text,
-      ts: ago(m.timestamp_ms),
-      streaming,
-    })
+    out.push(textMsg(m, live))
     renderedIds.add(m.id)
   }
 

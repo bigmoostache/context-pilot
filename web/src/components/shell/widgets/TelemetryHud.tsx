@@ -34,10 +34,6 @@ export function TelemetryHud() {
 
   if (!devMode || !open) return null
 
-  const inp = snap.vitals["INP"]
-  const lcp = snap.vitals["LCP"]
-  const cls = snap.vitals["CLS"]
-
   // Copy the full snapshot as markdown so it can be pasted straight into a
   // thread for diagnosis. The report carries MORE than the HUD renders (every
   // worst-list entry, the counts/totals, and the userAgent — so the browser is
@@ -78,117 +74,125 @@ export function TelemetryHud() {
         </span>
       </header>
 
-      {!collapsed && (
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-2.5">
-          {/* Real main-thread blocks — the AUTHORITATIVE freeze signal. A Web
-              Worker heartbeat runs on its own (never-throttled) thread; a gap
-              here means the main thread was GENUINELY blocked, so this can't be
-              faked by Firefox's focus-throttling of rAF the way a bare "stall"
-              can. If a block matches a stall → real freeze; if a stall shows
-              but NO block → that stall was a throttling artifact. */}
-          <Group
-            title="Real blocks (worker)"
-            meta={`${snap.blockCount} · worst ${snap.worstBlocks[0]?.blocked ?? 0}ms`}
-          >
-            {snap.worstBlocks.length === 0 ? (
-              <Empty>No real main-thread blocks — reproduce the freeze to capture it.</Empty>
-            ) : (
-              snap.worstBlocks.slice(0, 5).map((b, i) => <BlockRow key={i} block={b} />)
-            )}
-          </Group>
+      {!collapsed && <HudBody snap={snap} />}
+    </div>
+  )
+}
 
-          <Divider />
+/** A titled telemetry section: renders the empty hint when the list is empty,
+ *  else the mapped rows. Generic so every HUD section shares one control-flow
+ *  branch (the `length === 0` ternary lives here, once, instead of being repeated
+ *  per section in the body — the whole point of the P8 extraction). */
+function HudList<T>({
+  title,
+  meta,
+  items,
+  empty,
+  row,
+}: {
+  title: string
+  meta: string
+  items: T[]
+  empty: string
+  row: (item: T, i: number) => React.ReactNode
+}) {
+  return (
+    <Group title={title} meta={meta}>
+      {items.length === 0 ? <Empty>{empty}</Empty> : items.map((item, i) => row(item, i))}
+    </Group>
+  )
+}
 
-          {/* Task TOTALS — the burst-catcher. A storm of individually-cheap ops
-              (e.g. hundreds of sub-10ms SSE applies) never trips a single named
-              entry, but sums to a freeze here: a label with a huge count/total
-              names a death-by-a-thousand-cuts block. */}
-          <Group title="Task totals (Σ)" meta={`${snap.taskAgg.length} labels`}>
-            {snap.taskAgg.length === 0 ? (
-              <Empty>No tasks yet — reproduce the freeze to attribute it.</Empty>
-            ) : (
-              snap.taskAgg.slice(0, 6).map((a, i) => <AggRow key={i} agg={a} />)
-            )}
-          </Group>
-
-          <Divider />
-
-          {/* Main-thread stalls — THE headline freeze signal. A multi-second
-              hang shows here as one big gap even when INP/LoAF/Long-Tasks stay
-              silent (those are Chromium-only / per-frame; this rAF watchdog is
-              universal and catches storms of cheap tasks too). */}
-          <Group
-            title="Main-thread stalls"
-            meta={`${snap.stallCount} · worst ${snap.worstStalls[0]?.gap ?? 0}ms`}
-          >
-            {snap.worstStalls.length === 0 ? (
-              <Empty>No stalls yet — reproduce the freeze to capture it.</Empty>
-            ) : (
-              snap.worstStalls.slice(0, 5).map((s, i) => <StallRow key={i} stall={s} />)
-            )}
-          </Group>
-
-          <Divider />
-
-          {/* Named tasks — the ATTRIBUTION for a stall. A stall says the main
-              thread blocked for N ms; a matching task entry (sse:apply,
-              threads:merge, sse:parse) says WHICH instrumented path burned it —
-              the only way to name the culprit on Firefox (no LoAF). */}
-          <Group
-            title="Named tasks"
-            meta={`${snap.taskCount} · worst ${snap.worstTasks[0]?.duration ?? 0}ms`}
-          >
-            {snap.worstTasks.length === 0 ? (
-              <Empty>No named blocks yet — reproduce the freeze to attribute it.</Empty>
-            ) : (
-              snap.worstTasks.slice(0, 5).map((t, i) => <TaskRow key={i} task={t} />)
-            )}
-          </Group>
-
-          <Divider />
-
-          {/* Web Vitals row */}
-          <section className="flex items-center gap-2">
-            <Vital label="INP" value={inp?.value} rating={inp?.rating} unit="ms" />
-            <Vital label="LCP" value={lcp?.value} rating={lcp?.rating} unit="ms" />
-            <Vital label="CLS" value={cls?.value} rating={cls?.rating} />
-          </section>
-          {inp?.detail && (
-            <p className="-mt-1 truncate text-[10.5px] text-muted-foreground" title={inp.detail}>
-              worst interaction: {inp.detail}
-            </p>
-          )}
-
-          <Divider />
-
-          {/* Long Animation Frames */}
-          <Group
-            title="Long frames"
-            meta={`${snap.worstFrames.length} · ${Math.round(snap.totalBlockingMs)}ms blocking`}
-          >
-            {snap.worstFrames.length === 0 ? (
-              <Empty>No long frames yet — interact to sample.</Empty>
-            ) : (
-              snap.worstFrames.slice(0, 5).map((f, i) => <FrameRow key={i} frame={f} />)
-            )}
-          </Group>
-
-          <Divider />
-
-          {/* React commits — a HIGH count of small commits is the SSE
-              render-storm signature (many cheap re-renders, not one slow one). */}
-          <Group
-            title="Slow React commits"
-            meta={`${snap.commitCount} commits · ${Math.round(snap.commitTotalMs)}ms · ${snap.longTaskCount} long tasks`}
-          >
-            {snap.worstCommits.length === 0 ? (
-              <Empty>No slow commits yet.</Empty>
-            ) : (
-              snap.worstCommits.slice(0, 5).map((c, i) => <CommitRow key={i} commit={c} />)
-            )}
-          </Group>
-        </div>
+/** The Core Web Vitals row (INP/LCP/CLS) plus the worst-interaction caption.
+ *  Extracted so the many `inp?.…`/`lcp?.…`/`cls?.…` optional-chain reads don't
+ *  count against {@link HudBody}'s complexity budget. */
+function VitalsRow({ snap }: { snap: TelemetrySnapshot }) {
+  const inp = snap.vitals["INP"]
+  const lcp = snap.vitals["LCP"]
+  const cls = snap.vitals["CLS"]
+  return (
+    <>
+      <section className="flex items-center gap-2">
+        <Vital label="INP" value={inp?.value} rating={inp?.rating} unit="ms" />
+        <Vital label="LCP" value={lcp?.value} rating={lcp?.rating} unit="ms" />
+        <Vital label="CLS" value={cls?.value} rating={cls?.rating} />
+      </section>
+      {inp?.detail && (
+        <p className="-mt-1 truncate text-[10.5px] text-muted-foreground" title={inp.detail}>
+          worst interaction: {inp.detail}
+        </p>
       )}
+    </>
+  )
+}
+
+/** The expanded HUD body — every telemetry section, composed from {@link HudList}
+ *  + {@link VitalsRow} so no single function exceeds the P8 complexity budget. */
+function HudBody({ snap }: { snap: TelemetrySnapshot }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-2.5">
+      {/* Real main-thread blocks — the AUTHORITATIVE freeze signal. A Web
+          Worker heartbeat runs on its own (never-throttled) thread; a gap here
+          means the main thread was GENUINELY blocked, so this can't be faked by
+          Firefox's focus-throttling of rAF the way a bare "stall" can. */}
+      <HudList
+        title="Real blocks (worker)"
+        meta={`${snap.blockCount} · worst ${snap.worstBlocks[0]?.blocked ?? 0}ms`}
+        items={snap.worstBlocks.slice(0, 5)}
+        empty="No real main-thread blocks — reproduce the freeze to capture it."
+        row={(b, i) => <BlockRow key={i} block={b} />}
+      />
+      <Divider />
+      {/* Task TOTALS — the burst-catcher. A storm of individually-cheap ops sums
+          to a freeze here even when no single named entry trips. */}
+      <HudList
+        title="Task totals (Σ)"
+        meta={`${snap.taskAgg.length} labels`}
+        items={snap.taskAgg.slice(0, 6)}
+        empty="No tasks yet — reproduce the freeze to attribute it."
+        row={(a, i) => <AggRow key={i} agg={a} />}
+      />
+      <Divider />
+      {/* Main-thread stalls — THE headline freeze signal (universal rAF watchdog,
+          catches storms of cheap tasks INP/LoAF miss). */}
+      <HudList
+        title="Main-thread stalls"
+        meta={`${snap.stallCount} · worst ${snap.worstStalls[0]?.gap ?? 0}ms`}
+        items={snap.worstStalls.slice(0, 5)}
+        empty="No stalls yet — reproduce the freeze to capture it."
+        row={(s, i) => <StallRow key={i} stall={s} />}
+      />
+      <Divider />
+      {/* Named tasks — the ATTRIBUTION for a stall (the only culprit-naming on
+          Firefox, which has no LoAF). */}
+      <HudList
+        title="Named tasks"
+        meta={`${snap.taskCount} · worst ${snap.worstTasks[0]?.duration ?? 0}ms`}
+        items={snap.worstTasks.slice(0, 5)}
+        empty="No named blocks yet — reproduce the freeze to attribute it."
+        row={(t, i) => <TaskRow key={i} task={t} />}
+      />
+      <Divider />
+      <VitalsRow snap={snap} />
+      <Divider />
+      {/* Long Animation Frames */}
+      <HudList
+        title="Long frames"
+        meta={`${snap.worstFrames.length} · ${Math.round(snap.totalBlockingMs)}ms blocking`}
+        items={snap.worstFrames.slice(0, 5)}
+        empty="No long frames yet — interact to sample."
+        row={(f, i) => <FrameRow key={i} frame={f} />}
+      />
+      <Divider />
+      {/* React commits — a HIGH count of small commits is the SSE render-storm
+          signature (many cheap re-renders, not one slow one). */}
+      <HudList
+        title="Slow React commits"
+        meta={`${snap.commitCount} commits · ${Math.round(snap.commitTotalMs)}ms · ${snap.longTaskCount} long tasks`}
+        items={snap.worstCommits.slice(0, 5)}
+        empty="No slow commits yet."
+        row={(c, i) => <CommitRow key={i} commit={c} />}
+      />
     </div>
   )
 }

@@ -166,87 +166,8 @@ export function UsagePage() {
         </section>
 
         {/* per-agent table */}
-        <section className="flex flex-col gap-2.5">
-          <span className="text-[13px] font-semibold text-foreground/90">By agent</span>
-          {visible.length === 0 ? (
-            <div className="rounded-xl border border-border bg-card p-8 text-center text-[12.5px] text-muted-foreground card-shadow">
-              No agents in the fleet yet.
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-border bg-card card-shadow">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Agent</TableHead>
-                    <TableHead className="text-right">Input</TableHead>
-                    <TableHead className="text-right">Output</TableHead>
-                    <TableHead className="text-right">Spend</TableHead>
-                    <TableHead className="text-right">
-                      {unit === "usd" ? "% budget" : "Total"}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visible.map((r) => {
-                    const pct = r.budgetUsd > 0 ? (r.spendUsd / r.budgetUsd) * 100 : null
-                    return (
-                      <TableRow key={r.agent.id}>
-                        <TableCell className="font-medium text-foreground/85">
-                          <span className="flex items-center gap-2">
-                            <span
-                              className="size-2 shrink-0 rounded-full"
-                              style={{ background: agentAccent(r.agent) }}
-                            />
-                            {r.agent.name}
-                            {r.tripped && (
-                              <span className="rounded-full bg-[var(--danger)]/14 px-1.5 py-px text-[9.5px] font-medium text-[var(--danger)]">
-                                over budget
-                              </span>
-                            )}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-foreground/75">
-                          {fmtTok(r.inputTokens)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-foreground/75">
-                          {fmtTok(r.outputTokens)}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold tabular-nums text-foreground/90">
-                          {fmtUsd(r.spendUsd)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground/80">
-                          {unit === "usd"
-                            ? pct == null
-                              ? "—"
-                              : `${pct.toFixed(0)}%`
-                            : fmtTok(r.inputTokens + r.outputTokens)}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-                <TableFooter>
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell className="font-semibold text-foreground/90">Total</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-foreground/85">
-                      {fmtTok(totals.inputTokens)}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-foreground/85">
-                      {fmtTok(totals.outputTokens)}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-foreground">
-                      {fmtUsd(totals.spendUsd)}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-foreground/85">
-                      {unit === "usd" ? "" : fmtTok(totals.inputTokens + totals.outputTokens)}
-                    </TableCell>
-                  </TableRow>
-                </TableFooter>
-              </Table>
-            </div>
-          )}
-          <p className="sr-only">Active unit total: {fmt(totalValue)}</p>
-        </section>
+        <UsageTable visible={visible} totals={totals} unit={unit} />
+        <p className="sr-only">Active unit total: {fmt(totalValue)}</p>
 
         {/* honest boundary notice */}
         <section
@@ -263,6 +184,109 @@ export function UsagePage() {
         </section>
       </div>
     </ScrollArea>
+  )
+}
+
+/** The fleet's per-agent usage totals (the active-filter aggregate). */
+interface Totals {
+  spendUsd: number
+  inputTokens: number
+  outputTokens: number
+}
+
+/** The per-agent usage table (or the empty-fleet placeholder), with a totals
+ *  footer. Extracted from {@link UsagePage} so its render stays within the P8
+ *  line budget. */
+function UsageTable({
+  visible,
+  totals,
+  unit,
+}: {
+  visible: Row[]
+  totals: Totals
+  unit: UsageUnit
+}) {
+  return (
+    <section className="flex flex-col gap-2.5">
+      <span className="text-[13px] font-semibold text-foreground/90">By agent</span>
+      {visible.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-8 text-center text-[12.5px] text-muted-foreground card-shadow">
+          No agents in the fleet yet.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border bg-card card-shadow">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Agent</TableHead>
+                <TableHead className="text-right">Input</TableHead>
+                <TableHead className="text-right">Output</TableHead>
+                <TableHead className="text-right">Spend</TableHead>
+                <TableHead className="text-right">
+                  {unit === "usd" ? "% budget" : "Total"}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visible.map((r) => {
+                const pct = r.budgetUsd > 0 ? (r.spendUsd / r.budgetUsd) * 100 : null
+                return (
+                  <TableRow key={r.agent.id}>
+                    <TableCell className="font-medium text-foreground/85">
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="size-2 shrink-0 rounded-full"
+                          style={{ background: agentAccent(r.agent) }}
+                        />
+                        {r.agent.name}
+                        {r.tripped && (
+                          <span className="rounded-full bg-[var(--danger)]/14 px-1.5 py-px text-[9.5px] font-medium text-[var(--danger)]">
+                            over budget
+                          </span>
+                        )}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-foreground/75">
+                      {fmtTok(r.inputTokens)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-foreground/75">
+                      {fmtTok(r.outputTokens)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums text-foreground/90">
+                      {fmtUsd(r.spendUsd)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground/80">
+                      {unit === "usd"
+                        ? pct == null
+                          ? "—"
+                          : `${pct.toFixed(0)}%`
+                        : fmtTok(r.inputTokens + r.outputTokens)}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+            <TableFooter>
+              <TableRow className="hover:bg-transparent">
+                <TableCell className="font-semibold text-foreground/90">Total</TableCell>
+                <TableCell className="text-right font-semibold tabular-nums text-foreground/85">
+                  {fmtTok(totals.inputTokens)}
+                </TableCell>
+                <TableCell className="text-right font-semibold tabular-nums text-foreground/85">
+                  {fmtTok(totals.outputTokens)}
+                </TableCell>
+                <TableCell className="text-right font-semibold tabular-nums text-foreground">
+                  {fmtUsd(totals.spendUsd)}
+                </TableCell>
+                <TableCell className="text-right font-semibold tabular-nums text-foreground/85">
+                  {unit === "usd" ? "" : fmtTok(totals.inputTokens + totals.outputTokens)}
+                </TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </div>
+      )}
+    </section>
   )
 }
 

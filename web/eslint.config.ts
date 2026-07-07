@@ -212,6 +212,18 @@ export default defineConfig([
       // leak (fix at source — remove it) or a benign high-entropy constant
       // (calibrated per-site). Default tolerance (4.0) is kept.
       "no-secrets/no-secrets": "error",
+      // ── P8 structure & complexity budgets (core-ESLint, the clippy
+      //    cognitive-complexity + folder-sizes twin) — CENSUS PASS ──────────
+      "max-lines": ["error", { max: 500, skipBlankLines: false, skipComments: false }],
+      "max-lines-per-function": [
+        "error",
+        { max: 150, skipBlankLines: true, skipComments: true, IIFEs: true },
+      ],
+      complexity: ["error", { max: 15 }],
+      "max-depth": ["error", { max: 4 }],
+      "max-params": ["error", { max: 4 }],
+      "max-statements": ["error", { max: 30 }],
+      "max-nested-callbacks": ["error", { max: 3 }],
       // ban-ts-comment is already error via strictTypeChecked, but its default
       // still permits `@ts-expect-error` with a ≥10-char description. Harden it:
       // ALL four TS directive comments are forbidden outright, no description
@@ -509,17 +521,6 @@ export default defineConfig([
     // one file + these rules (the config-level exception channel, registered in
     // allowed-eslint-exceptions.yaml — never an inline eslint-disable):
     //
-    // • react-hooks/refs — the Finder threads its single-click SETTLE-TIMER ref
-    //   into the extracted pure handler factory `finderSelection` (a function
-    //   invoked during render). finderSelection reads/writes that ref ONLY
-    //   inside deferred event handlers (the setTimeout armed by onRowClick),
-    //   NEVER during render, so the pass is safe by construction — but the
-    //   react-compiler's conservative taint analysis can't see through the
-    //   function boundary and flags it. Every other ref in the file
-    //   (surfaceRef / fileInputRef / mainRef) is passed to a JSX `ref=` prop or
-    //   a hook, never read in render, so the file-scoped disable masks no real
-    //   ref-in-render bug.
-    //
     // • jsx-a11y/no-noninteractive-{element-interactions,tabindex} — the surface
     //   is a keyboard-driven WIDGET (arrow nav, type-ahead, Space Quick-Look,
     //   Enter rename, ⌘⌫ trash) that owns its key handling, so it carries
@@ -529,10 +530,11 @@ export default defineConfig([
     //   alternative `role="grid"` would be DISHONEST (the container wraps a
     //   toolbar + sidebar + main + path bar, not a literal grid of rows/cells).
     //
-    // Every other rule stays at error.
-    files: ["src/components/finder/Finder.tsx"],
+    // The role="application" surface lives in the Finder shell render (the P8
+    // decomposition split Finder.tsx into Finder/{index,state,controller,shell,
+    // body}); every other rule stays at error.
+    files: ["src/components/finder/Finder/shell.tsx"],
     rules: {
-      "react-hooks/refs": "off",
       "jsx-a11y/no-noninteractive-element-interactions": "off",
       "jsx-a11y/no-noninteractive-tabindex": "off",
     },
@@ -586,6 +588,21 @@ export default defineConfig([
     files: ["eslint.config.ts"],
     rules: {
       "no-secrets/no-secrets": "off",
+      // ── P8 max-lines — off for THIS config file ─────────────────────────
+      //
+      // The structural line cap (500, the CB7 web-structure twin) governs APP
+      // SOURCE — CB7 itself scopes its ≤500-lines/file check to `web/src/**`,
+      // deliberately exempting build tooling at the repo/web root. This flat
+      // config is exactly that: build tooling, not shipped code, and the bulk
+      // of its length is the per-rule rationale prose that the project's
+      // documentation standard mandates (every calibration/disable must explain
+      // WHY, in place). Capping a config whose value IS its documentation at 500
+      // lines would force either terse, unexplained rules or an artificial split
+      // that scatters one coherent ruleset across files — both worse than a
+      // single, fully-documented config. Scoped to this one file + this one rule
+      // (registered in allowed-eslint-exceptions.yaml, never an inline
+      // eslint-disable); every other file stays under the 500-line cap.
+      "max-lines": "off",
     },
   },
 ])

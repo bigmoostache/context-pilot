@@ -251,27 +251,6 @@ function ReleaseCard({
   index: number
   onChanged: () => void
 }) {
-  const dl = useMutation({
-    mutationFn: async () => {
-      await postApiReleasesDownload({ body: { tag: r.tag } })
-    },
-    onSuccess: onChanged,
-  })
-  const sel = useMutation({
-    mutationFn: async () => {
-      await putApiReleasesSelect({ body: { tag: r.tag } })
-    },
-    onSuccess: onChanged,
-  })
-  const del = useMutation({
-    mutationFn: async () => {
-      await deleteApiReleasesByTag({ path: { tag: r.tag } })
-    },
-    onSuccess: onChanged,
-  })
-
-  const busy = dl.isPending || sel.isPending || del.isPending
-
   return (
     <div
       style={{ animationDelay: `${index * 40}ms` }}
@@ -292,49 +271,90 @@ function ReleaseCard({
           {r.local && <Chip color="ok" label="Downloaded" />}
           {r.selected && <Chip color="interactive" label="Active" />}
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-          {r.name !== r.tag && <span>{r.name}</span>}
-          {r.publishedAt && <span>{formatDate(r.publishedAt)}</span>}
-          {r.assetSize != null && <span>{formatSize(r.assetSize)}</span>}
-          {r.local && r.binarySize != null && <span>binary {formatSize(r.binarySize)}</span>}
-        </div>
+        <ReleaseMeta release={r} />
       </div>
 
       {/* Right: actions */}
-      <div className="flex shrink-0 items-center gap-1.5">
-        {!r.local && r.assetUrl && (
-          <ActionBtn
-            icon={Download}
-            label="Download"
-            pending={dl.isPending}
-            disabled={busy}
-            onClick={() => dl.mutate()}
-          />
-        )}
-        {!r.local && !r.assetUrl && (
-          <span className="text-[10px] italic text-muted-foreground/50">no asset</span>
-        )}
-        {r.local && !r.selected && (
-          <ActionBtn
-            icon={Check}
-            label="Use"
-            pending={sel.isPending}
-            disabled={busy}
-            onClick={() => sel.mutate()}
-            accent
-          />
-        )}
-        {r.local && !r.selected && (
-          <ActionBtn
-            icon={Trash2}
-            label="Delete"
-            pending={del.isPending}
-            disabled={busy}
-            onClick={() => del.mutate()}
-            danger
-          />
-        )}
-      </div>
+      <ReleaseActions release={r} onChanged={onChanged} />
+    </div>
+  )
+}
+
+/** The release's secondary metadata line (name / date / asset + binary size). */
+function ReleaseMeta({ release: r }: { release: ReleaseEntry }) {
+  return (
+    <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+      {r.name !== r.tag && <span>{r.name}</span>}
+      {r.publishedAt && <span>{formatDate(r.publishedAt)}</span>}
+      {r.assetSize != null && <span>{formatSize(r.assetSize)}</span>}
+      {r.local && r.binarySize != null && <span>binary {formatSize(r.binarySize)}</span>}
+    </div>
+  )
+}
+
+/** The download / use / delete action cluster — owns its own mutations so the
+ *  card's render stays within the P8 complexity budget. */
+function ReleaseActions({
+  release: r,
+  onChanged,
+}: {
+  release: ReleaseEntry
+  onChanged: () => void
+}) {
+  const dl = useMutation({
+    mutationFn: async () => {
+      await postApiReleasesDownload({ body: { tag: r.tag } })
+    },
+    onSuccess: onChanged,
+  })
+  const sel = useMutation({
+    mutationFn: async () => {
+      await putApiReleasesSelect({ body: { tag: r.tag } })
+    },
+    onSuccess: onChanged,
+  })
+  const del = useMutation({
+    mutationFn: async () => {
+      await deleteApiReleasesByTag({ path: { tag: r.tag } })
+    },
+    onSuccess: onChanged,
+  })
+  const busy = dl.isPending || sel.isPending || del.isPending
+
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      {!r.local && r.assetUrl && (
+        <ActionBtn
+          icon={Download}
+          label="Download"
+          pending={dl.isPending}
+          disabled={busy}
+          onClick={() => dl.mutate()}
+        />
+      )}
+      {!r.local && !r.assetUrl && (
+        <span className="text-[10px] italic text-muted-foreground/50">no asset</span>
+      )}
+      {r.local && !r.selected && (
+        <ActionBtn
+          icon={Check}
+          label="Use"
+          pending={sel.isPending}
+          disabled={busy}
+          onClick={() => sel.mutate()}
+          accent
+        />
+      )}
+      {r.local && !r.selected && (
+        <ActionBtn
+          icon={Trash2}
+          label="Delete"
+          pending={del.isPending}
+          disabled={busy}
+          onClick={() => del.mutate()}
+          danger
+        />
+      )}
     </div>
   )
 }
