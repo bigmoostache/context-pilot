@@ -63,7 +63,7 @@ export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => v
               Manage Users
             </h3>
             <p className="text-[11px] text-muted-foreground">
-              {users.length} registered user{users.length !== 1 ? "s" : ""}
+              {users.length} registered user{users.length === 1 ? "" : "s"}
             </p>
           </div>
           <button

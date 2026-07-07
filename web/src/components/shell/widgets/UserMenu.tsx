@@ -38,8 +38,9 @@ export function UserMenu({
   const { authEnabled, user: authUser, logout } = useAuth()
   // Prefer the real signed-in identity when auth is on; fall back to the mock
   // account otherwise (auth disabled has no real user).
-  const displayName = authEnabled && authUser ? authUser.name : u.name
-  const displayEmail = authEnabled && authUser ? authUser.email : u.email
+  const identity = authEnabled && authUser ? authUser : u
+  const displayName = identity.name
+  const displayEmail = identity.email
   return (
     <DropdownMenu>
       <DropdownMenuTrigger

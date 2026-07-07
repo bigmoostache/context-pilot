@@ -76,7 +76,7 @@ export function GetInfo({ node, onClose }: { node: FinderNode; onClose: () => vo
           )}
           {node.image && <Row k="Dimensions" v={`${node.image.w} × ${node.image.h}`} />}
           {node.media && <Row k="Duration" v={node.media.duration} />}
-          {node.pdf && <Row k="Pages" v={`${node.pdf.pages}`} />}
+          {node.pdf && <Row k="Pages" v={String(node.pdf.pages)} />}
           <Row k="Created" v={node.created ?? "—"} />
           <Row k="Modified" v={node.modified} />
           <Row k="Where" v={node.path} mono />

@@ -63,22 +63,25 @@ function FleetStatus({ agents }: { agents: Agent[] }) {
   )
 }
 
+/** Resolve the live execution phase from the agent's folded vitals. Prefers the
+ *  push-delta `phase` (streaming/tooling/idle), falling back to `status` before
+ *  the first PhaseTransition has been observed. A flat if-chain, not a nested
+ *  ternary. */
+function resolvePhase(agent?: Agent): StreamPhase {
+  if (agent?.phase === "streaming") return "streaming"
+  if (agent?.phase === "tooling") return "tooling"
+  if (agent?.phase === "idle") return "ready"
+  if (agent?.status === "working") return "streaming"
+  return "ready"
+}
+
 /** Single-agent session vitals — shown while an agent is focused. */
 function AgentStatus({ agent }: { agent?: Agent | undefined }) {
   // Use the LIVE execution phase folded from the PhaseTransition delta (T297)
   // so the footer distinguishes streaming · tooling · ready instead of the old
   // 2-state projection of `status`. Falls back to `status` only before the
   // first phase transition has been observed (phase still undefined).
-  const phase: StreamPhase =
-    agent?.phase === "streaming"
-      ? "streaming"
-      : agent?.phase === "tooling"
-        ? "tooling"
-        : agent?.phase === "idle"
-          ? "ready"
-          : agent?.status === "working"
-            ? "streaming"
-            : "ready"
+  const phase: StreamPhase = resolvePhase(agent)
   const p = phaseMeta[phase]
   const costUsd = agent?.costUsd ?? 0
 

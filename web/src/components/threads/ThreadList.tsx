@@ -47,13 +47,13 @@ interface ThreadListProps {
  */
 function flattenMarkdown(md: string): string {
   return md
-    .replace(/```[\s\S]*?```/g, " ") // drop fenced code blocks
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1") // image → alt text
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // link → label
-    .replace(/<[^>]+>/g, " ") // strip HTML tags
-    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "") // heading/quote/bullet markers
-    .replace(/(\*\*|\*|__|~~|`)/g, "") // emphasis / code / strike markers
-    .replace(/\s+/g, " ")
+    .replaceAll(/```[\s\S]*?```/g, " ") // drop fenced code blocks
+    .replaceAll(/!\[([^\]]*)\]\([^)]*\)/g, "$1") // image → alt text
+    .replaceAll(/\[([^\]]*)\]\([^)]*\)/g, "$1") // link → label
+    .replaceAll(/<[^>]+>/g, " ") // strip HTML tags
+    .replaceAll(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "") // heading/quote/bullet markers
+    .replaceAll(/(\*\*|\*|__|~~|`)/g, "") // emphasis / code / strike markers
+    .replaceAll(/\s+/g, " ")
     .trim()
 }
 
@@ -72,6 +72,11 @@ function previewOf(t: ThreadDetail): string {
   if (!last) return ""
   if (last.text) return flattenMarkdown(last.text)
   return last.tool ? `⛭ ${last.tool.name}` : last.questions ? "asked a question" : ""
+}
+
+/** Sort threads by most recent activity first. */
+function byRecent(a: ThreadDetail, b: ThreadDetail): number {
+  return (b.lastActivityMs ?? 0) - (a.lastActivityMs ?? 0)
 }
 
 /**
@@ -109,11 +114,7 @@ export function ThreadList({
   const archivedCount = archived.length
 
   // search applies to whichever set is on screen
-  const visible = (showArchived ? archived : live).filter(matches)
-
-  /** Sort threads by most recent activity first. */
-  const byRecent = (a: ThreadDetail, b: ThreadDetail) =>
-    (b.lastActivityMs ?? 0) - (a.lastActivityMs ?? 0)
+  const visible = (showArchived ? archived : live).filter((t) => matches(t))
 
   /**
    * Sort the "Agent's turn" group focused-first, then by recency (T36). The
@@ -128,10 +129,10 @@ export function ThreadList({
     return byRecent(a, b)
   }
 
-  const mine = visible.filter((t) => t.status === "MY_TURN").sort(byFocusThenRecent)
+  const mine = visible.filter((t) => t.status === "MY_TURN").toSorted(byFocusThenRecent)
   const working = visible
     .filter((t) => t.status === "THEIR_TURN" || t.status === "ACTIVE")
-    .sort(byRecent)
+    .toSorted(byRecent)
   // agent-owned, actively-or-parallel working count (for the header pill)
   const workingCount = live.filter((t) => t.status !== "MY_TURN").length
 
@@ -255,7 +256,7 @@ export function ThreadList({
             {showArchived &&
               // Latest-archived first (T277) — most recently active on top.
               [...visible]
-                .sort(byRecent)
+                .toSorted(byRecent)
                 .map((t) => (
                   <ThreadRow
                     key={t.id}
@@ -300,6 +301,15 @@ function Group({ label, count, accent }: { label: string; count: number; accent?
   )
 }
 
+/** The status-dot colour for a thread row: green when focused/active, signal
+ *  when it's your turn, muted otherwise. A flat if-chain, not a nested ternary. */
+function dotColor(isFocused: boolean, status: ThreadDetail["status"]): string {
+  if (isFocused) return "var(--ok)"
+  if (status === "MY_TURN") return "var(--signal)"
+  if (status === "ACTIVE") return "var(--ok)"
+  return "var(--muted-foreground)"
+}
+
 function ThreadRow({
   t,
   selected,
@@ -320,13 +330,7 @@ function ThreadRow({
   const preview = previewOf(t)
   const isFocused = !archived && t.focused
   const isPaused = !archived && t.paused
-  const dot = isFocused
-    ? "var(--ok)"
-    : t.status === "MY_TURN"
-      ? "var(--signal)"
-      : t.status === "ACTIVE"
-        ? "var(--ok)"
-        : "var(--muted-foreground)"
+  const dot = dotColor(Boolean(isFocused), t.status)
   const pulse = isFocused || t.status === "MY_TURN" || t.status === "ACTIVE"
 
   return (

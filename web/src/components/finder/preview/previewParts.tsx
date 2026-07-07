@@ -150,7 +150,7 @@ export function Meta({ node }: { node: FinderNode }) {
         )}
         {node.image && <Row k="Dimensions" v={`${node.image.w} × ${node.image.h}`} />}
         {node.media && <Row k="Duration" v={node.media.duration} />}
-        {node.pdf && <Row k="Pages" v={`${node.pdf.pages}`} />}
+        {node.pdf && <Row k="Pages" v={String(node.pdf.pages)} />}
         {node.created && <Row k="Created" v={node.created} />}
         <Row k="Modified" v={node.modified} />
         {node.tags && node.tags.length > 0 && (

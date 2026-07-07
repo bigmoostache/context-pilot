@@ -141,6 +141,40 @@ function AppShell() {
     setView("finder")
   }, [])
 
+  // Route the active view to its surface. A flat if-chain (not a nested ternary)
+  // so each branch reads cleanly and the fleet fallthrough is explicit.
+  const renderView = () => {
+    if (effectiveView === "fleet") {
+      return (
+        <FleetShell
+          agents={agents}
+          onOpenAgent={openAgent}
+          openCreate={createAgent}
+          onCreateConsumed={() => setCreateAgent(false)}
+        />
+      )
+    }
+    if (effectiveView === "cockpit") return <CockpitView agentId={activeAgentId} />
+    if (effectiveView === "costs") return <CostsView agentId={activeAgentId} />
+    if (effectiveView === "finder" && activeAgent) {
+      return (
+        <Finder
+          key={activeAgent.id}
+          agent={activeAgent}
+          revealPath={finderRevealPath}
+          onRevealConsumed={() => setFinderRevealPath(null)}
+        />
+      )
+    }
+    return (
+      <ThreadsView
+        key={activeAgentId}
+        activeAgentId={activeAgentId}
+        onShowInFinder={showInFinder}
+      />
+    )
+  }
+
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
       <TopBar
@@ -152,31 +186,7 @@ function AppShell() {
         agents={agents}
       />
 
-      {effectiveView === "fleet" ? (
-        <FleetShell
-          agents={agents}
-          onOpenAgent={openAgent}
-          openCreate={createAgent}
-          onCreateConsumed={() => setCreateAgent(false)}
-        />
-      ) : effectiveView === "cockpit" ? (
-        <CockpitView agentId={activeAgentId} />
-      ) : effectiveView === "costs" ? (
-        <CostsView agentId={activeAgentId} />
-      ) : effectiveView === "finder" && activeAgent ? (
-        <Finder
-          key={activeAgent.id}
-          agent={activeAgent}
-          revealPath={finderRevealPath}
-          onRevealConsumed={() => setFinderRevealPath(null)}
-        />
-      ) : (
-        <ThreadsView
-          key={activeAgentId}
-          activeAgentId={activeAgentId}
-          onShowInFinder={showInFinder}
-        />
-      )}
+      {renderView()}
 
       <StatusBar fleet={effectiveView === "fleet"} agents={agents} activeAgent={activeAgent} />
     </div>

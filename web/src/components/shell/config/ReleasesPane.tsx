@@ -30,8 +30,6 @@ export function ReleasesPane() {
     queryFn: () => sdk<ReleasesResponse>(getApiReleases()),
   })
 
-  const invalidate = () => void qc.invalidateQueries({ queryKey: ["releases"] })
-
   if (isError) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
@@ -57,6 +55,11 @@ export function ReleasesPane() {
       </div>
     )
   }
+
+  // Refetch the releases query after any mutating action. Declared after the
+  // loading/error early exits so those paths don't build it
+  // (unicorn/no-declarations-before-early-exit).
+  const invalidate = () => void qc.invalidateQueries({ queryKey: ["releases"] })
 
   return (
     <div className="flex flex-col gap-4">

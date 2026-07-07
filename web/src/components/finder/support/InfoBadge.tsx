@@ -14,9 +14,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
  * pointer events are stopped from propagating so brushing the badge never
  * selects, opens, or drags the underlying node.
  */
+/** Swallow a pointer event so brushing the badge never reaches the row. */
+function stop(e: { stopPropagation: () => void }) {
+  e.stopPropagation()
+}
+
 export function InfoBadge({ description }: { description?: string | undefined }) {
   if (!description) return null
-  const stop = (e: { stopPropagation: () => void }) => e.stopPropagation()
   return (
     <TooltipProvider delay={120}>
       <Tooltip>

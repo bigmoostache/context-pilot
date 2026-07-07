@@ -102,17 +102,17 @@ export function applyThreadDelta(
     case "thread_archived":
     case "thread_restored": {
       const archived = k.kind === "thread_archived"
-      if (!prev.some((t) => t.id === k.thread_id)) return null
+      if (prev.every((t) => t.id !== k.thread_id)) return null
       return prev.map((t) => (t.id === k.thread_id ? { ...t, archived } : t))
     }
     case "thread_paused":
     case "thread_resumed": {
       const paused = k.kind === "thread_paused"
-      if (!prev.some((t) => t.id === k.thread_id)) return null
+      if (prev.every((t) => t.id !== k.thread_id)) return null
       return prev.map((t) => (t.id === k.thread_id ? { ...t, paused } : t))
     }
     case "thread_deleted": {
-      if (!prev.some((t) => t.id === k.thread_id)) return prev
+      if (prev.every((t) => t.id !== k.thread_id)) return prev
       return prev.filter((t) => t.id !== k.thread_id)
     }
     case "message_deleted": {
@@ -130,7 +130,7 @@ export function applyThreadDelta(
       return prev.map((t) => (t.id === k.thread_id ? { ...t, log: filtered } : t))
     }
     case "thread_status_changed": {
-      if (!prev.some((t) => t.id === k.thread_id)) return null
+      if (prev.every((t) => t.id !== k.thread_id)) return null
       return prev.map((t) => (t.id === k.thread_id ? { ...t, status: turnToStatus(k.status) } : t))
     }
     case "thread_focus_changed": {
@@ -209,10 +209,10 @@ export function applyThreadDelta(
         id: msgId,
         author: raw.author === "user" ? "user" : "assistant",
         ts: new Date(msgTs).toISOString(),
-        ...(msgText !== undefined ? { text: msgText } : {}),
-        ...(questions !== undefined ? { questions } : {}),
-        ...(msgFileRef !== undefined ? { fileRef: msgFileRef } : {}),
-        ...(raw.auto !== undefined ? { auto: raw.auto } : {}),
+        ...(msgText !== undefined && { text: msgText }),
+        ...(questions !== undefined && { questions }),
+        ...(msgFileRef !== undefined && { fileRef: msgFileRef }),
+        ...(raw.auto !== undefined && { auto: raw.auto }),
       }
       return prev.map((t) =>
         t.id === k.thread_id
@@ -225,8 +225,9 @@ export function applyThreadDelta(
           : t,
       )
     }
-    default:
+    default: {
       return prev // phase / cost / lifecycle → irrelevant to threads
+    }
   }
 }
 
@@ -304,8 +305,9 @@ export function applyAgentDelta(prev: Agent | undefined, entry: OpEntry): Agent 
       }
       return next
     }
-    default:
+    default: {
       return prev // thread / lifecycle → irrelevant to meta
+    }
   }
 }
 
@@ -342,9 +344,9 @@ export function mergeThreadLogs(
     // the two planes — an id-only filter would then preserve BOTH and render
     // the message twice. Matching on signature collapses that drifted-id dupe.
     const extra = p.log.filter((m) => !haveIds.has(m.id) && !haveSigs.has(msgSignature(m)))
-    return extra.length ? { ...t, log: [...t.log, ...extra] } : t
+    return extra.length > 0 ? { ...t, log: [...t.log, ...extra] } : t
   })
   const nextIds = new Set(next.map((t) => t.id))
   const missing = prev.filter((t) => !nextIds.has(t.id))
-  return missing.length ? [...missing, ...merged] : merged
+  return missing.length > 0 ? [...missing, ...merged] : merged
 }

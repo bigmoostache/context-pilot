@@ -129,7 +129,7 @@ export function useThreads(agentId: string): LiveQueryResult<ThreadDetail[]> {
 // mechanism is the poll. The default 15s backstop made the context meter feel
 // frozen (T297); a brisk poll keeps it tracking within a few seconds. The
 // backend read is mtime-cached, so an unchanged config.json is cheap to re-poll.
-const PANELS_POLL_MS = 4_000
+const PANELS_POLL_MS = 4000
 
 export function usePanels(agentId: string): LiveQueryResult<ContextPanel[]> {
   return useLive(qk.panels(agentId), () => api.fetchPanels(agentId), {
@@ -382,7 +382,7 @@ export function useStreamingTokens(agentId: string): LiveTokens {
 // agent mutations). So this hook rides a brisk poll (no delta fold): a tripped
 // breaker or a degraded stream surfaces within one poll interval (T121).
 
-const METRICS_POLL_MS = 4_000
+const METRICS_POLL_MS = 4000
 
 export function useMetrics(agentId: string): LiveQueryResult<api.AgentMetrics> {
   return useLive(qk.metrics(agentId), () => api.fetchMetrics(agentId), {

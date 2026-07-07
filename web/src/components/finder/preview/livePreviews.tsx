@@ -283,7 +283,7 @@ function HighlightedCode({
             <code
               className="min-w-0 whitespace-pre"
               // highlight.js escapes the source; the markup is class-tagged spans only.
-              dangerouslySetInnerHTML={{ __html: line || "\u200b" }}
+              dangerouslySetInnerHTML={{ __html: line || "\u{200B}" }}
             />
           </div>
         ))}

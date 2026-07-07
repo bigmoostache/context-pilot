@@ -86,8 +86,8 @@ export function culpritDistribution(rows: CostRow[]): Slice[] {
   for (const r of broken) {
     map.set(r.culprit, (map.get(r.culprit) ?? 0) + 1)
   }
-  return [...map.entries()]
-    .sort((a, b) => b[1] - a[1])
+  return [...map]
+    .toSorted((a, b) => b[1] - a[1])
     .map(([label, value], i) => ({
       label,
       value,
@@ -168,7 +168,7 @@ export function crossTabToolCulprit(rows: CostRow[]): CrossTab {
   const culpritSet = new Set<string>()
   for (const r of rows) {
     // First tool in the comma-separated list is the most recent (the one that ran at this tick)
-    const tool = r.tools.split(",")[0] ?? "(none)"
+    const tool = r.tools.split(",", 1)[0] ?? "(none)"
     if (!tool) continue
     const culprit = r.culprit || "none"
     toolSet.add(tool)
@@ -177,19 +177,21 @@ export function crossTabToolCulprit(rows: CostRow[]): CrossTab {
     cells.set(key, (cells.get(key) ?? 0) + 1)
   }
   // Sort tools by total count descending
-  const toolTotals = [...toolSet].map((t) => {
-    let total = 0
-    for (const c of culpritSet) total += cells.get(`${t}\t${c}`) ?? 0
-    return { tool: t, total }
-  })
-  toolTotals.sort((a, b) => b.total - a.total)
+  const toolTotals = [...toolSet]
+    .map((t) => {
+      let total = 0
+      for (const c of culpritSet) total += cells.get(`${t}\t${c}`) ?? 0
+      return { tool: t, total }
+    })
+    .toSorted((a, b) => b.total - a.total)
   // Sort culprits by total count descending
-  const culpritTotals = [...culpritSet].map((c) => {
-    let total = 0
-    for (const t of toolSet) total += cells.get(`${t}\t${c}`) ?? 0
-    return { culprit: c, total }
-  })
-  culpritTotals.sort((a, b) => b.total - a.total)
+  const culpritTotals = [...culpritSet]
+    .map((c) => {
+      let total = 0
+      for (const t of toolSet) total += cells.get(`${t}\t${c}`) ?? 0
+      return { culprit: c, total }
+    })
+    .toSorted((a, b) => b.total - a.total)
   return {
     tools: toolTotals.map((t) => t.tool),
     culprits: culpritTotals.map((c) => c.culprit),
@@ -207,7 +209,7 @@ function md$(v: number): string {
 /** Minimal token formatter for markdown. */
 function mdTok(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}K`
   return String(Math.round(v))
 }
 
@@ -224,7 +226,9 @@ export function buildMarkdownReport(
   const ct = crossTabToolCulprit(filtered)
 
   const lines: string[] = []
-  const push = (...l: string[]) => lines.push(...l)
+  const push = (...l: string[]) => {
+    lines.push(...l)
+  }
 
   // Header
   push("# Cost Analysis Report", "")
@@ -234,7 +238,7 @@ export function buildMarkdownReport(
   if (filters.breakKind !== "all") fParts.push(`Break=${filters.breakKind}`)
   if (fParts.length > 0) push(`**Filters:** ${fParts.join(", ")}`)
   push(
-    `**Ticks:** ${s.totalTicks}${s.totalTicks !== totalRows ? ` (filtered from ${totalRows})` : ""}`,
+    `**Ticks:** ${s.totalTicks}${s.totalTicks === totalRows ? "" : ` (filtered from ${totalRows})`}`,
     "",
   )
 
@@ -352,8 +356,8 @@ export function maxFreezePerCulprit(rows: CostRow[]): Slice[] {
     // Always take the latest value (overwrite) — reflects current code config
     map.set(key, r.culpritMaxFreezes)
   }
-  return [...map.entries()]
-    .sort((a, b) => b[1] - a[1])
+  return [...map]
+    .toSorted((a, b) => b[1] - a[1])
     .map(([label, value], i) => ({
       label,
       value,
@@ -370,8 +374,8 @@ export function culpritCostAttribution(rows: CostRow[]): Slice[] {
     const key = r.culprit || "unknown"
     map.set(key, (map.get(key) ?? 0) + totalCost)
   }
-  return [...map.entries()]
-    .sort((a, b) => b[1] - a[1])
+  return [...map]
+    .toSorted((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([label, value], i) => ({
       label,
@@ -385,12 +389,13 @@ export function toolCostAttribution(rows: CostRow[]): Slice[] {
   const map = new Map<string, number>()
   for (const r of rows) {
     const totalCost = r.hitCost + r.missCost + r.outCost
-    for (const tool of r.tools.split(",").filter(Boolean)) {
+    const rowTools = r.tools.split(",").filter(Boolean)
+    for (const tool of rowTools) {
       map.set(tool, (map.get(tool) ?? 0) + totalCost)
     }
   }
-  return [...map.entries()]
-    .sort((a, b) => b[1] - a[1])
+  return [...map]
+    .toSorted((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([label, value], i) => ({
       label,

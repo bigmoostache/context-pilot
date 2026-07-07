@@ -17,17 +17,30 @@ export function LoginPage() {
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
+  if (authLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background">
+        <div className="text-muted-foreground animate-pulse">Loading…</div>
+      </div>
+    )
+  }
+
+  // Bootstrap mode (no users yet) → the register form; otherwise sign-in.
+  // Declared after the loading early-exit so the guard path doesn't compute it
+  // (unicorn/no-declarations-before-early-exit) — every use is in the JSX below.
   const isRegister = !bootstrapped
 
+  // Defined after the early exit for the same reason; the submit path picks
+  // login vs register off `bootstrapped` (positive test — no negated condition).
   const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault()
     setError("")
     setSubmitting(true)
     try {
-      if (isRegister) {
-        await register(email, name, password)
-      } else {
+      if (bootstrapped) {
         await login(email, password)
+      } else {
+        await register(email, name, password)
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "An unexpected error occurred"
@@ -37,14 +50,6 @@ export function LoginPage() {
     } finally {
       setSubmitting(false)
     }
-  }
-
-  if (authLoading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground animate-pulse">Loading…</div>
-      </div>
-    )
   }
 
   return (

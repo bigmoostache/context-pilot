@@ -43,59 +43,74 @@ export function useFinderKeyboard(d: KeyboardDeps) {
       d.setPreview(n)
     }
 
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-      e.preventDefault()
-      focusAt(idx < 0 ? 0 : idx + 1)
-    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-      e.preventDefault()
-      focusAt(idx < 0 ? 0 : idx - 1)
-    } else if (e.key === "Enter") {
-      e.preventDefault()
-      // macOS Finder convention: Enter renames the focused entry (double-click
-      // opens it). Begins the inline editor on the current selection.
-      if (d.focusPath) {
-        const n = d.children.find((c) => c.path === d.focusPath)
-        if (n) d.startRename(n)
+    switch (e.key) {
+      case "ArrowRight":
+      case "ArrowDown": {
+        e.preventDefault()
+        focusAt(idx < 0 ? 0 : idx + 1)
+
+        break
       }
-    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "o") {
-      // …and Cmd/Ctrl+O opens, preserving a keyboard path to open now that
-      // Enter is bound to rename.
-      e.preventDefault()
-      if (d.focusPath) {
-        const n = d.children.find((c) => c.path === d.focusPath)
-        if (n) d.open(n)
+      case "ArrowLeft":
+      case "ArrowUp": {
+        e.preventDefault()
+        focusAt(idx < 0 ? 0 : idx - 1)
+
+        break
       }
-    } else if ((e.metaKey || e.ctrlKey) && e.key === "Backspace") {
-      // ⌘⌫ — move the current selection to Trash.
-      e.preventDefault()
-      const paths = d.selected.size ? [...d.selected] : d.focusPath ? [d.focusPath] : []
-      if (paths.length) d.trashPaths(paths)
-    } else if (e.key === "Backspace" || ((e.metaKey || e.ctrlKey) && e.key === "ArrowUp")) {
-      e.preventDefault()
-      d.goUp()
-    } else if (e.key === " ") {
-      e.preventDefault()
-      d.setPreviewOpen((o) => !o)
-    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
-      e.preventDefault()
-      d.setSelected(new Set(d.sorted.map((n) => n.path)))
-    } else if (e.key === "Escape") {
-      if (d.menuOpen) d.setMenu(null)
-      else {
-        d.setSelected(new Set())
-        d.setFocusPath(null)
+      case "Enter": {
+        e.preventDefault()
+        // macOS Finder convention: Enter renames the focused entry (double-click
+        // opens it). Begins the inline editor on the current selection.
+        if (d.focusPath) {
+          const n = d.children.find((c) => c.path === d.focusPath)
+          if (n) d.startRename(n)
+        }
+
+        break
       }
-    } else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
-      // type-ahead
-      typeBuf.current += e.key.toLowerCase()
-      window.clearTimeout(typeTimer.current)
-      typeTimer.current = window.setTimeout(() => (typeBuf.current = ""), 700)
-      const hit = d.sorted.find((n) => n.name.toLowerCase().startsWith(typeBuf.current))
-      if (hit) {
-        d.setFocusPath(hit.path)
-        d.setSelected(new Set([hit.path]))
-        d.setAnchor(hit.path)
-        d.setPreview(hit)
+      default: {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "o") {
+          // …and Cmd/Ctrl+O opens, preserving a keyboard path to open now that
+          // Enter is bound to rename.
+          e.preventDefault()
+          if (d.focusPath) {
+            const n = d.children.find((c) => c.path === d.focusPath)
+            if (n) d.open(n)
+          }
+        } else if ((e.metaKey || e.ctrlKey) && e.key === "Backspace") {
+          // ⌘⌫ — move the current selection to Trash.
+          e.preventDefault()
+          const paths = d.selected.size > 0 ? [...d.selected] : d.focusPath ? [d.focusPath] : []
+          if (paths.length > 0) d.trashPaths(paths)
+        } else if (e.key === "Backspace" || ((e.metaKey || e.ctrlKey) && e.key === "ArrowUp")) {
+          e.preventDefault()
+          d.goUp()
+        } else if (e.key === " ") {
+          e.preventDefault()
+          d.setPreviewOpen((o) => !o)
+        } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+          e.preventDefault()
+          d.setSelected(new Set(d.sorted.map((n) => n.path)))
+        } else if (e.key === "Escape") {
+          if (d.menuOpen) d.setMenu(null)
+          else {
+            d.setSelected(new Set())
+            d.setFocusPath(null)
+          }
+        } else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          // type-ahead
+          typeBuf.current += e.key.toLowerCase()
+          window.clearTimeout(typeTimer.current)
+          typeTimer.current = window.setTimeout(() => (typeBuf.current = ""), 700)
+          const hit = d.sorted.find((n) => n.name.toLowerCase().startsWith(typeBuf.current))
+          if (hit) {
+            d.setFocusPath(hit.path)
+            d.setSelected(new Set([hit.path]))
+            d.setAnchor(hit.path)
+            d.setPreview(hit)
+          }
+        }
       }
     }
   }

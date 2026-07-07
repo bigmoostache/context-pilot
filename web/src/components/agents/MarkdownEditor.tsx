@@ -13,6 +13,17 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+/** Whether a rich-text command is currently active for the selection (drives
+ *  the toolbar button's pressed state). `queryCommandState` throws on some
+ *  commands/browsers — treat any throw as inactive. */
+function active(cmd: string): boolean {
+  try {
+    return document.queryCommandState(cmd)
+  } catch {
+    return false
+  }
+}
+
 /**
  * A lightweight **WYSIWYG markdown editor** for the prompt library (design-only).
  *
@@ -50,10 +61,12 @@ export function MarkdownEditor({
   // (P6) — the inline `eslint-disable` that used to silence it is banned by the
   // P4 anti-suppression layer, so the honest warning stands until P6 restructures.
   useEffect(() => {
-    if (ref.current) {
-      ref.current.innerHTML = mdToHtml(initialMarkdown)
-      setEmpty(ref.current.textContent.trim().length === 0)
+    if (!ref.current) {
+      return
     }
+
+    ref.current.innerHTML = mdToHtml(initialMarkdown)
+    setEmpty(ref.current.textContent.trim().length === 0)
   }, [])
 
   // Serialize the live DOM back to markdown and report it (when a host wants to
@@ -71,14 +84,6 @@ export function MarkdownEditor({
   }
 
   const block = (tag: string) => exec("formatBlock", tag)
-
-  const active = (cmd: string) => {
-    try {
-      return document.queryCommandState(cmd)
-    } catch {
-      return false
-    }
-  }
 
   return (
     <div
@@ -201,16 +206,18 @@ function Sep() {
 
 /** Minimal markdown → HTML for seeding the editable surface (design-only). */
 function mdToHtml(md: string): string {
-  const lines = md.replace(/\r/g, "").split("\n")
+  const lines = md.replaceAll("\r", "").split("\n")
   const out: string[] = []
   let list: "ul" | "ol" | null = null
   let fence: string[] | null = null
 
   const closeList = () => {
-    if (list) {
-      out.push(`</${list}>`)
-      list = null
+    if (!list) {
+      return
     }
+
+    out.push(`</${list}>`)
+    list = null
   }
 
   for (const raw of lines) {
@@ -268,12 +275,12 @@ function mdToHtml(md: string): string {
 
 function inline(s: string): string {
   return esc(s)
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replaceAll(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replaceAll(/`([^`]+)`/g, "<code>$1</code>")
 }
 
 function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
 }
 
 /**
@@ -287,14 +294,14 @@ function esc(s: string): string {
  */
 function htmlToMarkdown(root: HTMLElement): string {
   const blocks: string[] = []
-  for (const node of Array.from(root.childNodes)) {
+  for (const node of root.childNodes) {
     const md = serializeBlock(node)
     if (md.trim().length > 0) blocks.push(md)
   }
   return (
     blocks
       .join("\n\n")
-      .replace(/\n{3,}/g, "\n\n")
+      .replaceAll(/\n{3,}/g, "\n\n")
       .trim() + "\n"
   )
 }
@@ -306,81 +313,95 @@ function serializeBlock(node: ChildNode): string {
 
   const tag = node.tagName.toLowerCase()
   switch (tag) {
-    case "h1":
+    case "h1": {
       return `# ${serializeInline(node)}`
-    case "h2":
+    }
+    case "h2": {
       return `## ${serializeInline(node)}`
-    case "h3":
+    }
+    case "h3": {
       return `### ${serializeInline(node)}`
-    case "blockquote":
+    }
+    case "blockquote": {
       return serializeInline(node)
         .split("\n")
         .map((l) => `> ${l}`)
         .join("\n")
-    case "pre":
+    }
+    case "pre": {
       return `\`\`\`\n${node.textContent}\n\`\`\``
-    case "ul":
+    }
+    case "ul": {
       return listItems(node)
         .map((li) => `- ${serializeInline(li)}`)
         .join("\n")
-    case "ol":
+    }
+    case "ol": {
       return listItems(node)
         .map((li, i) => `${i + 1}. ${serializeInline(li)}`)
         .join("\n")
-    case "br":
+    }
+    case "br": {
       return ""
-    default:
+    }
+    default: {
       // p / div / unknown block → its inline content as a paragraph.
       return serializeInline(node)
+    }
   }
 }
 
 /** The `<li>` children of a list element. */
 function listItems(list: HTMLElement): HTMLElement[] {
-  return Array.from(list.children).filter(
+  return [...list.children].filter(
     (c): c is HTMLElement => c instanceof HTMLElement && c.tagName.toLowerCase() === "li",
   )
+}
+
+/** Serialize a single inline node to markdown — the per-node switch, lifted out
+ *  of {@link serializeInline}'s loop so its `break`s no longer nest inside a
+ *  for-of (unicorn/no-break-in-nested-loop). Recurses through element children
+ *  via serializeInline. */
+function serializeInlineNode(node: ChildNode): string {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
+  if (!(node instanceof HTMLElement)) return ""
+  const tag = node.tagName.toLowerCase()
+  const inner = serializeInline(node)
+  switch (tag) {
+    case "strong":
+    case "b": {
+      return `**${inner}**`
+    }
+    case "em":
+    case "i": {
+      return `*${inner}*`
+    }
+    case "code": {
+      return `\`${inner}\``
+    }
+    case "del":
+    case "s":
+    case "strike": {
+      return `~~${inner}~~`
+    }
+    case "a": {
+      const href = node.getAttribute("href") ?? ""
+      return href ? `[${inner}](${href})` : inner
+    }
+    case "br": {
+      return "\n"
+    }
+    default: {
+      return inner
+    }
+  }
 }
 
 /** Serialize an element's inline content (recursively) to markdown. */
 function serializeInline(el: Node): string {
   let out = ""
-  for (const node of Array.from(el.childNodes)) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      out += node.textContent ?? ""
-      continue
-    }
-    if (!(node instanceof HTMLElement)) continue
-    const tag = node.tagName.toLowerCase()
-    const inner = serializeInline(node)
-    switch (tag) {
-      case "strong":
-      case "b":
-        out += `**${inner}**`
-        break
-      case "em":
-      case "i":
-        out += `*${inner}*`
-        break
-      case "code":
-        out += `\`${inner}\``
-        break
-      case "del":
-      case "s":
-      case "strike":
-        out += `~~${inner}~~`
-        break
-      case "a": {
-        const href = node.getAttribute("href") ?? ""
-        out += href ? `[${inner}](${href})` : inner
-        break
-      }
-      case "br":
-        out += "\n"
-        break
-      default:
-        out += inner
-    }
+  for (const node of el.childNodes) {
+    out += serializeInlineNode(node)
   }
   return out
 }

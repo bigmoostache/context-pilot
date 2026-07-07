@@ -188,31 +188,41 @@ export function ThreadComposer({
   // The agent owes a response on this thread (its turn, or actively streaming).
   const agentBusy = !userTurn
   // Only the FOCUSED thread is being worked right now; any other agent-turn
-  // thread is queued and will be picked up soon (T39).
-  const banner = paused
-    ? {
+  // thread is queued and will be picked up soon (T39). A flat if-chain builds
+  // the banner rather than a nested ternary.
+  const banner = ((): {
+    working: boolean
+    paused: boolean
+    color: string | undefined
+    text: string
+  } | null => {
+    if (paused) {
+      return {
         working: false,
         paused: true,
         color: undefined,
         text: "Thread paused — the agent won't respond until resumed.",
       }
-    : !agentBusy
-      ? null
-      : streaming
-        ? { working: true, paused: false, color: "var(--ok)", text: "Agent is streaming…" }
-        : focused
-          ? {
-              working: true,
-              paused: false,
-              color: "var(--signal)",
-              text: "Agent is working this thread…",
-            }
-          : {
-              working: false,
-              paused: false,
-              color: undefined,
-              text: "Agent will pick up this thread soon.",
-            }
+    }
+    if (!agentBusy) return null
+    if (streaming) {
+      return { working: true, paused: false, color: "var(--ok)", text: "Agent is streaming…" }
+    }
+    if (focused) {
+      return {
+        working: true,
+        paused: false,
+        color: "var(--signal)",
+        text: "Agent is working this thread…",
+      }
+    }
+    return {
+      working: false,
+      paused: false,
+      color: undefined,
+      text: "Agent will pick up this thread soon.",
+    }
+  })()
 
   const canSend = text.trim().length > 0 || pendingFiles.length > 0
 
@@ -367,7 +377,7 @@ export function ThreadComposer({
           multiple
           className="hidden"
           onChange={(e) => {
-            const files = Array.from(e.target.files ?? [])
+            const files = [...(e.target.files ?? [])]
             if (files.length > 0) void onAttach?.(files)
             // Reset so picking the same file again re-fires onChange.
             e.target.value = ""
@@ -400,7 +410,7 @@ export function ThreadComposer({
           }}
           onKeyDown={handleKeyDown}
           onPaste={(e) => {
-            const items = Array.from(e.clipboardData.items)
+            const items = [...e.clipboardData.items]
             const images = items
               .filter((i) => i.kind === "file" && i.type.startsWith("image/"))
               .map((i) => i.getAsFile())

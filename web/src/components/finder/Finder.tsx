@@ -125,8 +125,9 @@ export function Finder({
   // it's created. Folders sort first anyway, so the top is a natural spot.
   const displayNodes = useMemo<FinderNode[]>(
     () =>
-      pendingFolderName != null
-        ? [
+      pendingFolderName == null
+        ? sorted
+        : [
             {
               name: pendingFolderName,
               path: NEW_FOLDER_SENTINEL,
@@ -135,8 +136,7 @@ export function Finder({
               count: 0,
             },
             ...sorted,
-          ]
-        : sorted,
+          ],
     [pendingFolderName, sorted],
   )
   const crumbs = useMemo(
@@ -271,7 +271,7 @@ export function Finder({
   useEffect(() => {
     if (!revealPath) return
     const lastSlash = revealPath.lastIndexOf("/")
-    const parentRel = lastSlash >= 0 ? revealPath.slice(0, lastSlash) : ""
+    const parentRel = lastSlash === -1 ? "" : revealPath.slice(0, lastSlash)
     const parentAbs = parentRel ? `${agent.folder}/${parentRel}` : agent.folder
     navigate(parentAbs)
     setSelected(new Set([revealPath]))
@@ -324,7 +324,7 @@ export function Finder({
         multiple
         hidden
         onChange={(e) => {
-          uploadFiles(Array.from(e.target.files ?? []))
+          uploadFiles([...(e.target.files ?? [])])
           e.target.value = "" // allow re-selecting the same file
         }}
       />

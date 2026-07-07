@@ -155,11 +155,11 @@ export function CostTimeline({ rows, title, width = 600, height = 200 }: Timelin
   const buildArea = (accessor: (r: CostRow, base: number) => [number, number]) => {
     const upper: string[] = []
     const lower: string[] = []
-    rows.forEach((r, i) => {
+    for (const [i, r] of rows.entries()) {
       const [lo, hi] = accessor(r, 0)
       upper.push(`${xScale(i)},${yScale(hi)}`)
       lower.unshift(`${xScale(i)},${yScale(lo)}`)
-    })
+    }
     return `M${upper.join("L")}L${lower.join("L")}Z`
   }
 

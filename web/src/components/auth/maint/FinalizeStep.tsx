@@ -22,11 +22,6 @@ export function FinalizeStep({
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
 
-  // Gate on a known cockpit host too: identity_set and the identity object load
-  // from separate fetches, so guard against a stale "identity_set but no host".
-  const ready = status.identity_set && passwordChanged && cockpitName !== ""
-  const cockpitUrl = `https://${cockpitName}`
-
   const finalize = async () => {
     setError(null)
     setBusy(true)
@@ -49,6 +44,12 @@ export function FinalizeStep({
     }
   }
 
+  // The provisioned cockpit URL, used by both the done confirmation and the
+  // pre-finalize form below. Declared here (immediately before the `done` early
+  // exit that first consumes it) so no unrelated code sits between it and its
+  // use (unicorn/no-declarations-before-early-exit).
+  const cockpitUrl = `https://${cockpitName}`
+
   if (done) {
     return (
       <div className="flex flex-col gap-3">
@@ -66,6 +67,12 @@ export function FinalizeStep({
       </div>
     )
   }
+
+  // Enable finalize only once the backend pre-requisites are met (password
+  // changed + identity set + a known host). Declared after the `done` early
+  // exit so that return path doesn't compute it
+  // (unicorn/no-declarations-before-early-exit).
+  const ready = status.identity_set && passwordChanged && cockpitName !== ""
 
   return (
     <div className="flex flex-col gap-3">

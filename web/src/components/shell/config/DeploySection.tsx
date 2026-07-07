@@ -69,19 +69,7 @@ export function DeploySection({
           Deploy to Fleet
         </button>
 
-        {!orchConfirm ? (
-          <button
-            onClick={() => setOrchConfirm(true)}
-            disabled={restartOrch.isPending}
-            className={cn(
-              "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12px] font-medium transition-all disabled:opacity-50",
-              "border-[var(--danger)]/30 bg-[var(--danger)]/[0.06] text-[var(--danger)] hover:bg-[var(--danger)]/[0.12]",
-            )}
-          >
-            <Power className="size-3.5" />
-            Restart Orchestrator
-          </button>
-        ) : (
+        {orchConfirm ? (
           <button
             onClick={() => {
               restartOrch.mutate()
@@ -99,6 +87,18 @@ export function DeploySection({
               <Power className="size-3.5" />
             )}
             Confirm — connection will drop
+          </button>
+        ) : (
+          <button
+            onClick={() => setOrchConfirm(true)}
+            disabled={restartOrch.isPending}
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12px] font-medium transition-all disabled:opacity-50",
+              "border-[var(--danger)]/30 bg-[var(--danger)]/[0.06] text-[var(--danger)] hover:bg-[var(--danger)]/[0.12]",
+            )}
+          >
+            <Power className="size-3.5" />
+            Restart Orchestrator
           </button>
         )}
       </div>

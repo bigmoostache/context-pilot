@@ -123,56 +123,7 @@ export function ContextMenu({
       className="menu-pop fixed z-50 w-[214px] rounded-xl border border-border bg-popover/95 p-1.5 backdrop-blur-xl pop-shadow"
       style={{ left, top }}
     >
-      {!node ? (
-        // ── Empty-space (content-area) menu — realm-level actions ──
-        <>
-          <EmptyItem
-            icon={FolderPlus}
-            label="New Folder"
-            onClick={() => {
-              onNewFolder()
-              onClose()
-            }}
-            shortcut="⇧⌘N"
-          />
-          <EmptyItem
-            icon={Upload}
-            label="Upload…"
-            onClick={() => {
-              onUpload()
-              onClose()
-            }}
-          />
-          <Separator />
-          <EmptyItem
-            icon={CheckSquare}
-            label="Select All"
-            onClick={() => {
-              onSelectAll()
-              onClose()
-            }}
-            shortcut="⌘A"
-          />
-          <EmptyItem
-            icon={PanelRight}
-            label="Toggle Quick Look"
-            onClick={() => {
-              onTogglePreview()
-              onClose()
-            }}
-            shortcut="Space"
-          />
-          <Separator />
-          <EmptyItem
-            icon={RefreshCw}
-            label="Refresh"
-            onClick={() => {
-              onRefresh()
-              onClose()
-            }}
-          />
-        </>
-      ) : (
+      {node ? (
         <>
           <button
             onClick={() => {
@@ -238,6 +189,55 @@ export function ContextMenu({
             <span className="flex-1">Move to Trash</span>
             <span className="text-[10.5px] tabular-nums text-muted-foreground/50">⌘⌫</span>
           </button>
+        </>
+      ) : (
+        // ── Empty-space (content-area) menu — realm-level actions ──
+        <>
+          <EmptyItem
+            icon={FolderPlus}
+            label="New Folder"
+            onClick={() => {
+              onNewFolder()
+              onClose()
+            }}
+            shortcut="⇧⌘N"
+          />
+          <EmptyItem
+            icon={Upload}
+            label="Upload…"
+            onClick={() => {
+              onUpload()
+              onClose()
+            }}
+          />
+          <Separator />
+          <EmptyItem
+            icon={CheckSquare}
+            label="Select All"
+            onClick={() => {
+              onSelectAll()
+              onClose()
+            }}
+            shortcut="⌘A"
+          />
+          <EmptyItem
+            icon={PanelRight}
+            label="Toggle Quick Look"
+            onClick={() => {
+              onTogglePreview()
+              onClose()
+            }}
+            shortcut="Space"
+          />
+          <Separator />
+          <EmptyItem
+            icon={RefreshCw}
+            label="Refresh"
+            onClick={() => {
+              onRefresh()
+              onClose()
+            }}
+          />
         </>
       )}
     </div>

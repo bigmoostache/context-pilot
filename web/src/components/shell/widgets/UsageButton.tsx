@@ -25,18 +25,24 @@ function AnthropicMark({ className }: { className?: string }) {
 /** Human label for a usage-limit `kind`. */
 function limitLabel(kind: string): string {
   switch (kind) {
-    case "session":
+    case "session": {
       return "Session"
-    case "weekly_all":
+    }
+    case "weekly_all": {
       return "Weekly (all)"
-    case "weekly_sonnet":
+    }
+    case "weekly_sonnet": {
       return "Sonnet"
-    case "weekly_opus":
+    }
+    case "weekly_opus": {
       return "Opus"
-    case "weekly_cowork":
+    }
+    case "weekly_cowork": {
       return "Cowork"
-    default:
-      return kind.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    }
+    default: {
+      return kind.replaceAll("_", " ").replaceAll(/\b\w/g, (c) => c.toUpperCase())
+    }
   }
 }
 

@@ -47,8 +47,8 @@ function slugify(name: string): string {
   const s = name
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-+|-+$/g, "")
   return s || "untitled"
 }
 
@@ -210,7 +210,7 @@ export function AgentModal({
     setError(null)
     const apiName = findModel(providers, provId, modelId)?.apiName
     createAgent.mutate(
-      { name: name.trim(), ...(apiName ? { model: apiName } : {}) },
+      { name: name.trim(), ...(apiName && { model: apiName }) },
       {
         onSuccess: (receipt) => {
           onFlash?.(`Spawning “${slugify(name)}” in ${receipt.folder}`)

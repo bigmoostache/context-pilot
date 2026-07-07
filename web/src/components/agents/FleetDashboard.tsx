@@ -50,10 +50,12 @@ export function FleetDashboard({
   // Honour an external "create a new agent" request (from the workspace
   // switcher). Open the dialog in create mode, then consume the flag.
   useEffect(() => {
-    if (autoCreate) {
-      setModal({ mode: "create" })
-      onAutoCreateConsumed?.()
+    if (!autoCreate) {
+      return
     }
+
+    setModal({ mode: "create" })
+    onAutoCreateConsumed?.()
   }, [autoCreate, onAutoCreateConsumed])
 
   const flash = (m: string) => {
@@ -200,6 +202,38 @@ function AgentCard({
  *  backend view is no longer tracking the oplog head (a real health signal). */
 const REV_LAG_WARN = 50
 
+/** The first non-nominal health condition to surface for an agent card, or null
+ *  when everything is nominal. A flat if-chain (not a nested ternary): cost
+ *  breaker first (hard block), then a degraded stream, then a lagging
+ *  projection. */
+function healthCondition(
+  data: NonNullable<ReturnType<typeof useMetrics>["data"]>,
+): { label: string; tone: string; title: string } | null {
+  const { breaker, stream, rev } = data
+  if (breaker.tripped) {
+    return {
+      label: "Over budget",
+      tone: "var(--danger)",
+      title: `Cost breaker tripped — spent $${(breaker.spendUsd ?? 0).toFixed(2)} of $${(breaker.budgetUsd ?? 0).toFixed(2)} budget. Sends are blocked until the budget is raised or the run is stopped.`,
+    }
+  }
+  if (stream.degraded) {
+    return {
+      label: "Stream degraded",
+      tone: "var(--warn)",
+      title: `Live token stream dropped ${stream.droppedFrames} frame(s) — a slow consumer is being shed (the durable record is unaffected).`,
+    }
+  }
+  if ((rev.lag ?? 0) > REV_LAG_WARN) {
+    return {
+      label: "Projection lagging",
+      tone: "var(--warn)",
+      title: `Backend view is ${rev.lag} revs behind the oplog head (view ${rev.view} / head ${rev.oplogHead ?? "?"}). The projection is falling behind the durable log.`,
+    }
+  }
+  return null
+}
+
 /**
  * §19 health badge for an agent card. Polls `/api/agent/{id}/metrics` and
  * surfaces the *first* non-nominal condition as a coloured pill — so a tripped
@@ -212,27 +246,7 @@ function HealthBadge({ agentId }: { agentId: string }) {
   const { data } = useMetrics(agentId)
   if (!data) return null
 
-  const { breaker, stream, rev } = data
-  const condition = breaker.tripped
-    ? {
-        label: "Over budget",
-        tone: "var(--danger)",
-        title: `Cost breaker tripped — spent $${(breaker.spendUsd ?? 0).toFixed(2)} of $${(breaker.budgetUsd ?? 0).toFixed(2)} budget. Sends are blocked until the budget is raised or the run is stopped.`,
-      }
-    : stream.degraded
-      ? {
-          label: "Stream degraded",
-          tone: "var(--warn)",
-          title: `Live token stream dropped ${stream.droppedFrames} frame(s) — a slow consumer is being shed (the durable record is unaffected).`,
-        }
-      : (rev.lag ?? 0) > REV_LAG_WARN
-        ? {
-            label: "Projection lagging",
-            tone: "var(--warn)",
-            title: `Backend view is ${rev.lag} revs behind the oplog head (view ${rev.view} / head ${rev.oplogHead ?? "?"}). The projection is falling behind the durable log.`,
-          }
-        : null
-
+  const condition = healthCondition(data)
   if (!condition) return null
 
   return (

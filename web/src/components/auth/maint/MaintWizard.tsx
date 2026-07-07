@@ -48,8 +48,9 @@ export function MaintWizard({ initialStatus }: { initialStatus: MaintStatus }) {
     const token = getToken()
     const fresh = (await fetchMaintStatus().catch(() => null)) ?? initialStatus
     const user = token ? await fetchMaintMe().catch(() => null) : null
-    const id = user ? (await fetchIdentity().catch(() => ({ identity: null }))).identity : null
+    const idRes = user ? await fetchIdentity().catch(() => ({ identity: null })) : null
     if (!alive.current) return
+    const id = idRes?.identity ?? null
     setStatus(fresh)
     setMe(user)
     setIdentity(id)

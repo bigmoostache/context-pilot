@@ -3,6 +3,7 @@ import globals from "globals"
 import reactHooks from "eslint-plugin-react-hooks"
 import reactRefresh from "eslint-plugin-react-refresh"
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments"
+import unicorn from "eslint-plugin-unicorn"
 import tseslint from "typescript-eslint"
 import { defineConfig, globalIgnores } from "eslint/config"
 import type { ESLint } from "eslint"
@@ -39,6 +40,7 @@ export default defineConfig([
       tseslint.configs.strictTypeChecked,
       tseslint.configs.stylisticTypeChecked,
       reactRefresh.configs.vite,
+      unicorn.configs.recommended,
     ],
     plugins: {
       // react-hooks is pinned to its CLASSIC rule pair for the P0 baseline
@@ -150,6 +152,65 @@ export default defineConfig([
         "error",
         { ignorePrimitives: { string: true, boolean: true } },
       ],
+
+      // ── P5 unicorn calibrations (option-relaxations — the rule stays at
+      //    `error`, the clippy.toml-threshold twin; NOT registry exceptions) ──
+      //
+      // React source is PascalCase components (Message.tsx, AgentModal.tsx) +
+      // camelCase hooks/utils/modules (markdown.tsx, useFinderActions.ts).
+      // unicorn's default kebab-case would flag every component file; allow both
+      // cases so the rule still catches a genuinely mis-cased file.
+      "unicorn/filename-case": ["error", { cases: { camelCase: true, pascalCase: true } }],
+      // Catch bindings are `e` by house convention (a widened `unknown` since
+      // P3). `ignore` lets the handful of legacy `err`/`error` names pass while
+      // the rule still flags any other ad-hoc name.
+      "unicorn/catch-error-name": ["error", { name: "e", ignore: ["^err$", "^error$"] }],
+
+      // ── P5 unicorn justified disables (registered in
+      //    .github/checks/allowed-eslint-exceptions.yaml; each is a
+      //    React/DOM-incompatible or pure-naming-opinion rule with no
+      //    correctness value — the config-level exception channel, never an
+      //    inline eslint-disable) ──
+      //
+      // Bans idiomatic short identifiers (e, err, fn, props, params, db, ctx…)
+      // — pervasive, zero correctness value, fights React/JS convention.
+      "unicorn/name-replacements": "off",
+      // React & the DOM use `null` intrinsically: useState<T | null>(null),
+      // refs, getAttribute, DragEvent.dataTransfer. `null` is not avoidable.
+      "unicorn/no-null": "off",
+      // Forces is/has/should boolean-name prefixes; our booleans (dragging,
+      // copied, busy, saving, open, dirty) are idiomatic React state names.
+      "unicorn/consistent-boolean-name": "off",
+      // Browser-only code legitimately uses `window.*` (setTimeout,
+      // addEventListener, prompt); rewriting to globalThis buys nothing.
+      "unicorn/prefer-global-this": "off",
+      // Bans `new`/`set`-prefixed non-constructor names (newFolder, newAgent) —
+      // pure naming opinion.
+      "unicorn/no-non-function-verb-prefix": "off",
+      // `Array.prototype.reduce` is a legitimate, readable summation idiom used
+      // in the cost tables; unicorn's blanket ban is pure opinion.
+      "unicorn/no-array-reduce": "off",
+      // Fire-and-forget promise chains with a `.catch()` error sink are the
+      // idiomatic non-blocking pattern in React sync event handlers and effect
+      // bodies (which cannot be `async` — an effect must return its cleanup
+      // synchronously). Forcing `await` here means wrapping every handler in a
+      // `void (async () => { … })()` IIFE, a readability regression for a
+      // single-level chain. The genuine anti-pattern the rule targets (nested
+      // `.then()` pyramids) does not occur in this codebase.
+      "unicorn/prefer-await": "off",
+      // IRRECONCILABLE CONFLICT WITH PRETTIER (the canonical formatter — the
+      // rustfmt twin, established in P2). unicorn/no-nested-ternary permits
+      // nesting but DEMANDS the nested branch be parenthesized (`a ? b : (c ? d
+      // : e)`); Prettier authoritatively strips exactly those parens as
+      // redundant and reflows ternaries to its own indentation. The two fight
+      // in an infinite loop (eslint --fix re-adds the parens, prettier --write
+      // removes them). This rule is purely a paren-placement/readability
+      // opinion — formatting that Prettier already owns — so the formatter
+      // wins and the rule is off. Genuinely-complex nested ternaries were
+      // still extracted into flat if-chain helpers during P5 (App.renderView,
+      // StatusBar.resolvePhase, FleetDashboard.healthCondition,
+      // ThreadComposer banner, ThreadList.dotColor) on readability grounds.
+      "unicorn/no-nested-ternary": "off",
     },
   },
   {
@@ -159,6 +220,11 @@ export default defineConfig([
     files: ["src/components/ui/**/*.{ts,tsx}"],
     rules: {
       "react-refresh/only-export-components": "off",
+      // Vendored shadcn primitives keep their upstream kebab-case filenames
+      // (dropdown-menu.tsx, scroll-area.tsx) and their canonical cva() call
+      // nesting — both are the upstream shape we don't rewrite.
+      "unicorn/filename-case": "off",
+      "unicorn/max-nested-calls": "off",
     },
   },
   {
@@ -175,6 +241,20 @@ export default defineConfig([
     files: ["src/components/agents/MarkdownEditor.tsx"],
     rules: {
       "@typescript-eslint/no-deprecated": "off",
+    },
+  },
+  {
+    // The Finder mock filesystem embeds Rust + JSX code SAMPLES as multiline
+    // template literals for the preview pane (e.g. `format!("Sent to {tid}")`,
+    // `<Finder root={root} />`). Those `{tid}` / `{root}` braces are LITERAL
+    // text in the displayed foreign-language code, not JS interpolation —
+    // unicorn/no-incorrect-template-string-interpolation can't tell display
+    // text from a typo'd `${…}` and false-positives on every one. Scoped off
+    // for this single mock-data file (the rule stays at error everywhere else,
+    // where it genuinely catches a missing `$`).
+    files: ["src/lib/support/finderFs.ts"],
+    rules: {
+      "unicorn/no-incorrect-template-string-interpolation": "off",
     },
   },
 ])

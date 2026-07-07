@@ -28,7 +28,7 @@ export const CLICK_SETTLE_MS = 250
  *  byte can never appear in a real realm path, so this never collides with a
  *  live entry; the inline editor keys off it to route a commit to mkdir (create)
  *  instead of rename. */
-export const NEW_FOLDER_SENTINEL = "\u0000__cp_new_folder__"
+export const NEW_FOLDER_SENTINEL = "\u{0}__cp_new_folder__"
 
 const pinsKeyFor = (agentId: string) => `cp-finder-pins:${agentId}`
 
@@ -56,7 +56,7 @@ export function buildCrumbs(agentFolder: string, agentName: string, cwd: string)
   ]
   let cur = agentFolder
   for (const part of parts) {
-    cur = `${cur}/${part}`
+    cur += `/${part}`
     crumbs.push({ name: part, path: cur, kind: "folder", modified: "" })
   }
   return crumbs
@@ -65,7 +65,7 @@ export function buildCrumbs(agentFolder: string, agentName: string, cwd: string)
 /** Extract the last segment of a path as a human label. */
 export function pathName(p: string): string {
   const parts = p.split("/")
-  return parts[parts.length - 1] || p
+  return parts.at(-1) || p
 }
 
 /**

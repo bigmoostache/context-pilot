@@ -10,6 +10,11 @@ import type { PinnedFolder } from "../Finder"
 import { cn } from "@/lib/utils"
 
 // ── Left sidebar: favorites / locations / pinned ──────────────────
+/** True when a drag carries a Finder folder payload (pin-drop target). */
+function acceptsFolder(e: React.DragEvent): boolean {
+  return e.dataTransfer.types.includes(FOLDER_DRAG_MIME)
+}
+
 export function FinderSidebar({
   root,
   cwd,
@@ -32,8 +37,6 @@ export function FinderSidebar({
   const topFolders = (root.children ?? []).filter((c) => c.kind === "folder")
   const starred = collectStarred(root)
   const [dropActive, setDropActive] = useState(false)
-
-  const acceptsFolder = (e: React.DragEvent) => e.dataTransfer.types.includes(FOLDER_DRAG_MIME)
 
   return (
     <aside className="flex w-[var(--sidebar-w)] shrink-0 flex-col gap-3.5 overflow-y-auto border-r border-border bg-surface px-2.5 py-3">
@@ -75,10 +78,12 @@ export function FinderSidebar({
       {/* Pinned — a drag-and-drop target (drop a folder, or right-click → Pin). */}
       <div
         onDragOver={(e) => {
-          if (acceptsFolder(e)) {
-            e.preventDefault()
-            if (!dropActive) setDropActive(true)
+          if (!acceptsFolder(e)) {
+            return
           }
+
+          e.preventDefault()
+          if (!dropActive) setDropActive(true)
         }}
         onDragLeave={(e) => {
           if (e.currentTarget === e.target) setDropActive(false)

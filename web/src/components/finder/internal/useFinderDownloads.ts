@@ -24,7 +24,7 @@ export function useFinderDownloads(d: DownloadDeps) {
   // there's no archive-a-folder affordance here). No selection, or a
   // folders-only selection, is a no-op with an explanatory toast.
   const downloadSelected = () => {
-    if (!d.selected.size) {
+    if (d.selected.size === 0) {
       d.flash("Select files to download.")
       return
     }

@@ -40,11 +40,14 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
   // Backend-driven post-login step.
   switch (user.next_action) {
-    case "change_password":
+    case "change_password": {
       return <ForcePasswordChange />
-    case "onboarding":
+    }
+    case "onboarding": {
       return <Onboarding onComplete={() => void refreshMe()} />
-    default:
+    }
+    default: {
       return <>{children}</>
+    }
   }
 }

@@ -23,10 +23,14 @@ export function ProvisionedView({
     let live = true
     fetchIdentity()
       .then((r) => live && setIdentity(r.identity))
-      .catch(() => undefined)
+      .catch(() => {
+        /* identity is best-effort display — ignore a fetch failure */
+      })
     fetchCaFingerprint()
       .then((r) => live && setFingerprint(r.fingerprint))
-      .catch(() => undefined)
+      .catch(() => {
+        /* fingerprint is best-effort display — ignore a fetch failure */
+      })
     return () => {
       live = false
     }

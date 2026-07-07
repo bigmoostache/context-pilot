@@ -28,7 +28,7 @@ export function ThreadsPanel({ panel, agentId }: { panel: ContextPanel; agentId:
       <ul className="flex flex-col gap-2">
         {threadDetails.map((t) => {
           const meta = STATUS_META[t.status]
-          const last = t.log[t.log.length - 1]
+          const last = t.log.at(-1)
           return (
             <li key={t.id} className="rounded-lg border border-border bg-card p-3 card-shadow">
               <div className="mb-1 flex items-center gap-2">

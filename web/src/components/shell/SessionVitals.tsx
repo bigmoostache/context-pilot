@@ -168,7 +168,7 @@ function groupByCategory(vitals: Vital[] | null): VitalGroup[] {
 
 /** Turn a snake/kebab category tag into a Title-Cased section label. */
 function humanize(s: string): string {
-  return s.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  return s.replaceAll(/[-_]+/g, " ").replaceAll(/\b\w/g, (c) => c.toUpperCase())
 }
 
 /** Map a vital status to its semantic theme color (green / red / grey). */

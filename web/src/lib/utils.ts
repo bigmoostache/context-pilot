@@ -36,13 +36,13 @@ export function clipboard(): Clipboard | undefined {
  * would silently overwrite the first inside the archive.
  */
 function uniqueZipEntry(taken: Record<string, unknown>, name: string): string {
-  if (!(name in taken)) return name
+  if (!Object.hasOwn(taken, name)) return name
   const dot = name.lastIndexOf(".")
   const stem = dot > 0 ? name.slice(0, dot) : name
   const ext = dot > 0 ? name.slice(dot) : ""
   for (let i = 1; ; i++) {
     const candidate = `${stem} (${i})${ext}`
-    if (!(candidate in taken)) return candidate
+    if (!Object.hasOwn(taken, candidate)) return candidate
   }
 }
 
@@ -121,13 +121,13 @@ async function walkEntry(entry: FileSystemEntry, prefix: string): Promise<Droppe
  * which case folder recursion isn't possible.
  */
 export async function extractDroppedFiles(dt: DataTransfer): Promise<DroppedFile[]> {
-  const entries = Array.from(dt.items)
+  const entries = [...dt.items]
     .filter((it) => it.kind === "file")
     .map((it) => it.webkitGetAsEntry() ?? null)
     .filter((e): e is FileSystemEntry => e !== null)
 
   if (entries.length === 0) {
-    return Array.from(dt.files).map((file) => ({ file, path: file.name }))
+    return [...dt.files].map((file) => ({ file, path: file.name }))
   }
   const all: DroppedFile[] = []
   for (const entry of entries) all.push(...(await walkEntry(entry, "")))
@@ -141,7 +141,7 @@ function zipName(dropped: DroppedFile[]): string {
     const only = dropped[0].path
     return `${only.split("/").pop() ?? only}.zip`
   }
-  const roots = new Set(dropped.map((d) => d.path.split("/")[0]))
+  const roots = new Set(dropped.map((d) => d.path.split("/", 1)[0]))
   const [root] = roots
   if (roots.size === 1 && root && dropped.some((d) => d.path.includes("/"))) {
     return `${root}.zip`
@@ -227,12 +227,12 @@ function nextAlphaMarker(marker: string): string {
   const base = isUpper ? 65 : 97 // 'A' / 'a'
   // Decode bijective base-26 to a 1-indexed number (a=1, z=26, aa=27, …).
   let num = 0
-  for (const c of marker) num = num * 26 + (c.toLowerCase().charCodeAt(0) - 96)
+  for (const c of marker) num = num * 26 + ((c.toLowerCase().codePointAt(0) ?? 0) - 96)
   num += 1
   // Re-encode, peeling least-significant "digit" each step.
   let out = ""
   for (let n = num; n > 0; n = Math.floor((n - 1) / 26)) {
-    out = String.fromCharCode(base + ((n - 1) % 26)) + out
+    out = String.fromCodePoint(base + ((n - 1) % 26)) + out
   }
   return out
 }
@@ -297,7 +297,7 @@ function resetOrderedMarker(marker: string): string {
 /** Increment an ordered marker preserving its style: numeric `+1`, else the
  *  bijective base-26 letter step. */
 function incrementOrderedMarker(marker: string): string {
-  return /^\d+$/.test(marker) ? String(Number.parseInt(marker, 10) + 1) : nextAlphaMarker(marker)
+  return /^\d+$/.test(marker) ? String(Number(marker) + 1) : nextAlphaMarker(marker)
 }
 
 /**

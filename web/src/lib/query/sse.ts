@@ -92,9 +92,9 @@ function createSseClient(agentId: string): SseClient {
       if (lastEventId) url += `&last_rev=${encodeURIComponent(lastEventId)}`
       es = new EventSource(url)
 
-      es.onopen = () => {
+      es.addEventListener("open", () => {
         reconnectMs = RECONNECT_BASE_MS
-      }
+      })
 
       // Named events from the backend
       for (const type of ["delta", "stream", "resync", "invalidate"] as const) {
@@ -104,11 +104,11 @@ function createSseClient(agentId: string): SseClient {
         })
       }
 
-      es.onerror = () => {
+      es.addEventListener("error", () => {
         es?.close()
         es = null
         if (!isClosed()) scheduleReconnect()
-      }
+      })
     } catch {
       if (!isClosed()) scheduleReconnect()
     }

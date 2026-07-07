@@ -11,6 +11,6 @@ export const fmtDollar = (v: number): string => (v < 0.01 ? `$${v.toFixed(4)}` :
 export const fmtTokens = (v: number): string =>
   v >= 1_000_000
     ? `${(v / 1_000_000).toFixed(1)}M`
-    : v >= 1_000
-      ? `${(v / 1_000).toFixed(1)}K`
-      : `${v}`
+    : v >= 1000
+      ? `${(v / 1000).toFixed(1)}K`
+      : String(v)

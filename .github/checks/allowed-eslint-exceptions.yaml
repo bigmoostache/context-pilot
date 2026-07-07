@@ -64,3 +64,127 @@ exceptions:
     strategy: >
       Re-evaluate when a standardised formatting API (e.g. a matured
       EditContext) covers bold/italic/list/heading commands for contentEditable.
+
+  # ── P5 unicorn opinion rules — off tree-wide (React/DOM-incompatible or ────
+  #    pure-naming-opinion, no correctness value). These are global config-level
+  #    disables (not file-scoped), each justified below.
+  - path: "web/**"
+    rule: "unicorn/name-replacements"
+    reason: >
+      Bans idiomatic short identifiers (e, err, fn, props, params, db, ctx…) —
+      526 pervasive sites, zero correctness value, fights React/JS convention.
+      The prevent-abbreviations family twin; universally disabled in React
+      codebases.
+    strategy: >
+      Irreducible stylistic opinion. Would require a mechanical rename of nearly
+      every callback/parameter for no safety gain.
+
+  - path: "web/**"
+    rule: "unicorn/no-null"
+    reason: >
+      React and the DOM use `null` intrinsically — useState<T | null>(null),
+      refs, Element.getAttribute, DragEvent.dataTransfer, react-query data. Not
+      avoidable in a React/DOM codebase.
+    strategy: >
+      Irreducible — `null` is part of the React/DOM contract.
+
+  - path: "web/**"
+    rule: "unicorn/consistent-boolean-name"
+    reason: >
+      Forces is/has/should boolean-name prefixes; our booleans (dragging,
+      copied, busy, saving, open, dirty, paused) are idiomatic React state
+      names. Pure naming opinion, no correctness value.
+    strategy: >
+      Irreducible stylistic opinion.
+
+  - path: "web/**"
+    rule: "unicorn/prefer-global-this"
+    reason: >
+      Browser-only code legitimately uses `window.*` (setTimeout,
+      addEventListener, prompt, clearTimeout). Rewriting to `globalThis` buys
+      nothing in a browser-only bundle.
+    strategy: >
+      Re-evaluate only if any of this code is ever shared with a non-browser
+      (Node/worker) runtime where `window` is absent.
+
+  - path: "web/**"
+    rule: "unicorn/no-non-function-verb-prefix"
+    reason: >
+      Bans `new`/`set`-prefixed non-constructor names (newFolder, newAgent,
+      newThread) — pure naming opinion, no correctness value.
+    strategy: >
+      Irreducible stylistic opinion.
+
+  - path: "web/**"
+    rule: "unicorn/no-array-reduce"
+    reason: >
+      `Array.prototype.reduce` is a legitimate, readable summation idiom (cost
+      tables, token totals); unicorn's blanket ban is pure opinion.
+    strategy: >
+      Irreducible stylistic opinion.
+
+  - path: "web/**"
+    rule: "unicorn/prefer-await"
+    reason: >
+      Fire-and-forget promise chains with a `.catch()` error sink are the
+      idiomatic non-blocking pattern in React sync event handlers and effect
+      bodies (an effect cannot be `async` — it must return its cleanup
+      synchronously). Forcing `await` means wrapping each handler in a
+      `void (async () => { … })()` IIFE — a readability regression for a
+      single-level chain. The nested-`.then()`-pyramid anti-pattern the rule
+      targets does not occur here.
+    strategy: >
+      Re-evaluate if multi-level promise chaining ever appears; those genuine
+      cases would benefit from `await` and could be caught by a narrower rule.
+
+  - path: "web/**"
+    rule: "unicorn/no-nested-ternary"
+    reason: >
+      IRRECONCILABLE CONFLICT WITH PRETTIER (the canonical formatter, the
+      rustfmt twin established in P2). unicorn/no-nested-ternary permits nesting
+      but DEMANDS the nested branch be parenthesized (`a ? b : (c ? d : e)`);
+      Prettier authoritatively strips exactly those parens as redundant and
+      reflows ternaries to its own indentation. The two fight in an infinite
+      loop (eslint --fix re-adds the parens, prettier --write removes them). The
+      rule is purely a paren-placement/readability opinion — formatting Prettier
+      already owns — so the formatter wins. Genuinely-complex nested ternaries
+      were still hand-extracted into flat if-chain helpers during P5 (App
+      renderView, StatusBar resolvePhase, FleetDashboard healthCondition,
+      ThreadComposer banner, ThreadList dotColor) on readability grounds; what
+      remains are simple two-level value ternaries a formatter reads fine.
+    strategy: >
+      Re-evaluate if a Prettier-compatible nested-ternary readability rule
+      (e.g. the @stylistic variant that doesn't require the stripped parens)
+      becomes available.
+
+  # ── P5 unicorn vendored-shadcn exceptions (scoped to ui/**) ──────────────
+  - path: "web/src/components/ui/**"
+    rule: "unicorn/filename-case"
+    reason: >
+      Vendored shadcn/ui primitives keep their upstream kebab-case filenames
+      (dropdown-menu.tsx, scroll-area.tsx). The tree-wide rule is calibrated to
+      allow camel/pascal case; these vendored files are the sole kebab holdouts
+      and are not ours to rename.
+    strategy: >
+      Irreducible without forking shadcn. Re-evaluate if upstream renames them.
+
+  - path: "web/src/components/ui/**"
+    rule: "unicorn/max-nested-calls"
+    reason: >
+      Vendored shadcn primitives use the canonical cva() call nesting (badge.tsx)
+      that exceeds unicorn's depth-3 cap — the upstream shape we don't rewrite.
+    strategy: >
+      Irreducible without forking shadcn.
+
+  # ── P5 Finder mock — embedded code samples carry literal braces ──────────
+  - path: "web/src/lib/support/finderFs.ts"
+    rule: "unicorn/no-incorrect-template-string-interpolation"
+    reason: >
+      The Finder mock filesystem embeds Rust + JSX code SAMPLES in multiline
+      template literals for the preview pane (format!("Sent to {tid}"),
+      <Finder root={root} />). Those braces are literal display text in the
+      foreign-language sample, not JS interpolation; the rule can't distinguish
+      them from a typo'd ${…} and false-positives on each. Scoped to this one
+      mock-data file; the rule stays at error everywhere else.
+    strategy: >
+      Re-evaluate if the mock code samples are ever replaced by real data.

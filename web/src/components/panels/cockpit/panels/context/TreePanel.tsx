@@ -43,7 +43,7 @@ export function TreePanel({ panel, agentId }: { panel: ContextPanel; agentId: st
                       [!]
                     </span>
                   )}
-                  {r.size && (
+                  {r.size !== undefined && r.size !== "" && (
                     <span className="text-[10px] tabular-nums text-muted-foreground/60">
                       {r.size}
                     </span>

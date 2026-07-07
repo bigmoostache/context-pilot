@@ -174,11 +174,7 @@ export function CostsView({ agentId }: { agentId: string }) {
         {/* ── Row: Max freeze per culprit ─────────────────────────── */}
         {maxFreezes.length > 0 && (
           <Section>
-            <HBarChart
-              data={maxFreezes}
-              title="Max freezes per culprit"
-              format={(v) => String(v)}
-            />
+            <HBarChart data={maxFreezes} title="Max freezes per culprit" format={String} />
           </Section>
         )}
 

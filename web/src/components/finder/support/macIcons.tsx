@@ -99,7 +99,7 @@ export function FileIcon({
 
 // ── Folder ────────────────────────────────────────────────────────
 function MacFolder({ size, className }: { size: number; className?: string | undefined }) {
-  const id = useId().replace(/:/g, "")
+  const id = useId().replaceAll(":", "")
   return (
     <svg width={size} height={size} viewBox="0 0 28 28" className={className} aria-hidden>
       <defs>
@@ -164,7 +164,7 @@ function MacDocument({
   size: number
   className?: string | undefined
 }) {
-  const id = useId().replace(/:/g, "")
+  const id = useId().replaceAll(":", "")
   const meta = KIND_TAG[kind]
   const tagColor = (ext && EXT_COLOR[ext.toLowerCase()]) || meta.color
   const label = (ext ? ext.toUpperCase() : meta.ext).slice(0, 4)

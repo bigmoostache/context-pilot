@@ -51,6 +51,18 @@ const agentAccent = (a: Agent) =>
     danger: "var(--danger)",
   })[a.accent]
 
+/** Compact USD formatter: `$4.20` under $10, `$420` under $1K, else `$4.2K`. */
+const fmtUsd = (v: number) =>
+  `$${v < 10 ? v.toFixed(2) : v < 1000 ? v.toFixed(0) : `${(v / 1000).toFixed(1)}K`}`
+
+/** Compact token count: `4.20M` / `420K` / raw count. */
+const fmtTok = (v: number) =>
+  v >= 1e6
+    ? `${(v / 1e6).toFixed(2)}M`
+    : v >= 1e3
+      ? `${(v / 1e3).toFixed(0)}K`
+      : String(Math.round(v))
+
 export function UsagePage() {
   const [unit, setUnit] = useState<UsageUnit>("usd")
   const [agentId, setAgentId] = useState<string>("all")
@@ -90,14 +102,6 @@ export function UsagePage() {
     [visible],
   )
 
-  const fmtUsd = (v: number) =>
-    `$${v < 10 ? v.toFixed(2) : v < 1000 ? v.toFixed(0) : `${(v / 1000).toFixed(1)}K`}`
-  const fmtTok = (v: number) =>
-    v >= 1e6
-      ? `${(v / 1e6).toFixed(2)}M`
-      : v >= 1e3
-        ? `${(v / 1e3).toFixed(0)}K`
-        : `${Math.round(v)}`
   const fmt = unit === "usd" ? fmtUsd : fmtTok
   // The active-unit fleet total (drives the sr-only live announcement).
   const totalValue = unit === "usd" ? totals.spendUsd : totals.inputTokens + totals.outputTokens
@@ -212,9 +216,9 @@ export function UsagePage() {
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground/80">
                           {unit === "usd"
-                            ? pct != null
-                              ? `${pct.toFixed(0)}%`
-                              : "—"
+                            ? pct == null
+                              ? "—"
+                              : `${pct.toFixed(0)}%`
                             : fmtTok(r.inputTokens + r.outputTokens)}
                         </TableCell>
                       </TableRow>

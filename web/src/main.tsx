@@ -6,7 +6,7 @@ import { queryClient } from "./lib/query/queryClient"
 import "./index.css"
 import App from "./App.tsx"
 
-const rootEl = document.getElementById("root")
+const rootEl = document.querySelector("#root")
 if (!rootEl) throw new Error("Fatal: #root mount point missing from index.html")
 
 createRoot(rootEl).render(

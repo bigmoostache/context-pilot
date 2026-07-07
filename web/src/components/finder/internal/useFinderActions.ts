@@ -184,7 +184,7 @@ export function useFinderActions(d: ActionDeps) {
   }
   const back = () =>
     d.patchTab((t) =>
-      t.back.length
+      t.back.length > 0
         ? {
             ...t,
             fwd: [t.cwd, ...t.fwd],
@@ -196,7 +196,7 @@ export function useFinderActions(d: ActionDeps) {
     )
   const forward = () =>
     d.patchTab((t) =>
-      t.fwd.length
+      t.fwd.length > 0
         ? {
             ...t,
             back: [...t.back, t.cwd],

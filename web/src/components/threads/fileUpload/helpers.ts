@@ -63,7 +63,7 @@ const BLOCK_RE = /```file-upload\n([\s\S]*?)```/g
 
 /** Pull one `key: value` out of a `file-upload` block body (indented under `file:`). */
 function field(body: string, key: string): string {
-  const m = new RegExp(`^\\s*${key}:\\s*(.*)$`, "m").exec(body)
+  const m = new RegExp(String.raw`^\s*${key}:\s*(.*)$`, "m").exec(body)
   return m?.[1]?.trim() ?? ""
 }
 

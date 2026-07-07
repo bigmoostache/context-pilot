@@ -47,7 +47,7 @@ function genUsage(): UsagePoint[] {
 
   // miss-token base per agent (input/uncached), with a distinct phase.
   const seeds = [
-    { agentId: "a-cp", base: 1_650_000, phase: 0.0 },
+    { agentId: "a-cp", base: 1_650_000, phase: 0 },
     { agentId: "a-opio", base: 690_000, phase: 1.7 },
     { agentId: "a-lean", base: 168_000, phase: 3.1 },
   ]
@@ -69,7 +69,7 @@ function genUsage(): UsagePoint[] {
         hitTokens,
         missTokens,
         outputTokens,
-        ...(partial ? { partial: true, elapsed: 0.5 } : {}),
+        ...(partial && { partial: true, elapsed: 0.5 }),
       })
     }
   }

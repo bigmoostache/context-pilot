@@ -98,8 +98,12 @@ function tint(line: string) {
 }
 
 // ── spreadsheet (mock) ────────────────────────────────────────────
+/** Spreadsheet column label for a zero-based index (0→A, 1→B, …). */
+function colLetter(i: number): string {
+  return String.fromCodePoint(65 + i)
+}
+
 export function SheetPreview({ sheet }: { sheet: NonNullable<FinderNode["sheet"]> }) {
-  const colLetter = (i: number) => String.fromCharCode(65 + i)
   return (
     <div className="flex flex-col overflow-hidden rounded-lg border border-border card-shadow">
       <div className="overflow-x-auto">

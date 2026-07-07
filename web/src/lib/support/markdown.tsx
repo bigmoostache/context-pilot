@@ -30,15 +30,28 @@ import { cn, clipboard } from "@/lib/utils"
  */
 export type MarkdownVariant = "default" | "onAccent"
 
-/** Recursively extract plain text from a React element tree (for copy). */
-function extractText(node: ReactNode): string {
-  if (node == null || typeof node === "boolean") return ""
-  if (typeof node === "string" || typeof node === "number") return String(node)
-  if (Array.isArray(node)) return node.map(extractText).join("")
-  if (typeof node === "object" && "props" in node) {
-    return extractText((node as { props: { children?: ReactNode } }).props.children)
+/**
+ * Extract plain text from a React element tree (for copy). Walks the tree with
+ * an explicit stack rather than recursion — a React node tree can nest
+ * arbitrarily (arrays of elements whose children are arrays…), and the stack
+ * keeps the traversal iterative while preserving document order (children are
+ * pushed in reverse so they pop left-to-right).
+ */
+function extractText(root: ReactNode): string {
+  let out = ""
+  const stack: ReactNode[] = [root]
+  while (stack.length > 0) {
+    const node = stack.pop()
+    if (node == null || typeof node === "boolean") continue
+    if (typeof node === "string" || typeof node === "number") {
+      out += String(node)
+    } else if (Array.isArray(node)) {
+      for (let i = node.length - 1; i >= 0; i--) stack.push(node[i] as ReactNode)
+    } else if (typeof node === "object" && "props" in node) {
+      stack.push((node as { props: { children?: ReactNode } }).props.children)
+    }
   }
-  return ""
+  return out
 }
 
 /**
@@ -97,9 +110,9 @@ function ClickableCode({
  * markdown-native application.
  */
 function tableToMarkdown(table: HTMLTableElement): string {
-  const rows = Array.from(table.rows)
+  const rows = [...table.rows]
   if (rows.length === 0) return ""
-  const matrix = rows.map((row) => Array.from(row.cells).map((cell) => cell.textContent.trim()))
+  const matrix = rows.map((row) => [...row.cells].map((cell) => cell.textContent.trim()))
   const colCount = Math.max(...matrix.map((r) => r.length))
   const colWidths = Array.from({ length: colCount }, (_, i) =>
     Math.max(3, ...matrix.map((r) => (r[i] ?? "").length)),
@@ -112,7 +125,7 @@ function tableToMarkdown(table: HTMLTableElement): string {
     " |"
   const sep = "| " + colWidths.map((w) => "-".repeat(w)).join(" | ") + " |"
   const [header, ...body] = matrix
-  return [fmtRow(header ?? []), sep, ...body.map(fmtRow)].join("\n")
+  return [fmtRow(header ?? []), sep, ...body.map((row) => fmtRow(row))].join("\n")
 }
 
 /**
@@ -332,7 +345,7 @@ function components(variant: MarkdownVariant): Components {
 const BULLET_RE = /^([ \t]*)[•◦▪‣][ \t]/gm
 
 function normalizeMarkdown(text: string): string {
-  return text.replace(BULLET_RE, "$1- ")
+  return text.replaceAll(BULLET_RE, "$1- ")
 }
 
 /**

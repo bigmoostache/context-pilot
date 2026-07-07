@@ -120,7 +120,7 @@ export async function downloadCaCert(): Promise<void> {
   const a = document.createElement("a")
   a.href = url
   a.download = "root.crt"
-  document.body.appendChild(a)
+  document.body.append(a)
   a.click()
   a.remove()
   // Defer revoke: some browsers cancel the download if the blob URL is revoked
@@ -133,7 +133,9 @@ export function finalizeProvisioning(): Promise<{ provisioned: boolean; reloaded
 }
 
 export function maintLogout(): Promise<unknown> {
-  const p = maintFetch("/api/maint/logout", { method: "POST" }).catch(() => undefined)
+  const p = maintFetch("/api/maint/logout", { method: "POST" }).catch(() => {
+    /* logout is best-effort — the token is cleared locally regardless */
+  })
   setToken(null)
   return p
 }

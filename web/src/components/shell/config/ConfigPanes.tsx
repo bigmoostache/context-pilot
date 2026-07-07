@@ -17,14 +17,18 @@ import { cn } from "@/lib/utils"
 // present) vs. greyed-out (key absent).
 export function CategoryBody({ cat }: { cat: CatId }) {
   switch (cat) {
-    case "general":
+    case "general": {
       return <GeneralPane />
-    case "usage":
+    }
+    case "usage": {
       return <UsagePage />
-    case "services":
+    }
+    case "services": {
       return <ServicesPane />
-    case "releases":
+    }
+    case "releases": {
       return <ReleasesPane />
+    }
   }
 }
 

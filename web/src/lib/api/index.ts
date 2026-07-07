@@ -5,7 +5,7 @@
 // reshape backend data for UI consumption; the API contract itself is
 // enforced by the generated types.
 //
-// The sub-modules (auth, finder, body, env-keys) are re-exported so
+// The sub-modules (auth, finder, body, envKeys) are re-exported so
 // `@/lib/api` remains the single import surface.
 //
 // NOTE: setupClient.ts configures the hey-api singleton with
@@ -80,7 +80,7 @@ export { getToken, setToken } from "./client"
 export * from "./auth"
 export * from "./finder"
 export * from "./body"
-export * from "./env-keys"
+export * from "./envKeys"
 
 // ── Type re-exports ───────────────────────────────────────────────────
 
@@ -259,7 +259,7 @@ export function mapRawQuestions(raw: unknown): ThreadDetail["log"][number]["ques
     // rather than writing `undefined` into it.
     const header = q["header"] as string | undefined
     return {
-      ...(header !== undefined ? { header } : {}),
+      ...(header !== undefined && { header }),
       prompt: (q["question"] as string | undefined) ?? (q["prompt"] as string | undefined) ?? "",
       options: Array.isArray(q["options"])
         ? q["options"].map((o: unknown) =>

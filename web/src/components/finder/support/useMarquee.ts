@@ -65,7 +65,7 @@ export function useMarquee({
       if (!root) return []
       const hits: string[] = []
       root.querySelectorAll<HTMLElement>("[data-finder-item]").forEach((el) => {
-        const path = el.getAttribute("data-path")
+        const path = el.dataset["path"]
         if (!path) return
         const rc = el.getBoundingClientRect()
         const outside = rc.right < l || rc.left > r || rc.bottom < t || rc.top > b

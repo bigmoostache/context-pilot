@@ -271,19 +271,19 @@
   - forbidden
   last_edited_ms: 0
 45b9baa7eb6b3f01:
-  tl_dr: 'T506 web-lint P0-P4 COMPLETE. P4 anti-cheat DONE: banned eslint-disable + hardened ban-ts-comment + check-frontend-suppressions.sh grep-guard (CI-wired) + allowed-eslint-exceptions.yaml registry. NEXT: P5 opinion engines (X1132).'
+  tl_dr: 'T506 web-lint P0-P5 COMPLETE. P5 opinion engines (unicorn) LANDED: 1305 violations → 0 errors via calibrations + registered disables + ~90 real fixes. NEXT: P6 React stack (X1133).'
   contents: |-
-    P0 = scaffold + ignores + green baseline (X1127). P1 (X1128) = tsc maximal strict, pushed 743d2bfe on web-lint.
+    P0 = scaffold + ignores + green baseline (X1127). P1 (X1128) = tsc maximal strict, 743d2bfe. P2 (X1129) Prettier 0531ab4f. P3 (X1130) type-aware eslint 562→0 b25a5c37. P4 (X1131) anti-cheat b96f9c47.
 
-    P1 FIX PATTERNS (106 errors → 0):
-    - exactOptionalPropertyTypes (73 TS2375/TS2379): widen shared optional prop interfaces `x?: T` → `x?: T | undefined` across ~30 files. Function-typed props MUST be parenthesized: `((f: X) => void) | undefined` (bare `=> void | undefined` changes the return type, not optionality). This clears many at once via shared interfaces (ThreadConversation/ThreadComposer/ComposerBubbles props, ViewHandlers, PanelFrame, Tip, FileIcon, charts, etc).
-    - possibly-undefined (22 TS18048/TS2532): guard at source — `?? fallback`, or non-null `!` on PROVABLY length-guarded array indexes (tabs[0]!, crumbs[0]! where a prior length check guarantees presence), or `m?.[1]?.trim() ?? ""`.
-    - conditional spreads to OMIT undefined optional fields rather than write them: `...(x !== undefined ? { x } : {})` (reducers message_created append, DeploySection tag, AgentModal model).
-    - types.ts: ThreadQuestion had to be ADDED to the `import type` block — it was only RE-exported (`export type {...}`), not imported into module scope, so using it in the ThreadMsg redecl threw TS2304. ThreadMsg = Omit<GenThreadMsg,'ts'|'questions'> & {...}.
+    P5 (X1132) unicorn.configs.recommended, census 1305 violations → 0 errors:
+    - CALIBRATIONS (rule stays error): filename-case {camelCase,pascalCase}, catch-error-name {name:e, ignore ^err$/^error$}.
+    - 8 TREE-WIDE DISABLES registered in allowed-eslint-exceptions.yaml (React/DOM-incompatible or pure-opinion): name-replacements, no-null, consistent-boolean-name, prefer-global-this, no-non-function-verb-prefix, no-array-reduce, prefer-await, AND no-nested-ternary.
+    - KEY: unicorn/no-nested-ternary IRRECONCILABLY CONFLICTS with Prettier — unicorn demands nested branches be parenthesized `a?b:(c?d:e)`, Prettier strips those parens as redundant → infinite --fix/--write loop. Prettier (rustfmt twin, canonical formatter) wins; rule disabled + registered. Genuinely-complex nested ternaries STILL hand-extracted to flat if-chain helpers (App.renderView, StatusBar.resolvePhase, FleetDashboard.healthCondition, ThreadComposer banner, ThreadList.dotColor).
+    - SCOPED disables: ui/** (filename-case, max-nested-calls — vendored shadcn), finderFs.ts (no-incorrect-template-string-interpolation — embedded code samples w/ literal braces).
+    - ~90 REAL FIXES: .sort→.toSorted, consistent-function-scoping (hoist pure fns to module: fmtUsd/fmtTok, active, handleDragOver, byRecent, mutations invalidate closures, colLetter, acceptsFolder, stop, isFileDrag), no-declarations-before-early-exit (LoginPage handleSubmit+isRegister, FinalizeStep ready+cockpitUrl, ReleasesPane invalidate, MaintWizard id), no-negated-condition (LoginPage if(bootstrapped)), no-break-in-nested-loop (MarkdownEditor serializeInlineNode extracted), no-useless-recursion (markdown extractText→iterative stack), no-top-level-assignment (useFinderSelection tabSeq→{value}, models providerCache→{value}), no-useless-template-literals→String(), prefer-code-point, no-return-array-push, no-await-expression-member, prefer-add-event-listener (sse es.onerror→addEventListener), no-unsafe-argument (markdown node[i] as ReactNode), explicit-length-check (TreePanel r.size!==undefined&&!==""), filename-case rename env-keys.ts→envKeys.ts.
+    - REGRESSION fixed: prettier reflow exposed useMarquee.ts:68 TS4111 (el.dataset.path → el.dataset["path"], noPropertyAccessFromIndexSignature).
 
-    GENERATED-BINDINGS EXCEPTION: all 16 generated/*.ts carry a `// @ts-nocheck` GEN_HEADER (mirrors Rust generated-code allowance). check-typescript-contract.sh (CB5) RE-STAMPS them after every codegen with the EXACT GEN_HEADER via `printf '%s\n%s' "$HEADER" "$(cat file)"` (strips trailing newline → matches hey-api output) so the committed tree stays byte-identical to a fresh codegen+stamp for the drift diff. CB5 fires on web/src/**/*.ts edits (NOT .tsx) and wipes stamps — must re-stamp before every tsc run following a .ts edit AND before every commit.
-
-    SAILING NOTE: Edits auto-reactivate the Queue; console_easy_bash gets intercepted into the queue when active — pause or flush deliberately.
+    Final state committed on web-lint: tsc -b=0, eslint 0err/3warns (exhaustive-deps CreateCommandDialog/MarkdownEditor/Finder, all deferred P6), prettier clean, guard bidirectional green, generated byte-identical. X1132 done.
   importance: high
   labels:
   - web-lint
@@ -292,7 +292,7 @@
   - P1
   - complete
   - milestone
-  last_edited_ms: 1783411469975
+  last_edited_ms: 1783414885254
 48f2140d3c2dee0e:
   tl_dr: Entities module COMPLETE — all 151 stress tests passed (12 categories, 4 difficulty levels). 9 bugs found/fixed. Committed on 'entities' branch. Production-quality.
   contents: |-

@@ -155,7 +155,7 @@ export function buildRealm(folder: string, name: string): FinderNode {
             name: "workspace.tsx",
             path: p("src/workspace.tsx"),
             kind: "code",
-            size: 2_104,
+            size: 2104,
             modified: "1h ago",
             created: "1w ago",
             tags: ["blue"],
@@ -186,7 +186,7 @@ export function buildRealm(folder: string, name: string): FinderNode {
                 name: "threads.rs",
                 path: p("src/modules/threads.rs"),
                 kind: "code",
-                size: 9_210,
+                size: 9210,
                 modified: "2d ago",
                 created: "2 months ago",
                 code: { lang: "rust", lines: SAMPLE_RS },
@@ -258,7 +258,7 @@ export function buildRealm(folder: string, name: string): FinderNode {
             name: "CHANGELOG.md",
             path: p("docs/CHANGELOG.md"),
             kind: "markdown",
-            size: 2_410,
+            size: 2410,
             modified: "1d ago",
             created: "3 months ago",
             text: CHANGELOG_MD,
@@ -339,7 +339,7 @@ export function buildRealm(folder: string, name: string): FinderNode {
         name: "README.md",
         path: p("README.md"),
         kind: "markdown",
-        size: 1_842,
+        size: 1842,
         modified: "6h ago",
         created: "3 months ago",
         starred: true,
@@ -349,7 +349,7 @@ export function buildRealm(folder: string, name: string): FinderNode {
         name: "Cargo.toml",
         path: p("Cargo.toml"),
         kind: "code",
-        size: 3_201,
+        size: 3201,
         modified: "1d ago",
         created: "3 months ago",
         code: {
@@ -382,7 +382,8 @@ pedantic = "deny"`.split("\n"),
 /** Depth-first lookup of a node by path. */
 export function findNode(root: FinderNode, path: string): FinderNode | null {
   if (root.path === path) return root
-  for (const c of root.children ?? []) {
+  const kids = root.children ?? []
+  for (const c of kids) {
     const hit = findNode(c, path)
     if (hit) return hit
   }
@@ -395,7 +396,8 @@ export function pathChain(root: FinderNode, path: string): FinderNode[] {
   const walk = (node: FinderNode): boolean => {
     chain.push(node)
     if (node.path === path) return true
-    for (const c of node.children ?? []) {
+    const kids = node.children ?? []
+    for (const c of kids) {
       if (walk(c)) return true
     }
     chain.pop()
@@ -410,7 +412,8 @@ export function collectStarred(root: FinderNode): FinderNode[] {
   const out: FinderNode[] = []
   const walk = (n: FinderNode) => {
     if (n.starred && n.path !== root.path) out.push(n)
-    for (const c of n.children ?? []) walk(c)
+    const kids = n.children ?? []
+    for (const c of kids) walk(c)
   }
   walk(root)
   return out
@@ -441,15 +444,28 @@ export function childCounts(n: FinderNode): { folders: number; files: number } {
 /** Folders first, then by the chosen key. */
 export function sortNodes(nodes: FinderNode[], key: FinderSortKey, asc: boolean): FinderNode[] {
   const dir = asc ? 1 : -1
-  return [...nodes].sort((a, b) => {
+  return nodes.toSorted((a, b) => {
     const ad = a.kind === "folder"
     const bd = b.kind === "folder"
     if (ad !== bd) return ad ? -1 : 1
     let cmp: number
-    if (key === "name") cmp = a.name.localeCompare(b.name)
-    else if (key === "size") cmp = (a.size ?? 0) - (b.size ?? 0)
-    else if (key === "kind") cmp = a.kind.localeCompare(b.kind)
-    else cmp = a.name.localeCompare(b.name)
+    switch (key) {
+      case "name": {
+        cmp = a.name.localeCompare(b.name)
+        break
+      }
+      case "size": {
+        cmp = (a.size ?? 0) - (b.size ?? 0)
+        break
+      }
+      case "kind": {
+        cmp = a.kind.localeCompare(b.kind)
+        break
+      }
+      default: {
+        cmp = a.name.localeCompare(b.name)
+      }
+    }
     return cmp * dir
   })
 }

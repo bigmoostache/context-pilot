@@ -59,7 +59,7 @@ export function loadColor(ratio: number): string {
 
 export function fmtTokens(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
-  return `${n}`
+  return String(n)
 }
 
 export function fmtCost(n: number): string {

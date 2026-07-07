@@ -12,6 +12,19 @@ import { extractDroppedFiles, zipDropped } from "@/lib/utils"
 import { uploadToNode, type UploadedFile } from "./fileUpload/helpers"
 import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
 
+/** True only for an actual OS *file* drag — a text/selection drag must not blur. */
+function isFileDrag(e: React.DragEvent): boolean {
+  return e.dataTransfer.types.includes("Files")
+}
+
+/** Keep the surface a valid drop target on every dragover (a file drag only)
+ *  and show the copy cursor. Stateless — hoisted to module scope. */
+function handleDragOver(e: React.DragEvent) {
+  if (!isFileDrag(e)) return
+  e.preventDefault()
+  e.dataTransfer.dropEffect = "copy"
+}
+
 /**
  * Normalise a thread message's `ts` into a human-readable relative age.
  *
@@ -69,11 +82,11 @@ function parseAutoLine(m: ThreadMsg): { verb: string; tool: string; intent: stri
   const raw = m.text ?? ""
   const t = raw.startsWith("/* auto */ ") ? raw.slice("/* auto */ ".length) : raw
   const dotIdx = t.indexOf(" · ")
-  if (dotIdx < 0) return { verb: t, tool: "", intent: "" }
+  if (dotIdx === -1) return { verb: t, tool: "", intent: "" }
   const verb = t.slice(0, dotIdx)
   const rest = t.slice(dotIdx + 3)
   const dashIdx = rest.indexOf(" — ")
-  if (dashIdx < 0) return { verb, tool: rest, intent: "" }
+  if (dashIdx === -1) return { verb, tool: rest, intent: "" }
   return { verb, tool: rest.slice(0, dashIdx), intent: rest.slice(dashIdx + 3) }
 }
 
@@ -93,7 +106,7 @@ function segmentLog(log: ThreadMsg[]): Segment[] {
   const out: Segment[] = []
   for (const m of log) {
     if (m.auto) {
-      const tail = out[out.length - 1]
+      const tail = out.at(-1)
       if (tail?.type === "auto") tail.msgs.push(m)
       else out.push({ type: "auto", msgs: [m] })
     } else {
@@ -188,21 +201,12 @@ export function ThreadConversation({
   // dragenter/dragleave fire for every child crossed, so a plain boolean would
   // flicker; a depth counter tracks "is the cursor still somewhere inside".
   const dragDepth = useRef(0)
-  // True only for an actual OS *file* drag — a text/selection drag must not blur.
-  const isFileDrag = (e: React.DragEvent) => e.dataTransfer.types.includes("Files")
 
   const handleDragEnter = (e: React.DragEvent) => {
     if (!isFileDrag(e)) return
     e.preventDefault()
     dragDepth.current += 1
     setDragging(true)
-  }
-  const handleDragOver = (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    // Must preventDefault on every dragover to keep the element a valid drop
-    // target; the copy cursor signals an upload.
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "copy"
   }
   const handleDragLeave = (e: React.DragEvent) => {
     if (!isFileDrag(e)) return

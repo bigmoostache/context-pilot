@@ -21,9 +21,9 @@ export const PROJECT = {
 }
 
 export const tokenBudget = {
-  used: 74156,
-  threshold: 170000,
-  budget: 200000,
+  used: 74_156,
+  threshold: 170_000,
+  budget: 200_000,
 }
 
 export const panels: ContextPanel[] = [
@@ -31,7 +31,7 @@ export const panels: ContextPanel[] = [
     id: "P5",
     kind: "tree",
     name: "Directory Tree",
-    tokens: 19517,
+    tokens: 19_517,
     costUsd: 1.75,
     cached: false,
     frozen: 5,
@@ -42,7 +42,7 @@ export const panels: ContextPanel[] = [
     id: "P6",
     kind: "memory",
     name: "Memories",
-    tokens: 12416,
+    tokens: 12_416,
     costUsd: 0.76,
     cached: false,
     frozen: null,
@@ -142,7 +142,7 @@ export const panels: ContextPanel[] = [
     kind: "queue",
     name: "Queue",
     tokens: 52,
-    costUsd: 0.0,
+    costUsd: 0,
     cached: false,
     frozen: 5,
     misses: 2,
@@ -153,7 +153,7 @@ export const panels: ContextPanel[] = [
     kind: "scratchpad",
     name: "Scratchpad",
     tokens: 6,
-    costUsd: 0.0,
+    costUsd: 0,
     cached: false,
     frozen: null,
     misses: 1,
@@ -162,8 +162,8 @@ export const panels: ContextPanel[] = [
 ]
 
 export const cacheStats = {
-  hit: 41822,
-  miss: 12416,
+  hit: 41_822,
+  miss: 12_416,
   out: 4063,
   costUsd: 5.41,
   uncached: 7,

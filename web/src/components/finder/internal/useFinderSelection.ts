@@ -3,7 +3,10 @@ import type { Agent, FinderNode, FinderSortKey, FinderViewMode } from "@/lib/typ
 import { CLICK_SETTLE_MS, req, type Tab } from "./helpers"
 import type { MenuPos } from "../ContextMenu"
 
-let tabSeq = 1
+// Monotonic tab-id counter. Held in an object so the increments below are
+// property mutations, not reassignments of a module-level `let` from inside a
+// function (unicorn/no-top-level-assignment-in-function).
+const tabSeq = { value: 1 }
 
 interface SelectionDeps {
   agent: Agent
@@ -52,7 +55,7 @@ export function useFinderSelection(d: SelectionDeps) {
     if (range && d.anchor) {
       const ai = d.sorted.findIndex((n) => n.path === d.anchor)
       const bi = d.sorted.findIndex((n) => n.path === node.path)
-      if (ai >= 0 && bi >= 0) {
+      if (ai !== -1 && bi !== -1) {
         const [lo, hi] = ai < bi ? [ai, bi] : [bi, ai]
         d.setSelected(new Set(d.sorted.slice(lo, hi + 1).map((n) => n.path)))
       }
@@ -102,7 +105,7 @@ export function useFinderSelection(d: SelectionDeps) {
       d.setActiveId(existing.id)
       return
     }
-    const id = `t${tabSeq++}`
+    const id = `t${tabSeq.value++}`
     d.setTabs((ts) => [
       ...ts,
       { id, cwd: node.path, label: node.name, kind: node.kind, fileNode: node, back: [], fwd: [] },
@@ -141,7 +144,7 @@ export function useFinderSelection(d: SelectionDeps) {
   }
 
   const newTab = () => {
-    const id = `t${tabSeq++}`
+    const id = `t${tabSeq.value++}`
     d.setTabs((ts) => [
       ...ts,
       { id, cwd: d.agent.folder, label: d.agent.name, kind: "folder", back: [], fwd: [] },
@@ -151,8 +154,8 @@ export function useFinderSelection(d: SelectionDeps) {
   const closeTab = (id: string) => {
     d.setTabs((ts) => {
       const next = ts.filter((t) => t.id !== id)
-      if (id === d.activeId && next.length) d.setActiveId(req(next, -1).id)
-      return next.length ? next : ts
+      if (id === d.activeId && next.length > 0) d.setActiveId(req(next, -1).id)
+      return next.length > 0 ? next : ts
     })
   }
 

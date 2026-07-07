@@ -44,19 +44,23 @@ function modelIcon(badge: string | undefined | null): LucideIcon {
   switch (badge) {
     case "Most capable":
     case "Large":
-    case "Capable":
+    case "Capable": {
       return Sparkles
-    case "Balanced":
+    }
+    case "Balanced": {
       return Gauge
+    }
     case "Fast & cheap":
     case "Creative":
     case "Latest":
     case "Fastest":
     case "Cheap":
-    case "Fast":
+    case "Fast": {
       return Zap
-    default:
+    }
+    default: {
       return Bot
+    }
   }
 }
 
@@ -75,21 +79,23 @@ function enrichProviders(raw: GenProviderDef[]): ProviderDef[] {
 
 // ── Data fetching ─────────────────────────────────────────────────────
 
-/** Singleton cache — providers never change during a session. */
-let cached: ProviderDef[] | null = null
+/** Singleton cache — providers never change during a session. Held in an
+ *  object so the memoising write is a property mutation, not a reassignment of a
+ *  module-level binding from inside a function. */
+const providerCache: { value: ProviderDef[] | null } = { value: null }
 
 /** Fetch the full usable provider registry (cached after first call). The
  *  backend already drops providers without a configured key and stamps each
  *  model with its canonical `key`, so this is the admin-facing catalog (every
  *  usable model, unfiltered by the org allowlist). */
 export async function fetchProviders(): Promise<ProviderDef[]> {
-  if (cached) return cached
+  if (providerCache.value) return providerCache.value
   // The client runs in responseStyle:"data" (setupClient), so the SDK call
   // resolves to the array directly — use sdk() like every other consumer
   // rather than destructuring a `{ data }` wrapper that doesn't exist at runtime.
   const data = await sdk<GenProviderDef[]>(getApiProviders({ throwOnError: true }))
-  cached = enrichProviders(data)
-  return cached
+  providerCache.value = enrichProviders(data)
+  return providerCache.value
 }
 
 /** Fetch the picker registry — usable providers with the org model allowlist
@@ -110,7 +116,7 @@ export async function fetchPickerProviders(): Promise<ProviderDef[]> {
  * TanStack Query) and use this only as a fast path.
  */
 export function getCachedProviders(): ProviderDef[] | null {
-  return cached
+  return providerCache.value
 }
 
 /** TanStack Query hook — fetches once, caches forever (providers never change). */
@@ -140,7 +146,7 @@ export function priceTag(m: GenModelDef): string {
   const ctx =
     m.contextWindow >= 1_000_000
       ? `${(m.contextWindow / 1_000_000).toFixed(0)}M`
-      : `${(m.contextWindow / 1_000).toFixed(0)}K`
+      : `${(m.contextWindow / 1000).toFixed(0)}K`
   return `$${m.inputPrice} · ${ctx}`
 }
 
