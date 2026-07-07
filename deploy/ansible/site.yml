@@ -30,6 +30,15 @@
     appliance_bundle_url: >-
       https://github.com/{{ gh_repo }}/releases/{{ 'latest/download' if cp_release == 'latest' else 'download/' + cp_release }}/cpilot-appliance-aarch64.tar.gz
     caddy_url: "https://caddyserver.com/api/download?os=linux&arch=arm64"
+    # Photonicat 2 mini-display (GC9307 SPI LCD) — built + installed on the box.
+    cp_install_display: "{{ install_display | default(true) | bool }}"
+    cp_display_repo: https://github.com/photonicat/photonicat2_mini_display.git
+    cp_display_ref: "{{ display_ref | default('main') }}"
+    cp_display_src: /opt/pcat2_mini_display
+    cp_display_bin: /usr/local/bin/pcat2_mini_display
+    # Without pcat-manager the driver can't read the DC rail, so it treats the box
+    # as "on battery" and blanks the LCD after the 60s battery dimmer. Stretch it.
+    cp_display_battery_dimmer_seconds: "{{ display_battery_dimmer_seconds | default(86400) }}"
   tasks:
     - name: Fetch the release bundle + Caddy (control node, once)
       ansible.builtin.include_tasks:
@@ -45,3 +54,6 @@
       ansible.builtin.include_tasks: tasks/seed.yml
     - name: Start the services and wait until ready
       ansible.builtin.include_tasks: tasks/start.yml
+    - name: Install the Photonicat mini-display driver (GC9307 SPI LCD)
+      ansible.builtin.include_tasks: tasks/display.yml
+      when: cp_install_display | bool
