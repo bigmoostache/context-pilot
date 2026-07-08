@@ -330,25 +330,25 @@ export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
     getApiAgentByIdThreads({ path: { id: agentId } }),
   )
   const focusedId = res.focusedThreadId ?? null
-  return res.threads.map((t) => ({
-    ...t,
-    agentId: t.agentId,
-    lastActivity:
-      typeof t.lastActivity === "number"
-        ? formatAge(t.lastActivity as unknown as number)
-        : (t.lastActivity ?? ""),
-    lastActivityMs:
-      typeof t.lastActivityMs === "number"
-        ? t.lastActivityMs
-        : typeof t.lastActivity === "number"
-          ? (t.lastActivity as unknown as number)
-          : 0,
-    focused: focusedId != null && t.id === focusedId,
-    log: t.log.map((m) => ({
-      ...m,
-      questions: mapRawQuestions(m.questions),
-    })),
-  }))
+  return res.threads.map((t) => {
+    // The generated type declares `lastActivity: string`, but the backend sends
+    // an epoch number on the REST path and a display string on the SSE path.
+    // Widen once (single assertion, no `unknown`) so the typeof-branch narrows
+    // cleanly instead of needing a double-assertion at each read.
+    const la = t.lastActivity as string | number
+    return {
+      ...t,
+      agentId: t.agentId,
+      lastActivity: typeof la === "number" ? formatAge(la) : la,
+      lastActivityMs:
+        typeof t.lastActivityMs === "number" ? t.lastActivityMs : typeof la === "number" ? la : 0,
+      focused: focusedId != null && t.id === focusedId,
+      log: t.log.map((m) => ({
+        ...m,
+        questions: mapRawQuestions(m.questions),
+      })),
+    }
+  })
 }
 
 // ── Memory (SDK) ──────────────────────────────────────────────────────
