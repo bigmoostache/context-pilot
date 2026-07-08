@@ -10,7 +10,8 @@
 # Sub-checks (all fail-fast to a single non-zero exit):
 #   1. cargo fmt -- --check                     (rustfmt twin)
 #   2. cargo clippy --all-targets -- -D warnings (the clippy gate)
-#   3. RUSTFLAGS="-D warnings" cargo check       (rustc-forbid twin)
+#   3. RUSTFLAGS="-D warnings" cargo check       (rustc-forbid twin, --ci only —
+#      redundant with the rust-tests callback's full-workspace build in --callback)
 #   4. lint-exception registry — delegates to check-lint-exceptions.sh
 #   5. vault-bypass (FULL repo scan) — delegates to check-vault-bypass.sh
 #
@@ -30,8 +31,15 @@ cargo fmt -- --check 2>&1 || fail=1
 echo "=== cargo clippy --all-targets -D warnings ==="
 cargo clippy --all-targets -- -D warnings 2>&1 || fail=1
 
-echo "=== cargo check -D warnings ==="
-RUSTFLAGS="-D warnings" cargo check 2>&1 || fail=1
+# cargo check runs in --ci only. In --callback it is redundant + too slow: the
+# rust-tests callback already does a full-workspace `cargo build` (debug) which
+# compiles every crate and surfaces the exact same `-D warnings` rustc errors,
+# so re-checking here would double the workspace compile on every .rs edit for
+# zero extra coverage. CI keeps it (the rust job's cache is warm; explicit gate).
+if [ "$MODE" = "--ci" ]; then
+  echo "=== cargo check -D warnings ==="
+  RUSTFLAGS="-D warnings" cargo check 2>&1 || fail=1
+fi
 
 echo "=== lint-exception registry ==="
 bash "$ROOT/.github/checks/check-lint-exceptions.sh" || fail=1
