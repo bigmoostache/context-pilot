@@ -4032,3 +4032,57 @@ index ea1f90ff..6b94bf25 100644
    name: web-structure
    description: Enforce ≤8 entries/dir + ≤500 lines/file under web/src (shadcn ui/ exempt)
 # --- End entry #27 ---
+28:afed3401be22e8a4a9902adac1ce23f1640f27c31a21b7cdd55272ccd82978e3:9999a76cb9ff006f4b6429e0e4292e3c0e14714bc85a40776b41967cd7a84cc9:17419e5c0e0666a617e25023975c59c73dad04d159683c50529645023cb2bcfd
+# --- Diff for entry #28 ---
+diff --git a/.github/checks/protected-files.yaml b/.github/checks/protected-files.yaml
+index a5d3536b..fbbaa8e8 100644
+--- a/.github/checks/protected-files.yaml
++++ b/.github/checks/protected-files.yaml
+@@ -115,3 +115,9 @@
+   whole_file: true
+ - path: .github/checks/web-lint.sh
+   whole_file: true
++# The cross-file dead-code guard (knip whole-graph scan). Invoked by the CI
++# frontend job AND the web-deadcode blocking callback with the identical string
++# (`bash .github/checks/check-web-deadcode.sh`) — one implementation, structurally
++# equal both sides. Locking it keeps that single source of truth tamper-evident.
++- path: .github/checks/check-web-deadcode.sh
++  whole_file: true
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index fc5e633e..10fa7011 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -153,3 +153,11 @@ jobs:
+       # Runs here (not the structure job) because it needs web/node_modules.
+       - name: Frontend rule census
+         run: .github/checks/check-frontend-rule-census.sh
++
++      # Cross-file dead code (the inter-crate dead_code twin): dead exports,
++      # orphan files, unused deps — what tsc/eslint structurally can't see. The
++      # CB "web-deadcode" blocking callback invokes this SAME script with the
++      # SAME string, so CI and callback are structurally equal (one whole-graph
++      # knip pass, one implementation, hash-locked). Needs web/node_modules.
++      - name: Frontend dead code (knip)
++        run: .github/checks/check-web-deadcode.sh
+diff --git a/.context-pilot/shared/callbacks.yaml b/.context-pilot/shared/callbacks.yaml
+index 6b94bf25..dc3e02a7 100644
+--- a/.context-pilot/shared/callbacks.yaml
++++ b/.context-pilot/shared/callbacks.yaml
+@@ -134,6 +134,16 @@ vault-bypass:
+   is_global: true
+   script_content: .github/checks/check-vault-bypass.sh $CP_CHANGED_FILES
+   last_edited_ms: 1783256066883
++web-deadcode:
++  name: web-deadcode
++  description: 'Blocking cross-file dead-code guard on web/src edits: delegates to the shared .github/checks/check-web-deadcode.sh (knip whole-graph scan — dead files/exports/deps). Structurally identical to the CI frontend-job step (same script, same invocation string). Whole-graph, not incremental, so no per-file scoping.'
++  pattern: web/src/**
++  blocking: true
++  timeout_secs: 60
++  success_message: Web dead-code OK ✓
++  is_global: true
++  script_content: bash .github/checks/check-web-deadcode.sh
++  last_edited_ms: 1783506415665
+ web-lint:
+   name: web-lint
+   description: 'Blocking incremental frontend lint on web/src edits: eslint --max-warnings 0 + prettier --check on the changed .ts/.tsx files (type-aware, full projectService). Full tsc + type-coverage stay CI-side (project-wide). Catches the class of regression a stale sweep misses.'
+# --- End entry #28 ---

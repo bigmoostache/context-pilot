@@ -134,6 +134,16 @@ vault-bypass:
   is_global: true
   script_content: .github/checks/check-vault-bypass.sh $CP_CHANGED_FILES
   last_edited_ms: 1783256066883
+web-deadcode:
+  name: web-deadcode
+  description: 'Blocking cross-file dead-code guard on web/src edits: delegates to the shared .github/checks/check-web-deadcode.sh (knip whole-graph scan — dead files/exports/deps). Structurally identical to the CI frontend-job step (same script, same invocation string). Whole-graph, not incremental, so no per-file scoping.'
+  pattern: web/src/**
+  blocking: true
+  timeout_secs: 60
+  success_message: Web dead-code OK ✓
+  is_global: true
+  script_content: bash .github/checks/check-web-deadcode.sh
+  last_edited_ms: 1783506415665
 web-lint:
   name: web-lint
   description: 'Blocking incremental frontend lint on web/src edits: eslint --max-warnings 0 + prettier --check on the changed .ts/.tsx files (type-aware, full projectService). Full tsc + type-coverage stay CI-side (project-wide). Catches the class of regression a stale sweep misses.'

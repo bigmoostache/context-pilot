@@ -115,3 +115,9 @@
   whole_file: true
 - path: .github/checks/web-lint.sh
   whole_file: true
+# The cross-file dead-code guard (knip whole-graph scan). Invoked by the CI
+# frontend job AND the web-deadcode blocking callback with the identical string
+# (`bash .github/checks/check-web-deadcode.sh`) — one implementation, structurally
+# equal both sides. Locking it keeps that single source of truth tamper-evident.
+- path: .github/checks/check-web-deadcode.sh
+  whole_file: true

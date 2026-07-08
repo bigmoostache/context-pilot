@@ -153,3 +153,11 @@ jobs:
       # Runs here (not the structure job) because it needs web/node_modules.
       - name: Frontend rule census
         run: .github/checks/check-frontend-rule-census.sh
+
+      # Cross-file dead code (the inter-crate dead_code twin): dead exports,
+      # orphan files, unused deps — what tsc/eslint structurally can't see. The
+      # CB "web-deadcode" blocking callback invokes this SAME script with the
+      # SAME string, so CI and callback are structurally equal (one whole-graph
+      # knip pass, one implementation, hash-locked). Needs web/node_modules.
+      - name: Frontend dead code (knip)
+        run: .github/checks/check-web-deadcode.sh
