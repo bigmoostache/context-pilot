@@ -24,7 +24,11 @@ import { type CatId, CATEGORIES } from "./categories"
 export function ConfigPanel({ variant = "dialog" }: { variant?: "dialog" | "inline" }) {
   const [cat, setCat] = useState<CatId>("general")
   const { user: authUser, authEnabled } = useAuth()
-  const isAdmin = authEnabled === false || authUser?.role === "admin"
+  // `adminOnly` categories (IT, Releases) are gated on `can_manage_it` (admin+):
+  // an `admin` OR a `superadmin` (which subsumes it), or god-mode when access
+  // control is off (design §13.5/§13.10).
+  const isAdmin =
+    authEnabled === false || authUser?.role === "admin" || authUser?.role === "superadmin"
   // Secrets is superadmin-only (`can_manage_secrets`). In god-mode (access
   // control off ⇒ authEnabled false, no user) the single-user appliance viewer
   // is treated as superadmin so it can still manage keys (design §13.5/§13.10).

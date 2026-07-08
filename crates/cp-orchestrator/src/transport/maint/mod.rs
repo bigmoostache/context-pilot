@@ -21,11 +21,14 @@
 //!   a `401`. (This plane is superseded by the capability-gated IT Settings
 //!   section on `:443` and is removed in the v3 teardown.)
 
-mod ca;
+// `ca`, `identity` and `state` are `pub(crate)` so the product REST IT section
+// (`rest/config/it.rs`, design §13.5/§13.7) can re-home their handlers onto
+// `:443` under `can_manage_it` while this plane still exists (removed in M5).
+pub(crate) mod ca;
 mod caddy;
 mod crypto;
-mod identity;
-mod state;
+pub(crate) mod identity;
+pub(crate) mod state;
 
 pub(crate) use identity::apply_caddy_at_boot;
 pub(crate) use state::is_provisioned;

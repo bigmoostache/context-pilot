@@ -197,6 +197,38 @@ pub(super) fn transport() -> Value {
             },
             "required": ["env", "exists"]
         },
+        // ── IT infra (design §13.5) ─────────────────────────────────
+        "Identity": {
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" },
+                "ip": { "type": "string" }
+            },
+            "required": ["name", "ip"]
+        },
+        "ItFingerprint": {
+            "type": "object",
+            "properties": {
+                "fingerprint": { "type": "string" },
+                "algorithm": { "type": "string" }
+            },
+            "required": ["fingerprint", "algorithm"]
+        },
+        "ItIdentityResponse": {
+            "type": "object",
+            "properties": {
+                "identity": { "allOf": [r("Identity")], "nullable": true }
+            },
+            "required": ["identity"]
+        },
+        "ItSetIdentityResponse": {
+            "type": "object",
+            "properties": {
+                "identity": r("Identity"),
+                "reloaded": { "type": "boolean" }
+            },
+            "required": ["identity", "reloaded"]
+        },
         // ── Body ────────────────────────────────────────────────────
         "BodyPayload": {
             "type": "object",

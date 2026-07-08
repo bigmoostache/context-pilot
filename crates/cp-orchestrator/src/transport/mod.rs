@@ -215,6 +215,18 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
             files::handle_raw(request, state, id, &query);
             return;
         }
+        // IT: private-CA root download (design §13.5, re-homed from `:9090`).
+        // Owns the `Request` for its non-JSON content type, so it can't route
+        // through `route_rest`. Gate on `can_manage_it` here (a `None` caller is
+        // god-mode, FR-v3-08); then reuse the maintenance handler verbatim.
+        if let ["api", "it", "ca.crt"] = segments.as_slice() {
+            if auth_user.as_ref().is_some_and(|u| !u.can_manage_it()) {
+                respond_json(request, &rest::HttpReply::error(403, "IT management access required"));
+            } else {
+                maint::ca::serve_ca_cert(request);
+            }
+            return;
+        }
     }
 
     // Read the body up-front (only POST routes consume it). The mutable borrow
@@ -294,6 +306,12 @@ fn route_rest(
 
         // ── Vault snapshot (BridgeVault cache warm-up) ──────────────
         (Method::Get, ["api", "vault", "snapshot"]) => rest::vault_snapshot(auth_user),
+
+        // ── IT infra (design §13.5, re-homed from `:9090`; can_manage_it) ──
+        (Method::Get, ["api", "it", "ca", "fingerprint"]) => rest::it_ca_fingerprint(auth_user),
+        (Method::Get, ["api", "it", "identity"]) => rest::it_get_identity(state, auth_user),
+        (Method::Post, ["api", "it", "identity"]) => rest::it_set_identity(state, body_bytes, auth_user),
+        (Method::Get, ["api", "it", "provisioned"]) => rest::it_provisioned(state, auth_user),
 
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
         (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent_meta(state, id),

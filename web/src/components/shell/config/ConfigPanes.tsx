@@ -5,6 +5,7 @@ import { Check, Lock } from "lucide-react"
 import { UsagePage } from "@/components/agents/UsagePage"
 import { ReleasesPane } from "./ReleasesPane"
 import { SecretsPane } from "./SecretsPane"
+import { ItPane } from "./ItPane"
 import { useProviders } from "@/lib/support/models"
 import { fetchSettings, updateSettings, fetchEnvKeys } from "@/lib/api"
 import { useAuth } from "@/lib/providers/auth"
@@ -31,6 +32,9 @@ export function CategoryBody({ cat }: { cat: CatId }) {
     }
     case "secrets": {
       return <SecretsPane />
+    }
+    case "it": {
+      return <ItPane />
     }
     case "releases": {
       return <ReleasesPane />

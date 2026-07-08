@@ -1,10 +1,10 @@
-import { Boxes, Coins, KeyRound, Package, Sliders } from "lucide-react"
+import { Boxes, Coins, KeyRound, Package, ShieldCheck, Sliders } from "lucide-react"
 
 // Split out of `ConfigPanes.tsx` so that component file only exports components
 // (React Fast Refresh). Consumed by both `ConfigPanes` and `ConfigPanel`.
 
 // ── categories ────────────────────────────────────────────────────
-export type CatId = "general" | "usage" | "services" | "secrets" | "releases"
+export type CatId = "general" | "usage" | "services" | "secrets" | "it" | "releases"
 
 export const CATEGORIES: {
   id: CatId
@@ -25,6 +25,13 @@ export const CATEGORIES: {
     blurb: "Provider API keys & Claude login",
     icon: KeyRound,
     superadminOnly: true,
+  },
+  {
+    id: "it",
+    label: "IT",
+    blurb: "Network identity & TLS trust",
+    icon: ShieldCheck,
+    adminOnly: true,
   },
   {
     id: "releases",

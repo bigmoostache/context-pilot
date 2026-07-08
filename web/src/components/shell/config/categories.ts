@@ -1,7 +1,7 @@
-import { Boxes, Coins, KeyRound, Package, Sliders } from "lucide-react"
+import { Boxes, Coins, KeyRound, Package, ShieldCheck, Sliders } from "lucide-react"
 
 /** Settings category identifiers (the cockpit config panes). */
-export type CatId = "general" | "usage" | "services" | "secrets" | "releases"
+export type CatId = "general" | "usage" | "services" | "secrets" | "it" | "releases"
 
 /**
  * The config pane catalogue: order, labels, blurbs, icons and the `adminOnly` /
@@ -28,6 +28,13 @@ export const CATEGORIES: {
     blurb: "Provider API keys & Claude login",
     icon: KeyRound,
     superadminOnly: true,
+  },
+  {
+    id: "it",
+    label: "IT",
+    blurb: "Network identity & TLS trust",
+    icon: ShieldCheck,
+    adminOnly: true,
   },
   {
     id: "releases",
