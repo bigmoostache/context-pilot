@@ -191,6 +191,13 @@ cat /sys/class/backlight/backlight/max_brightness      # 255
 > Ces écritures sysfs sont volatiles (perdues au reboot et reprises par le
 > driver). Pour un réglage durable, passez par la config (§5).
 
+> **Pourquoi l'écran restait noir après un reboot.** Le driver ne pilote la
+> lumière que via `.../brightness` ; il **n'écrit jamais `bl_power`**. Or au
+> démarrage le pwm-backlight remonte *blanké* (`bl_power=4` = FB_BLANK_POWERDOWN),
+> et tant qu'il vaut 4 la valeur de `brightness` n'a aucun effet visible → dalle
+> noire. L'unité systemd corrige ça avec un `ExecStartPost` qui écrit `0` dans
+> `bl_power` à chaque démarrage du service (dé-blanke le rétroéclairage).
+
 ### API HTTP de contrôle
 
 Le driver écoute en local sur **`http://127.0.0.1:8081`**, routes sous `/api/v1`.
