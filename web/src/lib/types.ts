@@ -76,7 +76,6 @@ export type ThreadDetail = Omit<GenThreadDetail, "log"> & {
 
 export type AgentStatus = GenAgent["status"]
 export type ThreadStatus = GenThreadDetail["status"]
-export type Importance = import("./api/generated/types.gen").MemoryCard["importance"]
 export type NotifKind = import("./api/generated/types.gen").SpineNotif["kind"]
 export type LibraryKind = import("./api/generated/types.gen").LibraryItem["kind"]
 
@@ -99,33 +98,6 @@ export interface ChatMessage {
   tool?: import("./api/generated/types.gen").ToolCall | undefined
   ts: string
   streaming?: boolean | undefined
-}
-
-export interface Thread {
-  id: string
-  name: string
-  status: ThreadStatus
-  messages: number
-  unread: number
-  last: string
-}
-
-export interface StatRow {
-  label: string
-  value: string
-  accent?: AccentToken
-}
-
-export interface StatusModel {
-  phase: StreamPhase
-  agent: string
-  skills: string[]
-  branch: string
-  queue: number
-  think: number
-  reverie: boolean
-  autoContinue: boolean
-  costUsd: number
 }
 
 // ── Account / current user (avatar menu + profile) ───────────────
@@ -219,30 +191,3 @@ export type ViewMode = "fleet" | "cockpit" | "threads" | "finder" | "costs"
 
 /** Which lens the Usage page is viewed through. */
 export type UsageUnit = "usd" | "tokens"
-
-/**
- * One month of usage for one agent. Tokens are split into the three canonical
- * sections the Usage page ALWAYS surfaces:
- *  - **hit**    — cache-read tokens (cheap)
- *  - **miss**   — input / uncached tokens
- *  - **output** — generated tokens (expensive)
- */
-export interface UsagePoint {
-  agentId: string
-  /** calendar month key, e.g. "2026-06" */
-  month: string
-  hitTokens: number
-  missTokens: number
-  outputTokens: number
-  /** the in-progress current month (drives forecasting) */
-  partial?: boolean
-  /** fraction of the month elapsed (0–1), present when partial */
-  elapsed?: number
-}
-
-/** Per-section price, in USD per token. */
-export interface UsageRates {
-  hit: number
-  miss: number
-  output: number
-}

@@ -25,7 +25,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   if (loading || authEnabled === null) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground animate-pulse font-mono text-sm">
+        <div className="animate-pulse font-mono text-sm text-muted-foreground">
           <span className="text-signal">▌</span> Connecting…
         </div>
       </div>

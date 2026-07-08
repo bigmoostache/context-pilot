@@ -86,11 +86,11 @@ export function AgentModal({
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="backdrop-fade absolute inset-0 -z-[1] cursor-default bg-black/40 backdrop-blur-[3px]"
+        className="backdrop-fade absolute inset-0 z-[-1] cursor-default bg-black/40 backdrop-blur-[3px]"
       />
       <div
         className={cn(
-          "modal-pop relative flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover pop-shadow",
+          "modal-pop pop-shadow relative flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover",
           c.isManage ? "w-[960px] max-w-[calc(100vw-3rem)]" : "w-[460px]",
         )}
       >
@@ -106,7 +106,7 @@ export function AgentModal({
         {c.error && (
           <div
             role="alert"
-            className="mx-6 mb-1 flex items-start gap-2 rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-3 py-2 text-[11.5px] leading-snug text-[var(--danger)]"
+            className="mx-6 mb-1 flex items-start gap-2 rounded-lg border border-(--danger)/30 bg-(--danger)/10 px-3 py-2 text-[11.5px] leading-snug text-(--danger)"
           >
             <X className="mt-px size-3.5 shrink-0" />
             <span>{c.error}</span>

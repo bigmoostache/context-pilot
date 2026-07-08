@@ -56,7 +56,7 @@ export function FinderPreview({
         // variant is used) that means it spans the drawer's full width — the
         // Sheet owns the width + left border, so the pane no longer fixes its
         // own 420px or draws a border.
-        full ? "min-w-0 flex-1" : "h-full w-full",
+        full ? "min-w-0 flex-1" : "size-full",
       )}
     >
       {!full && (

@@ -43,7 +43,7 @@ export function PanelFrame({
           )}
         </div>
         {(tokens !== undefined || cost !== undefined) && (
-          <div className="ml-auto flex items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
+          <div className="ml-auto flex items-center gap-2 text-[11px] text-muted-foreground tabular-nums">
             {tokens !== undefined && (
               <span className="rounded-md bg-muted/70 px-1.5 py-0.5">{fmtTokens(tokens)} tok</span>
             )}
@@ -65,7 +65,7 @@ export function PanelFrame({
 export function PanelSection({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="mb-5 last:mb-0">
-      <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+      <div className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground/70 uppercase">
         {label}
       </div>
       {children}

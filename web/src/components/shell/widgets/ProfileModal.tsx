@@ -32,7 +32,7 @@ export function ProfileModal({ open, onClose }: { open: boolean; onClose: () => 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="flex max-h-[88vh] w-[540px] max-w-[calc(100vw-2rem)] flex-col">
-        <header className="flex items-start gap-3 border-b border-border/70 px-6 pb-4 pt-5">
+        <header className="flex items-start gap-3 border-b border-border/70 px-6 pt-5 pb-4">
           <div className="flex flex-1 flex-col gap-0.5">
             <h2 className="text-[17px] font-semibold tracking-tight text-foreground">Profile</h2>
             <p className="text-[12px] text-muted-foreground">
@@ -41,7 +41,7 @@ export function ProfileModal({ open, onClose }: { open: boolean; onClose: () => 
           </div>
           <DialogClose
             aria-label="Close"
-            className="-mr-1 -mt-1 flex size-7 items-center justify-center rounded-md text-muted-foreground/55 transition-colors hover:bg-muted/70 hover:text-foreground"
+            className="-mt-1 -mr-1 flex size-7 items-center justify-center rounded-md text-muted-foreground/55 transition-colors hover:bg-muted/70 hover:text-foreground"
           >
             ✕
           </DialogClose>
@@ -208,7 +208,7 @@ function PasswordSection() {
       onSubmit={(e) => void submit(e)}
       className="flex flex-col gap-3 border-t border-border/60 pt-5"
     >
-      <span className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+      <span className="flex items-center gap-1.5 text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
         <KeyRound className="size-3.5" /> Change password
       </span>
       <Field label="Current password">
@@ -290,7 +290,7 @@ function SessionsSection({ open }: { open: boolean }) {
 
   return (
     <div className="flex flex-col gap-3 border-t border-border/60 pt-5">
-      <span className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+      <span className="flex items-center gap-1.5 text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
         <Monitor className="size-3.5" /> Active sessions
       </span>
       {error && <p className="text-[12px] text-danger">{error}</p>}
@@ -310,7 +310,7 @@ function SessionsSection({ open }: { open: boolean }) {
                 <span className="truncate text-[12.5px] font-medium text-foreground/90">
                   {s.user_agent ?? "Unknown device"}
                   {s.current && (
-                    <span className="ml-2 rounded bg-signal/15 px-1.5 py-px text-[10px] font-medium text-signal">
+                    <span className="ml-2 rounded-sm bg-signal/15 px-1.5 py-px text-[10px] font-medium text-signal">
                       This device
                     </span>
                   )}
@@ -348,10 +348,10 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="flex items-center justify-between text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+      <span className="flex items-center justify-between text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
         {label}
         {hint ? (
-          <span className="text-[10px] font-medium normal-case tracking-normal text-muted-foreground/70">
+          <span className="text-[10px] font-medium tracking-normal text-muted-foreground/70 normal-case">
             {hint}
           </span>
         ) : null}

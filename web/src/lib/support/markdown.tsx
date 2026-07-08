@@ -77,7 +77,7 @@ function ClickableCode({
       className={cn(
         baseClass,
         "cursor-pointer transition-colors duration-150",
-        copied && "!border-[var(--ok)] !text-[var(--ok)]",
+        copied && "border-(--ok)! text-(--ok)!",
       )}
       onClick={(ev) => {
         if ((ev.target as HTMLElement).closest("pre")) return
@@ -203,18 +203,18 @@ function components(variant: MarkdownVariant): Components {
   return {
     // ── Headings — graded scale, tight top spacing, no top margin on first. ──
     h1: ({ children }) => (
-      <h1 className="mt-3 mb-1.5 text-[17px] font-semibold leading-snug first:mt-0">{children}</h1>
+      <h1 className="mt-3 mb-1.5 text-[17px] leading-snug font-semibold first:mt-0">{children}</h1>
     ),
     h2: ({ children }) => (
-      <h2 className="mt-3 mb-1.5 text-[15px] font-semibold leading-snug first:mt-0">{children}</h2>
+      <h2 className="mt-3 mb-1.5 text-[15px] leading-snug font-semibold first:mt-0">{children}</h2>
     ),
     h3: ({ children }) => (
-      <h3 className="mt-2.5 mb-1 text-[13.5px] font-semibold leading-snug first:mt-0">
+      <h3 className="mt-2.5 mb-1 text-[13.5px] leading-snug font-semibold first:mt-0">
         {children}
       </h3>
     ),
     h4: ({ children }) => (
-      <h4 className="mt-2 mb-1 text-[12.5px] font-semibold uppercase tracking-wide opacity-80 first:mt-0">
+      <h4 className="mt-2 mb-1 text-[12.5px] font-semibold tracking-wide uppercase opacity-80 first:mt-0">
         {children}
       </h4>
     ),
@@ -280,7 +280,7 @@ function components(variant: MarkdownVariant): Components {
         <pre
           className={cn(
             preBox,
-            "[&>code]:border-0 [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-[inherit]",
+            "[&>code]:border-0 [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-inherit",
           )}
         >
           {children}
@@ -326,7 +326,7 @@ function components(variant: MarkdownVariant): Components {
           type="checkbox"
           checked={checked}
           readOnly
-          className="mr-1.5 translate-y-px accent-[var(--signal)]"
+          className="mr-1.5 translate-y-px accent-(--signal)"
         />
       ) : null,
   }
@@ -363,7 +363,7 @@ export const Markdown = memo(function Markdown({
   className?: string
 }): ReactNode {
   return (
-    <div className={cn("break-words", className)}>
+    <div className={cn("wrap-break-word", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
         rehypePlugins={[rehypeKatex]}

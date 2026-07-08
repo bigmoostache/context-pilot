@@ -69,14 +69,14 @@ export function PromptsPage({ agentId }: { agentId?: string | undefined }) {
           <div className="flex shrink-0 items-center gap-2">
             <button
               onClick={() => setImporting(true)}
-              className="flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-[12.5px] font-medium text-foreground/80 transition-colors hover:border-[var(--interactive)]/50 hover:text-foreground"
+              className="flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-[12.5px] font-medium text-foreground/80 transition-colors hover:border-(--interactive)/50 hover:text-foreground"
             >
               <Download className="size-4" />
               Import
             </button>
             <button
               onClick={() => setEditing("new")}
-              className="flex items-center gap-2 rounded-lg bg-[var(--interactive)] px-3.5 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105"
+              className="flex items-center gap-2 rounded-lg bg-(--interactive) px-3.5 py-2 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105"
             >
               <Plus className="size-4" />
               New
@@ -96,12 +96,12 @@ export function PromptsPage({ agentId }: { agentId?: string | undefined }) {
                 className={cn(
                   "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium transition-all",
                   tab === t
-                    ? "bg-card text-foreground card-shadow"
+                    ? "card-shadow bg-card text-foreground"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {label}
-                <span className="rounded-full bg-muted/80 px-1.5 py-px text-[9.5px] tabular-nums text-muted-foreground">
+                <span className="rounded-full bg-muted/80 px-1.5 py-px text-[9.5px] text-muted-foreground tabular-nums">
                   {count}
                 </span>
               </button>
@@ -179,7 +179,7 @@ function LibraryCard({
     <button
       onClick={() => onOpen(item)}
       style={{ animationDelay: `${Math.min(i, 10) * 35}ms` }}
-      className="opt-rise group flex flex-col gap-2.5 rounded-xl border border-border bg-card p-4 text-left card-shadow transition-colors hover:border-[color-mix(in_oklab,var(--interactive)_45%,transparent)]"
+      className="opt-rise group card-shadow flex flex-col gap-2.5 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-[color-mix(in_oklab,var(--interactive)_45%,transparent)]"
     >
       <div className="flex items-center gap-2.5">
         <span

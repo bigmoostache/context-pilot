@@ -80,7 +80,7 @@ export function PromptModal({ item, onClose }: { item: LibraryItem | "new"; onCl
         onClick={onClose}
         className="backdrop-fade fixed inset-0 cursor-default bg-black/40"
       />
-      <div className="modal-pop relative z-10 flex h-[90vh] w-[1180px] max-w-[96vw] flex-col overflow-hidden rounded-2xl border border-border bg-card pop-shadow">
+      <div className="modal-pop pop-shadow relative z-10 flex h-[90vh] w-[1180px] max-w-[96vw] flex-col overflow-hidden rounded-2xl border border-border bg-card">
         {/* hero header */}
         <header
           className="relative flex items-center gap-3 px-6 py-5"
@@ -126,7 +126,7 @@ export function PromptModal({ item, onClose }: { item: LibraryItem | "new"; onCl
               onChange={(e) => setName(e.target.value)}
               readOnly={builtin}
               placeholder={kind === "command" ? "deep-review" : "Senior Reviewer"}
-              className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:border-[var(--interactive)]/60 read-only:opacity-60"
+              className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-[13px] text-foreground transition-colors outline-none read-only:opacity-60 focus:border-(--interactive)/60"
             />
           </Field>
           <Field label="Description" hint="One line — shows on the card">
@@ -134,14 +134,14 @@ export function PromptModal({ item, onClose }: { item: LibraryItem | "new"; onCl
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What is this prompt for?"
-              className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:border-[var(--interactive)]/60"
+              className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-[13px] text-foreground transition-colors outline-none focus:border-(--interactive)/60"
             />
           </Field>
 
           {/* body — WYSIWYG markdown editor */}
           <div className="flex min-h-0 flex-1 flex-col gap-1.5">
             <div className="flex items-baseline gap-2">
-              <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+              <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
                 {kind === "command" ? "Expansion" : "Body"}
               </span>
               {kind === "agent" && (
@@ -223,8 +223,8 @@ function KindField({
             className={cn(
               "flex flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all",
               on
-                ? "border-[var(--interactive)] bg-[var(--interactive)]/[0.07] ring-2 ring-[var(--interactive)]/15"
-                : "border-border bg-card hover:border-[var(--interactive)]/40 hover:bg-muted/30",
+                ? "border-(--interactive) bg-(--interactive)/[0.07] ring-2 ring-(--interactive)/15"
+                : "border-border bg-card hover:border-(--interactive)/40 hover:bg-muted/30",
             )}
           >
             <KM.icon className="size-4 shrink-0" style={{ color: KM.accent }} />
@@ -253,7 +253,7 @@ function PromptFooter({
   return (
     <footer className="flex h-[60px] shrink-0 items-center gap-2 border-t border-border bg-muted/25 px-6">
       {!isNew && !builtin && (
-        <button className="text-[12px] font-medium text-[var(--danger)]/80 transition-colors hover:text-[var(--danger)]">
+        <button className="text-[12px] font-medium text-(--danger)/80 transition-colors hover:text-(--danger)">
           Delete
         </button>
       )}
@@ -266,7 +266,7 @@ function PromptFooter({
       <button
         onClick={onClose}
         disabled={!canSubmit}
-        className="flex items-center gap-2 rounded-lg bg-[var(--interactive)] px-4 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-all hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45"
+        className="flex items-center gap-2 rounded-lg bg-(--interactive) px-4 py-2 text-[12.5px] font-medium text-(--primary-foreground) transition-all hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45"
       >
         <Check className="size-4" strokeWidth={2.5} />
         {isNew ? "Create" : "Save"}
@@ -338,9 +338,9 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
         onClick={onClose}
         className="backdrop-fade fixed inset-0 cursor-default bg-black/40"
       />
-      <div className="modal-pop relative z-10 flex max-h-[88vh] w-[520px] max-w-[94vw] flex-col overflow-hidden rounded-2xl border border-border bg-card pop-shadow">
+      <div className="modal-pop pop-shadow relative z-10 flex max-h-[88vh] w-[520px] max-w-[94vw] flex-col overflow-hidden rounded-2xl border border-border bg-card">
         <header className="flex items-center gap-3 border-b border-border px-6 py-4">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--interactive)]/14 text-[var(--interactive)]">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-(--interactive)/14 text-(--interactive)">
             <Download className="size-[18px]" />
           </span>
           <div className="flex min-w-0 flex-1 flex-col">
@@ -359,14 +359,14 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
           </button>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4">
           {SOURCES.map((s, i) => {
             const imported = done.has(s.id)
             return (
               <div
                 key={s.id}
                 style={{ animationDelay: `${i * 35}ms` }}
-                className="opt-rise flex items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 card-shadow"
+                className="opt-rise card-shadow flex items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5"
               >
                 <span
                   className="flex size-8 shrink-0 items-center justify-center rounded-lg"
@@ -391,8 +391,8 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
                   className={cn(
                     "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11.5px] font-medium transition-all",
                     imported
-                      ? "cursor-default bg-[var(--ok)]/14 text-[var(--ok)]"
-                      : "border border-border text-foreground/75 hover:border-[var(--interactive)]/50 hover:text-foreground active:scale-[0.97]",
+                      ? "cursor-default bg-(--ok)/14 text-(--ok)"
+                      : "border border-border text-foreground/75 hover:border-(--interactive)/50 hover:text-foreground active:scale-[0.97]",
                   )}
                 >
                   {imported ? (
@@ -413,7 +413,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
           </span>
           <button
             onClick={onClose}
-            className="ml-auto rounded-lg bg-[var(--interactive)] px-4 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-all hover:brightness-105 active:scale-[0.98]"
+            className="ml-auto rounded-lg bg-(--interactive) px-4 py-2 text-[12.5px] font-medium text-(--primary-foreground) transition-all hover:brightness-105 active:scale-[0.98]"
           >
             Done
           </button>
@@ -459,7 +459,7 @@ function Field({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline gap-2">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+        <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
           {label}
         </span>
         {hint && <span className="text-[11px] text-muted-foreground/55">{hint}</span>}

@@ -290,7 +290,7 @@ function ComposerInputRow({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   return (
-    <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2.5 card-shadow focus-within:border-[var(--signal)]/60">
+    <div className="card-shadow flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2.5 focus-within:border-(--signal)/60">
       <input
         ref={fileInputRef}
         type="file"
@@ -307,7 +307,7 @@ function ComposerInputRow({
         onClick={() => fileInputRef.current?.click()}
         disabled={!onAttach}
         title="Attach files"
-        className="mb-0.5 text-muted-foreground/60 transition-colors hover:text-[var(--interactive)] disabled:cursor-default disabled:opacity-40 disabled:hover:text-muted-foreground/60"
+        className="mb-0.5 text-muted-foreground/60 transition-colors hover:text-(--interactive) disabled:cursor-default disabled:opacity-40 disabled:hover:text-muted-foreground/60"
       >
         <Paperclip className="size-4" />
       </button>
@@ -331,12 +331,12 @@ function ComposerInputRow({
         }}
         placeholder="Reply to this thread…"
         rows={1}
-        className="max-h-[200px] min-h-[24px] flex-1 resize-none bg-transparent text-[13.5px] leading-relaxed text-foreground/90 placeholder:text-muted-foreground/60 outline-none"
+        className="max-h-[200px] min-h-[24px] flex-1 resize-none bg-transparent text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/60"
       />
       <button
         onClick={onSubmit}
         disabled={!sendable}
-        className="flex size-7 items-center justify-center rounded-full bg-[var(--signal)] text-[var(--primary-foreground)] transition-[filter] hover:brightness-105 disabled:opacity-40 disabled:hover:brightness-100"
+        className="flex size-7 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:opacity-40 disabled:hover:brightness-100"
       >
         <ArrowUp className="size-4" strokeWidth={2.5} />
       </button>
@@ -450,7 +450,7 @@ export function ThreadComposer({
   const commandsActive = composer.slashActive || (firstMessage && !composer.text.trim())
 
   return (
-    <div className="shrink-0 px-5 pb-4 pt-2">
+    <div className="shrink-0 px-5 pt-2 pb-4">
       {/* Unified bubble row (T350) — file-upload chips + /command suggestions +
           the create-command pill, all in ONE transparent, normal-flow container
           between the conversation and the textarea. */}

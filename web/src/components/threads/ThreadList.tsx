@@ -117,7 +117,7 @@ export function ThreadList({
   )
 
   return (
-    <aside className="flex w-[var(--sidebar-w)] shrink-0 flex-col overflow-hidden border-r border-border bg-surface">
+    <aside className="flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden border-r border-border bg-surface">
       {/* fixed-width inner shell pinned to the rail width */}
       <div
         className="flex h-full flex-col"
@@ -136,7 +136,7 @@ export function ThreadList({
           <div className="shrink-0 px-3 pb-2">
             <button
               onClick={onNewThread}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--signal)] px-3 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-(--signal) px-3 py-2 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105"
             >
               <Plus className="size-4" />
               New Thread
@@ -146,13 +146,13 @@ export function ThreadList({
 
         {/* search — works in both live and archived views */}
         <div className="shrink-0 px-3 pb-2">
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12px] focus-within:border-[var(--signal)]/60">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12px] focus-within:border-(--signal)/60">
             <Search className="size-3.5 shrink-0 text-muted-foreground/60" />
             <input
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
               placeholder={showArchived ? "Search archived…" : "Search threads…"}
-              className="min-w-0 flex-1 bg-transparent text-foreground/90 placeholder:text-muted-foreground/55 outline-none"
+              className="min-w-0 flex-1 bg-transparent text-foreground/90 outline-none placeholder:text-muted-foreground/55"
             />
             {query && (
               <button
@@ -194,7 +194,7 @@ export function ThreadList({
           >
             <Archive className="size-3.5" />
             Archived
-            <span className="ml-auto tabular-nums text-muted-foreground/50">{archivedCount}</span>
+            <span className="ml-auto text-muted-foreground/50 tabular-nums">{archivedCount}</span>
           </button>
         )}
       </div>
@@ -218,7 +218,7 @@ function ListHeader({
   workingCount: number
 }) {
   return (
-    <div className="flex items-center gap-2 px-3 pb-2.5 pt-3">
+    <div className="flex items-center gap-2 px-3 pt-3 pb-2.5">
       {showArchived ? (
         <button
           onClick={() => onToggleArchived(false)}
@@ -226,11 +226,11 @@ function ListHeader({
         >
           <ChevronLeft className="size-3.5" />
           Archived
-          <span className="tabular-nums text-muted-foreground/50">{archivedCount}</span>
+          <span className="text-muted-foreground/50 tabular-nums">{archivedCount}</span>
         </button>
       ) : (
         <>
-          <span className="text-[11px] tabular-nums text-muted-foreground">
+          <span className="text-[11px] text-muted-foreground tabular-nums">
             {liveCount} thread{liveCount === 1 ? "" : "s"}
           </span>
           {workingCount > 0 && (
@@ -242,8 +242,8 @@ function ListHeader({
               }}
             >
               <span className="relative flex size-1.5">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--interactive)] opacity-70" />
-                <span className="relative inline-flex size-1.5 rounded-full bg-[var(--interactive)]" />
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-(--interactive) opacity-70" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-(--interactive)" />
               </span>
               {workingCount} working
             </span>
@@ -267,14 +267,14 @@ function EmptyState({ hasQuery, showArchived }: { hasQuery: boolean; showArchive
 
 function Group({ label, count, accent }: { label: string; count: number; accent?: string }) {
   return (
-    <div className="flex items-center gap-2 px-2.5 pb-1 pt-3">
+    <div className="flex items-center gap-2 px-2.5 pt-3 pb-1">
       <span
         className="text-[11px] font-semibold"
         style={{ color: accent ?? "var(--muted-foreground)" }}
       >
         {label}
       </span>
-      <span className="text-[11px] tabular-nums text-muted-foreground/45">{count}</span>
+      <span className="text-[11px] text-muted-foreground/45 tabular-nums">{count}</span>
     </div>
   )
 }
@@ -314,7 +314,7 @@ function ThreadRow({
     <div
       className={cn(
         "group relative flex w-full flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition-colors",
-        selected ? "bg-card card-shadow" : "hover:bg-muted/60",
+        selected ? "card-shadow bg-card" : "hover:bg-muted/60",
       )}
     >
       <div
@@ -334,7 +334,7 @@ function ThreadRow({
           />
           <span className="truncate text-[13px] font-medium text-foreground/90">{t.name}</span>
           <span className="relative ml-auto shrink-0">
-            <span className="text-[10.5px] tabular-nums text-muted-foreground/50 transition-opacity group-hover:opacity-0">
+            <span className="text-[10.5px] text-muted-foreground/50 tabular-nums transition-opacity group-hover:opacity-0">
               {t.lastActivity}
             </span>
             <RowActions
@@ -395,7 +395,7 @@ function RowActions({
             e.stopPropagation()
             onDelete(id)
           }}
-          className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-[var(--danger)]"
+          className="flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-muted hover:text-(--danger)"
           title="Delete permanently"
         >
           <Trash2 className="size-3" />
@@ -435,7 +435,7 @@ function RowMeta({
     <div className="flex items-center gap-1.5 pl-4">
       {isFocused && (
         <span
-          className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide"
+          className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold tracking-wide uppercase"
           style={{
             background: "color-mix(in oklab, var(--ok) 18%, transparent)",
             color: "var(--ok)",
@@ -446,7 +446,7 @@ function RowMeta({
       )}
       {isPaused && (
         <span
-          className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide"
+          className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold tracking-wide uppercase"
           style={{
             background: "color-mix(in oklab, var(--warn) 18%, transparent)",
             color: "var(--warn)",
@@ -458,7 +458,7 @@ function RowMeta({
       <span className="truncate text-[11.5px] text-muted-foreground/70">{preview}</span>
       {!archived && (t.unread ?? 0) > 0 && (
         <span
-          className="ml-auto shrink-0 rounded-full px-1.5 text-[10px] font-semibold tabular-nums text-[var(--primary-foreground)]"
+          className="ml-auto shrink-0 rounded-full px-1.5 text-[10px] font-semibold text-(--primary-foreground) tabular-nums"
           style={{ background: "var(--signal)" }}
         >
           {t.unread}

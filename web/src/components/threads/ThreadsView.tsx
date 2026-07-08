@@ -353,9 +353,9 @@ export function ThreadsView({
       {actions.notice && (
         <div
           role="alert"
-          className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-[var(--danger)]/40 bg-card px-4 py-2.5 text-[12.5px] text-foreground/90 card-shadow"
+          className="card-shadow fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-(--danger)/40 bg-card px-4 py-2.5 text-[12.5px] text-foreground/90"
         >
-          <AlertTriangle className="size-4 shrink-0 text-[var(--danger)]" />
+          <AlertTriangle className="size-4 shrink-0 text-(--danger)" />
           <span>{actions.notice}</span>
         </div>
       )}
@@ -392,7 +392,7 @@ function EmptyRealm({
       {onNewThread && (
         <button
           onClick={onNewThread}
-          className="flex items-center gap-2 rounded-lg bg-[var(--signal)] px-3.5 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105"
+          className="flex items-center gap-2 rounded-lg bg-(--signal) px-3.5 py-2 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105"
         >
           <Plus className="size-4" />
           New Thread

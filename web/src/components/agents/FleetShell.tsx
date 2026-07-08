@@ -104,7 +104,7 @@ function ToggleTab({
       className={cn(
         "flex items-center gap-1.5 rounded-md px-3 py-1 text-[12.5px] font-medium transition-all",
         active
-          ? "bg-card text-foreground card-shadow"
+          ? "card-shadow bg-card text-foreground"
           : "text-muted-foreground hover:text-foreground",
       )}
     >

@@ -27,7 +27,7 @@ export function ToolsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
         ) : (
           toolGroups.map((g) => (
             <div key={g.category}>
-              <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+              <div className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                 {g.category}
               </div>
               <ul className="overflow-hidden rounded-lg border border-border">

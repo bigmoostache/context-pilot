@@ -13,8 +13,9 @@ import { AuthGuard } from "@/components/auth/AuthGuard"
 import { ThemeProvider } from "@/lib/providers/ThemeProvider"
 import { AccountProvider } from "@/lib/providers/AccountProvider"
 import { AuthProvider } from "@/lib/providers/AuthProvider"
-import { DevModeProvider } from "@/lib/providers/DevModeProvider"
-import { useDevMode } from "@/lib/providers/devMode"
+import { DevModeProvider } from "@/lib/providers/toggles/DevModeProvider"
+import { ShowOverlayProvider } from "@/lib/providers/toggles/ShowOverlayProvider"
+import { useDevMode } from "@/lib/providers/toggles/devMode"
 import { useFleet, useAgentMeta } from "@/lib/live"
 import { TelemetryProfiler } from "@/lib/support/telemetry"
 import { TelemetryHud } from "@/components/shell/widgets/TelemetryHud"
@@ -60,11 +61,13 @@ function App() {
       <AuthProvider>
         <AccountProvider>
           <DevModeProvider>
-            <TooltipProvider delay={350} closeDelay={80}>
-              <AuthGuard>
-                <AppShell />
-              </AuthGuard>
-            </TooltipProvider>
+            <ShowOverlayProvider>
+              <TooltipProvider delay={350} closeDelay={80}>
+                <AuthGuard>
+                  <AppShell />
+                </AuthGuard>
+              </TooltipProvider>
+            </ShowOverlayProvider>
           </DevModeProvider>
         </AccountProvider>
       </AuthProvider>

@@ -32,7 +32,7 @@ export function ReleasesPane() {
   if (isError) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
-        <span className="text-[12px] text-[var(--danger)]">
+        <span className="text-[12px] text-(--danger)">
           Failed to load releases{error.message ? `: ${error.message}` : ""}
         </span>
         <button
@@ -70,7 +70,7 @@ export function ReleasesPane() {
       />
 
       <div className="flex items-center justify-between">
-        <h3 className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+        <h3 className="text-[11px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
           Releases
         </h3>
         <button
@@ -127,14 +127,14 @@ function ArchSection({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+      <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
         Architecture
       </span>
       <div className="flex items-center gap-2">
         <div className="relative">
           <button
             onClick={() => setOpen((v) => !v)}
-            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[13px] font-medium text-foreground/90 transition-colors hover:bg-muted/40 card-shadow"
+            className="card-shadow flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[13px] font-medium text-foreground/90 transition-colors hover:bg-muted/40"
           >
             <Package className="size-4 text-muted-foreground/70" />
             {arch}
@@ -146,7 +146,7 @@ function ArchSection({
             />
           </button>
           {open && (
-            <div className="absolute left-0 top-full z-10 mt-1 min-w-[200px] rounded-lg border border-border bg-card py-1 card-shadow">
+            <div className="card-shadow absolute top-full left-0 z-10 mt-1 min-w-[200px] rounded-lg border border-border bg-card py-1">
               {knownArchs.map((a) => (
                 <button
                   key={a}
@@ -156,7 +156,7 @@ function ArchSection({
                   }}
                   className={cn(
                     "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12.5px] transition-colors hover:bg-muted/50",
-                    a === arch ? "font-medium text-[var(--interactive)]" : "text-foreground/80",
+                    a === arch ? "font-medium text-(--interactive)" : "text-foreground/80",
                   )}
                 >
                   {a === arch && <Check className="size-3" strokeWidth={3} />}
@@ -172,8 +172,8 @@ function ArchSection({
           className={cn(
             "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12px] font-medium transition-all",
             archAuto
-              ? "border-[var(--interactive)]/30 bg-[var(--interactive)]/[0.06] text-[var(--interactive)]"
-              : "border-border bg-card text-foreground/75 hover:bg-muted/40 card-shadow",
+              ? "border-(--interactive)/30 bg-(--interactive)/6 text-(--interactive)"
+              : "card-shadow border-border bg-card text-foreground/75 hover:bg-muted/40",
           )}
         >
           {setArch.isPending ? (
@@ -183,9 +183,7 @@ function ArchSection({
           )}
           Auto-detect
         </button>
-        {archAuto && (
-          <span className="text-[10.5px] text-[var(--interactive)]">✓ auto-detected</span>
-        )}
+        {archAuto && <span className="text-[10.5px] text-(--interactive)">✓ auto-detected</span>}
       </div>
     </div>
   )
@@ -223,7 +221,7 @@ function PaginatedReleases({
           >
             ← Prev
           </button>
-          <span className="text-[11px] tabular-nums text-muted-foreground">
+          <span className="text-[11px] text-muted-foreground tabular-nums">
             {safePage + 1} / {totalPages}
           </span>
           <button
@@ -254,10 +252,8 @@ function ReleaseCard({
     <div
       style={{ animationDelay: `${index * 40}ms` }}
       className={cn(
-        "opt-rise flex items-center gap-3 rounded-xl border px-3.5 py-3 card-shadow",
-        r.selected
-          ? "border-[var(--interactive)]/40 bg-[var(--interactive)]/[0.04]"
-          : "border-border bg-card",
+        "opt-rise card-shadow flex items-center gap-3 rounded-xl border px-3.5 py-3",
+        r.selected ? "border-(--interactive)/40 bg-(--interactive)/4" : "border-border bg-card",
       )}
     >
       {/* Left: tag + meta */}
@@ -332,7 +328,7 @@ function ReleaseActions({
         />
       )}
       {!r.local && !r.assetUrl && (
-        <span className="text-[10px] italic text-muted-foreground/50">no asset</span>
+        <span className="text-[10px] text-muted-foreground/50 italic">no asset</span>
       )}
       {r.local && !r.selected && (
         <ActionBtn
@@ -402,9 +398,8 @@ function ActionBtn({
       className={cn(
         "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-all disabled:opacity-50",
         accent &&
-          "border-[var(--interactive)]/30 bg-[var(--interactive)]/[0.06] text-[var(--interactive)] hover:bg-[var(--interactive)]/[0.12]",
-        danger &&
-          "border-[var(--danger)]/30 bg-[var(--danger)]/[0.06] text-[var(--danger)] hover:bg-[var(--danger)]/[0.12]",
+          "border-(--interactive)/30 bg-(--interactive)/6 text-(--interactive) hover:bg-(--interactive)/12",
+        danger && "border-(--danger)/30 bg-(--danger)/6 text-(--danger) hover:bg-(--danger)/12",
         !accent && !danger && "border-border bg-card text-foreground/75 hover:bg-muted/40",
       )}
     >

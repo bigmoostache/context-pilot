@@ -61,7 +61,7 @@ export function ProvisionedView({
             <span className="text-muted-foreground">IP:</span> {identity.ip}
           </div>
           {fingerprint && (
-            <div className="mt-1 break-all font-mono text-[11px] text-muted-foreground">
+            <div className="mt-1 font-mono text-[11px] break-all text-muted-foreground">
               CA: {fingerprint}
             </div>
           )}

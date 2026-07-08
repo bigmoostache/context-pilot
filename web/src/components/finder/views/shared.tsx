@@ -49,7 +49,7 @@ export function RenameInput({
         }
       }}
       onBlur={(e) => onCommit(e.target.value)}
-      className="min-w-0 flex-1 rounded-[4px] border border-[var(--signal)] bg-background px-1 py-px text-[12px] text-foreground outline-none ring-2 ring-[var(--signal)]/40"
+      className="min-w-0 flex-1 rounded-[4px] border border-(--signal) bg-background px-1 py-px text-[12px] text-foreground ring-2 ring-(--signal)/40 outline-none"
     />
   )
 }
@@ -69,7 +69,7 @@ export function TagDots({
         <span
           key={t}
           title={TAG_META[t].label}
-          className="size-2 rounded-full ring-1 ring-inset ring-black/10"
+          className="size-2 rounded-full ring-1 ring-black/10 ring-inset"
           style={{ background: TAG_META[t].color }}
         />
       ))}

@@ -79,7 +79,7 @@ export function CostsView({ agentId }: { agentId: string }) {
         <span className="text-[15px] font-semibold">No cost data yet</span>
         <span className="max-w-sm text-center text-[12px]">
           Cost telemetry appears after the agent completes its first LLM tick. The file{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+          <code className="rounded-sm bg-muted px-1 py-0.5 text-[11px]">
             .context-pilot/logs/cost-tracking.tsv
           </code>{" "}
           will be created automatically.
@@ -90,7 +90,7 @@ export function CostsView({ agentId }: { agentId: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
         {/* ── Header ──────────────────────────────────────────────── */}
         <div className="flex items-start justify-between">
           <div>
@@ -215,10 +215,10 @@ function Card({
   accent?: boolean
 }) {
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3 card-shadow">
+    <div className="card-shadow flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3">
       <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
       <span
-        className="text-[18px] font-bold tabular-nums tracking-tight"
+        className="text-[18px] font-bold tracking-tight tabular-nums"
         style={accent ? { color: "var(--ok, #4ade80)" } : undefined}
       >
         {value}
@@ -229,7 +229,7 @@ function Card({
 }
 
 function Section({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-xl border border-border bg-card p-5 card-shadow">{children}</div>
+  return <div className="card-shadow rounded-xl border border-border bg-card p-5">{children}</div>
 }
 
 type FilterValue = "all" | "0" | "1"

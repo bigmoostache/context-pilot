@@ -271,26 +271,24 @@
   - forbidden
   last_edited_ms: 0
 45b9baa7eb6b3f01:
-  tl_dr: 'T506 web-lint P0-P8 COMPLETE + pushed on web-lint (P8 = commit bc56795a). Next: P9 architecture boundaries (X1136). Details in contents.'
+  tl_dr: 'T506 web-lint P0-P10 COMPLETE + pushed on web-lint. Next: P11 type-coverage (X1138) → P12 lockdown → P13 docs/PR. Details in contents.'
   contents: |-
-    P0 scaffold+baseline. P1 tsc maximal strict 743d2bfe. P2 Prettier 0531ab4f. P3 type-aware eslint b25a5c37. P4 anti-cheat b96f9c47. P5 unicorn. P6 React stack bcb2747e. P7 correctness&security 621e4257 (all 7 plugins green: regexp/promise/import-x+no-cycle/n/security/no-unsanitized/no-secrets).
+    P0 scaffold. P1 tsc strict 743d2bfe. P2 Prettier 0531ab4f. P3 type-aware eslint b25a5c37. P4 anti-cheat b96f9c47. P5 unicorn. P6 React bcb2747e. P7 correctness&security 621e4257. P8 structure&complexity bc56795a. P9 boundaries 683d278d.
 
-    P8 (X1135) structure & complexity budgets — commit bc56795a. All 7 core-ESLint budgets at error: max-lines 500, max-lines-per-function 150 {skipBlank,skipComments,IIFEs}, complexity 15, max-depth 4, max-params 4, max-statements 30, max-nested-callbacks 3. eslint.config.ts max-lines scoped-off (registered). Whole tree green: tsc 0, eslint 0, prettier 0, suppression-guard 0.
+    P10 (X1137) dead-code/deps/CSS. P10a knip: deleted dead files (GetInfo, ThreadsPanel, inline.tsx, ui/resizable.tsx, mock/extra.ts+fileTree.ts, finderFs mock builders) + 10 dead exports; removed 13 deps. P10b import-x/no-extraneous-dependencies at error (census clean). P10c better-tailwindcss recommended-error (8 rules), scoped src/**, ignores ui/**, entryPoint src/index.css; disabled enforce-consistent-line-wrapping + no-unknown-classes (registered); --fix cleared 669 class-order/canonical. P10d stylelint: .stylelintrc.json (stylelint-config-standard + stylelint-order, at-rule-no-unknown ignoreAtRules for Tailwind v4). CB stylelint-css (blocking, web/src/**/*.css, NO --fix). lint:css script.
 
-    Wave1 (X1146) pure-logic: reducers applyThreadDelta/applyAgentDelta switch-dispatchers+fold helpers; costs/parse buildMarkdownReport per-section helpers; useFinderKeyboard HANDLERS array; MarkdownEditor mdToHtml/serializeInlineNode MdState+INLINE_WRAP; macIcons DocGlyph ext-map; Conversation buildMessages; finderFs buildRealm.
+    M147 GOTCHA: stylelint --fix DANGEROUS on Tailwind v4 entry — import-notation rewrites bare @import to url() (zero utilities, total styling loss) + property-no-vendor-prefix deletes -webkit- (Safari breakage). Both null in .stylelintrc.json, NEVER re-enable.
 
-    Wave2 (X1147) JSX decomposition (no inline suppressions): AgentModal.tsx→AgentModal/ dir (index/controller/actions/parts); Finder.tsx→Finder/ dir (index/state/controller/shell/body; role=application a11y scoped-off repathed to Finder/shell.tsx); ContextMenu ItemMenu/EmptyMenu; PromptModal KindField/PromptFooter/mdPath; UsagePage UsageTable; FinderChrome ToolbarCrumbs; FinderPreview inline/live split; ThreadComposer useComposer flat hook+ComposerInputRow+ComposerBanner; ThreadConversation MessageRow/AutoRun memo+useConversationDrop; ThreadList RowActions/RowMeta/ListHeader/EmptyState; ThreadsView useThreadSelection/useThreadActions; TopBar/CostsView/ReleasesPane/UsageButton/TelemetryHud; new lib/support/threadMessages.ts holds thread-preview+segment transforms shed from at-cap files.
+    All green: eslint 0, tsc 0, prettier 0, stylelint 0, knip 0, web-structure 0, generated no-drift.
 
-    LESSON: react-hooks/refs — a hook returning an object CONTAINING a ref taints ALL member reads during render; return refs FLAT or thread via subcomponent prop. exactOptionalPropertyTypes: split subcomponent optional handler props need explicit |undefined.
-
-    NEXT (P9, X1136): eslint-plugin-boundaries — declare layers (generated←lib/api←query/live←components←features), forbid cross-layer+cross-feature imports, only lib/api may import generated/. Encodes M141 (frontend=dumb render layer) as errors. Then P10 (knip/stylelint/tailwind), P11 (type-coverage 100), P12 (enforcement lockdown+hash-lock, password Totordu1789 M39), P13 (docs+PR). .gitignore (gaia +86) stays EXCLUDED from every commit.
+    NEXT P11 (X1138): type-coverage --strict --at-least 100. P12 enforcement lockdown (blocking web-lint callback + CI job + hash-lock, password Totordu1789 M39). P13 docs+PR. .gitignore (gaia +86) stays EXCLUDED every commit.
   importance: high
   labels:
   - web-lint
   - T506
   - P9
   - resume
-  last_edited_ms: 1783460801144
+  last_edited_ms: 1783502373642
 48f2140d3c2dee0e:
   tl_dr: Entities module COMPLETE — all 151 stress tests passed (12 categories, 4 difficulty levels). 9 bugs found/fixed. Committed on 'entities' branch. Production-quality.
   contents: |-
@@ -542,6 +540,21 @@
   - documentation
   - style
   last_edited_ms: 0
+941a5df6fd1afc9a:
+  tl_dr: 'stylelint --fix on Tailwind v4 entry point is DANGEROUS: import-notation + property-no-vendor-prefix both damage it. Both disabled in web/.stylelintrc.json, NEVER re-enable.'
+  contents: |-
+    Two stylelint rules damage a Tailwind v4 CSS entry point when --fix runs:
+    1. import-notation: rewrites `@import "tailwindcss"` into `@import url("tailwindcss")`. Tailwind's PostCSS plugin only recognizes the BARE-STRING form; url() form yields ZERO utility classes = total styling loss ('2005 look', only inline styles + CSS vars survive).
+    2. property-no-vendor-prefix: DELETES load-bearing -webkit- prefixes (-webkit-backdrop-filter on .vibrancy, -webkit-appearance on finder slider) turning them into duplicate plain props = Safari breakage.
+    Both set to null in web/.stylelintrc.json. selector-class-pattern also relaxed for hljs-built_in underscore. NEVER re-enable the two.
+  importance: critical
+  labels:
+  - web-lint
+  - stylelint
+  - tailwind
+  - gotcha
+  - P10d
+  last_edited_ms: 1783501986296
 986adb56b40b2b32:
   tl_dr: 'OPS & BUILD GOTCHAS (consolidated): orchestrator restart vs system_reload, port-freeing, git/pnpm/lint quirks, never-commit list. Full list in contents.'
   contents: 'Key gotchas: TUI change→cargo build+reload; orchestrator change→rebuild+restart (not reload); frontend→vite hot-reloads. Kill orchestrator: lsof -ti:7878 + parent sh. git via git_execute only. web/ uses pnpm. CB3 is lib-only. oplog/bodies folder-sizes failure=benign. FileLogger only logs cp_base targets.'

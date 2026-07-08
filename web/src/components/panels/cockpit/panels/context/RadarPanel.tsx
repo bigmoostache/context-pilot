@@ -30,7 +30,7 @@ export function RadarPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
             <ul className="flex flex-col gap-1.5">
               {radarAnchors.map((a, i) => (
                 <li key={i} className="flex gap-2.5 rounded-md bg-muted/40 px-2.5 py-1.5">
-                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-[var(--signal)]">
+                  <span className="shrink-0 font-mono text-[10px] text-(--signal) tabular-nums">
                     {a.time}
                   </span>
                   <span className="text-[11.5px] leading-snug text-foreground/80">{a.signal}</span>
@@ -45,16 +45,16 @@ export function RadarPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
                 <li key={i} className="rounded-md border border-border/70 px-2.5 py-2">
                   <div className="mb-1 flex items-center gap-2">
                     <ImportanceDot level={r.importance} />
-                    <span className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
+                    <span className="font-mono text-[10px] text-muted-foreground/70 tabular-nums">
                       {r.datetime}
                     </span>
-                    <span className="ml-auto font-mono text-[10px] tabular-nums text-foreground/70">
+                    <span className="ml-auto font-mono text-[10px] text-foreground/70 tabular-nums">
                       {r.score.toFixed(3)}
                     </span>
                   </div>
                   <div className="mb-1.5 h-1 overflow-hidden rounded-full bg-muted">
                     <div
-                      className="h-full rounded-full fill-sweep"
+                      className="fill-sweep h-full rounded-full"
                       style={{ width: `${r.score * 100}%`, background: "var(--interactive)" }}
                     />
                   </div>

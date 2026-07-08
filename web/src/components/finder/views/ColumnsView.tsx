@@ -168,7 +168,7 @@ function MillerColumn({
       {...columnDropProps}
       className={cn(
         "flex w-[218px] shrink-0 flex-col overflow-y-auto border-r border-border py-1",
-        showBodyOver && "bg-[var(--signal)]/8 ring-1 ring-inset ring-[var(--signal)]/40",
+        showBodyOver && "bg-(--signal)/8 ring-1 ring-(--signal)/40 ring-inset",
       )}
     >
       {nodes.map((n) => {
@@ -200,16 +200,16 @@ function MillerColumn({
               // TEXT selection instead of an element drag — the drag never
               // fires and the move silently fails (T287). Suppressing text
               // selection lets `draggable` initiate the element drag reliably.
-              "mx-1 flex select-none items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors",
+              "mx-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors select-none",
               // A folder that is OPEN in the path we're traversing (its children
               // fill the next column) gets the SAME prominent signal background
               // as a selected row — so the whole opened chain reads as a
               // connected trail down the columns at a glance (T287). Background
               // only: the user explicitly asked to drop the left accent bar.
               onTrail || sel
-                ? "bg-[var(--signal)]/20 font-medium text-foreground"
+                ? "bg-(--signal)/20 font-medium text-foreground"
                 : "text-foreground/80 hover:bg-muted/45",
-              dropOver && "bg-[var(--signal)]/20 ring-1 ring-inset ring-[var(--signal)]/70",
+              dropOver && "bg-(--signal)/20 ring-1 ring-(--signal)/70 ring-inset",
             )}
           >
             <FileIcon kind={n.kind} ext={extOf(n.name)} size={17} className="shrink-0" />

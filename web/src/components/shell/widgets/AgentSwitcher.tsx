@@ -51,7 +51,7 @@ export function AgentSwitcher({
       <DropdownMenuTrigger
         className={cn(
           "flex h-8 items-center gap-2 rounded-lg border border-border bg-card px-2.5 text-left transition-colors outline-none",
-          "hover:border-[var(--signal)]/50 card-shadow",
+          "card-shadow hover:border-(--signal)/50",
         )}
       >
         {/* Single-line trigger: just the workspace name (the folder path was
@@ -101,8 +101,8 @@ export function AgentSwitcher({
                 // brand wash that darkens correctly in dark mode and lightens in
                 // light mode from the popover surface beneath, with the text
                 // kept at full-contrast `foreground`.
-                "focus:!bg-[color-mix(in_oklab,var(--signal)_11%,transparent)] focus:!text-foreground",
-                "data-[highlighted]:!bg-[color-mix(in_oklab,var(--signal)_11%,transparent)] data-[highlighted]:!text-foreground",
+                "focus:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! focus:text-foreground!",
+                "data-highlighted:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! data-highlighted:text-foreground!",
               )}
             >
               <AgentDot
@@ -122,7 +122,7 @@ export function AgentSwitcher({
                     `group/dropdown-menu-item` — a scoped child rule that outranks the
                     universal `**:` descendant rule and leaves the status label + ✓
                     (their own colours) untouched. Correct contrast in both themes. */}
-                <span className="truncate text-[12.5px] font-medium text-foreground/90 group-focus/dropdown-menu-item:!text-foreground group-data-[highlighted]/dropdown-menu-item:!text-foreground">
+                <span className="truncate text-[12.5px] font-medium text-foreground/90 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
                   {a.name}
                 </span>
               </div>
@@ -132,7 +132,7 @@ export function AgentSwitcher({
               >
                 {statusMeta[a.status].label}
               </span>
-              {a.id === activeId && <Check className="size-3.5 shrink-0 text-[var(--signal)]" />}
+              {a.id === activeId && <Check className="size-3.5 shrink-0 text-(--signal)" />}
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>
@@ -142,17 +142,17 @@ export function AgentSwitcher({
             onClick={onNewAgent}
             className={cn(
               "gap-2 py-1.5 text-[12.5px]",
-              "focus:!bg-muted data-[highlighted]:!bg-muted focus:!text-foreground data-[highlighted]:!text-foreground",
+              "focus:bg-muted! focus:text-foreground! data-highlighted:bg-muted! data-highlighted:text-foreground!",
             )}
           >
-            <Plus className="size-3.5 text-[var(--interactive)]" />
+            <Plus className="size-3.5 text-(--interactive)" />
             New agent…
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={onFleet}
             className={cn(
               "gap-2 py-1.5 text-[12.5px]",
-              "focus:!bg-muted data-[highlighted]:!bg-muted focus:!text-foreground data-[highlighted]:!text-foreground",
+              "focus:bg-muted! focus:text-foreground! data-highlighted:bg-muted! data-highlighted:text-foreground!",
             )}
           >
             <FolderGit2 className="size-3.5 text-muted-foreground" />
@@ -208,7 +208,7 @@ function AgentDot({
       )}
       <span
         className={cn(
-          "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-card",
+          "absolute -right-0.5 -bottom-0.5 size-2 rounded-full ring-2 ring-card",
           status === "working" && "animate-pulse",
         )}
         style={{ background: statusMeta[status].color }}

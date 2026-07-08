@@ -93,7 +93,7 @@ export function MarkdownEditor({
   return (
     <div
       className={cn(
-        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card card-shadow",
+        "card-shadow flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card",
         className,
       )}
     >
@@ -142,7 +142,7 @@ export function MarkdownEditor({
       {/* editing surface */}
       <div className="relative min-h-0 flex-1 overflow-y-auto">
         {empty && placeholder && (
-          <span className="pointer-events-none absolute left-5 top-4 text-[13px] text-muted-foreground/40">
+          <span className="pointer-events-none absolute top-4 left-5 text-[13px] text-muted-foreground/40">
             {placeholder}
           </span>
         )}
@@ -163,14 +163,14 @@ export function MarkdownEditor({
           onMouseUp={() => force()}
           className={cn(
             "prose-editor min-h-full px-5 py-4 text-[13.5px] leading-relaxed text-foreground/90 outline-none",
-            "[&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:text-[20px] [&_h1]:font-bold [&_h1]:tracking-tight [&_h1]:text-foreground",
-            "[&_h2]:mb-1.5 [&_h2]:mt-3 [&_h2]:text-[16px] [&_h2]:font-semibold [&_h2]:text-foreground",
+            "[&_h1]:mt-3 [&_h1]:mb-2 [&_h1]:text-[20px] [&_h1]:font-bold [&_h1]:tracking-tight [&_h1]:text-foreground",
+            "[&_h2]:mt-3 [&_h2]:mb-1.5 [&_h2]:text-[16px] [&_h2]:font-semibold [&_h2]:text-foreground",
             "[&_p]:my-1.5",
-            "[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5",
-            "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--signal)]/60 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
-            "[&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-[var(--surface-2)]/60 [&_pre]:px-3 [&_pre]:py-2 [&_pre]:font-mono [&_pre]:text-[12px]",
-            "[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:text-[var(--signal)]",
-            "[&_a]:text-[var(--interactive)] [&_a]:underline [&_a]:underline-offset-2",
+            "[&_li]:my-0.5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5",
+            "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-(--signal)/60 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
+            "[&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-(--surface-2)/60 [&_pre]:px-3 [&_pre]:py-2 [&_pre]:font-mono [&_pre]:text-[12px]",
+            "[&_code]:rounded-sm [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:text-(--signal)",
+            "[&_a]:text-(--interactive) [&_a]:underline [&_a]:underline-offset-2",
             "[&_strong]:font-semibold [&_strong]:text-foreground",
           )}
         />
@@ -200,7 +200,7 @@ function Tool({
       className={cn(
         "flex size-7 items-center justify-center rounded-md transition-colors",
         on
-          ? "bg-[var(--signal)]/15 text-[var(--signal)]"
+          ? "bg-(--signal)/15 text-(--signal)"
           : "text-muted-foreground/80 hover:bg-muted/70 hover:text-foreground",
       )}
     >

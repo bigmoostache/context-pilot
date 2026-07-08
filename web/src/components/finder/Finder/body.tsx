@@ -213,7 +213,7 @@ export function FinderBody({
           >
             {band && (
               <div
-                className="pointer-events-none absolute z-10 rounded-[2px] border border-[var(--signal)] bg-[var(--signal)]/12"
+                className="pointer-events-none absolute z-10 rounded-[2px] border border-(--signal) bg-(--signal)/12"
                 style={{ left: band.left, top: band.top, width: band.width, height: band.height }}
               />
             )}

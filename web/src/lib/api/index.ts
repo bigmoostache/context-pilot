@@ -53,7 +53,6 @@ import {
   getApiAgentByIdMetrics,
   getApiAgentByIdVitals,
   getApiAgentByIdLibrary,
-  getApiAgentByIdUsage,
   getApiAgentByIdThreads,
   getApiAgentByIdMemory,
   getApiAgentByIdTodos,
@@ -77,7 +76,6 @@ import {
   postApiAgentByIdUnretire,
   postApiAgentByIdRename,
   postApiAgentByIdAvatar,
-  deleteApiAgentByIdAvatar,
   postApiAgentByIdCommand,
   postApiAgentByIdLibraryCommand,
   postApiTicket,
@@ -156,10 +154,6 @@ export function uploadAvatar(agentId: string, file: File): Promise<{ ok: boolean
   return sdk(postApiAgentByIdAvatar({ path: { id: agentId }, body: file }))
 }
 
-export function deleteAvatar(agentId: string): Promise<{ ok: boolean }> {
-  return sdk(deleteApiAgentByIdAvatar({ path: { id: agentId } }))
-}
-
 /** Build the URL to an agent's avatar image (for use as `<img src>`). */
 export function avatarUrl(agentId: string, cacheBust?: number): string {
   const base = (import.meta.env["VITE_API_URL"] as string | undefined) || ""
@@ -202,10 +196,6 @@ export function fetchFleetMetrics(): Promise<AgentMetrics[]> {
 }
 
 // ── Usage / Library (SDK) ─────────────────────────────────────────────
-
-export function fetchUsage(agentId: string): Promise<Record<string, unknown>> {
-  return sdk(getApiAgentByIdUsage({ path: { id: agentId } }))
-}
 
 export function fetchLibrary(agentId: string): Promise<LibraryItem[]> {
   return sdk(getApiAgentByIdLibrary({ path: { id: agentId } }))

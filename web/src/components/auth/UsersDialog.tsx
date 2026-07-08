@@ -17,8 +17,8 @@ export function RoleBadge({ role }: { role: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        isAdmin ? "bg-[var(--signal)]/15 text-[var(--signal)]" : "bg-muted text-muted-foreground",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase",
+        isAdmin ? "bg-(--signal)/15 text-(--signal)" : "bg-muted text-muted-foreground",
       )}
     >
       {isAdmin && <Shield className="size-2.5" />}
@@ -55,7 +55,7 @@ export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => v
       <DialogContent className="flex max-h-[80vh] w-[520px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0">
         {/* header */}
         <div className="flex items-center gap-3 border-b border-border/70 px-5 py-4">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-[var(--signal)]/14 text-[var(--signal)] ring-1 ring-inset ring-[var(--signal)]/25">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-(--signal)/14 text-(--signal) ring-1 ring-(--signal)/25 ring-inset">
             <Users className="size-[18px]" />
           </span>
           <div className="flex-1">
@@ -68,7 +68,7 @@ export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => v
           </div>
           <button
             onClick={() => setShowCreate((s) => !s)}
-            className="flex items-center gap-1.5 rounded-lg bg-[var(--signal)]/12 px-3 py-1.5 text-[11.5px] font-medium text-[var(--signal)] transition-colors hover:bg-[var(--signal)]/20"
+            className="flex items-center gap-1.5 rounded-lg bg-(--signal)/12 px-3 py-1.5 text-[11.5px] font-medium text-(--signal) transition-colors hover:bg-(--signal)/20"
           >
             <Plus className="size-3.5" />
             Add user
@@ -94,7 +94,7 @@ export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => v
         {/* user list */}
         <div className="flex-1 overflow-y-auto px-5 py-3">
           {isLoading && (
-            <p className="py-8 text-center text-xs text-muted-foreground animate-pulse">
+            <p className="animate-pulse py-8 text-center text-xs text-muted-foreground">
               Loading users…
             </p>
           )}
@@ -139,7 +139,7 @@ export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => v
                   <button
                     title="Delete user"
                     onClick={() => setConfirm({ id: u.id, name: u.name })}
-                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]"
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-(--danger)/10 hover:text-(--danger)"
                   >
                     <Trash2 className="size-3.5" />
                   </button>
@@ -151,8 +151,8 @@ export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => v
 
         {/* delete confirmation */}
         {confirm && (
-          <div className="border-t border-border/70 bg-[var(--danger)]/5 px-5 py-3">
-            <p className="mb-2 text-[12px] text-[var(--danger)]">
+          <div className="border-t border-border/70 bg-(--danger)/5 px-5 py-3">
+            <p className="mb-2 text-[12px] text-(--danger)">
               Delete <strong>{confirm.name}</strong>? This cascades to all their sessions and agent
               access entries. This cannot be undone.
             </p>
@@ -160,7 +160,7 @@ export function UsersDialog({ open, onClose }: { open: boolean; onClose: () => v
               <button
                 onClick={() => deleteMut.mutate(confirm.id)}
                 disabled={deleteMut.isPending}
-                className="rounded-lg bg-[var(--danger)] px-3 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="rounded-lg bg-(--danger) px-3 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {deleteMut.isPending ? "Deleting…" : "Delete"}
               </button>
@@ -217,7 +217,7 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
           placeholder="Name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] text-foreground placeholder:text-muted-foreground/50 focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal"
+          className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] text-foreground placeholder:text-muted-foreground/50 focus:border-signal focus:ring-1 focus:ring-signal focus:outline-none"
         />
         <input
           type="email"
@@ -225,7 +225,7 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] text-foreground placeholder:text-muted-foreground/50 focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal"
+          className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] text-foreground placeholder:text-muted-foreground/50 focus:border-signal focus:ring-1 focus:ring-signal focus:outline-none"
         />
         <input
           type="password"
@@ -234,18 +234,18 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
           placeholder="Password (min 8)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] text-foreground placeholder:text-muted-foreground/50 focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal"
+          className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] text-foreground placeholder:text-muted-foreground/50 focus:border-signal focus:ring-1 focus:ring-signal focus:outline-none"
         />
         <select
           value={role}
           onChange={(e) => setRole(e.target.value as "admin" | "user")}
-          className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] text-foreground focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal"
+          className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] text-foreground focus:border-signal focus:ring-1 focus:ring-signal focus:outline-none"
         >
           <option value="user">User</option>
           <option value="admin">Admin</option>
         </select>
       </div>
-      {error && <p className="mb-2 text-[11px] text-[var(--danger)]">{error}</p>}
+      {error && <p className="mb-2 text-[11px] text-(--danger)">{error}</p>}
       <button
         type="submit"
         disabled={create.isPending}

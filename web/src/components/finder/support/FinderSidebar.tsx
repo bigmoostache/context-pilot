@@ -39,7 +39,7 @@ export function FinderSidebar({
   const [dropActive, setDropActive] = useState(false)
 
   return (
-    <aside className="flex w-[var(--sidebar-w)] shrink-0 flex-col gap-3.5 overflow-y-auto border-r border-border bg-surface px-2.5 py-3">
+    <aside className="flex w-(--sidebar-w) shrink-0 flex-col gap-3.5 overflow-y-auto border-r border-border bg-surface px-2.5 py-3">
       {starred.length > 0 && (
         <Group label="Favorites">
           {starred.map((n) => (
@@ -103,10 +103,10 @@ export function FinderSidebar({
         }}
         className={cn(
           "flex flex-col gap-0.5 rounded-lg transition-colors",
-          dropActive && "bg-[var(--signal)]/10 ring-1 ring-inset ring-[var(--signal)]/45",
+          dropActive && "bg-(--signal)/10 ring-1 ring-(--signal)/45 ring-inset",
         )}
       >
-        <span className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+        <span className="px-2 pb-1 text-[10px] font-semibold tracking-wider text-muted-foreground/50 uppercase">
           Pinned
         </span>
         {pins.map((p) => (
@@ -129,7 +129,7 @@ export function FinderSidebar({
             <button
               title="Unpin"
               onClick={() => onUnpin(p.path)}
-              className="absolute right-1.5 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded text-muted-foreground/50 opacity-0 transition-opacity hover:text-foreground group-hover/pin:opacity-100"
+              className="absolute top-1/2 right-1.5 flex size-4 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground/50 opacity-0 transition-opacity group-hover/pin:opacity-100 hover:text-foreground"
             >
               <X className="size-3" />
             </button>
@@ -149,7 +149,7 @@ export function FinderSidebar({
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+      <span className="px-2 pb-1 text-[10px] font-semibold tracking-wider text-muted-foreground/50 uppercase">
         {label}
       </span>
       {children}
@@ -184,7 +184,7 @@ function Place({
         "flex items-center gap-2 rounded-md py-1.5 pr-2 text-left text-[12.5px] transition-colors",
         indent ? "pl-5" : "pl-2",
         active
-          ? "bg-card font-medium text-foreground card-shadow"
+          ? "card-shadow bg-card font-medium text-foreground"
           : "text-foreground/75 hover:bg-muted/60",
         muted && "cursor-default opacity-70",
       )}

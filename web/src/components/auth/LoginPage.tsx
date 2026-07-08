@@ -20,7 +20,7 @@ export function LoginPage() {
   if (authLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground animate-pulse">Loading…</div>
+        <div className="animate-pulse text-muted-foreground">Loading…</div>
       </div>
     )
   }
@@ -72,7 +72,7 @@ export function LoginPage() {
         >
           {/* Email */}
           <label className="mb-4 block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <span className="mb-1 block text-xs font-medium tracking-wider text-muted-foreground uppercase">
               Email
             </span>
             <input
@@ -84,7 +84,7 @@ export function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground
                          placeholder:text-muted-foreground/50
-                         focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal"
+                         focus:border-signal focus:ring-1 focus:ring-signal focus:outline-none"
               placeholder="you@company.com"
             />
           </label>
@@ -92,7 +92,7 @@ export function LoginPage() {
           {/* Name (register only) */}
           {isRegister && (
             <label className="mb-4 block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <span className="mb-1 block text-xs font-medium tracking-wider text-muted-foreground uppercase">
                 Name
               </span>
               <input
@@ -103,7 +103,7 @@ export function LoginPage() {
                 onChange={(e) => setName(e.target.value)}
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground
                            placeholder:text-muted-foreground/50
-                           focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal"
+                           focus:border-signal focus:ring-1 focus:ring-signal focus:outline-none"
                 placeholder="Your name"
               />
             </label>
@@ -111,7 +111,7 @@ export function LoginPage() {
 
           {/* Password */}
           <label className="mb-5 block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <span className="mb-1 block text-xs font-medium tracking-wider text-muted-foreground uppercase">
               Password
             </span>
             <input
@@ -123,7 +123,7 @@ export function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground
                          placeholder:text-muted-foreground/50
-                         focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal"
+                         focus:border-signal focus:ring-1 focus:ring-signal focus:outline-none"
               placeholder={isRegister ? "Min 8 characters" : "••••••••"}
             />
           </label>

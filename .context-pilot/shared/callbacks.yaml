@@ -87,6 +87,19 @@ rust-check:
     echo ""
     echo "All Rust checks passed."
   last_edited_ms: 1782897506974
+stylelint-css:
+  name: stylelint-css
+  description: 'Run stylelint (no --fix) on CSS edits under web/src to catch violations. NEVER autofix: --fix breaks Tailwind v4 imports + deletes -webkit- prefixes.'
+  pattern: web/src/**/*.css
+  blocking: true
+  timeout_secs: 30
+  success_message: Stylelint OK ✓
+  cwd: /Users/guillaume/context-pilot/web
+  is_global: true
+  script_content: |-
+    cd "$(git rev-parse --show-toplevel)/web"
+    npx stylelint "src/**/*.css"
+  last_edited_ms: 1783502152326
 ts-contract:
   name: ts-contract
   description: Regenerate TypeScript client from openapi.json on TS file edits to catch contract drift

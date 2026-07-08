@@ -45,7 +45,7 @@ export function TrustStep({ onDone }: { onDone: () => void }) {
 
       <div className="rounded-md border border-border bg-background p-3">
         <div className="mb-1 text-xs font-medium text-foreground/90">SHA-256 fingerprint</div>
-        <div className="break-all font-mono text-xs text-foreground">
+        <div className="font-mono text-xs break-all text-foreground">
           {fingerprint ?? "loading…"}
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Activity, X, Trash2, ChevronDown, ChevronUp, Copy, Check } from "lucide-react"
-import { useDevMode } from "@/lib/providers/devMode"
+import { useShowOverlay } from "@/lib/providers/toggles/showOverlay"
 import {
   useTelemetry,
   resetTelemetry,
@@ -15,8 +15,10 @@ import {
 import { cn, clipboard } from "@/lib/utils"
 
 /**
- * Dev-mode performance HUD — a live, corner-docked readout of where the user's
- * wall-time is going, gated behind the same Developer-mode flag as the Cockpit.
+ * Performance HUD — a live, corner-docked readout of where the user's
+ * wall-time is going, gated behind its own **Show Overlay** flag (T514,
+ * `useShowOverlay`) rather than Developer mode, so it can be enabled without
+ * revealing the rest of the developer surface.
  * It surfaces the three telemetry signals at a glance so a lag/freeze can be
  * diagnosed without opening browser DevTools:
  *   • Core Web Vitals (INP headline — the responsiveness metric — plus LCP/CLS),
@@ -26,13 +28,13 @@ import { cn, clipboard } from "@/lib/utils"
  * itself never becomes a source of the render churn it measures.
  */
 export function TelemetryHud() {
-  const { devMode } = useDevMode()
+  const { showOverlay } = useShowOverlay()
   const [open, setOpen] = useState(true)
   const [collapsed, setCollapsed] = useState(false)
   const [copied, setCopied] = useState(false)
   const snap = useTelemetry()
 
-  if (!devMode || !open) return null
+  if (!showOverlay || !open) return null
 
   // Copy the full snapshot as markdown so it can be pasted straight into a
   // thread for diagnosis. The report carries MORE than the HUD renders (every
@@ -47,17 +49,13 @@ export function TelemetryHud() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-[60] flex max-h-[calc(100vh-2rem)] w-[320px] flex-col rounded-xl border border-border bg-popover/95 text-[12px] text-foreground pop-shadow backdrop-blur-md">
+    <div className="pop-shadow fixed right-4 bottom-4 z-60 flex max-h-[calc(100vh-2rem)] w-[320px] flex-col rounded-xl border border-border bg-popover/95 text-[12px] text-foreground backdrop-blur-md">
       <header className="flex shrink-0 items-center gap-2 border-b border-border/70 px-3 py-2">
-        <Activity className="size-3.5 text-[var(--signal)]" />
+        <Activity className="size-3.5 text-(--signal)" />
         <span className="font-semibold tracking-tight">Performance</span>
         <span className="ml-auto flex items-center gap-1">
           <IconBtn title={copied ? "Copied!" : "Copy as markdown"} onClick={doCopy}>
-            {copied ? (
-              <Check className="size-3.5 text-[var(--ok)]" />
-            ) : (
-              <Copy className="size-3.5" />
-            )}
+            {copied ? <Check className="size-3.5 text-(--ok)" /> : <Copy className="size-3.5" />}
           </IconBtn>
           <IconBtn title="Clear" onClick={() => resetTelemetry()}>
             <Trash2 className="size-3.5" />
@@ -312,10 +310,10 @@ function Vital({
 }) {
   return (
     <div className="flex flex-1 flex-col rounded-lg border border-border/60 bg-card px-2 py-1.5">
-      <span className="text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+      <span className="text-[9.5px] font-semibold tracking-wide text-muted-foreground/70 uppercase">
         {label}
       </span>
-      <span className="tabular-nums font-semibold" style={{ color: ratingColor(rating) }}>
+      <span className="font-semibold tabular-nums" style={{ color: ratingColor(rating) }}>
         {value === undefined ? "—" : `${value}${unit ?? ""}`}
       </span>
     </div>
@@ -332,7 +330,7 @@ function BlockRow({ block }: { block: BlockEvent }) {
   })
   return (
     <div className="flex items-baseline gap-2">
-      <span className="w-14 shrink-0 tabular-nums font-semibold" style={{ color: tone }}>
+      <span className="w-14 shrink-0 font-semibold tabular-nums" style={{ color: tone }}>
         {block.blocked}ms
       </span>
       <span className="truncate text-[11px] text-muted-foreground">blocked at {when}</span>
@@ -347,7 +345,7 @@ function AggRow({ agg }: { agg: TaskAgg }) {
   return (
     <div className="flex items-baseline gap-2">
       <span
-        className="w-16 shrink-0 tabular-nums font-semibold"
+        className="w-16 shrink-0 font-semibold tabular-nums"
         style={tone ? { color: tone } : undefined}
       >
         {Math.round(agg.total)}ms
@@ -355,7 +353,7 @@ function AggRow({ agg }: { agg: TaskAgg }) {
       <span className="truncate font-mono text-[11px] text-muted-foreground" title={agg.label}>
         {agg.label}
       </span>
-      <span className="ml-auto shrink-0 tabular-nums text-[10px] text-muted-foreground/60">
+      <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/60 tabular-nums">
         ×{agg.count} · max {Math.round(agg.max)}ms
       </span>
     </div>
@@ -372,7 +370,7 @@ function StallRow({ stall }: { stall: StallEvent }) {
   })
   return (
     <div className="flex items-baseline gap-2">
-      <span className="w-14 shrink-0 tabular-nums font-semibold" style={{ color: tone }}>
+      <span className="w-14 shrink-0 font-semibold tabular-nums" style={{ color: tone }}>
         {stall.gap}ms
       </span>
       <span className="truncate text-[11px] text-muted-foreground">blocked at {when}</span>
@@ -386,7 +384,7 @@ function TaskRow({ task }: { task: TaskEvent }) {
   const tone = task.duration >= 1000 ? "var(--danger)" : "var(--warn)"
   return (
     <div className="flex items-baseline gap-2">
-      <span className="w-14 shrink-0 tabular-nums font-semibold" style={{ color: tone }}>
+      <span className="w-14 shrink-0 font-semibold tabular-nums" style={{ color: tone }}>
         {task.duration}ms
       </span>
       <span className="truncate font-mono text-[11px] text-muted-foreground" title={task.label}>
@@ -399,7 +397,7 @@ function TaskRow({ task }: { task: TaskEvent }) {
 function FrameRow({ frame }: { frame: LoafEvent }) {
   return (
     <div className="flex items-baseline gap-2">
-      <span className="w-12 shrink-0 tabular-nums font-medium text-[var(--warn)]">
+      <span className="w-12 shrink-0 font-medium text-(--warn) tabular-nums">
         {frame.duration}ms
       </span>
       <span className="truncate text-[11px] text-muted-foreground" title={frame.script}>
@@ -412,7 +410,7 @@ function FrameRow({ frame }: { frame: LoafEvent }) {
 function CommitRow({ commit }: { commit: CommitEvent }) {
   return (
     <div className="flex items-baseline gap-2">
-      <span className="w-12 shrink-0 tabular-nums font-medium text-[var(--signal)]">
+      <span className="w-12 shrink-0 font-medium text-(--signal) tabular-nums">
         {commit.actualDuration}ms
       </span>
       <span className="truncate text-[11px] text-muted-foreground" title={commit.id}>
@@ -434,10 +432,10 @@ function Group({
   return (
     <section className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80">
+        <span className="text-[10.5px] font-semibold tracking-[0.06em] text-muted-foreground/80 uppercase">
           {title}
         </span>
-        <span className="text-[10px] tabular-nums text-muted-foreground/60">{meta}</span>
+        <span className="text-[10px] text-muted-foreground/60 tabular-nums">{meta}</span>
       </div>
       {children}
     </section>
@@ -449,7 +447,7 @@ function Divider() {
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="text-[10.5px] italic text-muted-foreground/60">{children}</p>
+  return <p className="text-[10.5px] text-muted-foreground/60 italic">{children}</p>
 }
 
 function IconBtn({

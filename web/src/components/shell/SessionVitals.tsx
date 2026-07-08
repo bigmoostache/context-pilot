@@ -106,7 +106,7 @@ export function SessionVitals({ agentId }: { agentId: string }) {
         {vitalsErr && (
           <div
             role="alert"
-            className="rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-3 py-2 text-[11.5px] text-[var(--danger)]"
+            className="rounded-lg border border-(--danger)/30 bg-(--danger)/10 px-3 py-2 text-[11.5px] text-(--danger)"
           >
             {vitalsErr}
           </div>
@@ -123,7 +123,7 @@ export function SessionVitals({ agentId }: { agentId: string }) {
 
         {groups.map((g) => (
           <section key={g.category} className="flex flex-col gap-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/55">
+            <span className="text-[10px] font-semibold tracking-[0.07em] text-muted-foreground/55 uppercase">
               {g.label}
             </span>
             <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
@@ -199,13 +199,13 @@ function VitalRow({ vital }: { vital: Vital }) {
         {vital.name}
       </span>
       {vital.latencyMs != null && (
-        <span className="font-mono text-[10.5px] tabular-nums text-muted-foreground/65">
+        <span className="font-mono text-[10.5px] text-muted-foreground/65 tabular-nums">
           {vital.latencyMs}ms
         </span>
       )}
       {!healthy && (
         <span
-          className="shrink-0 rounded px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.05em]"
+          className="shrink-0 rounded-sm px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wider uppercase"
           style={{ color, background: `color-mix(in oklab, ${color} 14%, transparent)` }}
         >
           {vital.status}

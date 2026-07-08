@@ -9,7 +9,7 @@ import { UserMenu } from "./widgets/UserMenu"
 import { UsersDialog } from "@/components/auth/UsersDialog"
 import { AgentModal } from "@/components/agents/AgentModal"
 import { Tip } from "@/components/ui/tip"
-import { useDevMode } from "@/lib/providers/devMode"
+import { useDevMode } from "@/lib/providers/toggles/devMode"
 import type { Agent, ViewMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -59,7 +59,7 @@ export function TopBar({
               inFleet ? "text-foreground" : "text-foreground/90 hover:bg-muted/50",
             )}
           >
-            <Home className="size-4 text-[var(--signal)]" />
+            <Home className="size-4 text-(--signal)" />
             <span className="text-[13px] font-semibold tracking-tight">Context Pilot</span>
           </button>
         </Tip>
@@ -163,7 +163,7 @@ function ViewTab({
       className={cn(
         "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium transition-all",
         active
-          ? "bg-card text-foreground card-shadow"
+          ? "card-shadow bg-card text-foreground"
           : "text-muted-foreground hover:text-foreground",
       )}
     >

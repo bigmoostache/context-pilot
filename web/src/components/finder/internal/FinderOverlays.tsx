@@ -90,9 +90,9 @@ export function FinderOverlays(d: OverlaysDeps) {
 
       {/* drag-drop overlay */}
       {d.dragging && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[var(--signal)]/8 backdrop-blur-[2px]">
-          <div className="ants flex flex-col items-center gap-3 rounded-2xl bg-card/90 px-10 py-8 pop-shadow">
-            <UploadCloud className="size-9 text-[var(--signal)]" />
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-(--signal)/8 backdrop-blur-[2px]">
+          <div className="ants pop-shadow flex flex-col items-center gap-3 rounded-2xl bg-card/90 px-10 py-8">
+            <UploadCloud className="size-9 text-(--signal)" />
             <span className="text-[14px] font-semibold text-foreground">Drop to upload</span>
             <span className="text-[12px] text-muted-foreground">into {pathName(d.cwd)}</span>
           </div>
@@ -101,7 +101,7 @@ export function FinderOverlays(d: OverlaysDeps) {
 
       {/* transient toast */}
       {d.toast && (
-        <div className="absolute bottom-10 left-1/2 z-30 -translate-x-1/2 rounded-lg border border-border bg-card px-4 py-2 text-[12px] text-foreground/90 pop-shadow">
+        <div className="pop-shadow absolute bottom-10 left-1/2 z-30 -translate-x-1/2 rounded-lg border border-border bg-card px-4 py-2 text-[12px] text-foreground/90">
           {d.toast}
         </div>
       )}

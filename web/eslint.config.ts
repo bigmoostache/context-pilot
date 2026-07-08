@@ -14,6 +14,7 @@ import security from "eslint-plugin-security"
 import noUnsanitized from "eslint-plugin-no-unsanitized"
 import noSecrets from "eslint-plugin-no-secrets"
 import boundaries from "eslint-plugin-boundaries"
+import betterTailwind from "eslint-plugin-better-tailwindcss"
 import tseslint from "typescript-eslint"
 import { defineConfig, globalIgnores } from "eslint/config"
 import type { Linter } from "eslint"
@@ -375,6 +376,31 @@ export default defineConfig([
       // P9 boundaries layering guard (M141). `maxDepth: Infinity` traces the
       // full graph; `ignoreExternal` skips node_modules cycles we don't own.
       "import-x/no-cycle": ["error", { ignoreExternal: true }],
+      // ── P10b import-x/no-extraneous-dependencies ────────────────────────
+      // Every runtime import must be declared in package.json `dependencies`
+      // (not devDependencies, not undeclared/phantom). The frontend twin of
+      // clippy's cargo dependency hygiene: a runtime import of a devDep would
+      // ship a module the production bundle can't guarantee, and a phantom
+      // import (present only transitively) breaks on a clean install. Build
+      // tooling + tests legitimately pull devDeps, so those file globs are
+      // allowed devDependencies; the resolver was already wired by
+      // flatConfigs.typescript (P7).
+      "import-x/no-extraneous-dependencies": [
+        "error",
+        {
+          devDependencies: [
+            "eslint.config.ts",
+            "vite.config.ts",
+            "openapi-ts.config.ts",
+            "playwright.config.ts",
+            "e2e/**",
+            "**/*.test.{ts,tsx}",
+            "**/*.spec.{ts,tsx}",
+          ],
+          optionalDependencies: false,
+          peerDependencies: false,
+        },
+      ],
       // ── P7 import-x tsc-redundant / flat-config-idiom relaxations
       //    (registered in allowed-eslint-exceptions.yaml — the config-level
       //    channel, never an inline disable) ──
@@ -716,6 +742,60 @@ export default defineConfig([
       // (registered in allowed-eslint-exceptions.yaml, never an inline
       // eslint-disable); every other file stays under the 500-line cap.
       "max-lines": "off",
+    },
+  },
+  {
+    // ── P10c eslint-plugin-better-tailwindcss — Tailwind class validity +
+    //    order, scoped to the JSX/TS surface that carries `className`. ──
+    //
+    // `recommended-error` lands 8 rules at error: class ORDER
+    // (enforce-consistent-class-order — the twin of a prettier-plugin-tailwind
+    // sort, but lint-enforced), plus correctness — no-unknown-classes (a typo'd
+    // or non-existent utility), no-conflicting-classes (two utilities fighting
+    // for the same property), no-duplicate-classes, no-deprecated-classes,
+    // enforce-canonical-classes, no-unnecessary-whitespace. `no-unknown-classes`
+    // et al. resolve the project's real utility set (incl. the custom theme
+    // tokens) from the Tailwind v4 CSS entry point declared in `settings`.
+    //
+    // enforce-consistent-line-wrapping is turned OFF: it reflows the class
+    // string onto multiple lines, which Prettier (the canonical formatter, the
+    // rustfmt twin from P2) then re-collapses — the same irreconcilable
+    // formatter fight as unicorn/no-nested-ternary. Prettier owns whitespace;
+    // this rule is a pure line-shape opinion, off (registered in
+    // allowed-eslint-exceptions.yaml). The other seven stay at error.
+    files: ["src/**/*.{ts,tsx}"],
+    // Vendored shadcn primitives (ui/**) keep their upstream className shape —
+    // autofixing class order/canonical here is churn re-introduced on every
+    // re-vendor. Excluded via `ignores` (not a rule-off, so no registry entry),
+    // consistent with the other ui/** exemptions (react-refresh, filename-case).
+    ignores: ["src/components/ui/**"],
+    extends: [betterTailwind.configs["recommended-error"]],
+    settings: {
+      "better-tailwindcss": {
+        entryPoint: "src/index.css",
+      },
+    },
+    rules: {
+      "better-tailwindcss/enforce-consistent-line-wrapping": "off",
+      // no-unknown-classes is OFF (registered in allowed-eslint-exceptions.yaml):
+      // it can't resolve two legitimate patterns pervasive in this codebase, so
+      // it is pure false-positive noise here.
+      //   1. Custom index.css classes authored as plain CSS rules —
+      //      `.card-shadow`, `.pop-shadow`, `.fill-sweep`, `.opt-rise`,
+      //      `.menu-pop`, `.modal-pop` (shadow + keyframe-animation helpers). They
+      //      are real classes, but declared as ordinary `.foo {}` rules rather
+      //      than Tailwind `@utility` directives, so Tailwind's compiler never
+      //      registers them as utilities and the plugin's utility resolver can't
+      //      see them.
+      //   2. CSS-variable arbitrary values — `text-[var(--ok)]` / `bg-(--signal)`
+      //      / `ring-(--signal)/50`. The plugin can't resolve a theme custom
+      //      property to a known utility. This DIRECTLY CONTRADICTS the sibling
+      //      enforce-canonical-classes rule, which REWRITES `text-[var(--ok)]`
+      //      INTO `text-(--ok)` — the very shorthand no-unknown-classes then
+      //      flags as unknown. Two rules cannot both be right; canonical wins
+      //      (it's the autofixable, correctness-bearing one), so this is off.
+      // The other seven better-tailwindcss rules stay at error.
+      "better-tailwindcss/no-unknown-classes": "off",
     },
   },
   {

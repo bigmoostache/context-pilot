@@ -104,15 +104,6 @@ export async function fetchPickerProviders(): Promise<ProviderDef[]> {
   return enrichProviders(data)
 }
 
-/**
- * Synchronous access to the cached providers. Returns `null` if not yet
- * fetched. Components should call `fetchProviders()` first (e.g. via
- * TanStack Query) and use this only as a fast path.
- */
-export function getCachedProviders(): ProviderDef[] | null {
-  return providerCache.value
-}
-
 /** TanStack Query hook — fetches once, caches forever (providers never change). */
 export function useProviders() {
   return useQuery({

@@ -1,10 +1,8 @@
 import { X } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
-import { fmtBytes } from "@/lib/support/finderFs"
 import { Markdown } from "@/lib/support/markdown"
-import { extOf, kindMeta, TAG_META } from "../support/kind"
+import { extOf } from "../support/kind"
 import { FileIcon } from "../support/macIcons"
-import { TagDots } from "../views/shared"
 import { cn } from "@/lib/utils"
 
 /** A small icon-only button used in the Quick Look pane header. */
@@ -40,7 +38,7 @@ export function PreviewStatus({ label }: { label: string }) {
 /** A subtle footer noting the backend capped the preview at 256 KiB. */
 export function TruncatedNote() {
   return (
-    <p className="mt-3 border-t border-border pt-2 text-[10.5px] italic text-muted-foreground/60">
+    <p className="mt-3 border-t border-border pt-2 text-[10.5px] text-muted-foreground/60 italic">
       Preview truncated — file exceeds 256 KiB.
     </p>
   )
@@ -71,7 +69,7 @@ export function TextPreview({
     <div className="bg-card p-3.5">
       <pre
         className={cn(
-          "whitespace-pre-wrap break-words text-[11.5px] leading-relaxed text-foreground/85",
+          "text-[11.5px] leading-relaxed wrap-break-word whitespace-pre-wrap text-foreground/85",
           mono ? "font-mono" : "font-sans",
         )}
       >
@@ -121,59 +119,6 @@ export function Generic({ node }: { node: FinderNode }) {
       <FileIcon kind={node.kind} ext={extOf(node.name)} size={68} />
       <span className="text-[13px] text-muted-foreground">No preview available</span>
     </div>
-  )
-}
-
-// ── metadata footer ───────────────────────────────────────────────
-export function Meta({ node }: { node: FinderNode }) {
-  const isFolder = node.kind === "folder"
-  const kids = node.children ?? []
-  const folders = kids.filter((k) => k.kind === "folder").length
-  const files = kids.length - folders
-
-  return (
-    <div className="shrink-0 border-t border-border bg-card/60 px-4 py-3">
-      <div className="mb-2 flex items-center gap-2">
-        <FileIcon kind={node.kind} ext={extOf(node.name)} size={22} className="shrink-0" />
-        <span className="truncate text-[12.5px] font-medium text-foreground/90">{node.name}</span>
-        {node.tags && <TagDots tags={node.tags} className="ml-auto" />}
-      </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
-        <Row k="Kind" v={kindMeta[node.kind].label} />
-        {isFolder ? (
-          <Row
-            k="Contains"
-            v={`${folders} folder${folders === 1 ? "" : "s"}, ${files} file${files === 1 ? "" : "s"}`}
-          />
-        ) : (
-          <Row k="Size" v={fmtBytes(node.size)} />
-        )}
-        {node.image && <Row k="Dimensions" v={`${node.image.w} × ${node.image.h}`} />}
-        {node.media && <Row k="Duration" v={node.media.duration} />}
-        {node.pdf && <Row k="Pages" v={String(node.pdf.pages)} />}
-        {node.created && <Row k="Created" v={node.created} />}
-        <Row k="Modified" v={node.modified} />
-        {node.tags && node.tags.length > 0 && (
-          <Row k="Tags" v={node.tags.map((t) => TAG_META[t].label).join(", ")} />
-        )}
-        <Row k="Where" v={node.path} mono />
-      </dl>
-    </div>
-  )
-}
-
-function Row({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
-  return (
-    <>
-      <dt className="text-muted-foreground">{k}</dt>
-      <dd
-        className={
-          "min-w-0 truncate text-right text-foreground/80 " + (mono ? "font-mono text-[10px]" : "")
-        }
-      >
-        {v}
-      </dd>
-    </>
   )
 }
 

@@ -119,7 +119,7 @@ export function HBarChart({ data, title, format = fmtDollar }: HBarProps) {
                   style={{ width: `${Math.max(pct, 1)}%`, backgroundColor: d.color }}
                 />
               </div>
-              <span className="w-16 shrink-0 text-right text-[11px] tabular-nums text-foreground/70">
+              <span className="w-16 shrink-0 text-right text-[11px] text-foreground/70 tabular-nums">
                 {format(d.value)}
               </span>
             </div>
@@ -276,7 +276,7 @@ function Legend({
             style={{ backgroundColor: it.color }}
           />
           <span className="truncate">{it.label}</span>
-          <span className="tabular-nums text-foreground/60">{(it.pct * 100).toFixed(0)}%</span>
+          <span className="text-foreground/60 tabular-nums">{(it.pct * 100).toFixed(0)}%</span>
         </span>
       ))}
     </div>

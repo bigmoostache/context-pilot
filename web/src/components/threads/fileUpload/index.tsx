@@ -122,7 +122,7 @@ export function FileUploadChip({
         title="This file does not exist or has been moved elsewhere."
       >
         <AlertTriangle
-          className={onAccent ? "size-3.5 shrink-0" : "size-3.5 shrink-0 text-[var(--warn)]"}
+          className={onAccent ? "size-3.5 shrink-0" : "size-3.5 shrink-0 text-(--warn)"}
         />
         <span className="min-w-0 flex-col">
           <span className="block truncate font-medium line-through opacity-90">{file.name}</span>
@@ -214,7 +214,7 @@ function FileChipBody({
           className={
             onAccent
               ? "shrink-0 text-[10.5px] tabular-nums opacity-75"
-              : "shrink-0 text-[10.5px] tabular-nums text-muted-foreground/70"
+              : "shrink-0 text-[10.5px] text-muted-foreground/70 tabular-nums"
           }
         >
           {fmtSize(size)}
@@ -290,9 +290,9 @@ export function ComposerBubbles({
             type="button"
             onClick={() => onPick?.(s)}
             title={s.description || s.name}
-            className="group inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground/75 transition-colors hover:border-[var(--signal)]/60 hover:text-[var(--signal)]"
+            className="group inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground/75 transition-colors hover:border-(--signal)/60 hover:text-(--signal)"
           >
-            <span className="font-mono font-medium text-[var(--interactive)] group-hover:text-[var(--signal)]">
+            <span className="font-mono font-medium text-(--interactive) group-hover:text-(--signal)">
               {s.command}
             </span>
             {s.description && (
@@ -309,10 +309,10 @@ export function ComposerBubbles({
           type="button"
           onClick={onCreateCommand}
           title="Create a new /command"
-          className="group inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-card px-2.5 py-1 text-[11.5px] text-muted-foreground/80 transition-colors hover:border-[var(--signal)]/60 hover:text-[var(--signal)]"
+          className="group inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-card px-2.5 py-1 text-[11.5px] text-muted-foreground/80 transition-colors hover:border-(--signal)/60 hover:text-(--signal)"
         >
           <Plus
-            className="size-3 text-muted-foreground/70 group-hover:text-[var(--signal)]"
+            className="size-3 text-muted-foreground/70 group-hover:text-(--signal)"
             strokeWidth={2.5}
           />
           <span className="font-medium">create command</span>

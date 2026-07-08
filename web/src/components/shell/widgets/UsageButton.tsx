@@ -85,7 +85,7 @@ function LimitRow({ limit }: { limit: ClaudeUsageLimit }) {
     <div className="space-y-1">
       <div className="flex items-center justify-between text-[12px]">
         <span className="font-medium text-foreground">{limitLabel(limit.kind)}</span>
-        <span className="tabular-nums text-muted-foreground">{pct}%</span>
+        <span className="text-muted-foreground tabular-nums">{pct}%</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-muted">
         <div
@@ -124,14 +124,14 @@ function WaitingForCode({
     <div className="space-y-3">
       <p className="text-[12px] text-muted-foreground">
         After authorizing, Anthropic will show you a code. Copy the full{" "}
-        <code className="text-[11px] bg-muted px-1 rounded">code#state</code> string and paste it
+        <code className="rounded-sm bg-muted px-1 text-[11px]">code#state</code> string and paste it
         below:
       </p>
       <a
         href={authorizeUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-1 text-[11px] text-[var(--signal)] hover:underline"
+        className="flex items-center gap-1 text-[11px] text-(--signal) hover:underline"
       >
         <ExternalLink className="size-3" /> Re-open authorization page
       </a>
@@ -141,7 +141,7 @@ function WaitingForCode({
         onChange={(e) => setCode(e.target.value)}
         placeholder="Paste code or full callback URL…"
         autoFocus
-        className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-[var(--signal)]"
+        className="w-full rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:ring-1 focus:ring-(--signal) focus:outline-none"
       />
       <button
         onClick={onSubmit}
@@ -361,7 +361,7 @@ function TokenStatusRow({
           </div>
           <div className="flex items-center gap-1.5">
             {isValid && data.expires_at != null && (
-              <span className="text-[11px] tabular-nums text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground tabular-nums">
                 {formatExpiry(data.expires_at)}
               </span>
             )}
@@ -369,7 +369,7 @@ function TokenStatusRow({
               onClick={onRefresh}
               disabled={refreshPending}
               title="Refresh token"
-              className="flex size-5 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+              className="flex size-5 items-center justify-center rounded-sm text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
             >
               {refreshPending ? (
                 <Loader2 className="size-3 animate-spin" />

@@ -63,7 +63,7 @@ export function FinderTabs({
             className={cn(
               "group flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors",
               on
-                ? "bg-card text-foreground card-shadow"
+                ? "card-shadow bg-card text-foreground"
                 : "text-muted-foreground hover:bg-muted/60",
             )}
           >
@@ -75,7 +75,7 @@ export function FinderTabs({
                   e.stopPropagation()
                   onClose(t.id)
                 }}
-                className="flex size-4 items-center justify-center rounded text-muted-foreground/50 opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                className="flex size-4 items-center justify-center rounded-sm text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
               >
                 <X className="size-3" />
               </button>
@@ -163,7 +163,7 @@ export function FinderToolbar({
 
       {/* icon-size slider (grid only) */}
       {!fileActive && viewMode === "grid" && (
-        <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1 card-shadow">
+        <div className="card-shadow flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1">
           <LayoutGrid className="size-3 text-muted-foreground/60" />
           <input
             type="range"
@@ -182,7 +182,7 @@ export function FinderToolbar({
       {!fileActive && (
         <div className="relative flex items-center rounded-lg border border-border bg-muted/60 p-0.5">
           <span
-            className="absolute inset-y-0.5 left-0.5 w-7 rounded-md bg-card card-shadow transition-transform duration-200"
+            className="card-shadow absolute inset-y-0.5 left-0.5 w-7 rounded-md bg-card transition-transform duration-200"
             style={{ transform: `translateX(${idx * 28}px)` }}
           />
           {VIEW_ORDER.map((m) => {
@@ -192,9 +192,9 @@ export function FinderToolbar({
                 <button
                   onClick={() => onViewMode(m)}
                   className={cn(
-                    "relative z-[1] flex size-7 items-center justify-center rounded-md transition-colors",
+                    "relative z-1 flex size-7 items-center justify-center rounded-md transition-colors",
                     viewMode === m
-                      ? "text-[var(--signal)]"
+                      ? "text-(--signal)"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
@@ -208,7 +208,7 @@ export function FinderToolbar({
 
       {/* search */}
       {!fileActive && (
-        <div className="flex h-8 w-[156px] items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 card-shadow focus-within:border-[var(--signal)]/60">
+        <div className="card-shadow flex h-8 w-[156px] items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 focus-within:border-(--signal)/60">
           <Search className="size-3.5 shrink-0 text-muted-foreground/60" />
           <input
             value={query}
@@ -265,7 +265,7 @@ function ToolbarCrumbs({
   // assert it (noUncheckedIndexedAccess widens a bare `crumbs[0]`).
   const shown = collapsed ? [...crumbs.slice(0, 1), ...crumbs.slice(-2)] : crumbs
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto rounded-lg border border-border bg-card px-2 py-1 card-shadow">
+    <div className="card-shadow flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto rounded-lg border border-border bg-card px-2 py-1">
       {shown.map((c, i) => {
         const isFirst = i === 0
         const showEllipsis = collapsed && i === 1
@@ -281,7 +281,7 @@ function ToolbarCrumbs({
             <button
               onClick={() => onCrumb(c.path)}
               className={cn(
-                "rounded px-1.5 py-0.5 text-[12px] transition-colors hover:bg-muted/70",
+                "rounded-sm px-1.5 py-0.5 text-[12px] transition-colors hover:bg-muted/70",
                 i === shown.length - 1 ? "font-semibold text-foreground" : "text-muted-foreground",
               )}
             >
@@ -354,7 +354,7 @@ function SegBtn({
         className={cn(
           "flex size-8 items-center justify-center rounded-md transition-colors",
           on
-            ? "bg-muted text-[var(--signal)]"
+            ? "bg-muted text-(--signal)"
             : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
         )}
       >
@@ -384,7 +384,7 @@ export function FinderPathBar({
           {i > 0 && <ChevronRight className="size-3 text-muted-foreground/40" />}
           <button
             onClick={() => onCrumb(c.path)}
-            className="flex items-center gap-1 rounded px-1 py-0.5 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            className="flex items-center gap-1 rounded-sm px-1 py-0.5 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
           >
             <FileIcon kind="folder" size={13} />
             {c.name}

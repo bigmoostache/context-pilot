@@ -28,14 +28,14 @@ export function EntitiesPanel({ panel, agentId }: { panel: ContextPanel; agentId
           entityTables.map((t) => (
             <article
               key={t.name}
-              className="overflow-hidden rounded-lg border border-border card-shadow"
+              className="card-shadow overflow-hidden rounded-lg border border-border"
             >
               <header className="flex items-center gap-2 border-b border-border bg-card px-3 py-2">
-                <Database className="size-3.5 text-[var(--interactive)]" />
+                <Database className="size-3.5 text-(--interactive)" />
                 <span className="font-mono text-[12.5px] font-semibold text-foreground/90">
                   {t.name}
                 </span>
-                <span className="ml-auto rounded-md bg-muted/70 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+                <span className="ml-auto rounded-md bg-muted/70 px-1.5 py-0.5 text-[10px] text-muted-foreground tabular-nums">
                   {t.rows.toLocaleString()} rows
                 </span>
               </header>

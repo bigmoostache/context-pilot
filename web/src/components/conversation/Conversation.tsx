@@ -128,7 +128,7 @@ export function Conversation({ agentId }: { agentId: string }) {
         </span>
         {isStreaming && (
           <div className="ml-auto flex items-center gap-1.5">
-            <span className="size-1.5 animate-pulse rounded-full bg-[var(--signal)]" />
+            <span className="size-1.5 animate-pulse rounded-full bg-(--signal)" />
             <span className="text-[11px] text-muted-foreground">Streaming</span>
           </div>
         )}

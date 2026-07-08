@@ -58,7 +58,7 @@ export function LiveImagePreview({ agentId, node }: { agentId: string; node: Fin
               setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
             }
             onError={() => setFailed(true)}
-            className="max-h-[420px] max-w-full rounded-md object-contain card-shadow transition-transform"
+            className="card-shadow max-h-[420px] max-w-full rounded-md object-contain transition-transform"
             style={{ transform: `scale(${zoom / 100})` }}
           />
         </div>
@@ -70,16 +70,16 @@ export function LiveImagePreview({ agentId, node }: { agentId: string; node: Fin
         <div className="ml-auto flex items-center gap-1.5">
           <button
             onClick={() => setZoom((z) => Math.max(25, z - 25))}
-            className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             −
           </button>
-          <span className="w-9 text-center text-[11px] tabular-nums text-muted-foreground">
+          <span className="w-9 text-center text-[11px] text-muted-foreground tabular-nums">
             {zoom}%
           </span>
           <button
             onClick={() => setZoom((z) => Math.min(400, z + 25))}
-            className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             +
           </button>
@@ -104,7 +104,7 @@ export function LivePdfPreview({ agentId, node }: { agentId: string; node: Finde
     // had no effect because the scroll parent is a plain block, not a flex
     // column, so the object collapsed to its min-height.
     <div className="flex h-full min-h-0 flex-col gap-2">
-      <object data={src} type="application/pdf" className="w-full min-h-0 flex-1 bg-card">
+      <object data={src} type="application/pdf" className="min-h-0 w-full flex-1 bg-card">
         <div className="flex flex-col items-center gap-3 py-10 text-center">
           <FileIcon kind="pdf" size={64} />
           <span className="text-[12.5px] text-muted-foreground">
@@ -114,7 +114,7 @@ export function LivePdfPreview({ agentId, node }: { agentId: string; node: Finde
             href={src}
             target="_blank"
             rel="noreferrer"
-            className="rounded-md bg-[var(--signal)] px-3 py-1.5 text-[12px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105"
+            className="rounded-md bg-(--signal) px-3 py-1.5 text-[12px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105"
           >
             Open PDF in new tab
           </a>
@@ -156,13 +156,13 @@ export function LiveSheetPreview({ agentId, node }: { agentId: string; node: Fin
           <table className="w-full border-collapse text-[11px]">
             <thead className="sticky top-0">
               <tr>
-                <th className="w-9 border border-border bg-muted/70 px-1 py-1 text-center text-[10px] text-muted-foreground/50">
+                <th className="w-9 border border-border bg-muted/70 p-1 text-center text-[10px] text-muted-foreground/50">
                   #
                 </th>
                 {Array.from({ length: cols }, (_, c) => (
                   <th
                     key={c}
-                    className="border border-border bg-[var(--ok)]/10 px-2 py-1.5 text-left font-semibold text-foreground/85"
+                    className="border border-border bg-(--ok)/10 px-2 py-1.5 text-left font-semibold text-foreground/85"
                   >
                     {header[c] ?? ""}
                   </th>
@@ -171,18 +171,15 @@ export function LiveSheetPreview({ agentId, node }: { agentId: string; node: Fin
             </thead>
             <tbody>
               {body.map((row, r) => (
-                <tr
-                  key={r}
-                  className={cn(r % 2 === 1 && "bg-muted/20", "hover:bg-[var(--signal)]/8")}
-                >
-                  <td className="border border-border bg-muted/50 px-1 py-1 text-center text-[10px] text-muted-foreground/50">
+                <tr key={r} className={cn(r % 2 === 1 && "bg-muted/20", "hover:bg-(--signal)/8")}>
+                  <td className="border border-border bg-muted/50 p-1 text-center text-[10px] text-muted-foreground/50">
                     {r + 2}
                   </td>
                   {Array.from({ length: cols }, (_, c) => (
                     <td
                       key={c}
                       className={cn(
-                        "border border-border px-2 py-1 tabular-nums text-foreground/80",
+                        "border border-border px-2 py-1 text-foreground/80 tabular-nums",
                         c === 0 && "font-medium",
                       )}
                     >
@@ -216,7 +213,7 @@ export function LiveSheetPreview({ agentId, node }: { agentId: string; node: Fin
         )}
       </div>
       {data.truncated && (
-        <p className="text-[10.5px] italic text-muted-foreground/60">
+        <p className="text-[10.5px] text-muted-foreground/60 italic">
           Preview clipped — large sheet capped at 1000 rows × 50 columns.
         </p>
       )}
@@ -263,21 +260,21 @@ function HighlightedCode({
           <span className="size-2.5 rounded-full bg-[#febc2e]" />
           <span className="size-2.5 rounded-full bg-[#28c840]" />
         </span>
-        <span className="ml-1 font-mono text-[10.5px] uppercase tracking-wide text-muted-foreground">
+        <span className="ml-1 font-mono text-[10.5px] tracking-wide text-muted-foreground uppercase">
           {language}
         </span>
         <button
           onClick={copy}
           className="ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] text-muted-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
         >
-          {copied ? <Check className="size-3 text-[var(--ok)]" /> : <Copy className="size-3" />}
+          {copied ? <Check className="size-3 text-(--ok)" /> : <Copy className="size-3" />}
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
       <pre className="hljs overflow-x-auto bg-transparent px-3 py-2.5 font-mono text-[11px] leading-relaxed">
         {lines.map((line, i) => (
-          <div key={i} className="flex gap-3 rounded hover:bg-[var(--signal)]/6">
-            <span className="w-7 shrink-0 select-none text-right text-muted-foreground/35">
+          <div key={i} className="flex gap-3 rounded-sm hover:bg-(--signal)/6">
+            <span className="w-7 shrink-0 text-right text-muted-foreground/35 select-none">
               {i + 1}
             </span>
             <code
@@ -332,7 +329,7 @@ function EditableMarkdown({
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-end">
           {truncated ? (
-            <span className="text-[10.5px] italic text-muted-foreground/60">
+            <span className="text-[10.5px] text-muted-foreground/60 italic">
               Editing disabled — file exceeds the 256 KiB preview cap.
             </span>
           ) : (
@@ -369,7 +366,7 @@ function EditableMarkdown({
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex items-center gap-2">
         <span className="text-[11.5px] font-medium text-muted-foreground">Editing — Markdown</span>
-        {err && <span className="truncate text-[11px] text-[var(--danger)]">{err}</span>}
+        {err && <span className="truncate text-[11px] text-(--danger)">{err}</span>}
         <div className="ml-auto flex items-center gap-1.5">
           <button
             onClick={() => setEditing(false)}
@@ -382,7 +379,7 @@ function EditableMarkdown({
           <button
             onClick={save}
             disabled={write.isPending}
-            className="flex items-center gap-1.5 rounded-md bg-[var(--signal)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105 disabled:opacity-60"
+            className="flex items-center gap-1.5 rounded-md bg-(--signal) px-2.5 py-1 text-[11.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:opacity-60"
           >
             <Save className="size-3" />
             {write.isPending ? "Saving…" : "Save"}

@@ -20,14 +20,12 @@ export function CallbacksPanel({ panel, agentId }: { panel: ContextPanel; agentI
     >
       <ul className="flex flex-col gap-2">
         {callbackRows.map((c) => (
-          <li key={c.id} className="rounded-lg border border-border bg-card p-3 card-shadow">
+          <li key={c.id} className="card-shadow rounded-lg border border-border bg-card p-3">
             <div className="mb-1.5 flex items-center gap-2">
-              <span className="font-mono text-[11px] font-semibold text-[var(--signal)]">
-                {c.id}
-              </span>
+              <span className="font-mono text-[11px] font-semibold text-(--signal)">{c.id}</span>
               <span className="text-[12.5px] font-medium text-foreground/90">{c.name}</span>
               {c.blocking && (
-                <span className="ml-auto rounded-md bg-[var(--warn)]/15 px-1.5 py-0.5 text-[10px] font-medium text-[var(--warn)]">
+                <span className="ml-auto rounded-md bg-(--warn)/15 px-1.5 py-0.5 text-[10px] font-medium text-(--warn)">
                   blocking
                 </span>
               )}

@@ -418,3 +418,42 @@ exceptions:
     strategy: >
       Irreducible: a wrapper layer must import the thing it wraps. The guard is
       already as narrow as possible (this one folder, value imports only).
+
+  # ── P10c better-tailwindcss — line-wrapping owned by Prettier ─────────────
+  - path: "web/src/**/*.{ts,tsx}"
+    rule: "better-tailwindcss/enforce-consistent-line-wrapping"
+    reason: >
+      IRRECONCILABLE CONFLICT WITH PRETTIER (the canonical formatter, the rustfmt
+      twin from P2). This rule reflows the className string onto multiple lines;
+      Prettier then re-collapses it to its own line shape — the two fight in an
+      infinite --fix loop (the same class of conflict as unicorn/no-nested-ternary
+      resolved in P5). The rule is a pure line-shape opinion; whitespace/wrapping
+      is Prettier's domain, so the formatter wins and this rule is off. The other
+      seven better-tailwindcss rules (class order, canonical, duplicate,
+      deprecated, conflicting, unnecessary-whitespace) stay at error.
+    strategy: >
+      Re-evaluate if the rule gains a Prettier-compatible mode, or if
+      prettier-plugin-tailwindcss ever owns wrapping directly.
+
+  # ── P10c better-tailwindcss — no-unknown-classes can't resolve custom ─────
+  #    index.css utilities or CSS-var arbitrary values.
+  - path: "web/src/**/*.{ts,tsx}"
+    rule: "better-tailwindcss/no-unknown-classes"
+    reason: >
+      Pure false-positive noise against two legitimate patterns pervasive here.
+      (1) Custom index.css classes authored as plain CSS rules — .card-shadow,
+      .pop-shadow, .fill-sweep, .opt-rise, .menu-pop, .modal-pop (shadow +
+      keyframe-animation helpers). They are real classes but declared as ordinary
+      `.foo {}` rules, not Tailwind `@utility` directives, so Tailwind's compiler
+      never registers them as utilities and the plugin's resolver can't see them.
+      (2) CSS-variable arbitrary values — text-[var(--ok)] / bg-(--signal) /
+      ring-(--signal)/50 — which the plugin can't resolve to a known utility.
+      This DIRECTLY CONTRADICTS the sibling enforce-canonical-classes rule, which
+      REWRITES text-[var(--ok)] INTO text-(--ok) — the very shorthand
+      no-unknown-classes then flags as unknown. Two rules cannot both be right;
+      canonical wins (autofixable, correctness-bearing), so this is off. The
+      other seven better-tailwindcss rules stay at error.
+    strategy: >
+      Re-evaluate if the custom helpers are migrated to `@utility` directives AND
+      the plugin learns to resolve theme CSS-var arbitrary values (which would
+      also resolve the canonical-vs-unknown contradiction).

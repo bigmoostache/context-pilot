@@ -134,7 +134,7 @@ const AutoRun = memo(function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
           const { verb, tool, intent } = parseAutoLine(m)
           return (
             <Fragment key={m.id}>
-              <span className="text-[var(--interactive)]">{verb}</span>
+              <span className="text-(--interactive)">{verb}</span>
               <span className="text-foreground/70">{tool}</span>
               <span className="truncate text-muted-foreground/55">{intent}</span>
             </Fragment>
@@ -204,7 +204,7 @@ const MessageRow = memo(
         ))}
         {msg.fileRef && (
           <div className="pb-1.5 pl-7">
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[11.5px] text-[var(--interactive)] card-shadow">
+            <span className="card-shadow inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[11.5px] text-(--interactive)">
               📎 {msg.fileRef}
             </span>
           </div>
@@ -352,8 +352,8 @@ export function ThreadConversation({
           while a dropped folder/files are zipped + uploaded. */}
       {uploading && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/40 backdrop-blur-[1px]">
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[12.5px] text-foreground/90 card-shadow">
-            <Loader2 className="size-4 animate-spin text-[var(--signal)]" />
+          <div className="card-shadow flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[12.5px] text-foreground/90">
+            <Loader2 className="size-4 animate-spin text-(--signal)" />
             Uploading…
           </div>
         </div>

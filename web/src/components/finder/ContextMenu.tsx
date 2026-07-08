@@ -88,7 +88,7 @@ export function ContextMenu({
   return (
     <div
       ref={ref}
-      className="menu-pop fixed z-50 w-[214px] rounded-xl border border-border bg-popover/95 p-1.5 backdrop-blur-xl pop-shadow"
+      className="menu-pop pop-shadow fixed z-50 w-[214px] rounded-xl border border-border bg-popover/95 p-1.5 backdrop-blur-xl"
       style={{ left, top }}
     >
       {node ? (
@@ -145,11 +145,11 @@ function ItemMenu({
           onOpen(node)
           onClose()
         }}
-        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
+        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-(--signal)/14 hover:text-foreground"
       >
         <FolderOpen className="size-3.5 shrink-0 opacity-80" />
         <span className="flex-1">{isFolder ? "Open" : "Open Quick Look"}</span>
-        <span className="text-[10.5px] tabular-nums text-muted-foreground/50">
+        <span className="text-[10.5px] text-muted-foreground/50 tabular-nums">
           {isFolder ? "↵" : "Space"}
         </span>
       </button>
@@ -160,7 +160,7 @@ function ItemMenu({
             onPin(node)
             onClose()
           }}
-          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
+          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-(--signal)/14 hover:text-foreground"
         >
           <Pin className="size-3.5 shrink-0 opacity-80" />
           <span className="flex-1">Pin to Sidebar</span>
@@ -174,7 +174,7 @@ function ItemMenu({
           onRenameStart(node)
           onClose()
         }}
-        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
+        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-(--signal)/14 hover:text-foreground"
       >
         <PencilLine className="size-3.5 shrink-0 opacity-80" />
         <span className="flex-1">Rename</span>
@@ -185,7 +185,7 @@ function ItemMenu({
           onDownload(node)
           onClose()
         }}
-        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
+        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-(--signal)/14 hover:text-foreground"
       >
         <Download className="size-3.5 shrink-0 opacity-80" />
         <span className="flex-1">Download</span>
@@ -198,11 +198,11 @@ function ItemMenu({
           onTrash(node)
           onClose()
         }}
-        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/12"
+        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-(--danger) transition-colors hover:bg-(--danger)/12"
       >
         <Trash2 className="size-3.5 shrink-0 opacity-80" />
         <span className="flex-1">Move to Trash</span>
-        <span className="text-[10.5px] tabular-nums text-muted-foreground/50">⌘⌫</span>
+        <span className="text-[10.5px] text-muted-foreground/50 tabular-nums">⌘⌫</span>
       </button>
     </>
   )
@@ -304,14 +304,14 @@ function Item({
       className={
         "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] transition-colors " +
         (danger
-          ? "text-[var(--danger)] hover:bg-[var(--danger)]/12"
-          : "text-foreground/85 hover:bg-[var(--signal)]/14 hover:text-foreground")
+          ? "text-(--danger) hover:bg-(--danger)/12"
+          : "text-foreground/85 hover:bg-(--signal)/14 hover:text-foreground")
       }
     >
       <Icon className="size-3.5 shrink-0 opacity-80" />
       <span className="flex-1">{label}</span>
       {shortcut ? (
-        <span className="text-[10.5px] tabular-nums text-muted-foreground/50">{shortcut}</span>
+        <span className="text-[10.5px] text-muted-foreground/50 tabular-nums">{shortcut}</span>
       ) : null}
     </button>
   )
@@ -332,12 +332,12 @@ function EmptyItem({
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-[var(--signal)]/14 hover:text-foreground"
+      className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-foreground/85 transition-colors hover:bg-(--signal)/14 hover:text-foreground"
     >
       <Icon className="size-3.5 shrink-0 opacity-80" />
       <span className="flex-1">{label}</span>
       {shortcut ? (
-        <span className="text-[10.5px] tabular-nums text-muted-foreground/50">{shortcut}</span>
+        <span className="text-[10.5px] text-muted-foreground/50 tabular-nums">{shortcut}</span>
       ) : null}
     </button>
   )

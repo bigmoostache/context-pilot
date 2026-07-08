@@ -40,7 +40,7 @@ function Seg({
       className={cn(
         "flex size-6 items-center justify-center rounded-full transition-all",
         active
-          ? "bg-card text-foreground card-shadow"
+          ? "card-shadow bg-card text-foreground"
           : "text-muted-foreground hover:text-foreground",
       )}
     >

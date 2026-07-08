@@ -46,8 +46,8 @@ export function UserMenu({
       <DropdownMenuTrigger
         aria-label="Account menu"
         className={cn(
-          "rounded-full outline-none transition-[filter,box-shadow]",
-          "ring-1 ring-border hover:brightness-105 focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60",
+          "rounded-full transition-[filter,box-shadow] outline-none",
+          "ring-1 ring-border hover:brightness-105 focus-visible:ring-2 focus-visible:ring-(--signal)/60",
         )}
       >
         <AvatarMark user={u} initials={initialsOf(displayName)} className="size-7 text-[11px]" />
@@ -56,7 +56,7 @@ export function UserMenu({
       <DropdownMenuContent className="w-[268px]" align="end" sideOffset={8}>
         {/* identity header — non-interactive (plain div: GroupLabel would
             require a Menu.Group ancestor and throws MenuGroupContext otherwise). */}
-        <div className="flex items-center gap-2.5 px-2 py-2">
+        <div className="flex items-center gap-2.5 p-2">
           <AvatarMark user={u} initials={initialsOf(displayName)} className="size-9 text-[13px]" />
           <div className="flex min-w-0 flex-col leading-tight">
             <span className="truncate text-[12.5px] font-semibold text-foreground/90">
@@ -73,7 +73,7 @@ export function UserMenu({
 
         <DropdownMenuGroup>
           <DropdownMenuItem onClick={onOpenProfile} className="gap-2.5 py-1.5 text-[12.5px]">
-            <UserIcon className="size-4 text-[var(--interactive)]" />
+            <UserIcon className="size-4 text-(--interactive)" />
             Profile
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onOpenSettings} className="gap-2.5 py-1.5 text-[12.5px]">
@@ -109,7 +109,7 @@ export function UserMenu({
 function AccountPill({ user }: { user: User }) {
   if (user.managedByCompany) {
     return (
-      <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-[var(--interactive)]/12 px-1.5 py-px text-[9.5px] font-medium text-[var(--interactive)]">
+      <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-(--interactive)/12 px-1.5 py-px text-[9.5px] font-medium text-(--interactive)">
         <Building2 className="size-2.5" />
         {user.company ?? "Company account"}
       </span>
@@ -141,7 +141,7 @@ export function AvatarMark({
   return (
     <span
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full font-semibold text-[var(--primary-foreground)] select-none",
+        "flex shrink-0 items-center justify-center rounded-full font-semibold text-(--primary-foreground) select-none",
         className,
       )}
       style={{

@@ -46,18 +46,6 @@ function uniqueZipEntry(taken: Record<string, unknown>, name: string): string {
   }
 }
 
-/**
- * Zip the dropped `files` into one archive `File`, built client-side with
- * fflate (DEFLATE, level 6). The archive is named after the lone file when a
- * single one is dropped (`report.pdf` → `report.pdf.zip`, matching the macOS
- * Finder "Compress" convention) or `dropped-<n>-files.zip` for several. Each
- * entry keeps its original filename (de-duplicated on collision). Rejects if
- * fflate fails or a file can't be read.
- */
-export function zipFiles(files: File[]): Promise<File> {
-  return zipDropped(files.map((file) => ({ file, path: file.name })))
-}
-
 // ── Folder-aware drop extraction (T471) ───────────────────────────────
 //
 // `dataTransfer.files` does NOT recurse into dropped folders — a folder drop

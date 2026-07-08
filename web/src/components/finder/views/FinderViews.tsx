@@ -48,15 +48,14 @@ export function GridView({
             className={cn(
               "finder-pop group relative flex flex-col items-center gap-1.5 rounded-xl border p-2.5 text-center transition-[background,border,transform] duration-150",
               sel
-                ? "border-[var(--signal)]/55 bg-[var(--signal)]/10 card-shadow"
+                ? "card-shadow border-(--signal)/55 bg-(--signal)/10"
                 : "border-transparent hover:border-border hover:bg-muted/45",
-              focus && !sel && "ring-2 ring-[var(--signal)]/45",
-              dropOver &&
-                "border-[var(--signal)] bg-[var(--signal)]/15 ring-2 ring-[var(--signal)]/60",
+              focus && !sel && "ring-2 ring-(--signal)/45",
+              dropOver && "border-(--signal) bg-(--signal)/15 ring-2 ring-(--signal)/60",
             )}
           >
             {h.descriptions?.[n.path] && (
-              <span className="absolute right-1 top-1 z-[1]">
+              <span className="absolute top-1 right-1 z-1">
                 <InfoBadge description={h.descriptions[n.path]} />
               </span>
             )}
@@ -79,11 +78,11 @@ export function GridView({
                 />
               </span>
             ) : (
-              <span className="line-clamp-2 w-full px-0.5 text-[11.5px] font-medium leading-tight text-foreground/85">
+              <span className="line-clamp-2 w-full px-0.5 text-[11.5px] leading-tight font-medium text-foreground/85">
                 {n.name}
               </span>
             )}
-            <span className="flex items-center gap-1 text-[10px] tabular-nums text-muted-foreground/60">
+            <span className="flex items-center gap-1 text-[10px] text-muted-foreground/60 tabular-nums">
               {n.kind === "folder" ? itemCount(n) : fmtBytes(n.size)}
             </span>
             <TagDots tags={n.tags} />
@@ -110,7 +109,7 @@ export function ListView({
   const [dragOver, setDragOver] = useState<string | null>(null)
   return (
     <div className="px-2 py-1.5">
-      <div className="sticky top-0 z-[1] grid grid-cols-[1fr_120px_92px_120px] gap-2 bg-background/90 px-2.5 py-1.5 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground/70 backdrop-blur">
+      <div className="sticky top-0 z-1 grid grid-cols-[1fr_120px_92px_120px] gap-2 bg-background/90 px-2.5 py-1.5 text-[10.5px] font-medium tracking-wide text-muted-foreground/70 uppercase backdrop-blur-sm">
         <Head label="Name" k="name" cur={sortKey} asc={asc} onSort={onSort} />
         <Head label="Kind" k="kind" cur={sortKey} asc={asc} onSort={onSort} />
         <Head label="Size" k="size" cur={sortKey} asc={asc} onSort={onSort} />
@@ -136,10 +135,10 @@ export function ListView({
             className={cn(
               "finder-pop grid w-full grid-cols-[1fr_120px_92px_120px] items-center gap-2 rounded-md px-2.5 py-[5px] text-left text-[12px] transition-colors",
               sel
-                ? "bg-[var(--signal)]/12 text-foreground"
+                ? "bg-(--signal)/12 text-foreground"
                 : cn("text-foreground/80 hover:bg-muted/45", i % 2 === 1 && "bg-muted/20"),
-              focus && !sel && "ring-1 ring-inset ring-[var(--signal)]/50",
-              dropOver && "bg-[var(--signal)]/18 ring-1 ring-inset ring-[var(--signal)]/70",
+              focus && !sel && "ring-1 ring-(--signal)/50 ring-inset",
+              dropOver && "bg-(--signal)/18 ring-1 ring-(--signal)/70 ring-inset",
             )}
           >
             <span className="flex min-w-0 items-center gap-2">
@@ -157,7 +156,7 @@ export function ListView({
               {h.descriptions?.[n.path] && <InfoBadge description={h.descriptions[n.path]} />}
             </span>
             <span className="truncate text-muted-foreground">{M.label}</span>
-            <span className="tabular-nums text-muted-foreground">
+            <span className="text-muted-foreground tabular-nums">
               {n.kind === "folder" ? itemCount(n) : fmtBytes(n.size)}
             </span>
             <span
@@ -192,7 +191,7 @@ function Head({
       className="flex items-center gap-1 text-left transition-colors hover:text-foreground"
     >
       {label}
-      {cur === k && <span className="text-[var(--signal)]">{asc ? "▲" : "▼"}</span>}
+      {cur === k && <span className="text-(--signal)">{asc ? "▲" : "▼"}</span>}
     </button>
   )
 }
@@ -228,9 +227,7 @@ export function GalleryView({
               onContextMenu={(e) => h.onContext(e, n)}
               className={cn(
                 "flex shrink-0 flex-col items-center gap-1 rounded-lg p-1.5 transition-all",
-                active
-                  ? "bg-[var(--signal)]/14 ring-1 ring-[var(--signal)]/50"
-                  : "hover:bg-muted/50",
+                active ? "bg-(--signal)/14 ring-1 ring-(--signal)/50" : "hover:bg-muted/50",
               )}
             >
               {n.image ? (
@@ -258,7 +255,7 @@ function Hero({ node }: { node: FinderNode }) {
     <div className="ql-pop flex max-h-full max-w-[560px] flex-col items-center gap-4">
       {node.image ? (
         <div
-          className="aspect-video w-[460px] max-w-full rounded-xl border border-border card-shadow"
+          className="card-shadow aspect-video w-[460px] max-w-full rounded-xl border border-border"
           style={{ background: node.image.gradient }}
         />
       ) : (
@@ -269,7 +266,7 @@ function Hero({ node }: { node: FinderNode }) {
           {node.name}
         </span>
         <TagDots tags={node.tags} />
-        <span className="text-[12px] tabular-nums text-muted-foreground">
+        <span className="text-[12px] text-muted-foreground tabular-nums">
           {node.kind === "folder" ? itemCount(node) : `${M.label} · ${fmtBytes(node.size)}`}
           {node.media ? ` · ${node.media.duration}` : ""}
           {node.image ? ` · ${node.image.w}×${node.image.h}` : ""}

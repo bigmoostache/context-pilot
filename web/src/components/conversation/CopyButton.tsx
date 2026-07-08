@@ -63,9 +63,9 @@ export function CopyButton({
       aria-label={copied ? "Copied" : label}
       className={cn(
         "flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] transition-colors",
-        "opacity-50 hover:opacity-100 focus-visible:opacity-100 outline-none",
+        "opacity-50 outline-none hover:opacity-100 focus-visible:opacity-100",
         copied
-          ? "text-[var(--ok)] opacity-100"
+          ? "text-(--ok) opacity-100"
           : cn("text-muted-foreground/70 hover:text-foreground", extra),
         align === "end" ? "self-end" : "self-start",
       )}

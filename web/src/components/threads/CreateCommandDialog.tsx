@@ -77,7 +77,7 @@ export function CreateCommandDialog({
         <form onSubmit={submit} className="flex flex-col">
           {/* Header */}
           <div className="flex items-start gap-3 border-b border-border/70 px-5 py-4">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--signal)]/15 text-[var(--signal)]">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--signal)/15 text-(--signal)">
               <TerminalSquare className="size-[18px]" />
             </span>
             <div className="flex flex-col gap-0.5">
@@ -101,7 +101,7 @@ export function CreateCommandDialog({
                 placeholder="e.g. Boss Hunt"
               />
               <span className="text-[11px] text-muted-foreground/70">
-                Invoked as <span className="font-mono text-[var(--interactive)]">/{slug}</span>
+                Invoked as <span className="font-mono text-(--interactive)">/{slug}</span>
               </span>
             </label>
 
@@ -132,7 +132,7 @@ export function CreateCommandDialog({
             <div className="flex flex-col gap-1.5">
               <span className="text-[11px] text-muted-foreground/70">Preview</span>
               <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground/75">
-                <span className="font-mono font-medium text-[var(--interactive)]">/{slug}</span>
+                <span className="font-mono font-medium text-(--interactive)">/{slug}</span>
                 {description.trim() && (
                   <span className="max-w-[260px] truncate text-muted-foreground/70">
                     {description.trim()}

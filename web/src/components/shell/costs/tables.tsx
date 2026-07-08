@@ -27,7 +27,7 @@ function heatBgDark(count: number, max: number): string | undefined {
 // ── Section wrapper (shared) ────────────────────────────────────────────────
 
 function Section({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-xl border border-border bg-card p-5 card-shadow">{children}</div>
+  return <div className="card-shadow rounded-xl border border-border bg-card p-5">{children}</div>
 }
 
 // ── Cross-tab table ─────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ export function CrossTabTable({
             {" × "}
             <strong className="text-foreground/80">{hover.culprit}</strong>
             {" = "}
-            <strong className="tabular-nums text-foreground">
+            <strong className="text-foreground tabular-nums">
               {crossTab.cells.get(`${hover.tool}\t${hover.culprit}`) ?? 0}
             </strong>
           </span>
@@ -115,7 +115,7 @@ export function CrossTabTable({
                         key={c}
                         className={`px-2 py-1 text-center tabular-nums transition-all duration-150 ${
                           isActive
-                            ? "ring-2 ring-foreground/30 ring-inset font-bold text-foreground"
+                            ? "font-bold text-foreground ring-2 ring-foreground/30 ring-inset"
                             : isDimmed
                               ? "text-foreground/25"
                               : "text-foreground/70"
@@ -131,7 +131,7 @@ export function CrossTabTable({
                       </td>
                     )
                   })}
-                  <td className="px-2 py-1 text-center tabular-nums font-semibold text-foreground/70">
+                  <td className="px-2 py-1 text-center font-semibold text-foreground/70 tabular-nums">
                     {rowTotal}
                   </td>
                 </tr>
@@ -151,7 +151,7 @@ export function CrossTabTable({
                 return (
                   <td
                     key={c}
-                    className={`px-2 py-1.5 text-center tabular-nums font-semibold transition-colors ${
+                    className={`px-2 py-1.5 text-center font-semibold tabular-nums transition-colors ${
                       hover?.culprit === c ? "text-foreground" : "text-foreground/70"
                     }`}
                   >
@@ -159,7 +159,7 @@ export function CrossTabTable({
                   </td>
                 )
               })}
-              <td className="px-2 py-1.5 text-center tabular-nums font-bold text-foreground">
+              <td className="px-2 py-1.5 text-center font-bold text-foreground tabular-nums">
                 {totalTicks}
               </td>
             </tr>

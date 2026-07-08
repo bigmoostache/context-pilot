@@ -36,9 +36,9 @@ export function LeftRail({
   const usedRatio = Math.min(1, usedTokens / REF_BUDGET)
 
   return (
-    <aside className="rise flex w-[var(--sidebar-w)] shrink-0 flex-col border-r border-border bg-surface">
+    <aside className="rise flex w-(--sidebar-w) shrink-0 flex-col border-r border-border bg-surface">
       {/* budget meter */}
-      <div className="px-4 pb-3 pt-4">
+      <div className="px-4 pt-4 pb-3">
         <div className="mb-2 flex items-baseline justify-between">
           <span className="text-[12px] font-medium text-foreground/80">Context</span>
           <span
@@ -49,7 +49,7 @@ export function LeftRail({
           </span>
         </div>
         <TokenBar value={usedTokens} max={REF_BUDGET} className="h-1.5" />
-        <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-muted-foreground">
+        <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground tabular-nums">
           <span>{fmtTokens(usedTokens)}</span>
           <span>of {fmtTokens(REF_BUDGET)}</span>
         </div>
@@ -71,7 +71,7 @@ export function LeftRail({
             className={cn(
               "group flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
               selected === "conversation"
-                ? "bg-card text-foreground card-shadow"
+                ? "card-shadow bg-card text-foreground"
                 : "text-foreground/70 hover:bg-muted/60",
             )}
           >
@@ -104,7 +104,7 @@ export function LeftRail({
                   className={cn(
                     "group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors",
                     sel
-                      ? "bg-card text-foreground card-shadow"
+                      ? "card-shadow bg-card text-foreground"
                       : "text-foreground/70 hover:bg-muted/60",
                   )}
                 >
@@ -113,7 +113,7 @@ export function LeftRail({
                     style={{ color: sel ? "var(--signal)" : "var(--muted-foreground)" }}
                   />
                   <span className="min-w-0 flex-1 truncate text-[12.5px]">{p.name}</span>
-                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
+                  <span className="shrink-0 text-[11px] text-muted-foreground/70 tabular-nums">
                     {fmtTokens(p.tokens)}
                   </span>
                 </button>

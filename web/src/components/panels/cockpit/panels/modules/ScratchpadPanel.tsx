@@ -19,7 +19,7 @@ export function ScratchpadPanel({ panel, agentId }: { panel: ContextPanel; agent
     >
       <div className="flex flex-col gap-2.5">
         {scratchCells.map((c) => (
-          <article key={c.id} className="rounded-lg border border-border bg-card p-3 card-shadow">
+          <article key={c.id} className="card-shadow rounded-lg border border-border bg-card p-3">
             <div className="mb-1 flex items-center gap-2">
               <span className="font-mono text-[10px] text-muted-foreground/60">{c.id}</span>
               <span className="text-[12.5px] font-medium text-foreground/90">{c.title}</span>

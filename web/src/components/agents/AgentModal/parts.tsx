@@ -65,7 +65,7 @@ export function AgentModalHeader({
   onClose: () => void
 }) {
   return (
-    <div className="relative flex items-start gap-3.5 border-b border-border/70 px-6 pb-5 pt-6">
+    <div className="relative flex items-start gap-3.5 border-b border-border/70 px-6 pt-6 pb-5">
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.5]"
         style={{
@@ -82,8 +82,8 @@ export function AgentModalHeader({
           htmlFor="agent-avatar-input"
           title="Click to change avatar"
           className={cn(
-            "relative flex size-11 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl ring-1 ring-inset transition-opacity hover:opacity-80",
-            "bg-[var(--signal)]/14 text-[var(--signal)] ring-[var(--signal)]/25",
+            "relative flex size-11 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl ring-1 transition-opacity ring-inset hover:opacity-80",
+            "bg-(--signal)/14 text-(--signal) ring-(--signal)/25",
           )}
         >
           {agent?.hasAvatar ? (
@@ -97,7 +97,7 @@ export function AgentModalHeader({
           )}
         </label>
       ) : (
-        <span className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--interactive)]/14 text-[var(--interactive)] ring-1 ring-inset ring-[var(--interactive)]/25">
+        <span className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-(--interactive)/14 text-(--interactive) ring-1 ring-(--interactive)/25 ring-inset">
           <Wand2 className="size-[22px]" />
         </span>
       )}
@@ -126,7 +126,7 @@ export function AgentModalHeader({
       </div>
       <button
         onClick={onClose}
-        className="relative -mr-1 -mt-1 flex size-7 items-center justify-center rounded-md text-muted-foreground/55 transition-colors hover:bg-muted/70 hover:text-foreground"
+        className="relative -mt-1 -mr-1 flex size-7 items-center justify-center rounded-md text-muted-foreground/55 transition-colors hover:bg-muted/70 hover:text-foreground"
         aria-label="Close"
       >
         <X className="size-4" />
@@ -153,11 +153,11 @@ export function AgentModalBody({ c }: { c: Controller }) {
     >
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
-          <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+          <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
             Agent name
           </span>
-          <div className="group flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 transition-colors focus-within:border-[var(--interactive)]/70 focus-within:ring-2 focus-within:ring-[var(--interactive)]/15">
-            <FolderGit2 className="size-[18px] shrink-0 text-muted-foreground/55 transition-colors group-focus-within:text-[var(--interactive)]" />
+          <div className="group flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 transition-colors focus-within:border-(--interactive)/70 focus-within:ring-2 focus-within:ring-(--interactive)/15">
+            <FolderGit2 className="size-[18px] shrink-0 text-muted-foreground/55 transition-colors group-focus-within:text-(--interactive)" />
             <input
               ref={nameRef}
               value={name}
@@ -176,7 +176,7 @@ export function AgentModalBody({ c }: { c: Controller }) {
           </div>
         </div>
         <div className="flex flex-col gap-2">
-          <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+          <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
             Provider &amp; Model
           </span>
           <ModelPicker providers={providers} provider={provId} model={modelId} onChange={setSel} />
@@ -202,7 +202,7 @@ export function AgentModalFooter({ c }: { c: Controller }) {
           onClick={c.retire}
           disabled={pending}
           title="Stop the agent's process and console server and move it to the Retired section. The realm folder is kept — unretire brings it back."
-          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/10 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-medium text-(--danger) transition-colors hover:bg-(--danger)/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Archive className={cn("size-3.5", c.retireBusy && "animate-pulse")} />
           Retire
@@ -223,9 +223,9 @@ export function AgentModalFooter({ c }: { c: Controller }) {
         onClick={c.submit}
         disabled={!canSubmit}
         className={cn(
-          "ml-auto flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-medium text-[var(--primary-foreground)] transition-all",
+          "ml-auto flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-medium text-(--primary-foreground) transition-all",
           canSubmit
-            ? "bg-[var(--interactive)] hover:brightness-105 active:scale-[0.98]"
+            ? "bg-(--interactive) hover:brightness-105 active:scale-[0.98]"
             : "cursor-not-allowed bg-muted text-muted-foreground/60",
         )}
       >
@@ -237,7 +237,7 @@ export function AgentModalFooter({ c }: { c: Controller }) {
           <Sparkles className="size-4" />
         )}
         {submitLabel(pending, saving, isManage)}
-        <kbd className="ml-1 hidden items-center gap-0.5 rounded bg-black/15 px-1 py-px font-mono text-[9.5px] opacity-80 sm:flex">
+        <kbd className="ml-1 hidden items-center gap-0.5 rounded-sm bg-black/15 px-1 py-px font-mono text-[9.5px] opacity-80 sm:flex">
           <CornerDownLeft className="size-2.5" />⌘
         </kbd>
       </button>

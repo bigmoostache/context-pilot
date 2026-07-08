@@ -122,7 +122,7 @@ export function UsagePage() {
             <select
               value={agentId}
               onChange={(e) => setAgentId(e.target.value)}
-              className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] text-foreground/85 card-shadow"
+              className="card-shadow rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] text-foreground/85"
               aria-label="Filter by agent"
             >
               <option value="all">All agents</option>
@@ -210,11 +210,11 @@ function UsageTable({
     <section className="flex flex-col gap-2.5">
       <span className="text-[13px] font-semibold text-foreground/90">By agent</span>
       {visible.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card p-8 text-center text-[12.5px] text-muted-foreground card-shadow">
+        <div className="card-shadow rounded-xl border border-border bg-card p-8 text-center text-[12.5px] text-muted-foreground">
           No agents in the fleet yet.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card card-shadow">
+        <div className="card-shadow overflow-hidden rounded-xl border border-border bg-card">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -240,22 +240,22 @@ function UsageTable({
                         />
                         {r.agent.name}
                         {r.tripped && (
-                          <span className="rounded-full bg-[var(--danger)]/14 px-1.5 py-px text-[9.5px] font-medium text-[var(--danger)]">
+                          <span className="rounded-full bg-(--danger)/14 px-1.5 py-px text-[9.5px] font-medium text-(--danger)">
                             over budget
                           </span>
                         )}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-foreground/75">
+                    <TableCell className="text-right text-foreground/75 tabular-nums">
                       {fmtTok(r.inputTokens)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-foreground/75">
+                    <TableCell className="text-right text-foreground/75 tabular-nums">
                       {fmtTok(r.outputTokens)}
                     </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-foreground/90">
+                    <TableCell className="text-right font-semibold text-foreground/90 tabular-nums">
                       {fmtUsd(r.spendUsd)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground/80">
+                    <TableCell className="text-right text-muted-foreground/80 tabular-nums">
                       {unit === "usd"
                         ? pct == null
                           ? "—"
@@ -269,16 +269,16 @@ function UsageTable({
             <TableFooter>
               <TableRow className="hover:bg-transparent">
                 <TableCell className="font-semibold text-foreground/90">Total</TableCell>
-                <TableCell className="text-right font-semibold tabular-nums text-foreground/85">
+                <TableCell className="text-right font-semibold text-foreground/85 tabular-nums">
                   {fmtTok(totals.inputTokens)}
                 </TableCell>
-                <TableCell className="text-right font-semibold tabular-nums text-foreground/85">
+                <TableCell className="text-right font-semibold text-foreground/85 tabular-nums">
                   {fmtTok(totals.outputTokens)}
                 </TableCell>
-                <TableCell className="text-right font-semibold tabular-nums text-foreground">
+                <TableCell className="text-right font-semibold text-foreground tabular-nums">
                   {fmtUsd(totals.spendUsd)}
                 </TableCell>
-                <TableCell className="text-right font-semibold tabular-nums text-foreground/85">
+                <TableCell className="text-right font-semibold text-foreground/85 tabular-nums">
                   {unit === "usd" ? "" : fmtTok(totals.inputTokens + totals.outputTokens)}
                 </TableCell>
               </TableRow>
@@ -292,8 +292,8 @@ function UsageTable({
 
 function SummaryCard({ label, value, accent }: { label: string; value: string; accent: string }) {
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-4 card-shadow">
-      <span className="text-[11px] uppercase tracking-wide text-muted-foreground/65">{label}</span>
+    <div className="card-shadow flex flex-col gap-1 rounded-xl border border-border bg-card p-4">
+      <span className="text-[11px] tracking-wide text-muted-foreground/65 uppercase">{label}</span>
       <span className="text-[20px] font-semibold tabular-nums" style={{ color: accent }}>
         {value}
       </span>
@@ -319,7 +319,7 @@ function UnitTab({
       className={cn(
         "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
         active
-          ? "bg-card text-foreground card-shadow"
+          ? "card-shadow bg-card text-foreground"
           : "text-muted-foreground hover:text-foreground/80",
       )}
     >

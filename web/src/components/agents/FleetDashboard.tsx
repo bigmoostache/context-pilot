@@ -76,7 +76,7 @@ export function FleetDashboard({
             </div>
             <button
               onClick={() => setModal({ mode: "create" })}
-              className="flex shrink-0 items-center gap-2 rounded-lg bg-[var(--interactive)] px-3.5 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105"
+              className="flex shrink-0 items-center gap-2 rounded-lg bg-(--interactive) px-3.5 py-2 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105"
             >
               <FolderPlus className="size-4" />
               New agent
@@ -102,7 +102,7 @@ export function FleetDashboard({
       {modal && <AgentModal modal={modal} onClose={() => setModal(null)} onFlash={flash} />}
 
       {toast && (
-        <div className="absolute bottom-6 left-1/2 z-30 -translate-x-1/2 rounded-lg border border-border bg-card px-4 py-2 text-[12px] text-foreground/90 pop-shadow">
+        <div className="pop-shadow absolute bottom-6 left-1/2 z-30 -translate-x-1/2 rounded-lg border border-border bg-card px-4 py-2 text-[12px] text-foreground/90">
           {toast}
         </div>
       )}
@@ -128,7 +128,7 @@ function AgentCard({
   const accent = accentVar[a.accent]
 
   return (
-    <div className="group flex flex-col gap-3 rounded-xl border border-border bg-card p-4 card-shadow transition-colors hover:border-[color-mix(in_oklab,var(--signal)_45%,transparent)]">
+    <div className="group card-shadow flex flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-[color-mix(in_oklab,var(--signal)_45%,transparent)]">
       <div className="flex items-center gap-3">
         {a.hasAvatar ? (
           <img
@@ -175,7 +175,7 @@ function AgentCard({
           <Bot className="size-3.5" />
           {agent.model}
         </span>
-        <span className="ml-auto font-semibold tabular-nums text-foreground/80">
+        <span className="ml-auto font-semibold text-foreground/80 tabular-nums">
           {fmtCost(a.costUsd)}
         </span>
       </div>
@@ -183,14 +183,14 @@ function AgentCard({
       <div className="mt-0.5 flex items-center gap-2">
         <button
           onClick={onOpen}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[var(--signal)] px-3 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105"
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-(--signal) px-3 py-2 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105"
         >
           <Rocket className="size-4" />
           Open
         </button>
         <button
           onClick={onManage}
-          className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[12.5px] font-medium text-foreground/70 transition-colors hover:border-[var(--interactive)]/50 hover:text-[var(--interactive)]"
+          className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[12.5px] font-medium text-foreground/70 transition-colors hover:border-(--interactive)/50 hover:text-(--interactive)"
         >
           <Settings2 className="size-3.5" />
           Manage
@@ -282,7 +282,7 @@ function RetiredSection({ onFlash }: { onFlash: (m: string) => void }) {
   return (
     <section className="flex flex-col gap-3.5">
       <div className="flex items-center gap-2">
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80">
+        <h2 className="text-[13px] font-semibold tracking-[0.06em] text-muted-foreground/80 uppercase">
           Retired
         </h2>
         <span className="rounded-full bg-muted/60 px-1.5 py-0.5 text-[10.5px] font-medium text-muted-foreground/70">
@@ -310,7 +310,7 @@ function RetiredCard({ agent, onFlash }: { agent: Agent; onFlash: (m: string) =>
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-dashed border-border bg-card/50 p-4 transition-colors hover:border-[var(--interactive)]/45">
+    <div className="flex flex-col gap-3 rounded-xl border border-dashed border-border bg-card/50 p-4 transition-colors hover:border-(--interactive)/45">
       <div className="flex items-center gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground">
           <FolderGit2 className="size-5" />
@@ -336,7 +336,7 @@ function RetiredCard({ agent, onFlash }: { agent: Agent; onFlash: (m: string) =>
       <button
         onClick={onUnretire}
         disabled={unretire.isPending}
-        className="mt-0.5 flex items-center justify-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[12.5px] font-medium text-foreground/70 transition-colors hover:border-[var(--interactive)]/50 hover:text-[var(--interactive)] disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-0.5 flex items-center justify-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[12.5px] font-medium text-foreground/70 transition-colors hover:border-(--interactive)/50 hover:text-(--interactive) disabled:cursor-not-allowed disabled:opacity-50"
       >
         {unretire.isPending ? (
           <Loader2 className="size-4 animate-spin" />
@@ -353,7 +353,7 @@ function NewAgentCard({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex min-h-[164px] flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed border-border bg-transparent p-4 text-muted-foreground transition-colors hover:border-[var(--interactive)]/60 hover:text-[var(--interactive)]"
+      className="flex min-h-[164px] flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed border-border bg-transparent p-4 text-muted-foreground transition-colors hover:border-(--interactive)/60 hover:text-(--interactive)"
     >
       <span className="flex size-11 items-center justify-center rounded-xl bg-muted/50">
         <FolderPlus className="size-5" />

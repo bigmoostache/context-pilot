@@ -49,7 +49,7 @@ function FleetStatus({ agents }: { agents: Agent[] }) {
       {needsYou > 0 && (
         <span className="flex items-center gap-1.5 text-muted-foreground">
           <span className="size-2 rounded-full" style={{ background: "var(--signal)" }} />
-          <span className="tabular-nums text-foreground/80">{needsYou}</span>
+          <span className="text-foreground/80 tabular-nums">{needsYou}</span>
           <span>need{needsYou === 1 ? "s" : ""} you</span>
         </span>
       )}
@@ -57,7 +57,7 @@ function FleetStatus({ agents }: { agents: Agent[] }) {
       <span className="ml-auto flex items-center gap-1.5 text-muted-foreground">
         <Wallet className="size-3.5" />
         <span>Total spend</span>
-        <span className="tabular-nums font-medium text-foreground/85">{fmtCost(totalSpend)}</span>
+        <span className="font-medium text-foreground/85 tabular-nums">{fmtCost(totalSpend)}</span>
       </span>
     </footer>
   )
@@ -106,7 +106,7 @@ function AgentStatus({ agent }: { agent?: Agent | undefined }) {
       <span className="ml-auto flex items-center gap-3">
         <ContextBar used={used} threshold={threshold} budget={budget} hit={hit} miss={miss} />
         <span className="h-3.5 w-px bg-border" />
-        <span className="tabular-nums text-muted-foreground">{fmtCost(costUsd)}</span>
+        <span className="text-muted-foreground tabular-nums">{fmtCost(costUsd)}</span>
       </span>
     </footer>
   )
@@ -183,10 +183,10 @@ function ContextBar({
 
       {/* tooltip — opens upward, above the bar */}
       <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 translate-y-1 opacity-0 transition-all duration-150 group-hover/cb:translate-y-0 group-hover/cb:opacity-100">
-        <div className="w-[188px] rounded-lg border border-border bg-popover p-2.5 pop-shadow">
+        <div className="pop-shadow w-[188px] rounded-lg border border-border bg-popover p-2.5">
           <div className="mb-2 flex items-baseline justify-between">
             <span className="text-[11px] font-semibold text-foreground/90">Context window</span>
-            <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+            <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
               {(usedRatio * 100).toFixed(0)}%
             </span>
           </div>
@@ -204,13 +204,13 @@ function ContextBar({
           <TipRow color="var(--muted-foreground)" label="Free" value={fmtTokens(free)} dim />
           <div className="mt-2 flex items-center justify-between gap-8 border-t border-border/60 pt-1.5">
             <span className="shrink-0 text-[10.5px] text-muted-foreground">Used / budget</span>
-            <span className="font-mono text-[10.5px] font-medium tabular-nums text-foreground/85">
+            <span className="font-mono text-[10.5px] font-medium text-foreground/85 tabular-nums">
               {fmtTokens(used)} / {fmtTokens(safeBudget)}
             </span>
           </div>
         </div>
         {/* caret */}
-        <div className="absolute left-1/2 top-full size-2 -translate-x-1/2 -translate-y-1 rotate-45 border-b border-r border-border bg-popover" />
+        <div className="absolute top-full left-1/2 size-2 -translate-x-1/2 -translate-y-1 rotate-45 border-r border-b border-border bg-popover" />
       </div>
     </div>
   )
@@ -234,7 +234,7 @@ function TipRow({
       <span className={`text-[11px] ${dim ? "text-muted-foreground" : "text-foreground/80"}`}>
         {label}
       </span>
-      <span className="ml-auto font-mono text-[10.5px] tabular-nums text-foreground/85">
+      <span className="ml-auto font-mono text-[10.5px] text-foreground/85 tabular-nums">
         {value}
       </span>
     </div>
@@ -254,7 +254,7 @@ function Metric({
   return (
     <span className="flex items-center gap-1.5 text-muted-foreground">
       <Icon className="size-3.5" />
-      <span className="tabular-nums font-medium text-foreground/85">{value}</span>
+      <span className="font-medium text-foreground/85 tabular-nums">{value}</span>
       <span>{label}</span>
     </span>
   )
