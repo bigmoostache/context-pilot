@@ -211,7 +211,7 @@ impl Runtime {
             match crate::services::auth::store::AuthStore::open(&config.auth_db_path) {
                 Ok(store) => {
                     eprintln!("auth enabled — database at {}", config.auth_db_path.display());
-                    seed::seed_admin_if_empty(&store);
+                    seed::seed_accounts_if_empty(&store);
                     Some(store)
                 }
                 Err(err) => {

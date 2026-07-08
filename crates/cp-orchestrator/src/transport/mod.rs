@@ -390,8 +390,9 @@ fn handle_stream(request: Request, state: &Arc<Mutex<Backend>>, query: &str) {
             match b.auth.as_ref() {
                 Some(auth) => match auth.get_user_by_id(user_id) {
                     Ok(Some(user)) => {
-                        use crate::services::auth::types::UserRole;
-                        if user.role == UserRole::Admin {
+                        // Implicit access to all agents (manager+) bypasses the
+                        // per-agent ACL (design §13.3); everyone else needs a row.
+                        if user.can_manage_all_agents() {
                             true
                         } else {
                             auth.check_access(agent_id, user_id).map(|role| role.is_some()).unwrap_or(false)

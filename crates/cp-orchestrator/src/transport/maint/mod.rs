@@ -15,9 +15,11 @@
 //!   public IP is refused before any handler runs. Controlled by
 //!   `CP_MAINT_LAN_ONLY` (default on); on the box the network perimeter (the
 //!   client LAN) is the additional reachability boundary.
-//! * **Admin-gated** ([`authenticate`]) — every route except the unauthenticated
+//! * **IT-gated** ([`authenticate`]) — every route except the unauthenticated
 //!   whitelist (`login`, `status`) requires a valid session whose user holds the
-//!   [`UserRole::Admin`] role. A `User`-role token is a `403`, no token a `401`.
+//!   `can_manage_it` capability (admin+). A token below that is a `403`, no token
+//!   a `401`. (This plane is superseded by the capability-gated IT Settings
+//!   section on `:443` and is removed in the v3 teardown.)
 
 mod ca;
 mod caddy;
@@ -35,7 +37,7 @@ use tiny_http::{Header, Method, Request, Response};
 
 use super::Backend;
 use super::rest::HttpReply;
-use crate::services::auth::types::{User, UserRole};
+use crate::services::auth::types::User;
 
 /// Handle one request on the maintenance plane: LAN guard → Admin gate → route.
 /// Mirrors the product [`super::handle`] but dispatches only maintenance routes,
@@ -150,12 +152,12 @@ fn route(
 }
 
 /// Authenticate a maintenance-plane request, additionally requiring the
-/// [`UserRole::Admin`] role on every protected route.
+/// `can_manage_it` capability (admin+) on every protected route.
 ///
 /// * Whitelisted route (`login`, `status`) → `Ok(None)`.
 /// * No token → `Err(401)`.
-/// * Valid session, `User` role → `Err(403)`.
-/// * Valid session, `Admin` role → `Ok(Some(user))`.
+/// * Valid session without `can_manage_it` → `Err(403)`.
+/// * Valid session with `can_manage_it` → `Ok(Some(user))`.
 /// * Auth disabled → `Err(503)` on protected routes (the maintenance plane is
 ///   meaningless without the role model it gates on).
 fn authenticate(
@@ -184,7 +186,7 @@ fn authenticate(
         Err(_) => return Err(HttpReply::error(500, "session validation error")),
     };
 
-    if user.role == UserRole::Admin { Ok(Some(user)) } else { Err(HttpReply::error(403, "admin access required")) }
+    if user.can_manage_it() { Ok(Some(user)) } else { Err(HttpReply::error(403, "IT management access required")) }
 }
 
 /// Routes reachable on the maintenance plane without authentication. Kept to the
@@ -276,6 +278,8 @@ mod tests {
     use std::path::PathBuf;
     use std::time::Duration;
 
+    use crate::services::auth::types::UserRole;
+
     use crate::services::auth::store::AuthStore;
 
     /// A throwaway test password, built at runtime so no string literal flows
@@ -291,7 +295,7 @@ mod tests {
     fn backend_with_users() -> (Mutex<Backend>, String, String) {
         let dir = tempfile::tempdir().expect("tempdir");
         let store = AuthStore::open(&dir.path().join("auth.db")).expect("open auth store");
-        let admin = store.create_user("admin@box", "Admin", &test_pw(), UserRole::Admin).expect("admin");
+        let admin = store.create_user("admin@box", "Admin", &test_pw(), UserRole::Superadmin).expect("admin");
         let user = store.create_user("user@box", "User", &test_pw(), UserRole::User).expect("user");
         let ttl = Duration::from_secs(3600);
         let admin_tok = store.create_session(&admin.id, None, ttl).expect("admin session");
@@ -316,7 +320,7 @@ mod tests {
     fn backend_with_admin() -> (Mutex<Backend>, User) {
         let dir = tempfile::tempdir().expect("tempdir");
         let store = AuthStore::open(&dir.path().join("auth.db")).expect("open auth store");
-        let admin = store.create_user("admin@box", "Admin", &test_pw(), UserRole::Admin).expect("admin");
+        let admin = store.create_user("admin@box", "Admin", &test_pw(), UserRole::Superadmin).expect("admin");
         let backend = Backend::new(
             dir.path().to_path_buf(),
             100.0,
@@ -402,9 +406,9 @@ mod tests {
         let as_user = authenticate(&state, &protected, Some(&user_tok));
         assert_eq!(as_user.unwrap_err().status, 403, "User role is forbidden");
 
-        // Valid Admin-role token → 200 (Ok with the user).
+        // Valid can_manage_it token → 200 (Ok with the user).
         let as_admin = authenticate(&state, &protected, Some(&admin_tok)).expect("admin passes");
-        assert_eq!(as_admin.expect("user present").role, UserRole::Admin);
+        assert_eq!(as_admin.expect("user present").role, UserRole::Superadmin);
     }
 
     #[test]

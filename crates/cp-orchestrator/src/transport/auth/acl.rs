@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use super::super::Backend;
 use super::super::rest::HttpReply;
-use crate::services::auth::types::{User, UserRole};
+use crate::services::auth::types::User;
 
 // ───────────────── per-agent authorization (Phase 6) ─────────────────
 
@@ -23,12 +23,12 @@ pub(crate) fn extract_agent_id<'a>(segments: &[&'a str]) -> Option<&'a str> {
 
 /// Check whether `user` is authorized to access `agent_id`.
 ///
-/// System admins have implicit god-mode (FR-09). Everyone else needs an
-/// explicit ACL entry (FR-10).  Returns `true` when auth is disabled
-/// (backend.auth is `None`).
+/// `can_manage_all_agents` (manager+) grants implicit god-mode access to every
+/// agent (FR-09 → FR-v3-09/§13.3). Everyone else needs an explicit ACL entry
+/// (FR-10).  Returns `true` when auth is disabled (backend.auth is `None`).
 pub(crate) fn authorize_agent(state: &Mutex<Backend>, agent_id: &str, user: &User) -> bool {
-    // System admin bypasses ACL entirely (FR-09).
-    if user.role == UserRole::Admin {
+    // Implicit access to all agents bypasses ACL entirely (design §13.3).
+    if user.can_manage_all_agents() {
         return true;
     }
     let Ok(b) = state.lock() else { return false };
@@ -39,7 +39,7 @@ pub(crate) fn authorize_agent(state: &Mutex<Backend>, agent_id: &str, user: &Use
 /// Check whether the caller can manage ACL on an agent (system admin OR
 /// agent-admin on this specific agent — FR-14b/FR-14c).
 fn can_manage_acl(state: &Mutex<Backend>, agent_id: &str, user: &User) -> bool {
-    if user.role == UserRole::Admin {
+    if user.can_manage_all_agents() {
         return true;
     }
     let Ok(b) = state.lock() else { return false };
@@ -173,13 +173,14 @@ pub(crate) fn acl_revoke(
 
 /// Filter a fleet of agent IDs to only those the user can access.
 ///
-/// System admins see everything; regular users see only agents with an ACL
-/// entry. When auth is disabled (`auth_user` is `None`), all agents pass.
+/// `can_manage_all_agents` holders (manager+) see everything; regular users see
+/// only agents with an ACL entry. When auth is disabled (`auth_user` is `None`),
+/// all agents pass.
 pub(crate) fn filter_fleet(state: &Mutex<Backend>, agent_ids: &[String], auth_user: Option<&User>) -> Vec<String> {
     let Some(user) = auth_user else {
         return agent_ids.to_vec();
     };
-    if user.role == UserRole::Admin {
+    if user.can_manage_all_agents() {
         return agent_ids.to_vec();
     }
     let Ok(b) = state.lock() else {
