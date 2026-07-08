@@ -415,6 +415,7 @@ mod tests {
             name: "Plan".into(),
             status: ThreadTurn::MyTurn,
             archived: false,
+            paused: false,
             last_activity_ms: 1_700,
             msg_count: 3,
         });

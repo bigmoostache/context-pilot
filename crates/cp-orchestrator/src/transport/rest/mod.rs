@@ -188,6 +188,17 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
         Ok(entry) => entry,
         Err(reply) => return reply,
     };
+    // Fail closed (R2-8/V9): a cost-incurring command on a tripped-breaker agent
+    // is refused with 503, so no new spend is admitted while the agent is over
+    // budget. Control-plane commands (stop/interrupt/…) incur no spend and are
+    // never blocked — the user must always be able to halt a runaway agent.
+    if command.kind.is_cost_incurring() {
+        if let Ok(b) = state.lock() {
+            if b.breaker.is_tripped(id) {
+                return HttpReply::error(503, "cost breaker tripped");
+            }
+        }
+    }
     let dedup_token = command.dedup_token.clone();
     match AgentChannel::from_entry(&entry).send(command) {
         Ok(ack) => {

@@ -3122,6 +3122,10 @@
   path: Cargo.lock
   description: Workspace lockfile
   last_edited_ms: 0
+3954975f917b2e19:
+  path: .github/checks/check-frontend-suppressions.sh
+  description: 'Frontend anti-suppression guard (web-lint P4, twin of check-vault-bypass.sh). Two invariants, CI-side, independent of ESLint config: (1) STOWAWAY — no inline eslint-disable/@ts-ignore/@ts-nocheck/@ts-expect-error/@ts-check in web/src (excl generated/**); the BANNED regex anchors to real directive position `(//|/*)<ws>keyword` so backtick-wrapped mentions in prose don''t false-positive. (2) bidirectional config⇄registry audit — every `"<rule>": "off"` scoped override in eslint.config.ts must have a matching entry in allowed-eslint-exceptions.yaml and vice-versa (the ''*'' wildcard globalIgnore doc is exempt). Dual-mode: no args = full CI scan (both invariants); with args = callback stowaway-grep on given files. BSD/macOS-safe ([[:space:]] not \s). Wired in ci.yml Structure job.'
+  last_edited_ms: 0
 396a7b95e2355a50:
   path: crates/cp-mod-console/src/pollers.rs
   description: FilePoller (tails log file every 100ms into RingBuffer, grace read on stop) + StatusPoller (polls server status every 500ms, marks dead on exit/unreachable).
@@ -3802,6 +3806,10 @@
   path: ui/src/components/agents/FleetDashboard.tsx
   description: Fleet welcome dashboard — mission control + EXCLUSIVE agent create/manage surface. Greeting, aggregate stat strip, AgentCard grid (status/branch/model/thread pills/cost, Open→agent threads, Manage→modal), New-agent card, create/manage/archive modal. Thread stats from threadDetails by agentId.
   last_edited_ms: 1781516507817
+447a9140efd23d2f:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 44845c8d348a6463:
   path: src/app/run/streaming.rs
   description: Stream event processing with flame!("stream") + flame!("finalize_stream"). Chunk→typewriter, ToolUse→pending, Done→finalize. Error retry up to MAX_API_RETRIES. finalize_stream() resets spine counters, updates cache engine. No PendingForm guard.
@@ -6190,6 +6198,10 @@
   path: web/src/components/shell/config/ConfigPanes.tsx
   description: 'Config category panes + building blocks: CATEGORIES, CategoryBody, GeneralPane (useProviders() hook + ModelPicker + apply-to-all via sendCommand configure), KeyRow (live reveal/edit via API, T446: pencil button for unset keys), StatusRow, ToggleRow, DevModeToggle. Key panes lock when company-managed OR non-admin.'
   last_edited_ms: 0
+7173f613c77a3139:
+  path: .github/workflows/ci.yml
+  description: 'Unified CI: 3 jobs — rust (fmt+clippy+build+test), structure (file-lengths/folder-sizes/lint-exceptions/lint-config-hashchain/web-structure/vault-bypass/frontend-suppressions), contract (OpenAPI+TS drift). web-lint P4 added the ''Check frontend suppressions'' step (check-frontend-suppressions.sh) to the Structure job after vault-bypass. Contract job installs web deps via pnpm; action-setup pinned to pnpm 11.6.0 (matches pnpm-11 lockfile + web/pnpm-workspace.yaml allowBuilds/packages). Triggers: push/PR to master.'
+  last_edited_ms: 0
 718d9f6f398a7051:
   path: src/ui/ir/render_conversation.rs
   description: 'IR-controlled chrome: border, title, scrollbar, auto-scroll. Delegates content to build_content_cached(). Question form + autocomplete overlay rendering via IR data.'
@@ -6742,6 +6754,10 @@
   path: docs/design-orchestration-backend.md
   description: 'Orchestration backend design doc, v7 (branch maquette). Code-grounded three-tier durability: ① bridge-owned append-only fsync''d OPLOG (authoritative: command effects, rev, seen-marks, phase, lifecycle, cost + immutable content-addressed body store) + ② existing UNTOUCHED PersistenceWriter mutable coalesced state cache (messages/{uid}.yaml, NOT load-bearing for durability) + ③ lossy UDS stream. v7''s two answers + one subtraction (round-2 senior review, thread T36): (1) I13 BODY-BEFORE-REFERENCE BARRIER — a content hash may appear in a durable oplog entry only after its body is durable; small bodies inlined in the same fsync''d append, large bodies spill tmp→fdatasync→rename before the referencing entry commits; crash-in-gap = orphan body (GC''d), never dangling ref; ''accepted=durable'' now covers contents not just envelope (V12). (2) I2 EXECUTION MODEL — the main loop NEVER fsyncs; each oplog append (incl phase transitions) is a lock-free enqueue; a dedicated oplog thread group-commits (one fdatasync/group, off-loop); command-accept ack (I11) runs on intake/oplog thread (V11). (3) SECURITY SUBTRACTION — v1 command authn = perms (0700/0600) + presence-checked bearer cap_token; HMAC/nonce/rotation deferred to remote-transport seam (G7); new I9b keeps the frontend WS single-use ticket re-justified as browser confused-deputy/DNS-rebind defense. I1-I13, K1-K9, R2-*, V1-V12 fault matrix. Companions: architecture-adversarial-analysis.md, roadmap.md. NOT implemented (discussion).'
   last_edited_ms: 1781611846758
+7aed3f2a8a4a8a00:
+  path: .github/checks/lint-config.chain
+  description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
+  last_edited_ms: 0
 7b025083254ffc33:
   path: crates/cp-orchestrator/src/transport/rest/mod.rs
   description: 'REST resource handlers. fleet() filtered by auth_user ACL (FR-12). command() dispatches commands. rename_agent (T328), upload/delete avatar (T338). threads() prefers view roster. mint_ticket embeds auth_user.id (Phase 7). claude_usage() proxies Anthropic OAuth /api/oauth/usage (T451). resolve_entry. Backend re-exported from backend.rs. Submodules: create, lifecycle, library, thread_shape, backend, env_keys, releases. Re-exports env_key_reveal, env_key_update, env_keys_list, deploy_fleet, restart_orchestrator, and release handlers.'
@@ -7378,6 +7394,10 @@
   path: crates/cp-mod-console/Cargo.toml
   description: 'Console module deps: cp-base, cp-render, crossterm, serde, serde_json, regex.'
   last_edited_ms: 1780563847609
+8786f5cc46e447e6:
+  path: crates/cp-orchestrator/tests/supervisor_lifecycle.rs
+  description: Phase 28 (X795) backend supervisor lifecycle suite (4 tests, all green, ~15s). Black-box public-API + real OS processes. SIGTERM→grace→SIGKILL escalation, multi-agent fleet spawn/stop, adopted FOREIGN process signalled, check_liveness routes.
+  last_edited_ms: 0
 878f5e48c6c0c4ae:
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. Tabs+history+nav+selection+drag-drop+statusbar+marquee. PinnedFolder type + loadPins/pinsKey localStorage helpers. ContextMenu wired with onOpen/onDownload/onTag/onPin. No GetInfo state/import/rendering. Quick Look panel CLOSED by default; opens on single-click of a file.
@@ -8398,6 +8418,10 @@
   path: web/src/lib/api/generated/sdk.gen.ts
   description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
   last_edited_ms: 1782423397512
+9b0619dfe1571250:
+  path: crates/cp-orchestrator/tests/transport_http.rs
+  description: Phase 30 transport surface tests over a real tiny_http server (4 tests). Backend::new takes 6 args (auth=None, session_ttl). ticket_mint_and_command_status_codes asserts tripped breaker blocks cost-incurring send_message (503) but NOT control-plane stop (≠503). REST rev-envelope+404, SSE ticket gate single-use, Last-Event-ID replay.
+  last_edited_ms: 0
 9b41ca57f6386942:
   path: web/src/components/finder/preview/previewParts.tsx
   description: 'Shared Finder preview leaf renderers: IconBtn, PreviewStatus, TruncatedNote, MarkdownPreview, TextPreview, FolderPreview, Generic, Meta/Row, Empty. Imported by both FinderPreview shell and livePreviews. 173 lines.'
@@ -8933,6 +8957,10 @@ a3a8daa167736d62:
 a3b86992245bba9c:
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (493 LOC). Owns view state + derived listings + render; delegates fs mutations/nav to useFinderActions, selection/open/tab/menu to useFinderSelection, keyboard to useFinderKeyboard, external drag to useExternalDragUpload, DOWNLOADS to useFinderDownloads (web-lint P2 split), bottom chrome to FinderOverlays. QuickLook = modal shadcn Sheet (grid+list). T334 revealPath navigates to a file's parent + selects it.
+  last_edited_ms: 0
+a3c75a45a15f470b:
+  path: crates/cp-wire/tests/protocol.rs
+  description: 'Phase 21 (X788): cp-wire protocol coverage at public-API boundary. Every OpEntryKind variant JSON round-trip incl Checkpoint{Snapshot} (the inline tests skip CommandEffect/SeenMark/Lifecycle/CostAggregate/Checkpoint), checkpoint-carries-faithful-snapshot (GAP1 fast-replay reseed integrity), accepts() N-1 window sweep 0..PV+4, ContentHash to_hex/from_hex bijection + uppercase-accepted + malformed-rejected-never-panic, SeenSet evict_through retires exactly acked tokens + rev_of preserved, Heads upsert last-write-wins-per-thread (I3 bounded). serde_json used directly; crc32c/serde/sha2 acked as _. 7 tests.'
   last_edited_ms: 0
 a4282b39d6c4fdb9:
   path: src/infra/tools.rs
@@ -9561,6 +9589,10 @@ af8791537e1236b6:
 af989af82653ce47:
   path: .git/index
   description: Git index (binary). Not source.
+  last_edited_ms: 0
+afd31e44bf857b9c:
+  path: crates/cp-wire/src/types/snapshot.rs
+  description: 'Bounded replay snapshot: Snapshot{heads,seen,roster}. Heads (per-thread/panel content hashes) + SeenSet (dedup-tokens, evicted by acked-rev) + roster:Vec<RosterThread> (#[serde(default)] for N-1 tolerance). RosterThread{thread_id,name,status:ThreadTurn,archived,paused,last_activity_ms,msg_count} = the live thread list + fold helpers (fold_created via ThreadCreation<''src>, fold_archived, fold_paused, fold_deleted, fold_status, fold_message). Checkpoint carries the whole Snapshot. Tests: round-trip, with-roster, tolerant-decode, fold-helpers.'
   last_edited_ms: 0
 afd5f6a171e03b31:
   path: website/docs/keyboard.html
@@ -10858,6 +10890,10 @@ c6e75c6dd4531284:
   path: src/app/actions/streaming.rs
   description: 'Streaming action handlers: AppendChars (typewriter), StreamDone (token accounting, cache correction), StreamError (logging, truncation). Per-stream/total/tick token accumulation in apply_token_usage().'
   last_edited_ms: 0
+c72aaf91f2310ccd:
+  path: crates/cp-orchestrator/tests/services_integration.rs
+  description: 'Phase 29 (X796) backend services integration suite (4 tests, green, ~0.1s). Drives MaterializedView+CostBreaker+StreamHub TOGETHER against real cp-oplog via Tailer: restart rebuild, real segment-roll checkpoint, R2-17 reconcile, fleet isolation.'
+  last_edited_ms: 0
 c72db20f11261c9f:
   path: src/ui/help/config_overlay/budget_bars.rs
   description: Budget bars adapter for config overlay. Renders ConfigBudgetBar IR entries as filled/empty block bars with semantic colors. 24-cell bar width.
@@ -11082,6 +11118,10 @@ cb3ba8cb29ca642b:
   path: web/src/components/ui/tooltip.tsx
   description: shadcn-style Tooltip on Base UI tooltip primitive (Provider/Root/Trigger/Content). Portaled, arrow, side/align positioning, tw-animate. Frozen maquette UI primitive; T289 InfoBadge uses the Popover variant instead.
   last_edited_ms: 1782037386590
+cbb3d21aa5745cd4:
+  path: crates/cp-wire/tests/framing_integrity.rs
+  description: 'Phase 21 (X788): exhaustive framing integrity suite — the V1 torn-tail property at byte granularity. Truncate at EVERY offset (clean-prefix-only, never fabricated frame), single-byte-flip at every offset (detected-or-byte-identical, never silent-different), payload-region corruption always CrcMismatch, trailing garbage doesn''t corrupt first decode, sub-header buffers Incomplete-never-panic, oversized len-prefix rejected-not-allocated, zero-length payload round-trips. Lib-only deps acked via use crc32c/serde/serde_json/sha2 as _ (per-target unused-crate-dependencies). 8 tests.'
+  last_edited_ms: 0
 cbb71fe5106157bc:
   path: crates/cp-mod-logs/src/types.rs
   description: 'Log entry types. LogEntry: id, timestamp_ms, datetime, content, importance (no tags). LogsState: logs Vec + next_log_id counter. ms_to_iso() helper.'
@@ -12646,6 +12686,10 @@ ec35e41e73d1b8fc:
   path: crates/cp-mod-tree/src/panel.rs
   description: Tree panel. Background cache system for directory tree rendering. TreeCacheRequest data payload. Pagination. refresh_stale_from_yaml() call in apply_cache_update triggers second rebuild if descriptions changed.
   last_edited_ms: 0
+ec5352e985ca1cf9:
+  path: crates/cp-orchestrator/tests/registry_channel.rs
+  description: 'Phase 27 (X794) backend↔agent seam suite (4 tests, all green). Drives discovery+channel against real cp-mod-bridge artifacts: boot→Appeared→quiet scan→Disappeared, Stale transition, body spill→hydrate, command send→exactly-once dedup.'
+  last_edited_ms: 0
 ec70b48bbfb8d39a:
   path: ui/src/components/shell/TopBar.tsx
   description: macOS title bar. App mark (Home)→fleet. At fleet altitude no agent is selected → shows 'Mission control' caption (switcher + branch/cost chips hidden); inside an agent shows AgentSwitcher + per-agent segmented switcher Threads·Cockpit·Finder + branch+cost. Far-right Settings gear opens ConfigModal. ThemeToggle.
@@ -12734,6 +12778,10 @@ ee094a5116fc9a90:
   path: ui/src/components/finder/FinderPreview.tsx
   description: 'QuickLook preview pane. Kind-aware bespoke renders: code (line numbers + keyword tint), spreadsheet (A/B/C grid), slide deck (hero + thumbnails), PDF (paper mock), image (gradient), markdown/json/text, folder summary. Metadata footer (kind/size/modified/path).'
   last_edited_ms: 1781516507787
+ee0f3fac95d2384d:
+  path: crates/cp-orchestrator/tests/end_to_end.rs
+  description: Phase 30 end-to-end loopback capstone (3 tests). Backend::new takes 6 args (auth=None, session_ttl). Real agent stack ↔ real backend transport over real sockets. Command journals on agent and re-emerges as SSE delta. Spilled body hydrates over REST. 25 SSE connect/disconnect soak cycles.
+  last_edited_ms: 0
 ee110577b062c7b6:
   path: web/src/lib/support/models.ts
   description: LLM provider+model frontend layer. Fetches from GET /api/providers, enriches with Lucide icons (ONLY frontend-maintained data). useProviders() TanStack hook. Lookup helpers (findProvider/findModel/defaultModel/resolveSelection/resolveFromApiName) take providers[] as first arg. ~171 lines (was ~374 hardcoded).
@@ -12946,6 +12994,10 @@ f20eb801fafd5941:
   path: ui/src/components/agents/FleetShell.tsx
   description: 'Fleet shell — mission-control workspace shown when no agent is focused. NO sidebar (T18): single page with a top segmented [Agents | Prompts] toggle (full-bleed divider, control centred to shared FLEET_MAX_W·px-8 so it aligns with the page heading below). Exports FLEET_MAX_W (max-w-[960px]) — single source of truth shared by both sub-pages. Renders FleetDashboard or PromptsPage full-bleed. Usage moved into Settings dialog; Settings via TopBar gear. Prop: onOpenAgent.'
   last_edited_ms: 1781545320174
+f2114898fd5cab46:
+  path: crates/cp-orchestrator/tests/fleet_soak.rs
+  description: Phase 9.4 (X869) multi-agent soak + fleet-scale fault-matrix slice (2 tests). 16 agents concurrent contended workloads, gap-free+isolated projections. Flooded reordered subscriber coalesces then reconciles.
+  last_edited_ms: 0
 f212eee88adf98ea:
   path: crates/cp-orchestrator/Cargo.toml
   description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal) + serde + serde_json + serde_yaml + tiny_http (0.12) + notify (oplog inotify) + portable-pty 0.9 (X896 safe pty) + calamine 0.26 & csv 1 (T282 Finder spreadsheet→table preview). dev: cp-mod-bridge + tempfile. lib+bin. Workspace lints.'
@@ -13477,6 +13529,10 @@ fae88340a69a0bd9:
 fb00c83eb8aa781c:
   path: src/app/actions/streaming.rs
   description: 'Streaming action handlers: AppendChars (typewriter), StreamDone (token accounting, cache correction), StreamError (logging, truncation). Per-stream/total/tick token accumulation in apply_token_usage().'
+  last_edited_ms: 0
+fb05c93580e3881b:
+  path: .github/checks/protected-files.yaml
+  description: Protected files list for hash chain verification
   last_edited_ms: 0
 fb0ac1343206fd00:
   path: web/src/components/threads/ThreadList.tsx

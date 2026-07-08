@@ -9,7 +9,7 @@
 #
 # Sub-checks:
 #   1. cargo build [--release in --ci]
-#   2. cargo test
+#   2. cargo test --workspace  (all 26 crates + the tui binary, not just tui)
 #
 # Repo root via git so it is cwd-independent.
 set -uo pipefail
@@ -27,8 +27,8 @@ else
   cargo build --release 2>&1 || fail=1
 fi
 
-echo "=== cargo test ==="
-cargo test 2>&1 || fail=1
+echo "=== cargo test --workspace ==="
+cargo test --workspace 2>&1 || fail=1
 
 if [ "$fail" -eq 0 ]; then
   echo "check-rust-tests OK ($MODE): build · test ✓"

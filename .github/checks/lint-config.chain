@@ -4549,3 +4549,30 @@ index dc3e02a7..63a9c4c3 100644
 +  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-ts-tests.sh" --callback
 +  last_edited_ms: 1783511056445
 # --- End entry #29 ---
+30:a8405566f8a76820278a9b82ab8b253c34cd042496ecaaf28a7b0cd0a8ec537b:866acd4ef44341a5f1bd6870f86b8083825b833d6c4dd9828a0c6b0a971050f8:5ccbe8884a9efeb1871c34f9c6ab93f227c9a9b1bead2dbe4af32dc39218aab2
+# --- Diff for entry #30 ---
+diff --git a/.github/checks/check-rust-tests.sh b/.github/checks/check-rust-tests.sh
+index cb70835d..6c79b9ac 100755
+--- a/.github/checks/check-rust-tests.sh
++++ b/.github/checks/check-rust-tests.sh
+@@ -9,7 +9,7 @@
+ #
+ # Sub-checks:
+ #   1. cargo build [--release in --ci]
+-#   2. cargo test
++#   2. cargo test --workspace  (all 26 crates + the tui binary, not just tui)
+ #
+ # Repo root via git so it is cwd-independent.
+ set -uo pipefail
+@@ -27,8 +27,8 @@ else
+   cargo build --release 2>&1 || fail=1
+ fi
+ 
+-echo "=== cargo test ==="
+-cargo test 2>&1 || fail=1
++echo "=== cargo test --workspace ==="
++cargo test --workspace 2>&1 || fail=1
+ 
+ if [ "$fail" -eq 0 ]; then
+   echo "check-rust-tests OK ($MODE): build · test ✓"
+# --- End entry #30 ---

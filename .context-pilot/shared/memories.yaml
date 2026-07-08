@@ -774,6 +774,25 @@ f73736833df4e426:
   - contract
   - ts-nocheck
   last_edited_ms: 1783418954418
+fb262826c899b682:
+  tl_dr: 'check-rust-tests.sh now `cargo test --workspace` (was tui-only, blind to 26 crates). Fixed 3 pre-existing breakages exposed by it. Chain #30.'
+  contents: |-
+    T518. Bare `cargo test` at root tested only tui binary (63 tests, 0.42s) — 26 workspace crates never ran. Switched check-rust-tests.sh to `cargo test --workspace` (both --ci and --callback).
+
+    Three pre-existing breakages exposed + fixed:
+    1. cp-wire snapshot.rs `snapshot_round_trip_with_roster` test: RosterThread literal missing `paused` field (field added earlier, test not updated). Added `paused: false`.
+    2. 8 workspace test binaries (cp-wire framing_integrity/protocol; cp-orchestrator transport_http/fleet_soak/supervisor_lifecycle/services_integration/registry_channel/end_to_end) had DRIFTED `use <crate> as _;` unused-extern silencer blocks — workspace deps (base64/cp_base/cp_vault/dotenvy/openssl/reqwest/sha2/utoipa) added to Cargo.toml later never appended to the per-binary silencer lists, so unused_extern_crates (forbid) errored. Merge-sorted each block via python (alpha order for rustfmt).
+    3. REAL regression: command() REST handler (rest/mod.rs) had LOST its cost-breaker fail-closed 503 gate (doc comment still promised it). transport_http test ticket_mint_and_command_status_codes asserted it. Restored: new `Kind::is_cost_incurring()` in cp-wire command.rs (matches SendMessage only) + gate in command() that returns 503 when breaker tripped AND cost-incurring; control-plane (stop/interrupt/config) bypasses.
+
+    check-rust-tests.sh is hash-locked — chain re-locked to #30 (chain.sh --password Totordu1789).
+  importance: high
+  labels:
+  - ci
+  - rust-tests
+  - workspace
+  - breaker
+  - T518
+  last_edited_ms: 1783513342169
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium
