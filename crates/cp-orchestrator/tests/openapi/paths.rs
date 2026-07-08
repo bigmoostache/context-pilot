@@ -68,7 +68,9 @@ pub(super) fn paths() -> Value {
                     "default_provider": { "type": "string" },
                     "default_model": { "type": "string" },
                     "onboarding_completed": { "type": "boolean" },
-                    "allowed_models": arr(json!({ "type": "string" }))
+                    "allowed_models": arr(json!({ "type": "string" })),
+                    // Access-control master flag toggle (design §13.10).
+                    "access_control": { "type": "boolean" }
                 }
             })), r("AppSettings"))
         ),

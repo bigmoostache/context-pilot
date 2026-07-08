@@ -1,12 +1,12 @@
-import { Boxes, Coins, Package, Sliders } from "lucide-react"
+import { Boxes, Coins, KeyRound, Package, Sliders } from "lucide-react"
 
-/** Settings category identifiers (the four cockpit config panes). */
-export type CatId = "general" | "usage" | "services" | "releases"
+/** Settings category identifiers (the cockpit config panes). */
+export type CatId = "general" | "usage" | "services" | "secrets" | "releases"
 
 /**
- * The config pane catalogue: order, labels, blurbs, icons and the `adminOnly`
- * gate. Kept in its own module (not beside {@link CategoryBody}) so importing
- * this data never trips Fast Refresh's component-only-export rule.
+ * The config pane catalogue: order, labels, blurbs, icons and the `adminOnly` /
+ * `superadminOnly` gates. Kept in its own module (not beside {@link CategoryBody})
+ * so importing this data never trips Fast Refresh's component-only-export rule.
  */
 export const CATEGORIES: {
   id: CatId
@@ -15,10 +15,20 @@ export const CATEGORIES: {
   icon: typeof Sliders
   count?: number
   adminOnly?: boolean
+  /** Renders only for a superadmin (`can_manage_secrets`) — or in god-mode when
+   *  access control is off (design §13.5/§13.10). */
+  superadminOnly?: boolean
 }[] = [
   { id: "general", label: "General", blurb: "Models & autonomy", icon: Sliders },
   { id: "usage", label: "Usage & Cost", blurb: "Spend & token analytics", icon: Coins },
   { id: "services", label: "Services", blurb: "Available integrations", icon: Boxes },
+  {
+    id: "secrets",
+    label: "Secrets",
+    blurb: "Provider API keys & Claude login",
+    icon: KeyRound,
+    superadminOnly: true,
+  },
   {
     id: "releases",
     label: "Releases",

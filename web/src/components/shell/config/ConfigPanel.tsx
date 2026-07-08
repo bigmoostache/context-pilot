@@ -25,7 +25,13 @@ export function ConfigPanel({ variant = "dialog" }: { variant?: "dialog" | "inli
   const [cat, setCat] = useState<CatId>("general")
   const { user: authUser, authEnabled } = useAuth()
   const isAdmin = authEnabled === false || authUser?.role === "admin"
-  const visibleCategories = CATEGORIES.filter((c) => !c.adminOnly || isAdmin)
+  // Secrets is superadmin-only (`can_manage_secrets`). In god-mode (access
+  // control off ⇒ authEnabled false, no user) the single-user appliance viewer
+  // is treated as superadmin so it can still manage keys (design §13.5/§13.10).
+  const isSuperadmin = authEnabled === false || authUser?.role === "superadmin"
+  const visibleCategories = CATEGORIES.filter(
+    (c) => (!c.adminOnly || isAdmin) && (!c.superadminOnly || isSuperadmin),
+  )
   const inline = variant === "inline"
 
   return (

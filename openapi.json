@@ -214,6 +214,9 @@
       },
       "AppSettings": {
         "properties": {
+          "access_control": {
+            "type": "boolean"
+          },
           "allowed_models": {
             "items": {
               "type": "string"
@@ -260,6 +263,7 @@
           "onboarding_completed",
           "is_admin",
           "auth_enabled",
+          "access_control",
           "providers",
           "allowed_models"
         ],
@@ -5628,6 +5632,9 @@
             "application/json": {
               "schema": {
                 "properties": {
+                  "access_control": {
+                    "type": "boolean"
+                  },
                   "allowed_models": {
                     "items": {
                       "type": "string"

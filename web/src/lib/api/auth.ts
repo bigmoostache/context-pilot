@@ -110,6 +110,9 @@ export function updateSettings(patch: {
   default_model?: string
   onboarding_completed?: boolean
   allowed_models?: string[]
+  /** Access-control master flag (design §13.10). Asymmetric server gate:
+   *  enable = anyone, disable = superadmin. */
+  access_control?: boolean
 }): Promise<AppSettings> {
   return sdk(postApiSettings({ body: patch }))
 }

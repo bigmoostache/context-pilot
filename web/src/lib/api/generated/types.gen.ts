@@ -67,6 +67,7 @@ export type AgentMetrics = {
 };
 
 export type AppSettings = {
+    access_control: boolean;
     allowed_models: Array<string>;
     auth_enabled: boolean;
     default_model?: string | null;
@@ -2833,6 +2834,7 @@ export type GetApiSettingsResponse = GetApiSettingsResponses[keyof GetApiSetting
 
 export type PostApiSettingsData = {
     body: {
+        access_control?: boolean;
         allowed_models?: Array<string>;
         default_model?: string;
         default_provider?: string;
