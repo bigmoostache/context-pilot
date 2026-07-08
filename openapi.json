@@ -322,7 +322,9 @@
           },
           "role": {
             "enum": [
+              "superadmin",
               "admin",
+              "manager",
               "user"
             ],
             "type": "string"
@@ -374,7 +376,9 @@
           },
           "role": {
             "enum": [
+              "superadmin",
               "admin",
+              "manager",
               "user"
             ],
             "type": "string"

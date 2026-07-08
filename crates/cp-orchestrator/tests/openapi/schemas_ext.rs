@@ -105,7 +105,7 @@ pub(super) fn transport() -> Value {
                 "id": { "type": "string" },
                 "email": { "type": "string" },
                 "name": { "type": "string" },
-                "role": { "type": "string", "enum": ["admin", "user"] },
+                "role": { "type": "string", "enum": ["superadmin", "admin", "manager", "user"] },
                 "must_change_password": { "type": "boolean" },
                 "created_at": { "type": "integer" },
                 "updated_at": { "type": "integer" }
@@ -119,7 +119,7 @@ pub(super) fn transport() -> Value {
                 "id": { "type": "string" },
                 "email": { "type": "string" },
                 "name": { "type": "string" },
-                "role": { "type": "string", "enum": ["admin", "user"] },
+                "role": { "type": "string", "enum": ["superadmin", "admin", "manager", "user"] },
                 "must_change_password": { "type": "boolean" },
                 "created_at": { "type": "integer" },
                 "updated_at": { "type": "integer" },

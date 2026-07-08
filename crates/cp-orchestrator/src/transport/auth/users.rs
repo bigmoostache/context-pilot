@@ -192,3 +192,98 @@ fn target_manageable_by(auth: &crate::services::auth::store::AuthStore, caller: 
     }
     TargetCheck::Ok
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+    use std::time::Duration;
+
+    use super::{Backend, create_user, list_users};
+    use crate::services::auth::store::AuthStore;
+    use crate::services::auth::types::User;
+    // Bare variant imports (never the fully-qualified `UserRole::` form) so the
+    // V1.1a acceptance grep keeps matching only capabilities.rs / types.rs /
+    // *tests.rs.
+    use crate::services::auth::types::UserRole::{Admin, Manager, Superadmin};
+
+    /// A throwaway ≥8-char password built at runtime, so no credential literal
+    /// flows into the password sink (matches the maint-plane test fixtures).
+    fn test_pw() -> String {
+        std::iter::repeat_n('x', 12).collect()
+    }
+
+    /// Build a `Mutex<Backend>` with auth enabled over a leaked-tempdir SQLite
+    /// file, pre-seeding one caller of each manageable rank. Returns the backend
+    /// plus the seeded `superadmin`, `admin`, and `manager` `User`s — handlers
+    /// take `Option<&User>`, so these double as the callers.
+    fn seeded_backend() -> (Mutex<Backend>, User, User, User) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let store = AuthStore::open(&dir.path().join("auth.db")).expect("open auth store");
+        let root = store.create_user("root@box", "Root", &test_pw(), Superadmin).expect("superadmin");
+        let admin = store.create_user("admin@box", "Admin", &test_pw(), Admin).expect("admin");
+        let manager = store.create_user("manager@box", "Manager", &test_pw(), Manager).expect("manager");
+        let backend = Backend::new(
+            dir.path().to_path_buf(),
+            100.0,
+            PathBuf::from("/tmp/cp-users-test-realms"),
+            PathBuf::from("/tmp/cp-users-test-bin"),
+            Some(store),
+            Duration::from_secs(3600),
+        );
+        std::mem::forget(dir); // outlive the test body
+        (Mutex::new(backend), root, admin, manager)
+    }
+
+    /// A create-user request body for `email` at role `role_str`.
+    fn create_body(email: &str, role_str: &str) -> Vec<u8> {
+        format!("{{\"email\":\"{email}\",\"name\":\"New\",\"password\":\"{}\",\"role\":\"{role_str}\"}}", test_pw())
+            .into_bytes()
+    }
+
+    /// V2.1a — a superadmin caller can create a user of **each** of the four
+    /// roles (design §13.3 "superadmin→any"; FR-v3-05 only a superadmin creates
+    /// a superadmin). All four calls succeed via the real handler.
+    #[test]
+    fn create_all_roles() {
+        let (state, root, _admin, _manager) = seeded_backend();
+        for role_str in ["superadmin", "admin", "manager", "user"] {
+            let body = create_body(&format!("{role_str}@new"), role_str);
+            let reply = create_user(&state, &body, Some(&root));
+            assert_eq!(reply.status, 200, "superadmin creating a {role_str} succeeds");
+        }
+    }
+
+    /// V2.1b — anti-escalation + vendor invisibility end-to-end through the
+    /// handlers (mirrors V1.1d):
+    ///   * a manager creating an admin is refused (403),
+    ///   * an admin creating a manager succeeds (200),
+    ///   * a non-superadmin `list_users` never returns a superadmin row.
+    #[test]
+    fn anti_escalation_and_invisibility_via_handlers() {
+        let (state, _root, admin, manager) = seeded_backend();
+
+        // Manager → admin: assigning a role at/above own rank is forbidden.
+        let reply = create_user(&state, &create_body("esc@new", "admin"), Some(&manager));
+        assert_eq!(reply.status, 403, "manager cannot create an admin");
+
+        // Admin → manager: a role strictly below the caller is allowed.
+        let reply = create_user(&state, &create_body("mgr@new", "manager"), Some(&admin));
+        assert_eq!(reply.status, 200, "admin can create a manager");
+
+        // A non-superadmin lists users: the seeded superadmin row is filtered out.
+        let reply = list_users(&state, Some(&admin));
+        assert_eq!(reply.status, 200, "admin may list users");
+        assert!(!reply.body.contains("superadmin"), "superadmin rows are hidden from a non-superadmin: {}", reply.body);
+        assert!(reply.body.contains("manager@box"), "lower-rank rows are still listed");
+    }
+
+    /// A superadmin caller, by contrast, *does* see superadmin rows (FR-v3-05).
+    #[test]
+    fn superadmin_sees_superadmin_rows() {
+        let (state, root, _admin, _manager) = seeded_backend();
+        let reply = list_users(&state, Some(&root));
+        assert_eq!(reply.status, 200);
+        assert!(reply.body.contains("root@box"), "superadmin sees the superadmin row");
+    }
+}

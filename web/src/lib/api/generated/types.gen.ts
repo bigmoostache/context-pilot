@@ -96,7 +96,7 @@ export type AuthMe = {
     must_change_password: boolean;
     name: string;
     next_action: 'change_password' | 'onboarding' | 'ready';
-    role: 'admin' | 'user';
+    role: 'superadmin' | 'admin' | 'manager' | 'user';
     updated_at?: number;
 };
 
@@ -111,7 +111,7 @@ export type AuthUser = {
     id: string;
     must_change_password: boolean;
     name: string;
-    role: 'admin' | 'user';
+    role: 'superadmin' | 'admin' | 'manager' | 'user';
     updated_at?: number;
 };
 

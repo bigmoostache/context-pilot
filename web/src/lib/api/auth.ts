@@ -124,7 +124,7 @@ export function createUser(
   email: string,
   name: string,
   password: string,
-  role: "admin" | "user" = "user",
+  role: "superadmin" | "admin" | "manager" | "user" = "user",
 ): Promise<CreateUserResponse> {
   return sdk(postApiAuthUsers({ body: { email, name, password, role } }))
 }

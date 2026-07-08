@@ -40,9 +40,13 @@ impl User {
 
     /// Anti-escalation (FR-v3-03): may the caller create/promote/demote *to*
     /// `target`? Only to a role **strictly below** their own — nobody creates a
-    /// peer or a superior, nobody escalates themselves.
+    /// peer or a superior, nobody escalates themselves — with the one carve-out
+    /// that a `superadmin` may assign **any** role, including another
+    /// `superadmin` (design §13.3 "superadmin→any"; FR-v3-05 "only a superadmin
+    /// can create a superadmin"). This keeps vendor accounts creatable solely by
+    /// the vendor while every client role stays strictly-below-only.
     pub(crate) fn can_assign_role(&self, target: UserRole) -> bool {
-        target < self.role
+        self.role == UserRole::Superadmin || target < self.role
     }
 
     /// Vendor invisibility (FR-v3-05): may the caller see an account whose role
@@ -91,13 +95,14 @@ mod tests {
         }
     }
 
-    /// V0.2b — `can_assign_role` is true iff the target is strictly below self.
+    /// V0.2b — `can_assign_role` is true iff the target is strictly below self,
+    /// except a `superadmin` who may assign any role (design §13.3 "superadmin→any").
     #[test]
     fn anti_escalation() {
         let all = [Superadmin, Admin, Manager, Regular];
         for &caller in &all {
             for &target in &all {
-                let expected = target < caller;
+                let expected = target < caller || caller == Superadmin;
                 assert_eq!(user(caller).can_assign_role(target), expected, "{caller:?} → {target:?}");
             }
         }
