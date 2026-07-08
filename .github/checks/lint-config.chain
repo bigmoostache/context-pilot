@@ -397,3 +397,3555 @@ index a7521f77..0cd83915 100644
  stable_features = "forbid"
  static_mut_refs = "forbid"
 # --- End entry #24 ---
+25:b302ba41ae76a9610a8b4440f54493533ffd272adc91ad31c3c90b23df905d2a:a137e9d94cdc9b0c90f4e95e646968c6ce2c9e6afc053add3639b02de3efb573:8e2c34e305a93c4a5910333638660c7fcb560d46af785c1c8287d23f60b4c250
+# --- Diff for entry #25 ---
+diff --git a/.github/checks/protected-files.yaml b/.github/checks/protected-files.yaml
+index 31bc5889..e7d8f0c8 100644
+--- a/.github/checks/protected-files.yaml
++++ b/.github/checks/protected-files.yaml
+@@ -48,3 +48,37 @@
+   whole_file: true
+ - path: run.sh
+   whole_file: true
++
++# --- Frontend lint configuration (web-lint ratchet, P12) ---
++# The web twin of the Rust lint config above. Every file that DEFINES the
++# frontend ratchet (rulesets, strict flags, formatter/CSS/dead-code policy) or
++# ENFORCES it (the suppression + census guards + their baseline + the exception
++# registry). A silent relax of any is now tamper-evident. package.json is
++# deliberately NOT here: its typeCoverage floor is a secondary ratchet (the
++# primary any-ban is `no-explicit-any` inside the locked eslint.config.ts) and
++# whole-file locking would fight routine dependency bumps (the same reason
++# Cargo.toml locks only its lint sections, not its deps).
++- path: web/eslint.config.ts
++  whole_file: true
++- path: web/.prettierrc.json
++  whole_file: true
++- path: web/.prettierignore
++  whole_file: true
++- path: web/.stylelintrc.json
++  whole_file: true
++- path: web/knip.json
++  whole_file: true
++- path: web/tsconfig.app.json
++  whole_file: true
++- path: web/tsconfig.node.json
++  whole_file: true
++- path: .github/checks/check-frontend-suppressions.sh
++  whole_file: true
++- path: .github/checks/check-frontend-rule-census.sh
++  whole_file: true
++- path: .github/checks/frontend-rule-census.txt
++  whole_file: true
++- path: .github/checks/allowed-eslint-exceptions.yaml
++  whole_file: true
++- path: .github/checks/check-web-structure.sh
++  whole_file: true
+diff --git a/Cargo.toml b/Cargo.toml
+index 0cd83915..4a164f74 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,5 +1,5 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault"]
+ 
+ [workspace.package]
+ version = "0.1.0"
+@@ -1078,6 +1078,7 @@ cp-mod-firecrawl = { path = "crates/cp-mod-firecrawl" }
+ cp-mod-queue = { path = "crates/cp-mod-queue" }
+ cp-mod-ocr = { path = "crates/cp-mod-ocr" }
+ cp-mod-search = { path = "crates/cp-mod-search" }
++cp-vault = { path = "crates/cp-vault", features = ["bridge"] }
+ crossterm.workspace = true
+ ratatui.workspace = true
+ serde.workspace = true
+diff --git a/web/eslint.config.ts b/web/eslint.config.ts
+new file mode 100644
+index 00000000..58eeee48
+--- /dev/null
++++ b/web/eslint.config.ts
+@@ -0,0 +1,815 @@
++import js from "@eslint/js"
++import globals from "globals"
++import reactHooks from "eslint-plugin-react-hooks"
++import reactRefresh from "eslint-plugin-react-refresh"
++import eslintComments from "@eslint-community/eslint-plugin-eslint-comments"
++import unicorn from "eslint-plugin-unicorn"
++import eslintReact from "@eslint-react/eslint-plugin"
++import jsxA11y from "eslint-plugin-jsx-a11y"
++import regexp from "eslint-plugin-regexp"
++import promise from "eslint-plugin-promise"
++import importX from "eslint-plugin-import-x"
++import n from "eslint-plugin-n"
++import security from "eslint-plugin-security"
++import noUnsanitized from "eslint-plugin-no-unsanitized"
++import noSecrets from "eslint-plugin-no-secrets"
++import boundaries from "eslint-plugin-boundaries"
++import betterTailwind from "eslint-plugin-better-tailwindcss"
++import tseslint from "typescript-eslint"
++import { defineConfig, globalIgnores } from "eslint/config"
++import type { Linter } from "eslint"
++
++/**
++ * Frontend ESLint flat config — the Rust-parity strict stack (branch `web-lint`).
++ *
++ * Built as a RATCHET: plugin groups are switched on one phase at a time, each
++ * landing at `error` with its violations burned down before the next is added
++ * (see the P0→P13 roadmap). This file starts at the pre-existing effective
++ * ruleset (P0) and grows toward ~1,100–1,400 active rules.
++ *
++ * `src/lib/api/generated/**` is globally ignored: it is OpenAPI codegen output
++ * (regenerated by CB3/CB5), not hand-written — the analog of not linting Rust's
++ * generated bindings. It must never be hand-edited to satisfy a lint.
++ */
++export default defineConfig([
++  // Build artifacts + machine-generated code are never linted. Playwright e2e
++  // specs + their config are a separate surface (test-runner globals, their own
++  // idioms); they get a dedicated lint profile in P8 (test tooling), not the
++  // app's type-aware pass — ignore them here so `projectService` doesn't fault
++  // on files absent from the app/node tsconfigs.
++  globalIgnores(["dist", "src/lib/api/generated/**", "e2e/**", "playwright.config.ts"]),
++  {
++    files: ["**/*.{ts,tsx}"],
++    // P3 — the clippy-semantic twin. `strictTypeChecked` (superset of
++    // recommended + recommendedTypeChecked) adds the whole type-aware rule set
++    // — the analogue of clippy's `all + pedantic + nursery` correctness lints —
++    // and `stylisticTypeChecked` the type-informed stylistic pass. Both land at
++    // `error`; the gate runs `--max-warnings 0`. Type-aware rules require a
++    // TypeScript program, wired below via `parserOptions.projectService`.
++    extends: [
++      js.configs.recommended,
++      tseslint.configs.strictTypeChecked,
++      tseslint.configs.stylisticTypeChecked,
++      reactRefresh.configs.vite,
++      unicorn.configs.recommended,
++      // ── P6 React stack ──────────────────────────────────────────────────
++      // The frontend twin of clippy's React-domain correctness lints. Three
++      // presets, each landing at `error`:
++      //   • @eslint-react recommended-type-checked — the modern successor to
++      //     eslint-plugin-react (component/JSX correctness: unstable defaults,
++      //     unused/invalid props, context/effect misuse). Type-aware, so it
++      //     rides the projectService program wired below.
++      //   • react-hooks recommended-latest (v7) — the classic hooks pair PLUS
++      //     the compiler-aware rules (set-state-in-effect/render, immutability,
++      //     refs, purity, static-components). Replaces the P0 manual pinning;
++      //     exhaustive-deps is bumped from its recommended `warn` to `error` in
++      //     the rules block below (the P0→P6 deferral now comes due).
++      //   • jsx-a11y recommended — accessibility (alt text, roles, labels).
++      eslintReact.configs["recommended-type-checked"],
++      // `.configs.flat` is the flat-config surface of eslint-plugin-react-hooks
++      // v7 (the bare `.configs["recommended-latest"]` is the legacy eslintrc
++      // form — an array-of-strings `plugins`, which flat config rejects). The
++      // plugin types `.flat` as `any`, so cast it to an object with the SINGLE
++      // named key we read — a named-property cast (not a `Record<string, …>`
++      // index signature) so the access yields `Linter.Config` directly, without
++      // the `| undefined` that `noUncheckedIndexedAccess` adds to index-signature
++      // reads (and without a `!` assertion, banned here). This also clears the
++      // type-aware `no-unsafe-member-access` / `no-unsafe-assignment` rules that
++      // would otherwise flag reading a member off an `any` and spreading it in.
++      (reactHooks.configs.flat as { "recommended-latest": Linter.Config })["recommended-latest"],
++      // eslint-plugin-jsx-a11y ships no bundled types (its module is declared
++      // ambiently in types.d.ts to satisfy the strict `tsc` program), so its
++      // default export is `any`. Cast to an object with exactly the nested named
++      // property we use — again a named-property shape, not an index signature,
++      // so `.flatConfigs.recommended` is `Linter.Config` (no `| undefined`, no
++      // `noPropertyAccessFromIndexSignature` violation) and the surrounding
++      // `no-unsafe-*` rules stay clear.
++      (jsxA11y as { flatConfigs: { recommended: Linter.Config } }).flatConfigs.recommended,
++      // ── P7 correctness & security stack (added one plugin at a time) ────
++      // eslint-plugin-regexp — catches genuinely-buggy regular expressions
++      // (unused capture groups, super-linear backtracking, redundant/dead
++      // alternations, control-char confusables). Its `flat/recommended` lands
++      // at error; violations are real bugs, fixed at the source.
++      regexp.configs["flat/recommended"],
++      // eslint-plugin-promise — enforces correct Promise usage (every chain
++      // ends in a `.catch()` or is returned, no accidentally-swallowed
++      // rejections, no `return` inside `finally`, valid executor/`Promise.*`
++      // arg shapes). Its `flat/recommended` lands at error; violations are
++      // genuine async-correctness bugs or fixed with an explicit sink.
++      // eslint-plugin-promise ships an untyped default export (its `.configs`
++      // resolves to `any`), so — exactly like the jsxA11y cast above — narrow it
++      // to the single named config we read. A named-property cast (not an index
++      // signature) yields `Linter.Config` directly, so `noUncheckedIndexedAccess`
++      // adds no `| undefined` and the surrounding type-aware `no-unsafe-member-
++      // access` / `no-unsafe-assignment` rules stay clear.
++      (promise as { configs: { "flat/recommended": Linter.Config } }).configs["flat/recommended"],
++      // eslint-plugin-import-x — module-graph hygiene: no import cycles
++      // (import-x/no-cycle, wired at error in the rules block — the structural
++      // payoff of this plugin, the M141 layering guard's precursor), no
++      // duplicate imports, no self-import, valid named/default bindings. Two
++      // presets: `recommended` (the rule set) + `typescript` (wires
++      // eslint-import-resolver-typescript so the `@/*` tsconfig path aliases +
++      // extensionless `.ts`/`.tsx`/`.gen.ts` imports RESOLVE — without it
++      // no-cycle would silently under-trace the graph and no-unresolved would
++      // false-positive on every alias). The tsc-redundant resolution rules are
++      // relaxed in the rules block (tsc already proves them).
++      importX.flatConfigs.recommended,
++      importX.flatConfigs.typescript,
++      // eslint-plugin-security — heuristic detectors for injection/ReDoS/eval/
++      // unsafe-buffer classes of bug. Its `recommended` is flat-native and
++      // ships every rule at `warn`; the gate runs `--max-warnings 0`, and each
++      // kept rule is bumped to `error` in the rules block below (with the
++      // Node-only detectors staying inert here — no child_process/fs/require in
++      // a browser app — and the notorious detect-object-injection turned off,
++      // registered, as a pure-noise false-positive on typed record access).
++      // eslint-plugin-security ships no bundled types (declared ambiently in
++      // types.d.ts), so its default export is `any`. Cast to the single named
++      // config we read — a named-property shape (not an index signature) so
++      // `.configs.recommended` is `Linter.Config` directly (no `| undefined`
++      // under noUncheckedIndexedAccess, no `noPropertyAccessFromIndexSignature`
++      // violation) and the surrounding type-aware `no-unsafe-member-access` /
++      // `no-unsafe-assignment` rules stay clear — exactly the jsxA11y / promise
++      // cast idiom above.
++      (security as { configs: { recommended: Linter.Config } }).configs.recommended,
++      // eslint-plugin-no-unsanitized — bans assigning an unsanitized (non-
++      // literal, non-trusted) string to a DOM HTML sink: the `property` rule
++      // guards `.innerHTML`/`.outerHTML`/`.insertAdjacentHTML`-style property
++      // writes, the `method` rule guards `document.write`/`insertAdjacentHTML`/
++      // `DOMParser`-style calls. This is the raw-DOM XSS guard (distinct from
++      // @eslint-react's dangerouslySetInnerHTML rule wired in P6 — that one
++      // covers React's JSX prop; this one covers imperative DOM manipulation).
++      // Its `recommended` is flat-native (a `{ plugins, rules }` object, not the
++      // eslintrc `recommended-legacy`) and ships both rules at error. No bundled
++      // types (declared ambiently in types.d.ts) → its default export is `any`;
++      // cast to the single named config we read — a named-property shape (not an
++      // index signature) so `.configs.recommended` is `Linter.Config` directly
++      // (no `| undefined` under noUncheckedIndexedAccess) and the surrounding
++      // type-aware `no-unsafe-*` rules stay clear, the jsxA11y / promise /
++      // security cast idiom.
++      (noUnsanitized as { configs: { recommended: Linter.Config } }).configs.recommended,
++    ],
++    plugins: {
++      // react-hooks is now registered via its v7 `recommended-latest` flat
++      // preset in `extends` above (P6) — the manual P0 pinning to the classic
++      // rules-of-hooks + exhaustive-deps pair (and the `ESLint.Plugin` cast that
++      // bridged the plugin's then-unmodelled `.configs.flat` typing gap) is
++      // gone. The preset ships the compiler-aware rule set and the plugin key,
++      // so registering it here again would throw "Cannot redefine plugin".
++      //
++      // P4 anti-cheat layer: the eslint-comments plugin powers the ban on
++      // suppression directives (its `no-use` rule reports EVERY `eslint-disable`
++      // / `eslint-enable` comment). This is the frontend twin of the Rust
++      // `#[allow]`/`#[expect]` ban — lint suppression is forbidden inline; the
++      // only legal escape is a config-level scoped override, registered and
++      // justified in `.github/checks/allowed-eslint-exceptions.yaml`. Unlike
++      // react-hooks above, this plugin's default export already satisfies
++      // ESLint's `Plugin` type, so no cast is needed (one would be flagged
++      // unnecessary by @typescript-eslint/no-unnecessary-type-assertion).
++      "@eslint-community/eslint-comments": eslintComments,
++      // P7 eslint-plugin-no-secrets — no preset ships (empty `configs`), so the
++      // plugin is registered here and its rule enabled explicitly in the rules
++      // block below. Its default export satisfies ESLint's `Plugin` type (it
++      // bundles its own `.d.ts`), so — like eslint-comments above — no cast is
++      // needed. This is the frontend twin of the Rust vault-bypass guard: a
++      // hardcoded credential in the dumb render layer is an architecture
++      // violation (M141 — all secrets live server-side in cp-vault), and this
++      // rule catches a high-entropy literal before it can ever ship.
++      "no-secrets": noSecrets,
++      // P9 architecture boundaries (encodes M141 — frontend is the dumb render
++      // layer). eslint-plugin-boundaries ships no types (declared ambiently in
++      // types.d.ts), so its default export is `any`; narrow it to ESLint's
++      // `Plugin` shape at registration (a single `as` — meaningful any→Plugin,
++      // not a redundant assertion — which also clears no-unsafe-assignment). The
++      // layer model + direction rules live in `settings["boundaries/elements"]`
++      // + the `boundaries/dependencies` rule below.
++      boundaries: boundaries as import("eslint").ESLint.Plugin,
++    },
++    // ── P9 boundaries: the frontend layer model (M141) ────────────────────
++    // Elements are matched top-to-bottom, FIRST match wins — so the more
++    // specific paths precede the broader globs:
++    //   • generated — the OpenAPI codegen leaf (src/lib/api/generated).
++    //   • api — the hand-written SDK-wrapper layer (src/lib/api). The ONLY
++    //     layer allowed to value-import `generated` (also enforced by the
++    //     no-restricted-imports rule, which additionally permits `import type`).
++    //   • lib — every other shared support module (src/lib/*): query, live,
++    //     support, providers, mock, utils, types. Pure logic + data; MUST NOT
++    //     import the components layer (the M141 inversion this guard exists to
++    //     forbid).
++    //   • components — the render layer (src/components). May import lib + api.
++    //   • app — the composition root (src/App.tsx).
++    // markdown.tsx + finderFs.ts live under lib/support but EMIT JSX and render
++    // components, so they are classified `components` (view helpers), not `lib`
++    // — honest classification, not a suppression. Both are imported only by
++    // other components, so this creates no new cross-layer edge.
++    settings: {
++      "boundaries/elements": [
++        { type: "components", pattern: "src/lib/support/markdown.tsx", mode: "file" },
++        { type: "components", pattern: "src/lib/support/finderFs.ts", mode: "file" },
++        { type: "generated", pattern: "src/lib/api/generated", mode: "folder" },
++        { type: "api", pattern: "src/lib/api", mode: "folder" },
++        { type: "lib", pattern: "src/lib/*", mode: "folder" },
++        { type: "components", pattern: "src/components", mode: "folder" },
++        { type: "app", pattern: "src/App.tsx", mode: "file" },
++      ],
++      "boundaries/ignore": ["**/*.test.*", "**/*.spec.*"],
++      // boundaries resolves each import's target file via `eslint-module-utils/
++      // resolve`, which reads the classic `import/resolver` settings key — NOT
++      // the `import-x/resolver` key that importX.flatConfigs.typescript sets. So
++      // WITHOUT this, every import resolved to `undefined`, the target element
++      // was unknown, and `boundaries/dependencies` silently enforced NOTHING
++      // (default:disallow can't bite a dependency it can't classify — a toothless
++      // guard). Wiring the TypeScript resolver here (it reads tsconfig `paths`)
++      // makes the `@/*` alias + extensionless `.ts`/`.tsx` imports resolve, so
++      // both endpoints of every edge classify and the layer rules actually fire.
++      "import/resolver": { typescript: true },
++    },
++    languageOptions: {
++      globals: globals.browser,
++      // `projectService` gives every linted file its TypeScript program so the
++      // type-aware rules can query types. Config files not in a source tsconfig
++      // (eslint.config.ts, vite.config.ts) are covered by tsconfig.node.json's
++      // `include`. `tsconfigRootDir` anchors project discovery to this folder.
++      parserOptions: {
++        projectService: true,
++        tsconfigRootDir: import.meta.dirname,
++      },
++    },
++    // P4 anti-cheat: a stale `eslint-disable` that suppresses nothing is itself
++    // an error (belt-and-suspenders alongside the outright no-use ban below).
++    linterOptions: {
++      reportUnusedDisableDirectives: "error",
++    },
++    rules: {
++      // ── P4 anti-suppression layer (the crown jewel — Rust #[allow]-ban twin) ──
++      // Inline lint suppression is FORBIDDEN. The only legal escape is a
++      // config-level scoped override registered in
++      // .github/checks/allowed-eslint-exceptions.yaml (hash-locked) — never an
++      // inline comment. A grep-guard (check-frontend-suppressions.sh) enforces
++      // the same ban CI-side, independent of ESLint's own config.
++      //
++      // no-use bans EVERY eslint-disable/eslint-enable directive comment (any
++      // form: line, next-line, block, whole-file). no-unlimited-disable also
++      // catches a bare `eslint-disable` with no rule list.
++      "@eslint-community/eslint-comments/no-use": "error",
++      "@eslint-community/eslint-comments/no-unlimited-disable": "error",
++      // ── P7 no-secrets: hardcoded high-entropy string guard ──────────────
++      // Flags string literals whose Shannon entropy exceeds `tolerance` (or that
++      // match a known key pattern) — a hardcoded API key / token / secret. The
++      // frontend is the dumb render layer (M141): every credential is resolved
++      // server-side through cp-vault and reaches the browser only via an
++      // authenticated request, never as a literal. So any hit is either a real
++      // leak (fix at source — remove it) or a benign high-entropy constant
++      // (calibrated per-site). Default tolerance (4.0) is kept.
++      "no-secrets/no-secrets": "error",
++      // ── P9 M141 crown jewel: only lib/api may VALUE-import the generated
++      //    SDK. Type imports of the contract shape are allowed everywhere
++      //    (`allowTypeImports`) — consuming the generated *types* is the honest
++      //    contract coupling; importing the generated SDK *functions* outside
++      //    the api layer is the "frontend has backend logic" violation. The
++      //    api layer itself turns this off in a trailing block (registered). ──
++      "@typescript-eslint/no-restricted-imports": [
++        "error",
++        {
++          patterns: [
++            {
++              group: [
++                "@/lib/api/generated",
++                "@/lib/api/generated/*",
++                "**/api/generated",
++                "**/api/generated/*",
++              ],
++              allowTypeImports: true,
++              message:
++                "Import the hand-written wrapper from @/lib/api instead of the generated SDK directly (M141: only lib/api may value-import generated bindings; `import type` is allowed).",
++            },
++          ],
++        },
++      ],
++      // ── P9 layer-direction guard: encode the M141 dependency arrows as
++      //    errors. `default: "disallow"` means any import BETWEEN two known
++      //    elements that isn't explicitly allowed is an error (external/
++      //    node_modules imports are not local elements, so React etc. are
++      //    untouched). The one arrow that matters most: `lib` may NOT import
++      //    `components` — the dumb-render-layer inversion. Uses the v6
++      //    `boundaries/dependencies` rule + object dependency selectors
++      //    (`{ to: { type } }`); the legacy `element-types` name + bare-string
++      //    `allow` form was a silent no-op under v6's compat shim (it emitted a
++      //    "legacy selector syntax" warning and enforced NOTHING — a toothless
++      //    guard), so it is migrated in full here. ──
++      "boundaries/dependencies": [
++        "error",
++        {
++          default: "disallow",
++          rules: [
++            // Contract-shape coupling: ANY layer may `import type` from the
++            // generated bindings — consuming the generated *types* is honest
++            // (the API contract), it's only the generated *SDK functions*
++            // (value imports) that must stay inside lib/api. This mirrors the
++            // no-restricted-imports guard's `allowTypeImports: true`, so the two
++            // guards agree: type import of generated = allowed everywhere, value
++            // import of generated = allowed only in api (below + default:disallow).
++            {
++              from: [{ type: "*" }],
++              allow: [{ to: { type: "generated" }, dependency: { kind: "type" } }],
++            },
++            { from: [{ type: "generated" }], allow: [{ to: { type: "generated" } }] },
++            { from: [{ type: "api" }], allow: [{ to: { type: ["api", "lib", "generated"] } }] },
++            { from: [{ type: "lib" }], allow: [{ to: { type: ["lib", "api"] } }] },
++            {
++              from: [{ type: "components" }],
++              allow: [{ to: { type: ["components", "lib", "api"] } }],
++            },
++            {
++              from: [{ type: "app" }],
++              allow: [{ to: { type: ["app", "components", "lib", "api"] } }],
++            },
++          ],
++        },
++      ],
++      // ── P8 structure & complexity budgets (core-ESLint, the clippy
++      //    cognitive-complexity + folder-sizes twin) — CENSUS PASS ──────────
++      "max-lines": ["error", { max: 500, skipBlankLines: false, skipComments: false }],
++      "max-lines-per-function": [
++        "error",
++        { max: 150, skipBlankLines: true, skipComments: true, IIFEs: true },
++      ],
++      complexity: ["error", { max: 15 }],
++      "max-depth": ["error", { max: 4 }],
++      "max-params": ["error", { max: 4 }],
++      "max-statements": ["error", { max: 30 }],
++      "max-nested-callbacks": ["error", { max: 3 }],
++      // ban-ts-comment is already error via strictTypeChecked, but its default
++      // still permits `@ts-expect-error` with a ≥10-char description. Harden it:
++      // ALL four TS directive comments are forbidden outright, no description
++      // escape hatch (the generated bindings that legitimately carry @ts-nocheck
++      // are globally-ignored above, so this never touches them).
++      "@typescript-eslint/ban-ts-comment": [
++        "error",
++        {
++          "ts-expect-error": true,
++          "ts-ignore": true,
++          "ts-nocheck": true,
++          "ts-check": true,
++        },
++      ],
++      // Classic react-hooks pair (see the plugins note above).
++      // ── P7 promise calibrations (option-relaxations — the rule stays at
++      //    `error`, the clippy.toml-threshold twin; NOT registry disables) ──
++      //
++      // A TERMINAL `.then(() => { …side-effect… })` legitimately returns nothing
++      // — its whole job is the effect (setState, onClose, a toast). The rule's
++      // real value is catching a MIDDLE `.then()` that forgets to return and so
++      // silently breaks the chain's value flow; `ignoreLastCallback` keeps that
++      // teeth while permitting the terminal side-effect callback that pervades
++      // React handlers. A non-terminal miss still errors.
++      "promise/always-return": ["error", { ignoreLastCallback: true }],
++      // A chain that ends `.catch(…).finally(() => setSaving(false))` IS fully
++      // handled — the rejection has a sink; the `.finally()` is just cleanup
++      // after it. The default requires the LAST call to be `.catch()`, which a
++      // trailing `.finally()` violates. `allowFinally` recognises the
++      // catch-then-finally idiom; a chain with NO catch at all still errors.
++      "promise/catch-or-return": ["error", { allowFinally: true }],
++      // ── P7 import-x: no-cycle comes on ─────────────────────────────────
++      // import-x/recommended ships no-cycle OFF (it's resolution-heavy). Turn
++      // it on at error: a circular import between modules is a real
++      // maintainability + init-order hazard and the structural precursor to the
++      // P9 boundaries layering guard (M141). `maxDepth: Infinity` traces the
++      // full graph; `ignoreExternal` skips node_modules cycles we don't own.
++      "import-x/no-cycle": ["error", { ignoreExternal: true }],
++      // ── P10b import-x/no-extraneous-dependencies ────────────────────────
++      // Every runtime import must be declared in package.json `dependencies`
++      // (not devDependencies, not undeclared/phantom). The frontend twin of
++      // clippy's cargo dependency hygiene: a runtime import of a devDep would
++      // ship a module the production bundle can't guarantee, and a phantom
++      // import (present only transitively) breaks on a clean install. Build
++      // tooling + tests legitimately pull devDeps, so those file globs are
++      // allowed devDependencies; the resolver was already wired by
++      // flatConfigs.typescript (P7).
++      "import-x/no-extraneous-dependencies": [
++        "error",
++        {
++          devDependencies: [
++            "eslint.config.ts",
++            "vite.config.ts",
++            "openapi-ts.config.ts",
++            "playwright.config.ts",
++            "e2e/**",
++            "**/*.test.{ts,tsx}",
++            "**/*.spec.{ts,tsx}",
++          ],
++          optionalDependencies: false,
++          peerDependencies: false,
++        },
++      ],
++      // ── P7 import-x tsc-redundant / flat-config-idiom relaxations
++      //    (registered in allowed-eslint-exceptions.yaml — the config-level
++      //    channel, never an inline disable) ──
++      //
++      // import-x/default walks a module for a `default` export. It FALSE-
++      // POSITIVES on CJS-authored ESLint plugins (e.g. eslint-comments) whose
++      // `module.exports` is consumed via esModuleInterop's synthetic default —
++      // tsc already proves every `import x from "…"` binding is valid, so this
++      // rule is pure tsc-redundant noise here. Off tree-wide (the plugin's own
++      // TS guidance drops the resolution rules tsc subsumes).
++      "import-x/default": "off",
++      // no-named-as-default / -member CAUTION when a default import shares a
++      // name with one of the module's NAMED exports (`import tseslint …` while
++      // the module also exports `configs`). That is the UNIVERSAL flat-config
++      // plugin idiom — `tseslint.configs.*`, `regexp.configs.*`,
++      // `importX.flatConfigs.*` are exactly how every ESLint flat config is
++      // written — so the rule fires only on correct, conventional code. Pure
++      // style noise with no correctness value; off tree-wide.
++      "import-x/no-named-as-default": "off",
++      "import-x/no-named-as-default-member": "off",
++      // ── P7 eslint-plugin-security calibration ──────────────────────────
++      // detect-object-injection is pure noise in a typed codebase: it flags
++      // EVERY computed-key member access (obj[k], arr[i]) irrespective of
++      // provenance — 38 hits here, all on type-constrained record/array reads
++      // whose key space is fixed by the type. TypeScript already proves them
++      // safe, and the genuine sink the rule targets (a user-controlled key
++      // reaching a prototype-mutable object) cannot arise from these lookups.
++      // Off tree-wide (registered in allowed-eslint-exceptions.yaml — the
++      // config-level channel, never an inline eslint-disable).
++      "security/detect-object-injection": "off",
++      // The browser-relevant detectors are hardened from recommended's `warn`
++      // to `error` (real bug classes reachable in frontend code): catastrophic-
++      // backtracking regexes, dynamic `new RegExp(x)`, `eval`-with-expression,
++      // trojan-source bidi characters, and secret-comparison timing attacks.
++      // (The remaining recommended rules — detect-child-process / non-literal-
++      // fs-filename / non-literal-require / buffer-noassert / new-buffer /
++      // pseudoRandomBytes / no-csrf / disable-mustache-escape — target Node
++      // APIs absent from this browser app, so they are inert; they stay at
++      // recommended's `warn`, which the `--max-warnings 0` gate would still
++      // fail on the impossible day one fired.)
++      "security/detect-unsafe-regex": "error",
++      "security/detect-non-literal-regexp": "error",
++      "security/detect-eval-with-expression": "error",
++      "security/detect-bidi-characters": "error",
++      "security/detect-possible-timing-attacks": "error",
++      // ── P6: exhaustive-deps comes due ──────────────────────────────────
++      // react-hooks/recommended-latest (extends) sets rules-of-hooks + the
++      // compiler-aware rules at error, but leaves exhaustive-deps at its
++      // recommended `warn`. The P0→P5 deferral of the 3 known warnings
++      // (CreateCommandDialog, MarkdownEditor, Finder — intentional mount-once
++      // effects) now comes due: bump it to `error` and restructure each site
++      // (a ref-captured seed / stable callback), never an inline disable (P4).
++      "react-hooks/exhaustive-deps": "error",
++      // `cva()` variant tables and other module-level `const` exports sit
++      // beside their component (the shadcn/vite idiom). They don't break Fast
++      // Refresh, so permit them; hooks/functions co-exported with components
++      // still error and get factored into sibling modules.
++      "react-refresh/only-export-components": ["error", { allowConstantExport: true }],
++      // ── Two type-aware rules carry a codebase-contract OPTION (the twin of a
++      //    clippy.toml threshold — a calibration, NOT a suppression; the rule
++      //    stays at `error`): ──
++      //
++      // JSX event handlers are overwhelmingly `onClick={() => setState(x)}` —
++      // an arrow whose void return is deliberately discarded by the prop. The
++      // default forbids that shorthand, which would force noisy `{ … }` braces
++      // on ~240 handlers for zero safety gain. `ignoreArrowShorthand` permits
++      // exactly that shape while STILL flagging a void expression used as a
++      // value (`const x = doVoid()`, `return doVoid()`) — the genuinely
++      // confusing cases.
++      "@typescript-eslint/no-confusing-void-expression": ["error", { ignoreArrowShorthand: true }],
++      // Interpolating a `number` into a template literal is unambiguous and
++      // universal (`${count}`, `${size}px`). `allowNumber` (the conventional
++      // setting) permits it; a possibly-`undefined`/object/boolean interpolation
++      // still errors and gets a real fix (guard / `String(x)` / `?? fallback`).
++      "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
++      // Third calibration (same clippy.toml-threshold spirit — NOT a blanket
++      // suppression; the rule stays at `error`). The rule's safety concern is a
++      // `x || fallback` that silently swallows a VALID falsy value (a real `0`,
++      // `""`, or `false` that carried meaning). That danger is real for
++      // **numbers** — a legitimate `0` must not be replaced — so `number`
++      // stays flagged (→ genuine `?? ` fixes). But for **strings** and
++      // **booleans** every `||` site in this codebase is a deliberate
++      // truthy-or-fallback idiom where an empty string / `false` is *meant* to
++      // take the fallback (display-name chains `name || ip || ""`, path-segment
++      // fallbacks `split("/").pop() || path` where a trailing-slash `""` must
++      // use the whole path, and boolean OR like `disabled || busy` where `||`
++      // is the correct logical operator, not a fallback). Ignoring those two
++      // primitives keeps `||` where it expresses intent while still forcing
++      // `??` for the nullable-object and number cases the rule exists to catch.
++      "@typescript-eslint/prefer-nullish-coalescing": [
++        "error",
++        { ignorePrimitives: { string: true, boolean: true } },
++      ],
++
++      // ── P5 unicorn calibrations (option-relaxations — the rule stays at
++      //    `error`, the clippy.toml-threshold twin; NOT registry exceptions) ──
++      //
++      // React source is PascalCase components (Message.tsx, AgentModal.tsx) +
++      // camelCase hooks/utils/modules (markdown.tsx, useFinderActions.ts).
++      // unicorn's default kebab-case would flag every component file; allow both
++      // cases so the rule still catches a genuinely mis-cased file.
++      "unicorn/filename-case": ["error", { cases: { camelCase: true, pascalCase: true } }],
++      // Catch bindings are `e` by house convention (a widened `unknown` since
++      // P3). `ignore` lets the handful of legacy `err`/`error` names pass while
++      // the rule still flags any other ad-hoc name.
++      "unicorn/catch-error-name": ["error", { name: "e", ignore: ["^err$", "^error$"] }],
++
++      // ── P5 unicorn justified disables (registered in
++      //    .github/checks/allowed-eslint-exceptions.yaml; each is a
++      //    React/DOM-incompatible or pure-naming-opinion rule with no
++      //    correctness value — the config-level exception channel, never an
++      //    inline eslint-disable) ──
++      //
++      // Bans idiomatic short identifiers (e, err, fn, props, params, db, ctx…)
++      // — pervasive, zero correctness value, fights React/JS convention.
++      "unicorn/name-replacements": "off",
++      // React & the DOM use `null` intrinsically: useState<T | null>(null),
++      // refs, getAttribute, DragEvent.dataTransfer. `null` is not avoidable.
++      "unicorn/no-null": "off",
++      // Forces is/has/should boolean-name prefixes; our booleans (dragging,
++      // copied, busy, saving, open, dirty) are idiomatic React state names.
++      "unicorn/consistent-boolean-name": "off",
++      // Browser-only code legitimately uses `window.*` (setTimeout,
++      // addEventListener, prompt); rewriting to globalThis buys nothing.
++      "unicorn/prefer-global-this": "off",
++      // Bans `new`/`set`-prefixed non-constructor names (newFolder, newAgent) —
++      // pure naming opinion.
++      "unicorn/no-non-function-verb-prefix": "off",
++      // `Array.prototype.reduce` is a legitimate, readable summation idiom used
++      // in the cost tables; unicorn's blanket ban is pure opinion.
++      "unicorn/no-array-reduce": "off",
++      // Fire-and-forget promise chains with a `.catch()` error sink are the
++      // idiomatic non-blocking pattern in React sync event handlers and effect
++      // bodies (which cannot be `async` — an effect must return its cleanup
++      // synchronously). Forcing `await` here means wrapping every handler in a
++      // `void (async () => { … })()` IIFE, a readability regression for a
++      // single-level chain. The genuine anti-pattern the rule targets (nested
++      // `.then()` pyramids) does not occur in this codebase.
++      "unicorn/prefer-await": "off",
++      // IRRECONCILABLE CONFLICT WITH PRETTIER (the canonical formatter — the
++      // rustfmt twin, established in P2). unicorn/no-nested-ternary permits
++      // nesting but DEMANDS the nested branch be parenthesized (`a ? b : (c ? d
++      // : e)`); Prettier authoritatively strips exactly those parens as
++      // redundant and reflows ternaries to its own indentation. The two fight
++      // in an infinite loop (eslint --fix re-adds the parens, prettier --write
++      // removes them). This rule is purely a paren-placement/readability
++      // opinion — formatting that Prettier already owns — so the formatter
++      // wins and the rule is off. Genuinely-complex nested ternaries were
++      // still extracted into flat if-chain helpers during P5 (App.renderView,
++      // StatusBar.resolvePhase, FleetDashboard.healthCondition,
++      // ThreadComposer banner, ThreadList.dotColor) on readability grounds.
++      "unicorn/no-nested-ternary": "off",
++
++      // ── P6 React-stack justified disables (registered in
++      //    .github/checks/allowed-eslint-exceptions.yaml; each a
++      //    deliberate-UX or false-positive-only rule, config-level channel,
++      //    never an inline eslint-disable) ──
++      //
++      // autoFocus is a DELIBERATE UX choice throughout this power-user cockpit:
++      // the primary thread composer, every modal's first field (login email,
++      // inline rename, New-Thread / Create-Command titles, the maintenance
++      // wizard steps, the OAuth login popup) auto-focuses so the keyboard is
++      // ready the instant the surface opens. jsx-a11y flags it as a screen-
++      // reader-disorientation risk, a real concern for content pages — but here
++      // every autoFocus sits on the sole input of a just-opened focused dialog
++      // or the app's central composer, the canonical exception. Off tree-wide.
++      "jsx-a11y/no-autofocus": "off",
++      // @eslint-react/no-array-index-key guards against index keys on a list
++      // that REORDERS/INSERTS mid-stream (React then reuses the wrong child
++      // instance/state). Every dynamic, reorderable list in this app already
++      // keys by a stable domain id (fleet→agent.id, threads→thread.id,
++      // finder→node.path). The remaining `key={i}` sites are all STATIC,
++      // wholesale-rerendered presentational lists with no per-item state —
++      // syntax-highlighted code lines, sheet cells, PDF-page thumbnails,
++      // waveform bars, parsed markdown/message segments, read-only inspector
++      // rows (tree, radar, entities, vitals) — where the index IS the stable
++      // identity and reconciliation is never wrong. The rule yields only
++      // false positives against this codebase's actual usage; off tree-wide.
++      // (The two genuinely interactive lists — question options, upload chips —
++      // are ALSO keyed by a natural id so they stay correct regardless.)
++      "@eslint-react/no-array-index-key": "off",
++    },
++  },
++  {
++    // Vendored shadcn primitives (`components/ui/**`) ship component + variant
++    // table per file by design — the upstream canonical shape we don't rewrite.
++    // Treated like generated code: Fast-Refresh purity is not enforced here.
++    files: ["src/components/ui/**/*.{ts,tsx}"],
++    rules: {
++      "react-refresh/only-export-components": "off",
++      // Vendored shadcn primitives keep their upstream kebab-case filenames
++      // (dropdown-menu.tsx, scroll-area.tsx) and their canonical cva() call
++      // nesting — both are the upstream shape we don't rewrite.
++      "unicorn/filename-case": "off",
++      "unicorn/max-nested-calls": "off",
++    },
++  },
++  {
++    // The WYSIWYG markdown editor drives a `contentEditable` surface through
++    // `document.execCommand` / `queryCommandState`. Both are marked deprecated
++    // by MDN, yet they remain the ONLY browser API for rich-text editing of a
++    // contentEditable region — there is no standardised replacement (the
++    // proposed `EditContext`/Input Events level 2 don't cover formatting
++    // commands, and every WYSIWYG library still relies on `execCommand`). This
++    // is a genuine irreducible-exception, scoped to this one file and this one
++    // rule — the config-level analog of the Rust `allowed-lint-exceptions.yaml`
++    // registry (never an inline `eslint-disable`, which the P4 anti-cheat layer
++    // forbids). It is NOT a blanket downgrade: every other rule stays at error.
++    files: ["src/components/agents/MarkdownEditor.tsx"],
++    rules: {
++      "@typescript-eslint/no-deprecated": "off",
++      // The editor SEEDS its contentEditable surface once on mount via
++      // `ref.current.innerHTML = mdToHtml(initialMarkdown)`. no-unsanitized/
++      // property flags every non-literal innerHTML write, but this string is
++      // provably injection-free: mdToHtml runs esc() (escapes &, <, >) over ALL
++      // text before wrapping it in a FIXED literal tag vocabulary (h1/h2/p/
++      // blockquote/pre/ul/ol/li + inline strong/code), so no user character can
++      // form a tag or attribute and there is no user-controlled attribute value
++      // anywhere. Seeding via innerHTML is also irreducible for a contentEditable
++      // WYSIWYG: React cannot own the surface's children (it fights the browser's
++      // own execCommand mutations → caret jumps + reconciliation clobbering live
++      // edits — the very reason the surface is deliberately uncontrolled). Scoped
++      // to this one file + this one rule (registered in
++      // allowed-eslint-exceptions.yaml, never an inline eslint-disable). The
++      // sibling no-unsanitized/method rule stays at error, as does every other.
++      "no-unsanitized/property": "off",
++    },
++  },
++  {
++    // The Finder mock filesystem embeds Rust + JSX code SAMPLES as multiline
++    // template literals for the preview pane (e.g. `format!("Sent to {tid}")`,
++    // `<Finder root={root} cwd={cwd} setCwd={setCwd} />`). Those `{tid}` /
++    // `{root}` braces are LITERAL text in the displayed foreign-language code,
++    // not JS interpolation — unicorn/no-incorrect-template-string-interpolation
++    // can't tell display text from a typo'd `${…}` and false-positives on every
++    // one. Scoped off for this single mock-data file (the rule stays at error
++    // everywhere else, where it genuinely catches a missing `$`).
++    files: ["src/lib/support/finderFs.ts"],
++    rules: {
++      "unicorn/no-incorrect-template-string-interpolation": "off",
++    },
++  },
++  {
++    // hey-api's codegen config file carries the tool's CONVENTIONAL filename
++    // (`openapi-ts.config.ts`, hyphenated) — it's referenced verbatim by
++    // `npx @hey-api/openapi-ts -f openapi-ts.config.ts` in CB5 +
++    // check-typescript-contract.sh and by tsconfig.node.json's include, so it
++    // is not ours to rename. unicorn/filename-case (calibrated to camel/pascal)
++    // flags the hyphen; scoped off for this single external-tool config file.
++    files: ["openapi-ts.config.ts"],
++    rules: {
++      "unicorn/filename-case": "off",
++    },
++  },
++  {
++    // Two irreducible tooling false-positives on the Finder root, scoped to this
++    // one file + these rules (the config-level exception channel, registered in
++    // allowed-eslint-exceptions.yaml — never an inline eslint-disable):
++    //
++    // • jsx-a11y/no-noninteractive-{element-interactions,tabindex} — the surface
++    //   is a keyboard-driven WIDGET (arrow nav, type-ahead, Space Quick-Look,
++    //   Enter rename, ⌘⌫ trash) that owns its key handling, so it carries
++    //   `role="application"` + `tabIndex={0}` + `onKeyDown`. `application` is the
++    //   honest ARIA role for a keystroke-capturing region, but jsx-a11y models it
++    //   as STRUCTURAL (non-interactive) and false-positives; the correct-looking
++    //   alternative `role="grid"` would be DISHONEST (the container wraps a
++    //   toolbar + sidebar + main + path bar, not a literal grid of rows/cells).
++    //
++    // The role="application" surface lives in the Finder shell render (the P8
++    // decomposition split Finder.tsx into Finder/{index,state,controller,shell,
++    // body}); every other rule stays at error.
++    files: ["src/components/finder/Finder/shell.tsx"],
++    rules: {
++      "jsx-a11y/no-noninteractive-element-interactions": "off",
++      "jsx-a11y/no-noninteractive-tabindex": "off",
++    },
++  },
++  {
++    // The live code preview injects highlight.js output through
++    // `dangerouslySetInnerHTML`. highlight.js ESCAPES the source text and emits
++    // only class-tagged `<span>`s — there is no user-controlled HTML in the
++    // string, and rendering a pre-highlighted HTML fragment is the ONLY way to
++    // show syntax colours (React can't re-create highlight.js's span tree from
++    // JSX). A genuine irreducible use, scoped to this one file + this one rule
++    // (the config-level exception channel, registered in
++    // allowed-eslint-exceptions.yaml — never an inline eslint-disable, which the
++    // P4 anti-cheat layer forbids). Every other rule stays at error.
++    files: ["src/components/finder/preview/livePreviews.tsx"],
++    rules: {
++      "@eslint-react/dom-no-dangerously-set-innerhtml": "off",
++    },
++  },
++  {
++    // ── P7 eslint-plugin-n — Node.js correctness, scoped to the ONLY Node
++    //    code in this repo: the three build/tooling config files that run
++    //    under Node (not the browser app). ──
++    //
++    // This is a browser React app, so n/flat/recommended tree-wide would be
++    // nonsense (it would judge browser code by Node's rulebook). Instead the
++    // `recommended-module` preset (ESM variant — these files use `import`)
++    // lands at error on exactly `eslint.config.ts`, `vite.config.ts` and
++    // `openapi-ts.config.ts`: it catches deprecated Node APIs, process.exit
++    // misuse, missing `node:` protocol and unsupported-feature usage in the
++    // code that actually executes in Node. (`playwright.config.ts` is
++    // globally-ignored above; the app source has no Node code.)
++    files: ["eslint.config.ts", "vite.config.ts", "openapi-ts.config.ts"],
++    extends: [n.configs["flat/recommended-module"]],
++  },
++  {
++    // ── P7 no-secrets — off for THIS lint config's own doc comments ─────────
++    //
++    // eslint-plugin-no-secrets scans comment text as well as string literals.
++    // This config file's extensive rationale comments cite long, high-entropy
++    // API / compiler-flag IDENTIFIERS by name — `dangerouslySetInnerHTML`
++    // (entropy 4.02) and `noPropertyAccessFromIndexSignature` (4.24) — which the
++    // Shannon-entropy heuristic mistakes for hardcoded secrets. They are neither
++    // secrets nor even literals: they are documentation prose naming the very
++    // rules/flags this config governs, and this file is build tooling that never
++    // ships to the browser. Scoped to this one file + this one rule (registered
++    // in allowed-eslint-exceptions.yaml, never an inline eslint-disable); the
++    // rule stays at error across ALL app source — literals AND comments — where a
++    // genuine leaked credential would actually matter (M141: the browser is the
++    // dumb render layer, every secret resolves server-side via cp-vault).
++    files: ["eslint.config.ts"],
++    rules: {
++      "no-secrets/no-secrets": "off",
++      // ── P8 max-lines — off for THIS config file ─────────────────────────
++      //
++      // The structural line cap (500, the CB7 web-structure twin) governs APP
++      // SOURCE — CB7 itself scopes its ≤500-lines/file check to `web/src/**`,
++      // deliberately exempting build tooling at the repo/web root. This flat
++      // config is exactly that: build tooling, not shipped code, and the bulk
++      // of its length is the per-rule rationale prose that the project's
++      // documentation standard mandates (every calibration/disable must explain
++      // WHY, in place). Capping a config whose value IS its documentation at 500
++      // lines would force either terse, unexplained rules or an artificial split
++      // that scatters one coherent ruleset across files — both worse than a
++      // single, fully-documented config. Scoped to this one file + this one rule
++      // (registered in allowed-eslint-exceptions.yaml, never an inline
++      // eslint-disable); every other file stays under the 500-line cap.
++      "max-lines": "off",
++    },
++  },
++  {
++    // ── P10c eslint-plugin-better-tailwindcss — Tailwind class validity +
++    //    order, scoped to the JSX/TS surface that carries `className`. ──
++    //
++    // `recommended-error` lands 8 rules at error: class ORDER
++    // (enforce-consistent-class-order — the twin of a prettier-plugin-tailwind
++    // sort, but lint-enforced), plus correctness — no-unknown-classes (a typo'd
++    // or non-existent utility), no-conflicting-classes (two utilities fighting
++    // for the same property), no-duplicate-classes, no-deprecated-classes,
++    // enforce-canonical-classes, no-unnecessary-whitespace. `no-unknown-classes`
++    // et al. resolve the project's real utility set (incl. the custom theme
++    // tokens) from the Tailwind v4 CSS entry point declared in `settings`.
++    //
++    // enforce-consistent-line-wrapping is turned OFF: it reflows the class
++    // string onto multiple lines, which Prettier (the canonical formatter, the
++    // rustfmt twin from P2) then re-collapses — the same irreconcilable
++    // formatter fight as unicorn/no-nested-ternary. Prettier owns whitespace;
++    // this rule is a pure line-shape opinion, off (registered in
++    // allowed-eslint-exceptions.yaml). The other seven stay at error.
++    files: ["src/**/*.{ts,tsx}"],
++    // Vendored shadcn primitives (ui/**) keep their upstream className shape —
++    // autofixing class order/canonical here is churn re-introduced on every
++    // re-vendor. Excluded via `ignores` (not a rule-off, so no registry entry),
++    // consistent with the other ui/** exemptions (react-refresh, filename-case).
++    ignores: ["src/components/ui/**"],
++    extends: [betterTailwind.configs["recommended-error"]],
++    settings: {
++      "better-tailwindcss": {
++        entryPoint: "src/index.css",
++      },
++    },
++    rules: {
++      "better-tailwindcss/enforce-consistent-line-wrapping": "off",
++      // no-unknown-classes is OFF (registered in allowed-eslint-exceptions.yaml):
++      // it can't resolve two legitimate patterns pervasive in this codebase, so
++      // it is pure false-positive noise here.
++      //   1. Custom index.css classes authored as plain CSS rules —
++      //      `.card-shadow`, `.pop-shadow`, `.fill-sweep`, `.opt-rise`,
++      //      `.menu-pop`, `.modal-pop` (shadow + keyframe-animation helpers). They
++      //      are real classes, but declared as ordinary `.foo {}` rules rather
++      //      than Tailwind `@utility` directives, so Tailwind's compiler never
++      //      registers them as utilities and the plugin's utility resolver can't
++      //      see them.
++      //   2. CSS-variable arbitrary values — `text-[var(--ok)]` / `bg-(--signal)`
++      //      / `ring-(--signal)/50`. The plugin can't resolve a theme custom
++      //      property to a known utility. This DIRECTLY CONTRADICTS the sibling
++      //      enforce-canonical-classes rule, which REWRITES `text-[var(--ok)]`
++      //      INTO `text-(--ok)` — the very shorthand no-unknown-classes then
++      //      flags as unknown. Two rules cannot both be right; canonical wins
++      //      (it's the autofixable, correctness-bearing one), so this is off.
++      // The other seven better-tailwindcss rules stay at error.
++      "better-tailwindcss/no-unknown-classes": "off",
++    },
++  },
++  {
++    // ── P9: the api layer IS the sanctioned wrapper around the generated SDK.
++    //    It must value-import `@/lib/api/generated` to build the thin fetch
++    //    wrappers every other layer consumes — that's its whole job. So the
++    //    generated-import guard (no-restricted-imports) is off HERE and only
++    //    here (registered in allowed-eslint-exceptions.yaml). The boundaries
++    //    dependencies rule already permits api→generated; this off-switch is
++    //    the twin for the import-path guard. Every other file stays at error,
++    //    so no component/support module can reach past the api layer. ──
++    files: ["src/lib/api/**/*.{ts,tsx}"],
++    rules: {
++      "@typescript-eslint/no-restricted-imports": "off",
++    },
++  },
++])
+diff --git a/web/.prettierrc.json b/web/.prettierrc.json
+new file mode 100644
+index 00000000..280b8456
+--- /dev/null
++++ b/web/.prettierrc.json
+@@ -0,0 +1,12 @@
++{
++  "$schema": "https://json.schemastore.org/prettierrc",
++  "printWidth": 100,
++  "tabWidth": 2,
++  "semi": false,
++  "singleQuote": false,
++  "jsxSingleQuote": false,
++  "trailingComma": "all",
++  "bracketSpacing": true,
++  "arrowParens": "always",
++  "endOfLine": "lf"
++}
+diff --git a/web/.prettierignore b/web/.prettierignore
+new file mode 100644
+index 00000000..fe4ca973
+--- /dev/null
++++ b/web/.prettierignore
+@@ -0,0 +1,23 @@
++# ── Prettier ignore ─────────────────────────────────────────────────
++# Mirrors the ESLint globalIgnores (dist + generated bindings) plus build
++# and transient run artefacts. Prettier owns formatting for hand-written
++# source; anything machine-generated or vendored is left untouched.
++
++# Build output
++dist
++
++# Auto-generated OpenAPI client — regenerated verbatim by hey-api and kept
++# byte-identical to a fresh codegen (the @ts-nocheck-stamped tree the
++# contract-drift check diffs against). Formatting it here would break that
++# invariant, so it is NEVER touched — exactly like the Rust generated-code
++# lint allowance.
++src/lib/api/generated
++
++# Dependencies + lockfile
++node_modules
++pnpm-lock.yaml
++
++# Playwright e2e run artefacts
++test-results
++playwright-report
++.playwright
+diff --git a/web/.stylelintrc.json b/web/.stylelintrc.json
+new file mode 100644
+index 00000000..4b316f15
+--- /dev/null
++++ b/web/.stylelintrc.json
+@@ -0,0 +1,31 @@
++{
++  "extends": ["stylelint-config-standard"],
++  "plugins": ["stylelint-order"],
++  "rules": {
++    "at-rule-no-unknown": [
++      true,
++      {
++        "ignoreAtRules": [
++          "theme",
++          "source",
++          "utility",
++          "variant",
++          "custom-variant",
++          "apply",
++          "reference",
++          "config",
++          "plugin",
++          "tailwind"
++        ]
++      }
++    ],
++    "order/properties-alphabetical-order": null,
++    "order/order": ["custom-properties", "declarations"],
++    "property-no-vendor-prefix": null,
++    "import-notation": null,
++    "selector-class-pattern": [
++      "^(hljs[a-z_-]*|[a-z][a-z0-9]*(-[a-z0-9]+)*)$",
++      { "message": "Expected kebab-case class (highlight.js hljs-* tokens exempt)" }
++    ]
++  }
++}
+diff --git a/web/knip.json b/web/knip.json
+new file mode 100644
+index 00000000..9f18acbe
+--- /dev/null
++++ b/web/knip.json
+@@ -0,0 +1,8 @@
++{
++  "$schema": "https://unpkg.com/knip@5/schema.json",
++  "entry": ["e2e/**/*.{ts,tsx}"],
++  "project": ["src/**/*.{ts,tsx}"],
++  "ignore": ["src/lib/api/generated/**", "src/components/ui/**"],
++  "ignoreDependencies": ["type-coverage", "tw-animate-css", "@fontsource/ibm-plex-mono"],
++  "ignoreExportsUsedInFile": true
++}
+diff --git a/web/tsconfig.app.json b/web/tsconfig.app.json
+index e7f43a58..78039768 100644
+--- a/web/tsconfig.app.json
++++ b/web/tsconfig.app.json
+@@ -2,7 +2,7 @@
+   "compilerOptions": {
+     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+     "target": "es2023",
+-    "lib": ["ES2023", "DOM"],
++    "lib": ["ES2023", "ESNext.Iterator", "DOM"],
+     "module": "esnext",
+     "types": ["vite/client"],
+     "skipLibCheck": true,
+@@ -12,6 +12,7 @@
+     "allowImportingTsExtensions": true,
+     "verbatimModuleSyntax": true,
+     "moduleDetection": "force",
++    "isolatedModules": true,
+     "noEmit": true,
+     "jsx": "react-jsx",
+ 
+@@ -20,11 +21,21 @@
+       "@/*": ["./src/*"]
+     },
+ 
+-    /* Linting */
++    /* Linting — the maximal strict superset (web-lint P1, rustc-forbid twin) */
++    "strict": true,
++    "noUncheckedIndexedAccess": true,
++    "exactOptionalPropertyTypes": true,
++    "noImplicitReturns": true,
++    "noImplicitOverride": true,
++    "noPropertyAccessFromIndexSignature": true,
++    "noFallthroughCasesInSwitch": true,
++    "noUncheckedSideEffectImports": true,
++    "allowUnreachableCode": false,
++    "allowUnusedLabels": false,
++    "forceConsistentCasingInFileNames": true,
+     "noUnusedLocals": true,
+     "noUnusedParameters": true,
+-    "erasableSyntaxOnly": true,
+-    "noFallthroughCasesInSwitch": true
++    "erasableSyntaxOnly": true
+   },
+   "include": ["src"]
+ }
+diff --git a/web/tsconfig.node.json b/web/tsconfig.node.json
+index d3c52ea6..566e8b20 100644
+--- a/web/tsconfig.node.json
++++ b/web/tsconfig.node.json
+@@ -12,13 +12,24 @@
+     "allowImportingTsExtensions": true,
+     "verbatimModuleSyntax": true,
+     "moduleDetection": "force",
++    "isolatedModules": true,
+     "noEmit": true,
+ 
+-    /* Linting */
++    /* Linting — the maximal strict superset (web-lint P1, rustc-forbid twin) */
++    "strict": true,
++    "noUncheckedIndexedAccess": true,
++    "exactOptionalPropertyTypes": true,
++    "noImplicitReturns": true,
++    "noImplicitOverride": true,
++    "noPropertyAccessFromIndexSignature": true,
++    "noFallthroughCasesInSwitch": true,
++    "noUncheckedSideEffectImports": true,
++    "allowUnreachableCode": false,
++    "allowUnusedLabels": false,
++    "forceConsistentCasingInFileNames": true,
+     "noUnusedLocals": true,
+     "noUnusedParameters": true,
+-    "erasableSyntaxOnly": true,
+-    "noFallthroughCasesInSwitch": true
++    "erasableSyntaxOnly": true
+   },
+-  "include": ["vite.config.ts"]
++  "include": ["vite.config.ts", "eslint.config.ts", "openapi-ts.config.ts", "types.d.ts"]
+ }
+diff --git a/.github/checks/check-frontend-suppressions.sh b/.github/checks/check-frontend-suppressions.sh
+new file mode 100755
+index 00000000..f25843e5
+--- /dev/null
++++ b/.github/checks/check-frontend-suppressions.sh
+@@ -0,0 +1,164 @@
++#!/usr/bin/env bash
++# Frontend anti-suppression guard — the web twin of check-vault-bypass.sh and
++# the CI-side enforcement of the P4 anti-cheat layer.
++#
++# Inline lint/type suppression is FORBIDDEN in hand-written frontend source.
++# There is NO per-site allow-list: the only legal way to relax a rule is a
++# config-level scoped override in web/eslint.config.ts, registered + justified
++# in .github/checks/allowed-eslint-exceptions.yaml (hash-locked). This script
++# enforces two invariants, independent of ESLint's own config so a reconfigured
++# eslint.config.ts can't silently re-open the door:
++#
++#   1. STOWAWAY  — no eslint-disable / @ts-ignore / @ts-nocheck / @ts-expect-error
++#                  / @ts-check anywhere under web/src (excluding generated/**),
++#                  and no `as unknown as` double-assertion (the type-coverage
++#                  escape hatch) except the ONE documented useFs wire-view seam
++#                  (allow-listed by path + cast substring IN THIS SCRIPT, so the
++#                  exception is itself hash-locked, not a free source marker).
++#   2. ORPHAN/UNREGISTERED — every `"<rule>": "off"` scoped override in
++#                  eslint.config.ts must have a matching entry in the exceptions
++#                  registry, and every registry rule must appear in the config
++#                  (no silent add, no stale entry).
++#
++# Usage (CI):       .github/checks/check-frontend-suppressions.sh
++# Usage (callback): .github/checks/check-frontend-suppressions.sh [file ...]
++#
++# In callback mode only the STOWAWAY grep runs, over the supplied files (the
++# config-override audit is a whole-repo invariant, run in CI mode only).
++set -euo pipefail
++
++ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
++SRC="$ROOT/web/src"
++CONFIG="$ROOT/web/eslint.config.ts"
++REGISTRY="$ROOT/.github/checks/allowed-eslint-exceptions.yaml"
++
++# Banned inline suppression directives. A directive is only recognised by ESLint
++# / tsc when its keyword is the FIRST token inside the comment — so we anchor to
++# `//` or `/*` immediately followed (optional whitespace) by the keyword. This
++# matches a real `// eslint-disable-next-line` / `/* @ts-ignore */` while NEVER
++# matching the word appearing mid-prose (e.g. this file, or a doc comment that
++# merely mentions `eslint-disable` in backticks). @ts-nocheck is legal ONLY in
++# generated/** (the codegen bindings), which every scan below excludes.
++BANNED='(//|/\*)[[:space:]]*(eslint-disable|eslint-enable|@ts-ignore|@ts-nocheck|@ts-expect-error|@ts-check)'
++
++exit_code=0
++
++# ── Invariant 1: STOWAWAY — no inline suppression in hand-written source ──
++check_file() {
++  local file="$1"
++  case "$file" in
++    *"/generated/"*) return ;;            # codegen bindings: @ts-nocheck is legal
++    *.ts | *.tsx | *.js | *.jsx | *.cts | *.mts) ;;
++    *) return ;;
++  esac
++  [ -f "$file" ] || return 0
++
++  local hits
++  hits=$(grep -nE "$BANNED" "$file" 2>/dev/null || true)
++  if [ -n "$hits" ]; then
++    while IFS= read -r line; do
++      echo "::error file=$file::$line"
++    done <<< "$hits"
++    echo "FAIL: $file carries a banned inline suppression directive" >&2
++    exit_code=1
++  fi
++
++  # ── `as unknown as` double-assertion ban (type-coverage escape hatch) ──
++  # A double-assertion launders any type through `unknown`, defeating the
++  # type-coverage ratchet. Banned in hand-written source EXCEPT the single
++  # documented useFs wire-view seam (the generated FinderNode carries
++  # `modified: number`, the UI view `modified: string` — a backend spec gap
++  # whose real fix is a Rust type, out of frontend scope). The exception is
++  # allow-listed HERE (path + cast substring), so it lives in this hash-locked
++  # guard rather than as a free-floating source marker anyone could add.
++  local auas
++  auas=$(grep -nE 'as unknown as' "$file" 2>/dev/null || true)
++  if [ -n "$auas" ]; then
++    while IFS= read -r line; do
++      case "$file" in
++        */src/lib/live/index.ts)
++          # The lone sanctioned seam: `fetchFs(...) as unknown as Promise<FinderNode[]>`.
++          echo "$line" | grep -q 'as unknown as Promise<FinderNode\[\]>' && continue
++          ;;
++      esac
++      echo "::error file=$file::$line"
++      echo "FAIL: $file uses a banned 'as unknown as' double-assertion" >&2
++      exit_code=1
++    done <<< "$auas"
++  fi
++}
++
++if [ $# -gt 0 ]; then
++  # Callback mode: scan only the supplied files (stowaway grep only).
++  for file in "$@"; do
++    check_file "$file"
++  done
++  exit $exit_code
++fi
++
++# CI mode: scan the whole frontend source tree.
++if [ -d "$SRC" ]; then
++  while IFS= read -r file; do
++    check_file "$file"
++  done < <(find "$SRC" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -not -path '*/generated/*')
++fi
++
++# ── Invariant 2: config-level scoped overrides ⇄ registry (bidirectional) ──
++# Extract every `"<rule>": "off"` from eslint.config.ts — these are the only
++# rule-disabling scoped overrides (calibrations use the array form
++# `["error", {...}]`, never the bare `"off"` string, so they aren't matched).
++config_offs=""
++if [ -f "$CONFIG" ]; then
++  config_offs=$(grep -oE '"[^"]+"[[:space:]]*:[[:space:]]*"off"' "$CONFIG" \
++    | sed -E 's/^"([^"]+)".*/\1/' | sort -u || true)
++fi
++
++# Extract every `rule:` value from the registry. Match only the quoted value
++# and strip the quotes (`[[:space:]]` not `\s` so BSD/macOS sed works too); the
++# wildcard `*` entry is quoted (`rule: "*"`) so it extracts as `*`.
++registry_rules=""
++if [ -f "$REGISTRY" ]; then
++  registry_rules=$(grep -oE 'rule:[[:space:]]*"[^"]*"' "$REGISTRY" \
++    | sed -E 's/rule:[[:space:]]*"([^"]*)"/\1/' | sort -u || true)
++else
++  echo "::error::Exceptions registry not found: $REGISTRY" >&2
++  exit_code=1
++fi
++
++# 2a — every config `"off"` override must be registered (no silent exception).
++if [ -n "$config_offs" ]; then
++  while IFS= read -r rule; do
++    [ -z "$rule" ] && continue
++    if ! echo "$registry_rules" | grep -qxF "$rule"; then
++      echo "::error file=$CONFIG::Unregistered scoped override \"$rule\": \"off\" — add it to $REGISTRY" >&2
++      echo "FAIL: eslint.config.ts disables '$rule' with no registry entry" >&2
++      exit_code=1
++    fi
++  done <<< "$config_offs"
++fi
++
++# 2b — every registry rule (except the wildcard '*' globalIgnore doc) must
++#      correspond to a live config override (no stale/orphan entry).
++if [ -n "$registry_rules" ]; then
++  while IFS= read -r rule; do
++    [ -z "$rule" ] && continue
++    [ "$rule" = "*" ] && continue          # '*' documents the generated/** globalIgnore, not an "off"
++    if ! echo "$config_offs" | grep -qxF "$rule"; then
++      echo "::error file=$REGISTRY::Orphan registry entry '$rule' — no matching \"off\" override in eslint.config.ts" >&2
++      echo "FAIL: registry lists '$rule' but eslint.config.ts no longer disables it" >&2
++      exit_code=1
++    fi
++  done <<< "$registry_rules"
++fi
++
++if [ "$exit_code" -eq 0 ]; then
++  echo "Frontend suppression guard OK — no inline suppressions; exceptions registered. ✓"
++else
++  echo "" >&2
++  echo "Inline lint/type suppression is banned in web/src." >&2
++  echo "The only legal escape is a config-level scoped override in" >&2
++  echo "web/eslint.config.ts, registered + justified in" >&2
++  echo ".github/checks/allowed-eslint-exceptions.yaml." >&2
++fi
++
++exit $exit_code
+diff --git a/.github/checks/allowed-eslint-exceptions.yaml b/.github/checks/allowed-eslint-exceptions.yaml
+new file mode 100644
+index 00000000..dcbaacaf
+--- /dev/null
++++ b/.github/checks/allowed-eslint-exceptions.yaml
+@@ -0,0 +1,459 @@
++# Curated registry of allowed CONFIG-LEVEL ESLint exceptions (web frontend).
++#
++# The frontend twin of .github/checks/allowed-lint-exceptions.yaml (Rust).
++#
++# PHILOSOPHY — stricter than Rust's per-site #[allow] model:
++#   Inline lint/type suppression is BANNED OUTRIGHT in hand-written source.
++#   There is no such thing as a legal inline `eslint-disable`, `@ts-ignore`,
++#   `@ts-nocheck`, `@ts-expect-error`, or `@ts-check` — the P4 anti-cheat layer
++#   (eslint-comments/no-use + ban-ts-comment + reportUnusedDisableDirectives,
++#   plus the CI grep-guard check-frontend-suppressions.sh) forbids them all.
++#
++#   The ONLY way to relax a rule is a CONFIG-LEVEL scoped override — a
++#   `files: [...] rules: { "<rule>": "off" }` block in web/eslint.config.ts —
++#   and every such override MUST be registered here with a justification.
++#   check-frontend-suppressions.sh enforces this bidirectionally (a config
++#   "off" with no entry fails; an entry with no config "off" fails). This file
++#   is hash-locked (protected-files.yaml + the lint chain) so no exception can
++#   be added silently.
++#
++# Fields:
++#   path    — file glob the scoped override targets (matches eslint.config.ts).
++#   rule    — the ESLint rule id disabled, or '*' to document a whole-tree
++#             globalIgnore (codegen output ESLint never sees).
++#   reason  — why the exception is currently accepted.
++#   strategy— how it could eventually be eliminated.
++
++exceptions:
++  # ── Generated OpenAPI bindings — globally ignored (never linted) ──────────
++  - path: "web/src/lib/api/generated/**"
++    rule: "*"
++    reason: >
++      hey-api OpenAPI codegen output, regenerated verbatim from openapi.json by
++      CB3/CB5. Globally ignored by ESLint (globalIgnores in eslint.config.ts)
++      and carries a // @ts-nocheck header — the generated-bindings exception,
++      the exact analog of the Rust generated-code allowance. Hand-editing it to
++      satisfy a lint is forbidden; the committed tree must stay byte-identical
++      to a fresh codegen for the @ts-nocheck drift check to pass.
++    strategy: >
++      Irreducible — machine-generated. Regenerate, never hand-fix.
++
++  # ── Vendored shadcn primitives — Fast-Refresh purity not enforceable ──────
++  - path: "web/src/components/ui/**"
++    rule: "react-refresh/only-export-components"
++    reason: >
++      Vendored shadcn/ui primitives ship a component plus its cva() variant
++      table per file by design — the upstream canonical shape we don't rewrite.
++      The mixed component+constant export trips react-refresh purity, which is
++      irrelevant for vendored code we never author.
++    strategy: >
++      Irreducible without forking every shadcn primitive. Re-evaluate if the
++      upstream files are ever restructured to component-only exports.
++
++  # ── MarkdownEditor — contentEditable WYSIWYG has no non-deprecated API ────
++  - path: "web/src/components/agents/MarkdownEditor.tsx"
++    rule: "@typescript-eslint/no-deprecated"
++    reason: >
++      The WYSIWYG editor drives a contentEditable surface through
++      document.execCommand / queryCommandState. Both are marked deprecated by
++      MDN, yet they remain the ONLY browser API for rich-text formatting of a
++      contentEditable region — there is no standardised replacement (EditContext
++      / Input Events L2 don't cover formatting commands, and every WYSIWYG
++      library still relies on execCommand). Scoped to this one file + this one
++      rule; every other rule stays at error.
++    strategy: >
++      Re-evaluate when a standardised formatting API (e.g. a matured
++      EditContext) covers bold/italic/list/heading commands for contentEditable.
++
++  # ── P5 unicorn opinion rules — off tree-wide (React/DOM-incompatible or ────
++  #    pure-naming-opinion, no correctness value). These are global config-level
++  #    disables (not file-scoped), each justified below.
++  - path: "web/**"
++    rule: "unicorn/name-replacements"
++    reason: >
++      Bans idiomatic short identifiers (e, err, fn, props, params, db, ctx…) —
++      526 pervasive sites, zero correctness value, fights React/JS convention.
++      The prevent-abbreviations family twin; universally disabled in React
++      codebases.
++    strategy: >
++      Irreducible stylistic opinion. Would require a mechanical rename of nearly
++      every callback/parameter for no safety gain.
++
++  - path: "web/**"
++    rule: "unicorn/no-null"
++    reason: >
++      React and the DOM use `null` intrinsically — useState<T | null>(null),
++      refs, Element.getAttribute, DragEvent.dataTransfer, react-query data. Not
++      avoidable in a React/DOM codebase.
++    strategy: >
++      Irreducible — `null` is part of the React/DOM contract.
++
++  - path: "web/**"
++    rule: "unicorn/consistent-boolean-name"
++    reason: >
++      Forces is/has/should boolean-name prefixes; our booleans (dragging,
++      copied, busy, saving, open, dirty, paused) are idiomatic React state
++      names. Pure naming opinion, no correctness value.
++    strategy: >
++      Irreducible stylistic opinion.
++
++  - path: "web/**"
++    rule: "unicorn/prefer-global-this"
++    reason: >
++      Browser-only code legitimately uses `window.*` (setTimeout,
++      addEventListener, prompt, clearTimeout). Rewriting to `globalThis` buys
++      nothing in a browser-only bundle.
++    strategy: >
++      Re-evaluate only if any of this code is ever shared with a non-browser
++      (Node/worker) runtime where `window` is absent.
++
++  - path: "web/**"
++    rule: "unicorn/no-non-function-verb-prefix"
++    reason: >
++      Bans `new`/`set`-prefixed non-constructor names (newFolder, newAgent,
++      newThread) — pure naming opinion, no correctness value.
++    strategy: >
++      Irreducible stylistic opinion.
++
++  - path: "web/**"
++    rule: "unicorn/no-array-reduce"
++    reason: >
++      `Array.prototype.reduce` is a legitimate, readable summation idiom (cost
++      tables, token totals); unicorn's blanket ban is pure opinion.
++    strategy: >
++      Irreducible stylistic opinion.
++
++  - path: "web/**"
++    rule: "unicorn/prefer-await"
++    reason: >
++      Fire-and-forget promise chains with a `.catch()` error sink are the
++      idiomatic non-blocking pattern in React sync event handlers and effect
++      bodies (an effect cannot be `async` — it must return its cleanup
++      synchronously). Forcing `await` means wrapping each handler in a
++      `void (async () => { … })()` IIFE — a readability regression for a
++      single-level chain. The nested-`.then()`-pyramid anti-pattern the rule
++      targets does not occur here.
++    strategy: >
++      Re-evaluate if multi-level promise chaining ever appears; those genuine
++      cases would benefit from `await` and could be caught by a narrower rule.
++
++  - path: "web/**"
++    rule: "unicorn/no-nested-ternary"
++    reason: >
++      IRRECONCILABLE CONFLICT WITH PRETTIER (the canonical formatter, the
++      rustfmt twin established in P2). unicorn/no-nested-ternary permits nesting
++      but DEMANDS the nested branch be parenthesized (`a ? b : (c ? d : e)`);
++      Prettier authoritatively strips exactly those parens as redundant and
++      reflows ternaries to its own indentation. The two fight in an infinite
++      loop (eslint --fix re-adds the parens, prettier --write removes them). The
++      rule is purely a paren-placement/readability opinion — formatting Prettier
++      already owns — so the formatter wins. Genuinely-complex nested ternaries
++      were still hand-extracted into flat if-chain helpers during P5 (App
++      renderView, StatusBar resolvePhase, FleetDashboard healthCondition,
++      ThreadComposer banner, ThreadList dotColor) on readability grounds; what
++      remains are simple two-level value ternaries a formatter reads fine.
++    strategy: >
++      Re-evaluate if a Prettier-compatible nested-ternary readability rule
++      (e.g. the @stylistic variant that doesn't require the stripped parens)
++      becomes available.
++
++  # ── P5 unicorn vendored-shadcn exceptions (scoped to ui/**) ──────────────
++  - path: "web/src/components/ui/**"
++    rule: "unicorn/filename-case"
++    reason: >
++      Vendored shadcn/ui primitives keep their upstream kebab-case filenames
++      (dropdown-menu.tsx, scroll-area.tsx). The tree-wide rule is calibrated to
++      allow camel/pascal case; these vendored files are the sole kebab holdouts
++      and are not ours to rename.
++    strategy: >
++      Irreducible without forking shadcn. Re-evaluate if upstream renames them.
++
++  - path: "web/src/components/ui/**"
++    rule: "unicorn/max-nested-calls"
++    reason: >
++      Vendored shadcn primitives use the canonical cva() call nesting (badge.tsx)
++      that exceeds unicorn's depth-3 cap — the upstream shape we don't rewrite.
++    strategy: >
++      Irreducible without forking shadcn.
++
++  # ── P5 Finder mock — embedded code samples carry literal braces ──────────
++  - path: "web/src/lib/support/finderFs.ts"
++    rule: "unicorn/no-incorrect-template-string-interpolation"
++    reason: >
++      The Finder mock filesystem embeds Rust + JSX code SAMPLES in multiline
++      template literals for the preview pane (format!("Sent to {tid}"),
++      <Finder root={root} />). Those braces are literal display text in the
++      foreign-language sample, not JS interpolation; the rule can't distinguish
++      them from a typo'd ${…} and false-positives on each. Scoped to this one
++      mock-data file; the rule stays at error everywhere else.
++    strategy: >
++      Re-evaluate if the mock code samples are ever replaced by real data.
++
++  # ── hey-api codegen config — conventional hyphenated tool filename ────────
++  - path: "web/openapi-ts.config.ts"
++    rule: "unicorn/filename-case"
++    reason: >
++      hey-api's codegen config carries the tool's CONVENTIONAL filename
++      (openapi-ts.config.ts, hyphenated) — referenced verbatim by
++      `npx @hey-api/openapi-ts -f openapi-ts.config.ts` in CB5 +
++      check-typescript-contract.sh and by tsconfig.node.json's include, so it is
++      not ours to rename. The tree-wide filename-case calibration (camel/pascal)
++      flags the hyphen; scoped off for this single external-tool config file.
++    strategy: >
++      Irreducible while hey-api's config discovery expects this filename.
++
++  # ── P6 React stack — deliberate-UX / false-positive-only disables ─────────
++  - path: "web/**"
++    rule: "jsx-a11y/no-autofocus"
++    reason: >
++      autoFocus is a deliberate UX choice throughout this power-user cockpit —
++      the primary thread composer and every modal's sole first field (login
++      email, inline rename, New-Thread / Create-Command title, the maintenance
++      wizard steps, the OAuth login popup) auto-focuses so the keyboard is ready
++      the instant the surface opens. jsx-a11y flags it as a screen-reader
++      disorientation risk (a real concern on content pages), but every autoFocus
++      here sits on the lone input of a just-opened focused dialog or the app's
++      central composer — the canonical exception to the rule.
++    strategy: >
++      Re-evaluate if any autoFocus is ever added to a non-dialog, multi-input,
++      or content surface where it could steal focus disorientingly.
++
++  - path: "web/**"
++    rule: "@eslint-react/no-array-index-key"
++    reason: >
++      The rule guards against index keys on a list that REORDERS / INSERTS
++      mid-stream (React reuses the wrong child instance/state). Every dynamic,
++      reorderable list in this app already keys by a stable domain id
++      (fleet → agent.id, threads → thread.id, finder → node.path). Every
++      remaining `key={i}` site is a STATIC, wholesale-rerendered presentational
++      list with no per-item state — syntax-highlighted code lines, spreadsheet
++      cells, PDF-page thumbnails, audio waveform bars, parsed markdown/message
++      segments, and read-only inspector rows (tree, radar, entities, vitals) —
++      where the index IS the stable identity and reconciliation is never wrong.
++      The rule yields only false positives against this codebase's actual usage.
++      (The two genuinely interactive lists — question options, upload chips —
++      are additionally keyed by a natural id so they stay correct regardless.)
++    strategy: >
++      Re-evaluate if a reorderable/insertable list with stateful children is
++      ever introduced; such a list would need a stable per-item key and the rule
++      would correctly catch a bare index key there.
++
++  # ── P6 Finder shell — keyboard-widget surface (role="application") ────────
++  - path: "web/src/components/finder/Finder/shell.tsx"
++    rule: "jsx-a11y/no-noninteractive-element-interactions"
++    reason: >
++      The Finder root is a keyboard-driven WIDGET surface (arrow navigation,
++      type-ahead, Space Quick-Look, Enter rename, ⌘⌫ trash) that owns its key
++      handling, so it carries role="application" + tabIndex + onKeyDown.
++      `application` is the honest ARIA role for a keystroke-capturing region, but
++      jsx-a11y models it as a structural (non-interactive) role and
++      false-positives on the handler. The correct-looking alternative
++      role="grid" would be DISHONEST — the container wraps a toolbar + sidebar +
++      main + path bar, not a literal grid of rows/cells. The surface lives in the
++      Finder shell render since the P8 split (Finder.tsx → Finder/{index,state,
++      controller,shell,body}). Scoped to this file.
++    strategy: >
++      Re-evaluate if the surface is ever restructured into a genuine ARIA grid
++      with rows/gridcells, or jsx-a11y treats `application` as interactive.
++
++  - path: "web/src/components/finder/Finder/shell.tsx"
++    rule: "jsx-a11y/no-noninteractive-tabindex"
++    reason: >
++      Same role="application" keyboard-widget surface as above — a focusable
++      region that captures keystrokes legitimately holds tabIndex={0}, but
++      jsx-a11y models `application` as non-interactive and flags the tabIndex.
++      Scoped to this one file.
++    strategy: >
++      Re-evaluate alongside no-noninteractive-element-interactions if the
++      surface adopts genuine grid semantics or jsx-a11y recognises `application`.
++
++  # ── P6 highlight.js code preview — dangerouslySetInnerHTML is irreducible ──
++  - path: "web/src/components/finder/preview/livePreviews.tsx"
++    rule: "@eslint-react/dom-no-dangerously-set-innerhtml"
++    reason: >
++      The live code preview (HighlightedCode) renders per-line syntax-highlighted
++      HTML produced by highlight.js. highlight.js ESCAPES the source text and
++      emits only class-tagged <span>s — there is no user-controlled HTML in the
++      injected string. Rendering a pre-highlighted HTML fragment is the ONLY way
++      to display syntax colours (React cannot reconstruct highlight.js's span
++      tree from JSX). Scoped to this one file + this one rule; every other rule
++      stays at error. The exact analog of the MarkdownEditor execCommand
++      exception (an irreducible browser/library-shaped need).
++    strategy: >
++      Re-evaluate if a JSX-native syntax highlighter (one that returns a React
++      element tree instead of an HTML string) replaces highlight.js.
++
++  # ── P7 import-x tsc-redundant / flat-config-idiom rules — off tree-wide ────
++  - path: "web/**"
++    rule: "import-x/default"
++    reason: >
++      import-x/default walks a module for a `default` export and FALSE-POSITIVES
++      on CJS-authored ESLint plugins (e.g. @eslint-community/eslint-plugin-eslint-
++      comments) whose module.exports is consumed via esModuleInterop's synthetic
++      default. tsc already proves every `import x from "…"` default binding is
++      valid, so the rule is pure tsc-redundant noise here — import-x's own
++      TypeScript guidance drops the resolution rules tsc subsumes.
++    strategy: >
++      Irreducible while tsc (not import-x) is the authority on module resolution.
++
++  - path: "web/**"
++    rule: "import-x/no-named-as-default"
++    reason: >
++      Cautions when a DEFAULT import shares a name with one of the module's NAMED
++      exports (e.g. `import reactRefresh …` / `import importX …` while the module
++      also exports named members). That is the UNIVERSAL flat-config plugin
++      import idiom — every ESLint flat config imports the plugin's default and
++      reads `.configs`/`.flatConfigs` off it. Pure style caution, zero
++      correctness value; fires only on correct, conventional code.
++    strategy: >
++      Irreducible stylistic caution against the standard flat-config idiom.
++
++  - path: "web/**"
++    rule: "import-x/no-named-as-default-member"
++    reason: >
++      Cautions when a member access on a default import (`tseslint.configs`,
++      `regexp.configs`, `importX.flatConfigs`) collides with a same-named NAMED
++      export of that module. Exactly how every ESLint flat config is written —
++      `tseslint.configs.recommended` is the documented usage — so the rule is
++      pure noise here with no correctness value.
++    strategy: >
++      Irreducible stylistic caution against the standard flat-config idiom.
++
++  # ── P7 eslint-plugin-security — detect-object-injection off tree-wide ──────
++  - path: "web/**"
++    rule: "security/detect-object-injection"
++    reason: >
++      Pure noise in a typed codebase: the rule flags EVERY computed-key member
++      access (obj[k], arr[i]) irrespective of provenance — 38 hits here, all on
++      type-constrained record/array reads whose key space is fixed by the type.
++      TypeScript already proves them safe, and the genuine sink the rule targets
++      (a user-controlled key reaching a prototype-mutable object) cannot arise
++      from these lookups. The single dynamic-RegExp hit its sibling rule flagged
++      was fixed at source (fileUpload/helpers.ts field parser rewritten to one
++      literal regex + a Map, no computed-key object sink); the browser-relevant
++      security detectors (unsafe-regex, non-literal-regexp, eval-with-expression,
++      bidi-characters, possible-timing-attacks) stay at error.
++    strategy: >
++      Irreducible while the rule cannot see that TypeScript's type system fixes
++      the key space; re-evaluate if a type-aware object-injection rule appears.
++
++  # ── P7 no-unsanitized — contentEditable seeding is injection-free ─────────
++  - path: "web/src/components/agents/MarkdownEditor.tsx"
++    rule: "no-unsanitized/property"
++    reason: >
++      The WYSIWYG editor seeds its contentEditable surface once on mount via
++      `ref.current.innerHTML = mdToHtml(initialMarkdown)`. no-unsanitized/property
++      flags every non-literal innerHTML write, but this string is provably
++      injection-free: mdToHtml runs esc() (escapes &, <, >) over ALL text before
++      wrapping it in a FIXED literal tag vocabulary (h1/h2/p/blockquote/pre/
++      ul/ol/li + inline strong/code), so no user character can form a tag or
++      attribute, and there is no user-controlled attribute value anywhere.
++      Seeding via innerHTML is additionally IRREDUCIBLE for a contentEditable
++      WYSIWYG: React cannot own the surface's children without fighting the
++      browser's own execCommand mutations (caret jumps + reconciliation
++      clobbering live edits — the exact reason the surface is deliberately
++      uncontrolled). Scoped to this one file + this one rule; the sibling
++      no-unsanitized/method rule and every other rule stay at error. The analog
++      of the livePreviews highlight.js dangerouslySetInnerHTML exception.
++    strategy: >
++      Re-evaluate if a trusted-types / sanitizer API the rule recognises can
++      seed a contentEditable region, or if the editor is ever rebuilt on a
++      DOM-builder (createElement) seed instead of an HTML string.
++
++  # ── P7 no-secrets — off for the lint config's own documentation comments ──
++  - path: "web/eslint.config.ts"
++    rule: "no-secrets/no-secrets"
++    reason: >
++      eslint-plugin-no-secrets scans comment text as well as string literals.
++      This config file's extensive rationale comments cite long, high-entropy API
++      / compiler-flag IDENTIFIERS by name — `dangerouslySetInnerHTML` (Shannon
++      entropy 4.02) and `noPropertyAccessFromIndexSignature` (4.24) — which the
++      entropy heuristic mistakes for hardcoded secrets. They are neither secrets
++      nor even string literals: they are documentation prose naming the very
++      rules/flags this config governs, and this file is build tooling that never
++      ships to the browser. The rule stays at error across ALL app source
++      (literals AND comments) where a genuine leaked credential would actually
++      matter — the frontend being the dumb render layer (M141), every secret
++      resolves server-side through cp-vault and never appears as a literal.
++    strategy: >
++      Re-evaluate if a comment-skipping option lands upstream (then the rule can
++      be re-enabled here with comments excluded), or if the cited identifiers are
++      ever moved out of inline prose.
++
++  # ── P8 max-lines — off for the lint config file itself ────────────────────
++  - path: "web/eslint.config.ts"
++    rule: "max-lines"
++    reason: >
++      The structural line cap (500, the CB7 web-structure twin) governs APP
++      SOURCE — CB7 itself scopes its ≤500-lines/file check to web/src/**,
++      deliberately exempting build tooling at the repo/web root. This flat ESLint
++      config is exactly that: build tooling, not shipped code, and the bulk of
++      its length is the per-rule rationale prose the project's documentation
++      standard mandates (every calibration/disable explains WHY, in place).
++      Capping a config whose value IS its documentation at 500 lines would force
++      either terse, unexplained rules or an artificial split scattering one
++      coherent ruleset across files — both worse than one fully-documented
++      config. Scoped to this one file + this one rule; every other file stays
++      under the 500-line cap (all app source is currently ≤485 raw lines).
++    strategy: >
++      Re-evaluate if the config is ever split for other reasons (e.g. a shared
++      base preset extracted), or if a config-file-aware line budget is adopted.
++
++  # ── P9 no-restricted-imports — off inside the api layer (the SDK wrapper) ──
++  - path: "web/src/lib/api/**/*.{ts,tsx}"
++    rule: "@typescript-eslint/no-restricted-imports"
++    reason: >
++      The M141 crown-jewel guard bans value-importing the generated OpenAPI SDK
++      (@/lib/api/generated) anywhere outside the api layer — every other layer
++      must consume the hand-written wrappers from @/lib/api, so the frontend's
++      backend coupling lives in exactly one place. The api layer IS that place:
++      its whole job is to value-import the generated SDK functions and expose
++      thin fetch wrappers, so the rule is necessarily off HERE and only here.
++      The boundaries/dependencies rule already permits api→generated; this
++      off-switch is its twin for the import-path guard. `import type` of the
++      generated contract shape stays allowed everywhere via allowTypeImports, so
++      this exception governs only the value imports the api layer must make.
++      Every non-api file stays at error — no component or support module can
++      reach past the api layer to the raw SDK.
++    strategy: >
++      Irreducible: a wrapper layer must import the thing it wraps. The guard is
++      already as narrow as possible (this one folder, value imports only).
++
++  # ── P10c better-tailwindcss — line-wrapping owned by Prettier ─────────────
++  - path: "web/src/**/*.{ts,tsx}"
++    rule: "better-tailwindcss/enforce-consistent-line-wrapping"
++    reason: >
++      IRRECONCILABLE CONFLICT WITH PRETTIER (the canonical formatter, the rustfmt
++      twin from P2). This rule reflows the className string onto multiple lines;
++      Prettier then re-collapses it to its own line shape — the two fight in an
++      infinite --fix loop (the same class of conflict as unicorn/no-nested-ternary
++      resolved in P5). The rule is a pure line-shape opinion; whitespace/wrapping
++      is Prettier's domain, so the formatter wins and this rule is off. The other
++      seven better-tailwindcss rules (class order, canonical, duplicate,
++      deprecated, conflicting, unnecessary-whitespace) stay at error.
++    strategy: >
++      Re-evaluate if the rule gains a Prettier-compatible mode, or if
++      prettier-plugin-tailwindcss ever owns wrapping directly.
++
++  # ── P10c better-tailwindcss — no-unknown-classes can't resolve custom ─────
++  #    index.css utilities or CSS-var arbitrary values.
++  - path: "web/src/**/*.{ts,tsx}"
++    rule: "better-tailwindcss/no-unknown-classes"
++    reason: >
++      Pure false-positive noise against two legitimate patterns pervasive here.
++      (1) Custom index.css classes authored as plain CSS rules — .card-shadow,
++      .pop-shadow, .fill-sweep, .opt-rise, .menu-pop, .modal-pop (shadow +
++      keyframe-animation helpers). They are real classes but declared as ordinary
++      `.foo {}` rules, not Tailwind `@utility` directives, so Tailwind's compiler
++      never registers them as utilities and the plugin's resolver can't see them.
++      (2) CSS-variable arbitrary values — text-[var(--ok)] / bg-(--signal) /
++      ring-(--signal)/50 — which the plugin can't resolve to a known utility.
++      This DIRECTLY CONTRADICTS the sibling enforce-canonical-classes rule, which
++      REWRITES text-[var(--ok)] INTO text-(--ok) — the very shorthand
++      no-unknown-classes then flags as unknown. Two rules cannot both be right;
++      canonical wins (autofixable, correctness-bearing), so this is off. The
++      other seven better-tailwindcss rules stay at error.
++    strategy: >
++      Re-evaluate if the custom helpers are migrated to `@utility` directives AND
++      the plugin learns to resolve theme CSS-var arbitrary values (which would
++      also resolve the canonical-vs-unknown contradiction).
+diff --git a/.github/checks/check-web-structure.sh b/.github/checks/check-web-structure.sh
+new file mode 100755
+index 00000000..0997f03e
+--- /dev/null
++++ b/.github/checks/check-web-structure.sh
+@@ -0,0 +1,73 @@
++#!/usr/bin/env bash
++#
++# check-web-structure.sh — frontend structural guardrail for web/src.
++#
++# Mirrors the Rust workspace's folder-size / file-length policy (the sibling
++# .github/checks/check-file-lengths.sh + check-folder-sizes.sh enforce ≤8
++# entries per directory and ≤500 lines per source file) for the TypeScript
++# frontend, which those hash-chain-protected Rust scripts do not cover.
++#
++# Rules (applied to every directory + every .ts/.tsx file under web/src):
++#   • a directory may hold at most MAX_ENTRIES (8) immediate children;
++#   • a source file may be at most MAX_LINES (500) lines long.
++#
++# Exceptions:
++#   • web/src/components/ui       — shadcn primitives, vendored (not authored here);
++#   • web/src/lib/api/generated   — OpenAPI-generated client, machine-generated.
++#
++# Exit 0 when clean, 1 (listing every offender) otherwise. Invocation-cwd
++# independent: the repo root is resolved via `git rev-parse --show-toplevel`,
++# so it runs identically from a callback (project root), CI, or any subdir.
++
++set -euo pipefail
++
++MAX_ENTRIES=8
++MAX_LINES=500
++
++# Repo root — resolved independently of the caller's cwd, matching the other
++# .github/checks/ scripts (this one lives here after being moved out of
++# web/scripts/).
++ROOT="$(git rev-parse --show-toplevel)"
++WEB_ROOT="$ROOT/web"
++SRC="$WEB_ROOT/src"
++# shadcn vendored primitives — exempt from both rules.
++EXEMPT="$SRC/components/ui"
++# OpenAPI-generated TypeScript client — machine-generated, not authored here.
++EXEMPT_GENERATED="$SRC/lib/api/generated"
++
++fail=0
++
++is_exempt() {
++  # True when $1 is an exempt dir itself or anything beneath it.
++  case "$1" in
++    "$EXEMPT" | "$EXEMPT"/*) return 0 ;;
++    "$EXEMPT_GENERATED" | "$EXEMPT_GENERATED"/*) return 0 ;;
++    *) return 1 ;;
++  esac
++}
++
++# ── file length ────────────────────────────────────────────────────────
++while IFS= read -r f; do
++  is_exempt "$f" && continue
++  n=$(wc -l < "$f" | tr -d '[:space:]')
++  if [ "$n" -gt "$MAX_LINES" ]; then
++    echo "✗ file >$MAX_LINES lines ($n): ${f#"$WEB_ROOT"/}"
++    fail=1
++  fi
++done < <(find "$SRC" -type f \( -name '*.ts' -o -name '*.tsx' \))
++
++# ── directory entry count ──────────────────────────────────────────────
++while IFS= read -r d; do
++  is_exempt "$d" && continue
++  n=$(find "$d" -mindepth 1 -maxdepth 1 | wc -l | tr -d '[:space:]')
++  if [ "$n" -gt "$MAX_ENTRIES" ]; then
++    echo "✗ dir >$MAX_ENTRIES entries ($n): ${d#"$WEB_ROOT"/}"
++    fail=1
++  fi
++done < <(find "$SRC" -type d)
++
++if [ "$fail" -eq 0 ]; then
++  echo "web structure OK ✓ (≤$MAX_ENTRIES entries/dir, ≤$MAX_LINES lines/file; shadcn ui/ + generated/ exempt)"
++fi
++
++exit "$fail"
+# --- End entry #25 ---
+26:8e2c34e305a93c4a5910333638660c7fcb560d46af785c1c8287d23f60b4c250:2a02ace7cef140b83d0be8de3635e7242fb235c243166c887a5beef1e49c5331:88304ac2cccbbe2ed64b0305b5aa1b2bb947005f93decd4fd1cb307a2317a758
+# --- Diff for entry #26 ---
+diff --git a/.github/checks/protected-files.yaml b/.github/checks/protected-files.yaml
+index 31bc5889..e7d8f0c8 100644
+--- a/.github/checks/protected-files.yaml
++++ b/.github/checks/protected-files.yaml
+@@ -48,3 +48,37 @@
+   whole_file: true
+ - path: run.sh
+   whole_file: true
++
++# --- Frontend lint configuration (web-lint ratchet, P12) ---
++# The web twin of the Rust lint config above. Every file that DEFINES the
++# frontend ratchet (rulesets, strict flags, formatter/CSS/dead-code policy) or
++# ENFORCES it (the suppression + census guards + their baseline + the exception
++# registry). A silent relax of any is now tamper-evident. package.json is
++# deliberately NOT here: its typeCoverage floor is a secondary ratchet (the
++# primary any-ban is `no-explicit-any` inside the locked eslint.config.ts) and
++# whole-file locking would fight routine dependency bumps (the same reason
++# Cargo.toml locks only its lint sections, not its deps).
++- path: web/eslint.config.ts
++  whole_file: true
++- path: web/.prettierrc.json
++  whole_file: true
++- path: web/.prettierignore
++  whole_file: true
++- path: web/.stylelintrc.json
++  whole_file: true
++- path: web/knip.json
++  whole_file: true
++- path: web/tsconfig.app.json
++  whole_file: true
++- path: web/tsconfig.node.json
++  whole_file: true
++- path: .github/checks/check-frontend-suppressions.sh
++  whole_file: true
++- path: .github/checks/check-frontend-rule-census.sh
++  whole_file: true
++- path: .github/checks/frontend-rule-census.txt
++  whole_file: true
++- path: .github/checks/allowed-eslint-exceptions.yaml
++  whole_file: true
++- path: .github/checks/check-web-structure.sh
++  whole_file: true
+diff --git a/Cargo.toml b/Cargo.toml
+index 0cd83915..4a164f74 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,5 +1,5 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-threads", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault"]
+ 
+ [workspace.package]
+ version = "0.1.0"
+@@ -1078,6 +1078,7 @@ cp-mod-firecrawl = { path = "crates/cp-mod-firecrawl" }
+ cp-mod-queue = { path = "crates/cp-mod-queue" }
+ cp-mod-ocr = { path = "crates/cp-mod-ocr" }
+ cp-mod-search = { path = "crates/cp-mod-search" }
++cp-vault = { path = "crates/cp-vault", features = ["bridge"] }
+ crossterm.workspace = true
+ ratatui.workspace = true
+ serde.workspace = true
+diff --git a/web/eslint.config.ts b/web/eslint.config.ts
+new file mode 100644
+index 00000000..58eeee48
+--- /dev/null
++++ b/web/eslint.config.ts
+@@ -0,0 +1,815 @@
++import js from "@eslint/js"
++import globals from "globals"
++import reactHooks from "eslint-plugin-react-hooks"
++import reactRefresh from "eslint-plugin-react-refresh"
++import eslintComments from "@eslint-community/eslint-plugin-eslint-comments"
++import unicorn from "eslint-plugin-unicorn"
++import eslintReact from "@eslint-react/eslint-plugin"
++import jsxA11y from "eslint-plugin-jsx-a11y"
++import regexp from "eslint-plugin-regexp"
++import promise from "eslint-plugin-promise"
++import importX from "eslint-plugin-import-x"
++import n from "eslint-plugin-n"
++import security from "eslint-plugin-security"
++import noUnsanitized from "eslint-plugin-no-unsanitized"
++import noSecrets from "eslint-plugin-no-secrets"
++import boundaries from "eslint-plugin-boundaries"
++import betterTailwind from "eslint-plugin-better-tailwindcss"
++import tseslint from "typescript-eslint"
++import { defineConfig, globalIgnores } from "eslint/config"
++import type { Linter } from "eslint"
++
++/**
++ * Frontend ESLint flat config — the Rust-parity strict stack (branch `web-lint`).
++ *
++ * Built as a RATCHET: plugin groups are switched on one phase at a time, each
++ * landing at `error` with its violations burned down before the next is added
++ * (see the P0→P13 roadmap). This file starts at the pre-existing effective
++ * ruleset (P0) and grows toward ~1,100–1,400 active rules.
++ *
++ * `src/lib/api/generated/**` is globally ignored: it is OpenAPI codegen output
++ * (regenerated by CB3/CB5), not hand-written — the analog of not linting Rust's
++ * generated bindings. It must never be hand-edited to satisfy a lint.
++ */
++export default defineConfig([
++  // Build artifacts + machine-generated code are never linted. Playwright e2e
++  // specs + their config are a separate surface (test-runner globals, their own
++  // idioms); they get a dedicated lint profile in P8 (test tooling), not the
++  // app's type-aware pass — ignore them here so `projectService` doesn't fault
++  // on files absent from the app/node tsconfigs.
++  globalIgnores(["dist", "src/lib/api/generated/**", "e2e/**", "playwright.config.ts"]),
++  {
++    files: ["**/*.{ts,tsx}"],
++    // P3 — the clippy-semantic twin. `strictTypeChecked` (superset of
++    // recommended + recommendedTypeChecked) adds the whole type-aware rule set
++    // — the analogue of clippy's `all + pedantic + nursery` correctness lints —
++    // and `stylisticTypeChecked` the type-informed stylistic pass. Both land at
++    // `error`; the gate runs `--max-warnings 0`. Type-aware rules require a
++    // TypeScript program, wired below via `parserOptions.projectService`.
++    extends: [
++      js.configs.recommended,
++      tseslint.configs.strictTypeChecked,
++      tseslint.configs.stylisticTypeChecked,
++      reactRefresh.configs.vite,
++      unicorn.configs.recommended,
++      // ── P6 React stack ──────────────────────────────────────────────────
++      // The frontend twin of clippy's React-domain correctness lints. Three
++      // presets, each landing at `error`:
++      //   • @eslint-react recommended-type-checked — the modern successor to
++      //     eslint-plugin-react (component/JSX correctness: unstable defaults,
++      //     unused/invalid props, context/effect misuse). Type-aware, so it
++      //     rides the projectService program wired below.
++      //   • react-hooks recommended-latest (v7) — the classic hooks pair PLUS
++      //     the compiler-aware rules (set-state-in-effect/render, immutability,
++      //     refs, purity, static-components). Replaces the P0 manual pinning;
++      //     exhaustive-deps is bumped from its recommended `warn` to `error` in
++      //     the rules block below (the P0→P6 deferral now comes due).
++      //   • jsx-a11y recommended — accessibility (alt text, roles, labels).
++      eslintReact.configs["recommended-type-checked"],
++      // `.configs.flat` is the flat-config surface of eslint-plugin-react-hooks
++      // v7 (the bare `.configs["recommended-latest"]` is the legacy eslintrc
++      // form — an array-of-strings `plugins`, which flat config rejects). The
++      // plugin types `.flat` as `any`, so cast it to an object with the SINGLE
++      // named key we read — a named-property cast (not a `Record<string, …>`
++      // index signature) so the access yields `Linter.Config` directly, without
++      // the `| undefined` that `noUncheckedIndexedAccess` adds to index-signature
++      // reads (and without a `!` assertion, banned here). This also clears the
++      // type-aware `no-unsafe-member-access` / `no-unsafe-assignment` rules that
++      // would otherwise flag reading a member off an `any` and spreading it in.
++      (reactHooks.configs.flat as { "recommended-latest": Linter.Config })["recommended-latest"],
++      // eslint-plugin-jsx-a11y ships no bundled types (its module is declared
++      // ambiently in types.d.ts to satisfy the strict `tsc` program), so its
++      // default export is `any`. Cast to an object with exactly the nested named
++      // property we use — again a named-property shape, not an index signature,
++      // so `.flatConfigs.recommended` is `Linter.Config` (no `| undefined`, no
++      // `noPropertyAccessFromIndexSignature` violation) and the surrounding
++      // `no-unsafe-*` rules stay clear.
++      (jsxA11y as { flatConfigs: { recommended: Linter.Config } }).flatConfigs.recommended,
++      // ── P7 correctness & security stack (added one plugin at a time) ────
++      // eslint-plugin-regexp — catches genuinely-buggy regular expressions
++      // (unused capture groups, super-linear backtracking, redundant/dead
++      // alternations, control-char confusables). Its `flat/recommended` lands
++      // at error; violations are real bugs, fixed at the source.
++      regexp.configs["flat/recommended"],
++      // eslint-plugin-promise — enforces correct Promise usage (every chain
++      // ends in a `.catch()` or is returned, no accidentally-swallowed
++      // rejections, no `return` inside `finally`, valid executor/`Promise.*`
++      // arg shapes). Its `flat/recommended` lands at error; violations are
++      // genuine async-correctness bugs or fixed with an explicit sink.
++      // eslint-plugin-promise ships an untyped default export (its `.configs`
++      // resolves to `any`), so — exactly like the jsxA11y cast above — narrow it
++      // to the single named config we read. A named-property cast (not an index
++      // signature) yields `Linter.Config` directly, so `noUncheckedIndexedAccess`
++      // adds no `| undefined` and the surrounding type-aware `no-unsafe-member-
++      // access` / `no-unsafe-assignment` rules stay clear.
++      (promise as { configs: { "flat/recommended": Linter.Config } }).configs["flat/recommended"],
++      // eslint-plugin-import-x — module-graph hygiene: no import cycles
++      // (import-x/no-cycle, wired at error in the rules block — the structural
++      // payoff of this plugin, the M141 layering guard's precursor), no
++      // duplicate imports, no self-import, valid named/default bindings. Two
++      // presets: `recommended` (the rule set) + `typescript` (wires
++      // eslint-import-resolver-typescript so the `@/*` tsconfig path aliases +
++      // extensionless `.ts`/`.tsx`/`.gen.ts` imports RESOLVE — without it
++      // no-cycle would silently under-trace the graph and no-unresolved would
++      // false-positive on every alias). The tsc-redundant resolution rules are
++      // relaxed in the rules block (tsc already proves them).
++      importX.flatConfigs.recommended,
++      importX.flatConfigs.typescript,
++      // eslint-plugin-security — heuristic detectors for injection/ReDoS/eval/
++      // unsafe-buffer classes of bug. Its `recommended` is flat-native and
++      // ships every rule at `warn`; the gate runs `--max-warnings 0`, and each
++      // kept rule is bumped to `error` in the rules block below (with the
++      // Node-only detectors staying inert here — no child_process/fs/require in
++      // a browser app — and the notorious detect-object-injection turned off,
++      // registered, as a pure-noise false-positive on typed record access).
++      // eslint-plugin-security ships no bundled types (declared ambiently in
++      // types.d.ts), so its default export is `any`. Cast to the single named
++      // config we read — a named-property shape (not an index signature) so
++      // `.configs.recommended` is `Linter.Config` directly (no `| undefined`
++      // under noUncheckedIndexedAccess, no `noPropertyAccessFromIndexSignature`
++      // violation) and the surrounding type-aware `no-unsafe-member-access` /
++      // `no-unsafe-assignment` rules stay clear — exactly the jsxA11y / promise
++      // cast idiom above.
++      (security as { configs: { recommended: Linter.Config } }).configs.recommended,
++      // eslint-plugin-no-unsanitized — bans assigning an unsanitized (non-
++      // literal, non-trusted) string to a DOM HTML sink: the `property` rule
++      // guards `.innerHTML`/`.outerHTML`/`.insertAdjacentHTML`-style property
++      // writes, the `method` rule guards `document.write`/`insertAdjacentHTML`/
++      // `DOMParser`-style calls. This is the raw-DOM XSS guard (distinct from
++      // @eslint-react's dangerouslySetInnerHTML rule wired in P6 — that one
++      // covers React's JSX prop; this one covers imperative DOM manipulation).
++      // Its `recommended` is flat-native (a `{ plugins, rules }` object, not the
++      // eslintrc `recommended-legacy`) and ships both rules at error. No bundled
++      // types (declared ambiently in types.d.ts) → its default export is `any`;
++      // cast to the single named config we read — a named-property shape (not an
++      // index signature) so `.configs.recommended` is `Linter.Config` directly
++      // (no `| undefined` under noUncheckedIndexedAccess) and the surrounding
++      // type-aware `no-unsafe-*` rules stay clear, the jsxA11y / promise /
++      // security cast idiom.
++      (noUnsanitized as { configs: { recommended: Linter.Config } }).configs.recommended,
++    ],
++    plugins: {
++      // react-hooks is now registered via its v7 `recommended-latest` flat
++      // preset in `extends` above (P6) — the manual P0 pinning to the classic
++      // rules-of-hooks + exhaustive-deps pair (and the `ESLint.Plugin` cast that
++      // bridged the plugin's then-unmodelled `.configs.flat` typing gap) is
++      // gone. The preset ships the compiler-aware rule set and the plugin key,
++      // so registering it here again would throw "Cannot redefine plugin".
++      //
++      // P4 anti-cheat layer: the eslint-comments plugin powers the ban on
++      // suppression directives (its `no-use` rule reports EVERY `eslint-disable`
++      // / `eslint-enable` comment). This is the frontend twin of the Rust
++      // `#[allow]`/`#[expect]` ban — lint suppression is forbidden inline; the
++      // only legal escape is a config-level scoped override, registered and
++      // justified in `.github/checks/allowed-eslint-exceptions.yaml`. Unlike
++      // react-hooks above, this plugin's default export already satisfies
++      // ESLint's `Plugin` type, so no cast is needed (one would be flagged
++      // unnecessary by @typescript-eslint/no-unnecessary-type-assertion).
++      "@eslint-community/eslint-comments": eslintComments,
++      // P7 eslint-plugin-no-secrets — no preset ships (empty `configs`), so the
++      // plugin is registered here and its rule enabled explicitly in the rules
++      // block below. Its default export satisfies ESLint's `Plugin` type (it
++      // bundles its own `.d.ts`), so — like eslint-comments above — no cast is
++      // needed. This is the frontend twin of the Rust vault-bypass guard: a
++      // hardcoded credential in the dumb render layer is an architecture
++      // violation (M141 — all secrets live server-side in cp-vault), and this
++      // rule catches a high-entropy literal before it can ever ship.
++      "no-secrets": noSecrets,
++      // P9 architecture boundaries (encodes M141 — frontend is the dumb render
++      // layer). eslint-plugin-boundaries ships no types (declared ambiently in
++      // types.d.ts), so its default export is `any`; narrow it to ESLint's
++      // `Plugin` shape at registration (a single `as` — meaningful any→Plugin,
++      // not a redundant assertion — which also clears no-unsafe-assignment). The
++      // layer model + direction rules live in `settings["boundaries/elements"]`
++      // + the `boundaries/dependencies` rule below.
++      boundaries: boundaries as import("eslint").ESLint.Plugin,
++    },
++    // ── P9 boundaries: the frontend layer model (M141) ────────────────────
++    // Elements are matched top-to-bottom, FIRST match wins — so the more
++    // specific paths precede the broader globs:
++    //   • generated — the OpenAPI codegen leaf (src/lib/api/generated).
++    //   • api — the hand-written SDK-wrapper layer (src/lib/api). The ONLY
++    //     layer allowed to value-import `generated` (also enforced by the
++    //     no-restricted-imports rule, which additionally permits `import type`).
++    //   • lib — every other shared support module (src/lib/*): query, live,
++    //     support, providers, mock, utils, types. Pure logic + data; MUST NOT
++    //     import the components layer (the M141 inversion this guard exists to
++    //     forbid).
++    //   • components — the render layer (src/components). May import lib + api.
++    //   • app — the composition root (src/App.tsx).
++    // markdown.tsx + finderFs.ts live under lib/support but EMIT JSX and render
++    // components, so they are classified `components` (view helpers), not `lib`
++    // — honest classification, not a suppression. Both are imported only by
++    // other components, so this creates no new cross-layer edge.
++    settings: {
++      "boundaries/elements": [
++        { type: "components", pattern: "src/lib/support/markdown.tsx", mode: "file" },
++        { type: "components", pattern: "src/lib/support/finderFs.ts", mode: "file" },
++        { type: "generated", pattern: "src/lib/api/generated", mode: "folder" },
++        { type: "api", pattern: "src/lib/api", mode: "folder" },
++        { type: "lib", pattern: "src/lib/*", mode: "folder" },
++        { type: "components", pattern: "src/components", mode: "folder" },
++        { type: "app", pattern: "src/App.tsx", mode: "file" },
++      ],
++      "boundaries/ignore": ["**/*.test.*", "**/*.spec.*"],
++      // boundaries resolves each import's target file via `eslint-module-utils/
++      // resolve`, which reads the classic `import/resolver` settings key — NOT
++      // the `import-x/resolver` key that importX.flatConfigs.typescript sets. So
++      // WITHOUT this, every import resolved to `undefined`, the target element
++      // was unknown, and `boundaries/dependencies` silently enforced NOTHING
++      // (default:disallow can't bite a dependency it can't classify — a toothless
++      // guard). Wiring the TypeScript resolver here (it reads tsconfig `paths`)
++      // makes the `@/*` alias + extensionless `.ts`/`.tsx` imports resolve, so
++      // both endpoints of every edge classify and the layer rules actually fire.
++      "import/resolver": { typescript: true },
++    },
++    languageOptions: {
++      globals: globals.browser,
++      // `projectService` gives every linted file its TypeScript program so the
++      // type-aware rules can query types. Config files not in a source tsconfig
++      // (eslint.config.ts, vite.config.ts) are covered by tsconfig.node.json's
++      // `include`. `tsconfigRootDir` anchors project discovery to this folder.
++      parserOptions: {
++        projectService: true,
++        tsconfigRootDir: import.meta.dirname,
++      },
++    },
++    // P4 anti-cheat: a stale `eslint-disable` that suppresses nothing is itself
++    // an error (belt-and-suspenders alongside the outright no-use ban below).
++    linterOptions: {
++      reportUnusedDisableDirectives: "error",
++    },
++    rules: {
++      // ── P4 anti-suppression layer (the crown jewel — Rust #[allow]-ban twin) ──
++      // Inline lint suppression is FORBIDDEN. The only legal escape is a
++      // config-level scoped override registered in
++      // .github/checks/allowed-eslint-exceptions.yaml (hash-locked) — never an
++      // inline comment. A grep-guard (check-frontend-suppressions.sh) enforces
++      // the same ban CI-side, independent of ESLint's own config.
++      //
++      // no-use bans EVERY eslint-disable/eslint-enable directive comment (any
++      // form: line, next-line, block, whole-file). no-unlimited-disable also
++      // catches a bare `eslint-disable` with no rule list.
++      "@eslint-community/eslint-comments/no-use": "error",
++      "@eslint-community/eslint-comments/no-unlimited-disable": "error",
++      // ── P7 no-secrets: hardcoded high-entropy string guard ──────────────
++      // Flags string literals whose Shannon entropy exceeds `tolerance` (or that
++      // match a known key pattern) — a hardcoded API key / token / secret. The
++      // frontend is the dumb render layer (M141): every credential is resolved
++      // server-side through cp-vault and reaches the browser only via an
++      // authenticated request, never as a literal. So any hit is either a real
++      // leak (fix at source — remove it) or a benign high-entropy constant
++      // (calibrated per-site). Default tolerance (4.0) is kept.
++      "no-secrets/no-secrets": "error",
++      // ── P9 M141 crown jewel: only lib/api may VALUE-import the generated
++      //    SDK. Type imports of the contract shape are allowed everywhere
++      //    (`allowTypeImports`) — consuming the generated *types* is the honest
++      //    contract coupling; importing the generated SDK *functions* outside
++      //    the api layer is the "frontend has backend logic" violation. The
++      //    api layer itself turns this off in a trailing block (registered). ──
++      "@typescript-eslint/no-restricted-imports": [
++        "error",
++        {
++          patterns: [
++            {
++              group: [
++                "@/lib/api/generated",
++                "@/lib/api/generated/*",
++                "**/api/generated",
++                "**/api/generated/*",
++              ],
++              allowTypeImports: true,
++              message:
++                "Import the hand-written wrapper from @/lib/api instead of the generated SDK directly (M141: only lib/api may value-import generated bindings; `import type` is allowed).",
++            },
++          ],
++        },
++      ],
++      // ── P9 layer-direction guard: encode the M141 dependency arrows as
++      //    errors. `default: "disallow"` means any import BETWEEN two known
++      //    elements that isn't explicitly allowed is an error (external/
++      //    node_modules imports are not local elements, so React etc. are
++      //    untouched). The one arrow that matters most: `lib` may NOT import
++      //    `components` — the dumb-render-layer inversion. Uses the v6
++      //    `boundaries/dependencies` rule + object dependency selectors
++      //    (`{ to: { type } }`); the legacy `element-types` name + bare-string
++      //    `allow` form was a silent no-op under v6's compat shim (it emitted a
++      //    "legacy selector syntax" warning and enforced NOTHING — a toothless
++      //    guard), so it is migrated in full here. ──
++      "boundaries/dependencies": [
++        "error",
++        {
++          default: "disallow",
++          rules: [
++            // Contract-shape coupling: ANY layer may `import type` from the
++            // generated bindings — consuming the generated *types* is honest
++            // (the API contract), it's only the generated *SDK functions*
++            // (value imports) that must stay inside lib/api. This mirrors the
++            // no-restricted-imports guard's `allowTypeImports: true`, so the two
++            // guards agree: type import of generated = allowed everywhere, value
++            // import of generated = allowed only in api (below + default:disallow).
++            {
++              from: [{ type: "*" }],
++              allow: [{ to: { type: "generated" }, dependency: { kind: "type" } }],
++            },
++            { from: [{ type: "generated" }], allow: [{ to: { type: "generated" } }] },
++            { from: [{ type: "api" }], allow: [{ to: { type: ["api", "lib", "generated"] } }] },
++            { from: [{ type: "lib" }], allow: [{ to: { type: ["lib", "api"] } }] },
++            {
++              from: [{ type: "components" }],
++              allow: [{ to: { type: ["components", "lib", "api"] } }],
++            },
++            {
++              from: [{ type: "app" }],
++              allow: [{ to: { type: ["app", "components", "lib", "api"] } }],
++            },
++          ],
++        },
++      ],
++      // ── P8 structure & complexity budgets (core-ESLint, the clippy
++      //    cognitive-complexity + folder-sizes twin) — CENSUS PASS ──────────
++      "max-lines": ["error", { max: 500, skipBlankLines: false, skipComments: false }],
++      "max-lines-per-function": [
++        "error",
++        { max: 150, skipBlankLines: true, skipComments: true, IIFEs: true },
++      ],
++      complexity: ["error", { max: 15 }],
++      "max-depth": ["error", { max: 4 }],
++      "max-params": ["error", { max: 4 }],
++      "max-statements": ["error", { max: 30 }],
++      "max-nested-callbacks": ["error", { max: 3 }],
++      // ban-ts-comment is already error via strictTypeChecked, but its default
++      // still permits `@ts-expect-error` with a ≥10-char description. Harden it:
++      // ALL four TS directive comments are forbidden outright, no description
++      // escape hatch (the generated bindings that legitimately carry @ts-nocheck
++      // are globally-ignored above, so this never touches them).
++      "@typescript-eslint/ban-ts-comment": [
++        "error",
++        {
++          "ts-expect-error": true,
++          "ts-ignore": true,
++          "ts-nocheck": true,
++          "ts-check": true,
++        },
++      ],
++      // Classic react-hooks pair (see the plugins note above).
++      // ── P7 promise calibrations (option-relaxations — the rule stays at
++      //    `error`, the clippy.toml-threshold twin; NOT registry disables) ──
++      //
++      // A TERMINAL `.then(() => { …side-effect… })` legitimately returns nothing
++      // — its whole job is the effect (setState, onClose, a toast). The rule's
++      // real value is catching a MIDDLE `.then()` that forgets to return and so
++      // silently breaks the chain's value flow; `ignoreLastCallback` keeps that
++      // teeth while permitting the terminal side-effect callback that pervades
++      // React handlers. A non-terminal miss still errors.
++      "promise/always-return": ["error", { ignoreLastCallback: true }],
++      // A chain that ends `.catch(…).finally(() => setSaving(false))` IS fully
++      // handled — the rejection has a sink; the `.finally()` is just cleanup
++      // after it. The default requires the LAST call to be `.catch()`, which a
++      // trailing `.finally()` violates. `allowFinally` recognises the
++      // catch-then-finally idiom; a chain with NO catch at all still errors.
++      "promise/catch-or-return": ["error", { allowFinally: true }],
++      // ── P7 import-x: no-cycle comes on ─────────────────────────────────
++      // import-x/recommended ships no-cycle OFF (it's resolution-heavy). Turn
++      // it on at error: a circular import between modules is a real
++      // maintainability + init-order hazard and the structural precursor to the
++      // P9 boundaries layering guard (M141). `maxDepth: Infinity` traces the
++      // full graph; `ignoreExternal` skips node_modules cycles we don't own.
++      "import-x/no-cycle": ["error", { ignoreExternal: true }],
++      // ── P10b import-x/no-extraneous-dependencies ────────────────────────
++      // Every runtime import must be declared in package.json `dependencies`
++      // (not devDependencies, not undeclared/phantom). The frontend twin of
++      // clippy's cargo dependency hygiene: a runtime import of a devDep would
++      // ship a module the production bundle can't guarantee, and a phantom
++      // import (present only transitively) breaks on a clean install. Build
++      // tooling + tests legitimately pull devDeps, so those file globs are
++      // allowed devDependencies; the resolver was already wired by
++      // flatConfigs.typescript (P7).
++      "import-x/no-extraneous-dependencies": [
++        "error",
++        {
++          devDependencies: [
++            "eslint.config.ts",
++            "vite.config.ts",
++            "openapi-ts.config.ts",
++            "playwright.config.ts",
++            "e2e/**",
++            "**/*.test.{ts,tsx}",
++            "**/*.spec.{ts,tsx}",
++          ],
++          optionalDependencies: false,
++          peerDependencies: false,
++        },
++      ],
++      // ── P7 import-x tsc-redundant / flat-config-idiom relaxations
++      //    (registered in allowed-eslint-exceptions.yaml — the config-level
++      //    channel, never an inline disable) ──
++      //
++      // import-x/default walks a module for a `default` export. It FALSE-
++      // POSITIVES on CJS-authored ESLint plugins (e.g. eslint-comments) whose
++      // `module.exports` is consumed via esModuleInterop's synthetic default —
++      // tsc already proves every `import x from "…"` binding is valid, so this
++      // rule is pure tsc-redundant noise here. Off tree-wide (the plugin's own
++      // TS guidance drops the resolution rules tsc subsumes).
++      "import-x/default": "off",
++      // no-named-as-default / -member CAUTION when a default import shares a
++      // name with one of the module's NAMED exports (`import tseslint …` while
++      // the module also exports `configs`). That is the UNIVERSAL flat-config
++      // plugin idiom — `tseslint.configs.*`, `regexp.configs.*`,
++      // `importX.flatConfigs.*` are exactly how every ESLint flat config is
++      // written — so the rule fires only on correct, conventional code. Pure
++      // style noise with no correctness value; off tree-wide.
++      "import-x/no-named-as-default": "off",
++      "import-x/no-named-as-default-member": "off",
++      // ── P7 eslint-plugin-security calibration ──────────────────────────
++      // detect-object-injection is pure noise in a typed codebase: it flags
++      // EVERY computed-key member access (obj[k], arr[i]) irrespective of
++      // provenance — 38 hits here, all on type-constrained record/array reads
++      // whose key space is fixed by the type. TypeScript already proves them
++      // safe, and the genuine sink the rule targets (a user-controlled key
++      // reaching a prototype-mutable object) cannot arise from these lookups.
++      // Off tree-wide (registered in allowed-eslint-exceptions.yaml — the
++      // config-level channel, never an inline eslint-disable).
++      "security/detect-object-injection": "off",
++      // The browser-relevant detectors are hardened from recommended's `warn`
++      // to `error` (real bug classes reachable in frontend code): catastrophic-
++      // backtracking regexes, dynamic `new RegExp(x)`, `eval`-with-expression,
++      // trojan-source bidi characters, and secret-comparison timing attacks.
++      // (The remaining recommended rules — detect-child-process / non-literal-
++      // fs-filename / non-literal-require / buffer-noassert / new-buffer /
++      // pseudoRandomBytes / no-csrf / disable-mustache-escape — target Node
++      // APIs absent from this browser app, so they are inert; they stay at
++      // recommended's `warn`, which the `--max-warnings 0` gate would still
++      // fail on the impossible day one fired.)
++      "security/detect-unsafe-regex": "error",
++      "security/detect-non-literal-regexp": "error",
++      "security/detect-eval-with-expression": "error",
++      "security/detect-bidi-characters": "error",
++      "security/detect-possible-timing-attacks": "error",
++      // ── P6: exhaustive-deps comes due ──────────────────────────────────
++      // react-hooks/recommended-latest (extends) sets rules-of-hooks + the
++      // compiler-aware rules at error, but leaves exhaustive-deps at its
++      // recommended `warn`. The P0→P5 deferral of the 3 known warnings
++      // (CreateCommandDialog, MarkdownEditor, Finder — intentional mount-once
++      // effects) now comes due: bump it to `error` and restructure each site
++      // (a ref-captured seed / stable callback), never an inline disable (P4).
++      "react-hooks/exhaustive-deps": "error",
++      // `cva()` variant tables and other module-level `const` exports sit
++      // beside their component (the shadcn/vite idiom). They don't break Fast
++      // Refresh, so permit them; hooks/functions co-exported with components
++      // still error and get factored into sibling modules.
++      "react-refresh/only-export-components": ["error", { allowConstantExport: true }],
++      // ── Two type-aware rules carry a codebase-contract OPTION (the twin of a
++      //    clippy.toml threshold — a calibration, NOT a suppression; the rule
++      //    stays at `error`): ──
++      //
++      // JSX event handlers are overwhelmingly `onClick={() => setState(x)}` —
++      // an arrow whose void return is deliberately discarded by the prop. The
++      // default forbids that shorthand, which would force noisy `{ … }` braces
++      // on ~240 handlers for zero safety gain. `ignoreArrowShorthand` permits
++      // exactly that shape while STILL flagging a void expression used as a
++      // value (`const x = doVoid()`, `return doVoid()`) — the genuinely
++      // confusing cases.
++      "@typescript-eslint/no-confusing-void-expression": ["error", { ignoreArrowShorthand: true }],
++      // Interpolating a `number` into a template literal is unambiguous and
++      // universal (`${count}`, `${size}px`). `allowNumber` (the conventional
++      // setting) permits it; a possibly-`undefined`/object/boolean interpolation
++      // still errors and gets a real fix (guard / `String(x)` / `?? fallback`).
++      "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
++      // Third calibration (same clippy.toml-threshold spirit — NOT a blanket
++      // suppression; the rule stays at `error`). The rule's safety concern is a
++      // `x || fallback` that silently swallows a VALID falsy value (a real `0`,
++      // `""`, or `false` that carried meaning). That danger is real for
++      // **numbers** — a legitimate `0` must not be replaced — so `number`
++      // stays flagged (→ genuine `?? ` fixes). But for **strings** and
++      // **booleans** every `||` site in this codebase is a deliberate
++      // truthy-or-fallback idiom where an empty string / `false` is *meant* to
++      // take the fallback (display-name chains `name || ip || ""`, path-segment
++      // fallbacks `split("/").pop() || path` where a trailing-slash `""` must
++      // use the whole path, and boolean OR like `disabled || busy` where `||`
++      // is the correct logical operator, not a fallback). Ignoring those two
++      // primitives keeps `||` where it expresses intent while still forcing
++      // `??` for the nullable-object and number cases the rule exists to catch.
++      "@typescript-eslint/prefer-nullish-coalescing": [
++        "error",
++        { ignorePrimitives: { string: true, boolean: true } },
++      ],
++
++      // ── P5 unicorn calibrations (option-relaxations — the rule stays at
++      //    `error`, the clippy.toml-threshold twin; NOT registry exceptions) ──
++      //
++      // React source is PascalCase components (Message.tsx, AgentModal.tsx) +
++      // camelCase hooks/utils/modules (markdown.tsx, useFinderActions.ts).
++      // unicorn's default kebab-case would flag every component file; allow both
++      // cases so the rule still catches a genuinely mis-cased file.
++      "unicorn/filename-case": ["error", { cases: { camelCase: true, pascalCase: true } }],
++      // Catch bindings are `e` by house convention (a widened `unknown` since
++      // P3). `ignore` lets the handful of legacy `err`/`error` names pass while
++      // the rule still flags any other ad-hoc name.
++      "unicorn/catch-error-name": ["error", { name: "e", ignore: ["^err$", "^error$"] }],
++
++      // ── P5 unicorn justified disables (registered in
++      //    .github/checks/allowed-eslint-exceptions.yaml; each is a
++      //    React/DOM-incompatible or pure-naming-opinion rule with no
++      //    correctness value — the config-level exception channel, never an
++      //    inline eslint-disable) ──
++      //
++      // Bans idiomatic short identifiers (e, err, fn, props, params, db, ctx…)
++      // — pervasive, zero correctness value, fights React/JS convention.
++      "unicorn/name-replacements": "off",
++      // React & the DOM use `null` intrinsically: useState<T | null>(null),
++      // refs, getAttribute, DragEvent.dataTransfer. `null` is not avoidable.
++      "unicorn/no-null": "off",
++      // Forces is/has/should boolean-name prefixes; our booleans (dragging,
++      // copied, busy, saving, open, dirty) are idiomatic React state names.
++      "unicorn/consistent-boolean-name": "off",
++      // Browser-only code legitimately uses `window.*` (setTimeout,
++      // addEventListener, prompt); rewriting to globalThis buys nothing.
++      "unicorn/prefer-global-this": "off",
++      // Bans `new`/`set`-prefixed non-constructor names (newFolder, newAgent) —
++      // pure naming opinion.
++      "unicorn/no-non-function-verb-prefix": "off",
++      // `Array.prototype.reduce` is a legitimate, readable summation idiom used
++      // in the cost tables; unicorn's blanket ban is pure opinion.
++      "unicorn/no-array-reduce": "off",
++      // Fire-and-forget promise chains with a `.catch()` error sink are the
++      // idiomatic non-blocking pattern in React sync event handlers and effect
++      // bodies (which cannot be `async` — an effect must return its cleanup
++      // synchronously). Forcing `await` here means wrapping every handler in a
++      // `void (async () => { … })()` IIFE, a readability regression for a
++      // single-level chain. The genuine anti-pattern the rule targets (nested
++      // `.then()` pyramids) does not occur in this codebase.
++      "unicorn/prefer-await": "off",
++      // IRRECONCILABLE CONFLICT WITH PRETTIER (the canonical formatter — the
++      // rustfmt twin, established in P2). unicorn/no-nested-ternary permits
++      // nesting but DEMANDS the nested branch be parenthesized (`a ? b : (c ? d
++      // : e)`); Prettier authoritatively strips exactly those parens as
++      // redundant and reflows ternaries to its own indentation. The two fight
++      // in an infinite loop (eslint --fix re-adds the parens, prettier --write
++      // removes them). This rule is purely a paren-placement/readability
++      // opinion — formatting that Prettier already owns — so the formatter
++      // wins and the rule is off. Genuinely-complex nested ternaries were
++      // still extracted into flat if-chain helpers during P5 (App.renderView,
++      // StatusBar.resolvePhase, FleetDashboard.healthCondition,
++      // ThreadComposer banner, ThreadList.dotColor) on readability grounds.
++      "unicorn/no-nested-ternary": "off",
++
++      // ── P6 React-stack justified disables (registered in
++      //    .github/checks/allowed-eslint-exceptions.yaml; each a
++      //    deliberate-UX or false-positive-only rule, config-level channel,
++      //    never an inline eslint-disable) ──
++      //
++      // autoFocus is a DELIBERATE UX choice throughout this power-user cockpit:
++      // the primary thread composer, every modal's first field (login email,
++      // inline rename, New-Thread / Create-Command titles, the maintenance
++      // wizard steps, the OAuth login popup) auto-focuses so the keyboard is
++      // ready the instant the surface opens. jsx-a11y flags it as a screen-
++      // reader-disorientation risk, a real concern for content pages — but here
++      // every autoFocus sits on the sole input of a just-opened focused dialog
++      // or the app's central composer, the canonical exception. Off tree-wide.
++      "jsx-a11y/no-autofocus": "off",
++      // @eslint-react/no-array-index-key guards against index keys on a list
++      // that REORDERS/INSERTS mid-stream (React then reuses the wrong child
++      // instance/state). Every dynamic, reorderable list in this app already
++      // keys by a stable domain id (fleet→agent.id, threads→thread.id,
++      // finder→node.path). The remaining `key={i}` sites are all STATIC,
++      // wholesale-rerendered presentational lists with no per-item state —
++      // syntax-highlighted code lines, sheet cells, PDF-page thumbnails,
++      // waveform bars, parsed markdown/message segments, read-only inspector
++      // rows (tree, radar, entities, vitals) — where the index IS the stable
++      // identity and reconciliation is never wrong. The rule yields only
++      // false positives against this codebase's actual usage; off tree-wide.
++      // (The two genuinely interactive lists — question options, upload chips —
++      // are ALSO keyed by a natural id so they stay correct regardless.)
++      "@eslint-react/no-array-index-key": "off",
++    },
++  },
++  {
++    // Vendored shadcn primitives (`components/ui/**`) ship component + variant
++    // table per file by design — the upstream canonical shape we don't rewrite.
++    // Treated like generated code: Fast-Refresh purity is not enforced here.
++    files: ["src/components/ui/**/*.{ts,tsx}"],
++    rules: {
++      "react-refresh/only-export-components": "off",
++      // Vendored shadcn primitives keep their upstream kebab-case filenames
++      // (dropdown-menu.tsx, scroll-area.tsx) and their canonical cva() call
++      // nesting — both are the upstream shape we don't rewrite.
++      "unicorn/filename-case": "off",
++      "unicorn/max-nested-calls": "off",
++    },
++  },
++  {
++    // The WYSIWYG markdown editor drives a `contentEditable` surface through
++    // `document.execCommand` / `queryCommandState`. Both are marked deprecated
++    // by MDN, yet they remain the ONLY browser API for rich-text editing of a
++    // contentEditable region — there is no standardised replacement (the
++    // proposed `EditContext`/Input Events level 2 don't cover formatting
++    // commands, and every WYSIWYG library still relies on `execCommand`). This
++    // is a genuine irreducible-exception, scoped to this one file and this one
++    // rule — the config-level analog of the Rust `allowed-lint-exceptions.yaml`
++    // registry (never an inline `eslint-disable`, which the P4 anti-cheat layer
++    // forbids). It is NOT a blanket downgrade: every other rule stays at error.
++    files: ["src/components/agents/MarkdownEditor.tsx"],
++    rules: {
++      "@typescript-eslint/no-deprecated": "off",
++      // The editor SEEDS its contentEditable surface once on mount via
++      // `ref.current.innerHTML = mdToHtml(initialMarkdown)`. no-unsanitized/
++      // property flags every non-literal innerHTML write, but this string is
++      // provably injection-free: mdToHtml runs esc() (escapes &, <, >) over ALL
++      // text before wrapping it in a FIXED literal tag vocabulary (h1/h2/p/
++      // blockquote/pre/ul/ol/li + inline strong/code), so no user character can
++      // form a tag or attribute and there is no user-controlled attribute value
++      // anywhere. Seeding via innerHTML is also irreducible for a contentEditable
++      // WYSIWYG: React cannot own the surface's children (it fights the browser's
++      // own execCommand mutations → caret jumps + reconciliation clobbering live
++      // edits — the very reason the surface is deliberately uncontrolled). Scoped
++      // to this one file + this one rule (registered in
++      // allowed-eslint-exceptions.yaml, never an inline eslint-disable). The
++      // sibling no-unsanitized/method rule stays at error, as does every other.
++      "no-unsanitized/property": "off",
++    },
++  },
++  {
++    // The Finder mock filesystem embeds Rust + JSX code SAMPLES as multiline
++    // template literals for the preview pane (e.g. `format!("Sent to {tid}")`,
++    // `<Finder root={root} cwd={cwd} setCwd={setCwd} />`). Those `{tid}` /
++    // `{root}` braces are LITERAL text in the displayed foreign-language code,
++    // not JS interpolation — unicorn/no-incorrect-template-string-interpolation
++    // can't tell display text from a typo'd `${…}` and false-positives on every
++    // one. Scoped off for this single mock-data file (the rule stays at error
++    // everywhere else, where it genuinely catches a missing `$`).
++    files: ["src/lib/support/finderFs.ts"],
++    rules: {
++      "unicorn/no-incorrect-template-string-interpolation": "off",
++    },
++  },
++  {
++    // hey-api's codegen config file carries the tool's CONVENTIONAL filename
++    // (`openapi-ts.config.ts`, hyphenated) — it's referenced verbatim by
++    // `npx @hey-api/openapi-ts -f openapi-ts.config.ts` in CB5 +
++    // check-typescript-contract.sh and by tsconfig.node.json's include, so it
++    // is not ours to rename. unicorn/filename-case (calibrated to camel/pascal)
++    // flags the hyphen; scoped off for this single external-tool config file.
++    files: ["openapi-ts.config.ts"],
++    rules: {
++      "unicorn/filename-case": "off",
++    },
++  },
++  {
++    // Two irreducible tooling false-positives on the Finder root, scoped to this
++    // one file + these rules (the config-level exception channel, registered in
++    // allowed-eslint-exceptions.yaml — never an inline eslint-disable):
++    //
++    // • jsx-a11y/no-noninteractive-{element-interactions,tabindex} — the surface
++    //   is a keyboard-driven WIDGET (arrow nav, type-ahead, Space Quick-Look,
++    //   Enter rename, ⌘⌫ trash) that owns its key handling, so it carries
++    //   `role="application"` + `tabIndex={0}` + `onKeyDown`. `application` is the
++    //   honest ARIA role for a keystroke-capturing region, but jsx-a11y models it
++    //   as STRUCTURAL (non-interactive) and false-positives; the correct-looking
++    //   alternative `role="grid"` would be DISHONEST (the container wraps a
++    //   toolbar + sidebar + main + path bar, not a literal grid of rows/cells).
++    //
++    // The role="application" surface lives in the Finder shell render (the P8
++    // decomposition split Finder.tsx into Finder/{index,state,controller,shell,
++    // body}); every other rule stays at error.
++    files: ["src/components/finder/Finder/shell.tsx"],
++    rules: {
++      "jsx-a11y/no-noninteractive-element-interactions": "off",
++      "jsx-a11y/no-noninteractive-tabindex": "off",
++    },
++  },
++  {
++    // The live code preview injects highlight.js output through
++    // `dangerouslySetInnerHTML`. highlight.js ESCAPES the source text and emits
++    // only class-tagged `<span>`s — there is no user-controlled HTML in the
++    // string, and rendering a pre-highlighted HTML fragment is the ONLY way to
++    // show syntax colours (React can't re-create highlight.js's span tree from
++    // JSX). A genuine irreducible use, scoped to this one file + this one rule
++    // (the config-level exception channel, registered in
++    // allowed-eslint-exceptions.yaml — never an inline eslint-disable, which the
++    // P4 anti-cheat layer forbids). Every other rule stays at error.
++    files: ["src/components/finder/preview/livePreviews.tsx"],
++    rules: {
++      "@eslint-react/dom-no-dangerously-set-innerhtml": "off",
++    },
++  },
++  {
++    // ── P7 eslint-plugin-n — Node.js correctness, scoped to the ONLY Node
++    //    code in this repo: the three build/tooling config files that run
++    //    under Node (not the browser app). ──
++    //
++    // This is a browser React app, so n/flat/recommended tree-wide would be
++    // nonsense (it would judge browser code by Node's rulebook). Instead the
++    // `recommended-module` preset (ESM variant — these files use `import`)
++    // lands at error on exactly `eslint.config.ts`, `vite.config.ts` and
++    // `openapi-ts.config.ts`: it catches deprecated Node APIs, process.exit
++    // misuse, missing `node:` protocol and unsupported-feature usage in the
++    // code that actually executes in Node. (`playwright.config.ts` is
++    // globally-ignored above; the app source has no Node code.)
++    files: ["eslint.config.ts", "vite.config.ts", "openapi-ts.config.ts"],
++    extends: [n.configs["flat/recommended-module"]],
++  },
++  {
++    // ── P7 no-secrets — off for THIS lint config's own doc comments ─────────
++    //
++    // eslint-plugin-no-secrets scans comment text as well as string literals.
++    // This config file's extensive rationale comments cite long, high-entropy
++    // API / compiler-flag IDENTIFIERS by name — `dangerouslySetInnerHTML`
++    // (entropy 4.02) and `noPropertyAccessFromIndexSignature` (4.24) — which the
++    // Shannon-entropy heuristic mistakes for hardcoded secrets. They are neither
++    // secrets nor even literals: they are documentation prose naming the very
++    // rules/flags this config governs, and this file is build tooling that never
++    // ships to the browser. Scoped to this one file + this one rule (registered
++    // in allowed-eslint-exceptions.yaml, never an inline eslint-disable); the
++    // rule stays at error across ALL app source — literals AND comments — where a
++    // genuine leaked credential would actually matter (M141: the browser is the
++    // dumb render layer, every secret resolves server-side via cp-vault).
++    files: ["eslint.config.ts"],
++    rules: {
++      "no-secrets/no-secrets": "off",
++      // ── P8 max-lines — off for THIS config file ─────────────────────────
++      //
++      // The structural line cap (500, the CB7 web-structure twin) governs APP
++      // SOURCE — CB7 itself scopes its ≤500-lines/file check to `web/src/**`,
++      // deliberately exempting build tooling at the repo/web root. This flat
++      // config is exactly that: build tooling, not shipped code, and the bulk
++      // of its length is the per-rule rationale prose that the project's
++      // documentation standard mandates (every calibration/disable must explain
++      // WHY, in place). Capping a config whose value IS its documentation at 500
++      // lines would force either terse, unexplained rules or an artificial split
++      // that scatters one coherent ruleset across files — both worse than a
++      // single, fully-documented config. Scoped to this one file + this one rule
++      // (registered in allowed-eslint-exceptions.yaml, never an inline
++      // eslint-disable); every other file stays under the 500-line cap.
++      "max-lines": "off",
++    },
++  },
++  {
++    // ── P10c eslint-plugin-better-tailwindcss — Tailwind class validity +
++    //    order, scoped to the JSX/TS surface that carries `className`. ──
++    //
++    // `recommended-error` lands 8 rules at error: class ORDER
++    // (enforce-consistent-class-order — the twin of a prettier-plugin-tailwind
++    // sort, but lint-enforced), plus correctness — no-unknown-classes (a typo'd
++    // or non-existent utility), no-conflicting-classes (two utilities fighting
++    // for the same property), no-duplicate-classes, no-deprecated-classes,
++    // enforce-canonical-classes, no-unnecessary-whitespace. `no-unknown-classes`
++    // et al. resolve the project's real utility set (incl. the custom theme
++    // tokens) from the Tailwind v4 CSS entry point declared in `settings`.
++    //
++    // enforce-consistent-line-wrapping is turned OFF: it reflows the class
++    // string onto multiple lines, which Prettier (the canonical formatter, the
++    // rustfmt twin from P2) then re-collapses — the same irreconcilable
++    // formatter fight as unicorn/no-nested-ternary. Prettier owns whitespace;
++    // this rule is a pure line-shape opinion, off (registered in
++    // allowed-eslint-exceptions.yaml). The other seven stay at error.
++    files: ["src/**/*.{ts,tsx}"],
++    // Vendored shadcn primitives (ui/**) keep their upstream className shape —
++    // autofixing class order/canonical here is churn re-introduced on every
++    // re-vendor. Excluded via `ignores` (not a rule-off, so no registry entry),
++    // consistent with the other ui/** exemptions (react-refresh, filename-case).
++    ignores: ["src/components/ui/**"],
++    extends: [betterTailwind.configs["recommended-error"]],
++    settings: {
++      "better-tailwindcss": {
++        entryPoint: "src/index.css",
++      },
++    },
++    rules: {
++      "better-tailwindcss/enforce-consistent-line-wrapping": "off",
++      // no-unknown-classes is OFF (registered in allowed-eslint-exceptions.yaml):
++      // it can't resolve two legitimate patterns pervasive in this codebase, so
++      // it is pure false-positive noise here.
++      //   1. Custom index.css classes authored as plain CSS rules —
++      //      `.card-shadow`, `.pop-shadow`, `.fill-sweep`, `.opt-rise`,
++      //      `.menu-pop`, `.modal-pop` (shadow + keyframe-animation helpers). They
++      //      are real classes, but declared as ordinary `.foo {}` rules rather
++      //      than Tailwind `@utility` directives, so Tailwind's compiler never
++      //      registers them as utilities and the plugin's utility resolver can't
++      //      see them.
++      //   2. CSS-variable arbitrary values — `text-[var(--ok)]` / `bg-(--signal)`
++      //      / `ring-(--signal)/50`. The plugin can't resolve a theme custom
++      //      property to a known utility. This DIRECTLY CONTRADICTS the sibling
++      //      enforce-canonical-classes rule, which REWRITES `text-[var(--ok)]`
++      //      INTO `text-(--ok)` — the very shorthand no-unknown-classes then
++      //      flags as unknown. Two rules cannot both be right; canonical wins
++      //      (it's the autofixable, correctness-bearing one), so this is off.
++      // The other seven better-tailwindcss rules stay at error.
++      "better-tailwindcss/no-unknown-classes": "off",
++    },
++  },
++  {
++    // ── P9: the api layer IS the sanctioned wrapper around the generated SDK.
++    //    It must value-import `@/lib/api/generated` to build the thin fetch
++    //    wrappers every other layer consumes — that's its whole job. So the
++    //    generated-import guard (no-restricted-imports) is off HERE and only
++    //    here (registered in allowed-eslint-exceptions.yaml). The boundaries
++    //    dependencies rule already permits api→generated; this off-switch is
++    //    the twin for the import-path guard. Every other file stays at error,
++    //    so no component/support module can reach past the api layer. ──
++    files: ["src/lib/api/**/*.{ts,tsx}"],
++    rules: {
++      "@typescript-eslint/no-restricted-imports": "off",
++    },
++  },
++])
+diff --git a/web/.prettierrc.json b/web/.prettierrc.json
+new file mode 100644
+index 00000000..280b8456
+--- /dev/null
++++ b/web/.prettierrc.json
+@@ -0,0 +1,12 @@
++{
++  "$schema": "https://json.schemastore.org/prettierrc",
++  "printWidth": 100,
++  "tabWidth": 2,
++  "semi": false,
++  "singleQuote": false,
++  "jsxSingleQuote": false,
++  "trailingComma": "all",
++  "bracketSpacing": true,
++  "arrowParens": "always",
++  "endOfLine": "lf"
++}
+diff --git a/web/.prettierignore b/web/.prettierignore
+new file mode 100644
+index 00000000..fe4ca973
+--- /dev/null
++++ b/web/.prettierignore
+@@ -0,0 +1,23 @@
++# ── Prettier ignore ─────────────────────────────────────────────────
++# Mirrors the ESLint globalIgnores (dist + generated bindings) plus build
++# and transient run artefacts. Prettier owns formatting for hand-written
++# source; anything machine-generated or vendored is left untouched.
++
++# Build output
++dist
++
++# Auto-generated OpenAPI client — regenerated verbatim by hey-api and kept
++# byte-identical to a fresh codegen (the @ts-nocheck-stamped tree the
++# contract-drift check diffs against). Formatting it here would break that
++# invariant, so it is NEVER touched — exactly like the Rust generated-code
++# lint allowance.
++src/lib/api/generated
++
++# Dependencies + lockfile
++node_modules
++pnpm-lock.yaml
++
++# Playwright e2e run artefacts
++test-results
++playwright-report
++.playwright
+diff --git a/web/.stylelintrc.json b/web/.stylelintrc.json
+new file mode 100644
+index 00000000..4b316f15
+--- /dev/null
++++ b/web/.stylelintrc.json
+@@ -0,0 +1,31 @@
++{
++  "extends": ["stylelint-config-standard"],
++  "plugins": ["stylelint-order"],
++  "rules": {
++    "at-rule-no-unknown": [
++      true,
++      {
++        "ignoreAtRules": [
++          "theme",
++          "source",
++          "utility",
++          "variant",
++          "custom-variant",
++          "apply",
++          "reference",
++          "config",
++          "plugin",
++          "tailwind"
++        ]
++      }
++    ],
++    "order/properties-alphabetical-order": null,
++    "order/order": ["custom-properties", "declarations"],
++    "property-no-vendor-prefix": null,
++    "import-notation": null,
++    "selector-class-pattern": [
++      "^(hljs[a-z_-]*|[a-z][a-z0-9]*(-[a-z0-9]+)*)$",
++      { "message": "Expected kebab-case class (highlight.js hljs-* tokens exempt)" }
++    ]
++  }
++}
+diff --git a/web/knip.json b/web/knip.json
+new file mode 100644
+index 00000000..86e0030e
+--- /dev/null
++++ b/web/knip.json
+@@ -0,0 +1,8 @@
++{
++  "$schema": "https://unpkg.com/knip@5/schema.json",
++  "entry": ["e2e/**/*.{ts,tsx}"],
++  "project": ["src/**/*.{ts,tsx}"],
++  "ignore": ["src/lib/api/generated/**", "src/components/ui/**"],
++  "ignoreDependencies": ["tw-animate-css", "@fontsource/ibm-plex-mono"],
++  "ignoreExportsUsedInFile": true
++}
+diff --git a/web/tsconfig.app.json b/web/tsconfig.app.json
+index e7f43a58..78039768 100644
+--- a/web/tsconfig.app.json
++++ b/web/tsconfig.app.json
+@@ -2,7 +2,7 @@
+   "compilerOptions": {
+     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+     "target": "es2023",
+-    "lib": ["ES2023", "DOM"],
++    "lib": ["ES2023", "ESNext.Iterator", "DOM"],
+     "module": "esnext",
+     "types": ["vite/client"],
+     "skipLibCheck": true,
+@@ -12,6 +12,7 @@
+     "allowImportingTsExtensions": true,
+     "verbatimModuleSyntax": true,
+     "moduleDetection": "force",
++    "isolatedModules": true,
+     "noEmit": true,
+     "jsx": "react-jsx",
+ 
+@@ -20,11 +21,21 @@
+       "@/*": ["./src/*"]
+     },
+ 
+-    /* Linting */
++    /* Linting — the maximal strict superset (web-lint P1, rustc-forbid twin) */
++    "strict": true,
++    "noUncheckedIndexedAccess": true,
++    "exactOptionalPropertyTypes": true,
++    "noImplicitReturns": true,
++    "noImplicitOverride": true,
++    "noPropertyAccessFromIndexSignature": true,
++    "noFallthroughCasesInSwitch": true,
++    "noUncheckedSideEffectImports": true,
++    "allowUnreachableCode": false,
++    "allowUnusedLabels": false,
++    "forceConsistentCasingInFileNames": true,
+     "noUnusedLocals": true,
+     "noUnusedParameters": true,
+-    "erasableSyntaxOnly": true,
+-    "noFallthroughCasesInSwitch": true
++    "erasableSyntaxOnly": true
+   },
+   "include": ["src"]
+ }
+diff --git a/web/tsconfig.node.json b/web/tsconfig.node.json
+index d3c52ea6..566e8b20 100644
+--- a/web/tsconfig.node.json
++++ b/web/tsconfig.node.json
+@@ -12,13 +12,24 @@
+     "allowImportingTsExtensions": true,
+     "verbatimModuleSyntax": true,
+     "moduleDetection": "force",
++    "isolatedModules": true,
+     "noEmit": true,
+ 
+-    /* Linting */
++    /* Linting — the maximal strict superset (web-lint P1, rustc-forbid twin) */
++    "strict": true,
++    "noUncheckedIndexedAccess": true,
++    "exactOptionalPropertyTypes": true,
++    "noImplicitReturns": true,
++    "noImplicitOverride": true,
++    "noPropertyAccessFromIndexSignature": true,
++    "noFallthroughCasesInSwitch": true,
++    "noUncheckedSideEffectImports": true,
++    "allowUnreachableCode": false,
++    "allowUnusedLabels": false,
++    "forceConsistentCasingInFileNames": true,
+     "noUnusedLocals": true,
+     "noUnusedParameters": true,
+-    "erasableSyntaxOnly": true,
+-    "noFallthroughCasesInSwitch": true
++    "erasableSyntaxOnly": true
+   },
+-  "include": ["vite.config.ts"]
++  "include": ["vite.config.ts", "eslint.config.ts", "openapi-ts.config.ts", "types.d.ts"]
+ }
+diff --git a/.github/checks/check-frontend-suppressions.sh b/.github/checks/check-frontend-suppressions.sh
+new file mode 100755
+index 00000000..f25843e5
+--- /dev/null
++++ b/.github/checks/check-frontend-suppressions.sh
+@@ -0,0 +1,164 @@
++#!/usr/bin/env bash
++# Frontend anti-suppression guard — the web twin of check-vault-bypass.sh and
++# the CI-side enforcement of the P4 anti-cheat layer.
++#
++# Inline lint/type suppression is FORBIDDEN in hand-written frontend source.
++# There is NO per-site allow-list: the only legal way to relax a rule is a
++# config-level scoped override in web/eslint.config.ts, registered + justified
++# in .github/checks/allowed-eslint-exceptions.yaml (hash-locked). This script
++# enforces two invariants, independent of ESLint's own config so a reconfigured
++# eslint.config.ts can't silently re-open the door:
++#
++#   1. STOWAWAY  — no eslint-disable / @ts-ignore / @ts-nocheck / @ts-expect-error
++#                  / @ts-check anywhere under web/src (excluding generated/**),
++#                  and no `as unknown as` double-assertion (the type-coverage
++#                  escape hatch) except the ONE documented useFs wire-view seam
++#                  (allow-listed by path + cast substring IN THIS SCRIPT, so the
++#                  exception is itself hash-locked, not a free source marker).
++#   2. ORPHAN/UNREGISTERED — every `"<rule>": "off"` scoped override in
++#                  eslint.config.ts must have a matching entry in the exceptions
++#                  registry, and every registry rule must appear in the config
++#                  (no silent add, no stale entry).
++#
++# Usage (CI):       .github/checks/check-frontend-suppressions.sh
++# Usage (callback): .github/checks/check-frontend-suppressions.sh [file ...]
++#
++# In callback mode only the STOWAWAY grep runs, over the supplied files (the
++# config-override audit is a whole-repo invariant, run in CI mode only).
++set -euo pipefail
++
++ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
++SRC="$ROOT/web/src"
++CONFIG="$ROOT/web/eslint.config.ts"
++REGISTRY="$ROOT/.github/checks/allowed-eslint-exceptions.yaml"
++
++# Banned inline suppression directives. A directive is only recognised by ESLint
++# / tsc when its keyword is the FIRST token inside the comment — so we anchor to
++# `//` or `/*` immediately followed (optional whitespace) by the keyword. This
++# matches a real `// eslint-disable-next-line` / `/* @ts-ignore */` while NEVER
++# matching the word appearing mid-prose (e.g. this file, or a doc comment that
++# merely mentions `eslint-disable` in backticks). @ts-nocheck is legal ONLY in
++# generated/** (the codegen bindings), which every scan below excludes.
++BANNED='(//|/\*)[[:space:]]*(eslint-disable|eslint-enable|@ts-ignore|@ts-nocheck|@ts-expect-error|@ts-check)'
++
++exit_code=0
++
++# ── Invariant 1: STOWAWAY — no inline suppression in hand-written source ──
++check_file() {
++  local file="$1"
++  case "$file" in
++    *"/generated/"*) return ;;            # codegen bindings: @ts-nocheck is legal
++    *.ts | *.tsx | *.js | *.jsx | *.cts | *.mts) ;;
++    *) return ;;
++  esac
++  [ -f "$file" ] || return 0
++
++  local hits
++  hits=$(grep -nE "$BANNED" "$file" 2>/dev/null || true)
++  if [ -n "$hits" ]; then
++    while IFS= read -r line; do
++      echo "::error file=$file::$line"
++    done <<< "$hits"
++    echo "FAIL: $file carries a banned inline suppression directive" >&2
++    exit_code=1
++  fi
++
++  # ── `as unknown as` double-assertion ban (type-coverage escape hatch) ──
++  # A double-assertion launders any type through `unknown`, defeating the
++  # type-coverage ratchet. Banned in hand-written source EXCEPT the single
++  # documented useFs wire-view seam (the generated FinderNode carries
++  # `modified: number`, the UI view `modified: string` — a backend spec gap
++  # whose real fix is a Rust type, out of frontend scope). The exception is
++  # allow-listed HERE (path + cast substring), so it lives in this hash-locked
++  # guard rather than as a free-floating source marker anyone could add.
++  local auas
++  auas=$(grep -nE 'as unknown as' "$file" 2>/dev/null || true)
++  if [ -n "$auas" ]; then
++    while IFS= read -r line; do
++      case "$file" in
++        */src/lib/live/index.ts)
++          # The lone sanctioned seam: `fetchFs(...) as unknown as Promise<FinderNode[]>`.
++          echo "$line" | grep -q 'as unknown as Promise<FinderNode\[\]>' && continue
++          ;;
++      esac
++      echo "::error file=$file::$line"
++      echo "FAIL: $file uses a banned 'as unknown as' double-assertion" >&2
++      exit_code=1
++    done <<< "$auas"
++  fi
++}
++
++if [ $# -gt 0 ]; then
++  # Callback mode: scan only the supplied files (stowaway grep only).
++  for file in "$@"; do
++    check_file "$file"
++  done
++  exit $exit_code
++fi
++
++# CI mode: scan the whole frontend source tree.
++if [ -d "$SRC" ]; then
++  while IFS= read -r file; do
++    check_file "$file"
++  done < <(find "$SRC" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -not -path '*/generated/*')
++fi
++
++# ── Invariant 2: config-level scoped overrides ⇄ registry (bidirectional) ──
++# Extract every `"<rule>": "off"` from eslint.config.ts — these are the only
++# rule-disabling scoped overrides (calibrations use the array form
++# `["error", {...}]`, never the bare `"off"` string, so they aren't matched).
++config_offs=""
++if [ -f "$CONFIG" ]; then
++  config_offs=$(grep -oE '"[^"]+"[[:space:]]*:[[:space:]]*"off"' "$CONFIG" \
++    | sed -E 's/^"([^"]+)".*/\1/' | sort -u || true)
++fi
++
++# Extract every `rule:` value from the registry. Match only the quoted value
++# and strip the quotes (`[[:space:]]` not `\s` so BSD/macOS sed works too); the
++# wildcard `*` entry is quoted (`rule: "*"`) so it extracts as `*`.
++registry_rules=""
++if [ -f "$REGISTRY" ]; then
++  registry_rules=$(grep -oE 'rule:[[:space:]]*"[^"]*"' "$REGISTRY" \
++    | sed -E 's/rule:[[:space:]]*"([^"]*)"/\1/' | sort -u || true)
++else
++  echo "::error::Exceptions registry not found: $REGISTRY" >&2
++  exit_code=1
++fi
++
++# 2a — every config `"off"` override must be registered (no silent exception).
++if [ -n "$config_offs" ]; then
++  while IFS= read -r rule; do
++    [ -z "$rule" ] && continue
++    if ! echo "$registry_rules" | grep -qxF "$rule"; then
++      echo "::error file=$CONFIG::Unregistered scoped override \"$rule\": \"off\" — add it to $REGISTRY" >&2
++      echo "FAIL: eslint.config.ts disables '$rule' with no registry entry" >&2
++      exit_code=1
++    fi
++  done <<< "$config_offs"
++fi
++
++# 2b — every registry rule (except the wildcard '*' globalIgnore doc) must
++#      correspond to a live config override (no stale/orphan entry).
++if [ -n "$registry_rules" ]; then
++  while IFS= read -r rule; do
++    [ -z "$rule" ] && continue
++    [ "$rule" = "*" ] && continue          # '*' documents the generated/** globalIgnore, not an "off"
++    if ! echo "$config_offs" | grep -qxF "$rule"; then
++      echo "::error file=$REGISTRY::Orphan registry entry '$rule' — no matching \"off\" override in eslint.config.ts" >&2
++      echo "FAIL: registry lists '$rule' but eslint.config.ts no longer disables it" >&2
++      exit_code=1
++    fi
++  done <<< "$registry_rules"
++fi
++
++if [ "$exit_code" -eq 0 ]; then
++  echo "Frontend suppression guard OK — no inline suppressions; exceptions registered. ✓"
++else
++  echo "" >&2
++  echo "Inline lint/type suppression is banned in web/src." >&2
++  echo "The only legal escape is a config-level scoped override in" >&2
++  echo "web/eslint.config.ts, registered + justified in" >&2
++  echo ".github/checks/allowed-eslint-exceptions.yaml." >&2
++fi
++
++exit $exit_code
+diff --git a/.github/checks/allowed-eslint-exceptions.yaml b/.github/checks/allowed-eslint-exceptions.yaml
+new file mode 100644
+index 00000000..dcbaacaf
+--- /dev/null
++++ b/.github/checks/allowed-eslint-exceptions.yaml
+@@ -0,0 +1,459 @@
++# Curated registry of allowed CONFIG-LEVEL ESLint exceptions (web frontend).
++#
++# The frontend twin of .github/checks/allowed-lint-exceptions.yaml (Rust).
++#
++# PHILOSOPHY — stricter than Rust's per-site #[allow] model:
++#   Inline lint/type suppression is BANNED OUTRIGHT in hand-written source.
++#   There is no such thing as a legal inline `eslint-disable`, `@ts-ignore`,
++#   `@ts-nocheck`, `@ts-expect-error`, or `@ts-check` — the P4 anti-cheat layer
++#   (eslint-comments/no-use + ban-ts-comment + reportUnusedDisableDirectives,
++#   plus the CI grep-guard check-frontend-suppressions.sh) forbids them all.
++#
++#   The ONLY way to relax a rule is a CONFIG-LEVEL scoped override — a
++#   `files: [...] rules: { "<rule>": "off" }` block in web/eslint.config.ts —
++#   and every such override MUST be registered here with a justification.
++#   check-frontend-suppressions.sh enforces this bidirectionally (a config
++#   "off" with no entry fails; an entry with no config "off" fails). This file
++#   is hash-locked (protected-files.yaml + the lint chain) so no exception can
++#   be added silently.
++#
++# Fields:
++#   path    — file glob the scoped override targets (matches eslint.config.ts).
++#   rule    — the ESLint rule id disabled, or '*' to document a whole-tree
++#             globalIgnore (codegen output ESLint never sees).
++#   reason  — why the exception is currently accepted.
++#   strategy— how it could eventually be eliminated.
++
++exceptions:
++  # ── Generated OpenAPI bindings — globally ignored (never linted) ──────────
++  - path: "web/src/lib/api/generated/**"
++    rule: "*"
++    reason: >
++      hey-api OpenAPI codegen output, regenerated verbatim from openapi.json by
++      CB3/CB5. Globally ignored by ESLint (globalIgnores in eslint.config.ts)
++      and carries a // @ts-nocheck header — the generated-bindings exception,
++      the exact analog of the Rust generated-code allowance. Hand-editing it to
++      satisfy a lint is forbidden; the committed tree must stay byte-identical
++      to a fresh codegen for the @ts-nocheck drift check to pass.
++    strategy: >
++      Irreducible — machine-generated. Regenerate, never hand-fix.
++
++  # ── Vendored shadcn primitives — Fast-Refresh purity not enforceable ──────
++  - path: "web/src/components/ui/**"
++    rule: "react-refresh/only-export-components"
++    reason: >
++      Vendored shadcn/ui primitives ship a component plus its cva() variant
++      table per file by design — the upstream canonical shape we don't rewrite.
++      The mixed component+constant export trips react-refresh purity, which is
++      irrelevant for vendored code we never author.
++    strategy: >
++      Irreducible without forking every shadcn primitive. Re-evaluate if the
++      upstream files are ever restructured to component-only exports.
++
++  # ── MarkdownEditor — contentEditable WYSIWYG has no non-deprecated API ────
++  - path: "web/src/components/agents/MarkdownEditor.tsx"
++    rule: "@typescript-eslint/no-deprecated"
++    reason: >
++      The WYSIWYG editor drives a contentEditable surface through
++      document.execCommand / queryCommandState. Both are marked deprecated by
++      MDN, yet they remain the ONLY browser API for rich-text formatting of a
++      contentEditable region — there is no standardised replacement (EditContext
++      / Input Events L2 don't cover formatting commands, and every WYSIWYG
++      library still relies on execCommand). Scoped to this one file + this one
++      rule; every other rule stays at error.
++    strategy: >
++      Re-evaluate when a standardised formatting API (e.g. a matured
++      EditContext) covers bold/italic/list/heading commands for contentEditable.
++
++  # ── P5 unicorn opinion rules — off tree-wide (React/DOM-incompatible or ────
++  #    pure-naming-opinion, no correctness value). These are global config-level
++  #    disables (not file-scoped), each justified below.
++  - path: "web/**"
++    rule: "unicorn/name-replacements"
++    reason: >
++      Bans idiomatic short identifiers (e, err, fn, props, params, db, ctx…) —
++      526 pervasive sites, zero correctness value, fights React/JS convention.
++      The prevent-abbreviations family twin; universally disabled in React
++      codebases.
++    strategy: >
++      Irreducible stylistic opinion. Would require a mechanical rename of nearly
++      every callback/parameter for no safety gain.
++
++  - path: "web/**"
++    rule: "unicorn/no-null"
++    reason: >
++      React and the DOM use `null` intrinsically — useState<T | null>(null),
++      refs, Element.getAttribute, DragEvent.dataTransfer, react-query data. Not
++      avoidable in a React/DOM codebase.
++    strategy: >
++      Irreducible — `null` is part of the React/DOM contract.
++
++  - path: "web/**"
++    rule: "unicorn/consistent-boolean-name"
++    reason: >
++      Forces is/has/should boolean-name prefixes; our booleans (dragging,
++      copied, busy, saving, open, dirty, paused) are idiomatic React state
++      names. Pure naming opinion, no correctness value.
++    strategy: >
++      Irreducible stylistic opinion.
++
++  - path: "web/**"
++    rule: "unicorn/prefer-global-this"
++    reason: >
++      Browser-only code legitimately uses `window.*` (setTimeout,
++      addEventListener, prompt, clearTimeout). Rewriting to `globalThis` buys
++      nothing in a browser-only bundle.
++    strategy: >
++      Re-evaluate only if any of this code is ever shared with a non-browser
++      (Node/worker) runtime where `window` is absent.
++
++  - path: "web/**"
++    rule: "unicorn/no-non-function-verb-prefix"
++    reason: >
++      Bans `new`/`set`-prefixed non-constructor names (newFolder, newAgent,
++      newThread) — pure naming opinion, no correctness value.
++    strategy: >
++      Irreducible stylistic opinion.
++
++  - path: "web/**"
++    rule: "unicorn/no-array-reduce"
++    reason: >
++      `Array.prototype.reduce` is a legitimate, readable summation idiom (cost
++      tables, token totals); unicorn's blanket ban is pure opinion.
++    strategy: >
++      Irreducible stylistic opinion.
++
++  - path: "web/**"
++    rule: "unicorn/prefer-await"
++    reason: >
++      Fire-and-forget promise chains with a `.catch()` error sink are the
++      idiomatic non-blocking pattern in React sync event handlers and effect
++      bodies (an effect cannot be `async` — it must return its cleanup
++      synchronously). Forcing `await` means wrapping each handler in a
++      `void (async () => { … })()` IIFE — a readability regression for a
++      single-level chain. The nested-`.then()`-pyramid anti-pattern the rule
++      targets does not occur here.
++    strategy: >
++      Re-evaluate if multi-level promise chaining ever appears; those genuine
++      cases would benefit from `await` and could be caught by a narrower rule.
++
++  - path: "web/**"
++    rule: "unicorn/no-nested-ternary"
++    reason: >
++      IRRECONCILABLE CONFLICT WITH PRETTIER (the canonical formatter, the
++      rustfmt twin established in P2). unicorn/no-nested-ternary permits nesting
++      but DEMANDS the nested branch be parenthesized (`a ? b : (c ? d : e)`);
++      Prettier authoritatively strips exactly those parens as redundant and
++      reflows ternaries to its own indentation. The two fight in an infinite
++      loop (eslint --fix re-adds the parens, prettier --write removes them). The
++      rule is purely a paren-placement/readability opinion — formatting Prettier
++      already owns — so the formatter wins. Genuinely-complex nested ternaries
++      were still hand-extracted into flat if-chain helpers during P5 (App
++      renderView, StatusBar resolvePhase, FleetDashboard healthCondition,
++      ThreadComposer banner, ThreadList dotColor) on readability grounds; what
++      remains are simple two-level value ternaries a formatter reads fine.
++    strategy: >
++      Re-evaluate if a Prettier-compatible nested-ternary readability rule
++      (e.g. the @stylistic variant that doesn't require the stripped parens)
++      becomes available.
++
++  # ── P5 unicorn vendored-shadcn exceptions (scoped to ui/**) ──────────────
++  - path: "web/src/components/ui/**"
++    rule: "unicorn/filename-case"
++    reason: >
++      Vendored shadcn/ui primitives keep their upstream kebab-case filenames
++      (dropdown-menu.tsx, scroll-area.tsx). The tree-wide rule is calibrated to
++      allow camel/pascal case; these vendored files are the sole kebab holdouts
++      and are not ours to rename.
++    strategy: >
++      Irreducible without forking shadcn. Re-evaluate if upstream renames them.
++
++  - path: "web/src/components/ui/**"
++    rule: "unicorn/max-nested-calls"
++    reason: >
++      Vendored shadcn primitives use the canonical cva() call nesting (badge.tsx)
++      that exceeds unicorn's depth-3 cap — the upstream shape we don't rewrite.
++    strategy: >
++      Irreducible without forking shadcn.
++
++  # ── P5 Finder mock — embedded code samples carry literal braces ──────────
++  - path: "web/src/lib/support/finderFs.ts"
++    rule: "unicorn/no-incorrect-template-string-interpolation"
++    reason: >
++      The Finder mock filesystem embeds Rust + JSX code SAMPLES in multiline
++      template literals for the preview pane (format!("Sent to {tid}"),
++      <Finder root={root} />). Those braces are literal display text in the
++      foreign-language sample, not JS interpolation; the rule can't distinguish
++      them from a typo'd ${…} and false-positives on each. Scoped to this one
++      mock-data file; the rule stays at error everywhere else.
++    strategy: >
++      Re-evaluate if the mock code samples are ever replaced by real data.
++
++  # ── hey-api codegen config — conventional hyphenated tool filename ────────
++  - path: "web/openapi-ts.config.ts"
++    rule: "unicorn/filename-case"
++    reason: >
++      hey-api's codegen config carries the tool's CONVENTIONAL filename
++      (openapi-ts.config.ts, hyphenated) — referenced verbatim by
++      `npx @hey-api/openapi-ts -f openapi-ts.config.ts` in CB5 +
++      check-typescript-contract.sh and by tsconfig.node.json's include, so it is
++      not ours to rename. The tree-wide filename-case calibration (camel/pascal)
++      flags the hyphen; scoped off for this single external-tool config file.
++    strategy: >
++      Irreducible while hey-api's config discovery expects this filename.
++
++  # ── P6 React stack — deliberate-UX / false-positive-only disables ─────────
++  - path: "web/**"
++    rule: "jsx-a11y/no-autofocus"
++    reason: >
++      autoFocus is a deliberate UX choice throughout this power-user cockpit —
++      the primary thread composer and every modal's sole first field (login
++      email, inline rename, New-Thread / Create-Command title, the maintenance
++      wizard steps, the OAuth login popup) auto-focuses so the keyboard is ready
++      the instant the surface opens. jsx-a11y flags it as a screen-reader
++      disorientation risk (a real concern on content pages), but every autoFocus
++      here sits on the lone input of a just-opened focused dialog or the app's
++      central composer — the canonical exception to the rule.
++    strategy: >
++      Re-evaluate if any autoFocus is ever added to a non-dialog, multi-input,
++      or content surface where it could steal focus disorientingly.
++
++  - path: "web/**"
++    rule: "@eslint-react/no-array-index-key"
++    reason: >
++      The rule guards against index keys on a list that REORDERS / INSERTS
++      mid-stream (React reuses the wrong child instance/state). Every dynamic,
++      reorderable list in this app already keys by a stable domain id
++      (fleet → agent.id, threads → thread.id, finder → node.path). Every
++      remaining `key={i}` site is a STATIC, wholesale-rerendered presentational
++      list with no per-item state — syntax-highlighted code lines, spreadsheet
++      cells, PDF-page thumbnails, audio waveform bars, parsed markdown/message
++      segments, and read-only inspector rows (tree, radar, entities, vitals) —
++      where the index IS the stable identity and reconciliation is never wrong.
++      The rule yields only false positives against this codebase's actual usage.
++      (The two genuinely interactive lists — question options, upload chips —
++      are additionally keyed by a natural id so they stay correct regardless.)
++    strategy: >
++      Re-evaluate if a reorderable/insertable list with stateful children is
++      ever introduced; such a list would need a stable per-item key and the rule
++      would correctly catch a bare index key there.
++
++  # ── P6 Finder shell — keyboard-widget surface (role="application") ────────
++  - path: "web/src/components/finder/Finder/shell.tsx"
++    rule: "jsx-a11y/no-noninteractive-element-interactions"
++    reason: >
++      The Finder root is a keyboard-driven WIDGET surface (arrow navigation,
++      type-ahead, Space Quick-Look, Enter rename, ⌘⌫ trash) that owns its key
++      handling, so it carries role="application" + tabIndex + onKeyDown.
++      `application` is the honest ARIA role for a keystroke-capturing region, but
++      jsx-a11y models it as a structural (non-interactive) role and
++      false-positives on the handler. The correct-looking alternative
++      role="grid" would be DISHONEST — the container wraps a toolbar + sidebar +
++      main + path bar, not a literal grid of rows/cells. The surface lives in the
++      Finder shell render since the P8 split (Finder.tsx → Finder/{index,state,
++      controller,shell,body}). Scoped to this file.
++    strategy: >
++      Re-evaluate if the surface is ever restructured into a genuine ARIA grid
++      with rows/gridcells, or jsx-a11y treats `application` as interactive.
++
++  - path: "web/src/components/finder/Finder/shell.tsx"
++    rule: "jsx-a11y/no-noninteractive-tabindex"
++    reason: >
++      Same role="application" keyboard-widget surface as above — a focusable
++      region that captures keystrokes legitimately holds tabIndex={0}, but
++      jsx-a11y models `application` as non-interactive and flags the tabIndex.
++      Scoped to this one file.
++    strategy: >
++      Re-evaluate alongside no-noninteractive-element-interactions if the
++      surface adopts genuine grid semantics or jsx-a11y recognises `application`.
++
++  # ── P6 highlight.js code preview — dangerouslySetInnerHTML is irreducible ──
++  - path: "web/src/components/finder/preview/livePreviews.tsx"
++    rule: "@eslint-react/dom-no-dangerously-set-innerhtml"
++    reason: >
++      The live code preview (HighlightedCode) renders per-line syntax-highlighted
++      HTML produced by highlight.js. highlight.js ESCAPES the source text and
++      emits only class-tagged <span>s — there is no user-controlled HTML in the
++      injected string. Rendering a pre-highlighted HTML fragment is the ONLY way
++      to display syntax colours (React cannot reconstruct highlight.js's span
++      tree from JSX). Scoped to this one file + this one rule; every other rule
++      stays at error. The exact analog of the MarkdownEditor execCommand
++      exception (an irreducible browser/library-shaped need).
++    strategy: >
++      Re-evaluate if a JSX-native syntax highlighter (one that returns a React
++      element tree instead of an HTML string) replaces highlight.js.
++
++  # ── P7 import-x tsc-redundant / flat-config-idiom rules — off tree-wide ────
++  - path: "web/**"
++    rule: "import-x/default"
++    reason: >
++      import-x/default walks a module for a `default` export and FALSE-POSITIVES
++      on CJS-authored ESLint plugins (e.g. @eslint-community/eslint-plugin-eslint-
++      comments) whose module.exports is consumed via esModuleInterop's synthetic
++      default. tsc already proves every `import x from "…"` default binding is
++      valid, so the rule is pure tsc-redundant noise here — import-x's own
++      TypeScript guidance drops the resolution rules tsc subsumes.
++    strategy: >
++      Irreducible while tsc (not import-x) is the authority on module resolution.
++
++  - path: "web/**"
++    rule: "import-x/no-named-as-default"
++    reason: >
++      Cautions when a DEFAULT import shares a name with one of the module's NAMED
++      exports (e.g. `import reactRefresh …` / `import importX …` while the module
++      also exports named members). That is the UNIVERSAL flat-config plugin
++      import idiom — every ESLint flat config imports the plugin's default and
++      reads `.configs`/`.flatConfigs` off it. Pure style caution, zero
++      correctness value; fires only on correct, conventional code.
++    strategy: >
++      Irreducible stylistic caution against the standard flat-config idiom.
++
++  - path: "web/**"
++    rule: "import-x/no-named-as-default-member"
++    reason: >
++      Cautions when a member access on a default import (`tseslint.configs`,
++      `regexp.configs`, `importX.flatConfigs`) collides with a same-named NAMED
++      export of that module. Exactly how every ESLint flat config is written —
++      `tseslint.configs.recommended` is the documented usage — so the rule is
++      pure noise here with no correctness value.
++    strategy: >
++      Irreducible stylistic caution against the standard flat-config idiom.
++
++  # ── P7 eslint-plugin-security — detect-object-injection off tree-wide ──────
++  - path: "web/**"
++    rule: "security/detect-object-injection"
++    reason: >
++      Pure noise in a typed codebase: the rule flags EVERY computed-key member
++      access (obj[k], arr[i]) irrespective of provenance — 38 hits here, all on
++      type-constrained record/array reads whose key space is fixed by the type.
++      TypeScript already proves them safe, and the genuine sink the rule targets
++      (a user-controlled key reaching a prototype-mutable object) cannot arise
++      from these lookups. The single dynamic-RegExp hit its sibling rule flagged
++      was fixed at source (fileUpload/helpers.ts field parser rewritten to one
++      literal regex + a Map, no computed-key object sink); the browser-relevant
++      security detectors (unsafe-regex, non-literal-regexp, eval-with-expression,
++      bidi-characters, possible-timing-attacks) stay at error.
++    strategy: >
++      Irreducible while the rule cannot see that TypeScript's type system fixes
++      the key space; re-evaluate if a type-aware object-injection rule appears.
++
++  # ── P7 no-unsanitized — contentEditable seeding is injection-free ─────────
++  - path: "web/src/components/agents/MarkdownEditor.tsx"
++    rule: "no-unsanitized/property"
++    reason: >
++      The WYSIWYG editor seeds its contentEditable surface once on mount via
++      `ref.current.innerHTML = mdToHtml(initialMarkdown)`. no-unsanitized/property
++      flags every non-literal innerHTML write, but this string is provably
++      injection-free: mdToHtml runs esc() (escapes &, <, >) over ALL text before
++      wrapping it in a FIXED literal tag vocabulary (h1/h2/p/blockquote/pre/
++      ul/ol/li + inline strong/code), so no user character can form a tag or
++      attribute, and there is no user-controlled attribute value anywhere.
++      Seeding via innerHTML is additionally IRREDUCIBLE for a contentEditable
++      WYSIWYG: React cannot own the surface's children without fighting the
++      browser's own execCommand mutations (caret jumps + reconciliation
++      clobbering live edits — the exact reason the surface is deliberately
++      uncontrolled). Scoped to this one file + this one rule; the sibling
++      no-unsanitized/method rule and every other rule stay at error. The analog
++      of the livePreviews highlight.js dangerouslySetInnerHTML exception.
++    strategy: >
++      Re-evaluate if a trusted-types / sanitizer API the rule recognises can
++      seed a contentEditable region, or if the editor is ever rebuilt on a
++      DOM-builder (createElement) seed instead of an HTML string.
++
++  # ── P7 no-secrets — off for the lint config's own documentation comments ──
++  - path: "web/eslint.config.ts"
++    rule: "no-secrets/no-secrets"
++    reason: >
++      eslint-plugin-no-secrets scans comment text as well as string literals.
++      This config file's extensive rationale comments cite long, high-entropy API
++      / compiler-flag IDENTIFIERS by name — `dangerouslySetInnerHTML` (Shannon
++      entropy 4.02) and `noPropertyAccessFromIndexSignature` (4.24) — which the
++      entropy heuristic mistakes for hardcoded secrets. They are neither secrets
++      nor even string literals: they are documentation prose naming the very
++      rules/flags this config governs, and this file is build tooling that never
++      ships to the browser. The rule stays at error across ALL app source
++      (literals AND comments) where a genuine leaked credential would actually
++      matter — the frontend being the dumb render layer (M141), every secret
++      resolves server-side through cp-vault and never appears as a literal.
++    strategy: >
++      Re-evaluate if a comment-skipping option lands upstream (then the rule can
++      be re-enabled here with comments excluded), or if the cited identifiers are
++      ever moved out of inline prose.
++
++  # ── P8 max-lines — off for the lint config file itself ────────────────────
++  - path: "web/eslint.config.ts"
++    rule: "max-lines"
++    reason: >
++      The structural line cap (500, the CB7 web-structure twin) governs APP
++      SOURCE — CB7 itself scopes its ≤500-lines/file check to web/src/**,
++      deliberately exempting build tooling at the repo/web root. This flat ESLint
++      config is exactly that: build tooling, not shipped code, and the bulk of
++      its length is the per-rule rationale prose the project's documentation
++      standard mandates (every calibration/disable explains WHY, in place).
++      Capping a config whose value IS its documentation at 500 lines would force
++      either terse, unexplained rules or an artificial split scattering one
++      coherent ruleset across files — both worse than one fully-documented
++      config. Scoped to this one file + this one rule; every other file stays
++      under the 500-line cap (all app source is currently ≤485 raw lines).
++    strategy: >
++      Re-evaluate if the config is ever split for other reasons (e.g. a shared
++      base preset extracted), or if a config-file-aware line budget is adopted.
++
++  # ── P9 no-restricted-imports — off inside the api layer (the SDK wrapper) ──
++  - path: "web/src/lib/api/**/*.{ts,tsx}"
++    rule: "@typescript-eslint/no-restricted-imports"
++    reason: >
++      The M141 crown-jewel guard bans value-importing the generated OpenAPI SDK
++      (@/lib/api/generated) anywhere outside the api layer — every other layer
++      must consume the hand-written wrappers from @/lib/api, so the frontend's
++      backend coupling lives in exactly one place. The api layer IS that place:
++      its whole job is to value-import the generated SDK functions and expose
++      thin fetch wrappers, so the rule is necessarily off HERE and only here.
++      The boundaries/dependencies rule already permits api→generated; this
++      off-switch is its twin for the import-path guard. `import type` of the
++      generated contract shape stays allowed everywhere via allowTypeImports, so
++      this exception governs only the value imports the api layer must make.
++      Every non-api file stays at error — no component or support module can
++      reach past the api layer to the raw SDK.
++    strategy: >
++      Irreducible: a wrapper layer must import the thing it wraps. The guard is
++      already as narrow as possible (this one folder, value imports only).
++
++  # ── P10c better-tailwindcss — line-wrapping owned by Prettier ─────────────
++  - path: "web/src/**/*.{ts,tsx}"
++    rule: "better-tailwindcss/enforce-consistent-line-wrapping"
++    reason: >
++      IRRECONCILABLE CONFLICT WITH PRETTIER (the canonical formatter, the rustfmt
++      twin from P2). This rule reflows the className string onto multiple lines;
++      Prettier then re-collapses it to its own line shape — the two fight in an
++      infinite --fix loop (the same class of conflict as unicorn/no-nested-ternary
++      resolved in P5). The rule is a pure line-shape opinion; whitespace/wrapping
++      is Prettier's domain, so the formatter wins and this rule is off. The other
++      seven better-tailwindcss rules (class order, canonical, duplicate,
++      deprecated, conflicting, unnecessary-whitespace) stay at error.
++    strategy: >
++      Re-evaluate if the rule gains a Prettier-compatible mode, or if
++      prettier-plugin-tailwindcss ever owns wrapping directly.
++
++  # ── P10c better-tailwindcss — no-unknown-classes can't resolve custom ─────
++  #    index.css utilities or CSS-var arbitrary values.
++  - path: "web/src/**/*.{ts,tsx}"
++    rule: "better-tailwindcss/no-unknown-classes"
++    reason: >
++      Pure false-positive noise against two legitimate patterns pervasive here.
++      (1) Custom index.css classes authored as plain CSS rules — .card-shadow,
++      .pop-shadow, .fill-sweep, .opt-rise, .menu-pop, .modal-pop (shadow +
++      keyframe-animation helpers). They are real classes but declared as ordinary
++      `.foo {}` rules, not Tailwind `@utility` directives, so Tailwind's compiler
++      never registers them as utilities and the plugin's resolver can't see them.
++      (2) CSS-variable arbitrary values — text-[var(--ok)] / bg-(--signal) /
++      ring-(--signal)/50 — which the plugin can't resolve to a known utility.
++      This DIRECTLY CONTRADICTS the sibling enforce-canonical-classes rule, which
++      REWRITES text-[var(--ok)] INTO text-(--ok) — the very shorthand
++      no-unknown-classes then flags as unknown. Two rules cannot both be right;
++      canonical wins (autofixable, correctness-bearing), so this is off. The
++      other seven better-tailwindcss rules stay at error.
++    strategy: >
++      Re-evaluate if the custom helpers are migrated to `@utility` directives AND
++      the plugin learns to resolve theme CSS-var arbitrary values (which would
++      also resolve the canonical-vs-unknown contradiction).
+diff --git a/.github/checks/check-web-structure.sh b/.github/checks/check-web-structure.sh
+new file mode 100755
+index 00000000..0997f03e
+--- /dev/null
++++ b/.github/checks/check-web-structure.sh
+@@ -0,0 +1,73 @@
++#!/usr/bin/env bash
++#
++# check-web-structure.sh — frontend structural guardrail for web/src.
++#
++# Mirrors the Rust workspace's folder-size / file-length policy (the sibling
++# .github/checks/check-file-lengths.sh + check-folder-sizes.sh enforce ≤8
++# entries per directory and ≤500 lines per source file) for the TypeScript
++# frontend, which those hash-chain-protected Rust scripts do not cover.
++#
++# Rules (applied to every directory + every .ts/.tsx file under web/src):
++#   • a directory may hold at most MAX_ENTRIES (8) immediate children;
++#   • a source file may be at most MAX_LINES (500) lines long.
++#
++# Exceptions:
++#   • web/src/components/ui       — shadcn primitives, vendored (not authored here);
++#   • web/src/lib/api/generated   — OpenAPI-generated client, machine-generated.
++#
++# Exit 0 when clean, 1 (listing every offender) otherwise. Invocation-cwd
++# independent: the repo root is resolved via `git rev-parse --show-toplevel`,
++# so it runs identically from a callback (project root), CI, or any subdir.
++
++set -euo pipefail
++
++MAX_ENTRIES=8
++MAX_LINES=500
++
++# Repo root — resolved independently of the caller's cwd, matching the other
++# .github/checks/ scripts (this one lives here after being moved out of
++# web/scripts/).
++ROOT="$(git rev-parse --show-toplevel)"
++WEB_ROOT="$ROOT/web"
++SRC="$WEB_ROOT/src"
++# shadcn vendored primitives — exempt from both rules.
++EXEMPT="$SRC/components/ui"
++# OpenAPI-generated TypeScript client — machine-generated, not authored here.
++EXEMPT_GENERATED="$SRC/lib/api/generated"
++
++fail=0
++
++is_exempt() {
++  # True when $1 is an exempt dir itself or anything beneath it.
++  case "$1" in
++    "$EXEMPT" | "$EXEMPT"/*) return 0 ;;
++    "$EXEMPT_GENERATED" | "$EXEMPT_GENERATED"/*) return 0 ;;
++    *) return 1 ;;
++  esac
++}
++
++# ── file length ────────────────────────────────────────────────────────
++while IFS= read -r f; do
++  is_exempt "$f" && continue
++  n=$(wc -l < "$f" | tr -d '[:space:]')
++  if [ "$n" -gt "$MAX_LINES" ]; then
++    echo "✗ file >$MAX_LINES lines ($n): ${f#"$WEB_ROOT"/}"
++    fail=1
++  fi
++done < <(find "$SRC" -type f \( -name '*.ts' -o -name '*.tsx' \))
++
++# ── directory entry count ──────────────────────────────────────────────
++while IFS= read -r d; do
++  is_exempt "$d" && continue
++  n=$(find "$d" -mindepth 1 -maxdepth 1 | wc -l | tr -d '[:space:]')
++  if [ "$n" -gt "$MAX_ENTRIES" ]; then
++    echo "✗ dir >$MAX_ENTRIES entries ($n): ${d#"$WEB_ROOT"/}"
++    fail=1
++  fi
++done < <(find "$SRC" -type d)
++
++if [ "$fail" -eq 0 ]; then
++  echo "web structure OK ✓ (≤$MAX_ENTRIES entries/dir, ≤$MAX_LINES lines/file; shadcn ui/ + generated/ exempt)"
++fi
++
++exit "$fail"
+# --- End entry #26 ---

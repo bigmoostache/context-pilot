@@ -970,6 +970,10 @@
   path: web/src/components/threads/ThreadComposer.tsx
   description: 'Thread composer (always-active textarea + turn-status banner). T298: paperclip wired — hidden multi-file <input>, onAttach?(files) prop, button disabled when no onAttach. Enter sends / Shift+Enter newline, IME-guarded, auto-grow.'
   last_edited_ms: 1782045499750
+11ce4421c1d17206:
+  path: web/package.json
+  description: 'Frontend deps. scripts: dev/build(tsc -b && vite build)/lint/preview + P2 format/format:check (prettier). engines.node ''^22.16.0 || >=24.0.0'' (P7 n/no-unsupported-features: exact code-driven floor for import.meta.dirname — n credits the ^22.16 backport + >=24, the 23.x gap is dead). @tanstack/react-query, react 19.2, tailwindcss 4.3, shadcn, vite 8, playwright, full eslint ratchet plugin roster + prettier + web-vitals.'
+  last_edited_ms: 0
 11ce8bd539c9f3c1:
   path: docs/talk/slides/1-0.html
   description: 'Sub-TOC: WHYs section — left numeral, right slide list'
@@ -2466,6 +2470,10 @@
   path: .github/ISSUE_TEMPLATE/feature_request.md
   description: Feature request issue template
   last_edited_ms: 0
+2c54a760109eb666:
+  path: web/knip.json
+  description: 'knip dead-code/dep config (web-lint P10a). entry e2e/**, project src/**, ignore generated/** + ui/** (vendored). ignoreDependencies: tw-animate-css + @fontsource/ibm-plex-mono (CSS @import-only, knip-blind); type-coverage REMOVED P12e (P11''s package.json script now references it, so knip sees it used — stale ignore hint cleared). ignoreExportsUsedInFile. Hash-locked.'
+  last_edited_ms: 1783504129910
 2c6170ae008d1826:
   path: docs/question-tool.md
   description: Interactive question form tool design
@@ -4629,6 +4637,10 @@
 53d7ffa3f6ff96c9:
   path: web/src/components/threads/QuestionForm.tsx
   description: Embedded question form — single/multi-select options, interactive pick state, onSubmit callback sends formatted answers via sendCommand.
+  last_edited_ms: 0
+53dc8fad7ac1ead8:
+  path: web/src/lib/api/index.ts
+  description: 'REST API client barrel. SDK layer: 28 endpoints via generated SDK. Re-exports ./auth+./finder+./body+./envKeys (env-keys.ts renamed envKeys.ts in web-lint P5 filename-case).'
   last_edited_ms: 0
 53e645ce10696b88:
   path: web/src/components/shell/widgets/ProfileModal.tsx
@@ -10278,6 +10290,10 @@ bce4ff74fb4de2b0:
   path: web/src/components/finder/views/shared.tsx
   description: 'Shared Finder view helpers: MOVE/FOLDER_DRAG MIME consts, startItemDrag/readMovePayload/isMoveDrag/folderDropProps drag-drop, relOf, ViewHandlers interface, RenameInput, TagDots, mods, itemCount. Imported by FinderViews + ColumnsView. 199 lines.'
   last_edited_ms: 1782037375245
+bd011c0c2a616da1:
+  path: .github/checks/frontend-rule-census.txt
+  description: 'Committed baseline for check-frontend-rule-census.sh: 733 `rule = severity` lines (the resolved eslint ruleset for src/App.tsx). Any add/drop/severity-change fails CI until deliberately regenerated (--update) + re-hash-locked. Ends with trailing newline (fixed P12e — the $(...)/printf ''%s'' strip previously glued the next --show marker onto its last line, cosmetic only, hash unaffected). Hash-locked.'
+  last_edited_ms: 1783504122303
 bd217dcc3a74f32b:
   path: crates/cp-orchestrator/tests/openapi/schemas_ext.rs
   description: Transport-layer OpenAPI schemas — receipts, auth, env-keys, filesystem, FinderKind enum, LLM registry (ModelDef/ProviderDef), SSE delta protocol, release management, Claude Code usage+login (ClaudeTokenStatus/LoginStart/LoginComplete schemas).
@@ -11350,6 +11366,10 @@ d0efc39407dca0c9:
   path: src/app/context/mod.rs
   description: Context preparation + unified freeze system. FreezeConditions (queue/tempo). Panel ordering stabilization. Per-panel content hashing + freeze budgets. Cache cost tracking via prefix-match. flame!("prepare_context"). Reverie path branches.
   last_edited_ms: 0
+d0f1b0749754b98e:
+  path: web/src/index.css
+  description: Tailwind v4 + tw-animate. Two palettes (:root Cream light / .dark Dungeon Forge) as CSS token blocks; semantic tokens (signal/ok/warn/danger/surface). Finder micro-motion keyframes (finder-pop/ql-pop/menu-pop/ants/checker), modal-pop, highlight.js .hljs-* theme mapped to tokens (T280).
+  last_edited_ms: 0
 d1002291148c8efd:
   path: crates/cp-orchestrator/src/registry/channel.rs
   description: Per-agent channel — backend read/write handle. AgentChannel (from_entry/hydrate/send/send_with_retry) + read_ack. Tailer moved to sibling tailer.rs (split for 500-line limit) and re-exported here via `pub use crate::registry::tailer::Tailer` so channel::Tailer stays valid for all call sites. 320 lines.
@@ -11650,6 +11670,10 @@ d694781ff4514603:
   path: web/src/components/finder/FinderChrome.tsx
   description: 'Finder chrome: tab strip, main toolbar (nav/crumbs/view-switch/search/icon-size slider), left sidebar, path bar. FinderSidebar: Favorites + Locations + Pinned (drag-drop target, T276 full-width pinned rows via flex-col wrapper + self-centering Unpin). File-active toolbar: Download + Share only.'
   last_edited_ms: 1781889348374
+d6c17c91edbd05d2:
+  path: .github/checks/check-frontend-rule-census.sh
+  description: Frontend ESLint rule census (clippy_compare twin, web-lint P12d). Snapshots the FULLY RESOLVED ruleset eslint applies to a representative app file (src/App.tsx) as sorted `rule = severity` (sev normalized 0/1/2->off/warn/error, options dropped), diffs vs committed baseline frontend-rule-census.txt. Catches a silent error->warn/off flip or a plugin-bump rule drop that the suppression guard can't see. --update regenerates baseline (printf '%s\n' for trailing-newline consistency with the verify diff — a mismatch there fails the diff), default verifies. Needs web/node_modules (runs in CI frontend job). Hash-locked.
+  last_edited_ms: 1783504122238
 d6d2923755b7f261:
   path: web/run-stack.sh
   description: 'Launch script for full Context Pilot live stack: orchestrator backend (:7878) + web dev server (:5174) + TUI with CP_BRIDGE=1. --no-tui flag for backend+web only. Health check, cleanup trap, env overrides.'
@@ -12722,6 +12746,10 @@ ee2f4e90cf841383:
   path: crates/cp-orchestrator/src/services/auth/helpers.rs
   description: 'Auth subsystem low-level helpers: fill_random (/dev/urandom with nanosecond fallback), to_hex, random_hex, format_uuid (UUID v4 string with dashes), now_ms (epoch millis). Shared by store.rs.'
   last_edited_ms: 1782237717834
+ee38a3e551fbce29:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 ee41eb6a94d78b30:
   path: crates/cp-wire/Cargo.toml
   description: Wire protocol crate manifest. No deps yet (I/O-free). Workspace lints inherited.

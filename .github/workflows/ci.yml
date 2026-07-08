@@ -102,3 +102,54 @@ jobs:
 
       - name: Check TypeScript contract
         run: .github/checks/check-typescript-contract.sh
+
+  frontend:
+    name: Frontend (eslint · tsc · prettier · stylelint · type-coverage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # Match the lockfile origin (see the contract job + M144).
+          version: 11.6.0
+
+      - name: Install web dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: web
+
+      # The exhaustive project-wide mirror of the incremental web-lint callback
+      # (which runs eslint + prettier on only the changed files at edit time).
+      # Each tool is its own step so a failure is attributable.
+      - name: ESLint (--max-warnings 0)
+        run: npx eslint . --max-warnings 0
+        working-directory: web
+
+      - name: TypeScript (tsc -b)
+        run: npx tsc -b
+        working-directory: web
+
+      - name: Prettier (--check)
+        run: npx prettier --check .
+        working-directory: web
+
+      - name: Stylelint
+        run: npx stylelint "src/**/*.css"
+        working-directory: web
+
+      - name: Type coverage
+        run: npx type-coverage --project tsconfig.app.json
+        working-directory: web
+
+      # Ruleset drift guard (clippy_compare twin): the resolved eslint ruleset
+      # for a representative app-source file must match the committed, hash-locked
+      # baseline — catches a silent error→warn/off flip or a plugin-bump drop.
+      # Runs here (not the structure job) because it needs web/node_modules.
+      - name: Frontend rule census
+        run: .github/checks/check-frontend-rule-census.sh

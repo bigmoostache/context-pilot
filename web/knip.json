@@ -3,6 +3,6 @@
   "entry": ["e2e/**/*.{ts,tsx}"],
   "project": ["src/**/*.{ts,tsx}"],
   "ignore": ["src/lib/api/generated/**", "src/components/ui/**"],
-  "ignoreDependencies": ["type-coverage", "tw-animate-css", "@fontsource/ibm-plex-mono"],
+  "ignoreDependencies": ["tw-animate-css", "@fontsource/ibm-plex-mono"],
   "ignoreExportsUsedInFile": true
 }

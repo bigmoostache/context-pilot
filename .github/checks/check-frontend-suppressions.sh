@@ -10,7 +10,11 @@
 # eslint.config.ts can't silently re-open the door:
 #
 #   1. STOWAWAY  — no eslint-disable / @ts-ignore / @ts-nocheck / @ts-expect-error
-#                  / @ts-check anywhere under web/src (excluding generated/**).
+#                  / @ts-check anywhere under web/src (excluding generated/**),
+#                  and no `as unknown as` double-assertion (the type-coverage
+#                  escape hatch) except the ONE documented useFs wire-view seam
+#                  (allow-listed by path + cast substring IN THIS SCRIPT, so the
+#                  exception is itself hash-locked, not a free source marker).
 #   2. ORPHAN/UNREGISTERED — every `"<rule>": "off"` scoped override in
 #                  eslint.config.ts must have a matching entry in the exceptions
 #                  registry, and every registry rule must appear in the config
@@ -57,6 +61,30 @@ check_file() {
     done <<< "$hits"
     echo "FAIL: $file carries a banned inline suppression directive" >&2
     exit_code=1
+  fi
+
+  # ── `as unknown as` double-assertion ban (type-coverage escape hatch) ──
+  # A double-assertion launders any type through `unknown`, defeating the
+  # type-coverage ratchet. Banned in hand-written source EXCEPT the single
+  # documented useFs wire-view seam (the generated FinderNode carries
+  # `modified: number`, the UI view `modified: string` — a backend spec gap
+  # whose real fix is a Rust type, out of frontend scope). The exception is
+  # allow-listed HERE (path + cast substring), so it lives in this hash-locked
+  # guard rather than as a free-floating source marker anyone could add.
+  local auas
+  auas=$(grep -nE 'as unknown as' "$file" 2>/dev/null || true)
+  if [ -n "$auas" ]; then
+    while IFS= read -r line; do
+      case "$file" in
+        */src/lib/live/index.ts)
+          # The lone sanctioned seam: `fetchFs(...) as unknown as Promise<FinderNode[]>`.
+          echo "$line" | grep -q 'as unknown as Promise<FinderNode\[\]>' && continue
+          ;;
+      esac
+      echo "::error file=$file::$line"
+      echo "FAIL: $file uses a banned 'as unknown as' double-assertion" >&2
+      exit_code=1
+    done <<< "$auas"
   fi
 }
 

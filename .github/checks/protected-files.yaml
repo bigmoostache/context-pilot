@@ -48,3 +48,37 @@
   whole_file: true
 - path: run.sh
   whole_file: true
+
+# --- Frontend lint configuration (web-lint ratchet, P12) ---
+# The web twin of the Rust lint config above. Every file that DEFINES the
+# frontend ratchet (rulesets, strict flags, formatter/CSS/dead-code policy) or
+# ENFORCES it (the suppression + census guards + their baseline + the exception
+# registry). A silent relax of any is now tamper-evident. package.json is
+# deliberately NOT here: its typeCoverage floor is a secondary ratchet (the
+# primary any-ban is `no-explicit-any` inside the locked eslint.config.ts) and
+# whole-file locking would fight routine dependency bumps (the same reason
+# Cargo.toml locks only its lint sections, not its deps).
+- path: web/eslint.config.ts
+  whole_file: true
+- path: web/.prettierrc.json
+  whole_file: true
+- path: web/.prettierignore
+  whole_file: true
+- path: web/.stylelintrc.json
+  whole_file: true
+- path: web/knip.json
+  whole_file: true
+- path: web/tsconfig.app.json
+  whole_file: true
+- path: web/tsconfig.node.json
+  whole_file: true
+- path: .github/checks/check-frontend-suppressions.sh
+  whole_file: true
+- path: .github/checks/check-frontend-rule-census.sh
+  whole_file: true
+- path: .github/checks/frontend-rule-census.txt
+  whole_file: true
+- path: .github/checks/allowed-eslint-exceptions.yaml
+  whole_file: true
+- path: .github/checks/check-web-structure.sh
+  whole_file: true

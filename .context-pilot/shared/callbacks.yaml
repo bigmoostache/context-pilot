@@ -134,6 +134,41 @@ vault-bypass:
   is_global: true
   script_content: .github/checks/check-vault-bypass.sh $CP_CHANGED_FILES
   last_edited_ms: 1783256066883
+web-lint:
+  name: web-lint
+  description: 'Blocking incremental frontend lint on web/src edits: eslint --max-warnings 0 + prettier --check on the changed .ts/.tsx files (type-aware, full projectService). Full tsc + type-coverage stay CI-side (project-wide). Catches the class of regression a stale sweep misses.'
+  pattern: web/src/**
+  blocking: true
+  timeout_secs: 60
+  success_message: Web lint OK ✓
+  cwd: /Users/guillaume/context-pilot/web
+  is_global: true
+  script_content: |-
+    files=()
+    for f in $CP_CHANGED_FILES; do
+      rel="${f#web/}"        # repo-relative "web/src/x" -> "src/x"
+      rel="${rel##*/web/}"   # absolute "/a/web/src/x" -> "src/x"
+      case "$rel" in
+        *generated/*) continue ;;               # codegen bindings: never linted
+        src/*.ts | src/*.tsx) files+=("$rel") ;;
+      esac
+    done
+
+    [ ${#files[@]} -eq 0 ] && { echo "web-lint: no web/src ts/tsx changes"; exit 0; }
+
+    fail=0
+    echo "web-lint: eslint ${#files[@]} file(s)…"
+    npx eslint --max-warnings 0 "${files[@]}" || fail=1
+    echo "web-lint: prettier --check…"
+    npx prettier --check "${files[@]}" || fail=1
+
+    if [ "$fail" -ne 0 ]; then
+      echo "" >&2
+      echo "web-lint FAILED — fix the eslint/prettier violations above." >&2
+      echo "(full project gate: eslint . / tsc -b / type-coverage run in CI)" >&2
+    fi
+    exit $fail
+  last_edited_ms: 1783503355952
 web-structure:
   name: web-structure
   description: Enforce ≤8 entries/dir + ≤500 lines/file under web/src (shadcn ui/ exempt)

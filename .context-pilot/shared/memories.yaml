@@ -271,22 +271,24 @@
   - forbidden
   last_edited_ms: 0
 45b9baa7eb6b3f01:
-  tl_dr: 'T506 web-lint P0-P11 COMPLETE + pushed on web-lint. Next: P12 lockdown (X1139) → P13 docs/PR. Details in contents.'
+  tl_dr: 'T506 web-lint P0-P12 COMPLETE + pushed on web-lint. Next: P13 docs/PR (X1140). Details in contents.'
   contents: |-
-    P0 scaffold. P1 tsc strict 743d2bfe. P2 Prettier 0531ab4f. P3 type-aware eslint b25a5c37. P4 anti-cheat b96f9c47. P5 unicorn. P6 React bcb2747e. P7 correctness&security 621e4257. P8 structure&complexity bc56795a. P9 boundaries 683d278d. P10 dead-code/deps/CSS 1f70a88a.
+    P0 scaffold. P1 tsc strict 743d2bfe. P2 Prettier 0531ab4f. P3 type-aware eslint b25a5c37. P4 anti-cheat b96f9c47. P5 unicorn. P6 React bcb2747e. P7 correctness&security 621e4257. P8 structure&complexity bc56795a. P9 boundaries 683d278d. P10 dead-code/deps/CSS 1f70a88a. P11 type-coverage a6158620 (amended 31273882).
 
-    P11 (X1138) type-coverage DONE. Census --project tsconfig.app.json (root tsconfig is project-refs = 0/0). Strict all = 99.74%. Ignoring generated/** = 99.86% (35825/35872), 47 uncovered = irreducible boundary anys (JSON.parse raw:unknown, DOM webkitGetAsEntry FileSystem*Entry casts, react-markdown untyped node props, EventSource data, 1 useFs seam). Fixed 2 of 3 `as unknown as`: api/index.ts fetchThreads rewritten to block body with `const la = t.lastActivity as string|number` single covered assertion. Remaining 1 `as unknown as` = live/index.ts:187 useFs (Gen FinderNode.modified:number vs UI string, backend-spec problem, out of frontend scope). `as any` grep = NONE (eslint no-explicit-any blocks). package.json: type-coverage script (`type-coverage --project tsconfig.app.json`) + typeCoverage block {strict:true, atLeast:99.8 ratchet floor, ignoreFiles generated/**, detail:true}. pnpm type-coverage RC 0.
+    P12 (X1139) ENFORCEMENT LOCKDOWN DONE: CB8 blocking web-lint callback on web/src/** (eslint --max-warnings 0 + prettier --check on changed files; tsc+type-coverage CI-side). check-frontend-suppressions.sh extended: as-unknown-as double-assertion ban (only exception: live/index.ts `as unknown as Promise<FinderNode[]>` useFs seam, allow-listed by path+substring IN the hash-locked script). ci.yml new `frontend` job (eslint/tsc/prettier/stylelint/type-coverage/rule-census). check-frontend-rule-census.sh (clippy_compare twin): eslint --print-config src/App.tsx -> python3 sorted `rule = severity` (733 rules, sev 0/1/2->off/warn/error), --update writes baseline, default diffs+fails on drift; baseline frontend-rule-census.txt. protected-files.yaml + chain (26 entries) hash-lock all 12 frontend config files (eslint.config.ts, .prettierrc.json, .prettierignore, .stylelintrc.json, knip.json, tsconfig.app/node.json, check-frontend-suppressions.sh, check-frontend-rule-census.sh, frontend-rule-census.txt, allowed-eslint-exceptions.yaml, check-web-structure.sh). package.json NOT locked (dep churn; any-ban in locked eslint.config.ts).
 
-    All green: eslint 0, tsc 0, prettier 0, stylelint 0, knip 0, web-structure 0, type-coverage pass, generated no-drift.
+    BUG fixed: census baseline had no trailing newline (`$(...)` strips + `printf '%s'`), glued next --show marker onto census last line (cosmetic, hash unaffected). Fixed both census --update write + verify diff to `printf '%s\n'`, regenerated baseline. knip type-coverage ignore removed (P11 script references it now).
 
-    NEXT P12 (X1139): blocking web-lint callback on web/src/** (eslint --max-warnings 0 + tsc --noEmit + prettier --check + type-coverage) + CI job mirror + `as unknown as` grep-ban in check-frontend-suppressions.sh (with 1 documented useFs exception) + rule-census script + hash-lock all lint config (protected-files.yaml + chain.sh --update, password Totordu1789 M39). P13 docs+PR. .gitignore (gaia +86) + T509 Rust + T514 + caveman.md stay EXCLUDED every commit.
+    All green: eslint 0, tsc 0, prettier 0, stylelint 0, knip 0, web-structure 0, type-coverage 99.86% pass, generated no-drift, chain 26 verified. Guards probed: suppressions clean RC0, as-unknown-as ban bites, census drift bites (P12d).
+
+    NEXT P13 (X1140): web/README.md lint section, tree descs for new config/scripts, memory of frontend-lint architecture, final commit+push+PR. .gitignore (gaia +86) + T509 Rust + T514 + caveman.md stay EXCLUDED every commit.
   importance: high
   labels:
   - web-lint
   - T506
   - P9
   - resume
-  last_edited_ms: 1783502802681
+  last_edited_ms: 1783504109115
 48f2140d3c2dee0e:
   tl_dr: Entities module COMPLETE — all 151 stress tests passed (12 categories, 4 difficulty levels). 9 bugs found/fixed. Committed on 'entities' branch. Production-quality.
   contents: |-
