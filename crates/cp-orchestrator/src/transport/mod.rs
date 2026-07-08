@@ -154,6 +154,20 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
         return;
     }
 
+    // Maintenance-status shim on the PRODUCT plane. The SPA probes
+    // `GET /api/maint/status` at boot to decide wizard-vs-cockpit; the real
+    // handler lives only on the maintenance socket (`:9090`). On the product
+    // cockpit this path used to fall through to a 404 — harmless (the frontend
+    // treats a non-2xx as "not the maintenance plane") but it spammed a red
+    // failed-XHR in devtools every boot. Answer 200 with `plane:"product"` so
+    // the probe gets a clean response and `probeMaintPlane` returns null
+    // (it renders the wizard only when `plane === "maintenance"`). Public,
+    // pre-auth: it leaks nothing beyond "this is the product plane".
+    if method == Method::Get && segments.as_slice() == ["api", "maint", "status"] {
+        respond_json(request, &rest::HttpReply::ok(&serde_json::json!({ "plane": "product" })));
+        return;
+    }
+
     // Extract the Bearer token for auth-aware handlers.
     let auth_token = request.headers().iter().find_map(|h| {
         if h.field.equiv("Authorization") { h.value.as_str().strip_prefix("Bearer ").map(str::to_owned) } else { None }

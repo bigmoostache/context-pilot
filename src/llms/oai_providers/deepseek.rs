@@ -231,6 +231,7 @@ impl LlmClient for DeepSeekClient {
             cache_miss_tokens,
             stop_reason,
             bp_hashes: vec![],
+            bp_panel_ids: vec![],
             alive_count: 0,
             alive_positions_permille: vec![],
         });

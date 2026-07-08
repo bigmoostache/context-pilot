@@ -162,6 +162,15 @@ pub struct State {
     pub previous_panel_order: Vec<String>,
     /// Panel ID → context type from last emitted tick (for disappearance detection).
     pub previous_panel_id_types: Vec<(String, String)>,
+    /// Panel IDs that carried a cache breakpoint on the last emitted tick, in
+    /// prompt order (the BP→panel mapping recorded by the build path).
+    ///
+    /// Consumed by the freeze pass to widen the "free to update" region back to
+    /// the last alive breakpoint before the culprit: panels between that
+    /// breakpoint and the culprit are already billed fresh this turn, so
+    /// refreshing them costs nothing. Runtime-only (empty on cold start ⇒ the
+    /// freeze pass falls back to the culprit-anchored region).
+    pub previous_breakpoint_panel_ids: Vec<String>,
     /// Full snapshot of panel `ContextItem`s from the last unfrozen tick.
     ///
     /// During tempo/queue freeze, this snapshot is replayed verbatim — guaranteeing
@@ -288,6 +297,7 @@ impl Default for State {
             previous_panel_hash_list: vec![],
             previous_panel_order: vec![],
             previous_panel_id_types: vec![],
+            previous_breakpoint_panel_ids: vec![],
             frozen_context_snapshot: None,
             tool_sleep_until_ms: 0,
             cache_engine_json: None,

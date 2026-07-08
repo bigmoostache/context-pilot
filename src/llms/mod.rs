@@ -278,10 +278,32 @@ pub(crate) struct CcJsonResult {
     pub json_messages: Vec<Value>,
     /// Accumulated hashes at the 4 breakpoint positions (for `record_breakpoints`).
     pub bp_hashes: Vec<String>,
+    /// Panel IDs each breakpoint landed on, in prompt order — the BP→panel
+    /// mapping the freeze pass reads next turn to widen the free-to-update region.
+    pub bp_panel_ids: Vec<String>,
     /// How many stored BPs matched the current request's hash chain.
     pub alive_count: usize,
     /// Per-mille positions (0–1000) of alive BPs within the prompt.
     pub alive_positions_permille: Vec<u16>,
+}
+
+/// Recover the panel ID a breakpoint block belongs to, or `None` for a
+/// non-panel block (system / tools / conversation / footer).
+///
+/// Panels are injected (see `inject_panel_messages`) as an assistant `tool_use`
+/// plus a user `tool_result` pair, both keyed `panel_{id}`. A breakpoint may tag
+/// the header `Text` block or the `tool_use`/`tool_result` block of a panel
+/// message, so the whole message is scanned for the `panel_`-prefixed id instead
+/// of only the tagged block. The `panel_footer` sentinel is excluded.
+fn message_panel_id(msg: &ApiMessage) -> Option<String> {
+    msg.content.iter().find_map(|block| {
+        let raw = match block {
+            ContentBlock::ToolUse { id, .. } => id,
+            ContentBlock::ToolResult { tool_use_id, .. } => tool_use_id,
+            ContentBlock::Text { .. } => return None,
+        };
+        raw.strip_prefix("panel_").filter(|id| *id != "footer").map(str::to_string)
+    })
 }
 
 /// Convert pre-assembled `Vec<ApiMessage>` into Claude Code's raw JSON format.
@@ -348,9 +370,21 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage], engine_json: 
         }));
     }
 
+    // Map each breakpoint block back to the panel it landed on (in prompt order,
+    // deduped) — persisted next turn for the freeze pass's free-region widening.
+    let mut bp_panel_ids: Vec<String> = Vec::new();
+    for (msg_idx, _blk_idx) in &plan.positions {
+        if let Some(id) = api_messages.get(*msg_idx).and_then(message_panel_id)
+            && !bp_panel_ids.contains(&id)
+        {
+            bp_panel_ids.push(id);
+        }
+    }
+
     CcJsonResult {
         json_messages,
         bp_hashes: plan.bp_hashes,
+        bp_panel_ids,
         alive_count: plan.alive_count,
         alive_positions_permille: plan.alive_positions_permille,
     }

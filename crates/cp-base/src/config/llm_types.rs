@@ -37,6 +37,10 @@ pub enum StreamEvent {
         /// Accumulated hashes at breakpoint positions (for cache engine update).
         /// Only populated by providers that use the cache optimization engine.
         bp_hashes: Vec<String>,
+        /// Panel IDs each breakpoint landed on, in prompt order (the BP→panel
+        /// mapping consumed next turn by the freeze pass's free-region widening).
+        /// Empty for non-caching providers.
+        bp_panel_ids: Vec<String>,
         /// How many stored breakpoints were both non-expired AND matched in the
         /// current request's accumulated hash chain. Zero for non-caching providers.
         alive_count: usize,

@@ -163,6 +163,12 @@ pub(super) fn prepare_stream_context(
         // ═══ Normal path: per-panel freeze decisions ═════════════════════════
 
         {
+            // ── Pre-pass: BP-anchored free region (T509) ──────────────────
+            // Widen the "free to update" region back to the last alive
+            // breakpoint before the culprit; panels in `[anchor, culprit)` are
+            // already billed fresh this turn, so refreshing them is free.
+            let force_break_at = freeze::compute_force_break_at(&context_items, state, cond);
+
             let mut cache_broken = false;
             let mut new_hash_list: Vec<String> = Vec::new();
 
@@ -212,7 +218,13 @@ pub(super) fn prepare_stream_context(
                 if content_changed {
                     // Content differs from last emission — consult freeze policy
                     let panel = crate::app::panels::get_panel(&entry.context_type);
-                    let decision = cond.freeze_panel(cache_broken, entry.freeze_count, panel.max_freezes());
+                    // Widen the free region: a panel at/after the BP anchor is
+                    // already in the billed-fresh segment, so treat the cache as
+                    // broken for its freeze decision (emit Fresh, not frozen).
+                    // The real `cache_broken` still guards culprit telemetry, so
+                    // the first such panel is correctly recorded as the culprit.
+                    let broken_for_decision = cache_broken || panel_idx >= force_break_at;
+                    let decision = cond.freeze_panel(broken_for_decision, entry.freeze_count, panel.max_freezes());
 
                     if decision == FreezeDecision::Freeze
                         && let Some(ref frozen) = entry.emitted.context
