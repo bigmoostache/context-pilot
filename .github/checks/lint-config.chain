@@ -3949,3 +3949,86 @@ index 00000000..0997f03e
 +
 +exit "$fail"
 # --- End entry #26 ---
+27:88304ac2cccbbe2ed64b0305b5aa1b2bb947005f93decd4fd1cb307a2317a758:3af0faa579bf2912d44f82742ccf323ce69745a4b3c55b7fd33cb9c50494f2ee:afed3401be22e8a4a9902adac1ce23f1640f27c31a21b7cdd55272ccd82978e3
+# --- Diff for entry #27 ---
+diff --git a/.github/checks/protected-files.yaml b/.github/checks/protected-files.yaml
+index e7d8f0c8..a5d3536b 100644
+--- a/.github/checks/protected-files.yaml
++++ b/.github/checks/protected-files.yaml
+@@ -82,3 +82,36 @@
+   whole_file: true
+ - path: .github/checks/check-web-structure.sh
+   whole_file: true
++
++# --- Enforcement orchestration (closes the "locked script, unlocked caller"
++#     hole). A guard script is only as strong as the thing that RUNS it — a
++#     hash-locked check-*.sh whose CI step or callback definition is deletable
++#     is a silent bypass. So the orchestration layer is now locked too.
++#
++# A. The CI workflow that invokes every .github/checks guard. Deleting a step
++#    here would stop a locked guard from running without touching the guard.
++- path: .github/workflows/ci.yml
++  whole_file: true
++# B. Two guard scripts that were run in CI + callbacks but not yet chained:
++#    the vault-bypass detector (Structure job + CB7) and the OpenAPI/TS contract
++#    drift check (Contract job + CB3/CB6).
++- path: .github/checks/check-vault-bypass.sh
++  whole_file: true
++- path: .github/checks/check-typescript-contract.sh
++  whole_file: true
++# C. The edit-time enforcement layer: the callback registry (CB8 web-lint,
++#    CB4 rust-check, CB2 lint-integrity, …) and the standalone web-lint guard
++#    the CB8 callback delegates to. CB8's script_content is now a one-line
++#    `bash "$CP_PROJECT_ROOT/.github/checks/web-lint.sh"` (consistent with every
++#    other guard: body in .github/checks, callback just invokes it), so the
++#    executed logic lives in the tracked, hash-locked script below — NOT in the
++#    mutable callback registry, and NOT in the gitignored auto-materialized
++#    mirror at .context-pilot/scripts/web-lint.sh (a throwaway copy the runtime
++#    regenerates from script_content). Editing callbacks.yaml to make CB8
++#    non-blocking, or gutting the guard, would kill enforcement — so both the
++#    registry and the guard are locked. A deliberate callback change now needs
++#    a chain --update.
++- path: .context-pilot/shared/callbacks.yaml
++  whole_file: true
++- path: .github/checks/web-lint.sh
++  whole_file: true
+diff --git a/.context-pilot/shared/callbacks.yaml b/.context-pilot/shared/callbacks.yaml
+index ea1f90ff..6b94bf25 100644
+--- a/.context-pilot/shared/callbacks.yaml
++++ b/.context-pilot/shared/callbacks.yaml
+@@ -143,32 +143,8 @@ web-lint:
+   success_message: Web lint OK ✓
+   cwd: /Users/guillaume/context-pilot/web
+   is_global: true
+-  script_content: |-
+-    files=()
+-    for f in $CP_CHANGED_FILES; do
+-      rel="${f#web/}"        # repo-relative "web/src/x" -> "src/x"
+-      rel="${rel##*/web/}"   # absolute "/a/web/src/x" -> "src/x"
+-      case "$rel" in
+-        *generated/*) continue ;;               # codegen bindings: never linted
+-        src/*.ts | src/*.tsx) files+=("$rel") ;;
+-      esac
+-    done
+-
+-    [ ${#files[@]} -eq 0 ] && { echo "web-lint: no web/src ts/tsx changes"; exit 0; }
+-
+-    fail=0
+-    echo "web-lint: eslint ${#files[@]} file(s)…"
+-    npx eslint --max-warnings 0 "${files[@]}" || fail=1
+-    echo "web-lint: prettier --check…"
+-    npx prettier --check "${files[@]}" || fail=1
+-
+-    if [ "$fail" -ne 0 ]; then
+-      echo "" >&2
+-      echo "web-lint FAILED — fix the eslint/prettier violations above." >&2
+-      echo "(full project gate: eslint . / tsc -b / type-coverage run in CI)" >&2
+-    fi
+-    exit $fail
+-  last_edited_ms: 1783503355952
++  script_content: bash "$CP_PROJECT_ROOT/.github/checks/web-lint.sh"
++  last_edited_ms: 1783505838058
+ web-structure:
+   name: web-structure
+   description: Enforce ≤8 entries/dir + ≤500 lines/file under web/src (shadcn ui/ exempt)
+# --- End entry #27 ---

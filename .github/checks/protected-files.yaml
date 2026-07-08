@@ -82,3 +82,36 @@
   whole_file: true
 - path: .github/checks/check-web-structure.sh
   whole_file: true
+
+# --- Enforcement orchestration (closes the "locked script, unlocked caller"
+#     hole). A guard script is only as strong as the thing that RUNS it — a
+#     hash-locked check-*.sh whose CI step or callback definition is deletable
+#     is a silent bypass. So the orchestration layer is now locked too.
+#
+# A. The CI workflow that invokes every .github/checks guard. Deleting a step
+#    here would stop a locked guard from running without touching the guard.
+- path: .github/workflows/ci.yml
+  whole_file: true
+# B. Two guard scripts that were run in CI + callbacks but not yet chained:
+#    the vault-bypass detector (Structure job + CB7) and the OpenAPI/TS contract
+#    drift check (Contract job + CB3/CB6).
+- path: .github/checks/check-vault-bypass.sh
+  whole_file: true
+- path: .github/checks/check-typescript-contract.sh
+  whole_file: true
+# C. The edit-time enforcement layer: the callback registry (CB8 web-lint,
+#    CB4 rust-check, CB2 lint-integrity, …) and the standalone web-lint guard
+#    the CB8 callback delegates to. CB8's script_content is now a one-line
+#    `bash "$CP_PROJECT_ROOT/.github/checks/web-lint.sh"` (consistent with every
+#    other guard: body in .github/checks, callback just invokes it), so the
+#    executed logic lives in the tracked, hash-locked script below — NOT in the
+#    mutable callback registry, and NOT in the gitignored auto-materialized
+#    mirror at .context-pilot/scripts/web-lint.sh (a throwaway copy the runtime
+#    regenerates from script_content). Editing callbacks.yaml to make CB8
+#    non-blocking, or gutting the guard, would kill enforcement — so both the
+#    registry and the guard are locked. A deliberate callback change now needs
+#    a chain --update.
+- path: .context-pilot/shared/callbacks.yaml
+  whole_file: true
+- path: .github/checks/web-lint.sh
+  whole_file: true
