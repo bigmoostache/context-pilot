@@ -30,7 +30,13 @@ export function SessionVitals({ agentId }: { agentId: string }) {
       // (we are executing) and the measured round-trip to the orchestrator.
       const frontendRows: Vital[] = [
         { name: "Frontend", category: "frontend", status: "ok", detail: "this app is running" },
-        { name: "Frontend → Orchestrator", category: "frontend", status: "ok", latencyMs: rtt, detail: `round-trip ${rtt}ms` },
+        {
+          name: "Frontend → Orchestrator",
+          category: "frontend",
+          status: "ok",
+          latencyMs: rtt,
+          detail: `round-trip ${rtt}ms`,
+        },
       ]
       setVitals([...frontendRows, ...rows])
     } catch (e) {
@@ -83,7 +89,7 @@ export function SessionVitals({ agentId }: { agentId: string }) {
               ))}
             <button
               type="button"
-              onClick={runChecks}
+              onClick={() => void runChecks()}
               disabled={checking}
               className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface/70 px-3 py-1.5 text-[12px] font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60"
             >
@@ -100,7 +106,7 @@ export function SessionVitals({ agentId }: { agentId: string }) {
         {vitalsErr && (
           <div
             role="alert"
-            className="rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-3 py-2 text-[11.5px] text-[var(--danger)]"
+            className="rounded-lg border border-(--danger)/30 bg-(--danger)/10 px-3 py-2 text-[11.5px] text-(--danger)"
           >
             {vitalsErr}
           </div>
@@ -117,7 +123,7 @@ export function SessionVitals({ agentId }: { agentId: string }) {
 
         {groups.map((g) => (
           <section key={g.category} className="flex flex-col gap-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/55">
+            <span className="text-[10px] font-semibold tracking-[0.07em] text-muted-foreground/55 uppercase">
               {g.label}
             </span>
             <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
@@ -162,7 +168,7 @@ function groupByCategory(vitals: Vital[] | null): VitalGroup[] {
 
 /** Turn a snake/kebab category tag into a Title-Cased section label. */
 function humanize(s: string): string {
-  return s.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  return s.replaceAll(/[-_]+/g, " ").replaceAll(/\b\w/g, (c) => c.toUpperCase())
 }
 
 /** Map a vital status to its semantic theme color (green / red / grey). */
@@ -193,13 +199,13 @@ function VitalRow({ vital }: { vital: Vital }) {
         {vital.name}
       </span>
       {vital.latencyMs != null && (
-        <span className="font-mono text-[10.5px] tabular-nums text-muted-foreground/65">
+        <span className="font-mono text-[10.5px] text-muted-foreground/65 tabular-nums">
           {vital.latencyMs}ms
         </span>
       )}
       {!healthy && (
         <span
-          className="shrink-0 rounded px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.05em]"
+          className="shrink-0 rounded-sm px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wider uppercase"
           style={{ color, background: `color-mix(in oklab, ${color} 14%, transparent)` }}
         >
           {vital.status}

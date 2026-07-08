@@ -1,36 +1,14 @@
 import { useState } from "react"
+import type { CatId } from "./categories"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import {
-  Boxes,
-  Check,
-  Coins,
-  Lock,
-  Package,
-  Sliders,
-} from "lucide-react"
+import { Check, Lock } from "lucide-react"
 import { UsagePage } from "@/components/agents/UsagePage"
 import { ReleasesPane } from "./ReleasesPane"
 import { useProviders } from "@/lib/support/models"
 import { fetchSettings, updateSettings, fetchEnvKeys } from "@/lib/api"
-import { useDevMode } from "@/lib/support/devMode"
+import { useDevMode } from "@/lib/providers/toggles/devMode"
+import { useShowOverlay } from "@/lib/providers/toggles/showOverlay"
 import { cn } from "@/lib/utils"
-
-// ── categories ────────────────────────────────────────────────────
-export type CatId = "general" | "usage" | "services" | "releases"
-
-export const CATEGORIES: {
-  id: CatId
-  label: string
-  blurb: string
-  icon: typeof Sliders
-  count?: number
-  adminOnly?: boolean
-}[] = [
-  { id: "general", label: "General", blurb: "Models & autonomy", icon: Sliders },
-  { id: "usage", label: "Usage & Cost", blurb: "Spend & token analytics", icon: Coins },
-  { id: "services", label: "Services", blurb: "Available integrations", icon: Boxes },
-  { id: "releases", label: "Releases", blurb: "Manage binary versions", icon: Package, adminOnly: true },
-]
 
 // ── per-category bodies ───────────────────────────────────────────
 //
@@ -40,20 +18,33 @@ export const CATEGORIES: {
 // present) vs. greyed-out (key absent).
 export function CategoryBody({ cat }: { cat: CatId }) {
   switch (cat) {
-    case "general":
+    case "general": {
       return <GeneralPane />
-    case "usage":
+    }
+    case "usage": {
       return <UsagePage />
-    case "services":
+    }
+    case "services": {
       return <ServicesPane />
-    case "releases":
+    }
+    case "releases": {
       return <ReleasesPane />
+    }
   }
 }
 
 /** Grouping of the well-known env keys into display categories (by env name). */
 const SERVICE_GROUPS: { label: string; envs: string[] }[] = [
-  { label: "Model providers", envs: ["ANTHROPIC_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "DEEPSEEK_API_KEY", "MINIMAX_API_KEY"] },
+  {
+    label: "Model providers",
+    envs: [
+      "ANTHROPIC_API_KEY",
+      "GROQ_API_KEY",
+      "XAI_API_KEY",
+      "DEEPSEEK_API_KEY",
+      "MINIMAX_API_KEY",
+    ],
+  },
   { label: "Search & embeddings", envs: ["VOYAGE_API_KEY"] },
   { label: "Document AI", envs: ["DATALAB_API_KEY"] },
   { label: "Web & scraping", envs: ["BRAVE_API_KEY", "FIRECRAWL_API_KEY"] },
@@ -107,14 +98,16 @@ function ServiceRow({ label, available }: { label: string; available: boolean })
       <span
         className={cn(
           "flex size-7 shrink-0 items-center justify-center rounded-lg",
-          available ? "bg-[var(--ok)]/15 text-[var(--ok)]" : "bg-muted/60 text-muted-foreground/60",
+          available ? "bg-(--ok)/15 text-(--ok)" : "bg-muted/60 text-muted-foreground/60",
         )}
       >
         {available ? <Check className="size-4" strokeWidth={3} /> : <Lock className="size-3.5" />}
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-[13px] font-medium text-foreground/90">{label}</span>
-        <span className="text-[11px] text-muted-foreground">{available ? "Available" : "Not configured"}</span>
+        <span className="text-[11px] text-muted-foreground">
+          {available ? "Available" : "Not configured"}
+        </span>
       </span>
     </div>
   )
@@ -128,10 +121,20 @@ function GeneralPane() {
     <Stack>
       <AllowedModelsSection />
 
-      <ToggleRow i={0} name="Auto-continuation" detail="Let the agent keep working without a nudge" />
-      <ToggleRow i={1} name="Reverie (context optimizer)" detail="Background cleaner reshapes context when it grows" on />
+      <ToggleRow
+        i={0}
+        name="Auto-continuation"
+        detail="Let the agent keep working without a nudge"
+      />
+      <ToggleRow
+        i={1}
+        name="Reverie (context optimizer)"
+        detail="Background cleaner reshapes context when it grows"
+        on
+      />
       <ToggleRow i={2} name="Think reminders" detail="Periodic nudge to reason before acting" on />
       <DevModeToggle i={3} />
+      <ShowOverlayToggle i={4} />
     </Stack>
   )
 }
@@ -154,7 +157,7 @@ function AllowedModelsSection() {
 
   if (!settings?.is_admin) return null
 
-  const allowed = settings.allowed_models ?? []
+  const allowed = settings.allowed_models
   const allowedSet = new Set(allowed)
   const restricted = allowed.length > 0
   const everyKey = providers.flatMap((p) => p.models.map((m) => m.key))
@@ -173,18 +176,25 @@ function AllowedModelsSection() {
 
   return (
     <FieldGroup label="Allowed models" hint="Which models your users may pick">
-      <label className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2.5">
+      <label
+        htmlFor="allow-all-models"
+        className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2.5"
+      >
         <input
+          id="allow-all-models"
           type="checkbox"
+          aria-label="Allow all models"
           checked={!restricted}
           disabled={busy}
           onChange={(e) => void save(e.target.checked ? [] : everyKey)}
-          className="size-4 accent-[var(--interactive)]"
+          className="size-4 accent-(--interactive)"
         />
         <span className="flex min-w-0 flex-col">
           <span className="text-[13px] font-medium text-foreground/90">Allow all models</span>
           <span className="text-[11px] text-muted-foreground">
-            {restricted ? "Restricted — only the checked models below are available" : "Every provisioned model is available to your users"}
+            {restricted
+              ? "Restricted — only the checked models below are available"
+              : "Every provisioned model is available to your users"}
           </span>
         </span>
       </label>
@@ -193,13 +203,18 @@ function AllowedModelsSection() {
         <div className="flex flex-col gap-3 pt-1">
           {providers.map((p) => (
             <div key={p.id} className="flex flex-col gap-1.5">
-              <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">{p.name}</span>
+              <span className="text-[10.5px] font-semibold tracking-[0.06em] text-muted-foreground/70 uppercase">
+                {p.name}
+              </span>
               <div className="flex flex-col gap-1">
                 {p.models.map((m) => {
                   const key = m.key
                   const checked = allowedSet.has(key)
                   return (
-                    <label key={key} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-muted/40">
+                    <label
+                      key={key}
+                      className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-muted/40"
+                    >
                       <input
                         type="checkbox"
                         checked={checked}
@@ -207,7 +222,7 @@ function AllowedModelsSection() {
                         onChange={() =>
                           void save(checked ? allowed.filter((k) => k !== key) : [...allowed, key])
                         }
-                        className="size-3.5 accent-[var(--interactive)]"
+                        className="size-3.5 accent-(--interactive)"
                       />
                       <span className="text-[12.5px] text-foreground/85">{m.displayName}</span>
                     </label>
@@ -242,6 +257,26 @@ function DevModeToggle({ i }: { i: number }) {
   )
 }
 
+/**
+ * The **Show Overlay** toggle (T514): flips the performance HUD's own
+ * `localStorage`-backed flag ({@link useShowOverlay}), independent of Developer
+ * mode. A real controlled switch — enabling it renders the corner telemetry
+ * overlay in real time without exposing the rest of the developer surface. Off
+ * by default.
+ */
+function ShowOverlayToggle({ i }: { i: number }) {
+  const { showOverlay, setShowOverlay } = useShowOverlay()
+  return (
+    <ToggleRow
+      i={i}
+      name="Show Overlay"
+      detail="Corner performance HUD — Web Vitals, long frames, worst React commits"
+      value={showOverlay}
+      onChange={setShowOverlay}
+    />
+  )
+}
+
 // ── building blocks ───────────────────────────────────────────────
 function Stack({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-col gap-2.5">{children}</div>
@@ -259,7 +294,9 @@ function FieldGroup({
   return (
     <div className="flex flex-col gap-2 pb-1">
       <div className="flex items-baseline gap-2">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">{label}</span>
+        <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
+          {label}
+        </span>
         {hint && <span className="text-[11px] text-muted-foreground/60">{hint}</span>}
       </div>
       {children}
@@ -296,7 +333,7 @@ function ToggleRow({
     <button
       onClick={handleToggle}
       style={{ animationDelay: `${i * 40}ms` }}
-      className="opt-rise flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left card-shadow"
+      className="opt-rise card-shadow flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left"
     >
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[13px] font-medium text-foreground/90">{name}</span>
@@ -305,7 +342,7 @@ function ToggleRow({
       <span
         className={cn(
           "relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors",
-          on ? "bg-[var(--interactive)]" : "bg-muted-foreground/25",
+          on ? "bg-(--interactive)" : "bg-muted-foreground/25",
         )}
       >
         <span
@@ -318,4 +355,3 @@ function ToggleRow({
     </button>
   )
 }
-

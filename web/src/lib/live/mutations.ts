@@ -5,11 +5,24 @@
 // delta-covered resource, so they ride `useMutation` rather than the SSE push
 // plane and invalidate the affected query family on success.
 
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { qk } from "../query/sync"
 import * as api from "../api"
 import type { Agent } from "../types"
-import { useLive, type LiveQueryResult } from "./index"
+import { useLive, type LiveQueryResult } from "./core"
+
+/** Invalidate the active-fleet query — refetches the dashboard roster. Hoisted
+ *  to module scope so the timeout-retry closures don't re-create it per call. */
+function invalidateFleet(client: QueryClient) {
+  void client.invalidateQueries({ queryKey: qk.fleet() })
+}
+
+/** Invalidate BOTH the active and retired fleet queries (an agent moving
+ *  between the two grids changes both listings). */
+function invalidateBothFleets(client: QueryClient) {
+  void client.invalidateQueries({ queryKey: qk.fleet() })
+  void client.invalidateQueries({ queryKey: qk.retiredFleet() })
+}
 
 // ── Finder upload (TanStack mutation) ─────────────────────────────────
 //
@@ -35,9 +48,7 @@ export function useUploadFiles(agentId: string) {
     mutationFn: async ({ dir, files }: { dir: string; files: File[] }) => {
       const tooBig = files.filter((f) => f.size > MAX_UPLOAD_BYTES)
       if (tooBig.length > 0) {
-        throw new Error(
-          `${tooBig.map((f) => f.name).join(", ")} exceeds the 32 MB upload limit`,
-        )
+        throw new Error(`${tooBig.map((f) => f.name).join(", ")} exceeds the 32 MB upload limit`)
       }
       await Promise.all(files.map((f) => api.uploadFile(agentId, dir, f)))
       return { count: files.length, dir }
@@ -169,17 +180,13 @@ export function useRenameAgent() {
 export function useCreateAgent() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (body: { name: string; folder?: string; model?: string }) =>
-      api.createAgent(body),
+    mutationFn: (body: { name: string; folder?: string; model?: string }) => api.createAgent(body),
     onSuccess: () => {
-      const refetchFleet = () => {
-        void client.invalidateQueries({ queryKey: qk.fleet() })
-      }
-      refetchFleet()
+      invalidateFleet(client)
       // The agent self-registers in ~1-2s after the pty spawn; re-poll a couple
       // of times to catch it well before the 15s backstop.
-      window.setTimeout(refetchFleet, 1500)
-      window.setTimeout(refetchFleet, 3500)
+      window.setTimeout(() => invalidateFleet(client), 1500)
+      window.setTimeout(() => invalidateFleet(client), 3500)
     },
   })
 }
@@ -196,12 +203,9 @@ export function useRestartAgent() {
   return useMutation({
     mutationFn: (agentId: string) => api.restartAgent(agentId),
     onSuccess: () => {
-      const refetchFleet = () => {
-        void client.invalidateQueries({ queryKey: qk.fleet() })
-      }
-      refetchFleet()
-      window.setTimeout(refetchFleet, 2000)
-      window.setTimeout(refetchFleet, 4000)
+      invalidateFleet(client)
+      window.setTimeout(() => invalidateFleet(client), 2000)
+      window.setTimeout(() => invalidateFleet(client), 4000)
     },
   })
 }
@@ -229,12 +233,8 @@ export function useRetireAgent() {
   return useMutation({
     mutationFn: (agentId: string) => api.retireAgent(agentId),
     onSuccess: () => {
-      const refetch = () => {
-        void client.invalidateQueries({ queryKey: qk.fleet() })
-        void client.invalidateQueries({ queryKey: qk.retiredFleet() })
-      }
-      refetch()
-      window.setTimeout(refetch, 1500)
+      invalidateBothFleets(client)
+      window.setTimeout(() => invalidateBothFleets(client), 1500)
     },
   })
 }
@@ -250,13 +250,9 @@ export function useUnretireAgent() {
   return useMutation({
     mutationFn: (agentId: string) => api.unretireAgent(agentId),
     onSuccess: () => {
-      const refetch = () => {
-        void client.invalidateQueries({ queryKey: qk.fleet() })
-        void client.invalidateQueries({ queryKey: qk.retiredFleet() })
-      }
-      refetch()
-      window.setTimeout(refetch, 2000)
-      window.setTimeout(refetch, 4000)
+      invalidateBothFleets(client)
+      window.setTimeout(() => invalidateBothFleets(client), 2000)
+      window.setTimeout(() => invalidateBothFleets(client), 4000)
     },
   })
 }
@@ -274,21 +270,6 @@ export function useUploadAvatar() {
     mutationFn: ({ agentId, file }: { agentId: string; file: File }) =>
       api.uploadAvatar(agentId, file),
     onSuccess: (_res, { agentId }) => {
-      void client.invalidateQueries({ queryKey: qk.fleet() })
-      void client.invalidateQueries({ queryKey: qk.agent(agentId) })
-    },
-  })
-}
-
-/**
- * Mutation to remove an agent's profile picture. On success the fleet and
- * per-agent meta queries are invalidated so the fallback icon reappears.
- */
-export function useDeleteAvatar() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (agentId: string) => api.deleteAvatar(agentId),
-    onSuccess: (_res, agentId) => {
       void client.invalidateQueries({ queryKey: qk.fleet() })
       void client.invalidateQueries({ queryKey: qk.agent(agentId) })
     },

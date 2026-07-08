@@ -1,6 +1,6 @@
 // ── Wizard step 1a: maintenance login (Obj 5.1) ──────────────────────
 
-import { useState, type FormEvent } from "react"
+import { useState, type SyntheticEvent } from "react"
 import { maintLogin, type MaintUser } from "@/lib/api/maint"
 import { Field, ErrorNote, PrimaryButton } from "./parts"
 
@@ -10,7 +10,7 @@ export function LoginStep({ onSuccess }: { onSuccess: (user: MaintUser) => void 
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const submit = async (e: FormEvent) => {
+  const submit = async (e: SyntheticEvent) => {
     e.preventDefault()
     if (!email || !password || busy) return
     setError(null)
@@ -24,8 +24,15 @@ export function LoginStep({ onSuccess }: { onSuccess: (user: MaintUser) => void 
   }
 
   return (
-    <form onSubmit={submit}>
-      <Field label="Email" type="email" value={email} onChange={setEmail} autoFocus autoComplete="username" />
+    <form onSubmit={(e) => void submit(e)}>
+      <Field
+        label="Email"
+        type="email"
+        value={email}
+        onChange={setEmail}
+        autoFocus
+        autoComplete="username"
+      />
       <Field
         label="Password"
         type="password"

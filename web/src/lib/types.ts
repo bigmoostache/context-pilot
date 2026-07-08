@@ -42,6 +42,7 @@ import type {
   FinderNode as GenFinderNode,
   ThreadDetail as GenThreadDetail,
   ThreadMsg as GenThreadMsg,
+  ThreadQuestion,
 } from "./api/generated/types.gen"
 
 /** Agent with UI-only `accent` field (computed client-side in reducers). */
@@ -60,9 +61,10 @@ export type ContextPanel = GenContextPanel
  * string (see reducers `message_created`), and the mock fixtures use display
  * strings. Consumers normalise both (`typeof ts === "number" ? … : new Date(ts)`).
  */
-export type ThreadMsg = Omit<GenThreadMsg, "ts"> & {
-  ts?: number | string
-  streaming?: boolean
+export type ThreadMsg = Omit<GenThreadMsg, "ts" | "questions"> & {
+  ts?: number | string | undefined
+  streaming?: boolean | undefined
+  questions?: ThreadQuestion[] | undefined
 }
 
 /** ThreadDetail re-exported as-is (field optionality matches backend). */
@@ -74,7 +76,6 @@ export type ThreadDetail = Omit<GenThreadDetail, "log"> & {
 
 export type AgentStatus = GenAgent["status"]
 export type ThreadStatus = GenThreadDetail["status"]
-export type Importance = import("./api/generated/types.gen").MemoryCard["importance"]
 export type NotifKind = import("./api/generated/types.gen").SpineNotif["kind"]
 export type LibraryKind = import("./api/generated/types.gen").LibraryItem["kind"]
 
@@ -92,38 +93,11 @@ export interface ChatMessage {
   id: string
   role: MsgRole
   /** rich text (markdown-ish) for user/assistant */
-  text?: string
+  text?: string | undefined
   /** present when role === "tool" */
-  tool?: import("./api/generated/types.gen").ToolCall
+  tool?: import("./api/generated/types.gen").ToolCall | undefined
   ts: string
-  streaming?: boolean
-}
-
-export interface Thread {
-  id: string
-  name: string
-  status: ThreadStatus
-  messages: number
-  unread: number
-  last: string
-}
-
-export interface StatRow {
-  label: string
-  value: string
-  accent?: AccentToken
-}
-
-export interface StatusModel {
-  phase: StreamPhase
-  agent: string
-  skills: string[]
-  branch: string
-  queue: number
-  think: number
-  reverie: boolean
-  autoContinue: boolean
-  costUsd: number
+  streaming?: boolean | undefined
 }
 
 // ── Account / current user (avatar menu + profile) ───────────────
@@ -143,9 +117,9 @@ export interface User {
   /** true → account is provisioned & managed by an organization (SSO/org) */
   managedByCompany: boolean
   /** the managing organization (present when managedByCompany) */
-  company?: string
+  company?: string | undefined
   /** the user's role label */
-  role?: string
+  role?: string | undefined
 }
 
 // ── Filesystem browser ───────────────────────────────────────────
@@ -217,30 +191,3 @@ export type ViewMode = "fleet" | "cockpit" | "threads" | "finder" | "costs"
 
 /** Which lens the Usage page is viewed through. */
 export type UsageUnit = "usd" | "tokens"
-
-/**
- * One month of usage for one agent. Tokens are split into the three canonical
- * sections the Usage page ALWAYS surfaces:
- *  - **hit**    — cache-read tokens (cheap)
- *  - **miss**   — input / uncached tokens
- *  - **output** — generated tokens (expensive)
- */
-export interface UsagePoint {
-  agentId: string
-  /** calendar month key, e.g. "2026-06" */
-  month: string
-  hitTokens: number
-  missTokens: number
-  outputTokens: number
-  /** the in-progress current month (drives forecasting) */
-  partial?: boolean
-  /** fraction of the month elapsed (0–1), present when partial */
-  elapsed?: number
-}
-
-/** Per-section price, in USD per token. */
-export interface UsageRates {
-  hit: number
-  miss: number
-  output: number
-}

@@ -1,4 +1,3 @@
-import type { RefObject } from "react"
 import type { FinderNode, FinderViewMode } from "@/lib/types"
 import {
   useCreateFolder,
@@ -7,7 +6,7 @@ import {
   useTrashItems,
   useUploadFiles,
 } from "@/lib/live"
-import { NEW_FOLDER_SENTINEL, pathName, type Tab } from "./helpers"
+import { NEW_FOLDER_SENTINEL, pathName, req, type Tab } from "./helpers"
 
 interface ActionDeps {
   agentId: string
@@ -19,7 +18,8 @@ interface ActionDeps {
   hasFileTab: boolean
   flash: (msg: string) => void
   patchTab: (fn: (t: Tab) => Tab) => void
-  clickTimer: RefObject<number | undefined>
+  /** Clear the pending click-settle timer, if any (navigation pre-empts it). */
+  clearClickSettle: () => void
   setSelected: (s: Set<string>) => void
   setAnchor: (p: string | null) => void
   setFocusPath: (p: string | null) => void
@@ -51,8 +51,7 @@ export function useFinderActions(d: ActionDeps) {
     upload.mutate(
       { dir: d.relCwd, files },
       {
-        onSuccess: ({ count }) =>
-          d.flash(`Uploaded ${count} file${count === 1 ? "" : "s"}.`),
+        onSuccess: ({ count }) => d.flash(`Uploaded ${count} file${count === 1 ? "" : "s"}.`),
         onError: (err) => d.flash(err instanceof Error ? err.message : "Upload failed"),
       },
     )
@@ -111,8 +110,7 @@ export function useFinderActions(d: ActionDeps) {
       {
         onSuccess: ({ trashed }) =>
           d.flash(`Moved ${trashed} item${trashed === 1 ? "" : "s"} to Trash.`),
-        onError: (err) =>
-          d.flash(err instanceof Error ? err.message : "Move to Trash failed"),
+        onError: (err) => d.flash(err instanceof Error ? err.message : "Move to Trash failed"),
       },
     )
     d.setSelected(new Set())
@@ -135,8 +133,7 @@ export function useFinderActions(d: ActionDeps) {
         { dir: d.relCwd, name },
         {
           onSuccess: () => d.flash(`Created “${name}”.`),
-          onError: (err) =>
-            d.flash(err instanceof Error ? err.message : "Could not create folder"),
+          onError: (err) => d.flash(err instanceof Error ? err.message : "Could not create folder"),
         },
       )
       return
@@ -168,7 +165,7 @@ export function useFinderActions(d: ActionDeps) {
     p === d.agentFolder || p.startsWith(d.agentFolder + "/") ? p : `${d.agentFolder}/${p}`
 
   const navigate = (rawPath: string) => {
-    window.clearTimeout(d.clickTimer.current)
+    d.clearClickSettle()
     const path = toAbs(rawPath)
     if (path === d.cwd && !d.hasFileTab) return
     d.patchTab((t) => ({
@@ -187,20 +184,26 @@ export function useFinderActions(d: ActionDeps) {
   }
   const back = () =>
     d.patchTab((t) =>
-      t.back.length
+      t.back.length > 0
         ? {
             ...t,
             fwd: [t.cwd, ...t.fwd],
-            cwd: t.back[t.back.length - 1],
+            cwd: req(t.back, -1),
             back: t.back.slice(0, -1),
-            label: pathName(t.back[t.back.length - 1]),
+            label: pathName(req(t.back, -1)),
           }
         : t,
     )
   const forward = () =>
     d.patchTab((t) =>
-      t.fwd.length
-        ? { ...t, back: [...t.back, t.cwd], cwd: t.fwd[0], fwd: t.fwd.slice(1), label: pathName(t.fwd[0]) }
+      t.fwd.length > 0
+        ? {
+            ...t,
+            back: [...t.back, t.cwd],
+            cwd: req(t.fwd, 0),
+            fwd: t.fwd.slice(1),
+            label: pathName(req(t.fwd, 0)),
+          }
         : t,
     )
 

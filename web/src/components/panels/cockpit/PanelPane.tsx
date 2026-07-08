@@ -41,30 +41,42 @@ function EmptyState() {
 
 function renderPanel(panel: ContextPanel, agentId: string) {
   switch (panel.kind) {
-    case "tree":
+    case "tree": {
       return <TreePanel panel={panel} agentId={agentId} />
-    case "memory":
+    }
+    case "memory": {
       return <MemoryPanel panel={panel} agentId={agentId} />
-    case "radar":
+    }
+    case "radar": {
       return <RadarPanel panel={panel} agentId={agentId} />
-    case "todo":
+    }
+    case "todo": {
       return <TodoPanel panel={panel} agentId={agentId} />
-    case "stats":
+    }
+    case "stats": {
       return <StatsPanel panel={panel} agentId={agentId} />
-    case "tools":
+    }
+    case "tools": {
       return <ToolsPanel panel={panel} agentId={agentId} />
-    case "entities":
+    }
+    case "entities": {
       return <EntitiesPanel panel={panel} agentId={agentId} />
-    case "spine":
+    }
+    case "spine": {
       return <SpinePanel panel={panel} agentId={agentId} />
-    case "callback":
+    }
+    case "callback": {
       return <CallbacksPanel panel={panel} agentId={agentId} />
-    case "queue":
+    }
+    case "queue": {
       return <QueuePanel panel={panel} agentId={agentId} />
-    case "scratchpad":
+    }
+    case "scratchpad": {
       return <ScratchpadPanel panel={panel} agentId={agentId} />
-    default:
+    }
+    default: {
       return <Placeholder kind={panel.kind} name={panel.name} />
+    }
   }
 }
 

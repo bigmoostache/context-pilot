@@ -1,0 +1,31 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "plugins": ["stylelint-order"],
+  "rules": {
+    "at-rule-no-unknown": [
+      true,
+      {
+        "ignoreAtRules": [
+          "theme",
+          "source",
+          "utility",
+          "variant",
+          "custom-variant",
+          "apply",
+          "reference",
+          "config",
+          "plugin",
+          "tailwind"
+        ]
+      }
+    ],
+    "order/properties-alphabetical-order": null,
+    "order/order": ["custom-properties", "declarations"],
+    "property-no-vendor-prefix": null,
+    "import-notation": null,
+    "selector-class-pattern": [
+      "^(hljs[a-z_-]*|[a-z][a-z0-9]*(-[a-z0-9]+)*)$",
+      { "message": "Expected kebab-case class (highlight.js hljs-* tokens exempt)" }
+    ]
+  }
+}

@@ -51,6 +51,18 @@ const agentAccent = (a: Agent) =>
     danger: "var(--danger)",
   })[a.accent]
 
+/** Compact USD formatter: `$4.20` under $10, `$420` under $1K, else `$4.2K`. */
+const fmtUsd = (v: number) =>
+  `$${v < 10 ? v.toFixed(2) : v < 1000 ? v.toFixed(0) : `${(v / 1000).toFixed(1)}K`}`
+
+/** Compact token count: `4.20M` / `420K` / raw count. */
+const fmtTok = (v: number) =>
+  v >= 1e6
+    ? `${(v / 1e6).toFixed(2)}M`
+    : v >= 1e3
+      ? `${(v / 1e3).toFixed(0)}K`
+      : String(Math.round(v))
+
 export function UsagePage() {
   const [unit, setUnit] = useState<UsageUnit>("usd")
   const [agentId, setAgentId] = useState<string>("all")
@@ -90,10 +102,6 @@ export function UsagePage() {
     [visible],
   )
 
-  const fmtUsd = (v: number) =>
-    `$${v < 10 ? v.toFixed(2) : v < 1000 ? v.toFixed(0) : `${(v / 1000).toFixed(1)}K`}`
-  const fmtTok = (v: number) =>
-    v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(0)}K` : `${Math.round(v)}`
   const fmt = unit === "usd" ? fmtUsd : fmtTok
   // The active-unit fleet total (drives the sr-only live announcement).
   const totalValue = unit === "usd" ? totals.spendUsd : totals.inputTokens + totals.outputTokens
@@ -114,7 +122,7 @@ export function UsagePage() {
             <select
               value={agentId}
               onChange={(e) => setAgentId(e.target.value)}
-              className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] text-foreground/85 card-shadow"
+              className="card-shadow rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] text-foreground/85"
               aria-label="Filter by agent"
             >
               <option value="all">All agents</option>
@@ -126,8 +134,18 @@ export function UsagePage() {
             </select>
             {/* unit lens */}
             <div className="flex items-center rounded-lg border border-border bg-muted/60 p-0.5">
-              <UnitTab active={unit === "usd"} onClick={() => setUnit("usd")} icon={Coins} label="$" />
-              <UnitTab active={unit === "tokens"} onClick={() => setUnit("tokens")} icon={Hash} label="Tokens" />
+              <UnitTab
+                active={unit === "usd"}
+                onClick={() => setUnit("usd")}
+                icon={Coins}
+                label="$"
+              />
+              <UnitTab
+                active={unit === "tokens"}
+                onClick={() => setUnit("tokens")}
+                icon={Hash}
+                label="Tokens"
+              />
             </div>
           </div>
         </header>
@@ -135,71 +153,21 @@ export function UsagePage() {
         {/* summary cards */}
         <section className="grid grid-cols-3 gap-3">
           <SummaryCard label="Total spend" value={fmtUsd(totals.spendUsd)} accent="var(--signal)" />
-          <SummaryCard label="Input tokens" value={fmtTok(totals.inputTokens)} accent="var(--interactive)" />
-          <SummaryCard label="Output tokens" value={fmtTok(totals.outputTokens)} accent="var(--ok)" />
+          <SummaryCard
+            label="Input tokens"
+            value={fmtTok(totals.inputTokens)}
+            accent="var(--interactive)"
+          />
+          <SummaryCard
+            label="Output tokens"
+            value={fmtTok(totals.outputTokens)}
+            accent="var(--ok)"
+          />
         </section>
 
         {/* per-agent table */}
-        <section className="flex flex-col gap-2.5">
-          <span className="text-[13px] font-semibold text-foreground/90">By agent</span>
-          {visible.length === 0 ? (
-            <div className="rounded-xl border border-border bg-card p-8 text-center text-[12.5px] text-muted-foreground card-shadow">
-              No agents in the fleet yet.
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-border bg-card card-shadow">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Agent</TableHead>
-                    <TableHead className="text-right">Input</TableHead>
-                    <TableHead className="text-right">Output</TableHead>
-                    <TableHead className="text-right">Spend</TableHead>
-                    <TableHead className="text-right">{unit === "usd" ? "% budget" : "Total"}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visible.map((r) => {
-                    const pct = r.budgetUsd > 0 ? (r.spendUsd / r.budgetUsd) * 100 : null
-                    return (
-                      <TableRow key={r.agent.id}>
-                        <TableCell className="font-medium text-foreground/85">
-                          <span className="flex items-center gap-2">
-                            <span className="size-2 shrink-0 rounded-full" style={{ background: agentAccent(r.agent) }} />
-                            {r.agent.name}
-                            {r.tripped && (
-                              <span className="rounded-full bg-[var(--danger)]/14 px-1.5 py-px text-[9.5px] font-medium text-[var(--danger)]">
-                                over budget
-                              </span>
-                            )}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-foreground/75">{fmtTok(r.inputTokens)}</TableCell>
-                        <TableCell className="text-right tabular-nums text-foreground/75">{fmtTok(r.outputTokens)}</TableCell>
-                        <TableCell className="text-right font-semibold tabular-nums text-foreground/90">{fmtUsd(r.spendUsd)}</TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground/80">
-                          {unit === "usd" ? (pct != null ? `${pct.toFixed(0)}%` : "—") : fmtTok(r.inputTokens + r.outputTokens)}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-                <TableFooter>
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell className="font-semibold text-foreground/90">Total</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-foreground/85">{fmtTok(totals.inputTokens)}</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-foreground/85">{fmtTok(totals.outputTokens)}</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-foreground">{fmtUsd(totals.spendUsd)}</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-foreground/85">
-                      {unit === "usd" ? "" : fmtTok(totals.inputTokens + totals.outputTokens)}
-                    </TableCell>
-                  </TableRow>
-                </TableFooter>
-              </Table>
-            </div>
-          )}
-          <p className="sr-only">Active unit total: {fmt(totalValue)}</p>
-        </section>
+        <UsageTable visible={visible} totals={totals} unit={unit} />
+        <p className="sr-only">Active unit total: {fmt(totalValue)}</p>
 
         {/* honest boundary notice */}
         <section
@@ -219,10 +187,113 @@ export function UsagePage() {
   )
 }
 
+/** The fleet's per-agent usage totals (the active-filter aggregate). */
+interface Totals {
+  spendUsd: number
+  inputTokens: number
+  outputTokens: number
+}
+
+/** The per-agent usage table (or the empty-fleet placeholder), with a totals
+ *  footer. Extracted from {@link UsagePage} so its render stays within the P8
+ *  line budget. */
+function UsageTable({
+  visible,
+  totals,
+  unit,
+}: {
+  visible: Row[]
+  totals: Totals
+  unit: UsageUnit
+}) {
+  return (
+    <section className="flex flex-col gap-2.5">
+      <span className="text-[13px] font-semibold text-foreground/90">By agent</span>
+      {visible.length === 0 ? (
+        <div className="card-shadow rounded-xl border border-border bg-card p-8 text-center text-[12.5px] text-muted-foreground">
+          No agents in the fleet yet.
+        </div>
+      ) : (
+        <div className="card-shadow overflow-hidden rounded-xl border border-border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Agent</TableHead>
+                <TableHead className="text-right">Input</TableHead>
+                <TableHead className="text-right">Output</TableHead>
+                <TableHead className="text-right">Spend</TableHead>
+                <TableHead className="text-right">
+                  {unit === "usd" ? "% budget" : "Total"}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visible.map((r) => {
+                const pct = r.budgetUsd > 0 ? (r.spendUsd / r.budgetUsd) * 100 : null
+                return (
+                  <TableRow key={r.agent.id}>
+                    <TableCell className="font-medium text-foreground/85">
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="size-2 shrink-0 rounded-full"
+                          style={{ background: agentAccent(r.agent) }}
+                        />
+                        {r.agent.name}
+                        {r.tripped && (
+                          <span className="rounded-full bg-(--danger)/14 px-1.5 py-px text-[9.5px] font-medium text-(--danger)">
+                            over budget
+                          </span>
+                        )}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right text-foreground/75 tabular-nums">
+                      {fmtTok(r.inputTokens)}
+                    </TableCell>
+                    <TableCell className="text-right text-foreground/75 tabular-nums">
+                      {fmtTok(r.outputTokens)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-foreground/90 tabular-nums">
+                      {fmtUsd(r.spendUsd)}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground/80 tabular-nums">
+                      {unit === "usd"
+                        ? pct == null
+                          ? "—"
+                          : `${pct.toFixed(0)}%`
+                        : fmtTok(r.inputTokens + r.outputTokens)}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+            <TableFooter>
+              <TableRow className="hover:bg-transparent">
+                <TableCell className="font-semibold text-foreground/90">Total</TableCell>
+                <TableCell className="text-right font-semibold text-foreground/85 tabular-nums">
+                  {fmtTok(totals.inputTokens)}
+                </TableCell>
+                <TableCell className="text-right font-semibold text-foreground/85 tabular-nums">
+                  {fmtTok(totals.outputTokens)}
+                </TableCell>
+                <TableCell className="text-right font-semibold text-foreground tabular-nums">
+                  {fmtUsd(totals.spendUsd)}
+                </TableCell>
+                <TableCell className="text-right font-semibold text-foreground/85 tabular-nums">
+                  {unit === "usd" ? "" : fmtTok(totals.inputTokens + totals.outputTokens)}
+                </TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </div>
+      )}
+    </section>
+  )
+}
+
 function SummaryCard({ label, value, accent }: { label: string; value: string; accent: string }) {
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-4 card-shadow">
-      <span className="text-[11px] uppercase tracking-wide text-muted-foreground/65">{label}</span>
+    <div className="card-shadow flex flex-col gap-1 rounded-xl border border-border bg-card p-4">
+      <span className="text-[11px] tracking-wide text-muted-foreground/65 uppercase">{label}</span>
       <span className="text-[20px] font-semibold tabular-nums" style={{ color: accent }}>
         {value}
       </span>
@@ -247,7 +318,9 @@ function UnitTab({
       onClick={onClick}
       className={cn(
         "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
-        active ? "bg-card text-foreground card-shadow" : "text-muted-foreground hover:text-foreground/80",
+        active
+          ? "card-shadow bg-card text-foreground"
+          : "text-muted-foreground hover:text-foreground/80",
       )}
     >
       <Icon className="size-3.5" />

@@ -13,13 +13,13 @@
 
 import { mintTicket } from "../api"
 
-const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:7878"
+const BASE = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:7878"
 
 export type SseEventType = "delta" | "stream" | "resync" | "invalidate" | "error"
 
 export interface SseEvent {
   type: SseEventType
-  id?: string
+  id?: string | undefined
   data: string
 }
 
@@ -63,6 +63,11 @@ function createSseClient(agentId: string): SseClient {
   let es: EventSource | null = null
   let lastEventId: string | undefined
   let closed = false
+  // Read `closed` through a getter at sites inside synchronous callbacks
+  // (es.onerror): a direct `!closed` there is narrowed by control-flow analysis
+  // to the literal initializer (its only mutation is in the deferred `close()`),
+  // making the guard read as always-true. A function call is opaque to CFA.
+  const isClosed = () => closed
   let reconnectMs = RECONNECT_BASE_MS
 
   function emit(event: SseEvent) {
@@ -87,25 +92,25 @@ function createSseClient(agentId: string): SseClient {
       if (lastEventId) url += `&last_rev=${encodeURIComponent(lastEventId)}`
       es = new EventSource(url)
 
-      es.onopen = () => {
+      es.addEventListener("open", () => {
         reconnectMs = RECONNECT_BASE_MS
-      }
+      })
 
       // Named events from the backend
       for (const type of ["delta", "stream", "resync", "invalidate"] as const) {
         es.addEventListener(type, (e: MessageEvent) => {
           if (e.lastEventId) lastEventId = e.lastEventId
-          emit({ type, id: e.lastEventId || undefined, data: e.data })
+          emit({ type, id: e.lastEventId || undefined, data: e.data as string })
         })
       }
 
-      es.onerror = () => {
+      es.addEventListener("error", () => {
         es?.close()
         es = null
-        if (!closed) scheduleReconnect()
-      }
+        if (!isClosed()) scheduleReconnect()
+      })
     } catch {
-      if (!closed) scheduleReconnect()
+      if (!isClosed()) scheduleReconnect()
     }
   }
 
@@ -116,7 +121,7 @@ function createSseClient(agentId: string): SseClient {
   }
 
   // Start immediately
-  connect()
+  void connect()
 
   const client: SseClient = {
     subscribe(type, listener) {
@@ -127,8 +132,8 @@ function createSseClient(agentId: string): SseClient {
       }
       set.add(listener)
       return () => {
-        set!.delete(listener)
-        if (set!.size === 0) listeners.delete(type)
+        set.delete(listener)
+        if (set.size === 0) listeners.delete(type)
       }
     },
     close() {

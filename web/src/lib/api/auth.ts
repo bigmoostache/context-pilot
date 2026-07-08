@@ -75,18 +75,12 @@ export function authMe(): Promise<AuthMe> {
 // ── Self-serve profile (current user) ────────────────────────────────
 
 /** Change the current user's password (verifies the current one). */
-export function changePassword(
-  current: string,
-  next: string,
-): Promise<OkResponse> {
+export function changePassword(current: string, next: string): Promise<OkResponse> {
   return sdk(postApiAuthPassword({ body: { current, new: next } }))
 }
 
 /** Update the current user's display name + email. Returns the refreshed user. */
-export function updateProfile(
-  name: string,
-  email: string,
-): Promise<{ user: AuthUser }> {
+export function updateProfile(name: string, email: string): Promise<{ user: AuthUser }> {
   return sdk(patchApiAuthMe({ body: { name, email } }))
 }
 
@@ -95,9 +89,7 @@ export type DeviceSession = SessionInfo
 
 /** List the current user's active device sessions. */
 export function fetchSessions(): Promise<DeviceSession[]> {
-  return sdk<{ sessions: DeviceSession[] }>(getApiAuthSessions()).then(
-    (r) => r.sessions,
-  )
+  return sdk<{ sessions: DeviceSession[] }>(getApiAuthSessions()).then((r) => r.sessions)
 }
 
 /** Revoke one of the current user's own sessions by id. */
@@ -156,10 +148,12 @@ export function grantAccess(
   userId: string,
   role: "agent-admin" | "agent-user" = "agent-user",
 ): Promise<OkResponse> {
-  return sdk(postApiAgentByIdAcl({
-    path: { id: agentId },
-    body: { user_id: userId, role },
-  }))
+  return sdk(
+    postApiAgentByIdAcl({
+      path: { id: agentId },
+      body: { user_id: userId, role },
+    }),
+  )
 }
 
 export function updateAgentRole(
@@ -167,10 +161,12 @@ export function updateAgentRole(
   userId: string,
   role: "agent-admin" | "agent-user",
 ): Promise<OkResponse> {
-  return sdk(patchApiAgentByIdAclByUserId({
-    path: { id: agentId, userId },
-    body: { role },
-  }))
+  return sdk(
+    patchApiAgentByIdAclByUserId({
+      path: { id: agentId, userId },
+      body: { role },
+    }),
+  )
 }
 
 export function revokeAccess(agentId: string, userId: string): Promise<OkResponse> {

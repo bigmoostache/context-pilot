@@ -55,7 +55,7 @@ export function ModelPicker({
               active={on}
               onClick={() => {
                 const dm = defaultModel(providers, p.id)
-                onChange(p.id, dm?.id ?? p.models[0].id)
+                onChange(p.id, dm?.id ?? p.models[0]?.id ?? "")
               }}
             />
           )
@@ -97,7 +97,7 @@ function ProviderPill({
       className={cn(
         "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] font-medium transition-all",
         active
-          ? "bg-[var(--interactive)]/15 text-[var(--interactive)] ring-1 ring-[var(--interactive)]/30"
+          ? "bg-(--interactive)/15 text-(--interactive) ring-1 ring-(--interactive)/30"
           : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground/80",
       )}
     >
@@ -126,15 +126,15 @@ function ModelCard({
       className={cn(
         "opt-rise group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all",
         active
-          ? "border-[var(--interactive)] bg-[var(--interactive)]/[0.07] ring-2 ring-[var(--interactive)]/15"
-          : "border-border bg-card hover:border-[var(--interactive)]/40 hover:bg-muted/30",
+          ? "border-(--interactive) bg-(--interactive)/[0.07] ring-2 ring-(--interactive)/15"
+          : "border-border bg-card hover:border-(--interactive)/40 hover:bg-muted/30",
       )}
     >
       <span
         className={cn(
           "flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors",
           active
-            ? "bg-[var(--interactive)]/15 text-[var(--interactive)]"
+            ? "bg-(--interactive)/15 text-(--interactive)"
             : "bg-muted/60 text-muted-foreground/70",
         )}
       >
@@ -146,21 +146,21 @@ function ModelCard({
             {m.displayName}
           </span>
           {m.badge && (
-            <span className="rounded bg-muted/70 px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className="rounded-sm bg-muted/70 px-1.5 py-px text-[9.5px] font-semibold tracking-wide text-muted-foreground uppercase">
               {m.badge}
             </span>
           )}
         </span>
         <span className="text-[11px] text-muted-foreground">{m.apiName}</span>
       </div>
-      <span className="shrink-0 font-mono text-[10.5px] tabular-nums text-muted-foreground/65">
+      <span className="shrink-0 font-mono text-[10.5px] text-muted-foreground/65 tabular-nums">
         {priceTag(m)}
       </span>
       <span
         className={cn(
           "flex size-5 shrink-0 items-center justify-center rounded-full border transition-all",
           active
-            ? "border-[var(--interactive)] bg-[var(--interactive)] text-[var(--primary-foreground)]"
+            ? "border-(--interactive) bg-(--interactive) text-(--primary-foreground)"
             : "border-border text-transparent",
         )}
       >

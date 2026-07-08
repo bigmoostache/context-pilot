@@ -1,11 +1,6 @@
 import { Info } from "lucide-react"
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 /**
  * The Finder's per-node **info badge** — a small ⓘ affordance shown on a file or
@@ -19,8 +14,13 @@ import {
  * pointer events are stopped from propagating so brushing the badge never
  * selects, opens, or drags the underlying node.
  */
-export function InfoBadge({ description }: { description: string }) {
-  const stop = (e: { stopPropagation: () => void }) => e.stopPropagation()
+/** Swallow a pointer event so brushing the badge never reaches the row. */
+function stop(e: { stopPropagation: () => void }) {
+  e.stopPropagation()
+}
+
+export function InfoBadge({ description }: { description?: string | undefined }) {
+  if (!description) return null
   return (
     <TooltipProvider delay={120}>
       <Tooltip>
@@ -30,13 +30,13 @@ export function InfoBadge({ description }: { description: string }) {
           onClick={stop}
           onDoubleClick={stop}
           onPointerDown={stop}
-          className="flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-[var(--signal)]/15 hover:text-[var(--signal)]"
+          className="flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-(--signal)/15 hover:text-(--signal)"
         >
           <Info className="size-3.5" />
         </TooltipTrigger>
         <TooltipContent
           side="top"
-          className="max-w-[340px] whitespace-normal text-left text-[12px] leading-relaxed"
+          className="max-w-[340px] text-left text-[12px] leading-relaxed whitespace-normal"
         >
           {description}
         </TooltipContent>

@@ -36,12 +36,17 @@ export function TreePanel({ panel, agentId }: { panel: ContextPanel; agentId: st
                 <span className="flex items-center gap-1.5">
                   <span className="truncate text-foreground/90">{r.name}</span>
                   {r.changed && (
-                    <span className="text-[10px] font-bold text-[var(--warn)]" title="changed since description">
+                    <span
+                      className="text-[10px] font-bold text-(--warn)"
+                      title="changed since description"
+                    >
                       [!]
                     </span>
                   )}
-                  {r.size && (
-                    <span className="text-[10px] tabular-nums text-muted-foreground/60">{r.size}</span>
+                  {r.size !== undefined && r.size !== "" && (
+                    <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+                      {r.size}
+                    </span>
                   )}
                 </span>
                 {r.desc && (

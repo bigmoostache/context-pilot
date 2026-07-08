@@ -34,14 +34,19 @@ async function metaCost(req: APIRequestContext, id: string): Promise<number> {
 test.describe("cost / live dollar counters", () => {
   test("fleet card shows the agent's live cumulative cost", async ({ page, request }) => {
     const backend = await metaCost(request, AGENT_ID)
-    expect(backend, "live agent has spent real money (not the $5.41 mock)").toBeGreaterThan(DRIFT_USD)
+    expect(backend, "live agent has spent real money (not the $5.41 mock)").toBeGreaterThan(
+      DRIFT_USD,
+    )
 
     await page.goto("/")
     // The agent card carries the cost next to its model. Scope to the card by
     // its name, then read the whole card's text and pull the dollar figure.
-    const card = page.locator("div").filter({ hasText: /^context-pilot/ }).first()
+    const card = page
+      .locator("div")
+      .filter({ hasText: /^context-pilot/ })
+      .first()
     await expect(card).toBeVisible()
-    const cardText = (await page.locator("body").innerText())
+    const cardText = await page.locator("body").innerText()
     const shown = parseDollars(cardText)
     expect(shown, "a dollar figure renders on the fleet dashboard").not.toBeNull()
     expect(Math.abs((shown ?? 0) - backend)).toBeLessThan(DRIFT_USD)

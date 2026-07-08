@@ -6,9 +6,9 @@
 // On success the backend clears the flag; we refresh the profile so the guard
 // lets the user through.
 
-import { useState, type FormEvent } from "react"
+import { useState, type SyntheticEvent } from "react"
 import { changePassword } from "@/lib/api"
-import { useAuth } from "@/lib/support/auth"
+import { useAuth } from "@/lib/providers/auth"
 
 const MIN_PASSWORD_LEN = 8
 
@@ -20,10 +20,9 @@ export function ForcePasswordChange() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const canSubmit =
-    current !== "" && next.length >= MIN_PASSWORD_LEN && next === confirm && !busy
+  const canSubmit = current !== "" && next.length >= MIN_PASSWORD_LEN && next === confirm && !busy
 
-  const submit = async (e: FormEvent) => {
+  const submit = async (e: SyntheticEvent) => {
     e.preventDefault()
     if (!canSubmit) return
     setError(null)
@@ -52,11 +51,16 @@ export function ForcePasswordChange() {
         </div>
 
         <form
-          onSubmit={submit}
+          onSubmit={(e) => void submit(e)}
           className="flex flex-col gap-4 rounded-lg border border-border bg-card p-6 shadow-md"
         >
           <Field label="Current password" value={current} onChange={setCurrent} autoFocus />
-          <Field label="New password" value={next} onChange={setNext} hint={`At least ${MIN_PASSWORD_LEN} characters`} />
+          <Field
+            label="New password"
+            value={next}
+            onChange={setNext}
+            hint={`At least ${MIN_PASSWORD_LEN} characters`}
+          />
           <Field label="Confirm new password" value={confirm} onChange={setConfirm} />
 
           {confirm !== "" && next !== confirm && (
@@ -103,12 +107,11 @@ function Field({
       <input
         type="password"
         value={value}
-        // eslint-disable-next-line jsx-a11y/no-autofocus
         autoFocus={autoFocus}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="new-password"
         className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground
-                   focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal"
+                   focus:border-signal focus:ring-1 focus:ring-signal focus:outline-none"
       />
     </label>
   )

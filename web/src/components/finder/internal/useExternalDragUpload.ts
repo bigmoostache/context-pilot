@@ -19,10 +19,16 @@ export function useExternalDragUpload(
   onFiles: (files: File[]) => void,
 ) {
   const onFilesRef = useRef(onFiles)
-  onFilesRef.current = onFiles
+  // Keep the latest `onFiles` in a ref so the window listeners (bound once
+  // below) never go stale. Assigning in an effect — not during render — keeps
+  // render pure (@eslint-react/no-access-ref-during-render); the effect commits
+  // before any user drag can fire, so the ref is never observably behind.
+  useEffect(() => {
+    onFilesRef.current = onFiles
+  }, [onFiles])
   const lastDragOverRef = useRef(0)
   useEffect(() => {
-    const isFileDrag = (e: DragEvent) => !!e.dataTransfer?.types?.includes("Files")
+    const isFileDrag = (e: DragEvent) => !!e.dataTransfer?.types.includes("Files")
     const onOver = (e: DragEvent) => {
       if (!isFileDrag(e)) return
       e.preventDefault() // allow the drop
@@ -33,8 +39,8 @@ export function useExternalDragUpload(
       if (!isFileDrag(e)) return
       e.preventDefault()
       setDragging(false)
-      const files = Array.from(e.dataTransfer?.files ?? [])
-      if (files.length) onFilesRef.current(files)
+      const files = [...(e.dataTransfer?.files ?? [])]
+      if (files.length > 0) onFilesRef.current(files)
     }
     // Fired when the cursor leaves the document for the outside (relatedTarget
     // null) — clear at once rather than waiting on the watchdog.
@@ -46,10 +52,12 @@ export function useExternalDragUpload(
     // window, or Esc-cancel) → drop the overlay. Generous enough not to flicker
     // while the pointer holds still over the window.
     const watchdog = window.setInterval(() => {
-      if (lastDragOverRef.current && Date.now() - lastDragOverRef.current > 250) {
-        lastDragOverRef.current = 0
-        setDragging(false)
+      if (!(lastDragOverRef.current && Date.now() - lastDragOverRef.current > 250)) {
+        return
       }
+
+      lastDragOverRef.current = 0
+      setDragging(false)
     }, 100)
     const onEnd = () => setDragging(false)
     window.addEventListener("dragover", onOver)

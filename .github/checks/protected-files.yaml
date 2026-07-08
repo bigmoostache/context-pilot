@@ -29,11 +29,26 @@
 - path: rustfmt.toml
   whole_file: true
 
-# --- CI check scripts ---
-- path: .github/checks/check-file-lengths.sh
+# --- Six check-family scripts (the T518 unification: one script per family,
+#     invoked identically by CI --ci and the blocking callbacks --callback).
+#     These ARE the enforcement — locking them keeps CI ⇄ callback coverage
+#     tamper-evident. They absorbed + replaced check-file-lengths.sh,
+#     check-folder-sizes.sh, check-web-structure.sh and web-lint.sh (deleted). ---
+- path: .github/checks/check-structure.sh
   whole_file: true
-- path: .github/checks/check-folder-sizes.sh
+- path: .github/checks/check-rust-lints.sh
   whole_file: true
+- path: .github/checks/check-rust-tests.sh
+  whole_file: true
+- path: .github/checks/check-ts-lints.sh
+  whole_file: true
+- path: .github/checks/check-ts-tests.sh
+  whole_file: true
+- path: .github/checks/check-api-contract.sh
+  whole_file: true
+
+# --- Guard tools the family scripts delegate to (standalone value: --update/
+#     --show modes or dual-mode logic) ---
 - path: .github/checks/check-lint-config.sh
   whole_file: true
 - path: .github/checks/check-lint-exceptions.sh
@@ -47,4 +62,66 @@
 - path: deploy_local.sh
   whole_file: true
 - path: run.sh
+  whole_file: true
+
+# --- Frontend lint configuration (web-lint ratchet, P12) ---
+# The web twin of the Rust lint config above. Every file that DEFINES the
+# frontend ratchet (rulesets, strict flags, formatter/CSS/dead-code policy) or
+# ENFORCES it (the suppression + census guards + their baseline + the exception
+# registry). A silent relax of any is now tamper-evident. package.json is
+# deliberately NOT here: its typeCoverage floor is a secondary ratchet (the
+# primary any-ban is `no-explicit-any` inside the locked eslint.config.ts) and
+# whole-file locking would fight routine dependency bumps (the same reason
+# Cargo.toml locks only its lint sections, not its deps).
+- path: web/eslint.config.ts
+  whole_file: true
+- path: web/.prettierrc.json
+  whole_file: true
+- path: web/.prettierignore
+  whole_file: true
+- path: web/.stylelintrc.json
+  whole_file: true
+- path: web/knip.json
+  whole_file: true
+- path: web/tsconfig.app.json
+  whole_file: true
+- path: web/tsconfig.node.json
+  whole_file: true
+- path: .github/checks/check-frontend-suppressions.sh
+  whole_file: true
+- path: .github/checks/check-frontend-rule-census.sh
+  whole_file: true
+- path: .github/checks/frontend-rule-census.txt
+  whole_file: true
+- path: .github/checks/allowed-eslint-exceptions.yaml
+  whole_file: true
+
+# --- Enforcement orchestration (closes the "locked script, unlocked caller"
+#     hole). A guard script is only as strong as the thing that RUNS it — a
+#     hash-locked check-*.sh whose CI step or callback definition is deletable
+#     is a silent bypass. So the orchestration layer is now locked too.
+#
+# A. The CI workflow that invokes every .github/checks guard. Deleting a step
+#    here would stop a locked guard from running without touching the guard.
+- path: .github/workflows/ci.yml
+  whole_file: true
+# B. Two guard scripts that were run in CI + callbacks but not yet chained:
+#    the vault-bypass detector (Structure job + CB7) and the OpenAPI/TS contract
+#    drift check (Contract job + CB3/CB6).
+- path: .github/checks/check-vault-bypass.sh
+  whole_file: true
+- path: .github/checks/check-typescript-contract.sh
+  whole_file: true
+# C. The edit-time enforcement layer: the callback registry. Editing
+#    callbacks.yaml to make a family callback non-blocking, or gutting a guard,
+#    would kill enforcement — so the registry is locked. A deliberate callback
+#    change now needs a chain --update. The web-lint.sh guard the old CB8
+#    delegated to is GONE (absorbed into check-ts-lints.sh, above).
+- path: .context-pilot/shared/callbacks.yaml
+  whole_file: true
+# The cross-file dead-code guard (knip whole-graph scan). Invoked by the CI
+# frontend job AND the web-deadcode blocking callback with the identical string
+# (`bash .github/checks/check-web-deadcode.sh`) — one implementation, structurally
+# equal both sides. Locking it keeps that single source of truth tamper-evident.
+- path: .github/checks/check-web-deadcode.sh
   whole_file: true

@@ -1,11 +1,6 @@
 import { useState } from "react"
 import { MessagesSquare } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 /**
  * New Thread dialog — the maquette for starting a thread. A focused little
@@ -30,7 +25,7 @@ export function NewThreadDialog({
     onClose()
   }
 
-  const submit = (e: React.FormEvent) => {
+  const submit = (e: React.SyntheticEvent) => {
     e.preventDefault()
     if (!canCreate) return
     onCreate(title)
@@ -42,7 +37,7 @@ export function NewThreadDialog({
       <DialogContent className="w-[440px] max-w-[92vw] p-5">
         <form onSubmit={submit} className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--signal)]/15 text-[var(--signal)]">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--signal)/15 text-(--signal)">
               <MessagesSquare className="size-[18px]" />
             </span>
             <div className="flex flex-col">
@@ -58,7 +53,7 @@ export function NewThreadDialog({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Refactor the cache engine"
-            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-[13px] text-foreground/90 placeholder:text-muted-foreground/50 outline-none focus:border-[var(--signal)]/60"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-[13px] text-foreground/90 outline-none placeholder:text-muted-foreground/50 focus:border-(--signal)/60"
           />
 
           <div className="flex items-center justify-end gap-2">
@@ -72,7 +67,7 @@ export function NewThreadDialog({
             <button
               type="submit"
               disabled={!canCreate}
-              className="rounded-lg bg-[var(--signal)] px-3.5 py-1.5 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-(--signal) px-3.5 py-1.5 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Create thread
             </button>

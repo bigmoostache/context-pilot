@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
@@ -9,101 +9,100 @@ import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
 import { extractDroppedFiles, zipDropped } from "@/lib/utils"
-import { uploadToNode, type UploadedFile } from "./fileUpload"
-import type { ChatMessage, ThreadDetail, ThreadMsg } from "@/lib/types"
-import type { FinderNode } from "@/lib/types"
+import { measure } from "@/lib/support/telemetry"
+import { uploadToNode, type UploadedFile } from "./fileUpload/helpers"
+import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
+import type { ThreadDetail, ThreadMsg } from "@/lib/types"
+
+/** True only for an actual OS *file* drag — a text/selection drag must not blur. */
+function isFileDrag(e: React.DragEvent): boolean {
+  return e.dataTransfer.types.includes("Files")
+}
+
+/** Keep the surface a valid drop target on every dragover (a file drag only)
+ *  and show the copy cursor. Stateless — hoisted to module scope. */
+function handleDragOver(e: React.DragEvent) {
+  if (!isFileDrag(e)) return
+  e.preventDefault()
+  e.dataTransfer.dropEffect = "copy"
+}
+
+/** The drag-event handler set spread onto the conversation surface. Each is
+ *  `undefined` when uploads are disabled so the surface neither blurs nor drops. */
+interface DropHandlers {
+  onDragEnter: ((e: React.DragEvent) => void) | undefined
+  onDragOver: ((e: React.DragEvent) => void) | undefined
+  onDragLeave: ((e: React.DragEvent) => void) | undefined
+  onDrop: ((e: React.DragEvent) => void) | undefined
+}
 
 /**
- * Normalise a thread message's `ts` into a human-readable relative age.
+ * OS-file drag-and-drop onto the conversation surface (T367/T471). Returns the
+ * `dragging` blur flag, the `uploading` overlay flag, and the drag handler set
+ * — all inert (`undefined`) when `onAttach` is omitted. Extracted from
+ * {@link ThreadConversation} so its body stays within the P8 line budget.
  *
- * The field arrives as either an epoch-ms number (REST backstop poll), an
- * ISO 8601 string (SSE delta reducer), or an already-formatted relative
- * string — this helper collapses all three into a single "Xm ago" label so
- * the Message renderer never shows a raw timestamp.
+ * dragenter/dragleave fire for every child crossed, so a depth counter tracks
+ * "is the cursor still somewhere inside" rather than a flicker-prone boolean.
  */
-function formatTs(ts: string | number | undefined): string {
-  if (ts === undefined) return ""
-  const n = typeof ts === "number" ? ts : Number(ts)
-  // Epoch-ms: any number above 2020-01-01 00:00:00 UTC.
-  if (!Number.isNaN(n) && n > 1_577_836_800_000) {
-    const s = Math.max(0, Math.floor((Date.now() - n) / 1000))
-    if (s < 5) return "just now"
-    if (s < 60) return `${s}s ago`
-    const m = Math.floor(s / 60)
-    if (m < 60) return `${m}m ago`
-    const h = Math.floor(m / 60)
-    if (h < 24) return `${h}h ago`
-    return `${Math.floor(h / 24)}d ago`
+function useConversationDrop(onAttach: ((files: File[]) => void | Promise<void>) | undefined): {
+  dragging: boolean
+  uploading: boolean
+  dropHandlers: DropHandlers
+} {
+  const [dragging, setDragging] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const dragDepthRef = useRef(0)
+
+  const onDragEnter = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    e.preventDefault()
+    dragDepthRef.current += 1
+    setDragging(true)
   }
-  // ISO 8601 string (from SSE reducer).
-  if (typeof ts === "string") {
-    const d = new Date(ts)
-    if (!Number.isNaN(d.getTime()) && d.getTime() > 1_577_836_800_000) {
-      const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000))
-      if (s < 5) return "just now"
-      if (s < 60) return `${s}s ago`
-      const m = Math.floor(s / 60)
-      if (m < 60) return `${m}m ago`
-      const h = Math.floor(m / 60)
-      if (h < 24) return `${h}h ago`
-      return `${Math.floor(h / 24)}d ago`
+  const onDragLeave = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+    if (dragDepthRef.current === 0) setDragging(false)
+  }
+  const runDrop = async (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    e.preventDefault()
+    dragDepthRef.current = 0
+    setDragging(false)
+    // Recurse into any dropped FOLDERS (plain `dataTransfer.files` can't — a
+    // folder drop otherwise yields one unreadable pseudo-file that uploaded as a
+    // failed "CORS … status null" request). extractDroppedFiles captures the
+    // Entry objects synchronously before its first await, so the neutered
+    // DataTransfer doesn't matter (T471).
+    const dropped = await extractDroppedFiles(e.dataTransfer)
+    if (dropped.length === 0) return
+    setUploading(true)
+    try {
+      // Zip the whole drop (folder structure preserved) into ONE archive and
+      // upload it in a single request — no per-file burst; awaiting keeps the
+      // loader up until it lands.
+      const archive = await zipDropped(dropped)
+      await onAttach?.([archive])
+    } catch {
+      // Zipping failed (unreadable file / fflate error) — fall back to the raw
+      // files so a drop is never silently lost.
+      await onAttach?.(dropped.map((d) => d.file))
+    } finally {
+      setUploading(false)
     }
   }
-  // Already formatted or unknown — pass through.
-  return String(ts)
-}
 
-/** Map a thread message onto the shared ChatMessage shape for the renderer. */
-function toChatMessage(m: ThreadMsg): ChatMessage {
-  return {
-    id: m.id,
-    role: m.tool ? "tool" : m.author,
-    text: m.text,
-    tool: m.tool,
-    ts: formatTs(m.ts as string | number),
-    streaming: m.streaming,
-  }
-}
+  const dropHandlers: DropHandlers = onAttach
+    ? {
+        onDragEnter,
+        onDragOver: handleDragOver,
+        onDragLeave,
+        onDrop: (e) => void runDrop(e),
+      }
+    : { onDragEnter: undefined, onDragOver: undefined, onDragLeave: undefined, onDrop: undefined }
 
-/** Parse an auto-trace message into its three columns: verb, tool, intent. */
-function parseAutoLine(m: ThreadMsg): { verb: string; tool: string; intent: string } {
-  const raw = m.text ?? ""
-  const t = raw.startsWith("/* auto */ ") ? raw.slice("/* auto */ ".length) : raw
-  const dotIdx = t.indexOf(" · ")
-  if (dotIdx < 0) return { verb: t, tool: "", intent: "" }
-  const verb = t.slice(0, dotIdx)
-  const rest = t.slice(dotIdx + 3)
-  const dashIdx = rest.indexOf(" — ")
-  if (dashIdx < 0) return { verb, tool: rest, intent: "" }
-  return { verb, tool: rest.slice(0, dashIdx), intent: rest.slice(dashIdx + 3) }
-}
-
-/**
- * A rendered segment of the conversation: either a single normal message, or a
- * *run* of consecutive auto tool-activity traces collapsed into one block.
- */
-type Segment =
-  | { type: "msg"; msg: ThreadMsg }
-  | { type: "auto"; msgs: ThreadMsg[] }
-
-/**
- * Fold the flat message log into render segments, collapsing every maximal run
- * of consecutive `auto` traces into a single {@link Segment} so the live
- * tool-activity stream renders as one quiet, expandable group instead of a wall
- * of bubbles.
- */
-function segmentLog(log: ThreadMsg[]): Segment[] {
-  const out: Segment[] = []
-  for (const m of log) {
-    if (m.auto) {
-      const tail = out[out.length - 1]
-      if (tail?.type === "auto") tail.msgs.push(m)
-      else out.push({ type: "auto", msgs: [m] })
-    } else {
-      out.push({ type: "msg", msg: m })
-    }
-  }
-  return out
+  return { dragging, uploading, dropHandlers }
 }
 
 /**
@@ -111,21 +110,31 @@ function segmentLog(log: ThreadMsg[]): Segment[] {
  * three-column grid (verb · tool · intent) so the agent's live work is easy to
  * scan at a glance. Verbs and tool names carry distinct accent colours from the
  * app palette; intents are dimmed context.
+ *
+ * `memo`-wrapped: an auto-run re-renders only when its `msgs` array reference
+ * changes. `segmentLog` is memoized on `thread.log` in the parent, so the
+ * segment objects (hence this `msgs` array) stay reference-stable across the
+ * renders an unrelated SSE delta triggers — the shallow prop compare then skips
+ * this whole subtree. Part of the T510 render-storm fix.
  */
-function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
+const AutoRun = memo(function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
   const n = msgs.length
   return (
-    <details className="group/auto mb-2 ml-7">
+    <details className="group/auto mb-2 ml-7 [contain-intrinsic-size:auto_2rem] [content-visibility:auto]">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-muted-foreground/75 transition-colors hover:bg-muted/40 hover:text-muted-foreground">
-        <span className="text-muted-foreground/60 transition-transform group-open/auto:rotate-90">▸</span>
-        <span>⚙ {n} tool action{n === 1 ? "" : "s"}</span>
+        <span className="text-muted-foreground/60 transition-transform group-open/auto:rotate-90">
+          ▸
+        </span>
+        <span>
+          ⚙ {n} tool action{n === 1 ? "" : "s"}
+        </span>
       </summary>
       <div className="mt-1 grid grid-cols-[auto_auto_1fr] gap-x-3 gap-y-0.5 border-l border-border/60 pl-3 font-mono text-[11px]">
         {msgs.map((m) => {
           const { verb, tool, intent } = parseAutoLine(m)
           return (
             <Fragment key={m.id}>
-              <span className="text-[var(--interactive)]">{verb}</span>
+              <span className="text-(--interactive)">{verb}</span>
               <span className="text-foreground/70">{tool}</span>
               <span className="truncate text-muted-foreground/55">{intent}</span>
             </Fragment>
@@ -134,7 +143,77 @@ function AutoRun({ msgs }: { msgs: ThreadMsg[] }) {
       </div>
     </details>
   )
-}
+})
+
+/**
+ * One rendered NON-auto message row — the memoized boundary that kills the
+ * T510 render storm.
+ *
+ * `ThreadConversation` re-renders on every SSE delta / backstop poll (the
+ * threads cache hands it a new `thread` object each time). Without a memo
+ * boundary React would re-render — and re-parse the markdown/KaTeX of — every
+ * one of a huge thread's (T508 = 1690) message bodies on each of those renders,
+ * the 100–238 ms `threads·update` commits the telemetry named. TanStack Query's
+ * structural sharing already keeps each unchanged message OBJECT reference
+ * stable across renders (a delta append reuses the prior 1689 refs; a poll's
+ * fresh-but-deep-equal objects are collapsed back to the old refs), so a
+ * `memo` keyed on `msg` identity skips every row but the one that actually
+ * changed — turning a 1690-row re-render into a 1-row one.
+ *
+ * The comparator intentionally ignores the callback props: messages are
+ * immutable by `id`, so `msg`-reference equality is the sole correctness
+ * signal, and the handlers (`onDelete`/`onSend`/…) are behaviourally stable
+ * (they close over the same `agentId`/thread), so a skipped row safely keeps
+ * its prior closures rather than re-rendering on callback churn.
+ */
+const MessageRow = memo(
+  function MessageRow({
+    msg,
+    agentId,
+    onOpenFile,
+    onShowInFinder,
+    onDelete,
+    onSend,
+  }: {
+    msg: ThreadMsg
+    agentId: string
+    onOpenFile: (file: UploadedFile) => void
+    onShowInFinder: ((path: string) => void) | undefined
+    onDelete: (msg: ThreadMsg) => void
+    onSend: ((text: string) => void) | undefined
+  }) {
+    return (
+      <div
+        // THE freeze fix (layout half): `content-visibility:auto` lets the
+        // browser SKIP layout + paint for any message row scrolled out of view;
+        // the memo boundary above is the COMMIT half (skip re-rendering
+        // unchanged rows). Together they collapse both costs on a huge thread.
+        className="[contain-intrinsic-size:auto_5rem] [content-visibility:auto]"
+      >
+        <Message
+          msg={toChatMessage(msg)}
+          agentId={agentId}
+          onOpenFile={onOpenFile}
+          onShowInFinder={onShowInFinder}
+          onDelete={() => onDelete(msg)}
+        />
+        {msg.questions?.map((q, i) => (
+          <div key={i} className="pb-1.5 pl-7">
+            <QuestionForm q={q} onSubmit={(answer) => onSend?.(answer)} />
+          </div>
+        ))}
+        {msg.fileRef && (
+          <div className="pb-1.5 pl-7">
+            <span className="card-shadow inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[11.5px] text-(--interactive)">
+              📎 {msg.fileRef}
+            </span>
+          </div>
+        )}
+      </div>
+    )
+  },
+  (a, b) => a.msg === b.msg && a.agentId === b.agentId,
+)
 
 /**
  * Center pane — the selected thread's full conversation + composer.
@@ -156,16 +235,16 @@ export function ThreadConversation({
   thread: ThreadDetail
   /** owning agent — needed to open the shared Quick Look drawer for an attachment */
   agentId: string
-  onSend?: (text: string) => void
+  onSend?: ((text: string) => void) | undefined
   /** upload picked files into this thread (composer paperclip). May be async so
    *  callers can `await` it to keep an in-flight loader up (T471). */
-  onAttach?: (files: File[]) => void | Promise<void>
+  onAttach?: ((files: File[]) => void | Promise<void>) | undefined
   /** files uploaded but not yet sent — shown as chips in the composer (T331) */
-  pendingFiles?: UploadedFile[]
+  pendingFiles?: UploadedFile[] | undefined
   /** remove a pending file by index */
-  onRemoveFile?: (index: number) => void
+  onRemoveFile?: ((index: number) => void) | undefined
   /** navigate the Finder to a file's parent directory and select it (T334) */
-  onShowInFinder?: (path: string) => void
+  onShowInFinder?: ((path: string) => void) | undefined
 }) {
   // The attachment whose Quick Look drawer is open (null = closed). A
   // `file-upload` chip in any message sets it; the shared QuickLookSheet renders
@@ -173,68 +252,11 @@ export function ThreadConversation({
   const [sheetFile, setSheetFile] = useState<UploadedFile | null>(null)
 
   // ── OS-file drag-and-drop onto the whole conversation (T367) ──────────
-  //
   // Dragging files from the OS anywhere over the <main> uploads them exactly as
   // the composer's paperclip does (the SAME `onAttach` path → staged pending
   // chips), and the entire surface gets a discrete blur while a drag is in
-  // flight (300ms ease in AND out) as the only affordance — no overlay, no
-  // dashed border. The whole feature is gated on `onAttach`: with no upload sink
-  // the surface neither blurs nor accepts a drop.
-  const [dragging, setDragging] = useState(false)
-  // True while a dropped folder/files are being zipped + uploaded — drives the
-  // "Uploading…" overlay so a large folder drop shows clear progress (T471).
-  const [uploading, setUploading] = useState(false)
-  // dragenter/dragleave fire for every child crossed, so a plain boolean would
-  // flicker; a depth counter tracks "is the cursor still somewhere inside".
-  const dragDepth = useRef(0)
-  // True only for an actual OS *file* drag — a text/selection drag must not blur.
-  const isFileDrag = (e: React.DragEvent) => e.dataTransfer?.types?.includes("Files")
-
-  const handleDragEnter = (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    e.preventDefault()
-    dragDepth.current += 1
-    setDragging(true)
-  }
-  const handleDragOver = (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    // Must preventDefault on every dragover to keep the element a valid drop
-    // target; the copy cursor signals an upload.
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "copy"
-  }
-  const handleDragLeave = (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    dragDepth.current = Math.max(0, dragDepth.current - 1)
-    if (dragDepth.current === 0) setDragging(false)
-  }
-  const handleDrop = async (e: React.DragEvent) => {
-    if (!isFileDrag(e)) return
-    e.preventDefault()
-    dragDepth.current = 0
-    setDragging(false)
-    // Recurse into any dropped FOLDERS (plain `dataTransfer.files` can't — a
-    // folder drop otherwise yields one unreadable pseudo-file that uploaded as a
-    // failed "CORS … status null" request). extractDroppedFiles captures the
-    // Entry objects synchronously before its first await, so the neutered
-    // DataTransfer doesn't matter (T471).
-    const dropped = await extractDroppedFiles(e.dataTransfer)
-    if (dropped.length === 0) return
-    setUploading(true)
-    try {
-      // Zip the whole drop (folder structure preserved) into ONE archive and
-      // upload it in a single request — no more per-file burst. Awaiting
-      // onAttach keeps the loader up until the upload actually lands.
-      const archive = await zipDropped(dropped)
-      await onAttach?.([archive])
-    } catch {
-      // Zipping failed (unreadable file / fflate error) — fall back to
-      // uploading the raw files so a drop is never silently lost.
-      await onAttach?.(dropped.map((d) => d.file))
-    } finally {
-      setUploading(false)
-    }
-  }
+  // flight (300ms ease in AND out). The whole feature is gated on `onAttach`.
+  const { dragging, uploading, dropHandlers } = useConversationDrop(onAttach)
 
   // Whether the "create command" dialog (T350) is open — toggled by the pill
   // the composer renders beside the /command suggestion bubbles.
@@ -254,7 +276,12 @@ export function ThreadConversation({
   const suggestions = useMemo<CommandSuggestion[]>(() => {
     return library
       .filter((item) => item.kind === "command")
-      .map((item) => ({ command: `/${item.id}`, name: item.name, description: item.description, body: item.body }))
+      .map((item) => ({
+        command: `/${item.id}`,
+        name: item.name,
+        description: item.description,
+        body: item.body,
+      }))
   }, [library])
   // Pin the conversation to the latest message: scroll to the bottom whenever
   // a thread is opened (id change) or a new NON-AUTO message lands (user or
@@ -262,19 +289,49 @@ export function ThreadConversation({
   // counter inside a collapsed <details> and must NOT yank the scroll position
   // away from the message the user is reading (T414).
   const bottomRef = useRef<HTMLDivElement>(null)
-  const nonAutoCount = useMemo(
-    () => thread.log.filter((m) => !m.auto).length,
-    [thread.log],
-  )
+  const nonAutoCount = useMemo(() => thread.log.filter((m) => !m.auto).length, [thread.log])
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" })
+    const el = bottomRef.current
+    if (!el) return
+    // Pin the conversation to the bottom on thread-open / new message. This must
+    // CONVERGE, not fire once: the `content-visibility:auto` on each row (the
+    // T510 layout fix) gives every OFF-SCREEN row only its `contain-intrinsic-
+    // size` placeholder height (5rem) until it's scrolled into view. On open all
+    // rows are off-screen, so the container's scrollHeight is an ESTIMATE — a
+    // single `scrollIntoView` lands short of the true bottom (real rows are
+    // usually taller than 5rem), which was the T512 "opens not scrolled down"
+    // regression. Re-scrolling across a few animation frames fixes it: each
+    // scroll reveals the next chunk's REAL heights, the estimate corrects, and
+    // the position converges on the actual bottom within a handful of frames.
+    // `scrollIntoView` forces a synchronous layout, so it's wrapped in measure()
+    // for freeze attribution; a bounded 6-frame loop on thread-open is
+    // imperceptible (~100ms) and not on any hot path.
+    let raf = 0
+    let tries = 0
+    const settle = () => {
+      measure("threads:scrollIntoView", () => el.scrollIntoView({ block: "end" }))
+      tries += 1
+      if (tries < 6) raf = requestAnimationFrame(settle)
+    }
+    raf = requestAnimationFrame(settle)
+    return () => cancelAnimationFrame(raf)
   }, [thread.id, nonAutoCount])
 
-  /** Delete a message from this thread via the agent command bridge. */
-  const handleDelete = (msg: ThreadMsg) => {
-    const ts = typeof msg.ts === "number" ? msg.ts : new Date(msg.ts as string).getTime()
-    sendCommand(agentId, { kind: "delete_message", thread_id: thread.id, message_ts: ts })
-  }
+  /** Delete a message from this thread via the agent command bridge. Stable
+   *  across renders (deps: agentId + thread.id) so it doesn't defeat the
+   *  {@link MessageRow} memo boundary. */
+  const handleDelete = useCallback(
+    (msg: ThreadMsg) => {
+      const ts = typeof msg.ts === "number" ? msg.ts : new Date(msg.ts ?? "").getTime()
+      void sendCommand(agentId, { kind: "delete_message", thread_id: thread.id, message_ts: ts })
+    },
+    [agentId, thread.id],
+  )
+
+  // Fold the flat log into render segments ONCE per log change (not per
+  // render). Memoizing keeps each segment object reference-stable across the
+  // renders an SSE delta triggers, so the memoized AutoRun rows hold too.
+  const segments = useMemo(() => segmentLog(thread.log), [thread.log])
 
   return (
     <main
@@ -286,17 +343,17 @@ export function ThreadConversation({
         filter: dragging ? "blur(2px)" : "blur(0px)",
         transition: "filter 300ms ease",
       }}
-      onDragEnter={onAttach ? handleDragEnter : undefined}
-      onDragOver={onAttach ? handleDragOver : undefined}
-      onDragLeave={onAttach ? handleDragLeave : undefined}
-      onDrop={onAttach ? handleDrop : undefined}
+      onDragEnter={dropHandlers.onDragEnter}
+      onDragOver={dropHandlers.onDragOver}
+      onDragLeave={dropHandlers.onDragLeave}
+      onDrop={dropHandlers.onDrop}
     >
       {/* Upload progress (T471) — a discrete centered spinner over the surface
           while a dropped folder/files are zipped + uploaded. */}
       {uploading && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/40 backdrop-blur-[1px]">
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[12.5px] text-foreground/90 card-shadow">
-            <Loader2 className="size-4 animate-spin text-[var(--signal)]" />
+          <div className="card-shadow flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[12.5px] text-foreground/90">
+            <Loader2 className="size-4 animate-spin text-(--signal)" />
             Uploading…
           </div>
         </div>
@@ -312,31 +369,19 @@ export function ThreadConversation({
             <span className="h-px flex-1 bg-border/60" />
           </div>
 
-          {segmentLog(thread.log).map((seg) =>
+          {segments.map((seg) =>
             seg.type === "auto" ? (
-              <AutoRun key={`auto-${seg.msgs[0].id}`} msgs={seg.msgs} />
+              <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
             ) : (
-              <div key={seg.msg.id}>
-                <Message
-                  msg={toChatMessage(seg.msg)}
-                  agentId={agentId}
-                  onOpenFile={setSheetFile}
-                  onShowInFinder={onShowInFinder}
-                  onDelete={() => handleDelete(seg.msg)}
-                />
-                {seg.msg.questions?.map((q, i) => (
-                  <div key={i} className="pb-1.5 pl-7">
-                    <QuestionForm q={q} onSubmit={(answer) => onSend?.(answer)} />
-                  </div>
-                ))}
-                {seg.msg.fileRef && (
-                  <div className="pb-1.5 pl-7">
-                    <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[11.5px] text-[var(--interactive)] card-shadow">
-                      📎 {seg.msg.fileRef}
-                    </span>
-                  </div>
-                )}
-              </div>
+              <MessageRow
+                key={seg.msg.id}
+                msg={seg.msg}
+                agentId={agentId}
+                onOpenFile={setSheetFile}
+                onShowInFinder={onShowInFinder}
+                onDelete={handleDelete}
+                onSend={onSend}
+              />
             ),
           )}
           {/* scroll anchor — keeps the latest message in view */}
@@ -362,7 +407,7 @@ export function ThreadConversation({
       </div>
 
       <QuickLookSheet
-        node={sheetFile ? (uploadToNode(sheetFile) as FinderNode) : null}
+        node={sheetFile ? uploadToNode(sheetFile) : null}
         agentId={agentId}
         open={sheetFile !== null}
         onClose={() => setSheetFile(null)}

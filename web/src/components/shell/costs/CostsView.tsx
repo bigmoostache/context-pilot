@@ -1,8 +1,19 @@
 import { useCallback, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { fetchFsPreview } from "@/lib/api/finder"
-import { parseCostTsv, computeSummary, culpritDistribution, costBreakdown, toolCostAttribution, culpritCostAttribution, maxFreezePerCulprit, crossTabToolCulprit, buildMarkdownReport } from "./parse"
-import { DonutChart, HBarChart, CostTimeline, fmtDollar, fmtTokens } from "./charts"
+import {
+  parseCostTsv,
+  computeSummary,
+  culpritDistribution,
+  costBreakdown,
+  toolCostAttribution,
+  culpritCostAttribution,
+  maxFreezePerCulprit,
+  crossTabToolCulprit,
+  buildMarkdownReport,
+} from "./parse"
+import { DonutChart, HBarChart, CostTimeline } from "./charts"
+import { fmtDollar, fmtTokens } from "./format"
 import { CrossTabTable, TokenDistribution, ApiTokenDistribution } from "./tables"
 
 /**
@@ -48,7 +59,7 @@ export function CostsView({ agentId }: { agentId: string }) {
       queue: queueFilter,
       breakKind: breakKindFilter,
     })
-    navigator.clipboard.writeText(md).then(() => {
+    void navigator.clipboard.writeText(md).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     })
@@ -67,9 +78,11 @@ export function CostsView({ agentId }: { agentId: string }) {
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
         <span className="text-[15px] font-semibold">No cost data yet</span>
         <span className="max-w-sm text-center text-[12px]">
-          Cost telemetry appears after the agent completes its first LLM tick.
-          The file <code className="rounded bg-muted px-1 py-0.5 text-[11px]">.context-pilot/logs/cost-tracking.tsv</code> will
-          be created automatically.
+          Cost telemetry appears after the agent completes its first LLM tick. The file{" "}
+          <code className="rounded-sm bg-muted px-1 py-0.5 text-[11px]">
+            .context-pilot/logs/cost-tracking.tsv
+          </code>{" "}
+          will be created automatically.
         </span>
       </div>
     )
@@ -77,14 +90,15 @@ export function CostsView({ agentId }: { agentId: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
         {/* ── Header ──────────────────────────────────────────────── */}
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-[17px] font-bold tracking-tight text-foreground">Cost Analysis</h2>
             <p className="mt-0.5 text-[12px] text-muted-foreground">
               Per-tick cache efficiency and spend breakdown · {summary.totalTicks} ticks
-              {(tempoFilter !== "all" || queueFilter !== "all" || breakKindFilter !== "all") && ` (filtered from ${rows.length})`}
+              {(tempoFilter !== "all" || queueFilter !== "all" || breakKindFilter !== "all") &&
+                ` (filtered from ${rows.length})`}
             </p>
           </div>
           <button
@@ -102,21 +116,8 @@ export function CostsView({ agentId }: { agentId: string }) {
           <BreakKindFilter value={breakKindFilter} onChange={setBreakKindFilter} />
         </div>
 
-        {/* ── Summary cards ───────────────────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Card label="Total cost" value={fmtDollar(summary.totalCost)} />
-          <Card label="LLM ticks" value={summary.totalTicks.toLocaleString()} />
-          <Card label="Avg cost / tick" value={fmtDollar(summary.avgCostPerTick)} />
-          <Card label="Cache hit rate" value={`${(summary.cacheHitRate * 100).toFixed(1)}%`} accent={summary.cacheHitRate > 0.5} />
-        </div>
-
-        {/* ── Row: ticks with/without cache breaks ────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Card label="Clean ticks" value={summary.ticksClean.toLocaleString()} sub="no panel broke" />
-          <Card label="Break ticks" value={summary.ticksWithBreak.toLocaleString()} sub="cache broken" />
-          <Card label="Hit tokens" value={fmtTokens(summary.totalHitTokens)} />
-          <Card label="Miss tokens" value={fmtTokens(summary.totalMissTokens)} />
-        </div>
+        {/* ── Summary cards (spend + cache efficiency + break split) ─ */}
+        <SummaryCards summary={summary} />
 
         {/* ── Row: Culprit donut + Cost timeline ──────────────────── */}
         <div className="grid gap-6 lg:grid-cols-2">
@@ -148,7 +149,7 @@ export function CostsView({ agentId }: { agentId: string }) {
         {/* ── Row: Max freeze per culprit ─────────────────────────── */}
         {maxFreezes.length > 0 && (
           <Section>
-            <HBarChart data={maxFreezes} title="Max freezes per culprit" format={(v) => String(v)} />
+            <HBarChart data={maxFreezes} title="Max freezes per culprit" format={String} />
           </Section>
         )}
 
@@ -169,6 +170,39 @@ export function CostsView({ agentId }: { agentId: string }) {
 
 // ── Micro-components ────────────────────────────────────────────────────────
 
+/** The two summary-card rows (spend + cache efficiency, then the break split).
+ *  Extracted so {@link CostsView}'s render body stays within the P8 line budget. */
+function SummaryCards({ summary }: { summary: ReturnType<typeof computeSummary> }) {
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Card label="Total cost" value={fmtDollar(summary.totalCost)} />
+        <Card label="LLM ticks" value={summary.totalTicks.toLocaleString()} />
+        <Card label="Avg cost / tick" value={fmtDollar(summary.avgCostPerTick)} />
+        <Card
+          label="Cache hit rate"
+          value={`${(summary.cacheHitRate * 100).toFixed(1)}%`}
+          accent={summary.cacheHitRate > 0.5}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Card
+          label="Clean ticks"
+          value={summary.ticksClean.toLocaleString()}
+          sub="no panel broke"
+        />
+        <Card
+          label="Break ticks"
+          value={summary.ticksWithBreak.toLocaleString()}
+          sub="cache broken"
+        />
+        <Card label="Hit tokens" value={fmtTokens(summary.totalHitTokens)} />
+        <Card label="Miss tokens" value={fmtTokens(summary.totalMissTokens)} />
+      </div>
+    </>
+  )
+}
+
 function Card({
   label,
   value,
@@ -181,10 +215,10 @@ function Card({
   accent?: boolean
 }) {
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3 card-shadow">
+    <div className="card-shadow flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3">
       <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
       <span
-        className="text-[18px] font-bold tabular-nums tracking-tight"
+        className="text-[18px] font-bold tracking-tight tabular-nums"
         style={accent ? { color: "var(--ok, #4ade80)" } : undefined}
       >
         {value}
@@ -195,11 +229,7 @@ function Card({
 }
 
 function Section({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-5 card-shadow">
-      {children}
-    </div>
-  )
+  return <div className="card-shadow rounded-xl border border-border bg-card p-5">{children}</div>
 }
 
 type FilterValue = "all" | "0" | "1"
@@ -248,13 +278,7 @@ const BREAK_KINDS: { v: string; text: string }[] = [
   { v: "panel_disappeared", text: "Disappeared" },
 ]
 
-function BreakKindFilter({
-  value,
-  onChange,
-}: {
-  value: string
-  onChange: (v: string) => void
-}) {
+function BreakKindFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex items-center gap-1.5">
       <span className="text-[11px] font-medium text-muted-foreground">Break</span>
@@ -276,6 +300,3 @@ function BreakKindFilter({
     </div>
   )
 }
-
-
-

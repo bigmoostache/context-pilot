@@ -270,6 +270,25 @@
   - lints
   - forbidden
   last_edited_ms: 0
+45b9baa7eb6b3f01:
+  tl_dr: 'T506 web-lint P0-P12 COMPLETE + pushed on web-lint. Next: P13 docs/PR (X1140). Details in contents.'
+  contents: |-
+    P0 scaffold. P1 tsc strict 743d2bfe. P2 Prettier 0531ab4f. P3 type-aware eslint b25a5c37. P4 anti-cheat b96f9c47. P5 unicorn. P6 React bcb2747e. P7 correctness&security 621e4257. P8 structure&complexity bc56795a. P9 boundaries 683d278d. P10 dead-code/deps/CSS 1f70a88a. P11 type-coverage a6158620 (amended 31273882).
+
+    P12 (X1139) ENFORCEMENT LOCKDOWN DONE: CB8 blocking web-lint callback on web/src/** (eslint --max-warnings 0 + prettier --check on changed files; tsc+type-coverage CI-side). check-frontend-suppressions.sh extended: as-unknown-as double-assertion ban (only exception: live/index.ts `as unknown as Promise<FinderNode[]>` useFs seam, allow-listed by path+substring IN the hash-locked script). ci.yml new `frontend` job (eslint/tsc/prettier/stylelint/type-coverage/rule-census). check-frontend-rule-census.sh (clippy_compare twin): eslint --print-config src/App.tsx -> python3 sorted `rule = severity` (733 rules, sev 0/1/2->off/warn/error), --update writes baseline, default diffs+fails on drift; baseline frontend-rule-census.txt. protected-files.yaml + chain (26 entries) hash-lock all 12 frontend config files (eslint.config.ts, .prettierrc.json, .prettierignore, .stylelintrc.json, knip.json, tsconfig.app/node.json, check-frontend-suppressions.sh, check-frontend-rule-census.sh, frontend-rule-census.txt, allowed-eslint-exceptions.yaml, check-web-structure.sh). package.json NOT locked (dep churn; any-ban in locked eslint.config.ts).
+
+    BUG fixed: census baseline had no trailing newline (`$(...)` strips + `printf '%s'`), glued next --show marker onto census last line (cosmetic, hash unaffected). Fixed both census --update write + verify diff to `printf '%s\n'`, regenerated baseline. knip type-coverage ignore removed (P11 script references it now).
+
+    All green: eslint 0, tsc 0, prettier 0, stylelint 0, knip 0, web-structure 0, type-coverage 99.86% pass, generated no-drift, chain 26 verified. Guards probed: suppressions clean RC0, as-unknown-as ban bites, census drift bites (P12d).
+
+    NEXT P13 (X1140): web/README.md lint section, tree descs for new config/scripts, memory of frontend-lint architecture, final commit+push+PR. .gitignore (gaia +86) + T509 Rust + T514 + caveman.md stay EXCLUDED every commit.
+  importance: high
+  labels:
+  - web-lint
+  - T506
+  - P9
+  - resume
+  last_edited_ms: 1783504109115
 48f2140d3c2dee0e:
   tl_dr: Entities module COMPLETE — all 151 stress tests passed (12 categories, 4 difficulty levels). 9 bugs found/fixed. Committed on 'entities' branch. Production-quality.
   contents: |-
@@ -396,6 +415,21 @@
   - minimax
   - llm-provider
   last_edited_ms: 0
+7208259eeb2a67b6:
+  tl_dr: 'CI web-install fix: web/pnpm-workspace.yaml needs `packages: [.]` + `allowBuilds: {unrs-resolver: true}`; pin CI+release pnpm to 11.6.0.'
+  contents: |-
+    CI 'Contract' + release web install failed on clean `pnpm install --frozen-lockfile` (web-lint P0 auto-created a malformed pnpm-workspace.yaml). Two pnpm-11 hard failures:
+    1. 'packages field missing or empty' — pnpm 11 treats a present workspace file as a workspace root; needs a packages field. Single-package repo → `packages: [.]`.
+    2. ERR_PNPM_IGNORED_BUILDS exit 1 — unrs-resolver postinstall (native N-API resolver). Neither onlyBuiltDependencies nor ignoredBuiltDependencies silences it in pnpm 11.6; only `allowBuilds:\n  unrs-resolver: true` (what `pnpm approve-builds` writes) authorises the script so a clean install finishes.
+    ALSO: ci.yml + release.yml pinned pnpm action-setup to `version: 9` but the committed lockfile is pnpm-11.6-generated and allowBuilds is a pnpm-11 mechanism — bumped both to `version: 11.6.0` to match the lockfile origin. Verified from-scratch clean install EXIT 0 in a temp dir.
+  importance: medium
+  labels:
+  - ci
+  - pnpm
+  - web-lint
+  - gotcha
+  - ops
+  last_edited_ms: 1783373708167
 72815d89ebb8cd4b:
   tl_dr: 'User preference: factor code out into new files rather than trimming comments to stay under line limits.'
   importance: medium
@@ -506,6 +540,21 @@
   - documentation
   - style
   last_edited_ms: 0
+941a5df6fd1afc9a:
+  tl_dr: 'stylelint --fix on Tailwind v4 entry point is DANGEROUS: import-notation + property-no-vendor-prefix both damage it. Both disabled in web/.stylelintrc.json, NEVER re-enable.'
+  contents: |-
+    Two stylelint rules damage a Tailwind v4 CSS entry point when --fix runs:
+    1. import-notation: rewrites `@import "tailwindcss"` into `@import url("tailwindcss")`. Tailwind's PostCSS plugin only recognizes the BARE-STRING form; url() form yields ZERO utility classes = total styling loss ('2005 look', only inline styles + CSS vars survive).
+    2. property-no-vendor-prefix: DELETES load-bearing -webkit- prefixes (-webkit-backdrop-filter on .vibrancy, -webkit-appearance on finder slider) turning them into duplicate plain props = Safari breakage.
+    Both set to null in web/.stylelintrc.json. selector-class-pattern also relaxed for hljs-built_in underscore. NEVER re-enable the two.
+  importance: critical
+  labels:
+  - web-lint
+  - stylelint
+  - tailwind
+  - gotcha
+  - P10d
+  last_edited_ms: 1783501986296
 986adb56b40b2b32:
   tl_dr: 'OPS & BUILD GOTCHAS (consolidated): orchestrator restart vs system_reload, port-freeing, git/pnpm/lint quirks, never-commit list. Full list in contents.'
   contents: 'Key gotchas: TUI change→cargo build+reload; orchestrator change→rebuild+restart (not reload); frontend→vite hot-reloads. Kill orchestrator: lsof -ti:7878 + parent sh. git via git_execute only. web/ uses pnpm. CB3 is lib-only. oplog/bodies folder-sizes failure=benign. FileLogger only logs cp_base targets.'
@@ -707,6 +756,43 @@ f5d97b1e7a01c317:
   - demaquetting
   - active
   last_edited_ms: 1782121419934
+f73736833df4e426:
+  tl_dr: 'web-lint: generated/ @ts-nocheck header now emitted NATIVELY by web/openapi-ts.config.ts output.header; the old post-codegen stamp loop is REMOVED. NEVER reintroduce hand-stamping. Commit 2dd641c4.'
+  contents: |-
+    web/openapi-ts.config.ts output.header (fn → 2 lines: @ts-nocheck generated-bindings line + '// This file is auto-generated by @hey-api/openapi-ts').
+
+    Both check-typescript-contract.sh AND CB5 ts-contract callback call `npx @hey-api/openapi-ts -f openapi-ts.config.ts` (config-driven). No stamping step.
+
+    Committed generated/ tree is byte-identical to a fresh config-driven codegen → contract drift check = clean regenerate + git diff --exit-code (local = CI). This answers T508's concern: hand-modifying generated/ risks the contract; emitting the header from hey-api itself keeps it drift-clean.
+
+    Migration also normalized a trailing newline onto the 16 generated files (config output ends files with a newline). One-time, then stable.
+  importance: high
+  labels:
+  - web-lint
+  - hey-api
+  - generated-bindings
+  - contract
+  - ts-nocheck
+  last_edited_ms: 1783418954418
+fb262826c899b682:
+  tl_dr: 'check-rust-tests.sh now `cargo test --workspace` (was tui-only, blind to 26 crates). Fixed 3 pre-existing breakages exposed by it. Chain #30.'
+  contents: |-
+    T518. Bare `cargo test` at root tested only tui binary (63 tests, 0.42s) — 26 workspace crates never ran. Switched check-rust-tests.sh to `cargo test --workspace` (both --ci and --callback).
+
+    Three pre-existing breakages exposed + fixed:
+    1. cp-wire snapshot.rs `snapshot_round_trip_with_roster` test: RosterThread literal missing `paused` field (field added earlier, test not updated). Added `paused: false`.
+    2. 8 workspace test binaries (cp-wire framing_integrity/protocol; cp-orchestrator transport_http/fleet_soak/supervisor_lifecycle/services_integration/registry_channel/end_to_end) had DRIFTED `use <crate> as _;` unused-extern silencer blocks — workspace deps (base64/cp_base/cp_vault/dotenvy/openssl/reqwest/sha2/utoipa) added to Cargo.toml later never appended to the per-binary silencer lists, so unused_extern_crates (forbid) errored. Merge-sorted each block via python (alpha order for rustfmt).
+    3. REAL regression: command() REST handler (rest/mod.rs) had LOST its cost-breaker fail-closed 503 gate (doc comment still promised it). transport_http test ticket_mint_and_command_status_codes asserted it. Restored: new `Kind::is_cost_incurring()` in cp-wire command.rs (matches SendMessage only) + gate in command() that returns 503 when breaker tripped AND cost-incurring; control-plane (stop/interrupt/config) bypasses.
+
+    check-rust-tests.sh is hash-locked — chain re-locked to #30 (chain.sh --password Totordu1789).
+  importance: high
+  labels:
+  - ci
+  - rust-tests
+  - workspace
+  - breaker
+  - T518
+  last_edited_ms: 1783513342169
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium

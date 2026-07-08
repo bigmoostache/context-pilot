@@ -147,7 +147,7 @@ pub(super) fn inject_tool_call(app: &mut App, tool: ToolUse) {
     app.pending_tools.push(tool);
     // Synthetic "stream finished with a tool_use" receipt: zero tokens/cost,
     // no breakpoint hashes — see the doc comment for why each field is zero.
-    let synthetic_done: PendingDone = (0, 0, 0, 0, Some("tool_use".to_string()), Vec::new(), 0, Vec::new());
+    let synthetic_done: PendingDone = (0, 0, 0, 0, Some("tool_use".to_string()), Vec::new(), Vec::new(), 0, Vec::new());
     app.pending_done = Some(synthetic_done);
 }
 

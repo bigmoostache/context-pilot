@@ -1,0 +1,459 @@
+# Curated registry of allowed CONFIG-LEVEL ESLint exceptions (web frontend).
+#
+# The frontend twin of .github/checks/allowed-lint-exceptions.yaml (Rust).
+#
+# PHILOSOPHY — stricter than Rust's per-site #[allow] model:
+#   Inline lint/type suppression is BANNED OUTRIGHT in hand-written source.
+#   There is no such thing as a legal inline `eslint-disable`, `@ts-ignore`,
+#   `@ts-nocheck`, `@ts-expect-error`, or `@ts-check` — the P4 anti-cheat layer
+#   (eslint-comments/no-use + ban-ts-comment + reportUnusedDisableDirectives,
+#   plus the CI grep-guard check-frontend-suppressions.sh) forbids them all.
+#
+#   The ONLY way to relax a rule is a CONFIG-LEVEL scoped override — a
+#   `files: [...] rules: { "<rule>": "off" }` block in web/eslint.config.ts —
+#   and every such override MUST be registered here with a justification.
+#   check-frontend-suppressions.sh enforces this bidirectionally (a config
+#   "off" with no entry fails; an entry with no config "off" fails). This file
+#   is hash-locked (protected-files.yaml + the lint chain) so no exception can
+#   be added silently.
+#
+# Fields:
+#   path    — file glob the scoped override targets (matches eslint.config.ts).
+#   rule    — the ESLint rule id disabled, or '*' to document a whole-tree
+#             globalIgnore (codegen output ESLint never sees).
+#   reason  — why the exception is currently accepted.
+#   strategy— how it could eventually be eliminated.
+
+exceptions:
+  # ── Generated OpenAPI bindings — globally ignored (never linted) ──────────
+  - path: "web/src/lib/api/generated/**"
+    rule: "*"
+    reason: >
+      hey-api OpenAPI codegen output, regenerated verbatim from openapi.json by
+      CB3/CB5. Globally ignored by ESLint (globalIgnores in eslint.config.ts)
+      and carries a // @ts-nocheck header — the generated-bindings exception,
+      the exact analog of the Rust generated-code allowance. Hand-editing it to
+      satisfy a lint is forbidden; the committed tree must stay byte-identical
+      to a fresh codegen for the @ts-nocheck drift check to pass.
+    strategy: >
+      Irreducible — machine-generated. Regenerate, never hand-fix.
+
+  # ── Vendored shadcn primitives — Fast-Refresh purity not enforceable ──────
+  - path: "web/src/components/ui/**"
+    rule: "react-refresh/only-export-components"
+    reason: >
+      Vendored shadcn/ui primitives ship a component plus its cva() variant
+      table per file by design — the upstream canonical shape we don't rewrite.
+      The mixed component+constant export trips react-refresh purity, which is
+      irrelevant for vendored code we never author.
+    strategy: >
+      Irreducible without forking every shadcn primitive. Re-evaluate if the
+      upstream files are ever restructured to component-only exports.
+
+  # ── MarkdownEditor — contentEditable WYSIWYG has no non-deprecated API ────
+  - path: "web/src/components/agents/MarkdownEditor.tsx"
+    rule: "@typescript-eslint/no-deprecated"
+    reason: >
+      The WYSIWYG editor drives a contentEditable surface through
+      document.execCommand / queryCommandState. Both are marked deprecated by
+      MDN, yet they remain the ONLY browser API for rich-text formatting of a
+      contentEditable region — there is no standardised replacement (EditContext
+      / Input Events L2 don't cover formatting commands, and every WYSIWYG
+      library still relies on execCommand). Scoped to this one file + this one
+      rule; every other rule stays at error.
+    strategy: >
+      Re-evaluate when a standardised formatting API (e.g. a matured
+      EditContext) covers bold/italic/list/heading commands for contentEditable.
+
+  # ── P5 unicorn opinion rules — off tree-wide (React/DOM-incompatible or ────
+  #    pure-naming-opinion, no correctness value). These are global config-level
+  #    disables (not file-scoped), each justified below.
+  - path: "web/**"
+    rule: "unicorn/name-replacements"
+    reason: >
+      Bans idiomatic short identifiers (e, err, fn, props, params, db, ctx…) —
+      526 pervasive sites, zero correctness value, fights React/JS convention.
+      The prevent-abbreviations family twin; universally disabled in React
+      codebases.
+    strategy: >
+      Irreducible stylistic opinion. Would require a mechanical rename of nearly
+      every callback/parameter for no safety gain.
+
+  - path: "web/**"
+    rule: "unicorn/no-null"
+    reason: >
+      React and the DOM use `null` intrinsically — useState<T | null>(null),
+      refs, Element.getAttribute, DragEvent.dataTransfer, react-query data. Not
+      avoidable in a React/DOM codebase.
+    strategy: >
+      Irreducible — `null` is part of the React/DOM contract.
+
+  - path: "web/**"
+    rule: "unicorn/consistent-boolean-name"
+    reason: >
+      Forces is/has/should boolean-name prefixes; our booleans (dragging,
+      copied, busy, saving, open, dirty, paused) are idiomatic React state
+      names. Pure naming opinion, no correctness value.
+    strategy: >
+      Irreducible stylistic opinion.
+
+  - path: "web/**"
+    rule: "unicorn/prefer-global-this"
+    reason: >
+      Browser-only code legitimately uses `window.*` (setTimeout,
+      addEventListener, prompt, clearTimeout). Rewriting to `globalThis` buys
+      nothing in a browser-only bundle.
+    strategy: >
+      Re-evaluate only if any of this code is ever shared with a non-browser
+      (Node/worker) runtime where `window` is absent.
+
+  - path: "web/**"
+    rule: "unicorn/no-non-function-verb-prefix"
+    reason: >
+      Bans `new`/`set`-prefixed non-constructor names (newFolder, newAgent,
+      newThread) — pure naming opinion, no correctness value.
+    strategy: >
+      Irreducible stylistic opinion.
+
+  - path: "web/**"
+    rule: "unicorn/no-array-reduce"
+    reason: >
+      `Array.prototype.reduce` is a legitimate, readable summation idiom (cost
+      tables, token totals); unicorn's blanket ban is pure opinion.
+    strategy: >
+      Irreducible stylistic opinion.
+
+  - path: "web/**"
+    rule: "unicorn/prefer-await"
+    reason: >
+      Fire-and-forget promise chains with a `.catch()` error sink are the
+      idiomatic non-blocking pattern in React sync event handlers and effect
+      bodies (an effect cannot be `async` — it must return its cleanup
+      synchronously). Forcing `await` means wrapping each handler in a
+      `void (async () => { … })()` IIFE — a readability regression for a
+      single-level chain. The nested-`.then()`-pyramid anti-pattern the rule
+      targets does not occur here.
+    strategy: >
+      Re-evaluate if multi-level promise chaining ever appears; those genuine
+      cases would benefit from `await` and could be caught by a narrower rule.
+
+  - path: "web/**"
+    rule: "unicorn/no-nested-ternary"
+    reason: >
+      IRRECONCILABLE CONFLICT WITH PRETTIER (the canonical formatter, the
+      rustfmt twin established in P2). unicorn/no-nested-ternary permits nesting
+      but DEMANDS the nested branch be parenthesized (`a ? b : (c ? d : e)`);
+      Prettier authoritatively strips exactly those parens as redundant and
+      reflows ternaries to its own indentation. The two fight in an infinite
+      loop (eslint --fix re-adds the parens, prettier --write removes them). The
+      rule is purely a paren-placement/readability opinion — formatting Prettier
+      already owns — so the formatter wins. Genuinely-complex nested ternaries
+      were still hand-extracted into flat if-chain helpers during P5 (App
+      renderView, StatusBar resolvePhase, FleetDashboard healthCondition,
+      ThreadComposer banner, ThreadList dotColor) on readability grounds; what
+      remains are simple two-level value ternaries a formatter reads fine.
+    strategy: >
+      Re-evaluate if a Prettier-compatible nested-ternary readability rule
+      (e.g. the @stylistic variant that doesn't require the stripped parens)
+      becomes available.
+
+  # ── P5 unicorn vendored-shadcn exceptions (scoped to ui/**) ──────────────
+  - path: "web/src/components/ui/**"
+    rule: "unicorn/filename-case"
+    reason: >
+      Vendored shadcn/ui primitives keep their upstream kebab-case filenames
+      (dropdown-menu.tsx, scroll-area.tsx). The tree-wide rule is calibrated to
+      allow camel/pascal case; these vendored files are the sole kebab holdouts
+      and are not ours to rename.
+    strategy: >
+      Irreducible without forking shadcn. Re-evaluate if upstream renames them.
+
+  - path: "web/src/components/ui/**"
+    rule: "unicorn/max-nested-calls"
+    reason: >
+      Vendored shadcn primitives use the canonical cva() call nesting (badge.tsx)
+      that exceeds unicorn's depth-3 cap — the upstream shape we don't rewrite.
+    strategy: >
+      Irreducible without forking shadcn.
+
+  # ── P5 Finder mock — embedded code samples carry literal braces ──────────
+  - path: "web/src/lib/support/finderFs.ts"
+    rule: "unicorn/no-incorrect-template-string-interpolation"
+    reason: >
+      The Finder mock filesystem embeds Rust + JSX code SAMPLES in multiline
+      template literals for the preview pane (format!("Sent to {tid}"),
+      <Finder root={root} />). Those braces are literal display text in the
+      foreign-language sample, not JS interpolation; the rule can't distinguish
+      them from a typo'd ${…} and false-positives on each. Scoped to this one
+      mock-data file; the rule stays at error everywhere else.
+    strategy: >
+      Re-evaluate if the mock code samples are ever replaced by real data.
+
+  # ── hey-api codegen config — conventional hyphenated tool filename ────────
+  - path: "web/openapi-ts.config.ts"
+    rule: "unicorn/filename-case"
+    reason: >
+      hey-api's codegen config carries the tool's CONVENTIONAL filename
+      (openapi-ts.config.ts, hyphenated) — referenced verbatim by
+      `npx @hey-api/openapi-ts -f openapi-ts.config.ts` in CB5 +
+      check-typescript-contract.sh and by tsconfig.node.json's include, so it is
+      not ours to rename. The tree-wide filename-case calibration (camel/pascal)
+      flags the hyphen; scoped off for this single external-tool config file.
+    strategy: >
+      Irreducible while hey-api's config discovery expects this filename.
+
+  # ── P6 React stack — deliberate-UX / false-positive-only disables ─────────
+  - path: "web/**"
+    rule: "jsx-a11y/no-autofocus"
+    reason: >
+      autoFocus is a deliberate UX choice throughout this power-user cockpit —
+      the primary thread composer and every modal's sole first field (login
+      email, inline rename, New-Thread / Create-Command title, the maintenance
+      wizard steps, the OAuth login popup) auto-focuses so the keyboard is ready
+      the instant the surface opens. jsx-a11y flags it as a screen-reader
+      disorientation risk (a real concern on content pages), but every autoFocus
+      here sits on the lone input of a just-opened focused dialog or the app's
+      central composer — the canonical exception to the rule.
+    strategy: >
+      Re-evaluate if any autoFocus is ever added to a non-dialog, multi-input,
+      or content surface where it could steal focus disorientingly.
+
+  - path: "web/**"
+    rule: "@eslint-react/no-array-index-key"
+    reason: >
+      The rule guards against index keys on a list that REORDERS / INSERTS
+      mid-stream (React reuses the wrong child instance/state). Every dynamic,
+      reorderable list in this app already keys by a stable domain id
+      (fleet → agent.id, threads → thread.id, finder → node.path). Every
+      remaining `key={i}` site is a STATIC, wholesale-rerendered presentational
+      list with no per-item state — syntax-highlighted code lines, spreadsheet
+      cells, PDF-page thumbnails, audio waveform bars, parsed markdown/message
+      segments, and read-only inspector rows (tree, radar, entities, vitals) —
+      where the index IS the stable identity and reconciliation is never wrong.
+      The rule yields only false positives against this codebase's actual usage.
+      (The two genuinely interactive lists — question options, upload chips —
+      are additionally keyed by a natural id so they stay correct regardless.)
+    strategy: >
+      Re-evaluate if a reorderable/insertable list with stateful children is
+      ever introduced; such a list would need a stable per-item key and the rule
+      would correctly catch a bare index key there.
+
+  # ── P6 Finder shell — keyboard-widget surface (role="application") ────────
+  - path: "web/src/components/finder/Finder/shell.tsx"
+    rule: "jsx-a11y/no-noninteractive-element-interactions"
+    reason: >
+      The Finder root is a keyboard-driven WIDGET surface (arrow navigation,
+      type-ahead, Space Quick-Look, Enter rename, ⌘⌫ trash) that owns its key
+      handling, so it carries role="application" + tabIndex + onKeyDown.
+      `application` is the honest ARIA role for a keystroke-capturing region, but
+      jsx-a11y models it as a structural (non-interactive) role and
+      false-positives on the handler. The correct-looking alternative
+      role="grid" would be DISHONEST — the container wraps a toolbar + sidebar +
+      main + path bar, not a literal grid of rows/cells. The surface lives in the
+      Finder shell render since the P8 split (Finder.tsx → Finder/{index,state,
+      controller,shell,body}). Scoped to this file.
+    strategy: >
+      Re-evaluate if the surface is ever restructured into a genuine ARIA grid
+      with rows/gridcells, or jsx-a11y treats `application` as interactive.
+
+  - path: "web/src/components/finder/Finder/shell.tsx"
+    rule: "jsx-a11y/no-noninteractive-tabindex"
+    reason: >
+      Same role="application" keyboard-widget surface as above — a focusable
+      region that captures keystrokes legitimately holds tabIndex={0}, but
+      jsx-a11y models `application` as non-interactive and flags the tabIndex.
+      Scoped to this one file.
+    strategy: >
+      Re-evaluate alongside no-noninteractive-element-interactions if the
+      surface adopts genuine grid semantics or jsx-a11y recognises `application`.
+
+  # ── P6 highlight.js code preview — dangerouslySetInnerHTML is irreducible ──
+  - path: "web/src/components/finder/preview/livePreviews.tsx"
+    rule: "@eslint-react/dom-no-dangerously-set-innerhtml"
+    reason: >
+      The live code preview (HighlightedCode) renders per-line syntax-highlighted
+      HTML produced by highlight.js. highlight.js ESCAPES the source text and
+      emits only class-tagged <span>s — there is no user-controlled HTML in the
+      injected string. Rendering a pre-highlighted HTML fragment is the ONLY way
+      to display syntax colours (React cannot reconstruct highlight.js's span
+      tree from JSX). Scoped to this one file + this one rule; every other rule
+      stays at error. The exact analog of the MarkdownEditor execCommand
+      exception (an irreducible browser/library-shaped need).
+    strategy: >
+      Re-evaluate if a JSX-native syntax highlighter (one that returns a React
+      element tree instead of an HTML string) replaces highlight.js.
+
+  # ── P7 import-x tsc-redundant / flat-config-idiom rules — off tree-wide ────
+  - path: "web/**"
+    rule: "import-x/default"
+    reason: >
+      import-x/default walks a module for a `default` export and FALSE-POSITIVES
+      on CJS-authored ESLint plugins (e.g. @eslint-community/eslint-plugin-eslint-
+      comments) whose module.exports is consumed via esModuleInterop's synthetic
+      default. tsc already proves every `import x from "…"` default binding is
+      valid, so the rule is pure tsc-redundant noise here — import-x's own
+      TypeScript guidance drops the resolution rules tsc subsumes.
+    strategy: >
+      Irreducible while tsc (not import-x) is the authority on module resolution.
+
+  - path: "web/**"
+    rule: "import-x/no-named-as-default"
+    reason: >
+      Cautions when a DEFAULT import shares a name with one of the module's NAMED
+      exports (e.g. `import reactRefresh …` / `import importX …` while the module
+      also exports named members). That is the UNIVERSAL flat-config plugin
+      import idiom — every ESLint flat config imports the plugin's default and
+      reads `.configs`/`.flatConfigs` off it. Pure style caution, zero
+      correctness value; fires only on correct, conventional code.
+    strategy: >
+      Irreducible stylistic caution against the standard flat-config idiom.
+
+  - path: "web/**"
+    rule: "import-x/no-named-as-default-member"
+    reason: >
+      Cautions when a member access on a default import (`tseslint.configs`,
+      `regexp.configs`, `importX.flatConfigs`) collides with a same-named NAMED
+      export of that module. Exactly how every ESLint flat config is written —
+      `tseslint.configs.recommended` is the documented usage — so the rule is
+      pure noise here with no correctness value.
+    strategy: >
+      Irreducible stylistic caution against the standard flat-config idiom.
+
+  # ── P7 eslint-plugin-security — detect-object-injection off tree-wide ──────
+  - path: "web/**"
+    rule: "security/detect-object-injection"
+    reason: >
+      Pure noise in a typed codebase: the rule flags EVERY computed-key member
+      access (obj[k], arr[i]) irrespective of provenance — 38 hits here, all on
+      type-constrained record/array reads whose key space is fixed by the type.
+      TypeScript already proves them safe, and the genuine sink the rule targets
+      (a user-controlled key reaching a prototype-mutable object) cannot arise
+      from these lookups. The single dynamic-RegExp hit its sibling rule flagged
+      was fixed at source (fileUpload/helpers.ts field parser rewritten to one
+      literal regex + a Map, no computed-key object sink); the browser-relevant
+      security detectors (unsafe-regex, non-literal-regexp, eval-with-expression,
+      bidi-characters, possible-timing-attacks) stay at error.
+    strategy: >
+      Irreducible while the rule cannot see that TypeScript's type system fixes
+      the key space; re-evaluate if a type-aware object-injection rule appears.
+
+  # ── P7 no-unsanitized — contentEditable seeding is injection-free ─────────
+  - path: "web/src/components/agents/MarkdownEditor.tsx"
+    rule: "no-unsanitized/property"
+    reason: >
+      The WYSIWYG editor seeds its contentEditable surface once on mount via
+      `ref.current.innerHTML = mdToHtml(initialMarkdown)`. no-unsanitized/property
+      flags every non-literal innerHTML write, but this string is provably
+      injection-free: mdToHtml runs esc() (escapes &, <, >) over ALL text before
+      wrapping it in a FIXED literal tag vocabulary (h1/h2/p/blockquote/pre/
+      ul/ol/li + inline strong/code), so no user character can form a tag or
+      attribute, and there is no user-controlled attribute value anywhere.
+      Seeding via innerHTML is additionally IRREDUCIBLE for a contentEditable
+      WYSIWYG: React cannot own the surface's children without fighting the
+      browser's own execCommand mutations (caret jumps + reconciliation
+      clobbering live edits — the exact reason the surface is deliberately
+      uncontrolled). Scoped to this one file + this one rule; the sibling
+      no-unsanitized/method rule and every other rule stay at error. The analog
+      of the livePreviews highlight.js dangerouslySetInnerHTML exception.
+    strategy: >
+      Re-evaluate if a trusted-types / sanitizer API the rule recognises can
+      seed a contentEditable region, or if the editor is ever rebuilt on a
+      DOM-builder (createElement) seed instead of an HTML string.
+
+  # ── P7 no-secrets — off for the lint config's own documentation comments ──
+  - path: "web/eslint.config.ts"
+    rule: "no-secrets/no-secrets"
+    reason: >
+      eslint-plugin-no-secrets scans comment text as well as string literals.
+      This config file's extensive rationale comments cite long, high-entropy API
+      / compiler-flag IDENTIFIERS by name — `dangerouslySetInnerHTML` (Shannon
+      entropy 4.02) and `noPropertyAccessFromIndexSignature` (4.24) — which the
+      entropy heuristic mistakes for hardcoded secrets. They are neither secrets
+      nor even string literals: they are documentation prose naming the very
+      rules/flags this config governs, and this file is build tooling that never
+      ships to the browser. The rule stays at error across ALL app source
+      (literals AND comments) where a genuine leaked credential would actually
+      matter — the frontend being the dumb render layer (M141), every secret
+      resolves server-side through cp-vault and never appears as a literal.
+    strategy: >
+      Re-evaluate if a comment-skipping option lands upstream (then the rule can
+      be re-enabled here with comments excluded), or if the cited identifiers are
+      ever moved out of inline prose.
+
+  # ── P8 max-lines — off for the lint config file itself ────────────────────
+  - path: "web/eslint.config.ts"
+    rule: "max-lines"
+    reason: >
+      The structural line cap (500, the CB7 web-structure twin) governs APP
+      SOURCE — CB7 itself scopes its ≤500-lines/file check to web/src/**,
+      deliberately exempting build tooling at the repo/web root. This flat ESLint
+      config is exactly that: build tooling, not shipped code, and the bulk of
+      its length is the per-rule rationale prose the project's documentation
+      standard mandates (every calibration/disable explains WHY, in place).
+      Capping a config whose value IS its documentation at 500 lines would force
+      either terse, unexplained rules or an artificial split scattering one
+      coherent ruleset across files — both worse than one fully-documented
+      config. Scoped to this one file + this one rule; every other file stays
+      under the 500-line cap (all app source is currently ≤485 raw lines).
+    strategy: >
+      Re-evaluate if the config is ever split for other reasons (e.g. a shared
+      base preset extracted), or if a config-file-aware line budget is adopted.
+
+  # ── P9 no-restricted-imports — off inside the api layer (the SDK wrapper) ──
+  - path: "web/src/lib/api/**/*.{ts,tsx}"
+    rule: "@typescript-eslint/no-restricted-imports"
+    reason: >
+      The M141 crown-jewel guard bans value-importing the generated OpenAPI SDK
+      (@/lib/api/generated) anywhere outside the api layer — every other layer
+      must consume the hand-written wrappers from @/lib/api, so the frontend's
+      backend coupling lives in exactly one place. The api layer IS that place:
+      its whole job is to value-import the generated SDK functions and expose
+      thin fetch wrappers, so the rule is necessarily off HERE and only here.
+      The boundaries/dependencies rule already permits api→generated; this
+      off-switch is its twin for the import-path guard. `import type` of the
+      generated contract shape stays allowed everywhere via allowTypeImports, so
+      this exception governs only the value imports the api layer must make.
+      Every non-api file stays at error — no component or support module can
+      reach past the api layer to the raw SDK.
+    strategy: >
+      Irreducible: a wrapper layer must import the thing it wraps. The guard is
+      already as narrow as possible (this one folder, value imports only).
+
+  # ── P10c better-tailwindcss — line-wrapping owned by Prettier ─────────────
+  - path: "web/src/**/*.{ts,tsx}"
+    rule: "better-tailwindcss/enforce-consistent-line-wrapping"
+    reason: >
+      IRRECONCILABLE CONFLICT WITH PRETTIER (the canonical formatter, the rustfmt
+      twin from P2). This rule reflows the className string onto multiple lines;
+      Prettier then re-collapses it to its own line shape — the two fight in an
+      infinite --fix loop (the same class of conflict as unicorn/no-nested-ternary
+      resolved in P5). The rule is a pure line-shape opinion; whitespace/wrapping
+      is Prettier's domain, so the formatter wins and this rule is off. The other
+      seven better-tailwindcss rules (class order, canonical, duplicate,
+      deprecated, conflicting, unnecessary-whitespace) stay at error.
+    strategy: >
+      Re-evaluate if the rule gains a Prettier-compatible mode, or if
+      prettier-plugin-tailwindcss ever owns wrapping directly.
+
+  # ── P10c better-tailwindcss — no-unknown-classes can't resolve custom ─────
+  #    index.css utilities or CSS-var arbitrary values.
+  - path: "web/src/**/*.{ts,tsx}"
+    rule: "better-tailwindcss/no-unknown-classes"
+    reason: >
+      Pure false-positive noise against two legitimate patterns pervasive here.
+      (1) Custom index.css classes authored as plain CSS rules — .card-shadow,
+      .pop-shadow, .fill-sweep, .opt-rise, .menu-pop, .modal-pop (shadow +
+      keyframe-animation helpers). They are real classes but declared as ordinary
+      `.foo {}` rules, not Tailwind `@utility` directives, so Tailwind's compiler
+      never registers them as utilities and the plugin's resolver can't see them.
+      (2) CSS-variable arbitrary values — text-[var(--ok)] / bg-(--signal) /
+      ring-(--signal)/50 — which the plugin can't resolve to a known utility.
+      This DIRECTLY CONTRADICTS the sibling enforce-canonical-classes rule, which
+      REWRITES text-[var(--ok)] INTO text-(--ok) — the very shorthand
+      no-unknown-classes then flags as unknown. Two rules cannot both be right;
+      canonical wins (autofixable, correctness-bearing), so this is off. The
+      other seven better-tailwindcss rules stay at error.
+    strategy: >
+      Re-evaluate if the custom helpers are migrated to `@utility` directives AND
+      the plugin learns to resolve theme CSS-var arbitrary values (which would
+      also resolve the canonical-vs-unknown contradiction).

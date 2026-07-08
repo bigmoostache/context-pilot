@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import type { CrossTab, CostRow } from "./parse"
-import { fmtTokens } from "./charts"
+import { fmtTokens } from "./format"
 
 // ── Heat-map helpers ────────────────────────────────────────────────────────
 
@@ -27,16 +27,18 @@ function heatBgDark(count: number, max: number): string | undefined {
 // ── Section wrapper (shared) ────────────────────────────────────────────────
 
 function Section({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-5 card-shadow">
-      {children}
-    </div>
-  )
+  return <div className="card-shadow rounded-xl border border-border bg-card p-5">{children}</div>
 }
 
 // ── Cross-tab table ─────────────────────────────────────────────────────────
 
-export function CrossTabTable({ crossTab, totalTicks }: { crossTab: CrossTab; totalTicks: number }) {
+export function CrossTabTable({
+  crossTab,
+  totalTicks,
+}: {
+  crossTab: CrossTab
+  totalTicks: number
+}) {
   const [hover, setHover] = useState<{ tool: string; culprit: string } | null>(null)
   const isDark = document.documentElement.classList.contains("dark")
   const bgFn = isDark ? heatBgDark : heatBg
@@ -61,7 +63,7 @@ export function CrossTabTable({ crossTab, totalTicks }: { crossTab: CrossTab; to
             {" × "}
             <strong className="text-foreground/80">{hover.culprit}</strong>
             {" = "}
-            <strong className="tabular-nums text-foreground">
+            <strong className="text-foreground tabular-nums">
               {crossTab.cells.get(`${hover.tool}\t${hover.culprit}`) ?? 0}
             </strong>
           </span>
@@ -105,14 +107,15 @@ export function CrossTabTable({ crossTab, totalTicks }: { crossTab: CrossTab; to
                   </td>
                   {crossTab.culprits.map((c) => {
                     const v = crossTab.cells.get(`${tool}\t${c}`) ?? 0
-                    const isActive = hover?.tool === tool && hover?.culprit === c
-                    const isDimmed = hover !== null && !isActive && hover.tool !== tool && hover.culprit !== c
+                    const isActive = hover !== null && hover.tool === tool && hover.culprit === c
+                    const isDimmed =
+                      hover !== null && !isActive && hover.tool !== tool && hover.culprit !== c
                     return (
                       <td
                         key={c}
                         className={`px-2 py-1 text-center tabular-nums transition-all duration-150 ${
                           isActive
-                            ? "ring-2 ring-foreground/30 ring-inset font-bold text-foreground"
+                            ? "font-bold text-foreground ring-2 ring-foreground/30 ring-inset"
                             : isDimmed
                               ? "text-foreground/25"
                               : "text-foreground/70"
@@ -128,7 +131,7 @@ export function CrossTabTable({ crossTab, totalTicks }: { crossTab: CrossTab; to
                       </td>
                     )
                   })}
-                  <td className="px-2 py-1 text-center tabular-nums font-semibold text-foreground/70">
+                  <td className="px-2 py-1 text-center font-semibold text-foreground/70 tabular-nums">
                     {rowTotal}
                   </td>
                 </tr>
@@ -148,7 +151,7 @@ export function CrossTabTable({ crossTab, totalTicks }: { crossTab: CrossTab; to
                 return (
                   <td
                     key={c}
-                    className={`px-2 py-1.5 text-center tabular-nums font-semibold transition-colors ${
+                    className={`px-2 py-1.5 text-center font-semibold tabular-nums transition-colors ${
                       hover?.culprit === c ? "text-foreground" : "text-foreground/70"
                     }`}
                   >
@@ -156,7 +159,7 @@ export function CrossTabTable({ crossTab, totalTicks }: { crossTab: CrossTab; to
                   </td>
                 )
               })}
-              <td className="px-2 py-1.5 text-center tabular-nums font-bold text-foreground">
+              <td className="px-2 py-1.5 text-center font-bold text-foreground tabular-nums">
                 {totalTicks}
               </td>
             </tr>
@@ -206,7 +209,10 @@ export function ApiTokenDistribution({ rows }: { rows: CostRow[] }) {
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
         {segments.map((s) => (
           <span key={s.label} className="flex items-center gap-1.5">
-            <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
+            <span
+              className="inline-block size-2.5 rounded-sm"
+              style={{ backgroundColor: s.color }}
+            />
             {s.label}: {fmtTokens(s.value)} avg
           </span>
         ))}
@@ -252,7 +258,10 @@ export function TokenDistribution({ rows }: { rows: CostRow[] }) {
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
         {segments.map((s) => (
           <span key={s.label} className="flex items-center gap-1.5">
-            <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
+            <span
+              className="inline-block size-2.5 rounded-sm"
+              style={{ backgroundColor: s.color }}
+            />
             {s.label}: {fmtTokens(s.value)} avg
           </span>
         ))}

@@ -18,7 +18,16 @@ cargo test -p cp-orchestrator --test openapi generate_openapi -- --ignored --qui
 
 echo "▸ Regenerating TypeScript client from openapi.json…"
 cd "$ROOT/web"
-npx @hey-api/openapi-ts -i ../openapi.json -o src/lib/api/generated 2>&1
+# Codegen is driven by web/openapi-ts.config.ts, whose `output.header` emits the
+# `// @ts-nocheck` generated-bindings header NATIVELY into every file (web-lint
+# P1). No post-codegen stamping step: the committed tree is byte-identical to a
+# plain config-driven run, so the drift check below is a clean regenerate +
+# `git diff --exit-code`. The @ts-nocheck excludes the vendored runtime
+# internals (not exactOptionalPropertyTypes-clean) from strict internal
+# checking, while our hand-written lib/api consumers still type-check against the
+# exported types — the exact analogue of a relaxed lint profile over Rust
+# generated bindings.
+npx @hey-api/openapi-ts -f openapi-ts.config.ts 2>&1
 
 echo "▸ Checking for uncommitted drift…"
 cd "$ROOT"
@@ -29,7 +38,7 @@ if ! git diff --exit-code -- openapi.json web/src/lib/api/generated/; then
   echo "out of sync with the Rust backend types. Run:"
   echo ""
   echo "  cargo test -p cp-orchestrator --test openapi generate_openapi -- --ignored"
-  echo "  cd web && npx @hey-api/openapi-ts -i ../openapi.json -o src/lib/api/generated"
+  echo "  cd web && npx @hey-api/openapi-ts -f openapi-ts.config.ts"
   echo "  git add openapi.json web/src/lib/api/generated/"
   echo ""
   exit 1

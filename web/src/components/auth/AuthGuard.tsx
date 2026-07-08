@@ -13,7 +13,7 @@
 // re-pulls /me and advances `next_action`.
 
 import { type ReactNode } from "react"
-import { useAuth } from "@/lib/support/auth"
+import { useAuth } from "@/lib/providers/auth"
 import { LoginPage } from "./LoginPage"
 import { Onboarding } from "./Onboarding"
 import { ForcePasswordChange } from "./ForcePasswordChange"
@@ -25,7 +25,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   if (loading || authEnabled === null) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground animate-pulse font-mono text-sm">
+        <div className="animate-pulse font-mono text-sm text-muted-foreground">
           <span className="text-signal">▌</span> Connecting…
         </div>
       </div>
@@ -40,11 +40,14 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
   // Backend-driven post-login step.
   switch (user.next_action) {
-    case "change_password":
+    case "change_password": {
       return <ForcePasswordChange />
-    case "onboarding":
-      return <Onboarding onComplete={refreshMe} />
-    default:
+    }
+    case "onboarding": {
+      return <Onboarding onComplete={() => void refreshMe()} />
+    }
+    default: {
       return <>{children}</>
+    }
   }
 }

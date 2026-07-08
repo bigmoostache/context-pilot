@@ -5,8 +5,8 @@ import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import "katex/dist/katex.min.css"
 
-import { CopyButton } from "@/components/conversation/Message"
-import { cn } from "@/lib/utils"
+import { CopyButton } from "@/components/conversation/CopyButton"
+import { cn, clipboard } from "@/lib/utils"
 
 /**
  * Full GitHub-flavored markdown renderer for chat/thread messages.
@@ -30,15 +30,28 @@ import { cn } from "@/lib/utils"
  */
 export type MarkdownVariant = "default" | "onAccent"
 
-/** Recursively extract plain text from a React element tree (for copy). */
-function extractText(node: ReactNode): string {
-  if (node == null || typeof node === "boolean") return ""
-  if (typeof node === "string" || typeof node === "number") return String(node)
-  if (Array.isArray(node)) return node.map(extractText).join("")
-  if (typeof node === "object" && "props" in node) {
-    return extractText((node as { props: { children?: ReactNode } }).props.children)
+/**
+ * Extract plain text from a React element tree (for copy). Walks the tree with
+ * an explicit stack rather than recursion — a React node tree can nest
+ * arbitrarily (arrays of elements whose children are arrays…), and the stack
+ * keeps the traversal iterative while preserving document order (children are
+ * pushed in reverse so they pop left-to-right).
+ */
+function extractText(root: ReactNode): string {
+  let out = ""
+  const stack: ReactNode[] = [root]
+  while (stack.length > 0) {
+    const node = stack.pop()
+    if (node == null || typeof node === "boolean") continue
+    if (typeof node === "string" || typeof node === "number") {
+      out += String(node)
+    } else if (Array.isArray(node)) {
+      for (let i = node.length - 1; i >= 0; i--) stack.push(node[i] as ReactNode)
+    } else if (typeof node === "object" && "props" in node) {
+      stack.push((node as { props: { children?: ReactNode } }).props.children)
+    }
   }
-  return ""
+  return out
 }
 
 /**
@@ -48,18 +61,41 @@ function extractText(node: ReactNode): string {
  * `--ok` green as confirmation. Clicks inside a `<pre>` (fenced code blocks)
  * are ignored — those have a dedicated CopyButton beneath them.
  */
-function ClickableCode({ baseClass, children, ...rest }: { baseClass: string; children?: ReactNode; [k: string]: unknown }) {
+function ClickableCode({
+  baseClass,
+  children,
+  ...rest
+}: {
+  baseClass: string
+  children?: ReactNode
+  [k: string]: unknown
+}) {
   const [copied, setCopied] = useState(false)
   return (
     <code
-      className={cn(baseClass, "cursor-pointer transition-colors duration-150", copied && "!border-[var(--ok)] !text-[var(--ok)]")}
+      role="presentation"
+      className={cn(
+        baseClass,
+        "cursor-pointer transition-colors duration-150",
+        copied && "border-(--ok)! text-(--ok)!",
+      )}
       onClick={(ev) => {
         if ((ev.target as HTMLElement).closest("pre")) return
         const text = typeof children === "string" ? children : extractText(children)
-        navigator.clipboard?.writeText(text).then(() => {
-          setCopied(true)
-          window.setTimeout(() => setCopied(false), 1500)
-        }, () => {})
+        // `clipboard()` is honestly typed `Clipboard | undefined` (absent on an
+        // insecure origin), so the `?.` guard is real — a missing clipboard is a
+        // silent no-op, not a throw.
+        void clipboard()
+          ?.writeText(text)
+          .then(
+            () => {
+              setCopied(true)
+              window.setTimeout(() => setCopied(false), 1500)
+            },
+            () => {
+              /* clipboard write rejected — ignore, the copy tick simply won't flash */
+            },
+          )
       }}
       {...rest}
     >
@@ -75,25 +111,22 @@ function ClickableCode({ baseClass, children, ...rest }: { baseClass: string; ch
  * markdown-native application.
  */
 function tableToMarkdown(table: HTMLTableElement): string {
-  const rows = Array.from(table.rows)
+  const rows = [...table.rows]
   if (rows.length === 0) return ""
-  const matrix = rows.map((row) =>
-    Array.from(row.cells).map((cell) => cell.textContent?.trim() ?? ""),
-  )
+  const matrix = rows.map((row) => [...row.cells].map((cell) => cell.textContent.trim()))
   const colCount = Math.max(...matrix.map((r) => r.length))
   const colWidths = Array.from({ length: colCount }, (_, i) =>
     Math.max(3, ...matrix.map((r) => (r[i] ?? "").length)),
   )
   const fmtRow = (cells: string[]) =>
     "| " +
-    Array.from({ length: colCount }, (_, i) => (cells[i] ?? "").padEnd(colWidths[i])).join(
+    Array.from({ length: colCount }, (_, i) => (cells[i] ?? "").padEnd(colWidths[i] ?? 3)).join(
       " | ",
     ) +
     " |"
-  const sep =
-    "| " + colWidths.map((w) => "-".repeat(w)).join(" | ") + " |"
+  const sep = "| " + colWidths.map((w) => "-".repeat(w)).join(" | ") + " |"
   const [header, ...body] = matrix
-  return [fmtRow(header), sep, ...body.map(fmtRow)].join("\n")
+  return [fmtRow(header ?? []), sep, ...body.map((row) => fmtRow(row))].join("\n")
 }
 
 /**
@@ -170,16 +203,18 @@ function components(variant: MarkdownVariant): Components {
   return {
     // ── Headings — graded scale, tight top spacing, no top margin on first. ──
     h1: ({ children }) => (
-      <h1 className="mt-3 mb-1.5 text-[17px] font-semibold leading-snug first:mt-0">{children}</h1>
+      <h1 className="mt-3 mb-1.5 text-[17px] leading-snug font-semibold first:mt-0">{children}</h1>
     ),
     h2: ({ children }) => (
-      <h2 className="mt-3 mb-1.5 text-[15px] font-semibold leading-snug first:mt-0">{children}</h2>
+      <h2 className="mt-3 mb-1.5 text-[15px] leading-snug font-semibold first:mt-0">{children}</h2>
     ),
     h3: ({ children }) => (
-      <h3 className="mt-2.5 mb-1 text-[13.5px] font-semibold leading-snug first:mt-0">{children}</h3>
+      <h3 className="mt-2.5 mb-1 text-[13.5px] leading-snug font-semibold first:mt-0">
+        {children}
+      </h3>
     ),
     h4: ({ children }) => (
-      <h4 className="mt-2 mb-1 text-[12.5px] font-semibold uppercase tracking-wide opacity-80 first:mt-0">
+      <h4 className="mt-2 mb-1 text-[12.5px] font-semibold tracking-wide uppercase opacity-80 first:mt-0">
         {children}
       </h4>
     ),
@@ -245,12 +280,17 @@ function components(variant: MarkdownVariant): Components {
         <pre
           className={cn(
             preBox,
-            "[&>code]:border-0 [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-[inherit]",
+            "[&>code]:border-0 [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-inherit",
           )}
         >
           {children}
         </pre>
-        <CopyButton text={extractText(children)} align="start" label="Copy code" className={onAccent ? "text-current/60 hover:text-current" : undefined} />
+        <CopyButton
+          text={extractText(children)}
+          align="start"
+          label="Copy code"
+          className={onAccent ? "text-current/60 hover:text-current" : undefined}
+        />
       </div>
     ),
 
@@ -260,7 +300,9 @@ function components(variant: MarkdownVariant): Components {
     ),
 
     // ── Horizontal rule ──
-    hr: () => <hr className={cn("my-3 border-t", onAccent ? "border-white/25" : "border-border")} />,
+    hr: () => (
+      <hr className={cn("my-3 border-t", onAccent ? "border-white/25" : "border-border")} />
+    ),
 
     // ── Tables (GFM) — wrapped so wide tables scroll instead of overflowing. ──
     table: ({ children }) => (
@@ -284,7 +326,7 @@ function components(variant: MarkdownVariant): Components {
           type="checkbox"
           checked={checked}
           readOnly
-          className="mr-1.5 translate-y-px accent-[var(--signal)]"
+          className="mr-1.5 translate-y-px accent-(--signal)"
         />
       ) : null,
   }
@@ -304,7 +346,7 @@ function components(variant: MarkdownVariant): Components {
 const BULLET_RE = /^([ \t]*)[•◦▪‣][ \t]/gm
 
 function normalizeMarkdown(text: string): string {
-  return text.replace(BULLET_RE, "$1- ")
+  return text.replaceAll(BULLET_RE, "$1- ")
 }
 
 /**
@@ -321,8 +363,12 @@ export const Markdown = memo(function Markdown({
   className?: string
 }): ReactNode {
   return (
-    <div className={cn("break-words", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]} rehypePlugins={[rehypeKatex]} components={components(variant)}>
+    <div className={cn("wrap-break-word", className)}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
+        rehypePlugins={[rehypeKatex]}
+        components={components(variant)}
+      >
         {normalizeMarkdown(text)}
       </ReactMarkdown>
     </div>

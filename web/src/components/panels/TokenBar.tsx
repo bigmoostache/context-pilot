@@ -16,12 +16,7 @@ export function TokenBar({ value, max, color, animate = true, className }: Token
   const ratio = max > 0 ? Math.min(1, value / max) : 0
   const fill = color ?? loadColor(ratio)
   return (
-    <div
-      className={cn(
-        "w-full overflow-hidden rounded-full bg-muted",
-        className,
-      )}
-    >
+    <div className={cn("w-full overflow-hidden rounded-full bg-muted", className)}>
       <div
         className={cn("h-full rounded-full", animate && "fill-sweep")}
         style={{ width: `${ratio * 100}%`, background: fill }}

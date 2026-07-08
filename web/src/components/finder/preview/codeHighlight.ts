@@ -137,8 +137,5 @@ export function highlightCode(code: string, filename: string): HighlightResult {
 
 /** Minimal HTML escape for the degraded (highlight-failed) path. */
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
 }

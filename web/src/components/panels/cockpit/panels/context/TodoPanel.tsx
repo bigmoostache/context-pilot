@@ -31,7 +31,7 @@ export function TodoPanel({ panel, agentId }: { panel: ContextPanel; agentId: st
       <div className="mb-4">
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full rounded-full fill-sweep"
+            className="fill-sweep h-full rounded-full"
             style={{ width: `${ratio * 100}%`, background: "var(--ok)" }}
           />
         </div>
@@ -47,12 +47,16 @@ export function TodoPanel({ panel, agentId }: { panel: ContextPanel; agentId: st
               style={{ paddingLeft: `${t.depth * 18 + 8}px` }}
             >
               <Icon className="mt-0.5 size-4 shrink-0" style={{ color }} />
-              <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/60">
+              <span className="shrink-0 font-mono text-[10px] text-muted-foreground/60 tabular-nums">
                 {t.id}
               </span>
               <span
                 className="text-[12.5px] leading-snug text-foreground/85"
-                style={t.status === "done" ? { textDecoration: "line-through", opacity: 0.55 } : undefined}
+                style={
+                  t.status === "done"
+                    ? { textDecoration: "line-through", opacity: 0.55 }
+                    : undefined
+                }
               >
                 {t.name}
               </span>

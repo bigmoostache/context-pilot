@@ -86,8 +86,8 @@ export function culpritDistribution(rows: CostRow[]): Slice[] {
   for (const r of broken) {
     map.set(r.culprit, (map.get(r.culprit) ?? 0) + 1)
   }
-  return [...map.entries()]
-    .sort((a, b) => b[1] - a[1])
+  return [...map]
+    .toSorted((a, b) => b[1] - a[1])
     .map(([label, value], i) => ({
       label,
       value,
@@ -168,7 +168,7 @@ export function crossTabToolCulprit(rows: CostRow[]): CrossTab {
   const culpritSet = new Set<string>()
   for (const r of rows) {
     // First tool in the comma-separated list is the most recent (the one that ran at this tick)
-    const tool = r.tools.split(",")[0] ?? "(none)"
+    const tool = r.tools.split(",", 1)[0] ?? "(none)"
     if (!tool) continue
     const culprit = r.culprit || "none"
     toolSet.add(tool)
@@ -177,19 +177,21 @@ export function crossTabToolCulprit(rows: CostRow[]): CrossTab {
     cells.set(key, (cells.get(key) ?? 0) + 1)
   }
   // Sort tools by total count descending
-  const toolTotals = [...toolSet].map((t) => {
-    let total = 0
-    for (const c of culpritSet) total += cells.get(`${t}\t${c}`) ?? 0
-    return { tool: t, total }
-  })
-  toolTotals.sort((a, b) => b.total - a.total)
+  const toolTotals = [...toolSet]
+    .map((t) => {
+      let total = 0
+      for (const c of culpritSet) total += cells.get(`${t}\t${c}`) ?? 0
+      return { tool: t, total }
+    })
+    .toSorted((a, b) => b.total - a.total)
   // Sort culprits by total count descending
-  const culpritTotals = [...culpritSet].map((c) => {
-    let total = 0
-    for (const t of toolSet) total += cells.get(`${t}\t${c}`) ?? 0
-    return { culprit: c, total }
-  })
-  culpritTotals.sort((a, b) => b.total - a.total)
+  const culpritTotals = [...culpritSet]
+    .map((c) => {
+      let total = 0
+      for (const t of toolSet) total += cells.get(`${t}\t${c}`) ?? 0
+      return { culprit: c, total }
+    })
+    .toSorted((a, b) => b.total - a.total)
   return {
     tools: toolTotals.map((t) => t.tool),
     culprits: culpritTotals.map((c) => c.culprit),
@@ -207,8 +209,170 @@ function md$(v: number): string {
 /** Minimal token formatter for markdown. */
 function mdTok(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}K`
   return String(Math.round(v))
+}
+
+// ── Markdown report sections (one pure `CostRow[] → string[]` builder each) ──
+//
+// buildMarkdownReport was a single 86-statement function; each report section
+// is now its own small pure builder returning the lines it contributes (an
+// empty array when its section is omitted), so the top-level function is a thin
+// concat and every piece stays within the P8 complexity/statement budgets.
+
+/** Report title + optional active-filter line + tick count. */
+function reportHeader(
+  s: Summary,
+  totalRows: number,
+  filters: { tempo: string; queue: string; breakKind: string },
+): string[] {
+  const fParts: string[] = []
+  if (filters.tempo !== "all") fParts.push(`Tempo=${filters.tempo === "1" ? "On" : "Off"}`)
+  if (filters.queue !== "all") fParts.push(`Queue=${filters.queue === "1" ? "On" : "Off"}`)
+  if (filters.breakKind !== "all") fParts.push(`Break=${filters.breakKind}`)
+  const suffix = s.totalTicks === totalRows ? "" : ` (filtered from ${totalRows})`
+  return [
+    "# Cost Analysis Report",
+    "",
+    ...(fParts.length > 0 ? [`**Filters:** ${fParts.join(", ")}`] : []),
+    `**Ticks:** ${s.totalTicks}${suffix}`,
+    "",
+  ]
+}
+
+/** Summary metrics table. */
+function reportSummary(s: Summary): string[] {
+  return [
+    "## Summary",
+    "",
+    "| Metric | Value |",
+    "|--------|-------|",
+    `| Total cost | ${md$(s.totalCost)} |`,
+    `| LLM ticks | ${s.totalTicks.toLocaleString()} |`,
+    `| Avg cost / tick | ${md$(s.avgCostPerTick)} |`,
+    `| Cache hit rate | ${(s.cacheHitRate * 100).toFixed(1)}% |`,
+    `| Clean ticks | ${s.ticksClean} |`,
+    `| Break ticks | ${s.ticksWithBreak} |`,
+    `| Total hit tokens | ${mdTok(s.totalHitTokens)} |`,
+    `| Total miss tokens | ${mdTok(s.totalMissTokens)} |`,
+    `| Total output tokens | ${mdTok(s.totalOutTokens)} |`,
+    "",
+  ]
+}
+
+/** Cache-break culprit frequency table (omitted when no breaks). */
+function reportCulprits(culprits: Slice[]): string[] {
+  if (culprits.length === 0) return []
+  const totalCount = culprits.reduce((a, b) => a + b.value, 0)
+  return [
+    "## Cache Break Culprits",
+    "",
+    "| Culprit | Count | % |",
+    "|---------|-------|---|",
+    ...culprits.map(
+      (c) => `| ${c.label} | ${c.value} | ${((c.value / totalCount) * 100).toFixed(1)}% |`,
+    ),
+    "",
+  ]
+}
+
+/** Cost-by-category table. */
+function reportCostBreakdown(costs: Slice[]): string[] {
+  return [
+    "## Cost by Category",
+    "",
+    "| Category | Cost |",
+    "|----------|------|",
+    ...costs.map((c) => `| ${c.label} | ${md$(c.value)} |`),
+    "",
+  ]
+}
+
+/** A generic labelled cost table (top tools / top culprits by cost). */
+function reportCostTable(title: string, header: string, rows: Slice[]): string[] {
+  if (rows.length === 0) return []
+  return [
+    `## ${title}`,
+    "",
+    header,
+    "|------|------|",
+    ...rows.map((r) => `| ${r.label} | ${md$(r.value)} |`),
+    "",
+  ]
+}
+
+/** Max-freezes-per-culprit table (omitted when no breaks). */
+function reportFreezes(filtered: CostRow[]): string[] {
+  const freezes = maxFreezePerCulprit(filtered)
+  if (freezes.length === 0) return []
+  return [
+    "## Max Freezes per Culprit",
+    "",
+    "| Culprit | Max Freezes |",
+    "|---------|-------------|",
+    ...freezes.map((f) => `| ${f.label} | ${f.value} |`),
+    "",
+  ]
+}
+
+/** A three-row average-token table (mean of `pick` over the rows). */
+function avgTokenTable(
+  title: string,
+  filtered: CostRow[],
+  segments: [string, (r: CostRow) => number][],
+): string[] {
+  const rows = segments.map(([label, pick]) => {
+    const avg = Math.round(filtered.reduce((a, r) => a + pick(r), 0) / filtered.length)
+    return `| ${label} | ${mdTok(avg)} |`
+  })
+  return [
+    `## ${title} (${filtered.length} ticks)`,
+    "",
+    "| Segment | Avg tokens |",
+    "|---------|-----------|",
+    ...rows,
+    "",
+  ]
+}
+
+/** Both token-layout tables (panel-based + API-reported); omitted when empty. */
+function reportTokenLayout(filtered: CostRow[]): string[] {
+  if (filtered.length === 0) return []
+  return [
+    ...avgTokenTable("Average Token Layout", filtered, [
+      ["Before culprit", (r) => r.tokensBefore],
+      ["Culprit panel", (r) => r.tokensCulprit],
+      ["After culprit", (r) => r.tokensAfter],
+    ]),
+    ...avgTokenTable("API-Reported Token Layout", filtered, [
+      ["Cache hit", (r) => r.hitTokens],
+      ["Cache miss", (r) => r.missTokens],
+      ["Output", (r) => r.outTokens],
+    ]),
+  ]
+}
+
+/** Tool × culprit cross-tabulation table (omitted when either axis is empty). */
+function reportCrossTab(ct: CrossTab, filtered: CostRow[]): string[] {
+  if (ct.tools.length === 0 || ct.culprits.length === 0) return []
+  const hdr = ["Tool", ...ct.culprits, "Total"]
+  const body = ct.tools.map((tool) => {
+    const cells = ct.culprits.map((c) => String(ct.cells.get(`${tool}\t${c}`) ?? 0))
+    const rowTotal = ct.culprits.reduce((a, c) => a + (ct.cells.get(`${tool}\t${c}`) ?? 0), 0)
+    return `| ${tool} | ${cells.join(" | ")} | ${rowTotal} |`
+  })
+  const colTotals = ct.culprits.map((c) =>
+    String(ct.tools.reduce((a, t) => a + (ct.cells.get(`${t}\t${c}`) ?? 0), 0)),
+  )
+  return [
+    "## Tool × Culprit Cross-Tab",
+    "",
+    `| ${hdr.join(" | ")} |`,
+    `|${hdr.map(() => "------").join("|")}|`,
+    ...body,
+    `| **Total** | ${colTotals.join(" | ")} | **${filtered.length}** |`,
+    "",
+  ]
 }
 
 /** Serialize the current filtered view as a clean markdown report. */
@@ -218,124 +382,25 @@ export function buildMarkdownReport(
   filters: { tempo: string; queue: string; breakKind: string },
 ): string {
   const s = computeSummary(filtered)
-  const culprits = culpritDistribution(filtered)
-  const costs = costBreakdown(filtered)
-  const tools = toolCostAttribution(filtered)
-  const ct = crossTabToolCulprit(filtered)
-
-  const lines: string[] = []
-  const push = (...l: string[]) => lines.push(...l)
-
-  // Header
-  push("# Cost Analysis Report", "")
-  const fParts: string[] = []
-  if (filters.tempo !== "all") fParts.push(`Tempo=${filters.tempo === "1" ? "On" : "Off"}`)
-  if (filters.queue !== "all") fParts.push(`Queue=${filters.queue === "1" ? "On" : "Off"}`)
-  if (filters.breakKind !== "all") fParts.push(`Break=${filters.breakKind}`)
-  if (fParts.length > 0) push(`**Filters:** ${fParts.join(", ")}`)
-  push(`**Ticks:** ${s.totalTicks}${s.totalTicks !== totalRows ? ` (filtered from ${totalRows})` : ""}`, "")
-
-  // Summary
-  push("## Summary", "")
-  push("| Metric | Value |", "|--------|-------|")
-  push(`| Total cost | ${md$(s.totalCost)} |`)
-  push(`| LLM ticks | ${s.totalTicks.toLocaleString()} |`)
-  push(`| Avg cost / tick | ${md$(s.avgCostPerTick)} |`)
-  push(`| Cache hit rate | ${(s.cacheHitRate * 100).toFixed(1)}% |`)
-  push(`| Clean ticks | ${s.ticksClean} |`)
-  push(`| Break ticks | ${s.ticksWithBreak} |`)
-  push(`| Total hit tokens | ${mdTok(s.totalHitTokens)} |`)
-  push(`| Total miss tokens | ${mdTok(s.totalMissTokens)} |`)
-  push(`| Total output tokens | ${mdTok(s.totalOutTokens)} |`)
-  push("")
-
-  // Culprit distribution
-  if (culprits.length > 0) {
-    const totalCount = culprits.reduce((a, b) => a + b.value, 0)
-    push("## Cache Break Culprits", "")
-    push("| Culprit | Count | % |", "|---------|-------|---|")
-    for (const c of culprits) {
-      push(`| ${c.label} | ${c.value} | ${((c.value / totalCount) * 100).toFixed(1)}% |`)
-    }
-    push("")
-  }
-
-  // Cost breakdown
-  push("## Cost by Category", "")
-  push("| Category | Cost |", "|----------|------|")
-  for (const c of costs) push(`| ${c.label} | ${md$(c.value)} |`)
-  push("")
-
-  // Tool attribution
-  if (tools.length > 0) {
-    push("## Top Tools by Associated Cost", "")
-    push("| Tool | Cost |", "|------|------|")
-    for (const t of tools) push(`| ${t.label} | ${md$(t.value)} |`)
-    push("")
-  }
-
-  // Culprit cost attribution
-  const culpritCosts = culpritCostAttribution(filtered)
-  if (culpritCosts.length > 0) {
-    push("## Top Culprits by Associated Cost", "")
-    push("| Culprit | Cost |", "|---------|------|")
-    for (const c of culpritCosts) push(`| ${c.label} | ${md$(c.value)} |`)
-    push("")
-  }
-
-  // Max freeze per culprit
-  const freezes = maxFreezePerCulprit(filtered)
-  if (freezes.length > 0) {
-    push("## Max Freezes per Culprit", "")
-    push("| Culprit | Max Freezes |", "|---------|-------------|")
-    for (const f of freezes) push(`| ${f.label} | ${f.value} |`)
-    push("")
-  }
-
-  // Token distribution (panel-based)
-  if (filtered.length > 0) {
-    const avgBefore = Math.round(filtered.reduce((a, r) => a + r.tokensBefore, 0) / filtered.length)
-    const avgCulprit = Math.round(filtered.reduce((a, r) => a + r.tokensCulprit, 0) / filtered.length)
-    const avgAfter = Math.round(filtered.reduce((a, r) => a + r.tokensAfter, 0) / filtered.length)
-    push(`## Average Token Layout (${filtered.length} ticks)`, "")
-    push("| Segment | Avg tokens |", "|---------|-----------|")
-    push(`| Before culprit | ${mdTok(avgBefore)} |`)
-    push(`| Culprit panel | ${mdTok(avgCulprit)} |`)
-    push(`| After culprit | ${mdTok(avgAfter)} |`)
-    push("")
-
-    // Token distribution (API-reported)
-    const avgHit = Math.round(filtered.reduce((a, r) => a + r.hitTokens, 0) / filtered.length)
-    const avgMiss = Math.round(filtered.reduce((a, r) => a + r.missTokens, 0) / filtered.length)
-    const avgOut = Math.round(filtered.reduce((a, r) => a + r.outTokens, 0) / filtered.length)
-    push(`## API-Reported Token Layout (${filtered.length} ticks)`, "")
-    push("| Segment | Avg tokens |", "|---------|-----------|")
-    push(`| Cache hit | ${mdTok(avgHit)} |`)
-    push(`| Cache miss | ${mdTok(avgMiss)} |`)
-    push(`| Output | ${mdTok(avgOut)} |`)
-    push("")
-  }
-
-  // Cross-tab
-  if (ct.tools.length > 0 && ct.culprits.length > 0) {
-    push("## Tool × Culprit Cross-Tab", "")
-    const hdr = ["Tool", ...ct.culprits, "Total"]
-    push(`| ${hdr.join(" | ")} |`)
-    push(`|${hdr.map(() => "------").join("|")}|`)
-    for (const tool of ct.tools) {
-      const cells = ct.culprits.map((c) => String(ct.cells.get(`${tool}\t${c}`) ?? 0))
-      const rowTotal = ct.culprits.reduce((a, c) => a + (ct.cells.get(`${tool}\t${c}`) ?? 0), 0)
-      push(`| ${tool} | ${cells.join(" | ")} | ${rowTotal} |`)
-    }
-    // Totals row
-    const colTotals = ct.culprits.map((c) =>
-      String(ct.tools.reduce((a, t) => a + (ct.cells.get(`${t}\t${c}`) ?? 0), 0)),
-    )
-    push(`| **Total** | ${colTotals.join(" | ")} | **${filtered.length}** |`)
-    push("")
-  }
-
-  return lines.join("\n")
+  return [
+    ...reportHeader(s, totalRows, filters),
+    ...reportSummary(s),
+    ...reportCulprits(culpritDistribution(filtered)),
+    ...reportCostBreakdown(costBreakdown(filtered)),
+    ...reportCostTable(
+      "Top Tools by Associated Cost",
+      "| Tool | Cost |",
+      toolCostAttribution(filtered),
+    ),
+    ...reportCostTable(
+      "Top Culprits by Associated Cost",
+      "| Culprit | Cost |",
+      culpritCostAttribution(filtered),
+    ),
+    ...reportFreezes(filtered),
+    ...reportTokenLayout(filtered),
+    ...reportCrossTab(crossTabToolCulprit(filtered), filtered),
+  ].join("\n")
 }
 
 /** Per-culprit max_freezes (latest recorded value per panel type). */
@@ -347,8 +412,8 @@ export function maxFreezePerCulprit(rows: CostRow[]): Slice[] {
     // Always take the latest value (overwrite) — reflects current code config
     map.set(key, r.culpritMaxFreezes)
   }
-  return [...map.entries()]
-    .sort((a, b) => b[1] - a[1])
+  return [...map]
+    .toSorted((a, b) => b[1] - a[1])
     .map(([label, value], i) => ({
       label,
       value,
@@ -365,8 +430,8 @@ export function culpritCostAttribution(rows: CostRow[]): Slice[] {
     const key = r.culprit || "unknown"
     map.set(key, (map.get(key) ?? 0) + totalCost)
   }
-  return [...map.entries()]
-    .sort((a, b) => b[1] - a[1])
+  return [...map]
+    .toSorted((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([label, value], i) => ({
       label,
@@ -380,12 +445,13 @@ export function toolCostAttribution(rows: CostRow[]): Slice[] {
   const map = new Map<string, number>()
   for (const r of rows) {
     const totalCost = r.hitCost + r.missCost + r.outCost
-    for (const tool of r.tools.split(",").filter(Boolean)) {
+    const rowTools = r.tools.split(",").filter(Boolean)
+    for (const tool of rowTools) {
       map.set(tool, (map.get(tool) ?? 0) + totalCost)
     }
   }
-  return [...map.entries()]
-    .sort((a, b) => b[1] - a[1])
+  return [...map]
+    .toSorted((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([label, value], i) => ({
       label,

@@ -23,6 +23,7 @@
 use crc32c as _;
 use serde as _;
 use sha2 as _;
+use utoipa as _;
 
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
 use cp_wire::types::snapshot::{Heads, SeenSet, Snapshot};

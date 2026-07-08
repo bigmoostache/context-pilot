@@ -21,10 +21,10 @@ export function PanelFrame({
 }: {
   icon: LucideIcon
   name: string
-  subtitle?: string
-  tokens?: number
-  cost?: number
-  accent?: string
+  subtitle?: string | undefined
+  tokens?: number | undefined
+  cost?: number | undefined
+  accent?: string | undefined
   children: ReactNode
 }) {
   return (
@@ -43,7 +43,7 @@ export function PanelFrame({
           )}
         </div>
         {(tokens !== undefined || cost !== undefined) && (
-          <div className="ml-auto flex items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
+          <div className="ml-auto flex items-center gap-2 text-[11px] text-muted-foreground tabular-nums">
             {tokens !== undefined && (
               <span className="rounded-md bg-muted/70 px-1.5 py-0.5">{fmtTokens(tokens)} tok</span>
             )}
@@ -65,7 +65,7 @@ export function PanelFrame({
 export function PanelSection({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="mb-5 last:mb-0">
-      <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+      <div className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground/70 uppercase">
         {label}
       </div>
       {children}
@@ -92,7 +92,7 @@ export function ImportanceDot({ level }: { level: string }) {
 }
 
 /** A subtle rounded chip for labels/tags. */
-export function Chip({ children, accent }: { children: ReactNode; accent?: string }) {
+export function Chip({ children, accent }: { children: ReactNode; accent?: string | undefined }) {
   return (
     <span
       className="rounded-md px-1.5 py-0.5 text-[10px] font-medium"
@@ -127,9 +127,7 @@ export function InspectionUnavailable({ reason }: { reason: string }) {
       <span className="text-[12.5px] font-medium text-foreground/80">
         Unavailable over the web inspection plane
       </span>
-      <span className="max-w-sm text-[11.5px] leading-relaxed text-muted-foreground">
-        {reason}
-      </span>
+      <span className="max-w-sm text-[11.5px] leading-relaxed text-muted-foreground">{reason}</span>
     </div>
   )
 }

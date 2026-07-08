@@ -32,6 +32,7 @@ import { getOrCreateSseClient } from "./sse"
 import { queryClient } from "./queryClient"
 import { fetchMessageBody } from "../api"
 import { applyAgentDelta, applyThreadDelta, type OpEntry } from "./reducers"
+import { measure } from "../support/telemetry"
 import type { Agent, ThreadDetail } from "../types"
 
 // Re-export the pure folds + delta type so existing `@/lib/query/sync`
@@ -102,7 +103,11 @@ const wired = new Set<string>()
  * body-before-reference barrier), so the fetch is race-free. A fetch failure
  * falls back to invalidating the threads query so a refetch still surfaces it.
  */
-async function hydrateSpilledMessage(client: QueryClient, agentId: string, entry: OpEntry): Promise<void> {
+async function hydrateSpilledMessage(
+  client: QueryClient,
+  agentId: string,
+  entry: OpEntry,
+): Promise<void> {
   const head = entry.kind.head
   if (!head) return
   const tk = qk.threads(agentId)
@@ -118,7 +123,7 @@ async function hydrateSpilledMessage(client: QueryClient, agentId: string, entry
   const synthetic: OpEntry = { ...entry, kind: { ...entry.kind, inline_body: bodyStr } }
   const prev = client.getQueryData<ThreadDetail[]>(tk)
   const next = applyThreadDelta(prev, synthetic)
-  if (next === null || next === undefined) {
+  if (next === null) {
     if (prev !== undefined) void client.invalidateQueries({ queryKey: tk })
   } else if (next !== prev) {
     client.setQueryData(tk, next)
@@ -152,7 +157,7 @@ function applyDelta(client: QueryClient, agentId: string, entry: OpEntry): void 
   const tk = qk.threads(agentId)
   const tPrev = client.getQueryData<ThreadDetail[]>(tk)
   const tNext = applyThreadDelta(tPrev, entry)
-  if (tNext === null || tNext === undefined) {
+  if (tNext === null) {
     if (tPrev !== undefined) void client.invalidateQueries({ queryKey: tk })
   } else if (tNext !== tPrev) {
     client.setQueryData(tk, tNext)
@@ -162,7 +167,7 @@ function applyDelta(client: QueryClient, agentId: string, entry: OpEntry): void 
   const ak = qk.agent(agentId)
   const aPrev = client.getQueryData<Agent>(ak)
   const aNext = applyAgentDelta(aPrev, entry)
-  if (aNext === null || aNext === undefined) {
+  if (aNext === null) {
     if (aPrev !== undefined) void client.invalidateQueries({ queryKey: ak })
   } else if (aNext !== aPrev) {
     client.setQueryData(ak, aNext)
@@ -227,13 +232,17 @@ export function ensureSync(agentId: string): void {
   client.subscribe("delta", (event) => {
     let entry: OpEntry
     try {
-      entry = JSON.parse(event.data) as OpEntry
+      // Instrument the two synchronous suspects on the SSE hot path so a freeze
+      // here is NAMED in the HUD (Firefox has no LoAF to name it): the raw
+      // frame parse (a big spilled body can be a fat JSON.parse) and the fold
+      // that applies it to the cache (both thread + agent reducers).
+      entry = measure("sse:parse", () => JSON.parse(event.data) as OpEntry)
     } catch {
       // Malformed frame → fall back to a ground-truth refresh of live caches.
       invalidateLiveCaches(agentId)
       return
     }
-    applyDelta(queryClient, agentId, entry)
+    measure("sse:apply", () => applyDelta(queryClient, agentId, entry))
   })
   client.subscribe("invalidate", () => throttledInvalidateInspection(queryClient, agentId))
   client.subscribe("resync", () => {

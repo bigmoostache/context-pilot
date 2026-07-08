@@ -22,14 +22,11 @@ export function MemoryPanel({ panel, agentId }: { panel: ContextPanel; agentId: 
     >
       <div className="flex flex-col gap-2.5">
         {memoryCards.map((m) => (
-          <article
-            key={m.id}
-            className="rounded-lg border border-border bg-card p-3 card-shadow"
-          >
+          <article key={m.id} className="card-shadow rounded-lg border border-border bg-card p-3">
             <div className="mb-1.5 flex items-center gap-2">
               <ImportanceDot level={m.importance} />
               <span className="font-mono text-[11px] font-semibold text-foreground/80">{m.id}</span>
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground/60">
+              <span className="text-[10px] tracking-wide text-muted-foreground/60 uppercase">
                 {m.importance}
               </span>
             </div>

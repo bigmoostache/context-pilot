@@ -13,9 +13,16 @@ env:
 permissions:
   contents: read
 
+# ── Six check families, one script each (.github/checks/check-<family>.sh),
+#    every one invoked here with --ci and by its blocking callback with
+#    --callback. CI and the callbacks run the SAME script — they cannot diverge
+#    in coverage; the flag exists only for a future CI-vs-local environment
+#    tweak (today only rust-tests differs: --ci release build, --callback debug).
+#    Jobs stay split for parallelism + shared toolchain/node setup; each job
+#    just runs its family script(s).
 jobs:
   rust:
-    name: Rust (fmt · clippy · build · test)
+    name: Rust (lints · tests)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,41 +35,23 @@ jobs:
       - name: Cargo cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Check formatting
-        run: cargo fmt -- --check
+      # fmt · clippy · cargo check · lint-exception registry · vault-bypass
+      - name: Rust lints
+        run: .github/checks/check-rust-lints.sh --ci
 
-      - name: Clippy lints
-        run: cargo clippy --all-targets -- -D warnings
-
-      - name: Build
-        run: cargo build --release
-
-      - name: Run tests
-        run: cargo test
+      # cargo build --release · cargo test
+      - name: Rust tests
+        run: .github/checks/check-rust-tests.sh --ci
 
   structure:
-    name: Structure (lengths · folders · lints · web)
+    name: Structure (lengths · folders · web · chain)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check file lengths (max 500 lines)
-        run: .github/checks/check-file-lengths.sh
-
-      - name: Check folder sizes (max 8 entries)
-        run: .github/checks/check-folder-sizes.sh
-
-      - name: Check lint exception registry
-        run: .github/checks/check-lint-exceptions.sh
-
-      - name: Verify lint config hash chain
-        run: .github/checks/check-lint-config.sh
-
-      - name: Check web structure
-        run: web/scripts/check-web-structure.sh
-
-      - name: Check vault bypass
-        run: .github/checks/check-vault-bypass.sh
+      # file-lengths ≤500 + folder-sizes ≤8 (Rust + web/src, unified) + hash chain
+      - name: Structure
+        run: .github/checks/check-structure.sh --ci
 
   contract:
     name: Contract (OpenAPI · TypeScript)
@@ -86,11 +75,47 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          # Pinned to the lockfile origin (pnpm 11 workspace `packages:` +
+          # `allowBuilds` model; see web/pnpm-workspace.yaml + M144).
+          version: 11.6.0
 
       - name: Install web dependencies
         run: pnpm install --frozen-lockfile
         working-directory: web
 
-      - name: Check TypeScript contract
-        run: .github/checks/check-typescript-contract.sh
+      # OpenAPI spec + route exhaustiveness · TS client codegen + drift ·
+      # manual-fetch audit — the full Rust↔TypeScript wire contract.
+      - name: API contract
+        run: .github/checks/check-api-contract.sh --ci
+
+  frontend:
+    name: Frontend (ts-lints · ts-tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # Match the lockfile origin (see the contract job + M144).
+          version: 11.6.0
+
+      - name: Install web dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: web
+
+      # eslint · prettier · stylelint · tsc · type-coverage · suppressions ·
+      # rule-census · knip dead-code. The script self-cd's into web/, so no
+      # working-directory is needed here.
+      - name: TS lints
+        run: .github/checks/check-ts-lints.sh --ci
+
+      # Playwright e2e — documented stub (exit 0) until a dedicated ephemeral
+      # stack is provisioned (see TODO(playwright) in the script).
+      - name: TS tests
+        run: .github/checks/check-ts-tests.sh --ci

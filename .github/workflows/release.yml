@@ -120,7 +120,10 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          # Match the lockfile's origin (pnpm 11 — see ci.yml note): the
+          # workspace-root `packages:` requirement + `allowBuilds` script
+          # adjudication in web/pnpm-workspace.yaml are pnpm-11 mechanisms.
+          version: 11.6.0
 
       - name: Install web dependencies
         run: pnpm install --frozen-lockfile

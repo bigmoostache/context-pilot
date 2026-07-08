@@ -1,7 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react"
+import { useEffect, useState, type SyntheticEvent } from "react"
 import { KeyRound, Loader2, Monitor, Trash2 } from "lucide-react"
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
-import { useAuth } from "@/lib/support/auth"
+import { useAuth } from "@/lib/providers/auth"
 import {
   changePassword,
   fetchSessions,
@@ -26,26 +26,22 @@ const INPUT_CLS =
  * When auth is disabled there is no account to manage, so the modal shows a
  * short note instead.
  */
-export function ProfileModal({
-  open,
-  onClose,
-}: {
-  open: boolean
-  onClose: () => void
-}) {
+export function ProfileModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, authEnabled, refreshMe } = useAuth()
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="flex max-h-[88vh] w-[540px] max-w-[calc(100vw-2rem)] flex-col">
-        <header className="flex items-start gap-3 border-b border-border/70 px-6 pb-4 pt-5">
+        <header className="flex items-start gap-3 border-b border-border/70 px-6 pt-5 pb-4">
           <div className="flex flex-1 flex-col gap-0.5">
             <h2 className="text-[17px] font-semibold tracking-tight text-foreground">Profile</h2>
-            <p className="text-[12px] text-muted-foreground">Your account and personal information.</p>
+            <p className="text-[12px] text-muted-foreground">
+              Your account and personal information.
+            </p>
           </div>
           <DialogClose
             aria-label="Close"
-            className="-mr-1 -mt-1 flex size-7 items-center justify-center rounded-md text-muted-foreground/55 transition-colors hover:bg-muted/70 hover:text-foreground"
+            className="-mt-1 -mr-1 flex size-7 items-center justify-center rounded-md text-muted-foreground/55 transition-colors hover:bg-muted/70 hover:text-foreground"
           >
             ✕
           </DialogClose>
@@ -97,11 +93,18 @@ function IdentitySection({
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
-  // Re-sync when the underlying user changes (e.g. after a refresh).
-  useEffect(() => {
+  // Re-sync the editable fields when the underlying user changes (e.g. after a
+  // profile refresh). React's canonical "adjust state when a prop changes"
+  // pattern — a render-phase compare against the previously-seen values — rather
+  // than an effect that would trip @eslint-react/set-state-in-effect (and cost
+  // an extra commit). Setting state during render re-renders immediately, before
+  // the browser paints, so there is no flash.
+  const [seen, setSeen] = useState({ name: initialName, email: initialEmail })
+  if (seen.name !== initialName || seen.email !== initialEmail) {
+    setSeen({ name: initialName, email: initialEmail })
     setName(initialName)
     setEmail(initialEmail)
-  }, [initialName, initialEmail])
+  }
 
   const dirty = name.trim() !== initialName || email.trim() !== initialEmail
   const initials = initialName
@@ -111,7 +114,7 @@ function IdentitySection({
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("")
 
-  const save = async (e: FormEvent) => {
+  const save = async (e: SyntheticEvent) => {
     e.preventDefault()
     if (!dirty || busy) return
     setBusy(true)
@@ -128,7 +131,7 @@ function IdentitySection({
   }
 
   return (
-    <form onSubmit={save} className="flex flex-col gap-4">
+    <form onSubmit={(e) => void save(e)} className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
         <span className="flex size-[60px] shrink-0 items-center justify-center rounded-full bg-signal/15 text-[20px] font-semibold text-signal">
           {initials || "?"}
@@ -142,11 +145,7 @@ function IdentitySection({
       </div>
 
       <Field label="Display name">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className={INPUT_CLS}
-        />
+        <input value={name} onChange={(e) => setName(e.target.value)} className={INPUT_CLS} />
       </Field>
       <Field label="Email">
         <input
@@ -186,7 +185,7 @@ function PasswordSection() {
   const match = next.length > 0 && next === confirm
   const canSubmit = current.length > 0 && next.length >= 8 && match && !busy
 
-  const submit = async (e: FormEvent) => {
+  const submit = async (e: SyntheticEvent) => {
     e.preventDefault()
     if (!canSubmit) return
     setBusy(true)
@@ -205,22 +204,55 @@ function PasswordSection() {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3 border-t border-border/60 pt-5">
-      <span className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+    <form
+      onSubmit={(e) => void submit(e)}
+      className="flex flex-col gap-3 border-t border-border/60 pt-5"
+    >
+      <span className="flex items-center gap-1.5 text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
         <KeyRound className="size-3.5" /> Change password
       </span>
       <Field label="Current password">
-        <input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} className={INPUT_CLS} />
+        <input
+          type="password"
+          autoComplete="current-password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          className={INPUT_CLS}
+        />
       </Field>
-      <Field label="New password" hint={next.length > 0 && next.length < 8 ? "Min 8 characters" : undefined}>
-        <input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} className={INPUT_CLS} />
+      <Field
+        label="New password"
+        hint={next.length > 0 && next.length < 8 ? "Min 8 characters" : undefined}
+      >
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+          className={INPUT_CLS}
+        />
       </Field>
-      <Field label="Confirm new password" hint={confirm.length > 0 && !match ? "Doesn't match" : undefined}>
-        <input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={INPUT_CLS} />
+      <Field
+        label="Confirm new password"
+        hint={confirm.length > 0 && !match ? "Doesn't match" : undefined}
+      >
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          className={INPUT_CLS}
+        />
       </Field>
-      {msg && <p className={cn("text-[12px]", msg.ok ? "text-signal" : "text-danger")}>{msg.text}</p>}
+      {msg && (
+        <p className={cn("text-[12px]", msg.ok ? "text-signal" : "text-danger")}>{msg.text}</p>
+      )}
       <div className="flex justify-end">
-        <button type="submit" disabled={!canSubmit} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50">
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
+        >
           {busy && <Loader2 className="size-3.5 animate-spin" />}
           Update password
         </button>
@@ -236,8 +268,11 @@ function SessionsSection({ open }: { open: boolean }) {
 
   const load = () => {
     fetchSessions()
-      .then((s) => { setSessions(s); setError(null) })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load sessions"))
+      .then((s) => {
+        setSessions(s)
+        setError(null)
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load sessions"))
   }
 
   useEffect(() => {
@@ -255,7 +290,7 @@ function SessionsSection({ open }: { open: boolean }) {
 
   return (
     <div className="flex flex-col gap-3 border-t border-border/60 pt-5">
-      <span className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+      <span className="flex items-center gap-1.5 text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
         <Monitor className="size-3.5" /> Active sessions
       </span>
       {error && <p className="text-[12px] text-danger">{error}</p>}
@@ -266,12 +301,19 @@ function SessionsSection({ open }: { open: boolean }) {
       ) : (
         <div className="overflow-hidden rounded-xl border border-border">
           {sessions.map((s) => (
-            <div key={s.id} className="flex items-center gap-3 border-b border-border/60 bg-card px-3.5 py-2.5 last:border-0">
+            <div
+              key={s.id}
+              className="flex items-center gap-3 border-b border-border/60 bg-card px-3.5 py-2.5 last:border-0"
+            >
               <Monitor className="size-4 shrink-0 text-muted-foreground" />
               <div className="flex min-w-0 flex-1 flex-col leading-tight">
                 <span className="truncate text-[12.5px] font-medium text-foreground/90">
-                  {s.user_agent || "Unknown device"}
-                  {s.current && <span className="ml-2 rounded bg-signal/15 px-1.5 py-px text-[10px] font-medium text-signal">This device</span>}
+                  {s.user_agent ?? "Unknown device"}
+                  {s.current && (
+                    <span className="ml-2 rounded-sm bg-signal/15 px-1.5 py-px text-[10px] font-medium text-signal">
+                      This device
+                    </span>
+                  )}
                 </span>
                 <span className="text-[11px] text-muted-foreground/70">
                   Signed in {new Date(s.created_at).toLocaleString()}
@@ -280,7 +322,7 @@ function SessionsSection({ open }: { open: boolean }) {
               {!s.current && (
                 <button
                   type="button"
-                  onClick={() => revoke(s.id)}
+                  onClick={() => void revoke(s.id)}
                   title="Revoke session"
                   className="shrink-0 rounded-md p-1.5 text-muted-foreground/60 transition-colors hover:bg-danger/10 hover:text-danger"
                 >
@@ -306,9 +348,13 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="flex items-center justify-between text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+      <span className="flex items-center justify-between text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
         {label}
-        {hint && <span className="text-[10px] font-medium normal-case tracking-normal text-muted-foreground/70">{hint}</span>}
+        {hint ? (
+          <span className="text-[10px] font-medium tracking-normal text-muted-foreground/70 normal-case">
+            {hint}
+          </span>
+        ) : null}
       </span>
       {children}
     </label>

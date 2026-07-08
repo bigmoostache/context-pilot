@@ -20,7 +20,15 @@ const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
  *   spend (clearly labelled). A "Needs you" count surfaces how many agents are
  *   waiting on input, so the footer doubles as a glanceable fleet pulse.
  */
-export function StatusBar({ fleet = false, agents = [], activeAgent }: { fleet?: boolean; agents?: Agent[]; activeAgent?: Agent }) {
+export function StatusBar({
+  fleet = false,
+  agents = [],
+  activeAgent,
+}: {
+  fleet?: boolean
+  agents?: Agent[]
+  activeAgent?: Agent | undefined
+}) {
   return fleet ? <FleetStatus agents={agents} /> : <AgentStatus agent={activeAgent} />
 }
 
@@ -41,7 +49,7 @@ function FleetStatus({ agents }: { agents: Agent[] }) {
       {needsYou > 0 && (
         <span className="flex items-center gap-1.5 text-muted-foreground">
           <span className="size-2 rounded-full" style={{ background: "var(--signal)" }} />
-          <span className="tabular-nums text-foreground/80">{needsYou}</span>
+          <span className="text-foreground/80 tabular-nums">{needsYou}</span>
           <span>need{needsYou === 1 ? "s" : ""} you</span>
         </span>
       )}
@@ -49,28 +57,31 @@ function FleetStatus({ agents }: { agents: Agent[] }) {
       <span className="ml-auto flex items-center gap-1.5 text-muted-foreground">
         <Wallet className="size-3.5" />
         <span>Total spend</span>
-        <span className="tabular-nums font-medium text-foreground/85">{fmtCost(totalSpend)}</span>
+        <span className="font-medium text-foreground/85 tabular-nums">{fmtCost(totalSpend)}</span>
       </span>
     </footer>
   )
 }
 
+/** Resolve the live execution phase from the agent's folded vitals. Prefers the
+ *  push-delta `phase` (streaming/tooling/idle), falling back to `status` before
+ *  the first PhaseTransition has been observed. A flat if-chain, not a nested
+ *  ternary. */
+function resolvePhase(agent?: Agent): StreamPhase {
+  if (agent?.phase === "streaming") return "streaming"
+  if (agent?.phase === "tooling") return "tooling"
+  if (agent?.phase === "idle") return "ready"
+  if (agent?.status === "working") return "streaming"
+  return "ready"
+}
+
 /** Single-agent session vitals — shown while an agent is focused. */
-function AgentStatus({ agent }: { agent?: Agent }) {
+function AgentStatus({ agent }: { agent?: Agent | undefined }) {
   // Use the LIVE execution phase folded from the PhaseTransition delta (T297)
   // so the footer distinguishes streaming · tooling · ready instead of the old
   // 2-state projection of `status`. Falls back to `status` only before the
   // first phase transition has been observed (phase still undefined).
-  const phase: StreamPhase =
-    agent?.phase === "streaming"
-      ? "streaming"
-      : agent?.phase === "tooling"
-        ? "tooling"
-        : agent?.phase === "idle"
-          ? "ready"
-          : agent?.status === "working"
-            ? "streaming"
-            : "ready"
+  const phase: StreamPhase = resolvePhase(agent)
   const p = phaseMeta[phase]
   const costUsd = agent?.costUsd ?? 0
 
@@ -95,7 +106,7 @@ function AgentStatus({ agent }: { agent?: Agent }) {
       <span className="ml-auto flex items-center gap-3">
         <ContextBar used={used} threshold={threshold} budget={budget} hit={hit} miss={miss} />
         <span className="h-3.5 w-px bg-border" />
-        <span className="tabular-nums text-muted-foreground">{fmtCost(costUsd)}</span>
+        <span className="text-muted-foreground tabular-nums">{fmtCost(costUsd)}</span>
       </span>
     </footer>
   )
@@ -172,10 +183,10 @@ function ContextBar({
 
       {/* tooltip — opens upward, above the bar */}
       <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 translate-y-1 opacity-0 transition-all duration-150 group-hover/cb:translate-y-0 group-hover/cb:opacity-100">
-        <div className="w-[188px] rounded-lg border border-border bg-popover p-2.5 pop-shadow">
+        <div className="pop-shadow w-[188px] rounded-lg border border-border bg-popover p-2.5">
           <div className="mb-2 flex items-baseline justify-between">
             <span className="text-[11px] font-semibold text-foreground/90">Context window</span>
-            <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+            <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
               {(usedRatio * 100).toFixed(0)}%
             </span>
           </div>
@@ -193,13 +204,13 @@ function ContextBar({
           <TipRow color="var(--muted-foreground)" label="Free" value={fmtTokens(free)} dim />
           <div className="mt-2 flex items-center justify-between gap-8 border-t border-border/60 pt-1.5">
             <span className="shrink-0 text-[10.5px] text-muted-foreground">Used / budget</span>
-            <span className="font-mono text-[10.5px] font-medium tabular-nums text-foreground/85">
+            <span className="font-mono text-[10.5px] font-medium text-foreground/85 tabular-nums">
               {fmtTokens(used)} / {fmtTokens(safeBudget)}
             </span>
           </div>
         </div>
         {/* caret */}
-        <div className="absolute left-1/2 top-full size-2 -translate-x-1/2 -translate-y-1 rotate-45 border-b border-r border-border bg-popover" />
+        <div className="absolute top-full left-1/2 size-2 -translate-x-1/2 -translate-y-1 rotate-45 border-r border-b border-border bg-popover" />
       </div>
     </div>
   )
@@ -220,8 +231,12 @@ function TipRow({
   return (
     <div className="flex items-center gap-2 py-0.5">
       <span className="size-2 shrink-0 rounded-[3px]" style={{ background: color }} />
-      <span className={`text-[11px] ${dim ? "text-muted-foreground" : "text-foreground/80"}`}>{label}</span>
-      <span className="ml-auto font-mono text-[10.5px] tabular-nums text-foreground/85">{value}</span>
+      <span className={`text-[11px] ${dim ? "text-muted-foreground" : "text-foreground/80"}`}>
+        {label}
+      </span>
+      <span className="ml-auto font-mono text-[10.5px] text-foreground/85 tabular-nums">
+        {value}
+      </span>
     </div>
   )
 }
@@ -239,7 +254,7 @@ function Metric({
   return (
     <span className="flex items-center gap-1.5 text-muted-foreground">
       <Icon className="size-3.5" />
-      <span className="tabular-nums font-medium text-foreground/85">{value}</span>
+      <span className="font-medium text-foreground/85 tabular-nums">{value}</span>
       <span>{label}</span>
     </span>
   )

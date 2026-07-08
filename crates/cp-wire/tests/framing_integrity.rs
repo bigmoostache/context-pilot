@@ -19,6 +19,7 @@ use crc32c as _;
 use serde as _;
 use serde_json as _;
 use sha2 as _;
+use utoipa as _;
 
 use cp_wire::framing::{FRAME_HEADER_SIZE, FrameError, decode_entry, decode_raw, encode_entry, encode_raw};
 use cp_wire::types::ContentHash;

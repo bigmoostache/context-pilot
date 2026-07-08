@@ -1,5 +1,5 @@
 import { Moon, Sun } from "lucide-react"
-import { useTheme } from "@/lib/theme"
+import { useTheme } from "@/lib/providers/theme"
 import { cn } from "@/lib/utils"
 
 /**
@@ -40,7 +40,7 @@ function Seg({
       className={cn(
         "flex size-6 items-center justify-center rounded-full transition-all",
         active
-          ? "bg-card text-foreground card-shadow"
+          ? "card-shadow bg-card text-foreground"
           : "text-muted-foreground hover:text-foreground",
       )}
     >

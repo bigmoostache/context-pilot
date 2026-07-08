@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { LayoutGrid, Library } from "lucide-react"
 import { FleetDashboard } from "./FleetDashboard"
 import { PromptsPage } from "./PromptsPage"
 import { cn } from "@/lib/utils"
+import { FLEET_MAX_W } from "@/lib/support/panelMeta"
 import type { Agent } from "@/lib/types"
 
 /**
@@ -21,13 +22,6 @@ import type { Agent } from "@/lib/types"
  */
 type HomeTab = "agents" | "prompts"
 
-/**
- * Shared content width for the whole fleet home — the toggle bar, the agent
- * grid and the prompt library all centre on this so their left/right edges
- * line up perfectly as you flip between tabs. Single source of truth.
- */
-export const FLEET_MAX_W = "max-w-[960px]"
-
 export function FleetShell({
   agents,
   onOpenAgent,
@@ -43,11 +37,15 @@ export function FleetShell({
 }) {
   const [tab, setTab] = useState<HomeTab>("agents")
 
-  // A "new agent" request must surface on the Agents tab — snap to it before
-  // the dashboard opens its create dialog.
-  useEffect(() => {
+  // A "new agent" request must surface on the Agents tab — snap to it whenever
+  // `openCreate` transitions to true. React's canonical "adjust state when a
+  // prop changes" pattern (a render-phase compare against the previously-seen
+  // value), not an effect that would trip @eslint-react/set-state-in-effect.
+  const [prevOpen, setPrevOpen] = useState(openCreate)
+  if (openCreate !== prevOpen) {
+    setPrevOpen(openCreate)
     if (openCreate) setTab("agents")
-  }, [openCreate])
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background">
@@ -58,8 +56,18 @@ export function FleetShell({
       <div className="shrink-0 border-b border-border">
         <div className={cn("mx-auto flex h-[52px] w-full items-center px-8", FLEET_MAX_W)}>
           <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
-            <ToggleTab active={tab === "agents"} onClick={() => setTab("agents")} icon={LayoutGrid} label="Agents" />
-            <ToggleTab active={tab === "prompts"} onClick={() => setTab("prompts")} icon={Library} label="Prompts" />
+            <ToggleTab
+              active={tab === "agents"}
+              onClick={() => setTab("agents")}
+              icon={LayoutGrid}
+              label="Agents"
+            />
+            <ToggleTab
+              active={tab === "prompts"}
+              onClick={() => setTab("prompts")}
+              icon={Library}
+              label="Prompts"
+            />
           </div>
         </div>
       </div>
@@ -95,7 +103,9 @@ function ToggleTab({
       onClick={onClick}
       className={cn(
         "flex items-center gap-1.5 rounded-md px-3 py-1 text-[12.5px] font-medium transition-all",
-        active ? "bg-card text-foreground card-shadow" : "text-muted-foreground hover:text-foreground",
+        active
+          ? "card-shadow bg-card text-foreground"
+          : "text-muted-foreground hover:text-foreground",
       )}
     >
       <Icon className="size-3.5" />

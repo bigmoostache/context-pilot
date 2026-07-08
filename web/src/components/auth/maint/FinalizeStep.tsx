@@ -22,11 +22,6 @@ export function FinalizeStep({
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
 
-  // Gate on a known cockpit host too: identity_set and the identity object load
-  // from separate fetches, so guard against a stale "identity_set but no host".
-  const ready = status.identity_set && passwordChanged && cockpitName !== ""
-  const cockpitUrl = `https://${cockpitName}`
-
   const finalize = async () => {
     setError(null)
     setBusy(true)
@@ -49,12 +44,19 @@ export function FinalizeStep({
     }
   }
 
+  // The provisioned cockpit URL, used by both the done confirmation and the
+  // pre-finalize form below. Declared here (immediately before the `done` early
+  // exit that first consumes it) so no unrelated code sits between it and its
+  // use (unicorn/no-declarations-before-early-exit).
+  const cockpitUrl = `https://${cockpitName}`
+
   if (done) {
     return (
       <div className="flex flex-col gap-3">
         <p className="text-sm text-foreground">
-          ✓ Provisioned. The cockpit is now served on <span className="font-mono">{cockpitUrl}</span>. It may take a
-          few seconds for TLS to come up.
+          ✓ Provisioned. The cockpit is now served on{" "}
+          <span className="font-mono">{cockpitUrl}</span>. It may take a few seconds for TLS to come
+          up.
         </p>
         <a
           className="w-full rounded-md bg-signal px-4 py-2 text-center text-sm font-semibold text-background hover:opacity-90"
@@ -66,6 +68,12 @@ export function FinalizeStep({
     )
   }
 
+  // Enable finalize only once the backend pre-requisites are met (password
+  // changed + identity set + a known host). Declared after the `done` early
+  // exit so that return path doesn't compute it
+  // (unicorn/no-declarations-before-early-exit).
+  const ready = status.identity_set && passwordChanged && cockpitName !== ""
+
   return (
     <div className="flex flex-col gap-3">
       <ul className="flex flex-col gap-1 text-sm">
@@ -73,11 +81,11 @@ export function FinalizeStep({
         <Check ok={status.identity_set}>Box name / IP set</Check>
       </ul>
       <p className="text-xs text-muted-foreground">
-        Finalizing starts the cockpit on <span className="font-mono">{cockpitUrl}</span> and turns off this setup flow
-        for normal use (the maintenance console stays reachable on :9090).
+        Finalizing starts the cockpit on <span className="font-mono">{cockpitUrl}</span> and turns
+        off this setup flow for normal use (the maintenance console stays reachable on :9090).
       </p>
       <ErrorNote error={error} />
-      <PrimaryButton onClick={finalize} disabled={!ready} busy={busy}>
+      <PrimaryButton onClick={() => void finalize()} disabled={!ready} busy={busy}>
         Finalize &amp; launch the cockpit
       </PrimaryButton>
     </div>
@@ -87,7 +95,8 @@ export function FinalizeStep({
 function Check({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
     <li className={ok ? "text-foreground" : "text-muted-foreground"}>
-      <span className={ok ? "text-signal" : "text-muted-foreground"}>{ok ? "✓" : "○"}</span> {children}
+      <span className={ok ? "text-signal" : "text-muted-foreground"}>{ok ? "✓" : "○"}</span>{" "}
+      {children}
     </li>
   )
 }

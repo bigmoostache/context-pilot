@@ -48,6 +48,7 @@ pub(super) fn process_stream_events(app: &mut App, rx: &Receiver<StreamEvent>) {
                 cache_miss_tokens,
                 stop_reason,
                 bp_hashes,
+                bp_panel_ids,
                 alive_count,
                 alive_positions_permille,
             } => {
@@ -60,6 +61,7 @@ pub(super) fn process_stream_events(app: &mut App, rx: &Receiver<StreamEvent>) {
                     cache_miss_tokens,
                     stop_reason,
                     bp_hashes,
+                    bp_panel_ids,
                     alive_count,
                     alive_positions_permille,
                 ));
@@ -187,6 +189,7 @@ pub(super) fn finalize_stream(app: &mut App) {
         cache_miss_tokens,
         ref stop_reason,
         ref bp_hashes,
+        ref bp_panel_ids,
         alive_count,
         ref alive_positions_permille,
     )) = app.pending_done
@@ -238,6 +241,11 @@ pub(super) fn finalize_stream(app: &mut App) {
             app.state.tick_alive_bp_positions = alive_positions_permille.clone();
             app.state.cache_engine_json = Some(engine.to_json());
         }
+
+        // Record which panels carried a breakpoint this turn — the freeze pass
+        // reads it next turn to widen the free-to-update region back to the last
+        // alive breakpoint before the culprit (BP-anchored free region).
+        app.state.previous_breakpoint_panel_ids = bp_panel_ids.clone();
 
         app.typewriter.reset();
         app.pending_done = None;

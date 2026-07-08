@@ -37,7 +37,7 @@ export function SpinePanel({ panel, agentId }: { panel: ContextPanel; agentId: s
                   <span className="font-mono">{n.id}</span>
                   <span>· {n.time}</span>
                   <span>· {n.kind}</span>
-                  {n.processed && <span className="ml-auto text-[var(--ok)]">processed ✓</span>}
+                  {n.processed && <span className="ml-auto text-(--ok)">processed ✓</span>}
                 </div>
                 <p className="mt-0.5 text-[11.5px] leading-snug text-foreground/80">{n.text}</p>
               </div>
@@ -47,7 +47,7 @@ export function SpinePanel({ panel, agentId }: { panel: ContextPanel; agentId: s
       </PanelSection>
 
       <PanelSection label="Config">
-        <div className="rounded-lg border border-border bg-card p-3 text-[11.5px] card-shadow">
+        <div className="card-shadow rounded-lg border border-border bg-card p-3 text-[11.5px]">
           <Row k="continue_until_todos_done" v="false" />
           <Row k="auto_continuation_count" v="6" />
           <Row k="max_auto_retries" v="40" />
@@ -62,7 +62,10 @@ function Row({ k, v, accent }: { k: string; v: string; accent?: string }) {
   return (
     <div className="flex items-center justify-between border-b border-border/50 py-1 last:border-0">
       <span className="font-mono text-[11px] text-muted-foreground/80">{k}</span>
-      <span className="font-mono text-[11px] tabular-nums" style={{ color: accent ?? "var(--foreground)" }}>
+      <span
+        className="font-mono text-[11px] tabular-nums"
+        style={{ color: accent ?? "var(--foreground)" }}
+      >
         {v}
       </span>
     </div>

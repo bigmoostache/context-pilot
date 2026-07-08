@@ -35,11 +35,11 @@ export function MaintWizard({ initialStatus }: { initialStatus: MaintStatus }) {
   const [wizardStep, setWizardStep] = useState(0) // 0 identity, 1 trust, 2 finalize
 
   // Guards against setState after unmount (load() awaits several fetches).
-  const alive = useRef(true)
+  const aliveRef = useRef(true)
   useEffect(() => {
-    alive.current = true
+    aliveRef.current = true
     return () => {
-      alive.current = false
+      aliveRef.current = false
     }
   }, [])
 
@@ -48,8 +48,9 @@ export function MaintWizard({ initialStatus }: { initialStatus: MaintStatus }) {
     const token = getToken()
     const fresh = (await fetchMaintStatus().catch(() => null)) ?? initialStatus
     const user = token ? await fetchMaintMe().catch(() => null) : null
-    const id = user ? (await fetchIdentity().catch(() => ({ identity: null }))).identity : null
-    if (!alive.current) return
+    const idRes = user ? await fetchIdentity().catch(() => ({ identity: null })) : null
+    if (!aliveRef.current) return
+    const id = idRes?.identity ?? null
     setStatus(fresh)
     setMe(user)
     setIdentity(id)
@@ -62,9 +63,31 @@ export function MaintWizard({ initialStatus }: { initialStatus: MaintStatus }) {
     }
   }, [initialStatus])
 
+  // Initial flow computation on mount. Inlined as an async IIFE (rather than
+  // calling the `load` callback) so the setState calls sit provably AFTER an
+  // `await` — the compiler-aware set-state-in-effect rule accepts post-await
+  // state updates (external-data sync) but flags a synchronously-reachable
+  // setState. `load` itself stays for the callback-triggered refreshes below.
   useEffect(() => {
-    void load()
-  }, [load])
+    void (async () => {
+      const token = getToken()
+      const fresh = (await fetchMaintStatus().catch(() => null)) ?? initialStatus
+      const user = token ? await fetchMaintMe().catch(() => null) : null
+      const idRes = user ? await fetchIdentity().catch(() => ({ identity: null })) : null
+      if (!aliveRef.current) return
+      const id = idRes?.identity ?? null
+      setStatus(fresh)
+      setMe(user)
+      setIdentity(id)
+      if (!user) setPhase("login")
+      else if (user.must_change_password) setPhase("password")
+      else if (fresh.provisioned) setPhase("provisioned")
+      else {
+        setWizardStep(fresh.identity_set ? 1 : 0)
+        setPhase("wizard")
+      }
+    })()
+  }, [initialStatus])
 
   const logout = useCallback(async () => {
     await maintLogout()
@@ -86,7 +109,10 @@ export function MaintWizard({ initialStatus }: { initialStatus: MaintStatus }) {
 
   if (phase === "password" && me) {
     return (
-      <Shell title="Secure the admin account" subtitle="Change the delivered password before continuing.">
+      <Shell
+        title="Secure the admin account"
+        subtitle="Change the delivered password before continuing."
+      >
         <PasswordStep user={me} onDone={() => void load()} />
       </Shell>
     )

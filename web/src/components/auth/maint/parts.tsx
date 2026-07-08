@@ -25,7 +25,9 @@ export function Shell({
           <div className="mb-2 font-mono text-2xl font-bold tracking-tight text-foreground">
             <span className="text-signal">▌</span> Context Pilot
           </div>
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">IT maintenance console</div>
+          <div className="text-xs tracking-wider text-muted-foreground uppercase">
+            IT maintenance console
+          </div>
         </div>
         {step && (
           <div className="mb-3 flex items-center justify-center gap-1.5">
@@ -77,12 +79,11 @@ export function Field({
         type={type}
         value={value}
         placeholder={placeholder}
-        // eslint-disable-next-line jsx-a11y/no-autofocus
         autoFocus={autoFocus}
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
         className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground
-                   focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal"
+                   focus:border-signal focus:ring-1 focus:ring-signal focus:outline-none"
       />
     </label>
   )

@@ -20,19 +20,26 @@ async function command(req: APIRequestContext, kind: Record<string, unknown>): P
   expect(res.ok()).toBeTruthy()
 }
 
-interface RawThread { id: string; name: string; archived?: boolean }
+interface RawThread {
+  id: string
+  name: string
+  archived?: boolean
+}
 
 async function awaitThreadId(req: APIRequestContext, name: string): Promise<string> {
   let id = ""
   await expect
-    .poll(async () => {
-      const res = await req.get(`${API}/api/agent/${AGENT_ID}/threads`)
-      const raw = await res.json()
-      const list: RawThread[] = Array.isArray(raw) ? raw : raw.threads ?? []
-      const hit = list.find((t) => t.name === name && !t.archived)
-      id = hit?.id ?? ""
-      return !!hit
-    }, { timeout: 15_000 })
+    .poll(
+      async () => {
+        const res = await req.get(`${API}/api/agent/${AGENT_ID}/threads`)
+        const raw = await res.json()
+        const list: RawThread[] = Array.isArray(raw) ? raw : (raw.threads ?? [])
+        const hit = list.find((t) => t.name === name && !t.archived)
+        id = hit?.id ?? ""
+        return !!hit
+      },
+      { timeout: 15_000 },
+    )
     .toBe(true)
   return id
 }
@@ -43,7 +50,11 @@ test("T123 real-browser flicker timeline", async ({ page }) => {
   // surface browser console (so temporary live.ts logging shows up here),
   // prefixed with ms since send so we can locate WHEN each delta arrives.
   const clock = { sendMs: Date.now() }
-  page.on("console", (m) => console.log(`[+${String(Date.now() - clock.sendMs).padStart(6)}ms][browser:${m.type()}] ${m.text()}`))
+  page.on("console", (m) =>
+    console.log(
+      `[+${String(Date.now() - clock.sendMs).padStart(6)}ms][browser:${m.type()}] ${m.text()}`,
+    ),
+  )
   page.on("pageerror", (e) => console.log(`[browser:pageerror] ${e.message}`))
 
   const NAME = `probe-${Date.now()}`
@@ -93,9 +104,19 @@ test("T123 real-browser flicker timeline", async ({ page }) => {
   const appearThenDisappear = seq.some((v, i) => i > 0 && seq[i - 1] && !v)
   const everPresent = seq.some((v) => v)
   console.log("\n══ VERDICT ══")
-  console.log("ever appeared :", everPresent, firstPresent !== null ? `(first @ ${firstPresent}ms)` : "")
-  console.log("flickered     :", appearThenDisappear ? "❌ YES — appeared then disappeared" : "✅ NO — stayed once shown")
+  console.log(
+    "ever appeared :",
+    everPresent,
+    firstPresent !== null ? `(first @ ${firstPresent}ms)` : "",
+  )
+  console.log(
+    "flickered     :",
+    appearThenDisappear ? "❌ YES — appeared then disappeared" : "✅ NO — stayed once shown",
+  )
 
   // hygiene
-  await command(page.request, { kind: "archive_thread", thread_id: await awaitThreadId(page.request, NAME) })
+  await command(page.request, {
+    kind: "archive_thread",
+    thread_id: await awaitThreadId(page.request, NAME),
+  })
 })

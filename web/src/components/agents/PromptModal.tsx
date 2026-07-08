@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Bot,
   Boxes,
@@ -22,9 +22,24 @@ const KIND: Record<
   LibraryKind,
   { label: string; icon: typeof Bot; accent: string; blurb: string }
 > = {
-  agent: { label: "System prompt", icon: Bot, accent: "var(--signal)", blurb: "A personality & operating contract." },
-  skill: { label: "Skill", icon: Zap, accent: "var(--interactive)", blurb: "Reference material loaded on demand." },
-  command: { label: "Command", icon: TerminalSquare, accent: "var(--ok)", blurb: "A slash-command that expands into a prompt." },
+  agent: {
+    label: "System prompt",
+    icon: Bot,
+    accent: "var(--signal)",
+    blurb: "A personality & operating contract.",
+  },
+  skill: {
+    label: "Skill",
+    icon: Zap,
+    accent: "var(--interactive)",
+    blurb: "Reference material loaded on demand.",
+  },
+  command: {
+    label: "Command",
+    icon: TerminalSquare,
+    accent: "var(--ok)",
+    blurb: "A slash-command that expands into a prompt.",
+  },
 }
 
 const KIND_ORDER: LibraryKind[] = ["agent", "skill", "command"]
@@ -48,33 +63,37 @@ function mockBody(item: LibraryItem): string {
  * (backdrop-fade + modal-pop). `item === "new"` opens an empty create form;
  * passing a {@link LibraryItem} opens it prefilled for view/edit.
  */
-export function PromptModal({
-  item,
-  onClose,
-}: {
-  item: LibraryItem | "new"
-  onClose: () => void
-}) {
+export function PromptModal({ item, onClose }: { item: LibraryItem | "new"; onClose: () => void }) {
   const isNew = item === "new"
   const [kind, setKind] = useState<LibraryKind>(isNew ? "agent" : item.kind)
   const [name, setName] = useState(isNew ? "" : item.name)
   const [description, setDescription] = useState(isNew ? "" : item.description)
-  const [body] = useState(isNew ? "" : mockBody(item))
-  const builtin = !isNew && item.builtin
+  const [body] = useState(() => (isNew ? "" : mockBody(item)))
+  const builtin = !isNew && item.builtin === true
   const M = KIND[kind]
 
   return (
     <Backdrop onClose={onClose}>
-      <div className="backdrop-fade fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="modal-pop relative z-10 flex h-[90vh] w-[1180px] max-w-[96vw] flex-col overflow-hidden rounded-2xl border border-border bg-card pop-shadow">
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="backdrop-fade fixed inset-0 cursor-default bg-black/40"
+      />
+      <div className="modal-pop pop-shadow relative z-10 flex h-[90vh] w-[1180px] max-w-[96vw] flex-col overflow-hidden rounded-2xl border border-border bg-card">
         {/* hero header */}
         <header
           className="relative flex items-center gap-3 px-6 py-5"
-          style={{ background: `linear-gradient(135deg, color-mix(in oklab, ${M.accent} 16%, transparent), transparent)` }}
+          style={{
+            background: `linear-gradient(135deg, color-mix(in oklab, ${M.accent} 16%, transparent), transparent)`,
+          }}
         >
           <span
             className="flex size-11 shrink-0 items-center justify-center rounded-xl"
-            style={{ background: `color-mix(in oklab, ${M.accent} 18%, transparent)`, color: M.accent }}
+            style={{
+              background: `color-mix(in oklab, ${M.accent} 18%, transparent)`,
+              color: M.accent,
+            }}
           >
             <M.icon className="size-[22px]" />
           </span>
@@ -97,41 +116,7 @@ export function PromptModal({
         <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-5">
           {/* kind */}
           <Field label="Kind">
-            {isNew ? (
-              <div className="flex gap-2">
-                {KIND_ORDER.map((k) => {
-                  const on = k === kind
-                  const KM = KIND[k]
-                  return (
-                    <button
-                      key={k}
-                      onClick={() => setKind(k)}
-                      className={cn(
-                        "flex flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all",
-                        on
-                          ? "border-[var(--interactive)] bg-[var(--interactive)]/[0.07] ring-2 ring-[var(--interactive)]/15"
-                          : "border-border bg-card hover:border-[var(--interactive)]/40 hover:bg-muted/30",
-                      )}
-                    >
-                      <KM.icon className="size-4 shrink-0" style={{ color: KM.accent }} />
-                      <span className="text-[12.5px] font-medium text-foreground/85">{KM.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            ) : (
-              <span
-                className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[12px] font-medium text-foreground/80"
-              >
-                <M.icon className="size-3.5" style={{ color: M.accent }} />
-                {M.label}
-                {builtin && (
-                  <span className="ml-1 rounded-full bg-muted/70 px-1.5 py-px text-[9.5px] text-muted-foreground/70">
-                    Built-in
-                  </span>
-                )}
-              </span>
-            )}
+            <KindField isNew={isNew} kind={kind} setKind={setKind} builtin={builtin} />
           </Field>
 
           {/* name + description */}
@@ -141,7 +126,7 @@ export function PromptModal({
               onChange={(e) => setName(e.target.value)}
               readOnly={builtin}
               placeholder={kind === "command" ? "deep-review" : "Senior Reviewer"}
-              className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:border-[var(--interactive)]/60 read-only:opacity-60"
+              className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-[13px] text-foreground transition-colors outline-none read-only:opacity-60 focus:border-(--interactive)/60"
             />
           </Field>
           <Field label="Description" hint="One line — shows on the card">
@@ -149,14 +134,14 @@ export function PromptModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What is this prompt for?"
-              className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:border-[var(--interactive)]/60"
+              className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-[13px] text-foreground transition-colors outline-none focus:border-(--interactive)/60"
             />
           </Field>
 
           {/* body — WYSIWYG markdown editor */}
           <div className="flex min-h-0 flex-1 flex-col gap-1.5">
             <div className="flex items-baseline gap-2">
-              <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+              <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
                 {kind === "command" ? "Expansion" : "Body"}
               </span>
               {kind === "agent" && (
@@ -175,35 +160,118 @@ export function PromptModal({
           {!isNew && (
             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
               <FileCode2 className="size-3.5" />
-              Edits open <code className="font-mono">{`.context-pilot/${kind === "agent" ? "agents" : kind === "skill" ? "skills" : "commands"}/${!isNew ? item.id : ""}.md`}</code>.
+              Edits open <code className="font-mono">{mdPath(kind, item.id)}</code>.
             </p>
           )}
         </div>
 
         {/* footer */}
-        <footer className="flex h-[60px] shrink-0 items-center gap-2 border-t border-border bg-muted/25 px-6">
-          {!isNew && !builtin && (
-            <button className="text-[12px] font-medium text-[var(--danger)]/80 transition-colors hover:text-[var(--danger)]">
-              Delete
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="ml-auto rounded-lg border border-border px-3.5 py-2 text-[12.5px] font-medium text-foreground/75 transition-colors hover:bg-muted/50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onClose}
-            disabled={!name.trim()}
-            className="flex items-center gap-2 rounded-lg bg-[var(--interactive)] px-4 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-all hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            <Check className="size-4" strokeWidth={2.5} />
-            {isNew ? "Create" : "Save"}
-          </button>
-        </footer>
+        <PromptFooter
+          isNew={isNew}
+          builtin={builtin}
+          canSubmit={name.trim().length > 0}
+          onClose={onClose}
+        />
       </div>
     </Backdrop>
+  )
+}
+
+/** The `.context-pilot/<dir>/<id>.md` path a library item edits. */
+function mdPath(kind: LibraryKind, id: string): string {
+  const dir = kind === "agent" ? "agents" : kind === "skill" ? "skills" : "commands"
+  return `.context-pilot/${dir}/${id}.md`
+}
+
+/** The Kind selector: a three-way picker in create mode, or a read-only badge
+ *  (with a Built-in chip) in view/edit mode. Extracted so {@link PromptModal}
+ *  stays within the P8 complexity budget. */
+function KindField({
+  isNew,
+  kind,
+  setKind,
+  builtin,
+}: {
+  isNew: boolean
+  kind: LibraryKind
+  setKind: (k: LibraryKind) => void
+  builtin: boolean
+}) {
+  const M = KIND[kind]
+  if (!isNew) {
+    return (
+      <span className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[12px] font-medium text-foreground/80">
+        <M.icon className="size-3.5" style={{ color: M.accent }} />
+        {M.label}
+        {builtin && (
+          <span className="ml-1 rounded-full bg-muted/70 px-1.5 py-px text-[9.5px] text-muted-foreground/70">
+            Built-in
+          </span>
+        )}
+      </span>
+    )
+  }
+  return (
+    <div className="flex gap-2">
+      {KIND_ORDER.map((k) => {
+        const on = k === kind
+        const KM = KIND[k]
+        return (
+          <button
+            key={k}
+            onClick={() => setKind(k)}
+            className={cn(
+              "flex flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all",
+              on
+                ? "border-(--interactive) bg-(--interactive)/[0.07] ring-2 ring-(--interactive)/15"
+                : "border-border bg-card hover:border-(--interactive)/40 hover:bg-muted/30",
+            )}
+          >
+            <KM.icon className="size-4 shrink-0" style={{ color: KM.accent }} />
+            <span className="text-[12.5px] font-medium text-foreground/85">{KM.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** The modal's footer actions (Delete / Cancel / Create-or-Save). Design-only:
+ *  every button just closes. Extracted so {@link PromptModal} stays within the
+ *  P8 budgets. */
+function PromptFooter({
+  isNew,
+  builtin,
+  canSubmit,
+  onClose,
+}: {
+  isNew: boolean
+  builtin: boolean
+  canSubmit: boolean
+  onClose: () => void
+}) {
+  return (
+    <footer className="flex h-[60px] shrink-0 items-center gap-2 border-t border-border bg-muted/25 px-6">
+      {!isNew && !builtin && (
+        <button className="text-[12px] font-medium text-(--danger)/80 transition-colors hover:text-(--danger)">
+          Delete
+        </button>
+      )}
+      <button
+        onClick={onClose}
+        className="ml-auto rounded-lg border border-border px-3.5 py-2 text-[12.5px] font-medium text-foreground/75 transition-colors hover:bg-muted/50"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={onClose}
+        disabled={!canSubmit}
+        className="flex items-center gap-2 rounded-lg bg-(--interactive) px-4 py-2 text-[12.5px] font-medium text-(--primary-foreground) transition-all hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45"
+      >
+        <Check className="size-4" strokeWidth={2.5} />
+        {isNew ? "Create" : "Save"}
+      </button>
+    </footer>
   )
 }
 
@@ -217,12 +285,42 @@ interface Source {
 }
 
 const SOURCES: Source[] = [
-  { id: "claude-code", name: "Claude Code", file: "CLAUDE.md · .claude/agents/", icon: Sparkles, accent: "var(--signal)" },
-  { id: "codex", name: "Codex (OpenAI)", file: "AGENTS.md", icon: Bot, accent: "var(--interactive)" },
-  { id: "cursor", name: "Cursor", file: ".cursor/rules · .cursorrules", icon: Code2, accent: "var(--ok)" },
+  {
+    id: "claude-code",
+    name: "Claude Code",
+    file: "CLAUDE.md · .claude/agents/",
+    icon: Sparkles,
+    accent: "var(--signal)",
+  },
+  {
+    id: "codex",
+    name: "Codex (OpenAI)",
+    file: "AGENTS.md",
+    icon: Bot,
+    accent: "var(--interactive)",
+  },
+  {
+    id: "cursor",
+    name: "Cursor",
+    file: ".cursor/rules · .cursorrules",
+    icon: Code2,
+    accent: "var(--ok)",
+  },
   { id: "windsurf", name: "Windsurf", file: ".windsurfrules", icon: Wind, accent: "var(--warn)" },
-  { id: "aider", name: "Aider", file: "CONVENTIONS.md", icon: Terminal, accent: "var(--interactive)" },
-  { id: "continue", name: "Continue", file: ".continue/", icon: Boxes, accent: "var(--muted-foreground)" },
+  {
+    id: "aider",
+    name: "Aider",
+    file: "CONVENTIONS.md",
+    icon: Terminal,
+    accent: "var(--interactive)",
+  },
+  {
+    id: "continue",
+    name: "Continue",
+    file: ".continue/",
+    icon: Boxes,
+    accent: "var(--muted-foreground)",
+  },
 ]
 
 /**
@@ -230,18 +328,25 @@ const SOURCES: Source[] = [
  * Design-only: scanning each source flips the row to an "Imported ✓" state.
  */
 export function ImportModal({ onClose }: { onClose: () => void }) {
-  const [done, setDone] = useState<Set<string>>(new Set())
+  const [done, setDone] = useState<Set<string>>(() => new Set())
 
   return (
     <Backdrop onClose={onClose}>
-      <div className="backdrop-fade fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="modal-pop relative z-10 flex max-h-[88vh] w-[520px] max-w-[94vw] flex-col overflow-hidden rounded-2xl border border-border bg-card pop-shadow">
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="backdrop-fade fixed inset-0 cursor-default bg-black/40"
+      />
+      <div className="modal-pop pop-shadow relative z-10 flex max-h-[88vh] w-[520px] max-w-[94vw] flex-col overflow-hidden rounded-2xl border border-border bg-card">
         <header className="flex items-center gap-3 border-b border-border px-6 py-4">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--interactive)]/14 text-[var(--interactive)]">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-(--interactive)/14 text-(--interactive)">
             <Download className="size-[18px]" />
           </span>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="text-[15px] font-semibold tracking-tight text-foreground">Import prompts</span>
+            <span className="text-[15px] font-semibold tracking-tight text-foreground">
+              Import prompts
+            </span>
             <span className="text-[11.5px] text-muted-foreground">
               Bring rules & agents over from other tools into your global library.
             </span>
@@ -254,24 +359,31 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
           </button>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4">
           {SOURCES.map((s, i) => {
             const imported = done.has(s.id)
             return (
               <div
                 key={s.id}
                 style={{ animationDelay: `${i * 35}ms` }}
-                className="opt-rise flex items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 card-shadow"
+                className="opt-rise card-shadow flex items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5"
               >
                 <span
                   className="flex size-8 shrink-0 items-center justify-center rounded-lg"
-                  style={{ background: `color-mix(in oklab, ${s.accent} 15%, transparent)`, color: s.accent }}
+                  style={{
+                    background: `color-mix(in oklab, ${s.accent} 15%, transparent)`,
+                    color: s.accent,
+                  }}
                 >
                   <s.icon className="size-[17px]" />
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col leading-tight">
-                  <span className="truncate text-[13px] font-medium text-foreground/90">{s.name}</span>
-                  <span className="truncate font-mono text-[10.5px] text-muted-foreground/65">{s.file}</span>
+                  <span className="truncate text-[13px] font-medium text-foreground/90">
+                    {s.name}
+                  </span>
+                  <span className="truncate font-mono text-[10.5px] text-muted-foreground/65">
+                    {s.file}
+                  </span>
                 </div>
                 <button
                   onClick={() => setDone((d) => new Set(d).add(s.id))}
@@ -279,11 +391,15 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
                   className={cn(
                     "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11.5px] font-medium transition-all",
                     imported
-                      ? "cursor-default bg-[var(--ok)]/14 text-[var(--ok)]"
-                      : "border border-border text-foreground/75 hover:border-[var(--interactive)]/50 hover:text-foreground active:scale-[0.97]",
+                      ? "cursor-default bg-(--ok)/14 text-(--ok)"
+                      : "border border-border text-foreground/75 hover:border-(--interactive)/50 hover:text-foreground active:scale-[0.97]",
                   )}
                 >
-                  {imported ? <Check className="size-3.5" strokeWidth={2.5} /> : <Download className="size-3.5" />}
+                  {imported ? (
+                    <Check className="size-3.5" strokeWidth={2.5} />
+                  ) : (
+                    <Download className="size-3.5" />
+                  )}
                   {imported ? "Imported" : "Import"}
                 </button>
               </div>
@@ -292,10 +408,12 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <footer className="flex h-[56px] shrink-0 items-center border-t border-border bg-muted/25 px-6">
-          <span className="text-[11px] text-muted-foreground/65">Import rules &amp; agents from your other tools.</span>
+          <span className="text-[11px] text-muted-foreground/65">
+            Import rules &amp; agents from your other tools.
+          </span>
           <button
             onClick={onClose}
-            className="ml-auto rounded-lg bg-[var(--interactive)] px-4 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-all hover:brightness-105 active:scale-[0.98]"
+            className="ml-auto rounded-lg bg-(--interactive) px-4 py-2 text-[12.5px] font-medium text-(--primary-foreground) transition-all hover:brightness-105 active:scale-[0.98]"
           >
             Done
           </button>
@@ -307,10 +425,20 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
 
 // ── shared chrome ─────────────────────────────────────────────────
 function Backdrop({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  // Escape-to-close as a document listener rather than an onKeyDown on the
+  // dialog container: the container carries the (non-interactive) `dialog` role,
+  // so a JSX key handler on it trips jsx-a11y — and a document listener closes
+  // regardless of where focus sits inside the modal.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [onClose])
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onKeyDown={(e) => e.key === "Escape" && onClose()}
       role="dialog"
       aria-modal
     >
@@ -331,7 +459,9 @@ function Field({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline gap-2">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">{label}</span>
+        <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
+          {label}
+        </span>
         {hint && <span className="text-[11px] text-muted-foreground/55">{hint}</span>}
       </div>
       {children}

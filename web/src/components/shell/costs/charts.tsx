@@ -1,4 +1,5 @@
 import type { Slice, CostRow } from "./parse"
+import { fmtDollar } from "./format"
 
 // ── Shared constants ────────────────────────────────────────────────────────
 
@@ -9,7 +10,7 @@ const FONT = "system-ui, -apple-system, sans-serif"
 interface DonutProps {
   data: Slice[]
   size?: number
-  title?: string
+  title?: string | undefined
 }
 
 /**
@@ -25,12 +26,15 @@ export function DonutChart({ data, size = 220, title }: DonutProps) {
   const stroke = size * 0.16
   const circumference = 2 * Math.PI * r
 
-  let offset = 0
-  const arcs = data.map((d) => {
+  // Cumulative arc offset computed purely per segment (a prefix-sum of prior
+  // ratios) rather than mutating a running `let` across the map — reassigning an
+  // outer binding after render trips react-hooks/immutability, and the segment
+  // count is tiny so the O(n²) prefix scan is free.
+  const arcs = data.map((d, i) => {
     const ratio = d.value / total
+    const offset = data.slice(0, i).reduce((sum, x) => sum + x.value / total, 0) * circumference
     const dashArray = `${circumference * ratio} ${circumference * (1 - ratio)}`
     const dashOffset = -offset
-    offset += circumference * ratio
     return { ...d, dashArray, dashOffset, ratio }
   })
 
@@ -79,7 +83,9 @@ export function DonutChart({ data, size = 220, title }: DonutProps) {
           total
         </text>
       </svg>
-      <Legend items={arcs.map((a) => ({ label: a.label, color: a.color, value: a.value, pct: a.ratio }))} />
+      <Legend
+        items={arcs.map((a) => ({ label: a.label, color: a.color, value: a.value, pct: a.ratio }))}
+      />
     </div>
   )
 }
@@ -88,15 +94,9 @@ export function DonutChart({ data, size = 220, title }: DonutProps) {
 
 interface HBarProps {
   data: Slice[]
-  title?: string
+  title?: string | undefined
   format?: (v: number) => string
 }
-
-const fmtDollar = (v: number) => (v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`)
-const fmtTokens = (v: number) =>
-  v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `${(v / 1_000).toFixed(1)}K` : `${v}`
-
-export { fmtDollar, fmtTokens }
 
 export function HBarChart({ data, title, format = fmtDollar }: HBarProps) {
   const max = Math.max(...data.map((d) => d.value), 1)
@@ -110,14 +110,16 @@ export function HBarChart({ data, title, format = fmtDollar }: HBarProps) {
           const pct = (d.value / max) * 100
           return (
             <div key={d.label} className="flex items-center gap-2">
-              <span className="w-28 shrink-0 truncate text-right text-[11px] text-muted-foreground">{d.label}</span>
+              <span className="w-28 shrink-0 truncate text-right text-[11px] text-muted-foreground">
+                {d.label}
+              </span>
               <div className="relative h-5 min-w-0 flex-1 overflow-hidden rounded-md bg-muted/40">
                 <div
                   className="absolute inset-y-0 left-0 rounded-md transition-all duration-500"
                   style={{ width: `${Math.max(pct, 1)}%`, backgroundColor: d.color }}
                 />
               </div>
-              <span className="w-16 shrink-0 text-right text-[11px] tabular-nums text-foreground/70">
+              <span className="w-16 shrink-0 text-right text-[11px] text-foreground/70 tabular-nums">
                 {format(d.value)}
               </span>
             </div>
@@ -132,7 +134,7 @@ export function HBarChart({ data, title, format = fmtDollar }: HBarProps) {
 
 interface TimelineProps {
   rows: CostRow[]
-  title?: string
+  title?: string | undefined
   width?: number
   height?: number
 }
@@ -156,11 +158,11 @@ export function CostTimeline({ rows, title, width = 600, height = 200 }: Timelin
   const buildArea = (accessor: (r: CostRow, base: number) => [number, number]) => {
     const upper: string[] = []
     const lower: string[] = []
-    rows.forEach((r, i) => {
+    for (const [i, r] of rows.entries()) {
       const [lo, hi] = accessor(r, 0)
       upper.push(`${xScale(i)},${yScale(hi)}`)
       lower.unshift(`${xScale(i)},${yScale(lo)}`)
-    })
+    }
     return `M${upper.join("L")}L${lower.join("L")}Z`
   }
 
@@ -221,15 +223,24 @@ export function CostTimeline({ rows, title, width = 600, height = 200 }: Timelin
       </svg>
       <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1">
-          <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: "var(--ok, #4ade80)" }} />
+          <span
+            className="inline-block size-2.5 rounded-sm"
+            style={{ backgroundColor: "var(--ok, #4ade80)" }}
+          />
           Hit
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: "var(--warn, #fbbf24)" }} />
+          <span
+            className="inline-block size-2.5 rounded-sm"
+            style={{ backgroundColor: "var(--warn, #fbbf24)" }}
+          />
           Miss
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: "#60a5fa" }} />
+          <span
+            className="inline-block size-2.5 rounded-sm"
+            style={{ backgroundColor: "#60a5fa" }}
+          />
           Output
         </span>
       </div>
@@ -239,7 +250,7 @@ export function CostTimeline({ rows, title, width = 600, height = 200 }: Timelin
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function EmptyChart({ title }: { title?: string }) {
+function EmptyChart({ title }: { title?: string | undefined }) {
   return (
     <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
       {title && <span className="text-[13px] font-semibold text-foreground/80">{title}</span>}
@@ -256,10 +267,16 @@ function Legend({
   return (
     <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
       {items.map((it) => (
-        <span key={it.label} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span className="inline-block size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: it.color }} />
+        <span
+          key={it.label}
+          className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+        >
+          <span
+            className="inline-block size-2.5 shrink-0 rounded-sm"
+            style={{ backgroundColor: it.color }}
+          />
           <span className="truncate">{it.label}</span>
-          <span className="tabular-nums text-foreground/60">{(it.pct * 100).toFixed(0)}%</span>
+          <span className="text-foreground/60 tabular-nums">{(it.pct * 100).toFixed(0)}%</span>
         </span>
       ))}
     </div>

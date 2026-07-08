@@ -20,12 +20,12 @@
 // The imperative finder/agent mutations live in ./mutations and are re-exported
 // here so `@/lib/live` stays the single import surface.
 
-import { useEffect } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { BACKSTOP_POLL_MS } from "../query/queryClient"
-import { ensureSync, mergeThreadLogs, qk } from "../query/sync"
+import { useEffect, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { mergeThreadLogs, qk } from "../query/sync"
 import { getOrCreateSseClient } from "../query/sse"
-import { useRef, useState } from "react"
+import { measure } from "../support/telemetry"
+import { useLive, type LiveQueryResult } from "./core"
 import * as api from "../api"
 
 import type {
@@ -47,49 +47,13 @@ import type {
 
 export * from "./mutations"
 
-// ── Result shape (unchanged — consumers depend on this) ──────────────
+// ── Live-query core (re-exported for the public `@/lib/live` surface) ─
+//
+// `useLive` + `LiveQueryResult` moved to ./core so ./mutations can import them
+// without cycling back through this barrel (import-x/no-cycle). Re-exported here
+// so every existing `@/lib/live` consumer keeps its import path unchanged.
 
-export interface LiveQueryResult<T> {
-  data: T | undefined
-  loading: boolean
-  error: Error | null
-  refetch: () => void
-}
-
-/**
- * Wrap a TanStack `useQuery` into the legacy `LiveQueryResult` shape and ensure
- * the agent's SSE→cache bridge is live. `agentId` is optional: fleet-level
- * resources pass none (no bridge), agent-scoped ones pass theirs.
- */
-export function useLive<T>(
-  queryKey: readonly unknown[],
-  queryFn: () => Promise<T>,
-  opts: { agentId?: string; enabled?: boolean; pollMs?: number } = {},
-): LiveQueryResult<T> {
-  const { agentId, enabled = true, pollMs = BACKSTOP_POLL_MS } = opts
-
-  // Guarantee the push plane is running for this agent whenever its data is
-  // observed. Idempotent + no teardown (one long-lived subscription per agent).
-  useEffect(() => {
-    if (agentId) ensureSync(agentId)
-  }, [agentId])
-
-  const q = useQuery({
-    queryKey,
-    queryFn,
-    enabled,
-    refetchInterval: pollMs > 0 ? pollMs : false,
-  })
-
-  return {
-    data: q.data,
-    loading: q.isLoading,
-    error: q.error instanceof Error ? q.error : q.error ? new Error(String(q.error)) : null,
-    refetch: () => {
-      void q.refetch()
-    },
-  }
-}
+export { useLive, type LiveQueryResult } from "./core"
 
 // ── Fleet hooks ───────────────────────────────────────────────────────
 
@@ -117,7 +81,10 @@ export function useThreads(agentId: string): LiveQueryResult<ThreadDetail[]> {
     async () => {
       const next = await api.fetchThreads(agentId)
       const prev = client.getQueryData<ThreadDetail[]>(qk.threads(agentId))
-      return mergeThreadLogs(prev, next)
+      // The poll reconcile is O(threads × messages) and runs on the main thread
+      // on every backstop tick — a prime periodic-freeze suspect on a huge
+      // roster. Name it so the HUD attributes a stall landing here.
+      return measure("threads:merge", () => mergeThreadLogs(prev, next))
     },
     { agentId, enabled: !!agentId },
   )
@@ -129,7 +96,7 @@ export function useThreads(agentId: string): LiveQueryResult<ThreadDetail[]> {
 // mechanism is the poll. The default 15s backstop made the context meter feel
 // frozen (T297); a brisk poll keeps it tracking within a few seconds. The
 // backend read is mtime-cached, so an unchanged config.json is cheap to re-poll.
-const PANELS_POLL_MS = 4_000
+const PANELS_POLL_MS = 4000
 
 export function usePanels(agentId: string): LiveQueryResult<ContextPanel[]> {
   return useLive(qk.panels(agentId), () => api.fetchPanels(agentId), {
@@ -211,10 +178,7 @@ export function useEntities(agentId: string): LiveQueryResult<EntityTable[]> {
 
 // ── Finder hooks ──────────────────────────────────────────────────────
 
-export function useFs(
-  agentId: string,
-  path: string,
-): LiveQueryResult<FinderNode[]> {
+export function useFs(agentId: string, path: string): LiveQueryResult<FinderNode[]> {
   // `fetchFs` is typed with the generated FinderNode (epoch `modified: number`);
   // the UI FinderNode is an enriched view over the same payload (relative
   // `modified` string, optional tags/created). Cast at this single seam.
@@ -331,7 +295,11 @@ export function useStreamingTokens(agentId: string): LiveTokens {
       rafRef.current = null
       if (!dirtyRef.current) return
       dirtyRef.current = false
-      setTokens({ ...bufRef.current }) // one snapshot per frame
+      // The per-frame token flush spreads the whole accumulation buffer and
+      // triggers a conversation re-render. On a very long streamed message this
+      // is a live-updating suspect the SSE-delta/poll probes don't cover — name
+      // it so a stall landing here is attributed to token streaming.
+      measure("stream:flush", () => setTokens({ ...bufRef.current })) // one snapshot per frame
     }
     const schedule = () => {
       if (rafRef.current != null) return
@@ -352,7 +320,7 @@ export function useStreamingTokens(agentId: string): LiveTokens {
         kind?: { kind?: string; text?: string }
       }
       try {
-        frame = JSON.parse(event.data)
+        frame = measure("stream:parse", () => JSON.parse(event.data) as typeof frame)
       } catch {
         return
       }
@@ -385,7 +353,7 @@ export function useStreamingTokens(agentId: string): LiveTokens {
 // agent mutations). So this hook rides a brisk poll (no delta fold): a tripped
 // breaker or a degraded stream surfaces within one poll interval (T121).
 
-const METRICS_POLL_MS = 4_000
+const METRICS_POLL_MS = 4000
 
 export function useMetrics(agentId: string): LiveQueryResult<api.AgentMetrics> {
   return useLive(qk.metrics(agentId), () => api.fetchMetrics(agentId), {

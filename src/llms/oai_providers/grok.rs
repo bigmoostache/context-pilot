@@ -176,6 +176,7 @@ impl LlmClient for GrokClient {
             cache_miss_tokens: 0,
             stop_reason,
             bp_hashes: vec![],
+            bp_panel_ids: vec![],
             alive_count: 0,
             alive_positions_permille: vec![],
         });

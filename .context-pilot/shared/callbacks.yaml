@@ -1,129 +1,80 @@
-folder-sizes:
-  name: folder-sizes
-  description: Check that no source directory exceeds 8 entries and no .rs file exceeds 500 lines
-  pattern: '*.rs'
+api-contract-rust:
+  name: api-contract-rust
+  description: API-contract family (OpenAPI spec+routes, TS codegen drift, manual-fetch audit) on Rust edits
+  pattern: '**/*.rs'
   blocking: true
-  timeout_secs: 10
-  success_message: Structure checks OK ✓
+  timeout_secs: 180
+  success_message: API contract OK ✓
   is_global: true
-  script_content: |-
-    bash .github/checks/check-folder-sizes.sh
-    bash .github/checks/check-file-lengths.sh
-  last_edited_ms: 1781444438820
-lint-integrity:
-  name: lint-integrity
-  description: Verify lint config hash chain integrity (protected files unchanged)
-  pattern: '*.rs'
-  blocking: true
-  timeout_secs: 10
-  success_message: Lint integrity OK ✓
-  is_global: true
-  script_content: bash .github/checks/check-lint-config.sh
-  last_edited_ms: 0
-openapi-contract:
-  name: openapi-contract
-  description: 'Full OpenAPI pipeline: regenerate spec + route exhaustiveness + TS client codegen + tsc + manual API audit'
-  pattern: '*.rs'
-  blocking: true
-  timeout_secs: 60
-  success_message: OpenAPI contract OK ✓
-  is_global: true
-  script_content: |
-    echo "▸ Regenerating openapi.json + route exhaustiveness..."
-    cargo test -p cp-orchestrator --test openapi -- --ignored 2>&1
-
-    # ── Step 3: Regenerate TypeScript client ─────────────────────────────
-    echo "▸ Regenerating TS client from openapi.json..."
-    cd web
-    npx @hey-api/openapi-ts -i ../openapi.json -o src/lib/api/generated 2>&1
-
-    # ── Step 4: Type-check frontend ──────────────────────────────────────
-    echo "▸ Type-checking (tsc --noEmit)..."
-    npx tsc --noEmit 2>&1
-
-    # ── Step 5: Audit — no manual API calls ──────────────────────────────
-    # The API layer must use the generated SDK exclusively. The only
-    # acceptable manual patterns are:
-    #   - downloadFile in finder.ts (binary blob, needs manual fetch)
-    #   - rawUrl / avatarUrl (URL builders, not fetch calls)
-    echo "▸ Auditing for manual API calls..."
-    cd src/lib/api
-
-    # Check for raw fetch( calls (excluding downloadFile which is irreducible)
-    MANUAL_FETCH=$(grep -rn 'fetch(' --include='*.ts' . \
-      | grep -v '/generated/' \
-      | grep -v 'downloadFile' \
-      | grep -v '// ok:manual' \
-      || true)
-
-    if [ -n "$MANUAL_FETCH" ]; then
-      echo "::error::Manual fetch() calls found in API layer — use generated SDK instead:"
-      echo "$MANUAL_FETCH"
-      exit 1
-    fi
-
-    echo "✓ All checks passed"
-  last_edited_ms: 0
-rust-check:
-  name: rust-check
-  description: Run cargo fmt --check, cargo check, and clippy on Rust file edits
-  pattern: '*.rs'
-  blocking: true
-  timeout_secs: 60
-  success_message: Rust checks passed ✓
-  is_global: true
-  script_content: |
-    echo "=== cargo fmt (check only) ==="
-    cargo fmt -- --check 2>&1
-
-    echo ""
-    echo "=== cargo check (deny warnings) ==="
-    RUSTFLAGS="-D warnings" cargo check 2>&1
-
-    echo ""
-    echo "=== cargo clippy (workspace lints) ==="
-    cargo clippy --all-targets -- -D warnings 2>&1
-
-    echo ""
-    echo "All Rust checks passed."
-  last_edited_ms: 1782897506974
-ts-contract:
-  name: ts-contract
-  description: Regenerate TypeScript client from openapi.json on TS file edits to catch contract drift
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
+  last_edited_ms: 1783511056445
+api-contract-ts:
+  name: api-contract-ts
+  description: API-contract family (OpenAPI spec+routes, TS codegen drift, manual-fetch audit) on web TS edits
   pattern: web/src/**/*.ts
   blocking: true
-  timeout_secs: 30
-  success_message: TS contract OK ✓
+  timeout_secs: 180
+  success_message: API contract OK ✓
   is_global: true
-  script_content: |-
-    cd web
-    npx @hey-api/openapi-ts -i ../openapi.json -o src/lib/api/generated 2>&1
-
-    # Check for drift in tracked generated files (-- separates paths from revisions)
-    if ! git diff --exit-code --quiet -- web/src/lib/api/generated/ 2>/dev/null; then
-      echo "::error::Generated TypeScript client drifted from openapi.json!"
-      echo "Do not hand-edit generated files."
-      git diff --stat -- web/src/lib/api/generated/
-      exit 1
-    fi
-  last_edited_ms: 1782421737199
-vault-bypass:
-  name: vault-bypass
-  description: Catch direct env::var calls for vault-managed credential keys (delegates to .github/checks/check-vault-bypass.sh)
-  pattern: '*.rs'
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
+  last_edited_ms: 1783511056446
+rust-lints:
+  name: rust-lints
+  description: Rust-lints family (fmt, clippy -D warnings, cargo check, lint-exception registry, vault-bypass)
+  pattern: '**/*.rs'
   blocking: true
-  timeout_secs: 5
-  success_message: Vault bypass check OK ✓
+  timeout_secs: 120
+  success_message: Rust lints OK ✓
   is_global: true
-  script_content: .github/checks/check-vault-bypass.sh $CP_CHANGED_FILES
-  last_edited_ms: 1783256066883
-web-structure:
-  name: web-structure
-  description: Enforce ≤8 entries/dir + ≤500 lines/file under web/src (shadcn ui/ exempt)
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-rust-lints.sh" --callback
+  last_edited_ms: 1783511056443
+rust-tests:
+  name: rust-tests
+  description: Rust-tests family (cargo build debug in --callback, cargo test)
+  pattern: '**/*.rs'
+  blocking: true
+  timeout_secs: 300
+  success_message: Rust tests OK ✓
+  is_global: true
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-rust-tests.sh" --callback
+  last_edited_ms: 1783511056443
+structure-rust:
+  name: structure-rust
+  description: Structure family (file lengths ≤500, dir entries ≤8 across Rust+web, hash chain) on Rust edits
+  pattern: '**/*.rs'
+  blocking: true
+  timeout_secs: 30
+  success_message: Structure OK ✓
+  is_global: true
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-structure.sh" --callback
+  last_edited_ms: 1783511056442
+structure-web:
+  name: structure-web
+  description: Structure family (file lengths ≤500, dir entries ≤8 across Rust+web, hash chain) on web edits
   pattern: web/src/**
   blocking: true
-  timeout_secs: 15
-  success_message: Web structure OK ✓
+  timeout_secs: 30
+  success_message: Structure OK ✓
   is_global: true
-  script_content: bash web/scripts/check-web-structure.sh
-  last_edited_ms: 1782039392004
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-structure.sh" --callback
+  last_edited_ms: 1783511056442
+ts-lints:
+  name: ts-lints
+  description: TS-lints family (eslint, prettier, stylelint, tsc, type-coverage, suppressions, rule-census, knip)
+  pattern: web/src/**
+  blocking: true
+  timeout_secs: 300
+  success_message: TS lints OK ✓
+  is_global: true
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-ts-lints.sh" --callback
+  last_edited_ms: 1783511056444
+ts-tests:
+  name: ts-tests
+  description: TS-tests family (Playwright e2e — documented stub, exit 0 until ephemeral stack provisioned)
+  pattern: web/src/**
+  blocking: true
+  timeout_secs: 30
+  success_message: TS tests OK ✓
+  is_global: true
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-ts-tests.sh" --callback
+  last_edited_ms: 1783511056445

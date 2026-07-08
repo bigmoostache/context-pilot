@@ -13,7 +13,7 @@
 // preflight on JSON POSTs, and under an HTTPS origin (tailscale) it is
 // mixed-content-blocked — which surfaced as GET-works / POST-404 on the
 // OAuth login+refresh routes. Set VITE_API_URL only to target a remote backend.
-export const BASE = import.meta.env.VITE_API_URL ?? ""
+export const BASE = (import.meta.env["VITE_API_URL"] as string | undefined) ?? ""
 
 /** localStorage key for the auth session token. */
 const TOKEN_KEY = "cp-auth-token"
@@ -33,36 +33,6 @@ export function setToken(token: string | null) {
  *  but the generic defaults produce a wider type.  This cast is safe. */
 export function sdk<T>(call: unknown): Promise<T> {
   return call as Promise<T>
-}
-
-/** Minimal REST helper for the few endpoints whose response shape diverges
- *  from the OpenAPI contract (settings, password, profile, sessions) and so
- *  are not covered by the generated SDK. Mirrors the SDK client: base URL +
- *  Bearer token + the 401 → clear-token / `cp-auth-expired` behavior. Throws
- *  an `Error` (message = backend `error` field when present) on non-2xx. */
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getToken()
-  const headers = new Headers(init?.headers)
-  if (token && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${token}`)
-  }
-  const res = await fetch(`${BASE}${path}`, { ...init, headers }) // ok:manual — helper for endpoints whose shapes diverge from the contract
-  if (res.status === 401 && token) {
-    setToken(null)
-    window.dispatchEvent(new Event("cp-auth-expired"))
-  }
-  if (!res.ok) {
-    let msg = `${res.status} ${res.statusText}`
-    try {
-      const body = (await res.json()) as { error?: string }
-      if (body?.error) msg = body.error
-    } catch {
-      // non-JSON error body — keep the status line
-    }
-    throw new Error(msg)
-  }
-  if (res.status === 204) return undefined as T
-  return (await res.json()) as T
 }
 
 /** Build a full Command envelope around a Kind payload. */

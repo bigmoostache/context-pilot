@@ -6,7 +6,7 @@ import { useLibrary } from "@/lib/live"
 import type { LibraryItem, LibraryKind } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { ImportModal, PromptModal } from "./PromptModal"
-import { FLEET_MAX_W } from "./FleetShell"
+import { FLEET_MAX_W } from "@/lib/support/panelMeta"
 
 /**
  * Global prompt library — the fleet dashboard's "Prompts" page. Manages the
@@ -19,14 +19,32 @@ const KIND_META: Record<
   LibraryKind,
   { label: string; plural: string; icon: typeof Bot; accent: string; blurb: string }
 > = {
-  agent: { label: "System prompt", plural: "System", icon: Bot, accent: "var(--signal)", blurb: "System prompts — a personality & operating contract." },
-  skill: { label: "Skill", plural: "Skills", icon: Zap, accent: "var(--interactive)", blurb: "Reference material loaded into context on demand." },
-  command: { label: "Command", plural: "Commands", icon: TerminalSquare, accent: "var(--ok)", blurb: "Slash-commands that expand into a prompt." },
+  agent: {
+    label: "System prompt",
+    plural: "System",
+    icon: Bot,
+    accent: "var(--signal)",
+    blurb: "System prompts — a personality & operating contract.",
+  },
+  skill: {
+    label: "Skill",
+    plural: "Skills",
+    icon: Zap,
+    accent: "var(--interactive)",
+    blurb: "Reference material loaded into context on demand.",
+  },
+  command: {
+    label: "Command",
+    plural: "Commands",
+    icon: TerminalSquare,
+    accent: "var(--ok)",
+    blurb: "Slash-commands that expand into a prompt.",
+  },
 }
 
 const TABS: (LibraryKind | "all")[] = ["all", "agent", "skill", "command"]
 
-export function PromptsPage({ agentId }: { agentId?: string }) {
+export function PromptsPage({ agentId }: { agentId?: string | undefined }) {
   const { data: liveLibrary } = useLibrary(agentId ?? "")
   const library = agentId && liveLibrary ? liveLibrary : mockLibrary
   const [tab, setTab] = useState<LibraryKind | "all">("all")
@@ -51,14 +69,14 @@ export function PromptsPage({ agentId }: { agentId?: string }) {
           <div className="flex shrink-0 items-center gap-2">
             <button
               onClick={() => setImporting(true)}
-              className="flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-[12.5px] font-medium text-foreground/80 transition-colors hover:border-[var(--interactive)]/50 hover:text-foreground"
+              className="flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-[12.5px] font-medium text-foreground/80 transition-colors hover:border-(--interactive)/50 hover:text-foreground"
             >
               <Download className="size-4" />
               Import
             </button>
             <button
               onClick={() => setEditing("new")}
-              className="flex items-center gap-2 rounded-lg bg-[var(--interactive)] px-3.5 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-[filter] hover:brightness-105"
+              className="flex items-center gap-2 rounded-lg bg-(--interactive) px-3.5 py-2 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105"
             >
               <Plus className="size-4" />
               New
@@ -77,11 +95,13 @@ export function PromptsPage({ agentId }: { agentId?: string }) {
                 onClick={() => setTab(t)}
                 className={cn(
                   "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium transition-all",
-                  tab === t ? "bg-card text-foreground card-shadow" : "text-muted-foreground hover:text-foreground",
+                  tab === t
+                    ? "card-shadow bg-card text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {label}
-                <span className="rounded-full bg-muted/80 px-1.5 py-px text-[9.5px] tabular-nums text-muted-foreground">
+                <span className="rounded-full bg-muted/80 px-1.5 py-px text-[9.5px] text-muted-foreground tabular-nums">
                   {count}
                 </span>
               </button>
@@ -93,7 +113,12 @@ export function PromptsPage({ agentId }: { agentId?: string }) {
         {tab === "all" ? (
           <div className="flex flex-col gap-6">
             {(["agent", "skill", "command"] as LibraryKind[]).map((k) => (
-              <KindSection key={k} kind={k} items={library.filter((i) => i.kind === k)} onOpen={setEditing} />
+              <KindSection
+                key={k}
+                kind={k}
+                items={library.filter((i) => i.kind === k)}
+                onOpen={setEditing}
+              />
             ))}
           </div>
         ) : (
@@ -154,20 +179,30 @@ function LibraryCard({
     <button
       onClick={() => onOpen(item)}
       style={{ animationDelay: `${Math.min(i, 10) * 35}ms` }}
-      className="opt-rise group flex flex-col gap-2.5 rounded-xl border border-border bg-card p-4 text-left card-shadow transition-colors hover:border-[color-mix(in_oklab,var(--interactive)_45%,transparent)]"
+      className="opt-rise group card-shadow flex flex-col gap-2.5 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-[color-mix(in_oklab,var(--interactive)_45%,transparent)]"
     >
       <div className="flex items-center gap-2.5">
         <span
           className="flex size-8 shrink-0 items-center justify-center rounded-lg"
-          style={{ background: `color-mix(in oklab, ${M.accent} 15%, transparent)`, color: M.accent }}
+          style={{
+            background: `color-mix(in oklab, ${M.accent} 15%, transparent)`,
+            color: M.accent,
+          }}
         >
           <M.icon className="size-[18px]" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className={cn("truncate text-[13.5px] font-semibold text-foreground/90", mono && "font-mono text-[13px]")}>
+          <span
+            className={cn(
+              "truncate text-[13.5px] font-semibold text-foreground/90",
+              mono && "font-mono text-[13px]",
+            )}
+          >
             {item.name}
           </span>
-          {item.meta && <span className="truncate text-[10.5px] text-muted-foreground/65">{item.meta}</span>}
+          {item.meta && (
+            <span className="truncate text-[10.5px] text-muted-foreground/65">{item.meta}</span>
+          )}
         </div>
         {item.builtin && (
           <span className="shrink-0 rounded-full bg-muted/70 px-1.5 py-0.5 text-[9.5px] font-medium text-muted-foreground/70">
@@ -175,7 +210,9 @@ function LibraryCard({
           </span>
         )}
       </div>
-      <p className="line-clamp-2 min-h-[2.4em] text-[12px] leading-snug text-foreground/70">{item.description}</p>
+      <p className="line-clamp-2 min-h-[2.4em] text-[12px] leading-snug text-foreground/70">
+        {item.description}
+      </p>
     </button>
   )
 }

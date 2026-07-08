@@ -15,13 +15,7 @@ import { ConfigPanel } from "./ConfigPanel"
  * The fleet dashboard renders {@link ConfigPanel} inline instead (its own
  * "Settings" page), so the two entry points share one body.
  */
-export function ConfigModal({
-  open,
-  onClose,
-}: {
-  open: boolean
-  onClose: () => void
-}) {
+export function ConfigModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="flex h-[88vh] max-h-[860px] w-[1100px] max-w-[calc(100vw-3rem)]">

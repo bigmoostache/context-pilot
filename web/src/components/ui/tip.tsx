@@ -30,11 +30,11 @@ export function Tip({
   children,
 }: {
   title: ReactNode
-  body?: ReactNode
-  side?: "top" | "bottom" | "left" | "right"
-  sideOffset?: number
+  body?: ReactNode | undefined
+  side?: "top" | "bottom" | "left" | "right" | undefined
+  sideOffset?: number | undefined
   /** Class for the trigger wrapper span — e.g. `block` to preserve full-width children. */
-  triggerClassName?: string
+  triggerClassName?: string | undefined
   children: ReactNode
 }) {
   return (
@@ -61,9 +61,9 @@ export function Tip({
               <span className="block size-2.5 rotate-45 rounded-[2px] border-b border-r border-border bg-popover" />
             </TooltipPrimitive.Arrow>
             <span className="text-[12px] font-semibold leading-tight text-foreground">{title}</span>
-            {body && (
+            {body ? (
               <span className="text-[11px] leading-snug text-muted-foreground">{body}</span>
-            )}
+            ) : null}
           </TooltipPrimitive.Popup>
         </TooltipPrimitive.Positioner>
       </TooltipPrimitive.Portal>

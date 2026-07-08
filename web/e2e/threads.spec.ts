@@ -28,11 +28,13 @@ async function command(req: APIRequestContext, kind: Record<string, unknown>): P
 }
 
 /** The live roster as the backend sees it (ground-truth cross-check). */
-async function roster(req: APIRequestContext): Promise<Array<{ id: string; name: string; archived: boolean }>> {
+async function roster(
+  req: APIRequestContext,
+): Promise<Array<{ id: string; name: string; archived: boolean }>> {
   const res = await req.get(`${API}/api/agent/${AGENT_ID}/threads`)
   expect(res.ok()).toBeTruthy()
   const raw = await res.json()
-  const list = Array.isArray(raw) ? raw : raw.threads ?? []
+  const list = Array.isArray(raw) ? raw : (raw.threads ?? [])
   return list.map((t: { id: string; name: string; archived?: boolean }) => ({
     id: t.id,
     name: t.name,
@@ -108,7 +110,10 @@ test.describe("threads / CRUD over the push plane", () => {
     await awaitRoster(page.request, NAME, true)
 
     // The Archived view shows it (its search placeholder is "Search archived…").
-    await page.getByRole("button", { name: /^Archived/i }).first().click()
+    await page
+      .getByRole("button", { name: /^Archived/i })
+      .first()
+      .click()
     await page.getByPlaceholder(/Search archived/i).fill(NAME)
     await expect(page.getByText(NAME, { exact: true })).toBeVisible({ timeout: 15_000 })
   })
@@ -123,7 +128,10 @@ test.describe("threads / CRUD over the push plane", () => {
 
     await openThreads(page)
     // Enter the Archived view and find the thread.
-    await page.getByRole("button", { name: /^Archived/i }).first().click()
+    await page
+      .getByRole("button", { name: /^Archived/i })
+      .first()
+      .click()
     await page.getByPlaceholder(/Search archived/i).fill(NAME)
     const row = page.getByText(NAME, { exact: true })
     await expect(row).toBeVisible({ timeout: 15_000 })

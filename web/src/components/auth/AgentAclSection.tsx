@@ -24,9 +24,7 @@ function AgentRoleBadge({ role }: { role: string }) {
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[9.5px] font-semibold",
-        isAdmin
-          ? "bg-[var(--signal)]/15 text-[var(--signal)]"
-          : "bg-muted text-muted-foreground",
+        isAdmin ? "bg-(--signal)/15 text-(--signal)" : "bg-muted text-muted-foreground",
       )}
     >
       {isAdmin ? <ShieldCheck className="size-2.5" /> : <Shield className="size-2.5" />}
@@ -47,11 +45,7 @@ export function AgentAclSection({ agentId }: { agentId: string }) {
 
   const toggleRole = useMutation({
     mutationFn: (e: AclEntry) =>
-      updateAgentRole(
-        agentId,
-        e.user_id,
-        e.role === "agent-admin" ? "agent-user" : "agent-admin",
-      ),
+      updateAgentRole(agentId, e.user_id, e.role === "agent-admin" ? "agent-user" : "agent-admin"),
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   })
 
@@ -63,12 +57,12 @@ export function AgentAclSection({ agentId }: { agentId: string }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground/80">
+        <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
           Access control
         </span>
         <button
           onClick={() => setShowGrant((s) => !s)}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-medium text-[var(--signal)] transition-colors hover:bg-[var(--signal)]/10"
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-medium text-(--signal) transition-colors hover:bg-(--signal)/10"
         >
           <Plus className="size-3" />
           Grant
@@ -80,7 +74,7 @@ export function AgentAclSection({ agentId }: { agentId: string }) {
           agentId={agentId}
           existingUserIds={entries.map((e) => e.user_id)}
           onGranted={() => {
-            qc.invalidateQueries({ queryKey: key })
+            void qc.invalidateQueries({ queryKey: key })
             setShowGrant(false)
           }}
           onCancel={() => setShowGrant(false)}
@@ -88,9 +82,7 @@ export function AgentAclSection({ agentId }: { agentId: string }) {
       )}
 
       {isLoading && (
-        <p className="py-3 text-center text-[11px] text-muted-foreground animate-pulse">
-          Loading…
-        </p>
+        <p className="animate-pulse py-3 text-center text-[11px] text-muted-foreground">Loading…</p>
       )}
 
       {!isLoading && entries.length === 0 && (
@@ -117,9 +109,7 @@ export function AgentAclSection({ agentId }: { agentId: string }) {
               <span className="truncate text-[12px] font-medium text-foreground">
                 {e.user_name}
               </span>
-              <span className="truncate text-[10px] text-muted-foreground">
-                {e.user_email}
-              </span>
+              <span className="truncate text-[10px] text-muted-foreground">{e.user_email}</span>
             </div>
             <button
               title="Toggle role"
@@ -133,7 +123,7 @@ export function AgentAclSection({ agentId }: { agentId: string }) {
               title="Revoke access"
               onClick={() => revoke.mutate(e.user_id)}
               disabled={revoke.isPending}
-              className="flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-[var(--danger)]/10 hover:text-[var(--danger)] group-hover:opacity-100"
+              className="flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all group-hover:opacity-100 hover:bg-(--danger)/10 hover:text-(--danger)"
             >
               <Trash2 className="size-3" />
             </button>
@@ -176,15 +166,13 @@ function GrantForm({
   return (
     <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
       {available.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">
-          All users already have access.
-        </p>
+        <p className="text-[11px] text-muted-foreground">All users already have access.</p>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
-            className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-[11.5px] text-foreground focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal"
+            className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-[11.5px] text-foreground focus:border-signal focus:ring-1 focus:ring-signal focus:outline-none"
           >
             <option value="">Select user…</option>
             {available.map((u: AuthUser) => (
@@ -196,13 +184,16 @@ function GrantForm({
           <select
             value={role}
             onChange={(e) => setRole(e.target.value as "agent-admin" | "agent-user")}
-            className="rounded-md border border-border bg-background px-2 py-1.5 text-[11.5px] text-foreground focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal"
+            className="rounded-md border border-border bg-background px-2 py-1.5 text-[11.5px] text-foreground focus:border-signal focus:ring-1 focus:ring-signal focus:outline-none"
           >
             <option value="agent-user">agent-user</option>
             <option value="agent-admin">agent-admin</option>
           </select>
           <button
-            onClick={() => { setError(""); grant.mutate() }}
+            onClick={() => {
+              setError("")
+              grant.mutate()
+            }}
             disabled={!selected || grant.isPending}
             className="rounded-md bg-signal px-2.5 py-1.5 text-[11px] font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
           >
@@ -216,7 +207,7 @@ function GrantForm({
           </button>
         </div>
       )}
-      {error && <p className="mt-1 text-[10px] text-[var(--danger)]">{error}</p>}
+      {error && <p className="mt-1 text-[10px] text-(--danger)">{error}</p>}
     </div>
   )
 }

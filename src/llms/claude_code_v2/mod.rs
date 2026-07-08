@@ -80,11 +80,12 @@ impl ClaudeCodeV2Client {
             request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_string(), Clone::clone);
 
         // Convert pre-assembled API messages to JSON with cache breakpoints
-        let super::CcJsonResult { mut json_messages, bp_hashes, alive_count, alive_positions_permille } =
+        let super::CcJsonResult { mut json_messages, bp_hashes, bp_panel_ids, alive_count, alive_positions_permille } =
             if request.api_messages.is_empty() {
                 super::CcJsonResult {
                     json_messages: Vec::new(),
                     bp_hashes: Vec::new(),
+                    bp_panel_ids: Vec::new(),
                     alive_count: 0,
                     alive_positions_permille: Vec::new(),
                 }
@@ -193,6 +194,7 @@ impl ClaudeCodeV2Client {
             cache_miss_tokens,
             stop_reason,
             bp_hashes,
+            bp_panel_ids,
             alive_count,
             alive_positions_permille,
         });

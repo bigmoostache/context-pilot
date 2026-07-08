@@ -12,8 +12,7 @@ import type {
   ModelDef as GenModelDef,
   ProviderDef as GenProviderDef,
 } from "../api/generated/types.gen"
-import { getApiProviders } from "../api/generated/sdk.gen"
-import { sdk } from "../api/client"
+import { fetchProviderDefs } from "../api"
 
 // ── Types (generated base + frontend icon) ────────────────────────────
 
@@ -44,19 +43,23 @@ function modelIcon(badge: string | undefined | null): LucideIcon {
   switch (badge) {
     case "Most capable":
     case "Large":
-    case "Capable":
+    case "Capable": {
       return Sparkles
-    case "Balanced":
+    }
+    case "Balanced": {
       return Gauge
+    }
     case "Fast & cheap":
     case "Creative":
     case "Latest":
     case "Fastest":
     case "Cheap":
-    case "Fast":
+    case "Fast": {
       return Zap
-    default:
+    }
+    default: {
       return Bot
+    }
   }
 }
 
@@ -75,21 +78,20 @@ function enrichProviders(raw: GenProviderDef[]): ProviderDef[] {
 
 // ── Data fetching ─────────────────────────────────────────────────────
 
-/** Singleton cache — providers never change during a session. */
-let cached: ProviderDef[] | null = null
+/** Singleton cache — providers never change during a session. Held in an
+ *  object so the memoising write is a property mutation, not a reassignment of a
+ *  module-level binding from inside a function. */
+const providerCache: { value: ProviderDef[] | null } = { value: null }
 
 /** Fetch the full usable provider registry (cached after first call). The
  *  backend already drops providers without a configured key and stamps each
  *  model with its canonical `key`, so this is the admin-facing catalog (every
  *  usable model, unfiltered by the org allowlist). */
 export async function fetchProviders(): Promise<ProviderDef[]> {
-  if (cached) return cached
-  // The client runs in responseStyle:"data" (setupClient), so the SDK call
-  // resolves to the array directly — use sdk() like every other consumer
-  // rather than destructuring a `{ data }` wrapper that doesn't exist at runtime.
-  const data = await sdk<GenProviderDef[]>(getApiProviders({ throwOnError: true }))
-  cached = enrichProviders(data)
-  return cached
+  if (providerCache.value) return providerCache.value
+  const data = await fetchProviderDefs()
+  providerCache.value = enrichProviders(data)
+  return providerCache.value
 }
 
 /** Fetch the picker registry — usable providers with the org model allowlist
@@ -98,19 +100,8 @@ export async function fetchProviders(): Promise<ProviderDef[]> {
  *  is invalidated (query key `["providers", "picker"]`) when the admin edits the
  *  allowlist. */
 export async function fetchPickerProviders(): Promise<ProviderDef[]> {
-  const data = await sdk<GenProviderDef[]>(
-    getApiProviders({ query: { allowed: "1" }, throwOnError: true }),
-  )
+  const data = await fetchProviderDefs(true)
   return enrichProviders(data)
-}
-
-/**
- * Synchronous access to the cached providers. Returns `null` if not yet
- * fetched. Components should call `fetchProviders()` first (e.g. via
- * TanStack Query) and use this only as a fast path.
- */
-export function getCachedProviders(): ProviderDef[] | null {
-  return cached
 }
 
 /** TanStack Query hook — fetches once, caches forever (providers never change). */
@@ -140,17 +131,14 @@ export function priceTag(m: GenModelDef): string {
   const ctx =
     m.contextWindow >= 1_000_000
       ? `${(m.contextWindow / 1_000_000).toFixed(0)}M`
-      : `${(m.contextWindow / 1_000).toFixed(0)}K`
+      : `${(m.contextWindow / 1000).toFixed(0)}K`
   return `$${m.inputPrice} · ${ctx}`
 }
 
 // ── Lookup helpers ─────────────────────────────────────────────────────
 
 /** Find a provider by its serde id. */
-export function findProvider(
-  providers: ProviderDef[],
-  id: string,
-): ProviderDef | undefined {
+export function findProvider(providers: ProviderDef[], id: string): ProviderDef | undefined {
   return providers.find((p) => p.id === id)
 }
 
@@ -160,16 +148,11 @@ export function findModel(
   providerId: string,
   modelId: string,
 ): ModelDef | undefined {
-  return findProvider(providers, providerId)?.models.find(
-    (m) => m.id === modelId,
-  )
+  return findProvider(providers, providerId)?.models.find((m) => m.id === modelId)
 }
 
 /** Get the default model for a provider. */
-export function defaultModel(
-  providers: ProviderDef[],
-  providerId: string,
-): ModelDef | undefined {
+export function defaultModel(providers: ProviderDef[], providerId: string): ModelDef | undefined {
   const p = findProvider(providers, providerId)
   return p?.models.find((m) => m.isDefault) ?? p?.models[0]
 }
@@ -198,9 +181,7 @@ export function resolveSelection(
   providerId: string | undefined,
   apiName: string | undefined,
 ): { provider: ProviderDef; model: ModelDef } | undefined {
-  const provider = providerId
-    ? findProvider(providers, providerId)
-    : undefined
+  const provider = providerId ? findProvider(providers, providerId) : undefined
   if (provider) {
     const model =
       (apiName && provider.models.find((m) => m.apiName === apiName)) ||

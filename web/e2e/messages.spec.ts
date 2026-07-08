@@ -37,7 +37,7 @@ async function rawThreads(req: APIRequestContext): Promise<RawThread[]> {
   const res = await req.get(`${API}/api/agent/${AGENT_ID}/threads`)
   expect(res.ok()).toBeTruthy()
   const raw = await res.json()
-  return Array.isArray(raw) ? raw : raw.threads ?? []
+  return Array.isArray(raw) ? raw : (raw.threads ?? [])
 }
 
 /** Wait until `name` exists in the roster (non-archived) and return its id. */
@@ -103,7 +103,9 @@ test.describe("messages / send over the push plane", () => {
     // would legitimately match twice (preview + bubble) and tell us nothing
     // about the conversation double-render we actually care about.
     const conversation = page.getByRole("main")
-    await expect(conversation.getByText(MSG, { exact: false }).first()).toBeVisible({ timeout: 25_000 })
+    await expect(conversation.getByText(MSG, { exact: false }).first()).toBeVisible({
+      timeout: 25_000,
+    })
 
     // No double-render: in the conversation the message must appear EXACTLY
     // ONCE, not twice. This guards the regression where the delta plane and the

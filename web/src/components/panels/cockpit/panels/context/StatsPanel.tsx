@@ -59,13 +59,16 @@ export function StatsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
           <span className="text-[12px] text-muted-foreground">
             {fmtTokens(panelTokens)} across {panels.length} panel{panels.length === 1 ? "" : "s"}
           </span>
-          <span className="text-[12px] font-semibold tabular-nums" style={{ color: loadColor(usedRatio) }}>
+          <span
+            className="text-[12px] font-semibold tabular-nums"
+            style={{ color: loadColor(usedRatio) }}
+          >
             {(usedRatio * 100).toFixed(0)}%
           </span>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full rounded-full fill-sweep"
+            className="fill-sweep h-full rounded-full"
             style={{ width: `${usedRatio * 100}%`, background: loadColor(usedRatio) }}
           />
         </div>
@@ -75,14 +78,19 @@ export function StatsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
         <ul className="flex flex-col gap-1">
           {panels.map((p) => (
             <li key={p.id} className="flex items-center gap-2">
-              <span className="w-28 shrink-0 truncate text-[11.5px] text-foreground/80">{p.name}</span>
+              <span className="w-28 shrink-0 truncate text-[11.5px] text-foreground/80">
+                {p.name}
+              </span>
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full"
-                  style={{ width: `${(p.tokens / maxTokens) * 100}%`, background: "var(--signal-dim)" }}
+                  style={{
+                    width: `${(p.tokens / maxTokens) * 100}%`,
+                    background: "var(--signal-dim)",
+                  }}
                 />
               </div>
-              <span className="w-12 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground/70">
+              <span className="w-12 shrink-0 text-right text-[10px] text-muted-foreground/70 tabular-nums">
                 {fmtTokens(p.tokens)}
               </span>
             </li>
@@ -99,8 +107,8 @@ export function StatsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
 
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-2.5 card-shadow">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground/65">{label}</div>
+    <div className="card-shadow rounded-lg border border-border bg-card p-2.5">
+      <div className="text-[10px] tracking-wide text-muted-foreground/65 uppercase">{label}</div>
       <div className="mt-0.5 text-[13px] font-semibold tabular-nums" style={{ color }}>
         {value}
       </div>

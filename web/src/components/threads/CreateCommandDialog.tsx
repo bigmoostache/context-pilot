@@ -1,11 +1,6 @@
 import { useState } from "react"
 import { TerminalSquare, Loader2 } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -20,8 +15,8 @@ function slugify(name: string): string {
   const slug = name
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-+|-+$/g, "")
   return slug || "untitled"
 }
 
@@ -67,7 +62,7 @@ export function CreateCommandDialog({
     onClose()
   }
 
-  const submit = (e: React.FormEvent) => {
+  const submit = (e: React.SyntheticEvent) => {
     e.preventDefault()
     if (!canCreate || create.isPending) return
     create.mutate(
@@ -82,48 +77,50 @@ export function CreateCommandDialog({
         <form onSubmit={submit} className="flex flex-col">
           {/* Header */}
           <div className="flex items-start gap-3 border-b border-border/70 px-5 py-4">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--signal)]/15 text-[var(--signal)]">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--signal)/15 text-(--signal)">
               <TerminalSquare className="size-[18px]" />
             </span>
             <div className="flex flex-col gap-0.5">
               <DialogTitle>New command</DialogTitle>
               <DialogDescription>
-                Author a <span className="font-mono text-foreground/70">/command</span> for this agent's
-                library — it appears as a suggestion the moment you save it.
+                Author a <span className="font-mono text-foreground/70">/command</span> for this
+                agent's library — it appears as a suggestion the moment you save it.
               </DialogDescription>
             </div>
           </div>
 
           {/* Body */}
           <div className="flex flex-col gap-4 px-5 py-4">
-            <label className="flex flex-col gap-1.5">
+            <label htmlFor="cmd-name" className="flex flex-col gap-1.5">
               <span className="text-[12px] font-medium text-foreground/80">Name</span>
               <Input
+                id="cmd-name"
                 autoFocus
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Boss Hunt"
               />
               <span className="text-[11px] text-muted-foreground/70">
-                Invoked as{" "}
-                <span className="font-mono text-[var(--interactive)]">/{slug}</span>
+                Invoked as <span className="font-mono text-(--interactive)">/{slug}</span>
               </span>
             </label>
 
-            <label className="flex flex-col gap-1.5">
+            <label htmlFor="cmd-desc" className="flex flex-col gap-1.5">
               <span className="text-[12px] font-medium text-foreground/80">
                 Description <span className="text-muted-foreground/60">(optional)</span>
               </span>
               <Input
+                id="cmd-desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Shown on the suggestion bubble"
               />
             </label>
 
-            <label className="flex flex-col gap-1.5">
+            <label htmlFor="cmd-body" className="flex flex-col gap-1.5">
               <span className="text-[12px] font-medium text-foreground/80">Prompt</span>
               <Textarea
+                id="cmd-body"
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 placeholder="The prompt this command expands to when clicked…"
@@ -135,7 +132,7 @@ export function CreateCommandDialog({
             <div className="flex flex-col gap-1.5">
               <span className="text-[11px] text-muted-foreground/70">Preview</span>
               <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground/75">
-                <span className="font-mono font-medium text-[var(--interactive)]">/{slug}</span>
+                <span className="font-mono font-medium text-(--interactive)">/{slug}</span>
                 {description.trim() && (
                   <span className="max-w-[260px] truncate text-muted-foreground/70">
                     {description.trim()}
@@ -144,9 +141,7 @@ export function CreateCommandDialog({
               </span>
             </div>
 
-            {error && (
-              <p className="text-[12px] text-destructive">{error}</p>
-            )}
+            {error && <p className="text-[12px] text-destructive">{error}</p>}
           </div>
 
           {/* Footer */}

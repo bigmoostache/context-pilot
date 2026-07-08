@@ -6,6 +6,21 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * The async Clipboard API, honestly typed as possibly-absent.
+ *
+ * `navigator.clipboard` is typed `Clipboard` (always-present) by lib.dom, but it
+ * is genuinely `undefined` on an insecure origin or an older browser. Returning
+ * it through a function whose declared type is `Clipboard | undefined` keeps that
+ * truth visible to callers: a direct `navigator.clipboard?.` reads as a dead
+ * guard (control-flow analysis narrows the always-present type), whereas a call
+ * result is opaque to CFA — so `clipboard()?.writeText(…)` stays an honest guard
+ * (a failed/absent clipboard is a silent no-op, never a thrown TypeError).
+ */
+export function clipboard(): Clipboard | undefined {
+  return navigator.clipboard
+}
+
 // ── Client-side zip-on-drop (T367) ────────────────────────────────────
 //
 // Bundle the file(s) a user drops onto the thread conversation into a SINGLE
@@ -21,26 +36,14 @@ export function cn(...inputs: ClassValue[]) {
  * would silently overwrite the first inside the archive.
  */
 function uniqueZipEntry(taken: Record<string, unknown>, name: string): string {
-  if (!(name in taken)) return name
+  if (!Object.hasOwn(taken, name)) return name
   const dot = name.lastIndexOf(".")
   const stem = dot > 0 ? name.slice(0, dot) : name
   const ext = dot > 0 ? name.slice(dot) : ""
   for (let i = 1; ; i++) {
     const candidate = `${stem} (${i})${ext}`
-    if (!(candidate in taken)) return candidate
+    if (!Object.hasOwn(taken, candidate)) return candidate
   }
-}
-
-/**
- * Zip the dropped `files` into one archive `File`, built client-side with
- * fflate (DEFLATE, level 6). The archive is named after the lone file when a
- * single one is dropped (`report.pdf` → `report.pdf.zip`, matching the macOS
- * Finder "Compress" convention) or `dropped-<n>-files.zip` for several. Each
- * entry keeps its original filename (de-duplicated on collision). Rejects if
- * fflate fails or a file can't be read.
- */
-export function zipFiles(files: File[]): Promise<File> {
-  return zipDropped(files.map((file) => ({ file, path: file.name })))
 }
 
 // ── Folder-aware drop extraction (T471) ───────────────────────────────
@@ -83,7 +86,7 @@ function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEn
 async function walkEntry(entry: FileSystemEntry, prefix: string): Promise<DroppedFile[]> {
   if (entry.isFile) {
     const fileEntry = entry as FileSystemFileEntry
-    const file = await new Promise<File>((res, rej) => fileEntry.file(res, rej))
+    const file = await new Promise<File>((resolve, reject) => fileEntry.file(resolve, reject))
     return [{ file, path: prefix + entry.name }]
   }
   if (entry.isDirectory) {
@@ -106,13 +109,13 @@ async function walkEntry(entry: FileSystemEntry, prefix: string): Promise<Droppe
  * which case folder recursion isn't possible.
  */
 export async function extractDroppedFiles(dt: DataTransfer): Promise<DroppedFile[]> {
-  const entries = Array.from(dt.items)
+  const entries = [...dt.items]
     .filter((it) => it.kind === "file")
-    .map((it) => it.webkitGetAsEntry?.() ?? null)
+    .map((it) => it.webkitGetAsEntry() ?? null)
     .filter((e): e is FileSystemEntry => e !== null)
 
   if (entries.length === 0) {
-    return Array.from(dt.files).map((file) => ({ file, path: file.name }))
+    return [...dt.files].map((file) => ({ file, path: file.name }))
   }
   const all: DroppedFile[] = []
   for (const entry of entries) all.push(...(await walkEntry(entry, "")))
@@ -126,7 +129,7 @@ function zipName(dropped: DroppedFile[]): string {
     const only = dropped[0].path
     return `${only.split("/").pop() ?? only}.zip`
   }
-  const roots = new Set(dropped.map((d) => d.path.split("/")[0]))
+  const roots = new Set(dropped.map((d) => d.path.split("/", 1)[0]))
   const [root] = roots
   if (roots.size === 1 && root && dropped.some((d) => d.path.includes("/"))) {
     return `${root}.zip`
@@ -212,12 +215,12 @@ function nextAlphaMarker(marker: string): string {
   const base = isUpper ? 65 : 97 // 'A' / 'a'
   // Decode bijective base-26 to a 1-indexed number (a=1, z=26, aa=27, …).
   let num = 0
-  for (const c of marker) num = num * 26 + (c.toLowerCase().charCodeAt(0) - 96)
+  for (const c of marker) num = num * 26 + ((c.toLowerCase().codePointAt(0) ?? 0) - 96)
   num += 1
   // Re-encode, peeling least-significant "digit" each step.
   let out = ""
   for (let n = num; n > 0; n = Math.floor((n - 1) / 26)) {
-    out = String.fromCharCode(base + ((n - 1) % 26)) + out
+    out = String.fromCodePoint(base + ((n - 1) % 26)) + out
   }
   return out
 }
@@ -258,7 +261,7 @@ function parseListLine(line: string): ParsedLine | null {
   if (dot > 0) {
     const marker = trimmed.slice(0, dot)
     const isNumeric = /^\d+$/.test(marker)
-    const isAlpha = marker.length === 1 && /^[a-zA-Z]$/.test(marker)
+    const isAlpha = marker.length === 1 && /^[a-z]$/i.test(marker)
     if (isNumeric || isAlpha) {
       return { indent, depth, kind: "ol", marker, rest: trimmed.slice(dot + 2) }
     }
@@ -282,7 +285,7 @@ function resetOrderedMarker(marker: string): string {
 /** Increment an ordered marker preserving its style: numeric `+1`, else the
  *  bijective base-26 letter step. */
 function incrementOrderedMarker(marker: string): string {
-  return /^\d+$/.test(marker) ? String(Number.parseInt(marker, 10) + 1) : nextAlphaMarker(marker)
+  return /^\d+$/.test(marker) ? String(Number(marker) + 1) : nextAlphaMarker(marker)
 }
 
 /**
@@ -297,7 +300,11 @@ function incrementOrderedMarker(marker: string): string {
  * Walks upward skipping deeper (nested-child) lines; stops the moment it leaves
  * the enclosing context so numbering never bleeds across separate lists.
  */
-function siblingOrderedMarkerAtDepth(value: string, lineStart: number, targetIndentLen: number): string | null {
+function siblingOrderedMarkerAtDepth(
+  value: string,
+  lineStart: number,
+  targetIndentLen: number,
+): string | null {
   if (lineStart === 0) return null // current line is the first — no sibling above
   const before = value.slice(0, lineStart - 1) // drop the \n preceding the current line
   const lines = before.split("\n")
@@ -373,8 +380,14 @@ export function resolveEnter(value: string, selStart: number, selEnd: number): E
  * indenting an ordered item starts a fresh `1.` / `a.` sublist count. Outdenting
  * reverses both. The caret tracks the content as the indent/marker width shifts.
  */
-export function resolveTab(value: string, selStart: number, _selEnd: number, shift: boolean): {
-  value: string; caret: number;
+export function resolveTab(
+  value: string,
+  selStart: number,
+  _selEnd: number,
+  shift: boolean,
+): {
+  value: string
+  caret: number
 } | null {
   const { start: lineStart, end: lineEnd } = lineBounds(value, selStart)
   const oldLine = value.slice(lineStart, lineEnd)
@@ -414,3 +427,5 @@ export function resolveTab(value: string, selStart: number, _selEnd: number, shi
   const caret = Math.max(lineStart, Math.min(lineStart + rebuilt.length, selStart + delta))
   return { value: next, caret }
 }
+
+// Touch: workspace-test CI wiring verified (T518).

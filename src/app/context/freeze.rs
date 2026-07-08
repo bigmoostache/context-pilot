@@ -71,3 +71,92 @@ impl FreezeConditions {
         FreezeDecision::Fresh
     }
 }
+
+/// Index at which the "free to update" region begins, given the culprit panel
+/// and the breakpoint-carrying panel indices from last turn.
+///
+/// Cache reuse on a break turn extends only to the **last alive breakpoint
+/// at-or-before the culprit**. Everything from there onward is billed fresh this
+/// turn regardless, so panels in `[anchor, culprit)` can be refreshed for free.
+/// `bp_indices` are the current-order indices of panels that carried a
+/// breakpoint last turn; the anchor is the greatest one `<= culprit`. When none
+/// qualifies the anchor is the culprit itself — the region is empty and the old
+/// culprit-anchored behaviour holds (safe cold-start fallback).
+pub(super) fn free_region_anchor(bp_indices: &[usize], culprit_idx: usize) -> usize {
+    bp_indices.iter().copied().filter(|&i| i <= culprit_idx).max().unwrap_or(culprit_idx)
+}
+
+/// Pre-pass: compute the BP-anchored free-region start index (T509).
+///
+/// Finds the culprit under the current freeze policy, then widens the
+/// "free to update" region back to the last alive breakpoint before it.
+/// Panels in `[anchor, culprit)` are already billed fresh this turn (cache
+/// reuse stops at that breakpoint regardless), so refreshing them costs
+/// nothing. Returns that anchor index — panels at/after it may emit Fresh for
+/// free. `usize::MAX` when no culprit (nothing to free).
+pub(super) fn compute_force_break_at(
+    context_items: &[crate::app::panels::ContextItem],
+    state: &State,
+    cond: FreezeConditions,
+) -> usize {
+    use crate::state::cache::hash_content;
+
+    let bp_ids: std::collections::HashSet<&str> =
+        state.previous_breakpoint_panel_ids.iter().map(String::as_str).collect();
+    let mut culprit_idx: Option<usize> = None;
+    let mut bp_indices: Vec<usize> = Vec::new();
+    let mut idx = 0usize;
+    for item in context_items {
+        if item.id == "chat" {
+            continue;
+        }
+        if bp_ids.contains(item.id.as_str()) {
+            bp_indices.push(idx);
+        }
+        if culprit_idx.is_none() {
+            let fresh_hash = hash_content(&item.content);
+            match state.context.iter().find(|c| c.id == item.id) {
+                None => culprit_idx = Some(idx),
+                Some(entry) => {
+                    let changed = entry.emitted.hash.as_deref().is_none_or(|lh| lh != fresh_hash);
+                    if changed {
+                        let panel = crate::app::panels::get_panel(&entry.context_type);
+                        if cond.freeze_panel(false, entry.freeze_count, panel.max_freezes()) == FreezeDecision::Fresh {
+                            culprit_idx = Some(idx);
+                        }
+                    }
+                }
+            }
+        }
+        idx = idx.saturating_add(1);
+    }
+    culprit_idx.map_or(usize::MAX, |ci| free_region_anchor(&bp_indices, ci))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::free_region_anchor;
+
+    #[test]
+    fn anchor_is_last_bp_at_or_before_culprit() {
+        // BPs at 5, 12, 20; culprit at 15 → anchor 12 (frees panels 13, 14).
+        assert_eq!(free_region_anchor(&[5, 12, 20], 15), 12);
+    }
+
+    #[test]
+    fn no_bp_before_culprit_falls_back_to_culprit() {
+        // Only BPs after the culprit → no widening, anchor = culprit.
+        assert_eq!(free_region_anchor(&[20, 27], 15), 15);
+    }
+
+    #[test]
+    fn empty_bp_list_falls_back_to_culprit() {
+        assert_eq!(free_region_anchor(&[], 15), 15);
+    }
+
+    #[test]
+    fn bp_on_culprit_yields_empty_region() {
+        // A BP sits exactly on the culprit → anchor = culprit, region empty.
+        assert_eq!(free_region_anchor(&[5, 15, 20], 15), 15);
+    }
+}
