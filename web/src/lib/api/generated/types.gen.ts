@@ -96,7 +96,7 @@ export type AuthMe = {
     id: string;
     must_change_password: boolean;
     name: string;
-    next_action: 'change_password' | 'onboarding' | 'ready';
+    next_action: 'change_password' | 'set_identity' | 'onboarding' | 'ready';
     role: 'superadmin' | 'admin' | 'manager' | 'user';
     updated_at?: number;
 };

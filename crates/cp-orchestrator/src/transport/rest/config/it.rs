@@ -1,14 +1,14 @@
-//! IT-infrastructure REST handlers (design §13.3/§13.5/§13.7) — the maintenance
-//! plane's IT functions re-homed onto the product API (`:443`), gated on the
-//! `can_manage_it` capability (admin+).
+//! IT-infrastructure REST handlers (design §13.3/§13.5/§13.7) — the former
+//! maintenance plane's IT functions re-homed onto the product API (`:443`),
+//! gated on the `can_manage_it` capability (admin+).
 //!
-//! These are thin wrappers over the still-present maintenance modules
-//! ([`ca`](crate::transport::maint::ca),
-//! [`identity`](crate::transport::maint::identity),
-//! [`state`](crate::transport::maint::state)): each first enforces the
-//! capability, then delegates to the shared implementation. The `:9090` plane
-//! stays in place for M4 and is deleted in M5 — until then both faces call the
-//! same functions.
+//! These are thin wrappers over the retained IT modules
+//! ([`ca`](crate::transport::it::ca),
+//! [`identity`](crate::transport::it::identity),
+//! [`state`](crate::transport::it::state)): each first enforces the
+//! capability, then delegates to the shared implementation. The separate
+//! maintenance plane was removed in the M5 teardown (design §13.4/§13.8); these
+//! are the only face onto these functions now.
 //!
 //! Gate semantics mirror the rest of the RBAC surface: a `None` `auth_user`
 //! means access control is off (god-mode, FR-v3-08) and passes through; a
@@ -21,7 +21,7 @@ use std::sync::Mutex;
 
 use super::super::{Backend, HttpReply};
 use crate::services::auth::types::User;
-use crate::transport::maint::{ca, identity};
+use crate::transport::it::{ca, identity};
 
 /// `GET /api/it/ca/fingerprint` — the private-CA root's SHA-256 fingerprint
 /// (`can_manage_it`). Delegates to [`ca::ca_fingerprint`].
@@ -53,13 +53,13 @@ pub(crate) fn it_set_identity(state: &Mutex<Backend>, body: &[u8], auth_user: Op
 
 /// `GET /api/it/provisioned` — whether the box has been provisioned
 /// (`can_manage_it`). Reads the durable flag via
-/// [`state::is_provisioned`](crate::transport::maint::state::is_provisioned).
+/// [`state::is_provisioned`](crate::transport::it::state::is_provisioned).
 pub(crate) fn it_provisioned(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
     if auth_user.is_some_and(|u| !u.can_manage_it()) {
         return HttpReply::error(403, "IT management access required");
     }
     let provisioned = match state.lock() {
-        Ok(b) => crate::transport::maint::state::is_provisioned(&b.provision_flag_path),
+        Ok(b) => crate::transport::it::state::is_provisioned(&b.provision_flag_path),
         Err(_) => return HttpReply::error(500, "backend lock poisoned"),
     };
     HttpReply::ok(&serde_json::json!({ "provisioned": provisioned }))

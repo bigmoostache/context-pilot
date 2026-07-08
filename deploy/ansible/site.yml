@@ -23,6 +23,8 @@
     repo_root: "{{ playbook_dir | dirname | dirname }}"
     artifacts_dir: "{{ playbook_dir }}/.artifacts"
     cp_root: /opt/context-pilot
+    # Two seeded accounts (design §13.4): the vendor `superadmin` + client `admin`.
+    cp_seed_superadmin_email: "{{ cp_superadmin_email | default('vendor@context-pilot.internal') }}"
     cp_seed_admin_email: "{{ cp_admin_email | default('admin@admin.fr') }}"
     sheets_dir: "{{ playbook_dir }}/out"
     gh_repo: bigmoostache/context-pilot

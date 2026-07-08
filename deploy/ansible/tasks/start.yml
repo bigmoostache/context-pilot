@@ -30,19 +30,13 @@
     name: caddy
     state: restarted
 
-- name: Wait for the maintenance plane to answer (via the orchestrator loopback)
-  ansible.builtin.uri:
-    url: http://127.0.0.1:9191/api/maint/status
-    status_code: 200
-  register: maint
-  retries: 15
-  delay: 1
-  until: maint.status == 200
-
+# The orchestrator's own health was already verified on the loopback :7878
+# above; there is no longer an always-on maintenance plane to probe. Caddy fronts
+# the cockpit on :80 (day-0) or :443 (once the client names the box), so the
+# public URL depends on provisioning state and is reported, not probed.
 - name: Report readiness
   ansible.builtin.debug:
     msg: >-
       {{ inventory_hostname }} ready —
-      cockpit http://{{ ansible_host | default(inventory_hostname) }}:7878 ,
-      maintenance https://{{ ansible_host | default(inventory_hostname) }}:9090
-      (provisioned={{ (maint.json.provisioned | default(false)) }}).
+      day-0 setup at http://{{ ansible_host | default(inventory_hostname) }}:80
+      (unprovisioned box; becomes https://<name> once the client names it).

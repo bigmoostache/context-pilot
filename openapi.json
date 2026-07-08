@@ -319,6 +319,7 @@
           "next_action": {
             "enum": [
               "change_password",
+              "set_identity",
               "onboarding",
               "ready"
             ],

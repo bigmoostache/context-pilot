@@ -123,7 +123,7 @@ pub(super) fn transport() -> Value {
                 "must_change_password": { "type": "boolean" },
                 "created_at": { "type": "integer" },
                 "updated_at": { "type": "integer" },
-                "next_action": { "type": "string", "enum": ["change_password", "onboarding", "ready"] }
+                "next_action": { "type": "string", "enum": ["change_password", "set_identity", "onboarding", "ready"] }
             },
             "required": ["id", "email", "name", "role", "must_change_password", "next_action"]
         },
