@@ -1,167 +1,80 @@
-folder-sizes:
-  name: folder-sizes
-  description: Check that no source directory exceeds 8 entries and no .rs file exceeds 500 lines
-  pattern: '*.rs'
+api-contract-rust:
+  name: api-contract-rust
+  description: API-contract family (OpenAPI spec+routes, TS codegen drift, manual-fetch audit) on Rust edits
+  pattern: '**/*.rs'
   blocking: true
-  timeout_secs: 10
-  success_message: Structure checks OK ✓
+  timeout_secs: 180
+  success_message: API contract OK ✓
   is_global: true
-  script_content: |-
-    bash .github/checks/check-folder-sizes.sh
-    bash .github/checks/check-file-lengths.sh
-  last_edited_ms: 1781444438820
-lint-integrity:
-  name: lint-integrity
-  description: Verify lint config hash chain integrity (protected files unchanged)
-  pattern: '*.rs'
-  blocking: true
-  timeout_secs: 10
-  success_message: Lint integrity OK ✓
-  is_global: true
-  script_content: bash .github/checks/check-lint-config.sh
-  last_edited_ms: 0
-openapi-contract:
-  name: openapi-contract
-  description: 'Full OpenAPI pipeline: regenerate spec + route exhaustiveness + TS client codegen + tsc + manual API audit'
-  pattern: '*.rs'
-  blocking: true
-  timeout_secs: 60
-  success_message: OpenAPI contract OK ✓
-  is_global: true
-  script_content: |
-    echo "▸ Regenerating openapi.json + route exhaustiveness..."
-    cargo test -p cp-orchestrator --test openapi -- --ignored 2>&1
-
-    # ── Step 3: Regenerate TypeScript client ─────────────────────────────
-    echo "▸ Regenerating TS client from openapi.json..."
-    cd web
-    npx @hey-api/openapi-ts -i ../openapi.json -o src/lib/api/generated 2>&1
-
-    # ── Step 4: Type-check frontend ──────────────────────────────────────
-    echo "▸ Type-checking (tsc --noEmit)..."
-    npx tsc --noEmit 2>&1
-
-    # ── Step 5: Audit — no manual API calls ──────────────────────────────
-    # The API layer must use the generated SDK exclusively. The only
-    # acceptable manual patterns are:
-    #   - downloadFile in finder.ts (binary blob, needs manual fetch)
-    #   - rawUrl / avatarUrl (URL builders, not fetch calls)
-    echo "▸ Auditing for manual API calls..."
-    cd src/lib/api
-
-    # Check for raw fetch( calls (excluding downloadFile which is irreducible)
-    MANUAL_FETCH=$(grep -rn 'fetch(' --include='*.ts' . \
-      | grep -v '/generated/' \
-      | grep -v 'downloadFile' \
-      | grep -v '// ok:manual' \
-      || true)
-
-    if [ -n "$MANUAL_FETCH" ]; then
-      echo "::error::Manual fetch() calls found in API layer — use generated SDK instead:"
-      echo "$MANUAL_FETCH"
-      exit 1
-    fi
-
-    echo "✓ All checks passed"
-  last_edited_ms: 0
-rust-check:
-  name: rust-check
-  description: Run cargo fmt --check, cargo check, and clippy on Rust file edits
-  pattern: '*.rs'
-  blocking: true
-  timeout_secs: 60
-  success_message: Rust checks passed ✓
-  is_global: true
-  script_content: |
-    echo "=== cargo fmt (check only) ==="
-    cargo fmt -- --check 2>&1
-
-    echo ""
-    echo "=== cargo check (deny warnings) ==="
-    RUSTFLAGS="-D warnings" cargo check 2>&1
-
-    echo ""
-    echo "=== cargo clippy (workspace lints) ==="
-    cargo clippy --all-targets -- -D warnings 2>&1
-
-    echo ""
-    echo "All Rust checks passed."
-  last_edited_ms: 1782897506974
-stylelint-css:
-  name: stylelint-css
-  description: 'Run stylelint (no --fix) on CSS edits under web/src to catch violations. NEVER autofix: --fix breaks Tailwind v4 imports + deletes -webkit- prefixes.'
-  pattern: web/src/**/*.css
-  blocking: true
-  timeout_secs: 30
-  success_message: Stylelint OK ✓
-  cwd: /Users/guillaume/context-pilot/web
-  is_global: true
-  script_content: |-
-    cd "$(git rev-parse --show-toplevel)/web"
-    npx stylelint "src/**/*.css"
-  last_edited_ms: 1783502152326
-ts-contract:
-  name: ts-contract
-  description: Regenerate TypeScript client from openapi.json on TS file edits to catch contract drift
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
+  last_edited_ms: 1783511056445
+api-contract-ts:
+  name: api-contract-ts
+  description: API-contract family (OpenAPI spec+routes, TS codegen drift, manual-fetch audit) on web TS edits
   pattern: web/src/**/*.ts
   blocking: true
+  timeout_secs: 180
+  success_message: API contract OK ✓
+  is_global: true
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-api-contract.sh" --callback
+  last_edited_ms: 1783511056446
+rust-lints:
+  name: rust-lints
+  description: Rust-lints family (fmt, clippy -D warnings, cargo check, lint-exception registry, vault-bypass)
+  pattern: '**/*.rs'
+  blocking: true
+  timeout_secs: 120
+  success_message: Rust lints OK ✓
+  is_global: true
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-rust-lints.sh" --callback
+  last_edited_ms: 1783511056443
+rust-tests:
+  name: rust-tests
+  description: Rust-tests family (cargo build debug in --callback, cargo test)
+  pattern: '**/*.rs'
+  blocking: true
+  timeout_secs: 300
+  success_message: Rust tests OK ✓
+  is_global: true
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-rust-tests.sh" --callback
+  last_edited_ms: 1783511056443
+structure-rust:
+  name: structure-rust
+  description: Structure family (file lengths ≤500, dir entries ≤8 across Rust+web, hash chain) on Rust edits
+  pattern: '**/*.rs'
+  blocking: true
   timeout_secs: 30
-  success_message: TS contract OK ✓
+  success_message: Structure OK ✓
   is_global: true
-  script_content: |-
-    cd web
-    # Config-driven codegen: web/openapi-ts.config.ts emits the @ts-nocheck
-    # generated-bindings header natively via output.header (web-lint P1), so there
-    # is no post-codegen stamping step — the committed tree is byte-identical to a
-    # fresh config-driven run and the drift check is a clean regenerate + diff.
-    npx @hey-api/openapi-ts -f openapi-ts.config.ts 2>&1
-
-    # Check for drift in tracked generated files (-- separates paths from revisions)
-    if ! git diff --exit-code --quiet -- web/src/lib/api/generated/ 2>/dev/null; then
-      echo "::error::Generated TypeScript client drifted from openapi.json!"
-      echo "Do not hand-edit generated files."
-      git diff --stat -- web/src/lib/api/generated/
-      exit 1
-    fi
-  last_edited_ms: 1783418815248
-vault-bypass:
-  name: vault-bypass
-  description: Catch direct env::var calls for vault-managed credential keys (delegates to .github/checks/check-vault-bypass.sh)
-  pattern: '*.rs'
-  blocking: true
-  timeout_secs: 5
-  success_message: Vault bypass check OK ✓
-  is_global: true
-  script_content: .github/checks/check-vault-bypass.sh $CP_CHANGED_FILES
-  last_edited_ms: 1783256066883
-web-deadcode:
-  name: web-deadcode
-  description: 'Blocking cross-file dead-code guard on web/src edits: delegates to the shared .github/checks/check-web-deadcode.sh (knip whole-graph scan — dead files/exports/deps). Structurally identical to the CI frontend-job step (same script, same invocation string). Whole-graph, not incremental, so no per-file scoping.'
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-structure.sh" --callback
+  last_edited_ms: 1783511056442
+structure-web:
+  name: structure-web
+  description: Structure family (file lengths ≤500, dir entries ≤8 across Rust+web, hash chain) on web edits
   pattern: web/src/**
   blocking: true
-  timeout_secs: 60
-  success_message: Web dead-code OK ✓
+  timeout_secs: 30
+  success_message: Structure OK ✓
   is_global: true
-  script_content: bash .github/checks/check-web-deadcode.sh
-  last_edited_ms: 1783506415665
-web-lint:
-  name: web-lint
-  description: 'Blocking incremental frontend lint on web/src edits: eslint --max-warnings 0 + prettier --check on the changed .ts/.tsx files (type-aware, full projectService). Full tsc + type-coverage stay CI-side (project-wide). Catches the class of regression a stale sweep misses.'
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-structure.sh" --callback
+  last_edited_ms: 1783511056442
+ts-lints:
+  name: ts-lints
+  description: TS-lints family (eslint, prettier, stylelint, tsc, type-coverage, suppressions, rule-census, knip)
   pattern: web/src/**
   blocking: true
-  timeout_secs: 60
-  success_message: Web lint OK ✓
-  cwd: /Users/guillaume/context-pilot/web
+  timeout_secs: 300
+  success_message: TS lints OK ✓
   is_global: true
-  script_content: bash "$CP_PROJECT_ROOT/.github/checks/web-lint.sh"
-  last_edited_ms: 1783505838058
-web-structure:
-  name: web-structure
-  description: Enforce ≤8 entries/dir + ≤500 lines/file under web/src (shadcn ui/ exempt)
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-ts-lints.sh" --callback
+  last_edited_ms: 1783511056444
+ts-tests:
+  name: ts-tests
+  description: TS-tests family (Playwright e2e — documented stub, exit 0 until ephemeral stack provisioned)
   pattern: web/src/**
   blocking: true
-  timeout_secs: 15
-  success_message: Web structure OK ✓
+  timeout_secs: 30
+  success_message: TS tests OK ✓
   is_global: true
-  script_content: bash .github/checks/check-web-structure.sh
-  last_edited_ms: 1783352256371
+  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-ts-tests.sh" --callback
+  last_edited_ms: 1783511056445

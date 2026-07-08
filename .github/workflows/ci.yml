@@ -13,9 +13,16 @@ env:
 permissions:
   contents: read
 
+# ── Six check families, one script each (.github/checks/check-<family>.sh),
+#    every one invoked here with --ci and by its blocking callback with
+#    --callback. CI and the callbacks run the SAME script — they cannot diverge
+#    in coverage; the flag exists only for a future CI-vs-local environment
+#    tweak (today only rust-tests differs: --ci release build, --callback debug).
+#    Jobs stay split for parallelism + shared toolchain/node setup; each job
+#    just runs its family script(s).
 jobs:
   rust:
-    name: Rust (fmt · clippy · build · test)
+    name: Rust (lints · tests)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,44 +35,23 @@ jobs:
       - name: Cargo cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Check formatting
-        run: cargo fmt -- --check
+      # fmt · clippy · cargo check · lint-exception registry · vault-bypass
+      - name: Rust lints
+        run: .github/checks/check-rust-lints.sh --ci
 
-      - name: Clippy lints
-        run: cargo clippy --all-targets -- -D warnings
-
-      - name: Build
-        run: cargo build --release
-
-      - name: Run tests
-        run: cargo test
+      # cargo build --release · cargo test
+      - name: Rust tests
+        run: .github/checks/check-rust-tests.sh --ci
 
   structure:
-    name: Structure (lengths · folders · lints · web)
+    name: Structure (lengths · folders · web · chain)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check file lengths (max 500 lines)
-        run: .github/checks/check-file-lengths.sh
-
-      - name: Check folder sizes (max 8 entries)
-        run: .github/checks/check-folder-sizes.sh
-
-      - name: Check lint exception registry
-        run: .github/checks/check-lint-exceptions.sh
-
-      - name: Verify lint config hash chain
-        run: .github/checks/check-lint-config.sh
-
-      - name: Check web structure
-        run: .github/checks/check-web-structure.sh
-
-      - name: Check vault bypass
-        run: .github/checks/check-vault-bypass.sh
-
-      - name: Check frontend suppressions (P4 anti-cheat)
-        run: .github/checks/check-frontend-suppressions.sh
+      # file-lengths ≤500 + folder-sizes ≤8 (Rust + web/src, unified) + hash chain
+      - name: Structure
+        run: .github/checks/check-structure.sh --ci
 
   contract:
     name: Contract (OpenAPI · TypeScript)
@@ -89,22 +75,21 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          # Pinned to the version that generates the committed pnpm-lock.yaml
-          # (lockfileVersion 9.0) locally. pnpm 11 introduced the workspace-root
-          # `packages:` requirement and the `allowBuilds` build-script
-          # adjudication model that web/pnpm-workspace.yaml relies on; running an
-          # older major here diverged the environment from the lockfile's origin.
+          # Pinned to the lockfile origin (pnpm 11 workspace `packages:` +
+          # `allowBuilds` model; see web/pnpm-workspace.yaml + M144).
           version: 11.6.0
 
       - name: Install web dependencies
         run: pnpm install --frozen-lockfile
         working-directory: web
 
-      - name: Check TypeScript contract
-        run: .github/checks/check-typescript-contract.sh
+      # OpenAPI spec + route exhaustiveness · TS client codegen + drift ·
+      # manual-fetch audit — the full Rust↔TypeScript wire contract.
+      - name: API contract
+        run: .github/checks/check-api-contract.sh --ci
 
   frontend:
-    name: Frontend (eslint · tsc · prettier · stylelint · type-coverage)
+    name: Frontend (ts-lints · ts-tests)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -124,40 +109,13 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: web
 
-      # The exhaustive project-wide mirror of the incremental web-lint callback
-      # (which runs eslint + prettier on only the changed files at edit time).
-      # Each tool is its own step so a failure is attributable.
-      - name: ESLint (--max-warnings 0)
-        run: npx eslint . --max-warnings 0
-        working-directory: web
+      # eslint · prettier · stylelint · tsc · type-coverage · suppressions ·
+      # rule-census · knip dead-code. The script self-cd's into web/, so no
+      # working-directory is needed here.
+      - name: TS lints
+        run: .github/checks/check-ts-lints.sh --ci
 
-      - name: TypeScript (tsc -b)
-        run: npx tsc -b
-        working-directory: web
-
-      - name: Prettier (--check)
-        run: npx prettier --check .
-        working-directory: web
-
-      - name: Stylelint
-        run: npx stylelint "src/**/*.css"
-        working-directory: web
-
-      - name: Type coverage
-        run: npx type-coverage --project tsconfig.app.json
-        working-directory: web
-
-      # Ruleset drift guard (clippy_compare twin): the resolved eslint ruleset
-      # for a representative app-source file must match the committed, hash-locked
-      # baseline — catches a silent error→warn/off flip or a plugin-bump drop.
-      # Runs here (not the structure job) because it needs web/node_modules.
-      - name: Frontend rule census
-        run: .github/checks/check-frontend-rule-census.sh
-
-      # Cross-file dead code (the inter-crate dead_code twin): dead exports,
-      # orphan files, unused deps — what tsc/eslint structurally can't see. The
-      # CB "web-deadcode" blocking callback invokes this SAME script with the
-      # SAME string, so CI and callback are structurally equal (one whole-graph
-      # knip pass, one implementation, hash-locked). Needs web/node_modules.
-      - name: Frontend dead code (knip)
-        run: .github/checks/check-web-deadcode.sh
+      # Playwright e2e — documented stub (exit 0) until a dedicated ephemeral
+      # stack is provisioned (see TODO(playwright) in the script).
+      - name: TS tests
+        run: .github/checks/check-ts-tests.sh --ci

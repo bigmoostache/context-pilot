@@ -29,11 +29,26 @@
 - path: rustfmt.toml
   whole_file: true
 
-# --- CI check scripts ---
-- path: .github/checks/check-file-lengths.sh
+# --- Six check-family scripts (the T518 unification: one script per family,
+#     invoked identically by CI --ci and the blocking callbacks --callback).
+#     These ARE the enforcement — locking them keeps CI ⇄ callback coverage
+#     tamper-evident. They absorbed + replaced check-file-lengths.sh,
+#     check-folder-sizes.sh, check-web-structure.sh and web-lint.sh (deleted). ---
+- path: .github/checks/check-structure.sh
   whole_file: true
-- path: .github/checks/check-folder-sizes.sh
+- path: .github/checks/check-rust-lints.sh
   whole_file: true
+- path: .github/checks/check-rust-tests.sh
+  whole_file: true
+- path: .github/checks/check-ts-lints.sh
+  whole_file: true
+- path: .github/checks/check-ts-tests.sh
+  whole_file: true
+- path: .github/checks/check-api-contract.sh
+  whole_file: true
+
+# --- Guard tools the family scripts delegate to (standalone value: --update/
+#     --show modes or dual-mode logic) ---
 - path: .github/checks/check-lint-config.sh
   whole_file: true
 - path: .github/checks/check-lint-exceptions.sh
@@ -80,8 +95,6 @@
   whole_file: true
 - path: .github/checks/allowed-eslint-exceptions.yaml
   whole_file: true
-- path: .github/checks/check-web-structure.sh
-  whole_file: true
 
 # --- Enforcement orchestration (closes the "locked script, unlocked caller"
 #     hole). A guard script is only as strong as the thing that RUNS it — a
@@ -99,21 +112,12 @@
   whole_file: true
 - path: .github/checks/check-typescript-contract.sh
   whole_file: true
-# C. The edit-time enforcement layer: the callback registry (CB8 web-lint,
-#    CB4 rust-check, CB2 lint-integrity, …) and the standalone web-lint guard
-#    the CB8 callback delegates to. CB8's script_content is now a one-line
-#    `bash "$CP_PROJECT_ROOT/.github/checks/web-lint.sh"` (consistent with every
-#    other guard: body in .github/checks, callback just invokes it), so the
-#    executed logic lives in the tracked, hash-locked script below — NOT in the
-#    mutable callback registry, and NOT in the gitignored auto-materialized
-#    mirror at .context-pilot/scripts/web-lint.sh (a throwaway copy the runtime
-#    regenerates from script_content). Editing callbacks.yaml to make CB8
-#    non-blocking, or gutting the guard, would kill enforcement — so both the
-#    registry and the guard are locked. A deliberate callback change now needs
-#    a chain --update.
+# C. The edit-time enforcement layer: the callback registry. Editing
+#    callbacks.yaml to make a family callback non-blocking, or gutting a guard,
+#    would kill enforcement — so the registry is locked. A deliberate callback
+#    change now needs a chain --update. The web-lint.sh guard the old CB8
+#    delegated to is GONE (absorbed into check-ts-lints.sh, above).
 - path: .context-pilot/shared/callbacks.yaml
-  whole_file: true
-- path: .github/checks/web-lint.sh
   whole_file: true
 # The cross-file dead-code guard (knip whole-graph scan). Invoked by the CI
 # frontend job AND the web-deadcode blocking callback with the identical string
