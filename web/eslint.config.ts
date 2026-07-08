@@ -13,6 +13,7 @@ import n from "eslint-plugin-n"
 import security from "eslint-plugin-security"
 import noUnsanitized from "eslint-plugin-no-unsanitized"
 import noSecrets from "eslint-plugin-no-secrets"
+import boundaries from "eslint-plugin-boundaries"
 import tseslint from "typescript-eslint"
 import { defineConfig, globalIgnores } from "eslint/config"
 import type { Linter } from "eslint"
@@ -173,6 +174,53 @@ export default defineConfig([
       // violation (M141 — all secrets live server-side in cp-vault), and this
       // rule catches a high-entropy literal before it can ever ship.
       "no-secrets": noSecrets,
+      // P9 architecture boundaries (encodes M141 — frontend is the dumb render
+      // layer). eslint-plugin-boundaries ships no types (declared ambiently in
+      // types.d.ts), so its default export is `any`; narrow it to ESLint's
+      // `Plugin` shape at registration (a single `as` — meaningful any→Plugin,
+      // not a redundant assertion — which also clears no-unsafe-assignment). The
+      // layer model + direction rules live in `settings["boundaries/elements"]`
+      // + the `boundaries/dependencies` rule below.
+      boundaries: boundaries as import("eslint").ESLint.Plugin,
+    },
+    // ── P9 boundaries: the frontend layer model (M141) ────────────────────
+    // Elements are matched top-to-bottom, FIRST match wins — so the more
+    // specific paths precede the broader globs:
+    //   • generated — the OpenAPI codegen leaf (src/lib/api/generated).
+    //   • api — the hand-written SDK-wrapper layer (src/lib/api). The ONLY
+    //     layer allowed to value-import `generated` (also enforced by the
+    //     no-restricted-imports rule, which additionally permits `import type`).
+    //   • lib — every other shared support module (src/lib/*): query, live,
+    //     support, providers, mock, utils, types. Pure logic + data; MUST NOT
+    //     import the components layer (the M141 inversion this guard exists to
+    //     forbid).
+    //   • components — the render layer (src/components). May import lib + api.
+    //   • app — the composition root (src/App.tsx).
+    // markdown.tsx + finderFs.ts live under lib/support but EMIT JSX and render
+    // components, so they are classified `components` (view helpers), not `lib`
+    // — honest classification, not a suppression. Both are imported only by
+    // other components, so this creates no new cross-layer edge.
+    settings: {
+      "boundaries/elements": [
+        { type: "components", pattern: "src/lib/support/markdown.tsx", mode: "file" },
+        { type: "components", pattern: "src/lib/support/finderFs.ts", mode: "file" },
+        { type: "generated", pattern: "src/lib/api/generated", mode: "folder" },
+        { type: "api", pattern: "src/lib/api", mode: "folder" },
+        { type: "lib", pattern: "src/lib/*", mode: "folder" },
+        { type: "components", pattern: "src/components", mode: "folder" },
+        { type: "app", pattern: "src/App.tsx", mode: "file" },
+      ],
+      "boundaries/ignore": ["**/*.test.*", "**/*.spec.*"],
+      // boundaries resolves each import's target file via `eslint-module-utils/
+      // resolve`, which reads the classic `import/resolver` settings key — NOT
+      // the `import-x/resolver` key that importX.flatConfigs.typescript sets. So
+      // WITHOUT this, every import resolved to `undefined`, the target element
+      // was unknown, and `boundaries/dependencies` silently enforced NOTHING
+      // (default:disallow can't bite a dependency it can't classify — a toothless
+      // guard). Wiring the TypeScript resolver here (it reads tsconfig `paths`)
+      // makes the `@/*` alias + extensionless `.ts`/`.tsx` imports resolve, so
+      // both endpoints of every edge classify and the layer rules actually fire.
+      "import/resolver": { typescript: true },
     },
     languageOptions: {
       globals: globals.browser,
@@ -212,6 +260,71 @@ export default defineConfig([
       // leak (fix at source — remove it) or a benign high-entropy constant
       // (calibrated per-site). Default tolerance (4.0) is kept.
       "no-secrets/no-secrets": "error",
+      // ── P9 M141 crown jewel: only lib/api may VALUE-import the generated
+      //    SDK. Type imports of the contract shape are allowed everywhere
+      //    (`allowTypeImports`) — consuming the generated *types* is the honest
+      //    contract coupling; importing the generated SDK *functions* outside
+      //    the api layer is the "frontend has backend logic" violation. The
+      //    api layer itself turns this off in a trailing block (registered). ──
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "@/lib/api/generated",
+                "@/lib/api/generated/*",
+                "**/api/generated",
+                "**/api/generated/*",
+              ],
+              allowTypeImports: true,
+              message:
+                "Import the hand-written wrapper from @/lib/api instead of the generated SDK directly (M141: only lib/api may value-import generated bindings; `import type` is allowed).",
+            },
+          ],
+        },
+      ],
+      // ── P9 layer-direction guard: encode the M141 dependency arrows as
+      //    errors. `default: "disallow"` means any import BETWEEN two known
+      //    elements that isn't explicitly allowed is an error (external/
+      //    node_modules imports are not local elements, so React etc. are
+      //    untouched). The one arrow that matters most: `lib` may NOT import
+      //    `components` — the dumb-render-layer inversion. Uses the v6
+      //    `boundaries/dependencies` rule + object dependency selectors
+      //    (`{ to: { type } }`); the legacy `element-types` name + bare-string
+      //    `allow` form was a silent no-op under v6's compat shim (it emitted a
+      //    "legacy selector syntax" warning and enforced NOTHING — a toothless
+      //    guard), so it is migrated in full here. ──
+      "boundaries/dependencies": [
+        "error",
+        {
+          default: "disallow",
+          rules: [
+            // Contract-shape coupling: ANY layer may `import type` from the
+            // generated bindings — consuming the generated *types* is honest
+            // (the API contract), it's only the generated *SDK functions*
+            // (value imports) that must stay inside lib/api. This mirrors the
+            // no-restricted-imports guard's `allowTypeImports: true`, so the two
+            // guards agree: type import of generated = allowed everywhere, value
+            // import of generated = allowed only in api (below + default:disallow).
+            {
+              from: [{ type: "*" }],
+              allow: [{ to: { type: "generated" }, dependency: { kind: "type" } }],
+            },
+            { from: [{ type: "generated" }], allow: [{ to: { type: "generated" } }] },
+            { from: [{ type: "api" }], allow: [{ to: { type: ["api", "lib", "generated"] } }] },
+            { from: [{ type: "lib" }], allow: [{ to: { type: ["lib", "api"] } }] },
+            {
+              from: [{ type: "components" }],
+              allow: [{ to: { type: ["components", "lib", "api"] } }],
+            },
+            {
+              from: [{ type: "app" }],
+              allow: [{ to: { type: ["app", "components", "lib", "api"] } }],
+            },
+          ],
+        },
+      ],
       // ── P8 structure & complexity budgets (core-ESLint, the clippy
       //    cognitive-complexity + folder-sizes twin) — CENSUS PASS ──────────
       "max-lines": ["error", { max: 500, skipBlankLines: false, skipComments: false }],
@@ -603,6 +716,20 @@ export default defineConfig([
       // (registered in allowed-eslint-exceptions.yaml, never an inline
       // eslint-disable); every other file stays under the 500-line cap.
       "max-lines": "off",
+    },
+  },
+  {
+    // ── P9: the api layer IS the sanctioned wrapper around the generated SDK.
+    //    It must value-import `@/lib/api/generated` to build the thin fetch
+    //    wrappers every other layer consumes — that's its whole job. So the
+    //    generated-import guard (no-restricted-imports) is off HERE and only
+    //    here (registered in allowed-eslint-exceptions.yaml). The boundaries
+    //    dependencies rule already permits api→generated; this off-switch is
+    //    the twin for the import-path guard. Every other file stays at error,
+    //    so no component/support module can reach past the api layer. ──
+    files: ["src/lib/api/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": "off",
     },
   },
 ])

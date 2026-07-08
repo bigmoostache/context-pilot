@@ -1,9 +1,7 @@
 import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { Loader2, Power, Rocket } from "lucide-react"
-import { postApiReleasesDeploy, postApiReleasesRestartOrchestrator } from "@/lib/api/generated"
-import type { DeployResponse } from "@/lib/api/generated"
-import { sdk } from "@/lib/api/client"
+import { deployFleet as deployFleetReq, restartOrchestrator } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 /**
@@ -24,18 +22,14 @@ export function DeploySection({
 
   const deployFleet = useMutation({
     mutationFn: async () => {
-      return sdk<DeployResponse>(
-        postApiReleasesDeploy({
-          body: activeTag ? { tag: activeTag } : {},
-        }),
-      )
+      return deployFleetReq(activeTag)
     },
     onSuccess: () => onChanged(),
   })
 
   const restartOrch = useMutation({
     mutationFn: async () => {
-      await postApiReleasesRestartOrchestrator()
+      await restartOrchestrator()
     },
     onSuccess: () => {
       setOrchConfirm(false)

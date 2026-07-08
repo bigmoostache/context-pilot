@@ -31,3 +31,11 @@ declare module "eslint-plugin-security"
 // site to the minimal `{ configs: { recommended } }` shape is the real type
 // contract, and its two rules are enabled by that recommended preset.
 declare module "eslint-plugin-no-unsanitized"
+
+// eslint-plugin-boundaries (P9 architecture layers) ships no bundled types and
+// has no `@types/*` package. eslint.config.ts imports its default export only
+// to register it as a plugin (cast to ESLint's `Plugin` shape at the use site);
+// its behaviour is driven entirely by `settings["boundaries/elements"]` + the
+// `boundaries/dependencies` rule, not by the plugin object's own type — so an
+// untyped (`any`) module here is deliberate and safe.
+declare module "eslint-plugin-boundaries"

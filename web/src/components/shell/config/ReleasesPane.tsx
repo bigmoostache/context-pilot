@@ -2,14 +2,13 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, ChevronDown, Download, Loader2, Package, RefreshCw, Trash2 } from "lucide-react"
 import {
-  deleteApiReleasesByTag,
-  getApiReleases,
-  postApiReleasesDownload,
-  putApiReleasesArch,
-  putApiReleasesSelect,
-} from "@/lib/api/generated"
-import type { ReleaseEntry, ReleasesResponse } from "@/lib/api/generated"
-import { sdk } from "@/lib/api/client"
+  deleteRelease,
+  downloadRelease,
+  fetchReleases,
+  selectRelease,
+  setReleasesArch,
+} from "@/lib/api"
+import type { ReleaseEntry } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { DeploySection } from "./DeploySection"
 
@@ -27,7 +26,7 @@ export function ReleasesPane() {
   const [page, setPage] = useState(0)
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["releases"],
-    queryFn: () => sdk<ReleasesResponse>(getApiReleases()),
+    queryFn: () => fetchReleases(),
   })
 
   if (isError) {
@@ -121,7 +120,7 @@ function ArchSection({
   const [open, setOpen] = useState(false)
   const setArch = useMutation({
     mutationFn: async (v: { arch?: string; auto?: boolean }) => {
-      await putApiReleasesArch({ body: v })
+      await setReleasesArch(v)
     },
     onSuccess: onChanged,
   })
@@ -303,19 +302,19 @@ function ReleaseActions({
 }) {
   const dl = useMutation({
     mutationFn: async () => {
-      await postApiReleasesDownload({ body: { tag: r.tag } })
+      await downloadRelease(r.tag)
     },
     onSuccess: onChanged,
   })
   const sel = useMutation({
     mutationFn: async () => {
-      await putApiReleasesSelect({ body: { tag: r.tag } })
+      await selectRelease(r.tag)
     },
     onSuccess: onChanged,
   })
   const del = useMutation({
     mutationFn: async () => {
-      await deleteApiReleasesByTag({ path: { tag: r.tag } })
+      await deleteRelease(r.tag)
     },
     onSuccess: onChanged,
   })

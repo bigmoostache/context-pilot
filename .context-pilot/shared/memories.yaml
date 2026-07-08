@@ -271,34 +271,26 @@
   - forbidden
   last_edited_ms: 0
 45b9baa7eb6b3f01:
-  tl_dr: 'T506 web-lint P0-P7 COMPLETE + committed. P7 (X1134 correctness/security) DONE: all 7 plugins green (regexp, promise, import-x, n, security, no-unsanitized, no-secrets). Next: P8 structure/complexity budgets (X1135). See contents.'
+  tl_dr: 'T506 web-lint P0-P8 COMPLETE + pushed on web-lint (P8 = commit bc56795a). Next: P9 architecture boundaries (X1136). Details in contents.'
   contents: |-
-    P0 scaffold+baseline (X1127). P1 tsc maximal strict 743d2bfe. P2 Prettier 0531ab4f. P3 type-aware eslint b25a5c37. P4 anti-cheat b96f9c47. P5 unicorn. P6 React stack committed bcb2747e.
+    P0 scaffold+baseline. P1 tsc maximal strict 743d2bfe. P2 Prettier 0531ab4f. P3 type-aware eslint b25a5c37. P4 anti-cheat b96f9c47. P5 unicorn. P6 React stack bcb2747e. P7 correctness&security 621e4257 (all 7 plugins green: regexp/promise/import-x+no-cycle/n/security/no-unsanitized/no-secrets).
 
-    P7 (X1134) correctness & security — ALL 7 PLUGINS GREEN (tsc0/eslint0/prettier0/guard0):
-    1. regexp flat/recommended: 5 fixes.
-    2. promise flat/recommended: always-return{ignoreLastCallback} + catch-or-return{allowFinally}; executor params resolve/reject.
-    3. import-x recommended+typescript(+eslint-import-resolver-typescript@4.4.5)+no-cycle:error{ignoreExternal}. default+no-named-as-default(-member) OFF tree-wide. 8 no-cycle broken via 3 leaf-extractions (CopyButton, live/core.ts, panelMeta FLEET_MAX_W).
-    4. n flat/recommended-module scoped to Node config trio (eslint/vite/openapi-ts.config.ts). Fixed import.meta.dirname finding by declaring engines.node '^22.16.0 || >=24.0.0' in package.json (exact code floor, no suppression).
-    5. security (eslint-plugin-security v4) flat recommended: detect-object-injection OFF tree-wide (38 universal TS FPs). Fixed the 1 detect-non-literal-regexp at SOURCE: rewrote fileUpload/helpers.ts field()→fields() Map parser w/ one literal FIELD_RE (also removed regexp/no-super-linear-backtracking by dropping post-colon \s*). Browser detectors (unsafe-regex, non-literal-regexp, eval-with-expression, bidi-characters, possible-timing-attacks)→error.
-    6. no-unsanitized recommended (flat): 1 hit = MarkdownEditor.tsx:73 innerHTML contentEditable seed. Scoped-off no-unsanitized/property (esc()-escaped text + fixed literal tag vocab = injection-free; contentEditable seeding irreducible). method rule stays error.
-    7. no-secrets: NO preset, registered plugin+rule manually at error (ships own types, no cast). 4 FPs, all doc-comment prose in eslint.config.ts citing API identifiers (dangerouslySetInnerHTML, noPropertyAccessFromIndexSignature). Scoped-off no-secrets/no-secrets on eslint.config.ts only; rule stays error on all app source.
+    P8 (X1135) structure & complexity budgets — commit bc56795a. All 7 core-ESLint budgets at error: max-lines 500, max-lines-per-function 150 {skipBlank,skipComments,IIFEs}, complexity 15, max-depth 4, max-params 4, max-statements 30, max-nested-callbacks 3. eslint.config.ts max-lines scoped-off (registered). Whole tree green: tsc 0, eslint 0, prettier 0, suppression-guard 0.
 
-    Untyped plugins declared in types.d.ts: jsx-a11y, promise, security, no-unsanitized (each cast at use site). no-secrets NOT declared (has index.d.ts).
+    Wave1 (X1146) pure-logic: reducers applyThreadDelta/applyAgentDelta switch-dispatchers+fold helpers; costs/parse buildMarkdownReport per-section helpers; useFinderKeyboard HANDLERS array; MarkdownEditor mdToHtml/serializeInlineNode MdState+INLINE_WRAP; macIcons DocGlyph ext-map; Conversation buildMessages; finderFs buildRealm.
 
-    All config-level offs registered in allowed-eslint-exceptions.yaml (bidirectional guard balance holds). Hash-lock DEFERRED to P12 (X1139).
+    Wave2 (X1147) JSX decomposition (no inline suppressions): AgentModal.tsx→AgentModal/ dir (index/controller/actions/parts); Finder.tsx→Finder/ dir (index/state/controller/shell/body; role=application a11y scoped-off repathed to Finder/shell.tsx); ContextMenu ItemMenu/EmptyMenu; PromptModal KindField/PromptFooter/mdPath; UsagePage UsageTable; FinderChrome ToolbarCrumbs; FinderPreview inline/live split; ThreadComposer useComposer flat hook+ComposerInputRow+ComposerBanner; ThreadConversation MessageRow/AutoRun memo+useConversationDrop; ThreadList RowActions/RowMeta/ListHeader/EmptyState; ThreadsView useThreadSelection/useThreadActions; TopBar/CostsView/ReleasesPane/UsageButton/TelemetryHud; new lib/support/threadMessages.ts holds thread-preview+segment transforms shed from at-cap files.
 
-    COMMIT PENDING: stage the 6 P7 files + tree-descriptions.yaml, EXCLUDE root .gitignore (+86 gaia bundle, M143 never-commit). generated/ = no drift.
+    LESSON: react-hooks/refs — a hook returning an object CONTAINING a ref taints ALL member reads during render; return refs FLAT or thread via subcomponent prop. exactOptionalPropertyTypes: split subcomponent optional handler props need explicit |undefined.
 
-    NEXT (P8, X1135): ESLint max-lines:500, max-lines-per-function, complexity, max-depth, max-params, max-statements, max-nested-callbacks + eslint-plugin-project-structure. Coordinate with CB7. Exempt ui/ (shadcn).
+    NEXT (P9, X1136): eslint-plugin-boundaries — declare layers (generated←lib/api←query/live←components←features), forbid cross-layer+cross-feature imports, only lib/api may import generated/. Encodes M141 (frontend=dumb render layer) as errors. Then P10 (knip/stylelint/tailwind), P11 (type-coverage 100), P12 (enforcement lockdown+hash-lock, password Totordu1789 M39), P13 (docs+PR). .gitignore (gaia +86) stays EXCLUDED from every commit.
   importance: high
   labels:
   - web-lint
   - T506
-  - P7
-  - in-progress
+  - P9
   - resume
-  last_edited_ms: 1783438922599
+  last_edited_ms: 1783460801144
 48f2140d3c2dee0e:
   tl_dr: Entities module COMPLETE — all 151 stress tests passed (12 categories, 4 difficulty levels). 9 bugs found/fixed. Committed on 'entities' branch. Production-quality.
   contents: |-
@@ -623,30 +615,6 @@ bc38d2fd0bcf015a:
   - gotcha
   - bridge
   last_edited_ms: 1782121419937
-be1d0a1323e3232c:
-  tl_dr: web-lint P6 React-lint + T510 telemetry + huge-thread freeze fix COMMITTED+PUSHED (bcb2747e). Freeze = unvirtualized thread re-render + Firefox rAF throttling artifacts; fixed via content-visibility + React.memo. Details in contents.
-  contents: |-
-    T510 freeze SAGA (uncommitted on web-lint).
-
-    VERDICT (worker-heartbeat capture 14:05, window FOCUSED): the 7-9s 'freezes' were NEVER REAL. Worker heartbeat (throttle-immune) shows worst REAL main-thread block = 264ms. The 8932ms rAF stalls were Firefox FOCUS-THROTTLING artifacts (rAF→1fps when window unfocused; old stall.ts guarded document.hidden but not hasFocus). H2 CONFIRMED, H1 (content-visibility layout) was treating a non-existent freeze.
-
-    REAL remaining cost ('still pingy but better'): React commits 92× threads·update = 3933ms cumulative (worst 238ms) + poll-parse spans (load:fleet Σ1212ms/6× max387, load:library 523/9×, load:agent 514/4×). Both = the huge unvirtualized T508 (1690-msg) thread.
-
-    FIX SHIPPED (green tsc/eslint/prettier, hot-reloaded) — the COMMIT half, pairing the earlier content-visibility LAYOUT half, in ThreadConversation.tsx:
-    - MessageRow extracted as React.memo (comparator (a,b)=>a.msg===b.msg && a.agentId===b.agentId).
-    - AutoRun wrapped in memo. segments = useMemo(segmentLog, [thread.log]). handleDelete = useCallback([agentId, thread.id]).
-    - WHY it works: TanStack structural sharing (default on) keeps unchanged message OBJECT refs stable across delta-append (reuses prior refs) AND poll (deep-equal collapse) → memo skips all but the changed row → 1690-row re-render → 1-row. No stale-content risk (messages immutable; streaming rides separate useStreamingTokens overlay).
-
-    NEXT: await user's focused-window re-capture. Expect React commit count/total to collapse from ~92/3900ms to a handful. If load:fleet parse (387ms) still prominent after, tackle THAT with data (payload size / reshape O(n)?) — do NOT blind-fix. DO NOT over-claim (user was furious 'tu m'as bullshit'). DO NOT commit until user confirms resolved.
-
-    Still parked green+uncommitted on web-lint: full telemetry stack (vitals/frames/profiler/stall/task/heartbeat/store/index + HUD w/ 'Real blocks (worker)' + 'Task totals Σ' groups + scroll fix + Copy-as-markdown) + tsconfig lib+=ESNext.Iterator + P6 React-lint sweep (X1133/X1141-44). web-vitals@5.3.0 dep. On user OK to commit: git checkout generated/ if drift, commit both with memories+tree-descs (M15).
-  importance: critical
-  labels:
-  - web-lint
-  - P6
-  - uncommitted
-  - resume
-  last_edited_ms: 1783435001073
 bfd5725c88443a6a:
   tl_dr: User is at lunch. Continue the full hardcoded prompt audit (42 batches, 207 files) independently until complete. Work batch by batch, no autocontinuation. User will check results when back.
   importance: high

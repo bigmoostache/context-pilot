@@ -12,8 +12,7 @@ import type {
   ModelDef as GenModelDef,
   ProviderDef as GenProviderDef,
 } from "../api/generated/types.gen"
-import { getApiProviders } from "../api/generated/sdk.gen"
-import { sdk } from "../api/client"
+import { fetchProviderDefs } from "../api"
 
 // ── Types (generated base + frontend icon) ────────────────────────────
 
@@ -90,10 +89,7 @@ const providerCache: { value: ProviderDef[] | null } = { value: null }
  *  usable model, unfiltered by the org allowlist). */
 export async function fetchProviders(): Promise<ProviderDef[]> {
   if (providerCache.value) return providerCache.value
-  // The client runs in responseStyle:"data" (setupClient), so the SDK call
-  // resolves to the array directly — use sdk() like every other consumer
-  // rather than destructuring a `{ data }` wrapper that doesn't exist at runtime.
-  const data = await sdk<GenProviderDef[]>(getApiProviders({ throwOnError: true }))
+  const data = await fetchProviderDefs()
   providerCache.value = enrichProviders(data)
   return providerCache.value
 }
@@ -104,9 +100,7 @@ export async function fetchProviders(): Promise<ProviderDef[]> {
  *  is invalidated (query key `["providers", "picker"]`) when the admin edits the
  *  allowlist. */
 export async function fetchPickerProviders(): Promise<ProviderDef[]> {
-  const data = await sdk<GenProviderDef[]>(
-    getApiProviders({ query: { allowed: "1" }, throwOnError: true }),
-  )
+  const data = await fetchProviderDefs(true)
   return enrichProviders(data)
 }
 

@@ -62,6 +62,14 @@ import {
   getApiAgentByIdScratchpad,
   getApiAgentByIdTree,
   getApiAgentByIdCallbacks,
+  getApiProviders,
+  getApiReleases,
+  putApiReleasesArch,
+  postApiReleasesDownload,
+  putApiReleasesSelect,
+  deleteApiReleasesByTag,
+  postApiReleasesDeploy,
+  postApiReleasesRestartOrchestrator,
   getApiMetrics,
   postApiFleetCreate,
   postApiAgentByIdRestart,
@@ -201,6 +209,58 @@ export function fetchUsage(agentId: string): Promise<Record<string, unknown>> {
 
 export function fetchLibrary(agentId: string): Promise<LibraryItem[]> {
   return sdk(getApiAgentByIdLibrary({ path: { id: agentId } }))
+}
+
+// ── Providers (SDK) ───────────────────────────────────────────────────
+
+/** Fetch the raw provider registry from `GET /api/providers`. `allowedOnly`
+ *  applies the org model allowlist server-side (`?allowed=1`). Returns the
+ *  generated `ProviderDef` shape; frontend icon decoration lives in
+ *  lib/support/models. This is the api-layer boundary — the only value import
+ *  of the release/provider generated SDK (M141). */
+export function fetchProviderDefs(
+  allowedOnly = false,
+): Promise<import("./generated/types.gen").ProviderDef[]> {
+  return sdk(getApiProviders(allowedOnly ? { query: { allowed: "1" } } : {}))
+}
+
+// ── Releases (SDK, admin-only T427) ───────────────────────────────────
+//
+// Wraps the generated release-lifecycle SDK so the shell/config release
+// panes import from `@/lib/api` (the api layer) instead of reaching into
+// `@/lib/api/generated` directly — the M141 layering guard (only lib/api
+// may value-import the generated SDK).
+
+export type { ReleaseEntry, ReleasesResponse, DeployResponse } from "./generated/types.gen"
+
+export function fetchReleases(): Promise<import("./generated/types.gen").ReleasesResponse> {
+  return sdk(getApiReleases())
+}
+
+export function setReleasesArch(body: { arch?: string; auto?: boolean }): Promise<unknown> {
+  return sdk(putApiReleasesArch({ body }))
+}
+
+export function downloadRelease(tag: string): Promise<unknown> {
+  return sdk(postApiReleasesDownload({ body: { tag } }))
+}
+
+export function selectRelease(tag: string): Promise<unknown> {
+  return sdk(putApiReleasesSelect({ body: { tag } }))
+}
+
+export function deleteRelease(tag: string): Promise<unknown> {
+  return sdk(deleteApiReleasesByTag({ path: { tag } }))
+}
+
+export function deployFleet(
+  tag: string | null,
+): Promise<import("./generated/types.gen").DeployResponse> {
+  return sdk(postApiReleasesDeploy({ body: tag ? { tag } : {} }))
+}
+
+export function restartOrchestrator(): Promise<unknown> {
+  return sdk(postApiReleasesRestartOrchestrator())
 }
 
 // ── Commands (SDK) ────────────────────────────────────────────────────

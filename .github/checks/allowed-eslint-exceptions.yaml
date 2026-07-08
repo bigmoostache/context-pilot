@@ -398,3 +398,23 @@ exceptions:
     strategy: >
       Re-evaluate if the config is ever split for other reasons (e.g. a shared
       base preset extracted), or if a config-file-aware line budget is adopted.
+
+  # ── P9 no-restricted-imports — off inside the api layer (the SDK wrapper) ──
+  - path: "web/src/lib/api/**/*.{ts,tsx}"
+    rule: "@typescript-eslint/no-restricted-imports"
+    reason: >
+      The M141 crown-jewel guard bans value-importing the generated OpenAPI SDK
+      (@/lib/api/generated) anywhere outside the api layer — every other layer
+      must consume the hand-written wrappers from @/lib/api, so the frontend's
+      backend coupling lives in exactly one place. The api layer IS that place:
+      its whole job is to value-import the generated SDK functions and expose
+      thin fetch wrappers, so the rule is necessarily off HERE and only here.
+      The boundaries/dependencies rule already permits api→generated; this
+      off-switch is its twin for the import-path guard. `import type` of the
+      generated contract shape stays allowed everywhere via allowTypeImports, so
+      this exception governs only the value imports the api layer must make.
+      Every non-api file stays at error — no component or support module can
+      reach past the api layer to the raw SDK.
+    strategy: >
+      Irreducible: a wrapper layer must import the thing it wraps. The guard is
+      already as narrow as possible (this one folder, value imports only).
