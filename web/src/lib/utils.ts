@@ -427,3 +427,5 @@ export function resolveTab(
   const caret = Math.max(lineStart, Math.min(lineStart + rebuilt.length, selStart + delta))
   return { value: next, caret }
 }
+
+// Touch: workspace-test CI wiring verified (T518).

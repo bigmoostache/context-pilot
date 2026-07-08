@@ -23,6 +23,42 @@ set -uo pipefail
 MODE="${1:---ci}"   # --ci | --callback (behaviourally identical today)
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
+
+# Serialize concurrent invocations with a portable mkdir spin-lock. The
+# TS-codegen step regenerates the hey-api client into a SINGLE shared output dir
+# (web/src/lib/api/generated), and hey-api WIPES that dir before rewriting it. A
+# commit touching BOTH a .rs and a web .ts fires the api-contract-rust AND
+# api-contract-ts callbacks in parallel — two concurrent regenerations of the
+# same dir race, one deleting a core file the other's replaceImports is reading
+# ("ENOENT … core/auth.gen.ts"). The lock makes the second invocation wait, then
+# regenerate cleanly (idempotent: same openapi.json ⇒ byte-identical output, no
+# drift). CI is a single serial invocation, so the lock is uncontended there.
+#
+# `mkdir` (not flock) because flock is util-linux — ABSENT on the macOS dev box
+# where the callbacks actually run and the race actually bites (flock's presence
+# check silently skipped the guard there). `mkdir` is an atomic test-and-create
+# on every POSIX filesystem, so it is a true portable mutex. An EXIT trap removes
+# the lockdir on any normal/interrupted termination; a stale lock from a hard
+# kill is force-broken after LOCK_TIMEOUT so a crashed run can't wedge the guard.
+LOCK_DIR="$ROOT/.git/cp-api-contract.lock.d"
+LOCK_TIMEOUT=180
+waited=0
+until mkdir "$LOCK_DIR" 2>/dev/null; do
+  # Break a stale lock whose owning run died without cleanup (older than the
+  # timeout) so the guard self-heals instead of spinning forever.
+  if [ -d "$LOCK_DIR" ]; then
+    age=$(( $(date +%s) - $(stat -f %m "$LOCK_DIR" 2>/dev/null || stat -c %Y "$LOCK_DIR" 2>/dev/null || date +%s) ))
+    if [ "$age" -ge "$LOCK_TIMEOUT" ]; then
+      rmdir "$LOCK_DIR" 2>/dev/null || true
+      continue
+    fi
+  fi
+  sleep 0.3
+  waited=$((waited + 1))
+  [ "$waited" -ge $((LOCK_TIMEOUT * 4)) ] && break
+done
+trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+
 fail=0
 
 echo "=== OpenAPI spec + route exhaustiveness ==="
