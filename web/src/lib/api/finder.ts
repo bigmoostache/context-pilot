@@ -113,29 +113,9 @@ export function trashItems(agentId: string, items: string[]): Promise<TrashResul
 /** Build the URL that serves a realm file's raw bytes inline (no download
  *  prompt). `fs/raw` is NOT a public route, so an `<img src>` / `<object data>`
  *  pointed straight at this URL can't carry the `Authorization` header and 401s
- *  once auth is on (C2) — always go through {@link fetchRawBlob} + an object URL
- *  for preview surfaces. Kept only for the rare same-origin/no-auth caller. */
+ *  once auth is on (C2). Kept only for the rare same-origin/no-auth caller. */
 export function rawUrl(agentId: string, path: string): string {
   return `${BASE}/api/agent/${agentId}/fs/raw?path=${encodeURIComponent(path)}`
-}
-
-/** Fetch a realm file's raw bytes as a Blob, carrying the auth header (C2). The
- *  caller wraps the Blob in an object URL for `<img>` / `<object>` and revokes it
- *  on cleanup. Mirrors {@link downloadFile}'s auth + error handling. */
-export async function fetchRawBlob(agentId: string, path: string): Promise<Blob> {
-  const headers: Record<string, string> = {}
-  const token = getToken()
-  if (token) headers["Authorization"] = `Bearer ${token}`
-
-  const res = await fetch( // ok:manual — inline raw bytes for a preview blob, irreducible
-    `${BASE}/api/agent/${agentId}/fs/raw?path=${encodeURIComponent(path)}`,
-    { headers },
-  )
-  if (!res.ok) {
-    const body = await res.text().catch(() => res.statusText)
-    throw new Error(`${res.status}: ${body}`)
-  }
-  return res.blob()
 }
 
 /** Trigger a browser download for a file in the agent's realm. */

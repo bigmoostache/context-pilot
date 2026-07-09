@@ -89,9 +89,9 @@ export function PromptsPage({ agentId }: { agentId?: string | undefined }) {
         </header>
 
         {usingMock && (
-          <div className="flex items-center gap-2 rounded-lg border border-[var(--warn)]/30 bg-[var(--warn)]/10 px-3 py-2 text-[11.5px] text-[var(--warn)]">
-            Sample library — these are illustrative prompts, not your saved ones.
-            Open an agent to see its real library.
+          <div className="flex items-center gap-2 rounded-lg border border-(--warn)/30 bg-(--warn)/10 px-3 py-2 text-[11.5px] text-(--warn)">
+            Sample library — these are illustrative prompts, not your saved ones. Open an agent to
+            see its real library.
           </div>
         )}
 
