@@ -48,18 +48,16 @@ export default defineConfig({
         // `output` overload picking the ManualChunksFunction type and rejecting
         // the object literal under `tsc -b`.
         manualChunks(id) {
-          if (!id.includes('node_modules')) return undefined
-          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id))
-            return 'react'
+          if (!id.includes("node_modules")) return
+          if (/[\\/]node_modules[\\/](?:react|react-dom|scheduler)[\\/]/.test(id)) return "react"
           if (
-            /[\\/]node_modules[\\/](react-markdown|remark-gfm|remark-math|rehype-katex|katex|mdast|micromark|unist|hast|vfile|property-information|space-separated-tokens|comma-separated-tokens|decode-named-character-reference|character-entities)/.test(
+            /[\\/]node_modules[\\/](?:react-markdown|remark-gfm|remark-math|rehype-katex|katex|mdast|micromark|unist|hast|vfile|property-information|space-separated-tokens|comma-separated-tokens|decode-named-character-reference|character-entities)/.test(
               id,
             )
           )
-            return 'markdown'
-          if (/[\\/]node_modules[\\/]highlight\.js[\\/]/.test(id))
-            return 'highlight'
-          return undefined
+            return "markdown"
+          if (/[\\/]node_modules[\\/]highlight\.js[\\/]/.test(id)) return "highlight"
+          return
         },
       },
     },

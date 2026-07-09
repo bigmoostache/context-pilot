@@ -40,18 +40,13 @@ export function Tip({
   return (
     <TooltipPrimitive.Root>
       <TooltipPrimitive.Trigger
-        render={(props) => (
-          // `tabIndex={0}` keeps the tooltip reachable by keyboard even when the
-          // wrapped content is non-interactive (e.g. a plain label/icon). Placed
-          // before the spread so an explicit tabIndex on `props` still wins.
-          <span
-            tabIndex={0}
-            {...props}
-            className={cn(props.className, triggerClassName)}
-          >
-            {children}
-          </span>
-        )}
+        render={(props) => {
+          // `tabIndex: 0` keeps the tooltip reachable by keyboard even when the
+          // wrapped content is non-interactive (e.g. a plain label/icon). Seeded
+          // first so an explicit tabIndex on `props` still wins.
+          const merged = { tabIndex: 0, ...props, className: cn(props.className, triggerClassName) }
+          return <span {...merged}>{children}</span>
+        }}
       />
       <TooltipPrimitive.Portal>
         <TooltipPrimitive.Positioner side={side} sideOffset={sideOffset} className="z-50">

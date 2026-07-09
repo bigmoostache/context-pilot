@@ -21,11 +21,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     setBusy(true)
     try {
       await updateSettings({ onboarding_completed: true })
-      // Await onComplete (refreshMe): it can reject (M3), and awaiting inside
-      // this try means a /me hiccup surfaces as an inline error + a re-enabled
-      // button instead of an unhandled rejection with the screen stuck on
-      // "Finishing…".
-      await onComplete()
+      // Signal completion (the caller kicks off a /me refresh): fire-and-forget,
+      // so any /me hiccup can't leave the screen stuck on "Finishing…". A failure
+      // to persist the flag above still surfaces via the catch below.
+      onComplete()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Onboarding failed")
       setBusy(false)

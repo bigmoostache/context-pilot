@@ -35,8 +35,7 @@ export const buttonVariants = cva(
         // when it is the active/selected one (drive via `aria-pressed` on a
         // toggle or `aria-current` on a nav item). Pairs with `size="none"` for
         // the bespoke geometries these pills use (M27).
-        pill:
-          "font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground aria-pressed:bg-card aria-pressed:text-foreground aria-pressed:card-shadow aria-current:bg-card aria-current:text-foreground aria-current:card-shadow",
+        pill: "font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground aria-pressed:bg-card aria-pressed:text-foreground aria-pressed:card-shadow aria-current:bg-card aria-current:text-foreground aria-current:card-shadow",
       },
       size: {
         default:
@@ -59,5 +58,5 @@ export const buttonVariants = cva(
       variant: "default",
       size: "default",
     },
-  }
+  },
 )

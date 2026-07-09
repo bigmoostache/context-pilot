@@ -55,11 +55,9 @@ export function useUploadFiles(agentId: string) {
       if (tooBig.length > 0) {
         throw new Error(`${tooBig.map((f) => f.name).join(", ")} exceeds the 32 MB upload limit`)
       }
-      const results = await Promise.allSettled(
-        files.map((f) => api.uploadFile(agentId, dir, f)),
-      )
+      const results = await Promise.allSettled(files.map((f) => api.uploadFile(agentId, dir, f)))
       const failed = results
-        .map((r, i) => (r.status === "rejected" ? files[i].name : null))
+        .map((r, i) => (r.status === "rejected" ? (files[i]?.name ?? null) : null))
         .filter((n): n is string => n !== null)
       if (failed.length > 0) {
         throw new Error(

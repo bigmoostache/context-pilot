@@ -13,13 +13,11 @@
          (FOUC). Mirrors the logic in src/lib/theme.tsx: honour the saved
          preference, otherwise fall back to the OS `prefers-color-scheme`. -->
     <script>
-      (function () {
+      ;(function () {
         try {
           var t = localStorage.getItem("cp-theme")
           if (t !== "light" && t !== "dark") {
-            t = window.matchMedia("(prefers-color-scheme: dark)").matches
-              ? "dark"
-              : "light"
+            t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
           }
           if (t === "dark") document.documentElement.classList.add("dark")
         } catch (e) {}

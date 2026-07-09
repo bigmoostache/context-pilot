@@ -25,11 +25,7 @@ export function QuestionForm({
   // no longer light up together (L18).
   const backendAnswers = q.answered ?? null
   const isSelected = (opt: string, i: number): boolean =>
-    isAnswered
-      ? backendAnswers && !submitted
-        ? backendAnswers.includes(opt)
-        : picked.includes(i)
-      : picked.includes(i)
+    isAnswered && backendAnswers && !submitted ? backendAnswers.includes(opt) : picked.includes(i)
 
   const toggle = (i: number) => {
     if (isAnswered) return

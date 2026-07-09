@@ -66,6 +66,7 @@ export function FinderOverlays(d: OverlaysDeps) {
         <ContextMenu
           pos={d.menu}
           onClose={() => d.setMenu(null)}
+          onAction={(label) => d.flash(label)}
           onOpen={d.open}
           onDownload={(n) => {
             downloadFile(d.agentId, n.path).catch(() => d.flash(`Failed to download ${n.name}`))

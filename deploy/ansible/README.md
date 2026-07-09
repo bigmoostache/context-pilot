@@ -19,8 +19,8 @@ ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/site.yml
 What it does, end to end:
 
 1. **Fetch** (control node — needs internet): downloads the **pre-built appliance
-   bundle** (`cpilot-appliance-aarch64.tar.gz` = `bin/cp-orchestrator`, `bin/tui`,
-   `web/<spa>`) from GitHub Releases — produced by
+   bundle** (`cpilot-linux-aarch64-musl.tar.gz` = flat `cpilot`, `cp-console-server`,
+   `cp-orchestrator`, `web/<spa>`) from GitHub Releases — produced by
    `.github/workflows/release.yml` — plus a stock `caddy` arm64 binary. No local
    build/toolchain needed. Pin a tag with `-e release=v0.1.0-abc1234` (default:
    `latest`). The systemd units + bootstrap Caddyfile come from this repo.
@@ -32,9 +32,9 @@ What it does, end to end:
 4. **Start**: enables + starts the orchestrator (which seeds the admin and writes
    the real Caddyfile) then Caddy, and waits until both answer.
 
-> Requires a published release that contains `cpilot-appliance-aarch64.tar.gz`
-> (cut by pushing a tag → `release.yml`). The control node fetches it; the
-> offline LAN box never needs internet.
+> Requires a published release that contains `cpilot-linux-aarch64-musl.tar.gz`
+> (every push to master cuts one; a manual `v*` tag also works). The control
+> node fetches it; the offline LAN box never needs internet.
 
 ### No release yet? Build the bundle locally
 
@@ -42,12 +42,13 @@ When you can't cut a GitHub release, build the same bundle on the dev box and
 deploy it with `-e release=local`:
 
 ```sh
-deploy/photonicat/build.sh                 # → deploy/ansible/.artifacts/{cpilot-appliance-aarch64.tar.gz, caddy}
+deploy/photonicat/build.sh                 # → deploy/ansible/.artifacts/{cpilot-linux-aarch64-musl.tar.gz, caddy}
 ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/site.yml -e release=local
 ```
 
-`build.sh` cross-builds the orchestrator + agent TUI (aarch64-musl), builds the
-SPA, packages the exact same tarball `release.yml` would, and downloads Caddy.
+`build.sh` cross-builds the orchestrator + console-server + agent TUI
+(aarch64-musl), builds the SPA, packages the exact same tarball `release.yml`
+would, and downloads Caddy.
 With `-e release=local` the playbook skips the GitHub download and uses it.
 
 Result: the box boots **unprovisioned** with the IT maintenance console live at
