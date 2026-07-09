@@ -19,4 +19,3 @@ export const currentUser: User = {
   company: undefined,
   role: "Admin",
 }
-

@@ -59,7 +59,6 @@ export type ThreadDetail = Omit<GenThreadDetail, "log"> & {
 
 export type AgentStatus = GenAgent["status"]
 export type ThreadStatus = GenThreadDetail["status"]
-export type LibraryKind = import("./api/generated/types.gen").LibraryItem["kind"]
 
 // ── UI-only types (no backend equivalent) ────────────────────────────
 

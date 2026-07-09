@@ -127,7 +127,6 @@ impl StateReader {
         let dir = folder.join(CP_DIR).join(STATES_DIR);
         list_json_stems(&dir)
     }
-
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -312,5 +311,4 @@ mod tests {
         let workers = reader.list_workers(dir.path()).expect("list");
         assert!(workers.is_empty());
     }
-
 }
