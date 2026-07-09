@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Build the appliance bundle LOCALLY — a stand-in for a GitHub release while you
-# can't cut one. Produces the SAME `cpilot-appliance-aarch64.tar.gz` that
-# .github/workflows/release.yml publishes (bin/cp-orchestrator, bin/tui, web/<spa>)
+# can't cut one. Produces the SAME `cpilot-linux-aarch64-musl.tar.gz` that
+# .github/workflows/release.yml publishes (flat layout: cpilot, cp-console-server,
+# cp-orchestrator, web/<spa> — no meilisearch, none is built upstream for musl)
 # plus a stock Caddy arm64, into deploy/ansible/.artifacts/, so the Ansible
 # playbook can deploy it with `-e release=local` (no GitHub fetch).
 #
@@ -16,22 +17,24 @@ TARGET=aarch64-unknown-linux-musl
 ART=deploy/ansible/.artifacts
 CADDY_URL="https://caddyserver.com/api/download?os=linux&arch=arm64"
 
-echo "==> cross-building orchestrator + agent ($TARGET, static musl)"
+echo "==> cross-building orchestrator + console-server + agent ($TARGET, static musl)"
 # --cap-lints warn (NOT allow): allow breaks cross's cargo-metadata step.
 RUSTFLAGS="--cap-lints warn" cross build --release --target "$TARGET" -p cp-orchestrator
+RUSTFLAGS="--cap-lints warn" cross build --release --target "$TARGET" -p cp-console-server
 RUSTFLAGS="--cap-lints warn" cross build --release --target "$TARGET" --bin tui
 
 echo "==> building SPA (relative same-origin API URLs)"
 ( cd web && VITE_API_URL="" npm run build )
 
-echo "==> packaging cpilot-appliance-aarch64.tar.gz (matches release.yml layout)"
+echo "==> packaging cpilot-linux-aarch64-musl.tar.gz (matches release.yml flat layout)"
 rm -rf "$ART/staging"
-mkdir -p "$ART/staging/bin" "$ART/staging/web"
-cp "target/$TARGET/release/cp-orchestrator" "$ART/staging/bin/"
-cp "target/$TARGET/release/tui" "$ART/staging/bin/"
-chmod 755 "$ART/staging/bin/"*
+mkdir -p "$ART/staging/web"
+cp "target/$TARGET/release/tui" "$ART/staging/cpilot"
+cp "target/$TARGET/release/cp-console-server" "$ART/staging/cp-console-server"
+cp "target/$TARGET/release/cp-orchestrator" "$ART/staging/cp-orchestrator"
+chmod 755 "$ART/staging/cpilot" "$ART/staging/cp-console-server" "$ART/staging/cp-orchestrator"
 cp -r web/dist/. "$ART/staging/web/"
-tar -czf "$ART/cpilot-appliance-aarch64.tar.gz" -C "$ART/staging" .
+tar -czf "$ART/cpilot-linux-aarch64-musl.tar.gz" -C "$ART/staging" .
 rm -rf "$ART/staging"
 
 echo "==> fetching stock Caddy arm64 (static Go, ships tls internal) if absent"

@@ -22,15 +22,18 @@
     - web
     - caddy
 
-- name: Ship the binaries (orchestrator + agent TUI from the release bundle, Caddy)
+- name: Ship the binaries (orchestrator + agent + Caddy) from the flat release bundle
+  # The release bundle is flat (cpilot, cp-console-server, cp-orchestrator, web/);
+  # the agent binary is named `cpilot` there but the box + init script expect
+  # `bin/tui`, so the mapping is explicit rather than by basename.
   ansible.builtin.copy:
-    src: "{{ item }}"
-    dest: "{{ cp_root }}/bin/{{ item | basename }}"
+    src: "{{ item.src }}"
+    dest: "{{ cp_root }}/bin/{{ item.dst }}"
     mode: "0755"
   loop:
-    - "{{ artifacts_dir }}/bundle/bin/cp-orchestrator"
-    - "{{ artifacts_dir }}/bundle/bin/tui"
-    - "{{ artifacts_dir }}/caddy"
+    - { src: "{{ artifacts_dir }}/bundle/cp-orchestrator", dst: cp-orchestrator }
+    - { src: "{{ artifacts_dir }}/bundle/cpilot", dst: tui }
+    - { src: "{{ artifacts_dir }}/caddy", dst: caddy }
 
 - name: Ship the SPA bundle (from the release bundle)
   ansible.builtin.copy:
