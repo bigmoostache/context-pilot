@@ -14,23 +14,10 @@
 
 export type {
   AccentToken,
-  CallbackRow,
-  EntityTable,
   FinderKind,
   LibraryItem,
-  MemoryCard,
-  PanelKind,
-  QueueAction,
-  RadarAnchor,
-  RadarResult,
-  ScratchCell,
-  SpineNotif,
   ThreadQuestion,
-  TodoItem,
   ToolCall,
-  ToolGroup,
-  ToolRow,
-  TreeRow,
 } from "./api/generated/types.gen"
 
 // ── Extended re-exports (generated base + UI-only fields) ────────────
@@ -38,7 +25,6 @@ export type {
 import type {
   AccentToken,
   Agent as GenAgent,
-  ContextPanel as GenContextPanel,
   FinderNode as GenFinderNode,
   ThreadDetail as GenThreadDetail,
   ThreadMsg as GenThreadMsg,
@@ -49,9 +35,6 @@ import type {
 export type Agent = GenAgent & {
   accent: AccentToken
 }
-
-/** ContextPanel re-exported as-is (kind is already typed as PanelKind in generated). */
-export type ContextPanel = GenContextPanel
 
 /**
  * ThreadMsg with UI-only `streaming` flag (set during active LLM output).
@@ -76,7 +59,6 @@ export type ThreadDetail = Omit<GenThreadDetail, "log"> & {
 
 export type AgentStatus = GenAgent["status"]
 export type ThreadStatus = GenThreadDetail["status"]
-export type NotifKind = import("./api/generated/types.gen").SpineNotif["kind"]
 export type LibraryKind = import("./api/generated/types.gen").LibraryItem["kind"]
 
 // ── UI-only types (no backend equivalent) ────────────────────────────

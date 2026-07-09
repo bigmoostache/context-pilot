@@ -30,16 +30,6 @@ import * as api from "../api"
 
 import type {
   Agent,
-  ContextPanel,
-  MemoryCard,
-  TodoItem,
-  SpineNotif,
-  QueueAction,
-  ScratchCell,
-  TreeRow,
-  CallbackRow,
-  ToolGroup,
-  EntityTable,
   ThreadDetail,
   LibraryItem,
   FinderNode,
@@ -88,92 +78,6 @@ export function useThreads(agentId: string): LiveQueryResult<ThreadDetail[]> {
     },
     { agentId, enabled: !!agentId },
   )
-}
-
-// Context-panel weights power the cockpit/HUD context-budget meter. They are
-// pure tier-② inspection reads with NO oplog delta to fold (panel token sizes
-// are private agent working-set state, never journaled), so the only freshness
-// mechanism is the poll. The default 15s backstop made the context meter feel
-// frozen (T297); a brisk poll keeps it tracking within a few seconds. The
-// backend read is mtime-cached, so an unchanged config.json is cheap to re-poll.
-const PANELS_POLL_MS = 4000
-
-export function usePanels(agentId: string): LiveQueryResult<ContextPanel[]> {
-  return useLive(qk.panels(agentId), () => api.fetchPanels(agentId), {
-    agentId,
-    enabled: !!agentId,
-    pollMs: PANELS_POLL_MS,
-  })
-}
-
-export function useMemory(agentId: string): LiveQueryResult<MemoryCard[]> {
-  return useLive(qk.memory(agentId), () => api.fetchMemory(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useTodos(agentId: string): LiveQueryResult<TodoItem[]> {
-  return useLive(qk.todos(agentId), () => api.fetchTodos(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useSpine(agentId: string): LiveQueryResult<SpineNotif[]> {
-  return useLive(qk.spine(agentId), () => api.fetchSpine(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useQueue(agentId: string): LiveQueryResult<QueueAction[]> {
-  return useLive(qk.queue(agentId), () => api.fetchQueue(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useScratchpad(agentId: string): LiveQueryResult<ScratchCell[]> {
-  return useLive(qk.scratchpad(agentId), () => api.fetchScratchpad(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useTree(agentId: string): LiveQueryResult<TreeRow[]> {
-  return useLive(qk.tree(agentId), () => api.fetchTree(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useCallbacks(agentId: string): LiveQueryResult<CallbackRow[]> {
-  return useLive(qk.callbacks(agentId), () => api.fetchCallbacks(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useTools(agentId: string): LiveQueryResult<ToolGroup[]> {
-  return useLive(qk.tools(agentId), () => api.fetchTools(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useRadar(agentId: string): LiveQueryResult<api.RadarData> {
-  return useLive(qk.radar(agentId), () => api.fetchRadar(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useEntities(agentId: string): LiveQueryResult<EntityTable[]> {
-  return useLive(qk.entities(agentId), () => api.fetchEntities(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
 }
 
 // ── Finder hooks ──────────────────────────────────────────────────────

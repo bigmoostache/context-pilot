@@ -1,43 +1,4 @@
-import {
-  Activity,
-  Brain,
-  Database,
-  FileText,
-  FolderTree,
-  Gauge,
-  GitBranch,
-  Layers,
-  ListTodo,
-  MessagesSquare,
-  NotebookPen,
-  Radar,
-  Search,
-  SquareTerminal,
-  Webhook,
-  Wrench,
-  type LucideIcon,
-} from "lucide-react"
-import type { PanelKind } from "../types"
 import type { AccentToken } from "../api/generated/types.gen"
-
-export const panelIcon: Record<PanelKind, LucideIcon> = {
-  tree: FolderTree,
-  memory: Brain,
-  threads: MessagesSquare,
-  spine: Activity,
-  stats: Gauge,
-  entities: Database,
-  search: Search,
-  file: FileText,
-  git: GitBranch,
-  console: SquareTerminal,
-  queue: Layers,
-  todo: ListTodo,
-  callback: Webhook,
-  scratchpad: NotebookPen,
-  tools: Wrench,
-  radar: Radar,
-}
 
 export type Accent = AccentToken | "muted"
 
@@ -48,13 +9,6 @@ export const accentVar: Record<Accent, string> = {
   warn: "var(--warn)",
   danger: "var(--danger)",
   muted: "var(--muted-foreground)",
-}
-
-/** Load → color: calm when light, warm caution mid, red when heavy. Theme-aware. */
-export function loadColor(ratio: number): string {
-  if (ratio >= 0.85) return "var(--danger)"
-  if (ratio >= 0.6) return "var(--warn)"
-  return "var(--ok)"
 }
 
 export function fmtTokens(n: number): string {

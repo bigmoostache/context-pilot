@@ -42,15 +42,6 @@ const CONFIG_FILE: &str = "config.json";
 /// Directory holding per-worker state files (`<worker_id>.json`).
 const STATES_DIR: &str = "states";
 
-/// Directory holding shared files (memories.yaml, callbacks.yaml, etc.).
-const SHARED_DIR: &str = "shared";
-
-/// Directory holding conversation messages (`UID_*.yaml`).
-const MESSAGES_DIR: &str = "messages";
-
-/// Directory holding panel persistence files (`<uid>.json`).
-const PANELS_DIR: &str = "panels";
-
 // ── Cached value ───────────────────────────────────────────────────────
 
 /// A parsed JSON value paired with the file's `mtime` at the time of parsing,
@@ -137,54 +128,6 @@ impl StateReader {
         list_json_stems(&dir)
     }
 
-    /// Read a raw shared file (e.g. `memories.yaml`) as bytes.
-    ///
-    /// No caching — shared YAML files are small and infrequently requested
-    /// compared to the JSON config. Callers parse at their own layer.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`io::Error`] on read failure.
-    pub fn read_shared(&self, folder: &Path, filename: &str) -> io::Result<Vec<u8>> {
-        fs::read(folder.join(CP_DIR).join(SHARED_DIR).join(filename))
-    }
-
-    /// List conversation message filenames in the `messages/` directory.
-    ///
-    /// Returns filenames (not full paths) sorted lexicographically. A missing
-    /// directory yields an empty list.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`io::Error`] if the directory cannot be listed (other than
-    /// not-found).
-    pub fn list_messages(&self, folder: &Path) -> io::Result<Vec<String>> {
-        list_filenames(&folder.join(CP_DIR).join(MESSAGES_DIR))
-    }
-
-    /// Read a single message file by filename.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`io::Error`] on read failure.
-    pub fn read_message(&self, folder: &Path, filename: &str) -> io::Result<Vec<u8>> {
-        fs::read(folder.join(CP_DIR).join(MESSAGES_DIR).join(filename))
-    }
-
-    /// Read a single panel file by uid.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`io::Error`] on read failure.
-    pub fn read_panel(&self, folder: &Path, uid: &str) -> io::Result<Value> {
-        let path = folder.join(CP_DIR).join(PANELS_DIR).join(format!("{uid}.json"));
-        read_json(&path)
-    }
-
-    /// Drop cached state for an agent that has disappeared from the fleet.
-    pub fn evict(&mut self, folder: &Path) {
-        let _removed = self.agents.remove(folder);
-    }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -270,25 +213,6 @@ fn list_json_stems(dir: &Path) -> io::Result<Vec<String>> {
     }
     stems.sort();
     Ok(stems)
-}
-
-/// List filenames in a directory, sorted. Missing directory yields empty.
-fn list_filenames(dir: &Path) -> io::Result<Vec<String>> {
-    let read_dir = match fs::read_dir(dir) {
-        Ok(rd) => rd,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(e) => return Err(e),
-    };
-
-    let mut names = Vec::new();
-    for entry in read_dir {
-        let entry = entry?;
-        if let Some(name) = entry.file_name().to_str() {
-            names.push(name.to_owned());
-        }
-    }
-    names.sort();
-    Ok(names)
 }
 
 #[cfg(test)]
@@ -389,42 +313,4 @@ mod tests {
         assert!(workers.is_empty());
     }
 
-    #[test]
-    fn read_shared_and_list_messages() {
-        let dir = tempdir().expect("dir");
-        let folder = dir.path();
-
-        // Shared file.
-        let shared = folder.join(CP_DIR).join(SHARED_DIR);
-        fs::create_dir_all(&shared).expect("mkdir");
-        fs::write(shared.join("memories.yaml"), b"- memory: test").expect("write");
-
-        let reader = StateReader::new();
-        let bytes = reader.read_shared(folder, "memories.yaml").expect("read");
-        assert_eq!(bytes, b"- memory: test");
-
-        // Messages directory.
-        let msgs = folder.join(CP_DIR).join(MESSAGES_DIR);
-        fs::create_dir_all(&msgs).expect("mkdir");
-        fs::write(msgs.join("UID_001.yaml"), b"msg1").expect("write");
-        fs::write(msgs.join("UID_002.yaml"), b"msg2").expect("write");
-
-        let names = reader.list_messages(folder).expect("list");
-        assert_eq!(names, vec!["UID_001.yaml", "UID_002.yaml"]);
-    }
-
-    #[test]
-    fn evict_clears_agent_cache() {
-        let dir = tempdir().expect("dir");
-        let folder = dir.path();
-        let val = serde_json::json!({"x": 1});
-        write_config(folder, &val);
-
-        let mut reader = StateReader::new();
-        let _first = reader.read_config(folder).expect("read");
-        assert!(!reader.agents.is_empty());
-
-        reader.evict(folder);
-        assert!(reader.agents.is_empty());
-    }
 }
