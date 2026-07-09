@@ -240,7 +240,7 @@ function AllowedModelsSection() {
 /**
  * The one **functional** General-pane toggle (T301): the global dev-mode flag,
  * persisted via {@link useDevMode}. Unlike the decorative sibling rows it is a
- * real controlled switch — flipping it reveals/hides the developer-only Cockpit
+ * real controlled switch — flipping it reveals/hides the developer-only Costs
  * tab in the TopBar in real time (App gates the view on the same flag). Off by
  * default.
  */
@@ -250,7 +250,7 @@ function DevModeToggle({ i }: { i: number }) {
     <ToggleRow
       i={i}
       name="Developer mode"
-      detail="Reveal the Cockpit — the agent's live context-panel inspector"
+      detail="Reveal developer-only surfaces (Cost Analysis) and diagnostics"
       value={devMode}
       onChange={setDevMode}
     />

@@ -185,7 +185,7 @@ export type FinderSortKey = "name" | "size" | "modified" | "kind"
  * Top-level surfaces. `fleet` = the mission-control dashboard (the ONLY place
  * agents are managed). The other three are the per-agent views.
  */
-export type ViewMode = "fleet" | "cockpit" | "threads" | "finder" | "costs"
+export type ViewMode = "fleet" | "threads" | "finder" | "costs"
 
 // ── Usage / cost analytics (Usage page) ──────────────────────────
 

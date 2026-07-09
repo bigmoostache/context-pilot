@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from "react"
 import { MaintWizard } from "@/components/auth/maint/MaintWizard"
 import { probeMaintPlane, type MaintStatus } from "@/lib/api/maint"
 import { TopBar } from "@/components/shell/TopBar"
-import { CockpitView } from "@/components/shell/CockpitView"
 import { CostsView } from "@/components/shell/costs/CostsView"
 import { StatusBar } from "@/components/shell/StatusBar"
 import { ThreadsView } from "@/components/threads/ThreadsView"
@@ -31,7 +30,7 @@ import "./App.css"
  * Before any of that, it probes whether this origin is the **IT maintenance
  * plane** (:9090). The same bundle serves both planes; on the maintenance plane
  * `GET /api/maint/status` answers, and we render the provisioning wizard instead
- * of the cockpit (Milestone 5). On the cockpit that route 404s, so the normal
+ * of the app (Milestone 5). On the product plane that route 404s, so the normal
  * app renders.
  */
 function App() {
@@ -104,18 +103,18 @@ function AppShell() {
   const { data: liveAgent } = useAgentMeta(activeAgentId)
   const activeAgent = liveAgent ?? fleetAgent
 
-  // A persisted view of "threads"/"cockpit"/"finder" requires a live agent to
+  // A persisted view of "threads"/"finder" requires a live agent to
   // render. If the fleet is still loading, or the stored agent id no longer
   // matches any live agent (stale localStorage — e.g. the agent was removed),
   // `activeAgent` is undefined and those views would crash on `activeAgent.id`.
   // Fall back to the fleet view in that case (private windows never hit this
   // because they start with empty localStorage → default "fleet").
   //
-  // Cockpit and Costs are DEVELOPER-only surfaces (T301): when dev mode is off,
+  // Costs is a DEVELOPER-only surface (T301): when dev mode is off,
   // a persisted (or stale) selection resolves to "threads" so the view can
   // never render a tab the TopBar deliberately hides.
   const effectiveView: ViewMode =
-    (view === "cockpit" || view === "costs") && !devMode
+    view === "costs" && !devMode
       ? activeAgent
         ? "threads"
         : "fleet"
@@ -156,7 +155,6 @@ function AppShell() {
         />
       )
     }
-    if (effectiveView === "cockpit") return <CockpitView agentId={activeAgentId} />
     if (effectiveView === "costs") return <CostsView agentId={activeAgentId} />
     if (effectiveView === "finder" && activeAgent) {
       return (
