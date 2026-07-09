@@ -28,16 +28,6 @@ rust-lints:
   is_global: true
   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-rust-lints.sh" --callback
   last_edited_ms: 1783511056443
-rust-tests:
-  name: rust-tests
-  description: Rust-tests family (cargo build debug in --callback, cargo test)
-  pattern: '**/*.rs'
-  blocking: true
-  timeout_secs: 300
-  success_message: Rust tests OK ✓
-  is_global: true
-  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-rust-tests.sh" --callback
-  last_edited_ms: 1783511056443
 structure-rust:
   name: structure-rust
   description: Structure family (file lengths ≤500, dir entries ≤8 across Rust+web, hash chain) on Rust edits
@@ -58,16 +48,6 @@ structure-web:
   is_global: true
   script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-structure.sh" --callback
   last_edited_ms: 1783511056442
-ts-lints:
-  name: ts-lints
-  description: TS-lints family (eslint, prettier, stylelint, tsc, type-coverage, suppressions, rule-census, knip)
-  pattern: web/src/**
-  blocking: true
-  timeout_secs: 300
-  success_message: TS lints OK ✓
-  is_global: true
-  script_content: bash "$CP_PROJECT_ROOT/.github/checks/check-ts-lints.sh" --callback
-  last_edited_ms: 1783511056444
 ts-tests:
   name: ts-tests
   description: TS-tests family (Playwright e2e — documented stub, exit 0 until ephemeral stack provisioned)

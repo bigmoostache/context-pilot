@@ -30,9 +30,8 @@
 //!   [`AgentSupervisor`](supervisor::AgentSupervisor): spawn / stop / restart /
 //!   adopt of agent processes.
 //! * [`services`] — the runtime services layer:
-//!   [`MaterializedView`](services::MaterializedView) (fleet-state projection),
-//!   [`CostBreaker`](services::CostBreaker) (durable spend breaker), and
-//!   [`StreamHub`](services::StreamHub) (stream fan-out).
+//!   [`MaterializedView`](services::MaterializedView) (fleet-state projection)
+//!   and [`StreamHub`](services::StreamHub) (stream fan-out).
 
 pub mod inspect;
 pub mod registry;

@@ -42,11 +42,6 @@ export type Agent = {
 };
 
 export type AgentMetrics = {
-    breaker: {
-        budgetUsd?: number;
-        spendUsd?: number;
-        tripped?: boolean;
-    };
     id: string;
     lifecycle?: string | null;
     phase?: string | null;

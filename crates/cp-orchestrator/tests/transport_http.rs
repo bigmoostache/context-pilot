@@ -12,8 +12,7 @@
 //! * **REST envelopes.** `GET /api/fleet` and `/api/agent/{id}` carry the
 //!   `rev` they reflect; an unknown agent is a real `404`.
 //! * **Actions.** `POST /api/ticket` mints a token; `POST .../command` is a
-//!   real `400` on malformed input and a fail-closed `503` when the breaker is
-//!   tripped.
+//!   real `400` on malformed input.
 //! * **The SSE ticket gate.** `/api/stream` is `401` without a valid ticket and
 //!   single-use: a redeemed ticket cannot open a second stream.
 //! * **Reconnect-replay by `rev`.** A `Last-Event-ID` header resumes the oplog
@@ -106,8 +105,8 @@ fn replay_entries(oplog_dir: &Path) -> Vec<OpEntry> {
 struct Harness {
     /// `host:port` the server is bound to.
     addr: String,
-    /// Shared backend state (for in-test mutation, e.g. tripping the breaker).
-    state: Arc<Mutex<Backend>>,
+    /// Shared backend state.
+    _state: Arc<Mutex<Backend>>,
     /// Agents directory (held so it outlives the server).
     _agents: TempDir,
     /// Oplog directory (held so it outlives the server).
@@ -132,7 +131,6 @@ fn harness(agent_id: &str, n_msgs: u8) -> Harness {
 
     let mut backend = Backend::new(
         agents.path().to_path_buf(),
-        5.0,
         std::path::PathBuf::from("/tmp/cp-test-realms"),
         std::path::PathBuf::from("/tmp/cp-test-bin"),
         None,
@@ -146,7 +144,7 @@ fn harness(agent_id: &str, n_msgs: u8) -> Harness {
     let serve_state = Arc::clone(&state);
     let _acceptor = thread::spawn(move || serve_bound(server, serve_state));
 
-    Harness { addr, state, _agents: agents, _oplog: oplog }
+    Harness { addr, _state: state, _agents: agents, _oplog: oplog }
 }
 
 /// Mint a ticket over the real server and return its token.
@@ -177,7 +175,7 @@ fn rest_fleet_and_agent_carry_rev_envelopes() {
     assert_eq!(missing.status, 404, "unknown agent is a real 404");
 }
 
-// ── 2. actions: ticket mint, command 400 / fail-closed 503 ──────────────────
+// ── 2. actions: ticket mint, command 400 ─────────────────────────────────────
 
 #[test]
 fn ticket_mint_and_command_status_codes() {
@@ -189,22 +187,6 @@ fn ticket_mint_and_command_status_codes() {
 
     let bad = common::post_json(&h.addr, "/api/agent/agent-b/command", b"{not json");
     assert_eq!(bad.status, 400, "a malformed command is a real 400");
-
-    // Trip the breaker. A cost-incurring `send_message` is then fail-closed
-    // with 503 (the breaker gates new spending).
-    h.state.lock().expect("lock").breaker_mut().observe("agent-b", 99.0);
-    let costly = br#"{"schema_version":1,"id":"c1","seq":1,"dedup_token":"d1","kind":{"kind":"send_message","thread_id":"T1","content":"hi"}}"#;
-    let tripped = common::post_json(&h.addr, "/api/agent/agent-b/command", costly);
-    assert_eq!(tripped.status, 503, "a tripped breaker blocks a cost-incurring command (fail-closed)");
-    assert!(tripped.body.contains("tripped"));
-
-    // A control-plane command costs nothing, so the tripped breaker must NOT
-    // refuse it — the user has to be able to halt/manage a runaway agent. It
-    // sails past the breaker gate and only then reaches command delivery (the
-    // agent socket is absent in this harness ⇒ 502, never 503).
-    let control = br#"{"schema_version":1,"id":"c2","seq":1,"dedup_token":"d2","kind":{"kind":"stop"}}"#;
-    let allowed = common::post_json(&h.addr, "/api/agent/agent-b/command", control);
-    assert_ne!(allowed.status, 503, "a tripped breaker must not block control-plane commands");
 }
 
 // ── 3. the SSE ticket gate is required and single-use ───────────────────────
@@ -246,7 +228,6 @@ fn maint_harness() -> Harness {
     let oplog = tempdir().expect("oplog dir");
     let backend = Backend::new(
         agents.path().to_path_buf(),
-        5.0,
         std::path::PathBuf::from("/tmp/cp-test-realms"),
         std::path::PathBuf::from("/tmp/cp-test-bin"),
         None,
@@ -257,7 +238,7 @@ fn maint_harness() -> Harness {
     let addr = server.server_addr().to_string();
     let serve_state = Arc::clone(&state);
     let _acceptor = thread::spawn(move || serve_bound_plane(server, serve_state, Plane::Maintenance));
-    Harness { addr, state, _agents: agents, _oplog: oplog }
+    Harness { addr, _state: state, _agents: agents, _oplog: oplog }
 }
 
 #[test]

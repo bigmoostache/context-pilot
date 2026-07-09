@@ -7,22 +7,18 @@
 //!
 //! * [`materialized_view`] — [`MaterializedView`], the in-memory fleet-state
 //!   projection folded from each agent's oplog (count-bounded restart, I5).
-//! * [`cost_breaker`] — [`CostBreaker`], the durable per-agent spend breaker
-//!   whose trip survives a crash-loop and which fails closed (R2-8 / V9).
 //! * [`stream_hub`] — [`StreamHub`], the per-agent stream fan-out to N bounded
 //!   subscribers with overflow-drop, degraded marking, and snapshot reconcile
 //!   (R2-17).
 
 pub mod agent_meta;
 pub mod auth;
-pub mod cost_breaker;
 pub mod materialized_view;
 pub mod releases;
 pub mod retire;
 pub mod stream_hub;
 
 pub use agent_meta::{AvatarStore, NameOverrides};
-pub use cost_breaker::{CostBreaker, Verdict};
 pub use materialized_view::{AgentView, CostSnapshot, MaterializedView};
 pub use releases::ReleaseStore;
 pub use retire::{RetiredRecord, RetiredStore};

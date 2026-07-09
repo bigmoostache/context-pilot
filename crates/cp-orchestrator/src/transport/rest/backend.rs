@@ -9,9 +9,7 @@ use std::time::Duration;
 
 use crate::inspect::StateReader;
 use crate::services::auth::store::AuthStore;
-use crate::services::{
-    AvatarStore, CostBreaker, MaterializedView, NameOverrides, ReleaseStore, RetiredStore, StreamHub,
-};
+use crate::services::{AvatarStore, MaterializedView, NameOverrides, ReleaseStore, RetiredStore, StreamHub};
 use crate::supervisor::AgentSupervisor;
 
 use super::super::stream::ticket::TicketStore;
@@ -29,8 +27,6 @@ const DEFAULT_SUB_CAPACITY: usize = 256;
 pub struct Backend {
     /// Per-agent projected fleet state.
     pub(crate) view: MaterializedView,
-    /// Durable per-agent spend breaker.
-    pub(crate) breaker: CostBreaker,
     /// Per-agent ephemeral stream fan-out.
     pub(crate) hub: StreamHub,
     /// Single-use SSE upgrade tickets.
@@ -77,7 +73,7 @@ pub struct Backend {
 }
 
 impl Backend {
-    /// Build a backend with empty services and the given per-agent cost budget.
+    /// Build a backend with empty services and the given agent directory.
     ///
     /// `agents_root` is where dashboard-created agents' folders are made, and
     /// `agent_binary` is the `cp` TUI binary the supervisor may spawn — it
@@ -86,7 +82,6 @@ impl Backend {
     #[must_use]
     pub fn new(
         agents_dir: PathBuf,
-        budget_usd: f64,
         agents_root: PathBuf,
         agent_binary: PathBuf,
         auth: Option<AuthStore>,
@@ -100,7 +95,6 @@ impl Backend {
             std::env::var_os("CP_PROVISION_FLAG").map_or_else(|| agents_dir.join(".provisioned"), PathBuf::from);
         Self {
             view: MaterializedView::new(),
-            breaker: CostBreaker::new(budget_usd),
             hub: StreamHub::new(DEFAULT_SUB_CAPACITY),
             tickets: TicketStore::new(),
             inspect: StateReader::new(),
@@ -123,11 +117,6 @@ impl Backend {
     /// Mutable access to the materialized view (for the runtime loop's fold).
     pub fn view_mut(&mut self) -> &mut MaterializedView {
         &mut self.view
-    }
-
-    /// Mutable access to the cost breaker (for the runtime loop's observe).
-    pub fn breaker_mut(&mut self) -> &mut CostBreaker {
-        &mut self.breaker
     }
 
     /// Mutable access to the stream hub (for the runtime loop's publish).
@@ -154,10 +143,9 @@ impl Backend {
 
     /// Construct a backend from explicit services — used by tests.
     #[cfg(test)]
-    pub(crate) fn for_test(agents_dir: PathBuf, view: MaterializedView, breaker: CostBreaker) -> Self {
+    pub(crate) fn for_test(agents_dir: PathBuf, view: MaterializedView) -> Self {
         Self {
             view,
-            breaker,
             hub: StreamHub::new(DEFAULT_SUB_CAPACITY),
             tickets: TicketStore::new(),
             inspect: StateReader::new(),

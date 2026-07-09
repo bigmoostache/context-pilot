@@ -11,7 +11,7 @@
 //! # Layers
 //!
 //! * [`Backend`] — the shared state the runtime loop owns and the handlers read
-//!   (materialized view, cost breaker, stream hub, ticket store, agents dir),
+//!   (materialized view, stream hub, ticket store, agents dir),
 //!   accessed under a single [`Mutex`].
 //! * [`rest`] — request/response handlers returning a transport-agnostic
 //!   [`HttpReply`](rest::HttpReply).

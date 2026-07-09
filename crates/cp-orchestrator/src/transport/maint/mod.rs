@@ -298,7 +298,6 @@ mod tests {
         let user_tok = store.create_session(&user.id, None, ttl).expect("user session");
         let backend = Backend::new(
             dir.path().to_path_buf(),
-            100.0,
             PathBuf::from("/tmp/cp-maint-test-realms"),
             PathBuf::from("/tmp/cp-maint-test-bin"),
             Some(store),
@@ -319,7 +318,6 @@ mod tests {
         let admin = store.create_user("admin@box", "Admin", &test_pw(), UserRole::Admin).expect("admin");
         let backend = Backend::new(
             dir.path().to_path_buf(),
-            100.0,
             PathBuf::from("/tmp/cp-maint-test-realms"),
             PathBuf::from("/tmp/cp-maint-test-bin"),
             Some(store),
@@ -420,7 +418,6 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let backend = Backend::new(
             dir.path().to_path_buf(),
-            100.0,
             PathBuf::from("/tmp/cp-maint-test-realms"),
             PathBuf::from("/tmp/cp-maint-test-bin"),
             None,

@@ -109,7 +109,6 @@ fn write_entry(agents_dir: &Path, entry: &Entry) {
 fn serve_backend(agents_dir: &Path) -> (String, Arc<Mutex<Backend>>) {
     let state = Arc::new(Mutex::new(Backend::new(
         agents_dir.to_path_buf(),
-        5.0,
         std::path::PathBuf::from("/tmp/cp-test-realms"),
         std::path::PathBuf::from("/tmp/cp-test-bin"),
         None,

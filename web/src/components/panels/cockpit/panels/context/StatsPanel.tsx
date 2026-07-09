@@ -36,7 +36,7 @@ export function StatsPanel({ panel, agentId }: { panel: ContextPanel; agentId: s
 
   const inTok = metrics?.tokens?.input ?? 0
   const outTok = metrics?.tokens?.output ?? 0
-  const costUsd = meta?.costUsd ?? metrics?.breaker.spendUsd ?? 0
+  const costUsd = meta?.costUsd ?? 0
 
   return (
     <PanelFrame

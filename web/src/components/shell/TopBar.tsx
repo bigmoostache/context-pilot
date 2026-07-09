@@ -18,13 +18,13 @@ interface TopBarProps {
   onViewChange: (v: ViewMode) => void
   activeAgentId: string
   onSwitchAgent: (id: string) => void
-  /** Raise a "create new agent" request (→ fleet agents page + dialog). */
   onNewAgent: () => void
   agents: Agent[]
 }
 
-/** Slim macOS-style title bar — app mark (→ fleet), workspace switcher,
- *  per-agent view tabs (Threads · Cockpit · Finder), branch, cost, theme. */
+/** Slim macOS-style title bar — app mark, workspace switcher, view tabs, then a
+ *  controls cluster (theme, agent gear, Claude usage, account menu). Complexity
+ *  stays ≤15 by extracting {@link TopBarActions}. */
 export function TopBar({
   view,
   onViewChange,
@@ -34,6 +34,9 @@ export function TopBar({
   agents,
 }: TopBarProps) {
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
+  // OAuth usage/login widget applies ONLY to the OAuth providers (Bearer token
+  // via vault "claude_oauth"). The `anthropic` provider authenticates by
+  // x-api-key (ANTHROPIC_API_KEY) and has no OAuth login, so it's excluded.
   const isClaudeOAuth =
     activeAgent?.provider === "claudecode" || activeAgent?.provider === "claudecodev2"
   const inFleet = view === "fleet"
@@ -46,7 +49,6 @@ export function TopBar({
   return (
     <>
       <header className="vibrancy flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
-        {/* app mark → fleet dashboard (mission control) */}
         <Tip
           title="Mission control"
           body="Back to the fleet — an overview of all your agents."
@@ -64,10 +66,6 @@ export function TopBar({
           </button>
         </Tip>
 
-        {/* Workspace switcher — always present. Inside an agent it shows the
-          active workspace; at fleet altitude (no agent focused) it falls back
-          to a neutral "Select an agent" placeholder so the card never vanishes.
-          Picking an agent here enters it (→ threads view). */}
         <span className="ml-1 text-muted-foreground/40">/</span>
         <AgentSwitcher
           agents={agents}
@@ -84,58 +82,22 @@ export function TopBar({
           onNewAgent={onNewAgent}
         />
 
-        {/* per-agent view switcher (hidden at fleet altitude). */}
         {!inFleet && <ViewTabs view={view} onViewChange={onViewChange} devMode={devMode} />}
 
-        <div className="ml-auto flex items-center gap-3">
-          <Tip title="Appearance" body="Switch between light and dark." side="bottom">
-            <span className="inline-flex">
-              <ThemeToggle />
-            </span>
-          </Tip>
-          <span className="h-5 w-px bg-border/70" />
-          {/* per-agent configuration — the one-click shortcut to the same
-            "Manage <agent>" dialog the fleet exposes, so editing the focused
-            agent no longer needs the four-step switcher journey (T26). Only
-            meaningful inside an agent; sits just left of the global gear so the
-            two cog buttons (agent-scoped vs global) read as a pair. */}
-          {!inFleet && (
-            <Tip
-              title="Agent configuration"
-              body="Rename, switch model, or archive this agent — the same dialog as Manage."
-              side="bottom"
-            >
-              <button
-                onClick={() => setManageOpen(true)}
-                className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
-                aria-label="Configure this agent"
-              >
-                <Settings2 className="size-[17px]" />
-              </button>
-            </Tip>
-          )}
-          {isClaudeOAuth && <UsageButton />}
-          {/* Account avatar menu (T30) — replaced the old top-right Settings
-            gear. The gear's behaviour is preserved: the menu's "Settings" item
-            still opens the same ConfigModal, and "Profile" opens the profile
-            sheet. To revert, restore a <Tip><button onClick={() =>
-            setConfigOpen(true)}><Settings/></button></Tip> here in place of
-            <UserMenu/> (and re-import the Settings icon). */}
-          <UserMenu
-            onOpenSettings={() => setConfigOpen(true)}
-            onOpenProfile={() => setProfileOpen(true)}
-            onOpenUsers={() => setUsersOpen(true)}
-          />
-        </div>
-
-        <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
-        <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
-        <UsersDialog open={usersOpen} onClose={() => setUsersOpen(false)} />
+        <TopBarActions
+          inFleet={inFleet}
+          isClaudeOAuth={isClaudeOAuth}
+          setManageOpen={setManageOpen}
+          setConfigOpen={setConfigOpen}
+          setProfileOpen={setProfileOpen}
+          setUsersOpen={setUsersOpen}
+        />
       </header>
 
-      {/* Rendered as a SIBLING of the .vibrancy header (never a descendant) so its
-        `absolute inset-0` backdrop anchors to the viewport and escapes the
-        header's backdrop-filter containing block. */}
+      <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
+      <UsersDialog open={usersOpen} onClose={() => setUsersOpen(false)} />
+
       {!inFleet && manageOpen && activeAgent && (
         <AgentModal
           modal={{ mode: "manage", agent: activeAgent }}
@@ -143,6 +105,57 @@ export function TopBar({
         />
       )}
     </>
+  )
+}
+
+/** Right-side controls cluster: theme toggle, agent-config gear, Claude Usage
+ *  button, and the account avatar menu. Extracted from {@link TopBar} so both
+ *  components stay within the P8 complexity budget. */
+function TopBarActions({
+  inFleet,
+  isClaudeOAuth,
+  setManageOpen,
+  setConfigOpen,
+  setProfileOpen,
+  setUsersOpen,
+}: {
+  inFleet: boolean
+  isClaudeOAuth: boolean
+  setManageOpen: (v: boolean) => void
+  setConfigOpen: (v: boolean) => void
+  setProfileOpen: (v: boolean) => void
+  setUsersOpen: (v: boolean) => void
+}) {
+  return (
+    <div className="ml-auto flex items-center gap-3">
+      <Tip title="Appearance" body="Switch between light and dark." side="bottom">
+        <span className="inline-flex">
+          <ThemeToggle />
+        </span>
+      </Tip>
+      <span className="h-5 w-px bg-border/70" />
+      {!inFleet && (
+        <Tip
+          title="Agent configuration"
+          body="Rename, switch model, or archive this agent — the same dialog as Manage."
+          side="bottom"
+        >
+          <button
+            onClick={() => setManageOpen(true)}
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
+            aria-label="Configure this agent"
+          >
+            <Settings2 className="size-[17px]" />
+          </button>
+        </Tip>
+      )}
+      {isClaudeOAuth && <UsageButton />}
+      <UserMenu
+        onOpenSettings={() => setConfigOpen(true)}
+        onOpenProfile={() => setProfileOpen(true)}
+        onOpenUsers={() => setUsersOpen(true)}
+      />
+    </div>
   )
 }
 
@@ -174,9 +187,7 @@ function ViewTab({
 }
 
 /** Per-agent view switcher (Threads · Finder · Cockpit · Costs). Cockpit + Costs
- *  are dev-mode only. Extracted from {@link TopBar} so its tab cluster + the two
- *  `devMode` gates don't count against the bar's complexity budget. Each tab
- *  carries a tooltip since the names aren't obvious to a first-time user. */
+ *  are dev-mode only. */
 function ViewTabs({
   view,
   onViewChange,

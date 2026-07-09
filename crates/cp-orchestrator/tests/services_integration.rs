@@ -1,4 +1,4 @@
-//! Phase 29 — the backend **services** (`MaterializedView`, `CostBreaker`,
+//! Phase 29 — the backend **services** (`MaterializedView`,
 //! `StreamHub`) driven *together* against a **real oplog**, through their
 //! public APIs.
 //!
@@ -9,9 +9,9 @@
 //! restart-rebuild path, and the cross-service wiring (R2-17 reconcile,
 //! per-agent isolation).
 //!
-//! * **Restart rebuild end-to-end (I5 + V9).** A real oplog is replayed through
-//!   the [`Tailer`] into a fresh [`MaterializedView`]; the [`CostBreaker`] then
-//!   rebuilds its trip state from that view — exactly the backend-restart path.
+//! * **Restart rebuild end-to-end (I5).** A real oplog is replayed through
+//!   the [`Tailer`] into a fresh [`MaterializedView`] — exactly the
+//!   backend-restart path.
 //! * **A real segment-roll checkpoint folds to the correct heads (I5).** A roll
 //!   stamps a leading authoritative `Checkpoint`; folding the full stream
 //!   (checkpoint included) still yields the ground-truth final heads.
@@ -19,8 +19,7 @@
 //!   reconciled from the authoritative snapshot the [`MaterializedView`] holds,
 //!   folded from the real oplog.
 //! * **Fleet isolation across all three services.** Two agents, two oplogs:
-//!   the view keeps two isolated projections, the breaker trips only the
-//!   overspender, the hub fans per-agent.
+//!   the view keeps two isolated projections and the hub fans per-agent.
 
 // Linked into this integration-test target but not named directly; acknowledge
 // them for the per-target `unused-crate-dependencies` lint.
@@ -50,7 +49,7 @@ use std::path::Path;
 use cp_oplog::service::Service as OplogService;
 
 use cp_orchestrator::channel::Tailer;
-use cp_orchestrator::services::{CostBreaker, MaterializedView, StreamHub, Verdict};
+use cp_orchestrator::services::{MaterializedView, StreamHub};
 
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::stream::{Frame, Kind as StreamKind};
@@ -95,7 +94,7 @@ fn tail_all(oplog_dir: &Path) -> Vec<cp_wire::types::oplog::OpEntry> {
 // ── 1. restart rebuild end-to-end (I5 + V9) ─────────────────────────────────
 
 #[test]
-fn a_fresh_view_and_breaker_rebuild_from_a_real_oplog_after_restart() {
+fn a_fresh_view_rebuilds_from_a_real_oplog_after_restart() {
     let dir = tempdir().expect("dir");
 
     // The agent journals a realistic mix: heads, a phase, rising cost.
@@ -111,7 +110,7 @@ fn a_fresh_view_and_breaker_rebuild_from_a_real_oplog_after_restart() {
     }
 
     // Backend restart: replay the durable oplog through the Tailer into a fresh
-    // view, then rebuild the breaker from that view.
+    // view.
     let entries = tail_all(dir.path());
     let mut view = MaterializedView::new();
     view.apply_batch("a1", &entries);
@@ -122,14 +121,6 @@ fn a_fresh_view_and_breaker_rebuild_from_a_real_oplog_after_restart() {
     assert_eq!(t1.last_message_hash, ContentHash::new([0x12; 32]), "newest T1 head wins");
     assert!(agent.heads.threads.iter().any(|h| h.thread_id == "T2"), "T2 head present");
     assert!((agent.cost.cost_usd - 9.0).abs() < f64::EPSILON, "latest cumulative cost");
-
-    let mut breaker = CostBreaker::new(5.0);
-    breaker.rebuild_from_view(&view);
-    assert_eq!(
-        breaker.check("a1"),
-        Verdict::Tripped,
-        "the trip state is reconstructed from the durable oplog after restart (V9)",
-    );
 }
 
 // ── 2. a real segment-roll checkpoint folds to the correct heads (I5) ───────
@@ -206,7 +197,7 @@ fn a_degraded_subscriber_reconciles_from_the_views_oplog_snapshot() {
 // ── 4. fleet isolation across all three services ────────────────────────────
 
 #[test]
-fn two_agents_stay_isolated_across_view_breaker_and_hub() {
+fn two_agents_stay_isolated_across_view_and_hub() {
     let spender = tempdir().expect("spender dir");
     let thrifty = tempdir().expect("thrifty dir");
     {
@@ -226,12 +217,6 @@ fn two_agents_stay_isolated_across_view_breaker_and_hub() {
     view.apply_batch("spender", &tail_all(spender.path()));
     view.apply_batch("thrifty", &tail_all(thrifty.path()));
     assert_eq!(view.len(), 2, "two distinct agent projections");
-
-    // The breaker trips only the overspender.
-    let mut breaker = CostBreaker::new(5.0);
-    breaker.rebuild_from_view(&view);
-    assert_eq!(breaker.check("spender"), Verdict::Tripped);
-    assert_eq!(breaker.check("thrifty"), Verdict::Allowed);
 
     // The hub fans per-agent: a frame for `spender` never reaches `thrifty`.
     let mut hub = StreamHub::new(8);

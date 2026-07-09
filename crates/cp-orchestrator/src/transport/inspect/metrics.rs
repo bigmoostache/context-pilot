@@ -1,15 +1,12 @@
 //! §19 observability — per-agent and fleet **metrics** endpoints.
 //!
 //! The design doc's observability clause (§19) requires the backend to surface,
-//! per agent: durable cost-breaker state, stream health (subscriber count +
-//! dropped/coalesced frames + degraded flag), and the view-vs-oplog rev lag —
-//! so an operator (and the cockpit) can *see* a tripped breaker or a lagging
-//! projection instead of inferring it from behaviour. This module exposes that
-//! slice from state the backend already collects:
+//! per agent: stream health (subscriber count + dropped/coalesced frames +
+//! degraded flag), and the view-vs-oplog rev lag — so an operator (and the
+//! cockpit) can *see* a lagging projection instead of inferring it from
+//! behaviour. This module exposes that slice from state the backend already
+//! collects:
 //!
-//! * **breaker** — [`CostBreaker`](crate::services::CostBreaker) high-water
-//!   spend, budget, and trip verdict (the durable R2-8 latch made visible: a
-//!   tripped breaker is reported here, not left a silent backend state).
 //! * **stream** — [`StreamHub`](crate::services::StreamHub) aggregate health:
 //!   live subscriber count, total dropped frames, any-degraded.
 //! * **rev** — the [`MaterializedView`](crate::services::MaterializedView)'s
@@ -72,25 +69,21 @@ pub fn fleet_metrics(state: &Mutex<Backend>, auth_user: Option<&crate::services:
 
 // ── Builder ────────────────────────────────────────────────────────────
 
-/// Assemble one agent's metrics object from the breaker, hub, and view.
+/// Assemble one agent's metrics object from the hub and view.
 ///
 /// Holds the backend lock once for every in-memory read, then computes the
 /// oplog head `rev` from disk *outside* the lock (a metrics call must never
 /// block a command path on I/O).
 fn build_metrics(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde_json::Value {
     let snapshot = state.lock().ok().map(|b| {
-        let tripped = b.breaker.is_tripped(agent_id);
-        let spend = b.breaker.spend_of(agent_id).unwrap_or(0.0);
-        let budget = b.breaker.budget();
         let (subs, dropped, degraded) = b.hub.agent_stream_health(agent_id);
         let (view_rev, phase, lifecycle, in_tok, out_tok) = b.view.get(agent_id).map_or((0, None, None, 0, 0), |v| {
             (v.rev, v.phase, v.lifecycle, v.cost.input_tokens, v.cost.output_tokens)
         });
-        (tripped, spend, budget, subs, dropped, degraded, view_rev, phase, lifecycle, in_tok, out_tok)
+        (subs, dropped, degraded, view_rev, phase, lifecycle, in_tok, out_tok)
     });
 
-    let Some((tripped, spend, budget, subs, dropped, degraded, view_rev, phase, lifecycle, in_tok, out_tok)) = snapshot
-    else {
+    let Some((subs, dropped, degraded, view_rev, phase, lifecycle, in_tok, out_tok)) = snapshot else {
         return serde_json::json!({ "id": agent_id, "error": "backend lock poisoned" });
     };
 
@@ -101,11 +94,6 @@ fn build_metrics(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde
 
     serde_json::json!({
         "id": agent_id,
-        "breaker": {
-            "tripped": tripped,
-            "spendUsd": spend,
-            "budgetUsd": budget,
-        },
         "stream": {
             "subscribers": subs,
             "droppedFrames": dropped,
