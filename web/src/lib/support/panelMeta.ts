@@ -21,10 +21,9 @@ export function fmtCost(n: number): string {
 }
 
 /**
- * Shared content width for the whole fleet home (the Agents ⇄ Prompts shell and
- * both its sub-pages centre on this so their left/right edges line up as you
- * flip between tabs). Lives here — a leaf presentation-token module — rather
- * than in FleetShell so the two sub-pages (FleetDashboard, PromptsPage) can
- * import it without forming an import cycle with the shell that renders them.
+ * Shared content width for the fleet dashboard (FleetDashboard centres its
+ * content on this). Lives here — a leaf presentation-token module — rather than
+ * in the dashboard component so it can be imported without any layout-shell
+ * dependency.
  */
 export const FLEET_MAX_W = "max-w-[960px]"

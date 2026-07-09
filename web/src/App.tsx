@@ -5,7 +5,7 @@ import { TopBar } from "@/components/shell/TopBar"
 import { CostsView } from "@/components/shell/costs/CostsView"
 import { StatusBar } from "@/components/shell/StatusBar"
 import { ThreadsView } from "@/components/threads/ThreadsView"
-import { FleetShell } from "@/components/agents/FleetShell"
+import { FleetDashboard } from "@/components/agents/FleetDashboard"
 import { Finder } from "@/components/finder/Finder"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AuthGuard } from "@/components/auth/AuthGuard"
@@ -147,11 +147,11 @@ function AppShell() {
   const renderView = () => {
     if (effectiveView === "fleet") {
       return (
-        <FleetShell
+        <FleetDashboard
           agents={agents}
           onOpenAgent={openAgent}
-          openCreate={createAgent}
-          onCreateConsumed={() => setCreateAgent(false)}
+          autoCreate={createAgent}
+          onAutoCreateConsumed={() => setCreateAgent(false)}
         />
       )
     }
