@@ -69,13 +69,22 @@ function IdentityPhase({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
-      <Field label="DNS name" hint="optional" value={name} onChange={setName} placeholder="pilot.acme.corp" autoFocus />
+      <Field
+        label="DNS name"
+        hint="optional"
+        value={name}
+        onChange={setName}
+        placeholder="pilot.acme.corp"
+        autoFocus
+      />
       <Field label="LAN IP address" value={ip} onChange={setIp} placeholder="192.168.1.116" />
       <p className="-mt-1 text-[11px] text-muted-foreground">
         Saving issues the TLS certificate for this name/IP and brings the secure (https) site up.
         Use a static lease so the address doesn't change.
       </p>
-      {error && <div className="rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">{error}</div>}
+      {error && (
+        <div className="rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">{error}</div>
+      )}
       <button
         type="submit"
         disabled={ip.trim() === "" || busy}
@@ -123,16 +132,20 @@ function TrustPhase({ onContinue }: { onContinue: () => void }) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        Install this certificate-authority root as trusted on every client (push it via Group
-        Policy or your MDM). Verify the fingerprint below out-of-band before trusting it.
+        Install this certificate-authority root as trusted on every client (push it via Group Policy
+        or your MDM). Verify the fingerprint below out-of-band before trusting it.
       </p>
 
       <div className="rounded-md border border-border bg-background p-3">
         <div className="mb-1 text-xs font-medium text-foreground/90">SHA-256 fingerprint</div>
-        <div className="font-mono text-xs break-all text-foreground">{fingerprint ?? "loading…"}</div>
+        <div className="font-mono text-xs break-all text-foreground">
+          {fingerprint ?? "loading…"}
+        </div>
       </div>
 
-      {error && <div className="rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">{error}</div>}
+      {error && (
+        <div className="rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">{error}</div>
+      )}
 
       <button
         type="button"

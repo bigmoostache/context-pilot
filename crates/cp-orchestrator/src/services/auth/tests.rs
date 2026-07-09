@@ -3,6 +3,13 @@
 use super::super::types::AgentRole;
 use super::*;
 
+/// A throwaway password for tests. Generated at runtime (never a string
+/// literal) so CodeQL's hard-coded-credential scan has nothing to flag — the
+/// exact value is irrelevant since no test re-authenticates with it.
+fn test_password() -> String {
+    AuthStore::generate_token()
+}
+
 #[test]
 fn schema_creates_tables() {
     let store = AuthStore::open(Path::new(":memory:")).unwrap_or_else(|err| {
@@ -101,7 +108,7 @@ fn migration_widens_check() {
     assert_eq!(user_role, "user", "legacy user unchanged");
     // The widened CHECK now admits a manager.
     let _manager = store
-        .create_user("m@x", "Mgr", "pass1234", UserRole::Manager)
+        .create_user("m@x", "Mgr", &test_password(), UserRole::Manager)
         .unwrap_or_else(|err| panic!("manager insert should succeed post-migration: {err}"));
 }
 
@@ -110,8 +117,9 @@ fn migration_widens_check() {
 #[test]
 fn migration_idempotent() {
     let store = AuthStore::open(Path::new(":memory:")).unwrap_or_else(|err| panic!("open failed: {err}"));
-    let _s = store.create_user("s@x", "S", "pass1234", UserRole::Superadmin).unwrap_or_else(|err| panic!("{err}"));
-    let _u = store.create_user("u@x", "U", "pass1234", UserRole::User).unwrap_or_else(|err| panic!("{err}"));
+    let _s =
+        store.create_user("s@x", "S", &test_password(), UserRole::Superadmin).unwrap_or_else(|err| panic!("{err}"));
+    let _u = store.create_user("u@x", "U", &test_password(), UserRole::User).unwrap_or_else(|err| panic!("{err}"));
     store.init_schema().unwrap_or_else(|err| panic!("second init_schema failed: {err}"));
     assert_eq!(store.count_users().unwrap_or(0), 2, "no rows added or dropped");
     let role: String =
@@ -136,7 +144,7 @@ fn create_and_get_user() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("alice@example.com", "Alice", "password123", UserRole::Admin)
+        .create_user("alice@example.com", "Alice", &test_password(), UserRole::Admin)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     assert_eq!(user.email, "alice@example.com");
     assert_eq!(user.name, "Alice");
@@ -166,7 +174,7 @@ fn list_and_count_users() {
     });
     assert_eq!(store.count_users().unwrap_or(99), 0);
     let _u1 = store
-        .create_user("a@x.com", "A", "pass1234", UserRole::Admin)
+        .create_user("a@x.com", "A", &test_password(), UserRole::Admin)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     let _u2 = store
         .create_user("b@x.com", "B", "pass5678", UserRole::User)
@@ -182,7 +190,7 @@ fn delete_user_cascades() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("del@x.com", "Del", "pass1234", UserRole::User)
+        .create_user("del@x.com", "Del", &test_password(), UserRole::User)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     let token = store
         .create_session(&user.id, None, Duration::from_secs(3600))
@@ -200,7 +208,7 @@ fn session_lifecycle() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("sess@x.com", "Sess", "pass1234", UserRole::User)
+        .create_user("sess@x.com", "Sess", &test_password(), UserRole::User)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     let token = store
         .create_session(&user.id, Some("test-agent"), Duration::from_secs(3600))
@@ -223,7 +231,7 @@ fn expired_session_swept() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("exp@x.com", "Exp", "pass1234", UserRole::User)
+        .create_user("exp@x.com", "Exp", &test_password(), UserRole::User)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     // Create a session that's already expired (TTL = 0).
     let token =
@@ -240,7 +248,7 @@ fn grant_and_check_access() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("acl@x.com", "Acl", "pass1234", UserRole::User)
+        .create_user("acl@x.com", "Acl", &test_password(), UserRole::User)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     // No access initially.
     let access = store.check_access("agent-1", &user.id).unwrap_or_else(|err| panic!("check failed: {err}"));
@@ -260,7 +268,7 @@ fn update_agent_role() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("role@x.com", "Role", "pass1234", UserRole::User)
+        .create_user("role@x.com", "Role", &test_password(), UserRole::User)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
         .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
@@ -278,7 +286,7 @@ fn revoke_access() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("rev-acl@x.com", "RevAcl", "pass1234", UserRole::User)
+        .create_user("rev-acl@x.com", "RevAcl", &test_password(), UserRole::User)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
         .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
@@ -295,7 +303,7 @@ fn list_agent_users_and_user_agents() {
         panic!("open failed: {err}");
     });
     let alice = store
-        .create_user("alice-acl@x.com", "Alice", "pass1234", UserRole::User)
+        .create_user("alice-acl@x.com", "Alice", &test_password(), UserRole::User)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     let bob = store
         .create_user("bob-acl@x.com", "Bob", "pass5678", UserRole::User)
@@ -331,7 +339,7 @@ fn delete_user_cascades_acl() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("del-acl@x.com", "DelAcl", "pass1234", UserRole::User)
+        .create_user("del-acl@x.com", "DelAcl", &test_password(), UserRole::User)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
         .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
@@ -347,7 +355,7 @@ fn grant_overwrites_previous() {
         panic!("open failed: {err}");
     });
     let user = store
-        .create_user("ow@x.com", "Ow", "pass1234", UserRole::User)
+        .create_user("ow@x.com", "Ow", &test_password(), UserRole::User)
         .unwrap_or_else(|err| panic!("create failed: {err}"));
     store
         .grant_access("agent-1", &user.id, AgentRole::AgentUser, None)
