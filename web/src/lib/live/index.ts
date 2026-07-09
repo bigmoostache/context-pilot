@@ -20,30 +20,13 @@
 // The imperative finder/agent mutations live in ./mutations and are re-exported
 // here so `@/lib/live` stays the single import surface.
 
-import { useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { mergeThreadLogs, qk } from "../query/sync"
-import { getOrCreateSseClient } from "../query/sse"
 import { measure } from "../support/telemetry"
 import { useLive, type LiveQueryResult } from "./core"
 import * as api from "../api"
 
-import type {
-  Agent,
-  ContextPanel,
-  MemoryCard,
-  TodoItem,
-  SpineNotif,
-  QueueAction,
-  ScratchCell,
-  TreeRow,
-  CallbackRow,
-  ToolGroup,
-  EntityTable,
-  ThreadDetail,
-  LibraryItem,
-  FinderNode,
-} from "../types"
+import type { Agent, ThreadDetail, LibraryItem, FinderNode } from "../types"
 
 export * from "./mutations"
 
@@ -88,92 +71,6 @@ export function useThreads(agentId: string): LiveQueryResult<ThreadDetail[]> {
     },
     { agentId, enabled: !!agentId },
   )
-}
-
-// Context-panel weights power the cockpit/HUD context-budget meter. They are
-// pure tier-② inspection reads with NO oplog delta to fold (panel token sizes
-// are private agent working-set state, never journaled), so the only freshness
-// mechanism is the poll. The default 15s backstop made the context meter feel
-// frozen (T297); a brisk poll keeps it tracking within a few seconds. The
-// backend read is mtime-cached, so an unchanged config.json is cheap to re-poll.
-const PANELS_POLL_MS = 4000
-
-export function usePanels(agentId: string): LiveQueryResult<ContextPanel[]> {
-  return useLive(qk.panels(agentId), () => api.fetchPanels(agentId), {
-    agentId,
-    enabled: !!agentId,
-    pollMs: PANELS_POLL_MS,
-  })
-}
-
-export function useMemory(agentId: string): LiveQueryResult<MemoryCard[]> {
-  return useLive(qk.memory(agentId), () => api.fetchMemory(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useTodos(agentId: string): LiveQueryResult<TodoItem[]> {
-  return useLive(qk.todos(agentId), () => api.fetchTodos(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useSpine(agentId: string): LiveQueryResult<SpineNotif[]> {
-  return useLive(qk.spine(agentId), () => api.fetchSpine(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useQueue(agentId: string): LiveQueryResult<QueueAction[]> {
-  return useLive(qk.queue(agentId), () => api.fetchQueue(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useScratchpad(agentId: string): LiveQueryResult<ScratchCell[]> {
-  return useLive(qk.scratchpad(agentId), () => api.fetchScratchpad(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useTree(agentId: string): LiveQueryResult<TreeRow[]> {
-  return useLive(qk.tree(agentId), () => api.fetchTree(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useCallbacks(agentId: string): LiveQueryResult<CallbackRow[]> {
-  return useLive(qk.callbacks(agentId), () => api.fetchCallbacks(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useTools(agentId: string): LiveQueryResult<ToolGroup[]> {
-  return useLive(qk.tools(agentId), () => api.fetchTools(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useRadar(agentId: string): LiveQueryResult<api.RadarData> {
-  return useLive(qk.radar(agentId), () => api.fetchRadar(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-export function useEntities(agentId: string): LiveQueryResult<EntityTable[]> {
-  return useLive(qk.entities(agentId), () => api.fetchEntities(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
 }
 
 // ── Finder hooks ──────────────────────────────────────────────────────
@@ -247,102 +144,6 @@ export function useFsSheet(
     enabled: enabled && !!agentId && !!path,
     pollMs: 0,
   })
-}
-
-export function useConversation(agentId: string): LiveQueryResult<api.ConversationMsg[]> {
-  return useLive(qk.conversation(agentId), () => api.fetchConversation(agentId), {
-    agentId,
-    enabled: !!agentId,
-  })
-}
-
-// ── Live token streaming (§7 stream plane) ────────────────────────────
-//
-// The durable conversation (`useConversation`) is the authoritative record,
-// but it only updates once a message is flushed to disk. While the assistant
-// is *typing*, the only source of the in-progress text is the ephemeral stream
-// plane: the agent tees `Token` frames → backend `StreamHub` → SSE `stream`
-// event. This hook consumes that channel and exposes a live, per-message text
-// buffer for the conversation view to paint in real time.
-//
-// **§7 mandatory contract — rAF batching.** Tokens can arrive dozens of times
-// per second; calling `setState` per token would thrash React. Instead each
-// token is appended to a mutable ref buffer and a single state snapshot is
-// flushed once per `requestAnimationFrame`. State updates are therefore capped
-// at the display refresh rate (~60fps) no matter how fast tokens stream.
-//
-// The returned map is keyed by `message_id` (= the agent's `Message::id`, the
-// same id the durable `MessageCreated`/conversation entry carries), so the
-// view can correlate a live buffer with its durable message and reconcile
-// (stop overriding) once the durable text catches up.
-
-/** Per-message accumulated streaming text, keyed by `message_id`. */
-export type LiveTokens = Record<string, string>
-
-export function useStreamingTokens(agentId: string): LiveTokens {
-  const [tokens, setTokens] = useState<LiveTokens>({})
-  // Accumulation buffer — mutated synchronously on every token, snapshotted
-  // into React state once per animation frame (never per token).
-  const bufRef = useRef<LiveTokens>({})
-  const dirtyRef = useRef(false)
-  const rafRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    if (!agentId) return
-    const client = getOrCreateSseClient(agentId)
-
-    const flush = () => {
-      rafRef.current = null
-      if (!dirtyRef.current) return
-      dirtyRef.current = false
-      // The per-frame token flush spreads the whole accumulation buffer and
-      // triggers a conversation re-render. On a very long streamed message this
-      // is a live-updating suspect the SSE-delta/poll probes don't cover — name
-      // it so a stall landing here is attributed to token streaming.
-      measure("stream:flush", () => setTokens({ ...bufRef.current })) // one snapshot per frame
-    }
-    const schedule = () => {
-      if (rafRef.current != null) return
-      rafRef.current = requestAnimationFrame(flush)
-    }
-
-    // Reset buffers when the agent changes (a new realm = a new stream) and
-    // schedule an empty flush — never call setState synchronously in the
-    // effect body (react-hooks/set-state-in-effect); the clear lands on the
-    // next animation frame alongside the same rAF-batching contract.
-    bufRef.current = {}
-    dirtyRef.current = true
-    schedule()
-
-    const unsub = client.subscribe("stream", (event) => {
-      let frame: {
-        message_id?: string
-        kind?: { kind?: string; text?: string }
-      }
-      try {
-        frame = measure("stream:parse", () => JSON.parse(event.data) as typeof frame)
-      } catch {
-        return
-      }
-      // Internally-tagged wire enum: Token → {"kind":"token","text":"…"}.
-      if (frame.kind?.kind !== "token") return
-      const id = frame.message_id
-      if (!id) return
-      bufRef.current[id] = (bufRef.current[id] ?? "") + (frame.kind.text ?? "")
-      dirtyRef.current = true
-      schedule()
-    })
-
-    return () => {
-      unsub()
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
-      rafRef.current = null
-      bufRef.current = {}
-      dirtyRef.current = false
-    }
-  }, [agentId])
-
-  return tokens
 }
 
 // ── Metrics (§19 observability — agent-scoped) ────────────────────────

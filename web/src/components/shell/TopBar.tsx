@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { LayoutGrid, MessagesSquare, FolderTree, Home, Settings2, BarChart3 } from "lucide-react"
+import { MessagesSquare, FolderTree, Home, Settings2, BarChart3 } from "lucide-react"
 import { ThemeToggle } from "./widgets/ThemeToggle"
 import { AgentSwitcher } from "./widgets/AgentSwitcher"
 import { UsageButton } from "./widgets/UsageButton"
@@ -24,7 +24,7 @@ interface TopBarProps {
 }
 
 /** Slim macOS-style title bar — app mark (→ fleet), workspace switcher,
- *  per-agent view tabs (Threads · Cockpit · Finder), branch, cost, theme. */
+ *  per-agent view tabs (Threads · Finder), branch, cost, theme. */
 export function TopBar({
   view,
   onViewChange,
@@ -173,9 +173,9 @@ function ViewTab({
   )
 }
 
-/** Per-agent view switcher (Threads · Finder · Cockpit · Costs). Cockpit + Costs
- *  are dev-mode only. Extracted from {@link TopBar} so its tab cluster + the two
- *  `devMode` gates don't count against the bar's complexity budget. Each tab
+/** Per-agent view switcher (Threads · Finder · Costs). Costs
+ *  is dev-mode only. Extracted from {@link TopBar} so its tab cluster + the
+ *  `devMode` gate don't count against the bar's complexity budget. Each tab
  *  carries a tooltip since the names aren't obvious to a first-time user. */
 function ViewTabs({
   view,
@@ -210,19 +210,6 @@ function ViewTabs({
           label="Finder"
         />
       </Tip>
-      {devMode && (
-        <Tip
-          title="Cockpit"
-          body="Look inside the agent's mind: its live context panels — memory, todos, stats and more."
-        >
-          <ViewTab
-            active={view === "cockpit"}
-            onClick={() => onViewChange("cockpit")}
-            icon={LayoutGrid}
-            label="Cockpit"
-          />
-        </Tip>
-      )}
       {devMode && (
         <Tip
           title="Cost Analysis"

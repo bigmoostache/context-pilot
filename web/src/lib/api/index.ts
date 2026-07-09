@@ -14,25 +14,15 @@
 // `ThrowOnError = false`, hence the `as` casts below — they align the
 // compile-time type with the runtime guarantee.
 
-import type { Agent, ContextPanel, ThreadDetail } from "../types"
+import type { Agent, ThreadDetail } from "../types"
 import type {
   AgentMetrics,
-  CallbackRow,
   CommandReceipt as GenCommandReceipt,
   CreateAgentReceipt,
   CreateCommandReceipt,
-  EntityTable,
   LibraryItem,
-  MemoryCard,
-  QueueAction,
-  RadarData,
   RestartReceipt,
   RetireReceipt,
-  ScratchCell,
-  SpineNotif,
-  TodoItem,
-  ToolGroup,
-  TreeRow,
   UnretireReceipt,
   Vital,
   ClaudeUsageResponse,
@@ -46,21 +36,10 @@ import {
   getApiFleetMeta,
   getApiFleetRetired,
   getApiAgentByIdMeta,
-  getApiAgentByIdPanels,
-  getApiAgentByIdTools,
-  getApiAgentByIdRadar,
-  getApiAgentByIdEntities,
   getApiAgentByIdMetrics,
   getApiAgentByIdVitals,
   getApiAgentByIdLibrary,
   getApiAgentByIdThreads,
-  getApiAgentByIdMemory,
-  getApiAgentByIdTodos,
-  getApiAgentByIdSpine,
-  getApiAgentByIdQueue,
-  getApiAgentByIdScratchpad,
-  getApiAgentByIdTree,
-  getApiAgentByIdCallbacks,
   getApiProviders,
   getApiReleases,
   putApiReleasesArch,
@@ -93,7 +72,6 @@ export * from "./envKeys"
 export type { CreateAgentReceipt } from "./generated/types.gen"
 export type { RestartReceipt } from "./generated/types.gen"
 export type { RetireReceipt, UnretireReceipt } from "./generated/types.gen"
-export type { RadarData } from "./generated/types.gen"
 export type { AgentMetrics } from "./generated/types.gen"
 export type { Vital } from "./generated/types.gen"
 export type { CreateCommandReceipt } from "./generated/types.gen"
@@ -161,27 +139,7 @@ export function avatarUrl(agentId: string, cacheBust?: number): string {
   return `${base}/api/agent/${agentId}/avatar${v}`
 }
 
-// ── Panels (SDK) ──────────────────────────────────────────────────────
-
-export function fetchPanels(agentId: string): Promise<ContextPanel[]> {
-  return sdk(getApiAgentByIdPanels({ path: { id: agentId } }))
-}
-
 // ── Tools / Radar / Entities (SDK) ────────────────────────────────────
-
-export function fetchTools(agentId: string): Promise<ToolGroup[]> {
-  return sdk(getApiAgentByIdTools({ path: { id: agentId } }))
-}
-
-export function fetchRadar(agentId: string): Promise<RadarData> {
-  return sdk(getApiAgentByIdRadar({ path: { id: agentId } }))
-}
-
-export function fetchEntities(agentId: string): Promise<EntityTable[]> {
-  return sdk(getApiAgentByIdEntities({ path: { id: agentId } }))
-}
-
-// ── Metrics / Vitals (SDK) ────────────────────────────────────────────
 
 export function fetchMetrics(agentId: string): Promise<AgentMetrics> {
   return sdk(getApiAgentByIdMetrics({ path: { id: agentId } }))
@@ -349,48 +307,6 @@ export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
       })),
     }
   })
-}
-
-// ── Memory (SDK) ──────────────────────────────────────────────────────
-
-export function fetchMemory(agentId: string): Promise<MemoryCard[]> {
-  return sdk(getApiAgentByIdMemory({ path: { id: agentId } }))
-}
-
-// ── Todos (SDK) ───────────────────────────────────────────────────────
-
-export function fetchTodos(agentId: string): Promise<TodoItem[]> {
-  return sdk(getApiAgentByIdTodos({ path: { id: agentId } }))
-}
-
-// ── Spine (SDK) ───────────────────────────────────────────────────────
-
-export function fetchSpine(agentId: string): Promise<SpineNotif[]> {
-  return sdk(getApiAgentByIdSpine({ path: { id: agentId } }))
-}
-
-// ── Queue (SDK) ───────────────────────────────────────────────────────
-
-export function fetchQueue(agentId: string): Promise<QueueAction[]> {
-  return sdk(getApiAgentByIdQueue({ path: { id: agentId } }))
-}
-
-// ── Scratchpad (SDK) ──────────────────────────────────────────────────
-
-export function fetchScratchpad(agentId: string): Promise<ScratchCell[]> {
-  return sdk(getApiAgentByIdScratchpad({ path: { id: agentId } }))
-}
-
-// ── Tree (SDK) ────────────────────────────────────────────────────────
-
-export function fetchTree(agentId: string): Promise<TreeRow[]> {
-  return sdk(getApiAgentByIdTree({ path: { id: agentId } }))
-}
-
-// ── Callbacks (SDK) ───────────────────────────────────────────────────
-
-export function fetchCallbacks(agentId: string): Promise<CallbackRow[]> {
-  return sdk(getApiAgentByIdCallbacks({ path: { id: agentId } }))
 }
 
 // ── Claude Code usage (SDK) ───────────────────────────────────────────
