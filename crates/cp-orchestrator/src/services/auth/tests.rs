@@ -68,6 +68,57 @@ fn user_role_roundtrip() {
     assert_eq!(UserRole::from_sql("unknown"), UserRole::User);
 }
 
+/// V0.3a — a legacy 2-role DB is rebuilt on `init_schema`: the `admin` row maps
+/// to `superadmin`, the `user` row is untouched, and a `manager` insert (barred
+/// by the old CHECK) now succeeds.
+#[test]
+fn migration_widens_check() {
+    let conn = Connection::open_in_memory().unwrap_or_else(|err| panic!("open failed: {err}"));
+    conn.execute_batch(
+        "CREATE TABLE users (
+             id TEXT PRIMARY KEY,
+             email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+             name TEXT NOT NULL,
+             password_hash TEXT NOT NULL,
+             role TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('admin', 'user')),
+             must_change_password INTEGER NOT NULL DEFAULT 0,
+             created_at INTEGER NOT NULL,
+             updated_at INTEGER NOT NULL
+         );
+         INSERT INTO users VALUES ('a', 'admin@x', 'Admin', 'h', 'admin', 0, 0, 0);
+         INSERT INTO users VALUES ('u', 'user@x', 'User', 'h', 'user', 0, 0, 0);",
+    )
+    .unwrap_or_else(|err| panic!("seed legacy schema failed: {err}"));
+
+    let store = AuthStore { conn };
+    store.init_schema().unwrap_or_else(|err| panic!("init_schema failed: {err}"));
+
+    let admin_role: String =
+        store.conn.query_row("SELECT role FROM users WHERE id = 'a'", [], |r| r.get(0)).unwrap_or_default();
+    assert_eq!(admin_role, "superadmin", "legacy admin must map to superadmin");
+    let user_role: String =
+        store.conn.query_row("SELECT role FROM users WHERE id = 'u'", [], |r| r.get(0)).unwrap_or_default();
+    assert_eq!(user_role, "user", "legacy user unchanged");
+    // The widened CHECK now admits a manager.
+    let _manager = store
+        .create_user("m@x", "Mgr", "pass1234", UserRole::Manager)
+        .unwrap_or_else(|err| panic!("manager insert should succeed post-migration: {err}"));
+}
+
+/// V0.3b — running `init_schema` twice is a no-op: row count and roles are
+/// unchanged on the second pass.
+#[test]
+fn migration_idempotent() {
+    let store = AuthStore::open(Path::new(":memory:")).unwrap_or_else(|err| panic!("open failed: {err}"));
+    let _s = store.create_user("s@x", "S", "pass1234", UserRole::Superadmin).unwrap_or_else(|err| panic!("{err}"));
+    let _u = store.create_user("u@x", "U", "pass1234", UserRole::User).unwrap_or_else(|err| panic!("{err}"));
+    store.init_schema().unwrap_or_else(|err| panic!("second init_schema failed: {err}"));
+    assert_eq!(store.count_users().unwrap_or(0), 2, "no rows added or dropped");
+    let role: String =
+        store.conn.query_row("SELECT role FROM users WHERE email = 's@x'", [], |r| r.get(0)).unwrap_or_default();
+    assert_eq!(role, "superadmin", "roles unchanged on idempotent re-run");
+}
+
 #[test]
 fn agent_role_roundtrip() {
     use super::super::types::AgentRole;

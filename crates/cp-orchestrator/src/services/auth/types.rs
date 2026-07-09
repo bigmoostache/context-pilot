@@ -28,13 +28,23 @@ impl From<rusqlite::Error> for AuthError {
 
 // ──────────────────────────── domain types ────────────────────────────
 
-/// System-level role — controls orchestrator-wide permissions.
+/// System-level role — controls orchestrator-wide permissions (design §13.2).
+///
+/// The four roles form a **total order**; higher roles subsume every capability
+/// of lower ones. Enforcement code never matches a role name directly — it tests
+/// a [capability](super::capabilities) instead, so the ordering below is the
+/// single source of truth the whole matrix derives from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum UserRole {
-    /// God-mode: implicit access to all agents, can manage users.
+    /// Vendor god-mode (rank 4): everything, including provider secrets;
+    /// invisible to the client (FR-v3-05).
+    Superadmin,
+    /// Client top account (rank 3): everything a manager does + IT infra.
     Admin,
-    /// Regular authenticated user.
+    /// Client power user (rank 2): manage all agents + manage users of lower rank.
+    Manager,
+    /// Regular employee (rank 1): own agents + share access via the ACL.
     User,
 }
 
@@ -42,15 +52,50 @@ impl UserRole {
     /// SQL column value.
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
+            Self::Superadmin => "superadmin",
             Self::Admin => "admin",
+            Self::Manager => "manager",
             Self::User => "user",
         }
     }
 
     /// Parse from the stored SQL text.  Falls back to [`User`](Self::User) on
-    /// unknown values (forward-compat).
+    /// unknown values (forward-compat, design §13.6).
     pub(crate) fn from_sql(value: &str) -> Self {
-        if value.eq_ignore_ascii_case("admin") { Self::Admin } else { Self::User }
+        if value.eq_ignore_ascii_case("superadmin") {
+            Self::Superadmin
+        } else if value.eq_ignore_ascii_case("admin") {
+            Self::Admin
+        } else if value.eq_ignore_ascii_case("manager") {
+            Self::Manager
+        } else {
+            Self::User
+        }
+    }
+
+    /// Total-order rank — the explicit numeric weight that fixes
+    /// `superadmin (4) > admin (3) > manager (2) > user (1)` (FR-v3-02). An
+    /// explicit rank is deliberately preferred over a derived `Ord` (which would
+    /// silently tie the ordering to declaration order).
+    pub(crate) const fn rank(self) -> u8 {
+        match self {
+            Self::Superadmin => 4,
+            Self::Admin => 3,
+            Self::Manager => 2,
+            Self::User => 1,
+        }
+    }
+}
+
+impl PartialOrd for UserRole {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for UserRole {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.rank().cmp(&other.rank())
     }
 }
 
@@ -155,4 +200,32 @@ pub(crate) fn row_to_user(row: &rusqlite::Row<'_>) -> Result<User, rusqlite::Err
         updated_at: row.get(6)?,
         must_change_password: row.get::<_, i64>(7)? != 0,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::UserRole::{Admin, Manager, Superadmin, User};
+    use super::*;
+
+    /// V0.1a — the four roles are totally ordered
+    /// `superadmin > admin > manager > user` (all six pairwise).
+    #[test]
+    fn role_ordering() {
+        assert!(Superadmin > Admin);
+        assert!(Superadmin > Manager);
+        assert!(Superadmin > User);
+        assert!(Admin > Manager);
+        assert!(Admin > User);
+        assert!(Manager > User);
+    }
+
+    /// V0.1b — `from_sql(r.as_str()) == r` for all four; unknown → `User`.
+    #[test]
+    fn role_sql_roundtrip() {
+        for role in [Superadmin, Admin, Manager, User] {
+            assert_eq!(UserRole::from_sql(role.as_str()), role, "roundtrip {role:?}");
+        }
+        assert_eq!(UserRole::from_sql("bogus"), User);
+        assert_eq!(UserRole::from_sql("SUPERADMIN"), Superadmin, "case-insensitive");
+    }
 }

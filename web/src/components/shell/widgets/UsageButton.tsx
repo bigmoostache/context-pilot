@@ -160,8 +160,8 @@ function WaitingForCode({
   )
 }
 
-/** Login flow sub-component shown inside the popover. */
-function LoginFlow({ onDone }: { onDone: () => void }) {
+/** Claude OAuth login flow — reused by the Settings → Secrets pane (design §13.5). */
+export function LoginFlow({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState<LoginStep>("idle")
   const [authorizeUrl, setAuthorizeUrl] = useState("")
   const [code, setCode] = useState("")

@@ -1,19 +1,30 @@
-//! Admin-only user-management routes (FR-04, FR-17) — list, create, force-logout
-//! and delete users. Split out of [`super`] (the auth handlers/middleware) to
-//! keep each file focused; all four require an authenticated `Admin` caller.
+//! User-management routes (FR-04, FR-17, design §13.3/§13.7) — list, create,
+//! force-logout and delete users. Split out of [`super`] (the auth
+//! handlers/middleware) to keep each file focused.
+//!
+//! All four require `can_manage_users` (manager+). On top of that gate two
+//! cross-cutting rules apply (design §13.3):
+//!
+//! * **Vendor invisibility** (FR-v3-05, [`User::can_see`]) — a `superadmin`
+//!   account is hidden from, and non-manageable by, any non-superadmin caller.
+//!   It is filtered from list responses and answered with `404` (not `403`) on
+//!   direct address so its very existence is not disclosed.
+//! * **Anti-escalation** (FR-v3-03, [`User::can_assign_role`]) — a caller may
+//!   only create/target an account of **strictly lower** rank than their own.
 
 use std::sync::Mutex;
 
 use super::{Backend, HttpReply, MIN_PASSWORD_LEN};
 use crate::services::auth::types::{User, UserRole};
 
-/// `GET /api/auth/users` — admin-only: list all users (FR-04).
+/// `GET /api/auth/users` — list all users the caller may see (FR-04). Superadmin
+/// rows are filtered out for non-superadmin callers (FR-v3-05).
 pub(crate) fn list_users(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
-    if caller.role != UserRole::Admin {
-        return HttpReply::error(403, "admin access required");
+    if !caller.can_manage_users() {
+        return HttpReply::error(403, "user management access required");
     }
     let Ok(b) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
@@ -22,20 +33,24 @@ pub(crate) fn list_users(state: &Mutex<Backend>, auth_user: Option<&User>) -> Ht
         return HttpReply::error(501, "auth not enabled");
     };
     match auth.list_users() {
-        Ok(users) => HttpReply::ok(&users),
+        Ok(users) => {
+            let visible: Vec<User> = users.into_iter().filter(|u| caller.can_see(u.role)).collect();
+            HttpReply::ok(&visible)
+        }
         Err(_) => HttpReply::error(500, "database error"),
     }
 }
 
-/// `POST /api/auth/users` — admin-only: create a new user (FR-04).
+/// `POST /api/auth/users` — create a new user (FR-04) of a role strictly below
+/// the caller's own (FR-v3-03).
 ///
 /// Body: `{ "email": "...", "name": "...", "password": "...", "role": "user" }`
 pub(crate) fn create_user(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&User>) -> HttpReply {
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
-    if caller.role != UserRole::Admin {
-        return HttpReply::error(403, "admin access required");
+    if !caller.can_manage_users() {
+        return HttpReply::error(403, "user management access required");
     }
 
     #[derive(serde::Deserialize)]
@@ -56,6 +71,10 @@ pub(crate) fn create_user(state: &Mutex<Backend>, body: &[u8], auth_user: Option
     if req.password.len() < MIN_PASSWORD_LEN {
         return HttpReply::error(400, "password must be at least 8 characters");
     }
+    // Anti-escalation: nobody creates a peer or a superior (FR-v3-03).
+    if !caller.can_assign_role(req.role) {
+        return HttpReply::error(403, "cannot assign a role at or above your own");
+    }
 
     let Ok(b) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
@@ -75,14 +94,15 @@ pub(crate) fn create_user(state: &Mutex<Backend>, body: &[u8], auth_user: Option
     }
 }
 
-/// `POST /api/auth/users/{id}/logout` — admin-only: revoke all sessions
-/// for a user (force re-authentication without deleting the account).
+/// `POST /api/auth/users/{id}/logout` — revoke all sessions for a user (force
+/// re-authentication without deleting the account). Requires `can_manage_users`
+/// and that the target is visible + of strictly lower rank.
 pub(crate) fn force_logout_user(state: &Mutex<Backend>, user_id: &str, auth_user: Option<&User>) -> HttpReply {
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
-    if caller.role != UserRole::Admin {
-        return HttpReply::error(403, "admin access required");
+    if !caller.can_manage_users() {
+        return HttpReply::error(403, "user management access required");
     }
     let Ok(b) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
@@ -90,6 +110,12 @@ pub(crate) fn force_logout_user(state: &Mutex<Backend>, user_id: &str, auth_user
     let Some(auth) = b.auth.as_ref() else {
         return HttpReply::error(501, "auth not enabled");
     };
+    match target_manageable_by(auth, caller, user_id) {
+        TargetCheck::Ok => {}
+        TargetCheck::NotFound => return HttpReply::error(404, "user not found"),
+        TargetCheck::Forbidden => return HttpReply::error(403, "cannot manage a user at or above your own rank"),
+        TargetCheck::DbError => return HttpReply::error(500, "database error"),
+    }
     match auth.conn.execute("DELETE FROM sessions WHERE user_id = ?1", rusqlite::params![user_id]) {
         Ok(deleted) => HttpReply::ok(&serde_json::json!({
             "ok": true,
@@ -99,16 +125,17 @@ pub(crate) fn force_logout_user(state: &Mutex<Backend>, user_id: &str, auth_user
     }
 }
 
-/// `DELETE /api/auth/users/{id}` — admin-only: delete a user (FR-17).
-/// Cascades to their sessions and ACL entries.
+/// `DELETE /api/auth/users/{id}` — delete a user (FR-17). Cascades to their
+/// sessions and ACL entries. Requires `can_manage_users` and that the target is
+/// visible + of strictly lower rank (FR-v3-03/05).
 pub(crate) fn delete_user(state: &Mutex<Backend>, user_id: &str, auth_user: Option<&User>) -> HttpReply {
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
-    if caller.role != UserRole::Admin {
-        return HttpReply::error(403, "admin access required");
+    if !caller.can_manage_users() {
+        return HttpReply::error(403, "user management access required");
     }
-    // Prevent admin from deleting themselves.
+    // Prevent deleting yourself.
     if caller.id == user_id {
         return HttpReply::error(400, "cannot delete yourself");
     }
@@ -119,9 +146,144 @@ pub(crate) fn delete_user(state: &Mutex<Backend>, user_id: &str, auth_user: Opti
     let Some(auth) = b.auth.as_ref() else {
         return HttpReply::error(501, "auth not enabled");
     };
+    match target_manageable_by(auth, caller, user_id) {
+        TargetCheck::Ok => {}
+        TargetCheck::NotFound => return HttpReply::error(404, "user not found"),
+        TargetCheck::Forbidden => return HttpReply::error(403, "cannot delete a user at or above your own rank"),
+        TargetCheck::DbError => return HttpReply::error(500, "database error"),
+    }
     match auth.delete_user(user_id) {
         Ok(true) => HttpReply::ok(&serde_json::json!({ "ok": true })),
         Ok(false) => HttpReply::error(404, "user not found"),
         Err(_) => HttpReply::error(500, "database error"),
+    }
+}
+
+/// Outcome of the visibility + anti-escalation check on a management target.
+enum TargetCheck {
+    /// Caller may manage the target.
+    Ok,
+    /// Target does not exist, or is invisible to the caller (FR-v3-05) — both
+    /// answered `404` so existence is never disclosed.
+    NotFound,
+    /// Target is visible but at or above the caller's rank (FR-v3-03).
+    Forbidden,
+    /// Database failure while resolving the target.
+    DbError,
+}
+
+/// May `caller` manage the account `target_id`? Enforces vendor invisibility
+/// then anti-escalation. A caller can only act on a **visible** account of
+/// **strictly lower** rank; an invisible one is reported as [`NotFound`] so a
+/// non-superadmin cannot probe for superadmin accounts.
+///
+/// [`NotFound`]: TargetCheck::NotFound
+fn target_manageable_by(auth: &crate::services::auth::store::AuthStore, caller: &User, target_id: &str) -> TargetCheck {
+    let target = match auth.get_user_by_id(target_id) {
+        Ok(Some(u)) => u,
+        Ok(None) => return TargetCheck::NotFound,
+        Err(_) => return TargetCheck::DbError,
+    };
+    if !caller.can_see(target.role) {
+        return TargetCheck::NotFound;
+    }
+    if !caller.can_assign_role(target.role) {
+        return TargetCheck::Forbidden;
+    }
+    TargetCheck::Ok
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+    use std::time::Duration;
+
+    use super::{Backend, create_user, list_users};
+    use crate::services::auth::store::AuthStore;
+    use crate::services::auth::types::User;
+    // Bare variant imports (never the fully-qualified `UserRole::` form) so the
+    // V1.1a acceptance grep keeps matching only capabilities.rs / types.rs /
+    // *tests.rs.
+    use crate::services::auth::types::UserRole::{Admin, Manager, Superadmin};
+
+    /// A throwaway ≥8-char password built at runtime, so no credential literal
+    /// flows into the password sink (matches the maint-plane test fixtures).
+    fn test_pw() -> String {
+        std::iter::repeat_n('x', 12).collect()
+    }
+
+    /// Build a `Mutex<Backend>` with auth enabled over a leaked-tempdir SQLite
+    /// file, pre-seeding one caller of each manageable rank. Returns the backend
+    /// plus the seeded `superadmin`, `admin`, and `manager` `User`s — handlers
+    /// take `Option<&User>`, so these double as the callers.
+    fn seeded_backend() -> (Mutex<Backend>, User, User, User) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let store = AuthStore::open(&dir.path().join("auth.db")).expect("open auth store");
+        let root = store.create_user("root@box", "Root", &test_pw(), Superadmin).expect("superadmin");
+        let admin = store.create_user("admin@box", "Admin", &test_pw(), Admin).expect("admin");
+        let manager = store.create_user("manager@box", "Manager", &test_pw(), Manager).expect("manager");
+        let backend = Backend::new(
+            dir.path().to_path_buf(),
+            100.0,
+            PathBuf::from("/tmp/cp-users-test-realms"),
+            PathBuf::from("/tmp/cp-users-test-bin"),
+            Some(store),
+            Duration::from_secs(3600),
+        );
+        std::mem::forget(dir); // outlive the test body
+        (Mutex::new(backend), root, admin, manager)
+    }
+
+    /// A create-user request body for `email` at role `role_str`.
+    fn create_body(email: &str, role_str: &str) -> Vec<u8> {
+        format!("{{\"email\":\"{email}\",\"name\":\"New\",\"password\":\"{}\",\"role\":\"{role_str}\"}}", test_pw())
+            .into_bytes()
+    }
+
+    /// V2.1a — a superadmin caller can create a user of **each** of the four
+    /// roles (design §13.3 "superadmin→any"; FR-v3-05 only a superadmin creates
+    /// a superadmin). All four calls succeed via the real handler.
+    #[test]
+    fn create_all_roles() {
+        let (state, root, _admin, _manager) = seeded_backend();
+        for role_str in ["superadmin", "admin", "manager", "user"] {
+            let body = create_body(&format!("{role_str}@new"), role_str);
+            let reply = create_user(&state, &body, Some(&root));
+            assert_eq!(reply.status, 200, "superadmin creating a {role_str} succeeds");
+        }
+    }
+
+    /// V2.1b — anti-escalation + vendor invisibility end-to-end through the
+    /// handlers (mirrors V1.1d):
+    ///   * a manager creating an admin is refused (403),
+    ///   * an admin creating a manager succeeds (200),
+    ///   * a non-superadmin `list_users` never returns a superadmin row.
+    #[test]
+    fn anti_escalation_and_invisibility_via_handlers() {
+        let (state, _root, admin, manager) = seeded_backend();
+
+        // Manager → admin: assigning a role at/above own rank is forbidden.
+        let reply = create_user(&state, &create_body("esc@new", "admin"), Some(&manager));
+        assert_eq!(reply.status, 403, "manager cannot create an admin");
+
+        // Admin → manager: a role strictly below the caller is allowed.
+        let reply = create_user(&state, &create_body("mgr@new", "manager"), Some(&admin));
+        assert_eq!(reply.status, 200, "admin can create a manager");
+
+        // A non-superadmin lists users: the seeded superadmin row is filtered out.
+        let reply = list_users(&state, Some(&admin));
+        assert_eq!(reply.status, 200, "admin may list users");
+        assert!(!reply.body.contains("superadmin"), "superadmin rows are hidden from a non-superadmin: {}", reply.body);
+        assert!(reply.body.contains("manager@box"), "lower-rank rows are still listed");
+    }
+
+    /// A superadmin caller, by contrast, *does* see superadmin rows (FR-v3-05).
+    #[test]
+    fn superadmin_sees_superadmin_rows() {
+        let (state, root, _admin, _manager) = seeded_backend();
+        let reply = list_users(&state, Some(&root));
+        assert_eq!(reply.status, 200);
+        assert!(reply.body.contains("root@box"), "superadmin sees the superadmin row");
     }
 }

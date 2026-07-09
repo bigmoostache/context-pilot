@@ -19,8 +19,6 @@
 //! | Env var | Default | Meaning |
 //! |---|---|---|
 //! | `CP_ORCH_PORT` | `7878` | Product cockpit HTTP listen port |
-//! | `CP_MAINT_PORT` | `9090` | IT maintenance-plane HTTP listen port |
-//! | `CP_MAINT_BIND` | `0.0.0.0` | Maintenance-plane bind address (LAN IP on the box) |
 //! | `CP_AGENTS_DIR` | `~/.context-pilot/agents` | Registry directory |
 //! | `CP_COST_BUDGET` | `100.0` | Per-agent cost budget (USD) |
 //! | `CP_SCAN_INTERVAL_MS` | `2000` | Registry-discovery + tier-② mtime poll cadence (ms) |
@@ -48,14 +46,6 @@ use crate::transport::Backend;
 /// Default product cockpit HTTP listen port.
 const DEFAULT_PORT: u16 = 7878;
 
-/// Default IT maintenance-plane HTTP listen port.
-const DEFAULT_MAINT_PORT: u16 = 9090;
-
-/// Default maintenance-plane bind address. `0.0.0.0` here is paired with the
-/// LAN-only application guard ([`transport::maint`]) and, on the appliance, the
-/// network perimeter (the box only listens on the client LAN).
-const DEFAULT_MAINT_BIND: &str = "0.0.0.0";
-
 /// Default per-agent cost budget in USD.
 const DEFAULT_BUDGET: f64 = 100.0;
 
@@ -77,12 +67,6 @@ const TAIL_INTERVAL: Duration = Duration::from_millis(100);
 pub struct Config {
     /// Product cockpit HTTP listen port.
     pub port: u16,
-    /// IT maintenance-plane HTTP listen port (second listener).
-    pub maint_port: u16,
-    /// Maintenance-plane bind address. Defaults to `0.0.0.0`; set to the box's
-    /// LAN IP in deployment so the plane is not reachable off-LAN even before
-    /// the application-level LAN guard.
-    pub maint_bind: String,
     /// Directory holding agent registry records.
     pub agents_dir: PathBuf,
     /// Per-agent cost budget in USD.
@@ -119,13 +103,6 @@ impl Config {
     /// (so the default directory cannot be derived).
     pub fn from_env() -> Result<Self, String> {
         let port = std::env::var("CP_ORCH_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_PORT);
-
-        let maint_port = std::env::var("CP_MAINT_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_MAINT_PORT);
-
-        let maint_bind = std::env::var("CP_MAINT_BIND")
-            .ok()
-            .filter(|s| !s.trim().is_empty())
-            .unwrap_or_else(|| DEFAULT_MAINT_BIND.to_owned());
 
         let agents_dir = match std::env::var_os("CP_AGENTS_DIR") {
             Some(dir) => PathBuf::from(dir),
@@ -175,8 +152,6 @@ impl Config {
 
         Ok(Self {
             port,
-            maint_port,
-            maint_bind,
             agents_dir,
             budget_usd,
             scan_interval,
@@ -211,7 +186,7 @@ impl Runtime {
             match crate::services::auth::store::AuthStore::open(&config.auth_db_path) {
                 Ok(store) => {
                     eprintln!("auth enabled — database at {}", config.auth_db_path.display());
-                    seed::seed_admin_if_empty(&store);
+                    seed::seed_accounts_if_empty(&store);
                     Some(store)
                 }
                 Err(err) => {
@@ -252,49 +227,38 @@ impl Runtime {
     /// Block the calling thread on the product HTTP transport, serving requests
     /// until the process exits.
     ///
-    /// Before blocking, spawns the **maintenance plane** on its own thread and
-    /// socket ([`transport::serve_plane`] with [`Plane::Maintenance`]). The two
-    /// listeners are fully independent: a panic or bind failure on one does not
-    /// take down the other (the maintenance bind failure is logged, not fatal —
-    /// the cockpit must still come up).
+    /// There is a single transport face (design §13.4 removed the separate
+    /// maintenance plane). Before blocking, this renders + reloads Caddy for the
+    /// current provisioning state so the cockpit is served on `:80` (cleartext,
+    /// day-0) or `:443` (private-CA TLS, once provisioned).
     ///
     /// # Errors
     ///
     /// Returns an error string if the product address cannot be bound.
     pub fn serve(&self) -> Result<(), String> {
-        use crate::transport::Plane;
-
-        // Boot-time read of the durable provisioning flag (M2, Obj 2.1.2). The
-        // orchestrator always runs both listeners; the effective cockpit gate
-        // lives in Caddy (M3), which only serves :80/:443 once provisioned. This
-        // log makes the boot state observable in `logread`.
+        // Boot-time read of the durable provisioning flag. The effective cockpit
+        // gate lives in Caddy, which serves the cockpit on :80 (day-0) or :443
+        // (provisioned). This log makes the boot state observable in `logread`.
         if let Ok(b) = self.backend.lock() {
-            let provisioned = crate::transport::maint::is_provisioned(&b.provision_flag_path);
+            let provisioned = crate::transport::it::is_provisioned(&b.provision_flag_path);
             eprintln!(
                 "provisioning state: {} (flag: {})",
-                if provisioned { "provisioned — cockpit may serve" } else { "UNPROVISIONED — maintenance only" },
+                if provisioned {
+                    "provisioned — cockpit on :443"
+                } else {
+                    "UNPROVISIONED — cockpit on :80 (day-0)"
+                },
                 b.provision_flag_path.display()
             );
         }
 
-        // Render + reload Caddy for the current state (M3). No-op unless Caddy is
+        // Render + reload Caddy for the current state. No-op unless Caddy is
         // configured (CP_CADDYFILE); never fatal.
-        crate::transport::maint::apply_caddy_at_boot(&self.backend);
-
-        // Maintenance plane (M1) — second listener, LAN-only + Admin-gated.
-        let maint_addr = format!("{}:{}", self.config.maint_bind, self.config.maint_port);
-        let maint_state = Arc::clone(&self.backend);
-        let maint_addr_log = maint_addr.clone();
-        let _maint = thread::spawn(move || {
-            eprintln!("maintenance plane on http://{maint_addr_log}");
-            if let Err(e) = crate::transport::serve_plane(&maint_addr, maint_state, Plane::Maintenance) {
-                eprintln!("WARN: maintenance plane failed to bind {maint_addr_log}: {e}");
-            }
-        });
+        crate::transport::it::apply_caddy_at_boot(&self.backend);
 
         let addr = format!("0.0.0.0:{}", self.config.port);
         eprintln!("serving on http://{addr}");
-        crate::transport::serve_plane(&addr, Arc::clone(&self.backend), Plane::Product)
+        crate::transport::serve(&addr, Arc::clone(&self.backend))
     }
 }
 

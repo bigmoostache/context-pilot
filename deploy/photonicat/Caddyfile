@@ -2,28 +2,28 @@
 #
 # "Tout local, rien sur le web": this box has NO public DNS and NO public ACME.
 # Caddy terminates all TLS with its built-in CA (`tls internal`); the root is
-# distributed to clients out-of-band (see the IT maintenance console on :9090).
+# distributed to clients out-of-band from the IT section of cockpit Settings.
 #
 # IMPORTANT: this file is a BOOTSTRAP fallback only. The orchestrator REGENERATES
-# it at boot and on every identity/finalize change — rendering explicit name/IP
-# site addresses, the cockpit on :443 once provisioned, and the :80→:443 redirect
-# (see crates/cp-orchestrator/src/transport/maint/caddy.rs). The orchestrator
-# starts before Caddy (the caddy.service unit has After=context-pilot.service), so
-# by the time Caddy reads this it has usually been replaced. Until then we serve
-# only the maintenance plane.
+# it at boot and on every identity change — rendering explicit name/IP site
+# addresses, the cockpit on :443 once provisioned, and the :80→:443 redirect
+# (see crates/cp-orchestrator/src/transport/it/caddy.rs). The orchestrator starts
+# before Caddy (the caddy.service unit has After=context-pilot.service), so by the
+# time Caddy reads this it has usually been replaced. Until then we serve the
+# cockpit over cleartext :80 for the day-0 flow (design §13.4 — no :9090 plane).
 {
 	# LAN appliance: private CA only, never reach out to public ACME.
 	auto_https disable_redirects
 }
 
-# IT maintenance plane — reachable on the LAN before the box is named.
-# Caddy fronts the public :9090 and proxies to the orchestrator's loopback
-# maintenance listener (CP_MAINT_PORT=9191, CP_MAINT_BIND=127.0.0.1).
-:9090 {
-	tls internal
-	reverse_proxy 127.0.0.1:9191
+# Day-0 cockpit — cleartext :80 until the box is provisioned. An IT operator logs
+# in here, changes the seeded password, and names the box; that provisions it and
+# brings the private-CA :443 cockpit up (the orchestrator then regenerates this
+# file so :80 becomes a redirect to :443).
+:80 {
+	reverse_proxy 127.0.0.1:7878
 }
 
 # The product cockpit (:443) and the :80→:443 redirect are intentionally ABSENT
-# here: an unprovisioned box must not serve the cockpit. The orchestrator adds
-# those blocks only after `finalize` flips the box to provisioned.
+# here: an unprovisioned box has no cert yet. The orchestrator adds those blocks
+# only after the box is named (provisioned).

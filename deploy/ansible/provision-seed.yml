@@ -16,7 +16,10 @@
   gather_facts: false
   vars:
     cp_root: /opt/context-pilot
-    # Obj 6.2.1 — default admin email; override with -e cp_admin_email=…
+    # Obj 6.2.1 — default account emails; override with -e cp_admin_email=… /
+    # -e cp_superadmin_email=… . Two seeded accounts (design §13.4): the vendor
+    # `superadmin` + the client `admin`.
+    cp_seed_superadmin_email: "{{ cp_superadmin_email | default('vendor@context-pilot.internal') }}"
     cp_seed_admin_email: "{{ cp_admin_email | default('admin@admin.fr') }}"
     # Where the printable sheets are written, on the CONTROL machine.
     sheets_dir: "{{ playbook_dir }}/out"

@@ -13,7 +13,7 @@
 use serde_json::json;
 
 use super::super::HttpReply;
-use crate::services::auth::types::{User, UserRole};
+use crate::services::auth::types::User;
 
 /// `GET /api/vault/snapshot` — bulk-fetch all set key values.
 ///
@@ -23,8 +23,8 @@ use crate::services::auth::types::{User, UserRole};
 ///
 /// Admin-only when auth is enabled.
 pub(crate) fn vault_snapshot(auth_user: Option<&User>) -> HttpReply {
-    if auth_user.is_some_and(|u| u.role != UserRole::Admin) {
-        return HttpReply::error(403, "admin required");
+    if auth_user.is_some_and(|u| !u.can_manage_secrets()) {
+        return HttpReply::error(403, "superadmin required");
     }
 
     let snapshot: serde_json::Map<String, serde_json::Value> = cp_vault::registry::ALL_KEYS
@@ -61,8 +61,8 @@ pub(crate) fn env_keys_list() -> HttpReply {
 /// (`anthropic`).  Rejects unknown names with `404` to prevent arbitrary
 /// environment enumeration.
 pub(crate) fn env_key_reveal(name: &str, auth_user: Option<&User>) -> HttpReply {
-    if auth_user.is_some_and(|u| u.role != UserRole::Admin) {
-        return HttpReply::error(403, "admin required");
+    if auth_user.is_some_and(|u| !u.can_manage_secrets()) {
+        return HttpReply::error(403, "superadmin required");
     }
 
     if cp_vault::registry::resolve_definition(name).is_none() {
@@ -86,8 +86,8 @@ pub(crate) fn env_key_reveal(name: &str, auth_user: Option<&User>) -> HttpReply 
 /// `~/.context-pilot/.env` and stores an in-memory override for immediate
 /// visibility.
 pub(crate) fn env_key_update(name: &str, auth_user: Option<&User>, body: &str) -> HttpReply {
-    if auth_user.is_some_and(|u| u.role != UserRole::Admin) {
-        return HttpReply::error(403, "admin required");
+    if auth_user.is_some_and(|u| !u.can_manage_secrets()) {
+        return HttpReply::error(403, "superadmin required");
     }
 
     if cp_vault::registry::resolve_definition(name).is_none() {
@@ -133,6 +133,7 @@ fn mask_key(key: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::auth::types::UserRole;
 
     #[test]
     fn mask_key_short_is_fully_redacted() {

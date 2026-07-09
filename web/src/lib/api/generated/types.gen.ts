@@ -67,6 +67,7 @@ export type AgentMetrics = {
 };
 
 export type AppSettings = {
+    access_control: boolean;
     allowed_models: Array<string>;
     auth_enabled: boolean;
     default_model?: string | null;
@@ -95,8 +96,8 @@ export type AuthMe = {
     id: string;
     must_change_password: boolean;
     name: string;
-    next_action: 'change_password' | 'onboarding' | 'ready';
-    role: 'admin' | 'user';
+    next_action: 'change_password' | 'set_identity' | 'onboarding' | 'ready';
+    role: 'superadmin' | 'admin' | 'manager' | 'user';
     updated_at?: number;
 };
 
@@ -111,7 +112,7 @@ export type AuthUser = {
     id: string;
     must_change_password: boolean;
     name: string;
-    role: 'admin' | 'user';
+    role: 'superadmin' | 'admin' | 'manager' | 'user';
     updated_at?: number;
 };
 
@@ -268,6 +269,25 @@ export type FsPreview = {
     content: string;
     size: number;
     truncated: boolean;
+};
+
+export type Identity = {
+    ip: string;
+    name: string;
+};
+
+export type ItFingerprint = {
+    algorithm: string;
+    fingerprint: string;
+};
+
+export type ItIdentityResponse = {
+    identity: Identity | null;
+};
+
+export type ItSetIdentityResponse = {
+    identity: Identity;
+    reloaded: boolean;
 };
 
 export type LibraryItem = {
@@ -2167,6 +2187,127 @@ export type GetApiHealthResponses = {
 
 export type GetApiHealthResponse = GetApiHealthResponses[keyof GetApiHealthResponses];
 
+export type GetApiItCaCrtData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/it/ca.crt';
+};
+
+export type GetApiItCaCrtResponses = {
+    /**
+     * CA root PEM bytes
+     */
+    200: Blob | File;
+};
+
+export type GetApiItCaCrtResponse = GetApiItCaCrtResponses[keyof GetApiItCaCrtResponses];
+
+export type GetApiItCaFingerprintData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/it/ca/fingerprint';
+};
+
+export type GetApiItCaFingerprintErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiItCaFingerprintError = GetApiItCaFingerprintErrors[keyof GetApiItCaFingerprintErrors];
+
+export type GetApiItCaFingerprintResponses = {
+    /**
+     * Success
+     */
+    200: ItFingerprint;
+};
+
+export type GetApiItCaFingerprintResponse = GetApiItCaFingerprintResponses[keyof GetApiItCaFingerprintResponses];
+
+export type GetApiItIdentityData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/it/identity';
+};
+
+export type GetApiItIdentityErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiItIdentityError = GetApiItIdentityErrors[keyof GetApiItIdentityErrors];
+
+export type GetApiItIdentityResponses = {
+    /**
+     * Success
+     */
+    200: ItIdentityResponse;
+};
+
+export type GetApiItIdentityResponse = GetApiItIdentityResponses[keyof GetApiItIdentityResponses];
+
+export type PostApiItIdentityData = {
+    body: {
+        ip: string;
+        name: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/it/identity';
+};
+
+export type PostApiItIdentityErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiItIdentityError = PostApiItIdentityErrors[keyof PostApiItIdentityErrors];
+
+export type PostApiItIdentityResponses = {
+    /**
+     * Success
+     */
+    200: ItSetIdentityResponse;
+};
+
+export type PostApiItIdentityResponse = PostApiItIdentityResponses[keyof PostApiItIdentityResponses];
+
+export type GetApiItProvisionedData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/it/provisioned';
+};
+
+export type GetApiItProvisionedErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiItProvisionedError = GetApiItProvisionedErrors[keyof GetApiItProvisionedErrors];
+
+export type GetApiItProvisionedResponses = {
+    /**
+     * Success
+     */
+    200: {
+        provisioned: boolean;
+    };
+};
+
+export type GetApiItProvisionedResponse = GetApiItProvisionedResponses[keyof GetApiItProvisionedResponses];
+
 export type GetApiMetricsData = {
     body?: never;
     path?: never;
@@ -2432,6 +2573,7 @@ export type GetApiSettingsResponse = GetApiSettingsResponses[keyof GetApiSetting
 
 export type PostApiSettingsData = {
     body: {
+        access_control?: boolean;
         allowed_models?: Array<string>;
         default_model?: string;
         default_provider?: string;

@@ -2,7 +2,7 @@
 # Templated by Ansible; cp_root defaults to /opt/context-pilot (the Debian rootfs
 # is the whole disk).
 [Unit]
-Description=Context Pilot orchestrator (cockpit :7878 + loopback maintenance :9191)
+Description=Context Pilot orchestrator (cockpit :7878; Caddy fronts :80/:443)
 Documentation=https://github.com/bigmoostache/context-pilot
 After=network-online.target
 Wants=network-online.target
@@ -17,12 +17,9 @@ Type=simple
 Environment=HOME={{ cp_root }}/home
 Environment=CP_AUTH_ENABLED=1
 Environment=CP_ORCH_PORT=7878
-# IT maintenance plane: Caddy fronts the public :9090 (tls internal) and proxies
-# to this loopback-only listener — never exposed directly.
-Environment=CP_MAINT_PORT=9191
-Environment=CP_MAINT_BIND=127.0.0.1
 # Caddy integration: the orchestrator regenerates this Caddyfile (name/IP,
-# provisioned gate) and reloads Caddy through its admin API.
+# provisioned gate — cockpit on cleartext :80 at day-0, private-CA :443 once
+# provisioned) and reloads Caddy through its admin API. No :9090 plane (§13.4).
 Environment=CP_CADDYFILE={{ cp_root }}/caddy/Caddyfile
 Environment=CP_CADDY_BIN={{ cp_root }}/bin/caddy
 Environment=CP_CA_ROOT={{ cp_root }}/caddy/data/caddy/pki/authorities/local/root.crt

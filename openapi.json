@@ -214,6 +214,9 @@
       },
       "AppSettings": {
         "properties": {
+          "access_control": {
+            "type": "boolean"
+          },
           "allowed_models": {
             "items": {
               "type": "string"
@@ -260,6 +263,7 @@
           "onboarding_completed",
           "is_admin",
           "auth_enabled",
+          "access_control",
           "providers",
           "allowed_models"
         ],
@@ -315,6 +319,7 @@
           "next_action": {
             "enum": [
               "change_password",
+              "set_identity",
               "onboarding",
               "ready"
             ],
@@ -322,7 +327,9 @@
           },
           "role": {
             "enum": [
+              "superadmin",
               "admin",
+              "manager",
               "user"
             ],
             "type": "string"
@@ -374,7 +381,9 @@
           },
           "role": {
             "enum": [
+              "superadmin",
               "admin",
+              "manager",
               "user"
             ],
             "type": "string"
@@ -854,6 +863,67 @@
           "content",
           "size",
           "truncated"
+        ],
+        "type": "object"
+      },
+      "Identity": {
+        "properties": {
+          "ip": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "ip"
+        ],
+        "type": "object"
+      },
+      "ItFingerprint": {
+        "properties": {
+          "algorithm": {
+            "type": "string"
+          },
+          "fingerprint": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fingerprint",
+          "algorithm"
+        ],
+        "type": "object"
+      },
+      "ItIdentityResponse": {
+        "properties": {
+          "identity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Identity"
+              }
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "identity"
+        ],
+        "type": "object"
+      },
+      "ItSetIdentityResponse": {
+        "properties": {
+          "identity": {
+            "$ref": "#/components/schemas/Identity"
+          },
+          "reloaded": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "identity",
+          "reloaded"
         ],
         "type": "object"
       },
@@ -4368,6 +4438,175 @@
         ]
       }
     },
+    "/api/it/ca.crt": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "CA root PEM bytes"
+          }
+        },
+        "summary": "Download the private-CA root certificate (PEM)",
+        "tags": [
+          "it"
+        ]
+      }
+    },
+    "/api/it/ca/fingerprint": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItFingerprint"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "CA root SHA-256 fingerprint",
+        "tags": [
+          "it"
+        ]
+      }
+    },
+    "/api/it/identity": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItIdentityResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Current box network identity (name/IP), or null",
+        "tags": [
+          "it"
+        ]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "ip": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "ip"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItSetIdentityResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set box network identity — re-issues the leaf & reloads Caddy",
+        "tags": [
+          "it"
+        ]
+      }
+    },
+    "/api/it/provisioned": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "provisioned": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "provisioned"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Whether the box has been provisioned",
+        "tags": [
+          "it"
+        ]
+      }
+    },
     "/api/metrics": {
       "get": {
         "responses": {
@@ -4767,6 +5006,9 @@
             "application/json": {
               "schema": {
                 "properties": {
+                  "access_control": {
+                    "type": "boolean"
+                  },
                   "allowed_models": {
                     "items": {
                       "type": "string"

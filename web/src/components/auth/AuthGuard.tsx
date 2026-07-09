@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/providers/auth"
 import { LoginPage } from "./LoginPage"
 import { Onboarding } from "./Onboarding"
 import { ForcePasswordChange } from "./ForcePasswordChange"
+import { DayZeroSetup } from "./DayZeroSetup"
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   const { authEnabled, user, loading, refreshMe } = useAuth()
@@ -42,6 +43,12 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   switch (user.next_action) {
     case "change_password": {
       return <ForcePasswordChange />
+    }
+    case "set_identity": {
+      // Day-0 (design §13.4): an IT-capable operator names the unprovisioned box
+      // (which brings :443 up) and distributes the CA root, replacing the removed
+      // maintenance wizard.
+      return <DayZeroSetup />
     }
     case "onboarding": {
       return <Onboarding onComplete={() => void refreshMe()} />
