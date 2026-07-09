@@ -5,7 +5,6 @@
 // re-exported from generated/types.gen so existing imports keep working.
 
 import type {
-  ConversationMsg as GenConversationMsg,
   FinderNode,
   FsPreview,
   MkdirResult,
@@ -18,7 +17,6 @@ import type {
   WriteResult,
 } from "./generated/types.gen"
 import {
-  getApiAgentByIdConversation,
   getApiAgentByIdFs,
   getApiAgentByIdFsDescriptions,
   getApiAgentByIdFsPreview,
@@ -38,7 +36,6 @@ import { BASE, getToken, sdk } from "./client"
 export type { FinderNode, FsPreview, SheetData } from "./generated/types.gen"
 export type { WriteResult, UploadResult, UploadUniqueResult } from "./generated/types.gen"
 export type { MkdirResult, RenameResult, MoveResult, TrashResult } from "./generated/types.gen"
-export type { ConversationMsg } from "./generated/types.gen"
 
 // ── GET endpoints (SDK) ──────────────────────────────────────────────
 
@@ -56,10 +53,6 @@ export function fetchFsPreview(agentId: string, path: string): Promise<FsPreview
 
 export function fetchSheet(agentId: string, path: string): Promise<SheetData> {
   return sdk(getApiAgentByIdFsSheet({ path: { id: agentId }, query: { path } }))
-}
-
-export function fetchConversation(agentId: string): Promise<GenConversationMsg[]> {
-  return sdk(getApiAgentByIdConversation({ path: { id: agentId } }))
 }
 
 // ── POST endpoints (SDK) ─────────────────────────────────────────────

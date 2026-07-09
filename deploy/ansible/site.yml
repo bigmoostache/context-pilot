@@ -28,7 +28,7 @@
     gh_repo: bigmoostache/context-pilot
     cp_release: "{{ release | default('latest') }}"
     appliance_bundle_url: >-
-      https://github.com/{{ gh_repo }}/releases/{{ 'latest/download' if cp_release == 'latest' else 'download/' + cp_release }}/cpilot-appliance-aarch64.tar.gz
+      https://github.com/{{ gh_repo }}/releases/{{ 'latest/download' if cp_release == 'latest' else 'download/' + cp_release }}/cpilot-linux-aarch64-musl.tar.gz
     caddy_url: "https://caddyserver.com/api/download?os=linux&arch=arm64"
     # Photonicat 2 mini-display (GC9307 SPI LCD) — built + installed on the box.
     cp_install_display: "{{ install_display | default(true) | bool }}"

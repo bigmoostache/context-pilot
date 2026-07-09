@@ -1,19 +1,85 @@
-name: Release
+name: Build & Release
+
+# ── ONE code path for every release. ────────────────────────────────────────
+# Both triggers run the EXACT same jobs (web → build matrix → release):
+#   • push to master   → auto-release tagged  v<version>-<short_sha>  (make_latest)
+#   • push of a v* tag  → release tagged with that tag
+# There is no separate "build" workflow — this file is the whole pipeline.
+#
+# Every architecture tarball is a COMPLETE bundle, laid out FLAT at the root:
+#   cpilot              (the agent TUI)
+#   cp-console-server
+#   cp-orchestrator
+#   web/                (the vite-built SPA, shared across all arches)
+#   meilisearch         (ONLY when meilisearch ships an upstream build for the
+#                        arch — i.e. every target except aarch64-musl)
+#
+# Asset names stay `cpilot-<arch>.tar.gz`: the in-app updater
+# (crates/cp-orchestrator/src/services/releases) matches assets by
+# name.contains(<arch>) && ends_with(".tar.gz") against a fixed KNOWN_ARCHS,
+# so renaming would break self-update.
 
 on:
   push:
-    tags:
-      - 'v*'
-
-env:
-  CARGO_TERM_COLOR: always
-  RUST_VERSION: "1.95.0"
+    branches: ["master"]
+    tags: ["v*"]
 
 permissions:
   contents: write
 
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: "1.95.0"
+  # Must match the version the search module downloads at runtime
+  # (crates/cp-mod-search/src/meili/download.rs :: MEILISEARCH_VERSION).
+  MEILI_VERSION: "v1.13.3"
+
+concurrency:
+  group: build-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  # The SPA is architecture-independent — build it ONCE and share the dist to
+  # every platform bundle via an artifact.
+  web:
+    name: Build SPA (shared)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+
+      - name: Install web dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: web
+
+      # Relative same-origin API URLs so the SPA talks to the orchestrator that
+      # serves it (one binary, one port).
+      - name: Build SPA (relative same-origin)
+        run: pnpm run build
+        working-directory: web
+        env:
+          VITE_API_URL: ""
+
+      - name: Upload SPA dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          retention-days: 5
+
   build:
+    name: ${{ matrix.artifact }}
+    needs: web
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -21,23 +87,26 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             artifact: cpilot-linux-x86_64
+            meili: linux-amd64
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             artifact: cpilot-linux-aarch64
             cross: true
+            meili: linux-aarch64
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
             artifact: cpilot-linux-aarch64-musl
             cross: true
+            # No upstream meilisearch build for musl → bundle omits it.
+            meili: ""
           - target: x86_64-apple-darwin
             os: macos-latest
             artifact: cpilot-macos-x86_64
+            meili: macos-amd64
           - target: aarch64-apple-darwin
             os: macos-latest
             artifact: cpilot-macos-aarch64
-
-    name: Build ${{ matrix.artifact }}
-    runs-on: ${{ matrix.os }}
+            meili: macos-apple-silicon
 
     steps:
       - uses: actions/checkout@v4
@@ -57,124 +126,85 @@ jobs:
         if: matrix.cross
         uses: taiki-e/install-action@cross
 
+      # Three binaries per target: agent (tui) + console server + orchestrator.
       - name: Build (native)
         if: ${{ !matrix.cross }}
         run: |
-          cargo build --release --target ${{ matrix.target }}
+          cargo build --release --target ${{ matrix.target }} --bin tui
           cargo build --release --target ${{ matrix.target }} -p cp-console-server
+          cargo build --release --target ${{ matrix.target }} -p cp-orchestrator
 
       - name: Build (cross)
         if: ${{ matrix.cross }}
         run: |
-          cross build --release --target ${{ matrix.target }}
+          cross build --release --target ${{ matrix.target }} --bin tui
           cross build --release --target ${{ matrix.target }} -p cp-console-server
+          cross build --release --target ${{ matrix.target }} -p cp-orchestrator
 
-      - name: Package artifacts
+      - name: Download SPA dist
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web-dist
+
+      # Flat bundle layout — everything at the tarball root, web/ as a subdir.
+      - name: Stage bundle
         run: |
-          mkdir -p staging
+          mkdir -p staging/web
           cp target/${{ matrix.target }}/release/tui staging/cpilot
           cp target/${{ matrix.target }}/release/cp-console-server staging/cp-console-server
-          chmod 755 staging/*
-          tar -czf ${{ matrix.artifact }}.tar.gz -C staging .
+          cp target/${{ matrix.target }}/release/cp-orchestrator staging/cp-orchestrator
+          chmod 755 staging/cpilot staging/cp-console-server staging/cp-orchestrator
+          cp -r web-dist/. staging/web/
+
+      # Meilisearch is a prebuilt raw binary (not a tarball) fetched from the
+      # meilisearch GitHub releases — same source + version the app uses at
+      # runtime. Skipped for arches with no upstream build (aarch64-musl).
+      - name: Bundle meilisearch (if available for arch)
+        if: ${{ matrix.meili != '' }}
+        run: |
+          curl -fSL -o staging/meilisearch \
+            "https://github.com/meilisearch/meilisearch/releases/download/${MEILI_VERSION}/meilisearch-${{ matrix.meili }}"
+          chmod 755 staging/meilisearch
+
+      - name: Package tarball
+        run: tar -czf ${{ matrix.artifact }}.tar.gz -C staging .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}.tar.gz
-          retention-days: 5
-
-  appliance:
-    name: Build appliance bundle (Photonicat, aarch64 musl)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust ${{ env.RUST_VERSION }}
-        run: |
-          rustup toolchain install ${{ env.RUST_VERSION }} --profile minimal
-          rustup default ${{ env.RUST_VERSION }}
-          rustup target add aarch64-unknown-linux-musl
-
-      - name: Cargo cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: appliance-aarch64-musl
-
-      - name: Install cross
-        uses: taiki-e/install-action@cross
-
-      # Orchestrator (API+SPA server) + agent (tui), fully static musl. These are
-      # the two binaries the context-pilot.service systemd unit runs on the box;
-      # see deploy/ansible/templates/context-pilot.service.j2.
-      - name: Build orchestrator + agent (cross, static musl)
-        run: |
-          cross build --release --target aarch64-unknown-linux-musl -p cp-orchestrator
-          cross build --release --target aarch64-unknown-linux-musl --bin tui
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          # Match the lockfile's origin (pnpm 11 — see ci.yml note): the
-          # workspace-root `packages:` requirement + `allowBuilds` script
-          # adjudication in web/pnpm-workspace.yaml are pnpm-11 mechanisms.
-          version: 11.6.0
-
-      - name: Install web dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: web
-
-      # Relative same-origin API URLs so the SPA talks to the orchestrator that
-      # serves it (one binary, one port). Runs tsc -b && vite build.
-      - name: Build SPA (relative same-origin)
-        run: pnpm run build
-        working-directory: web
-        env:
-          VITE_API_URL: ""
-
-      # Layout matches what the context-pilot systemd unit expects under
-      # /opt/context-pilot:  bin/cp-orchestrator, bin/tui, web/<spa dist>
-      - name: Package appliance bundle
-        run: |
-          mkdir -p staging/bin staging/web
-          cp target/aarch64-unknown-linux-musl/release/cp-orchestrator staging/bin/
-          cp target/aarch64-unknown-linux-musl/release/tui staging/bin/
-          chmod 755 staging/bin/*
-          cp -r web/dist/. staging/web/
-          tar -czf cpilot-appliance-aarch64.tar.gz -C staging .
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cpilot-appliance-aarch64
-          path: cpilot-appliance-aarch64.tar.gz
-          retention-days: 5
+          retention-days: 30
 
   release:
     name: Create Release
-    needs: [build, appliance]
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract version
+      # Tag comes from the pushed ref on a tag event; otherwise it's derived
+      # from the workspace version + the commit short-sha (auto-release path).
+      - name: Compute release tag
         id: version
         run: |
-          version=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          short_sha=$(echo "${{ github.sha }}" | cut -c1-7)
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "tag=v${version}-${short_sha}" >> "$GITHUB_OUTPUT"
-          echo "name=v${version} (${short_sha})" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            version=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+            short_sha=$(echo "${{ github.sha }}" | cut -c1-7)
+            echo "tag=v${version}-${short_sha}" >> "$GITHUB_OUTPUT"
+            echo "name=v${version} (${short_sha})" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Download all artifacts
+      # Only the platform tarballs — the shared web-dist artifact is excluded.
+      - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: cpilot-*
 
       - name: List artifacts
         run: find artifacts -type f | sort
