@@ -354,6 +354,16 @@ subtlest risk. Mitigation: **back up `auth.db` before apply** (§5.5 step 2),
 **auto-restore on rollback**, and an engineering rule that **migrations stay
 additive / backward-compatible across one version step**.
 
+**The migration contract (v3, binding on every release):** any change to the
+`auth.db` schema MUST be readable by the release **one version step behind**
+— add columns with defaults, add tables, never rename/drop/retype in the same
+release that starts writing the new shape (drop in a later release, once no
+supported `min_from` can roll back across the boundary). Rationale: on
+rollback the box restores the pre-apply backup, losing whatever the failed
+version wrote — sessions or users created during that window are the accepted
+cost; a schema the old binary cannot even open is not. If a release truly
+cannot honour this, it MUST raise `min_from` to fence off direct jumps.
+
 ### §5.9 — Cockpit UX (the *Update* category)
 
 The existing `releases` category (`ConfigPanes.tsx`, already `adminOnly`) becomes

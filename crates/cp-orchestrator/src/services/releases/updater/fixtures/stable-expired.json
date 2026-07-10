@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "channel": "stable",
+  "version": "v9.9.9",
+  "released_at": "2020-01-01T00:00:00Z",
+  "expires_at": "2020-03-31T00:00:00Z",
+  "min_from": "v0.2.0",
+  "notes_url": "https://github.com/bigmoostache/context-pilot/releases/tag/v9.9.9",
+  "artifacts": {
+    "linux-aarch64": {
+      "url": "https://github.com/bigmoostache/context-pilot/releases/download/v9.9.9/cpilot-linux-aarch64.tar.gz",
+      "sha256": "3f2acf2cbd0d571d029ad9de4b30a38b53e36741e0a5f19b95ec6e51a4bf3a49",
+      "size": 12345678
+    }
+  }
+}

@@ -208,6 +208,54 @@ impl Runtime {
         thread::spawn(move || driver_loop(backend, agents_dir, interval, backup_scheduler))
     }
 
+    /// Spawn the self-update committer thread (update-policy §5.5 steps 4-5).
+    ///
+    /// It polls our own `/healthz` and, once a staged update's boot proves
+    /// genuinely healthy within the deadline
+    /// ([`boot_commit_when_healthy`](crate::services::releases::boot_commit_when_healthy)),
+    /// commits the binary markers and **promotes** the release-level state:
+    /// `active_tag` + the agent binary + the supervisor allow-list flip to the
+    /// new tag, the `auth.db` backup is dropped, and `success` is recorded. If
+    /// the probe never turns healthy the markers stay, so the next boot's
+    /// `boot_check` counts the failure and can roll back.
+    ///
+    /// No-op thread on a normal (nothing-staged) boot.
+    pub fn start_update_committer(&self, install: std::path::PathBuf) -> thread::JoinHandle<()> {
+        let backend = Arc::clone(&self.backend);
+        let url = format!("http://127.0.0.1:{}/healthz", self.config.port);
+        let auth_db = self.config.auth_db_path.clone();
+        thread::spawn(move || {
+            let client = reqwest::blocking::Client::builder()
+                .timeout(Duration::from_secs(2))
+                .build()
+                .unwrap_or_else(|_| reqwest::blocking::Client::new());
+            let healthy = || client.get(&url).send().map(|r| r.status().as_u16() == 200).unwrap_or(false);
+            let committed = crate::services::releases::boot_commit_when_healthy(
+                &install,
+                healthy,
+                Duration::from_secs(60),
+                Duration::from_secs(2),
+            );
+            if !committed {
+                return;
+            }
+            // The new binary is blessed — flip the release state to match it.
+            let Ok(mut b) = backend.lock() else {
+                eprintln!("updater: promote skipped — backend lock poisoned");
+                return;
+            };
+            match crate::services::releases::updater::promote_committed(&mut b.releases, &auth_db) {
+                Ok(Some(agent_binary)) => {
+                    b.agent_binary = agent_binary.clone();
+                    b.supervisor = crate::supervisor::AgentSupervisor::new(&[agent_binary]);
+                    eprintln!("updater: update committed — active tag is now {:?}", b.releases.active_tag());
+                }
+                Ok(None) => {} // plain self-restart (manual flow), nothing to promote
+                Err(e) => eprintln!("updater: promote after healthy boot FAILED: {e}"),
+            }
+        })
+    }
+
     /// Block the calling thread on the product HTTP transport, serving requests
     /// until the process exits.
     ///

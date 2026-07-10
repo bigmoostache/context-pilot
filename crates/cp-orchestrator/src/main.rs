@@ -18,6 +18,7 @@ use cp_mod_bridge as _;
 use cp_oplog as _;
 use cp_vault as _;
 use csv as _;
+use minisign_verify as _;
 use nix as _;
 use notify as _;
 use openssl as _;
@@ -64,26 +65,14 @@ fn main() {
         }
     };
 
-    // Health-gated commit of a staged update (update-policy §5.5): a committer
-    // thread polls our own `/healthz` and clears the rollback markers only
-    // after a real `200` — socket bound + auth DB answering + registry
-    // readable — within the deadline. If the probe never turns healthy, the
-    // markers stay and the next boot's `boot_check` counts the failure.
-    if let Some(install) = install {
-        let url = format!("http://127.0.0.1:{}/healthz", config.port);
-        let _committer = std::thread::spawn(move || {
-            let client = reqwest::blocking::Client::builder()
-                .timeout(std::time::Duration::from_secs(2))
-                .build()
-                .unwrap_or_else(|_| reqwest::blocking::Client::new());
-            let healthy = || client.get(&url).send().map(|r| r.status().as_u16() == 200).unwrap_or(false);
-            let _committed = cp_orchestrator::services::releases::boot_commit_when_healthy(
-                &install,
-                healthy,
-                std::time::Duration::from_secs(60),
-                std::time::Duration::from_secs(2),
-            );
-        });
+    // Reconcile a rolled-back update (update-policy §5.5 step 6) BEFORE the
+    // auth store opens: if a staged update crash-looped and `boot_check`
+    // restored the old binary, this restores the matching `auth.db` backup (a
+    // forward migration may have run, §5.8) and records `rolled_back`.
+    if let Some(install) = install.as_deref() {
+        let releases_dir = cp_orchestrator::services::ReleaseStore::default_dir()
+            .unwrap_or_else(|| config.agents_dir.join("releases"));
+        cp_orchestrator::services::releases::updater::boot_reconcile(&releases_dir, &config.auth_db_path, install);
     }
 
     eprintln!("agents directory: {}", config.agents_dir.display());
@@ -93,6 +82,15 @@ fn main() {
 
     let runtime = Runtime::new(config);
     let _driver = runtime.start_driver();
+
+    // Health-gated commit of a staged update (update-policy §5.5): a committer
+    // thread polls our own `/healthz` and, only after a real `200` within the
+    // deadline, commits the binary swap and promotes the release state
+    // (`active_tag`, agent binary). If the probe never turns healthy, the
+    // rollback markers stay and the next boot's `boot_check` self-heals.
+    if let Some(install) = install {
+        let _committer = runtime.start_update_committer(install);
+    }
 
     if let Err(e) = runtime.serve() {
         eprintln!("serve failed: {e}");

@@ -187,6 +187,12 @@ impl ReleaseStore {
         self.config.active_tag.as_deref()
     }
 
+    /// The releases root directory this store manages.
+    #[must_use]
+    pub(crate) fn dir(&self) -> &std::path::Path {
+        &self.dir
+    }
+
     /// Select a downloaded release as active. Returns the binary path.
     ///
     /// # Errors
@@ -416,6 +422,9 @@ pub use manifest::{Manifest, ManifestArtifact};
 /// Manifest-signing trust anchor (update-policy §5.4).
 mod signing;
 pub use signing::UPDATE_PUBKEY;
+
+/// The on-box updater: fetch → verify → download → apply (update-policy §5.5).
+pub mod updater;
 
 #[cfg(test)]
 pub(crate) use self_update::{backup_path, pending_path};

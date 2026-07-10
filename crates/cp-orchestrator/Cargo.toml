@@ -62,16 +62,16 @@ sha2 = "0.10"
 # Base64url-no-pad encoding for PKCE code_verifier and code_challenge (RFC
 # 7636 §4.2). Already a transitive dep via reqwest.
 base64 = "0.22"
+# Minisign signature verification for the OTA update manifest (pure Rust,
+# clean static musl build) — the trust anchor is the UPDATE_PUBKEY const in
+# services/releases/signing.rs (update-policy §5.4).
+minisign-verify = "0.2"
 
 [dev-dependencies]
 # Test-only: the integration suite boots a real agent and drives its command
 # intake + body store to validate the backend↔agent seam against real
 # artifacts. The backend never depends on the agent crate at runtime.
 cp-mod-bridge = { path = "../cp-mod-bridge" }
-# Parses the embedded minisign public key (services/releases/signing.rs) in
-# unit tests. Moves to [dependencies] when the on-box updater (M3) starts
-# verifying manifests at runtime.
-minisign-verify = "0.2"
 tempfile = "3"
 
 [lints]
