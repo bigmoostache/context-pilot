@@ -91,7 +91,7 @@ export function AgentModal({
       <div
         className={cn(
           "modal-pop pop-shadow relative flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover",
-          c.isManage ? "w-[960px] max-w-[calc(100vw-3rem)]" : "w-[460px]",
+          c.isManage ? "w-[1120px] max-w-[calc(100vw-3rem)]" : "w-[460px]",
         )}
       >
         <AgentModalHeader
