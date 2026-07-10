@@ -257,3 +257,114 @@ jobs:
           draft: false
           prerelease: false
           make_latest: true
+
+  # ── Signed update manifest (update-policy §5.3–§5.5) ────────────────────
+  # Only a REAL `v*` tag push promotes the fleet: it publishes `stable.json` +
+  # a detached minisign signature on the `channels` branch. Auto-releases from
+  # master pushes (v<version>-<sha>) build + release but never touch the
+  # channel — tagging IS the fleet release act (update-policy v3 decision 2).
+  manifest:
+    name: Publish signed stable manifest
+    needs: release
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.ref_name }}
+      REPO: ${{ github.repository }}
+      # Oldest running version this release can be applied from (update-policy
+      # §5.6 anti-rollback floor). Bump deliberately when a migration or
+      # protocol break makes direct jumps unsafe.
+      MIN_FROM: "v0.1.0"
+      # Manifest freshness horizon (§5.6): a manifest older than this is
+      # treated as a stale replay by the box.
+      EXPIRES_DAYS: "90"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install minisign
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq minisign jq
+
+      # The manifest pins the sha256 of the ACTUALLY-PUBLISHED release assets,
+      # so download them back from the release (not from the build workspace) —
+      # what we hash is byte-for-byte what a box will download.
+      - name: Download published release assets
+        run: |
+          mkdir -p assets
+          for arch in linux-aarch64 linux-x86_64; do
+            curl -fSL --retry 5 --retry-delay 10 -o "assets/cpilot-${arch}.tar.gz" \
+              "https://github.com/${REPO}/releases/download/${TAG}/cpilot-${arch}.tar.gz"
+          done
+          sha256sum assets/*.tar.gz
+
+      - name: Generate stable.json
+        run: |
+          released_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          expires_at=$(date -u -d "+${EXPIRES_DAYS} days" +%Y-%m-%dT%H:%M:%SZ)
+          artifacts='{}'
+          for arch in linux-aarch64 linux-x86_64; do
+            f="assets/cpilot-${arch}.tar.gz"
+            sha=$(sha256sum "$f" | cut -d' ' -f1)
+            size=$(stat -c%s "$f")
+            url="https://github.com/${REPO}/releases/download/${TAG}/cpilot-${arch}.tar.gz"
+            artifacts=$(jq -c --arg a "$arch" --arg u "$url" --arg s "$sha" --argjson z "$size" \
+              '. + {($a): {url: $u, sha256: $s, size: $z}}' <<<"$artifacts")
+          done
+          jq -n \
+            --arg version "$TAG" \
+            --arg released_at "$released_at" \
+            --arg expires_at "$expires_at" \
+            --arg min_from "$MIN_FROM" \
+            --arg notes_url "https://github.com/${REPO}/releases/tag/${TAG}" \
+            --argjson artifacts "$artifacts" \
+            '{schema: 1, channel: "stable", version: $version,
+              released_at: $released_at, expires_at: $expires_at,
+              min_from: $min_from, notes_url: $notes_url,
+              artifacts: $artifacts}' > stable.json
+          cat stable.json
+
+      # Gate the exact contract the box relies on before signing anything.
+      - name: Check manifest contract
+        run: |
+          jq -e '.schema and .version and .artifacts["linux-aarch64"].sha256 and .artifacts["linux-x86_64"].sha256' stable.json
+          test "$(jq -r .version stable.json)" = "$TAG"
+
+      - name: Sign stable.json (minisign)
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$MINISIGN_SECRET_KEY" > minisign.key
+          minisign -S -s minisign.key -m stable.json -x stable.json.minisig \
+            -t "channel=stable version=${TAG}"
+          rm -f minisign.key
+          # Verify with the embedded public key — the signature must check out
+          # against the exact trust anchor shipped in the orchestrator.
+          pubkey=$(grep -o '"RW[A-Za-z0-9+/=]*"' \
+            crates/cp-orchestrator/src/services/releases/signing.rs | tr -d '"')
+          minisign -Vm stable.json -x stable.json.minisig -P "$pubkey"
+
+      # Idempotent, dedicated commit on the `channels` branch (created orphan
+      # on first publish). Re-running the job for the same content is a no-op.
+      - name: Push manifest to channels branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code origin channels >/dev/null 2>&1; then
+            git fetch origin channels
+            git worktree add channels-wt origin/channels
+            (cd channels-wt && git checkout -B channels)
+          else
+            git worktree add --detach channels-wt
+            (cd channels-wt && git checkout --orphan channels && git rm -rfq . || true)
+          fi
+          cp stable.json stable.json.minisig channels-wt/
+          cd channels-wt
+          git add stable.json stable.json.minisig
+          if git diff --cached --quiet; then
+            echo "channels already up to date — nothing to push"
+          else
+            git commit -m "channels: stable → ${TAG}"
+            git push origin channels
+          fi
