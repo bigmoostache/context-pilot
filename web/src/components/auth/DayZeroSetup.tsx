@@ -103,17 +103,25 @@ function TrustPhase({ onContinue }: { onContinue: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // Caddy mints the private-CA root lazily on the first `:443` handshake, so the
+  // fingerprint 404s for a beat right after the identity is set. Poll every 2s
+  // until it lands instead of asking the operator to reload the page.
   useEffect(() => {
     let live = true
-    fetchItCaFingerprint()
-      .then((r) => {
-        if (live) setFingerprint(r.fingerprint)
-      })
-      .catch(() => {
-        if (live) setError("The CA root isn't ready yet — reload in a moment.")
-      })
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const poll = () => {
+      fetchItCaFingerprint()
+        .then((r) => {
+          if (live) setFingerprint(r.fingerprint)
+        })
+        .catch(() => {
+          if (live) timer = setTimeout(poll, 2000)
+        })
+    }
+    poll()
     return () => {
       live = false
+      if (timer) clearTimeout(timer)
     }
   }, [])
 
@@ -139,7 +147,7 @@ function TrustPhase({ onContinue }: { onContinue: () => void }) {
       <div className="rounded-md border border-border bg-background p-3">
         <div className="mb-1 text-xs font-medium text-foreground/90">SHA-256 fingerprint</div>
         <div className="font-mono text-xs break-all text-foreground">
-          {fingerprint ?? "loading…"}
+          {fingerprint ?? "waiting for the CA root…"}
         </div>
       </div>
 

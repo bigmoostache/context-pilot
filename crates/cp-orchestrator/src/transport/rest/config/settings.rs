@@ -24,8 +24,9 @@ const DEFAULT_PROVIDER: &str = "default_provider";
 const DEFAULT_MODEL: &str = "default_model";
 const ONBOARDING_DONE: &str = "onboarding_completed";
 /// Access-control master flag (design §13.10) — server-authoritative central
-/// setting (NOT localStorage). `"true"` ⇒ four-role RBAC enforced; unset/empty
-/// ⇒ off (default), everyone is effectively superadmin with no login (FR-v3-08).
+/// setting (NOT localStorage). Four-role RBAC is enforced **by default**; only an
+/// explicit `"false"` disables it, returning everyone to superadmin/no-login
+/// god-mode (FR-v3-08 opt-out).
 const ACCESS_CONTROL: &str = "access_control";
 /// JSON array of `"<providerId>:<modelId>"` the admin permits org-wide. An
 /// **empty** list means *all models allowed* (non-blocking default at delivery).
@@ -44,10 +45,11 @@ pub(crate) fn onboarding_completed() -> bool {
     global::get_setting(ONBOARDING_DONE).as_deref() == Some("true")
 }
 
-/// Interpret the raw stored value of the access-control flag. Default **OFF**
-/// (FR-v3-08): only an explicit `"true"` enables RBAC.
+/// Interpret the raw stored value of the access-control flag. Default **ON**
+/// (design §13.10): RBAC is enforced unless explicitly disabled with `"false"`.
+/// So unset (fresh box), empty, or `"true"` all read as on — only `"false"` off.
 pub(crate) fn access_control_from_raw(raw: Option<&str>) -> bool {
-    raw == Some("true")
+    raw != Some("false")
 }
 
 /// Read the persisted access-control master flag from the central config
@@ -130,7 +132,9 @@ pub fn update_settings(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&U
         if !may_set_access_control(want, auth_user) {
             return HttpReply::error(403, "superadmin required to disable access control");
         }
-        if let Err(e) = global::set_setting(ACCESS_CONTROL, if want { "true" } else { "" }) {
+        // Store `"false"` (not empty) to disable: the default is ON, so only an
+        // explicit `"false"` marker turns RBAC off (access_control_from_raw).
+        if let Err(e) = global::set_setting(ACCESS_CONTROL, if want { "true" } else { "false" }) {
             return HttpReply::error(500, &e);
         }
         // Update the in-memory cache the enforcement pipeline reads per request.
@@ -194,14 +198,14 @@ mod tests {
         }
     }
 
-    /// V0.4a — the flag reads `false` when unset (fresh DB) and only `"true"`
-    /// turns it on.
+    /// V0.4a — the flag reads `true` by default (unset/fresh DB, empty, or an
+    /// explicit `"true"`); only an explicit `"false"` turns it off.
     #[test]
-    fn flag_default_off() {
-        assert!(!access_control_from_raw(None), "unset ⇒ off");
-        assert!(!access_control_from_raw(Some("")), "empty ⇒ off");
-        assert!(!access_control_from_raw(Some("false")), "any non-true ⇒ off");
+    fn flag_default_on() {
+        assert!(access_control_from_raw(None), "unset ⇒ on (default)");
+        assert!(access_control_from_raw(Some("")), "empty ⇒ on");
         assert!(access_control_from_raw(Some("true")), "explicit true ⇒ on");
+        assert!(!access_control_from_raw(Some("false")), "explicit false ⇒ off");
     }
 
     /// V0.4c — enabling is allowed for anyone; disabling requires superadmin.

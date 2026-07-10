@@ -46,8 +46,9 @@ pub(crate) fn authenticate(
     segments: &[&str],
     auth_token: Option<&str>,
 ) -> Result<Option<User>, HttpReply> {
-    // Fast path: access control OFF (default) → god mode (FR-v3-08, design
-    // §13.10). Everyone is effectively superadmin with no login; the enforcement
+    // Fast path: access control OFF (explicit `"false"` opt-out) → god mode
+    // (FR-v3-08, design §13.10; RBAC is ON by default now). Everyone is
+    // effectively superadmin with no login; the enforcement
     // sites already short-circuit to full access on `auth_user == None`. Also a
     // no-op when there is no auth store to enforce against (NFR-09). Both are read
     // from the cached [`Backend::access_control`] flag — no per-request disk I/O.

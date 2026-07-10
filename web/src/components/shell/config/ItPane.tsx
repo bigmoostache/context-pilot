@@ -170,10 +170,14 @@ function IdentityForm({ initialName, initialIp }: { initialName: string; initial
 /** CA-root download + fingerprint. Fingerprint from `GET /api/it/ca/fingerprint`;
  *  download via the authenticated binary blob (`GET /api/it/ca.crt`). */
 function TrustSection() {
-  const { data: fp, isError: fpError } = useQuery({
+  // Caddy mints the private-CA root lazily on the first `:443` handshake, so the
+  // fingerprint 404s for a beat after the box is provisioned. Poll every 2s until
+  // it lands, then stop (data present ⇒ no further refetch).
+  const { data: fp } = useQuery({
     queryKey: ["it-ca-fingerprint"],
     queryFn: fetchItCaFingerprint,
-    retry: 1,
+    retry: false,
+    refetchInterval: (query) => (query.state.data ? false : 2000),
   })
   const download = useMutation({ mutationFn: downloadItCaCert })
 
@@ -190,8 +194,7 @@ function TrustSection() {
           SHA-256 fingerprint
         </div>
         <div className="font-mono text-[11px] break-all text-foreground/90">
-          {fp?.fingerprint ??
-            (fpError ? "The CA root isn't ready yet — reload in a moment." : "loading…")}
+          {fp?.fingerprint ?? "waiting for the CA root…"}
         </div>
       </div>
 
