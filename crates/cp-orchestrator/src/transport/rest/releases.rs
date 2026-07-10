@@ -324,19 +324,51 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     }))
 }
 
-/// `POST /api/releases/restart-orchestrator` — gracefully restart the
-/// orchestrator process.
+/// `POST /api/releases/restart-orchestrator` — restart the orchestrator process
+/// **in place** so it actually comes back up.
 ///
-/// Sends the HTTP response first, then schedules a delayed `SIGTERM` to self so
-/// the process manager (systemd on the box, or the user on a dev machine) can
-/// respawn it. The 200 ms delay ensures the response reaches the client before
-/// the process dies.
+/// Sends the HTTP response first, then (after a short delay so the response
+/// reaches the client) re-executes the running binary via `execv`. This
+/// **replaces the current process image with a fresh one on the same PID** —
+/// the listening socket is closed automatically on `exec` (Rust opens it
+/// `SOCK_CLOEXEC`), freeing the port, and the new image re-binds and re-reads
+/// its config from the environment, which is inherited across `exec`.
+///
+/// Why not a bare `SIGTERM`? The previous implementation signalled itself and
+/// relied on an external supervisor (procd) to respawn. On any host without
+/// such a supervisor — a dev machine, or a deployment where the service is not
+/// under an auto-restart supervisor — SIGTERM simply killed the orchestrator,
+/// leaving the frontend with no backend. Re-exec works with **or without** a
+/// supervisor, and because the PID is preserved it never trips procd's
+/// crash-loop back-off either.
+///
+/// If the re-exec fails (e.g. `current_exe` cannot be resolved, or `execv`
+/// errors) we fall back to the old `SIGTERM` behaviour so a supervised host can
+/// still respawn us.
 pub(crate) fn restart_orchestrator(_state: &Mutex<Backend>) -> HttpReply {
-    let _delayed_exit = std::thread::spawn(|| {
+    use std::os::unix::process::CommandExt as _;
+
+    let _restart = std::thread::spawn(|| {
+        // Let the HTTP 200 flush to the client before the socket goes away.
         std::thread::sleep(std::time::Duration::from_millis(200));
-        // SIGTERM triggers the default handler (process exit). On systemd-managed
-        // deployments the service respawns automatically (Restart=on-failure); on
-        // a dev machine the user relaunches manually.
+
+        match std::env::current_exe() {
+            Ok(exe) => {
+                // Forward the original arguments; the environment (which carries
+                // all orchestrator config) is inherited automatically.
+                let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+                // `exec` only ever returns on failure — on success it never comes
+                // back because the process image is replaced.
+                let err = std::process::Command::new(&exe).args(&args).exec();
+                eprintln!("restart_orchestrator: exec of {} failed: {err}; falling back to SIGTERM", exe.display());
+            }
+            Err(e) => {
+                eprintln!("restart_orchestrator: current_exe() failed: {e}; falling back to SIGTERM");
+            }
+        }
+
+        // Fallback: if re-exec did not take over, signal ourselves so a
+        // supervisor (procd) can respawn the service the old way.
         let _sent = nix::sys::signal::kill(nix::unistd::Pid::this(), nix::sys::signal::Signal::SIGTERM);
     });
     HttpReply::ok(&serde_json::json!({ "status": "restarting" }))
