@@ -9,26 +9,15 @@ import { LogOut, Plus, Shield, ShieldAlert, ShieldHalf, Trash2, Users } from "lu
 import { fetchUsers, createUser, deleteUser, forceLogoutUser } from "@/lib/api"
 import { useAuth } from "@/lib/providers/auth"
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
+import { assignableRoles, type Role } from "@/lib/support/roles"
 import { cn } from "@/lib/utils"
 
-// ── Roles ────────────────────────────────────────────────────────────
+// ── Role presentation ────────────────────────────────────────────────
 //
-// The four ordered system roles (design §13.2): superadmin > admin > manager >
-// user. `ROLE_RANK` is the client-side mirror of the backend total order and
-// drives both which roles the current user may assign and superadmin-row hiding.
-// Server-side checks remain authoritative (NFR-05); this gating is cosmetic.
-
-export type Role = "superadmin" | "admin" | "manager" | "user"
-
-const ROLE_ORDER: readonly Role[] = ["superadmin", "admin", "manager", "user"] as const
-const ROLE_RANK: Record<Role, number> = { superadmin: 4, admin: 3, manager: 2, user: 1 }
-
-/** Roles the current user may assign: strictly below their own rank, except a
- *  superadmin who may assign any role (mirrors backend `can_assign_role`). */
-function assignableRoles(current: Role): Role[] {
-  if (current === "superadmin") return [...ROLE_ORDER]
-  return ROLE_ORDER.filter((r) => ROLE_RANK[r] < ROLE_RANK[current])
-}
+// The role model itself (order/rank/assignable/manage predicate) lives in the
+// component-free `@/lib/support/roles` module so it can be shared with the shell
+// menu without tripping react-refresh. What stays here is purely the dialog's
+// presentation of a role: its label and badge.
 
 const ROLE_LABEL: Record<Role, string> = {
   superadmin: "Superadmin",

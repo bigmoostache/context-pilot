@@ -10,6 +10,7 @@ import {
 import { useAccount } from "@/lib/providers/account"
 import { useAuth } from "@/lib/providers/auth"
 import { accentVar } from "@/lib/support/panelMeta"
+import { canManageUsers } from "@/lib/support/roles"
 import type { User } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -80,7 +81,7 @@ export function UserMenu({
             <Settings className="size-4 text-muted-foreground" />
             Settings
           </DropdownMenuItem>
-          {authEnabled && authUser?.role === "admin" && onOpenUsers && (
+          {authEnabled && canManageUsers(authUser?.role) && onOpenUsers && (
             <DropdownMenuItem onClick={onOpenUsers} className="gap-2.5 py-1.5 text-[12.5px]">
               <Users className="size-4 text-muted-foreground" />
               Manage Users
