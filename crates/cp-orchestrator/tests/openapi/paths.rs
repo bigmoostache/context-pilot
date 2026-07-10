@@ -345,6 +345,19 @@ pub(super) fn paths() -> Value {
         "/api/claude-login/status": get("usage", "Claude Code OAuth token status", r("ClaudeTokenStatus")),
         "/api/claude-login/start": post("usage", "Start Claude Code OAuth login (PKCE)", None, r("ClaudeLoginStartResponse")),
         "/api/claude-login/complete": post("usage", "Complete Claude Code OAuth login", Some(r("ClaudeLoginCompleteRequest")), r("ClaudeLoginCompleteResponse")),
-        "/api/claude-login/refresh": post("usage", "Refresh Claude Code OAuth token", None, r("ClaudeLoginCompleteResponse"))
+        "/api/claude-login/refresh": post("usage", "Refresh Claude Code OAuth token", None, r("ClaudeLoginCompleteResponse")),
+        // ── Claude multi-account token vault ────────────────────────
+        "/api/claude-accounts": get("usage", "List stored Claude accounts", r("ClaudeAccountsListResponse")),
+        "/api/claude-accounts/store": post("usage", "Store current active token under its account email", None, r("OkResponse")),
+        "/api/claude-accounts/switch": post("usage", "Switch to a stored account", Some(json!({
+            "type": "object",
+            "properties": { "email": { "type": "string" } },
+            "required": ["email"]
+        })), r("OkResponse")),
+        "/api/claude-accounts/{email}": json!({ "delete": {
+            "tags": ["usage"], "summary": "Delete a stored account",
+            "parameters": [{ "name": "email", "in": "path", "required": true, "schema": { "type": "string" } }],
+            "responses": merge(ok(r("OkResponse")), err())
+        }})
     })
 }

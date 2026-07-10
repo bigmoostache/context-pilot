@@ -115,6 +115,16 @@ export type BodyPayload = {
     bytes: Array<number>;
 };
 
+export type ClaudeAccountSummary = {
+    email: string;
+    expires_at?: number | null;
+    valid: boolean;
+};
+
+export type ClaudeAccountsListResponse = {
+    accounts: Array<ClaudeAccountSummary>;
+};
+
 export type ClaudeLoginCompleteRequest = {
     code: string;
 };
@@ -1842,6 +1852,110 @@ export type PostApiAuthUsersByUserIdLogoutResponses = {
 };
 
 export type PostApiAuthUsersByUserIdLogoutResponse = PostApiAuthUsersByUserIdLogoutResponses[keyof PostApiAuthUsersByUserIdLogoutResponses];
+
+export type GetApiClaudeAccountsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/claude-accounts';
+};
+
+export type GetApiClaudeAccountsErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiClaudeAccountsError = GetApiClaudeAccountsErrors[keyof GetApiClaudeAccountsErrors];
+
+export type GetApiClaudeAccountsResponses = {
+    /**
+     * Success
+     */
+    200: ClaudeAccountsListResponse;
+};
+
+export type GetApiClaudeAccountsResponse = GetApiClaudeAccountsResponses[keyof GetApiClaudeAccountsResponses];
+
+export type PostApiClaudeAccountsStoreData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/claude-accounts/store';
+};
+
+export type PostApiClaudeAccountsStoreErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiClaudeAccountsStoreError = PostApiClaudeAccountsStoreErrors[keyof PostApiClaudeAccountsStoreErrors];
+
+export type PostApiClaudeAccountsStoreResponses = {
+    /**
+     * Success
+     */
+    200: OkResponse;
+};
+
+export type PostApiClaudeAccountsStoreResponse = PostApiClaudeAccountsStoreResponses[keyof PostApiClaudeAccountsStoreResponses];
+
+export type PostApiClaudeAccountsSwitchData = {
+    body: {
+        email: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/claude-accounts/switch';
+};
+
+export type PostApiClaudeAccountsSwitchErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiClaudeAccountsSwitchError = PostApiClaudeAccountsSwitchErrors[keyof PostApiClaudeAccountsSwitchErrors];
+
+export type PostApiClaudeAccountsSwitchResponses = {
+    /**
+     * Success
+     */
+    200: OkResponse;
+};
+
+export type PostApiClaudeAccountsSwitchResponse = PostApiClaudeAccountsSwitchResponses[keyof PostApiClaudeAccountsSwitchResponses];
+
+export type DeleteApiClaudeAccountsByEmailData = {
+    body?: never;
+    path: {
+        email: string;
+    };
+    query?: never;
+    url: '/api/claude-accounts/{email}';
+};
+
+export type DeleteApiClaudeAccountsByEmailErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type DeleteApiClaudeAccountsByEmailError = DeleteApiClaudeAccountsByEmailErrors[keyof DeleteApiClaudeAccountsByEmailErrors];
+
+export type DeleteApiClaudeAccountsByEmailResponses = {
+    /**
+     * Success
+     */
+    200: OkResponse;
+};
+
+export type DeleteApiClaudeAccountsByEmailResponse = DeleteApiClaudeAccountsByEmailResponses[keyof DeleteApiClaudeAccountsByEmailResponses];
 
 export type PostApiClaudeLoginCompleteData = {
     body: ClaudeLoginCompleteRequest;

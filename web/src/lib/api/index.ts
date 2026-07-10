@@ -33,6 +33,10 @@ import {
   postApiClaudeLoginStart,
   postApiClaudeLoginComplete,
   postApiClaudeLoginRefresh,
+  getApiClaudeAccounts,
+  postApiClaudeAccountsStore,
+  postApiClaudeAccountsSwitch,
+  deleteApiClaudeAccountsByEmail,
   getApiFleetMeta,
   getApiFleetRetired,
   getApiAgentByIdMeta,
@@ -82,6 +86,7 @@ export type {
   ClaudeLoginStartResponse,
   ClaudeLoginCompleteResponse,
 } from "./generated/types.gen"
+export type { ClaudeAccountSummary, ClaudeAccountsListResponse } from "./generated/types.gen"
 
 // ── Helper: align TS with runtime (setupClient.ts guarantees) ─────────
 
@@ -338,4 +343,24 @@ export function refreshClaudeLogin(): Promise<
   import("./generated/types.gen").ClaudeLoginCompleteResponse
 > {
   return sdk(postApiClaudeLoginRefresh())
+}
+
+// ── Claude multi-account token vault (SDK) ────────────────────────────
+
+export function fetchClaudeAccounts(): Promise<
+  import("./generated/types.gen").ClaudeAccountsListResponse
+> {
+  return sdk(getApiClaudeAccounts())
+}
+
+export function storeClaudeAccount(): Promise<{ ok: boolean; email: string }> {
+  return sdk(postApiClaudeAccountsStore())
+}
+
+export function switchClaudeAccount(email: string): Promise<{ ok: boolean; email: string }> {
+  return sdk(postApiClaudeAccountsSwitch({ body: { email } }))
+}
+
+export function deleteClaudeAccount(email: string): Promise<{ ok: boolean }> {
+  return sdk(deleteApiClaudeAccountsByEmail({ path: { email } }))
 }

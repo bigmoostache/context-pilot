@@ -177,6 +177,23 @@ pub(super) fn deploy() -> Value {
                 "expires_at": { "type": "integer", "nullable": true }
             },
             "required": ["status"]
+        },
+        // ── Claude multi-account token vault ────────────────────────
+        "ClaudeAccountSummary": {
+            "type": "object",
+            "properties": {
+                "email": { "type": "string" },
+                "expires_at": { "type": "integer", "nullable": true },
+                "valid": { "type": "boolean" }
+            },
+            "required": ["email", "valid"]
+        },
+        "ClaudeAccountsListResponse": {
+            "type": "object",
+            "properties": {
+                "accounts": arr(r("ClaudeAccountSummary"))
+            },
+            "required": ["accounts"]
         }
     })
 }
