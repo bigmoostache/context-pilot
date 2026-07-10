@@ -100,8 +100,7 @@ mod tests {
 
         // Every required field is mandatory: dropping any one key must fail.
         let full: serde_json::Value = serde_json::from_str(FIXTURE).expect("fixture is valid JSON");
-        for key in ["schema", "channel", "version", "released_at", "expires_at", "min_from", "notes_url", "artifacts"]
-        {
+        for key in ["schema", "channel", "version", "released_at", "expires_at", "min_from", "notes_url", "artifacts"] {
             let mut pruned = full.clone();
             let _removed = pruned.as_object_mut().expect("object").remove(key);
             let outcome = serde_json::from_value::<Manifest>(pruned);

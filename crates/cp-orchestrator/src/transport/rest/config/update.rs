@@ -145,7 +145,10 @@ pub(crate) fn update_set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply 
         window: Option<MaintenanceWindow>,
     }
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
-        return HttpReply::error(400, "expected {\"mode\":\"auto|manual|paused\",\"window\":{\"start\":..,\"end\":..}}");
+        return HttpReply::error(
+            400,
+            "expected {\"mode\":\"auto|manual|paused\",\"window\":{\"start\":..,\"end\":..}}",
+        );
     };
     if req.mode.is_none() && req.window.is_none() {
         return HttpReply::error(400, "nothing to update: provide mode and/or window");

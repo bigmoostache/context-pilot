@@ -51,7 +51,12 @@ pub fn download_artifact(store: &ReleaseStore, manifest: &Manifest, arch: &str) 
 ///
 /// On a hash mismatch nothing is written at all; on an extraction failure the
 /// partial `releases/<tag>/` directory is removed.
-pub(crate) fn verify_and_extract(store: &ReleaseStore, tag: &str, bytes: &[u8], expected_sha256: &str) -> Result<(), String> {
+pub(crate) fn verify_and_extract(
+    store: &ReleaseStore,
+    tag: &str,
+    bytes: &[u8],
+    expected_sha256: &str,
+) -> Result<(), String> {
     let actual = hex_sha256(bytes);
     if !actual.eq_ignore_ascii_case(expected_sha256) {
         return Err(format!("sha256 mismatch for {tag}: manifest pins {expected_sha256}, tarball hashes to {actual}"));

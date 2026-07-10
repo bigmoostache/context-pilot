@@ -124,13 +124,7 @@ pub fn evaluate_manifest(
 /// dependency for one fixed format.
 pub(crate) fn iso8601_to_epoch(s: &str) -> Option<u64> {
     let b = s.as_bytes();
-    if b.len() != 20
-        || b[4] != b'-'
-        || b[7] != b'-'
-        || b[10] != b'T'
-        || b[13] != b':'
-        || b[16] != b':'
-        || b[19] != b'Z'
+    if b.len() != 20 || b[4] != b'-' || b[7] != b'-' || b[10] != b'T' || b[13] != b':' || b[16] != b':' || b[19] != b'Z'
     {
         return None;
     }

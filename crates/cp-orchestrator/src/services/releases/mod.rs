@@ -34,8 +34,8 @@ const USER_AGENT: &str = "context-pilot-orchestrator";
 /// On-disk configuration (arch, active tag, auto-update policy) — see
 /// [`config`].
 mod config;
-pub use config::{MaintenanceWindow, UpdateMode};
 use config::ReleaseConfig;
+pub use config::{MaintenanceWindow, UpdateMode};
 
 // ── Public types ────────────────────────────────────────────────────────
 

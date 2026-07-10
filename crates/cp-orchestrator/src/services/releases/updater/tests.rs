@@ -68,10 +68,7 @@ fn updater_verify() {
 
     // Anti-rollback: offered (v9.9.9) below the running version.
     assert!(
-        matches!(
-            evaluate_manifest(VALID_JSON, VALID_SIG, "v10.0.0", NOW),
-            Err(super::VerifyError::Rollback { .. })
-        ),
+        matches!(evaluate_manifest(VALID_JSON, VALID_SIG, "v10.0.0", NOW), Err(super::VerifyError::Rollback { .. })),
         "manifest older than the running version must be rejected"
     );
 
@@ -99,10 +96,10 @@ fn updater_no_download_on_failed_check() {
     tampered[0] = b' ';
 
     for (bytes, sig, current) in [
-        (tampered.as_slice(), VALID_SIG, "v0.3.0"),  // bad signature
-        (EXPIRED_JSON, EXPIRED_SIG, "v0.3.0"),       // expired
-        (VALID_JSON, VALID_SIG, "v10.0.0"),          // rollback
-        (VALID_JSON, VALID_SIG, "v0.1.0"),           // below min_from
+        (tampered.as_slice(), VALID_SIG, "v0.3.0"), // bad signature
+        (EXPIRED_JSON, EXPIRED_SIG, "v0.3.0"),      // expired
+        (VALID_JSON, VALID_SIG, "v10.0.0"),         // rollback
+        (VALID_JSON, VALID_SIG, "v0.1.0"),          // below min_from
     ] {
         let mut downloaded = false;
         let outcome = check_and_prepare(bytes, sig, current, NOW, |_m| {

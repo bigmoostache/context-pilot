@@ -179,7 +179,8 @@ pub fn boot_reconcile(releases_dir: &Path, auth_db_path: &Path, install: &Path) 
     let _rm = std::fs::remove_file(&path);
 
     let mut st = UpdateState::load(releases_dir);
-    st.last_result = Some(UpdateResult::RolledBack { to: pending.from.clone(), attempted: pending.to.clone(), at_ms: now_ms() });
+    st.last_result =
+        Some(UpdateResult::RolledBack { to: pending.from.clone(), attempted: pending.to.clone(), at_ms: now_ms() });
     st.save(releases_dir);
     eprintln!(
         "updater: update to {} failed — rolled back to {}",

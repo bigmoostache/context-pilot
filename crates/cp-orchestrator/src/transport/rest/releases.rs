@@ -14,9 +14,9 @@
 //! passes (design §13.10). The handlers themselves take no `auth_user` — the
 //! router guard is the enforcement point.
 
+use serde::Deserialize;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use serde::Deserialize;
 
 use super::{Backend, HttpReply};
 use crate::services::releases::{KNOWN_ARCHS, semver_sort_key};

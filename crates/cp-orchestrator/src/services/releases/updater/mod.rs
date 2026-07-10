@@ -52,11 +52,8 @@ pub fn fetch_stable_manifest() -> Result<(Vec<u8>, String), String> {
         .map_err(|e| format!("http client: {e}"))?;
     let fetch = |file: &str| -> Result<Vec<u8>, String> {
         let url = channel_url(file);
-        let resp = client
-            .get(&url)
-            .header("User-Agent", super::USER_AGENT)
-            .send()
-            .map_err(|e| format!("GET {url}: {e}"))?;
+        let resp =
+            client.get(&url).header("User-Agent", super::USER_AGENT).send().map_err(|e| format!("GET {url}: {e}"))?;
         if !resp.status().is_success() {
             return Err(format!("GET {url}: HTTP {}", resp.status()));
         }

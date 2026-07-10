@@ -53,3 +53,18 @@ pub(super) fn format_uuid(bytes: &[u8; 16]) -> String {
 pub(super) fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |dur| u64::try_from(dur.as_millis()).unwrap_or(u64::MAX))
 }
+
+impl super::store::AuthStore {
+    /// The auth database path — `CP_AUTH_DB`, else
+    /// `~/.context-pilot/orchestrator/auth.db` (the one place this default is
+    /// derived; `runtime::Config` and the transport both read it here).
+    #[must_use]
+    pub fn default_db_path() -> std::path::PathBuf {
+        match std::env::var_os("CP_AUTH_DB") {
+            Some(p) => std::path::PathBuf::from(p),
+            None => std::env::var_os("HOME")
+                .map(|h| std::path::PathBuf::from(h).join(".context-pilot/orchestrator/auth.db"))
+                .unwrap_or_else(|| std::path::PathBuf::from("auth.db")),
+        }
+    }
+}
