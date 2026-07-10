@@ -21,9 +21,24 @@ tools:
   panel_goto_page:
     description: |
       Navigates to a specific page of a paginated panel. Only available when a panel has more than one page.
+
+      DESTRUCTIVE: only the current page is ever in your context. Navigating away
+      PERMANENTLY discards the current page's content — you retain NOTHING from it
+      except the note you write in `current_page_description`. This is not like
+      flipping through a document you can re-read; the bytes are gone from context
+      and there is no trace they existed. Do NOT walk pages to "read" a panel:
+      each hop re-emits a full page (~25k tokens), breaks the prompt cache, and
+      loses what you just saw. Prefer searching the panel or opening a specific
+      range. Only page when you have a concrete reason, and always extract what
+      you need from the current page FIRST.
+
+      Your `current_page_description` notes accumulate in a scratchpad at the top
+      of the panel, so they survive after each page's raw content is discarded.
+      The scratchpad is temporary — it vanishes when the panel is closed.
     parameters:
       panel_id: "Panel ID (e.g., P8)"
-      page: "Page number (1-indexed)"
+      page: "Page number (1-indexed) to navigate TO"
+      current_page_description: "COMPULSORY. A concise but information-dense summary of what is on the page you are CURRENTLY viewing (the page you are about to leave). This is saved to the panel's scratchpad and is the ONLY thing you keep once you navigate away — its raw content is discarded. Capture the facts, names, values, and line ranges you'll need later."
 
   module_toggle:
     description: |

@@ -76,6 +76,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             source_hash: None,
             current_page: 0,
             total_pages: 1,
+            page_descriptions: Default::default(),
             full_token_count: 0,
             scroll_state: cp_base::state::context::ScrollState::default(),
             panel_cache_hit: false,

@@ -133,7 +133,7 @@ impl Panel for ConversationHistoryPanel {
             .filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY)
             .filter_map(|c| {
                 let content = c.cached_content.as_ref()?;
-                let output = paginate_content(content, c.current_page, c.total_pages);
+                let output = paginate_content(content, c.current_page, c.total_pages, &c.page_descriptions);
                 Some(ContextItem::new(&c.id, &c.name, output, c.last_refresh_ms))
             })
             .collect()

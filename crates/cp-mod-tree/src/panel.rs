@@ -146,7 +146,7 @@ impl Panel for TreePanel {
                 if let Some(content) = &ctx.cached_content
                     && !content.is_empty()
                 {
-                    let output = paginate_content(content, ctx.current_page, ctx.total_pages);
+                    let output = paginate_content(content, ctx.current_page, ctx.total_pages, &ctx.page_descriptions);
                     return vec![ContextItem::new(&ctx.id, "Directory Tree", output, ctx.last_refresh_ms)];
                 }
                 break;

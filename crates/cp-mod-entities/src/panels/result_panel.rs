@@ -180,8 +180,12 @@ impl Panel for EntityResultPanel {
             ctx.total_pages = compute_total_pages(token_count);
             ctx.current_page = 0;
             if ctx.total_pages > 1 {
-                let page_content =
-                    paginate_content(ctx.cached_content.as_deref().unwrap_or(""), ctx.current_page, ctx.total_pages);
+                let page_content = paginate_content(
+                    ctx.cached_content.as_deref().unwrap_or(""),
+                    ctx.current_page,
+                    ctx.total_pages,
+                    &ctx.page_descriptions,
+                );
                 ctx.token_count = estimate_tokens(&page_content);
             } else {
                 ctx.token_count = token_count;
@@ -239,7 +243,7 @@ impl Panel for EntityResultPanel {
             .filter(|c| c.context_type == Kind::new(ENTITY_RESULT_TYPE))
             .filter_map(|c| {
                 let content = c.cached_content.as_ref()?;
-                let output = paginate_content(content, c.current_page, c.total_pages);
+                let output = paginate_content(content, c.current_page, c.total_pages, &c.page_descriptions);
                 Some(ContextItem::new(&c.id, &c.name, output, c.last_refresh_ms))
             })
             .collect()

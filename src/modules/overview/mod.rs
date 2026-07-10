@@ -308,6 +308,7 @@ impl Module for OverviewModule {
                 .enabled(false)
                 .param("panel_id", ParamType::String, true)
                 .param("page", ParamType::Integer, true)
+                .param("current_page_description", ParamType::String, true)
                 .build(),
         );
 
@@ -382,6 +383,18 @@ impl Module for OverviewModule {
             }
             "panel_goto_page" => {
                 let mut pf = Verdict::new();
+                let has_desc = tool
+                    .input
+                    .get("current_page_description")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|s| !s.trim().is_empty());
+                if !has_desc {
+                    pf.errors.push(
+                        "Missing 'current_page_description' — summarize what you see on the CURRENT page \
+before leaving it; its raw content will be discarded and this note is all you keep."
+                            .to_string(),
+                    );
+                }
                 if let Some(panel_id) = tool.input.get("panel_id").and_then(serde_json::Value::as_str) {
                     match state.context.iter().find(|c| c.id == panel_id) {
                         None => pf.errors.push(format!("Panel '{panel_id}' not found")),

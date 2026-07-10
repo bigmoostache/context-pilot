@@ -213,7 +213,7 @@ impl Panel for ConsolePanel {
                 let header = format!("Console: {desc} ({status})");
 
                 // Content is already truncated to MAX_CONTEXT_CHARS in refresh_cache
-                let output = paginate_content(content, c.current_page, c.total_pages);
+                let output = paginate_content(content, c.current_page, c.total_pages, &c.page_descriptions);
                 Some(ContextItem::new(&c.id, header, output, c.last_refresh_ms))
             })
             .collect()

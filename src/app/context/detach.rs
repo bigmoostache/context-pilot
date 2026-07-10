@@ -190,6 +190,7 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
             source_hash: None,
             current_page: 0,
             total_pages,
+            page_descriptions: std::collections::BTreeMap::new(),
             full_token_count: token_count,
             scroll_state: cp_base::state::context::ScrollState::default(),
             panel_cache_hit: false,
