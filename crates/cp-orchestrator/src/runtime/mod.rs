@@ -209,7 +209,7 @@ impl Runtime {
     /// maintenance window, drive the download → stage → restart pipeline.
     /// `manual`/`paused` only refresh the visible state. See
     /// [`update_scheduler`].
-    pub fn start_update_scheduler(&self, install: std::path::PathBuf) -> thread::JoinHandle<()> {
+    pub fn start_update_scheduler(&self, install: PathBuf) -> thread::JoinHandle<()> {
         update_scheduler::spawn(Arc::clone(&self.backend), self.config.auth_db_path.clone(), install)
     }
 
@@ -225,7 +225,7 @@ impl Runtime {
     /// `boot_check` counts the failure and can roll back.
     ///
     /// No-op thread on a normal (nothing-staged) boot.
-    pub fn start_update_committer(&self, install: std::path::PathBuf) -> thread::JoinHandle<()> {
+    pub fn start_update_committer(&self, install: PathBuf) -> thread::JoinHandle<()> {
         let backend = Arc::clone(&self.backend);
         let url = format!("http://127.0.0.1:{}/healthz", self.config.port);
         let auth_db = self.config.auth_db_path.clone();

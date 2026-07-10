@@ -26,13 +26,31 @@ pub enum VerifyError {
     /// The (signed) JSON does not parse into the frozen [`Manifest`] schema.
     Parse(String),
     /// A timestamp field is malformed.
-    Timestamp { field: &'static str, value: String },
+    Timestamp {
+        /// Which manifest field failed to parse.
+        field: &'static str,
+        /// The offending raw value.
+        value: String,
+    },
     /// The manifest's `expires_at` is in the past — a stale replay.
-    Expired { expires_at: String },
+    Expired {
+        /// The manifest's expiry instant.
+        expires_at: String,
+    },
     /// The manifest offers a version at or below the running one.
-    Rollback { offered: String, current: String },
+    Rollback {
+        /// The version the manifest offers.
+        offered: String,
+        /// The version this box runs.
+        current: String,
+    },
     /// The running version is below the manifest's `min_from` floor.
-    TooOldForJump { current: String, min_from: String },
+    TooOldForJump {
+        /// The version this box runs.
+        current: String,
+        /// The manifest's minimum direct-jump version.
+        min_from: String,
+    },
 }
 
 impl std::fmt::Display for VerifyError {
