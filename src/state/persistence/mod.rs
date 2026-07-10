@@ -231,6 +231,7 @@ fn panel_to_context(panel: &PanelData, local_id: &str) -> Entry {
         source_hash: None,
         current_page: 0,
         total_pages: 1,
+        page_descriptions: std::collections::BTreeMap::new(),
         full_token_count: 0,
         scroll_state: cp_base::state::context::ScrollState::default(),
         panel_cache_hit: false,

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::OnceLock;
 
 use serde::de::DeserializeOwned;
@@ -260,6 +260,14 @@ pub struct Entry {
     /// Total pages for LLM context pagination
     #[serde(skip)]
     pub total_pages: usize,
+    /// LLM-authored, per-page scratchpad notes for paginated panels.
+    /// Keyed by 0-indexed page number → the description the LLM wrote for that
+    /// page (captured via `panel_goto_page`'s compulsory `current_page_description`
+    /// before navigating away). Rendered at the top of the panel so the notes
+    /// survive after the page's raw content is discarded from context.
+    /// Transient: lives on the Entry, so it vanishes when the panel is closed.
+    #[serde(skip)]
+    pub page_descriptions: BTreeMap<usize, String>,
     /// Full content token count (before pagination). `token_count` reflects current page.
     #[serde(skip)]
     pub full_token_count: usize,
@@ -352,6 +360,7 @@ pub fn make_default_entry(id: &str, context_type: Kind, name: &str, cache_deprec
         source_hash: None,
         current_page: 0,
         total_pages: 1,
+        page_descriptions: BTreeMap::new(),
         full_token_count: 0,
         scroll_state: ScrollState::default(),
         panel_cache_hit: false,

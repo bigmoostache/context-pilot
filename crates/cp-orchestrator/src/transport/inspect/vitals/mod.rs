@@ -45,6 +45,11 @@ use cp_wire::types::registry::Entry;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
+/// Authenticated API-key validation probes (GitHub username, Brave/Firecrawl/
+/// Voyage/Datalab account info) — proves each key is *valid*, not just that the
+/// host is reachable. See [`keychecks`] for the honesty contract.
+mod keychecks;
+
 /// Per-probe network timeout. Bounds DNS+connect for a single remote check.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -77,16 +82,17 @@ pub fn agent_vitals(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     vitals.push(meilisearch_vital());
     vitals.push(console_vital(&entry.folder));
 
-    // 5. Remote host reachability — run concurrently, collected under a deadline.
+    // 5. LLM provider reachability — a key-independent TCP probe (the provider
+    //    picked in the agent's config; no cheap whoami exists to validate it).
     let (provider_label, provider_host) = provider_host(&provider);
-    let remotes: Vec<(String, String, String)> = vec![
-        (provider_label.to_owned(), "llm".to_owned(), provider_host.to_owned()),
-        ("Voyage".to_owned(), "service".to_owned(), "api.voyageai.com".to_owned()),
-        ("Datalab".to_owned(), "service".to_owned(), "www.datalab.to".to_owned()),
-        ("Brave".to_owned(), "service".to_owned(), "api.search.brave.com".to_owned()),
-        ("Firecrawl".to_owned(), "service".to_owned(), "api.firecrawl.dev".to_owned()),
-    ];
+    let remotes: Vec<(String, String, String)> =
+        vec![(provider_label.to_owned(), "llm".to_owned(), provider_host.to_owned())];
     vitals.extend(probe_remotes(remotes));
+
+    // 6. Keyed services (GitHub, Brave, Firecrawl, Voyage, Datalab) — real
+    //    authenticated probes that prove the configured API key is valid and
+    //    report minimal account/identity info (username, credits, quota).
+    vitals.extend(keychecks::probe_keyed_services());
 
     HttpReply::ok(&vitals)
 }

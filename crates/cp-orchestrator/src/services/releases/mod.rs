@@ -164,10 +164,21 @@ impl ReleaseStore {
         releases
     }
 
-    /// Path to the `cpilot` binary for a given tag.
+    /// Path to the `cpilot` (agent/TUI) binary for a given tag.
     #[must_use]
     pub fn binary_path(&self, tag: &str) -> PathBuf {
         self.dir.join(tag).join("cpilot")
+    }
+
+    /// Path to the `cp-orchestrator` binary inside a downloaded release.
+    ///
+    /// The release bundle is flat (`cpilot`, `cp-console-server`,
+    /// `cp-orchestrator`, `web/`), so the orchestrator binary sits next to the
+    /// agent binary in the tag directory. Used by the "Update & Restart
+    /// Orchestrator" self-update flow to adopt a freshly downloaded orchestrator.
+    #[must_use]
+    pub fn orchestrator_binary_path(&self, tag: &str) -> PathBuf {
+        self.dir.join(tag).join("cp-orchestrator")
     }
 
     /// The currently active tag, if any.
@@ -392,6 +403,14 @@ pub fn semver_sort_key(tag: &str) -> (u32, u32, u32) {
         .unwrap_or(0);
     (major, minor, patch)
 }
+
+/// Orchestrator self-update — stage a downloaded `cp-orchestrator` over the
+/// running install path with atomic-rename + `.bak` rollback (see module docs).
+mod self_update;
+pub use self_update::{boot_check, boot_commit, stage_orchestrator_update};
+
+#[cfg(test)]
+pub(crate) use self_update::{backup_path, pending_path};
 
 #[cfg(test)]
 mod tests;

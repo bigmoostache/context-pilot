@@ -180,8 +180,10 @@ function statusColor(status: Vital["status"]): string {
 
 /** One compact probe cell: a status dot, the service name, the measured latency
  *  (when reported), and — only when the service is NOT ok — a loud status chip,
- *  so a healthy board stays quiet and a problem leaps out. The honest detail
- *  line rides the `title` tooltip to keep the cell tight. */
+ *  so a healthy board stays quiet and a problem leaps out. The honest `detail`
+ *  line (account identity, credits, quota, or the failure reason) is rendered
+ *  **inline** under the name so the proof of a valid key is visible at a glance,
+ *  not hidden behind a hover tooltip. */
 function VitalRow({ vital }: { vital: Vital }) {
   const color = statusColor(vital.status)
   const healthy = vital.status === "ok"
@@ -191,26 +193,38 @@ function VitalRow({ vital }: { vital: Vital }) {
       title={vital.detail}
     >
       <span
-        className="size-2 shrink-0 rounded-full"
-        style={{ background: color, boxShadow: `0 0 6px ${color}66` }}
+        className="size-2 shrink-0 self-start rounded-full"
+        style={{ marginTop: "0.28rem", background: color, boxShadow: `0 0 6px ${color}66` }}
         aria-hidden
       />
-      <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground">
-        {vital.name}
-      </span>
-      {vital.latencyMs != null && (
-        <span className="font-mono text-[10.5px] text-muted-foreground/65 tabular-nums">
-          {vital.latencyMs}ms
-        </span>
-      )}
-      {!healthy && (
-        <span
-          className="shrink-0 rounded-sm px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wider uppercase"
-          style={{ color, background: `color-mix(in oklab, ${color} 14%, transparent)` }}
-        >
-          {vital.status}
-        </span>
-      )}
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground">
+            {vital.name}
+          </span>
+          {vital.latencyMs != null && (
+            <span className="font-mono text-[10.5px] text-muted-foreground/65 tabular-nums">
+              {vital.latencyMs}ms
+            </span>
+          )}
+          {!healthy && (
+            <span
+              className="shrink-0 rounded-sm px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wider uppercase"
+              style={{ color, background: `color-mix(in oklab, ${color} 14%, transparent)` }}
+            >
+              {vital.status}
+            </span>
+          )}
+        </div>
+        {vital.detail && (
+          <span
+            className="truncate text-[10.5px] leading-snug"
+            style={{ color: healthy ? "var(--muted-foreground)" : color }}
+          >
+            {vital.detail}
+          </span>
+        )}
+      </div>
     </li>
   )
 }
