@@ -20,6 +20,7 @@
 
 pub(crate) mod apply;
 pub(crate) mod download;
+pub(crate) mod scheduler;
 pub(crate) mod state;
 pub(crate) mod verify;
 

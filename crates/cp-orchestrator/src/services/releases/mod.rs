@@ -31,22 +31,11 @@ const USER_AGENT: &str = "context-pilot-orchestrator";
 
 // ── Config persistence ──────────────────────────────────────────────────
 
-/// On-disk configuration for the release manager.
-#[derive(Debug, Serialize, Deserialize)]
-struct ReleaseConfig {
-    /// Platform architecture string (e.g. `"macos-aarch64"`).
-    arch: String,
-    /// `true` when `arch` was auto-detected, `false` when manually set.
-    arch_auto: bool,
-    /// Tag of the currently selected (active) release, if any.
-    active_tag: Option<String>,
-}
-
-impl Default for ReleaseConfig {
-    fn default() -> Self {
-        Self { arch: detect_arch(), arch_auto: true, active_tag: None }
-    }
-}
+/// On-disk configuration (arch, active tag, auto-update policy) — see
+/// [`config`].
+mod config;
+pub use config::{MaintenanceWindow, UpdateMode};
+use config::ReleaseConfig;
 
 // ── Public types ────────────────────────────────────────────────────────
 
@@ -191,6 +180,52 @@ impl ReleaseStore {
     #[must_use]
     pub(crate) fn dir(&self) -> &std::path::Path {
         &self.dir
+    }
+
+    // ── Auto-update policy (update-policy v3, O4.1) ─────────────────────
+
+    /// The box's auto-update posture (`auto` / `manual` / `paused`).
+    #[must_use]
+    pub fn update_mode(&self) -> UpdateMode {
+        self.config.update_mode
+    }
+
+    /// Set the auto-update posture and persist.
+    pub fn set_update_mode(&mut self, mode: UpdateMode) {
+        self.config.update_mode = mode;
+        self.persist();
+    }
+
+    /// The channel this box follows (`stable` today).
+    #[must_use]
+    pub fn channel(&self) -> &str {
+        &self.config.channel
+    }
+
+    /// Hours between channel polls.
+    #[must_use]
+    pub fn poll_interval_hours(&self) -> u32 {
+        self.config.poll_interval_hours
+    }
+
+    /// The box-local maintenance window auto-applies are confined to.
+    #[must_use]
+    pub fn window(&self) -> &MaintenanceWindow {
+        &self.config.window
+    }
+
+    /// Set the maintenance window and persist. Rejects malformed bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either bound is not a valid `HH:MM`.
+    pub fn set_window(&mut self, window: MaintenanceWindow) -> Result<(), String> {
+        if !window.is_valid() {
+            return Err(format!("invalid window bounds: {} – {}", window.start, window.end));
+        }
+        self.config.window = window;
+        self.persist();
+        Ok(())
     }
 
     /// Select a downloaded release as active. Returns the binary path.

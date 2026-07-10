@@ -309,6 +309,134 @@ fn updater_apply_rollback_cycle() {
     drop(std::fs::remove_dir_all(&base));
 }
 
+// ── O4.2 — scheduler tick decisions ─────────────────────────────────────────
+
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use super::super::{MaintenanceWindow, UpdateMode};
+use super::scheduler::{TickOutcome, run_tick};
+
+/// The valid fixture parsed into a [`Manifest`](super::super::Manifest).
+fn fixture_manifest() -> super::super::Manifest {
+    serde_json::from_slice(VALID_JSON).expect("fixture parses")
+}
+
+/// Drive one tick with an injected clock + hooks; returns the outcome and
+/// whether each hook ran.
+fn tick(mode: UpdateMode, now_minutes: u16, gate: &AtomicBool, available: bool) -> (TickOutcome, bool, bool) {
+    let window = MaintenanceWindow::default(); // 03:00–05:00
+    let mut checked = false;
+    let mut applied = false;
+    let outcome = run_tick(
+        mode,
+        &window,
+        now_minutes,
+        gate,
+        || {
+            checked = true;
+            Ok(if available { Some(fixture_manifest()) } else { None })
+        },
+        |m| {
+            assert_eq!(m.version, "v9.9.9");
+            applied = true;
+            Ok("v0.3.0".to_owned())
+        },
+    );
+    (outcome, checked, applied)
+}
+
+/// In-window (03:30) and out-of-window (12:00) instants for the default window.
+const IN_WINDOW: u16 = 3 * 60 + 30;
+const OUT_WINDOW: u16 = 12 * 60;
+
+/// V4.2a — the decision matrix with an injected clock: `auto` + in-window +
+/// available → the pipeline runs; out-of-window → it does not; `manual` does
+/// not even in-window; `paused` never. Every mode still checks.
+#[test]
+fn scheduler_tick_decisions() {
+    // auto + in-window + available → apply.
+    let gate = AtomicBool::new(false);
+    let (outcome, checked, applied) = tick(UpdateMode::Auto, IN_WINDOW, &gate, true);
+    assert!(matches!(outcome, TickOutcome::Applied { ref to, .. } if to == "v9.9.9"), "{outcome:?}");
+    assert!(checked && applied);
+
+    // auto + out-of-window → no apply.
+    let gate = AtomicBool::new(false);
+    let (outcome, checked, applied) = tick(UpdateMode::Auto, OUT_WINDOW, &gate, true);
+    assert!(matches!(outcome, TickOutcome::SkipWindow { .. }), "{outcome:?}");
+    assert!(checked && !applied, "out-of-window must not apply");
+
+    // manual + in-window → no apply (but the check refreshed state).
+    let gate = AtomicBool::new(false);
+    let (outcome, checked, applied) = tick(UpdateMode::Manual, IN_WINDOW, &gate, true);
+    assert!(matches!(outcome, TickOutcome::SkipMode(UpdateMode::Manual)), "{outcome:?}");
+    assert!(checked && !applied, "manual never auto-applies");
+
+    // paused → never, in or out of the window.
+    for now in [IN_WINDOW, OUT_WINDOW] {
+        let gate = AtomicBool::new(false);
+        let (outcome, checked, applied) = tick(UpdateMode::Paused, now, &gate, true);
+        assert!(matches!(outcome, TickOutcome::SkipMode(UpdateMode::Paused)), "{outcome:?}");
+        assert!(checked && !applied, "paused never applies");
+    }
+
+    // Up to date → nothing to do in any mode.
+    let gate = AtomicBool::new(false);
+    let (outcome, checked, applied) = tick(UpdateMode::Auto, IN_WINDOW, &gate, false);
+    assert!(matches!(outcome, TickOutcome::UpToDate), "{outcome:?}");
+    assert!(checked && !applied);
+
+    // A failed check applies nothing.
+    let gate = AtomicBool::new(false);
+    let mut applied = false;
+    let outcome = run_tick(
+        UpdateMode::Auto,
+        &MaintenanceWindow::default(),
+        IN_WINDOW,
+        &gate,
+        || Err("boom".to_owned()),
+        |_m| {
+            applied = true;
+            Ok(String::new())
+        },
+    );
+    assert!(matches!(outcome, TickOutcome::CheckFailed(_)), "{outcome:?}");
+    assert!(!applied, "no apply on a failed check");
+}
+
+/// V4.2b — applies are serialised: once one is in flight the gate refuses a
+/// second, and only a *failed* apply releases the gate for a retry.
+#[test]
+fn scheduler_serialises_applies() {
+    let gate = AtomicBool::new(false);
+
+    // First tick applies and keeps the gate held (a restart is pending).
+    let (outcome, _c, applied) = tick(UpdateMode::Auto, IN_WINDOW, &gate, true);
+    assert!(matches!(outcome, TickOutcome::Applied { .. }), "{outcome:?}");
+    assert!(applied && gate.load(Ordering::SeqCst), "gate held after a successful apply");
+
+    // A second close tick must not launch a concurrent apply.
+    let (outcome, checked, applied) = tick(UpdateMode::Auto, IN_WINDOW, &gate, true);
+    assert!(matches!(outcome, TickOutcome::SkipInFlight), "{outcome:?}");
+    assert!(checked && !applied, "no concurrent apply");
+
+    // A failed apply releases the gate so the next tick can retry.
+    let gate = AtomicBool::new(false);
+    let outcome = run_tick(
+        UpdateMode::Auto,
+        &MaintenanceWindow::default(),
+        IN_WINDOW,
+        &gate,
+        || Ok(Some(fixture_manifest())),
+        |_m| Err("download broke".to_owned()),
+    );
+    assert!(matches!(outcome, TickOutcome::ApplyFailed(_)), "{outcome:?}");
+    assert!(!gate.load(Ordering::SeqCst), "failed apply releases the gate");
+    let (outcome, _c, applied) = tick(UpdateMode::Auto, IN_WINDOW, &gate, true);
+    assert!(matches!(outcome, TickOutcome::Applied { .. }), "{outcome:?}");
+    assert!(applied, "retry allowed after a failure");
+}
+
 /// Sanity: the fixtures' version ordering matches the comparator the
 /// anti-rollback check uses.
 #[test]

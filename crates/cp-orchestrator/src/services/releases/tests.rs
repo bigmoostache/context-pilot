@@ -50,6 +50,48 @@ fn store_set_arch_persists() {
     drop(std::fs::remove_dir_all(&dir));
 }
 
+/// V4.1a — a legacy `config.json` (arch + active tag only, no update-policy
+/// fields) loads with the v3 defaults and no error.
+#[test]
+fn update_config_legacy_migrates_with_defaults() {
+    let dir = std::env::temp_dir().join(format!("cp-rel-legacy-{}", std::process::id()));
+    drop(std::fs::create_dir_all(&dir));
+    std::fs::write(dir.join("config.json"), br#"{"arch":"linux-aarch64","arch_auto":false,"active_tag":"v0.3.0"}"#)
+        .expect("write legacy config");
+
+    let store = ReleaseStore::load(dir.clone());
+    assert_eq!(store.arch(), "linux-aarch64", "legacy fields preserved");
+    assert_eq!(store.active_tag(), Some("v0.3.0"));
+    assert_eq!(store.update_mode(), UpdateMode::Auto, "default mode is auto");
+    assert_eq!(store.channel(), "stable");
+    assert_eq!(store.poll_interval_hours(), 6);
+    assert_eq!(store.window(), &MaintenanceWindow::default(), "default window 03:00–05:00");
+
+    drop(std::fs::remove_dir_all(&dir));
+}
+
+/// V4.1b — the new fields round-trip through persist + reload.
+#[test]
+fn update_config_roundtrip() {
+    let dir = std::env::temp_dir().join(format!("cp-rel-upcfg-{}", std::process::id()));
+    drop(std::fs::create_dir_all(&dir));
+
+    let mut store = ReleaseStore::load(dir.clone());
+    store.set_update_mode(UpdateMode::Manual);
+    let window = MaintenanceWindow { start: "22:30".to_owned(), end: "23:45".to_owned() };
+    store.set_window(window.clone()).expect("valid window accepted");
+    assert!(
+        store.set_window(MaintenanceWindow { start: "9:99".to_owned(), end: "05:00".to_owned() }).is_err(),
+        "malformed window rejected"
+    );
+
+    let reloaded = ReleaseStore::load(dir.clone());
+    assert_eq!(reloaded.update_mode(), UpdateMode::Manual);
+    assert_eq!(reloaded.window(), &window, "rejected write must not have clobbered the valid one");
+
+    drop(std::fs::remove_dir_all(&dir));
+}
+
 #[test]
 fn store_select_rejects_missing() {
     let dir = std::env::temp_dir().join(format!("cp-rel-sel-{}", std::process::id()));

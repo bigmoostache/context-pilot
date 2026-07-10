@@ -89,7 +89,9 @@ fn main() {
     // (`active_tag`, agent binary). If the probe never turns healthy, the
     // rollback markers stay and the next boot's `boot_check` self-heals.
     if let Some(install) = install {
-        let _committer = runtime.start_update_committer(install);
+        let _committer = runtime.start_update_committer(install.clone());
+        // Auto-update scheduler (O4.2): boot poll + nightly-window applies.
+        let _scheduler = runtime.start_update_scheduler(install);
     }
 
     if let Err(e) = runtime.serve() {

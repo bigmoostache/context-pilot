@@ -35,6 +35,7 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 mod seed;
+mod update_scheduler;
 
 use cp_wire::types::LifecycleState;
 use cp_wire::types::oplog::OpEntryKind;
@@ -206,6 +207,15 @@ impl Runtime {
             if self.config.auth_enabled { Some(BackupScheduler::new(self.config.auth_db_path.clone())) } else { None };
 
         thread::spawn(move || driver_loop(backend, agents_dir, interval, backup_scheduler))
+    }
+
+    /// Spawn the auto-update scheduler (O4.2): poll the channel on boot and
+    /// every `poll_interval_hours`; in `auto` mode, inside the box-local
+    /// maintenance window, drive the download → stage → restart pipeline.
+    /// `manual`/`paused` only refresh the visible state. See
+    /// [`update_scheduler`].
+    pub fn start_update_scheduler(&self, install: std::path::PathBuf) -> thread::JoinHandle<()> {
+        update_scheduler::spawn(Arc::clone(&self.backend), self.config.auth_db_path.clone(), install)
     }
 
     /// Spawn the self-update committer thread (update-policy §5.5 steps 4-5).
