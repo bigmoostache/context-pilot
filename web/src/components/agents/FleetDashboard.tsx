@@ -161,7 +161,7 @@ function AgentCard({
         </span>
       </div>
 
-      {/* §19 health — a tripped breaker / degraded stream / lagging projection
+      {/* §19 health — a degraded stream / lagging projection
           surfaces here so it is VISIBLE, never a silent backend latch (T121). */}
       <HealthBadge agentId={agent.id} />
 
@@ -206,20 +206,12 @@ function AgentCard({
 const REV_LAG_WARN = 50
 
 /** The first non-nominal health condition to surface for an agent card, or null
- *  when everything is nominal. A flat if-chain (not a nested ternary): cost
- *  breaker first (hard block), then a degraded stream, then a lagging
- *  projection. */
+ *  when everything is nominal. A flat if-chain (not a nested ternary): a
+ *  degraded stream first, then a lagging projection. */
 function healthCondition(
   data: NonNullable<ReturnType<typeof useMetrics>["data"]>,
 ): { label: string; tone: string; title: string } | null {
-  const { breaker, stream, rev } = data
-  if (breaker.tripped) {
-    return {
-      label: "Over budget",
-      tone: "var(--danger)",
-      title: `Cost breaker tripped — spent $${(breaker.spendUsd ?? 0).toFixed(2)} of $${(breaker.budgetUsd ?? 0).toFixed(2)} budget. Sends are blocked until the budget is raised or the run is stopped.`,
-    }
-  }
+  const { stream, rev } = data
   if (stream.degraded) {
     return {
       label: "Stream degraded",
@@ -239,8 +231,8 @@ function healthCondition(
 
 /**
  * §19 health badge for an agent card. Polls `/api/agent/{id}/metrics` and
- * surfaces the *first* non-nominal condition as a coloured pill — so a tripped
- * cost-breaker, a degraded stream, or a lagging projection is **visible at a
+ * surfaces the *first* non-nominal condition as a coloured pill — so a
+ * degraded stream or a lagging projection is **visible at a
  * glance** on the fleet board rather than a silent backend latch (T121). When
  * everything is nominal (or metrics haven't loaded) it renders nothing, keeping
  * healthy cards uncluttered.

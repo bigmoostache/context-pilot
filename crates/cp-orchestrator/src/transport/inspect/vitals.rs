@@ -2,7 +2,7 @@
 //! /api/agent/{id}/vitals`).
 //!
 //! Where [`metrics`](super::metrics) reports the *durable* observability slice
-//! the backend already holds (breaker, stream health, rev lag), this endpoint
+//! the backend already holds (stream health, rev lag), this endpoint
 //! answers a different, *live* question the operator asks by pressing a button:
 //! "can each service this agent depends on actually be reached right now?"
 //!

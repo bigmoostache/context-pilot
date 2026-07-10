@@ -155,6 +155,15 @@
   - abandoned
   - T320
   last_edited_ms: 1782121419939
+1f7ae27d462497dd:
+  tl_dr: NEVER touch Tailscale or network configuration on Mac Mini 'gilbert'. User explicitly forbids it. Tailscale already configured. Deploy Context Pilot without any network changes.
+  importance: critical
+  labels:
+  - gilbert
+  - network
+  - forbidden
+  - tailscale
+  last_edited_ms: 1783602624394
 2abaa3035bec794f:
   tl_dr: X522 Harbor adapter + X524 dry-run COMPLETE & PASSED end-to-end. Reward 1.0 on break-filter-js-from-html (mXSS). v0.2.1 glibc-fixed bundle + diagnosability fix validated. Ready for X525 official -k 5 run. X526 (submit) gated on HF window (~end June).
   contents: |-
@@ -651,6 +660,14 @@ bfff572081f9301e:
   - x520
   - complete
   last_edited_ms: 1782908683633
+c70e24f88c9a3e60:
+  tl_dr: 'Mac Mini ''gilbert'' user/password: gilbert/gilbert. Used for sudo and Keychain unlock.'
+  importance: high
+  labels:
+  - gilbert
+  - credentials
+  - mac-mini
+  last_edited_ms: 1783603900964
 caf6de1cb65ac661:
   tl_dr: 'DEMAQUETTING COMPLETE: branch merged to master (f1de2e65) and deleted (local + remote). Working on master from now on. All demaquetting work is on master.'
   contents: '18-phase plan, 4 workstreams: backend runtime, inspection REST, bridge activation, web client. Stack: orchestrator :7878, web dev :5174.'

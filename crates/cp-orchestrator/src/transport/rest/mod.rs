@@ -177,9 +177,8 @@ pub fn body(state: &Mutex<Backend>, id: &str, hash_hex: &str) -> HttpReply {
 
 /// `POST /api/agent/{id}/command` — submit a command to an agent.
 ///
-/// Fails closed with `503` if the agent's cost breaker is tripped (R2-8/V9),
-/// `400` for a malformed command, `404` for an unknown agent, and `502` if the
-/// agent is unreachable.
+/// Returns `400` for a malformed command, `404` for an unknown agent, and `502`
+/// if the agent is unreachable.
 pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply {
     let Ok(command) = serde_json::from_slice::<Command>(body_bytes) else {
         return HttpReply::error(400, "malformed command");
@@ -189,17 +188,6 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
         Ok(entry) => entry,
         Err(reply) => return reply,
     };
-    // Fail closed (R2-8/V9): a cost-incurring command on a tripped-breaker agent
-    // is refused with 503, so no new spend is admitted while the agent is over
-    // budget. Control-plane commands (stop/interrupt/…) incur no spend and are
-    // never blocked — the user must always be able to halt a runaway agent.
-    if command.kind.is_cost_incurring() {
-        if let Ok(b) = state.lock() {
-            if b.breaker.is_tripped(id) {
-                return HttpReply::error(503, "cost breaker tripped");
-            }
-        }
-    }
     let dedup_token = command.dedup_token.clone();
     match AgentChannel::from_entry(&entry).send(command) {
         Ok(ack) => {
@@ -392,7 +380,7 @@ struct BodyPayload<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::{CostBreaker, MaterializedView};
+    use crate::services::MaterializedView;
     use cp_wire::types::Phase;
     use cp_wire::types::oplog::{OpEntry, OpEntryKind};
     use std::path::PathBuf;
@@ -404,7 +392,7 @@ mod tests {
     fn backend_with_agent() -> Mutex<Backend> {
         let mut view = MaterializedView::new();
         view.apply("a1", &phase_entry(7, Phase::Streaming));
-        Mutex::new(Backend::for_test(PathBuf::from("/tmp/cp-test-agents"), view, CostBreaker::new(5.0)))
+        Mutex::new(Backend::for_test(PathBuf::from("/tmp/cp-test-agents"), view))
     }
 
     #[test]

@@ -49,11 +49,6 @@ pub(super) fn core() -> Value {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
-                "breaker": { "type": "object", "properties": {
-                    "tripped": { "type": "boolean" },
-                    "spendUsd": { "type": "number" },
-                    "budgetUsd": { "type": "number" }
-                }},
                 "stream": { "type": "object", "properties": {
                     "subscribers": { "type": "integer" },
                     "droppedFrames": { "type": "integer" },
@@ -71,7 +66,7 @@ pub(super) fn core() -> Value {
                 "phase": { "type": "string", "nullable": true },
                 "lifecycle": { "type": "string", "nullable": true }
             },
-            "required": ["id", "breaker", "stream", "rev"]
+            "required": ["id", "stream", "rev"]
         },
         "Vital": {
             "type": "object",

@@ -213,7 +213,6 @@ mod tests {
         let dir = tempdir().expect("dir");
         let backend = Arc::new(Mutex::new(Backend::new(
             dir.path().to_path_buf(),
-            100.0,
             PathBuf::from("/tmp/cp-test-realms"),
             PathBuf::from("/tmp/cp-test-bin"),
             None,

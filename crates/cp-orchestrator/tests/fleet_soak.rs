@@ -16,9 +16,9 @@
 //!   the rev-assigner). This is the concurrent, fleet-scale version of the
 //!   gap-free guarantee `oplog_core`/`dedup_compaction` prove single-threaded.
 //! * **V8 (scaled) — fleet isolation with no cross-contamination.** One shared
-//!   [`MaterializedView`], [`CostBreaker`], and [`StreamHub`] project all `N`
-//!   agents at once: the view holds `N` isolated projections, the breaker trips
-//!   only the over-budget agents, and the hub fans per-agent. The literal
+//!   [`MaterializedView`] and [`StreamHub`] project all `N`
+//!   agents at once: the view holds `N` isolated projections and the hub fans
+//!   per-agent. The literal
 //!   10 000-agent OS soak (flat RSS / FD / thread counts) is an *external* CI
 //!   harness — one `OplogWaiter` per agent by construction means watch count is
 //!   `O(agents)` regardless of scale; what a cargo test can falsify is the
@@ -61,7 +61,7 @@ use std::thread;
 use cp_oplog::service::Service as OplogService;
 
 use cp_orchestrator::channel::Tailer;
-use cp_orchestrator::services::{CostBreaker, MaterializedView, StreamHub, Verdict};
+use cp_orchestrator::services::{MaterializedView, StreamHub};
 
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::stream::{Frame, Kind as StreamKind};
@@ -130,34 +130,19 @@ fn tail_all(oplog_dir: &Path) -> Vec<cp_wire::types::oplog::OpEntry> {
 
 /// One agent's contended workload: open its oplog, interleave durable roster /
 /// message records with droppable best-effort phase / cost records, then shut
-/// down (draining + syncing the final batch). The over-budget agents push a
-/// cost past the breaker budget so the fleet has a mix of tripped / allowed.
-///
-/// Returns the agent's final cumulative spend so the test can predict the
-/// breaker verdict without re-reading the log.
-fn run_agent_workload(dir: &Path, agent_idx: usize) -> f64 {
+/// down (draining + syncing the final batch).
+fn run_agent_workload(dir: &Path, _agent_idx: usize) {
     let oplog = OplogService::spawn(dir).expect("spawn agent oplog");
-
-    // Even agents overspend (cost climbs past a 5.0 budget); odd agents stay
-    // thrifty. The final cost is the high-water the breaker will latch on.
-    let over_budget = agent_idx % 2 == 0;
-    let final_cost = if over_budget { 9.0 } else { 1.0 };
 
     let _thread_rev = oplog.append_durable(thread_created("T1")).expect("thread durable");
     for byte in 0..RECORDS_PER_AGENT {
         // A best-effort phase + cost between every durable head — these may be
         // shed under pressure, and that shedding must NOT tear the rev stream.
         let _phase = oplog.append_best_effort(phase());
-        let climbing = final_cost * (f64::from(byte) + 1.0) / f64::from(RECORDS_PER_AGENT);
-        let _cost = oplog.append_best_effort(cost(climbing));
+        let _cost = oplog.append_best_effort(cost(f64::from(byte) + 1.0));
         let _msg_rev = oplog.append_durable(message("T1", byte)).expect("message durable");
     }
-    // A final durable cost so the cumulative high-water is deterministic in the
-    // log regardless of which best-effort samples were shed.
-    let _cost_rev = oplog.append_durable(cost(final_cost)).expect("final cost durable");
     oplog.shutdown().expect("agent shutdown");
-
-    final_cost
 }
 
 /// Assert an agent's replayed oplog is a **gap-free** `rev` stream: the first
@@ -188,7 +173,7 @@ fn n_agents_under_concurrent_load_stay_gap_free_and_isolated() {
 
     // Drive all N agents' workloads concurrently — real contention across N
     // commit threads, each on its own oplog. Scoped threads borrow `dirs`.
-    let expected_costs = thread::scope(|scope| {
+    thread::scope(|scope| {
         let handles: Vec<_> = dirs
             .iter()
             .enumerate()
@@ -197,7 +182,9 @@ fn n_agents_under_concurrent_load_stay_gap_free_and_isolated() {
                 scope.spawn(move || run_agent_workload(&path, idx))
             })
             .collect();
-        handles.into_iter().map(|h| h.join().expect("agent thread")).collect::<Vec<f64>>()
+        for h in handles {
+            h.join().expect("agent thread");
+        }
     });
 
     // Every agent's oplog is independently gap-free after the concurrent storm.
@@ -222,19 +209,6 @@ fn n_agents_under_concurrent_load_stay_gap_free_and_isolated() {
             "{agent_id}: head is this agent's own last message, not a neighbour's",
         );
         assert!(agent.roster.iter().any(|t| t.thread_id == "T1"), "{agent_id}: roster carries its own thread",);
-    }
-
-    // The breaker trips exactly the over-budget agents and no others.
-    let mut breaker = CostBreaker::new(5.0);
-    breaker.rebuild_from_view(&view);
-    for (idx, expected_cost) in expected_costs.iter().enumerate() {
-        let agent_id = format!("agent-{idx}");
-        let verdict = breaker.check(&agent_id);
-        if *expected_cost > 5.0 {
-            assert_eq!(verdict, Verdict::Tripped, "{agent_id}: over-budget agent is tripped");
-        } else {
-            assert_eq!(verdict, Verdict::Allowed, "{agent_id}: thrifty agent is allowed");
-        }
     }
 }
 

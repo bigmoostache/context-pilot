@@ -145,20 +145,6 @@ pub struct Frame {
     pub command: Command,
 }
 
-impl Kind {
-    /// Whether applying this command can incur LLM spend.
-    ///
-    /// Only a message send drives the model; every other variant is thread
-    /// management or control plane and costs nothing. The cost breaker gates
-    /// exactly the cost-incurring commands — a user must always be able to
-    /// `stop`/manage a runaway agent even while its breaker is tripped (design
-    /// doc R2-8/V9: fail closed on new spend, never on control).
-    #[must_use]
-    pub const fn is_cost_incurring(&self) -> bool {
-        matches!(self, Self::SendMessage { .. })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,15 +220,5 @@ mod tests {
         let json = serde_json::to_string(&cmd).expect("serialize");
         let back: Command = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(cmd, back);
-    }
-
-    #[test]
-    fn only_send_message_is_cost_incurring() {
-        assert!(Kind::SendMessage { thread_id: "T1".into(), content: "hi".into() }.is_cost_incurring());
-        assert!(!Kind::Stop.is_cost_incurring());
-        assert!(!Kind::InterruptStream.is_cost_incurring());
-        assert!(!Kind::CreateThread { name: "n".into() }.is_cost_incurring());
-        assert!(!Kind::Configure { provider: "p".into(), model: "m".into() }.is_cost_incurring());
-        assert!(!Kind::Unknown.is_cost_incurring());
     }
 }

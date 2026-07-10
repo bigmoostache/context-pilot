@@ -138,15 +138,14 @@ interface Actions {
 }
 
 /**
- * All thread-mutation handlers for a realm, plus a transient, breaker-aware
- * failure notice.
+ * All thread-mutation handlers for a realm, plus a transient failure notice.
  *
- * A command rejected by the backend (most importantly a tripped CostBreaker →
- * 503) must be *visible*, never a silent `.catch(console.error)` swallow (T121):
- * every handler routes its rejection through {@link describeCommandError} into
- * `flash`, which shows one auto-dismissing toast at a time (cleared on unmount
- * so a late tick can't setState a dead component). Extracted from
- * {@link ThreadsView} so both units stay within the P8 line/statement budgets.
+ * A command rejected by the backend must be *visible*, never a silent
+ * `.catch(console.error)` swallow (T121): every handler routes its rejection
+ * through {@link describeCommandError} into `flash`, which shows one
+ * auto-dismissing toast at a time (cleared on unmount so a late tick can't
+ * setState a dead component). Extracted from {@link ThreadsView} so both units
+ * stay within the P8 line/statement budgets.
  */
 function useThreadActions(activeAgentId: string, threads: ThreadDetail[], sel: Selection): Actions {
   const { selectedId, setSelectedId, effectiveSelectedId, pendingFiles, setPendingFiles } = sel

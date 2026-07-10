@@ -138,20 +138,6 @@
       },
       "AgentMetrics": {
         "properties": {
-          "breaker": {
-            "properties": {
-              "budgetUsd": {
-                "type": "number"
-              },
-              "spendUsd": {
-                "type": "number"
-              },
-              "tripped": {
-                "type": "boolean"
-              }
-            },
-            "type": "object"
-          },
           "id": {
             "type": "string"
           },
@@ -206,7 +192,6 @@
         },
         "required": [
           "id",
-          "breaker",
           "stream",
           "rev"
         ],

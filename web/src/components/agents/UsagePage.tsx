@@ -20,9 +20,8 @@ import { cn } from "@/lib/utils"
  * state (no mock, no fabricated history).
  *
  * The backend retains, per agent, only what the oplog durably carries:
- *   - cumulative-since-boot **spend** (the durable cost-breaker high-water),
- *   - cumulative **input / output token** totals (folded from `CostAggregate`),
- *   - the agent's spend **budget** and breaker trip state.
+ *   - cumulative-since-boot **spend** (folded from `CostAggregate`),
+ *   - cumulative **input / output token** totals (folded from `CostAggregate`).
  *
  * It does **not** retain a month-by-month time series, nor the cache hit/miss
  * token split (that split is private agent working-set state, never journaled).
@@ -36,10 +35,8 @@ import { cn } from "@/lib/utils"
 interface Row {
   agent: Agent
   spendUsd: number
-  budgetUsd: number
   inputTokens: number
   outputTokens: number
-  tripped: boolean
 }
 
 const agentAccent = (a: Agent) =>
@@ -77,12 +74,9 @@ export function UsagePage() {
       const m = byId.get(agent.id)
       return {
         agent,
-        // Prefer the durable breaker high-water; fall back to meta costUsd.
-        spendUsd: m?.breaker.spendUsd ?? agent.costUsd,
-        budgetUsd: m?.breaker.budgetUsd ?? 0,
+        spendUsd: agent.costUsd,
         inputTokens: m?.tokens?.input ?? 0,
         outputTokens: m?.tokens?.output ?? 0,
-        tripped: m?.breaker.tripped ?? false,
       }
     })
   }, [agents, metrics])
@@ -166,7 +160,7 @@ export function UsagePage() {
         </section>
 
         {/* per-agent table */}
-        <UsageTable visible={visible} totals={totals} unit={unit} />
+        <UsageTable visible={visible} totals={totals} />
         <p className="sr-only">Active unit total: {fmt(totalValue)}</p>
 
         {/* honest boundary notice */}
@@ -197,15 +191,7 @@ interface Totals {
 /** The per-agent usage table (or the empty-fleet placeholder), with a totals
  *  footer. Extracted from {@link UsagePage} so its render stays within the P8
  *  line budget. */
-function UsageTable({
-  visible,
-  totals,
-  unit,
-}: {
-  visible: Row[]
-  totals: Totals
-  unit: UsageUnit
-}) {
+function UsageTable({ visible, totals }: { visible: Row[]; totals: Totals }) {
   return (
     <section className="flex flex-col gap-2.5">
       <span className="text-[13px] font-semibold text-foreground/90">By agent</span>
@@ -222,49 +208,35 @@ function UsageTable({
                 <TableHead className="text-right">Input</TableHead>
                 <TableHead className="text-right">Output</TableHead>
                 <TableHead className="text-right">Spend</TableHead>
-                <TableHead className="text-right">
-                  {unit === "usd" ? "% budget" : "Total"}
-                </TableHead>
+                <TableHead className="text-right">Total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visible.map((r) => {
-                const pct = r.budgetUsd > 0 ? (r.spendUsd / r.budgetUsd) * 100 : null
-                return (
-                  <TableRow key={r.agent.id}>
-                    <TableCell className="font-medium text-foreground/85">
-                      <span className="flex items-center gap-2">
-                        <span
-                          className="size-2 shrink-0 rounded-full"
-                          style={{ background: agentAccent(r.agent) }}
-                        />
-                        {r.agent.name}
-                        {r.tripped && (
-                          <span className="rounded-full bg-(--danger)/14 px-1.5 py-px text-[9.5px] font-medium text-(--danger)">
-                            over budget
-                          </span>
-                        )}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right text-foreground/75 tabular-nums">
-                      {fmtTok(r.inputTokens)}
-                    </TableCell>
-                    <TableCell className="text-right text-foreground/75 tabular-nums">
-                      {fmtTok(r.outputTokens)}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold text-foreground/90 tabular-nums">
-                      {fmtUsd(r.spendUsd)}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground/80 tabular-nums">
-                      {unit === "usd"
-                        ? pct == null
-                          ? "—"
-                          : `${pct.toFixed(0)}%`
-                        : fmtTok(r.inputTokens + r.outputTokens)}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
+              {visible.map((r) => (
+                <TableRow key={r.agent.id}>
+                  <TableCell className="font-medium text-foreground/85">
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="size-2 shrink-0 rounded-full"
+                        style={{ background: agentAccent(r.agent) }}
+                      />
+                      {r.agent.name}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right text-foreground/75 tabular-nums">
+                    {fmtTok(r.inputTokens)}
+                  </TableCell>
+                  <TableCell className="text-right text-foreground/75 tabular-nums">
+                    {fmtTok(r.outputTokens)}
+                  </TableCell>
+                  <TableCell className="text-right font-semibold text-foreground/90 tabular-nums">
+                    {fmtUsd(r.spendUsd)}
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground/80 tabular-nums">
+                    {fmtTok(r.inputTokens + r.outputTokens)}
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
             <TableFooter>
               <TableRow className="hover:bg-transparent">
@@ -279,7 +251,7 @@ function UsageTable({
                   {fmtUsd(totals.spendUsd)}
                 </TableCell>
                 <TableCell className="text-right font-semibold text-foreground/85 tabular-nums">
-                  {unit === "usd" ? "" : fmtTok(totals.inputTokens + totals.outputTokens)}
+                  {fmtTok(totals.inputTokens + totals.outputTokens)}
                 </TableCell>
               </TableRow>
             </TableFooter>

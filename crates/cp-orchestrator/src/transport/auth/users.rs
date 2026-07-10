@@ -225,7 +225,6 @@ mod tests {
         let manager = store.create_user("manager@box", "Manager", &test_pw(), Manager).expect("manager");
         let backend = Backend::new(
             dir.path().to_path_buf(),
-            100.0,
             PathBuf::from("/tmp/cp-users-test-realms"),
             PathBuf::from("/tmp/cp-users-test-bin"),
             Some(store),

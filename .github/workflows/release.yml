@@ -177,6 +177,44 @@ jobs:
           path: ${{ matrix.artifact }}.tar.gz
           retention-days: 30
 
+  frontend:
+    name: Build web frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+
+      - name: Install web dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: web
+
+      # Relative same-origin API URLs so the SPA talks to the orchestrator
+      # that serves it (one binary, one port).
+      - name: Build SPA (relative same-origin)
+        run: pnpm run build
+        working-directory: web
+        env:
+          VITE_API_URL: ""
+
+      - name: Package web dist
+        run: tar -czf web-dist.tar.gz -C web/dist .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web-dist.tar.gz
+          retention-days: 5
+
   release:
     name: Create Release
     needs: build

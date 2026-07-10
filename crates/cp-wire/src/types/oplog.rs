@@ -192,7 +192,7 @@ pub enum OpEntryKind {
         state: LifecycleState,
     },
 
-    /// Periodic cost snapshot for the durable `CostBreaker` (R2-8).
+    /// Periodic cost snapshot — cumulative input/output tokens and spend.
     #[serde(rename = "cost_aggregate")]
     CostAggregate {
         /// Cumulative input tokens since agent boot.

@@ -100,7 +100,6 @@ mod tests {
         let store = AuthStore::open(&dir.path().join("auth.db")).expect("open auth store");
         let backend = Backend::new(
             dir.path().to_path_buf(),
-            100.0,
             PathBuf::from("/tmp/cp-it-test-realms"),
             PathBuf::from("/tmp/cp-it-test-bin"),
             Some(store),

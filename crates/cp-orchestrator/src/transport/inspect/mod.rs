@@ -8,7 +8,7 @@
 //! * [`meta`] — enriched `Agent` objects (registry + view + git + threads).
 //! * [`panels`] — the surviving non-cockpit inspection endpoints (usage, library).
 //! * [`finder`] — the per-agent file manager (`/fs`, preview, download).
-//! * [`metrics`] — the §19 observability snapshot (breaker, stream, rev lag).
+//! * [`metrics`] — the §19 observability snapshot (stream, rev lag).
 //! * [`vitals`] — on-demand service-connectivity probes (`/vitals`).
 //!
 //! Each submodule reaches the shared [`Backend`](crate::transport::Backend) and

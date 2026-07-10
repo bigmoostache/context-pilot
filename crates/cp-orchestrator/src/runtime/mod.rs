@@ -5,7 +5,7 @@
 //!
 //! * [`start_driver`](Runtime::start_driver) — spawns a background thread that
 //!   scans the registry, tails every discovered agent's oplog, folds entries
-//!   into the shared [`Backend`], and observes cost against the breaker.
+//!   into the shared [`Backend`].
 //! * [`serve`](Runtime::serve) — blocks the calling thread on the HTTP
 //!   acceptor (delegating to [`transport::serve`]).
 //!
@@ -20,7 +20,6 @@
 //! |---|---|---|
 //! | `CP_ORCH_PORT` | `7878` | Product cockpit HTTP listen port |
 //! | `CP_AGENTS_DIR` | `~/.context-pilot/agents` | Registry directory |
-//! | `CP_COST_BUDGET` | `100.0` | Per-agent cost budget (USD) |
 //! | `CP_SCAN_INTERVAL_MS` | `2000` | Registry-discovery + tier-② mtime poll cadence (ms) |
 //!
 //! The oplog tail (the live state-fold that feeds the view) runs on a
@@ -46,9 +45,6 @@ use crate::transport::Backend;
 /// Default product cockpit HTTP listen port.
 const DEFAULT_PORT: u16 = 7878;
 
-/// Default per-agent cost budget in USD.
-const DEFAULT_BUDGET: f64 = 100.0;
-
 /// Default registry + oplog poll interval.
 const DEFAULT_SCAN_INTERVAL: Duration = Duration::from_millis(2000);
 
@@ -69,8 +65,6 @@ pub struct Config {
     pub port: u16,
     /// Directory holding agent registry records.
     pub agents_dir: PathBuf,
-    /// Per-agent cost budget in USD.
-    pub budget_usd: f64,
     /// How often the driver scans the registry and tails oplogs.
     pub scan_interval: Duration,
     /// Root directory new agents' realm folders are created under
@@ -111,8 +105,6 @@ impl Config {
             }
         };
 
-        let budget_usd = std::env::var("CP_COST_BUDGET").ok().and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_BUDGET);
-
         let scan_interval = std::env::var("CP_SCAN_INTERVAL_MS")
             .ok()
             .and_then(|s| s.parse::<u64>().ok())
@@ -150,17 +142,7 @@ impl Config {
                 .unwrap_or_else(|| PathBuf::from("auth.db")),
         };
 
-        Ok(Self {
-            port,
-            agents_dir,
-            budget_usd,
-            scan_interval,
-            agents_root,
-            agent_binary,
-            auth_enabled,
-            session_ttl,
-            auth_db_path,
-        })
+        Ok(Self { port, agents_dir, scan_interval, agents_root, agent_binary, auth_enabled, session_ttl, auth_db_path })
     }
 }
 
@@ -200,7 +182,6 @@ impl Runtime {
 
         let backend = Arc::new(Mutex::new(Backend::new(
             config.agents_dir.clone(),
-            config.budget_usd,
             config.agents_root.clone(),
             config.agent_binary.clone(),
             auth_store,
@@ -396,13 +377,6 @@ fn tail_all_agents(backend: &Arc<Mutex<Backend>>, tailers: &mut HashMap<String, 
 
         if let Ok(mut b) = backend.lock() {
             b.view_mut().apply_batch(id, &entries);
-
-            // Observe the latest cumulative cost against the breaker.
-            // Extract the cost first to avoid overlapping borrows on `b`.
-            let cost = b.view.get(id).map(|v| v.cost.cost_usd);
-            if let Some(cost_usd) = cost {
-                b.breaker_mut().observe(id, cost_usd);
-            }
         }
     }
 }
@@ -456,7 +430,6 @@ mod tests {
             // assert the types parse correctly rather than exact values
             // (CI may set CP_ORCH_PORT etc.).
             assert!(cfg.port > 0);
-            assert!(cfg.budget_usd > 0.0);
             assert!(cfg.scan_interval.as_millis() > 0);
         }
     }

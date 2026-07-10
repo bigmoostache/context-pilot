@@ -148,11 +148,11 @@ export function useFsSheet(
 
 // ── Metrics (§19 observability — agent-scoped) ────────────────────────
 //
-// Health vitals (durable cost-breaker state, stream health, view-vs-oplog rev
-// lag) are NOT delta-covered — there is no oplog entry whose folding yields
-// "rev lag" or "subscriber count" (they are derived backend observations, not
-// agent mutations). So this hook rides a brisk poll (no delta fold): a tripped
-// breaker or a degraded stream surfaces within one poll interval (T121).
+// Health vitals (stream health, view-vs-oplog rev lag) are NOT delta-covered —
+// there is no oplog entry whose folding yields "rev lag" or "subscriber count"
+// (they are derived backend observations, not agent mutations). So this hook
+// rides a brisk poll (no delta fold): a degraded stream or lagging projection
+// surfaces within one poll interval (T121).
 
 const METRICS_POLL_MS = 4000
 
