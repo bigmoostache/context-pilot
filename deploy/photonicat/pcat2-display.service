@@ -1,0 +1,18 @@
+[Unit]
+Description=Photonicat2 Mini Display Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/pcat2_mini_display
+# The driver only ever writes .../brightness, never bl_power. At boot the
+# pwm-backlight comes up blanked (bl_power=4 = FB_BLANK_POWERDOWN), so brightness
+# has no visible effect and the panel stays dark. Unblank it after the driver
+# has initialised the panel. Harmless if the node is already 0.
+ExecStartPost=/bin/sh -c 'echo 0 > /sys/class/backlight/backlight/bl_power'
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

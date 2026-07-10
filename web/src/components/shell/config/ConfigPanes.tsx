@@ -4,8 +4,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, Lock } from "lucide-react"
 import { UsagePage } from "@/components/agents/UsagePage"
 import { ReleasesPane } from "./ReleasesPane"
+import { SecretsPane } from "./SecretsPane"
+import { ItPane } from "./ItPane"
 import { useProviders } from "@/lib/support/models"
 import { fetchSettings, updateSettings, fetchEnvKeys } from "@/lib/api"
+import { useAuth } from "@/lib/providers/auth"
 import { useDevMode } from "@/lib/providers/toggles/devMode"
 import { useShowOverlay } from "@/lib/providers/toggles/showOverlay"
 import { cn } from "@/lib/utils"
@@ -26,6 +29,12 @@ export function CategoryBody({ cat }: { cat: CatId }) {
     }
     case "services": {
       return <ServicesPane />
+    }
+    case "secrets": {
+      return <SecretsPane />
+    }
+    case "it": {
+      return <ItPane />
     }
     case "releases": {
       return <ReleasesPane />
@@ -135,7 +144,47 @@ function GeneralPane() {
       <ToggleRow i={2} name="Think reminders" detail="Periodic nudge to reason before acting" on />
       <DevModeToggle i={3} />
       <ShowOverlayToggle i={4} />
+      <AccessControlToggle i={5} />
     </Stack>
+  )
+}
+
+/**
+ * **Access control** (design §13.10) — the RBAC master flag. Unlike the
+ * `localStorage`-backed dev/overlay toggles, this is a **server-authoritative**
+ * central setting: read from `access_control` in `fetchSettings()` and written
+ * via `updateSettings({ access_control })`, then the `["settings"]` query is
+ * invalidated. A CONTROLLED `ToggleRow`.
+ *
+ * Visibility (cosmetic; the server enforces the asymmetric gate): shown when
+ * RBAC is currently OFF — so anyone on the single-user appliance may turn it ON
+ * (enable is open to all, FR-v3-10) — OR to a superadmin (who alone may turn it
+ * OFF, FR-v3-11). In god-mode (`authEnabled === false`) the viewer is treated
+ * as superadmin.
+ */
+function AccessControlToggle({ i }: { i: number }) {
+  const qc = useQueryClient()
+  const { user: authUser, authEnabled } = useAuth()
+  const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: fetchSettings })
+
+  if (settings === undefined) return null
+  const enabled = settings.access_control
+  const isSuperadmin = authEnabled === false || authUser?.role === "superadmin"
+  if (enabled && !isSuperadmin) return null
+
+  const onChange = async (next: boolean) => {
+    await updateSettings({ access_control: next })
+    await qc.invalidateQueries({ queryKey: ["settings"] })
+  }
+
+  return (
+    <ToggleRow
+      i={i}
+      name="Access control"
+      detail="Require login and enforce role-based access (RBAC)"
+      value={enabled}
+      onChange={(next) => void onChange(next)}
+    />
   )
 }
 
@@ -240,7 +289,7 @@ function AllowedModelsSection() {
 /**
  * The one **functional** General-pane toggle (T301): the global dev-mode flag,
  * persisted via {@link useDevMode}. Unlike the decorative sibling rows it is a
- * real controlled switch — flipping it reveals/hides the developer-only Cockpit
+ * real controlled switch — flipping it reveals/hides the developer-only Costs
  * tab in the TopBar in real time (App gates the view on the same flag). Off by
  * default.
  */
@@ -250,7 +299,7 @@ function DevModeToggle({ i }: { i: number }) {
     <ToggleRow
       i={i}
       name="Developer mode"
-      detail="Reveal the Cockpit — the agent's live context-panel inspector"
+      detail="Reveal developer-only surfaces (Cost Analysis) and diagnostics"
       value={devMode}
       onChange={setDevMode}
     />

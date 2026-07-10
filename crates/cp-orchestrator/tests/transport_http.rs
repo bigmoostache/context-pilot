@@ -49,7 +49,7 @@ use std::time::Duration;
 use cp_oplog::append::OplogWriter;
 
 use cp_orchestrator::channel::Tailer;
-use cp_orchestrator::transport::{Backend, Plane, serve_bound, serve_bound_plane};
+use cp_orchestrator::transport::{Backend, serve_bound};
 
 use cp_wire::types::ContentHash;
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
@@ -217,55 +217,6 @@ fn sse_requires_a_valid_single_use_ticket() {
     // The same ticket cannot open a second stream (single-use).
     let (reused, _e2) = common::sse_collect(&h.addr, &path, &[], 1, Duration::from_millis(800));
     assert_eq!(reused, 401, "a redeemed ticket is single-use");
-}
-
-// ── 5. maintenance plane isolation over the wire (M1, Objective 1.3.1) ───────
-
-/// Boot a **maintenance-plane** listener (auth disabled) on an ephemeral port.
-/// Shares the [`Harness`] shape so the temp dirs outlive the server.
-fn maint_harness() -> Harness {
-    let agents = tempdir().expect("agents dir");
-    let oplog = tempdir().expect("oplog dir");
-    let backend = Backend::new(
-        agents.path().to_path_buf(),
-        std::path::PathBuf::from("/tmp/cp-test-realms"),
-        std::path::PathBuf::from("/tmp/cp-test-bin"),
-        None,
-        Duration::from_secs(3600),
-    );
-    let state = Arc::new(Mutex::new(backend));
-    let server = Server::http("127.0.0.1:0").expect("bind ephemeral");
-    let addr = server.server_addr().to_string();
-    let serve_state = Arc::clone(&state);
-    let _acceptor = thread::spawn(move || serve_bound_plane(server, serve_state, Plane::Maintenance));
-    Harness { addr, _state: state, _agents: agents, _oplog: oplog }
-}
-
-#[test]
-fn maintenance_plane_isolates_product_routes() {
-    let h = maint_harness();
-
-    // The public maintenance status probe answers 200 (the plane is up).
-    let status = common::get(&h.addr, "/api/maint/status", &[]);
-    assert_eq!(status.status, 200, "maintenance status is reachable");
-    assert!(status.body.contains("maintenance"), "status identifies the maintenance plane");
-
-    // Product routes never serve data on this plane. They are not in the
-    // maintenance whitelist, so the Admin gate blocks them before any handler
-    // (503 here because auth is disabled in this harness) — never a 200 fleet
-    // payload. The router-level absence (a true 404 once past the gate) is
-    // proven by the `product_routes_are_absent_from_the_maintenance_router`
-    // unit test, which can build an admin session the wire harness cannot.
-    let fleet = common::get(&h.addr, "/api/fleet", &[]);
-    assert_ne!(fleet.status, 200, "the product fleet route serves no data on the maintenance plane");
-    assert!(!fleet.body.contains("\"rev\""), "no fleet envelope leaks on the maintenance plane");
-    let agent = common::get(&h.addr, "/api/agent/agent-a", &[]);
-    assert_ne!(agent.status, 200, "the product agent route serves no data on the maintenance plane");
-
-    // A protected maintenance route with auth disabled is unavailable (503) —
-    // it never falls through to a product handler.
-    let pw = common::post_json(&h.addr, "/api/maint/password", b"{}");
-    assert_eq!(pw.status, 503, "a protected maintenance route requires auth to be enabled");
 }
 
 // ── 4. reconnect-replay by rev (Last-Event-ID) ──────────────────────────────

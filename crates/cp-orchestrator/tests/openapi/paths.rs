@@ -68,10 +68,31 @@ pub(super) fn paths() -> Value {
                     "default_provider": { "type": "string" },
                     "default_model": { "type": "string" },
                     "onboarding_completed": { "type": "boolean" },
-                    "allowed_models": arr(json!({ "type": "string" }))
+                    "allowed_models": arr(json!({ "type": "string" })),
+                    // Access-control master flag toggle (design §13.10).
+                    "access_control": { "type": "boolean" }
                 }
             })), r("AppSettings"))
         ),
+        // ── IT infra (design §13.5, can_manage_it) ─────────────────
+        "/api/it/ca.crt": json!({ "get": {
+            "tags": ["it"], "summary": "Download the private-CA root certificate (PEM)",
+            "responses": { "200": { "description": "CA root PEM bytes", "content": {
+                "application/octet-stream": { "schema": { "type": "string", "format": "binary" } }
+            }}}
+        }}),
+        "/api/it/ca/fingerprint": get("it", "CA root SHA-256 fingerprint", r("ItFingerprint")),
+        "/api/it/identity": merge(
+            get("it", "Current box network identity (name/IP), or null", r("ItIdentityResponse")),
+            post("it", "Set box network identity — re-issues the leaf & reloads Caddy", Some(json!({
+                "type": "object",
+                "properties": { "name": { "type": "string" }, "ip": { "type": "string" } },
+                "required": ["name", "ip"]
+            })), r("ItSetIdentityResponse"))
+        ),
+        "/api/it/provisioned": get("it", "Whether the box has been provisioned", json!({
+            "type": "object", "properties": { "provisioned": { "type": "boolean" } }, "required": ["provisioned"]
+        })),
         // ── Ticket ──────────────────────────────────────────────────
         "/api/ticket": post("ticket", "Mint SSE upgrade ticket", None, r("TicketResponse")),
         // ── Auth ────────────────────────────────────────────────────
@@ -142,17 +163,6 @@ pub(super) fn paths() -> Value {
         "/api/agent/{id}/metrics": with_agent(get("agent", "Agent metrics", r("AgentMetrics"))),
         "/api/agent/{id}/vitals": with_agent(get("agent", "Agent service vitals", arr(r("Vital")))),
         "/api/agent/{id}/threads": with_agent(get("agent", "Agent threads + conversation", r("ThreadsResponse"))),
-        "/api/agent/{id}/panels": with_agent(get("agent", "Context panels", arr(r("ContextPanel")))),
-        "/api/agent/{id}/memory": with_agent(get("agent", "Memory cards", arr(r("MemoryCard")))),
-        "/api/agent/{id}/todos": with_agent(get("agent", "Todo items", arr(r("TodoItem")))),
-        "/api/agent/{id}/spine": with_agent(get("agent", "Spine notifications", arr(r("SpineNotif")))),
-        "/api/agent/{id}/queue": with_agent(get("agent", "Queued actions", arr(r("QueueAction")))),
-        "/api/agent/{id}/scratchpad": with_agent(get("agent", "Scratchpad cells", arr(r("ScratchCell")))),
-        "/api/agent/{id}/tree": with_agent(get("agent", "Directory tree", arr(r("TreeRow")))),
-        "/api/agent/{id}/callbacks": with_agent(get("agent", "Callbacks", arr(r("CallbackRow")))),
-        "/api/agent/{id}/tools": with_agent(get("agent", "Tool groups", arr(r("ToolGroup")))),
-        "/api/agent/{id}/radar": with_agent(get("agent", "Context radar", r("RadarData"))),
-        "/api/agent/{id}/entities": with_agent(get("agent", "Entity tables", arr(r("EntityTable")))),
         "/api/agent/{id}/usage": with_agent(get("agent", "Usage analytics", json!({ "type": "object" }))),
         "/api/agent/{id}/library": with_agent(get("agent", "Prompt library", arr(r("LibraryItem")))),
         "/api/agent/{id}/conversation": with_agent(get("agent", "Conversation feed", arr(r("ConversationMsg")))),

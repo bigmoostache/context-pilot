@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
  * Deploy actions for the Releases settings pane.
  *
  * Two buttons: "Deploy to Fleet" (select release + restart all agents) and
- * "Restart Orchestrator" (delayed SIGTERM → procd respawn). The orchestrator
+ * "Restart Orchestrator" (delayed SIGTERM → systemd respawn). The orchestrator
  * button has a click-to-confirm guard since the connection drops on restart.
  */
 export function DeploySection({

@@ -130,7 +130,11 @@ export function LoginPage() {
 
           {/* Error */}
           {error && (
-            <div className="mb-4 rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">
+            <div
+              role="alert"
+              aria-live="assertive"
+              className="mb-4 rounded-md bg-danger/10 px-3 py-2 text-xs text-danger"
+            >
               {error}
             </div>
           )}

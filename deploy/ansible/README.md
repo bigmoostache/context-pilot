@@ -1,6 +1,7 @@
 # Appliance provisioning (Ansible)
 
-Factory-fresh Photonicat → fully deployed and ready, in one pass.
+Freshly-installed Armbian/Debian 13 box (systemd) → fully deployed and ready, in
+one pass.
 
 ## Full deploy — `site.yml`
 
@@ -18,22 +19,22 @@ ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/site.yml
 What it does, end to end:
 
 1. **Fetch** (control node — needs internet): downloads the **pre-built appliance
-   bundle** (`cpilot-appliance-aarch64.tar.gz` = `bin/cp-orchestrator`, `bin/tui`,
-   `web/<spa>`) from GitHub Releases — produced by
+   bundle** (`cpilot-linux-aarch64-musl.tar.gz` = flat `cpilot`, `cp-console-server`,
+   `cp-orchestrator`, `web/<spa>`) from GitHub Releases — produced by
    `.github/workflows/release.yml` — plus a stock `caddy` arm64 binary. No local
    build/toolchain needed. Pin a tag with `-e release=v0.1.0-abc1234` (default:
-   `latest`). The procd init scripts + bootstrap Caddyfile come from this repo.
-2. **Deploy** (each box): ships the binaries + SPA + procd init scripts +
-   bootstrap Caddyfile, and frees TCP `:80`/`:443` from the vendor admin web
-   (moves it to `:8088`).
+   `latest`). The systemd units + bootstrap Caddyfile come from this repo.
+2. **Deploy** (each box): ships the binaries + SPA + the `context-pilot` and
+   `caddy` systemd units + bootstrap Caddyfile under `/opt/context-pilot`. A stock
+   Armbian box has nothing on `:80`/`:443`, so no port juggling is needed.
 3. **Seed** (Obj 6): writes a unique per-unit admin `seed.env` (chmod 600) and a
    printable delivery sheet on the control node (`out/<unit>-admin.txt`).
 4. **Start**: enables + starts the orchestrator (which seeds the admin and writes
    the real Caddyfile) then Caddy, and waits until both answer.
 
-> Requires a published release that contains `cpilot-appliance-aarch64.tar.gz`
-> (cut by pushing a tag → `release.yml`). The control node fetches it; the
-> offline LAN box never needs internet.
+> Requires a published release that contains `cpilot-linux-aarch64-musl.tar.gz`
+> (every push to master cuts one; a manual `v*` tag also works). The control
+> node fetches it; the offline LAN box never needs internet.
 
 ### No release yet? Build the bundle locally
 
@@ -41,12 +42,13 @@ When you can't cut a GitHub release, build the same bundle on the dev box and
 deploy it with `-e release=local`:
 
 ```sh
-deploy/photonicat/build.sh                 # → deploy/ansible/.artifacts/{cpilot-appliance-aarch64.tar.gz, caddy}
+deploy/photonicat/build.sh                 # → deploy/ansible/.artifacts/{cpilot-linux-aarch64-musl.tar.gz, caddy}
 ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/site.yml -e release=local
 ```
 
-`build.sh` cross-builds the orchestrator + agent TUI (aarch64-musl), builds the
-SPA, packages the exact same tarball `release.yml` would, and downloads Caddy.
+`build.sh` cross-builds the orchestrator + console-server + agent TUI
+(aarch64-musl), builds the SPA, packages the exact same tarball `release.yml`
+would, and downloads Caddy.
 With `-e release=local` the playbook skips the GitHub download and uses it.
 
 Result: the box boots **unprovisioned** with the IT maintenance console live at
@@ -110,7 +112,10 @@ ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/provision-seed.y
 - `tasks/{fetch,deploy,keys,seed,start}.yml` — the steps (seed is shared).
 - `group_vars/<client>/vault.yml` — per-client provider keys (ansible-vault).
 - `group_vars/example-client.yml` — copy this to make a real client's vault.
-- `templates/{seed.env.j2,admin-sheet.txt.j2}` — the seed file + delivery sheet.
+- `templates/{context-pilot,caddy}.service.j2` — the systemd units.
+- `templates/{seed.env.j2,providers.env.j2,admin-sheet.txt.j2}` — the seed/keys
+  env files + delivery sheet.
+- `../photonicat/Caddyfile` — bootstrap Caddyfile (the orchestrator regenerates it).
 - `examples/inventory.example.ini` — copy to `inventory.ini`.
 
 ## Guarantees & hygiene
@@ -121,12 +126,13 @@ ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/provision-seed.y
 - **Secret hygiene** (6.1.3): `seed.env` is `0600`; the password is `no_log`
   throughout; `seed.env`, `out/`, and `.artifacts/` are all git-ignored.
 - **Default email** (6.2.1): `admin@admin.fr`, changed during the wizard.
-- **OpenWrt**: root login, no sudo → `become: false`. The box needs `python3`
-  (present on photonicatWrt) for the Ansible modules.
+- **Armbian/Debian**: we log in as root and a minimal image may lack sudo →
+  `become: false`. The box needs `python3` (present on the Armbian image) for the
+  Ansible modules.
 
 ## Idempotence
 
-Re-running is safe: binaries are checksum-compared (re-copied only when changed),
-`:80` freeing is a no-op once done, and a unit that already has `seed.env` keeps
-its password (never rotated, no stale sheet). To re-provision a unit from scratch,
-wipe `/mnt/data/context-pilot` on the box first.
+Re-running is safe: the appliance bundle is re-shipped and re-extracted, and a
+unit that already has `seed.env` keeps its password (never rotated, no stale
+sheet). To re-provision a unit from scratch, wipe `/opt/context-pilot` on the box
+first.

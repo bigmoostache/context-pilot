@@ -1,9 +1,16 @@
 # Design Document — Authentication & Authorization
 
-**Status:** Draft v2  
+**Status:** v3 (RBAC extension) — supersedes v2 where marked  
 **Author:** Context Pilot  
-**Date:** 2026-06-23  
+**Date:** 2026-07-08 (v3), 2026-06-23 (v2)  
 **Thread:** T341
+
+> **v3 revision (2026-07-08):** the two-role model (`admin`/`user`) is replaced by
+> a four-role hierarchy, the separate `:9090` maintenance plane is removed and its
+> functions fold into the cockpit, and IT/secrets management moves into a unified,
+> capability-gated Settings UI. See **§13** for the authoritative v3 spec — where
+> §13 and §§1–12 disagree, **§13 wins**. Sections §§1–12 are retained as the v2
+> record and remain accurate for everything §13 does not override.
 
 ---
 
@@ -297,3 +304,213 @@ All 12 open questions have been decided.
 | Frontend — Auth context + guard | ~130 lines | `lib/auth.tsx` (new), `shell/AuthGuard.tsx` (new) |
 | Frontend — Token injection + 401 handling | ~20 lines | `lib/api/client.ts` (edit), `App.tsx` (edit) |
 | **Total** | **~800 lines** | **4 new files + 4 edits** |
+
+---
+
+## §13 — v3 Revision: Four-Role RBAC + Unified Cockpit
+
+**Authoritative for everything below. Supersedes the two-role model of §1–§12.**
+
+### §13.1 — Motivation
+
+The v2 single god-mode `admin` conflated three distinct concerns that the
+appliance deployment needs to separate:
+
+1. **Vendor vs. client.** We (the sellers) need a god account the client cannot
+   see, edit, or lock us out of. The client's own top account must be powerful
+   but must *not* touch provider secrets (LLM API keys, OAuth) — those are tied to
+   our billing and must stay vendor-controlled.
+2. **App supervision vs. IT infra.** Managing *all* agents (supervision) is a
+   different job from managing certs / network identity (IT), which is different
+   again from managing provider secrets.
+3. **One UI, not two planes.** The separate LAN-only `:9090` maintenance plane is
+   an operational wart. Its functions belong inside the cockpit, revealed by role.
+
+### §13.2 — Role model (four ordered roles)
+
+Roles form a **total order**. Higher roles subsume every capability of lower ones.
+
+| Rank | Role | Who | One-line charter |
+|-----:|------|-----|------------------|
+| 4 | `superadmin` | **Vendor (us)** | God-mode. Everything, incl. provider secrets. Invisible to the client. |
+| 3 | `admin` | Client's top account | Everything a manager does **+ IT infra** (certs, network identity). |
+| 2 | `manager` | Client power user | Manage **all** agents of all users **+ create/manage users** (rank < self). |
+| 1 | `user` | Regular employee | Create & manage **own** agents; share agent access to other users (ACL). |
+
+`FR-v3-01` — The `role` column domain becomes `('superadmin','admin','manager','user')`.
+`FR-v3-02` — `UserRole` is `Ord`: `superadmin > admin > manager > user`.
+
+### §13.3 — Capabilities (the enforcement primitives)
+
+Enforcement code MUST test a **capability**, never a role name directly. This is
+the single most important design rule of v3 — it keeps the matrix in §13.2
+readable in one place and makes adding a fifth role a one-line change instead of a
+grep-and-pray across 9 files.
+
+| Capability | Rule | Grants |
+|------------|------|--------|
+| `can_manage_own_agents` | always (any authenticated user) | CRUD + ACL-share on agents you own / are `agent-admin` on |
+| `can_manage_all_agents` | `role >= manager` | implicit access & management on **every** agent |
+| `can_manage_users` | `role >= manager` | create/list/delete/force-logout users **of strictly lower rank** |
+| `can_manage_it` | `role >= admin` | certs (download CA root + fingerprint), network identity (name/IP), cert regeneration |
+| `can_manage_secrets` | `role == superadmin` | provider API keys + Claude OAuth |
+
+**Cross-cutting rules:**
+
+- `FR-v3-03` **Anti-escalation.** A user may only create, promote, or demote to a
+  role **strictly below their own**. Nobody promotes themselves; nobody creates a
+  peer or a superior. (manager→user only; admin→{manager,user}; superadmin→any.)
+- `FR-v3-04` **No account ownership.** Any `can_manage_users` holder manages any
+  account of lower rank — there is no "creator owns the account" notion. (Single
+  mono-client box; per-account ownership is unwarranted complexity.)
+- `FR-v3-05` **Vendor invisibility.** `superadmin` accounts are filtered out of
+  every user list, and are non-editable/non-deletable, for any caller who is not
+  themselves a `superadmin`. Only a `superadmin` can create a `superadmin`.
+- `FR-v3-06` The per-agent ACL (`agent-admin`/`agent-user`, FR-14a/b/c) is
+  **unchanged and orthogonal**. It is the horizontal user→user sharing mechanism;
+  the system role is the vertical hierarchy. `can_manage_all_agents` grants an
+  *implicit* access — it MUST NOT write ACL rows.
+
+### §13.4 — Bootstrap & provisioning (no maintenance plane)
+
+The `:9090`/`:9191` maintenance plane is **removed entirely**. The chicken-and-egg
+it solved — needing a UI to set the network identity *before* a TLS cert (and thus
+`:443`) can exist — is instead solved by serving the cockpit itself over plain
+HTTP at day-0. We do **not** provision identity via Ansible: the client's network
+(name/IP) is not under our control and is unknown at provisioning time.
+
+**Provisioning split:**
+
+- **Ansible seeds *accounts only*** (no infra knowledge required): one or more
+  `superadmin` (vendor) and the **first `admin`** (client), each with a paper
+  password + `must_change_password=true`. A `superadmin` may also create further
+  `admin`s after delivery.
+- **On-site day-0 flow, in the cockpit itself:**
+  1. Caddy serves the cockpit on **`:80` (cleartext)** while no cert exists; `:443`
+     is not yet up.
+  2. An `admin`/`superadmin` logs in on `:80`, is forced through password change,
+     then enters **network identity (name / IP)** — gated by `can_manage_it`.
+  3. Backend writes the identity, generates the private-CA leaf, reloads Caddy →
+     **`:443` comes up**. The CA root cert is offered for download (client trust
+     distribution: GPO/MDM).
+  4. Once `:443` is live, **`:80` serves only a redirect to `:443`** — no login,
+     no app, no cleartext surface after day-0.
+
+`NFR-v3-01` — The one-time day-0 password change + identity entry occur over
+cleartext on the LAN, before any real secret exists. Accepted trade-off; mitigated
+by dropping `:80` to a redirect immediately post-finalize.
+
+`FR-v3-07` — Recurring IT (change IP later, regenerate cert, re-view fingerprint)
+is **not** a special mode; it is a permanent capability-gated section of Settings
+(see §13.5), reachable over `:443` by any `can_manage_it` holder.
+
+### §13.5 — Unified Settings UI
+
+One cockpit Settings surface; sections render **iff** the viewer holds the
+capability. No section is reachable by a role that lacks its capability, enforced
+server-side (client gating is cosmetic only, NFR-05).
+
+| Settings section | Gate | Origin |
+|------------------|------|--------|
+| **Secrets** — provider API keys, Claude OAuth | `can_manage_secrets` | exists (`env_keys.rs`, `claude_oauth.rs`) — **re-gate admin→superadmin**, surface in Settings |
+| **IT** — CA cert download + fingerprint, network identity (name/IP), cert regen | `can_manage_it` | **migrated** from `:9090` (`ca.rs`, `identity.rs`, `caddy.rs`) |
+| **Users** — create/list/delete/force-logout | `can_manage_users` | exists (`users.rs`, `UsersDialog.tsx`) — **extend to 4 roles + anti-escalation** |
+| App/product config (existing panes) | per-existing-gate | exists (`config/*`) |
+
+Visibility outcome: `manager` sees neither Secrets nor IT; `admin` sees IT but not
+Secrets; `superadmin` sees all.
+
+### §13.6 — Data-model & migration changes
+
+- `users.role` CHECK constraint widens to
+  `('superadmin','admin','manager','user')`. Because the schema is created inline
+  in `init_schema()` (no migration files), an **idempotent ALTER-style migration**
+  is required for existing DBs — SQLite cannot alter a CHECK in place, so either
+  (a) recreate the table via the standard 12-step rename-copy-drop, or (b) since
+  the seed flow always starts from an empty DB in the appliance, gate on
+  `count_users()` and rebuild only when non-empty. Prefer (a) for safety.
+- **Existing-data mapping** on upgrade: legacy `admin` → **`superadmin`** (it held
+  the provider-key capability, which is now superadmin-only), legacy `user` →
+  `user`. There is no legacy `manager`/`admin(client)` to map.
+- `UserRole::from_sql` gains the two new variants; the fallback stays `User`
+  (forward-compat, NFR unchanged).
+
+### §13.7 — Enforcement refactor (v2 → v3)
+
+Every current `user.role == UserRole::Admin` check (9 files) is replaced by the
+matching capability predicate. Concretely:
+
+| Current check | Location | v3 replacement |
+|---------------|----------|----------------|
+| `role == Admin` bypass in `authorize_agent` | `transport/auth/acl.rs:31` | `can_manage_all_agents(user)` |
+| `role == Admin` in `can_manage_acl` | `transport/auth/acl.rs:42` | `can_manage_all_agents(user)` OR `is_agent_admin` |
+| `role == Admin` in `filter_fleet` | `transport/auth/acl.rs:182` | `can_manage_all_agents(user)` |
+| `role != Admin` gates on env-keys | `rest/config/env_keys.rs:26,64,89` | `!can_manage_secrets(user)` |
+| admin-gate on user CRUD | `transport/auth/users.rs` | `can_manage_users(caller)` + anti-escalation (FR-v3-03/05) |
+| admin-gate on maint plane | `transport/maint/mod.rs` | **deleted** with the plane; IT endpoints re-homed under `can_manage_it` |
+| seed role | `runtime/seed.rs` | seeds `superadmin` (vendor) + first `admin` (client) |
+
+### §13.8 — What is deleted
+
+- Backend: `transport/maint/mod.rs` (plane router/guards), the `Plane` split and
+  the `:9090`/`:9191` dual-socket in `transport/mod.rs`. Retained but **re-homed**
+  into product REST under `can_manage_it`: `ca.rs`, `identity.rs`, `caddy.rs`,
+  `state.rs` (provisioning flag), `crypto.rs`.
+- Frontend: `web/src/components/auth/maint/*` (wizard steps), `lib/api/maint.ts`,
+  the `probeMaintPlane` plane-detection branch in `App.tsx`. The day-0 flow becomes
+  states of the existing `AuthGuard` (`next_action`) served over `:80`.
+- Caddy: the `:9090`→`:9191` maintenance vhost; add a `:80`→`:443` redirect that is
+  active only post-finalize, and a pre-finalize `:80`-serves-cockpit rule.
+
+### §13.9 — Revised requirements delta
+
+| ID | Change vs v2 |
+|----|--------------|
+| FR-03 | First-user bootstrap still creates the top account, but that account is now `superadmin` (vendor seed via Ansible), **not** a generic admin. Client `admin` is seeded alongside or created by a superadmin. |
+| FR-04 | "Admin can manage users" → **`can_manage_users` (manager+)** with anti-escalation. |
+| FR-09 | "Admins have implicit access to all agents" → **`can_manage_all_agents` (manager+)**. |
+| FR-D2 | OAuth is no longer fully deferred: **provider OAuth (Claude) management** ships under `can_manage_secrets`. (SSO/SAML *federation for login* remains deferred.) |
+| New | FR-v3-01…07, NFR-v3-01 (this section). |
+
+### §13.10 — Access-control master flag (feature-flag model)
+
+RBAC is **off by default**. The whole four-role enforcement is gated behind a
+single runtime flag — **"Access control"** — surfaced in Settings alongside the
+existing feature toggles (Developer mode, Show Overlay). This mirrors, and
+generalises, today's boot-time `CP_AUTH_ENABLED` switch: instead of a deploy-time
+env var only, it is a runtime-toggleable central setting.
+
+**Semantics:**
+
+- `FR-v3-08` **Off (default): effective role = `superadmin` for everyone, no login.**
+  This reuses the existing "auth disabled" fast-path — capability helpers already
+  short-circuit to full access when there is no authenticated user
+  (`authorize_agent`/`filter_fleet` return all/true on `auth_user == None`). No
+  parallel code path: "off" ≡ "no authenticated user" ≡ god-mode.
+- `FR-v3-09` **On:** full four-role RBAC + login requirement (§13.2–§13.7).
+
+**Not a `localStorage` toggle.** Unlike `devMode`/`showOverlay` (per-browser,
+cosmetic, client-side), Access control is a **security boundary**: it MUST be a
+server-authoritative central setting (like `onboarding_completed`), never
+client-stored. A browser-local flag would be bypassable from devtools.
+
+**Toggle gating (asymmetric, prevents escalation):**
+
+- `FR-v3-10` **Enabling** is allowed by anyone (when off, everyone is superadmin
+  anyway — enabling only *closes* access, never opens it).
+- `FR-v3-11` **Disabling** requires `can_manage_secrets` (`superadmin` only).
+  Otherwise a `manager`/`admin` would disable RBAC → everyone superadmin →
+  trivial self-escalation.
+
+**Bootstrap invariant:** Ansible **always seeds ≥1 `superadmin`** (§13.4). So the
+on-transition never has a chicken-and-egg: a superadmin account with a known paper
+password already exists before the flag is ever flipped. No self-serve
+"create-first-superadmin-on-enable" flow is needed.
+
+> **⚠️ DEV-PHASE — to be hardened.** A global off-switch that returns *everyone* to
+> superadmin is, by construction, a trivial escalation surface (a single
+> compromised superadmin, or any future loosening of the disable gate, reopens the
+> whole box). It exists now only for frictionless development. Before production
+> this MUST evolve — e.g. no full disable in prod, or a disabled state that does
+> **not** grant god-mode. Do not treat `FR-v3-11`'s superadmin gate as a
+> sufficient long-term control.

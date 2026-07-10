@@ -1,5 +1,6 @@
 ---
 # Admin-seed tasks (Obj 6.1/6.2) — shared by site.yml and provision-seed.yml.
+# Path-agnostic via cp_root.
 # Idempotent: a unit that already has seed.env is left untouched.
 
 - name: Check whether this unit is already seeded
@@ -7,11 +8,14 @@
     path: "{{ cp_root }}/seed.env"
   register: seed_stat
 
-- name: Generate a unique admin password for this unit (Obj 6.1.1)
+- name: Generate unique passwords for this unit's seeded accounts (Obj 6.1.1)
   ansible.builtin.set_fact:
     # 20 chars, letters+digits — strong, and shell-safe for an sh-sourced env
-    # file. Force a fixed one with -e cp_admin_password=… (testing / a specific
-    # unit); otherwise a fresh random one per unit.
+    # file. Force a fixed one with -e cp_admin_password= / -e cp_superadmin_password=
+    # (testing / a specific unit); otherwise a fresh random one per unit.
+    # Two accounts (design §13.4): the vendor `superadmin` + the client `admin`.
+    cp_seed_superadmin_password: >-
+      {{ cp_superadmin_password | default(lookup('password', '/dev/null length=20 chars=ascii_letters,digits'), true) }}
     cp_seed_admin_password: >-
       {{ cp_admin_password | default(lookup('password', '/dev/null length=20 chars=ascii_letters,digits'), true) }}
   no_log: true

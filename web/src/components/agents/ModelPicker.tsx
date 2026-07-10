@@ -54,6 +54,8 @@ export function ModelPicker({
               prov={p}
               active={on}
               onClick={() => {
+                // A provider can have an empty model list (allowlist filtered it
+                // to nothing) — never dereference models[0] unguarded.
                 const dm = defaultModel(providers, p.id)
                 onChange(p.id, dm?.id ?? p.models[0]?.id ?? "")
               }}

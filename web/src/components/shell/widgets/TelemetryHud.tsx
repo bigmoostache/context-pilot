@@ -28,13 +28,12 @@ import { cn, clipboard } from "@/lib/utils"
  * itself never becomes a source of the render churn it measures.
  */
 export function TelemetryHud() {
-  const { showOverlay } = useShowOverlay()
-  const [open, setOpen] = useState(true)
+  const { showOverlay, setShowOverlay } = useShowOverlay()
   const [collapsed, setCollapsed] = useState(false)
   const [copied, setCopied] = useState(false)
   const snap = useTelemetry()
 
-  if (!showOverlay || !open) return null
+  if (!showOverlay) return null
 
   // Copy the full snapshot as markdown so it can be pasted straight into a
   // thread for diagnosis. The report carries MORE than the HUD renders (every
@@ -66,7 +65,7 @@ export function TelemetryHud() {
           >
             {collapsed ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
           </IconBtn>
-          <IconBtn title="Close" onClick={() => setOpen(false)}>
+          <IconBtn title="Close" onClick={() => setShowOverlay(false)}>
             <X className="size-3.5" />
           </IconBtn>
         </span>

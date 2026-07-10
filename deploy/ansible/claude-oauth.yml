@@ -25,7 +25,7 @@
   become: false
   gather_facts: false
   vars:
-    cp_root: /mnt/data/context-pilot
+    cp_root: /opt/context-pilot
     oauth_creds_file: "~/.claude/.credentials.json"
   tasks:
     - name: Read the local credentials file

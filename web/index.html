@@ -9,6 +9,20 @@
       content="Context Pilot — phosphor cockpit interface (design maquette)"
     />
     <title>Context·Pilot — Cockpit</title>
+    <!-- Set the theme class before first paint to avoid a light→dark flash
+         (FOUC). Mirrors the logic in src/lib/theme.tsx: honour the saved
+         preference, otherwise fall back to the OS `prefers-color-scheme`. -->
+    <script>
+      ;(function () {
+        try {
+          var t = localStorage.getItem("cp-theme")
+          if (t !== "light" && t !== "dark") {
+            t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+          }
+          if (t === "dark") document.documentElement.classList.add("dark")
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

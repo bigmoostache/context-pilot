@@ -199,6 +199,9 @@
       },
       "AppSettings": {
         "properties": {
+          "access_control": {
+            "type": "boolean"
+          },
           "allowed_models": {
             "items": {
               "type": "string"
@@ -245,6 +248,7 @@
           "onboarding_completed",
           "is_admin",
           "auth_enabled",
+          "access_control",
           "providers",
           "allowed_models"
         ],
@@ -300,6 +304,7 @@
           "next_action": {
             "enum": [
               "change_password",
+              "set_identity",
               "onboarding",
               "ready"
             ],
@@ -307,7 +312,9 @@
           },
           "role": {
             "enum": [
+              "superadmin",
               "admin",
+              "manager",
               "user"
             ],
             "type": "string"
@@ -359,7 +366,9 @@
           },
           "role": {
             "enum": [
+              "superadmin",
               "admin",
+              "manager",
               "user"
             ],
             "type": "string"
@@ -388,37 +397,6 @@
         },
         "required": [
           "bytes"
-        ],
-        "type": "object"
-      },
-      "CallbackRow": {
-        "properties": {
-          "blocking": {
-            "type": "boolean"
-          },
-          "cwd": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "pattern": {
-            "type": "string"
-          },
-          "scope": {
-            "type": "string"
-          },
-          "timeout": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "pattern"
         ],
         "type": "object"
       },
@@ -557,45 +535,6 @@
           "cmd_id",
           "dedup_token",
           "status"
-        ],
-        "type": "object"
-      },
-      "ContextPanel": {
-        "properties": {
-          "cached": {
-            "type": "boolean"
-          },
-          "costUsd": {
-            "type": "number"
-          },
-          "fixed": {
-            "type": "boolean"
-          },
-          "frozen": {
-            "nullable": true,
-            "type": "integer"
-          },
-          "id": {
-            "type": "string"
-          },
-          "kind": {
-            "$ref": "#/components/schemas/PanelKind"
-          },
-          "misses": {
-            "type": "integer"
-          },
-          "name": {
-            "type": "string"
-          },
-          "tokens": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "kind",
-          "name",
-          "tokens"
         ],
         "type": "object"
       },
@@ -744,32 +683,6 @@
         "required": [
           "status",
           "tag"
-        ],
-        "type": "object"
-      },
-      "EntityTable": {
-        "properties": {
-          "columns": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "rows": {
-            "type": "integer"
-          },
-          "samples": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "name",
-          "rows",
-          "columns",
-          "samples"
         ],
         "type": "object"
       },
@@ -938,6 +851,67 @@
         ],
         "type": "object"
       },
+      "Identity": {
+        "properties": {
+          "ip": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "ip"
+        ],
+        "type": "object"
+      },
+      "ItFingerprint": {
+        "properties": {
+          "algorithm": {
+            "type": "string"
+          },
+          "fingerprint": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fingerprint",
+          "algorithm"
+        ],
+        "type": "object"
+      },
+      "ItIdentityResponse": {
+        "properties": {
+          "identity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Identity"
+              }
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "identity"
+        ],
+        "type": "object"
+      },
+      "ItSetIdentityResponse": {
+        "properties": {
+          "identity": {
+            "$ref": "#/components/schemas/Identity"
+          },
+          "reloaded": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "identity",
+          "reloaded"
+        ],
+        "type": "object"
+      },
       "LibraryItem": {
         "properties": {
           "active": {
@@ -975,38 +949,6 @@
           "name",
           "kind",
           "description"
-        ],
-        "type": "object"
-      },
-      "MemoryCard": {
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "importance": {
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "critical"
-            ],
-            "type": "string"
-          },
-          "labels": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "tldr": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "tldr",
-          "importance",
-          "labels"
         ],
         "type": "object"
       },
@@ -1175,27 +1117,6 @@
         ],
         "type": "object"
       },
-      "PanelKind": {
-        "enum": [
-          "tree",
-          "memory",
-          "threads",
-          "spine",
-          "stats",
-          "entities",
-          "search",
-          "file",
-          "git",
-          "console",
-          "queue",
-          "todo",
-          "callback",
-          "scratchpad",
-          "tools",
-          "radar"
-        ],
-        "type": "string"
-      },
       "ProviderDef": {
         "properties": {
           "description": {
@@ -1219,92 +1140,6 @@
           "name",
           "description",
           "models"
-        ],
-        "type": "object"
-      },
-      "QueueAction": {
-        "properties": {
-          "index": {
-            "type": "integer"
-          },
-          "intent": {
-            "type": "string"
-          },
-          "preview": {
-            "type": "string"
-          },
-          "tool": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "index",
-          "tool"
-        ],
-        "type": "object"
-      },
-      "RadarAnchor": {
-        "properties": {
-          "signal": {
-            "type": "string"
-          },
-          "time": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "time",
-          "signal"
-        ],
-        "type": "object"
-      },
-      "RadarData": {
-        "properties": {
-          "anchors": {
-            "items": {
-              "$ref": "#/components/schemas/RadarAnchor"
-            },
-            "type": "array"
-          },
-          "results": {
-            "items": {
-              "$ref": "#/components/schemas/RadarResult"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "anchors",
-          "results"
-        ],
-        "type": "object"
-      },
-      "RadarResult": {
-        "properties": {
-          "content": {
-            "type": "string"
-          },
-          "datetime": {
-            "type": "string"
-          },
-          "importance": {
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "critical"
-            ],
-            "type": "string"
-          },
-          "score": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "content",
-          "datetime",
-          "importance",
-          "score"
         ],
         "type": "object"
       },
@@ -1458,24 +1293,6 @@
         ],
         "type": "object"
       },
-      "ScratchCell": {
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "preview": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "title"
-        ],
-        "type": "object"
-      },
       "SelectResponse": {
         "properties": {
           "binaryPath": {
@@ -1558,37 +1375,6 @@
         "required": [
           "name",
           "rows"
-        ],
-        "type": "object"
-      },
-      "SpineNotif": {
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "kind": {
-            "enum": [
-              "user",
-              "reload",
-              "custom"
-            ],
-            "type": "string"
-          },
-          "processed": {
-            "type": "boolean"
-          },
-          "text": {
-            "type": "string"
-          },
-          "time": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "kind",
-          "text",
-          "processed"
         ],
         "type": "object"
       },
@@ -1753,34 +1539,6 @@
         ],
         "type": "object"
       },
-      "TodoItem": {
-        "properties": {
-          "depth": {
-            "type": "integer"
-          },
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "pending",
-              "in_progress",
-              "done"
-            ],
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "status",
-          "depth"
-        ],
-        "type": "object"
-      },
       "ToolCall": {
         "properties": {
           "intent": {
@@ -1810,46 +1568,6 @@
         ],
         "type": "object"
       },
-      "ToolGroup": {
-        "properties": {
-          "category": {
-            "type": "string"
-          },
-          "tools": {
-            "items": {
-              "$ref": "#/components/schemas/ToolRow"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "category",
-          "tools"
-        ],
-        "type": "object"
-      },
-      "ToolRow": {
-        "properties": {
-          "desc": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "on",
-              "off"
-            ],
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "status"
-        ],
-        "type": "object"
-      },
       "TrashResult": {
         "properties": {
           "skipped": {
@@ -1862,41 +1580,6 @@
         "required": [
           "trashed",
           "skipped"
-        ],
-        "type": "object"
-      },
-      "TreeRow": {
-        "properties": {
-          "changed": {
-            "type": "boolean"
-          },
-          "depth": {
-            "type": "integer"
-          },
-          "desc": {
-            "type": "string"
-          },
-          "kind": {
-            "enum": [
-              "dir",
-              "file"
-            ],
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "open": {
-            "type": "boolean"
-          },
-          "size": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "depth",
-          "name",
-          "kind"
         ],
         "type": "object"
       },
@@ -2431,49 +2114,6 @@
         ]
       }
     },
-    "/api/agent/{id}/callbacks": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/CallbackRow"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Callbacks",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
     "/api/agent/{id}/command": {
       "post": {
         "parameters": [
@@ -2562,49 +2202,6 @@
           }
         },
         "summary": "Conversation feed",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
-    "/api/agent/{id}/entities": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/EntityTable"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Entity tables",
         "tags": [
           "agent"
         ]
@@ -3412,49 +3009,6 @@
         ]
       }
     },
-    "/api/agent/{id}/memory": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/MemoryCard"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Memory cards",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
     "/api/agent/{id}/meta": {
       "get": {
         "parameters": [
@@ -3530,132 +3084,6 @@
           }
         },
         "summary": "Agent metrics",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
-    "/api/agent/{id}/panels": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ContextPanel"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Context panels",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
-    "/api/agent/{id}/queue": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/QueueAction"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Queued actions",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
-    "/api/agent/{id}/radar": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RadarData"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Context radar",
         "tags": [
           "agent"
         ]
@@ -3799,92 +3227,6 @@
         ]
       }
     },
-    "/api/agent/{id}/scratchpad": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ScratchCell"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Scratchpad cells",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
-    "/api/agent/{id}/spine": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/SpineNotif"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Spine notifications",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
     "/api/agent/{id}/threads": {
       "get": {
         "parameters": [
@@ -3920,135 +3262,6 @@
           }
         },
         "summary": "Agent threads + conversation",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
-    "/api/agent/{id}/todos": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/TodoItem"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Todo items",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
-    "/api/agent/{id}/tools": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ToolGroup"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Tool groups",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
-    "/api/agent/{id}/tree": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/TreeRow"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Directory tree",
         "tags": [
           "agent"
         ]
@@ -5210,6 +4423,175 @@
         ]
       }
     },
+    "/api/it/ca.crt": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "CA root PEM bytes"
+          }
+        },
+        "summary": "Download the private-CA root certificate (PEM)",
+        "tags": [
+          "it"
+        ]
+      }
+    },
+    "/api/it/ca/fingerprint": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItFingerprint"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "CA root SHA-256 fingerprint",
+        "tags": [
+          "it"
+        ]
+      }
+    },
+    "/api/it/identity": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItIdentityResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Current box network identity (name/IP), or null",
+        "tags": [
+          "it"
+        ]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "ip": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "ip"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItSetIdentityResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set box network identity — re-issues the leaf & reloads Caddy",
+        "tags": [
+          "it"
+        ]
+      }
+    },
+    "/api/it/provisioned": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "provisioned": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "provisioned"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Whether the box has been provisioned",
+        "tags": [
+          "it"
+        ]
+      }
+    },
     "/api/metrics": {
       "get": {
         "responses": {
@@ -5609,6 +4991,9 @@
             "application/json": {
               "schema": {
                 "properties": {
+                  "access_control": {
+                    "type": "boolean"
+                  },
                   "allowed_models": {
                     "items": {
                       "type": "string"

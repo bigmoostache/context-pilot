@@ -14,8 +14,10 @@ export default defineConfig({
     // reachable from a phone/other device on the tailnet. Vite otherwise
     // rejects any request whose Host isn't localhost/an IP (anti-DNS-rebinding).
     // The dev server only ever listens on 127.0.0.1 and is exposed solely over
-    // the private WireGuard tailnet, so relaxing the Host check is safe here.
-    allowedHosts: true,
+    // the private WireGuard tailnet. Scope the allow-list to the tailnet suffix
+    // (`.ts.net`) plus localhost rather than disabling the check entirely, so
+    // anti-DNS-rebinding protection stays on for every other Host header.
+    allowedHosts: ["localhost", ".ts.net"],
     // Single-origin proxy: every backend route lives under `/api` (REST + the
     // `/api/stream` SSE endpoint). Proxying it to the orchestrator lets the
     // frontend address the backend with a RELATIVE base (VITE_API_URL="" — see
@@ -35,6 +37,29 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split the heaviest vendor groups out of the single app chunk so the
+        // browser can cache them independently and the initial bundle shrinks.
+        // Function form (rather than the Record form) to avoid the Vite/Rollup
+        // `output` overload picking the ManualChunksFunction type and rejecting
+        // the object literal under `tsc -b`.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return
+          if (/[\\/]node_modules[\\/](?:react|react-dom|scheduler)[\\/]/.test(id)) return "react"
+          if (
+            /[\\/]node_modules[\\/](?:react-markdown|remark-gfm|remark-math|rehype-katex|katex|mdast|micromark|unist|hast|vfile|property-information|space-separated-tokens|comma-separated-tokens|decode-named-character-reference|character-entities)/.test(
+              id,
+            )
+          )
+            return "markdown"
+          if (/[\\/]node_modules[\\/]highlight\.js[\\/]/.test(id)) return "highlight"
+          return
+        },
+      },
     },
   },
 })

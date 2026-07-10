@@ -33,7 +33,7 @@
 mod auth;
 mod files;
 pub mod inspect;
-pub mod maint;
+pub mod it;
 mod query;
 pub mod rest;
 // `pub` so the `sse` and `ticket` submodules it now contains stay as reachable
@@ -65,23 +65,8 @@ pub use rest::Backend;
 /// intake's `MAX_CONNECTION_BUFFER` (the other cap on the same path).
 const MAX_BODY: u64 = 32 * 1024 * 1024;
 
-/// Which face of the transport a listener serves.
-///
-/// The orchestrator runs two independent `tiny_http` listeners on two sockets:
-/// the [`Product`](Plane::Product) cockpit (`:7878` — fleet, agents, chat, SPA)
-/// and the [`Maintenance`](Plane::Maintenance) plane (`:9090` — IT provisioning,
-/// TLS, CA; Admin-gated and LAN-only). Each picks its router by its `Plane`, so
-/// no product route is reachable on the maintenance socket and vice-versa.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Plane {
-    /// The product cockpit plane.
-    Product,
-    /// The IT maintenance plane.
-    Maintenance,
-}
-
-/// Bind an HTTP server to `addr` and serve the [`Product`](Plane::Product) plane
-/// until the process exits. Back-compat shim over [`serve_plane`].
+/// Bind an HTTP server to `addr` and serve the product cockpit until the process
+/// exits. Back-compat shim over [`serve_bound`].
 ///
 /// Each request runs on its own thread (`tiny_http`'s blocking model). A
 /// streaming request occupies its thread for the lifetime of the connection;
@@ -91,40 +76,23 @@ pub enum Plane {
 ///
 /// Returns an error string if the address cannot be bound.
 pub fn serve(addr: &str, state: Arc<Mutex<Backend>>) -> Result<(), String> {
-    serve_plane(addr, state, Plane::Product)
-}
-
-/// Bind an HTTP server to `addr` and serve the given [`Plane`] until the process
-/// exits.
-///
-/// # Errors
-///
-/// Returns an error string if the address cannot be bound.
-pub fn serve_plane(addr: &str, state: Arc<Mutex<Backend>>, plane: Plane) -> Result<(), String> {
     let server = Server::http(addr).map_err(|e| e.to_string())?;
-    serve_bound_plane(server, state, plane);
+    serve_bound(server, state);
     Ok(())
 }
 
-/// Serve the [`Product`](Plane::Product) plane on an already-bound [`Server`].
-/// Back-compat shim over [`serve_bound_plane`] used by the integration tests.
+/// Serve the product cockpit on an already-bound [`Server`], thread-per-request,
+/// until the server is dropped.
 ///
 /// Split out so a caller that needs the bound address up-front — notably a test
 /// binding `127.0.0.1:0` to claim an ephemeral port — can read
-/// [`Server::server_addr`] before handing the server here.
+/// [`Server::server_addr`] before handing the server here. There is a single
+/// transport face now (design §13.4 removed the separate maintenance plane), so
+/// this dispatches every request through the one product [`handle`] pipeline.
 pub fn serve_bound(server: Server, state: Arc<Mutex<Backend>>) {
-    serve_bound_plane(server, state, Plane::Product);
-}
-
-/// Serve the given [`Plane`] on an already-bound [`Server`], thread-per-request,
-/// until the server is dropped.
-pub fn serve_bound_plane(server: Server, state: Arc<Mutex<Backend>>, plane: Plane) {
     for request in server.incoming_requests() {
         let state = Arc::clone(&state);
-        let _handle = thread::spawn(move || match plane {
-            Plane::Product => handle(request, &state),
-            Plane::Maintenance => maint::handle(request, &state),
-        });
+        let _handle = thread::spawn(move || handle(request, &state));
     }
 }
 
@@ -151,20 +119,6 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     // and download routes all live under `/api`, so they are untouched.
     if method == Method::Get && segments.first() != Some(&"api") && files::web_root().is_some() {
         files::serve_static(request, &path);
-        return;
-    }
-
-    // Maintenance-status shim on the PRODUCT plane. The SPA probes
-    // `GET /api/maint/status` at boot to decide wizard-vs-cockpit; the real
-    // handler lives only on the maintenance socket (`:9090`). On the product
-    // cockpit this path used to fall through to a 404 — harmless (the frontend
-    // treats a non-2xx as "not the maintenance plane") but it spammed a red
-    // failed-XHR in devtools every boot. Answer 200 with `plane:"product"` so
-    // the probe gets a clean response and `probeMaintPlane` returns null
-    // (it renders the wizard only when `plane === "maintenance"`). Public,
-    // pre-auth: it leaks nothing beyond "this is the product plane".
-    if method == Method::Get && segments.as_slice() == ["api", "maint", "status"] {
-        respond_json(request, &rest::HttpReply::ok(&serde_json::json!({ "plane": "product" })));
         return;
     }
 
@@ -215,6 +169,18 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
             files::handle_raw(request, state, id, &query);
             return;
         }
+        // IT: private-CA root download (design §13.5, re-homed from the maint plane).
+        // Owns the `Request` for its non-JSON content type, so it can't route
+        // through `route_rest`. Gate on `can_manage_it` here (a `None` caller is
+        // god-mode, FR-v3-08); then reuse the maintenance handler verbatim.
+        if let ["api", "it", "ca.crt"] = segments.as_slice() {
+            if auth_user.as_ref().is_some_and(|u| !u.can_manage_it()) {
+                respond_json(request, &rest::HttpReply::error(403, "IT management access required"));
+            } else {
+                it::ca::serve_ca_cert(request);
+            }
+            return;
+        }
     }
 
     // Read the body up-front (only POST routes consume it). The mutable borrow
@@ -256,7 +222,7 @@ fn route_rest(
         (Method::Post, ["api", "auth", "login"]) => auth::login(state, body_bytes),
         (Method::Post, ["api", "auth", "register"]) => auth::register(state, body_bytes, auth_user),
         (Method::Post, ["api", "auth", "logout"]) => auth::logout(state, auth_token),
-        (Method::Get, ["api", "auth", "me"]) => auth::me(auth_user),
+        (Method::Get, ["api", "auth", "me"]) => auth::me(state, auth_user),
         (Method::Patch, ["api", "auth", "me"]) => auth::update_me(state, body_bytes, auth_user),
         (Method::Post, ["api", "auth", "password"]) => auth::change_password(state, body_bytes, auth_user),
         (Method::Get, ["api", "auth", "sessions"]) => auth::list_sessions(state, auth_token, auth_user),
@@ -295,23 +261,18 @@ fn route_rest(
         // ── Vault snapshot (BridgeVault cache warm-up) ──────────────
         (Method::Get, ["api", "vault", "snapshot"]) => rest::vault_snapshot(auth_user),
 
+        // ── IT infra (design §13.5, re-homed from the maint plane; can_manage_it) ──
+        (Method::Get, ["api", "it", "ca", "fingerprint"]) => rest::it_ca_fingerprint(auth_user),
+        (Method::Get, ["api", "it", "identity"]) => rest::it_get_identity(state, auth_user),
+        (Method::Post, ["api", "it", "identity"]) => rest::it_set_identity(state, body_bytes, auth_user),
+        (Method::Get, ["api", "it", "provisioned"]) => rest::it_provisioned(state, auth_user),
+
         (Method::Get, ["api", "agent", id]) => rest::agent(state, id),
         (Method::Get, ["api", "agent", id, "meta"]) => inspect::meta::agent_meta(state, id),
         (Method::Get, ["api", "agent", id, "metrics"]) => inspect::metrics::agent_metrics(state, id),
         (Method::Get, ["api", "agent", id, "vitals"]) => inspect::vitals::agent_vitals(state, id),
         (Method::Get, ["api", "agent", id, "body", hash]) => rest::body(state, id, hash),
         (Method::Get, ["api", "agent", id, "threads"]) => rest::threads(state, id),
-        (Method::Get, ["api", "agent", id, "panels"]) => inspect::panels::panel_list(state, id),
-        (Method::Get, ["api", "agent", id, "memory"]) => inspect::panels::memory(state, id),
-        (Method::Get, ["api", "agent", id, "todos"]) => inspect::panels::todos(state, id, query),
-        (Method::Get, ["api", "agent", id, "spine"]) => inspect::panels::spine(state, id, query),
-        (Method::Get, ["api", "agent", id, "queue"]) => inspect::panels::queue(state, id, query),
-        (Method::Get, ["api", "agent", id, "scratchpad"]) => inspect::panels::scratchpad(state, id, query),
-        (Method::Get, ["api", "agent", id, "tree"]) => inspect::panels::tree(state, id),
-        (Method::Get, ["api", "agent", id, "callbacks"]) => inspect::panels::callbacks(state, id),
-        (Method::Get, ["api", "agent", id, "tools"]) => inspect::panels::tools(state, id),
-        (Method::Get, ["api", "agent", id, "radar"]) => inspect::panels::radar(state, id),
-        (Method::Get, ["api", "agent", id, "entities"]) => inspect::panels::entities(state, id),
         (Method::Get, ["api", "agent", id, "usage"]) => inspect::panels::usage(state, id, query),
         (Method::Get, ["api", "agent", id, "library"]) => inspect::panels::library(state, id),
         (Method::Get, ["api", "agent", id, "fs"]) => inspect::finder::fs_list(state, id, query),
@@ -390,8 +351,9 @@ fn handle_stream(request: Request, state: &Arc<Mutex<Backend>>, query: &str) {
             match b.auth.as_ref() {
                 Some(auth) => match auth.get_user_by_id(user_id) {
                     Ok(Some(user)) => {
-                        use crate::services::auth::types::UserRole;
-                        if user.role == UserRole::Admin {
+                        // Implicit access to all agents (manager+) bypasses the
+                        // per-agent ACL (design §13.3); everyone else needs a row.
+                        if user.can_manage_all_agents() {
                             true
                         } else {
                             auth.check_access(agent_id, user_id).map(|role| role.is_some()).unwrap_or(false)

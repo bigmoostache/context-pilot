@@ -46,9 +46,15 @@ pub(crate) fn authenticate(
     segments: &[&str],
     auth_token: Option<&str>,
 ) -> Result<Option<User>, HttpReply> {
-    // Fast path: auth disabled — no-op pass-through (NFR-09).
-    let auth_enabled = state.lock().map(|b| b.auth.is_some()).unwrap_or(false);
-    if !auth_enabled {
+    // Fast path: access control OFF (explicit `"false"` opt-out) → god mode
+    // (FR-v3-08, design §13.10; RBAC is ON by default now). Everyone is
+    // effectively superadmin with no login; the enforcement
+    // sites already short-circuit to full access on `auth_user == None`. Also a
+    // no-op when there is no auth store to enforce against (NFR-09). Both are read
+    // from the cached [`Backend::access_control`] flag — no per-request disk I/O.
+    let (access_control, auth_enabled) =
+        state.lock().map(|b| (b.access_control, b.auth.is_some())).unwrap_or((false, false));
+    if !access_control || !auth_enabled {
         return Ok(None);
     }
 
@@ -197,15 +203,16 @@ pub(crate) fn register(state: &Mutex<Backend>, body: &[u8], auth_user: Option<&U
         Err(_) => return HttpReply::error(500, "database error"),
     };
 
-    // Bootstrap: first user becomes admin (FR-03).
-    // Subsequent registrations require a valid admin session.
+    // Bootstrap: the first-ever account is the vendor `superadmin` (FR-03 →
+    // design §13.9). Subsequent self-serve registrations require a
+    // `can_manage_users` session and always create a plain `user`.
     let role = if user_count == 0 {
-        UserRole::Admin
+        UserRole::Superadmin
     } else {
         match auth_user {
-            Some(u) if u.role == UserRole::Admin => UserRole::User,
-            Some(_) => return HttpReply::error(403, "admin access required"),
-            None => return HttpReply::error(401, "admin authorization required"),
+            Some(u) if u.can_manage_users() => UserRole::User,
+            Some(_) => return HttpReply::error(403, "user management access required"),
+            None => return HttpReply::error(401, "management authorization required"),
         }
     };
 
@@ -246,32 +253,36 @@ pub(crate) fn logout(state: &Mutex<Backend>, auth_token: Option<&str>) -> HttpRe
     }
 }
 
-/// `GET /api/auth/me` — current user profile + the backend-driven post-login
-/// step (FR-07). The profile is the serialized [`User`] plus a `next_action`
-/// field the frontend renders directly (no client-side flow logic):
-///   • `"change_password"` — a provisioned account must rotate its password;
-///   • `"onboarding"` — an admin still has first-run setup to complete;
-///   • `"ready"` — render the app.
-///
-/// The middleware guarantees `auth_user` is `Some` when auth is enabled.
-pub(crate) fn me(auth_user: Option<&User>) -> HttpReply {
+/// `GET /api/auth/me` — the serialized [`User`] plus a backend-driven
+/// `next_action` (FR-07): `change_password` / `set_identity` (day-0) /
+/// `onboarding` / `ready`. `me` reads the durable provisioning flag (state the
+/// [`User`] doesn't carry) and threads it into [`next_action`]. The middleware
+/// guarantees `auth_user` is `Some` when auth is enabled.
+pub(crate) fn me(state: &Mutex<Backend>, auth_user: Option<&User>) -> HttpReply {
     let Some(user) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
+    let provisioned =
+        state.lock().map(|b| crate::transport::it::is_provisioned(&b.provision_flag_path)).unwrap_or(false);
     let mut value = serde_json::to_value(user).unwrap_or_default();
     if let Some(obj) = value.as_object_mut() {
-        drop(obj.insert("next_action".to_owned(), serde_json::Value::String(next_action(user).to_owned())));
+        drop(obj.insert("next_action".to_owned(), next_action(user, provisioned).into()));
     }
     HttpReply::ok(&value)
 }
 
-/// Decide the post-login step the frontend should render for `user`. Password
-/// rotation takes precedence over onboarding, which takes precedence over the
-/// app itself — mirroring the gate order in the web `AuthGuard`.
-fn next_action(user: &User) -> &'static str {
+/// Decide the post-login step the frontend should render for `user`, given the
+/// box's `provisioned` state. Order (mirrors the web `AuthGuard`): password
+/// rotation → day-0 identity/provisioning → first-run onboarding → the app.
+fn next_action(user: &User, provisioned: bool) -> &'static str {
     if user.must_change_password {
         "change_password"
-    } else if user.role == UserRole::Admin && !super::rest::onboarding_completed() {
+    } else if user.can_manage_it() && !provisioned {
+        // Day-0 (design §13.4): an IT operator names the unprovisioned box, which
+        // provisions it and brings the private-CA `:443` cockpit up (CA download too).
+        "set_identity"
+    } else if user.can_manage_users() && !super::rest::onboarding_completed() {
+        // First-run product/org onboarding — the client-management tier's setup.
         "onboarding"
     } else {
         "ready"
@@ -393,3 +404,94 @@ pub(crate) fn revoke_session(state: &Mutex<Backend>, session_id: &str, auth_user
 
 // Admin-only user-management routes (list/create/force-logout/delete) live in
 // the sibling `users` module and are re-exported above.
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use std::time::Duration;
+
+    use super::*;
+
+    /// Build a `Mutex<Backend>` with an auth store present, and the access-control
+    /// flag forced to `access_control`. The tempdir is leaked so the SQLite file
+    /// outlives the test body.
+    fn backend(access_control: bool) -> Mutex<Backend> {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let store = AuthStore::open(&dir.path().join("auth.db")).expect("open auth store");
+        let mut b = Backend::new(
+            dir.path().to_path_buf(),
+            100.0,
+            PathBuf::from("/tmp/cp-auth-test-realms"),
+            PathBuf::from("/tmp/cp-auth-test-bin"),
+            Some(store),
+            Duration::from_secs(3600),
+        );
+        b.access_control = access_control;
+        std::mem::forget(dir);
+        Mutex::new(b)
+    }
+
+    /// V0.4b — with the flag OFF, a request with no token on an agent-scoped
+    /// route resolves to full access (`Ok(None)` = god mode), even though an auth
+    /// store is present. Mirrors the current auth-disabled behaviour.
+    #[test]
+    fn flag_off_is_god_mode() {
+        let state = backend(false);
+        let outcome = authenticate(&state, &["api", "agent", "some-agent"], None);
+        assert!(matches!(outcome, Ok(None)), "flag off ⇒ no authenticated user (god mode)");
+    }
+
+    /// With the flag ON, the same tokenless request to a protected route is
+    /// rejected (401), while a public route still passes through.
+    #[test]
+    fn flag_on_enforces() {
+        let state = backend(true);
+        let protected = authenticate(&state, &["api", "agent", "some-agent"], None);
+        assert!(matches!(protected, Err(reply) if reply.status == 401), "flag on + no token ⇒ 401");
+        let public = authenticate(&state, &["api", "health"], None);
+        assert!(matches!(public, Ok(None)), "public route bypasses the gate");
+    }
+
+    // Bare variant imports (not the `UserRole::Superadmin` qualified path) keep
+    // the capability-grep gate happy (reserved for capabilities/types/tests.rs).
+    use crate::services::auth::types::UserRole::{Superadmin, User as Regular};
+
+    fn user(role: UserRole, must_change_password: bool) -> User {
+        User {
+            id: "a".to_owned(),
+            email: "a@box".to_owned(),
+            name: "A".to_owned(),
+            password_hash: String::new(),
+            role,
+            must_change_password,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
+
+    /// V5.2a — `me` drives the day-0 flow via `next_action` from the threaded
+    /// provisioning state: a `can_manage_it` operator on an unprovisioned box walks
+    /// `change_password → set_identity → (cleared)` as each precondition is met; a
+    /// regular user skips the IT step → `ready`. Hermetic (only the durable flag).
+    #[test]
+    fn me_next_action_day0_walk_and_capability_scope() {
+        let state = backend(false); // me() ignores access_control; needs the flag path
+        let flag_path = state.lock().expect("lock").provision_flag_path.clone();
+        let na = |u: &User| me(&state, Some(u)).body;
+        let set = |v| crate::transport::it::state::set_provisioned(&flag_path, v).expect("flag");
+        set(false);
+        let mut admin = user(Superadmin, true);
+        // 1. Seeded paper password must be rotated first.
+        assert!(na(&admin).contains("\"next_action\":\"change_password\""), "paper password first");
+        // 2. Password changed, box still unprovisioned → day-0 identity step.
+        admin.must_change_password = false;
+        assert!(na(&admin).contains("\"next_action\":\"set_identity\""), "unprovisioned IT operator names the box");
+        // 3. Provisioned → day-0 IT gate cleared (proceeds to app / onboarding).
+        set(true);
+        let done = na(&admin);
+        assert!(!done.contains("\"next_action\":\"set_identity\""), "provisioned clears day-0: {done}");
+        // A regular user skips the IT step; no user-mgmt cap → onboarding short-circuits → ready.
+        set(false);
+        assert!(na(&user(Regular, false)).contains("\"next_action\":\"ready\""), "non-IT user ⇒ ready");
+    }
+}

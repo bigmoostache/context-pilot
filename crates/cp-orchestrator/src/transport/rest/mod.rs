@@ -34,6 +34,7 @@ mod thread_shape;
 pub use backend::Backend;
 pub(crate) use claude_oauth::{claude_usage, login_complete, login_start, refresh_login, token_status};
 pub(crate) use config::env_keys::{env_key_reveal, env_key_update, env_keys_list, vault_snapshot};
+pub(crate) use config::it::{it_ca_fingerprint, it_get_identity, it_provisioned, it_set_identity};
 pub(crate) use config::settings::{allowed_models, onboarding_completed};
 pub use config::settings::{get_settings, update_settings};
 pub use create::{create_agent, create_command};

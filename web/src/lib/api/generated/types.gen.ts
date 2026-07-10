@@ -62,6 +62,7 @@ export type AgentMetrics = {
 };
 
 export type AppSettings = {
+    access_control: boolean;
     allowed_models: Array<string>;
     auth_enabled: boolean;
     default_model?: string | null;
@@ -90,8 +91,8 @@ export type AuthMe = {
     id: string;
     must_change_password: boolean;
     name: string;
-    next_action: 'change_password' | 'onboarding' | 'ready';
-    role: 'admin' | 'user';
+    next_action: 'change_password' | 'set_identity' | 'onboarding' | 'ready';
+    role: 'superadmin' | 'admin' | 'manager' | 'user';
     updated_at?: number;
 };
 
@@ -106,22 +107,12 @@ export type AuthUser = {
     id: string;
     must_change_password: boolean;
     name: string;
-    role: 'admin' | 'user';
+    role: 'superadmin' | 'admin' | 'manager' | 'user';
     updated_at?: number;
 };
 
 export type BodyPayload = {
     bytes: Array<number>;
-};
-
-export type CallbackRow = {
-    blocking?: boolean;
-    cwd?: string;
-    id: string;
-    name: string;
-    pattern: string;
-    scope?: string;
-    timeout?: string;
 };
 
 export type ClaudeLoginCompleteRequest = {
@@ -170,18 +161,6 @@ export type CommandReceipt = {
     status: string;
 };
 
-export type ContextPanel = {
-    cached?: boolean;
-    costUsd?: number;
-    fixed?: boolean;
-    frozen?: number | null;
-    id: string;
-    kind: PanelKind;
-    misses?: number;
-    name: string;
-    tokens: number;
-};
-
 export type ConversationMsg = {
     content: string;
     id: string;
@@ -225,13 +204,6 @@ export type DeployResponse = {
 export type DownloadResponse = {
     status: string;
     tag: string;
-};
-
-export type EntityTable = {
-    columns: string;
-    name: string;
-    rows: number;
-    samples: Array<string>;
 };
 
 export type EnvKeyReveal = {
@@ -294,6 +266,25 @@ export type FsPreview = {
     truncated: boolean;
 };
 
+export type Identity = {
+    ip: string;
+    name: string;
+};
+
+export type ItFingerprint = {
+    algorithm: string;
+    fingerprint: string;
+};
+
+export type ItIdentityResponse = {
+    identity: Identity | null;
+};
+
+export type ItSetIdentityResponse = {
+    identity: Identity;
+    reloaded: boolean;
+};
+
 export type LibraryItem = {
     active?: boolean;
     body?: string;
@@ -303,13 +294,6 @@ export type LibraryItem = {
     kind: 'agent' | 'skill' | 'command';
     meta?: string;
     name: string;
-};
-
-export type MemoryCard = {
-    id: string;
-    importance: 'low' | 'medium' | 'high' | 'critical';
-    labels: Array<string>;
-    tldr: string;
 };
 
 export type MkdirResult = {
@@ -371,37 +355,11 @@ export type OpEntryKind = {
     used_tokens?: number;
 };
 
-export type PanelKind = 'tree' | 'memory' | 'threads' | 'spine' | 'stats' | 'entities' | 'search' | 'file' | 'git' | 'console' | 'queue' | 'todo' | 'callback' | 'scratchpad' | 'tools' | 'radar';
-
 export type ProviderDef = {
     description: string;
     id: string;
     models: Array<ModelDef>;
     name: string;
-};
-
-export type QueueAction = {
-    index: number;
-    intent?: string;
-    preview?: string;
-    tool: string;
-};
-
-export type RadarAnchor = {
-    signal: string;
-    time: string;
-};
-
-export type RadarData = {
-    anchors: Array<RadarAnchor>;
-    results: Array<RadarResult>;
-};
-
-export type RadarResult = {
-    content: string;
-    datetime: string;
-    importance: 'low' | 'medium' | 'high' | 'critical';
-    score: number;
 };
 
 export type RegisterResponse = {
@@ -449,12 +407,6 @@ export type RetireReceipt = {
     status: string;
 };
 
-export type ScratchCell = {
-    id: string;
-    preview?: string;
-    title: string;
-};
-
 export type SelectResponse = {
     binaryPath: string;
     status: string;
@@ -477,14 +429,6 @@ export type SheetData = {
 export type SheetTab = {
     name: string;
     rows: Array<Array<string>>;
-};
-
-export type SpineNotif = {
-    id: string;
-    kind: 'user' | 'reload' | 'custom';
-    processed: boolean;
-    text: string;
-    time?: string;
 };
 
 export type ThreadDetail = {
@@ -532,13 +476,6 @@ export type TicketResponse = {
     ticket: string;
 };
 
-export type TodoItem = {
-    depth: number;
-    id: string;
-    name: string;
-    status: 'pending' | 'in_progress' | 'done';
-};
-
 export type ToolCall = {
     intent?: string;
     isError?: boolean;
@@ -550,30 +487,9 @@ export type ToolCall = {
     verb?: string;
 };
 
-export type ToolGroup = {
-    category: string;
-    tools: Array<ToolRow>;
-};
-
-export type ToolRow = {
-    desc?: string;
-    name: string;
-    status: 'on' | 'off';
-};
-
 export type TrashResult = {
     skipped: number;
     trashed: number;
-};
-
-export type TreeRow = {
-    changed?: boolean;
-    depth: number;
-    desc?: string;
-    kind: 'dir' | 'file';
-    name: string;
-    open?: boolean;
-    size?: string;
 };
 
 export type UnretireReceipt = {
@@ -851,33 +767,6 @@ export type GetApiAgentByIdBodyByHashResponses = {
 
 export type GetApiAgentByIdBodyByHashResponse = GetApiAgentByIdBodyByHashResponses[keyof GetApiAgentByIdBodyByHashResponses];
 
-export type GetApiAgentByIdCallbacksData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/callbacks';
-};
-
-export type GetApiAgentByIdCallbacksErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdCallbacksError = GetApiAgentByIdCallbacksErrors[keyof GetApiAgentByIdCallbacksErrors];
-
-export type GetApiAgentByIdCallbacksResponses = {
-    /**
-     * Success
-     */
-    200: Array<CallbackRow>;
-};
-
-export type GetApiAgentByIdCallbacksResponse = GetApiAgentByIdCallbacksResponses[keyof GetApiAgentByIdCallbacksResponses];
-
 export type PostApiAgentByIdCommandData = {
     body: {
         [key: string]: unknown;
@@ -933,33 +822,6 @@ export type GetApiAgentByIdConversationResponses = {
 };
 
 export type GetApiAgentByIdConversationResponse = GetApiAgentByIdConversationResponses[keyof GetApiAgentByIdConversationResponses];
-
-export type GetApiAgentByIdEntitiesData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/entities';
-};
-
-export type GetApiAgentByIdEntitiesErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdEntitiesError = GetApiAgentByIdEntitiesErrors[keyof GetApiAgentByIdEntitiesErrors];
-
-export type GetApiAgentByIdEntitiesResponses = {
-    /**
-     * Success
-     */
-    200: Array<EntityTable>;
-};
-
-export type GetApiAgentByIdEntitiesResponse = GetApiAgentByIdEntitiesResponses[keyof GetApiAgentByIdEntitiesResponses];
 
 export type GetApiAgentByIdFsData = {
     body?: never;
@@ -1381,33 +1243,6 @@ export type PostApiAgentByIdLibraryCommandResponses = {
 
 export type PostApiAgentByIdLibraryCommandResponse = PostApiAgentByIdLibraryCommandResponses[keyof PostApiAgentByIdLibraryCommandResponses];
 
-export type GetApiAgentByIdMemoryData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/memory';
-};
-
-export type GetApiAgentByIdMemoryErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdMemoryError = GetApiAgentByIdMemoryErrors[keyof GetApiAgentByIdMemoryErrors];
-
-export type GetApiAgentByIdMemoryResponses = {
-    /**
-     * Success
-     */
-    200: Array<MemoryCard>;
-};
-
-export type GetApiAgentByIdMemoryResponse = GetApiAgentByIdMemoryResponses[keyof GetApiAgentByIdMemoryResponses];
-
 export type GetApiAgentByIdMetaData = {
     body?: never;
     path: {
@@ -1461,87 +1296,6 @@ export type GetApiAgentByIdMetricsResponses = {
 };
 
 export type GetApiAgentByIdMetricsResponse = GetApiAgentByIdMetricsResponses[keyof GetApiAgentByIdMetricsResponses];
-
-export type GetApiAgentByIdPanelsData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/panels';
-};
-
-export type GetApiAgentByIdPanelsErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdPanelsError = GetApiAgentByIdPanelsErrors[keyof GetApiAgentByIdPanelsErrors];
-
-export type GetApiAgentByIdPanelsResponses = {
-    /**
-     * Success
-     */
-    200: Array<ContextPanel>;
-};
-
-export type GetApiAgentByIdPanelsResponse = GetApiAgentByIdPanelsResponses[keyof GetApiAgentByIdPanelsResponses];
-
-export type GetApiAgentByIdQueueData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/queue';
-};
-
-export type GetApiAgentByIdQueueErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdQueueError = GetApiAgentByIdQueueErrors[keyof GetApiAgentByIdQueueErrors];
-
-export type GetApiAgentByIdQueueResponses = {
-    /**
-     * Success
-     */
-    200: Array<QueueAction>;
-};
-
-export type GetApiAgentByIdQueueResponse = GetApiAgentByIdQueueResponses[keyof GetApiAgentByIdQueueResponses];
-
-export type GetApiAgentByIdRadarData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/radar';
-};
-
-export type GetApiAgentByIdRadarErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdRadarError = GetApiAgentByIdRadarErrors[keyof GetApiAgentByIdRadarErrors];
-
-export type GetApiAgentByIdRadarResponses = {
-    /**
-     * Success
-     */
-    200: RadarData;
-};
-
-export type GetApiAgentByIdRadarResponse = GetApiAgentByIdRadarResponses[keyof GetApiAgentByIdRadarResponses];
 
 export type PostApiAgentByIdRenameData = {
     body: {
@@ -1626,60 +1380,6 @@ export type PostApiAgentByIdRetireResponses = {
 
 export type PostApiAgentByIdRetireResponse = PostApiAgentByIdRetireResponses[keyof PostApiAgentByIdRetireResponses];
 
-export type GetApiAgentByIdScratchpadData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/scratchpad';
-};
-
-export type GetApiAgentByIdScratchpadErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdScratchpadError = GetApiAgentByIdScratchpadErrors[keyof GetApiAgentByIdScratchpadErrors];
-
-export type GetApiAgentByIdScratchpadResponses = {
-    /**
-     * Success
-     */
-    200: Array<ScratchCell>;
-};
-
-export type GetApiAgentByIdScratchpadResponse = GetApiAgentByIdScratchpadResponses[keyof GetApiAgentByIdScratchpadResponses];
-
-export type GetApiAgentByIdSpineData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/spine';
-};
-
-export type GetApiAgentByIdSpineErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdSpineError = GetApiAgentByIdSpineErrors[keyof GetApiAgentByIdSpineErrors];
-
-export type GetApiAgentByIdSpineResponses = {
-    /**
-     * Success
-     */
-    200: Array<SpineNotif>;
-};
-
-export type GetApiAgentByIdSpineResponse = GetApiAgentByIdSpineResponses[keyof GetApiAgentByIdSpineResponses];
-
 export type GetApiAgentByIdThreadsData = {
     body?: never;
     path: {
@@ -1706,87 +1406,6 @@ export type GetApiAgentByIdThreadsResponses = {
 };
 
 export type GetApiAgentByIdThreadsResponse = GetApiAgentByIdThreadsResponses[keyof GetApiAgentByIdThreadsResponses];
-
-export type GetApiAgentByIdTodosData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/todos';
-};
-
-export type GetApiAgentByIdTodosErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdTodosError = GetApiAgentByIdTodosErrors[keyof GetApiAgentByIdTodosErrors];
-
-export type GetApiAgentByIdTodosResponses = {
-    /**
-     * Success
-     */
-    200: Array<TodoItem>;
-};
-
-export type GetApiAgentByIdTodosResponse = GetApiAgentByIdTodosResponses[keyof GetApiAgentByIdTodosResponses];
-
-export type GetApiAgentByIdToolsData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/tools';
-};
-
-export type GetApiAgentByIdToolsErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdToolsError = GetApiAgentByIdToolsErrors[keyof GetApiAgentByIdToolsErrors];
-
-export type GetApiAgentByIdToolsResponses = {
-    /**
-     * Success
-     */
-    200: Array<ToolGroup>;
-};
-
-export type GetApiAgentByIdToolsResponse = GetApiAgentByIdToolsResponses[keyof GetApiAgentByIdToolsResponses];
-
-export type GetApiAgentByIdTreeData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/agent/{id}/tree';
-};
-
-export type GetApiAgentByIdTreeErrors = {
-    /**
-     * Error
-     */
-    default: Error;
-};
-
-export type GetApiAgentByIdTreeError = GetApiAgentByIdTreeErrors[keyof GetApiAgentByIdTreeErrors];
-
-export type GetApiAgentByIdTreeResponses = {
-    /**
-     * Success
-     */
-    200: Array<TreeRow>;
-};
-
-export type GetApiAgentByIdTreeResponse = GetApiAgentByIdTreeResponses[keyof GetApiAgentByIdTreeResponses];
 
 export type PostApiAgentByIdUnretireData = {
     body?: never;
@@ -2563,6 +2182,127 @@ export type GetApiHealthResponses = {
 
 export type GetApiHealthResponse = GetApiHealthResponses[keyof GetApiHealthResponses];
 
+export type GetApiItCaCrtData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/it/ca.crt';
+};
+
+export type GetApiItCaCrtResponses = {
+    /**
+     * CA root PEM bytes
+     */
+    200: Blob | File;
+};
+
+export type GetApiItCaCrtResponse = GetApiItCaCrtResponses[keyof GetApiItCaCrtResponses];
+
+export type GetApiItCaFingerprintData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/it/ca/fingerprint';
+};
+
+export type GetApiItCaFingerprintErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiItCaFingerprintError = GetApiItCaFingerprintErrors[keyof GetApiItCaFingerprintErrors];
+
+export type GetApiItCaFingerprintResponses = {
+    /**
+     * Success
+     */
+    200: ItFingerprint;
+};
+
+export type GetApiItCaFingerprintResponse = GetApiItCaFingerprintResponses[keyof GetApiItCaFingerprintResponses];
+
+export type GetApiItIdentityData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/it/identity';
+};
+
+export type GetApiItIdentityErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiItIdentityError = GetApiItIdentityErrors[keyof GetApiItIdentityErrors];
+
+export type GetApiItIdentityResponses = {
+    /**
+     * Success
+     */
+    200: ItIdentityResponse;
+};
+
+export type GetApiItIdentityResponse = GetApiItIdentityResponses[keyof GetApiItIdentityResponses];
+
+export type PostApiItIdentityData = {
+    body: {
+        ip: string;
+        name: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/it/identity';
+};
+
+export type PostApiItIdentityErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiItIdentityError = PostApiItIdentityErrors[keyof PostApiItIdentityErrors];
+
+export type PostApiItIdentityResponses = {
+    /**
+     * Success
+     */
+    200: ItSetIdentityResponse;
+};
+
+export type PostApiItIdentityResponse = PostApiItIdentityResponses[keyof PostApiItIdentityResponses];
+
+export type GetApiItProvisionedData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/it/provisioned';
+};
+
+export type GetApiItProvisionedErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiItProvisionedError = GetApiItProvisionedErrors[keyof GetApiItProvisionedErrors];
+
+export type GetApiItProvisionedResponses = {
+    /**
+     * Success
+     */
+    200: {
+        provisioned: boolean;
+    };
+};
+
+export type GetApiItProvisionedResponse = GetApiItProvisionedResponses[keyof GetApiItProvisionedResponses];
+
 export type GetApiMetricsData = {
     body?: never;
     path?: never;
@@ -2828,6 +2568,7 @@ export type GetApiSettingsResponse = GetApiSettingsResponses[keyof GetApiSetting
 
 export type PostApiSettingsData = {
     body: {
+        access_control?: boolean;
         allowed_models?: Array<string>;
         default_model?: string;
         default_provider?: string;
