@@ -191,13 +191,7 @@ interface Totals {
 /** The per-agent usage table (or the empty-fleet placeholder), with a totals
  *  footer. Extracted from {@link UsagePage} so its render stays within the P8
  *  line budget. */
-function UsageTable({
-  visible,
-  totals,
-}: {
-  visible: Row[]
-  totals: Totals
-}) {
+function UsageTable({ visible, totals }: { visible: Row[]; totals: Totals }) {
   return (
     <section className="flex flex-col gap-2.5">
       <span className="text-[13px] font-semibold text-foreground/90">By agent</span>
@@ -219,29 +213,29 @@ function UsageTable({
             </TableHeader>
             <TableBody>
               {visible.map((r) => (
-                  <TableRow key={r.agent.id}>
-                    <TableCell className="font-medium text-foreground/85">
-                      <span className="flex items-center gap-2">
-                        <span
-                          className="size-2 shrink-0 rounded-full"
-                          style={{ background: agentAccent(r.agent) }}
-                        />
-                        {r.agent.name}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right text-foreground/75 tabular-nums">
-                      {fmtTok(r.inputTokens)}
-                    </TableCell>
-                    <TableCell className="text-right text-foreground/75 tabular-nums">
-                      {fmtTok(r.outputTokens)}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold text-foreground/90 tabular-nums">
-                      {fmtUsd(r.spendUsd)}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground/80 tabular-nums">
-                      {fmtTok(r.inputTokens + r.outputTokens)}
-                    </TableCell>
-                  </TableRow>
+                <TableRow key={r.agent.id}>
+                  <TableCell className="font-medium text-foreground/85">
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="size-2 shrink-0 rounded-full"
+                        style={{ background: agentAccent(r.agent) }}
+                      />
+                      {r.agent.name}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right text-foreground/75 tabular-nums">
+                    {fmtTok(r.inputTokens)}
+                  </TableCell>
+                  <TableCell className="text-right text-foreground/75 tabular-nums">
+                    {fmtTok(r.outputTokens)}
+                  </TableCell>
+                  <TableCell className="text-right font-semibold text-foreground/90 tabular-nums">
+                    {fmtUsd(r.spendUsd)}
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground/80 tabular-nums">
+                    {fmtTok(r.inputTokens + r.outputTokens)}
+                  </TableCell>
+                </TableRow>
               ))}
             </TableBody>
             <TableFooter>
