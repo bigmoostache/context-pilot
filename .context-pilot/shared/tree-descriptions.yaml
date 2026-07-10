@@ -610,6 +610,10 @@
   path: crates/cp-render/src/markdown.rs
   description: Shared markdown→IR parser. to_blocks() (fenced code blocks, headers, bullets, inline). parse_line() (single line). parse_inline() (bold, code, links). Used by skill panels + conversation renderer.
   last_edited_ms: 0
+0a99324c7c30c162:
+  path: .context-pilot/shared/callbacks.yaml
+  description: Shared callback definitions YAML — 8 blocking callbacks covering Rust+TS lints/tests/structure/contract.
+  last_edited_ms: 0
 0a9bfca4eb1d3869:
   path: src/modules/conversation/list.rs
   description: 'List continuation: detect_list_action() for ''- '', ''1. '', ''a. '' patterns on Enter, alpha increment, ListAction enum'
@@ -4718,6 +4722,10 @@
   path: devis-attali-context-pilot.md
   description: 'Commercial brief for DF: Context Pilot as-a-Service deployment to cabinet Attali. 7 sections: service description, pricing grid (750€ setup / 250€/month / 500€/day support), financial summary, cost transparency (1/4 sub-service mutualization, 48% margin), scope, contractual terms (12-month auto-renew), DF notes.'
   last_edited_ms: 1782140719490
+54351bd4bd052680:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 549866596144eb9b:
   path: src/app/run/reverie.rs
   description: Reverie event processing with flame!("reverie_tools"). maybe_start_reverie_stream, process_reverie_events, handle_reverie_tools (tool dispatch + queue support), check_reverie_end_turn (Report nudge). Multi-agent concurrent.
@@ -8750,6 +8758,10 @@
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. Tabs+history+nav+selection+drag-drop+statusbar+marquee. PinnedFolder type + loadPins/pinsKey localStorage helpers (key cp-finder-pins:<agentId>); pins state persisted via useEffect; addPin/removePin. ColumnsView called with live-Miller props (agentId/agentFolder/chain/currentNodes/onNavigate). FinderSidebar + ContextMenu wired with onPin/onUnpin. Four view modes, keyboard control.
   last_edited_ms: 0
+9f3a43358d8a0b16:
+  path: .github/workflows/release.yml
+  description: 'Release workflow (push tags v*). 5-target build matrix (tui+cp-console-server) + appliance bundle (aarch64 musl: cp-orchestrator+tui+SPA) + GitHub Release. pnpm action-setup pinned to 11.6.0 (matches lockfile origin, see ci.yml).'
+  last_edited_ms: 0
 9f3a8d1e74c79661:
   path: web/src/components/shell/TopBar.tsx
   description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit/Costs), agent-config gear, UsageButton, account UserMenu. Costs tab dev-mode only. P8: view-tab cluster extracted into a ViewTabs subcomponent (moving the two devMode gates off TopBar''s complexity budget); TopBar fn now <150 lines / cx<15.'
@@ -12562,6 +12574,10 @@ e6b9ad2949d17655:
   path: src/app/panels.rs
   description: Thin wrapper around cp_base::panels. get_panel() delegates to module system. FallbackPanel for orphaned contexts. refresh_all_panels() and collect_all_context() helpers.
   last_edited_ms: 0
+e6d23c43d25765a0:
+  path: crates/cp-orchestrator/src/transport/inspect/providers/oauth_creds.rs
+  description: 'Claude Code OAuth credential presence check. Routes through cp_vault::oauth::load_claude_oauth_raw (Keychain then file). oauth_creds_usable pure verdict: non-empty accessToken + unexpired expiresAt. 3 tests.'
+  last_edited_ms: 1783589205322
 e6d894ba1292b237:
   path: web/src/lib/providers/AuthProvider.tsx
   description: 'AuthProvider: probes /api/auth/status, validates token via /me, drives login/register/logout. isCancelled() getter defeats CFA false-narrowing (web-lint P3). Zero overhead when auth disabled.'
@@ -12598,6 +12614,10 @@ e74deab2bf289b26:
   path: crates/cp-orchestrator/src/transport/finder.rs
   description: 'Finder endpoints: confined dir listing (GET /fs?path=), file preview (GET /fs/preview?path=, 256KB cap, binary reject), conversation (GET /conversation, messages/*.yaml sorted, cap 200). Path confinement via canonicalize+starts_with (rejects ../symlink/absolute). FinderKind from 60+ extensions. 5 new tests.'
   last_edited_ms: 1781686757707
+e753b93f4909876a:
+  path: crates/cp-orchestrator/src/runtime/mod.rs
+  description: 'Orchestrator runtime — Config (env vars: port, maint_port, agents_dir, scan_interval, auth, session_ttl) + Runtime (start_driver background thread + serve HTTP). driver_loop: registry scan (slow cadence) + oplog tail (fast 100ms TAIL_INTERVAL) + config mtime backstop + auth backup. Two listeners: product :7878 + maintenance :9090. Caddy apply at boot.'
+  last_edited_ms: 1783589205397
 e764dee9fb758b38:
   path: crates/cp-mod-entities/src/types.rs
   description: EntitiesState (db_path, dump_path, migrations_dir, schema_cache), SchemaCache, TableInfo, ColumnInfo, ForeignKeyInfo. get/get_mut helpers for State TypeMap access.
@@ -12666,6 +12686,10 @@ e8981ed3ddb5d20d:
   path: web/src/components/shell/costs/CostsView.tsx
   description: Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool bars, two token distribution bars (panel-estimated before/culprit/after + API-reported hit/miss/output for comparison), Tool×Culprit cross-tab with heat-map. Both token bars filter on !noPanelBroken. Tempo/queue/no-break AND-filters. Copy as Markdown button. TanStack useQuery + fetchFsPreview 15s refetch.
   last_edited_ms: 1782923787710
+e89a17ff8ebe702c:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 e89e1f125170586c:
   path: web/e2e/messages.spec.ts
   description: Phase 2 e2e message send (1 test) over the K7 push plane. Composer send→user bubble appears live + roster log grows. Asserts the user message only (agent reply is non-deterministic LLM). roster-log poll timeout 25s to absorb cumulative live-agent command backlog in the serial suite. afterAll archives e2e- threads.

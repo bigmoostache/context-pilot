@@ -110,9 +110,10 @@ jobs:
       # Orchestrator (API+SPA server) + agent (tui), fully static musl. These are
       # the two binaries the procd service runs on the box; see
       # deploy/photonicat/init.d/context-pilot.init.
-      - name: Build orchestrator + agent (cross, static musl)
+      - name: Build orchestrator + agent + console server (cross, static musl)
         run: |
           cross build --release --target aarch64-unknown-linux-musl -p cp-orchestrator
+          cross build --release --target aarch64-unknown-linux-musl -p cp-console-server
           cross build --release --target aarch64-unknown-linux-musl --bin tui
 
       - name: Install Node.js
@@ -146,6 +147,7 @@ jobs:
         run: |
           mkdir -p staging/bin staging/web
           cp target/aarch64-unknown-linux-musl/release/cp-orchestrator staging/bin/
+          cp target/aarch64-unknown-linux-musl/release/cp-console-server staging/bin/
           cp target/aarch64-unknown-linux-musl/release/tui staging/bin/
           chmod 755 staging/bin/*
           cp -r web/dist/. staging/web/
