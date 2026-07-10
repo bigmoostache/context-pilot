@@ -8,8 +8,11 @@
 //! * `PUT  /api/releases/select`   — set the active binary for future agent launches
 //! * `DELETE /api/releases/{tag}`  — remove a locally downloaded release
 //!
-//! All endpoints are admin-only — the router gates them behind the auth check
-//! before dispatching here.
+//! Every `/api/releases/*` route is gated on the `can_manage_it` capability
+//! (Admin+) by a single guard arm in [`route_rest`](crate::transport) before
+//! dispatching here; a `None` caller (access control off) is god-mode and
+//! passes (design §13.10). The handlers themselves take no `auth_user` — the
+//! router guard is the enforcement point.
 
 use std::path::PathBuf;
 use std::sync::Mutex;

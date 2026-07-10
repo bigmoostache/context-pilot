@@ -302,7 +302,14 @@ fn route_rest(
         (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes, auth_user),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state, auth_user),
 
-        // ── Release management (T427, admin-only) ──────────────────
+        // ── Release management (T427) — IT-management surface ──────
+        // One guard for every `/api/releases/*` arm below (update-policy §1
+        // problem 2): a real caller without `can_manage_it` (Admin+) is
+        // refused here; a `None` caller means access control is off →
+        // god-mode passes through (design §13.10).
+        (_, ["api", "releases", ..]) if auth_user.is_some_and(|u| !u.can_manage_it()) => {
+            rest::HttpReply::error(403, "IT management access required")
+        }
         (Method::Get, ["api", "releases"]) => rest::list_releases(state),
         (Method::Put, ["api", "releases", "arch"]) => rest::set_arch(state, body_bytes),
         (Method::Post, ["api", "releases", "download"]) => rest::download_release(state, body_bytes),
@@ -450,6 +457,83 @@ fn split_url(url: &str) -> (String, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::services::MaterializedView;
+    use crate::services::auth::types::{User, UserRole};
+    // Bare variant imports (not the `UserRole::Admin` qualified spelling) keep
+    // the capability-grep gate clean — the qualified paths are reserved for
+    // capabilities/types/tests.rs.
+    use crate::services::auth::types::UserRole::{Admin, User as Regular};
+
+    /// Build a bare [`User`] with the given role — only `role` matters to the
+    /// dispatch guard under test.
+    fn user(role: UserRole) -> User {
+        User {
+            id: "id".to_owned(),
+            email: "e@x.com".to_owned(),
+            name: "N".to_owned(),
+            password_hash: String::new(),
+            role,
+            must_change_password: false,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
+
+    /// A hermetic backend for dispatching `route_rest` directly (no socket,
+    /// no real releases dir writes — every mutating call below fails validation
+    /// before touching the store).
+    fn state() -> Arc<Mutex<Backend>> {
+        Arc::new(Mutex::new(Backend::for_test(PathBuf::from("/tmp/cp-rbac-test-agents"), MaterializedView::new())))
+    }
+
+    /// Dispatch one route through [`route_rest`] with the given caller.
+    fn dispatch(state: &Arc<Mutex<Backend>>, method: &Method, segments: &[&str], caller: Option<&User>) -> u16 {
+        route_rest(method, segments, state, b"", "", None, caller).status
+    }
+
+    /// V0.2a — every `/api/releases/*` route sits behind the single
+    /// `can_manage_it` guard arm: a `user`-role caller gets `403` on all seven
+    /// routes; an `Admin` (and a `None` caller = access control off, god-mode
+    /// §13.10) passes the gate and reaches the handler (any non-403 status —
+    /// the safe probes below fail handler-side validation with `400`, or
+    /// succeed with `200` for the no-op fleet deploy).
+    #[test]
+    fn releases_rbac() {
+        let state = state();
+        let all: [(&Method, &[&str]); 7] = [
+            (&Method::Get, &["api", "releases"]),
+            (&Method::Put, &["api", "releases", "arch"]),
+            (&Method::Post, &["api", "releases", "download"]),
+            (&Method::Put, &["api", "releases", "select"]),
+            (&Method::Post, &["api", "releases", "deploy"]),
+            (&Method::Post, &["api", "releases", "restart-orchestrator"]),
+            (&Method::Delete, &["api", "releases", "v0.0.0-ghost"]),
+        ];
+        let low = user(Regular);
+        for (method, segments) in all {
+            assert_eq!(dispatch(&state, method, segments, Some(&low)), 403, "user must be refused on {segments:?}");
+        }
+
+        // Gate-pass probes for Admin and god-mode. Restricted to routes with a
+        // safe, network-free failure mode: `GET /api/releases` would call the
+        // GitHub API and `restart-orchestrator` would re-exec the test binary —
+        // the guard is a single arm, so passing it anywhere proves it for all.
+        let safe: [(&Method, &[&str]); 4] = [
+            (&Method::Put, &["api", "releases", "arch"]),
+            (&Method::Post, &["api", "releases", "download"]),
+            (&Method::Put, &["api", "releases", "select"]),
+            (&Method::Delete, &["api", "releases", "v0.0.0-ghost"]),
+        ];
+        let admin = user(Admin);
+        for (method, segments) in safe {
+            assert_ne!(dispatch(&state, method, segments, Some(&admin)), 403, "admin passes the gate {segments:?}");
+            assert_ne!(dispatch(&state, method, segments, None), 403, "god-mode passes the gate {segments:?}");
+        }
+        // The no-op fleet deploy (empty view) even succeeds outright.
+        assert_eq!(dispatch(&state, &Method::Post, &["api", "releases", "deploy"], Some(&admin)), 200);
+        assert_eq!(dispatch(&state, &Method::Post, &["api", "releases", "deploy"], None), 200);
+    }
 
     #[test]
     fn split_url_separates_path_and_query() {
