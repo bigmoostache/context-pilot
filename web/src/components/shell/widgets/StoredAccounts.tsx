@@ -70,13 +70,7 @@ function StoredAccountRow({
 
 /** Stored accounts list — store current, switch to stored, delete.
  *  Extracted from UsageButton for the P8 line budget. */
-export function StoredAccounts({
-  isValid,
-  onSwitch,
-}: {
-  isValid: boolean
-  onSwitch: () => void
-}) {
+export function StoredAccounts({ isValid, onSwitch }: { isValid: boolean; onSwitch: () => void }) {
   const queryClient = useQueryClient()
 
   const accountsQuery = useQuery({
