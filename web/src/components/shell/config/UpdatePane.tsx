@@ -79,7 +79,9 @@ export function UpdatePane() {
     <div className="flex flex-col gap-5">
       <VersionCard status={data} onApplying={setApplying} />
       <ModeSection status={data} />
-      <WindowSection status={data} />
+      {/* Keyed on the server value: when the box reports a new window the
+          editor remounts and re-seeds its inputs — no state-sync effect. */}
+      <WindowSection key={`${data.window.start}-${data.window.end}`} status={data} />
     </div>
   )
 }
@@ -122,7 +124,10 @@ function VersionCard({
           {upToDate ? <CheckCircle2 className="size-5" /> : <ArrowUpCircle className="size-5" />}
         </span>
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[13.5px] font-medium text-foreground/90" data-testid="update-current">
+          <span
+            className="text-[13.5px] font-medium text-foreground/90"
+            data-testid="update-current"
+          >
             {status.current}
             <span className="ml-2 text-[11px] font-normal text-muted-foreground">
               {status.channel} · {status.arch}
@@ -187,9 +192,7 @@ function VersionCard({
 /** Last check instant + last apply outcome, when known. */
 function LastOutcome({ status }: { status: UpdateStatus }) {
   const result = status.last_result
-  const checked = status.last_check_ms
-    ? new Date(status.last_check_ms).toLocaleString()
-    : "never"
+  const checked = status.last_check_ms ? new Date(status.last_check_ms).toLocaleString() : "never"
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
       <span>Last check: {checked}</span>
@@ -234,7 +237,9 @@ function ModeSection({ status }: { status: UpdateStatus }) {
               onClick={() => setMode.mutate(m.id)}
               className={cn(
                 "card-shadow flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-left transition-colors",
-                on ? "border-(--interactive)/60 bg-(--interactive)/8" : "border-border bg-card hover:bg-muted/40",
+                on
+                  ? "border-(--interactive)/60 bg-(--interactive)/8"
+                  : "border-border bg-card hover:bg-muted/40",
               )}
             >
               <span
@@ -261,13 +266,10 @@ function ModeSection({ status }: { status: UpdateStatus }) {
 /** Maintenance-window editor (box-local `HH:MM` bounds, auto mode only). */
 function WindowSection({ status }: { status: UpdateStatus }) {
   const qc = useQueryClient()
+  // Seeded from the server value; the parent remounts this section (key) when
+  // that value changes, so no synchronisation effect is needed.
   const [start, setStart] = useState(status.window.start)
   const [end, setEnd] = useState(status.window.end)
-  // Track the server value so an outside refresh re-seeds the inputs.
-  useEffect(() => {
-    setStart(status.window.start)
-    setEnd(status.window.end)
-  }, [status.window.start, status.window.end])
 
   const save = useMutation({
     mutationFn: () => setUpdateMode({ window: { start, end } }),
@@ -344,34 +346,28 @@ function ApplyProgress({
   const [outcome, setOutcome] = useState<"success" | "rolled_back" | "unknown" | null>(null)
 
   useEffect(() => {
-    let cancelled = false
     const startedAt = Date.now()
-    const tick = async () => {
-      if (cancelled) return
-      try {
-        const status = await fetchUpdateStatus()
-        if (cancelled) return
-        if (status.current === target.to) {
-          setOutcome("success")
-          return
-        }
-        if (status.last_result?.kind === "rolled_back" || status.current === target.from) {
-          setOutcome("rolled_back")
-          return
-        }
-      } catch {
-        // The console is restarting — keep polling until it answers.
-      }
-      if (Date.now() - startedAt > 5 * 60_000) {
-        setOutcome("unknown")
-        return
-      }
-      setTimeout(() => void tick(), 2000)
+    const settle = (o: "success" | "rolled_back" | "unknown") => {
+      clearInterval(poll)
+      setOutcome(o)
     }
-    void tick()
-    return () => {
-      cancelled = true
-    }
+    const poll = setInterval(() => {
+      fetchUpdateStatus()
+        .then((status) => {
+          if (status.current === target.to) {
+            settle("success")
+          } else if (status.last_result?.kind === "rolled_back" || status.current === target.from) {
+            settle("rolled_back")
+          } else if (Date.now() - startedAt > 5 * 60_000) {
+            settle("unknown")
+          }
+        })
+        .catch(() => {
+          // The console is restarting — keep polling until it answers.
+          if (Date.now() - startedAt > 5 * 60_000) settle("unknown")
+        })
+    }, 2000)
+    return () => clearInterval(poll)
   }, [target.from, target.to])
 
   if (outcome === null) {
@@ -384,19 +380,22 @@ function ApplyProgress({
         <span className="text-[13px] font-medium text-foreground/85">
           Updating {target.from} → {target.to}
         </span>
-        <span className="text-[11.5px]">The console is restarting — this page will recover on its own.</span>
+        <span className="text-[11.5px]">
+          The console is restarting — this page will recover on its own.
+        </span>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16" data-testid="update-apply-result">
+    <div
+      className="flex flex-col items-center justify-center gap-3 py-16"
+      data-testid="update-apply-result"
+    >
       {outcome === "success" ? (
         <>
           <CheckCircle2 className="size-6 text-(--ok)" />
-          <span className="text-[13px] font-medium text-foreground/85">
-            Updated to {target.to}
-          </span>
+          <span className="text-[13px] font-medium text-foreground/85">Updated to {target.to}</span>
         </>
       ) : outcome === "rolled_back" ? (
         <>

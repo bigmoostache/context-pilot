@@ -421,7 +421,13 @@ fn detect_arch() -> String {
         "aarch64" => "aarch64",
         _ => "unknown",
     };
-    format!("{os}-{arch}")
+    // The appliance ships the static musl bundle (deploy/ansible/tasks/
+    // fetch.yml) — a musl-built binary must self-identify as `-musl` or the
+    // updater would OTA the box onto the gnu lane (different bundle contents:
+    // the musl one has no meilisearch). Compile-time is exactly right here:
+    // the running binary IS the lane.
+    let libc = if cfg!(target_env = "musl") { "-musl" } else { "" };
+    format!("{os}-{arch}{libc}")
 }
 
 /// All known architecture targets from the release matrix.

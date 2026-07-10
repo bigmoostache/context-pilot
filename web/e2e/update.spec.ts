@@ -22,10 +22,7 @@ async function openUpdatePane(page: Page) {
 }
 
 test.describe("update pane", () => {
-  test("admin sees the pane with live status (V5.2a positive half)", async ({
-    page,
-    request,
-  }) => {
+  test("admin sees the pane with live status (V5.2a positive half)", async ({ page, request }) => {
     // The backend status is the source of truth the pane must reflect.
     const status = await (await request.get(`${API}/api/update/status`)).json()
     await openUpdatePane(page)
@@ -68,9 +65,7 @@ test.describe("update pane", () => {
     expect(restore.ok()).toBeTruthy()
   })
 
-  test("Check now fires /api/update/check and refreshes the status (V5.2c)", async ({
-    page,
-  }) => {
+  test("Check now fires /api/update/check and refreshes the status (V5.2c)", async ({ page }) => {
     await openUpdatePane(page)
     const checkRequest = page.waitForRequest(
       (req) => req.url().includes("/api/update/check") && req.method() === "POST",
