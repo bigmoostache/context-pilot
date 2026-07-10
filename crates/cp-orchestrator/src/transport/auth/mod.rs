@@ -11,6 +11,8 @@
 //! authenticated [`User`], which handlers use for role checks.
 
 mod acl;
+#[cfg(test)]
+mod dispatch_rbac;
 mod users;
 
 pub(crate) use acl::{
