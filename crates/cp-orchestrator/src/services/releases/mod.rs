@@ -407,7 +407,7 @@ pub fn semver_sort_key(tag: &str) -> (u32, u32, u32) {
 /// Orchestrator self-update — stage a downloaded `cp-orchestrator` over the
 /// running install path with atomic-rename + `.bak` rollback (see module docs).
 mod self_update;
-pub use self_update::{boot_check, boot_commit, stage_orchestrator_update};
+pub use self_update::{boot_check, boot_commit, boot_commit_when_healthy, stage_orchestrator_update};
 
 /// Signed update-manifest schema (update-policy §5.3).
 mod manifest;

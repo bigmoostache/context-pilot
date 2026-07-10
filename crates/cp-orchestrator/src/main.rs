@@ -46,18 +46,14 @@ fn main() {
 
     eprintln!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION,);
 
-    // Self-update guard. If the "Update & Restart Orchestrator" button staged a
-    // new binary over our install path, a `.pending` marker is present. Account
-    // for this boot attempt *before* we bind anything: if the staged binary has
-    // crash-looped past the tolerance, `boot_check` rolls back to the `.bak`
-    // binary so the service self-heals. Once we've stayed up past a short grace
-    // period, a watchdog thread commits the update (clears the marker + backup).
-    if let Ok(install) = std::env::current_exe() {
-        cp_orchestrator::services::releases::boot_check(&install);
-        let _watchdog = std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_secs(5));
-            cp_orchestrator::services::releases::boot_commit(&install);
-        });
+    // Self-update guard. If a staged update replaced the binary on our install
+    // path, a `.pending` marker is present. Account for this boot attempt
+    // *before* we bind anything: if the staged binary has crash-looped past the
+    // tolerance, `boot_check` rolls back to the `.bak` binary so the service
+    // self-heals. The matching commit is health-gated below (needs the port).
+    let install = std::env::current_exe().ok();
+    if let Some(install) = install.as_deref() {
+        cp_orchestrator::services::releases::boot_check(install);
     }
 
     let config = match Config::from_env() {
@@ -67,6 +63,28 @@ fn main() {
             std::process::exit(1);
         }
     };
+
+    // Health-gated commit of a staged update (update-policy §5.5): a committer
+    // thread polls our own `/healthz` and clears the rollback markers only
+    // after a real `200` — socket bound + auth DB answering + registry
+    // readable — within the deadline. If the probe never turns healthy, the
+    // markers stay and the next boot's `boot_check` counts the failure.
+    if let Some(install) = install {
+        let url = format!("http://127.0.0.1:{}/healthz", config.port);
+        let _committer = std::thread::spawn(move || {
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(2))
+                .build()
+                .unwrap_or_else(|_| reqwest::blocking::Client::new());
+            let healthy = || client.get(&url).send().map(|r| r.status().as_u16() == 200).unwrap_or(false);
+            let _committed = cp_orchestrator::services::releases::boot_commit_when_healthy(
+                &install,
+                healthy,
+                std::time::Duration::from_secs(60),
+                std::time::Duration::from_secs(2),
+            );
+        });
+    }
 
     eprintln!("agents directory: {}", config.agents_dir.display());
     eprintln!("scan interval: {}ms", config.scan_interval.as_millis());
