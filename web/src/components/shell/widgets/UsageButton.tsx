@@ -12,6 +12,7 @@ import {
 } from "@/lib/api"
 import type { ClaudeUsageLimit } from "@/lib/api/generated/types.gen"
 import { cn } from "@/lib/utils"
+import { StoredAccounts } from "./StoredAccounts"
 
 /** Anthropic "A" logomark (Simple Icons, 24×24 viewBox). */
 function AnthropicMark({ className }: { className?: string }) {
@@ -105,8 +106,7 @@ function LimitRow({ limit }: { limit: ClaudeUsageLimit }) {
 
 type LoginStep = "idle" | "starting" | "waiting_for_code" | "completing" | "done" | "error"
 
-/** The paste-your-code step of the login flow — the largest LoginFlow branch,
- *  extracted so LoginFlow stays within the P8 line budget. */
+/** Paste-your-code step — the largest LoginFlow branch, extracted for P8 budget. */
 function WaitingForCode({
   authorizeUrl,
   code,
@@ -201,11 +201,8 @@ export function LoginFlow({ onDone }: { onDone: () => void }) {
   // in" — otherwise the flow auto-completes before the user pastes a fresh code
   // (T472). We snapshot the expiry at the moment login starts and only accept a
   // token whose expiry has strictly advanced (a genuinely new credential).
-  // Keep the latest onDone in a ref so the polling effect below can bind ONCE
-  // (deps [step]) without re-subscribing whenever the parent recreates onDone —
-  // and without `useCallback(onDone, …)`, which react-hooks/use-memo rejects
-  // (its first arg must be an inline function). The ref is read only inside the
-  // deferred setTimeout (a handler), never during render.
+  // Keep latest onDone in a ref so polling effect binds ONCE (deps [step])
+  // without re-subscribing when parent recreates onDone.
   const onDoneRef = useRef(onDone)
   useEffect(() => {
     onDoneRef.current = onDone
@@ -323,9 +320,7 @@ export function LoginFlow({ onDone }: { onDone: () => void }) {
 
 type TokenStatus = Awaited<ReturnType<typeof fetchClaudeTokenStatus>>
 
-/** Account email + token valid/expired row (with the refresh control) + refresh
- *  error — the top half of the popover, extracted so {@link UsageButton} stays
- *  within the P8 complexity budget. */
+/** Account email + token status row + refresh control — extracted for P8 budget. */
 function TokenStatusRow({
   data,
   isLoading,
@@ -389,8 +384,7 @@ function TokenStatusRow({
   )
 }
 
-/** The usage-limit bars (or the loading / error / empty placeholder), gated on a
- *  valid token — extracted so {@link UsageButton} stays within the P8 budget. */
+/** Usage-limit bars (loading/error/empty placeholder) — extracted for P8 budget. */
 function UsageLimits({
   isValid,
   isLoading,
@@ -489,6 +483,11 @@ export function UsageButton() {
 
         {/* ── Usage limits (only when token valid) ─────────── */}
         <UsageLimits isValid={isValid} isLoading={isLoading} isError={isError} limits={limits} />
+
+        {/* ── Stored accounts (multi-account vault) ────────── */}
+        <div className="border-t border-border pt-3">
+          <StoredAccounts isValid={isValid} onSwitch={handleLoginDone} />
+        </div>
 
         {/* ── Login flow (always available) ────────────────── */}
         <div className="border-t border-border pt-3">

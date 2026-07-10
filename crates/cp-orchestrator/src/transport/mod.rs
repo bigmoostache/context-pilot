@@ -318,6 +318,12 @@ fn route_rest(
         (Method::Post, ["api", "claude-login", "complete"]) => rest::login_complete(state, body_bytes),
         (Method::Post, ["api", "claude-login", "refresh"]) => rest::refresh_login(),
 
+        // ── Claude multi-account token vault ────────────────────────
+        (Method::Get, ["api", "claude-accounts"]) => rest::list_accounts(),
+        (Method::Post, ["api", "claude-accounts", "store"]) => rest::store_account(),
+        (Method::Post, ["api", "claude-accounts", "switch"]) => rest::switch_account(body_bytes),
+        (Method::Delete, ["api", "claude-accounts", email]) => rest::delete_account(email),
+
         _ => rest::HttpReply { status: 404, body: "{\"error\":\"not found\"}".to_owned() },
     }
 }

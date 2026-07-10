@@ -5,6 +5,8 @@
 //! builds the authorize URL, and the user completes authorization in their
 //! browser, then pastes the resulting code back into the frontend dialog.
 
+pub(crate) mod accounts;
+
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -16,15 +18,15 @@ use super::{Backend, HttpReply};
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+pub(super) const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const AUTHORIZE_URL: &str = "https://claude.ai/oauth/authorize";
-const TOKEN_URL: &str = "https://claude.ai/v1/oauth/token";
+pub(super) const TOKEN_URL: &str = "https://claude.ai/v1/oauth/token";
 const REDIRECT_URI: &str = "https://console.anthropic.com/oauth/code/callback";
 /// User-Agent required by Anthropic's OAuth token endpoint. The canonical
 /// Claude Code OAuth contract expects a Claude Code identity here; a default
 /// `reqwest/x.y` UA is rejected/misrouted by the edge, breaking both the
 /// authorization_code exchange and refresh.
-const TOKEN_USER_AGENT: &str = "claude-cli/2.1.196 (external, cli)";
+pub(super) const TOKEN_USER_AGENT: &str = "claude-cli/2.1.196 (external, cli)";
 const SCOPES: &str =
     "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
 /// PKCE sessions expire after 5 minutes.
@@ -334,7 +336,7 @@ fn exchange_and_store(code: &str, code_verifier: &str, state: &str) -> Result<i6
 /// Read the `claudeAiOauth` object from Keychain or credentials file.
 ///
 /// Delegates to [`cp_vault::oauth::load_claude_oauth_raw`].
-fn read_credentials_json() -> Option<serde_json::Value> {
+pub(super) fn read_credentials_json() -> Option<serde_json::Value> {
     cp_vault::oauth::load_claude_oauth_raw()
 }
 
@@ -344,7 +346,7 @@ fn read_access_token() -> Option<String> {
 }
 
 /// Store credentials in macOS Keychain (primary) and `~/.claude/.credentials.json` (fallback).
-fn store_credentials(creds: &serde_json::Value) -> Result<(), String> {
+pub(super) fn store_credentials(creds: &serde_json::Value) -> Result<(), String> {
     let json = serde_json::to_string(creds).map_err(|e| e.to_string())?;
 
     // Try macOS Keychain first.
@@ -439,7 +441,7 @@ fn read_random(buf: &mut [u8]) -> Result<(), std::io::Error> {
 }
 
 /// Fetch the account email from Anthropic's OAuth profile endpoint.
-fn fetch_account_email(token: &str) -> Option<String> {
+pub(super) fn fetch_account_email(token: &str) -> Option<String> {
     let client = reqwest::blocking::Client::new();
     let resp = client
         .get("https://api.anthropic.com/api/oauth/profile")
