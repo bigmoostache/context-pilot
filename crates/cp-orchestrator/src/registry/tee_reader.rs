@@ -34,7 +34,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle, sleep};
 use std::time::Duration;
 
-use cp_wire::framing::{FrameError, MAX_PAYLOAD_SIZE, decode_raw};
+use cp_wire::framing::{FRAME_HEADER_SIZE, FrameError, MAX_PAYLOAD_SIZE, decode_raw};
 use cp_wire::types::stream::Frame as StreamFrame;
 
 use crate::transport::Backend;
@@ -169,14 +169,42 @@ fn drain_frames(agent_id: &str, buf: &mut Vec<u8>, backend: &Arc<Mutex<Backend>>
             }
             // Not enough bytes yet — wait for the next read.
             Err(FrameError::Incomplete) => return,
-            // A corrupt frame (CRC) or an oversized length is unrecoverable in
-            // place; resync by discarding the buffer (tier-③ is lossy).
+            // A CRC mismatch means this frame's payload is corrupt, but its
+            // length header is intact — skip exactly this frame and keep
+            // decoding, so a good frame that arrived in the same read still
+            // gets delivered (tier-③ is lossy per frame, not per buffer).
+            Err(FrameError::CrcMismatch { .. }) => match corrupt_frame_span(buf) {
+                Some(span) if span <= buf.len() => {
+                    let _resynced = buf.drain(..span);
+                }
+                // The declared length is not yet fully buffered or is
+                // untrustworthy — drop everything and resync from scratch.
+                _ => {
+                    buf.clear();
+                    return;
+                }
+            },
+            // An oversized/implausible length header is unrecoverable in place;
+            // resync by discarding the buffer.
             Err(_corrupt) => {
                 buf.clear();
                 return;
             }
         }
     }
+}
+
+/// Byte span (`header + payload`) that the frame at the front of `buf` *claims*
+/// to occupy, read from its intact little-endian length header. Returns `None`
+/// when the header is not yet fully buffered or the declared length exceeds the
+/// safety cap (so the caller falls back to a full-buffer resync).
+fn corrupt_frame_span(buf: &[u8]) -> Option<usize> {
+    let len_bytes: [u8; 4] = buf.get(0..4)?.try_into().ok()?;
+    let len = u32::from_le_bytes(len_bytes);
+    if len > MAX_PAYLOAD_SIZE {
+        return None;
+    }
+    Some(FRAME_HEADER_SIZE.wrapping_add(usize::try_from(len).ok()?))
 }
 
 /// Publish one frame into the hub under a brief lock.
