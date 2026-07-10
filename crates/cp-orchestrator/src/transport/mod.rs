@@ -317,13 +317,26 @@ fn route_rest(
         (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes, auth_user),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state, auth_user),
 
-        // ── Release management (T427) — IT-management surface ──────
-        // One guard for every `/api/releases/*` arm below (update-policy §1
-        // problem 2): a real caller without `can_manage_it` (Admin+) is
-        // refused here; a `None` caller means access control is off →
-        // god-mode passes through (design §13.10).
-        (_, ["api", "releases", ..]) if auth_user.is_some_and(|u| !u.can_manage_it()) => {
+        // ── Release + update management — IT surface (can_manage_it) ──
+        // One guard for every `/api/releases/*` and `/api/update/*` arm below
+        // (update-policy §1 problem 2): a real caller without `can_manage_it`
+        // (Admin+) is refused; `None` = access control off → god-mode (§13.10).
+        (_, ["api", "releases" | "update", ..]) if auth_user.is_some_and(|u| !u.can_manage_it()) => {
             rest::HttpReply::error(403, "IT management access required")
+        }
+        // ── Auto-update (O5.1, update-policy §5.9) ──────────────────
+        (Method::Get, ["api", "update", "status"]) => rest::update_status(state),
+        (Method::Post, ["api", "update", "check"]) => rest::update_check(state),
+        (Method::Post, ["api", "update", "apply"]) => rest::update_apply(state),
+        (Method::Put, ["api", "update", "mode"]) => rest::update_set_mode(state, body_bytes),
+        // Retired manual version-choice routes (T5.1.5): the Update pane owns
+        // the flow now; these stay only as a break-glass hatch.
+        (Method::Post, ["api", "releases", "download"])
+        | (Method::Put, ["api", "releases", "select"])
+        | (Method::Delete, ["api", "releases", _])
+            if !rest::releases_break_glass() =>
+        {
+            rest::HttpReply::error(410, "retired — auto-update owns versions (set CP_RELEASES_BREAK_GLASS=1)")
         }
         (Method::Get, ["api", "releases"]) => rest::list_releases(state),
         (Method::Put, ["api", "releases", "arch"]) => rest::set_arch(state, body_bytes),

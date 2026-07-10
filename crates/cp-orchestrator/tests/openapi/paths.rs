@@ -340,6 +340,21 @@ pub(super) fn paths() -> Value {
             "parameters": [{ "name": "tag", "in": "path", "required": true, "schema": { "type": "string" } }],
             "responses": merge(ok(r("OkResponse")), err())
         }}),
+        // ── Auto-update (O5.1, update-policy §5.9, can_manage_it) ───
+        "/api/update/status": get("update", "Auto-update status (version, channel, mode, window, last result)", r("UpdateStatus")),
+        "/api/update/check": post("update", "Force a channel poll now", None, r("UpdateStatus")),
+        "/api/update/apply": post("update", "Verify, download and apply the channel version now (off-window)", None, r("UpdateApplyResponse")),
+        "/api/update/mode": json!({ "put": {
+            "tags": ["update"], "summary": "Set update mode and/or maintenance window",
+            "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                "type": "object",
+                "properties": {
+                    "mode": { "type": "string", "enum": ["auto", "manual", "paused"] },
+                    "window": r("UpdateWindow")
+                }
+            }}}},
+            "responses": merge(ok(r("UpdateStatus")), err())
+        }}),
         // ── Claude Code usage + login ─────────────────────────────────
         "/api/claude-usage": get("usage", "Claude Code OAuth usage limits", r("ClaudeUsageResponse")),
         "/api/claude-login/status": get("usage", "Claude Code OAuth token status", r("ClaudeTokenStatus")),

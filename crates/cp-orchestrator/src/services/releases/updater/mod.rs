@@ -86,8 +86,14 @@ pub fn check_stable(releases_dir: &Path, current: &str) -> Result<UpdateEvaluati
         evaluate_manifest(&bytes, &sig, current, state::now_epoch_secs()).map_err(|e| e.to_string())
     });
     match &outcome {
-        Ok(UpdateEvaluation::Available(manifest)) => st.available = Some(manifest.version.clone()),
-        Ok(UpdateEvaluation::UpToDate) => st.available = None,
+        Ok(UpdateEvaluation::Available(manifest)) => {
+            st.available = Some(manifest.version.clone());
+            st.available_notes_url = Some(manifest.notes_url.clone());
+        }
+        Ok(UpdateEvaluation::UpToDate) => {
+            st.available = None;
+            st.available_notes_url = None;
+        }
         Err(_) => {} // keep last-known `available` — never regress on a bad fetch
     }
     st.save(releases_dir);

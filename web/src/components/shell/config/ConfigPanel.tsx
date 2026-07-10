@@ -24,7 +24,7 @@ import { type CatId, CATEGORIES } from "./categories"
 export function ConfigPanel({ variant = "dialog" }: { variant?: "dialog" | "inline" }) {
   const [cat, setCat] = useState<CatId>("general")
   const { user: authUser, authEnabled } = useAuth()
-  // `adminOnly` categories (IT, Releases) are gated on `can_manage_it` (admin+):
+  // `adminOnly` categories (IT, Update) are gated on `can_manage_it` (admin+):
   // an `admin` OR a `superadmin` (which subsumes it), or god-mode when access
   // control is off (design §13.5/§13.10).
   const isAdmin =

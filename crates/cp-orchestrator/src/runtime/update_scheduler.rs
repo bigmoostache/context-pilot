@@ -10,7 +10,6 @@
 //! the job.
 
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -20,6 +19,9 @@ use crate::services::releases::updater::{
     UpdateEvaluation, check_stable, download_artifact, restart_self, scheduler, stage_apply,
 };
 use crate::transport::Backend;
+// The process-wide apply gate is shared with `POST /api/update/apply` so the
+// scheduler and an admin click can never race two applies.
+use crate::transport::rest::APPLY_IN_FLIGHT;
 
 /// Settle delay before the boot poll — lets the transport bind and the first
 /// registry scan land so a check never races the boot sequence.
@@ -28,10 +30,9 @@ const BOOT_POLL_DELAY: Duration = Duration::from_secs(30);
 /// Spawn the scheduler loop. One thread for the process lifetime.
 pub(crate) fn spawn(backend: Arc<Mutex<Backend>>, auth_db: PathBuf, install: PathBuf) -> thread::JoinHandle<()> {
     thread::spawn(move || {
-        let apply_gate = AtomicBool::new(false);
         thread::sleep(BOOT_POLL_DELAY);
         loop {
-            let sleep = tick(&backend, &auth_db, &install, &apply_gate);
+            let sleep = tick(&backend, &auth_db, &install);
             thread::sleep(sleep);
         }
     })
@@ -40,7 +41,7 @@ pub(crate) fn spawn(backend: Arc<Mutex<Backend>>, auth_db: PathBuf, install: Pat
 /// One poll tick: snapshot config, run the decision, log it, and say how long
 /// to sleep before the next tick (until the window opens when an update is
 /// waiting on it, else the configured poll interval).
-fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf, apply_gate: &AtomicBool) -> Duration {
+fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> Duration {
     // Snapshot everything the tick needs under one short lock.
     let Ok(b) = backend.lock() else {
         return Duration::from_secs(60);
@@ -58,7 +59,7 @@ fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf, app
         mode,
         &window,
         now_minutes,
-        apply_gate,
+        &APPLY_IN_FLIGHT,
         || {
             check_stable(&releases_dir, &current).map(|eval| match eval {
                 UpdateEvaluation::Available(manifest) => Some(manifest),

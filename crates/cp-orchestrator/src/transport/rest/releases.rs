@@ -16,12 +16,19 @@
 
 use std::path::PathBuf;
 use std::sync::Mutex;
-
 use serde::Deserialize;
 
 use super::{Backend, HttpReply};
 use crate::services::releases::{KNOWN_ARCHS, semver_sort_key};
 use crate::supervisor;
+
+/// Break-glass gate for the retired manual version-choice routes (T5.1.5):
+/// `download`/`select`/`delete` answer `410 Gone` unless the operator sets
+/// `CP_RELEASES_BREAK_GLASS=1` (e.g. over Tailscale SSH for a recovery). The
+/// auto-updater and its *Update* pane own version choice now.
+pub(crate) fn releases_break_glass() -> bool {
+    std::env::var("CP_RELEASES_BREAK_GLASS").map(|v| v == "1" || v.eq_ignore_ascii_case("true")).unwrap_or(false)
+}
 
 /// `GET /api/releases` — list all releases (local + remote merged), current
 /// architecture, and selected version.

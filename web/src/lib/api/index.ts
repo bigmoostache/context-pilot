@@ -45,13 +45,10 @@ import {
   getApiAgentByIdLibrary,
   getApiAgentByIdThreads,
   getApiProviders,
-  getApiReleases,
-  putApiReleasesArch,
-  postApiReleasesDownload,
-  putApiReleasesSelect,
-  deleteApiReleasesByTag,
-  postApiReleasesDeploy,
-  postApiReleasesRestartOrchestrator,
+  getApiUpdateStatus,
+  postApiUpdateCheck,
+  postApiUpdateApply,
+  putApiUpdateMode,
   getApiMetrics,
   postApiFleetCreate,
   postApiAgentByIdRestart,
@@ -178,43 +175,33 @@ export function fetchProviderDefs(
   return sdk(getApiProviders(allowedOnly ? { query: { allowed: "1" } } : {}))
 }
 
-// ── Releases (SDK, admin-only T427) ───────────────────────────────────
+// ── Auto-update (SDK, can_manage_it — O5.1, update-policy §5.9) ───────
 //
-// Wraps the generated release-lifecycle SDK so the shell/config release
-// panes import from `@/lib/api` (the api layer) instead of reaching into
-// `@/lib/api/generated` directly — the M141 layering guard (only lib/api
-// may value-import the generated SDK).
+// Wraps the generated auto-update SDK so the Update pane imports from
+// `@/lib/api` (the api layer) instead of reaching into `@/lib/api/generated`
+// directly — the M141 layering guard (only lib/api may value-import the
+// generated SDK). The legacy manual release routes (download/select/delete)
+// are retired server-side (T5.1.5) and have no client any more.
 
-export type { ReleaseEntry, ReleasesResponse, DeployResponse } from "./generated/types.gen"
+export type { UpdateStatus, UpdateWindow, UpdateApplyResponse } from "./generated/types.gen"
 
-export function fetchReleases(): Promise<import("./generated/types.gen").ReleasesResponse> {
-  return sdk(getApiReleases())
+export function fetchUpdateStatus(): Promise<import("./generated/types.gen").UpdateStatus> {
+  return sdk(getApiUpdateStatus())
 }
 
-export function setReleasesArch(body: { arch?: string; auto?: boolean }): Promise<unknown> {
-  return sdk(putApiReleasesArch({ body }))
+export function checkForUpdate(): Promise<import("./generated/types.gen").UpdateStatus> {
+  return sdk(postApiUpdateCheck())
 }
 
-export function downloadRelease(tag: string): Promise<unknown> {
-  return sdk(postApiReleasesDownload({ body: { tag } }))
+export function applyUpdate(): Promise<import("./generated/types.gen").UpdateApplyResponse> {
+  return sdk(postApiUpdateApply())
 }
 
-export function selectRelease(tag: string): Promise<unknown> {
-  return sdk(putApiReleasesSelect({ body: { tag } }))
-}
-
-export function deleteRelease(tag: string): Promise<unknown> {
-  return sdk(deleteApiReleasesByTag({ path: { tag } }))
-}
-
-export function deployFleet(
-  tag: string | null,
-): Promise<import("./generated/types.gen").DeployResponse> {
-  return sdk(postApiReleasesDeploy({ body: tag ? { tag } : {} }))
-}
-
-export function restartOrchestrator(): Promise<unknown> {
-  return sdk(postApiReleasesRestartOrchestrator())
+export function setUpdateMode(body: {
+  mode?: "auto" | "manual" | "paused"
+  window?: import("./generated/types.gen").UpdateWindow
+}): Promise<import("./generated/types.gen").UpdateStatus> {
+  return sdk(putApiUpdateMode({ body }))
 }
 
 // ── Commands (SDK) ────────────────────────────────────────────────────

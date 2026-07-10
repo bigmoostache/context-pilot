@@ -1,7 +1,7 @@
 import { Boxes, Coins, KeyRound, Package, ShieldCheck, Sliders } from "lucide-react"
 
 /** Settings category identifiers (the cockpit config panes). */
-export type CatId = "general" | "usage" | "services" | "secrets" | "it" | "releases"
+export type CatId = "general" | "usage" | "services" | "secrets" | "it" | "update"
 
 /**
  * The config pane catalogue: order, labels, blurbs, icons and the `adminOnly` /
@@ -37,9 +37,9 @@ export const CATEGORIES: {
     adminOnly: true,
   },
   {
-    id: "releases",
-    label: "Releases",
-    blurb: "Manage binary versions",
+    id: "update",
+    label: "Update",
+    blurb: "Software updates & window",
     icon: Package,
     adminOnly: true,
   },

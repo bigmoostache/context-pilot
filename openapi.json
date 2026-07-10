@@ -1604,6 +1604,148 @@
         ],
         "type": "object"
       },
+      "UpdateApplyResponse": {
+        "properties": {
+          "current": {
+            "nullable": true,
+            "type": "string"
+          },
+          "from": {
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "applying",
+              "up_to_date"
+            ],
+            "type": "string"
+          },
+          "to": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "UpdateLastResult": {
+        "properties": {
+          "at_ms": {
+            "type": "integer"
+          },
+          "attempted": {
+            "nullable": true,
+            "type": "string"
+          },
+          "from": {
+            "nullable": true,
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "success",
+              "rolled_back",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "message": {
+            "nullable": true,
+            "type": "string"
+          },
+          "to": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "at_ms"
+        ],
+        "type": "object"
+      },
+      "UpdateStatus": {
+        "properties": {
+          "active_tag": {
+            "nullable": true,
+            "type": "string"
+          },
+          "apply_in_flight": {
+            "type": "boolean"
+          },
+          "arch": {
+            "type": "string"
+          },
+          "available": {
+            "nullable": true,
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "current": {
+            "type": "string"
+          },
+          "last_check_ms": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "last_result": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UpdateLastResult"
+              }
+            ],
+            "nullable": true
+          },
+          "mode": {
+            "enum": [
+              "auto",
+              "manual",
+              "paused"
+            ],
+            "type": "string"
+          },
+          "notes_url": {
+            "nullable": true,
+            "type": "string"
+          },
+          "poll_interval_hours": {
+            "type": "integer"
+          },
+          "window": {
+            "$ref": "#/components/schemas/UpdateWindow"
+          }
+        },
+        "required": [
+          "current",
+          "channel",
+          "arch",
+          "mode",
+          "window",
+          "poll_interval_hours",
+          "apply_in_flight"
+        ],
+        "type": "object"
+      },
+      "UpdateWindow": {
+        "properties": {
+          "end": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "type": "object"
+      },
       "UploadResult": {
         "properties": {
           "path": {
@@ -5217,6 +5359,149 @@
         "summary": "Mint SSE upgrade ticket",
         "tags": [
           "ticket"
+        ]
+      }
+    },
+    "/api/update/apply": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateApplyResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Verify, download and apply the channel version now (off-window)",
+        "tags": [
+          "update"
+        ]
+      }
+    },
+    "/api/update/check": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStatus"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Force a channel poll now",
+        "tags": [
+          "update"
+        ]
+      }
+    },
+    "/api/update/mode": {
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "mode": {
+                    "enum": [
+                      "auto",
+                      "manual",
+                      "paused"
+                    ],
+                    "type": "string"
+                  },
+                  "window": {
+                    "$ref": "#/components/schemas/UpdateWindow"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStatus"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set update mode and/or maintenance window",
+        "tags": [
+          "update"
+        ]
+      }
+    },
+    "/api/update/status": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStatus"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Auto-update status (version, channel, mode, window, last result)",
+        "tags": [
+          "update"
         ]
       }
     },

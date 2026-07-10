@@ -78,6 +78,10 @@ pub struct Backend {
     /// In-flight PKCE session for the Claude Code OAuth login flow (T451).
     /// At most one login can be in progress at a time.
     pub(crate) pkce_session: Option<super::claude_oauth::PkceSession>,
+    /// Path of the auth SQLite database — the update-apply flow backs it up
+    /// around the binary swap (update-policy §5.5 step 2 / §5.8). Derived from
+    /// the same env default as `runtime::Config` (`AuthStore::default_db_path`).
+    pub(crate) auth_db_path: PathBuf,
 }
 
 impl Backend {
@@ -129,6 +133,7 @@ impl Backend {
             releases,
             provision_flag_path,
             pkce_session: None,
+            auth_db_path: AuthStore::default_db_path(),
             agents_dir,
             dirty_agents: HashSet::new(),
             liveness: HashMap::new(),
@@ -191,6 +196,7 @@ impl Backend {
             releases: ReleaseStore::load(PathBuf::from("/tmp/cp-test-releases")),
             provision_flag_path: PathBuf::from("/tmp/cp-test-provisioned"),
             pkce_session: None,
+            auth_db_path: PathBuf::from("/tmp/cp-test-auth.db"),
         }
     }
 }

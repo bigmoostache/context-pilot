@@ -139,12 +139,7 @@ impl Config {
             .and_then(|s| s.parse::<u64>().ok())
             .map_or(Duration::from_secs(2_592_000), Duration::from_secs); // 30 days
 
-        let auth_db_path = match std::env::var_os("CP_AUTH_DB") {
-            Some(p) => PathBuf::from(p),
-            None => std::env::var_os("HOME")
-                .map(|h| PathBuf::from(h).join(".context-pilot/orchestrator/auth.db"))
-                .unwrap_or_else(|| PathBuf::from("auth.db")),
-        };
+        let auth_db_path = crate::services::auth::store::AuthStore::default_db_path();
 
         Ok(Self { port, agents_dir, scan_interval, agents_root, agent_binary, auth_enabled, session_ttl, auth_db_path })
     }

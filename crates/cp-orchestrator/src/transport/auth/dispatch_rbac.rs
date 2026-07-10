@@ -67,9 +67,11 @@ fn releases_rbac() {
     }
 
     // Gate-pass probes for Admin and god-mode. Restricted to routes with a
-    // safe, network-free failure mode: `GET /api/releases` would call the
-    // GitHub API and `restart-orchestrator` would re-exec the test binary —
-    // the guard is a single arm, so passing it anywhere proves it for all.
+    // safe, network-free outcome: `GET /api/releases` would call the GitHub
+    // API and `restart-orchestrator` would re-exec the test binary — the
+    // guard is a single arm, so passing it anywhere proves it for all. The
+    // probes land on handler-side validation (400), the break-glass gate of
+    // the retired routes (410, T5.1.5) — anything but the guard's 403.
     let safe: [(&Method, &[&str]); 4] = [
         (&Method::Put, &["api", "releases", "arch"]),
         (&Method::Post, &["api", "releases", "download"]),
@@ -84,4 +86,51 @@ fn releases_rbac() {
     // The no-op fleet deploy (empty view) even succeeds outright.
     assert_eq!(dispatch(&state, &Method::Post, &["api", "releases", "deploy"], Some(&admin)), 200);
     assert_eq!(dispatch(&state, &Method::Post, &["api", "releases", "deploy"], None), 200);
+}
+
+/// V5.1a — every `/api/update/*` route sits behind the same `can_manage_it`
+/// guard arm: `user`/`Manager` → 403 on all four; an `Admin` reaches the
+/// handlers (`status`/`mode` prove it with a real 200 — `check`/`apply` hit
+/// the network and the re-exec path, so the single shared guard arm carries
+/// the proof for them).
+#[test]
+fn update_routes_rbac() {
+    let state = state();
+    let all: [(&Method, &[&str]); 4] = [
+        (&Method::Get, &["api", "update", "status"]),
+        (&Method::Post, &["api", "update", "check"]),
+        (&Method::Post, &["api", "update", "apply"]),
+        (&Method::Put, &["api", "update", "mode"]),
+    ];
+    let low = user(Regular);
+    for (method, segments) in all {
+        assert_eq!(dispatch(&state, method, segments, Some(&low)), 403, "user must be refused on {segments:?}");
+    }
+
+    let admin = user(Admin);
+    assert_eq!(dispatch(&state, &Method::Get, &["api", "update", "status"], Some(&admin)), 200);
+    assert_eq!(dispatch(&state, &Method::Get, &["api", "update", "status"], None), 200, "god-mode passes");
+    // `mode` with an empty body is a handler-side 400 — past the gate.
+    assert_ne!(dispatch(&state, &Method::Put, &["api", "update", "mode"], Some(&admin)), 403);
+}
+
+/// T5.1.5 — the retired manual version-choice routes are `410 Gone` without
+/// the break-glass env (arch/list/deploy stay live; the guard still runs
+/// first, so a low-role caller sees 403, not 410).
+#[test]
+fn retired_release_routes_are_gone() {
+    let state = state();
+    let admin = user(Admin);
+    let retired: [(&Method, &[&str]); 3] = [
+        (&Method::Post, &["api", "releases", "download"]),
+        (&Method::Put, &["api", "releases", "select"]),
+        (&Method::Delete, &["api", "releases", "v0.0.0-ghost"]),
+    ];
+    for (method, segments) in retired {
+        assert_eq!(dispatch(&state, method, segments, Some(&admin)), 410, "retired: {segments:?}");
+        assert_eq!(dispatch(&state, method, segments, Some(&user(Regular))), 403, "guard precedes the 410");
+    }
+    // The surviving routes are untouched by the break-glass gate.
+    assert_ne!(dispatch(&state, &Method::Put, &["api", "releases", "arch"], Some(&admin)), 410);
+    assert_ne!(dispatch(&state, &Method::Post, &["api", "releases", "deploy"], Some(&admin)), 410);
 }

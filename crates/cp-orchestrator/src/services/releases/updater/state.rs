@@ -50,6 +50,8 @@ pub struct UpdateState {
     pub last_check_ms: Option<u64>,
     /// Version the channel offers, as of the last *verified* check.
     pub available: Option<String>,
+    /// Release-notes URL for the offered version (from the manifest).
+    pub available_notes_url: Option<String>,
     /// Outcome of the most recent apply attempt.
     pub last_result: Option<UpdateResult>,
 }
