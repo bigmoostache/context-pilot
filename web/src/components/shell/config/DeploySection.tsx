@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils"
  * Deploy actions for the Releases settings pane.
  *
  * Two buttons: "Deploy to Fleet" (select release + restart all agents) and
- * "Restart Orchestrator" (delayed SIGTERM → systemd respawn). The orchestrator
+ * "Update & Restart Orchestrator" (adopt the selected release's cp-orchestrator
+ * binary via atomic-rename self-update, then re-exec in place). The orchestrator
  * button has a click-to-confirm guard since the connection drops on restart.
  */
 export function DeploySection({
@@ -80,7 +81,7 @@ export function DeploySection({
             ) : (
               <Power className="size-3.5" />
             )}
-            Confirm — connection will drop
+            Confirm — update &amp; restart, connection will drop
           </button>
         ) : (
           <button
@@ -92,7 +93,7 @@ export function DeploySection({
             )}
           >
             <Power className="size-3.5" />
-            Restart Orchestrator
+            Update &amp; Restart Orchestrator
           </button>
         )}
       </div>
@@ -110,7 +111,7 @@ export function DeploySection({
       {restartOrch.isPending && (
         <div className="flex items-center gap-2 rounded-lg border border-(--danger)/30 bg-(--danger)/6 px-3 py-2 text-[11px] text-(--danger)">
           <Loader2 className="size-3 animate-spin" />
-          Restarting orchestrator — page will reload in a few seconds…
+          Updating &amp; restarting orchestrator — page will reload in a few seconds…
         </div>
       )}
 

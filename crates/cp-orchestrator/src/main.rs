@@ -43,6 +43,20 @@ fn main() {
 
     eprintln!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION,);
 
+    // Self-update guard. If the "Update & Restart Orchestrator" button staged a
+    // new binary over our install path, a `.pending` marker is present. Account
+    // for this boot attempt *before* we bind anything: if the staged binary has
+    // crash-looped past the tolerance, `boot_check` rolls back to the `.bak`
+    // binary so the service self-heals. Once we've stayed up past a short grace
+    // period, a watchdog thread commits the update (clears the marker + backup).
+    if let Ok(install) = std::env::current_exe() {
+        cp_orchestrator::services::releases::boot_check(&install);
+        let _watchdog = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            cp_orchestrator::services::releases::boot_commit(&install);
+        });
+    }
+
     let config = match Config::from_env() {
         Ok(c) => c,
         Err(e) => {

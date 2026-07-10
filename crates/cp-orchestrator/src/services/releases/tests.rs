@@ -102,3 +102,100 @@ fn local_releases_scan() {
 
     drop(std::fs::remove_dir_all(&dir));
 }
+
+// ── Self-update (stage / boot_check / boot_commit) ───────────────────────
+
+#[test]
+fn stage_swaps_binary_and_writes_markers() {
+    let dir = std::env::temp_dir().join(format!("cp-selfupd-stage-{}", std::process::id()));
+    drop(std::fs::create_dir_all(&dir));
+
+    let install = dir.join("cp-orchestrator");
+    drop(std::fs::write(&install, b"OLD-BINARY"));
+    let src = dir.join("new-orch");
+    drop(std::fs::write(&src, b"NEW-BINARY-BYTES"));
+
+    stage_orchestrator_update(&install, &src).expect("stage should succeed");
+
+    // install now holds the new bytes; backup holds the old ones; marker exists.
+    assert_eq!(std::fs::read(&install).unwrap(), b"NEW-BINARY-BYTES");
+    assert_eq!(std::fs::read(backup_path(&install)).unwrap(), b"OLD-BINARY");
+    assert_eq!(std::fs::read_to_string(pending_path(&install)).unwrap(), "0");
+
+    drop(std::fs::remove_dir_all(&dir));
+}
+
+#[test]
+fn stage_rejects_empty_source() {
+    let dir = std::env::temp_dir().join(format!("cp-selfupd-empty-{}", std::process::id()));
+    drop(std::fs::create_dir_all(&dir));
+
+    let install = dir.join("cp-orchestrator");
+    drop(std::fs::write(&install, b"OLD"));
+    let src = dir.join("empty-orch");
+    drop(std::fs::write(&src, b""));
+
+    assert!(stage_orchestrator_update(&install, &src).is_err(), "empty src rejected");
+    // install untouched.
+    assert_eq!(std::fs::read(&install).unwrap(), b"OLD");
+
+    drop(std::fs::remove_dir_all(&dir));
+}
+
+#[test]
+fn boot_check_rolls_back_after_max_attempts() {
+    let dir = std::env::temp_dir().join(format!("cp-selfupd-rollback-{}", std::process::id()));
+    drop(std::fs::create_dir_all(&dir));
+
+    let install = dir.join("cp-orchestrator");
+    drop(std::fs::write(&install, b"NEW-CRASHING"));
+    drop(std::fs::write(backup_path(&install), b"OLD-GOOD"));
+    drop(std::fs::write(pending_path(&install), b"0"));
+
+    // First boot: counter 0 -> 1, still within tolerance (MAX_BOOT_ATTEMPTS=2).
+    boot_check(&install);
+    assert_eq!(std::fs::read_to_string(pending_path(&install)).unwrap(), "1");
+    assert_eq!(std::fs::read(&install).unwrap(), b"NEW-CRASHING", "not yet rolled back");
+
+    // Second boot: counter 1 -> 2 == MAX → rollback to backup, markers cleared.
+    boot_check(&install);
+    assert_eq!(std::fs::read(&install).unwrap(), b"OLD-GOOD", "rolled back to backup");
+    assert!(!pending_path(&install).exists(), "pending marker cleared");
+
+    drop(std::fs::remove_dir_all(&dir));
+}
+
+#[test]
+fn boot_commit_clears_markers() {
+    let dir = std::env::temp_dir().join(format!("cp-selfupd-commit-{}", std::process::id()));
+    drop(std::fs::create_dir_all(&dir));
+
+    let install = dir.join("cp-orchestrator");
+    drop(std::fs::write(&install, b"NEW-GOOD"));
+    drop(std::fs::write(backup_path(&install), b"OLD"));
+    drop(std::fs::write(pending_path(&install), b"1"));
+
+    boot_commit(&install);
+    assert!(!pending_path(&install).exists(), "pending removed");
+    assert!(!backup_path(&install).exists(), "backup removed");
+    // Live binary is untouched.
+    assert_eq!(std::fs::read(&install).unwrap(), b"NEW-GOOD");
+
+    drop(std::fs::remove_dir_all(&dir));
+}
+
+#[test]
+fn boot_check_noop_without_pending() {
+    let dir = std::env::temp_dir().join(format!("cp-selfupd-noop-{}", std::process::id()));
+    drop(std::fs::create_dir_all(&dir));
+
+    let install = dir.join("cp-orchestrator");
+    drop(std::fs::write(&install, b"NORMAL"));
+
+    // No pending marker → boot_check and boot_commit are both no-ops.
+    boot_check(&install);
+    boot_commit(&install);
+    assert_eq!(std::fs::read(&install).unwrap(), b"NORMAL");
+
+    drop(std::fs::remove_dir_all(&dir));
+}

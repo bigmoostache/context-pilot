@@ -324,52 +324,88 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
     }))
 }
 
-/// `POST /api/releases/restart-orchestrator` — restart the orchestrator process
-/// **in place** so it actually comes back up.
+/// `POST /api/releases/restart-orchestrator` — **update &** restart the
+/// orchestrator process **in place**.
 ///
-/// Sends the HTTP response first, then (after a short delay so the response
-/// reaches the client) re-executes the running binary via `execv`. This
-/// **replaces the current process image with a fresh one on the same PID** —
-/// the listening socket is closed automatically on `exec` (Rust opens it
-/// `SOCK_CLOEXEC`), freeing the port, and the new image re-binds and re-reads
-/// its config from the environment, which is inherited across `exec`.
+/// Two things happen, in order:
 ///
-/// Why not a bare `SIGTERM`? The previous implementation signalled itself and
-/// relied on an external supervisor (procd) to respawn. On any host without
-/// such a supervisor — a dev machine, or a deployment where the service is not
-/// under an auto-restart supervisor — SIGTERM simply killed the orchestrator,
-/// leaving the frontend with no backend. Re-exec works with **or without** a
-/// supervisor, and because the PID is preserved it never trips procd's
-/// crash-loop back-off either.
+/// 1. **Self-update (optional).** If a release is currently selected and its
+///    downloaded bundle contains a `cp-orchestrator` binary, that binary is
+///    staged over the running install path via atomic rename (see
+///    [`stage_orchestrator_update`]). The current binary is backed up to
+///    `<name>.bak` and a `<name>.pending` boot-attempt marker is written so a
+///    bad update self-heals on the next boots (see
+///    [`boot_check`](crate::services::releases::boot_check)). If no release is
+///    selected, or staging fails, we skip the swap and fall through to a plain
+///    restart — the button must always at least restart.
 ///
-/// If the re-exec fails (e.g. `current_exe` cannot be resolved, or `execv`
-/// errors) we fall back to the old `SIGTERM` behaviour so a supervised host can
-/// still respawn us.
-pub(crate) fn restart_orchestrator(_state: &Mutex<Backend>) -> HttpReply {
+/// 2. **Re-exec.** After the HTTP response flushes, the running binary re-execs
+///    the **install path** via `execv`. Because staging renamed the new bytes
+///    onto that path, the re-exec picks up the **new** orchestrator. This
+///    replaces the process image on the same PID — the listening sockets are
+///    `SOCK_CLOEXEC` so they close on `exec` (freeing the ports), and all config
+///    is re-read from the inherited environment.
+///
+/// We exec the captured install *path string* (from `current_exe` taken
+/// **before** the swap) rather than `/proc/self/exe`, because after the rename
+/// the latter resolves to the old, now-unlinked inode (`… (deleted)`).
+///
+/// Re-exec works with **or without** a supervisor, and because the PID is
+/// preserved it never trips procd's crash-loop back-off. If `current_exe` or
+/// `exec` fails, we fall back to `SIGTERM` so a supervised host can still
+/// respawn the old way.
+pub(crate) fn restart_orchestrator(state: &Mutex<Backend>) -> HttpReply {
     use std::os::unix::process::CommandExt as _;
 
-    let _restart = std::thread::spawn(|| {
+    // Resolve the running binary's install path up front, before any swap.
+    let install = std::env::current_exe().ok();
+
+    // If a release is selected and ships a cp-orchestrator, stage it over the
+    // install path so the re-exec below adopts the new binary.
+    let mut updated_tag: Option<String> = None;
+    if let Some(install) = install.as_deref() {
+        let src = {
+            match state.lock() {
+                Ok(b) => b.releases.active_tag().map(|tag| (tag.to_owned(), b.releases.orchestrator_binary_path(tag))),
+                Err(_) => None,
+            }
+        };
+        if let Some((tag, src)) = src {
+            if src.exists() {
+                match crate::services::releases::stage_orchestrator_update(install, &src) {
+                    Ok(()) => updated_tag = Some(tag),
+                    Err(e) => {
+                        eprintln!("restart_orchestrator: staging update {tag} failed: {e}; restarting current binary")
+                    }
+                }
+            }
+        }
+    }
+
+    let _restart = std::thread::spawn(move || {
         // Let the HTTP 200 flush to the client before the socket goes away.
         std::thread::sleep(std::time::Duration::from_millis(200));
 
-        match std::env::current_exe() {
-            Ok(exe) => {
-                // Forward the original arguments; the environment (which carries
-                // all orchestrator config) is inherited automatically.
-                let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
-                // `exec` only ever returns on failure — on success it never comes
-                // back because the process image is replaced.
-                let err = std::process::Command::new(&exe).args(&args).exec();
-                eprintln!("restart_orchestrator: exec of {} failed: {err}; falling back to SIGTERM", exe.display());
-            }
-            Err(e) => {
-                eprintln!("restart_orchestrator: current_exe() failed: {e}; falling back to SIGTERM");
-            }
+        if let Some(exe) = install {
+            // Forward the original arguments; the environment (which carries all
+            // orchestrator config) is inherited automatically.
+            let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+            // `exec` only ever returns on failure — on success it never comes
+            // back because the process image is replaced.
+            let err = std::process::Command::new(&exe).args(&args).exec();
+            eprintln!("restart_orchestrator: exec of {} failed: {err}; falling back to SIGTERM", exe.display());
+        } else {
+            eprintln!("restart_orchestrator: current_exe() unavailable; falling back to SIGTERM");
         }
 
         // Fallback: if re-exec did not take over, signal ourselves so a
         // supervisor (procd) can respawn the service the old way.
         let _sent = nix::sys::signal::kill(nix::unistd::Pid::this(), nix::sys::signal::Signal::SIGTERM);
     });
-    HttpReply::ok(&serde_json::json!({ "status": "restarting" }))
+
+    HttpReply::ok(&serde_json::json!({
+        "status": "restarting",
+        "updated": updated_tag.is_some(),
+        "tag": updated_tag,
+    }))
 }
