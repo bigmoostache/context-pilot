@@ -409,6 +409,14 @@ pub fn semver_sort_key(tag: &str) -> (u32, u32, u32) {
 mod self_update;
 pub use self_update::{boot_check, boot_commit, stage_orchestrator_update};
 
+/// Signed update-manifest schema (update-policy §5.3).
+mod manifest;
+pub use manifest::{Manifest, ManifestArtifact};
+
+/// Manifest-signing trust anchor (update-policy §5.4).
+mod signing;
+pub use signing::UPDATE_PUBKEY;
+
 #[cfg(test)]
 pub(crate) use self_update::{backup_path, pending_path};
 

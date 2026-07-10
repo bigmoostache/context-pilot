@@ -68,6 +68,10 @@ base64 = "0.22"
 # intake + body store to validate the backend↔agent seam against real
 # artifacts. The backend never depends on the agent crate at runtime.
 cp-mod-bridge = { path = "../cp-mod-bridge" }
+# Parses the embedded minisign public key (services/releases/signing.rs) in
+# unit tests. Moves to [dependencies] when the on-box updater (M3) starts
+# verifying manifests at runtime.
+minisign-verify = "0.2"
 tempfile = "3"
 
 [lints]

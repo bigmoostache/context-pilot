@@ -1,8 +1,8 @@
 # Update Policy — Fleet OTA Strategy
 
-**Status:** Draft v2
+**Status:** Frozen v3
 **Author:** Context Pilot
-**Date:** 2026-06-28
+**Date:** 2026-07-10
 
 > v2 (2026-06-28): reworked §2/§5/§6 after a code audit. Two findings drive the
 > design — (1) a release ships **two** binaries (the long-running orchestrator
@@ -11,6 +11,28 @@
 > rollback decision cannot live in the binary being swapped. The apply model is
 > now **client-initiated** (an *Update* category in Settings): we choose the
 > version, the client chooses the moment.
+
+> **v3 (2026-07-10) — frozen decisions.** The appliance moved to
+> Armbian/Debian 13 + **systemd**, and the apply model moved from
+> client-initiated to **automatic**:
+>
+> 1. **App-only auto-update.** Only `cp-console-server` + `cpilot` self-update.
+>    OS, Caddy, Tailscale, the systemd unit and the updater itself are day-0 /
+>    Ansible / break-glass (§5.7).
+> 2. **Promotion = auto on tag `v*`.** Pushing a tag publishes the signed
+>    `stable` manifest in CI; tagging *is* the fleet release act.
+> 3. **Box default = `auto`, nightly window 03:00–05:00 box-local** —
+>    adjustable; an Admin can switch to `manual` / `paused` (§5.9).
+> 4. **Capability = `can_manage_it` (Admin+)** for every update route/view.
+> 5. **systemd-native mechanism** — re-exec + boot-attempt counter +
+>    `Restart=on-failure` + `StartLimitBurst`. The §5.2 procd wrapper is
+>    **superseded** (see the v3 note inside §5.2).
+> 6. **Non-negotiable safety net:** minisign signature + `sha256` verified on
+>    the box, anti-rollback + freshness, health-gated commit via `/healthz`,
+>    `auth.db` backup/restore around the swap.
+> 7. **Accepted residual risk:** a binary crashing *before* `main()` cannot
+>    self-rollback → break-glass recovery (rare — static musl, caught in CI);
+>    documented, not engineered around.
 
 ---
 
@@ -159,6 +181,24 @@ follows the link).
 
 ### §5.2 — The rollback supervisor = the wrapper (keystone)
 
+> **v3 — SUPERSEDED.** This section was designed for procd/OpenWrt. The box now
+> runs systemd, and the mechanism is **systemd-native, no wrapper**:
+>
+> - The updater stages the new `cp-orchestrator` over the install path
+>   (atomic rename + `.bak` backup + `.pending` boot-attempt marker — already
+>   implemented in `services/releases/self_update.rs`) and **re-execs** itself;
+>   the PID is preserved, so no restart-burst is consumed on a healthy apply.
+> - A crash-looping new binary is respawned by systemd (`Restart=on-failure`,
+>   bounded by `StartLimitIntervalSec`/`StartLimitBurst`); each boot,
+>   `boot_check` increments the `.pending` counter and **rolls back to `.bak`**
+>   once it passes the tolerance — the box self-heals without any wrapper.
+> - A boot is **committed** (markers cleared, backup dropped) only when
+>   `/healthz` answers `200` within a deadline (§5.5) — not merely "stayed up".
+> - Residual risk (accepted): a binary that crashes *before* `main()` never
+>   runs `boot_check` and cannot self-rollback → break-glass via Tailscale SSH.
+>
+> The original procd design is kept below for the record only.
+
 `PROG` becomes `run-orchestrator.sh`. **procd respawns the wrapper, not the binary**,
 so the wrapper survives the swap and owns the rollback decision — which the binary
 being replaced cannot, because procd (`respawn 3600 5 5`) would just respawn a
@@ -222,6 +262,38 @@ Chain of trust: the signature covers the manifest; the manifest pins a per-arch
   build), with the **public key embedded as a `const`** in the orchestrator at build
   time. No TUF/Uptane — we keep only its anti-rollback + freshness ideas (§5.6).
 
+Concretely (v3): the keypair was generated 2026-07-10 (key id `5C445DA7034A99A4`,
+unencrypted — its only online copy is the CI secret). The secret key lives in the
+GitHub Actions secret `MINISIGN_SECRET_KEY` plus an offline copy on the signing
+host (`~/.config/context-pilot/release-signing/`, mode 600, **never** in the
+repo). The public key is `UPDATE_PUBKEY` in
+`crates/cp-orchestrator/src/services/releases/signing.rs`.
+
+#### §5.4.1 — Key rotation procedure
+
+Rotation is a **software update like any other** — the trust anchor ships inside
+the signed binary, so a rotation rides the previous key's last release:
+
+1. Generate the new keypair **off-repo** on the signing host:
+   `minisign -G -W -s minisign-new.key -p minisign-new.pub` (record the key id +
+   date; keep the old key files until step 5).
+2. Update `UPDATE_PUBKEY` in `services/releases/signing.rs` with the new public
+   key (update the key id + generation date in the doc comment; the
+   `pubkey_parses` test guards the paste).
+3. Release that change **signed with the OLD key** (normal tag → CI signs the
+   manifest with the old `MINISIGN_SECRET_KEY`). Every box that applies this
+   release now trusts the NEW key.
+4. Once the fleet has converged on that release (check `/api/update/status`
+   fleet-wide), replace the GitHub secret: `gh secret set MINISIGN_SECRET_KEY <
+   minisign-new.key`.
+5. The next tag signs with the new key. Archive the old key offline (do not
+   delete immediately — a straggler box still on the old trust anchor needs one
+   more old-key release, or a break-glass reinstall).
+
+**Compromised key** (no time for the two-step dance): break-glass path — rotate
+the secret immediately, then redeploy the fleet via Ansible/Tailscale SSH with a
+binary embedding the new public key. This is the §5.7 escape hatch, not OTA.
+
 ### §5.5 — End-to-end steps
 
 **Our side (publish a version):**
@@ -239,7 +311,13 @@ Chain of trust: the signature covers the manifest; the manifest pins a per-arch
    min_from`. `version == current` → "up to date".
 5. Else → surface "Update available: vY" + `notes_url`. No download yet.
 
-**Box side (apply — only on admin click):**
+**Box side (apply — v3: automatic in the nightly window, or on admin click):**
+
+> v3: the apply below is triggered by the box's own scheduler when
+> `update_mode == auto` and the box-local time is inside the maintenance window
+> (default **03:00–05:00**), or immediately via `POST /api/update/apply`
+> (Admin+). `manual` mode only surfaces "update available"; `paused` does
+> nothing. Applies are serialised — never two in flight.
 1. *PREPARE (reversible):* resolve the artifact for this arch, download into
    `releases/<newtag>/` (reuse `ReleaseStore::download`), **verify the sha256**
    against the manifest. KO → clean abort, nothing moved.
@@ -282,8 +360,9 @@ The existing `releases` category (`ConfigPanes.tsx`, already `adminOnly`) become
 **Update**:
 
 - **Read** for everyone: current version + channel.
-- **Admin:** "Up to date" *or* "Update available: vY" + notes + **[Update now]** +
-  **[Check now]**.
+- **Admin (v3 — gate is `can_manage_it`, Admin+):** "Up to date" *or* "Update
+  available: vY" + notes + the **mode toggle** (`auto` — default — / `manual` /
+  `paused`) + the maintenance **window** + **[Update now]** + **[Check now]**.
 - During apply: the API drops for a few seconds (restart). The frontend shows
   "Applying… the console is restarting" and **polls `/version`** until it returns —
   back on vY → success; back on vX → "failed, rolled back".
@@ -339,8 +418,7 @@ decoupled from the OTA epic.
 - `deploy/ansible/templates/context-pilot.service.j2` — the systemd unit
   (`ExecStart`, `Restart=`) the update wrapper plugs into.
 
-> ⚠️ This doc's §2/§5/§6 self-update *mechanism* is still written against procd
-> (`respawn 3600 5 5`, `PROG` wrapper, init.d). The appliance now runs
-> Armbian/Debian 13 + systemd, so that mechanism needs a systemd re-derivation
-> (`Restart=`, `StartLimitIntervalSec`/`StartLimitBurst` for the crash-loop
-> backoff, a wrapper as `ExecStart`). Tracked as a follow-up — not yet done.
+> ~~⚠️ This doc's §2/§5/§6 self-update *mechanism* is still written against
+> procd.~~ **Resolved in v3:** the mechanism is systemd-native (re-exec +
+> boot-counter + `Restart=on-failure` + `StartLimitBurst`, no wrapper) — see the
+> v3 note in §5.2 and the frozen-decisions block at the top.
