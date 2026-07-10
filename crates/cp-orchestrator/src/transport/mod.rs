@@ -112,6 +112,21 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
         return;
     }
 
+    // Readiness probe (update-policy §5.2/§5.5) — top-level (not `/api`),
+    // unauthenticated, loopback-only. Served before the SPA fallback and the
+    // auth gate: its consumer is the box itself (the health-gated boot commit
+    // and the systemd-era rollback machinery), which must reach it before any
+    // session can exist. Non-loopback callers get a flat 403.
+    if method == Method::Get && segments.as_slice() == ["healthz"] {
+        let reply = if request.remote_addr().is_some_and(|a| a.ip().is_loopback()) {
+            it::health::healthz(state)
+        } else {
+            rest::HttpReply::error(403, "loopback only")
+        };
+        respond_json(request, &reply);
+        return;
+    }
+
     // Static SPA serving (P-native): when `CP_WEB_ROOT` is set, every non-`/api`
     // GET is the web UI — served straight from disk with an index.html fallback
     // for client-side routes, BEFORE the auth gate (the shell + assets must load
