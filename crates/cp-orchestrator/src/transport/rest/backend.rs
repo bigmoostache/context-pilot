@@ -60,6 +60,11 @@ pub struct Backend {
     /// Auth store — `None` when auth is disabled (`CP_AUTH_ENABLED=false`).
     /// Contains the SQLite-backed user/session/ACL database (design doc §5).
     pub(crate) auth: Option<AuthStore>,
+    /// Access-control master flag (design §13.10), cached from the central config
+    /// at boot and updated by the settings toggle. When `false` (default) the
+    /// enforcement pipeline supplies no authenticated user — everyone is
+    /// effectively superadmin, no login (FR-v3-08). Server-authoritative.
+    pub(crate) access_control: bool,
     /// Session lifetime for newly created sessions (FR-15).
     pub(crate) session_ttl: Duration,
     /// Local release manager — download, select, and delete release binaries
@@ -93,9 +98,9 @@ impl Backend {
         session_ttl: Duration,
     ) -> Self {
         // Durable provisioned-flag location: env override, else a dot-file in
-        // the agents dir (on the box that dir lives on the /mnt/data partition,
-        // so the flag survives reboots; the registry scan only reads `*.json`,
-        // so the dot-file is ignored there).
+        // the agents dir (on the box that dir lives under /opt/context-pilot on
+        // the persistent rootfs, so the flag survives reboots; the registry scan
+        // only reads `*.json`, so the dot-file is ignored there).
         let provision_flag_path =
             std::env::var_os("CP_PROVISION_FLAG").map_or_else(|| agents_dir.join(".provisioned"), PathBuf::from);
         Self {
@@ -116,6 +121,7 @@ impl Backend {
             agents_root,
             agent_binary,
             auth,
+            access_control: super::config::settings::access_control_enabled(),
             session_ttl,
         }
     }
@@ -170,6 +176,7 @@ impl Backend {
             agents_root: PathBuf::from("/tmp/cp-test-realms"),
             agent_binary: PathBuf::from("/tmp/cp-test-bin"),
             auth: None,
+            access_control: false,
             session_ttl: Duration::from_secs(3600),
             releases: ReleaseStore::load(PathBuf::from("/tmp/cp-test-releases")),
             provision_flag_path: PathBuf::from("/tmp/cp-test-provisioned"),

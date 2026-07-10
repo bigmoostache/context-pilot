@@ -1,8 +1,10 @@
 # Provisionnement d'une box Context Pilot — procédure complète
 
-> De la box d'usine au cockpit en prod. Validé end-to-end sur `cp-test-01` (2026-06-27).
-> Détails : [`photonicat/docs/runbook-day0.md`](./photonicat/docs/runbook-day0.md) (Phase 1 pas à pas),
-> [`ansible/README.md`](./ansible/README.md) (playbook). Décisions & caveats : sections en bas.
+> De la box (Armbian/Debian 13, systemd) au cockpit en prod.
+> Cible matérielle : Photonicat 2 reflashée sur l'**image officielle Armbian Debian 13**
+> (systemd, aarch64). Flashage de l'image : [`photonicat/docs/debian2-flash-protocol.md`](./photonicat/docs/debian2-flash-protocol.md).
+> Détails playbook : [`ansible/README.md`](./ansible/README.md).
+> Décisions & caveats : sections en bas.
 
 ## Deux plans d'accès (à garder en tête)
 - **Vendeur (nous) → le tailnet uniquement** : SSH/admin à distance, outbound-only, par MagicDNS.
@@ -13,14 +15,12 @@
 |------|---------|-------|
 | `:80`/`:443` | **Caddy → cockpit Context Pilot** (`:80` redirige vers `:443`) | client (LAN) |
 | `:9090` | **Caddy → maintenance IT** (orchestrateur loopback `:9191`) | client (LAN) + nous (tailnet) |
-| `:8088` | **uhttpd / LuCI** (config hardware) | IT client |
 | `:22` | SSH | nous (tailnet, Tailscale SSH) |
 
-> Le board Photonicat embarque deux UIs web qui se disputent `:80/:443` ; le déploiement
-> (`free-port-80.sh`) les écarte : **LuCI → `:8088`** (conservé pour l'IT), **`pcat-manager-web`
-> (dashboard board, port `:80` codé en dur) → DÉSACTIVÉ** (décision produit : le client voit Context
-> Pilot, l'IT utilise LuCI). Le daemon hardware `pcat-manager` (cellulaire/batterie) reste actif —
-> seul le dashboard *web* est retiré.
+> Sur l'image Armbian standard, rien ne se dispute `:80/:443` (pas de LuCI, pas de
+> `pcat-manager-web`) : Caddy prend les deux ports directement, aucun *free-port* à jouer.
+> Le daemon hardware `pcat-manager` (cellulaire/batterie), s'il est présent sur l'image,
+> reste actif — il n'expose pas de web sur `:80`.
 
 ---
 
@@ -37,30 +37,44 @@
 ## Phase 0 bis — Control node (machine qui lance Ansible)
 - Sur le tailnet. Venv + Ansible : `python3 -m venv .venv && ./.venv/bin/pip install ansible` (`.venv` gitignoré).
 
-## Phase 1 — Day-0 sur la box (manuel, via l'AP WiFi `172.16.0.1`)
-> Runbook détaillé : [`photonicat/docs/runbook-day0.md`](./photonicat/docs/runbook-day0.md).
-1. `ssh root@172.16.0.1` (creds d'usine).
-2. **Installer Tailscale — binaire statique officiel** (le feed opkg fige 1.76.1 = CVE) :
+## Phase 1 — Day-0 sur la box (Armbian Debian, manuel)
+1. **Flasher l'image officielle Armbian Debian 13** sur la box (procédure complète
+   microSD/eMMC : [`photonicat/docs/debian2-flash-protocol.md`](./photonicat/docs/debian2-flash-protocol.md)),
+   booter, puis `ssh root@<ip-lan>` (l'IP DHCP de la box sur ton réseau ; login root de l'image).
+   Pousser ta clé (`ssh-copy-id`) ; sur un reflash, l'empreinte d'hôte change → `ssh-keygen -R <ip>` d'abord.
+2. **Installer Tailscale — dépôt apt officiel** (Debian standard, pas d'opkg/CVE) :
    ```sh
-   opkg list-installed | grep -q ca-bundle || { opkg update && opkg install ca-bundle kmod-tun; }
-   cd /tmp && V=1.98.4
-   wget "https://pkgs.tailscale.com/stable/tailscale_${V}_arm64.tgz" && tar xzf tailscale_${V}_arm64.tgz
-   install -m0755 tailscale_${V}_arm64/tailscale{,d} /usr/sbin/
+   curl -fsSL https://tailscale.com/install.sh | sh    # ajoute le repo + le service systemd
+   systemctl enable --now tailscaled
    ```
-3. Poser le service procd : `scp deploy/photonicat/init.d/tailscale.init root@172.16.0.1:/etc/init.d/tailscale`
-   puis `chmod +x … && /etc/init.d/tailscale enable && start`.
-4. Enrôler : `tailscale up --authkey=<key> --advertise-tags=tag:cp-<client> --hostname=<unit> --ssh --accept-routes=false`
-5. La box est joignable en `<unit>.<tailnet>.ts.net`. Vérifier (console) : tag OK + **Key expiry disabled**.
+3. **Enrôler** (systemd gère le daemon, pas de service procd à poser) :
+   ```sh
+   tailscale up --authkey=<key> --advertise-tags=tag:cp-<client> \
+                --hostname=<unit> --ssh --accept-routes=false
+   ```
+4. La box est joignable en `<unit>.<tailnet>.ts.net`. Vérifier (console) : tag OK + **Key expiry disabled**.
+
+> **État réel (2026-07-05)** : le premier déploiement Debian (`192.168.1.116`) a été fait en
+> **auth par clé directe sur le LAN** (mon `id_ed25519` poussé sur la box), pas encore par le
+> tailnet. L'overlay Tailscale ci-dessus reste la stratégie de flotte ; il a été validé
+> bout-en-bout le 2026-06-27, mais **sur l'ancienne box OpenWrt** — le chemin apt/systemd
+> Debian n'a pas encore été rejoué en vrai. Le break-glass LAN (clé) reste le fallback.
 
 ## Phase 2 — Construire l'artefact (control node)
 ```sh
-deploy/photonicat/build.sh        # cross-compile aarch64 + SPA → deploy/ansible/.artifacts/ (release=local)
+deploy/photonicat/build.sh        # cross-compile aarch64-musl + SPA → deploy/ansible/.artifacts/ (release=local)
 ```
-(ou un tag GitHub Release : `-e release=v0.x.y`).
+(ou un tag GitHub Release : `-e release=v0.x.y`.)
 
-## Phase 3 — Déployer via Ansible (par le tailnet)
+> ⚠️ **`-e release=latest` ne marche plus tel quel** : les GitHub Releases ne shippent plus
+> le bundle appliance `cpilot-appliance-aarch64.tar.gz`. Tant que le workflow release n'est pas
+> réaligné, **construire en local** et déployer avec **`-e release=local`**.
+> `build.sh` bâtit la SPA via `npm run build` (Vite) — ce qui contourne aussi les erreurs
+> `tsc -b` de type-check qui peuvent casser le build.
+
+## Phase 3 — Déployer via Ansible (par le tailnet, ou LAN break-glass)
 1. **Inventaire** : `cp examples/inventory.example.ini inventory.ini`, `ansible_host=<unit>.<tailnet>.ts.net`,
-   un groupe par client. (`inventory.ini` gitignoré.)
+   un groupe par client. (`inventory.ini` gitignoré.) Pour le break-glass, `ansible_host=<ip-lan>` + clé.
 2. **Secrets au lancement** (jamais commités) :
    ```sh
    cp deploy/ansible/examples/secrets.example.yml deploy/ansible/<client>.local.yml
@@ -72,9 +86,10 @@ deploy/photonicat/build.sh        # cross-compile aarch64 + SPA → deploy/ansib
    ./.venv/bin/ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/site.yml \
      --limit <client> -e @deploy/ansible/<client>.local.yml -e release=local
    ```
-   Le playbook : **fetch** (artefact) → **deploy** (binaires/SPA/init/Caddyfile, free `:80`,
-   **ouvre `:80/:443/:9090` côté client** via `open-client-firewall.sh`) → **keys** (`providers.env`)
-   → **seed** (admin write-once + fiche `out/<unit>-admin.txt`) → **start** (+ sondes santé).
+   Le playbook (`site.yml`, systemd) : **fetch** (artefact, control node) → **deploy**
+   (binaires/SPA/units systemd/Caddyfile sous `/opt/context-pilot`) → **keys** (`providers.env`)
+   → **seed** (admin write-once + fiche `out/<unit>-admin.txt`) → **start** (units `enable`+`start`,
+   sondes santé). Pas de manipulation de firewall/ports : l'image Armbian n'a que `:22` ouvert.
 
 ## Phase 3 bis — (optionnel) Claude Code OAuth par abonnement
 > Cas particulier, **hors `site.yml`** : par défaut les providers sont en clé API
@@ -120,43 +135,49 @@ deploy/photonicat/build.sh        # cross-compile aarch64 + SPA → deploy/ansib
 ## Exploitation courante
 - **Admin distant** : `tailscale ssh root@<unit>` (sans clé) ; re-run Ansible par le tailnet.
 - **Rotation des clés** : éditer `<client>.local.yml`, re-run `--limit <client>` (seed admin intact).
-- **MàJ app** : re-run `site.yml` (push). [Pull-agent à manifeste signé = cible long terme, cf §3 archi.]
-- **MàJ Tailscale** : binaire statique ; ⚠️ restart détaché (pas par la session tailnet, cf runbook).
+- **MàJ app** : re-run `site.yml` (push). [Pull-agent à manifeste signé = cible long terme, cf `docs/update-policy.md`.]
+- **MàJ Tailscale** : `apt update && apt install tailscale` puis `systemctl restart tailscaled`
+  (systemd détache le restart de ta session — pas d'auto-coupure, cf caveat).
 
-## Contexte & décisions (figées le 2026-06-27)
+## Contexte & décisions (figées le 2026-06-27, révisées Debian le 2026-07-05)
+- **OS = Armbian Debian 13 / systemd.** La box est reflashée sur l'image officielle Armbian ;
+  Context Pilot tourne sous deux units systemd (`context-pilot`, `caddy`), racine `/opt/context-pilot`.
+  (L'ancien chemin d'usine OpenWrt/procd a été retiré.)
 - **Accès distant = Tailscale.** SaaS d'abord, **Headscale en migration** (client identique → bascule
   = un flag `--login-server`). Nœuds **tagués par client**, **Tailscale SSH** (pas de clé distribuée),
   auth-key taguée **reusable → single-use** à l'industrialisation. C'est aussi une **hypothèse de
   sécurité du design auth** (le transport chiffré est supposé par le modèle bearer-token/CORS).
-- **Tailscale via binaire statique officiel**, pas le feed opkg (qui fige une version **CVE** : 1.76.1).
-- **Day-0 manuel d'abord** (runbook) → `bootstrap.sh` → gravure image (`/etc/uci-defaults`).
+- **Tailscale via le dépôt apt officiel Debian** (`install.sh`), service systemd `tailscaled`.
+- **Day-0 manuel d'abord** (flash + apt + enrôlement) → à scripter en `bootstrap.sh` → cuire dans une
+  image Armbian custom (first-boot) pour qu'un flash de NOTRE image rejoigne le tailnet seul.
 - **MàJ app = push Ansible** maintenant ; **agent pull à manifeste signé** = cible long terme (scale +
   tolérance offline). **Signer les artefacts** (cosign/minisign) dans les deux cas.
-- **Board dashboard `pcat-manager-web` désactivé** (Caddy possède `:80/:443`) ; daemon hardware
-  `pcat-manager` + LuCI (`:8088`) conservés pour l'IT.
-- **Secrets au lancement** (`-e @file` gitignoré), jamais commités — pas de vault.
+- **Secrets au lancement** (`-e @file` gitignoré), jamais commités — pas de vault (option ansible-vault dispo).
 - **Control node** : laptop maintenant → **VPS bastion tagué** quand la flotte grossit (concentre root
   sur toutes les box + le déchiffrement des secrets → cible à durcir).
 
 ## Caveats / landmines opérationnelles
-- **Upgrade Tailscale = self-cut.** `ssh root@<unit>.<tailnet>` passe par Tailscale SSH (session
-  **fille de `tailscaled`**) → redémarrer `tailscaled` **tue ta propre session**, et busybox n'a pas
-  `setsid`. Upgrader en **restart détaché** (`start-stop-daemon -b`) ou via le LAN break-glass (cf. runbook).
+- **`-e release=latest` est mort** (le bundle appliance n'est plus publié) → **build local + `release=local`**.
+- **Cert maintenance / IP.** Le cert `tls internal` de Caddy est lié à l'**identité** (IP LAN + nom).
+  Tester via l'**IP réelle** de la box, pas `127.0.0.1` (SNI/identité ≠ loopback → `tlsv1 alert internal error`).
+  Le **nom** (`pilot.acme.fr`) est **inerte tant que le DNS client ne pointe pas dessus** — accès par IP
+  en attendant. Nommer la box ≠ créer le DNS : prévoir l'enregistrement A côté client.
+- **Copie SPA lente.** Le déploiement ship+untar **un** tarball de ~19 Mo (`unarchive`) plutôt qu'une
+  copie récursive par fichier (centaines de fonts KaTeX → round-trips SFTP + checksum, timeout 2 min).
+  Lancer le playbook **en tâche de fond** (le foreground a un cap 2 min).
+- **Upgrade Tailscale.** `tailscale ssh` passe par une session gérée par `tailscaled` → redémarrer le
+  daemon coupe la session SSH. Sous systemd, `systemctl restart tailscaled` **détache** le restart de ta
+  session (il survit) ; via `tailscale up` interactif, préférer le LAN break-glass.
 - **Key-expiry.** Vérifier **« Key expiry disabled »** sur chaque nœud tagué (sinon il tombe du tailnet
   à ~180 j). C'est automatique pour les nœuds tagués mais à confirmer en console.
-- **Firewall.** `eth0` (l'IP que le client utilise) est en zone OpenWrt **`wan` (REJECT)** →
-  `open-client-firewall.sh` ouvre `:80/:443/:9090`. `:9090` reste gardé par l'auth admin ; le périmètre
-  réseau est la responsabilité de l'IT client.
-- **Cert maintenance / nom.** Le cert est lié à l'identité (IP LAN **+** nom). Le **nom** (`pilot.acme.fr`)
-  est **inerte tant que le DNS client ne pointe pas dessus** — accès par IP en attendant. Nommer la box
-  ≠ créer le DNS : prévoir l'enregistrement A côté client.
-- **`tailscale.init`.** Le `stop_service` ne fait **pas** `tailscale down` (sinon `wantRunning=false`
-  persiste → nœud *down* après reboot/restart, casse l'auto-rejoin).
-- **`/mnt/data`.** Sur une box reset ce n'est pas une partition séparée (retombe sur l'overlay f2fs,
-  persistant) ; sans impact Tailscale, mais le « big data partition » du déploiement devra être monté à part.
+- **Firewall = responsabilité IT client.** `:9090` reste gardé par l'auth admin ; le périmètre réseau
+  (qui atteint la box sur le LAN) est du ressort de l'IT. L'image Armbian n'ouvre que `:22` par défaut.
 
 ## Reste à industrialiser (non bloquant)
-- [ ] Scripter la Phase 1 en `bootstrap.sh`, puis graver dans `/etc/uci-defaults` (reset usine → re-join auto).
+- [ ] Scripter la Phase 1 en `bootstrap.sh`, puis cuire dans une **image Armbian custom** (first-boot → re-join auto).
+- [ ] Rejouer/valider l'enrôlement Tailscale **sur Debian/systemd** (validé jusqu'ici sur l'ancienne box OpenWrt).
+- [ ] Réaligner le workflow GitHub Release pour re-publier `cpilot-appliance-aarch64.tar.gz` (sortir de `release=local`).
 - [ ] Révoquer les auth-keys de provisioning après usage.
 - [ ] Signer les artefacts (cosign/minisign) + vérif on-device.
 - [ ] Control node : passer du laptop à un VPS bastion tagué quand la flotte grossit.
+- [ ] Finir l'onboarding de `192.168.1.116` (actuellement `provisioned=false`, `providers.env` vide).

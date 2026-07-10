@@ -127,8 +127,8 @@ export function SessionVitals({ agentId }: { agentId: string }) {
               {g.label}
             </span>
             <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-              {g.rows.map((v, i) => (
-                <VitalRow key={`${v.name}-${i}`} vital={v} />
+              {g.rows.map((v) => (
+                <VitalRow key={v.name} vital={v} />
               ))}
             </ul>
           </section>

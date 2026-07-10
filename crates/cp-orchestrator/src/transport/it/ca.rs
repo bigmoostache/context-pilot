@@ -1,16 +1,16 @@
 //! Private-CA root distribution (M4, "chemin A").
 //!
 //! The appliance's TLS is signed by Caddy's internal CA, which clients don't
-//! trust by default. So the operator downloads the CA **root** from the
-//! maintenance plane and pushes it to clients (GPO/MDM), verifying its SHA-256
+//! trust by default. So the operator downloads the CA **root** from the cockpit's
+//! IT settings (`can_manage_it`) and pushes it to clients (GPO/MDM), verifying its SHA-256
 //! fingerprint out-of-band against what the console shows. Two routes:
 //!
-//! * `GET /api/maint/ca.crt` — the root PEM (Admin), served as a file download.
-//! * `GET /api/maint/ca/fingerprint` — its SHA-256 fingerprint (Admin), matching
+//! * `GET /api/it/ca.crt` — the root PEM (Admin), served as a file download.
+//! * `GET /api/it/ca/fingerprint` — its SHA-256 fingerprint (Admin), matching
 //!   `openssl x509 -in root.crt -noout -fingerprint -sha256`.
 //!
 //! The root lives in Caddy's data dir (`…/pki/authorities/local/root.crt`); its
-//! path is given by `CP_CA_ROOT` (set in the procd `.init`). Until Caddy has
+//! path is given by `CP_CA_ROOT` (set in the systemd unit). Until Caddy has
 //! generated it (first TLS handshake), both routes report `404`.
 
 use std::path::PathBuf;
@@ -26,14 +26,14 @@ fn root_path() -> Option<PathBuf> {
     std::env::var_os("CP_CA_ROOT").map(PathBuf::from)
 }
 
-/// `GET /api/maint/ca.crt` (Admin) — serve the CA root PEM as a download.
+/// `GET /api/it/ca.crt` (Admin) — serve the CA root PEM as a download.
 ///
 /// Owns the [`Request`] so it can set a non-JSON content type. Reports `404`
 /// (JSON) when the root isn't configured or hasn't been generated yet.
 pub(crate) fn serve_ca_cert(request: Request) {
     let pem = root_path().and_then(|p| std::fs::read(p).ok());
     let Some(pem) = pem else {
-        super::respond(request, &HttpReply::error(404, "CA root not available yet"));
+        crate::transport::respond_json(request, &HttpReply::error(404, "CA root not available yet"));
         return;
     };
     let mut response = Response::from_data(pem).with_status_code(200);
@@ -47,7 +47,7 @@ pub(crate) fn serve_ca_cert(request: Request) {
     let _sent = request.respond(response);
 }
 
-/// `GET /api/maint/ca/fingerprint` (Admin) — the root's SHA-256 fingerprint,
+/// `GET /api/it/ca/fingerprint` (Admin) — the root's SHA-256 fingerprint,
 /// colon-hex (matching `openssl … -fingerprint -sha256`). `404` when the root
 /// isn't available, `500` when the PEM can't be parsed.
 pub(crate) fn ca_fingerprint() -> HttpReply {

@@ -105,7 +105,7 @@ pub(super) fn transport() -> Value {
                 "id": { "type": "string" },
                 "email": { "type": "string" },
                 "name": { "type": "string" },
-                "role": { "type": "string", "enum": ["admin", "user"] },
+                "role": { "type": "string", "enum": ["superadmin", "admin", "manager", "user"] },
                 "must_change_password": { "type": "boolean" },
                 "created_at": { "type": "integer" },
                 "updated_at": { "type": "integer" }
@@ -119,11 +119,11 @@ pub(super) fn transport() -> Value {
                 "id": { "type": "string" },
                 "email": { "type": "string" },
                 "name": { "type": "string" },
-                "role": { "type": "string", "enum": ["admin", "user"] },
+                "role": { "type": "string", "enum": ["superadmin", "admin", "manager", "user"] },
                 "must_change_password": { "type": "boolean" },
                 "created_at": { "type": "integer" },
                 "updated_at": { "type": "integer" },
-                "next_action": { "type": "string", "enum": ["change_password", "onboarding", "ready"] }
+                "next_action": { "type": "string", "enum": ["change_password", "set_identity", "onboarding", "ready"] }
             },
             "required": ["id", "email", "name", "role", "must_change_password", "next_action"]
         },
@@ -196,6 +196,38 @@ pub(super) fn transport() -> Value {
                 "persisted": { "type": "boolean" }
             },
             "required": ["env", "exists"]
+        },
+        // ── IT infra (design §13.5) ─────────────────────────────────
+        "Identity": {
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" },
+                "ip": { "type": "string" }
+            },
+            "required": ["name", "ip"]
+        },
+        "ItFingerprint": {
+            "type": "object",
+            "properties": {
+                "fingerprint": { "type": "string" },
+                "algorithm": { "type": "string" }
+            },
+            "required": ["fingerprint", "algorithm"]
+        },
+        "ItIdentityResponse": {
+            "type": "object",
+            "properties": {
+                "identity": { "allOf": [r("Identity")], "nullable": true }
+            },
+            "required": ["identity"]
+        },
+        "ItSetIdentityResponse": {
+            "type": "object",
+            "properties": {
+                "identity": r("Identity"),
+                "reloaded": { "type": "boolean" }
+            },
+            "required": ["identity", "reloaded"]
         },
         // ── Body ────────────────────────────────────────────────────
         "BodyPayload": {

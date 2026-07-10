@@ -328,15 +328,15 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
 /// orchestrator process.
 ///
 /// Sends the HTTP response first, then schedules a delayed `SIGTERM` to self so
-/// the process manager (procd on OpenWrt, or the user on a dev machine) can
+/// the process manager (systemd on the box, or the user on a dev machine) can
 /// respawn it. The 200 ms delay ensures the response reaches the client before
 /// the process dies.
 pub(crate) fn restart_orchestrator(_state: &Mutex<Backend>) -> HttpReply {
     let _delayed_exit = std::thread::spawn(|| {
         std::thread::sleep(std::time::Duration::from_millis(200));
-        // SIGTERM triggers the default handler (process exit). On procd-managed
-        // deployments the service respawns automatically; on a dev machine the
-        // user relaunches manually.
+        // SIGTERM triggers the default handler (process exit). On systemd-managed
+        // deployments the service respawns automatically (Restart=on-failure); on
+        // a dev machine the user relaunches manually.
         let _sent = nix::sys::signal::kill(nix::unistd::Pid::this(), nix::sys::signal::Signal::SIGTERM);
     });
     HttpReply::ok(&serde_json::json!({ "status": "restarting" }))

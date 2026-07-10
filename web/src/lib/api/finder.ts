@@ -104,7 +104,9 @@ export function trashItems(agentId: string, items: string[]): Promise<TrashResul
 // ── Manual endpoints (irreducible — URL builder + binary download) ───
 
 /** Build the URL that serves a realm file's raw bytes inline (no download
- *  prompt) — for `<img src>` / `<object data>` in Finder previews. */
+ *  prompt). `fs/raw` is NOT a public route, so an `<img src>` / `<object data>`
+ *  pointed straight at this URL can't carry the `Authorization` header and 401s
+ *  once auth is on (C2). Kept only for the rare same-origin/no-auth caller. */
 export function rawUrl(agentId: string, path: string): string {
   return `${BASE}/api/agent/${agentId}/fs/raw?path=${encodeURIComponent(path)}`
 }
@@ -134,5 +136,9 @@ export async function downloadFile(agentId: string, path: string): Promise<void>
   a.href = url
   a.download = filename
   a.click()
-  URL.revokeObjectURL(url)
+  // Defer the revoke: revoking synchronously after click() can race the
+  // browser's own read of the blob and abort the download in some browsers
+  // (same fix downloadCaCert applies in maint.ts). 10s is comfortably past the
+  // navigation the click kicks off.
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }

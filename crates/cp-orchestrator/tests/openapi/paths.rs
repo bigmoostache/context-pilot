@@ -68,10 +68,31 @@ pub(super) fn paths() -> Value {
                     "default_provider": { "type": "string" },
                     "default_model": { "type": "string" },
                     "onboarding_completed": { "type": "boolean" },
-                    "allowed_models": arr(json!({ "type": "string" }))
+                    "allowed_models": arr(json!({ "type": "string" })),
+                    // Access-control master flag toggle (design §13.10).
+                    "access_control": { "type": "boolean" }
                 }
             })), r("AppSettings"))
         ),
+        // ── IT infra (design §13.5, can_manage_it) ─────────────────
+        "/api/it/ca.crt": json!({ "get": {
+            "tags": ["it"], "summary": "Download the private-CA root certificate (PEM)",
+            "responses": { "200": { "description": "CA root PEM bytes", "content": {
+                "application/octet-stream": { "schema": { "type": "string", "format": "binary" } }
+            }}}
+        }}),
+        "/api/it/ca/fingerprint": get("it", "CA root SHA-256 fingerprint", r("ItFingerprint")),
+        "/api/it/identity": merge(
+            get("it", "Current box network identity (name/IP), or null", r("ItIdentityResponse")),
+            post("it", "Set box network identity — re-issues the leaf & reloads Caddy", Some(json!({
+                "type": "object",
+                "properties": { "name": { "type": "string" }, "ip": { "type": "string" } },
+                "required": ["name", "ip"]
+            })), r("ItSetIdentityResponse"))
+        ),
+        "/api/it/provisioned": get("it", "Whether the box has been provisioned", json!({
+            "type": "object", "properties": { "provisioned": { "type": "boolean" } }, "required": ["provisioned"]
+        })),
         // ── Ticket ──────────────────────────────────────────────────
         "/api/ticket": post("ticket", "Mint SSE upgrade ticket", None, r("TicketResponse")),
         // ── Auth ────────────────────────────────────────────────────

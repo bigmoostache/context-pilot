@@ -7,7 +7,9 @@ function initialTheme(): Theme {
   if (typeof window === "undefined") return "light"
   const saved = window.localStorage.getItem(STORAGE_KEY)
   if (saved === "light" || saved === "dark") return saved
-  return "light"
+  // No explicit choice yet: honour the OS preference (matches the pre-paint
+  // init script in index.html so the first render agrees with the DOM class).
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
 }
 
 /** Provides the active palette and applies the `.dark` class to <html>. */

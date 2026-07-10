@@ -30,8 +30,13 @@ export function setToken(token: string | null) {
 }
 
 /** SDK calls return `T` at runtime (throwOnError + responseStyle:'data'),
- *  but the generic defaults produce a wider type.  This cast is safe. */
-export function sdk<T>(call: unknown): Promise<T> {
+ *  but the generic defaults produce a wider type.  This cast is safe.
+ *  Constrained to a thenable (every generated SDK call returns a
+ *  `RequestResult`, i.e. a `Promise`) so a non-awaitable value can't be passed
+ *  in by mistake — a genuine tightening over the old `unknown` (L22). Full
+ *  contract-accurate typing would require threading the SDK's generated return
+ *  types through here; FLAGGED as out of scope for this pass. */
+export function sdk<T>(call: PromiseLike<unknown>): Promise<T> {
   return call as Promise<T>
 }
 

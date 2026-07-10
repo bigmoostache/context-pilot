@@ -1,0 +1,105 @@
+---
+# Photonicat 2 mini-display (GC9307 SPI LCD) driver, installed as a systemd
+# service. The LCD is NOT a Linux framebuffer — photonicat's Go driver talks to
+# it directly over spidev + gpiochip. We build it natively on the box (arm64
+# Debian, CGO enabled) and install it to the SAME absolute paths as upstream's
+# install_service.sh, because the binary reads its config and assets from
+# hard-coded absolute paths (/etc/pcat2_mini_display-config.json and
+# /usr/local/share/pcat2_mini_display/assets) and the unit sets no WorkingDirectory.
+#
+# Skip with -e cp_install_display=false. Building here requires the box to reach
+# GitHub + the Go module proxy during provisioning (the Photonicat is a router,
+# so it usually has WAN). Pin a specific commit with -e cp_display_ref=<sha>.
+#
+# Prerequisite NOT handled here: the SPI bus + GPIO lines feeding the LCD must be
+# exposed by the device tree. The vendor Armbian image enables them out of the
+# box; if `ls /dev/spidev*` is empty, add the SPI overlay in /boot/armbianEnv.txt
+# by hand (device-specific, so we don't mutate /boot automatically).
+
+- name: Install the Go toolchain + C compiler (CGO) + git for the display build
+  ansible.builtin.apt:
+    name:
+      - golang
+      - build-essential
+      - git
+    state: present
+    update_cache: true
+
+- name: Clone/update the mini-display driver at the pinned ref
+  ansible.builtin.git:
+    repo: "{{ cp_display_repo }}"
+    dest: "{{ cp_display_src }}"
+    version: "{{ cp_display_ref }}"
+    force: true
+  register: cp_display_clone
+
+- name: Check whether the driver binary is already installed
+  ansible.builtin.stat:
+    path: "{{ cp_display_bin }}"
+  register: cp_display_installed
+
+- name: Build the driver natively (arm64, CGO)
+  ansible.builtin.command:
+    cmd: go build -o pcat2_mini_display_debian .
+    chdir: "{{ cp_display_src }}"
+  environment:
+    CGO_ENABLED: "1"
+    GOCACHE: /tmp/go-build-cache
+    GOFLAGS: -mod=mod
+  when: cp_display_clone.changed or not cp_display_installed.stat.exists
+  register: cp_display_build
+
+- name: Install the display binary
+  ansible.builtin.copy:
+    src: "{{ cp_display_src }}/pcat2_mini_display_debian"
+    dest: "{{ cp_display_bin }}"
+    mode: "0755"
+    remote_src: true
+  register: cp_display_bin_installed
+
+- name: Install the display config (write-once; keep on-box edits)
+  ansible.builtin.copy:
+    src: "{{ cp_display_src }}/config.json"
+    dest: /etc/pcat2_mini_display-config.json
+    mode: "0644"
+    remote_src: true
+    force: false
+
+- name: Keep the LCD lit (stretch the battery dimmer — see cp_display_battery_dimmer_seconds)
+  # The driver blanks the backlight after screen_dimmer_time_on_battery_seconds,
+  # and without pcat-manager it always thinks it's on battery, so the stock 60s
+  # value kills the screen a minute after boot. The DC dimmer (24h) never applies.
+  ansible.builtin.replace:
+    path: /etc/pcat2_mini_display-config.json
+    regexp: '("screen_dimmer_time_on_battery_seconds"\s*:\s*)\d+'
+    replace: '\g<1>{{ cp_display_battery_dimmer_seconds }}'
+  register: cp_display_dimmer
+
+- name: Install the display assets (fonts + svg icons)
+  ansible.builtin.copy:
+    src: "{{ cp_display_src }}/assets"
+    dest: /usr/local/share/pcat2_mini_display/
+    mode: "0644"
+    directory_mode: "0755"
+    remote_src: true
+  register: cp_display_assets
+
+- name: Install the display systemd unit
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/deploy/photonicat/pcat2-display.service"
+    dest: /etc/systemd/system/pcat2_mini_display.service
+    mode: "0644"
+  register: cp_display_unit
+
+- name: Enable + (re)start the display service
+  ansible.builtin.systemd_service:
+    name: pcat2_mini_display
+    state: >-
+      {{ 'restarted'
+         if (cp_display_bin_installed is changed
+             or cp_display_assets is changed
+             or cp_display_unit is changed
+             or cp_display_dimmer is changed)
+         else 'started' }}
+    enabled: true
+    daemon_reload: true

@@ -73,6 +73,8 @@ pub(super) fn deploy() -> Value {
                 "onboarding_completed": { "type": "boolean" },
                 "is_admin": { "type": "boolean" },
                 "auth_enabled": { "type": "boolean" },
+                // Access-control master flag (design §13.10) — server-authoritative.
+                "access_control": { "type": "boolean" },
                 "providers": arr(json!({
                     "type": "object",
                     "properties": {
@@ -83,7 +85,7 @@ pub(super) fn deploy() -> Value {
                 })),
                 "allowed_models": arr(json!({ "type": "string" }))
             },
-            "required": ["onboarding_completed", "is_admin", "auth_enabled", "providers", "allowed_models"]
+            "required": ["onboarding_completed", "is_admin", "auth_enabled", "access_control", "providers", "allowed_models"]
         },
         "SessionInfo": {
             "type": "object",

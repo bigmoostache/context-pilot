@@ -7,6 +7,7 @@ function Tabs({ className, orientation = "horizontal", ...props }: TabsPrimitive
   return (
     <TabsPrimitive.Root
       data-slot="tabs"
+      orientation={orientation}
       data-orientation={orientation}
       className={cn("group/tabs flex gap-2 data-horizontal:flex-col", className)}
       {...props}
@@ -70,4 +71,6 @@ function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
   )
 }
 
-export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants }
+// `tabsListVariants` stays module-local (no external consumer) so this file only
+// exports components — required for React Fast Refresh.
+export { Tabs, TabsList, TabsTrigger, TabsContent }

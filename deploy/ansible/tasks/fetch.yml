@@ -6,8 +6,8 @@
 # Pulls the aarch64-musl bundle (flat: cpilot, cp-console-server,
 # cp-orchestrator, web/<spa> — no meilisearch, none is built upstream for musl)
 # published by .github/workflows/release.yml, plus a stock Caddy arm64 binary.
-# The procd init scripts + bootstrap Caddyfile come from the repo
-# (deploy/photonicat), not the release.
+# The systemd units + bootstrap Caddyfile come from the repo (templates/ +
+# deploy/photonicat/Caddyfile), not the release.
 
 - name: Ensure the artifacts dirs exist
   ansible.builtin.file:

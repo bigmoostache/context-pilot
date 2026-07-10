@@ -60,7 +60,7 @@ impl AuthStore {
                  name         TEXT NOT NULL,
                  password_hash TEXT NOT NULL,
                  role         TEXT NOT NULL DEFAULT 'user'
-                                  CHECK(role IN ('admin', 'user')),
+                                  CHECK(role IN ('superadmin', 'admin', 'manager', 'user')),
                  must_change_password INTEGER NOT NULL DEFAULT 0,
                  created_at   INTEGER NOT NULL,
                  updated_at   INTEGER NOT NULL
@@ -96,6 +96,54 @@ impl AuthStore {
         // databases (where the CREATE already includes `id`) is expected and
         // ignored.
         let _migration = self.conn.execute("ALTER TABLE sessions ADD COLUMN id TEXT", []);
+        self.migrate_role_check()?;
+        Ok(())
+    }
+
+    /// Widen the legacy two-role `users.role` CHECK to the v3 four-role domain
+    /// (`superadmin`/`admin`/`manager`/`user`) on an existing database (design
+    /// §13.6). SQLite cannot alter a CHECK in place, so a legacy table is rebuilt
+    /// via the standard 12-step rename-copy-drop, mapping legacy `admin` →
+    /// `superadmin` (the god account held the provider-key capability, now
+    /// superadmin-only). Idempotent: a no-op once the CHECK already lists
+    /// `superadmin` (fresh DBs are created with the widened CHECK directly).
+    fn migrate_role_check(&self) -> Result<(), AuthError> {
+        use rusqlite::OptionalExtension as _;
+        let ddl: Option<String> = self
+            .conn
+            .query_row("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'", [], |row| row.get(0))
+            .optional()?;
+        let Some(ddl) = ddl else { return Ok(()) };
+        // Already widened (fresh DB or previously migrated) → nothing to do.
+        if ddl.contains("superadmin") {
+            return Ok(());
+        }
+        // Legacy two-role CHECK — rebuild. `foreign_keys` must toggle outside a
+        // transaction, so it brackets the BEGIN/COMMIT block.
+        self.conn.execute_batch(
+            "PRAGMA foreign_keys = OFF;
+             BEGIN;
+             CREATE TABLE users_new (
+                 id           TEXT PRIMARY KEY,
+                 email        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                 name         TEXT NOT NULL,
+                 password_hash TEXT NOT NULL,
+                 role         TEXT NOT NULL DEFAULT 'user'
+                                  CHECK(role IN ('superadmin', 'admin', 'manager', 'user')),
+                 must_change_password INTEGER NOT NULL DEFAULT 0,
+                 created_at   INTEGER NOT NULL,
+                 updated_at   INTEGER NOT NULL
+             );
+             INSERT INTO users_new (id, email, name, password_hash, role, must_change_password, created_at, updated_at)
+                 SELECT id, email, name, password_hash,
+                        CASE role WHEN 'admin' THEN 'superadmin' ELSE role END,
+                        must_change_password, created_at, updated_at
+                 FROM users;
+             DROP TABLE users;
+             ALTER TABLE users_new RENAME TO users;
+             COMMIT;
+             PRAGMA foreign_keys = ON;",
+        )?;
         Ok(())
     }
 

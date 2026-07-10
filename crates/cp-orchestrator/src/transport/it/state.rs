@@ -1,11 +1,11 @@
 //! Durable **`provisioned`** flag — the boot gate for the product cockpit.
 //!
-//! A fresh appliance boots *unprovisioned*: the IT operator drives the wizard on
-//! the maintenance plane (`:9090`) and only the final `finalize` step flips the
-//! box to *provisioned*, at which point Caddy is reconfigured to serve the
-//! cockpit on `:80/:443` (the Caddy side lands in Milestone 3). The flag is a
-//! single small file so it survives reboots with no database dependency and can
-//! be inspected/repaired by hand on the box.
+//! A fresh appliance boots *unprovisioned*: the cockpit is served over cleartext
+//! `:80` (day-0) and an IT operator names the box in the cockpit, which flips
+//! this flag to *provisioned* — at which point Caddy is reconfigured to serve the
+//! cockpit on `:443` (design §13.4). The flag is a single small file so it
+//! survives reboots with no database dependency and can be inspected/repaired by
+//! hand on the box.
 //!
 //! This is deliberately **distinct from** the product's `onboarding_completed`
 //! UI setting (`transport/rest/config/settings.rs`): that flag is a cosmetic

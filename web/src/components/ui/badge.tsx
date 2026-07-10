@@ -46,4 +46,7 @@ function Badge({
   })
 }
 
-export { Badge, badgeVariants }
+// `badgeVariants` is intentionally NOT exported: nothing outside this file
+// consumes it, and exporting a non-component alongside `Badge` breaks React Fast
+// Refresh (react-refresh/only-export-components).
+export { Badge }

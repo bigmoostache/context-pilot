@@ -1,0 +1,41 @@
+# Context Pilot orchestrator — systemd unit (Armbian/Debian, glibc).
+# Templated by Ansible; cp_root defaults to /opt/context-pilot (the Debian rootfs
+# is the whole disk).
+[Unit]
+Description=Context Pilot orchestrator (cockpit :7878; Caddy fronts :80/:443)
+Documentation=https://github.com/bigmoostache/context-pilot
+After=network-online.target
+Wants=network-online.target
+# Crash-loop backoff: at most 5 restarts per hour before systemd gives up.
+StartLimitIntervalSec=3600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# Persisted state (registry, auth.db, central config, Claude creds, agent
+# project roots) all live under $HOME.
+Environment=HOME={{ cp_root }}/home
+Environment=CP_AUTH_ENABLED=1
+Environment=CP_ORCH_PORT=7878
+# Caddy integration: the orchestrator regenerates this Caddyfile (name/IP,
+# provisioned gate — cockpit on cleartext :80 at day-0, private-CA :443 once
+# provisioned) and reloads Caddy through its admin API. No :9090 plane (§13.4).
+Environment=CP_CADDYFILE={{ cp_root }}/caddy/Caddyfile
+Environment=CP_CADDY_BIN={{ cp_root }}/bin/caddy
+Environment=CP_CA_ROOT={{ cp_root }}/caddy/data/caddy/pki/authorities/local/root.crt
+Environment=CP_WEB_ROOT={{ cp_root }}/web
+Environment=CP_AGENT_BINARY={{ cp_root }}/bin/tui
+# Provisioning values (templated by Ansible, chmod 600). Loaded as KEY=value.
+#   seed.env      — per-UNIT admin seed (CP_SEED_ADMIN_*); write-once, seeded
+#                   only when the user table is empty (idempotent).
+#   providers.env — per-CLIENT provider/integration API keys; rewritten each run.
+# `-` prefix = optional (a factory-fresh box has neither yet).
+EnvironmentFile=-{{ cp_root }}/seed.env
+EnvironmentFile=-{{ cp_root }}/providers.env
+ExecStartPre=/bin/mkdir -p {{ cp_root }}/home
+ExecStart={{ cp_root }}/bin/cp-orchestrator
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

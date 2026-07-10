@@ -1,15 +1,25 @@
 ---
-# Ship binaries + web + init scripts + Caddyfile to the appliance and free :80.
-# Does NOT start anything — services are started after the seed (so the admin is
-# seeded from seed.env on first boot). Idempotent: copies are checksum-compared.
+# Ship binaries + web + systemd units + Caddyfile to an Armbian/Debian 13 box.
+# Does NOT start anything — services start after the seed (tasks/start.yml), so
+# the admin is seeded from seed.env on first boot. Idempotent.
+#
+# cp_root lives under /opt (the Debian rootfs is the whole disk). No port/firewall
+# juggling is needed: a stock Armbian box has nothing fighting for :80/:443 and no
+# default REJECT zone — only :22 listens on a fresh box.
+#
+# The binaries + SPA come from the flat release bundle (fetch.yml extracts it on
+# the control node into {{ artifacts_dir }}/bundle): cpilot, cp-console-server,
+# cp-orchestrator, web/<spa>. The systemd units + bootstrap Caddyfile come from
+# the repo (templates/ + deploy/photonicat/Caddyfile), not the release.
 
 - name: Stop services if already present (factory box won't have them)
-  ansible.builtin.command: "/etc/init.d/{{ item }} stop"
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: stopped
   loop:
     - context-pilot
     - caddy
   failed_when: false
-  changed_when: false
 
 - name: Create the data tree
   ansible.builtin.file:
@@ -24,8 +34,8 @@
 
 - name: Ship the binaries (orchestrator + agent + Caddy) from the flat release bundle
   # The release bundle is flat (cpilot, cp-console-server, cp-orchestrator, web/);
-  # the agent binary is named `cpilot` there but the box + init script expect
-  # `bin/tui`, so the mapping is explicit rather than by basename.
+  # the agent binary is named `cpilot` there but the box + unit expect `bin/tui`,
+  # so the mapping is explicit rather than by basename.
   ansible.builtin.copy:
     src: "{{ item.src }}"
     dest: "{{ cp_root }}/bin/{{ item.dst }}"
@@ -42,14 +52,14 @@
     mode: "0644"
     directory_mode: "0755"
 
-- name: Install the procd init scripts
-  ansible.builtin.copy:
-    src: "{{ repo_root }}/deploy/photonicat/{{ item.src }}"
-    dest: "/etc/init.d/{{ item.dst }}"
-    mode: "0755"
+- name: Install the systemd units (templated with cp_root)
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/{{ item }}.service.j2"
+    dest: "/etc/systemd/system/{{ item }}.service"
+    mode: "0644"
   loop:
-    - { src: init.d/context-pilot.init, dst: context-pilot }
-    - { src: init.d/caddy.init, dst: caddy }
+    - context-pilot
+    - caddy
 
 - name: Install the bootstrap Caddyfile (the orchestrator regenerates it at boot)
   ansible.builtin.copy:
@@ -57,15 +67,6 @@
     dest: "{{ cp_root }}/caddy/Caddyfile"
     mode: "0644"
 
-- name: Free TCP :80/:443 for Caddy (move LuCI→:8088, disable board dashboard) (Obj 3.3.1)
-  ansible.builtin.script: "{{ repo_root }}/deploy/photonicat/free-port-80.sh"
-  register: free_port
-  changed_when: "'now free for Caddy' in free_port.stdout"
-
-- name: Open client-facing services (cockpit :443, maintenance :9090) on the client LAN
-  # The box's uplink (eth0) is OpenWrt's `wan` zone (input REJECT), so the client
-  # reaches :443/:9090 over their corporate/local LAN only once these are opened.
-  # Vendor admin (SSH) stays on the tailnet, not here. Idempotent (named uci rule).
-  ansible.builtin.script: "{{ repo_root }}/deploy/photonicat/open-client-firewall.sh"
-  register: client_fw
-  changed_when: "'applied' in client_fw.stdout"
+- name: Reload systemd so it picks up the new/updated units
+  ansible.builtin.systemd_service:
+    daemon_reload: true

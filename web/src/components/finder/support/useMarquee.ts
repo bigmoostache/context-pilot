@@ -111,8 +111,18 @@ export function useMarquee({
       const r = Math.max(d.ox, e.clientX)
       const b = Math.max(d.oy, e.clientY)
 
+      // The band is an absolutely-positioned child of the (scrollable) surface,
+      // so its offset is measured from the CONTENT origin, not the viewport.
+      // Add the current scroll so a band drawn after scrolling lines up with the
+      // pointer instead of floating scrollTop px above it (M14). Hit-testing uses
+      // live viewport rects, so it stays correct regardless.
       const cr = root.getBoundingClientRect()
-      setBand({ left: l - cr.left, top: t - cr.top, width: r - l, height: b - t })
+      setBand({
+        left: l - cr.left + root.scrollLeft,
+        top: t - cr.top + root.scrollTop,
+        width: r - l,
+        height: b - t,
+      })
       onChange(new Set([...d.base, ...hitTest(l, t, r, b)]))
     },
     [containerRef, hitTest, onChange],
