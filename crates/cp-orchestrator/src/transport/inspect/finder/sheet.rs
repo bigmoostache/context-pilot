@@ -134,23 +134,48 @@ fn parse_workbook(path: &std::path::Path) -> Option<Workbook> {
         let Ok(range) = workbook.worksheet_range(&name) else {
             continue;
         };
+        // Formula range — not all formats support it; `.ok()` gracefully
+        // degrades to no-formula mode for ODS / older XLS.
+        let formula_range = workbook.worksheet_formula(&name).ok();
+
         let mut rows: Vec<serde_json::Value> = Vec::new();
-        for row in range.rows() {
+        let mut formulas: Vec<serde_json::Value> = Vec::new();
+        let mut has_any_formula = false;
+
+        for (ri, row) in range.rows().enumerate() {
             if rows.len() >= MAX_ROWS {
                 truncated = true;
                 break;
             }
             let mut cells: Vec<String> = Vec::new();
-            for (i, cell) in row.iter().enumerate() {
-                if i >= MAX_COLS {
+            let mut formula_row: Vec<serde_json::Value> = Vec::new();
+
+            for (ci, cell) in row.iter().enumerate() {
+                if ci >= MAX_COLS {
                     truncated = true;
                     break;
                 }
                 cells.push(cell_to_string(cell));
+
+                // Extract formula string for this cell position if available.
+                let formula = formula_range.as_ref().and_then(|fr| fr.get((ri, ci))).filter(|f| !f.is_empty());
+                if let Some(f) = formula {
+                    formula_row.push(serde_json::json!(f));
+                    has_any_formula = true;
+                } else {
+                    formula_row.push(serde_json::Value::Null);
+                }
             }
             rows.push(serde_json::json!(cells));
+            formulas.push(serde_json::json!(formula_row));
         }
-        sheets.push(serde_json::json!({ "name": name, "rows": rows }));
+        let mut sheet = serde_json::json!({ "name": name, "rows": rows });
+        // Only include the formulas array when the sheet actually has formulas,
+        // keeping the response lean for plain data sheets.
+        if has_any_formula {
+            sheet["formulas"] = serde_json::json!(formulas);
+        }
+        sheets.push(sheet);
     }
 
     if sheets.is_empty() {

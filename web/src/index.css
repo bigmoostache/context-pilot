@@ -518,3 +518,57 @@
 .hljs-strong {
   font-weight: 600;
 }
+
+/* ── Univer spreadsheet — theme integration ───────────────────────── */
+
+/*
+ * Univer renders with its native light palette (white canvas) regardless
+ * of app dark mode — same convention as Excel / Sheets / Numbers.
+ * Structural overrides mirror the AG Grid themeQuartz config the user
+ * approved: borderRadius 2, fontSize 13, headerFontWeight 400,
+ * columnBorder false, spacing 6, wrapperBorder false, fontFamily
+ * inherit (SF Pro).
+ */
+
+.univer-container {
+  height: 100%;
+}
+
+/* ── structural overrides (themeQuartz parity) ────────────────── */
+
+/* Font: inherit SF Pro stack, 13px base, 400 weight headers */
+.univer-container,
+.univer-container * {
+  font-family: inherit !important;
+}
+
+.univer-container {
+  font-size: 13px;
+  border-radius: 2px;
+  border: none;
+}
+
+/* Slim, lightweight header row — left-aligned, not centered */
+.univer-container [class*="sheet-bar"],
+.univer-container [class*="ribbon"] {
+  font-size: 12px;
+}
+
+.univer-container [data-u-comp="ribbon-header-menu"] > div {
+  justify-content: flex-start !important;
+}
+
+/* Toolbar: tighter, left-aligned, matches our header chrome */
+.univer-container [data-u-comp="ribbon-toolbar"] {
+  justify-content: flex-start !important;
+}
+
+.univer-container [class*="toolbar"] {
+  font-size: 12px;
+  gap: 2px;
+}
+
+/* No wrapper border (wrapperBorder: false) */
+.univer-container > div {
+  border: none !important;
+}

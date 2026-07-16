@@ -34,11 +34,14 @@ use tiny_http as _;
 use utoipa as _;
 
 fn main() {
-    // Load .env files — project-local first, then global fallback.
-    let _local = dotenvy::dotenv().ok();
+    // Load .env files — override mode so file values always win over stale
+    // shell env vars (e.g. BRAVE_API_KEY inherited from parent process).
+    // Global loads second and overrides project-local — it's where the
+    // settings-page vault.set() writes, so it has the latest user intent.
+    let _local = dotenvy::dotenv_override().ok();
     if let Some(home) = std::env::var_os("HOME") {
         let global_env = std::path::PathBuf::from(home).join(".context-pilot/.env");
-        let _global = dotenvy::from_path(&global_env).ok();
+        let _global = dotenvy::from_path_override(&global_env).ok();
     }
 
     eprintln!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION,);

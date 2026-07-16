@@ -10,8 +10,9 @@ import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
 import { extractDroppedFiles, zipDropped } from "@/lib/utils"
 import { measure } from "@/lib/support/telemetry"
-import { uploadToNode, type UploadedFile } from "./fileUpload/helpers"
+import { uploadToNode, splitMessageSegments, type UploadedFile } from "./fileUpload/helpers"
 import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
+import { FileSidebar, type ThreadFile } from "./fileUpload/FileSidebar"
 import type { ThreadDetail, ThreadMsg } from "@/lib/types"
 
 /** True only for an actual OS *file* drag — a text/selection drag must not blur. */
@@ -333,12 +334,21 @@ export function ThreadConversation({
   // renders an SSE delta triggers, so the memoized AutoRun rows hold too.
   const segments = useMemo(() => segmentLog(thread.log), [thread.log])
 
+  // Collect every file-upload block across all messages for the sidebar rail.
+  const threadFiles = useMemo<ThreadFile[]>(() => {
+    const result: ThreadFile[] = []
+    for (const msg of thread.log) {
+      const cm = toChatMessage(msg)
+      for (const seg of splitMessageSegments(cm.text ?? "")) {
+        if (seg.type === "file") result.push({ file: seg.file, role: cm.role })
+      }
+    }
+    return result
+  }, [thread.log])
+
   return (
     <main
-      className="relative flex min-w-0 flex-1 flex-col bg-background"
-      // Discrete drag affordance (T367): a subtle 2px blur over the whole
-      // surface while an OS file drag is in flight, eased 300ms in and out. The
-      // baseline blur(0px) is kept so the OUT direction interpolates too.
+      className="relative flex min-w-0 flex-1 flex-row bg-background"
       style={{
         filter: dragging ? "blur(2px)" : "blur(0px)",
         transition: "filter 300ms ease",
@@ -348,8 +358,7 @@ export function ThreadConversation({
       onDragLeave={dropHandlers.onDragLeave}
       onDrop={dropHandlers.onDrop}
     >
-      {/* Upload progress (T471) — a discrete centered spinner over the surface
-          while a dropped folder/files are zipped + uploaded. */}
+      {/* Upload progress (T471) */}
       {uploading && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/40 backdrop-blur-[1px]">
           <div className="card-shadow flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[12.5px] text-foreground/90">
@@ -358,8 +367,10 @@ export function ThreadConversation({
           </div>
         </div>
       )}
-      {/* messages */}
-      <ScrollArea className="min-h-0 flex-1">
+
+      {/* ── Conversation column ── */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">
           <div className="mb-3 flex items-center gap-2">
             <span className="h-px flex-1 bg-border/60" />
@@ -405,6 +416,13 @@ export function ThreadConversation({
           draftKey={`cp-draft-${agentId}-${thread.id}`}
         />
       </div>
+
+      </div>
+
+      {/* ── File attachments rail ── */}
+      {threadFiles.length > 0 && (
+        <FileSidebar files={threadFiles} onOpen={setSheetFile} />
+      )}
 
       <QuickLookSheet
         node={sheetFile ? uploadToNode(sheetFile) : null}
