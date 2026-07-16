@@ -155,6 +155,16 @@
   - reverie
   - api
   last_edited_ms: 1784202931990
+4e40e1fbeb5882f6:
+  tl_dr: 'T570 forms feature shipped: inline form/form-answer blocks, 8 field types, zero API change, frontend-only parsing, Rust send-time YAML validation. Commit 8898f043 on updates branch.'
+  contents: 'T570 forms feature DONE. Inline ```form``` / ```form-answer``` blocks replace the questions param entirely. 8 field types: single+allow-other, multi, text, number, date, toggle, confirm+confirm-word, files (immediate upload to .uploads/). Zero API change — pure markdown fenced blocks parsed frontend. Rust YAML validation at send-time only (forms.rs). Frontend forms/ module: helpers (indent parser), FormFields (8 renderers), FormWidget (draft+submit), FormMessageRow, useThreadForms hook. Design doc: docs/forms.md. Commit 8898f043 on branch updates.'
+  importance: high
+  labels:
+  - forms
+  - threads
+  - feature
+  - T570
+  last_edited_ms: 1784222610385
 5623177cb0b0ed7d:
   tl_dr: 'MULTI-WORKER (subworkers branch, off master): N equal workers, true concurrency, single main loop. Design doc: docs/design-subworkers.md. 14 shared modules, 8 per-worker.'
   importance: critical

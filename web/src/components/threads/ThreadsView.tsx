@@ -317,10 +317,18 @@ export function ThreadsView({
   return (
     <div
       className="relative flex min-h-0 flex-1"
-      style={disconnected ? { filter: "blur(3px) grayscale(0.5)", transition: "filter 300ms" } : { transition: "filter 300ms" }}
+      style={
+        disconnected
+          ? { filter: "blur(3px) grayscale(0.5)", transition: "filter 300ms" }
+          : { transition: "filter 300ms" }
+      }
     >
       {disconnected && (
-        <div onClick={onReconnect} className="absolute inset-0 z-40 cursor-pointer bg-background/30" />
+        <button
+          onClick={onReconnect}
+          className="absolute inset-0 z-40 cursor-pointer bg-background/30"
+          aria-label="Reconnect to agent"
+        />
       )}
       <ThreadList
         threads={threads}

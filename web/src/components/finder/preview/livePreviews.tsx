@@ -11,9 +11,7 @@ const LazyMarkdownEditor = lazy(() =>
 import { FileIcon } from "../support/macIcons"
 import { Generic, MarkdownPreview, PreviewStatus, TextPreview, TruncatedNote } from "./previewParts"
 /** Lazy-loaded — Univer + ExcelJS (~46 MB) deferred until a sheet is previewed. */
-const LazySheetGrid = lazy(() =>
-  import("./SheetGrid").then((m) => ({ default: m.SheetGrid })),
-)
+const LazySheetGrid = lazy(() => import("./SheetGrid").then((m) => ({ default: m.SheetGrid })))
 
 /**
  * Fetch a live file's text content and render it: markdown through the rich GFM

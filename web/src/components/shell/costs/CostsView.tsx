@@ -21,7 +21,15 @@ import { CrossTabTable, TokenDistribution, ApiTokenDistribution } from "./tables
  * cost-tracking TSV and renders charts for cache efficiency, culprit
  * attribution, and spend breakdown.
  */
-export function CostsView({ agentId, disconnected, onReconnect }: { agentId: string; disconnected?: boolean; onReconnect?: () => void }) {
+export function CostsView({
+  agentId,
+  disconnected,
+  onReconnect,
+}: {
+  agentId: string
+  disconnected?: boolean
+  onReconnect?: () => void
+}) {
   const { data, isLoading, error } = useQuery({
     queryKey: ["cost-tsv", agentId],
     queryFn: () => fetchFsPreview(agentId, ".context-pilot/logs/cost-tracking.tsv"),
@@ -65,49 +73,30 @@ export function CostsView({ agentId, disconnected, onReconnect }: { agentId: str
     })
   }, [filtered, rows.length, tempoFilter, queueFilter, breakKindFilter])
 
-  const blurStyle = disconnected
-    ? { filter: "blur(3px) grayscale(0.5)", transition: "filter 300ms" } as const
-    : { transition: "filter 300ms" } as const
+  const blurStyle: { filter: string; transition: string } = disconnected
+    ? { filter: "blur(3px) grayscale(0.5)", transition: "filter 300ms" }
+    : { filter: "none", transition: "filter 300ms" }
 
   if (isLoading) {
     return (
-      <div
-        className="relative flex min-h-0 flex-1 items-center justify-center text-muted-foreground"
-        style={blurStyle}
-      >
-        {disconnected && (
-          <div onClick={onReconnect} className="absolute inset-0 z-40 cursor-pointer bg-background/30" />
-        )}
-        <span className="text-[13px]">Loading cost data…</span>
-      </div>
+      <CostsLoading disconnected={disconnected} onReconnect={onReconnect} blurStyle={blurStyle} />
     )
   }
 
   if (error || rows.length === 0) {
     return (
-      <div
-        className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-muted-foreground"
-        style={blurStyle}
-      >
-        {disconnected && (
-          <div onClick={onReconnect} className="absolute inset-0 z-40 cursor-pointer bg-background/30" />
-        )}
-        <span className="text-[15px] font-semibold">No cost data yet</span>
-        <span className="max-w-sm text-center text-[12px]">
-          Cost telemetry appears after the agent completes its first LLM tick. The file{" "}
-          <code className="rounded-sm bg-muted px-1 py-0.5 text-[11px]">
-            .context-pilot/logs/cost-tracking.tsv
-          </code>{" "}
-          will be created automatically.
-        </span>
-      </div>
+      <CostsEmpty disconnected={disconnected} onReconnect={onReconnect} blurStyle={blurStyle} />
     )
   }
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto" style={blurStyle}>
       {disconnected && (
-        <div onClick={onReconnect} className="absolute inset-0 z-40 cursor-pointer bg-background/30" />
+        <button
+          onClick={onReconnect}
+          className="absolute inset-0 z-40 cursor-pointer bg-background/30"
+          aria-label="Reconnect to agent"
+        />
       )}
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
         {/* ── Header ──────────────────────────────────────────────── */}
@@ -138,51 +127,142 @@ export function CostsView({ agentId, disconnected, onReconnect }: { agentId: str
         {/* ── Summary cards (spend + cache efficiency + break split) ─ */}
         <SummaryCards summary={summary} />
 
-        {/* ── Row: Culprit donut + Cost timeline ──────────────────── */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Section>
-            <DonutChart data={culprits} title="Cache break culprits" />
-          </Section>
-          <Section>
-            <CostTimeline rows={filtered} title="Cost per tick over time" />
-          </Section>
-        </div>
-
-        {/* ── Row: Cost breakdown + Tool attribution ──────────────── */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Section>
-            <HBarChart data={costs} title="Cost by category" />
-          </Section>
-          <Section>
-            <HBarChart data={tools} title="Top tools by associated cost" />
-          </Section>
-        </div>
-
-        {/* ── Row: Culprit cost attribution ────────────────────────── */}
-        {culpritCosts.length > 0 && (
-          <Section>
-            <HBarChart data={culpritCosts} title="Top culprits by associated cost" />
-          </Section>
-        )}
-
-        {/* ── Row: Max freeze per culprit ─────────────────────────── */}
-        {maxFreezes.length > 0 && (
-          <Section>
-            <HBarChart data={maxFreezes} title="Max freezes per culprit" format={String} />
-          </Section>
-        )}
-
-        {/* ── Token distribution per tick (average) ────────────────── */}
-        {filtered.length > 0 && <TokenDistribution rows={filtered} />}
-
-        {/* ── API-reported token distribution (comparison) ─────────── */}
-        {filtered.length > 0 && <ApiTokenDistribution rows={filtered} />}
-
-        {/* ── Tool × Culprit cross-tab ────────────────────────────── */}
-        {crossTab.tools.length > 0 && crossTab.culprits.length > 0 && (
-          <CrossTabTable crossTab={crossTab} totalTicks={filtered.length} />
-        )}
+        <ChartsArea
+          filtered={filtered}
+          culprits={culprits}
+          costs={costs}
+          tools={tools}
+          culpritCosts={culpritCosts}
+          maxFreezes={maxFreezes}
+          crossTab={crossTab}
+        />
       </div>
+    </div>
+  )
+}
+
+/** All chart sections below the summary cards. Extracted so {@link CostsView}
+ *  stays under the P8 complexity(15) budget (was 17). */
+function ChartsArea({
+  filtered,
+  culprits,
+  costs,
+  tools,
+  culpritCosts,
+  maxFreezes,
+  crossTab,
+}: {
+  filtered: ReturnType<typeof parseCostTsv>
+  culprits: ReturnType<typeof culpritDistribution>
+  costs: ReturnType<typeof costBreakdown>
+  tools: ReturnType<typeof toolCostAttribution>
+  culpritCosts: ReturnType<typeof culpritCostAttribution>
+  maxFreezes: ReturnType<typeof maxFreezePerCulprit>
+  crossTab: ReturnType<typeof crossTabToolCulprit>
+}) {
+  return (
+    <>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Section>
+          <DonutChart data={culprits} title="Cache break culprits" />
+        </Section>
+        <Section>
+          <CostTimeline rows={filtered} title="Cost per tick over time" />
+        </Section>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Section>
+          <HBarChart data={costs} title="Cost by category" />
+        </Section>
+        <Section>
+          <HBarChart data={tools} title="Top tools by associated cost" />
+        </Section>
+      </div>
+
+      {culpritCosts.length > 0 && (
+        <Section>
+          <HBarChart data={culpritCosts} title="Top culprits by associated cost" />
+        </Section>
+      )}
+
+      {maxFreezes.length > 0 && (
+        <Section>
+          <HBarChart data={maxFreezes} title="Max freezes per culprit" format={String} />
+        </Section>
+      )}
+
+      {filtered.length > 0 && <TokenDistribution rows={filtered} />}
+
+      {filtered.length > 0 && <ApiTokenDistribution rows={filtered} />}
+
+      {crossTab.tools.length > 0 && crossTab.culprits.length > 0 && (
+        <CrossTabTable crossTab={crossTab} totalTicks={filtered.length} />
+      )}
+    </>
+  )
+}
+
+// ── Shared micro-components ─────────────────────────────────────────────────
+
+/** Transparent overlay that captures clicks to reconnect — an accessible
+ *  `<button>` instead of an unlabelled `<div>` with onClick. */
+function DisconnectOverlay({ onReconnect }: { onReconnect?: (() => void) | undefined }) {
+  if (!onReconnect) return null
+  return (
+    <button
+      onClick={onReconnect}
+      className="absolute inset-0 z-40 cursor-pointer bg-background/30"
+      aria-label="Reconnect to agent"
+    />
+  )
+}
+
+/** Loading state — shown while the cost TSV is being fetched. */
+function CostsLoading({
+  disconnected,
+  onReconnect,
+  blurStyle,
+}: {
+  disconnected?: boolean | undefined
+  onReconnect?: (() => void) | undefined
+  blurStyle: { filter?: string; transition: string }
+}) {
+  return (
+    <div
+      className="relative flex min-h-0 flex-1 items-center justify-center text-muted-foreground"
+      style={blurStyle}
+    >
+      <DisconnectOverlay onReconnect={disconnected ? onReconnect : undefined} />
+      <span className="text-[13px]">Loading cost data…</span>
+    </div>
+  )
+}
+
+/** Empty / error state — shown when there is no cost data yet. */
+function CostsEmpty({
+  disconnected,
+  onReconnect,
+  blurStyle,
+}: {
+  disconnected?: boolean | undefined
+  onReconnect?: (() => void) | undefined
+  blurStyle: { filter?: string; transition: string }
+}) {
+  return (
+    <div
+      className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-muted-foreground"
+      style={blurStyle}
+    >
+      <DisconnectOverlay onReconnect={disconnected ? onReconnect : undefined} />
+      <span className="text-[15px] font-semibold">No cost data yet</span>
+      <span className="max-w-sm text-center text-[12px]">
+        Cost telemetry appears after the agent completes its first LLM tick. The file{" "}
+        <code className="rounded-sm bg-muted px-1 py-0.5 text-[11px]">
+          .context-pilot/logs/cost-tracking.tsv
+        </code>{" "}
+        will be created automatically.
+      </span>
     </div>
   )
 }

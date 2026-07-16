@@ -101,31 +101,31 @@ export function AgentSwitcher({
           {agents
             .toSorted((a, b) => statusOrder[a.status] - statusOrder[b.status])
             .map((a) => (
-            <DropdownMenuItem
-              key={a.id}
-              onClick={() => onSwitch(a.id)}
-              className={cn(
-                "flex items-center gap-2.5 py-1.5",
-                // A refined, theme-correct highlight. base-ui marks the active
-                // row with `data-highlighted` AND moves DOM focus onto it (the
-                // reason the shadcn default `focus:bg-accent` fires) — we
-                // override BOTH so the harsh stock accent is never seen. The
-                // tint is a `color-mix` over transparent so it reads as a soft
-                // brand wash that darkens correctly in dark mode and lightens in
-                // light mode from the popover surface beneath, with the text
-                // kept at full-contrast `foreground`.
-                "focus:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! focus:text-foreground!",
-                "data-highlighted:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! data-highlighted:text-foreground!",
-              )}
-            >
-              <AgentDot
-                accent={a.accent}
-                status={a.status}
-                agentId={a.id}
-                hasAvatar={a.hasAvatar}
-              />
-              <div className="flex min-w-0 flex-1 leading-tight">
-                {/* base-ui's DropdownMenuItem ships a `focus:**:text-accent-foreground`
+              <DropdownMenuItem
+                key={a.id}
+                onClick={() => onSwitch(a.id)}
+                className={cn(
+                  "flex items-center gap-2.5 py-1.5",
+                  // A refined, theme-correct highlight. base-ui marks the active
+                  // row with `data-highlighted` AND moves DOM focus onto it (the
+                  // reason the shadcn default `focus:bg-accent` fires) — we
+                  // override BOTH so the harsh stock accent is never seen. The
+                  // tint is a `color-mix` over transparent so it reads as a soft
+                  // brand wash that darkens correctly in dark mode and lightens in
+                  // light mode from the popover surface beneath, with the text
+                  // kept at full-contrast `foreground`.
+                  "focus:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! focus:text-foreground!",
+                  "data-highlighted:bg-[color-mix(in_oklab,var(--signal)_11%,transparent)]! data-highlighted:text-foreground!",
+                )}
+              >
+                <AgentDot
+                  accent={a.accent}
+                  status={a.status}
+                  agentId={a.id}
+                  hasAvatar={a.hasAvatar}
+                />
+                <div className="flex min-w-0 flex-1 leading-tight">
+                  {/* base-ui's DropdownMenuItem ships a `focus:**:text-accent-foreground`
                     rule that recolours EVERY descendant on highlight — in light
                     mode accent-foreground is near-white, so the name turned
                     white-on-white over our soft signal wash (T302). The item-level
@@ -135,19 +135,19 @@ export function AgentSwitcher({
                     `group/dropdown-menu-item` — a scoped child rule that outranks the
                     universal `**:` descendant rule and leaves the status label + ✓
                     (their own colours) untouched. Correct contrast in both themes. */}
-                <span className="truncate text-[12.5px] font-medium text-foreground/90 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
-                  {a.name}
+                  <span className="truncate text-[12.5px] font-medium text-foreground/90 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
+                    {a.name}
+                  </span>
+                </div>
+                <span
+                  className="shrink-0 text-[10px] font-medium"
+                  style={{ color: statusMeta[a.status].color }}
+                >
+                  {statusMeta[a.status].label}
                 </span>
-              </div>
-              <span
-                className="shrink-0 text-[10px] font-medium"
-                style={{ color: statusMeta[a.status].color }}
-              >
-                {statusMeta[a.status].label}
-              </span>
-              {a.id === activeId && <Check className="size-3.5 shrink-0 text-(--signal)" />}
-            </DropdownMenuItem>
-          ))}
+                {a.id === activeId && <Check className="size-3.5 shrink-0 text-(--signal)" />}
+              </DropdownMenuItem>
+            ))}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>

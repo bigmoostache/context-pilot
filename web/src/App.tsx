@@ -51,7 +51,12 @@ function AppShell() {
   const { devMode } = useDevMode()
   const { data: agents = [] } = useFleet()
   const [view, setView] = useState<ViewMode>(() => {
-    const modes: Record<string, ViewMode> = { fleet: "fleet", threads: "threads", finder: "finder", costs: "costs" }
+    const modes: Record<string, ViewMode> = {
+      fleet: "fleet",
+      threads: "threads",
+      finder: "finder",
+      costs: "costs",
+    }
     return modes[localStorage.getItem("cp-view") ?? ""] ?? "fleet"
   })
   const [activeAgentId, setActiveAgentId] = useState(() => localStorage.getItem("cp-agent") ?? "")
@@ -132,7 +137,13 @@ function AppShell() {
       )
     }
     if (effectiveView === "costs") {
-      return <CostsView agentId={activeAgentId} disconnected={showDisconnectOverlay} onReconnect={restartAgent} />
+      return (
+        <CostsView
+          agentId={activeAgentId}
+          disconnected={showDisconnectOverlay}
+          onReconnect={restartAgent}
+        />
+      )
     }
     if (effectiveView === "finder" && activeAgent) {
       return (
@@ -164,7 +175,8 @@ function AppShell() {
   // Suppress the blur+grey overlay during an active restart — the spinner
   // already communicates the transition, and flashing "Disconnected" during a
   // controlled restart is visual noise, not a genuine failure signal.
-  const showDisconnectOverlay = (!sseConnected || agentStale) && effectiveView !== "fleet" && !agentRestarting
+  const showDisconnectOverlay =
+    (!sseConnected || agentStale) && effectiveView !== "fleet" && !agentRestarting
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">

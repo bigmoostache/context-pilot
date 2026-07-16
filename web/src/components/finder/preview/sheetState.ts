@@ -29,7 +29,16 @@ export interface SheetPayload {
  */
 export function toWorkbookData(sheets: SheetPayload[]): IWorkbookData {
   const sheetOrder: string[] = []
-  const sheetEntries: [string, { id: string; name: string; rowCount: number; columnCount: number; cellData: IObjectMatrixPrimitiveType<ICellData> }][] = []
+  const sheetEntries: [
+    string,
+    {
+      id: string
+      name: string
+      rowCount: number
+      columnCount: number
+      cellData: IObjectMatrixPrimitiveType<ICellData>
+    },
+  ][] = []
 
   for (const [idx, sheet] of sheets.entries()) {
     const id = `s${idx}`
@@ -86,12 +95,13 @@ interface DataBounds {
 }
 
 /** Scan cell matrix for actual data extent. */
-function findDataBounds(
-  cellData: IObjectMatrixPrimitiveType<ICellData>,
-): DataBounds {
+function findDataBounds(cellData: IObjectMatrixPrimitiveType<ICellData>): DataBounds {
   let maxRow = 0
   let maxCol = 0
-  for (const [ri, cols] of Object.entries(cellData) as [string, Record<number, ICellData> | undefined][]) {
+  for (const [ri, cols] of Object.entries(cellData) as [
+    string,
+    Record<number, ICellData> | undefined,
+  ][]) {
     const row = Number(ri)
     if (row > maxRow) maxRow = row
     if (!cols) continue

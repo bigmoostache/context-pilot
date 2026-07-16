@@ -64,9 +64,7 @@ test.describe("§19 fleet health badge surfacing", () => {
       timeout: 10_000,
     })
     await expect(
-      page
-        .getByRole("status")
-        .filter({ hasText: /Stream degraded|Projection lagging/i }),
+      page.getByRole("status").filter({ hasText: /Stream degraded|Projection lagging/i }),
     ).toHaveCount(0)
   })
 })

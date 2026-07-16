@@ -482,6 +482,10 @@
   path: crates/cp-mod-git/src/result_panel.rs
   description: 'GitResultPanel: auto-refreshing read-only command output, timeout execution, diff-aware syntax coloring'
   last_edited_ms: 0
+0788eca1e11987ff:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Thread sidebar orchestrator. P8 refactor: logic split into TWO same-file hooks — useThreadSelection (selectedId/query/showArchived/newOpen/pendingFiles + effectiveSelectedId resolution + persist effect + auto-select-new-thread diff effect + switch-thread pending-files render-phase reset) and useThreadActions (flash/notice + handleArchive/Pause/Delete/Create/Send/Attach, all routing rejections through describeCommandError toast per T121) — so the render body meets the 150-line/30-statement budgets. `thread` lookup moved below the no-agent early exit (unicorn/no-declarations-before-early-exit). handleAttach uploads to .uploads/ via uploadUnique. Wires ThreadList+ThreadConversation+NewThreadDialog + EmptyRealm.'
+  last_edited_ms: 0
 078ea1d4d40c8452:
   path: crates/cp-mod-git/src/cache_invalidation.rs
   description: 'Cache invalidation: 11 regex rules mapping mutating git commands to stale panel patterns, find_invalidations()'
@@ -2266,6 +2270,10 @@
   path: crates/cp-orchestrator/src/services/stream_hub.rs
   description: 'Phase 18: StreamHub — per-agent stream fan-out to N bounded subscribers (R2-17). Subscriber{id,buffer:VecDeque<Frame>,capacity,degraded,dropped}: admit() evicts OLDEST on full (coalesce toward latest window) + sets degraded + bumps dropped; cap 0 drops all. StreamHub{agents:HashMap<id,Vec<Subscriber>>,next_id,sub_capacity}: subscribe→id, unsubscribe, publish(id,&frame)=fan to all (clone per sub, returns clean-delivery count), drain(id,sub), subscriber(id,sub) inspect, mark_reconciled clears degraded+dropped (after caller delivers oplog-snapshot resync). Single-owner lock-free; socket-read + WS-writer wiring deferred to Phase 19. 8 tests incl per-subscriber degraded isolation + overflow-evicts-oldest.'
   last_edited_ms: 1781646122383
+25ce81f165cffb63:
+  path: web/src/components/threads/forms/FormFields.tsx
+  description: '8 form field input renderers: single+allow-other, multi, text, number, date, toggle, confirm+confirm-word, files (immediate upload). FieldInput dispatcher.'
+  last_edited_ms: 1784222584293
 25e9d34823dff4cb:
   path: docs/trust-center/logos/openai.svg
   description: 'OpenAI hexagonal flower logomark SVG, fill #334155 (slate monochrome). From simple-icons CDN.'
@@ -3330,6 +3338,10 @@
   path: web/e2e/flicker_probe.spec.ts
   description: 'T123 REAL-BROWSER flicker probe. Drives the actual web hook (applyThreadDelta + mergeThreadLogs + 5s poll) in real Chromium against live web :5175, sends a message, samples bubble visibility every 120ms, prints a PRESENT/ABSENT timeline + verdict. The faithful reproduction that caught the burst-clobber (before: first paint 9.8s; after fix: ~130ms and stays). Committed regression artifact.'
   last_edited_ms: 1781858556183
+3798f51a5c78e49c:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: 'Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool/culprit-cost/max-freeze bars, two token distribution bars (panel-estimated + API-reported). Tempo/queue/breakKind AND-filters (BreakKindFilter: 5-button group). Copy as Markdown button. TanStack useQuery + fetchFsPreview 15s refetch. P8: the two summary-card grid rows extracted into a SummaryCards subcomponent so CostsView fn stays under the 150-line budget.'
+  last_edited_ms: 0
 37c090f619a600a6:
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
@@ -4738,10 +4750,18 @@
   path: web/src/components/conversation/Message.tsx
   description: 'Thread/conversation message renderer. Markdown body, inline file-upload chips, CopyButton(imported from ./CopyButton)+DeleteButton, ToolMessage card. web-lint P7: CopyButton definition extracted to its own module (cycle break); Message no longer exports it.'
   last_edited_ms: 0
+4f3fcc26058b4b63:
+  path: web/src/components/threads/forms/useThreadForms.ts
+  description: useThreadForms (answersByForm memo from log scan + onFormSubmit via sendCommand send_message) + useScrollPin (converge-scroll-to-bottom, extracted from ThreadConversation).
+  last_edited_ms: 1784222584435
 4f47dcaf257cdfa6:
   path: web/src/components/finder/FinderChrome.tsx
   description: 'Finder chrome: tab strip, main toolbar (nav/crumbs/view-switch/search/icon-size/actions), path bar + NavBtn/SegBtn. P8 refactor: the breadcrumb map extracted into a ToolbarCrumbs subcomponent (first·…·last-two collapse for deep paths) so FinderToolbar meets the 150-line budget. FinderSidebar re-exported from support/. web-lint P6: the tab-select <div> uses clickable() from lib/support/a11y (role=button + keyboard) since it holds a nested close ✕ button.'
   last_edited_ms: 0
+4f548fbf364ac491:
+  path: web/src/components/threads/forms/helpers.ts
+  description: Pure form/form-answer YAML parser — indent scanner (no YAML dep). parseFormBlocks, parseFormAnswerBlock, stripFormBlocks, buildFormAnswerContent, isFormMessage.
+  last_edited_ms: 1784222584206
 4f5bb4865e3e0414:
   path: src/app/actions/input.rs
   description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation. Thread input routing: handle_thread_input_submit resolves selected_thread_idx through ThreadsState::visible_indices(viewing_archived) — the selection is a VISIBLE-slice position (T9 archive refactor), so the virtual ''+ New Thread'' row is detected as selected_idx >= visible.len() (active view only) and message-send maps the visible position back to a real storage index. handle_thread_create stores the new thread''s VISIBLE index. Thread struct includes paused:false default. MAX_THREAD_NAME_LEN=200. Paste sentinel expansion. /command replacement.'
@@ -5401,6 +5421,10 @@
 59dc653037191337:
   path: web/src/lib/api/generated/sdk.gen.ts
   description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
+  last_edited_ms: 0
+59eecbdb5322736a:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 5a08e3e9effbdbe7:
   path: crates/cp-orchestrator/tests/openapi/schemas.rs
@@ -6922,6 +6946,10 @@
   path: ui/src/components/shell/LeftRail.tsx
   description: 'Context navigator: token-budget meter, scrollable panel list (icon+name+token-bar+freeze/miss), cache economics footer (hit/miss/out + cost).'
   last_edited_ms: 0
+73b14a76f7919f91:
+  path: web/src/components/threads/forms/FormWidget.tsx
+  description: Interactive form widget rendered inline from ```form``` block. localStorage draft per form-id, fieldFilled client-side submit gate, LockedForm read-only view.
+  last_edited_ms: 1784222584341
 73c4d45dac7335bf:
   path: web/src/lib/query/sync.ts
   description: 'SSE→QueryClient delta bridge (push plane Leg-2 frontend) — the IMPERATIVE half (pure folds live in ./reducers, T357 split). Owns qk (query-key registry), ensureSync (idempotent per-agent SSE subscription), applyDelta (functional-updater setQueryData fold of threads+agent caches, rev high-water guard) and hydrateSpilledMessage (T357: a message_created delta with no inline_body but a head hash → fetchMessageBody → re-fold as synthetic inline delta via applyThreadDelta, so big messages appear live instead of waiting the 15s backstop poll; fetch-fail → invalidate). Re-exports applyThreadDelta/applyAgentDelta/mergeThreadLogs/OpEntry for existing consumers.'
@@ -11502,6 +11530,10 @@ bf372e93d15d115a:
   path: crates/cp-base/src/config/llm_types.rs
   description: StreamEvent, ApiCheckResult, ModelInfo trait, LlmProvider enum (7 backends), per-provider model enums with pricing/context windows
   last_edited_ms: 0
+bf40875921091c7e:
+  path: web/src/components/threads/forms/FormMessageRow.tsx
+  description: Un-memoized message row for form-bearing messages. form-answer msg renders summary line only; form msg renders stripped prose + one FormWidget per block.
+  last_edited_ms: 1784222584387
 bf4acdc8e66d6a2f:
   path: web/vite.config.ts
   description: 'Vite dev config. T310: single-origin tailnet serving — server.allowedHosts:true (accept the macbook.<tailnet>.ts.net Host from `tailscale serve`''s reverse proxy, anti-DNS-rebinding relaxed since the server binds 127.0.0.1 and is exposed only over the private WireGuard tailnet) + server.proxy ''/api''→http://127.0.0.1:7878 (REST + /api/stream SSE) so the frontend uses a RELATIVE base (VITE_API_URL="" in .env.local) and the app works identically at localhost:5174 or https://<host>.ts.net (phone access) with no CORS/mixed-content. @ alias → ./src.'
@@ -14194,6 +14226,10 @@ efde2af2e2e182a3:
   path: web/src/App.tsx
   description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) ?? fleetAgent. view/agent persisted to localStorage via write-through effects (web-lint P6: dropped setter wrappers so useState setters keep canonical setView/setActiveAgentId names). effectiveView gates cockpit+costs behind devMode, falls back to fleet when no agent. Routes: fleet/threads/cockpit/costs/finder.'
   last_edited_ms: 1783417478783
+eff5cde1c49ef9ce:
+  path: crates/cp-mod-threads/src/forms.rs
+  description: Send-time validation of agent-authored ```form``` YAML blocks. Rejects missing form-id or fields.
+  last_edited_ms: 1784222584528
 f0084294a9bef3c2:
   path: web/src/lib/sse.ts
   description: 'Reconnecting SSE client. Singleton per-agent via getOrCreateSseClient(). EventSource to /api/stream with ticket auth. RESUME via the `last_rev` QUERY param (T268 fix): native EventSource auto-reconnect is disabled (es.close() in onerror + manual scheduleReconnect), so the Last-Event-ID HEADER is never sent — the query param is the ONLY resume channel, and the backend reads `last_rev`. The old `last_event_id` name mismatch made every reconnect a cold seed at oplog HEAD, dropping deltas emitted during the disconnect window (they surfaced only on the 15s backstop poll = the 5-10s TUI→frontend delay). lastEventId captured from each event''s e.lastEventId. Exponential backoff with jitter. Named events: delta/stream/resync/invalidate.'
@@ -14786,6 +14822,10 @@ f9624475fd1e00ba:
   path: crates/cp-orchestrator/src/lib.rs
   description: 'Phase 15 (X782): backend library root (split from main.rs for unit-testability). Declares liveness + registry modules. Backend-only peer of cp-mod-bridge: bridge WRITES registry/heartbeat/oplog, backend READS/tails them across a fleet.'
   last_edited_ms: 1781629188001
+f985e89a7eb4a14d:
+  path: docs/forms.md
+  description: Inline ```form``` block design spec. 8 field types, zero API change, frontend-only rendering, form-answer derivation, localStorage draft, files immediate upload.
+  last_edited_ms: 1784222584481
 f9a106e852ea82de:
   path: src/app/run/lifecycle.rs
   description: 'Main event loop with flame!("loop"). Input-first (non-blocking poll). Background: stream events, tools, cache, watchers, spine, reverie. poll_bridge_commands runs every tick. X18 LATENCY: adaptive idle poll — 8ms streaming/dirty, 2ms when bridge_active (web UI connected, keeps command→apply latency ≤ a few ms), 50ms otherwise. Ownership checks. Render ~28fps. Thread helpers in run/threads.rs.'

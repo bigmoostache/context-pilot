@@ -56,7 +56,11 @@ export function FinderShell({
       tabIndex={0}
       onKeyDown={ctrl.onKeyDown}
       className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background outline-none"
-      style={disconnected ? { filter: "blur(3px) grayscale(0.5)", transition: "filter 300ms" } : { transition: "filter 300ms" }}
+      style={
+        disconnected
+          ? { filter: "blur(3px) grayscale(0.5)", transition: "filter 300ms" }
+          : { transition: "filter 300ms" }
+      }
     >
       {disconnected && (
         <div

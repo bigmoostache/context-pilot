@@ -49,12 +49,17 @@ export interface ActionsArgs {
 export function useAgentModalActions(args: ActionsArgs): Actions {
   const { isManage, agent, name, sel, providers, onClose, onFlash } = args
   const createAgent = useCreateAgent()
-  const { restart: doRestart, restarting: restartBusy, error: restartFlowError } = useRestartFlow(agent?.id ?? "")
+  const {
+    restart: doRestart,
+    restarting: restartBusy,
+    error: restartFlowError,
+  } = useRestartFlow(agent?.id ?? "")
   const retireAgent = useRetireAgent()
   const renameAgent = useRenameAgent()
   const uploadAvatar = useUploadAvatar()
   const [avatarBust, setAvatarBust] = useState(0)
-  const [error, setError] = useState<string | null>(null)
+  const [localError, setLocalError] = useState<string | null>(null)
+  const error = restartFlowError ?? localError
   const [saving, setSaving] = useState(false)
   const pending = createAgent.isPending || saving || restartBusy || retireAgent.isPending
 
@@ -64,7 +69,8 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
       { agentId: agent.id, file },
       {
         onSuccess: () => setAvatarBust(Date.now()),
-        onError: (err) => setError(err instanceof Error ? err.message : "Avatar upload failed"),
+        onError: (err) =>
+          setLocalError(err instanceof Error ? err.message : "Avatar upload failed"),
       },
     )
   }
@@ -74,32 +80,30 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
    *  the SSE push plane reconnects (full lifecycle, not just API ack). */
   const restart = () => {
     if (!agent || restartBusy) return
-    setError(null)
+    setLocalError(null)
     doRestart()
   }
 
-  // Surface restart flow errors alongside local errors.
-  useEffect(() => {
-    if (restartFlowError) setError(restartFlowError)
-  }, [restartFlowError])
+  // Restart flow errors are derived from the hook — no sync effect needed.
+  // `error` is the derived value: restartFlowError takes precedence over local.
 
   /** Retire (archive) the agent: stop its process + console server, keep its
    *  folder, and move it to the dashboard's Retired section. Reversible. */
   const retire = () => {
     if (!agent || retireAgent.isPending) return
-    setError(null)
+    setLocalError(null)
     retireAgent.mutate(agent.id, {
       onSuccess: () => {
         onFlash?.(`Retired ${agent.name} — moved to the Retired section`)
         onClose()
       },
-      onError: (e) => setError(e instanceof Error ? e.message : "Could not retire the agent."),
+      onError: (e) => setLocalError(e instanceof Error ? e.message : "Could not retire the agent."),
     })
   }
 
   const saveManage = (a: Agent) => {
     setSaving(true)
-    setError(null)
+    setLocalError(null)
     const nameChanged = name.trim() !== a.name
     const tasks: Promise<unknown>[] = [
       sendCommand(a.id, { kind: "configure", provider: sel.provId, model: sel.modelId }),
@@ -114,12 +118,14 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
         )
         onClose()
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to save changes"))
+      .catch((e: unknown) =>
+        setLocalError(e instanceof Error ? e.message : "Failed to save changes"),
+      )
       .finally(() => setSaving(false))
   }
 
   const create = () => {
-    setError(null)
+    setLocalError(null)
     const apiName = findModel(providers, sel.provId, sel.modelId)?.apiName
     createAgent.mutate(
       { name: name.trim(), ...(apiName && { model: apiName }) },
@@ -129,7 +135,7 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
           onClose()
         },
         onError: (e) =>
-          setError(
+          setLocalError(
             e instanceof Error ? e.message : "Could not create the agent. Please try again.",
           ),
       },
