@@ -836,8 +836,8 @@
   last_edited_ms: 0
 0e4133bbd3984ad1:
   path: crates/cp-base/src/state/runtime.rs
-  description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary+secondary), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
-  last_edited_ms: 0
+  description: State struct — monolithic runtime. context/messages/input (with input_selection_anchor), flags, token accumulators (total/stream/tick), LLM config (primary only, secondary removed), cache engine, tempo, render cache. TypeMap for module_data. Message creation helpers.
+  last_edited_ms: 1784197695830
 0e439ae1c8f5575f:
   path: crates/cp-mod-search/src/meili/bootstrap.rs
   description: 'Init-time helpers: index creation (files+logs), Voyage AI embedder config, project path hashing, initial metrics population from Meilisearch facets.'
@@ -1068,8 +1068,8 @@
   last_edited_ms: 1781078806892
 11d253c0c0159779:
   path: src/app/actions/mod.rs
-  description: Central action dispatch (Elm/Redux-style). CycleViewMode resets scroll_offset + user_scrolled. Thread actions extracted to threads.rs.
-  last_edited_ms: 0
+  description: Central action dispatch (Elm/Redux-style). CycleViewMode resets scroll_offset + user_scrolled. Thread actions extracted to threads.rs. Secondary model handlers removed.
+  last_edited_ms: 1784197696116
 1215ef17bfcb32d5:
   path: dummy-spec.md
   description: Dummy markdown spec doc (Project Aurora) for testing markdown renderer. Tables, code blocks, task lists, blockquotes, links.
@@ -2040,8 +2040,8 @@
   last_edited_ms: 0
 22585fef188ee52d:
   path: src/ui/help/config_overlay/builder.rs
-  description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean — cost bar removed), toggles (auto-continue/reverie/think).
-  last_edited_ms: 0
+  description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms, primary only), budget bars (context/clean), toggles (auto-continue/reverie/think). Secondary model section removed.
+  last_edited_ms: 1784197696027
 2262c56241784fa6:
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (493 LOC after X913 split). Owns view state + derived listings + render; delegates fs mutations/nav to useFinderActions, selection/open/tab/menu to useFinderSelection, keyboard to useFinderKeyboard, external drag to useExternalDragUpload, bottom chrome to FinderOverlays. QuickLook = modal shadcn Sheet (2/3 width, grid+list).
@@ -2516,8 +2516,8 @@
   last_edited_ms: 0
 2a7369ed3c49c594:
   path: src/app/events/models.rs
-  description: 'Config-overlay model selection dispatch. pub(super) dispatch_primary_model + dispatch_secondary_model const fns: provider + letter-index (a/b/c/d→0-3) → Action::ConfigSelect*Model. Extracted from events/mod.rs for the 500-line structure limit.'
-  last_edited_ms: 0
+  description: 'Config-overlay model selection dispatch. pub(super) dispatch_primary_model const fn: provider + letter-index (a/b/c/d 0-3) to Action::ConfigSelect*Model. dispatch_secondary_model removed.'
+  last_edited_ms: 1784197696248
 2a76ebc68096b534:
   path: docs/talk/script.js
   description: 'Slide deck nav: 2D grid (sections×slides), keyboard arrows, sidebar, TOC clicks, persistent timer'
@@ -3268,8 +3268,8 @@
   last_edited_ms: 0
 372bb89ec080e0fb:
   path: crates/cp-base/src/state/actions.rs
-  description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay, NewContext, UI actions. ActionResult enum.'
-  last_edited_ms: 0
+  description: 'Action enum: InputChar/Submit/Backspace/Delete, CursorLeft/Right/WordLeft/WordRight/Home/End (+ Select variants for Shift), SelectAll. Streaming, Scroll, Config overlay (primary only, secondary removed), NewContext, UI actions. ActionResult enum.'
+  last_edited_ms: 1784197695982
 37530dfa848d902a:
   path: crates/cp-wire/src/types/mod.rs
   description: ContentHash (SHA-256, custom hex serde, Copy), Phase (Idle/Streaming/Tooling), LifecycleState (Starting/Running/Stopping/Stopped). Re-exports all submodule types.
@@ -4024,8 +4024,8 @@
   last_edited_ms: 0
 435ae29c6a7015a4:
   path: src/app/events/mod.rs
-  description: 'handle_event() event router. Global Ctrl shortcuts first: in Threads view Ctrl+A = archive (active) / restore-confirm (archived), Ctrl+U = ThreadToggleArchivedView. dispatch_primary/secondary_model thin wrappers → models::. Explicit KeyCode match arms (no _ wildcard per lint).'
-  last_edited_ms: 0
+  description: 'handle_event() event router. Global Ctrl shortcuts first: in Threads view Ctrl+A = archive (active) / restore-confirm (archived), Ctrl+U = ThreadToggleArchivedView. dispatch_primary_model thin wrapper. Explicit KeyCode match arms (no _ wildcard per lint). Secondary model dispatch removed.'
+  last_edited_ms: 1784197696204
 4375663128d8b7a1:
   path: crates/cp-wire/src/types/oplog.rs
   description: 'OpEntry + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated{...,inline_body}, ThreadCreated/Archived/Restored/StatusChanged, ThreadFocusChanged, Lifecycle, CostAggregate, ContextUsage{used,threshold,budget,hit_tokens,miss_tokens (T297 cache split, #[serde(default)] N-1)}, Checkpoint, Unknown. Framed (len+CRC). round-trip + tolerant-decode + roster + stable-tag tests.'
@@ -5580,8 +5580,8 @@
   last_edited_ms: 1783182573161
 5f8fb51abc4f024e:
   path: src/modules/overview/mod.rs
-  description: 'OverviewModule (id=''core'', is_global) — owns the Statistics + Tools panels, core system tools (Close_panel/system_reload/tool_manage/panel_goto_page/module_toggle), and the GLOBAL config persistence in config.json modules.core. save/load_module_data serialize active_modules, dev_mode, llm_provider + EVERY provider''s model enum + reverie/cleaning/budget + token/cost counters + disabled_tools. Close_panel pre_flight warns on stale [!]/missing tree descriptions (T355: skips the warning when the file no longer exists on disk — matches the execute-time exemption), delegating the queue-introspection guard to tools::close_context::has_pending_tree_describe. Visualizers in visualizers.rs.'
-  last_edited_ms: 0
+  description: OverviewModule (id='core', is_global) — owns Statistics + Tools panels, core system tools (Close_panel/system_reload/tool_manage/panel_goto_page/module_toggle), and GLOBAL config persistence. save/load_module_data serialize active_modules, dev_mode, llm_provider + EVERY provider model enum + reverie/cleaning/budget + token/cost counters + disabled_tools. Secondary model persistence removed.
+  last_edited_ms: 1784197696336
 5f94336085c495f4:
   path: crates/cp-oplog/tests/oplog_core.rs
   description: 'Phase 22 (X789): cp-oplog append/segment/replay public-API black-box suite (7 tests). rev strictly-monotonic + never-reused across 60 appends/tiny-limit rolls + reopen; reopen resumes at exact next_rev; EVERY rolled segment (index>0) opens with leading Checkpoint while seg-0 does NOT (GAP1/I5); segment::indices ascending-contiguous-from-0; replay() rebuilds ground-truth heads (last-byte-per-thread, 3 threads) + seen-set (committed dedup tokens) over rolled+reopened log tracked independently; torn-tail recovery correct at EVERY byte offset (truncate seg-0 to each length 0..=len, reopen never errors, rev_head = highest fully-written rev via expected_rev_head boundary helper, next_rev resumes); mid-frame-truncation reissues torn rev to fresh append no-reuse. No access to pub(crate) replay_full/fold_entry — pure black-box. tempfile+cp_wire used directly (no as _ needed).'
@@ -6232,8 +6232,8 @@
   last_edited_ms: 1782038018690
 6a2923b3b24b499f:
   path: src/ui/help/config_overlay.rs
-  description: Config overlay adapter — renders ConfigOverlay IR to ratatui. Centered bordered popup. Provider/model/toggle sections consume IR data. No direct State access.
-  last_edited_ms: 0
+  description: Config overlay adapter — renders ConfigOverlay IR to ratatui. Centered bordered popup. Provider/model/toggle sections consume IR data. No direct State access. Tab toggle removed.
+  last_edited_ms: 1784197696071
 6a55ca613db04a42:
   path: crates/cp-oplog/tests/service_group_commit.rs
   description: 'Phase 24 (X791): cp-oplog group-commit Service public-API suite (5 tests). Properties that emerge only under concurrency/pressure (GAP2/I2): durability_of_is_exhaustive_over_every_kind (all 8 OpEntryKind discriminants: PhaseTransition+CostAggregate=BestEffort, CommandEffect+SeenMark+MessageCreated+Lifecycle+Checkpoint{Snapshot::default}+Unknown=Durable); concurrent_durable_submitters_get_unique_contiguous_revs (Arc<Service>, 8 threads x 50 append_durable, default limit=no rolls=no checkpoint revs → revs exactly 0..400 contiguous no dup/gap proving single commit thread is sole serialised rev-assigner; replay rev_head=399 + seen.len=400; flush via drop(service) Arc→0→Drop joins+syncs); best_effort_floods_drop_without_ever_blocking (200k phase try_sends ≫ 1024 queue cap → <5s never-block + dropped>0 deterministic under any real fdatasync latency + submitted>0 + post-flood durable append survives replay); a_large_final_batch_is_flushed_on_shutdown (30 durable then shutdown drains+syncs, rev_head+T1 head durable); interleaved_durable_and_best_effort_preserves_every_durable_record (phase between each durable pair, all 20 tokens + final head survive, seen.len==tokens). Service is Send+Sync (SyncSender+JoinHandle). shutdown consumes self (no double-shutdown by type). NO append-with-capacity hook so deterministic queue-full saturation only via flood≫cap.'
@@ -7252,8 +7252,8 @@
   last_edited_ms: 1782233053738
 7ac33e0613e0f51e:
   path: crates/cp-base/src/state/data/model_helpers.rs
-  description: 'ModelPricing trait: model selection, pricing, context budget, cleaning thresholds — impl for State + token_cost()'
-  last_edited_ms: 0
+  description: 'ModelPricing trait: model selection, pricing, context budget, cleaning thresholds — impl for State + token_cost(). secondary_max_output_tokens removed.'
+  last_edited_ms: 1784197695937
 7ae3e41b45283bfc:
   path: docs/design-orchestration-backend.md
   description: 'Orchestration backend design doc, v7 (branch maquette). Code-grounded three-tier durability: ① bridge-owned append-only fsync''d OPLOG (authoritative: command effects, rev, seen-marks, phase, lifecycle, cost + immutable content-addressed body store) + ② existing UNTOUCHED PersistenceWriter mutable coalesced state cache (messages/{uid}.yaml, NOT load-bearing for durability) + ③ lossy UDS stream. v7''s two answers + one subtraction (round-2 senior review, thread T36): (1) I13 BODY-BEFORE-REFERENCE BARRIER — a content hash may appear in a durable oplog entry only after its body is durable; small bodies inlined in the same fsync''d append, large bodies spill tmp→fdatasync→rename before the referencing entry commits; crash-in-gap = orphan body (GC''d), never dangling ref; ''accepted=durable'' now covers contents not just envelope (V12). (2) I2 EXECUTION MODEL — the main loop NEVER fsyncs; each oplog append (incl phase transitions) is a lock-free enqueue; a dedicated oplog thread group-commits (one fdatasync/group, off-loop); command-accept ack (I11) runs on intake/oplog thread (V11). (3) SECURITY SUBTRACTION — v1 command authn = perms (0700/0600) + presence-checked bearer cap_token; HMAC/nonce/rotation deferred to remote-transport seam (G7); new I9b keeps the frontend WS single-use ticket re-justified as browser confused-deputy/DNS-rebind defense. I1-I13, K1-K9, R2-*, V1-V12 fault matrix. Companions: architecture-adversarial-analysis.md, roadmap.md. NOT implemented (discussion).'
@@ -7880,8 +7880,8 @@
   last_edited_ms: 0
 862fff7835280893:
   path: crates/cp-render/src/conversation.rs
-  description: 'Conversation + overlay IR types. Message/HistorySection/StreamingTool/InputArea. Overlays: QuestionForm (with cursor/typing_other/other_text), Autocomplete (with dir_prefix/total_matches/input_visual_lines), PerfOverlay (with open_fds/fd_limit_soft/fd_semantic), ConfigOverlay, PaletteOverlay, SearchIndexOverlay. All serializable.'
-  last_edited_ms: 0
+  description: 'Conversation + overlay IR types. Message/HistorySection/StreamingTool/InputArea. Overlays: QuestionForm (with cursor/typing_other/other_text), Autocomplete (with dir_prefix/total_matches/input_visual_lines), PerfOverlay (with open_fds/fd_limit_soft/fd_semantic), ConfigOverlay (secondary_mode removed), PaletteOverlay, SearchIndexOverlay. All serializable.'
+  last_edited_ms: 1784197696292
 864108c638c6102a:
   path: src/app/run/threads/commands.rs
   description: Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/DeleteMessage(T416 per-message delete by epoch-ms timestamp)/Stop|Interrupt/Configure. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted. DeleteMessage removes single message by timestamp, emits durable MessageDeleted.
@@ -8702,6 +8702,10 @@
   path: web/src/components/shell/TopBar.tsx
   description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit/Costs), agent-config gear, UsageButton, account UserMenu. Costs tab dev-mode only with BarChart3 icon.'
   last_edited_ms: 0
+93dfd651a157c25a:
+  path: web/src/components/shell/widgets/AgentSwitcher.tsx
+  description: TopBar workspace switcher dropdown (one agent=one folder); switch/create/fleet. AgentDot shows avatar image (T338) when hasAvatar is true, fallback to accent-tinted FolderGit2 icon.
+  last_edited_ms: 1784197835892
 93e6898e8151096d:
   path: web/src/components/finder/internal/useFinderActions.ts
   description: 'Finder filesystem-mutating actions + path navigation hook: upload/move/mkdir(inline New Folder)/rename/trash live mutations + navigate/back/forward. commitRename routes sentinel→mkdir else rename; cancelRename drops pending placeholder. Uses req() invariant accessor (P3).'
@@ -9056,8 +9060,8 @@
   last_edited_ms: 1781531576316
 9a3bfa0501419a9e:
   path: crates/cp-base/src/state/flags.rs
-  description: Stream-phase state machine (Idle/Receiving/ExecutingTools), UI/config/lifecycle boolean flags, streaming-tool advisory state. StatusBools composite struct organizes all flags by domain. HighlightIrFn callback type.
-  last_edited_ms: 0
+  description: Stream-phase state machine (Idle/Receiving/ExecutingTools), UI/config/lifecycle boolean flags, streaming-tool advisory state. StatusBools composite struct organizes all flags by domain. HighlightIrFn callback type. Secondary mode removed.
+  last_edited_ms: 1784197695892
 9a3dfb3caa3e5c62:
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent (T328) + avatar CRUD (uploadAvatar/deleteAvatar/avatarUrl, T338). Re-exports ./auth + ./finder + shares ./client request/BASE/envelope. The @/lib/api single import surface.'
@@ -9548,8 +9552,8 @@ a174d5d1534d0498:
   last_edited_ms: 0
 a17ceb670921f6a9:
   path: src/app/actions/threads.rs
-  description: Thread action handlers. Archive = SOFT-DELETE (archived=true) not remove; restore clears flag. archive_confirm is view-aware (archive in active view, restore in archived view). toggle_archived_view flips FocusState.viewing_archived. Select/archive_start resolve selection through visible_indices. Question form → MY_TURN + spine notification.
-  last_edited_ms: 0
+  description: Thread action handlers. Archive = SOFT-DELETE (archived=true) not remove; restore clears flag. archive_confirm is view-aware (archive in active view, restore in archived view). toggle_archived_view flips FocusState.viewing_archived. Select/archive_start resolve selection through visible_indices. Question form dispatch. Secondary action variants removed from exhaustive match.
+  last_edited_ms: 1784197696160
 a17d304c5a64b3ef:
   path: crates/cp-orchestrator/src/transport/rest.rs
   description: 'REST handlers: HttpReply, Envelope<T>{rev,data}, CommandReceipt. fleet/agent/mint_ticket/body/command/threads. resolve_entry reads <id>.json. Locks Backend briefly, never across blocking agent I/O. reshape_thread/reshape_message for maquette ThreadDetail. 8 tests.'
@@ -9796,8 +9800,8 @@ a68a7a44a225a555:
   last_edited_ms: 0
 a69e52c1c2370552:
   path: src/app/reverie/streaming.rs
-  description: 'start_reverie_stream(): ReverieContext prompt, build_reverie_seed() (agent instructions + directive + tool restrictions)'
-  last_edited_ms: 0
+  description: 'Reverie streaming — prompt construction and LLM stream management. Uses same prepare_stream_context() as main worker. Doc comment fixed: no longer references ''secondary LLM''.'
+  last_edited_ms: 1784197696380
 a6c691fbfe4d7d3b:
   path: crates/cp-mod-entities/src/lib.rs
   description: Entities module trait impl. init_state with recovery priority (DB→dump→migrations→fresh). save_module_data with dump regeneration + WAL checkpoint. entity_sql tool dispatch. Declares sql/ + panels/ submodules with re-exports. Depends on search.

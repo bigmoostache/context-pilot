@@ -227,7 +227,7 @@
   - active
   last_edited_ms: 0
 3182e8c4a21fcc81:
-  tl_dr: Secondary model selector with Tab key toggle implemented
+  tl_dr: 'HISTORICAL: Secondary model selector was implemented (Tab key toggle in config overlay). REMOVED in commit 11553823 — user never used it. Zero secondary model refs remain in codebase.'
   contents: |-
     Successfully implemented Tab key toggle for secondary model selection in config overlay (Ctrl+H).
 
@@ -240,12 +240,12 @@
     6. Fixed missing render_model_section function in config_overlay.rs
 
     Testing shows reverie works but gets API errors due to 128K > 64K token limit for Haiku. Need to test with Opus or Sonnet as secondary model.
-  importance: high
+  importance: low
   labels:
-  - feature
+  - historical
+  - removed
   - ui
-  - reverie
-  last_edited_ms: 0
+  last_edited_ms: 1784197715219
 39d008d9bddac9f0:
   tl_dr: 'Lean 4 project (X-mathsA-2019) deleted March 20. Q1-Q5b proven, Q6a in progress. Key: use linear_combination on ℂ (linarith fails, no linear order).'
   importance: low

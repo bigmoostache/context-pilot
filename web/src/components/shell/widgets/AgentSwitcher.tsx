@@ -19,6 +19,13 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
   idle: { label: "Idle", color: "var(--muted-foreground)" },
 }
 
+/** Sort priority: working first, then needs-you, then idle. */
+const statusOrder: Record<AgentStatus, number> = {
+  working: 0,
+  "needs-you": 1,
+  idle: 2,
+}
+
 /**
  * Workspace switcher (1 agent = 1 folder). Sits at the left of the TopBar:
  * shows the active agent + its folder, opens a menu to switch between agents
@@ -87,7 +94,9 @@ export function AgentSwitcher({
           <DropdownMenuLabel className="text-[11px]">
             Workspaces · one agent per folder
           </DropdownMenuLabel>
-          {agents.map((a) => (
+          {[...agents]
+            .sort((a, b) => statusOrder[a.status] - statusOrder[b.status])
+            .map((a) => (
             <DropdownMenuItem
               key={a.id}
               onClick={() => onSwitch(a.id)}
