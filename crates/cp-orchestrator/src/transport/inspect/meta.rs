@@ -128,10 +128,11 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
     // deltas folded into the view), so serving them here keeps a COLD load /
     // backstop poll consistent with the live SSE deltas the frontend folds —
     // the same value arrives over both planes (T297 live HUD reactivity).
-    let (phase, lifecycle, cost_usd, input_tokens, output_tokens, context) =
-        state.lock().map_or((None, None, 0.0, 0, 0, Default::default()), |b| {
-            b.view.get(agent_id).map_or((None, None, 0.0, 0, 0, Default::default()), |v| {
-                (v.phase, v.lifecycle, v.cost.cost_usd, v.cost.input_tokens, v.cost.output_tokens, v.context)
+    let (phase, lifecycle, cost_usd, input_tokens, output_tokens, context, is_stale) =
+        state.lock().map_or((None, None, 0.0, 0, 0, Default::default(), false), |b| {
+            let stale = b.liveness.get(agent_id).is_some_and(|l| !l.is_live());
+            b.view.get(agent_id).map_or((None, None, 0.0, 0, 0, Default::default(), stale), |v| {
+                (v.phase, v.lifecycle, v.cost.cost_usd, v.cost.input_tokens, v.cost.output_tokens, v.context, stale)
             })
         });
 
@@ -153,7 +154,7 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
     // when config is unreadable or the provider has no dedicated field.
     let model = read_current_model(state, folder, &provider).unwrap_or_else(|| entry.model.clone());
 
-    let status = derive_status(phase, lifecycle, has_my_turn);
+    let status = derive_status(phase, lifecycle, has_my_turn, is_stale);
     let accent = derive_accent(&status);
     let has_avatar = state.lock().is_ok_and(|b| b.avatars.has(agent_id));
 
@@ -317,18 +318,25 @@ fn git_branch(folder: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Derive the maquette `AgentStatus` from lifecycle, phase, and thread state.
+/// Derive the maquette `AgentStatus` from lifecycle, phase, thread state, and
+/// registry liveness.
 ///
-/// An agent that has emitted a graceful-shutdown lifecycle (`Stopping`/
-/// `Stopped`, I8) can never be "working": the authoritative oplog signal wins
-/// over a stale phase that a torn shutdown might have left behind. Otherwise
-/// the live `phase` decides "working", falling back to "needs-you" (any
-/// MY_TURN thread) or "idle".
+/// A **stale** agent (dead PID / stale heartbeat, detected by the registry
+/// scan) is always "disconnected" — the authoritative liveness verdict wins
+/// over whatever the last oplog phase/lifecycle said. An agent that has emitted
+/// a graceful-shutdown lifecycle (`Stopping`/`Stopped`, I8) can never be
+/// "working": the authoritative oplog signal wins over a stale phase that a
+/// torn shutdown might have left behind. Otherwise the live `phase` decides
+/// "working", falling back to "needs-you" (any MY_TURN thread) or "idle".
 fn derive_status(
     phase: Option<cp_wire::types::Phase>,
     lifecycle: Option<cp_wire::types::LifecycleState>,
     has_my_turn: bool,
+    is_stale: bool,
 ) -> String {
+    if is_stale {
+        return "disconnected".to_owned();
+    }
     use cp_wire::types::LifecycleState;
     if matches!(lifecycle, Some(LifecycleState::Stopping | LifecycleState::Stopped)) {
         return if has_my_turn { "needs-you".to_owned() } else { "idle".to_owned() };
@@ -358,6 +366,7 @@ fn derive_accent(status: &str) -> &'static str {
     match status {
         "working" => "ok",
         "needs-you" => "signal",
+        "disconnected" => "danger",
         _ => "interactive",
     }
 }

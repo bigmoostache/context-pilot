@@ -3,7 +3,7 @@
 //!
 //! Extracted from `transport/mod.rs` to keep both files within the line budget.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -38,6 +38,9 @@ pub struct Backend {
     /// Agents whose tier-② state has changed since the last SSE sweep.
     /// SSE producers drain this per-agent to emit `invalidate` events.
     pub(crate) dirty_agents: HashSet<String>,
+    /// Per-agent registry liveness, updated by the driver loop's registry
+    /// scan. Stale agents surface as "disconnected" in the fleet meta.
+    pub(crate) liveness: HashMap<String, crate::liveness::Liveness>,
     /// Process-lifecycle manager — spawns dashboard-created agents (PTY) under
     /// a binary allow-list (R2-15).
     pub(crate) supervisor: AgentSupervisor,
@@ -111,6 +114,7 @@ impl Backend {
             pkce_session: None,
             agents_dir,
             dirty_agents: HashSet::new(),
+            liveness: HashMap::new(),
             supervisor: AgentSupervisor::new(&[agent_binary.clone()]),
             agents_root,
             agent_binary,
@@ -160,6 +164,7 @@ impl Backend {
             avatars: AvatarStore::default(),
             agents_dir,
             dirty_agents: HashSet::new(),
+            liveness: HashMap::new(),
             supervisor: AgentSupervisor::new(&[]),
             agents_root: PathBuf::from("/tmp/cp-test-realms"),
             agent_binary: PathBuf::from("/tmp/cp-test-bin"),

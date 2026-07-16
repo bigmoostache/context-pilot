@@ -157,9 +157,11 @@ function AppShell() {
     )
   }
 
-  // When the agent is unreachable (SSE down) and we're viewing an agent surface,
-  // blur+grey the main content and intercept all clicks to trigger reconnect.
-  const showDisconnectOverlay = !sseConnected && effectiveView !== "fleet"
+  // When the agent is unreachable (SSE down OR registry-stale) and we're
+  // viewing an agent surface, blur+grey the main content and intercept all
+  // clicks to trigger reconnect.
+  const agentStale = activeAgent?.status === "disconnected"
+  const showDisconnectOverlay = (!sseConnected || agentStale) && effectiveView !== "fleet"
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
@@ -178,7 +180,7 @@ function AppShell() {
         fleet={effectiveView === "fleet"}
         agents={agents}
         activeAgent={activeAgent}
-        connected={sseConnected}
+        connected={sseConnected && !agentStale}
         onRestart={restartAgent}
         restarting={agentRestarting}
         loading={agentLoading}

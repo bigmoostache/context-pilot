@@ -344,6 +344,9 @@ fn process_registry_events(
                     old.stop();
                 }
                 let _prev = agent_folders.insert(entry.id.clone(), folder);
+                if let Ok(mut b) = backend.lock() {
+                    let _prev = b.liveness.insert(entry.id.clone(), crate::liveness::Liveness::Live);
+                }
             }
             Event::Disappeared(id) => {
                 let _removed = tailers.remove(id);
@@ -353,13 +356,19 @@ fn process_registry_events(
                 let _removed = agent_folders.remove(id);
                 if let Ok(mut b) = backend.lock() {
                     let _removed = b.view_mut().remove(id);
+                    let _removed = b.liveness.remove(id);
                 }
             }
-            Event::StatusChanged(..) | Event::Stale(..) => {
-                // StatusChanged and Stale are informational for the registry
-                // layer; the view reflects phase/lifecycle from the oplog, so
-                // no view mutation needed here.
+            Event::Stale(id, reason) => {
+                // Store the stale verdict so fleet meta returns "disconnected",
+                // and mark the agent dirty so the SSE invalidate fires promptly
+                // (the frontend refetches agent meta within ~2s, not 15s).
+                if let Ok(mut b) = backend.lock() {
+                    let _prev = b.liveness.insert(id.clone(), *reason);
+                    b.mark_dirty(id);
+                }
             }
+            Event::StatusChanged(..) => {}
         }
     }
 }
