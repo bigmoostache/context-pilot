@@ -80,7 +80,7 @@ function ClickableCode({
         copied && "border-(--ok)! text-(--ok)!",
       )}
       onClick={(ev) => {
-        if ((ev.target as HTMLElement).closest("pre")) return
+        if (ev.target instanceof HTMLElement && ev.target.closest("pre")) return
         const text = typeof children === "string" ? children : extractText(children)
         // `clipboard()` is honestly typed `Clipboard | undefined` (absent on an
         // insecure origin), so the `?.` guard is real — a missing clipboard is a

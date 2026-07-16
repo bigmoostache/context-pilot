@@ -42,7 +42,7 @@ export function RenameInput({
         e.stopPropagation()
         if (e.key === "Enter") {
           e.preventDefault()
-          onCommit((e.target as HTMLInputElement).value)
+          if (e.target instanceof HTMLInputElement) onCommit(e.target.value)
         } else if (e.key === "Escape") {
           e.preventDefault()
           onCancel()

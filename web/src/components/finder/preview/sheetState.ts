@@ -28,8 +28,8 @@ export interface SheetPayload {
  * (number when parseable, string otherwise).
  */
 export function toWorkbookData(sheets: SheetPayload[]): IWorkbookData {
-  const sheetMap: Record<string, Record<string, unknown>> = {}
   const sheetOrder: string[] = []
+  const sheetEntries: [string, { id: string; name: string; rowCount: number; columnCount: number; cellData: IObjectMatrixPrimitiveType<ICellData> }][] = []
 
   for (const [idx, sheet] of sheets.entries()) {
     const id = `s${idx}`
@@ -51,19 +51,13 @@ export function toWorkbookData(sheets: SheetPayload[]): IWorkbookData {
       }
     }
 
-    sheetMap[id] = {
-      id,
-      name: sheet.name,
-      rowCount,
-      columnCount: colCount,
-      cellData,
-    }
+    sheetEntries.push([id, { id, name: sheet.name, rowCount, columnCount: colCount, cellData }])
   }
 
   return {
     id: "workbook",
     sheetOrder,
-    sheets: sheetMap,
+    sheets: Object.fromEntries(sheetEntries),
   } as IWorkbookData
 }
 
@@ -93,11 +87,11 @@ interface DataBounds {
 
 /** Scan cell matrix for actual data extent. */
 function findDataBounds(
-  cellData: Record<string, Record<number, ICellData> | undefined>,
+  cellData: IObjectMatrixPrimitiveType<ICellData>,
 ): DataBounds {
   let maxRow = 0
   let maxCol = 0
-  for (const [ri, cols] of Object.entries(cellData)) {
+  for (const [ri, cols] of Object.entries(cellData) as [string, Record<number, ICellData> | undefined][]) {
     const row = Number(ri)
     if (row > maxRow) maxRow = row
     if (!cols) continue
@@ -181,7 +175,7 @@ export async function generateXlsxBlob(univerAPI: FUniver): Promise<Blob | null>
     if (!sheetData) continue
     const ws = wb.addWorksheet(sheetData.name ?? sheetId)
     const cellData = sheetData.cellData ?? {}
-    const bounds = findDataBounds(cellData as Record<string, Record<number, ICellData> | undefined>)
+    const bounds = findDataBounds(cellData)
     writeCells(ws, cellData, bounds, snapshot.styles)
   }
 
@@ -266,14 +260,14 @@ function applyAlignment(cell: ExcelJS.Cell, style: IStyleData): void {
 function applyBorders(cell: ExcelJS.Cell, style: IStyleData): void {
   if (!style.bd) return
   const border: Partial<ExcelJS.Borders> = {}
-  const edgeMap: Record<string, keyof ExcelJS.Borders> = {
-    t: "top",
-    b: "bottom",
-    l: "left",
-    r: "right",
-  }
-  for (const [key, excelKey] of Object.entries(edgeMap)) {
-    const edge = style.bd[key as keyof IBorderData] as IBorderStyleData | undefined
+  const edges: [keyof IBorderData, keyof ExcelJS.Borders][] = [
+    ["t", "top"],
+    ["b", "bottom"],
+    ["l", "left"],
+    ["r", "right"],
+  ]
+  for (const [key, excelKey] of edges) {
+    const edge = style.bd[key] as IBorderStyleData | undefined
     if (!edge?.s) continue
     const borderStyle = toBorderStyle(edge.s)
     if (!borderStyle) continue

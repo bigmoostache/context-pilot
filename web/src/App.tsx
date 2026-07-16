@@ -50,9 +50,10 @@ function App() {
 function AppShell() {
   const { devMode } = useDevMode()
   const { data: agents = [] } = useFleet()
-  const [view, setView] = useState<ViewMode>(
-    () => (localStorage.getItem("cp-view") as ViewMode | null) ?? "fleet",
-  )
+  const [view, setView] = useState<ViewMode>(() => {
+    const modes: Record<string, ViewMode> = { fleet: "fleet", threads: "threads", finder: "finder", costs: "costs" }
+    return modes[localStorage.getItem("cp-view") ?? ""] ?? "fleet"
+  })
   const [activeAgentId, setActiveAgentId] = useState(() => localStorage.getItem("cp-agent") ?? "")
   // One-shot request to pop the "create agent" dialog on the fleet dashboard
   // (raised by the workspace switcher's "New agent" entry).

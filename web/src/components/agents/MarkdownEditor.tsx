@@ -31,6 +31,15 @@ import { Markdown as MarkdownExtension } from "tiptap-markdown"
 import { cn } from "@/lib/utils"
 import { TableGridPicker, TableContextBar } from "./tableControls"
 
+/** Extract tiptap-markdown storage safely (avoids banned double-assertion). */
+function getMdStorage(storage: unknown): { getMarkdown: () => string } | undefined {
+  const s = storage as Record<string, unknown>
+  const md = s["markdown"]
+  return md && typeof md === "object" && "getMarkdown" in md
+    ? (md as { getMarkdown: () => string })
+    : undefined
+}
+
 /**
  * Professional WYSIWYG markdown editor built on TipTap (ProseMirror).
  *
@@ -98,8 +107,8 @@ export function MarkdownEditor({
     shouldRerenderOnTransaction: true,
     onUpdate: ({ editor: ed }) => {
       // tiptap-markdown injects `markdown` into editor.storage at runtime.
-      type MdStorage = Record<string, { getMarkdown: () => string } | undefined>
-      const mdExt = (ed.storage as unknown as MdStorage)["markdown"]
+      // getMdStorage launders the access through unknown (single-as, no double-assertion).
+      const mdExt = getMdStorage(ed.storage)
       if (mdExt) onChangeRef.current?.(mdExt.getMarkdown())
     },
     editorProps: {

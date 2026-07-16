@@ -23,7 +23,7 @@ export function TableGridPicker({
   // Close on outside click.
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+      if (ref.current && e.target instanceof Node && !ref.current.contains(e.target)) onClose()
     }
     document.addEventListener("mousedown", handler)
     return () => document.removeEventListener("mousedown", handler)
