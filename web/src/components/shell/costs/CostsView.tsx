@@ -21,7 +21,7 @@ import { CrossTabTable, TokenDistribution, ApiTokenDistribution } from "./tables
  * cost-tracking TSV and renders charts for cache efficiency, culprit
  * attribution, and spend breakdown.
  */
-export function CostsView({ agentId }: { agentId: string }) {
+export function CostsView({ agentId, disconnected, onReconnect }: { agentId: string; disconnected?: boolean; onReconnect?: () => void }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ["cost-tsv", agentId],
     queryFn: () => fetchFsPreview(agentId, ".context-pilot/logs/cost-tracking.tsv"),
@@ -65,9 +65,19 @@ export function CostsView({ agentId }: { agentId: string }) {
     })
   }, [filtered, rows.length, tempoFilter, queueFilter, breakKindFilter])
 
+  const blurStyle = disconnected
+    ? { filter: "blur(3px) grayscale(0.5)", transition: "filter 300ms" } as const
+    : { transition: "filter 300ms" } as const
+
   if (isLoading) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground">
+      <div
+        className="relative flex min-h-0 flex-1 items-center justify-center text-muted-foreground"
+        style={blurStyle}
+      >
+        {disconnected && (
+          <div onClick={onReconnect} className="absolute inset-0 z-40 cursor-pointer bg-background/30" />
+        )}
         <span className="text-[13px]">Loading cost data…</span>
       </div>
     )
@@ -75,7 +85,13 @@ export function CostsView({ agentId }: { agentId: string }) {
 
   if (error || rows.length === 0) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
+      <div
+        className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-muted-foreground"
+        style={blurStyle}
+      >
+        {disconnected && (
+          <div onClick={onReconnect} className="absolute inset-0 z-40 cursor-pointer bg-background/30" />
+        )}
         <span className="text-[15px] font-semibold">No cost data yet</span>
         <span className="max-w-sm text-center text-[12px]">
           Cost telemetry appears after the agent completes its first LLM tick. The file{" "}
@@ -89,7 +105,10 @@ export function CostsView({ agentId }: { agentId: string }) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto" style={blurStyle}>
+      {disconnected && (
+        <div onClick={onReconnect} className="absolute inset-0 z-40 cursor-pointer bg-background/30" />
+      )}
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
         {/* ── Header ──────────────────────────────────────────────── */}
         <div className="flex items-start justify-between">

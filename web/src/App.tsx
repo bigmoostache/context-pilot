@@ -131,7 +131,9 @@ function AppShell() {
         />
       )
     }
-    if (effectiveView === "costs") return <CostsView agentId={activeAgentId} />
+    if (effectiveView === "costs") {
+      return <CostsView agentId={activeAgentId} disconnected={showDisconnectOverlay} onReconnect={restartAgent} />
+    }
     if (effectiveView === "finder" && activeAgent) {
       return (
         <Finder
@@ -139,6 +141,8 @@ function AppShell() {
           agent={activeAgent}
           revealPath={finderRevealPath}
           onRevealConsumed={() => setFinderRevealPath(null)}
+          disconnected={showDisconnectOverlay}
+          onReconnect={restartAgent}
         />
       )
     }
@@ -147,6 +151,8 @@ function AppShell() {
         key={activeAgentId}
         activeAgentId={activeAgentId}
         onShowInFinder={showInFinder}
+        disconnected={showDisconnectOverlay}
+        onReconnect={restartAgent}
       />
     )
   }
@@ -166,23 +172,7 @@ function AppShell() {
         agents={agents}
       />
 
-      <div className="relative min-h-0 flex-1 overflow-hidden">
-        <div
-          className="h-full overflow-hidden"
-          style={{
-            filter: showDisconnectOverlay ? "blur(3px) grayscale(0.5)" : "none",
-            transition: "filter 300ms",
-          }}
-        >
-          <TelemetryProfiler id={effectiveView}>{renderView()}</TelemetryProfiler>
-        </div>
-        {showDisconnectOverlay && (
-          <div
-            onClick={restartAgent}
-            className="absolute inset-0 z-40 cursor-pointer bg-background/40"
-          />
-        )}
-      </div>
+      <TelemetryProfiler id={effectiveView}>{renderView()}</TelemetryProfiler>
 
       <StatusBar
         fleet={effectiveView === "fleet"}
