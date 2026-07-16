@@ -58,8 +58,14 @@ export function useSseConnected(agentId: string): boolean {
       return
     }
     const client = getOrCreateSseClient(agentId)
-    // Seed with current snapshot
-    setConnected(client.connected)
+    // Only seed from snapshot if the client has connected before. A brand-new
+    // client is still mid-handshake (es === null → connected === false) — seeding
+    // from that would flash "Disconnected" on every agent switch until the
+    // EventSource opens. Stay optimistic (default true) and let the subscription
+    // callback deliver the real state once the handshake settles.
+    if (client.hasEverConnected) {
+      setConnected(client.connected)
+    }
     return client.subscribeConnection(setConnected)
   }, [agentId])
 

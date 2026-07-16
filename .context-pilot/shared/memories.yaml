@@ -300,7 +300,10 @@
   last_edited_ms: 1783501986296
 986adb56b40b2b32:
   tl_dr: 'OPS & BUILD GOTCHAS (consolidated): orchestrator restart vs system_reload, port-freeing, git/pnpm/lint quirks, never-commit list. Full list in contents.'
-  contents: 'Key gotchas: TUI change = cargo build+reload; orchestrator change = rebuild+restart (not reload); frontend = vite hot-reloads. Kill orchestrator: lsof -ti:7878 + parent sh. git via git_execute only. web/ uses pnpm. CB3 is lib-only. oplog/bodies folder-sizes failure = benign.'
+  contents: |-
+    Key gotchas: TUI change = cargo build+reload; orchestrator change = rebuild+restart (not reload); frontend = vite hot-reloads. Kill orchestrator: lsof -ti:7878 + parent sh. git via git_execute only. web/ uses pnpm. CB3 is lib-only. oplog/bodies folder-sizes failure = benign.
+
+    Orchestrator launch: separate binary `cp-orchestrator` (crate cp-orchestrator), NOT the TUI binary. Build: `cargo build --release -p cp-orchestrator`. Run: `./target/release/cp-orchestrator`. Serves on :7878. Kill stale: `kill -9 $(lsof -ti:7878)`. The TUI binary (`cargo run --release` / `target/release/tui`) is the AGENT — needs CP_BRIDGE=1 for headless mode, fails with 'failed to enable raw mode' without a real TTY. Full stack script: web/run-stack.sh (orchestrator + web dev + optional TUI).
   importance: critical
   labels:
   - workflow
@@ -308,7 +311,7 @@
   - build
   - deploy
   - git
-  last_edited_ms: 1784203006414
+  last_edited_ms: 1784204581022
 9a2449142b04169a:
   tl_dr: Freeze RESOLVED at infra level (v0.2.8 deadman + v0.2.9 stream timeout + v0.2.10 deadman-aware-of-retry). gpt2 dribble = throttle-induced, not fundamental. Normal tasks pass.
   importance: low

@@ -138,6 +138,10 @@
   path: src/modules/overview/mod.rs
   description: 'Overview module. Core/global. Close_panel pre-flight: warns (not errors) for stale [!] or missing tree descriptions. pub(crate) has_pending_tree_describe() helper. tool_manage, panel_goto_page pre-flights. save/load module+worker data. Visualizer extracted to visualizers.rs.'
   last_edited_ms: 1781447353294
+024dff6af1e3cecf:
+  path: web/src/App.tsx
+  description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) ?? fleetAgent. sseConnected = useSseConnected(activeAgentId) tracks SSE push plane health. useRestartFlow(activeAgentId) provides restart + restarting for both footer and dialog. agentLoading from useAgentMeta shows loader on agent switch. Disconnect overlay: when !sseConnected && agent view, main content blurred(3px)+greyscaled(50%) with transparent clickable overlay triggering restartAgent — prevents dead-agent interaction. view/agent persisted to localStorage via write-through effects. effectiveView gates cockpit+costs behind devMode, falls back to fleet when no agent. StatusBar receives connected + onRestart + restarting + loading. Routes: fleet/threads/cockpit/costs/finder. renderView wrapped in <TelemetryProfiler id={effectiveView}>; mounts <TelemetryHud/> (dev-mode gated).'
+  last_edited_ms: 1784203360165
 02534f9eb511e493:
   path: .context-pilot/shared/entities/schema.sql
   description: 'Auto-generated SQLite dump: CREATE + INSERT for all entity tables. Recovery source for DB corruption/deletion.'
@@ -2649,6 +2653,10 @@
 2bfe4a03d49b306f:
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. ModelPicker (provider+model, like TUI Ctrl+H), slugify(name) derives realm folder. X896: create-mode submit() LIVE via useCreateAgent (POST /api/fleet/create). Manage-mode submit() sends Configure command (provider+model). NEW Restart button (manage footer, RefreshCw icon, spins while pending): useRestartAgent → POST /api/agent/{id}/restart, kills+respawns the agent from the current binary — fixes a stale agent that rejects commands with 502 ''agent unreachable''. Shared by TopBar + FleetDashboard.'
+  last_edited_ms: 0
+2c129ac2d399c169:
+  path: web/src/components/threads/ThreadsView.tsx
+  description: 'Thread sidebar orchestrator. P8 refactor: logic split into TWO same-file hooks — useThreadSelection (selectedId/query/showArchived/newOpen/pendingFiles + effectiveSelectedId resolution + persist effect + auto-select-new-thread diff effect + switch-thread pending-files render-phase reset) and useThreadActions (flash/notice + handleArchive/Pause/Delete/Create/Send/Attach, all routing rejections through describeCommandError toast per T121) — so the render body meets the 150-line/30-statement budgets. `thread` lookup moved below the no-agent early exit (unicorn/no-declarations-before-early-exit). handleAttach uploads to .uploads/ via uploadUnique. Wires ThreadList+ThreadConversation+NewThreadDialog + EmptyRealm.'
   last_edited_ms: 0
 2c14c206a2c40263:
   path: web/src/components/threads/ThreadList.tsx
@@ -6846,6 +6854,10 @@
   path: crates/cp-oplog/src/service.rs
   description: 'OplogService — off-loop group-commit thread + GAP2/I2 asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate|ThreadFocusChanged=BestEffort (disposable/self-healing), all else (roster mutations + Lifecycle + Unknown)=Durable. THREE submit paths: append_durable (blocks+awaits sync — intake/I11), submit_durable (non-blocking durable, detached ack — I2 main loop), append_best_effort (try_send drop-on-full — phase/cost/focus). commit_loop drains batch, ONE fdatasync. Tests in sibling service_tests.rs.'
   last_edited_ms: 1781869236457
+741d8cc03d8f5ee0:
+  path: web/src/components/finder/Finder/shell.tsx
+  description: Finder chrome + content render (P8 split). role=application keyboard-widget surface (jsx-a11y/no-noninteractive-{element-interactions,tabindex} scoped-off here in eslint.config.ts + registered — repath from old Finder.tsx). Renders FinderTabs+FinderToolbar+FinderBody+FinderPathBar+FinderOverlays from vs/listing/ctrl. Owns Favorites pins (useFinderPins) consumed by body+overlay.
+  last_edited_ms: 0
 743cbcce98d42e87:
   path: crates/cp-vault/src/types.rs
   description: 'Core types: SecretString (zeroized), VaultError, KeyStatus, Vault trait (get/require/set/delete/list/health).'
@@ -8470,6 +8482,10 @@
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. Manage mode (T321): wider (w-960px) 2-col grid when auth enabled — left = name + provider/model form, right = <AgentAclSection>. Single-col when auth disabled. max-h constrained + scrollable body. Clickable avatar in header uploads profile pic (T338). Submit sends Configure + renameAgent (T328, concurrent Promise.all when name changed). Restart/Retire footer. Create mode: narrower single-col, useCreateAgent.'
   last_edited_ms: 1782249265726
+8ee22b98388a0203:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 8eeb31ef835ea0c1:
   path: web/src/components/conversation/CopyButton.tsx
   description: 'Discrete click-to-copy button (green-tick-for-2s feedback) beneath message bubbles + reused by the markdown renderer''s code/table Copy controls. Extracted into its OWN leaf module in web-lint P7 to break the Message↔markdown import cycle (import-x/no-cycle): Message imports Markdown, markdown imports CopyButton — routing the button through a shared leaf keeps that edge acyclic. clipboard() guard for insecure-origin no-op. align mirrors bubble side.'
@@ -11034,6 +11050,10 @@ bb05e2336216163a:
   path: .github/checks/check-folder-sizes.sh
   description: Folder size check script (max 8 entries)
   last_edited_ms: 0
+bb1241d81e1704cc:
+  path: web/src/App.tsx
+  description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) ?? fleetAgent. sseConnected = useSseConnected(activeAgentId) tracks SSE push plane health. useRestartFlow(activeAgentId) provides restart + restarting for both footer and dialog. agentLoading from useAgentMeta shows loader on agent switch. Disconnect overlay: when !sseConnected && agent view, main content blurred(3px)+greyscaled(50%) with transparent overlay captures clicks and triggers restartAgent — prevents dead-agent interaction. 300ms transition. Fleet view unaffected. view/agent persisted to localStorage via write-through effects. effectiveView gates cockpit+costs behind devMode, falls back to fleet when no agent. StatusBar receives connected + onRestart + restarting + loading. Routes: fleet/threads/cockpit/costs/finder. renderView wrapped in <TelemetryProfiler id={effectiveView}>; mounts <TelemetryHud/> (dev-mode gated).'
+  last_edited_ms: 1784203628426
 bb226690c4c1eecf:
   path: web/e2e/messages.spec.ts
   description: Phase 2 e2e message send (1 test) over the K7 push plane. Composer send→user bubble appears live + roster log grows. Asserts the user message only (agent reply is non-deterministic LLM). Both the DOM-bubble visibility AND roster-log poll use a 25s timeout to absorb cumulative live-agent command backlog in the serial suite (single live agent shared across specs). afterAll archives e2e- threads.
@@ -11474,6 +11494,10 @@ c2baaa90fec05e51:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block on Send, count positive. Focus enforcement with dangling/escalation. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
   last_edited_ms: 1781448934515
+c2bd2b65e6593dfc:
+  path: web/src/components/finder/Finder/index.tsx
+  description: 'Finder component — thin seam (P8 split of the old 493-line Finder.tsx). Resolves the active tab (req(tabs,0) invariant) then wires four units: useFinderViewState (view state), useFinderListing (live listing + derivations), useFinderController (all behaviour hooks), FinderShell (render). Re-exports PinnedFolder. Importers App.tsx + finderFs.ts use extensionless @/components/finder/Finder → resolves here.'
+  last_edited_ms: 0
 c2cf88c5f7477e1f:
   path: src/llms/oai_providers/groq.rs
   description: Groq client. OpenAI-compatible with built-in tools (browser_search, code_interpreter) for GPT-OSS models. API key from vault ("groq").
@@ -12630,6 +12654,10 @@ d6d2923755b7f261:
   path: web/run-stack.sh
   description: 'Launch script for full Context Pilot live stack: orchestrator backend (:7878) + web dev server (:5174) + TUI with CP_BRIDGE=1. --no-tui flag for backend+web only. Health check, cleanup trap, env overrides.'
   last_edited_ms: 1781698549890
+d6e70a55ad1820a0:
+  path: web/src/components/shell/costs/CostsView.tsx
+  description: 'Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool/culprit-cost/max-freeze bars, two token distribution bars (panel-estimated + API-reported). Tempo/queue/breakKind AND-filters (BreakKindFilter: 5-button group). Copy as Markdown button. TanStack useQuery + fetchFsPreview 15s refetch. P8: the two summary-card grid rows extracted into a SummaryCards subcomponent so CostsView fn stays under the 150-line budget.'
+  last_edited_ms: 0
 d6fe3bef04a79aab:
   path: ideas.md
   description: Brainstorming / feature ideas
@@ -13794,6 +13822,10 @@ edd321c2de89ceab:
   path: ui/src/components/shell/LeftRail.tsx
   description: Cockpit context navigator (width = shared var(--sidebar-w), unified with threads/finder/fleet rails). Context-budget meter + scrollable panel list (icon+name+tokens). Dense per-panel telemetry omitted for calm enterprise feel.
   last_edited_ms: 1781533961657
+eddf0bf99b7d6246:
+  path: web/src/App.tsx
+  description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) ?? fleetAgent. sseConnected = useSseConnected(activeAgentId) tracks SSE push plane health. useRestartFlow(activeAgentId) provides restart + restarting for both footer and dialog. agentLoading from useAgentMeta shows loader on agent switch. Disconnect overlay: when !sseConnected && agent view, main content blurred(3px)+greyscaled(50%) with transparent overlay captures clicks and triggers restartAgent — prevents dead-agent interaction. 300ms transition. Fleet view unaffected. view/agent persisted to localStorage via write-through effects. effectiveView gates cockpit+costs behind devMode, falls back to fleet when no agent. StatusBar receives connected + onRestart + restarting + loading. Routes: fleet/threads/cockpit/costs/finder. renderView wrapped in <TelemetryProfiler id={effectiveView}>; mounts <TelemetryHud/> (dev-mode gated).'
+  last_edited_ms: 0
 edf0e03e608d5a8b:
   path: test_file_to_describe.txt
   description: Version C of the test file

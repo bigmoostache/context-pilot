@@ -35,6 +35,8 @@ export interface SseClient {
   close(): void
   /** True if currently connected. */
   readonly connected: boolean
+  /** True once the first successful connection has occurred. */
+  readonly hasEverConnected: boolean
 }
 
 /** Shared per-agent SSE clients (singleton per agentId). */
@@ -66,6 +68,7 @@ function createSseClient(agentId: string): SseClient {
   let es: EventSource | null = null
   let lastEventId: string | undefined
   let closed = false
+  let everConnected = false
   // Read `closed` through a getter at sites inside synchronous callbacks
   // (es.onerror): a direct `!closed` there is narrowed by control-flow analysis
   // to the literal initializer (its only mutation is in the deferred `close()`),
@@ -97,6 +100,7 @@ function createSseClient(agentId: string): SseClient {
 
       es.addEventListener("open", () => {
         reconnectMs = RECONNECT_BASE_MS
+        everConnected = true
         connectionListeners.forEach((fn) => fn(true))
       })
 
@@ -155,6 +159,9 @@ function createSseClient(agentId: string): SseClient {
     },
     get connected() {
       return es?.readyState === EventSource.OPEN
+    },
+    get hasEverConnected() {
+      return everConnected
     },
   }
 
