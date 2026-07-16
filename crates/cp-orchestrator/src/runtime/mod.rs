@@ -285,6 +285,25 @@ fn driver_loop(
                     let _removed = config_mtimes.remove(id);
                 }
             }
+
+            // Sync liveness for ALL known agents on every scan. The registry
+            // emits `Event::Stale` on a Live→non-live transition but has NO
+            // recovery event for Stale→Live. Without this sync, a briefly-stale
+            // agent that recovers (heartbeat resumes, PID alive) would stay
+            // "disconnected" in the Backend forever. Mark recovered agents dirty
+            // so the SSE invalidate fires promptly.
+            if let Ok(mut b) = backend.lock() {
+                for id in agent_folders.keys() {
+                    if let Some(live) = registry.liveness(id) {
+                        let prev = b.liveness.get(id).copied();
+                        let _prev = b.liveness.insert(id.clone(), live);
+                        // Agent recovered from stale — notify frontend.
+                        if prev.is_some_and(|p| !p.is_live()) && live.is_live() {
+                            b.mark_dirty(id);
+                        }
+                    }
+                }
+            }
         }
 
         // 2. Detect tier-② INSPECTION-resource changes by checking config.json
