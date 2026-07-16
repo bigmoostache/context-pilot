@@ -116,7 +116,7 @@ function createSseClient(agentId: string): SseClient {
 
   function scheduleReconnect() {
     const jitter = Math.random() * 0.5 * reconnectMs
-    setTimeout(() => connect(), reconnectMs + jitter)
+    setTimeout(() => void connect(), reconnectMs + jitter)
     reconnectMs = Math.min(reconnectMs * 2, RECONNECT_MAX_MS)
   }
 

@@ -1,6 +1,18 @@
-import type { IWorkbookData, ICellData, IObjectMatrixPrimitiveType } from "@univerjs/presets"
+import type {
+  FUniver,
+  IWorkbookData,
+  ICellData,
+  IObjectMatrixPrimitiveType,
+  IStyleData,
+  IColorStyle,
+  ITextDecoration,
+  IBorderStyleData,
+  IBorderData,
+  Nullable,
+} from "@univerjs/presets"
+import { BooleanNumber } from "@univerjs/presets"
 import ExcelJS from "exceljs"
-import { postApiAgentByIdFsUpload } from "@/lib/api/generated"
+import { uploadFile } from "@/lib/api"
 
 /** Backend sheet shape from the calamine `/fs/sheet` endpoint. */
 export interface SheetPayload {
@@ -31,25 +43,12 @@ export function toWorkbookData(sheets: SheetPayload[]): IWorkbookData {
     )
 
     const cellData: IObjectMatrixPrimitiveType<ICellData> = {}
-    for (let ri = 0; ri < rows.length; ri++) {
-      const row = rows[ri]
-      if (!row) continue
+    for (const [ri, row] of rows.entries()) {
       const formulaRow = sheet.formulas?.[ri]
-      const rowCells: Record<number, ICellData> = {}
-      for (let ci = 0; ci < row.length; ci++) {
-        const raw = row[ci]
-        if (raw === undefined || raw === "") continue
-        const num = Number(raw)
-        const cell: ICellData = { v: !Number.isNaN(num) && raw.trim() !== "" ? num : raw }
-        // Attach formula string from backend (calamine) if present.
-        const formula = formulaRow?.[ci]
-        if (formula) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Univer's ICellData typing doesn't expose `f` but the engine reads it.
-          ;(cell as Record<string, unknown>)["f"] = formula
-        }
-        rowCells[ci] = cell
+      const rowCells = buildRowCells(row, formulaRow)
+      if (Object.keys(rowCells).length > 0) {
+        cellData[ri] = rowCells
       }
-      cellData[ri] = rowCells
     }
 
     sheetMap[id] = {
@@ -68,76 +67,122 @@ export function toWorkbookData(sheets: SheetPayload[]): IWorkbookData {
   } as IWorkbookData
 }
 
+/** Parse one source row into a sparse cell map. */
+function buildRowCells(
+  row: string[],
+  formulaRow: (string | null)[] | undefined,
+): Record<number, ICellData> {
+  const result: Record<number, ICellData> = {}
+  for (const [ci, raw] of row.entries()) {
+    if (raw === "") continue
+    const num = Number(raw)
+    const cell: ICellData = { v: !Number.isNaN(num) && raw.trim() !== "" ? num : raw }
+    const formula = formulaRow?.[ci]
+    if (formula) cell.f = formula
+    result[ci] = cell
+  }
+  return result
+}
+
+// ── Data bounds ─────────────────────────────────────────────────────
+
+interface DataBounds {
+  maxRow: number
+  maxCol: number
+}
+
+/** Scan cell matrix for actual data extent. */
+function findDataBounds(
+  cellData: Record<string, Record<number, ICellData> | undefined>,
+): DataBounds {
+  let maxRow = 0
+  let maxCol = 0
+  for (const [ri, cols] of Object.entries(cellData)) {
+    const row = Number(ri)
+    if (row > maxRow) maxRow = row
+    if (!cols) continue
+    for (const ci of Object.keys(cols)) {
+      const col = Number(ci)
+      if (col > maxCol) maxCol = col
+    }
+  }
+  return { maxRow, maxCol }
+}
+
+// ── Cell writing ────────────────────────────────────────────────────
+
+/** Write one sheet's cells to an ExcelJS worksheet. */
+function writeCells(
+  ws: ExcelJS.Worksheet,
+  cellData: IObjectMatrixPrimitiveType<ICellData>,
+  bounds: DataBounds,
+  styles: Record<string, Nullable<IStyleData>> | undefined,
+): void {
+  for (let ri = 0; ri <= bounds.maxRow; ri++) {
+    const rowCells = cellData[ri]
+    if (!rowCells) continue
+    const wsRow = ws.getRow(ri + 1)
+    writeCellRow(wsRow, rowCells, bounds.maxCol, styles)
+  }
+}
+
+/** Write a single row of cells. */
+function writeCellRow(
+  wsRow: ExcelJS.Row,
+  rowCells: Record<number, ICellData>,
+  maxCol: number,
+  styles: Record<string, Nullable<IStyleData>> | undefined,
+): void {
+  for (let ci = 0; ci <= maxCol; ci++) {
+    const cell = rowCells[ci]
+    if (!cell) continue
+    const wsCell = wsRow.getCell(ci + 1)
+    writeCellValue(wsCell, cell)
+    const resolved = resolveStyle(cell.s, styles)
+    if (resolved) applyStyle(wsCell, resolved)
+  }
+}
+
+/** Write cell value or formula. */
+function writeCellValue(wsCell: ExcelJS.Cell, cell: ICellData): void {
+  wsCell.value = cell.f
+    ? ({ formula: cell.f, result: cell.v } as ExcelJS.CellFormulaValue)
+    : (cell.v as ExcelJS.CellValue)
+}
+
+/** Resolve style — may be inline IStyleData or a string ID referencing the workbook's registry. */
+function resolveStyle(
+  style: ICellData["s"],
+  styles: Record<string, Nullable<IStyleData>> | undefined,
+): IStyleData | null {
+  if (!style) return null
+  if (typeof style === "string") {
+    return styles?.[style] ?? null
+  }
+  return style
+}
+
+// ── XLSX generation ─────────────────────────────────────────────────
+
 /**
  * Read current Univer workbook state and build an XLSX blob via ExcelJS.
  * Handles value + style mapping (bold, italic, underline, strike, text color,
- * background color, font size, horizontal alignment).
+ * background color, font size, horizontal alignment, borders).
  */
-export async function generateXlsxBlob(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  univerAPI: any,
-): Promise<Blob | null> {
+export async function generateXlsxBlob(univerAPI: FUniver): Promise<Blob | null> {
   const workbook = univerAPI.getActiveWorkbook()
   if (!workbook) return null
 
-  const snapshot = workbook.getSnapshot()
+  const snapshot = workbook.save()
   const wb = new ExcelJS.Workbook()
 
-  for (const sheetId of snapshot.sheetOrder ?? []) {
-    const sheetData = snapshot.sheets?.[sheetId]
+  for (const sheetId of snapshot.sheetOrder) {
+    const sheetData = snapshot.sheets[sheetId]
     if (!sheetData) continue
-
     const ws = wb.addWorksheet(sheetData.name ?? sheetId)
     const cellData = sheetData.cellData ?? {}
-
-    // Find actual data bounds.
-    let maxRow = 0
-    let maxCol = 0
-    for (const ri of Object.keys(cellData)) {
-      const row = Number(ri)
-      if (row > maxRow) maxRow = row
-      const cols = cellData[ri] as Record<string, unknown> | undefined
-      if (!cols) continue
-      for (const ci of Object.keys(cols)) {
-        const col = Number(ci)
-        if (col > maxCol) maxCol = col
-      }
-    }
-
-    // Write cells.
-    for (let ri = 0; ri <= maxRow; ri++) {
-      const rowCells = cellData[ri] as Record<string, { v?: unknown; s?: unknown }> | undefined
-      if (!rowCells) continue
-      const wsRow = ws.getRow(ri + 1)
-      for (let ci = 0; ci <= maxCol; ci++) {
-        const cell = rowCells[ci]
-        if (!cell) continue
-        const wsCell = wsRow.getCell(ci + 1)
-
-        // Write formula if present — ExcelJS CellFormulaValue carries both
-        // the formula string and the cached result so Excel shows the value
-        // immediately without recalc.
-        const formula = (cell as Record<string, unknown>)["f"] as string | undefined
-        if (formula) {
-          wsCell.value = {
-            formula,
-            result: cell.v as number | string | boolean | Date,
-          } as ExcelJS.CellFormulaValue
-        } else {
-          wsCell.value = cell.v as ExcelJS.CellValue
-        }
-
-        // Resolve style — may be inline IStyleData or a string ID referencing
-        // the workbook's styles registry.
-        let style = cell.s as Record<string, unknown> | string | undefined
-        if (typeof style === "string" && snapshot.styles) {
-          style = snapshot.styles[style] as Record<string, unknown> | undefined
-        }
-        if (style && typeof style === "object") {
-          applyStyle(wsCell, style)
-        }
-      }
-    }
+    const bounds = findDataBounds(cellData as Record<string, Record<number, ICellData> | undefined>)
+    writeCells(ws, cellData, bounds, snapshot.styles)
   }
 
   const buffer = await wb.xlsx.writeBuffer()
@@ -147,33 +192,12 @@ export async function generateXlsxBlob(
 }
 
 /**
- * Generate a modified XLSX from Univer state and trigger a browser download.
- */
-export async function exportToXlsx(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  univerAPI: any,
-  filename: string,
-): Promise<void> {
-  const blob = await generateXlsxBlob(univerAPI)
-  if (!blob) return
-
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = filename.replace(/\.[^.]+$/, "") + ".xlsx"
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-/**
  * Generate a modified XLSX from Univer state and upload it back to the agent
  * realm, overwriting the original file. The realm's file becomes the new
- * source of truth — the FinderPreview Download button then serves the
- * updated version.
+ * source of truth.
  */
 export async function saveToRealm(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  univerAPI: any,
+  univerAPI: FUniver,
   agentId: string,
   realmPath: string,
 ): Promise<void> {
@@ -181,39 +205,43 @@ export async function saveToRealm(
   if (!blob) throw new Error("No active workbook")
 
   const lastSlash = realmPath.lastIndexOf("/")
-  const dir = lastSlash > 0 ? realmPath.slice(0, lastSlash) : ""
-  const name = lastSlash >= 0 ? realmPath.slice(lastSlash + 1) : realmPath
+  const hasSlash = lastSlash !== -1
+  const dir = hasSlash ? realmPath.slice(0, lastSlash) : ""
+  const name = hasSlash ? realmPath.slice(lastSlash + 1) : realmPath
 
-  await postApiAgentByIdFsUpload({
-    path: { id: agentId },
-    query: { path: dir, name },
-    body: blob,
-  })
+  const file = new File([blob], name, { type: blob.type })
+  await uploadFile(agentId, dir, file)
 }
 
-/** Map Univer style object to ExcelJS cell styling. */
-function applyStyle(cell: ExcelJS.Cell, style: Record<string, unknown>): void {
+// ── Style mapping ───────────────────────────────────────────────────
+
+/** Map Univer IStyleData to ExcelJS cell styling. */
+function applyStyle(cell: ExcelJS.Cell, style: IStyleData): void {
+  applyFont(cell, style)
+  applyFill(cell, style)
+  applyAlignment(cell, style)
+  applyBorders(cell, style)
+}
+
+/** Extract font properties from Univer style. */
+function applyFont(cell: ExcelJS.Cell, style: IStyleData): void {
   const font: Partial<ExcelJS.Font> = {}
-  if (style["bl"] === 1) font.bold = true
-  if (style["it"] === 1) font.italic = true
+  if (style.bl === BooleanNumber.TRUE) font.bold = true
+  if (style.it === BooleanNumber.TRUE) font.italic = true
 
-  // Univer stores underline/strike as ITextDecoration {s: BooleanNumber}.
-  const ul = style["ul"] as { s?: number } | number | undefined
-  if (typeof ul === "object" ? ul?.s === 1 : ul === 1) font.underline = true
-  const st = style["st"] as { s?: number } | number | undefined
-  if (typeof st === "object" ? st?.s === 1 : st === 1) font.strike = true
+  if (isDecorationActive(style.ul)) font.underline = true
+  if (isDecorationActive(style.st)) font.strike = true
 
-  // Text color — Univer IColorStyle: {rgb: 'RRGGBB'} or plain string fallback.
-  const cl = style["cl"] as { rgb?: string } | string | undefined
-  const textRgb = typeof cl === "object" ? cl?.rgb : typeof cl === "string" ? cl : undefined
+  const textRgb = extractRgb(style.cl)
   if (textRgb) font.color = { argb: textRgb.replace(/^#/, "") }
+  if (style.fs) font.size = style.fs
 
-  if (style["fs"]) font.size = style["fs"] as number
   if (Object.keys(font).length > 0) cell.font = font
+}
 
-  // Background color — Univer IColorStyle on "bg" key.
-  const bg = style["bg"] as { rgb?: string } | string | undefined
-  const bgRgb = typeof bg === "object" ? bg?.rgb : typeof bg === "string" ? bg : undefined
+/** Apply background fill from Univer style. */
+function applyFill(cell: ExcelJS.Cell, style: IStyleData): void {
+  const bgRgb = extractRgb(style.bg)
   if (bgRgb) {
     cell.fill = {
       type: "pattern",
@@ -221,42 +249,54 @@ function applyStyle(cell: ExcelJS.Cell, style: Record<string, unknown>): void {
       fgColor: { argb: bgRgb.replace(/^#/, "") },
     }
   }
+}
 
-  // Horizontal alignment.
-  const ht = style["ht"] as number | undefined
-  if (ht !== undefined) {
-    const map: Record<number, ExcelJS.Alignment["horizontal"]> = {
-      0: "left",
-      1: "center",
-      2: "right",
-    }
-    cell.alignment = { horizontal: map[ht] ?? "left" }
+/** Apply horizontal alignment from Univer style. */
+function applyAlignment(cell: ExcelJS.Cell, style: IStyleData): void {
+  if (style.ht == null) return
+  const map: Record<number, ExcelJS.Alignment["horizontal"]> = {
+    0: "left",
+    1: "center",
+    2: "right",
   }
+  cell.alignment = { horizontal: map[style.ht] ?? "left" }
+}
 
-  // Borders — Univer IBorderData with t/b/l/r edges, each {s: BorderStyleTypes, cl: IColorStyle}.
-  const bd = style["bd"] as Record<string, { s?: number; cl?: { rgb?: string } | string }> | undefined
-  if (bd) {
-    const border: Partial<ExcelJS.Borders> = {}
-    const edgeMap: Record<string, keyof ExcelJS.Borders> = {
-      t: "top",
-      b: "bottom",
-      l: "left",
-      r: "right",
-    }
-    for (const [key, excelKey] of Object.entries(edgeMap)) {
-      const edge = bd[key]
-      if (!edge || !edge.s) continue
-      const borderStyle = toBorderStyle(edge.s)
-      if (!borderStyle) continue
-      const edgeCl = edge.cl
-      const edgeRgb = typeof edgeCl === "object" ? edgeCl?.rgb : typeof edgeCl === "string" ? edgeCl : undefined
-      border[excelKey] = {
-        style: borderStyle,
-        color: edgeRgb ? { argb: edgeRgb.replace(/^#/, "") } : { argb: "000000" },
-      }
-    }
-    if (Object.keys(border).length > 0) cell.border = border
+/** Apply border edges from Univer IBorderData. */
+function applyBorders(cell: ExcelJS.Cell, style: IStyleData): void {
+  if (!style.bd) return
+  const border: Partial<ExcelJS.Borders> = {}
+  const edgeMap: Record<string, keyof ExcelJS.Borders> = {
+    t: "top",
+    b: "bottom",
+    l: "left",
+    r: "right",
   }
+  for (const [key, excelKey] of Object.entries(edgeMap)) {
+    const edge = style.bd[key as keyof IBorderData] as IBorderStyleData | undefined
+    if (!edge?.s) continue
+    const borderStyle = toBorderStyle(edge.s)
+    if (!borderStyle) continue
+    const edgeRgb = extractRgb(edge.cl)
+    border[excelKey] = {
+      style: borderStyle,
+      color: edgeRgb ? { argb: edgeRgb.replace(/^#/, "") } : { argb: "000000" },
+    }
+  }
+  if (Object.keys(border).length > 0) cell.border = border
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+/** Check if a text decoration (underline/strikethrough) is active. */
+function isDecorationActive(dec: ITextDecoration | null | undefined): boolean {
+  if (!dec) return false
+  return dec.s === BooleanNumber.TRUE
+}
+
+/** Extract RGB string from Univer IColorStyle. */
+function extractRgb(color: Nullable<IColorStyle>): string | undefined {
+  return color?.rgb ?? undefined
 }
 
 /** Map Univer BorderStyleTypes enum to ExcelJS border style string. */

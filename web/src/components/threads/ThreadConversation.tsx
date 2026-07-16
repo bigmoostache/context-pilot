@@ -216,6 +216,19 @@ const MessageRow = memo(
   (a, b) => a.msg === b.msg && a.agentId === b.agentId,
 )
 
+/** Collect every file-upload block across all messages for the sidebar rail. */
+function collectThreadFiles(log: ThreadMsg[]): ThreadFile[] {
+  const result: ThreadFile[] = []
+  for (const msg of log) {
+    const cm = toChatMessage(msg)
+    const segments = splitMessageSegments(cm.text ?? "")
+    for (const seg of segments) {
+      if (seg.type === "file") result.push({ file: seg.file, role: cm.role })
+    }
+  }
+  return result
+}
+
 /**
  * Center pane — the selected thread's full conversation + composer.
  *
@@ -334,17 +347,7 @@ export function ThreadConversation({
   // renders an SSE delta triggers, so the memoized AutoRun rows hold too.
   const segments = useMemo(() => segmentLog(thread.log), [thread.log])
 
-  // Collect every file-upload block across all messages for the sidebar rail.
-  const threadFiles = useMemo<ThreadFile[]>(() => {
-    const result: ThreadFile[] = []
-    for (const msg of thread.log) {
-      const cm = toChatMessage(msg)
-      for (const seg of splitMessageSegments(cm.text ?? "")) {
-        if (seg.type === "file") result.push({ file: seg.file, role: cm.role })
-      }
-    }
-    return result
-  }, [thread.log])
+  const threadFiles = useMemo(() => collectThreadFiles(thread.log), [thread.log])
 
   return (
     <main
@@ -371,58 +374,55 @@ export function ThreadConversation({
       {/* ── Conversation column ── */}
       <div className="flex min-w-0 flex-1 flex-col">
         <ScrollArea className="min-h-0 flex-1">
-        <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="h-px flex-1 bg-border/60" />
-            <span className="text-[10.5px] text-muted-foreground/50">
-              {thread.createdAt} · thread opened
-            </span>
-            <span className="h-px flex-1 bg-border/60" />
+          <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="h-px flex-1 bg-border/60" />
+              <span className="text-[10.5px] text-muted-foreground/50">
+                {thread.createdAt} · thread opened
+              </span>
+              <span className="h-px flex-1 bg-border/60" />
+            </div>
+
+            {segments.map((seg) =>
+              seg.type === "auto" ? (
+                <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
+              ) : (
+                <MessageRow
+                  key={seg.msg.id}
+                  msg={seg.msg}
+                  agentId={agentId}
+                  onOpenFile={setSheetFile}
+                  onShowInFinder={onShowInFinder}
+                  onDelete={handleDelete}
+                  onSend={onSend}
+                />
+              ),
+            )}
+            {/* scroll anchor — keeps the latest message in view */}
+            <div ref={bottomRef} />
           </div>
+        </ScrollArea>
 
-          {segments.map((seg) =>
-            seg.type === "auto" ? (
-              <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
-            ) : (
-              <MessageRow
-                key={seg.msg.id}
-                msg={seg.msg}
-                agentId={agentId}
-                onOpenFile={setSheetFile}
-                onShowInFinder={onShowInFinder}
-                onDelete={handleDelete}
-                onSend={onSend}
-              />
-            ),
-          )}
-          {/* scroll anchor — keeps the latest message in view */}
-          <div ref={bottomRef} />
+        <div className="mx-auto w-full max-w-[720px]">
+          <ThreadComposer
+            key={thread.id}
+            status={thread.status}
+            focused={thread.focused}
+            paused={thread.paused}
+            onSend={onSend}
+            onAttach={onAttach}
+            pendingFiles={pendingFiles}
+            onRemoveFile={onRemoveFile}
+            suggestions={suggestions}
+            firstMessage={isEmpty}
+            onCreateCommand={() => setCreateCmdOpen(true)}
+            draftKey={`cp-draft-${agentId}-${thread.id}`}
+          />
         </div>
-      </ScrollArea>
-
-      <div className="mx-auto w-full max-w-[720px]">
-        <ThreadComposer
-          key={thread.id}
-          status={thread.status}
-          focused={thread.focused}
-          paused={thread.paused}
-          onSend={onSend}
-          onAttach={onAttach}
-          pendingFiles={pendingFiles}
-          onRemoveFile={onRemoveFile}
-          suggestions={suggestions}
-          firstMessage={isEmpty}
-          onCreateCommand={() => setCreateCmdOpen(true)}
-          draftKey={`cp-draft-${agentId}-${thread.id}`}
-        />
-      </div>
-
       </div>
 
       {/* ── File attachments rail ── */}
-      {threadFiles.length > 0 && (
-        <FileSidebar files={threadFiles} onOpen={setSheetFile} />
-      )}
+      {threadFiles.length > 0 && <FileSidebar files={threadFiles} onOpen={setSheetFile} />}
 
       <QuickLookSheet
         node={sheetFile ? uploadToNode(sheetFile) : null}

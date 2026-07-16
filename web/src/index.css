@@ -532,20 +532,22 @@
 
 .univer-container {
   height: 100%;
+  font-size: 13px;
+  border-radius: 2px;
+  border: none;
 }
 
 /* ── structural overrides (themeQuartz parity) ────────────────── */
 
-/* Font: inherit SF Pro stack, 13px base, 400 weight headers */
+/* Font: inherit SF Pro stack, 400 weight headers */
 .univer-container,
 .univer-container * {
   font-family: inherit !important;
 }
 
-.univer-container {
-  font-size: 13px;
-  border-radius: 2px;
-  border: none;
+/* No wrapper border (wrapperBorder: false) — must precede higher-specificity selectors */
+.univer-container > div {
+  border: none !important;
 }
 
 /* Slim, lightweight header row — left-aligned, not centered */
@@ -566,9 +568,4 @@
 .univer-container [class*="toolbar"] {
   font-size: 12px;
   gap: 2px;
-}
-
-/* No wrapper border (wrapperBorder: false) */
-.univer-container > div {
-  border: none !important;
 }

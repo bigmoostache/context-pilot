@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { FUniver } from "@univerjs/presets"
 import { createUniver, LocaleType, mergeLocales } from "@univerjs/presets"
 import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core"
 import UniverPresetSheetsCoreEnUS from "@univerjs/preset-sheets-core/locales/en-US"
@@ -28,8 +29,7 @@ export function SheetGrid({
   agentId?: string | undefined
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const univerRef = useRef<any>(null)
+  const univerRef = useRef<FUniver | null>(null)
   const [ready, setReady] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
@@ -54,7 +54,7 @@ export function SheetGrid({
       setSaveStatus("error")
       setSaveError(error instanceof Error ? error.message : "Save failed")
     }
-  }, [agentId, path])
+  }, [agentId, path, storageKey])
 
   useEffect(() => {
     const el = containerRef.current
@@ -74,7 +74,10 @@ export function SheetGrid({
     // deep-merged into the FR pack BEFORE calling mergeLocales — otherwise our
     // patches object { "sheets-ui": { info: {...} } } would REPLACE the entire
     // sheets-ui key from EN/FR, wiping toolbar/align/etc.
-    const frWithPatches = structuredClone(UniverPresetSheetsCoreFrFR) as Record<string, Record<string, Record<string, string>>>
+    const frWithPatches = structuredClone(UniverPresetSheetsCoreFrFR) as Record<
+      string,
+      Record<string, Record<string, string>>
+    >
     frWithPatches["sheets-ui"] ??= {}
     frWithPatches["sheets-ui"]["info"] ??= {}
     frWithPatches["sheets-ui"]["info"]["error"] = "Erreur dans la cellule"
@@ -94,20 +97,21 @@ export function SheetGrid({
 
     univerAPI.createWorkbook(data)
     univerRef.current = univerAPI
-    setReady(true)
+    // Deferred: avoids synchronous setState in effect (eslint-react/set-state-in-effect).
+    const readyFrame = requestAnimationFrame(() => setReady(true))
 
     // Track edits: set dirty on any command, autosave to localStorage
     // as crash recovery (not the primary save — that's the explicit Save
     // button which uploads to the agent realm).
     let timer: ReturnType<typeof setTimeout> | null = null
-    const sub = univerAPI.onCommandExecuted(() => {
+    const sub = univerAPI.addEvent(univerAPI.Event.CommandExecuted, () => {
       setDirty(true)
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => {
         const wb = univerAPI.getActiveWorkbook()
         if (wb) {
           try {
-            localStorage.setItem(storageKey, JSON.stringify(wb.getSnapshot()))
+            localStorage.setItem(storageKey, JSON.stringify(wb.save()))
           } catch {
             /* quota exceeded — silently skip */
           }
@@ -118,10 +122,11 @@ export function SheetGrid({
     return () => {
       // Flush pending save on unmount.
       if (timer) clearTimeout(timer)
+      cancelAnimationFrame(readyFrame)
       const wb = univerAPI.getActiveWorkbook()
       if (wb) {
         try {
-          localStorage.setItem(storageKey, JSON.stringify(wb.getSnapshot()))
+          localStorage.setItem(storageKey, JSON.stringify(wb.save()))
         } catch {
           /* quota exceeded — silently skip */
         }
@@ -137,7 +142,7 @@ export function SheetGrid({
     <div className="relative flex min-h-0 flex-1 flex-col">
       {/* Save + dirty indicator — top-right overlay */}
       {(dirty || saveStatus !== "idle") && (
-        <div className="pointer-events-none absolute right-2 top-1.5 z-50 flex items-center gap-1.5">
+        <div className="pointer-events-none absolute top-1.5 right-2 z-50 flex items-center gap-1.5">
           {dirty && agentId && (
             <button
               type="button"

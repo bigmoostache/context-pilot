@@ -36,7 +36,7 @@ export function FileSidebar({
 
   return (
     <aside className="flex w-[200px] shrink-0 flex-col border-l border-border">
-      <div className="flex-1 space-y-0.5 overflow-y-auto px-1.5 py-1.5">
+      <div className="flex-1 space-y-0.5 overflow-y-auto p-1.5">
         {unique.map((f) => (
           <button
             key={f.file.path}

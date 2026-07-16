@@ -52,10 +52,11 @@ export function TableGridPicker({
           Array.from({ length: GRID_COLS }, (_, c) => {
             const highlighted = hover != null && r <= hover.r && c <= hover.c
             return (
-              <div
+              <button
+                type="button"
                 key={`${r}-${c}`}
                 className={cn(
-                  "size-[18px] rounded-[2px] border transition-colors duration-75 cursor-pointer",
+                  "size-[18px] cursor-pointer rounded-[2px] border transition-colors duration-75",
                   highlighted
                     ? "border-(--signal)/60 bg-(--signal)/25"
                     : "border-border/40 bg-muted/20",
@@ -80,11 +81,7 @@ export function TableGridPicker({
 // ── Table context bar ──────────────────────────────────────────────
 // Appears between the main toolbar and the editor when cursor is inside a table.
 
-export function TableContextBar({
-  editor,
-}: {
-  editor: NonNullable<ReturnType<typeof useEditor>>
-}) {
+export function TableContextBar({ editor }: { editor: NonNullable<ReturnType<typeof useEditor>> }) {
   return (
     <div className="flex h-7 shrink-0 items-center gap-0.5 border-b border-border bg-muted/25 px-2">
       <span className="mr-1 text-[10px] font-semibold tracking-wide text-muted-foreground/60 uppercase">

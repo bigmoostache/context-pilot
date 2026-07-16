@@ -153,19 +153,21 @@ export function LoginFlow({ onDone }: { onDone: () => void }) {
         })
     }
     let doneTimer: number | undefined
-    const id = setInterval(async () => {
-      try {
-        const status = await fetchClaudeTokenStatus()
-        const baseline = baselineExpiryRef.current ?? 0
-        // Only a valid token with a NEWER expiry than the baseline is a fresh login.
-        if (status.valid && (status.expires_at ?? 0) > baseline) {
-          clearInterval(id)
-          setStep("done")
-          doneTimer = window.setTimeout(() => onDoneRef.current(), 1500)
-        }
-      } catch {
-        /* ignore polling errors */
+    const handlePollResult = (status: TokenStatus) => {
+      const baseline = baselineExpiryRef.current ?? 0
+      // Only a valid token with a NEWER expiry than the baseline is a fresh login.
+      if (status.valid && (status.expires_at ?? 0) > baseline) {
+        clearInterval(id)
+        setStep("done")
+        doneTimer = window.setTimeout(() => onDoneRef.current(), 1500)
       }
+    }
+    const id = setInterval(() => {
+      fetchClaudeTokenStatus()
+        .then(handlePollResult)
+        .catch(() => {
+          /* ignore polling errors */
+        })
     }, 2000)
     return () => {
       cancelled = true
@@ -357,7 +359,7 @@ export function UsageButton() {
     return session ? Math.min(session.percent, 100) : 0
   }, [data?.limits])
   const pieBg = useMemo(() => {
-    if (sessionPct <= 0) return undefined
+    if (sessionPct <= 0) return
     const color =
       sessionPct >= 90
         ? "rgb(239 68 68 / 0.25)"
@@ -374,18 +376,18 @@ export function UsageButton() {
   useEffect(() => {
     refreshMutateRef.current = refreshMutation.mutate
   })
-  const autoRefreshAttempted = useRef(false)
+  const autoRefreshAttemptedRef = useRef(false)
   useEffect(() => {
     const status = tokenStatus.data
     if (!status?.valid || status.expires_at == null) return
     const remaining = status.expires_at - Date.now()
     if (remaining > 0 && remaining < 30 * 60_000) {
-      if (!autoRefreshAttempted.current) {
-        autoRefreshAttempted.current = true
+      if (!autoRefreshAttemptedRef.current) {
+        autoRefreshAttemptedRef.current = true
         refreshMutateRef.current()
       }
     } else {
-      autoRefreshAttempted.current = false
+      autoRefreshAttemptedRef.current = false
     }
   }, [tokenStatus.data])
 

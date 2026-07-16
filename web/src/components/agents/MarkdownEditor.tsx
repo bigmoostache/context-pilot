@@ -59,10 +59,11 @@ export function MarkdownEditor({
   /** Extra content rendered at the right end of the toolbar bar. */
   toolbarExtra?: ReactNode
 }) {
-  // Guard against re-seeding on prop changes (fresh item remounts via key).
-  const seededRef = useRef(false)
+  // Keep latest onChange in a ref so useEditor binds once on mount.
   const onChangeRef = useRef(onChange)
-  onChangeRef.current = onChange
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
 
   const editor = useEditor({
     extensions: [
@@ -98,7 +99,7 @@ export function MarkdownEditor({
     onUpdate: ({ editor: ed }) => {
       // tiptap-markdown injects `markdown` into editor.storage at runtime.
       type MdStorage = Record<string, { getMarkdown: () => string } | undefined>
-      const mdExt = (ed.storage as unknown as MdStorage)['markdown']
+      const mdExt = (ed.storage as unknown as MdStorage)["markdown"]
       if (mdExt) onChangeRef.current?.(mdExt.getMarkdown())
     },
     editorProps: {
@@ -117,8 +118,8 @@ export function MarkdownEditor({
           "[&_strong]:font-semibold [&_strong]:text-foreground",
           "[&_hr]:my-3 [&_hr]:border-t [&_hr]:border-border",
           // Tables
-          "[&_table]:w-full [&_table]:border-collapse [&_table]:my-2",
-          "[&_th]:border [&_th]:border-border [&_th]:bg-muted/40 [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_th]:text-[12.5px]",
+          "[&_table]:my-2 [&_table]:w-full [&_table]:border-collapse",
+          "[&_th]:border [&_th]:border-border [&_th]:bg-muted/40 [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:text-left [&_th]:text-[12.5px] [&_th]:font-semibold",
           "[&_td]:border [&_td]:border-border [&_td]:px-2.5 [&_td]:py-1.5 [&_td]:text-[12.5px]",
           // Task lists
           "[&_ul[data-type='taskList']]:list-none [&_ul[data-type='taskList']]:pl-0",
@@ -135,14 +136,6 @@ export function MarkdownEditor({
       },
     },
   })
-
-  // Seed once on mount. Re-mount via parent key resets seededRef.
-  useEffect(() => {
-    if (seededRef.current || !editor) return
-    seededRef.current = true
-  }, [editor])
-
-  if (!editor) return null
 
   const inTable = editor.isActive("table")
 
@@ -256,11 +249,7 @@ function Toolbar({
         {showGrid && (
           <TableGridPicker
             onSelect={(rows, cols) => {
-              editor
-                .chain()
-                .focus()
-                .insertTable({ rows, cols, withHeaderRow: true })
-                .run()
+              editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run()
             }}
             onClose={closeGrid}
           />
@@ -280,7 +269,7 @@ function Toolbar({
         onClick={() => editor.chain().focus().redo().run()}
         disabled={!editor.can().redo()}
       />
-      {extra && (
+      {extra != null && (
         <>
           <span className="flex-1" />
           {extra}
