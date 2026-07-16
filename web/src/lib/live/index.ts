@@ -75,39 +75,53 @@ export function useSseConnected(agentId: string): boolean {
 // ── Restart lifecycle ─────────────────────────────────────────────────
 
 /**
- * Full restart lifecycle: API call, spin, detect SSE drop, wait for
- * reconnect, stop. Handles both entry points: dialog restart (SSE up)
- * and footer restart (SSE already down). 30s failsafe timeout.
+ * Full restart lifecycle: API call, wait for the agent to go through
+ * "disconnected" (old process killed) and recover to a live status (new
+ * process booted). 30s failsafe timeout with forced invalidation.
  *
- * State machine: waiting + !connected sets sawDrop; sawDrop + connected
- * clears both and invalidates the fleet + agent caches.
+ * Previous implementation watched SSE connection state, but SSE connects to
+ * the orchestrator — not the agent — so an agent restart never drops the SSE
+ * link. This version watches the reactive `agent.status` field (fed by the
+ * delta plane via `useAgentMeta`), which is the correct signal.
+ *
+ * State machine: waiting + status==="disconnected" sets sawDisconnect;
+ * sawDisconnect + status!=="disconnected" clears both and invalidates caches.
+ * Handles both entry points: dialog restart (agent is live, goes through
+ * disconnect then recovery) and footer restart (agent already disconnected,
+ * sawDisconnect fires immediately, waits only for recovery).
  */
 export function useRestartFlow(agentId: string) {
   const mutation = useRestartAgent()
   const client = useQueryClient()
-  const connected = useSseConnected(agentId)
+  const { data: agent } = useAgentMeta(agentId)
   const [waiting, setWaiting] = useState(false)
-  const [sawDrop, setSawDrop] = useState(false)
+  const [sawDisconnect, setSawDisconnect] = useState(false)
 
   useEffect(() => {
     if (!waiting) return
-    if (!connected && !sawDrop) setSawDrop(true)
-    if (sawDrop && connected) {
+    const status = agent?.status
+    if (!sawDisconnect && status === "disconnected") {
+      setSawDisconnect(true)
+    }
+    if (sawDisconnect && status !== undefined && status !== "disconnected") {
       setWaiting(false)
-      setSawDrop(false)
+      setSawDisconnect(false)
       void client.invalidateQueries({ queryKey: qk.fleet() })
       void client.invalidateQueries({ queryKey: qk.agent(agentId) })
     }
-  }, [waiting, connected, sawDrop, client, agentId])
+  }, [waiting, sawDisconnect, agent?.status, client, agentId])
 
+  // 30s failsafe — clear spinner AND invalidate so we don't leave stale data.
   useEffect(() => {
     if (!waiting) return
     const t = setTimeout(() => {
       setWaiting(false)
-      setSawDrop(false)
+      setSawDisconnect(false)
+      void client.invalidateQueries({ queryKey: qk.fleet() })
+      void client.invalidateQueries({ queryKey: qk.agent(agentId) })
     }, 30_000)
     return () => clearTimeout(t)
-  }, [waiting])
+  }, [waiting, client, agentId])
 
   const restart = useCallback(() => {
     if (!agentId || mutation.isPending || waiting) return
