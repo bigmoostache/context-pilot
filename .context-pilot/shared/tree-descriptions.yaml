@@ -1482,6 +1482,10 @@
   path: crates/cp-mod-bridge/tests/boot_heartbeat.rs
   description: 'Phase 25 (X792): cp-mod-bridge boot+heartbeat integration suite (4 tests, FIRST tests/ dir for this crate). Discovery contract viewed AS THE BACKEND SEES IT — reads artifacts back through cp_wire exactly like Phase 15 registry+liveness. a_booted_agent_is_fully_discoverable (registry <id>.json round-trips to valid Entry: protocol_version=PROTOCOL_VERSION, status=Starting, cap_token 64hex, boot_id 32hex; all advertised paths oplog/socket/heartbeat EXIST on disk; heartbeat file decodes to fresh beat whose matches_boot(entry.boot_id)+pid agree = cross-artifact tie inline tests don''t make). two_folders_boot_independently_into_one_fleet (folder A+B both alive simultaneously in one agents_dir → distinct id/cap_token/boot_id, both records coexist+round-trip, both beats fresh+bound = lock is per-folder not global, fleet precondition). rebooting_a_folder_keeps_its_id_but_mints_a_fresh_identity (drop boot1, boot2 same folder → SAME folder_id deterministic but DIFFERENT boot_id+cap_token = restart-identity/pid-reuse defence at boot layer). a_real_beat_drives_the_freshness_and_boot_match_verdict (beacon-produced beat: is_fresh(now,DEFAULT_MAX_AGE)=true, is_fresh(ts+60s,10ms)=false age-driven, matches_boot self=true/other=false). is_fresh(now_ms:u64,max_age_ms:u64) takes MILLIS not Duration → DEFAULT_MAX_AGE.as_millis() try_from. Per-target unused-crate-dependencies: `use cp_base/cp_render/cp_oplog/nix as _;` (bridge deps not directly named); names cp_mod_bridge+cp_wire+serde_json(from_str)+tempfile. 44 cp-mod-bridge tests green (40 inline + 4 integration).'
   last_edited_ms: 1781649010174
+18a67331b12ff8cd:
+  path: openapi.json
+  description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
+  last_edited_ms: 0
 18a7fc26e1396d89:
   path: web/src/components/ui/sheet.tsx
   description: 'shadcn Sheet (drawer) on Base UI Dialog. Side-anchored (top/right/bottom/left) slide-in Popup, portaled, with backdrop + slide/fade animations via data-[side]/data-[starting|ending]-style classes. T288: SheetContent gained showOverlay?:boolean (default true) to skip the dimming backdrop for a NON-MODAL sheet whose background must stay interactive (Finder Quick Look — clicking another file updates the preview instead of dismissing). showCloseButton toggles the built-in X. GOTCHA: to override the base data-[side=right]:w-3/4 / sm:max-w-sm width you must use the SAME data-[side=right]: variant prefix (tailwind-merge only collapses same-prefix classes).'
@@ -3390,6 +3394,10 @@
   path: web/src/components/finder/preview/sourcedPdfTypes.ts
   description: Types, color map, and ZIP-bundle parser for the .sourced_pdf format. Domain types (Metadata/Value/Ref/Arrow), REF_COLORS/REF_LABELS palettes, docType() helper (pdf/xlsx/unknown from extension), parseSourcedBundle() decompresses ZIP → metadata + ALL document bytes (docBytes Map) + values + refs. 160 lines.
   last_edited_ms: 1782148226563
+393d0caf69780009:
+  path: web/src/App.tsx
+  description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) ?? fleetAgent. sseConnected = useSseConnected(activeAgentId) tracks SSE push plane health. useRestartFlow(activeAgentId) provides restart + restarting for both footer and dialog. agentLoading from useAgentMeta shows loader on agent switch. Disconnect overlay: when !sseConnected && agent view, main content blurred(3px)+greyscaled(50%) with transparent overlay captures clicks and triggers restartAgent — prevents dead-agent interaction. 300ms transition. Fleet view unaffected. view/agent persisted to localStorage via write-through effects. effectiveView gates cockpit+costs behind devMode, falls back to fleet when no agent. StatusBar receives connected + onRestart + restarting + loading. Routes: fleet/threads/cockpit/costs/finder. renderView wrapped in <TelemetryProfiler id={effectiveView}>; mounts <TelemetryHud/> (dev-mode gated).'
+  last_edited_ms: 0
 394677c93656e26d:
   path: crates/cp-wire/src/types/ack.rs
   description: 'Command Ack: cmd_id + Status (Accepted/Rejected) + optional rev. Journal-then-ack (I11).'
@@ -6354,6 +6362,10 @@
   path: src/llms/claude_code/mod.rs
   description: Claude Code OAuth client. Token from vault (macOS Keychain or ~/.claude/.credentials.json via cp_vault::oauth). Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
   last_edited_ms: 1783255244895
+6b880a36694de3d5:
+  path: crates/cp-orchestrator/src/transport/rest/backend.rs
+  description: 'Backend shared state struct + impl. Holds view/breaker/hub/tickets/inspect/agents_dir/dirty/supervisor/retired/names/avatars/auth/session_ttl/releases/pkce_session(T451). Accessor methods + for_test. T568: Backend::new reconciles persisted active_tag onto agent_binary at boot (ReleaseStore active_tag WINS over CP_AGENT_BINARY env seed, fallback to seed if binary deleted) so a ''Use''-selected release survives an orchestrator reload — previously lost while the UI badge still showed Active.'
+  last_edited_ms: 1784215387783
 6b9f77904ef7fe30:
   path: crates/cp-wire/src/types/oplog.rs
   description: OpEntry (rev, timestamp_ms) + OpEntryKind (CommandEffect, SeenMark, PhaseTransition, MessageCreated, Lifecycle, CostAggregate, Checkpoint, Unknown).
@@ -10310,6 +10322,10 @@ ae116ff12ae35cfb:
   path: web/src/components/shell/StatusBar.tsx
   description: 'Bottom status footer. Fleet mode: accepts agents prop for aggregates (count, threads, needs-you, spend). Agent mode: accepts activeAgent prop, derives phase from status, wires cost live. Cache bar (cacheStats/tokenBudget) still mock.'
   last_edited_ms: 0
+ae15766ccd34a005:
+  path: crates/cp-orchestrator/src/runtime/mod.rs
+  description: 'Orchestrator runtime — Config (env vars: port, maint_port, agents_dir, scan_interval, auth, session_ttl) + Runtime (start_driver background thread + serve HTTP). driver_loop: registry scan (slow cadence) + oplog tail (fast 100ms TAIL_INTERVAL) + config mtime backstop + auth backup. Two listeners: product :7878 + maintenance :9090. Caddy apply at boot.'
+  last_edited_ms: 0
 ae206df0560a302e:
   path: web/src/components/agents/AgentModal.tsx
   description: 'Agent create/manage dialog. ModelPicker (provider+model, like TUI Ctrl+H), slugify(name) derives realm folder. X896: create-mode submit() LIVE via useCreateAgent (POST /api/fleet/create). Manage-mode submit() sends Configure command (provider+model). NEW Restart button (manage footer, RefreshCw icon, spins while pending): useRestartAgent → POST /api/agent/{id}/restart, kills+respawns the agent from the current binary — fixes a stale agent that rejects commands with 502 ''agent unreachable''. Shared by TopBar + FleetDashboard.'
@@ -11442,6 +11458,10 @@ bfe9a6a3b1b653bb:
   path: web/src/components/shell/ConfigModal.tsx
   description: Settings dialog wrapping shared ConfigPanel in a portaled Base UI Dialog (TopBar gear entry). Portal renders into document.body to escape the TopBar .vibrancy backdrop-filter containing block (the prior 'half off-screen' fixed-overlay bug) + brings focus trap/scroll-lock/Esc. Fleet dashboard renders ConfigPanel inline instead; two entry points share one body.
   last_edited_ms: 1781885516055
+bff8035c48925683:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 bffa53d66fe1e5d6:
   path: web/src/components/agents/UsagePage.tsx
   description: 'Cost & token Usage page — LIVE (no mock). useFleet + useFleetMetrics joined per agent: summary cards (total spend / input / output tokens), per-agent table (input/output tokens, spend, % budget, over-budget badge), $/tokens unit lens + agent filter. Honest role=note notice: month-by-month history + cache hit/miss split are NOT retained by the backend (oplog carries only cumulative-since-boot totals; hit/miss is private agent working-set, never journaled). Rewritten off the old usagePoints/USAGE_RATES mock.'
@@ -13661,6 +13681,10 @@ e8c58716af121d3c:
 e8c87aefe7be8bef:
   path: src/ui/search_overlay/text.rs
   description: Plain-text export of Ctrl+I overlay for clipboard copy. Includes process CPU%/RAM stats for Meilisearch.
+  last_edited_ms: 0
+e8e291eaf510af31:
+  path: crates/cp-orchestrator/src/transport/rest/lifecycle.rs
+  description: Agent lifecycle REST handlers. restart_agent (POST, kill+respawn via supervisor), retire_agent (POST, mark retired+stop), unretire_agent (POST, unmark+respawn). Merged from former restart.rs + retire.rs.
   last_edited_ms: 0
 e904bbfc5f5f955d:
   path: crates/cp-orchestrator/tests/registry_channel.rs

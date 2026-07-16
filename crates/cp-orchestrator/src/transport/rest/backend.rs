@@ -101,6 +101,23 @@ impl Backend {
         // only reads `*.json`, so the dot-file is ignored there).
         let provision_flag_path =
             std::env::var_os("CP_PROVISION_FLAG").map_or_else(|| agents_dir.join(".provisioned"), PathBuf::from);
+
+        let releases = ReleaseStore::load(ReleaseStore::default_dir().unwrap_or_else(|| agents_dir.join("releases")));
+
+        // Reconcile the persisted active release onto the live agent binary. The
+        // "Use" action (select_release) writes `active_tag` to the durable
+        // releases/config.json AND mutates the in-memory `agent_binary`; only the
+        // former survives a restart. Without this, a reload silently reverts
+        // spawns to the `CP_AGENT_BINARY` boot seed while the UI still shows the
+        // release as "Active" — an incoherence where the badge lies. So the
+        // persisted `active_tag` WINS over the env seed, with a fallback to the
+        // seed when its binary was deleted out from under us.
+        let agent_binary = releases
+            .active_tag()
+            .map(|tag| releases.binary_path(tag))
+            .filter(|bin| bin.exists())
+            .unwrap_or(agent_binary);
+
         Self {
             view: MaterializedView::new(),
             hub: StreamHub::new(DEFAULT_SUB_CAPACITY),
@@ -109,7 +126,7 @@ impl Backend {
             retired: RetiredStore::load(&agents_dir),
             names: NameOverrides::load(&agents_dir),
             avatars: AvatarStore::load(&agents_dir),
-            releases: ReleaseStore::load(ReleaseStore::default_dir().unwrap_or_else(|| agents_dir.join("releases"))),
+            releases,
             provision_flag_path,
             pkce_session: None,
             agents_dir,

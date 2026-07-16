@@ -128,6 +128,17 @@
   - P9
   - resume
   last_edited_ms: 1784203006412
+47b97e9a3b5951a1:
+  tl_dr: 'T568: ''Use'' release selection now survives orchestrator reload. Backend::new reconciles persisted active_tag onto agent_binary at boot. Fix in transport/rest/backend.rs.'
+  contents: 'select_release persists active_tag to releases/config.json but only mutated in-memory agent_binary, so reload reverted spawns to CP_AGENT_BINARY boot seed while UI badge still showed release Active — silent incoherence. Fix: Backend::new does releases.active_tag().map(binary_path).filter(bin.exists()).unwrap_or(agent_binary) — active_tag WINS over env seed, fallback to seed if binary deleted out from under us.'
+  importance: medium
+  labels:
+  - releases
+  - active_tag
+  - orchestrator
+  - T568
+  - bugfix
+  last_edited_ms: 1784215400065
 48f2140d3c2dee0e:
   tl_dr: Entities module COMPLETE — 151/151 stress tests passed. 9 bugs found/fixed. Production-quality.
   importance: medium
