@@ -13,6 +13,45 @@ use cp_mod_console::manager::SessionHandle;
 use cp_mod_console::types::ConsoleState;
 
 use crate::trigger::{MatchedCallback, build_changed_files_env};
+use crate::types::CallbackState;
+
+/// Result of firing a callback, including dedup info.
+#[derive(Debug)]
+pub struct FireResult {
+    /// Console session key for the spawned script.
+    pub session_key: String,
+    /// Whether an existing session for the same callback was killed and replaced.
+    pub replaced: bool,
+}
+
+/// Kill an existing session for the same callback definition (dedup).
+///
+/// If the same callback already has an active session, kills its process,
+/// removes its watcher, and cleans up the console entry. Returns `true`
+/// if a running session was replaced.
+fn kill_existing_callback(state: &mut State, callback_id: &str) -> bool {
+    let cs = CallbackState::get_mut(state);
+    let Some(old_key) = cs.active_sessions.remove(callback_id) else {
+        return false;
+    };
+
+    // Kill the old process if still alive
+    let console = ConsoleState::get(state);
+    if let Some(handle) = console.sessions.get(&old_key)
+        && !handle.get_status().is_terminal()
+    {
+        handle.kill();
+    }
+
+    // Remove session from console state
+    drop(ConsoleState::get_mut(state).sessions.remove(&old_key));
+
+    // Remove watcher from registry
+    let tag = format!("callback_{callback_id}");
+    WatcherRegistry::get_mut(state).remove_by_tag(&tag);
+
+    true
+}
 
 /// Fire a single callback by spawning its script via the console server.
 /// Creates a console session + watcher (no panel — deferred until failure).
@@ -28,7 +67,7 @@ pub fn fire_callback(
     matched: &MatchedCallback,
     blocking_tool_use_id: Option<&str>,
     single_file: Option<&str>,
-) -> Result<String, String> {
+) -> Result<FireResult, String> {
     let _fg = cp_base::flame!("cb_fire");
     let def = &matched.definition;
 
@@ -77,6 +116,9 @@ pub fn fire_callback(
             script = shell_escape(&script_path_str),
         )
     };
+
+    // Dedup: kill any existing session for the same callback definition
+    let replaced = kill_existing_callback(state, &def.id);
 
     // Generate session key via console state
     let session_key = {
@@ -130,7 +172,10 @@ pub fn fire_callback(
     let registry = WatcherRegistry::get_mut(state);
     registry.register(Box::new(watcher));
 
-    Ok(session_key)
+    // Track this session for dedup
+    drop(CallbackState::get_mut(state).active_sessions.insert(def.id.clone(), session_key.clone()));
+
+    Ok(FireResult { session_key, replaced })
 }
 
 /// Fire all matched non-blocking callbacks.
@@ -142,13 +187,19 @@ pub fn fire_async_callbacks(state: &mut State, callbacks: &[MatchedCallback]) ->
     for cb in callbacks {
         if cb.definition.is_global {
             match fire_callback(state, cb, None, None) {
-                Ok(_) => summaries.push(format!("· {} dispatched", cb.definition.name)),
+                Ok(r) => {
+                    let suffix = if r.replaced { " (replaced previous run)" } else { "" };
+                    summaries.push(format!("· {} dispatched{suffix}", cb.definition.name));
+                }
                 Err(e) => summaries.push(format!("· {} FAILED to spawn: {}", cb.definition.name, e)),
             }
         } else {
             for file in &cb.matched_files {
                 match fire_callback(state, cb, None, Some(file)) {
-                    Ok(_) => summaries.push(format!("· {} dispatched ({})", cb.definition.name, file)),
+                    Ok(r) => {
+                        let suffix = if r.replaced { " (replaced previous run)" } else { "" };
+                        summaries.push(format!("· {} dispatched ({}){suffix}", cb.definition.name, file));
+                    }
                     Err(e) => summaries.push(format!("· {} FAILED to spawn for {}: {}", cb.definition.name, file, e)),
                 }
             }
@@ -166,13 +217,19 @@ pub fn fire_blocking_callbacks(state: &mut State, callbacks: &[MatchedCallback],
     for cb in callbacks {
         if cb.definition.is_global {
             match fire_callback(state, cb, Some(tool_use_id), None) {
-                Ok(_) => summaries.push(format!("· {} running (blocking)", cb.definition.name)),
+                Ok(r) => {
+                    let suffix = if r.replaced { " — replaced timed-out run" } else { "" };
+                    summaries.push(format!("· {} running (blocking){suffix}", cb.definition.name));
+                }
                 Err(e) => summaries.push(format!("· {} FAILED to spawn: {}", cb.definition.name, e)),
             }
         } else {
             for file in &cb.matched_files {
                 match fire_callback(state, cb, Some(tool_use_id), Some(file)) {
-                    Ok(_) => summaries.push(format!("· {} running (blocking, {})", cb.definition.name, file)),
+                    Ok(r) => {
+                        let suffix = if r.replaced { " — replaced timed-out run" } else { "" };
+                        summaries.push(format!("· {} running (blocking, {}){suffix}", cb.definition.name, file));
+                    }
                     Err(e) => summaries.push(format!("· {} FAILED to spawn for {}: {}", cb.definition.name, file, e)),
                 }
             }
@@ -262,7 +319,7 @@ impl Watcher for CallbackWatcher {
                 create_panel: None,
                 create_dyn_panel: None,
                 processed_already: true,
-                kill_session: None,
+                kill_session: Some(self.session_name.clone()),
                 preserves_tempo: false,
             });
         }
@@ -280,7 +337,7 @@ impl Watcher for CallbackWatcher {
                 create_panel: None,
                 create_dyn_panel: None,
                 processed_already: true,
-                kill_session: None,
+                kill_session: Some(self.session_name.clone()),
                 preserves_tempo: false,
             })
         } else {

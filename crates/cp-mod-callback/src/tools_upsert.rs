@@ -48,6 +48,9 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(ToString::to_string);
     let is_global = tool.input.get("is_global").and_then(serde_json::Value::as_bool).unwrap_or(true);
 
+    // Non-blocking callbacks must always be global (dedup requires one-session-per-def).
+    let is_global = if blocking { is_global } else { true };
+
     // Blocking callbacks require a timeout
     if blocking && timeout_secs.is_none() {
         return ToolResult::new(
@@ -250,6 +253,12 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         def.is_global = is_global;
         let scope = if is_global { "global" } else { "local" };
         changes.push(format!("scope → {scope}"));
+    }
+
+    // Non-blocking callbacks must always be global (dedup requires one-session-per-def).
+    if !def.blocking && !def.is_global {
+        def.is_global = true;
+        changes.push("scope → global (forced: non-blocking callbacks must be global)".to_string());
     }
 
     // Handle script updates
