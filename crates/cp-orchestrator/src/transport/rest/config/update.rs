@@ -179,7 +179,7 @@ mod tests {
         drop(std::fs::remove_dir_all(&dir));
         std::fs::create_dir_all(&dir).expect("temp dir");
         let mut b = Backend::for_test(dir.clone(), MaterializedView::new());
-        b.releases = crate::services::ReleaseStore::load(dir.join("releases"));
+        b.releases = ReleaseStore::load(dir.join("releases"));
         (Mutex::new(b), dir)
     }
 
@@ -200,8 +200,8 @@ mod tests {
         assert!(set.body.contains("\"start\":\"22:00\""));
 
         // Persisted server-side: a reloaded store sees the same values.
-        let reloaded = crate::services::ReleaseStore::load(dir.join("releases"));
-        assert_eq!(reloaded.update_mode(), crate::services::releases::UpdateMode::Manual);
+        let reloaded = ReleaseStore::load(dir.join("releases"));
+        assert_eq!(reloaded.update_mode(), UpdateMode::Manual);
         assert_eq!(reloaded.window().start, "22:00");
 
         drop(std::fs::remove_dir_all(&dir));
