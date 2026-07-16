@@ -362,8 +362,8 @@ pub(crate) fn deploy_fleet(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
 ///
 /// Re-exec works with **or without** a supervisor, and because the PID is
 /// preserved it never trips procd's crash-loop back-off. If `current_exe` or
-/// `exec` fails, we fall back to `SIGTERM` so a supervised host can still
-/// respawn the old way.
+/// `exec` fails, we exit non-zero so a supervised host respawns us (a
+/// self-inflicted `SIGTERM` is a *clean* stop to systemd and would not).
 pub(crate) fn restart_orchestrator(state: &Mutex<Backend>) -> HttpReply {
     use std::os::unix::process::CommandExt as _;
 
@@ -403,14 +403,15 @@ pub(crate) fn restart_orchestrator(state: &Mutex<Backend>) -> HttpReply {
             // `exec` only ever returns on failure — on success it never comes
             // back because the process image is replaced.
             let err = std::process::Command::new(&exe).args(&args).exec();
-            eprintln!("restart_orchestrator: exec of {} failed: {err}; falling back to SIGTERM", exe.display());
+            eprintln!("restart_orchestrator: exec of {} failed: {err}; exiting for supervisor respawn", exe.display());
         } else {
-            eprintln!("restart_orchestrator: current_exe() unavailable; falling back to SIGTERM");
+            eprintln!("restart_orchestrator: current_exe() unavailable; exiting for supervisor respawn");
         }
 
-        // Fallback: if re-exec did not take over, signal ourselves so a
-        // supervisor (procd) can respawn the service the old way.
-        let _sent = nix::sys::signal::kill(nix::unistd::Pid::this(), nix::sys::signal::Signal::SIGTERM);
+        // Fallback: exit non-zero so the supervisor respawns us. A
+        // self-inflicted SIGTERM counts as a *clean* stop under systemd's
+        // `Restart=on-failure` and would leave the service down.
+        std::process::exit(1);
     });
 
     HttpReply::ok(&serde_json::json!({

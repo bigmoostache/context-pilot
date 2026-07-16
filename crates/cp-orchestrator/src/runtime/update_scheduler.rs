@@ -76,7 +76,7 @@ fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> 
             };
             stage_apply(&b.releases, b.auth.as_ref(), auth_db, install, &manifest.version)?;
             drop(b);
-            restart_self();
+            restart_self(install);
             Ok(current.clone())
         },
     );

@@ -131,7 +131,7 @@ pub(crate) fn update_apply(state: &Mutex<Backend>) -> HttpReply {
         }
     }
     eprintln!("updater: apply {current} → {} (admin request) — restarting", manifest.version);
-    restart_self();
+    restart_self(&install);
     HttpReply::ok(&serde_json::json!({ "status": "applying", "from": current, "to": manifest.version }))
 }
 

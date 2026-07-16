@@ -189,22 +189,23 @@ pub fn boot_reconcile(releases_dir: &Path, auth_db_path: &Path, install: &Path) 
     );
 }
 
-/// Re-exec the install path after a short delay (lets the HTTP reply flush).
-/// The process image is replaced on the same PID — no restart-burst consumed;
-/// falls back to `SIGTERM` so a supervisor can respawn us if `exec` fails.
-pub fn restart_self() {
+/// Re-exec `install` after a short delay (lets the HTTP reply flush). The
+/// caller passes the install path it resolved **before** the swap:
+/// `current_exe()` after the swap reads `/proc/self/exe`, which names the
+/// replaced inode (`… (deleted)`), not the staged binary.
+/// The process image is replaced on the same PID — no restart-burst consumed.
+/// If `exec` fails we exit non-zero so the supervisor respawns us: a
+/// self-inflicted `SIGTERM` counts as a *clean* stop under systemd's
+/// `Restart=on-failure` and would leave the service down.
+pub fn restart_self(install: &Path) {
     use std::os::unix::process::CommandExt as _;
-    let install = std::env::current_exe().ok();
+    let install = install.to_path_buf();
     let _restart = std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(200));
-        if let Some(exe) = install {
-            let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
-            let err = std::process::Command::new(&exe).args(&args).exec();
-            eprintln!("updater: exec of {} failed: {err}; falling back to SIGTERM", exe.display());
-        } else {
-            eprintln!("updater: current_exe() unavailable; falling back to SIGTERM");
-        }
-        let _sent = nix::sys::signal::kill(nix::unistd::Pid::this(), nix::sys::signal::Signal::SIGTERM);
+        let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+        let err = std::process::Command::new(&install).args(&args).exec();
+        eprintln!("updater: exec of {} failed: {err}; exiting for supervisor respawn", install.display());
+        std::process::exit(1);
     });
 }
 

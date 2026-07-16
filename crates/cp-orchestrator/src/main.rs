@@ -35,6 +35,23 @@ use tiny_http as _;
 use utoipa as _;
 
 fn main() {
+    // Arguments must be handled before ANYTHING boots: a silently-ignored
+    // `--version` used to start the full server, bind the port, and shadow
+    // the real service (M6 e2e, 2026-07-16). Unknown arguments are a hard
+    // error for the same reason.
+    for arg in std::env::args().skip(1) {
+        match arg.as_str() {
+            "--version" | "-V" => {
+                println!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION);
+                return;
+            }
+            other => {
+                eprintln!("unknown argument: {other}");
+                std::process::exit(2);
+            }
+        }
+    }
+
     // Load .env files — override mode so file values always win over stale
     // shell env vars (e.g. BRAVE_API_KEY inherited from parent process).
     // Global loads second and overrides project-local — it's where the
