@@ -21,7 +21,9 @@
 // here so `@/lib/live` stays the single import surface.
 
 import { useQueryClient } from "@tanstack/react-query"
+import { useEffect, useState } from "react"
 import { mergeThreadLogs, qk } from "../query/sync"
+import { getOrCreateSseClient } from "../query/sse"
 import { measure } from "../support/telemetry"
 import { useLive, type LiveQueryResult } from "./core"
 import * as api from "../api"
@@ -37,6 +39,31 @@ export * from "./mutations"
 // so every existing `@/lib/live` consumer keeps its import path unchanged.
 
 export { useLive, type LiveQueryResult } from "./core"
+
+// ── SSE connection state ──────────────────────────────────────────────
+
+/**
+ * Reactive SSE connection state for one agent. Returns `true` while the
+ * EventSource is OPEN, `false` during reconnect / when the orchestrator is
+ * unreachable. Subscribes to the shared per-agent SSE client's connection
+ * callbacks so the component re-renders on open/error transitions.
+ */
+export function useSseConnected(agentId: string): boolean {
+  const [connected, setConnected] = useState(true)
+
+  useEffect(() => {
+    if (!agentId) {
+      setConnected(true)
+      return
+    }
+    const client = getOrCreateSseClient(agentId)
+    // Seed with current snapshot
+    setConnected(client.connected)
+    return client.subscribeConnection(setConnected)
+  }, [agentId])
+
+  return connected
+}
 
 // ── Fleet hooks ───────────────────────────────────────────────────────
 

@@ -4042,6 +4042,10 @@
   path: web/src/lib/api/generated/client/client.gen.ts
   description: Client factory (createClient). Configurable fetch-based HTTP client with interceptors (request/response/error), SSE support, response parsing (json/stream/blob/etc), throwOnError support. Singleton configured via setConfig().
   last_edited_ms: 1782425020225
+4395f4ab2aef9cc0:
+  path: web/src/lib/live/index.ts
+  description: 'Live data hooks (TanStack Query + SSE). useAgentMeta/useThreads/useConversation/useStreamingTokens/useLibrary/useFleet/useFleetMetrics/useMetrics + useSseConnected (reactive SSE connection state per agent). ensureSync SSE watcher. sendCommand→REST. web-lint P7: useLive+LiveQueryResult extracted to ./core (re-exported here) so ./mutations imports them from the leaf, breaking the index↔mutations barrel cycle.'
+  last_edited_ms: 1784201925061
 43afb0c49addaf7d:
   path: web/src/components/finder/preview/mockPreviews.tsx
   description: 'Decorative maquette Finder previews (inline node payloads): CodePreview/SheetPreview/SlidesPreview/PdfPreview/ImagePreview/AudioPreview/VideoPreview + tint helper. 293 lines.'
@@ -4282,6 +4286,10 @@
   path: .context-pilot/config.json
   description: 'Global config: active model, API keys, feature flags'
   last_edited_ms: 0
+4820657b238499e3:
+  path: web/src/App.tsx
+  description: 'Root shell. activeAgent = useAgentMeta(activeAgentId) ?? fleetAgent. sseConnected = useSseConnected(activeAgentId) tracks SSE push plane health. view/agent persisted to localStorage via write-through effects. effectiveView gates cockpit+costs behind devMode, falls back to fleet when no agent. StatusBar receives connected + onReconnect (window.location.reload). Routes: fleet/threads/cockpit/costs/finder. renderView wrapped in <TelemetryProfiler id={effectiveView}>; mounts <TelemetryHud/> (dev-mode gated).'
+  last_edited_ms: 1784201925105
 484c8d2183d5aee3:
   path: web/src/components/shell/config/DeploySection.tsx
   description: 'Deploy actions for Releases settings pane. Two buttons: "Deploy to Fleet" (POST /api/releases/deploy, select+restart all agents) and "Restart Orchestrator" (POST /api/releases/restart-orchestrator, delayed SIGTERM, auto-reload after 3s). Click-to-confirm guard on orchestrator restart. Uses generated SDK.'
@@ -5550,6 +5558,10 @@
   path: crates/cp-orchestrator/Cargo.toml
   description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal, for kill signal-0 pid-liveness) + serde_json (registry record parse). dev: tempfile. lib+bin package. Workspace lints.'
   last_edited_ms: 0
+5ef9689c06cc50e4:
+  path: web/src/lib/query/sse.ts
+  description: 'Reconnecting SSE client for one agent''s event stream. EventSource with ticket auth, last_rev resume param (T268 fix), exponential backoff (1s→30s). Singleton per agent via getOrCreateSseClient. Named event listeners: delta/stream/resync/invalidate. Wildcard ''*'' subscriber support. subscribeConnection(callback) for reactive connection state (open/error transitions). web-lint P3: `closed` flag read through an isClosed() getter at the onerror + catch sites — a direct !closed is CFA-narrowed to always-true (its only mutation is in the deferred close()), a function call is opaque to CFA.'
+  last_edited_ms: 1784201925016
 5f161a3fc06fceef:
   path: web/src/lib/support/telemetry/vitals.ts
   description: 'web-vitals attribution telemetry producer. onINP/onLCP/onCLS/onFCP/onTTFB from web-vitals/attribution → VitalEvent{name,value,rating,detail}. INP is the headline ''feels frozen'' metric; inpDetail() splits latency into input/processing/presentation + interactionTarget. v5 fields: LCP target?, CLS largestShiftTarget?. Chromium-only.'
@@ -6506,6 +6518,10 @@
   path: crates/cp-mod-bridge/src/lib.rs
   description: 'BridgeModule: all Module trait methods implemented (stubs, behaviorally inert bridge-OFF). is_global=true, no tools/panels. Declares boot+command+error+heartbeat+identity+registry_io+tee modules. Deps: cp-base, cp-render, cp-wire, cp-oplog, nix(fs), serde_json.'
   last_edited_ms: 1781627477165
+6e8299a79c0bc134:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 6e8612aca76b3e84:
   path: crates/cp-mod-callback/src/panel.rs
   description: Callback panel. Table view of all definitions (ID/name/pattern/blocking/timeout/scope/success_msg/cwd). Editor sub-view shows script content for one callback. No Active column.
@@ -8685,6 +8701,10 @@
 93437a4d1fcca158:
   path: crates/cp-mod-callback/src/trigger.rs
   description: Callback trigger engine. collect_changed_files() extracts paths from Edit/Write tools. match_callbacks() with flame!("cb_match") matches files against glob patterns. validate_skip_names() warns on non-existent callbacks. partition_callbacks() splits blocking/async.
+  last_edited_ms: 0
+93675230eb37ea5b:
+  path: .git/index
+  description: Git index (binary). Not source.
   last_edited_ms: 0
 9378afe7eb534ebb:
   path: web/vite.config.ts
@@ -13626,6 +13646,10 @@ eb89991db53b2918:
   path: web/src/components/finder/views/shared.tsx
   description: 'Shared Finder-view COMPONENTS only (react-refresh purity): RenameInput (inline rename field) + TagDots (macOS tag dots). Non-component helpers moved to ./helpers.ts.'
   last_edited_ms: 1783350174213
+eba197dfc1603b70:
+  path: web/src/components/shell/StatusBar.tsx
+  description: 'Bottom status footer. Fleet mode: aggregates (count, threads, needs-you, spend). Agent mode: AgentStatus reads the LIVE agent.phase (streaming/tooling/ready distinct, T297) + cost folded from deltas. Disconnected state: when SSE push plane is down, shows red-dot ''Disconnected'' button (clickable, fires onReconnect). ContextBar meter is fully push-fed from the agent''s authoritative ContextUsage delta (contextUsed/Threshold/Budget + contextHit/contextMiss); draws ratatui''s two-segment green-hit/amber-miss bar (falls back to a single proximity-coloured fill pre-split) + threshold tick + hover tooltip Used(hit)/Used(miss)/Threshold/Free. T297: bar segments + fallback fill + threshold tick ease to new widths over 1s (transition-[width|left] duration-1000 ease-out); tooltip Used/budget row uses gap-8 + shrink-0 label so the two columns never crowd.'
+  last_edited_ms: 1784201924937
 eba1bdf62952589c:
   path: web/eslint.config.ts
   description: Frontend ESLint flat config — the Rust-parity strict stack (branch web-lint), built as a RATCHET (P0→P13, one plugin group per phase, each landing at error). Migrated from eslint.config.js in P0. globalIgnores dist + src/lib/api/generated/**. P0 baseline = js.recommended + tseslint.recommended + reactHooks classic pair (rules-of-hooks:error, exhaustive-deps:warn) + reactRefresh.vite (allowConstantExport, ui/** exempt). Grows toward ~1100-1400 active rules.

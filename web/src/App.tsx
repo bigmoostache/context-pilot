@@ -13,7 +13,7 @@ import { AuthProvider } from "@/lib/providers/AuthProvider"
 import { DevModeProvider } from "@/lib/providers/toggles/DevModeProvider"
 import { ShowOverlayProvider } from "@/lib/providers/toggles/ShowOverlayProvider"
 import { useDevMode } from "@/lib/providers/toggles/devMode"
-import { useFleet, useAgentMeta } from "@/lib/live"
+import { useFleet, useAgentMeta, useSseConnected } from "@/lib/live"
 import { TelemetryProfiler } from "@/lib/support/telemetry"
 import { TelemetryHud } from "@/components/shell/widgets/TelemetryHud"
 import type { ViewMode } from "@/lib/types"
@@ -76,6 +76,7 @@ function AppShell() {
   const fleetAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
   const { data: liveAgent } = useAgentMeta(activeAgentId)
   const activeAgent = liveAgent ?? fleetAgent
+  const sseConnected = useSseConnected(activeAgentId)
 
   // A persisted view of "threads"/"finder" requires a live agent to
   // render. If the fleet is still loading, or the stored agent id no longer
@@ -162,7 +163,13 @@ function AppShell() {
 
       <TelemetryProfiler id={effectiveView}>{renderView()}</TelemetryProfiler>
 
-      <StatusBar fleet={effectiveView === "fleet"} agents={agents} activeAgent={activeAgent} />
+      <StatusBar
+        fleet={effectiveView === "fleet"}
+        agents={agents}
+        activeAgent={activeAgent}
+        connected={sseConnected}
+        onReconnect={() => window.location.reload()}
+      />
 
       {/* Dev-mode performance HUD (gated on the Developer-mode flag inside). */}
       <TelemetryHud />

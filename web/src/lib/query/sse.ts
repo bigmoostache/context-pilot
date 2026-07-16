@@ -29,6 +29,8 @@ type SseListener = (event: SseEvent) => void
 export interface SseClient {
   /** Register a listener for a specific event type (or "*" for all). */
   subscribe(type: SseEventType | "*", listener: SseListener): () => void
+  /** Register a callback for connection state changes. Returns unsubscribe. */
+  subscribeConnection(callback: (connected: boolean) => void): () => void
   /** Permanently close (no reconnect). */
   close(): void
   /** True if currently connected. */
@@ -60,6 +62,7 @@ const RECONNECT_MAX_MS = 30_000
 
 function createSseClient(agentId: string): SseClient {
   const listeners = new Map<string, Set<SseListener>>()
+  const connectionListeners = new Set<(connected: boolean) => void>()
   let es: EventSource | null = null
   let lastEventId: string | undefined
   let closed = false
@@ -94,6 +97,7 @@ function createSseClient(agentId: string): SseClient {
 
       es.addEventListener("open", () => {
         reconnectMs = RECONNECT_BASE_MS
+        connectionListeners.forEach((fn) => fn(true))
       })
 
       // Named events from the backend
@@ -107,6 +111,7 @@ function createSseClient(agentId: string): SseClient {
       es.addEventListener("error", () => {
         es?.close()
         es = null
+        connectionListeners.forEach((fn) => fn(false))
         if (!isClosed()) scheduleReconnect()
       })
     } catch {
@@ -134,6 +139,12 @@ function createSseClient(agentId: string): SseClient {
       return () => {
         set.delete(listener)
         if (set.size === 0) listeners.delete(type)
+      }
+    },
+    subscribeConnection(callback) {
+      connectionListeners.add(callback)
+      return () => {
+        connectionListeners.delete(callback)
       }
     },
     close() {

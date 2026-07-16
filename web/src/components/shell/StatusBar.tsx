@@ -24,12 +24,22 @@ export function StatusBar({
   fleet = false,
   agents = [],
   activeAgent,
+  connected = true,
+  onReconnect,
 }: {
   fleet?: boolean
   agents?: Agent[]
   activeAgent?: Agent | undefined
+  /** False when the SSE push plane for this agent is down. */
+  connected?: boolean
+  /** Fired when the user clicks the "Disconnected" label to reconnect. */
+  onReconnect?: () => void
 }) {
-  return fleet ? <FleetStatus agents={agents} /> : <AgentStatus agent={activeAgent} />
+  return fleet ? (
+    <FleetStatus agents={agents} />
+  ) : (
+    <AgentStatus agent={activeAgent} connected={connected} onReconnect={onReconnect} />
+  )
 }
 
 /** Fleet-wide aggregates — shown when no single agent is focused. */
@@ -76,7 +86,15 @@ function resolvePhase(agent?: Agent): StreamPhase {
 }
 
 /** Single-agent session vitals — shown while an agent is focused. */
-function AgentStatus({ agent }: { agent?: Agent | undefined }) {
+function AgentStatus({
+  agent,
+  connected = true,
+  onReconnect,
+}: {
+  agent?: Agent | undefined
+  connected?: boolean
+  onReconnect?: () => void
+}) {
   // Use the LIVE execution phase folded from the PhaseTransition delta (T297)
   // so the footer distinguishes streaming · tooling · ready instead of the old
   // 2-state projection of `status`. Falls back to `status` only before the
@@ -98,10 +116,21 @@ function AgentStatus({ agent }: { agent?: Agent | undefined }) {
 
   return (
     <footer className="vibrancy flex h-8 shrink-0 items-center gap-3 border-t border-border px-4 text-[12px]">
-      <span className="flex items-center gap-1.5">
-        <span className="size-2 rounded-full" style={{ background: p.color }} />
-        <span className="font-medium text-foreground/80">{p.label}</span>
-      </span>
+      {connected ? (
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full" style={{ background: p.color }} />
+          <span className="font-medium text-foreground/80">{p.label}</span>
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={onReconnect}
+          className="flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 transition-colors hover:bg-muted"
+        >
+          <span className="size-2 rounded-full bg-[var(--danger)]" />
+          <span className="font-medium text-[var(--danger)]">Disconnected</span>
+        </button>
+      )}
 
       <span className="ml-auto flex items-center gap-3">
         <ContextBar used={used} threshold={threshold} budget={budget} hit={hit} miss={miss} />
