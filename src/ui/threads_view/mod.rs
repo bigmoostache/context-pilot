@@ -20,8 +20,7 @@ use cp_render::{Block as IrBlock, Semantic, Span as S};
 use crate::state::State;
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
-use cp_mod_threads::questions::ThreadQuestionForm;
-use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
+use cp_mod_threads::types::{FocusState, ThreadStatus, ThreadsState};
 
 /// Width of the thread list pane in columns.
 pub(crate) const THREAD_LIST_WIDTH: u16 = 28;
@@ -275,69 +274,6 @@ fn render_new_thread_prompt(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let lines = ir::blocks_to_lines(&ir_blocks);
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);
-}
-
-/// Detect pending questions in the selected thread and initialize the
-/// active question form in `FocusState` if needed.
-///
-/// Called from `render_body()` before rendering the threads view, while
-/// state is still `&mut`. Lazy initialization: parses questions from the
-/// last assistant message only when the form hasn't been opened yet.
-pub(crate) fn maybe_activate_thread_question(state: &mut State) {
-    // Phase 1: gather data with shared borrows only
-    let (should_clear, init_data) = {
-        let ts = ThreadsState::get(state);
-        let focus = FocusState::get(state);
-        let visible = ts.visible_indices(focus.viewing_archived);
-
-        let Some(thread) = visible.get(focus.selected_thread_idx).and_then(|&i| ts.threads.get(i)) else {
-            return;
-        };
-
-        if thread.status != ThreadStatus::TheirTurn {
-            // Thread not waiting for user — clear stale form if it belongs to this thread
-            let clear = focus.active_question.as_ref().is_some_and(|aq| aq.thread_id == thread.id);
-            (clear, None)
-        } else if focus.active_question.as_ref().is_some_and(|aq| aq.thread_id == thread.id) {
-            // Already have an active question for this thread
-            (false, None)
-        } else {
-            // Need to initialize — find last assistant message with questions
-            let clear = focus.active_question.is_some(); // clear if for different thread
-            // Find the last assistant message with questions, then check if
-            // a user message exists after it (meaning it was already answered).
-            let last_q_idx = thread
-                .messages
-                .iter()
-                .enumerate()
-                .rev()
-                .find(|(_, m)| m.author == ThreadAuthor::Assistant && m.question.is_some())
-                .map(|(i, _)| i);
-            let json = last_q_idx.and_then(|qi| {
-                let already_answered = thread
-                    .messages
-                    .get(qi.saturating_add(1)..)
-                    .is_some_and(|tail| tail.iter().any(|m| m.author == ThreadAuthor::User));
-                if already_answered {
-                    None
-                } else {
-                    let m = thread.messages.get(qi)?;
-                    m.question.clone()
-                }
-            });
-            json.map_or((clear, None), |j| (clear, Some((thread.id.clone(), j))))
-        }
-    }; // all shared borrows dropped
-
-    // Phase 2: mutate state
-    if should_clear {
-        FocusState::get_mut(state).active_question = None;
-    }
-    if let Some((thread_id, json)) = init_data
-        && let Some(form) = ThreadQuestionForm::from_json(&thread_id, &json)
-    {
-        FocusState::get_mut(state).active_question = Some(form);
-    }
 }
 
 /// Truncate a string to `max_len` characters, appending "…" if truncated.

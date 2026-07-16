@@ -270,7 +270,6 @@ pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut cp_base::state
             author: ThreadAuthor::Assistant,
             content: Some(line),
             file_path: None,
-            question: None,
             timestamp: now_ms(),
             acknowledged: true,
             auto: true,

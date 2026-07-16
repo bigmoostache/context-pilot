@@ -140,25 +140,8 @@ pub enum Action {
     /// Make think reminder threshold more negative (less frequent reminders).
     ConfigThinkThresholdDown,
 
-    // === Config overlay — secondary model ===
-    /// Select secondary (reverie) LLM provider.
-    ConfigSelectSecondaryProvider(crate::config::llm_types::LlmProvider),
-    /// Select secondary Anthropic model.
-    ConfigSelectSecondaryAnthropicModel(crate::config::models::AnthropicModel),
-    /// Select secondary Grok model.
-    ConfigSelectSecondaryGrokModel(crate::config::models::GrokModel),
-    /// Select secondary Groq model.
-    ConfigSelectSecondaryGroqModel(crate::config::models::GroqModel),
-    /// Select secondary `DeepSeek` model.
-    ConfigSelectSecondaryDeepSeekModel(crate::config::models::DeepSeekModel),
-    /// Select secondary `MiniMax` model.
-    ConfigSelectSecondaryMiniMaxModel(crate::config::models::MiniMaxModel),
-    /// Select secondary Claude Code V2 model.
-    ConfigSelectSecondaryClaudeCodeV2Model(crate::config::models::ClaudeCodeV2Model),
     /// Toggle reverie (background optimizer) on/off.
     ConfigToggleReverie,
-    /// Toggle between primary and secondary model tabs.
-    ConfigToggleSecondaryMode,
 
     // === UI ===
     /// Jump to first dynamic panel on the next page (Shift+Right).
@@ -185,24 +168,6 @@ pub enum Action {
     /// Toggle between the active and archived thread lists in the
     /// thread-centered view (Ctrl+U). Resets selection to the top.
     ThreadToggleArchivedView,
-    /// Move cursor up in thread question form.
-    ThreadQuestionUp,
-    /// Move cursor down in thread question form.
-    ThreadQuestionDown,
-    /// Navigate to previous question in thread question form.
-    ThreadQuestionLeft,
-    /// Navigate to next question in thread question form.
-    ThreadQuestionRight,
-    /// Toggle selection on current option in thread question form.
-    ThreadQuestionToggle,
-    /// Handle Enter in thread question form (select + advance or submit).
-    ThreadQuestionEnter,
-    /// Dismiss thread question form without answering.
-    ThreadQuestionDismiss,
-    /// Type a character in the "Other" text field of thread question form.
-    ThreadQuestionChar(char),
-    /// Backspace in the "Other" text field of thread question form.
-    ThreadQuestionBackspace,
     /// Open the Ctrl+P command palette.
     OpenCommandPalette,
     /// Reset the session cost counters to zero.

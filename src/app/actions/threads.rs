@@ -22,14 +22,6 @@ pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
         Action::ThreadArchiveConfirm => archive_confirm(state),
         Action::ThreadArchiveCancel => archive_cancel(state),
         Action::ThreadToggleArchivedView => toggle_archived_view(state),
-        Action::ThreadQuestionUp => question_up(state),
-        Action::ThreadQuestionDown => question_down(state),
-        Action::ThreadQuestionLeft => question_left(state),
-        Action::ThreadQuestionRight => question_right(state),
-        Action::ThreadQuestionToggle => question_toggle(state),
-        Action::ThreadQuestionEnter => question_enter(state),
-        Action::ThreadQuestionDismiss => question_dismiss(state),
-        Action::ThreadQuestionBackspace => question_backspace(state),
         // Exhaustive: all non-Thread variants — dispatch is only called for Thread* actions
         // from the central match in mod.rs, so these arms are unreachable.
         Action::InputChar(_)
@@ -87,19 +79,10 @@ pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
         | Action::ConfigToggleAutoContinue
         | Action::ConfigThinkThresholdUp
         | Action::ConfigThinkThresholdDown
-        | Action::ConfigSelectSecondaryProvider(_)
-        | Action::ConfigSelectSecondaryAnthropicModel(_)
-        | Action::ConfigSelectSecondaryGrokModel(_)
-        | Action::ConfigSelectSecondaryGroqModel(_)
-        | Action::ConfigSelectSecondaryDeepSeekModel(_)
-        | Action::ConfigSelectSecondaryMiniMaxModel(_)
-        | Action::ConfigSelectSecondaryClaudeCodeV2Model(_)
         | Action::ConfigToggleReverie
-        | Action::ConfigToggleSecondaryMode
         | Action::PageDynamicNext
         | Action::PageDynamicPrev
         | Action::CycleViewMode
-        | Action::ThreadQuestionChar(_)
         | Action::OpenCommandPalette
         | Action::ResetSessionCosts
         | Action::SelectContextById(_)
@@ -259,123 +242,6 @@ fn archive_confirm(state: &mut State) -> ActionResult {
 /// Cancel thread archive — dismiss confirmation.
 fn archive_cancel(state: &mut State) -> ActionResult {
     FocusState::get_mut(state).confirming_archive = false;
-    state.flags.ui.dirty = true;
-    ActionResult::Nothing
-}
-
-/// Move cursor up in the active question form.
-fn question_up(state: &mut State) -> ActionResult {
-    if let Some(aq) = FocusState::get_mut(state).active_question.as_mut() {
-        aq.cursor_up();
-    }
-    state.flags.ui.dirty = true;
-    ActionResult::Nothing
-}
-
-/// Move cursor down in the active question form.
-fn question_down(state: &mut State) -> ActionResult {
-    if let Some(aq) = FocusState::get_mut(state).active_question.as_mut() {
-        aq.cursor_down();
-    }
-    state.flags.ui.dirty = true;
-    ActionResult::Nothing
-}
-
-/// Navigate to previous question in multi-question form.
-fn question_left(state: &mut State) -> ActionResult {
-    if let Some(aq) = FocusState::get_mut(state).active_question.as_mut() {
-        aq.prev_question();
-    }
-    state.flags.ui.dirty = true;
-    ActionResult::Nothing
-}
-
-/// Navigate to next question in multi-question form.
-fn question_right(state: &mut State) -> ActionResult {
-    if let Some(aq) = FocusState::get_mut(state).active_question.as_mut() {
-        aq.next_question();
-    }
-    state.flags.ui.dirty = true;
-    ActionResult::Nothing
-}
-
-/// Toggle selection on the current option.
-fn question_toggle(state: &mut State) -> ActionResult {
-    if let Some(aq) = FocusState::get_mut(state).active_question.as_mut() {
-        aq.toggle_selection();
-    }
-    state.flags.ui.dirty = true;
-    ActionResult::Nothing
-}
-
-/// Handle Enter in question form — select + advance, or submit on final question.
-fn question_enter(state: &mut State) -> ActionResult {
-    let should_submit = {
-        let focus = FocusState::get_mut(state);
-        focus.active_question.as_mut().is_some_and(|aq| {
-            aq.handle_enter();
-            aq.is_last_question() && aq.all_answered()
-        })
-    };
-    if should_submit {
-        let (thread_id, yaml) = {
-            let focus = FocusState::get_mut(state);
-            let aq = focus.active_question.take();
-            aq.map_or_else(
-                || (String::new(), String::new()),
-                |form| (form.thread_id.clone(), form.format_answers_yaml()),
-            )
-        };
-        if !thread_id.is_empty() {
-            let ts = ThreadsState::get_mut(state);
-            if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == thread_id) {
-                thread.messages.push(cp_mod_threads::types::ThreadMessage {
-                    author: cp_mod_threads::types::ThreadAuthor::User,
-                    content: Some(yaml),
-                    file_path: None,
-                    question: None,
-                    timestamp: crate::app::panels::now_ms(),
-                    acknowledged: false,
-                    auto: false,
-                });
-                thread.status = cp_mod_threads::types::ThreadStatus::MyTurn;
-            }
-            let _id = cp_mod_spine::types::SpineState::create_notification(
-                state,
-                cp_mod_spine::types::NotificationType::Custom,
-                "Thread Question Answered".into(),
-                format!(
-                    "User answered questions in thread \"{thread_id}\". \
-                     Use Read(thread_id=\"{thread_id}\") to see the answers."
-                ),
-            );
-        }
-    }
-    state.flags.ui.dirty = true;
-    ActionResult::Save
-}
-
-/// Dismiss the active question form without answering.
-fn question_dismiss(state: &mut State) -> ActionResult {
-    FocusState::get_mut(state).active_question = None;
-    state.flags.ui.dirty = true;
-    ActionResult::Nothing
-}
-
-/// Type a character into the question form's "Other" text field.
-pub(super) fn question_char(state: &mut State, c: char) -> ActionResult {
-    if let Some(aq) = FocusState::get_mut(state).active_question.as_mut() {
-        aq.type_char(c);
-    }
-    state.flags.ui.dirty = true;
-    ActionResult::Nothing
-}
-
-/// Delete last character from the "Other" text field.
-fn question_backspace(state: &mut State) -> ActionResult {
-    if let Some(aq) = FocusState::get_mut(state).active_question.as_mut() {
-        aq.backspace();
-    }
     state.flags.ui.dirty = true;
     ActionResult::Nothing
 }

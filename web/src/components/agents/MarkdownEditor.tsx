@@ -1,6 +1,7 @@
-import { useEffect, useReducer, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Bold,
+  Code,
   Code2,
   Heading1,
   Heading2,
@@ -9,196 +10,309 @@ import {
   List,
   ListOrdered,
   Quote,
+  Redo2,
   Strikethrough,
+  Table,
+  Undo2,
 } from "lucide-react"
+import type { ReactNode } from "react"
+import { useEditor, EditorContent } from "@tiptap/react"
+import StarterKit from "@tiptap/starter-kit"
+import LinkExtension from "@tiptap/extension-link"
+import Placeholder from "@tiptap/extension-placeholder"
+import TaskList from "@tiptap/extension-task-list"
+import TaskItem from "@tiptap/extension-task-item"
+import { Table as TableExtension } from "@tiptap/extension-table"
+import TableRow from "@tiptap/extension-table-row"
+import TableHeader from "@tiptap/extension-table-header"
+import TableCell from "@tiptap/extension-table-cell"
+import Image from "@tiptap/extension-image"
+import { Markdown as MarkdownExtension } from "tiptap-markdown"
 import { cn } from "@/lib/utils"
+import { TableGridPicker, TableContextBar } from "./tableControls"
 
-/** Whether a rich-text command is currently active for the selection (drives
- *  the toolbar button's pressed state). `queryCommandState` throws on some
- *  commands/browsers — treat any throw as inactive. */
-function active(cmd: string): boolean {
-  try {
-    return document.queryCommandState(cmd)
-  } catch {
-    return false
-  }
+/** Extract tiptap-markdown storage safely (avoids banned double-assertion). */
+function getMdStorage(storage: unknown): { getMarkdown: () => string } | undefined {
+  const s = storage as Record<string, unknown>
+  const md = s["markdown"]
+  return md && typeof md === "object" && "getMarkdown" in md
+    ? (md as { getMarkdown: () => string })
+    : undefined
 }
 
 /**
- * A lightweight **WYSIWYG markdown editor** for the prompt library (design-only).
+ * Professional WYSIWYG markdown editor built on TipTap (ProseMirror).
  *
- * Rather than a raw textarea, this renders an inline-formatted editing surface
- * (a `contentEditable` region) with a sticky formatting toolbar — bold, italic,
- * headings, lists, quote, code, link. Formatting is applied live via the
- * browser's rich-text commands, so what you type is what you see.
+ * The `tiptap-markdown` extension handles round-trip conversion: content is
+ * seeded from markdown and serialised back to markdown on every change via
+ * `editor.storage.markdown.getMarkdown()`.
  *
- * The initial markdown is converted to HTML once on mount; thereafter the
- * surface is uncontrolled (so the caret never jumps). When `onChange` is
- * supplied, every edit serializes the live DOM back to markdown (the inverse of
- * the seeding `mdToHtml`) and reports it, so a host can save the result. With no
- * `onChange` the surface is a pure design-only maquette (the prompt library).
+ * Extensions: StarterKit, Link, Placeholder, TaskList/TaskItem, Table (with
+ * header/cell/row), Image, and tiptap-markdown for serialization.
+ *
+ * `toolbarExtra` renders at the right end of the toolbar — use it for Save
+ * buttons, autosave indicators, or other controls that belong in the bar.
  */
 export function MarkdownEditor({
   initialMarkdown,
   placeholder,
   className,
   onChange,
+  toolbarExtra,
 }: {
   initialMarkdown: string
   placeholder?: string
   className?: string
-  /** Fired with the current markdown after every edit (enables save-back). */
+  /** Fired with current markdown after every edit (enables save-back). */
   onChange?: (markdown: string) => void
+  /** Extra content rendered at the right end of the toolbar bar. */
+  toolbarExtra?: ReactNode
 }) {
-  const ref = useRef<HTMLDivElement>(null)
-  // A monotonic reducer whose only job is to force a re-render so the toolbar's
-  // active-state re-reads queryCommandState after a command or caret move. The
-  // value is intentionally discarded (the canonical force-update idiom); a
-  // useState pair would leave an unread state variable.
-  const [, force] = useReducer((n: number) => n + 1, 0)
-  const [empty, setEmpty] = useState(false)
-
-  // Seed the surface once — re-seeding would fight the caret. A ref guard makes
-  // the seed run only on first mount while keeping `initialMarkdown` an honest
-  // dependency: a later prop change re-runs the effect but the guard no-ops, so
-  // in-progress edits are never blown away. (A fresh item remounts the editor
-  // via its `key`, resetting the guard.) This replaces the old empty-dep +
-  // inline eslint-disable, which the P4 anti-suppression layer bans.
-  const seededRef = useRef(false)
+  // Keep latest onChange in a ref so useEditor binds once on mount.
+  const onChangeRef = useRef(onChange)
   useEffect(() => {
-    if (seededRef.current || !ref.current) {
-      return
-    }
-    seededRef.current = true
-    ref.current.innerHTML = mdToHtml(initialMarkdown)
-    setEmpty(ref.current.textContent.trim().length === 0)
-  }, [initialMarkdown])
+    onChangeRef.current = onChange
+  }, [onChange])
 
-  // Serialize the live DOM back to markdown and report it (when a host wants to
-  // save). Cheap (a read-only walk of a small doc) and never touches the DOM, so
-  // the caret is safe to call after any edit.
-  const emit = () => {
-    if (onChange && ref.current) onChange(htmlToMarkdown(ref.current))
-  }
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3] },
+      }),
+      LinkExtension.configure({
+        openOnClick: false,
+        HTMLAttributes: { class: "text-(--interactive) underline underline-offset-2" },
+      }),
+      Placeholder.configure({
+        placeholder: placeholder ?? "",
+      }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      TableExtension.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      Image.configure({ inline: false, allowBase64: true }),
+      MarkdownExtension.configure({
+        html: false,
+        transformPastedText: true,
+        transformCopiedText: true,
+      }),
+    ],
+    content: initialMarkdown,
+    // Default only re-renders on docChanged — selection-only transactions
+    // (clicking into/out of a table) are skipped, so isActive("table") goes
+    // stale until the next keystroke. Re-render on every transaction so the
+    // table context bar appears instantly on click.
+    shouldRerenderOnTransaction: true,
+    onUpdate: ({ editor: ed }) => {
+      // tiptap-markdown injects `markdown` into editor.storage at runtime.
+      // getMdStorage launders the access through unknown (single-as, no double-assertion).
+      const mdExt = getMdStorage(ed.storage)
+      if (mdExt) onChangeRef.current?.(mdExt.getMarkdown())
+    },
+    editorProps: {
+      attributes: {
+        class: cn(
+          "prose-editor min-h-full px-5 py-4 text-[13.5px] leading-relaxed text-foreground/90 outline-none",
+          "[&_h1]:mt-3 [&_h1]:mb-2 [&_h1]:text-[20px] [&_h1]:font-bold [&_h1]:tracking-tight [&_h1]:text-foreground",
+          "[&_h2]:mt-3 [&_h2]:mb-1.5 [&_h2]:text-[16px] [&_h2]:font-semibold [&_h2]:text-foreground",
+          "[&_h3]:mt-2.5 [&_h3]:mb-1 [&_h3]:text-[13.5px] [&_h3]:leading-snug [&_h3]:font-semibold",
+          "[&_p]:my-1.5",
+          "[&_li]:my-0.5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5",
+          "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-(--signal)/60 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
+          "[&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-(--surface-2)/60 [&_pre]:px-3 [&_pre]:py-2 [&_pre]:font-mono [&_pre]:text-[12px]",
+          "[&_code]:rounded-sm [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:text-(--signal)",
+          "[&_a]:text-(--interactive) [&_a]:underline [&_a]:underline-offset-2",
+          "[&_strong]:font-semibold [&_strong]:text-foreground",
+          "[&_hr]:my-3 [&_hr]:border-t [&_hr]:border-border",
+          // Tables
+          "[&_table]:my-2 [&_table]:w-full [&_table]:border-collapse",
+          "[&_th]:border [&_th]:border-border [&_th]:bg-muted/40 [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:text-left [&_th]:text-[12.5px] [&_th]:font-semibold",
+          "[&_td]:border [&_td]:border-border [&_td]:px-2.5 [&_td]:py-1.5 [&_td]:text-[12.5px]",
+          // Task lists
+          "[&_ul[data-type='taskList']]:list-none [&_ul[data-type='taskList']]:pl-0",
+          "[&_ul[data-type='taskList']_li]:flex [&_ul[data-type='taskList']_li]:items-start [&_ul[data-type='taskList']_li]:gap-2",
+          "[&_ul[data-type='taskList']_label]:mt-px",
+          // Images
+          "[&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg",
+        ),
+        role: "textbox",
+        "aria-multiline": "true",
+        "aria-label": "Markdown editor",
+        tabindex: "0",
+        spellcheck: "false",
+      },
+    },
+  })
 
-  const exec = (cmd: string, arg?: string) => {
-    ref.current?.focus()
-    document.execCommand(cmd, false, arg)
-    force()
-    emit()
-  }
-
-  const block = (tag: string) => exec("formatBlock", tag)
+  const inTable = editor.isActive("table")
 
   return (
     <div
       className={cn(
-        "card-shadow flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card",
+        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card",
         className,
       )}
     >
-      {/* toolbar */}
-      <div className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-border bg-muted/40 px-2 py-1.5">
-        <Tool icon={Bold} title="Bold" on={active("bold")} onClick={() => exec("bold")} />
-        <Tool icon={Italic} title="Italic" on={active("italic")} onClick={() => exec("italic")} />
-        <Tool
-          icon={Strikethrough}
-          title="Strikethrough"
-          on={active("strikeThrough")}
-          onClick={() => exec("strikeThrough")}
-        />
-        <Sep />
-        <Tool icon={Heading1} title="Heading 1" onClick={() => block("<h1>")} />
-        <Tool icon={Heading2} title="Heading 2" onClick={() => block("<h2>")} />
-        <Tool icon={Quote} title="Quote" onClick={() => block("<blockquote>")} />
-        <Tool icon={Code2} title="Code block" onClick={() => block("<pre>")} />
-        <Sep />
-        <Tool
-          icon={List}
-          title="Bulleted list"
-          on={active("insertUnorderedList")}
-          onClick={() => exec("insertUnorderedList")}
-        />
-        <Tool
-          icon={ListOrdered}
-          title="Numbered list"
-          on={active("insertOrderedList")}
-          onClick={() => exec("insertOrderedList")}
-        />
-        <Sep />
-        <Tool
-          icon={Link2}
-          title="Link"
-          onClick={() => {
-            const url = window.prompt("Link URL", "https://")
-            if (url) exec("createLink", url)
-          }}
-        />
-        <span className="ml-auto pr-1 text-[10.5px] text-muted-foreground/55">
-          Markdown · WYSIWYG
-        </span>
-      </div>
-
-      {/* editing surface */}
+      <Toolbar editor={editor} extra={toolbarExtra} />
+      {inTable && <TableContextBar editor={editor} />}
       <div className="relative min-h-0 flex-1 overflow-y-auto">
-        {empty && placeholder && (
-          <span className="pointer-events-none absolute top-4 left-5 text-[13px] text-muted-foreground/40">
-            {placeholder}
-          </span>
-        )}
-        <div
-          ref={ref}
-          contentEditable
-          suppressContentEditableWarning
-          spellCheck={false}
-          role="textbox"
-          aria-multiline
-          aria-label="Markdown editor"
-          tabIndex={0}
-          onInput={() => {
-            setEmpty(ref.current?.textContent.trim().length === 0)
-            emit()
-          }}
-          onKeyUp={() => force()}
-          onMouseUp={() => force()}
-          className={cn(
-            "prose-editor min-h-full px-5 py-4 text-[13.5px] leading-relaxed text-foreground/90 outline-none",
-            "[&_h1]:mt-3 [&_h1]:mb-2 [&_h1]:text-[20px] [&_h1]:font-bold [&_h1]:tracking-tight [&_h1]:text-foreground",
-            "[&_h2]:mt-3 [&_h2]:mb-1.5 [&_h2]:text-[16px] [&_h2]:font-semibold [&_h2]:text-foreground",
-            "[&_p]:my-1.5",
-            "[&_li]:my-0.5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5",
-            "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-(--signal)/60 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
-            "[&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-(--surface-2)/60 [&_pre]:px-3 [&_pre]:py-2 [&_pre]:font-mono [&_pre]:text-[12px]",
-            "[&_code]:rounded-sm [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:text-(--signal)",
-            "[&_a]:text-(--interactive) [&_a]:underline [&_a]:underline-offset-2",
-            "[&_strong]:font-semibold [&_strong]:text-foreground",
-          )}
-        />
+        <EditorContent editor={editor} className="min-h-full" />
       </div>
     </div>
   )
 }
+
+/**
+ * Single merged toolbar: formatting buttons left, optional extra content right.
+ */
+function Toolbar({
+  editor,
+  extra,
+}: {
+  editor: NonNullable<ReturnType<typeof useEditor>>
+  extra?: ReactNode
+}) {
+  const [showGrid, setShowGrid] = useState(false)
+  const toggleGrid = useCallback(() => setShowGrid((v) => !v), [])
+  const closeGrid = useCallback(() => setShowGrid(false), [])
+
+  const addLink = () => {
+    const url = window.prompt("Link URL", "https://")
+    if (url) {
+      editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run()
+    }
+  }
+
+  return (
+    <div className="flex h-8 shrink-0 items-center gap-0.5 border-b border-border bg-muted/40 px-2">
+      <Tool
+        icon={Bold}
+        title="Bold"
+        on={editor.isActive("bold")}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+      />
+      <Tool
+        icon={Italic}
+        title="Italic"
+        on={editor.isActive("italic")}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+      />
+      <Tool
+        icon={Strikethrough}
+        title="Strikethrough"
+        on={editor.isActive("strike")}
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+      />
+      <Tool
+        icon={Code}
+        title="Inline code"
+        on={editor.isActive("code")}
+        onClick={() => editor.chain().focus().toggleCode().run()}
+      />
+      <Sep />
+      <Tool
+        icon={Heading1}
+        title="Heading 1"
+        on={editor.isActive("heading", { level: 1 })}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+      />
+      <Tool
+        icon={Heading2}
+        title="Heading 2"
+        on={editor.isActive("heading", { level: 2 })}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+      />
+      <Tool
+        icon={Quote}
+        title="Quote"
+        on={editor.isActive("blockquote")}
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+      />
+      <Tool
+        icon={Code2}
+        title="Code block"
+        on={editor.isActive("codeBlock")}
+        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+      />
+      <Sep />
+      <Tool
+        icon={List}
+        title="Bulleted list"
+        on={editor.isActive("bulletList")}
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+      />
+      <Tool
+        icon={ListOrdered}
+        title="Numbered list"
+        on={editor.isActive("orderedList")}
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+      />
+      <Sep />
+      <Tool icon={Link2} title="Link" on={editor.isActive("link")} onClick={addLink} />
+
+      {/* Table button with grid picker popover */}
+      <div className="relative">
+        <Tool icon={Table} title="Insert table" onClick={toggleGrid} on={showGrid} />
+        {showGrid && (
+          <TableGridPicker
+            onSelect={(rows, cols) => {
+              editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run()
+            }}
+            onClose={closeGrid}
+          />
+        )}
+      </div>
+
+      <Sep />
+      <Tool
+        icon={Undo2}
+        title="Undo"
+        onClick={() => editor.chain().focus().undo().run()}
+        disabled={!editor.can().undo()}
+      />
+      <Tool
+        icon={Redo2}
+        title="Redo"
+        onClick={() => editor.chain().focus().redo().run()}
+        disabled={!editor.can().redo()}
+      />
+      {extra != null && (
+        <>
+          <span className="flex-1" />
+          {extra}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Shared button primitives ───────────────────────────────────────
 
 function Tool({
   icon: Icon,
   title,
   on,
   onClick,
+  disabled,
 }: {
   icon: typeof Bold
   title: string
   on?: boolean
   onClick: () => void
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       title={title}
-      // keep selection in the editor while clicking the toolbar
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
+      disabled={disabled}
       className={cn(
         "flex size-7 items-center justify-center rounded-md transition-colors",
+        disabled && "opacity-30",
         on
           ? "bg-(--signal)/15 text-(--signal)"
           : "text-muted-foreground/80 hover:bg-muted/70 hover:text-foreground",
@@ -210,209 +324,5 @@ function Tool({
 }
 
 function Sep() {
-  return <span className="mx-1 h-4 w-px bg-border" />
-}
-
-/** Mutable accumulator threaded through the line-by-line markdown scan. */
-interface MdState {
-  out: string[]
-  list: "ul" | "ol" | null
-  fence: string[] | null
-}
-
-/** Close the currently-open list, if any. */
-function closeMdList(st: MdState): void {
-  if (!st.list) return
-  st.out.push(`</${st.list}>`)
-  st.list = null
-}
-
-/** Open `kind` as the current list (closing a different one first), so the
- *  caller can push a `<li>` into it. */
-function openMdList(st: MdState, kind: "ul" | "ol"): void {
-  if (st.list === kind) return
-  closeMdList(st)
-  st.out.push(`<${kind}>`)
-  st.list = kind
-}
-
-/** Classify and emit a single markdown line into the accumulator — the branch
- *  chain lifted out of {@link mdToHtml} so that function stays a thin scan under
- *  the P8 statement budget. Handles fenced code blocks (open/close), the block
- *  prefixes (#/##, >, -/*, ordered) and paragraphs; blank lines close any list. */
-function emitMdLine(line: string, st: MdState): void {
-  if (line.trim().startsWith("```")) {
-    if (st.fence) {
-      st.out.push(`<pre>${esc(st.fence.join("\n"))}</pre>`)
-      st.fence = null
-    } else {
-      closeMdList(st)
-      st.fence = []
-    }
-    return
-  }
-  if (st.fence) {
-    st.fence.push(line)
-    return
-  }
-  if (line.startsWith("## ")) {
-    closeMdList(st)
-    st.out.push(`<h2>${inline(line.slice(3))}</h2>`)
-  } else if (line.startsWith("# ")) {
-    closeMdList(st)
-    st.out.push(`<h1>${inline(line.slice(2))}</h1>`)
-  } else if (line.startsWith("> ")) {
-    closeMdList(st)
-    st.out.push(`<blockquote>${inline(line.slice(2))}</blockquote>`)
-  } else if (/^[-*] /.test(line)) {
-    openMdList(st, "ul")
-    st.out.push(`<li>${inline(line.slice(2))}</li>`)
-  } else if (/^\d+\. /.test(line)) {
-    openMdList(st, "ol")
-    st.out.push(`<li>${inline(line.replace(/^\d+\. /, ""))}</li>`)
-  } else if (line.trim() === "") {
-    closeMdList(st)
-  } else {
-    closeMdList(st)
-    st.out.push(`<p>${inline(line)}</p>`)
-  }
-}
-
-/** Minimal markdown → HTML for seeding the editable surface (design-only). */
-function mdToHtml(md: string): string {
-  const st: MdState = { out: [], list: null, fence: null }
-  for (const line of md.replaceAll("\r", "").split("\n")) emitMdLine(line, st)
-  if (st.fence) st.out.push(`<pre>${esc(st.fence.join("\n"))}</pre>`)
-  closeMdList(st)
-  return st.out.join("")
-}
-
-function inline(s: string): string {
-  return esc(s)
-    .replaceAll(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replaceAll(/`([^`]+)`/g, "<code>$1</code>")
-}
-
-function esc(s: string): string {
-  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
-}
-
-/**
- * Serialize the editable surface's DOM back to markdown — the inverse of
- * {@link mdToHtml}. The tag set is bounded by what the toolbar + seeding produce
- * (h1/h2, p, blockquote, pre, ul/ol/li, and the inline strong·em·code·link·del),
- * so a focused walk covers every case; an unrecognized element degrades to its
- * inline text. Block elements are separated by a blank line so the result
- * re-parses cleanly. `execCommand` emits either semantic (`<strong>`) or
- * presentational (`<b>`) tags depending on the browser — both are handled.
- */
-function htmlToMarkdown(root: HTMLElement): string {
-  const blocks: string[] = []
-  for (const node of root.childNodes) {
-    const md = serializeBlock(node)
-    if (md.trim().length > 0) blocks.push(md)
-  }
-  return (
-    blocks
-      .join("\n\n")
-      .replaceAll(/\n{3,}/g, "\n\n")
-      .trim() + "\n"
-  )
-}
-
-/** Serialize one top-level (block) node to its markdown line(s). */
-function serializeBlock(node: ChildNode): string {
-  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
-  if (!(node instanceof HTMLElement)) return ""
-
-  const tag = node.tagName.toLowerCase()
-  switch (tag) {
-    case "h1": {
-      return `# ${serializeInline(node)}`
-    }
-    case "h2": {
-      return `## ${serializeInline(node)}`
-    }
-    case "h3": {
-      return `### ${serializeInline(node)}`
-    }
-    case "blockquote": {
-      return serializeInline(node)
-        .split("\n")
-        .map((l) => `> ${l}`)
-        .join("\n")
-    }
-    case "pre": {
-      return `\`\`\`\n${node.textContent}\n\`\`\``
-    }
-    case "ul": {
-      return listItems(node)
-        .map((li) => `- ${serializeInline(li)}`)
-        .join("\n")
-    }
-    case "ol": {
-      return listItems(node)
-        .map((li, i) => `${i + 1}. ${serializeInline(li)}`)
-        .join("\n")
-    }
-    case "br": {
-      return ""
-    }
-    default: {
-      // p / div / unknown block → its inline content as a paragraph.
-      return serializeInline(node)
-    }
-  }
-}
-
-/** The `<li>` children of a list element. */
-function listItems(list: HTMLElement): HTMLElement[] {
-  return [...list.children].filter(
-    (c): c is HTMLElement => c instanceof HTMLElement && c.tagName.toLowerCase() === "li",
-  )
-}
-
-// Symmetric inline wrappers: an element whose markdown is just `delim + inner +
-// delim`. Folding these eight tags into a lookup keeps serializeInlineNode below
-// the P8 complexity budget (the switch was 16 branches); `execCommand` emits
-// either semantic (<strong>/<em>/<del>) or presentational (<b>/<i>/<s>/<strike>)
-// tags depending on the browser, so both spellings of each map to one delimiter.
-const INLINE_WRAP: Record<string, string> = {
-  strong: "**",
-  b: "**",
-  em: "*",
-  i: "*",
-  code: "`",
-  del: "~~",
-  s: "~~",
-  strike: "~~",
-}
-
-/** Serialize a single inline node to markdown — lifted out of
- *  {@link serializeInline}'s loop so its branches no longer nest inside a for-of
- *  (unicorn/no-break-in-nested-loop). Symmetric wrappers go through INLINE_WRAP;
- *  the asymmetric `a`/`br` cases are handled explicitly. Recurses through element
- *  children via serializeInline. */
-function serializeInlineNode(node: ChildNode): string {
-  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
-  if (!(node instanceof HTMLElement)) return ""
-  const tag = node.tagName.toLowerCase()
-  const inner = serializeInline(node)
-  const wrap = INLINE_WRAP[tag]
-  if (wrap !== undefined) return `${wrap}${inner}${wrap}`
-  if (tag === "a") {
-    const href = node.getAttribute("href") ?? ""
-    return href ? `[${inner}](${href})` : inner
-  }
-  if (tag === "br") return "\n"
-  return inner
-}
-
-/** Serialize an element's inline content (recursively) to markdown. */
-function serializeInline(el: Node): string {
-  let out = ""
-  for (const node of el.childNodes) {
-    out += serializeInlineNode(node)
-  }
-  return out
+  return <span className="mx-0.5 h-4 w-px bg-border" />
 }

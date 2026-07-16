@@ -368,6 +368,9 @@ pub(super) fn transport() -> Value {
                 "status": { "type": "string" },
                 "timestamp_ms": { "type": "integer" },
                 "phase": { "type": "string" },
+                // Lifecycle delta payload: the agent's new process state
+                // ("running"/"stopping"/"stopped"), carried by a `kind:"lifecycle"` entry.
+                "state": { "type": "string" },
                 "cost_usd": { "type": "number" },
                 "input_tokens": { "type": "integer" },
                 "output_tokens": { "type": "integer" },

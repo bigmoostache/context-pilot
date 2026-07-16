@@ -75,14 +75,6 @@ pub(super) fn render_message_area_with_input(frame: &mut Frame<'_>, state: &Stat
 
     render_thread_messages(frame, state, thread, msg_area);
     render_thread_input(frame, state, input_area);
-
-    // Question form overlay — rendered OVER the input area if active
-    if let Some(question_form_ir) = build_thread_question_form_ir(state) {
-        let form_height = crate::ui::help::input::calculate_question_form_height(&question_form_ir);
-        let form_y = inner.y.saturating_add(inner.height.saturating_sub(form_height));
-        let form_area = Rect { x: inner.x, y: form_y, width: inner.width, height: form_height.min(inner.height) };
-        crate::ui::help::input::render_question_form(frame, &question_form_ir, form_area);
-    }
 }
 
 /// Render thread messages using the conversation IR renderer.
@@ -190,25 +182,12 @@ fn auto_line(msg: &cp_mod_threads::types::ThreadMessage) -> String {
 }
 
 /// Convert a `ThreadMessage` to a `Message` for the conversation IR renderer.
-///
-/// If the message has embedded questions, appends a formatted markdown
-/// representation so the questions are visible in the thread history.
 fn thread_message_to_message(msg: &cp_mod_threads::types::ThreadMessage) -> Message {
     let role = match msg.author {
         ThreadAuthor::User => "user",
         ThreadAuthor::Assistant => "assistant",
     };
-    let mut content = msg.content.clone().unwrap_or_default();
-
-    // Append formatted questions if present
-    if let Some(ref json) = msg.question
-        && let Some(formatted) = format_questions_markdown(json)
-    {
-        if !content.is_empty() {
-            content.push_str("\n\n");
-        }
-        content.push_str(&formatted);
-    }
+    let content = msg.content.clone().unwrap_or_default();
 
     Message {
         id: String::new(),
@@ -223,34 +202,6 @@ fn thread_message_to_message(msg: &cp_mod_threads::types::ThreadMessage) -> Mess
         content_token_count: 0,
         timestamp_ms: msg.timestamp,
     }
-}
-
-/// Format question JSON as readable markdown for thread message display.
-///
-/// Returns `None` if the JSON is malformed or empty.
-fn format_questions_markdown(json: &serde_json::Value) -> Option<String> {
-    let arr = json.as_array()?;
-    if arr.is_empty() {
-        return None;
-    }
-    let mut lines = vec!["📋 **Questions:**".to_owned(), String::new()];
-    for (i, q) in arr.iter().enumerate() {
-        let header = q.get("header").and_then(serde_json::Value::as_str).unwrap_or("?");
-        let text = q.get("question").and_then(serde_json::Value::as_str).unwrap_or("");
-        let multi = q.get("multiSelect").and_then(serde_json::Value::as_bool).unwrap_or(false);
-        let tag = if multi { " *(multi-select)*" } else { "" };
-        lines.push(format!("**{}. {}**{} — {}", i.saturating_add(1), header, tag, text));
-        if let Some(options) = q.get("options").and_then(serde_json::Value::as_array) {
-            for opt in options {
-                let label = opt.get("label").and_then(serde_json::Value::as_str).unwrap_or("?");
-                let desc = opt.get("description").and_then(serde_json::Value::as_str).unwrap_or("");
-                lines.push(format!("  - **{label}**: {desc}"));
-            }
-        }
-        lines.push("  - *Other (free text)*".to_owned());
-        lines.push(String::new());
-    }
-    Some(lines.join("\n"))
 }
 
 /// Calculate input area height based on current input content.
@@ -270,36 +221,4 @@ fn calculate_input_height(state: &State, width: u16, available_height: u16) -> u
     let total = wrapped_lines.max(line_count);
     // Separator (1) + content + hint line (1), capped at 50% of available height
     (total.saturating_add(3)).min(max_input.into()).to_u16()
-}
-
-/// Build a [`QuestionForm`] IR snapshot from the active thread question form.
-///
-/// Returns `None` if no active question form exists.
-fn build_thread_question_form_ir(state: &State) -> Option<cp_render::conversation::QuestionForm> {
-    let focus = FocusState::get(state);
-    let form = focus.active_question.as_ref()?;
-
-    let questions = form
-        .questions
-        .iter()
-        .map(|q| cp_render::conversation::Question {
-            header: q.header.clone(),
-            text: q.text.clone(),
-            options: q
-                .options
-                .iter()
-                .map(|o| cp_render::conversation::QuestionOption {
-                    label: o.label.clone(),
-                    description: o.description.clone(),
-                })
-                .collect(),
-            multi_select: q.multi_select,
-            cursor: q.cursor,
-            selected: q.selected.clone(),
-            typing_other: q.typing_other,
-            other_text: q.other_text.clone(),
-        })
-        .collect();
-
-    Some(cp_render::conversation::QuestionForm { questions, focused_index: form.focused_index })
 }

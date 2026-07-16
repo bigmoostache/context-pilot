@@ -1,17 +1,19 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
-import { QuestionForm } from "./QuestionForm"
 import { ThreadComposer, type CommandSuggestion } from "./ThreadComposer"
 import { CreateCommandDialog } from "./CreateCommandDialog"
 import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
 import { extractDroppedFiles, zipDropped } from "@/lib/utils"
-import { measure } from "@/lib/support/telemetry"
-import { uploadToNode, type UploadedFile } from "./fileUpload/helpers"
+import { uploadToNode, splitMessageSegments, type UploadedFile } from "./fileUpload/helpers"
+import { FormMessageRow } from "./forms/FormMessageRow"
+import { isFormMessage } from "./forms/helpers"
+import { useScrollPin, useThreadForms } from "./forms/useThreadForms"
 import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
+import { FileSidebar, type ThreadFile } from "./fileUpload/FileSidebar"
 import type { ThreadDetail, ThreadMsg } from "@/lib/types"
 
 /** True only for an actual OS *file* drag — a text/selection drag must not blur. */
@@ -173,14 +175,12 @@ const MessageRow = memo(
     onOpenFile,
     onShowInFinder,
     onDelete,
-    onSend,
   }: {
     msg: ThreadMsg
     agentId: string
     onOpenFile: (file: UploadedFile) => void
     onShowInFinder: ((path: string) => void) | undefined
     onDelete: (msg: ThreadMsg) => void
-    onSend: ((text: string) => void) | undefined
   }) {
     return (
       <div
@@ -197,11 +197,6 @@ const MessageRow = memo(
           onShowInFinder={onShowInFinder}
           onDelete={() => onDelete(msg)}
         />
-        {msg.questions?.map((q, i) => (
-          <div key={i} className="pb-1.5 pl-7">
-            <QuestionForm q={q} onSubmit={(answer) => onSend?.(answer)} />
-          </div>
-        ))}
         {msg.fileRef && (
           <div className="pb-1.5 pl-7">
             <span className="card-shadow inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[11.5px] text-(--interactive)">
@@ -214,6 +209,19 @@ const MessageRow = memo(
   },
   (a, b) => a.msg === b.msg && a.agentId === b.agentId,
 )
+
+/** Collect every file-upload block across all messages for the sidebar rail. */
+function collectThreadFiles(log: ThreadMsg[]): ThreadFile[] {
+  const result: ThreadFile[] = []
+  for (const msg of log) {
+    const cm = toChatMessage(msg)
+    const segments = splitMessageSegments(cm.text ?? "")
+    for (const seg of segments) {
+      if (seg.type === "file") result.push({ file: seg.file, role: cm.role })
+    }
+  }
+  return result
+}
 
 /**
  * Center pane — the selected thread's full conversation + composer.
@@ -268,7 +276,6 @@ export function ThreadConversation({
   // library (kind === "command"); each command's slash invocation is `/${id}`
   // (the id is the command's file-stem slug, e.g. "clean" → `/clean`).
   const { data: library = [] } = useLibrary(agentId)
-  const isEmpty = thread.log.length === 0
   // Command suggestions are built for EVERY thread (not just empty ones): the
   // composer surfaces them both as first-message bubbles on an empty thread AND
   // mid-draft on any thread when the caret's line is a lone `/` (T350). The
@@ -290,32 +297,8 @@ export function ThreadConversation({
   // away from the message the user is reading (T414).
   const bottomRef = useRef<HTMLDivElement>(null)
   const nonAutoCount = useMemo(() => thread.log.filter((m) => !m.auto).length, [thread.log])
-  useEffect(() => {
-    const el = bottomRef.current
-    if (!el) return
-    // Pin the conversation to the bottom on thread-open / new message. This must
-    // CONVERGE, not fire once: the `content-visibility:auto` on each row (the
-    // T510 layout fix) gives every OFF-SCREEN row only its `contain-intrinsic-
-    // size` placeholder height (5rem) until it's scrolled into view. On open all
-    // rows are off-screen, so the container's scrollHeight is an ESTIMATE — a
-    // single `scrollIntoView` lands short of the true bottom (real rows are
-    // usually taller than 5rem), which was the T512 "opens not scrolled down"
-    // regression. Re-scrolling across a few animation frames fixes it: each
-    // scroll reveals the next chunk's REAL heights, the estimate corrects, and
-    // the position converges on the actual bottom within a handful of frames.
-    // `scrollIntoView` forces a synchronous layout, so it's wrapped in measure()
-    // for freeze attribution; a bounded 6-frame loop on thread-open is
-    // imperceptible (~100ms) and not on any hot path.
-    let raf = 0
-    let tries = 0
-    const settle = () => {
-      measure("threads:scrollIntoView", () => el.scrollIntoView({ block: "end" }))
-      tries += 1
-      if (tries < 6) raf = requestAnimationFrame(settle)
-    }
-    raf = requestAnimationFrame(settle)
-    return () => cancelAnimationFrame(raf)
-  }, [thread.id, nonAutoCount])
+  // Pin to the latest message on thread-open / new non-auto message (T414/T512).
+  useScrollPin(bottomRef, thread.id, nonAutoCount)
 
   /** Delete a message from this thread via the agent command bridge. Stable
    *  across renders (deps: agentId + thread.id) so it doesn't defeat the
@@ -333,12 +316,13 @@ export function ThreadConversation({
   // renders an SSE delta triggers, so the memoized AutoRun rows hold too.
   const segments = useMemo(() => segmentLog(thread.log), [thread.log])
 
+  const threadFiles = useMemo(() => collectThreadFiles(thread.log), [thread.log])
+  // Form derivations: answered-state lookup + submit handler (docs/forms.md §5).
+  const { answersByForm, onFormSubmit } = useThreadForms(thread.log, agentId, thread.id)
+
   return (
     <main
-      className="relative flex min-w-0 flex-1 flex-col bg-background"
-      // Discrete drag affordance (T367): a subtle 2px blur over the whole
-      // surface while an OS file drag is in flight, eased 300ms in and out. The
-      // baseline blur(0px) is kept so the OUT direction interpolates too.
+      className="relative flex min-w-0 flex-1 flex-row bg-background"
       style={{
         filter: dragging ? "blur(2px)" : "blur(0px)",
         transition: "filter 300ms ease",
@@ -348,8 +332,7 @@ export function ThreadConversation({
       onDragLeave={dropHandlers.onDragLeave}
       onDrop={dropHandlers.onDrop}
     >
-      {/* Upload progress (T471) — a discrete centered spinner over the surface
-          while a dropped folder/files are zipped + uploaded. */}
+      {/* Upload progress (T471) */}
       {uploading && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/40 backdrop-blur-[1px]">
           <div className="card-shadow flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[12.5px] text-foreground/90">
@@ -358,53 +341,70 @@ export function ThreadConversation({
           </div>
         </div>
       )}
-      {/* messages */}
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="h-px flex-1 bg-border/60" />
-            <span className="text-[10.5px] text-muted-foreground/50">
-              {thread.createdAt} · thread opened
-            </span>
-            <span className="h-px flex-1 bg-border/60" />
+
+      {/* ── Conversation column ── */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="h-px flex-1 bg-border/60" />
+              <span className="text-[10.5px] text-muted-foreground/50">
+                {thread.createdAt} · thread opened
+              </span>
+              <span className="h-px flex-1 bg-border/60" />
+            </div>
+
+            {segments.map((seg) =>
+              seg.type === "auto" ? (
+                <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
+              ) : isFormMessage(seg.msg.text ?? "") ? (
+                <FormMessageRow
+                  key={seg.msg.id}
+                  msg={seg.msg}
+                  agentId={agentId}
+                  threadId={thread.id}
+                  answersByForm={answersByForm}
+                  onFormSubmit={onFormSubmit}
+                  onOpenFile={setSheetFile}
+                  onShowInFinder={onShowInFinder}
+                  onDelete={handleDelete}
+                />
+              ) : (
+                <MessageRow
+                  key={seg.msg.id}
+                  msg={seg.msg}
+                  agentId={agentId}
+                  onOpenFile={setSheetFile}
+                  onShowInFinder={onShowInFinder}
+                  onDelete={handleDelete}
+                />
+              ),
+            )}
+            {/* scroll anchor — keeps the latest message in view */}
+            <div ref={bottomRef} />
           </div>
+        </ScrollArea>
 
-          {segments.map((seg) =>
-            seg.type === "auto" ? (
-              <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
-            ) : (
-              <MessageRow
-                key={seg.msg.id}
-                msg={seg.msg}
-                agentId={agentId}
-                onOpenFile={setSheetFile}
-                onShowInFinder={onShowInFinder}
-                onDelete={handleDelete}
-                onSend={onSend}
-              />
-            ),
-          )}
-          {/* scroll anchor — keeps the latest message in view */}
-          <div ref={bottomRef} />
+        <div className="mx-auto w-full max-w-[720px]">
+          <ThreadComposer
+            key={thread.id}
+            status={thread.status}
+            focused={thread.focused}
+            paused={thread.paused}
+            onSend={onSend}
+            onAttach={onAttach}
+            pendingFiles={pendingFiles}
+            onRemoveFile={onRemoveFile}
+            suggestions={suggestions}
+            firstMessage={thread.log.length === 0}
+            onCreateCommand={() => setCreateCmdOpen(true)}
+            draftKey={`cp-draft-${agentId}-${thread.id}`}
+          />
         </div>
-      </ScrollArea>
-
-      <div className="mx-auto w-full max-w-[720px]">
-        <ThreadComposer
-          key={thread.id}
-          status={thread.status}
-          focused={thread.focused}
-          paused={thread.paused}
-          onSend={onSend}
-          onAttach={onAttach}
-          pendingFiles={pendingFiles}
-          onRemoveFile={onRemoveFile}
-          suggestions={suggestions}
-          firstMessage={isEmpty}
-          onCreateCommand={() => setCreateCmdOpen(true)}
-          draftKey={`cp-draft-${agentId}-${thread.id}`}
-        />
       </div>
+
+      {/* ── File attachments rail ── */}
+      {threadFiles.length > 0 && <FileSidebar files={threadFiles} onOpen={setSheetFile} />}
 
       <QuickLookSheet
         node={sheetFile ? uploadToNode(sheetFile) : null}

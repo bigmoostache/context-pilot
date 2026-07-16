@@ -148,7 +148,8 @@ function MillerColumn({
         onDragLeave: (e: ReactDragEvent) => {
           // Only clear when the cursor actually leaves the whole column, not when
           // it moves onto a child row.
-          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          const related = e.relatedTarget instanceof Node ? e.relatedTarget : null
+          if (!e.currentTarget.contains(related)) {
             setBodyOver(false)
           }
         },

@@ -129,7 +129,7 @@ export function previewOf(t: ThreadDetail): string {
   }
   if (!last) return ""
   if (last.text) return flattenMarkdown(last.text)
-  return last.tool ? `⛭ ${last.tool.name}` : last.questions ? "asked a question" : ""
+  return last.tool ? `⛭ ${last.tool.name}` : ""
 }
 
 /** A persisted composer draft: the unsent text plus the caret/selection range

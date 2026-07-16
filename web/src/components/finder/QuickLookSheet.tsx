@@ -39,7 +39,7 @@ export function QuickLookSheet({
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="border-l border-border p-0 data-[side=right]:w-2/3 data-[side=right]:max-w-none data-[side=right]:sm:max-w-none"
+        className="border-l border-border p-0 data-[side=right]:w-[90%] data-[side=right]:max-w-none data-[side=right]:sm:max-w-none"
       >
         <FinderPreview node={node} agentId={agentId} onClose={onClose} />
       </SheetContent>

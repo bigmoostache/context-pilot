@@ -1,4 +1,4 @@
-import { Boxes, MessagesSquare, Wallet } from "lucide-react"
+import { Boxes, Loader2, MessagesSquare, RefreshCw, Wallet } from "lucide-react"
 import { fmtCost, fmtTokens } from "@/lib/support/panelMeta"
 import type { Agent, StreamPhase } from "@/lib/types"
 
@@ -24,12 +24,34 @@ export function StatusBar({
   fleet = false,
   agents = [],
   activeAgent,
+  connected = true,
+  onRestart,
+  restarting = false,
+  loading = false,
 }: {
   fleet?: boolean
   agents?: Agent[]
   activeAgent?: Agent | undefined
+  /** False when the SSE push plane for this agent is down. */
+  connected?: boolean
+  /** Fires the restart API + full reconnect lifecycle (same as AgentModal Restart). */
+  onRestart?: () => void
+  /** True while the restart lifecycle is in-flight (API call through SSE reconnect). */
+  restarting?: boolean
+  /** True while the agent meta is loading after a switch (show loader, not stale phase). */
+  loading?: boolean
 }) {
-  return fleet ? <FleetStatus agents={agents} /> : <AgentStatus agent={activeAgent} />
+  return fleet ? (
+    <FleetStatus agents={agents} />
+  ) : (
+    <AgentStatus
+      agent={activeAgent}
+      connected={connected}
+      onRestart={onRestart}
+      restarting={restarting}
+      loading={loading}
+    />
+  )
 }
 
 /** Fleet-wide aggregates — shown when no single agent is focused. */
@@ -75,33 +97,53 @@ function resolvePhase(agent?: Agent): StreamPhase {
   return "ready"
 }
 
+/** Pull the footer's numeric vitals off the agent with safe fallbacks, so the
+ *  host component's branch count stays under the complexity budget. */
+function agentVitals(agent?: Agent) {
+  return {
+    costUsd: agent?.costUsd ?? 0,
+    used: agent?.contextUsed ?? 0,
+    budget: agent?.contextBudget ?? 200_000,
+    threshold: agent?.contextThreshold ?? 0,
+    hit: agent?.contextHit ?? 0,
+    miss: agent?.contextMiss ?? 0,
+  }
+}
+
 /** Single-agent session vitals — shown while an agent is focused. */
-function AgentStatus({ agent }: { agent?: Agent | undefined }) {
+function AgentStatus({
+  agent,
+  connected = true,
+  onRestart,
+  restarting = false,
+  loading = false,
+}: {
+  agent?: Agent | undefined
+  connected?: boolean
+  onRestart?: (() => void) | undefined
+  restarting?: boolean
+  loading?: boolean
+}) {
   // Use the LIVE execution phase folded from the PhaseTransition delta (T297)
   // so the footer distinguishes streaming · tooling · ready instead of the old
   // 2-state projection of `status`. Falls back to `status` only before the
   // first phase transition has been observed (phase still undefined).
   const phase: StreamPhase = resolvePhase(agent)
   const p = phaseMeta[phase]
-  const costUsd = agent?.costUsd ?? 0
-
-  // Context-window meter — the agent's OWN authoritative occupancy, folded from
-  // the ContextUsage push delta (T297), so this is byte-identical to the
-  // ratatui sidebar's `used / threshold / budget` line, not a frontend re-sum.
-  const used = agent?.contextUsed ?? 0
-  const budget = agent?.contextBudget ?? 200_000
-  const threshold = agent?.contextThreshold ?? 0
-  // Cache hit/miss split of `used` (hit + miss === used), folded from the same
-  // ContextUsage delta — lets the meter draw ratatui's green/amber segments.
-  const hit = agent?.contextHit ?? 0
-  const miss = agent?.contextMiss ?? 0
+  // Context-window meter figures — the agent's OWN authoritative occupancy +
+  // cache split, folded from the ContextUsage push delta (T297), byte-identical
+  // to the ratatui sidebar.
+  const { costUsd, used, budget, threshold, hit, miss } = agentVitals(agent)
 
   return (
     <footer className="vibrancy flex h-8 shrink-0 items-center gap-3 border-t border-border px-4 text-[12px]">
-      <span className="flex items-center gap-1.5">
-        <span className="size-2 rounded-full" style={{ background: p.color }} />
-        <span className="font-medium text-foreground/80">{p.label}</span>
-      </span>
+      <StatusIndicator
+        phase={p}
+        connected={connected}
+        restarting={restarting}
+        loading={loading}
+        onRestart={onRestart}
+      />
 
       <span className="ml-auto flex items-center gap-3">
         <ContextBar used={used} threshold={threshold} budget={budget} hit={hit} miss={miss} />
@@ -109,6 +151,59 @@ function AgentStatus({ agent }: { agent?: Agent | undefined }) {
         <span className="text-muted-foreground tabular-nums">{fmtCost(costUsd)}</span>
       </span>
     </footer>
+  )
+}
+
+/** The footer's left indicator: a loading / restarting / connected phase dot, or
+ *  a clickable "Disconnected" restart button when the push plane is down.
+ *  Extracted from {@link AgentStatus} so its host stays under the complexity
+ *  budget — this is where the four-way state cascade lives. */
+function StatusIndicator({
+  phase,
+  connected,
+  restarting,
+  loading,
+  onRestart,
+}: {
+  phase: { label: string; color: string }
+  connected: boolean
+  restarting: boolean
+  loading: boolean
+  onRestart?: (() => void) | undefined
+}) {
+  if (loading) {
+    return (
+      <span className="flex items-center gap-1.5">
+        <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+        <span className="text-muted-foreground">Loading…</span>
+      </span>
+    )
+  }
+  if (restarting) {
+    return (
+      <span className="flex items-center gap-1.5">
+        <RefreshCw className="size-3.5 animate-spin text-muted-foreground" />
+        <span className="font-medium text-muted-foreground">Restarting…</span>
+      </span>
+    )
+  }
+  if (connected) {
+    return (
+      <span className="flex items-center gap-1.5">
+        <span className="size-2 rounded-full" style={{ background: phase.color }} />
+        <span className="font-medium text-foreground/80">{phase.label}</span>
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={onRestart}
+      className="flex cursor-pointer items-center gap-1.5 rounded-sm px-1 py-0.5 transition-colors hover:bg-muted"
+    >
+      <span className="size-2 rounded-full bg-(--danger)" />
+      <span className="font-medium text-(--danger)">Disconnected</span>
+    </button>
   )
 }
 

@@ -82,24 +82,6 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
         }
     }
 
-    if let Some(v) = tool.input.get("max_cost") {
-        if v.is_null() {
-            SpineState::get_mut(state).config.max_cost = None;
-            changes.push("max_cost = disabled".to_string());
-        } else if let Some(n) = v.as_f64() {
-            if n <= 0.0 {
-                return ToolResult::new(
-                    tool.id.clone(),
-                    "Error: max_cost <= 0 would permanently block all auto-continuation. Use null to disable."
-                        .to_string(),
-                    true,
-                );
-            }
-            SpineState::get_mut(state).config.max_cost = Some(n);
-            changes.push(format!("max_cost = ${n:.2}"));
-        }
-    }
-
     if let Some(v) = tool.input.get("max_duration_secs") {
         if v.is_null() {
             SpineState::get_mut(state).config.max_duration_secs = None;

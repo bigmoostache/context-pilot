@@ -23,9 +23,10 @@
 //!    and `0600` (design doc §10). Writing it last means any earlier failure
 //!    leaves no discovery record pointing at half-acquired resources.
 //!
-//! On drop, the registry record and the socket file are removed (best-effort)
-//! so the backend observes a clean disappearance; the lock and the oplog thread
-//! are released by their own `Drop`.
+//! On drop, the stream socket is removed (best-effort) and the oplog thread
+//! is joined; the **registry record is intentionally kept** so the backend
+//! observes a stale agent (shown as "Disconnected" in the fleet) rather than a
+//! clean disappearance. The lock is released by its own `Drop`.
 //!
 //! # Module layout
 //!
@@ -94,9 +95,6 @@ pub struct Boot {
 
     /// The discovery record written to the agents directory.
     entry: Entry,
-
-    /// The agents directory the registry record lives in (for drop cleanup).
-    agents_dir: PathBuf,
 
     /// The bound socket's path (for drop cleanup).
     socket_path: PathBuf,
@@ -217,15 +215,7 @@ impl Boot {
         // `Lifecycle::Stopping` emitted on `Drop`.
         oplog.submit_durable(OpEntryKind::Lifecycle { state: LifecycleState::Running });
 
-        Ok(Self {
-            _lock: lock,
-            oplog,
-            listener,
-            entry,
-            agents_dir: agents_dir.to_path_buf(),
-            socket_path,
-            _heartbeat: heartbeat,
-        })
+        Ok(Self { _lock: lock, oplog, listener, entry, socket_path, _heartbeat: heartbeat })
     }
 
     /// The agent's stable registry id (FNV-1a of its canonical folder path).
@@ -260,25 +250,27 @@ impl Boot {
 }
 
 impl Drop for Boot {
-    /// Remove the discovery record and socket file so the backend sees a clean
-    /// disappearance. The lock and oplog thread release via their own `Drop`.
+    /// Emit a durable [`Lifecycle::Stopping`] delta and remove the stream
+    /// socket. The lock and oplog thread release via their own `Drop`.
     ///
-    /// Before tearing down, append a durable [`Lifecycle::Stopping`] delta so the
-    /// backend's view records an *authoritative* graceful shutdown (I8) rather
-    /// than inferring it from the heartbeat going stale. The append is the
-    /// non-blocking durable path; the `oplog` field drops *after* this body, and
-    /// its commit thread drains every queued job before joining
-    /// (`Service::drop`), so the Stopping record is `fdatasync`'d before exit.
-    /// On a hard kill (`SIGKILL`) this body never runs — the backend then falls
-    /// back to liveness (flock release + stale heartbeat), which is the
-    /// intended best-effort-graceful contract.
+    /// The **registry record is intentionally kept**: the orchestrator's
+    /// liveness check detects the dead PID / stale heartbeat and surfaces the
+    /// agent as "Disconnected" in the fleet rather than making it vanish. A
+    /// subsequent boot in the same folder overwrites the stale record
+    /// atomically and the agent transitions back to Live. Retirement is the
+    /// only mechanism that removes a registry record for good.
+    ///
+    /// The append is the non-blocking durable path; the `oplog` field drops
+    /// *after* this body, and its commit thread drains every queued job before
+    /// joining (`Service::drop`), so the Stopping record is `fdatasync`'d
+    /// before exit. On a hard kill (`SIGKILL`) this body never runs — the
+    /// backend then falls back to liveness (flock release + stale heartbeat),
+    /// which is the intended best-effort-graceful contract.
     ///
     /// [`Lifecycle::Stopping`]: cp_wire::types::LifecycleState::Stopping
     fn drop(&mut self) {
         self.oplog.submit_durable(OpEntryKind::Lifecycle { state: LifecycleState::Stopping });
 
-        let registry = registry::path(&self.agents_dir, &self.entry.id);
-        let _registry_removed = fs::remove_file(&registry);
         let _socket_removed = fs::remove_file(&self.socket_path);
     }
 }
@@ -355,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn drop_removes_registry_record() {
+    fn drop_keeps_registry_record() {
         let folder = tempdir().expect("folder");
         let agents = tempdir().expect("agents");
         let registry;
@@ -364,7 +356,7 @@ mod tests {
             registry = registry::path(agents.path(), booted.id());
             assert!(registry.exists());
         }
-        assert!(!registry.exists(), "registry record removed on graceful drop");
+        assert!(registry.exists(), "registry record must survive graceful drop (agent shows as Disconnected)");
     }
 
     #[test]

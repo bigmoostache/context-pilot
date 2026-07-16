@@ -289,10 +289,14 @@ function useThreadActions(activeAgentId: string, threads: ThreadDetail[], sel: S
 export function ThreadsView({
   activeAgentId,
   onShowInFinder,
+  disconnected,
+  onReconnect,
 }: {
   activeAgentId: string
   /** navigate the Finder to a file's parent directory and select it (T334) */
   onShowInFinder?: (path: string) => void
+  disconnected?: boolean
+  onReconnect?: () => void
 }) {
   const { data: agents = [] } = useFleet()
   const { data: threads = [] } = useThreads(activeAgentId)
@@ -311,7 +315,21 @@ export function ThreadsView({
   const thread = threads.find((t) => t.id === sel.effectiveSelectedId)
 
   return (
-    <div className="flex min-h-0 flex-1">
+    <div
+      className="relative flex min-h-0 flex-1"
+      style={
+        disconnected
+          ? { filter: "blur(3px) grayscale(0.5)", transition: "filter 300ms" }
+          : { transition: "filter 300ms" }
+      }
+    >
+      {disconnected && (
+        <button
+          onClick={onReconnect}
+          className="absolute inset-0 z-40 cursor-pointer bg-background/30"
+          aria-label="Reconnect to agent"
+        />
+      )}
       <ThreadList
         threads={threads}
         selectedId={sel.effectiveSelectedId}

@@ -36,7 +36,7 @@ export type Agent = {
     outputTokens?: number;
     phase?: 'idle' | 'streaming' | 'tooling';
     provider?: string;
-    status: 'working' | 'needs-you' | 'idle';
+    status: 'working' | 'needs-you' | 'idle' | 'disconnected';
     task?: string;
     threads: number;
 };
@@ -358,6 +358,7 @@ export type OpEntryKind = {
     name?: string;
     output_tokens?: number;
     phase?: string;
+    state?: string;
     status?: string;
     thread_id?: string;
     threshold_tokens?: number;
@@ -462,19 +463,9 @@ export type ThreadMsg = {
     auto?: boolean;
     fileRef?: string;
     id: string;
-    questions?: Array<ThreadQuestion>;
     text?: string;
     tool?: ToolCall;
     ts?: number;
-};
-
-export type ThreadQuestion = {
-    allowOther?: boolean;
-    answered?: Array<string>;
-    header?: string;
-    multi?: boolean;
-    options: Array<string>;
-    prompt: string;
 };
 
 export type ThreadsResponse = {

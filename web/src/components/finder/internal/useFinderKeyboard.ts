@@ -172,7 +172,8 @@ export function useFinderKeyboard(d: KeyboardDeps) {
   const typeTimerRef = useRef<number | undefined>(undefined)
 
   return (e: React.KeyboardEvent) => {
-    const tag = (e.target as HTMLElement).tagName
+    if (!(e.target instanceof HTMLElement)) return
+    const tag = e.target.tagName
     if (tag === "INPUT" || tag === "TEXTAREA") return
 
     const idx = d.focusPath ? d.sorted.findIndex((n) => n.path === d.focusPath) : -1

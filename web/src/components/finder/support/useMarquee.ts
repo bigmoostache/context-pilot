@@ -79,7 +79,8 @@ export function useMarquee({
   const onPointerDown = useCallback(
     (e: ReactMouseEvent) => {
       if (!enabled || e.button !== 0) return
-      if ((e.target as HTMLElement).closest("[data-finder-item]")) return // press on a cell → click
+      if (!(e.target instanceof HTMLElement)) return
+      if (e.target.closest("[data-finder-item]")) return // press on a cell → click
       const additive = e.metaKey || e.ctrlKey
       dragRef.current = {
         ox: e.clientX,

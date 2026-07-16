@@ -32,12 +32,14 @@ pub(crate) fn boot_extract_module_data(cfg: &BootConfig) -> BootModuleData {
 pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData, mut progress: impl FnMut(&str)) {
     // Load .env files FIRST — modules read env vars during init_state
     // (e.g. DATALAB_API_KEY for OCR, GITHUB_TOKEN for gh).
-    // Project-specific .env takes priority (dotenvy won't override existing).
-    let _local = dotenvy::dotenv().ok();
-    // Global .env as fallback (only sets vars not already present).
+    // Override mode so file values always win over stale shell env vars
+    // (e.g. BRAVE_API_KEY inherited from parent).  Global loads second
+    // and overrides project-local — it's where vault.set() writes.
+    let _local = dotenvy::dotenv_override().ok();
+    // Global .env overrides project-local (latest user intent from settings page).
     if let Ok(home) = std::env::var("HOME") {
         let global_env = std::path::PathBuf::from(home).join(".context-pilot").join(".env");
-        let _global = dotenvy::from_path(&global_env).ok();
+        let _global = dotenvy::from_path_override(&global_env).ok();
     }
 
     // Trigger vault initialization (reads env vars loaded above) and warn

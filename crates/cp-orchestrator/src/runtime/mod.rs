@@ -36,6 +36,9 @@ use std::time::{Duration, SystemTime};
 
 mod seed;
 
+use cp_wire::types::LifecycleState;
+use cp_wire::types::oplog::OpEntryKind;
+
 use crate::channel::Tailer;
 use crate::registry::tee_reader::TeeReader;
 use crate::registry::{AgentRegistry, Event};
@@ -285,6 +288,25 @@ fn driver_loop(
                     let _removed = config_mtimes.remove(id);
                 }
             }
+
+            // Sync liveness for ALL known agents on every scan. The registry
+            // emits `Event::Stale` on a Live→non-live transition but has NO
+            // recovery event for Stale→Live. Without this sync, a briefly-stale
+            // agent that recovers (heartbeat resumes, PID alive) would stay
+            // "disconnected" in the Backend forever. Mark recovered agents dirty
+            // so the SSE invalidate fires promptly.
+            if let Ok(mut b) = backend.lock() {
+                for id in agent_folders.keys() {
+                    if let Some(live) = registry.liveness(id) {
+                        let prev = b.liveness.get(id).copied();
+                        let _prev = b.liveness.insert(id.clone(), live);
+                        // Agent recovered from stale — notify frontend.
+                        if prev.is_some_and(|p| !p.is_live()) && live.is_live() {
+                            b.mark_dirty(id);
+                        }
+                    }
+                }
+            }
         }
 
         // 2. Detect tier-② INSPECTION-resource changes by checking config.json
@@ -344,6 +366,9 @@ fn process_registry_events(
                     old.stop();
                 }
                 let _prev = agent_folders.insert(entry.id.clone(), folder);
+                if let Ok(mut b) = backend.lock() {
+                    let _prev = b.liveness.insert(entry.id.clone(), crate::liveness::Liveness::Live);
+                }
             }
             Event::Disappeared(id) => {
                 let _removed = tailers.remove(id);
@@ -353,18 +378,29 @@ fn process_registry_events(
                 let _removed = agent_folders.remove(id);
                 if let Ok(mut b) = backend.lock() {
                     let _removed = b.view_mut().remove(id);
+                    let _removed = b.liveness.remove(id);
                 }
             }
-            Event::StatusChanged(..) | Event::Stale(..) => {
-                // StatusChanged and Stale are informational for the registry
-                // layer; the view reflects phase/lifecycle from the oplog, so
-                // no view mutation needed here.
+            Event::Stale(id, reason) => {
+                // Store the stale verdict so fleet meta returns "disconnected",
+                // and mark the agent dirty so the SSE invalidate fires promptly
+                // (the frontend refetches agent meta within ~2s, not 15s).
+                if let Ok(mut b) = backend.lock() {
+                    let _prev = b.liveness.insert(id.clone(), *reason);
+                    b.mark_dirty(id);
+                }
             }
+            Event::StatusChanged(..) => {}
         }
     }
 }
 
 /// Poll every agent's tailer and fold new entries into the shared backend.
+///
+/// When a `Lifecycle::Stopping` entry is seen, the agent is marked stale and
+/// dirty immediately — this pushes "disconnected" to the frontend within one
+/// SSE invalidate cycle (~ms) rather than waiting for the registry scan (~2s)
+/// to notice the dead PID.
 fn tail_all_agents(backend: &Arc<Mutex<Backend>>, tailers: &mut HashMap<String, Tailer>) {
     for (id, tailer) in tailers.iter_mut() {
         let entries = match tailer.poll() {
@@ -375,8 +411,15 @@ fn tail_all_agents(backend: &Arc<Mutex<Backend>>, tailers: &mut HashMap<String, 
             continue;
         }
 
+        let has_stopping =
+            entries.iter().any(|e| matches!(&e.kind, OpEntryKind::Lifecycle { state: LifecycleState::Stopping }));
+
         if let Ok(mut b) = backend.lock() {
             b.view_mut().apply_batch(id, &entries);
+            if has_stopping {
+                let _prev = b.liveness.insert(id.clone(), crate::liveness::Liveness::StalePid);
+                b.mark_dirty(id);
+            }
         }
     }
 }

@@ -29,10 +29,14 @@ type SseListener = (event: SseEvent) => void
 export interface SseClient {
   /** Register a listener for a specific event type (or "*" for all). */
   subscribe(type: SseEventType | "*", listener: SseListener): () => void
+  /** Register a callback for connection state changes. Returns unsubscribe. */
+  subscribeConnection(callback: (connected: boolean) => void): () => void
   /** Permanently close (no reconnect). */
   close(): void
   /** True if currently connected. */
   readonly connected: boolean
+  /** True once the first successful connection has occurred. */
+  readonly hasEverConnected: boolean
 }
 
 /** Shared per-agent SSE clients (singleton per agentId). */
@@ -60,9 +64,11 @@ const RECONNECT_MAX_MS = 30_000
 
 function createSseClient(agentId: string): SseClient {
   const listeners = new Map<string, Set<SseListener>>()
+  const connectionListeners = new Set<(connected: boolean) => void>()
   let es: EventSource | null = null
   let lastEventId: string | undefined
   let closed = false
+  let everConnected = false
   // Read `closed` through a getter at sites inside synchronous callbacks
   // (es.onerror): a direct `!closed` there is narrowed by control-flow analysis
   // to the literal initializer (its only mutation is in the deferred `close()`),
@@ -94,6 +100,8 @@ function createSseClient(agentId: string): SseClient {
 
       es.addEventListener("open", () => {
         reconnectMs = RECONNECT_BASE_MS
+        everConnected = true
+        connectionListeners.forEach((fn) => fn(true))
       })
 
       // Named events from the backend
@@ -107,6 +115,7 @@ function createSseClient(agentId: string): SseClient {
       es.addEventListener("error", () => {
         es?.close()
         es = null
+        connectionListeners.forEach((fn) => fn(false))
         if (!isClosed()) scheduleReconnect()
       })
     } catch {
@@ -116,7 +125,7 @@ function createSseClient(agentId: string): SseClient {
 
   function scheduleReconnect() {
     const jitter = Math.random() * 0.5 * reconnectMs
-    setTimeout(() => connect(), reconnectMs + jitter)
+    setTimeout(() => void connect(), reconnectMs + jitter)
     reconnectMs = Math.min(reconnectMs * 2, RECONNECT_MAX_MS)
   }
 
@@ -136,6 +145,12 @@ function createSseClient(agentId: string): SseClient {
         if (set.size === 0) listeners.delete(type)
       }
     },
+    subscribeConnection(callback) {
+      connectionListeners.add(callback)
+      return () => {
+        connectionListeners.delete(callback)
+      }
+    },
     close() {
       closed = true
       es?.close()
@@ -144,6 +159,9 @@ function createSseClient(agentId: string): SseClient {
     },
     get connected() {
       return es?.readyState === EventSource.OPEN
+    },
+    get hasEverConnected() {
+      return everConnected
     },
   }
 

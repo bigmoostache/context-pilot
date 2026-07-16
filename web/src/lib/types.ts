@@ -12,13 +12,7 @@
 // authoritative source — edits go through the Rust types → openapi.json →
 // codegen pipeline, never by hand.
 
-export type {
-  AccentToken,
-  FinderKind,
-  LibraryItem,
-  ThreadQuestion,
-  ToolCall,
-} from "./api/generated/types.gen"
+export type { AccentToken, FinderKind, LibraryItem, ToolCall } from "./api/generated/types.gen"
 
 // ── Extended re-exports (generated base + UI-only fields) ────────────
 
@@ -28,12 +22,17 @@ import type {
   FinderNode as GenFinderNode,
   ThreadDetail as GenThreadDetail,
   ThreadMsg as GenThreadMsg,
-  ThreadQuestion,
 } from "./api/generated/types.gen"
 
-/** Agent with UI-only `accent` field (computed client-side in reducers). */
-export type Agent = GenAgent & {
+/**
+ * Agent with UI-only `accent` field (computed client-side in reducers) and a
+ * `status` widened to include the client-only `"waiting"` restart status (set
+ * by {@link useRestartFlow}; never emitted by the backend). The base
+ * `GenAgent["status"]` is the narrow backend union, so we override it here.
+ */
+export type Agent = Omit<GenAgent, "status"> & {
   accent: AccentToken
+  status: AgentStatus
 }
 
 /**
@@ -44,10 +43,9 @@ export type Agent = GenAgent & {
  * string (see reducers `message_created`), and the mock fixtures use display
  * strings. Consumers normalise both (`typeof ts === "number" ? … : new Date(ts)`).
  */
-export type ThreadMsg = Omit<GenThreadMsg, "ts" | "questions"> & {
+export type ThreadMsg = Omit<GenThreadMsg, "ts"> & {
   ts?: number | string | undefined
   streaming?: boolean | undefined
-  questions?: ThreadQuestion[] | undefined
 }
 
 /** ThreadDetail re-exported as-is (field optionality matches backend). */
@@ -57,7 +55,12 @@ export type ThreadDetail = Omit<GenThreadDetail, "log"> & {
 
 // ── Derived type aliases (extracted from generated union literals) ────
 
-export type AgentStatus = GenAgent["status"]
+/**
+ * Agent status — backend statuses plus the client-only `"waiting"` status set
+ * by {@link useRestartFlow} during a controlled restart. The new agent's
+ * `Lifecycle::Running` delta naturally clears it back to `"idle"`.
+ */
+export type AgentStatus = GenAgent["status"] | "waiting"
 export type ThreadStatus = GenThreadDetail["status"]
 
 // ── UI-only types (no backend equivalent) ────────────────────────────

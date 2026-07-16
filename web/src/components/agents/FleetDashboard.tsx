@@ -21,6 +21,8 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
   working: { label: "Working", color: "var(--interactive)" },
   "needs-you": { label: "Needs input", color: "var(--signal)" },
   idle: { label: "Standby", color: "var(--muted-foreground)" },
+  disconnected: { label: "Disconnected", color: "var(--danger)" },
+  waiting: { label: "Restarting", color: "var(--interactive)" },
 }
 
 type Modal = { mode: "create" } | { mode: "manage"; agent: Agent } | null

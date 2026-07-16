@@ -7,64 +7,28 @@
   - spine
   last_edited_ms: 0
 07f9cb0fc782bcee:
-  tl_dr: 'Meilisearch design complete (9 rounds). Embedded global server, cp-mod-search crate, tree-sitter chunking, unified search tool, log redesign (drop summarization, add tags/importance). Full spec: docs/design-meilisearch.md, branch ''meilisearch''.'
-  importance: critical
+  tl_dr: 'Meilisearch design complete. Embedded global server, cp-mod-search crate, tree-sitter chunking, unified search tool, log redesign. Full spec: docs/design-meilisearch.md.'
+  importance: high
   labels:
   - architecture
   - meilisearch
-  - design
-  last_edited_ms: 0
+  last_edited_ms: 1784202976545
 0c509f3ad4df7597:
   tl_dr: 'Reverie supports multiple concurrent sub-agents (one per agent type). HashMap<String, ReverieState> keyed by agent_id. UI shows one card per active reverie. Tool cap: 50.'
-  contents: |-
-    - State: HashMap<String, ReverieState> in runtime.rs, HashMap<String, ReverieStream> in App
-    - Guards check per-agent (reveries.contains_key(agent_id)), not global
-    - Auto-trigger only blocks if 'cleaner' is already running
-    - Manual trigger (optimize_context tool) accepts 'agent' param, default 'cleaner'
-    - UI renders one status card per active reverie with spinner + tool count
-    - ReverieContext struct includes agent_id for context.rs panel content lookup
-    - Built-in agents: 'cleaner' (context optimizer), 'cartographer' (tree describer)
-    - Tool cap: 50 calls per run (REVERIE_TOOL_CAP in constants.rs)
+  contents: 'HashMap<String, ReverieState> keyed by agent_id. UI shows one card per active reverie. Built-in: cleaner (context optimizer), cartographer (tree describer). Tool cap: 50.'
   importance: critical
   labels:
   - architecture
   - feature
   - reverie
-  last_edited_ms: 0
+  last_edited_ms: 1784203006424
 12fd8ad76d4cafda:
-  tl_dr: 'Think tool v4 (May 4): Single param (thought_body). ThinkState{consecutive_count:i32, reminder_threshold:i32, next_notification_at:i32}.'
-  contents: |-
-    ## Counter Logic
-    - Think called: counter = max(1, counter+1)
-    - Any other tool: counter = min(0, counter-1)
-
-    ## Notification System
-    - Fires at next_notification_at, advances by reminder_threshold each time
-    - Resets next_notification_at to reminder_threshold when Think is called
-    - Message: "Please think more. Thinking is both cheap in tokens, and drastically augments your performances."
-    - No % operator (banned by clippy) — uses marker tracking instead
-
-    ## Queue Bypass
-    - Think bypasses queue intercept in pipeline.rs (tool.name != "Think" check)
-
-    ## UI
-    - Status bar card: ThinkCard (red bg) shows negative balance, hidden when >= 0
-    - Config overlay (Ctrl+H): Think nudge threshold with [ ] keys, default -5, capped at -1 min
-    - Config overlay trimmed: removed theme picker, API check section, reduced separators to 1 line
-
-    ## State
-    - pub(crate) ThinkState re-exported from questions/mod.rs
-    - Stored via ext/ext_mut on State, serialized via save/load_worker_data
-    - Actions: ConfigThinkThresholdUp/Down in actions.rs, events.rs ([ ] keys)
-
-    ## Files Changed
-    think.rs, questions/mod.rs, core.yaml, actions.rs, events.rs, actions/mod.rs, config_overlay.rs, frame.rs, status_bar.rs, render_status_bar.rs, pipeline.rs, infra/config.rs
+  tl_dr: 'Think tool v4: single param (thought_body). ThinkState{consecutive_count, reminder_threshold, next_notification_at}. Fires reminder at threshold. Queue bypass. TUI card shows negative balance.'
   importance: high
   labels:
   - think-tool
   - architecture
-  - feature
-  last_edited_ms: 0
+  last_edited_ms: 1784202976528
 136daa3a4207df23:
   tl_dr: 'TAILSCALE SERVE: Context Pilot at https://macbook.barking-hue.ts.net (tailnet-only). Command: tailscale serve --bg --https=443 http://127.0.0.1:5174. Single-origin fix: vite proxy /api→:7878, VITE_API_URL= empty in .env.local. Requires vite+orchestrator running.'
   importance: high
@@ -76,85 +40,36 @@
   - web
   last_edited_ms: 1782121419935
 13a1d96ff4a4e7d0:
-  tl_dr: 'Context Pilot is a Rust TUI AI coding assistant (~15K LOC) built with Ratatui+Crossterm. Workspace has 18 module crates + 1 main binary. Branch: reverie-context-optimizer with +209 lines in src/app/reverie/tools.rs'
-  importance: high
-  last_edited_ms: 0
+  tl_dr: 'Context Pilot: Rust TUI AI coding assistant built with Ratatui+Crossterm. Workspace has 22+ crates + 1 main binary.'
+  importance: medium
+  labels:
+  - architecture
+  - overview
+  last_edited_ms: 1784202931972
 141fecab40a0635e:
   tl_dr: 'Claude Code V2: only `diagnostics` body field is internal-only (400). thinking/output_config/context_management/temperature/top_p/top_k all WORK with the 9 beta flags. V2 = headers + models opus-4-8, fable-5, sonnet-4-6.'
-  contents: |-
-    ## Claude Code V2 Provider — Working Configuration
-
-    Built from Claude Code CLI v2.1.170 mitmproxy capture. OAuth Bearer token (Keychain / ~/.claude/.credentials.json).
-
-    ### Verified ACCEPTED body tunables (probed 2026-06-10 via curl, sonnet-4-6):
-    - `thinking: {type: "adaptive"}` — Claude Code default, model self-budgets
-    - `thinking: {type: "enabled", budget_tokens: N}` — forced thinking blocks
-    - `output_config: {effort: "low"|"medium"|"high"}` — reasoning/output effort dial
-    - `context_management: {edits: [{type: "clear_tool_uses_20250919"}]}` — server-side context pruning
-    - `temperature`, `top_p`, `top_k` — standard sampling
-
-    ### REJECTED (400 'Extra inputs are not permitted'):
-    - `diagnostics: {previous_message_id: null}` — internal telemetry. SOLE culprit of original 400.
-
-    ### Current request body (minimal V1-style):
-    `{model, max_tokens, system, messages, tools, stream}`
-
-    ### V2 headers:
-    - 9 beta flags: claude-code-20250219, oauth-2025-04-20, interleaved-thinking-2025-05-14, context-management-2025-06-27, prompt-caching-scope-2026-01-05, structured-outputs-2025-12-15, files-api-2025-04-14, mcp-client-2025-04-04, token-efficient-tools-2025-02-19
-    - BILLING HEADER now SYSTEMATICALLY appends `cc_is_subagent=true;` (2026-06-10) — captured CC subagent traffic carries this flag; main-agent traffic does not. Experiment: may route through distinct billing/rate bucket. Confirmed still HTTP 200 + streams fine.
-    - user-agent claude-cli/2.1.170 (external, sdk-cli)
-
-    ### Models (all verified HTTP 200 + echo):
-    - claude-opus-4-8 ($5/$25, 200K ctx)
-    - claude-fable-5 ($10/$50, ctx CAPPED at 400K — overrides full 1M window, per user 2026-06-10)
-    - claude-sonnet-4-6 ($3/$15, 1M ctx standard pricing)
-
-    ### Subagent request format (mitmproxy capture, 18 reqs):
-    Main agent=opus-4-8, 10 tools (incl Edit/Write/Agent), thinking adaptive, output_config effort:high, context_management, max_tokens 64000. Subagent=haiku-4-5, 4 tools (Bash/Read/Skill/ToolSearch — no mutate/recursion), thinking disabled, temperature set, max_tokens 32000. Three subagent markers: (1) cc_is_subagent=true in billing header; (2) file-search-specialist system prompt w/ READ-ONLY sandbox; (3) restricted toolset.
-
-    Reuses helpers + parse_sse_stream from claude_code_api_key.
+  contents: 'Claude Code V2: OAuth Bearer, 9 beta headers. Models: opus-4-8 ($5/$25 200K), fable-5 ($10/$50 400K cap), sonnet-4-6 ($3/$15 1M). Thinking adaptive works. diagnostics body field = sole 400 culprit. Subagent = haiku-4-5, 4 tools (read-only), cc_is_subagent=true billing header.'
   importance: high
   labels:
   - llm-provider
   - claude-code
   - api
   - v2
-  last_edited_ms: 0
+  last_edited_ms: 1784203006404
 1552560f9d4055af:
   tl_dr: 'Datalab OCR API: POST /api/v1/convert (multipart, X-Api-Key). Poll GET /convert/{id}. Returns markdown. Old /marker and /ocr endpoints deprecated.'
-  contents: |-
-    ## Endpoint Details
-    - **Submit**: POST https://www.datalab.to/api/v1/convert
-      - Content-Type: multipart/form-data
-      - Auth: X-Api-Key header
-      - Params: mode (fast/balanced/accurate), output_format (markdown/html/json/chunks), max_pages, page_range, paginate, disable_image_extraction, disable_image_captions
-    - **Poll**: GET https://www.datalab.to/api/v1/convert/{request_id}
-      - Returns: status, markdown, html, json, chunks fields
-      - Wait until status='complete'
-    - Old /api/v1/ocr and /api/v1/marker are DEPRECATED — use /convert
-    - reqwest needs `multipart` feature for file upload
-    - OCR extensions: pdf, png, jpg, jpeg, tiff, bmp, webp, heic, gif
-    - **For markdown mode**: output_format='markdown'
-    - **For text boxes mode**: output_format='json' — returns blocks with bounding boxes and block types
+  contents: 'Endpoint: POST https://www.datalab.to/api/v1/convert (multipart, X-Api-Key). Poll: GET /api/v1/convert/{id}. Params: mode, output_format (markdown/html/json/chunks), max_pages, page_range. Old /marker and /ocr deprecated.'
   importance: high
   labels:
   - datalab
   - api
   - ocr
   - phase9
-  last_edited_ms: 0
+  last_edited_ms: 1784203006408
 184c1ab0bcb8dbb0:
   tl_dr: 'Context Pilot env vars: ANTHROPIC_API_KEY, BRAVE_API_KEY, FIRECRAWL_API_KEY, GITHUB_TOKEN (core). Optional LLM providers and chat bridge tokens. Loaded via dotenvy from .env, fallback to global config.'
   importance: high
   last_edited_ms: 0
-18e8f59aa30c4b6e:
-  tl_dr: 'MOBILE WEB (T313/T313-NATIVE): ABANDONED per T320. The mobile branch was dropped entirely (local + origin/mobile deleted) and the repo returned to demaquetting; all mobile work discarded by user decision.'
-  importance: low
-  labels:
-  - mobile
-  - abandoned
-  - T320
-  last_edited_ms: 1782121419939
 1f7ae27d462497dd:
   tl_dr: NEVER touch Tailscale or network configuration on Mac Mini 'gilbert'. User explicitly forbids it. Tailscale already configured. Deploy Context Pilot without any network changes.
   importance: critical
@@ -165,91 +80,30 @@
   - tailscale
   last_edited_ms: 1783602624394
 2abaa3035bec794f:
-  tl_dr: X522 Harbor adapter + X524 dry-run COMPLETE & PASSED end-to-end. Reward 1.0 on break-filter-js-from-html (mXSS). v0.2.1 glibc-fixed bundle + diagnosability fix validated. Ready for X525 official -k 5 run. X526 (submit) gated on HF window (~end June).
-  contents: |-
-    ## X522 — Harbor installed-agent adapter
-
-    File: benchmarks/terminal-bench/context_pilot_agent.py (188 lines, py_compile clean).
-
-    ### Verified against real Harbor source (fetched, not guessed):
-    - base.py: BaseInstalledAgent.install(env) async; exec_as_root/exec_as_agent(environment, command, env=, cwd=, timeout_sec=) RAISE on non-zero exit; run(instruction, environment, context) async abstract + @with_prompt_template; _get_env(key); static version().
-    - context.py AgentContext fields: n_input_tokens, n_cache_tokens, n_output_tokens, cost_usd, rollout_details, metadata (all Optional).
-    - claude_code.py reference: reads self.model_name (Harbor -m 'anthropic/claude-sonnet-4-6'), strips provider via split('/')[-1]; sets context.cost_usd/n_*_tokens from final metrics. _resolve_model() mirrors this.
-
-    ### Trajectory alignment (headless.rs TrajectoryWriter):
-    final event emits {status, messages, output_tokens, total_cost_usd, duration_secs}. Adapter reads exactly those.
-
-    ### Exit-code tolerance: '|| true' so guard-rail(2)/error(1) does NOT raise + mark trial errored.
-
-    ### ⚠️ MODEL-MAPPING BUG (confirmed 2026-06-11, batch 2 run 19-49-28):
-    apply_provider_model in headless.rs only maps --model onto state.anthropic_model for the ANTHROPIC FAMILY (Anthropic|ClaudeCode|ClaudeCodeApiKey). When CP_PROVIDER=claude_code_v2, --model claude-sonnet-4-6 is IGNORED -> falls back to ClaudeCodeV2Model::default() = ClaudeOpus48. So batch 2 ACTUALLY RAN OPUS 4.8, not Sonnet 4.6. Captain decision: let batch 2 finish on Opus; for FUTURE runs use v2 provider + Sonnet 4.6 -> MUST FIX apply_provider_model to map --model onto state.claude_code_v2_model (claude-sonnet-4-6/sonnet->ClaudeSonnet46, claude-opus-4-8/opus->ClaudeOpus48, claude-fable-5/fable->ClaudeFable5).
-  importance: high
+  tl_dr: 'Harbor adapter (context_pilot_agent.py) validated. Reward 1.0 on break-filter-js-from-html. Model-mapping bug: apply_provider_model ignores --model for claude_code_v2 provider.'
+  importance: medium
   labels:
   - terminal-bench
   - harbor
-  - x522
-  - x524
-  - complete
-  - validated
-  last_edited_ms: 0
+  last_edited_ms: 1784202931982
 2bfb816e017b246e:
-  tl_dr: 'DOCUMENTATION PHASE: Ignore structure-check callback warnings about files >500 lines during doc additions. Lines will grow temporarily — that''s expected and acceptable.'
-  importance: critical
+  tl_dr: 'DOCUMENTATION PHASE: Ignore structure-check callback warnings about files >500 lines during doc additions. Temporarily acceptable.'
+  importance: medium
   labels:
   - workflow
   - documentation
-  - structure-check
-  last_edited_ms: 0
+  last_edited_ms: 1784202949004
 2fb69a4032fb9c9e:
-  tl_dr: 'OPERATING MODEL: harbor auto-loop STOPPED. I am the only loop — launch ONE task at a time, monitor to completion. GATES per task: (1) Claude OAuth >=40% free; (2) SSE freeze fixed (v0.2.4 watchdog, now LIVE). CORRECTED launch syntax in contents.'
+  tl_dr: 'OPERATING MODEL: harbor auto-loop STOPPED. Launch ONE task at a time from benchmarks/terminal-bench. Full launch syntax in contents.'
   contents: |-
-    Single-task harbor launch (CORRECTED 2026-06-11 ~22:03 — old file-path/--task-id syntax is BROKEN on current harbor):
+    Launch: `bash -lc 'CREDS=$(security find-generic-password -s "Claude Code-credentials" -w); export CLAUDE_CREDENTIALS_JSON="$CREDS"; export CP_PROVIDER=claude_code_v2; export PYTHONPATH="$PWD:$PYTHONPATH"; ~/.harbor-venv/bin/harbor run -d terminal-bench@2.0 --agent-import-path context_pilot_agent:ContextPilotAgent -m anthropic/claude-sonnet-4-6 -k 1 -n 1 -i <TASK-NAME> 2>&1'`
 
-    Run FROM benchmarks/terminal-bench (cwd), with PYTHONPATH including it so importlib can find the adapter module:
-
-    bash -lc 'CREDS=$(security find-generic-password -s "Claude Code-credentials" -w); export CLAUDE_CREDENTIALS_JSON="$CREDS"; export CP_PROVIDER=claude_code_v2; export CP_MAX_COST=5.0; export PYTHONPATH="$PWD:$PYTHONPATH"; ~/.harbor-venv/bin/harbor run -d terminal-bench@2.0 --agent-import-path context_pilot_agent:ContextPilotAgent -m anthropic/claude-sonnet-4-6 -k 1 -n 1 -i <TASK-NAME> 2>&1'
-
-    KEY FLAG FIXES:
-    - Task selector = -i / --include-task-name <bare-name> (e.g. gpt2-codegolf). NOT --task-id (no such option). -t/--task wants an org/name PACKAGE ref, not a dataset task.
-    - --agent-import-path = DOTTED module:Class (context_pilot_agent:ContextPilotAgent), module importable via PYTHONPATH. Current harbor passes the pre-colon part to importlib.import_module, so a 'path/to/file.py:Class' string fails 'No module named'.
-    - cwd = benchmarks/terminal-bench — jobs/ output lands there (matches prior job dirs).
-    - -n 1 strictly sequential (one container). -k 1 = one attempt per trial.
-
-    Results live at jobs/<ts>/<task>__<id>/verifier/reward.txt + result.json; trajectory at <task>/agent/context-pilot-trajectory.jsonl.
-
-    v0.2.4 SSE freeze fix is LIVE (releases/latest → v0.2.4, linux bundle HTTP 200). Adapter downloads it per container install.
-
-    CURRENT RUN: gpt2-codegolf (X572) relaunched ~22:03 on v0.2.4 / Sonnet 4.6 / claude_code_v2, container gpt2-codegolf__utdgsz9. Validates the watchdog on the canonical freeze victim (0.0 twice). opio-rag-* containers = user's OTHER project, NEVER touch.
-  importance: critical
+    Flags: -i (include task), cwd=benchmarks/terminal-bench, -n 1 sequential, -k 1 one attempt.
+  importance: high
   labels:
   - terminal-bench
   - run
-  - active
-  last_edited_ms: 0
-3182e8c4a21fcc81:
-  tl_dr: Secondary model selector with Tab key toggle implemented
-  contents: |-
-    Successfully implemented Tab key toggle for secondary model selection in config overlay (Ctrl+H).
-
-    Key changes:
-    1. Added config_secondary_mode field to State struct
-    2. Added ConfigToggleSecondaryMode action
-    3. Updated config overlay to show secondary model section when config_secondary_mode is true
-    4. Added Tab key handler in config view to toggle between main/secondary model selection
-    5. Secondary model uses keys e/f/g for Opus/Sonnet/Haiku selection
-    6. Fixed missing render_model_section function in config_overlay.rs
-
-    Testing shows reverie works but gets API errors due to 128K > 64K token limit for Haiku. Need to test with Opus or Sonnet as secondary model.
-  importance: high
-  labels:
-  - feature
-  - ui
-  - reverie
-  last_edited_ms: 0
-39d008d9bddac9f0:
-  tl_dr: 'Lean 4 project (X-mathsA-2019) deleted March 20. Q1-Q5b proven, Q6a in progress. Key: use linear_combination on ℂ (linarith fails, no linear order).'
-  importance: low
-  last_edited_ms: 0
+  last_edited_ms: 1784202957618
 3d36396d2a618055:
   tl_dr: NEVER touch temp_1.md or temp_2.md — they are user's personal files. Do not read, write, edit, or revert them.
   importance: critical
@@ -258,136 +112,75 @@
   - forbidden
   last_edited_ms: 0
 3f7ea7b0cdf9397d:
-  tl_dr: 'Cache optimizer: K=3 + beacon (4th). ConversationTailDensity uses UNIFORM weight (1.0) for hot blocks, zero for cold. Previous i² was catastrophic (1350:1 ratio, all BPs at tail).'
-  contents: |-
-    The DP optimizer receives budget=3 and places BPs across the full prompt. The 4th breakpoint is the beacon (frontier + LOOKBACK_WINDOW). ConversationTailDensity marks panel user-side blocks (ToolResult with panel_* id) and the last user message as 'hot'. All hot blocks get weight 1.0, cold blocks get 0.0.
-
-    Previous i² weighting created a 1350:1 ratio between the last user block (position ~147, weight 21609) and early panel blocks (position ~4, weight 16). The DP optimizer placed ALL 3 BPs at the conversation tail, leaving the panel section (60-80K tokens) without any breakpoint. On break ticks, the hash chain diverged at the panel position with no BP before it → frontier=0 → total miss.
-
-    Uniform weighting spreads BPs evenly. With ~27 panel hot blocks vs 1 conversation hot block, ~3 of K=3 BPs land in the panel section where divergence actually occurs. Fix committed ed83c9df.
-  importance: critical
+  tl_dr: 'Cache optimizer: K=3 + beacon (4th). ConversationTailDensity uses UNIFORM weight (1.0) for hot blocks, zero for cold. Previous i² was catastrophic. Fix: ed83c9df.'
+  importance: high
   labels:
   - cache-optimizer
   - architecture
-  - constraint
-  last_edited_ms: 1783186000589
-42962fefaa6ee609:
-  tl_dr: 'FORBIDDEN: #[allow(...)] is BANNED in this project. Always use #[expect(...)] instead. Only in exceptional cases. This applies to all clippy and rustc lint suppression.'
-  importance: critical
-  labels:
-  - code-style
-  - lints
-  - forbidden
-  last_edited_ms: 0
+  last_edited_ms: 1784202976534
 45b9baa7eb6b3f01:
   tl_dr: 'T506 web-lint P0-P12 COMPLETE + pushed on web-lint. Next: P13 docs/PR (X1140). Details in contents.'
-  contents: |-
-    P0 scaffold. P1 tsc strict 743d2bfe. P2 Prettier 0531ab4f. P3 type-aware eslint b25a5c37. P4 anti-cheat b96f9c47. P5 unicorn. P6 React bcb2747e. P7 correctness&security 621e4257. P8 structure&complexity bc56795a. P9 boundaries 683d278d. P10 dead-code/deps/CSS 1f70a88a. P11 type-coverage a6158620 (amended 31273882).
-
-    P12 (X1139) ENFORCEMENT LOCKDOWN DONE: CB8 blocking web-lint callback on web/src/** (eslint --max-warnings 0 + prettier --check on changed files; tsc+type-coverage CI-side). check-frontend-suppressions.sh extended: as-unknown-as double-assertion ban (only exception: live/index.ts `as unknown as Promise<FinderNode[]>` useFs seam, allow-listed by path+substring IN the hash-locked script). ci.yml new `frontend` job (eslint/tsc/prettier/stylelint/type-coverage/rule-census). check-frontend-rule-census.sh (clippy_compare twin): eslint --print-config src/App.tsx -> python3 sorted `rule = severity` (733 rules, sev 0/1/2->off/warn/error), --update writes baseline, default diffs+fails on drift; baseline frontend-rule-census.txt. protected-files.yaml + chain (26 entries) hash-lock all 12 frontend config files (eslint.config.ts, .prettierrc.json, .prettierignore, .stylelintrc.json, knip.json, tsconfig.app/node.json, check-frontend-suppressions.sh, check-frontend-rule-census.sh, frontend-rule-census.txt, allowed-eslint-exceptions.yaml, check-web-structure.sh). package.json NOT locked (dep churn; any-ban in locked eslint.config.ts).
-
-    BUG fixed: census baseline had no trailing newline (`$(...)` strips + `printf '%s'`), glued next --show marker onto census last line (cosmetic, hash unaffected). Fixed both census --update write + verify diff to `printf '%s\n'`, regenerated baseline. knip type-coverage ignore removed (P11 script references it now).
-
-    All green: eslint 0, tsc 0, prettier 0, stylelint 0, knip 0, web-structure 0, type-coverage 99.86% pass, generated no-drift, chain 26 verified. Guards probed: suppressions clean RC0, as-unknown-as ban bites, census drift bites (P12d).
-
-    NEXT P13 (X1140): web/README.md lint section, tree descs for new config/scripts, memory of frontend-lint architecture, final commit+push+PR. .gitignore (gaia +86) + T509 Rust + T514 + caveman.md stay EXCLUDED every commit.
+  contents: 'P0-P12 COMPLETE on web-lint branch. P12: CB8 blocking callback, as-unknown-as ban, CI frontend job, rule-census script (733 rules), hash-locked 26 config files. All green: eslint 0, tsc 0, prettier 0, stylelint 0, knip 0, type-coverage 99.86%. NEXT: P13 docs/PR (X1140).'
   importance: high
   labels:
   - web-lint
   - T506
   - P9
   - resume
-  last_edited_ms: 1783504109115
+  last_edited_ms: 1784203006412
+47b97e9a3b5951a1:
+  tl_dr: 'T568: ''Use'' release selection now survives orchestrator reload. Backend::new reconciles persisted active_tag onto agent_binary at boot. Fix in transport/rest/backend.rs.'
+  contents: 'select_release persists active_tag to releases/config.json but only mutated in-memory agent_binary, so reload reverted spawns to CP_AGENT_BINARY boot seed while UI badge still showed release Active — silent incoherence. Fix: Backend::new does releases.active_tag().map(binary_path).filter(bin.exists()).unwrap_or(agent_binary) — active_tag WINS over env seed, fallback to seed if binary deleted out from under us.'
+  importance: medium
+  labels:
+  - releases
+  - active_tag
+  - orchestrator
+  - T568
+  - bugfix
+  last_edited_ms: 1784215400065
 48f2140d3c2dee0e:
-  tl_dr: Entities module COMPLETE — all 151 stress tests passed (12 categories, 4 difficulty levels). 9 bugs found/fixed. Committed on 'entities' branch. Production-quality.
-  contents: |-
-    ## Stress Test Results — COMPLETE (151/151)
-
-    ### Bugs Found & Fixed (9 total):
-    1. **Bug #1**: PRAGMA hex literal `0x4_000_000` → `67108864` (SQLite doesn't understand Rust hex)
-    2. **Bug #2**: SQL comments before SELECT caused misclassification → added `strip_leading_comments()`
-    3. **Bug #3**: Non-atomic multi-statement DML → implicit BEGIN/COMMIT/ROLLBACK wrapper
-    4. **Bug #4** (CRITICAL): Dump/restore data loss — db::open() auto-creates files, panel.refresh()/save_module_data could overwrite good dump. Fix: multi-layer guards.
-    5. **Bug #5**: Trailing comments after semicolons cause 'bad parameter or other API misuse' → strip in split_statements()
-    6. **Bug #6**: split_statements empty segments → filter empty after split
-    7. **Bug #7**: dump_to_file only captures tables, misses triggers/views/indexes → query sqlite_master for all types
-    8. **Bug #8**: recover_database() didn't handle db::open() failure → delete corrupt file, create fresh, restore
-    9. **Bug #9**: extract_affected_tables wrong table name for INSERT INTO table(col) → clean_identifier stops at '('
-
-    ### UX Fix:
-    - Added panel refresh note to tool result: "The Entities panel now reflects the updated database state."
-
-    ### 12 Test Categories:
-    T1: SQL Execution (18 tests) — CRUD, JOINs, CTEs, triggers, adversarial SQL
-    T2: Schema Persistence (14) — migrations, dump format, 1MB cap, rapid DDL
-    T3: Recovery (12) — fresh start, dump restore, migration replay, corrupt DB self-heal
-    T4: Panel & Context (12) — schema display, samples, empty state, extreme schema
-    T5: Meilisearch Sync (13) — CRUD sync, orphan cleanup, 1000-row batch, rogue docs
-    T6: Search Scope (9) — scope=entities/all, facets, typo tolerance, full lifecycle
-    T7: Connection & PRAGMAs (11) — WAL, FK, busy_timeout, self-healing
-    T8: Error Handling (12) — fuzzy matching, Levenshtein, constraint errors
-    T9: Data Types (13) — TEXT/INT/REAL/BLOB/NULL, unicode, SQL injection strings
-    T10: Module Integration (12) — registration, toggle, YAML validation, flame
-    T11: Dump/Restore (13) — round-trip, WITHOUT ROWID, near-1MB, crash gap
-    T12: End-to-End (12) — full workflows, stress, incremental build-up
-  importance: high
+  tl_dr: Entities module COMPLETE — 151/151 stress tests passed. 9 bugs found/fixed. Production-quality.
+  importance: medium
   labels:
   - entities
   - complete
   - stress-testing
-  last_edited_ms: 0
+  last_edited_ms: 1784202931986
 491617a47084996a:
-  tl_dr: Fixed Haiku 4.5 token limit issue in reverie
-  contents: |-
-    Fixed API error 400: 'max_tokens: 128000 > 64000' when reverie uses Haiku as secondary model.
-
-    Key changes:
-    1. Updated anthropic client to use model-specific context windows instead of hardcoded MAX_RESPONSE_TOKENS
-    2. Haiku 4.5 (claude-3-5-haiku-20251001) now correctly uses 64K output token limit instead of 128K
-    3. Other models (Sonnet, Opus) still use 200K limit
-    4. The fix allows reverie to work with Haiku as secondary model
-    5. Tab key toggle functionality now ready for testing with proper token limits
-
-    Testing shows reverie starts successfully without API errors. Need to verify it completes and calls Report tool.
-  importance: high
+  tl_dr: 'Haiku 4.5 max_tokens fix: anthropic client uses model-specific limits (64K for Haiku, 200K for others) instead of hardcoded.'
+  importance: medium
   labels:
   - bugfix
   - reverie
   - api
-  last_edited_ms: 0
+  last_edited_ms: 1784202931990
+4e40e1fbeb5882f6:
+  tl_dr: 'T570 forms feature shipped: inline form/form-answer blocks, 8 field types, zero API change, frontend-only parsing, Rust send-time YAML validation. Commit 8898f043 on updates branch.'
+  contents: 'T570 forms feature DONE. Inline ```form``` / ```form-answer``` blocks replace the questions param entirely. 8 field types: single+allow-other, multi, text, number, date, toggle, confirm+confirm-word, files (immediate upload to .uploads/). Zero API change — pure markdown fenced blocks parsed frontend. Rust YAML validation at send-time only (forms.rs). Frontend forms/ module: helpers (indent parser), FormFields (8 renderers), FormWidget (draft+submit), FormMessageRow, useThreadForms hook. Design doc: docs/forms.md. Commit 8898f043 on branch updates.'
+  importance: high
+  labels:
+  - forms
+  - threads
+  - feature
+  - T570
+  last_edited_ms: 1784222610385
 5623177cb0b0ed7d:
-  tl_dr: 'MULTI-WORKER (subworkers branch, off master): N equal workers, true concurrency, single main loop. Design doc: docs/design-subworkers.md.'
-  contents: 'Key decisions: BG workers run fully (all tools), shared model/theme, per-worker cost/guard-rails, global reverie cap, soft cap 8 workers. 14 shared modules, 8 per-worker.'
+  tl_dr: 'MULTI-WORKER (subworkers branch, off master): N equal workers, true concurrency, single main loop. Design doc: docs/design-subworkers.md. 14 shared modules, 8 per-worker.'
   importance: critical
   labels:
   - subworkers
   - multi-worker
   - architecture
-  - design
-  - active
-  last_edited_ms: 1782121426494
+  last_edited_ms: 1784202976543
 58aad4aedbb99175:
-  tl_dr: 'v0.2.8 DEADMAN: gpt2 freeze root cause = headless main loop wedges after first stream launch (4 streaming guards no-op; retry runs on dead loop). Fix = dedicated-thread deadman, re-execs/aborts. Built, adapter 0.2.8, pending commit+tag+relaunch.'
-  contents: |-
-    ROOT CAUSE (found v0.2.7 forensics): main_worker.json/config.json/perf.log all froze at the stream-launch instant; main thread in clock_nanosleep; container Up but no trajectory progress; catch-all watchdog string IS in the binary yet errors/ stayed empty after 480s. => watchdog threads fire+send StreamEvent::Error fine, but NOBODY DRAINS it: process_stream_events runs INSIDE the wedged background_tick. So ALL FOUR streaming-layer guards (v0.2.4 idle-120s, v0.2.5 send-header-60s, v0.2.6 first-content-90s, v0.2.7 catch-all-100s) had ZERO field effect.
-
-    v0.2.8 FIX (src/app/run/headless.rs spawn_deadman + src/app/run/lifecycle.rs heartbeats):
-    - LOOP_HEARTBEAT_MS (AtomicU64): stored at top of background_tick + top of run_headless loop. >30s stale => WEDGE.
-    - LAST_PROGRESS_MS (AtomicU64): bumped when messages.len() grows. >180s stale => HUNG STREAM (live loop). Covers both failure modes.
-    - DEADMAN_POLL 5s; DEADMAN_TICK_STALL_MS 30_000; DEADMAN_NO_PROGRESS_MS 180_000.
-    - On trip: dump_deadman_diagnostic writes `final`/deadman_timeout to trajectory (Harbor scores cleanly, NO 900s wall) + /proc/self per-thread state/wchan/syscall to .context-pilot/errors/deadman.log (pinpoints wedge for v0.2.9).
-    - terminate_wedged_process() -> !: bounded in-place RE-EXEC via CommandExt::exec() (fresh attempt, resumes via --resume-stream, max 2 via CP_DEADMAN_REEXEC_COUNT env) -> falls back to std::process::abort() (SIGABRT; only whole-process terminator NOT on clippy disallowed-methods; std::process::exit doubly banned).
-    - Deadman closure + terminate fn are `-> !` to satisfy clippy::infinite_loop.
-
-    Status: rust-check PASSED, release build 7.77s, reloaded live, 4 deadman strings in binary. Adapter 0.2.7->0.2.8. PENDING: commit+push + tag v0.2.8 -> CI; relaunch gpt2 (X572).
-  importance: critical
+  tl_dr: 'HISTORICAL: v0.2.8 deadman fix for headless main loop wedge. Dedicated-thread deadman, re-exec/abort. Proven field-effective. Details in src/app/run/headless.rs.'
+  importance: low
   labels:
   - terminal-bench
-  - sse-freeze
   - deadman
-  - v0.2.8
-  - headless
-  last_edited_ms: 0
+  - historical
+  last_edited_ms: 1784202948992
 6cc818f12c0d231a:
   tl_dr: 'DOCUMENTATION QUALITY: Documentation is ABSOLUTELY CRITICAL. Do NOT half-ass it. If understanding a function requires opening extra files to see context, DO IT. Don''t document to document — document to HELP future readers. Take the extra step.'
   importance: critical
@@ -396,26 +189,18 @@
   - quality
   last_edited_ms: 0
 6eba1bb10defa389:
-  tl_dr: 'Thinking mode plan: ThinkingConfig enum in LlmRequest, inject into claude_code + anthropic JSON body, ThinkingChunk StreamEvent variant, thinking_delta SSE parsing, TUI display. Beta header already present.'
-  importance: high
-  last_edited_ms: 0
-6fc02a69ab52f6ab:
-  tl_dr: 'Hash chain entry #5 signed (May 4). All 5 entries verified. Chain is current. Lint exceptions: 6. Protected file change was allowed-lint-exceptions.yaml (7→6 exceptions from ModelPricing refactor).'
+  tl_dr: 'HISTORICAL: Thinking mode plan implemented. ThinkingConfig in LlmRequest, ThinkingChunk SSE parsing, TUI display all shipped.'
   importance: low
-  labels:
-  - pending
-  - hash-chain
-  - lint-exceptions
-  last_edited_ms: 0
+  last_edited_ms: 1784202931993
 711abc0a918906ba:
-  tl_dr: 'BANNED: #[expect] and #[allow] lint suppressions. Always refactor the code instead. Register unavoidable exceptions in .github/checks/.'
+  tl_dr: 'BANNED: #[allow(...)] lint suppressions. Always use #[expect(...)] for unavoidable cases. Register exceptions in .github/checks/. Never #[allow], always #[expect].'
   importance: critical
   labels:
   - code-quality
   - lint
   - philosophy
   - boss-hunt
-  last_edited_ms: 1782121419938
+  last_edited_ms: 1784202908952
 713d9f0a50517625:
   tl_dr: 'MiniMax Token Plan API key: sk-cp-SML34Q-eh3y1ob1na0P68nYpXfN-8jk86fYnaAjo6H6cd_vWZ0E089CWYEhlFX6EyNh6PNRYWJRmGgj9kK5Wk88rzf_0bMW-IBuybCYQXPm08PcFTW6GwDo'
   importance: high
@@ -426,11 +211,7 @@
   last_edited_ms: 0
 7208259eeb2a67b6:
   tl_dr: 'CI web-install fix: web/pnpm-workspace.yaml needs `packages: [.]` + `allowBuilds: {unrs-resolver: true}`; pin CI+release pnpm to 11.6.0.'
-  contents: |-
-    CI 'Contract' + release web install failed on clean `pnpm install --frozen-lockfile` (web-lint P0 auto-created a malformed pnpm-workspace.yaml). Two pnpm-11 hard failures:
-    1. 'packages field missing or empty' — pnpm 11 treats a present workspace file as a workspace root; needs a packages field. Single-package repo → `packages: [.]`.
-    2. ERR_PNPM_IGNORED_BUILDS exit 1 — unrs-resolver postinstall (native N-API resolver). Neither onlyBuiltDependencies nor ignoredBuiltDependencies silences it in pnpm 11.6; only `allowBuilds:\n  unrs-resolver: true` (what `pnpm approve-builds` writes) authorises the script so a clean install finishes.
-    ALSO: ci.yml + release.yml pinned pnpm action-setup to `version: 9` but the committed lockfile is pnpm-11.6-generated and allowBuilds is a pnpm-11 mechanism — bumped both to `version: 11.6.0` to match the lockfile origin. Verified from-scratch clean install EXIT 0 in a temp dir.
+  contents: 'pnpm 11 needs `packages: [.]` in pnpm-workspace.yaml + `allowBuilds: {unrs-resolver: true}` for postinstall. CI/release pinned pnpm to 11.6.0 to match lockfile.'
   importance: medium
   labels:
   - ci
@@ -438,7 +219,7 @@
   - web-lint
   - gotcha
   - ops
-  last_edited_ms: 1783373708167
+  last_edited_ms: 1784203015355
 72815d89ebb8cd4b:
   tl_dr: 'User preference: factor code out into new files rather than trimming comments to stay under line limits.'
   importance: medium
@@ -451,29 +232,13 @@
   - llm-provider
   last_edited_ms: 0
 76bca3b377df349e:
-  tl_dr: 'v0.2.7 SSE freeze: FOUR watchdogs. 3 inner (streaming.rs, never fired in field) + 1 OUTER catch-all (mod.rs start_streaming, TTFB 100s relay+watchdog, fires wherever do_stream blocks) + oauth.rs timeouts (10s/30s). Pending commit+tag v0.2.7.'
-  contents: |-
-    ## SSE Freeze Fix — v0.2.4 + v0.2.5
-
-    ### v0.2.4 (body-read watchdog) — INSUFFICIENT ALONE
-    IdleTimeoutReader (reader-thread + recv_timeout, IDLE_READ_TIMEOUT=120s) in src/llms/claude_code_api_key/streaming.rs guards the SSE BODY read loop. Aborts silent app-level holds AFTER response headers arrive. Shared by all 3 claude_code* clients.
-
-    ### v0.2.5 (send-header watchdog) — THE MISSING PIECE
-    DEFINITIVE root cause (gpt2 re-run on v0.2.4, job 00-03-22): froze AGAIN at 'start' 7min. Evidence: container Up 8min, tui Sl 0.7% CPU, EXACTLY 1 established conn to :443, NO sse_errors.log, watchdog never fired. The silent hold is in the RESPONSE-HEADERS wait inside reqwest blocking .send() — connect_timeout covers only TCP connect; once connected .send() blocks awaiting headers with NO timeout (.timeout(None)). IdleTimeoutReader only arms AFTER send() returns Ok, so that phase was unguarded -> infinite hang -> 900s wall -> 0.0.
-
-    FIX: pub(crate) fn send_with_header_timeout(builder) in claude_code_api_key/streaming.rs. Spawns a detached thread running builder.send(), waits rx.recv_timeout(SEND_HEADER_TIMEOUT=60s). Timeout -> Err(StreamRead) -> StreamEvent::Error -> existing fresh-connection retry. Ok(Err)->Network; Disconnected->Network. Same leak caveat as IdleTimeoutReader (timed-out send thread parks until process exit; negligible for short-lived TB tasks).
-
-    Wired at ALL 3 streaming call sites: claude_code/mod.rs, claude_code_api_key/mod.rs, claude_code_v2/mod.rs — each binds the request builder then `let response = ...::send_with_header_timeout(request_builder)?;` replacing the inline `.send()?`.
-
-    Status: rust-check passed, cargo build --release 6.78s, TUI reloaded (live). Adapter version() bumped 0.2.4->0.2.5. REMAINING: git commit+push (with memories+tree-descs per M15) + tag v0.2.5 -> release CI publishes context-pilot-linux-x86_64.tar.gz to releases/latest.
-  importance: high
+  tl_dr: 'SSE freeze v0.2.4-v0.2.7: 4 watchdogs layered (idle-body 120s, send-header 60s, first-content 90s, catch-all TTFB 100s) in streaming.rs + mod.rs. All still in binary.'
+  importance: medium
   labels:
   - llm-provider
   - sse-freeze
-  - v0.2.4
-  - terminal-bench
-  - complete
-  last_edited_ms: 0
+  - watchdogs
+  last_edited_ms: 1784202948996
 77a6639f89352d52:
   tl_dr: 'Hardcoded prompt audit: user wants EVERY occurrence of LLM-facing text noted, no matter how minor. No ''clean enough'' dismissals. User decides what''s behavioral steering vs. not. Be exhaustive — if the LLM sees it, log it as a finding.'
   importance: critical
@@ -492,13 +257,13 @@
   last_edited_ms: 0
 7b858470e0ce17bf:
   tl_dr: Memory Architecture v2 Phase 1 PAUSED — stashed on memory-architecture-v2 branch. Resume later.
-  contents: 'Storage engine complete: db/mod.rs (CRUD, BFS, FTS5 BM25), decay.rs (Ebbinghaus), types.rs (Node/Edge/enums, field renames typ/relation), lib.rs (Module scaffold + health check), tests.rs (full coverage). 42 clippy errors fixed but uncommitted — stash has the fixes. Todo list had 92 items across 6 phases.'
+  contents: Memory Architecture v2 Phase 1 PAUSED on branch memory-architecture-v2. Storage engine complete (db, decay, types, tests). Resume later.
   importance: high
   labels:
   - memory-v2
   - paused
   - branch-stashed
-  last_edited_ms: 0
+  last_edited_ms: 1784203006417
 7c6035d323faf713:
   tl_dr: 'Cryptographic hash chain protects 12 critical files (Cargo.toml lint sections, clippy.toml, rustfmt.toml, CI scripts, lint exceptions YAML, deploy scripts). Password: Totordu1789. Updates via chain.sh --update.'
   importance: critical
@@ -522,26 +287,16 @@
 82fd73098bb46d75:
   tl_dr: 'Queue module design: fixed panel, 5 tools, pipeline intercept, shared queue (reverie + main), reverie auto-activates queue on start, Report blocks if unflushed, Queue_empty on reverie destroy/timeout.'
   importance: high
-  last_edited_ms: 0
+  last_edited_ms: 1784202976537
 83e84589e8deaf29:
-  tl_dr: 'entity_sql SQL bugs fixed (issue #113 + stress-test follow-ups): UTF-8 truncation, comment/identifier mis-splitting, and DML-batch-with-SELECT all resolved.'
-  contents: |-
-    ISSUE #113 (f8a674b): split_statements collected Vec<char>, iterated by char-index, sliced original &str with that index as a BYTE offset → multi-byte UTF-8 in non-final position truncated statements. Fix: drive slicing from str::char_indices() byte offsets.
-
-    STRESS-TEST FOLLOW-UPS (3 more splitter bugs, same family): split_statements only tracked single-quote ' strings — blind to (1) -- line comments, (2) /* block comments */, (3) double-quote/backtick/bracket quoted identifiers, so a ; inside any of those mis-split the batch. Fix: rewrote split_statements as a SQLite-aware mini-tokenizer (skip_quoted for '/"/`, skip_until for [], skip_line_comment, skip_block_comment). Honors doubling escapes ('' "" ``). Unterminated spans consume to EOF (no panic).
-
-    4th BUG (pre-existing, EXPOSED by splitter fix): a DML-classified batch containing a row-returning statement (plain trailing SELECT, not RETURNING) failed with rusqlite 'Execute returned results - did you mean to call query?'. execute_dml_stmts called conn.execute() on row-returning stmts. Fix: dispatch per-statement on prep.column_count()>0 (returns_rows). Last row-returning → formatted table (capped MAX_RESULT_ROWS); non-last row-returning → drain side effects; else execute(). Dropped has_returning param.
-
-    Also fixed format.rs extract_table_name: was computing byte offset via upper.find("FROM ") then slicing original sql — wrong when to_uppercase() changes byte length (ß→SS). Now case-insensitive scan on original bytes.
-
-    Structure: SqlKind/classify/strip_leading_comments/split_statements in crates/cp-mod-entities/src/sql/parse.rs (15 tests); error enrichment in sql/errors.rs. lib.rs: `mod sql;` + `pub(crate) use sql::{errors, parse};`. tools.rs imports from crate::parse, has 4 DML-dispatch regression tests. The old ASCII-sanitization workaround for entity_sql is no longer needed.
-  importance: high
+  tl_dr: 'entity_sql SQL splitter bugs fixed: UTF-8 truncation, comment/identifier mis-splitting, DML-batch-with-SELECT dispatch. Mini-tokenizer in sql/parse.rs.'
+  importance: medium
   labels:
   - entities
   - bugfix
   - utf8
   - issue-113
-  last_edited_ms: 0
+  last_edited_ms: 1784202931997
 8e07129a2a85fdb2:
   tl_dr: 'DOCUMENTATION STYLE: Keep docs SYNTHETIC. No useless verbosity, no trivial obvious statements. Every word must earn its place. Bad: ''/// Returns the result of the operation''. Good: ''/// Saturating cast — clamps to target range on overflow''.'
   importance: critical
@@ -566,7 +321,10 @@
   last_edited_ms: 1783501986296
 986adb56b40b2b32:
   tl_dr: 'OPS & BUILD GOTCHAS (consolidated): orchestrator restart vs system_reload, port-freeing, git/pnpm/lint quirks, never-commit list. Full list in contents.'
-  contents: 'Key gotchas: TUI change→cargo build+reload; orchestrator change→rebuild+restart (not reload); frontend→vite hot-reloads. Kill orchestrator: lsof -ti:7878 + parent sh. git via git_execute only. web/ uses pnpm. CB3 is lib-only. oplog/bodies folder-sizes failure=benign. FileLogger only logs cp_base targets.'
+  contents: |-
+    Key gotchas: TUI change = cargo build+reload; orchestrator change = rebuild+restart (not reload); frontend = vite hot-reloads. Kill orchestrator: lsof -ti:7878 + parent sh. git via git_execute only. web/ uses pnpm. CB3 is lib-only. oplog/bodies folder-sizes failure = benign.
+
+    Orchestrator launch: separate binary `cp-orchestrator` (crate cp-orchestrator), NOT the TUI binary. Build: `cargo build --release -p cp-orchestrator`. Run: `./target/release/cp-orchestrator`. Serves on :7878. Kill stale: `kill -9 $(lsof -ti:7878)`. The TUI binary (`cargo run --release` / `target/release/tui`) is the AGENT — needs CP_BRIDGE=1 for headless mode, fails with 'failed to enable raw mode' without a real TTY. Full stack script: web/run-stack.sh (orchestrator + web dev + optional TUI).
   importance: critical
   labels:
   - workflow
@@ -574,59 +332,41 @@
   - build
   - deploy
   - git
-  last_edited_ms: 1782121419935
+  last_edited_ms: 1784204581022
 9a2449142b04169a:
-  tl_dr: 'Freeze RESOLVED at infra level (v0.2.8 deadman + v0.2.9 + v0.2.10 deadman-aware-of-retry). Throttle REJECTED: gpt2 dribbles even at 1% OAuth util (pathological, gpt2-specific). Normal tasks pass. Deprioritize gpt2; pivot to other tasks.'
-  contents: |-
-    SAGA (gpt2-codegolf X572, freeze v0.2.4–v0.2.9+):
-
-    v0.2.8 DEADMAN proved the freeze is a HUNG stream (alive loop), not a wedge. /proc: thread state=R read()ing SSE socket pulling a dribble that never emits message_stop. Re-exec recovered (attempt #3 got healthy conn, 2 Think turns) but hang recurred → 3 trips → reward 0.
-
-    v0.2.9 (src/llms/claude_code_api_key/streaming.rs:76 + loop@334): STREAM_COMPLETION_TIMEOUT=90s wall-clock from stream_start → if no message_stop within 90s → StreamRead → in-process MAX_API_RETRIES(=4) retry on fresh conn. CONFIRMED FIRING (job 02-13-03, container 5l4vrdr): error_1.txt = 'message did not finalize within 90s ... 124 lines / 5885 bytes seen, got_content=true. Attempt 1/4 (will retry)'. got_content=true proves the dribble mode (content flowed then stalled; disarmed all 4 prior guards). Binary has the const (strings grep=1).
-
-    v0.2.9 LIMITATION FOUND: the v0.2.8 deadman STILL tripped at 184s and re-exec'd (CP_DEADMAN_REEXEC_COUNT=1, deadman.log present, 'no task progress 184812ms'). ROOT: deadman's LAST_PROGRESS_MS only bumps on messages.len() growth (message FINALIZED). v0.2.9 retries hang at 90s each WITHOUT finalizing → LAST_PROGRESS ages → after ~2 failed retries (180s) deadman PREEMPTS v0.2.9's 4×90s=360s retry budget → re-exec before in-process retry can land a healthy conn. The deadman and v0.2.9 fight each other.
-
-    v0.2.10 FIX (design): bump LAST_PROGRESS_MS on stream-RETRY activity (or any StreamEvent / retry initiation), not just on message finalization. Then: true wedge→LOOP_HEARTBEAT(30s) catches; truly silent hang (no retry activity)→LAST_PROGRESS catches; v0.2.9 actively cycling connections→deadman stays out of the way, lets the 4 retries complete. Safe because exhausted retries produce a terminal StreamError (not a silent hang).
-
-    CONFOUND: this session EVERY stream dribbled (not connection-specific like v0.2.8's run) — likely worsened by my OWN OAuth at 60% five_hour util (near rate limit → throttled/dribbled responses). Consider waiting for OAuth reset before concluding the dribble is fundamental vs throttle-induced. STATUS: gpt2 v0.2.9 run still going (re-exec #1), likely 0 again this session. v0.2.9 mechanism = WIN; v0.2.10 deadman-aware-of-retry = next.
-  importance: critical
+  tl_dr: Freeze RESOLVED at infra level (v0.2.8 deadman + v0.2.9 stream timeout + v0.2.10 deadman-aware-of-retry). gpt2 dribble = throttle-induced, not fundamental. Normal tasks pass.
+  importance: low
   labels:
   - terminal-bench
   - sse-freeze
-  - deadman
-  - v0.2.8
-  - breakthrough
-  - root-cause
-  last_edited_ms: 0
+  - resolved
+  last_edited_ms: 1784202949001
+a330cfc0a3c317f2:
+  tl_dr: 'EVEN IF A RED CALLBACK IS PRE-EXISTING: ALWAYS TAKE OWNERSHIP OF IT AND SOLVE IT. PERIOD. EVERYONE IS RESPONSIBLE, ESPECIALLY YOU. No dismissing failures as ''pre-existing'' — fix them.'
+  importance: critical
+  labels:
+  - callback
+  - workflow
+  - ownership
+  - philosophy
+  last_edited_ms: 1784195611669
 a8b1054e0a11c2fe:
   tl_dr: 'Cache engine v2: gap-decomposition DP replaces greedy. F(Ω'')=ΣT[pₖ]×gap. DP per gap O(k×|gap|²) + enumerate across ≤5 gaps. In cache_engine.rs.'
   importance: high
   last_edited_ms: 0
 b0c2cf76e35d0b9e:
-  tl_dr: 'IR Architecture (April 1): Phases 1-6 COMPLETE. Full-frame IR pipeline committed (eea0ec0, +4619/-1305, 70 files). Phase 6.1 deferred. egui-frontend attempted April 2-4 then abandoned — branch deleted, back to master.'
-  contents: 'cp-render crate with typed IR primitives (Semantic, Span, Block, Frame, Sidebar, StatusBar, Conversation, Overlay). Panel::blocks() trait migration, Panel::render() removed. 23 panels emit IR blocks. build_frame() centralized builder. 5 TUI adapters (sidebar, status bar, panel, conversation, overlays). Dead code cleanup: deleted sidebar/ (694 lines), ConversationPanel::render() (70 lines), 25+ empty stubs. Branch: intermediate-rendering.'
+  tl_dr: IR Architecture Phases 1-6 COMPLETE. cp-render crate with typed IR primitives. Panel::blocks() trait, build_frame() centralized builder. egui-frontend abandoned.
   importance: medium
-  last_edited_ms: 0
+  last_edited_ms: 1784202932000
 b14e6817a83938b5:
   tl_dr: 'Search module: Voyage AI REST embedder (voyage-code-3) for hybrid search, zero local CPU. VOYAGE_API_KEY in ~/.context-pilot/.env. --max-indexing-threads 2. Port reconnects on reload.'
-  contents: |-
-    - Project hash: c7f7b6db, ~4196 chunks across ~1399 files
-    - Embedder: voyage-code-3, 1024 dims, Meilisearch 'rest' source
-    - API key: VOYAGE_API_KEY in global ~/.context-pilot/.env
-    - Server flags: --max-indexing-threads 2 caps indexing CPU
-    - load_module_data() calls ensure_server_running() to pick up live port
-    - ensure_indexes() called on reload to re-add embedders if missing
-    - Keyword search always works even without Voyage API key
-    - Doc IDs sanitized to [a-zA-Z0-9_-]
-    - OCR cache at ~/.context-pilot/ocr-cache/
-    - Boot loads .env before module init
-    - File watcher: RecommendedWatcher (FSEvents on macOS, inotify on Linux) — event-driven, negligible CPU. Former PollWatcher walked entire tree every 3s doing lstat, consumed ~50% CPU at ~3000 files.
+  contents: 'Project hash: c7f7b6db, ~4196 chunks ~1399 files. Embedder: voyage-code-3, 1024 dims. VOYAGE_API_KEY in ~/.context-pilot/.env. Server flags: --max-indexing-threads 2. File watcher: RecommendedWatcher (event-driven, not poll).'
   importance: high
   labels:
   - meilisearch
   - search
   - operational
-  last_edited_ms: 1782461427114
+  last_edited_ms: 1784203006419
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high
@@ -637,29 +377,6 @@ bc38d2fd0bcf015a:
   - gotcha
   - bridge
   last_edited_ms: 1782121419937
-bfd5725c88443a6a:
-  tl_dr: User is at lunch. Continue the full hardcoded prompt audit (42 batches, 207 files) independently until complete. Work batch by batch, no autocontinuation. User will check results when back.
-  importance: high
-  labels:
-  - workflow
-  - audit
-  - task
-  last_edited_ms: 0
-bfff572081f9301e:
-  tl_dr: 'HISTORICAL: X520/X521 headless mode REMOVED from tree (confirmed T475 2026-07-01). No headless.rs / TrajectoryWriter / run_headless. Only watchdog.rs sibling remains.'
-  contents: |-
-    Confirmed T475 2026-07-01: grep for headless/Headless/TrajectoryWriter/run_headless/LAST_PROGRESS in src/ returns only src/app/run/tools/watchdog.rs. The headless trajectory + deadman tick-telemetry path (per-event {status,messages,output_tokens,total_cost_usd,duration_secs} + LOOP_HEARTBEAT_MS/LAST_PROGRESS_MS) no longer exists. Original headless notes below are kept for history only.
-
-    ---
-
-    Files: src/app/run/headless.rs (new ~360 lines), src/app/run/lifecycle.rs (background_tick extracted), src/main.rs (run_headless_main branch), src/app/run/mod.rs (pub(crate) mod headless). Behaviour: instruction injected as UserMessage; quiescence detection; guard rails --max-cost/--max-messages/--max-duration-secs; JSONL trajectory.
-  importance: low
-  labels:
-  - terminal-bench
-  - headless
-  - x520
-  - complete
-  last_edited_ms: 1782908683633
 c70e24f88c9a3e60:
   tl_dr: 'Mac Mini ''gilbert'' user/password: gilbert/gilbert. Used for sudo and Keychain unlock.'
   importance: high
@@ -670,13 +387,13 @@ c70e24f88c9a3e60:
   last_edited_ms: 1783603900964
 caf6de1cb65ac661:
   tl_dr: 'DEMAQUETTING COMPLETE: branch merged to master (f1de2e65) and deleted (local + remote). Working on master from now on. All demaquetting work is on master.'
-  contents: '18-phase plan, 4 workstreams: backend runtime, inspection REST, bridge activation, web client. Stack: orchestrator :7878, web dev :5174.'
+  contents: 'Demaquetting merged to master (f1de2e65). Stack: orchestrator :7878, web dev :5174.'
   importance: critical
   labels:
   - demaquetting
   - complete
   - master
-  last_edited_ms: 1782131583402
+  last_edited_ms: 1784203006422
 ceac945d9376fcf2:
   tl_dr: 'FEATURE COMPLETION SEQUENCE: build → reload → commit+push (with memories/tree-descs) → clean context. Always, every time.'
   importance: critical
@@ -691,17 +408,7 @@ d1e512c8273ba340:
   last_edited_ms: 0
 d421b9943691f60e:
   tl_dr: 'OAuth architecture (T504 final): ALL consumers read the Claude token via vault().get("claude_oauth") — single entry, overrides→Keychain→file. Bypass is now a compile error. Commits dd9d2c54 + d2dde2cc.'
-  contents: |-
-    ALL consumers read the Claude token through cp_vault::vault().get("claude_oauth") — the single vault entry point (cascade: in-memory overrides → Keychain → ~/.claude/.credentials.json). Agent providers claude_code + claude_code_v2 (src/llms/*/mod.rs new()) AND orchestrator usage/status all use this one path.
-
-    cp_vault::oauth::load_claude_oauth_token() is now pub(crate) — the mechanism behind AuthMechanism::KeychainThenFile, called ONLY by the vault resolve() cascade; bypassing the vault for OAuth is a COMPILE ERROR, not a convention.
-
-    load_claude_oauth_raw() stays pub (orchestrator status/refresh needs the full JSON blob: refreshToken/expiresAt fields the trait get() doesn't model).
-
-    WRITE authority: store_credentials in cp-orchestrator/src/transport/rest/claude_oauth.rs uses delete-then-add on the Keychain item (not -U) so re-login always replaces the token cleanly (the -U in-place update no-ops/diverges on an ACL-locked stale item created by the real Claude Code CLI, which was the original T504 bug).
-
-    Net: single write authority + single read path = zero bypass point.
-    Commits: dd9d2c54 (keychain delete-then-add fix), d2dde2cc (vault() unification + pub(crate) enforcement).
+  contents: 'ALL consumers read Claude token via cp_vault::vault().get("claude_oauth") — cascade: overrides, Keychain, file. load_claude_oauth_token() is pub(crate) — bypass = compile error. Write authority: delete-then-add Keychain in claude_oauth.rs (fixes ACL-locked stale item). Commits dd9d2c54 + d2dde2cc.'
   importance: high
   labels:
   - architecture
@@ -709,30 +416,28 @@ d421b9943691f60e:
   - vault
   - credentials
   - T504
-  last_edited_ms: 1783347116387
+  last_edited_ms: 1784203006410
 d76e1f4576d9458a:
   tl_dr: 'Context Pilot is a SIDE PROJECT. In <3 months: became #1 tool for all professional + personal life, enables 2-4 simultaneous projects, helps family gain weeks of time.'
-  contents: |-
-    ## The Side Project That Took Over Everything
-
-    - Context Pilot has been a SIDE PROJECT the entire time — not full-time work
-    - In under 3 months it became Guillaume's #1 working tool for his ENTIRE professional life
-    - Also used for personal life — helping family and proches (through him) gain weeks of work time
-    - Allows maintaining 2-4 projects AT THE SAME TIME, constantly
-    - This is the ultimate compound returns story: a tool built on the side that multiplied his output across everything
-    - Key talk angle: "This was a side project. In 3 months it became the center of everything I do. That's compound returns."
-    - The 762 commits, 65K LOC, 22 crates — all while running 2-4 other projects simultaneously
   importance: critical
   labels:
   - talk
   - wow
   - context-pilot
-  - side-project
-  last_edited_ms: 0
+  last_edited_ms: 1784202976539
 d7a30d2f21fd675a:
   tl_dr: 'Dream layer decided: Groq API with tiny model (Llama 3.2 3B), ~200-token prompts, 30-50 token completions, fires every 2-3 min, writes to soul.journal. Cost ~$0.02/day. Local models reserved for future non-text sensing.'
   importance: high
   last_edited_ms: 0
+d9a2e890ab98776f:
+  tl_dr: 'T566 restart flow: useRestartFlow uses client-only ''waiting'' AgentStatus. Set ONLY on restart success (setQueryData). New agent Lifecycle::Running delta clears it via foldLifecycle. No state machine, no timers. Committed 33099872 on branch updates.'
+  importance: medium
+  labels:
+  - web
+  - restart
+  - waiting-status
+  - T566
+  last_edited_ms: 1784213091300
 e22b1ea921ff9aec:
   tl_dr: 'Datalab documentation site: documentation.datalab.to (Mintlify-hosted). API reference at documentation.datalab.to/api-reference/health. Has sections on limits, supported file types, SDK, on-prem, webhooks, billing.'
   importance: low
@@ -765,14 +470,14 @@ f3090cd5b6320bde:
   - principle
   last_edited_ms: 1782426985989
 f5d97b1e7a01c317:
-  tl_dr: 'ALIGNMENT EPIC (X818/T120) DONE; HUD fully push-fed incl context meter + hit/miss split (T297). Stack: orchestrator :7878, web dev :5174. Context helpers in src/modules/overview/context.rs. OpEntryKind::ContextUsage carries used/threshold/budget + hit/miss.'
-  importance: high
+  tl_dr: Alignment epic (X818/T120) and HUD push-feed (T297) DONE. Context helpers in src/modules/overview/context.rs. OpEntryKind::ContextUsage carries used/threshold/budget + hit/miss.
+  importance: medium
   labels:
   - latency
   - architecture
   - demaquetting
   - active
-  last_edited_ms: 1782121419934
+  last_edited_ms: 1784202931977
 f73736833df4e426:
   tl_dr: 'web-lint: generated/ @ts-nocheck header now emitted NATIVELY by web/openapi-ts.config.ts output.header; the old post-codegen stamp loop is REMOVED. NEVER reintroduce hand-stamping. Commit 2dd641c4.'
   contents: |-
@@ -793,15 +498,7 @@ f73736833df4e426:
   last_edited_ms: 1783418954418
 fb262826c899b682:
   tl_dr: 'check-rust-tests.sh now `cargo test --workspace` (was tui-only, blind to 26 crates). Fixed 3 pre-existing breakages exposed by it. Chain #30.'
-  contents: |-
-    T518. Bare `cargo test` at root tested only tui binary (63 tests, 0.42s) — 26 workspace crates never ran. Switched check-rust-tests.sh to `cargo test --workspace` (both --ci and --callback).
-
-    Three pre-existing breakages exposed + fixed:
-    1. cp-wire snapshot.rs `snapshot_round_trip_with_roster` test: RosterThread literal missing `paused` field (field added earlier, test not updated). Added `paused: false`.
-    2. 8 workspace test binaries (cp-wire framing_integrity/protocol; cp-orchestrator transport_http/fleet_soak/supervisor_lifecycle/services_integration/registry_channel/end_to_end) had DRIFTED `use <crate> as _;` unused-extern silencer blocks — workspace deps (base64/cp_base/cp_vault/dotenvy/openssl/reqwest/sha2/utoipa) added to Cargo.toml later never appended to the per-binary silencer lists, so unused_extern_crates (forbid) errored. Merge-sorted each block via python (alpha order for rustfmt).
-    3. REAL regression: command() REST handler (rest/mod.rs) had LOST its cost-breaker fail-closed 503 gate (doc comment still promised it). transport_http test ticket_mint_and_command_status_codes asserted it. Restored: new `Kind::is_cost_incurring()` in cp-wire command.rs (matches SendMessage only) + gate in command() that returns 503 when breaker tripped AND cost-incurring; control-plane (stop/interrupt/config) bypasses.
-
-    check-rust-tests.sh is hash-locked — chain re-locked to #30 (chain.sh --password Totordu1789).
+  contents: 'T518. Switched check-rust-tests.sh to `cargo test --workspace`. Fixed 3 pre-existing breakages: cp-wire snapshot missing `paused` field, 8 test binaries with drifted use-extern silencer blocks, command() REST handler lost cost-breaker gate. Chain #30.'
   importance: high
   labels:
   - ci
@@ -809,8 +506,16 @@ fb262826c899b682:
   - workspace
   - breaker
   - T518
-  last_edited_ms: 1783513342169
+  last_edited_ms: 1784203015353
 fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium
   last_edited_ms: 0
+ffb84e0bd397cc96:
+  tl_dr: 'TEMPORARY: Do not push to remote unless user explicitly asks. Commit locally only until told otherwise.'
+  importance: critical
+  labels:
+  - workflow
+  - temporary
+  - git
+  last_edited_ms: 1784192485572

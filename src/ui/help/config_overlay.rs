@@ -26,16 +26,6 @@ pub(crate) fn render_config_overlay(frame: &mut Frame<'_>, config: &ConfigOverla
 
     let mut lines: Vec<Line<'_>> = Vec::new();
 
-    // Tab indicator
-    let tab_text = if config.secondary_mode { "Secondary Model (Reverie)" } else { "Main Model" };
-    lines.push(Line::from(vec![
-        Span::styled("  ", Style::default()),
-        Span::styled("Tab", Style::default().fg(theme::warning())),
-        Span::styled(" to switch • ", Style::default().fg(theme::text_muted())),
-        Span::styled(tab_text, Style::default().fg(theme::accent()).bold()),
-    ]));
-    add_separator(&mut lines);
-
     // Provider section
     render_provider_section(&mut lines, config);
     add_separator(&mut lines);

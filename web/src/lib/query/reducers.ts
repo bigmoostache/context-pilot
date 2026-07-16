@@ -17,7 +17,6 @@
 // P8 budgets and each concern is independently readable.
 
 import type { Agent, ThreadDetail } from "../types"
-import { mapRawQuestions } from "../api"
 
 // ── Oplog delta shape (the push-plane payload) ───────────────────────
 //
@@ -168,7 +167,6 @@ interface RawMessage {
   content?: string | null
   ts?: number
   timestamp?: number
-  question?: unknown
   fileRef?: string | null
   file_path?: string | null
   auto?: boolean
@@ -203,13 +201,11 @@ function buildLogRow(
         : fallbackTs
   const msgText = raw.text ?? raw.content ?? undefined
   const msgFileRef = raw.fileRef ?? raw.file_path ?? undefined
-  const questions = mapRawQuestions(raw.question)
   return {
     id: msgId,
     author: raw.author === "user" ? "user" : "assistant",
     ts: new Date(msgTs).toISOString(),
     ...(msgText !== undefined && { text: msgText }),
-    ...(questions !== undefined && { questions }),
     ...(msgFileRef !== undefined && { fileRef: msgFileRef }),
     ...(raw.auto !== undefined && { auto: raw.auto }),
   }
@@ -382,7 +378,34 @@ function foldContextUsage(prev: Agent, k: Kind): Agent {
 }
 
 /**
- * Fold one oplog delta into the live agent meta (phase + cost + token vitals).
+ * lifecycle — fold the agent's process lifecycle (Running / Stopping) into the
+ * live agent meta so the dashboard reacts within ~100ms of the oplog delta,
+ * not on the next 2s registry scan.
+ *
+ * Stopping → status "disconnected" (process going down), UNLESS the current
+ *   status is `"waiting"` (a controlled restart is in progress — the old
+ *   agent's Stopping delta must not flash "disconnected").
+ * Running  → status "idle" (fresh boot, clears both "disconnected" and the
+ *   client-only "waiting" restart status).
+ */
+function foldLifecycle(prev: Agent, k: Kind): Agent {
+  const state = k.state
+  if (state === "stopping" || state === "stopped") {
+    if (prev.status === "disconnected" || prev.status === "waiting") return prev
+    return { ...prev, status: "disconnected", accent: "danger" }
+  }
+  if (state === "running") {
+    if (["disconnected", "idle", "waiting"].includes(prev.status)) {
+      return { ...prev, status: "idle", accent: "interactive" }
+    }
+    return prev
+  }
+  return prev
+}
+
+/**
+ * Fold one oplog delta into the live agent meta (phase + cost + token vitals +
+ * lifecycle).
  *
  * A thin dispatcher — each case delegates to a single-purpose fold helper above
  * and NEVER returns `null` for a known agent, so a phase change (notably going
@@ -401,8 +424,11 @@ export function applyAgentDelta(prev: Agent | undefined, entry: OpEntry): Agent 
     case "context_usage": {
       return foldContextUsage(prev, k)
     }
+    case "lifecycle": {
+      return foldLifecycle(prev, k)
+    }
     default: {
-      return prev // thread / lifecycle → irrelevant to meta
+      return prev // thread deltas → irrelevant to meta
     }
   }
 }

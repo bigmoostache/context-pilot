@@ -13,7 +13,7 @@ import { AuthProvider } from "@/lib/providers/AuthProvider"
 import { DevModeProvider } from "@/lib/providers/toggles/DevModeProvider"
 import { ShowOverlayProvider } from "@/lib/providers/toggles/ShowOverlayProvider"
 import { useDevMode } from "@/lib/providers/toggles/devMode"
-import { useFleet, useAgentMeta } from "@/lib/live"
+import { useFleet, useAgentMeta, useSseConnected, useRestartFlow } from "@/lib/live"
 import { TelemetryProfiler } from "@/lib/support/telemetry"
 import { TelemetryHud } from "@/components/shell/widgets/TelemetryHud"
 import type { ViewMode } from "@/lib/types"
@@ -50,9 +50,15 @@ function App() {
 function AppShell() {
   const { devMode } = useDevMode()
   const { data: agents = [] } = useFleet()
-  const [view, setView] = useState<ViewMode>(
-    () => (localStorage.getItem("cp-view") as ViewMode | null) ?? "fleet",
-  )
+  const [view, setView] = useState<ViewMode>(() => {
+    const modes: Record<string, ViewMode> = {
+      fleet: "fleet",
+      threads: "threads",
+      finder: "finder",
+      costs: "costs",
+    }
+    return modes[localStorage.getItem("cp-view") ?? ""] ?? "fleet"
+  })
   const [activeAgentId, setActiveAgentId] = useState(() => localStorage.getItem("cp-agent") ?? "")
   // One-shot request to pop the "create agent" dialog on the fleet dashboard
   // (raised by the workspace switcher's "New agent" entry).
@@ -73,8 +79,10 @@ function AppShell() {
   // fleet row makes the always-visible TopBar + StatusBar reactive instead of
   // riding the 15s fleet poll — the same gold path threads already use.
   const fleetAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
-  const { data: liveAgent } = useAgentMeta(activeAgentId)
+  const { data: liveAgent, loading: agentLoading } = useAgentMeta(activeAgentId)
   const activeAgent = liveAgent ?? fleetAgent
+  const sseConnected = useSseConnected(activeAgentId)
+  const { restart: restartAgent, restarting: agentRestarting } = useRestartFlow(activeAgentId)
 
   // A persisted view of "threads"/"finder" requires a live agent to
   // render. If the fleet is still loading, or the stored agent id no longer
@@ -128,7 +136,15 @@ function AppShell() {
         />
       )
     }
-    if (effectiveView === "costs") return <CostsView agentId={activeAgentId} />
+    if (effectiveView === "costs") {
+      return (
+        <CostsView
+          agentId={activeAgentId}
+          disconnected={showDisconnectOverlay}
+          onReconnect={restartAgent}
+        />
+      )
+    }
     if (effectiveView === "finder" && activeAgent) {
       return (
         <Finder
@@ -136,6 +152,8 @@ function AppShell() {
           agent={activeAgent}
           revealPath={finderRevealPath}
           onRevealConsumed={() => setFinderRevealPath(null)}
+          disconnected={showDisconnectOverlay}
+          onReconnect={restartAgent}
         />
       )
     }
@@ -144,9 +162,21 @@ function AppShell() {
         key={activeAgentId}
         activeAgentId={activeAgentId}
         onShowInFinder={showInFinder}
+        disconnected={showDisconnectOverlay}
+        onReconnect={restartAgent}
       />
     )
   }
+
+  // When the agent is unreachable (SSE down OR registry-stale) and we're
+  // viewing an agent surface, blur+grey the main content and intercept all
+  // clicks to trigger reconnect.
+  const agentStale = activeAgent?.status === "disconnected"
+  // Suppress the blur+grey overlay during an active restart — the spinner
+  // already communicates the transition, and flashing "Disconnected" during a
+  // controlled restart is visual noise, not a genuine failure signal.
+  const showDisconnectOverlay =
+    (!sseConnected || agentStale) && effectiveView !== "fleet" && !agentRestarting
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
@@ -161,7 +191,15 @@ function AppShell() {
 
       <TelemetryProfiler id={effectiveView}>{renderView()}</TelemetryProfiler>
 
-      <StatusBar fleet={effectiveView === "fleet"} agents={agents} activeAgent={activeAgent} />
+      <StatusBar
+        fleet={effectiveView === "fleet"}
+        agents={agents}
+        activeAgent={activeAgent}
+        connected={sseConnected && !agentStale}
+        onRestart={restartAgent}
+        restarting={agentRestarting}
+        loading={agentLoading}
+      />
 
       {/* Dev-mode performance HUD (gated on the Developer-mode flag inside). */}
       <TelemetryHud />

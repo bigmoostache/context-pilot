@@ -27,7 +27,7 @@ pub(super) fn core() -> Value {
                 "branch": { "type": "string" },
                 "model": { "type": "string" },
                 "provider": { "type": "string" },
-                "status": { "type": "string", "enum": ["working", "needs-you", "idle"] },
+                "status": { "type": "string", "enum": ["working", "needs-you", "idle", "disconnected"] },
                 "phase": { "type": "string", "enum": ["idle", "streaming", "tooling"] },
                 "costUsd": { "type": "number" },
                 "inputTokens": { "type": "integer" },
@@ -106,23 +106,10 @@ pub(super) fn core() -> Value {
                 "text": { "type": "string" },
                 "ts": { "type": "integer" },
                 "tool": r("ToolCall"),
-                "questions": arr(r("ThreadQuestion")),
                 "fileRef": { "type": "string" },
                 "auto": { "type": "boolean" }
             },
             "required": ["id", "author"]
-        },
-        "ThreadQuestion": {
-            "type": "object",
-            "properties": {
-                "header": { "type": "string" },
-                "prompt": { "type": "string" },
-                "options": arr(json!({ "type": "string" })),
-                "multi": { "type": "boolean" },
-                "allowOther": { "type": "boolean" },
-                "answered": arr(json!({ "type": "string" }))
-            },
-            "required": ["prompt", "options"]
         },
         "ToolCall": {
             "type": "object",

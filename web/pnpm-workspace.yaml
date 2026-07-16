@@ -19,4 +19,5 @@ packages:
 # `true`) is the mechanism that actually authorises the script and lets a clean
 # `--frozen-lockfile` install finish green.
 allowBuilds:
+  protobufjs: true
   unrs-resolver: true

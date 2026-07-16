@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use cp_base::state::runtime::State;
 use serde::{Deserialize, Serialize};
 
@@ -47,6 +49,10 @@ pub struct CallbackState {
     pub definitions: Vec<CallbackDefinition>,
     /// Which callback **name** is currently open in the editor (if any).
     pub editor_open: Option<String>,
+    /// Active callback sessions: `callback_id` → `session_key`.
+    /// Used for dedup: if the same callback fires again, the old session is killed first.
+    /// Ephemeral — not persisted across restarts.
+    pub active_sessions: HashMap<String, String>,
 }
 
 impl Default for CallbackState {
@@ -58,8 +64,8 @@ impl Default for CallbackState {
 impl CallbackState {
     /// Create an empty callback state.
     #[must_use]
-    pub const fn new() -> Self {
-        Self { definitions: Vec::new(), editor_open: None }
+    pub fn new() -> Self {
+        Self { definitions: Vec::new(), editor_open: None, active_sessions: HashMap::new() }
     }
 
     /// Assign deterministic IDs (CB1, CB2, ...) based on alphabetical order of names.

@@ -17,9 +17,6 @@ type ModelEntryFn = dyn Fn(bool, &str, &dyn crate::llms::ModelInfo) -> ConfigMod
 pub(crate) fn build_config_overlay(state: &State) -> ConfigOverlay {
     use crate::llms::{LlmProvider, ModelInfo};
 
-    let secondary_mode = state.flags.config.config_secondary_mode;
-    let active_provider = if secondary_mode { state.secondary_provider } else { state.llm_provider };
-
     // Providers
     let provider_list: [(LlmProvider, &str, &str); 8] = [
         (LlmProvider::Anthropic, "1", "Anthropic Claude"),
@@ -37,7 +34,7 @@ pub(crate) fn build_config_overlay(state: &State) -> ConfigOverlay {
         .map(|(p, key, name)| ConfigProvider {
             key: (*key).into(),
             name: (*name).into(),
-            selected: active_provider == *p,
+            selected: state.llm_provider == *p,
         })
         .collect();
 
@@ -61,7 +58,6 @@ pub(crate) fn build_config_overlay(state: &State) -> ConfigOverlay {
     let toggles = build_toggles(state);
 
     ConfigOverlay {
-        secondary_mode,
         providers,
         model_section_title,
         models,
@@ -71,139 +67,67 @@ pub(crate) fn build_config_overlay(state: &State) -> ConfigOverlay {
     }
 }
 
-/// Build model entries for the active provider + mode.
+/// Build model entries for the active provider.
 fn build_models(state: &State, model_entry: &ModelEntryFn) -> (String, Vec<ConfigModel>) {
     use crate::llms::{AnthropicModel, DeepSeekModel, GrokModel, GroqModel, LlmProvider, MiniMaxModel};
 
-    if state.flags.config.config_secondary_mode {
-        let title = "Secondary Model (Reverie)".to_owned();
-        let models = match state.secondary_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                vec![
-                    model_entry(
-                        state.secondary_anthropic_model == AnthropicModel::ClaudeOpus45,
-                        "a",
-                        &AnthropicModel::ClaudeOpus45,
-                    ),
-                    model_entry(
-                        state.secondary_anthropic_model == AnthropicModel::ClaudeSonnet45,
-                        "b",
-                        &AnthropicModel::ClaudeSonnet45,
-                    ),
-                    model_entry(
-                        state.secondary_anthropic_model == AnthropicModel::ClaudeHaiku45,
-                        "c",
-                        &AnthropicModel::ClaudeHaiku45,
-                    ),
-                ]
-            }
-            LlmProvider::Grok => vec![
-                model_entry(state.secondary_grok_model == GrokModel::Grok41Fast, "a", &GrokModel::Grok41Fast),
-                model_entry(state.secondary_grok_model == GrokModel::Grok4Fast, "b", &GrokModel::Grok4Fast),
-            ],
-            LlmProvider::Groq => vec![
-                model_entry(state.secondary_groq_model == GroqModel::GptOss120b, "a", &GroqModel::GptOss120b),
-                model_entry(state.secondary_groq_model == GroqModel::GptOss20b, "b", &GroqModel::GptOss20b),
-                model_entry(state.secondary_groq_model == GroqModel::Llama33_70b, "c", &GroqModel::Llama33_70b),
-                model_entry(state.secondary_groq_model == GroqModel::Llama31_8b, "d", &GroqModel::Llama31_8b),
-            ],
-            LlmProvider::DeepSeek => vec![
-                model_entry(state.secondary_deepseek_model == DeepSeekModel::V4Flash, "a", &DeepSeekModel::V4Flash),
-                model_entry(state.secondary_deepseek_model == DeepSeekModel::V4Pro, "b", &DeepSeekModel::V4Pro),
-            ],
-            LlmProvider::MiniMax => vec![
-                model_entry(state.secondary_minimax_model == MiniMaxModel::M27, "a", &MiniMaxModel::M27),
+    let title = "Model".to_owned();
+    let models = match state.llm_provider {
+        LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
+            vec![
+                model_entry(state.anthropic_model == AnthropicModel::ClaudeOpus45, "a", &AnthropicModel::ClaudeOpus45),
                 model_entry(
-                    state.secondary_minimax_model == MiniMaxModel::M27Highspeed,
+                    state.anthropic_model == AnthropicModel::ClaudeSonnet45,
                     "b",
-                    &MiniMaxModel::M27Highspeed,
+                    &AnthropicModel::ClaudeSonnet45,
                 ),
-            ],
-            LlmProvider::ClaudeCodeV2 => {
-                use crate::llms::ClaudeCodeV2Model;
-                vec![
-                    model_entry(
-                        state.secondary_claude_code_v2_model == ClaudeCodeV2Model::ClaudeOpus48,
-                        "a",
-                        &ClaudeCodeV2Model::ClaudeOpus48,
-                    ),
-                    model_entry(
-                        state.secondary_claude_code_v2_model == ClaudeCodeV2Model::ClaudeFable5,
-                        "b",
-                        &ClaudeCodeV2Model::ClaudeFable5,
-                    ),
-                    model_entry(
-                        state.secondary_claude_code_v2_model == ClaudeCodeV2Model::ClaudeSonnet46,
-                        "c",
-                        &ClaudeCodeV2Model::ClaudeSonnet46,
-                    ),
-                ]
-            }
-        };
-        (title, models)
-    } else {
-        let title = "Model".to_owned();
-        let models = match state.llm_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                vec![
-                    model_entry(
-                        state.anthropic_model == AnthropicModel::ClaudeOpus45,
-                        "a",
-                        &AnthropicModel::ClaudeOpus45,
-                    ),
-                    model_entry(
-                        state.anthropic_model == AnthropicModel::ClaudeSonnet45,
-                        "b",
-                        &AnthropicModel::ClaudeSonnet45,
-                    ),
-                    model_entry(
-                        state.anthropic_model == AnthropicModel::ClaudeHaiku45,
-                        "c",
-                        &AnthropicModel::ClaudeHaiku45,
-                    ),
-                ]
-            }
-            LlmProvider::Grok => vec![
-                model_entry(state.grok_model == GrokModel::Grok41Fast, "a", &GrokModel::Grok41Fast),
-                model_entry(state.grok_model == GrokModel::Grok4Fast, "b", &GrokModel::Grok4Fast),
-            ],
-            LlmProvider::Groq => vec![
-                model_entry(state.groq_model == GroqModel::GptOss120b, "a", &GroqModel::GptOss120b),
-                model_entry(state.groq_model == GroqModel::GptOss20b, "b", &GroqModel::GptOss20b),
-                model_entry(state.groq_model == GroqModel::Llama33_70b, "c", &GroqModel::Llama33_70b),
-                model_entry(state.groq_model == GroqModel::Llama31_8b, "d", &GroqModel::Llama31_8b),
-            ],
-            LlmProvider::DeepSeek => vec![
-                model_entry(state.deepseek_model == DeepSeekModel::V4Flash, "a", &DeepSeekModel::V4Flash),
-                model_entry(state.deepseek_model == DeepSeekModel::V4Pro, "b", &DeepSeekModel::V4Pro),
-            ],
-            LlmProvider::MiniMax => vec![
-                model_entry(state.minimax_model == MiniMaxModel::M27, "a", &MiniMaxModel::M27),
-                model_entry(state.minimax_model == MiniMaxModel::M27Highspeed, "b", &MiniMaxModel::M27Highspeed),
-            ],
-            LlmProvider::ClaudeCodeV2 => {
-                use crate::llms::ClaudeCodeV2Model;
-                vec![
-                    model_entry(
-                        state.claude_code_v2_model == ClaudeCodeV2Model::ClaudeOpus48,
-                        "a",
-                        &ClaudeCodeV2Model::ClaudeOpus48,
-                    ),
-                    model_entry(
-                        state.claude_code_v2_model == ClaudeCodeV2Model::ClaudeFable5,
-                        "b",
-                        &ClaudeCodeV2Model::ClaudeFable5,
-                    ),
-                    model_entry(
-                        state.claude_code_v2_model == ClaudeCodeV2Model::ClaudeSonnet46,
-                        "c",
-                        &ClaudeCodeV2Model::ClaudeSonnet46,
-                    ),
-                ]
-            }
-        };
-        (title, models)
-    }
+                model_entry(
+                    state.anthropic_model == AnthropicModel::ClaudeHaiku45,
+                    "c",
+                    &AnthropicModel::ClaudeHaiku45,
+                ),
+            ]
+        }
+        LlmProvider::Grok => vec![
+            model_entry(state.grok_model == GrokModel::Grok41Fast, "a", &GrokModel::Grok41Fast),
+            model_entry(state.grok_model == GrokModel::Grok4Fast, "b", &GrokModel::Grok4Fast),
+        ],
+        LlmProvider::Groq => vec![
+            model_entry(state.groq_model == GroqModel::GptOss120b, "a", &GroqModel::GptOss120b),
+            model_entry(state.groq_model == GroqModel::GptOss20b, "b", &GroqModel::GptOss20b),
+            model_entry(state.groq_model == GroqModel::Llama33_70b, "c", &GroqModel::Llama33_70b),
+            model_entry(state.groq_model == GroqModel::Llama31_8b, "d", &GroqModel::Llama31_8b),
+        ],
+        LlmProvider::DeepSeek => vec![
+            model_entry(state.deepseek_model == DeepSeekModel::V4Flash, "a", &DeepSeekModel::V4Flash),
+            model_entry(state.deepseek_model == DeepSeekModel::V4Pro, "b", &DeepSeekModel::V4Pro),
+        ],
+        LlmProvider::MiniMax => vec![
+            model_entry(state.minimax_model == MiniMaxModel::M27, "a", &MiniMaxModel::M27),
+            model_entry(state.minimax_model == MiniMaxModel::M27Highspeed, "b", &MiniMaxModel::M27Highspeed),
+        ],
+        LlmProvider::ClaudeCodeV2 => {
+            use crate::llms::ClaudeCodeV2Model;
+            vec![
+                model_entry(
+                    state.claude_code_v2_model == ClaudeCodeV2Model::ClaudeOpus48,
+                    "a",
+                    &ClaudeCodeV2Model::ClaudeOpus48,
+                ),
+                model_entry(
+                    state.claude_code_v2_model == ClaudeCodeV2Model::ClaudeFable5,
+                    "b",
+                    &ClaudeCodeV2Model::ClaudeFable5,
+                ),
+                model_entry(
+                    state.claude_code_v2_model == ClaudeCodeV2Model::ClaudeSonnet46,
+                    "c",
+                    &ClaudeCodeV2Model::ClaudeSonnet46,
+                ),
+            ]
+        }
+    };
+    (title, models)
 }
 
 /// Build the budget bar entries.
@@ -216,10 +140,6 @@ fn build_budget_bars(state: &State) -> Vec<ConfigBudgetBar> {
 
     let budget_pct = (effective_budget.to_f64() / max_budget.to_f64() * 100.0).to_usize();
     let threshold_pct = (state.cleaning_threshold * 100.0).to_usize();
-
-    let spine_cfg = &cp_mod_spine::types::SpineState::get(state).config;
-    let max_cost = spine_cfg.max_cost.unwrap_or(0.0);
-    let max_display = 20.0f64;
 
     vec![
         ConfigBudgetBar {
@@ -239,15 +159,6 @@ fn build_budget_bars(state: &State) -> Vec<ConfigBudgetBar> {
             extra: None,
             semantic: Semantic::Warning,
             selected: state.config_selected_bar == 1,
-        },
-        ConfigBudgetBar {
-            label: "Max Cost".into(),
-            percent: 0,
-            fill_ratio: (max_cost / max_display).min(1.0),
-            value_display: if max_cost <= 0.0 { "disabled".into() } else { format!("${max_cost:.2}") },
-            extra: Some("(guard rail)".into()),
-            semantic: Semantic::Error,
-            selected: state.config_selected_bar == 2,
         },
     ]
 }

@@ -3,7 +3,7 @@
 //!
 //! Extracted from `transport/mod.rs` to keep both files within the line budget.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -38,6 +38,9 @@ pub struct Backend {
     /// Agents whose tier-② state has changed since the last SSE sweep.
     /// SSE producers drain this per-agent to emit `invalidate` events.
     pub(crate) dirty_agents: HashSet<String>,
+    /// Per-agent registry liveness, updated by the driver loop's registry
+    /// scan. Stale agents surface as "disconnected" in the fleet meta.
+    pub(crate) liveness: HashMap<String, crate::liveness::Liveness>,
     /// Process-lifecycle manager — spawns dashboard-created agents (PTY) under
     /// a binary allow-list (R2-15).
     pub(crate) supervisor: AgentSupervisor,
@@ -98,6 +101,23 @@ impl Backend {
         // only reads `*.json`, so the dot-file is ignored there).
         let provision_flag_path =
             std::env::var_os("CP_PROVISION_FLAG").map_or_else(|| agents_dir.join(".provisioned"), PathBuf::from);
+
+        let releases = ReleaseStore::load(ReleaseStore::default_dir().unwrap_or_else(|| agents_dir.join("releases")));
+
+        // Reconcile the persisted active release onto the live agent binary. The
+        // "Use" action (select_release) writes `active_tag` to the durable
+        // releases/config.json AND mutates the in-memory `agent_binary`; only the
+        // former survives a restart. Without this, a reload silently reverts
+        // spawns to the `CP_AGENT_BINARY` boot seed while the UI still shows the
+        // release as "Active" — an incoherence where the badge lies. So the
+        // persisted `active_tag` WINS over the env seed, with a fallback to the
+        // seed when its binary was deleted out from under us.
+        let agent_binary = releases
+            .active_tag()
+            .map(|tag| releases.binary_path(tag))
+            .filter(|bin| bin.exists())
+            .unwrap_or(agent_binary);
+
         Self {
             view: MaterializedView::new(),
             hub: StreamHub::new(DEFAULT_SUB_CAPACITY),
@@ -106,11 +126,12 @@ impl Backend {
             retired: RetiredStore::load(&agents_dir),
             names: NameOverrides::load(&agents_dir),
             avatars: AvatarStore::load(&agents_dir),
-            releases: ReleaseStore::load(ReleaseStore::default_dir().unwrap_or_else(|| agents_dir.join("releases"))),
+            releases,
             provision_flag_path,
             pkce_session: None,
             agents_dir,
             dirty_agents: HashSet::new(),
+            liveness: HashMap::new(),
             supervisor: AgentSupervisor::new(&[agent_binary.clone()]),
             agents_root,
             agent_binary,
@@ -160,6 +181,7 @@ impl Backend {
             avatars: AvatarStore::default(),
             agents_dir,
             dirty_agents: HashSet::new(),
+            liveness: HashMap::new(),
             supervisor: AgentSupervisor::new(&[]),
             agents_root: PathBuf::from("/tmp/cp-test-realms"),
             agent_binary: PathBuf::from("/tmp/cp-test-bin"),

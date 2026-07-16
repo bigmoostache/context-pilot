@@ -69,7 +69,7 @@ export function ContextMenu({
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+      if (ref.current && e.target instanceof Node && !ref.current.contains(e.target)) onClose()
     }
     const onEsc = (e: KeyboardEvent) => e.key === "Escape" && onClose()
     window.addEventListener("mousedown", onDown)

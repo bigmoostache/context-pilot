@@ -172,11 +172,11 @@ export function ThreadList({
 
             {!showArchived && (
               <>
-                {working.length > 0 && <Group label="User turn" count={working.length} />}
-                {working.map((t) => row(t))}
-
                 {mine.length > 0 && <Group label="Agent's turn" count={mine.length} />}
                 {mine.map((t) => row(t))}
+
+                {working.length > 0 && <Group label="User turn" count={working.length} />}
+                {working.map((t) => row(t))}
               </>
             )}
 

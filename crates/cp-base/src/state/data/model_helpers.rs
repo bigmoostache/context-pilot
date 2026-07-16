@@ -14,8 +14,6 @@ pub trait ModelPricing {
     fn current_model(&self) -> String;
     /// Max output tokens for the active provider/model.
     fn current_max_output_tokens(&self) -> u32;
-    /// Max output tokens for the secondary provider/model.
-    fn secondary_max_output_tokens(&self) -> u32;
     /// Context window size (tokens) for the active model.
     fn model_context_window(&self) -> usize;
     /// Effective context budget: custom override or full context window.
@@ -56,19 +54,6 @@ impl ModelPricing for State {
             LlmProvider::DeepSeek => self.deepseek_model.max_output_tokens(),
             LlmProvider::MiniMax => self.minimax_model.max_output_tokens(),
             LlmProvider::ClaudeCodeV2 => self.claude_code_v2_model.max_output_tokens(),
-        }
-    }
-
-    fn secondary_max_output_tokens(&self) -> u32 {
-        match self.secondary_provider {
-            LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                self.secondary_anthropic_model.max_output_tokens()
-            }
-            LlmProvider::Grok => self.secondary_grok_model.max_output_tokens(),
-            LlmProvider::Groq => self.secondary_groq_model.max_output_tokens(),
-            LlmProvider::DeepSeek => self.secondary_deepseek_model.max_output_tokens(),
-            LlmProvider::MiniMax => self.secondary_minimax_model.max_output_tokens(),
-            LlmProvider::ClaudeCodeV2 => self.secondary_claude_code_v2_model.max_output_tokens(),
         }
     }
 

@@ -26,10 +26,14 @@ export function Finder({
   agent,
   revealPath,
   onRevealConsumed,
+  disconnected,
+  onReconnect,
 }: {
   agent: Agent
   revealPath?: string | null | undefined
   onRevealConsumed?: (() => void) | undefined
+  disconnected?: boolean
+  onReconnect?: () => void
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -76,6 +80,8 @@ export function Finder({
       ctrl={ctrl}
       surfaceRef={surfaceRef}
       fileInputRef={fileInputRef}
+      disconnected={disconnected}
+      onReconnect={onReconnect}
     />
   )
 }

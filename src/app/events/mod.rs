@@ -160,45 +160,6 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
 
             // Threads view: intercept navigation keys before panel/scroll handling
             if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
-                // Thread question form captures ALL input when active
-                if let Some(aq) = cp_mod_threads::types::FocusState::get(state).active_question.as_ref() {
-                    let typing_other = aq.questions.get(aq.focused_index).is_some_and(|q| q.typing_other);
-                    return Some(match key.code {
-                        KeyCode::Esc => Action::ThreadQuestionDismiss,
-                        KeyCode::Up => Action::ThreadQuestionUp,
-                        KeyCode::Down => Action::ThreadQuestionDown,
-                        KeyCode::Left if !typing_other => Action::ThreadQuestionLeft,
-                        KeyCode::Right if !typing_other => Action::ThreadQuestionRight,
-                        KeyCode::Enter => Action::ThreadQuestionEnter,
-                        KeyCode::Char(' ') if !typing_other => Action::ThreadQuestionToggle,
-                        KeyCode::Backspace if typing_other => Action::ThreadQuestionBackspace,
-                        KeyCode::Char(c) if typing_other => Action::ThreadQuestionChar(c),
-                        KeyCode::Backspace
-                        | KeyCode::Left
-                        | KeyCode::Right
-                        | KeyCode::Home
-                        | KeyCode::End
-                        | KeyCode::PageUp
-                        | KeyCode::PageDown
-                        | KeyCode::Tab
-                        | KeyCode::BackTab
-                        | KeyCode::Delete
-                        | KeyCode::Insert
-                        | KeyCode::F(_)
-                        | KeyCode::Char(_)
-                        | KeyCode::Null
-                        | KeyCode::CapsLock
-                        | KeyCode::ScrollLock
-                        | KeyCode::NumLock
-                        | KeyCode::PrintScreen
-                        | KeyCode::Pause
-                        | KeyCode::Menu
-                        | KeyCode::KeypadBegin
-                        | KeyCode::Media(_)
-                        | KeyCode::Modifier(_) => Action::None,
-                    });
-                }
-
                 let shift = key.modifiers.contains(KeyModifiers::SHIFT);
                 let confirming = cp_mod_threads::types::FocusState::get(state).confirming_archive;
                 match key.code {
@@ -321,96 +282,23 @@ pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
 
 /// Handle key events when config view is open
 const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
-    let secondary = state.flags.config.config_secondary_mode;
     match key.code {
         // Escape closes config
         KeyCode::Esc => Action::ToggleConfigView,
-        // Number keys select provider (main or secondary depending on Tab mode)
-        KeyCode::Char('1') => {
-            if secondary {
-                Action::ConfigSelectSecondaryProvider(LlmProvider::Anthropic)
-            } else {
-                Action::ConfigSelectProvider(LlmProvider::Anthropic)
-            }
-        }
-        KeyCode::Char('2') => {
-            if secondary {
-                Action::ConfigSelectSecondaryProvider(LlmProvider::ClaudeCode)
-            } else {
-                Action::ConfigSelectProvider(LlmProvider::ClaudeCode)
-            }
-        }
-        KeyCode::Char('3') => {
-            if secondary {
-                Action::ConfigSelectSecondaryProvider(LlmProvider::Grok)
-            } else {
-                Action::ConfigSelectProvider(LlmProvider::Grok)
-            }
-        }
-        KeyCode::Char('4') => {
-            if secondary {
-                Action::ConfigSelectSecondaryProvider(LlmProvider::Groq)
-            } else {
-                Action::ConfigSelectProvider(LlmProvider::Groq)
-            }
-        }
-        KeyCode::Char('5') => {
-            if secondary {
-                Action::ConfigSelectSecondaryProvider(LlmProvider::DeepSeek)
-            } else {
-                Action::ConfigSelectProvider(LlmProvider::DeepSeek)
-            }
-        }
-        KeyCode::Char('6') => {
-            if secondary {
-                Action::ConfigSelectSecondaryProvider(LlmProvider::ClaudeCodeApiKey)
-            } else {
-                Action::ConfigSelectProvider(LlmProvider::ClaudeCodeApiKey)
-            }
-        }
-        KeyCode::Char('7') => {
-            if secondary {
-                Action::ConfigSelectSecondaryProvider(LlmProvider::MiniMax)
-            } else {
-                Action::ConfigSelectProvider(LlmProvider::MiniMax)
-            }
-        }
-        KeyCode::Char('8') => {
-            if secondary {
-                Action::ConfigSelectSecondaryProvider(LlmProvider::ClaudeCodeV2)
-            } else {
-                Action::ConfigSelectProvider(LlmProvider::ClaudeCodeV2)
-            }
-        }
-        // Letter keys select model based on current provider and Tab mode
-        KeyCode::Char('a') => {
-            if secondary {
-                dispatch_secondary_model(state, 0)
-            } else {
-                dispatch_primary_model(state, 0)
-            }
-        }
-        KeyCode::Char('b') => {
-            if secondary {
-                dispatch_secondary_model(state, 1)
-            } else {
-                dispatch_primary_model(state, 1)
-            }
-        }
-        KeyCode::Char('c') => {
-            if secondary {
-                dispatch_secondary_model(state, 2)
-            } else {
-                dispatch_primary_model(state, 2)
-            }
-        }
-        KeyCode::Char('d') => {
-            if secondary {
-                dispatch_secondary_model(state, 3)
-            } else {
-                dispatch_primary_model(state, 3)
-            }
-        }
+        // Number keys select provider
+        KeyCode::Char('1') => Action::ConfigSelectProvider(LlmProvider::Anthropic),
+        KeyCode::Char('2') => Action::ConfigSelectProvider(LlmProvider::ClaudeCode),
+        KeyCode::Char('3') => Action::ConfigSelectProvider(LlmProvider::Grok),
+        KeyCode::Char('4') => Action::ConfigSelectProvider(LlmProvider::Groq),
+        KeyCode::Char('5') => Action::ConfigSelectProvider(LlmProvider::DeepSeek),
+        KeyCode::Char('6') => Action::ConfigSelectProvider(LlmProvider::ClaudeCodeApiKey),
+        KeyCode::Char('7') => Action::ConfigSelectProvider(LlmProvider::MiniMax),
+        KeyCode::Char('8') => Action::ConfigSelectProvider(LlmProvider::ClaudeCodeV2),
+        // Letter keys select model based on current provider
+        KeyCode::Char('a') => dispatch_primary_model(state, 0),
+        KeyCode::Char('b') => dispatch_primary_model(state, 1),
+        KeyCode::Char('c') => dispatch_primary_model(state, 2),
+        KeyCode::Char('d') => dispatch_primary_model(state, 3),
         // Theme selection - t/T to cycle through themes
         KeyCode::Char('t') => Action::ConfigNextTheme,
         KeyCode::Char('T') => Action::ConfigPrevTheme,
@@ -421,8 +309,6 @@ const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
         // Think reminder threshold adjustment
         KeyCode::Char(']') => Action::ConfigThinkThresholdUp,
         KeyCode::Char('[') => Action::ConfigThinkThresholdDown,
-        // Tab toggles between main/secondary model selection
-        KeyCode::Tab => Action::ConfigToggleSecondaryMode,
         KeyCode::Down => Action::ConfigSelectNextBar,
         // Left/Right adjust the selected bar
         KeyCode::Left => Action::ConfigDecreaseSelectedBar,
@@ -435,6 +321,7 @@ const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
         | KeyCode::End
         | KeyCode::PageUp
         | KeyCode::PageDown
+        | KeyCode::Tab
         | KeyCode::BackTab
         | KeyCode::Delete
         | KeyCode::Insert
@@ -456,9 +343,4 @@ const fn handle_config_event(key: &KeyEvent, state: &State) -> Action {
 /// Dispatch primary model selection based on provider and index (0=a, 1=b, 2=c, 3=d)
 const fn dispatch_primary_model(state: &State, idx: usize) -> Action {
     models::dispatch_primary_model(state, idx)
-}
-
-/// Dispatch secondary model selection based on secondary provider and index
-const fn dispatch_secondary_model(state: &State, idx: usize) -> Action {
-    models::dispatch_secondary_model(state, idx)
 }

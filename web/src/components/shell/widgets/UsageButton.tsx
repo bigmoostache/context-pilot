@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Loader2, ExternalLink, CheckCircle2, XCircle, LogIn, RefreshCw } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
@@ -10,9 +10,9 @@ import {
   completeClaudeLogin,
   refreshClaudeLogin,
 } from "@/lib/api"
-import type { ClaudeUsageLimit } from "@/lib/api/generated/types.gen"
 import { cn } from "@/lib/utils"
 import { StoredAccounts } from "./StoredAccounts"
+import { UsageLimits } from "./UsageLimits"
 
 /** Anthropic "A" logomark (Simple Icons, 24×24 viewBox). */
 function AnthropicMark({ className }: { className?: string }) {
@@ -21,51 +21,6 @@ function AnthropicMark({ className }: { className?: string }) {
       <path d="M13.827 3.52h3.603L24 20.48h-3.603l-6.57-16.96zm-7.257 0h3.603l6.57 16.96h-3.603L11.627 16.47H5.166L3.653 20.48H0L6.57 3.52zm1.04 4.96l-2.49 6.7h5.47l-2.49-6.7z" />
     </svg>
   )
-}
-
-/** Human label for a usage-limit `kind`. */
-function limitLabel(kind: string): string {
-  switch (kind) {
-    case "session": {
-      return "Session"
-    }
-    case "weekly_all": {
-      return "Weekly (all)"
-    }
-    case "weekly_sonnet": {
-      return "Sonnet"
-    }
-    case "weekly_opus": {
-      return "Opus"
-    }
-    case "weekly_cowork": {
-      return "Cowork"
-    }
-    default: {
-      return kind.replaceAll("_", " ").replaceAll(/\b\w/g, (c) => c.toUpperCase())
-    }
-  }
-}
-
-/** Format a reset timestamp as a short relative string. */
-function formatReset(iso: string | null | undefined): string {
-  if (!iso) return ""
-  const d = new Date(iso)
-  const now = new Date()
-  const diffMs = d.getTime() - now.getTime()
-  if (diffMs < 0) return "resetting…"
-  const diffH = diffMs / 3_600_000
-  if (diffH < 24) {
-    return `Resets ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-  }
-  return `Resets ${d.toLocaleDateString([], { month: "short", day: "numeric" })}`
-}
-
-/** Severity → bar colour. */
-function barColor(severity: string, pct: number): string {
-  if (severity === "critical" || pct >= 90) return "bg-red-500"
-  if (severity === "warning" || pct >= 70) return "bg-amber-500"
-  return "bg-emerald-500"
 }
 
 /** Format epoch ms as a short relative expiry string. */
@@ -78,30 +33,6 @@ function formatExpiry(epochMs: number): string {
   const hrs = Math.floor(mins / 60)
   if (hrs < 24) return `${hrs}h ${mins % 60}m left`
   return `${Math.floor(hrs / 24)}d left`
-}
-
-function LimitRow({ limit }: { limit: ClaudeUsageLimit }) {
-  const pct = Math.min(limit.percent, 100)
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between text-[12px]">
-        <span className="font-medium text-foreground">{limitLabel(limit.kind)}</span>
-        <span className="text-muted-foreground tabular-nums">{pct}%</span>
-      </div>
-      <div className="h-1.5 w-full rounded-full bg-muted">
-        <div
-          className={cn(
-            "h-full rounded-full transition-all duration-500",
-            barColor(limit.severity, pct),
-          )}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      {limit.resets_at && (
-        <p className="text-[11px] text-muted-foreground/70">{formatReset(limit.resets_at)}</p>
-      )}
-    </div>
-  )
 }
 
 type LoginStep = "idle" | "starting" | "waiting_for_code" | "completing" | "done" | "error"
@@ -222,19 +153,21 @@ export function LoginFlow({ onDone }: { onDone: () => void }) {
         })
     }
     let doneTimer: number | undefined
-    const id = setInterval(async () => {
-      try {
-        const status = await fetchClaudeTokenStatus()
-        const baseline = baselineExpiryRef.current ?? 0
-        // Only a valid token with a NEWER expiry than the baseline is a fresh login.
-        if (status.valid && (status.expires_at ?? 0) > baseline) {
-          clearInterval(id)
-          setStep("done")
-          doneTimer = window.setTimeout(() => onDoneRef.current(), 1500)
-        }
-      } catch {
-        /* ignore polling errors */
+    const handlePollResult = (status: TokenStatus) => {
+      const baseline = baselineExpiryRef.current ?? 0
+      // Only a valid token with a NEWER expiry than the baseline is a fresh login.
+      if (status.valid && (status.expires_at ?? 0) > baseline) {
+        clearInterval(id)
+        setStep("done")
+        doneTimer = window.setTimeout(() => onDoneRef.current(), 1500)
       }
+    }
+    const id = setInterval(() => {
+      fetchClaudeTokenStatus()
+        .then(handlePollResult)
+        .catch(() => {
+          /* ignore polling errors */
+        })
     }, 2000)
     return () => {
       cancelled = true
@@ -384,40 +317,6 @@ function TokenStatusRow({
   )
 }
 
-/** Usage-limit bars (loading/error/empty placeholder) — extracted for P8 budget. */
-function UsageLimits({
-  isValid,
-  isLoading,
-  isError,
-  limits,
-}: {
-  isValid: boolean
-  isLoading: boolean
-  isError: boolean
-  limits: ClaudeUsageLimit[]
-}) {
-  if (!isValid) return null
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-4">
-        <Loader2 className="size-4 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-  if (isError)
-    return <p className="text-[12px] text-muted-foreground">Could not fetch usage data.</p>
-  if (limits.length === 0) {
-    return <p className="text-[12px] text-muted-foreground">No active usage limits.</p>
-  }
-  return (
-    <>
-      {limits.map((l) => (
-        <LimitRow key={l.kind} limit={l} />
-      ))}
-    </>
-  )
-}
-
 /** Anthropic logo button that opens a popover with live usage bars + login. */
 export function UsageButton() {
   const [open, setOpen] = useState(false)
@@ -434,8 +333,8 @@ export function UsageButton() {
   const tokenStatus = useQuery({
     queryKey: ["claude-token-status"],
     queryFn: fetchClaudeTokenStatus,
-    enabled: open,
-    refetchInterval: open ? 30_000 : false,
+    // Always poll — background check enables auto-refresh before expiry.
+    refetchInterval: open ? 30_000 : 300_000,
     staleTime: 10_000,
     retry: 1,
   })
@@ -443,14 +342,54 @@ export function UsageButton() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["claude-usage"],
     queryFn: fetchClaudeUsage,
-    enabled: open && tokenStatus.data?.valid === true,
-    refetchInterval: open ? 30_000 : false,
+    // Always poll when token valid — feeds the background usage indicator.
+    enabled: tokenStatus.data?.valid === true,
+    refetchInterval: open ? 30_000 : 300_000,
     staleTime: 10_000,
     retry: 1,
   })
 
   const limits = (data?.limits ?? []).filter((l) => l.percent > 0)
   const isValid = tokenStatus.data?.valid === true
+
+  // Camembert (pie-chart) background behind the Anthropic logo — shows
+  // session usage at a glance without opening the popover.
+  const sessionPct = useMemo(() => {
+    const session = data?.limits?.find((l) => l.kind === "session")
+    return session ? Math.min(session.percent, 100) : 0
+  }, [data?.limits])
+  const pieBg = useMemo(() => {
+    if (sessionPct <= 0) return
+    const color =
+      sessionPct >= 90
+        ? "rgb(239 68 68 / 0.25)"
+        : sessionPct >= 70
+          ? "rgb(245 158 11 / 0.25)"
+          : "rgb(16 185 129 / 0.25)"
+    return `conic-gradient(from 0deg, ${color} ${String(sessionPct)}%, transparent ${String(sessionPct)}%)`
+  }, [sessionPct])
+
+  // Auto-refresh when token expires within 30 minutes.
+  // Ref pattern mirrors LoginFlow's onDoneRef — stable callback avoids
+  // exhaustive-deps issues with the mutation object.
+  const refreshMutateRef = useRef(refreshMutation.mutate)
+  useEffect(() => {
+    refreshMutateRef.current = refreshMutation.mutate
+  })
+  const autoRefreshAttemptedRef = useRef(false)
+  useEffect(() => {
+    const status = tokenStatus.data
+    if (!status?.valid || status.expires_at == null) return
+    const remaining = status.expires_at - Date.now()
+    if (remaining > 0 && remaining < 30 * 60_000) {
+      if (!autoRefreshAttemptedRef.current) {
+        autoRefreshAttemptedRef.current = true
+        refreshMutateRef.current()
+      }
+    } else {
+      autoRefreshAttemptedRef.current = false
+    }
+  }, [tokenStatus.data])
 
   const handleLoginDone = () => {
     void queryClient.invalidateQueries({ queryKey: ["claude-token-status"] })
@@ -463,6 +402,7 @@ export function UsageButton() {
         <PopoverTrigger
           className="flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground"
           aria-label="Claude Code usage"
+          style={{ background: pieBg }}
         >
           <AnthropicMark className="size-[17px]" />
         </PopoverTrigger>

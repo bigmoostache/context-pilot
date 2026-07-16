@@ -11,7 +11,6 @@ tools:
     parameters:
       continue_until_todos_done: "Keep auto-continuing until all todos are done (default: false)"
       max_output_tokens: "Guard rail: max total output tokens before blocking. Null to disable."
-      max_cost: "Guard rail: max cost in USD before blocking. Based on stream (burst) counters — accumulates across auto-continuations, resets only when the user sends a new message. Null to disable."
       max_duration_secs: "Guard rail: max autonomous duration in seconds. Null to disable."
       max_messages: "Guard rail: max conversation messages before blocking. Null to disable."
       max_auto_retries: "Guard rail: max consecutive auto-continuations without human input. Null to disable."

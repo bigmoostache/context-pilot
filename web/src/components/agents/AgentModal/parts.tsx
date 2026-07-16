@@ -216,7 +216,7 @@ export function AgentModalFooter({ c }: { c: Controller }) {
           className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-medium text-foreground/80 transition-colors hover:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <RefreshCw className={cn("size-3.5", c.restartBusy && "animate-spin")} />
-          Restart
+          {c.restartBusy ? "Restarting…" : "Restart"}
         </button>
       )}
       <button

@@ -21,7 +21,7 @@ Context Pilot is not one process. It is a small constellation of cooperating sur
                                          │  (HTTP :7878)
                          ┌───────────────▼───────────────────────────┐
                          │        Orchestrator  (cp-orchestrator)     │
-                         │  registry · materialized view · breaker ·  │
+                         │  registry · materialized view ·             │
                          │  stream hub · supervisor · REST/SSE        │
                          └───┬───────────────┬───────────────┬────────┘
             oplog tail       │   commands     │   stream tap  │   spawn / signals
@@ -127,7 +127,7 @@ A single resource is owned by exactly one plane, so the two never fight over fre
 `crates/cp-orchestrator` is a standalone binary that controls a fleet. It uses **no async runtime**: a blocking, thread-per-connection HTTP server (`tiny_http`) mirrors the rest of the codebase.
 
 - **Registry** (`registry/`) — `AgentRegistry` poll-scans the agents directory (`~/.context-pilot/agents/<id>.json`) and diffs it into events (Appeared / Disappeared / StatusChanged / Stale). Liveness is a three-factor verdict (registry record + heartbeat freshness + lock ownership). `Tailer` is the incremental, gap-free oplog consumer; `AgentChannel` hydrates and sends; `TeeReader` taps an agent's stream plane.
-- **Services** (`services/`) — `MaterializedView` is the in-memory fleet projection: one `AgentView` per agent (rev, heads, thread roster, focused thread, phase, lifecycle, cost), folded purely from `OpEntry`. `CostBreaker` is a durable per-agent spend breaker (high-water mark, fail-closed, survives crash-loops). `StreamHub` fans an agent's stream out to N bounded subscribers. `RetiredStore` records stopped-but-kept agents.
+- **Services** (`services/`) — `MaterializedView` is the in-memory fleet projection: one `AgentView` per agent (rev, heads, thread roster, focused thread, phase, lifecycle, cost), folded purely from `OpEntry`. `StreamHub` fans an agent's stream out to N bounded subscribers. `RetiredStore` records stopped-but-kept agents.
 - **Supervisor** (`supervisor/`) — `AgentSupervisor` owns process lifecycle: spawn an agent on a real **pty** (the TUI needs a tty), stop (SIGTERM → grace → SIGKILL → reap), restart, and adopt externally-launched agents. Spawns are gated by a binary allow-list.
 - **Transport** (`transport/`) — REST + SSE. The driver loop runs two cadences: a slow scan (~2 s: registry diff + a `config.json` mtime backstop) and a fast tail (~100 ms: poll each Tailer → fold into the view → observe cost). Notable routes:
   - `GET /api/fleet/meta`, `/api/fleet/retired`, `/api/metrics`

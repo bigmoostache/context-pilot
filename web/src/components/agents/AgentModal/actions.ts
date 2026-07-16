@@ -3,7 +3,7 @@ import type { Agent } from "@/lib/types"
 import {
   useCreateAgent,
   useRenameAgent,
-  useRestartAgent,
+  useRestartFlow,
   useRetireAgent,
   useUploadAvatar,
   sendCommand,
@@ -49,14 +49,19 @@ export interface ActionsArgs {
 export function useAgentModalActions(args: ActionsArgs): Actions {
   const { isManage, agent, name, sel, providers, onClose, onFlash } = args
   const createAgent = useCreateAgent()
-  const restartAgent = useRestartAgent()
+  const {
+    restart: doRestart,
+    restarting: restartBusy,
+    error: restartFlowError,
+  } = useRestartFlow(agent?.id ?? "")
   const retireAgent = useRetireAgent()
   const renameAgent = useRenameAgent()
   const uploadAvatar = useUploadAvatar()
   const [avatarBust, setAvatarBust] = useState(0)
-  const [error, setError] = useState<string | null>(null)
+  const [localError, setLocalError] = useState<string | null>(null)
+  const error = restartFlowError ?? localError
   const [saving, setSaving] = useState(false)
-  const pending = createAgent.isPending || saving || restartAgent.isPending || retireAgent.isPending
+  const pending = createAgent.isPending || saving || restartBusy || retireAgent.isPending
 
   const onAvatarChange = (file: File) => {
     if (!agent) return
@@ -64,42 +69,41 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
       { agentId: agent.id, file },
       {
         onSuccess: () => setAvatarBust(Date.now()),
-        onError: (err) => setError(err instanceof Error ? err.message : "Avatar upload failed"),
+        onError: (err) =>
+          setLocalError(err instanceof Error ? err.message : "Avatar upload failed"),
       },
     )
   }
 
   /** Restart a (possibly stale-binary) agent so a fresh process can accept
-   *  commands the old binary rejected with `502 agent unreachable`. */
+   *  commands the old binary rejected with `502 agent unreachable`. Spins until
+   *  the SSE push plane reconnects (full lifecycle, not just API ack). */
   const restart = () => {
-    if (!agent || restartAgent.isPending) return
-    setError(null)
-    restartAgent.mutate(agent.id, {
-      onSuccess: () => {
-        onFlash?.(`Restarting ${agent.name} — it will reconnect in a moment`)
-        onClose()
-      },
-      onError: (e) => setError(e instanceof Error ? e.message : "Could not restart the agent."),
-    })
+    if (!agent || restartBusy) return
+    setLocalError(null)
+    doRestart()
   }
+
+  // Restart flow errors are derived from the hook — no sync effect needed.
+  // `error` is the derived value: restartFlowError takes precedence over local.
 
   /** Retire (archive) the agent: stop its process + console server, keep its
    *  folder, and move it to the dashboard's Retired section. Reversible. */
   const retire = () => {
     if (!agent || retireAgent.isPending) return
-    setError(null)
+    setLocalError(null)
     retireAgent.mutate(agent.id, {
       onSuccess: () => {
         onFlash?.(`Retired ${agent.name} — moved to the Retired section`)
         onClose()
       },
-      onError: (e) => setError(e instanceof Error ? e.message : "Could not retire the agent."),
+      onError: (e) => setLocalError(e instanceof Error ? e.message : "Could not retire the agent."),
     })
   }
 
   const saveManage = (a: Agent) => {
     setSaving(true)
-    setError(null)
+    setLocalError(null)
     const nameChanged = name.trim() !== a.name
     const tasks: Promise<unknown>[] = [
       sendCommand(a.id, { kind: "configure", provider: sel.provId, model: sel.modelId }),
@@ -114,12 +118,14 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
         )
         onClose()
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to save changes"))
+      .catch((e: unknown) =>
+        setLocalError(e instanceof Error ? e.message : "Failed to save changes"),
+      )
       .finally(() => setSaving(false))
   }
 
   const create = () => {
-    setError(null)
+    setLocalError(null)
     const apiName = findModel(providers, sel.provId, sel.modelId)?.apiName
     createAgent.mutate(
       { name: name.trim(), ...(apiName && { model: apiName }) },
@@ -129,7 +135,7 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
           onClose()
         },
         onError: (e) =>
-          setError(
+          setLocalError(
             e instanceof Error ? e.message : "Could not create the agent. Please try again.",
           ),
       },
@@ -167,7 +173,7 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
     retire,
     restart,
     retireBusy: retireAgent.isPending,
-    restartBusy: restartAgent.isPending,
+    restartBusy,
     avatarBust,
     onAvatarChange,
   }

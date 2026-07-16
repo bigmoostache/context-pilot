@@ -21,7 +21,10 @@
 // here so `@/lib/live` stays the single import surface.
 
 import { useQueryClient } from "@tanstack/react-query"
+import { useCallback, useEffect, useState } from "react"
 import { mergeThreadLogs, qk } from "../query/sync"
+import { getOrCreateSseClient } from "../query/sse"
+import { useRestartAgent } from "./mutations"
 import { measure } from "../support/telemetry"
 import { useLive, type LiveQueryResult } from "./core"
 import * as api from "../api"
@@ -37,6 +40,84 @@ export * from "./mutations"
 // so every existing `@/lib/live` consumer keeps its import path unchanged.
 
 export { useLive, type LiveQueryResult } from "./core"
+
+// ── SSE connection state ──────────────────────────────────────────────
+
+/**
+ * Reactive SSE connection state for one agent. Returns `true` while the
+ * EventSource is OPEN, `false` during reconnect / when the orchestrator is
+ * unreachable. Subscribes to the shared per-agent SSE client's connection
+ * callbacks so the component re-renders on open/error transitions.
+ */
+export function useSseConnected(agentId: string): boolean {
+  const [connected, setConnected] = useState(true)
+  const [seededFor, setSeededFor] = useState<string | null>(null)
+
+  // Seed the connection state when the agent changes — a render-phase
+  // adjust-state-on-prop-change (React's documented pattern), NOT an effect (a
+  // synchronous setState in an effect trips react-hooks/set-state-in-effect and
+  // costs an extra commit). A brand-new client is still mid-handshake
+  // (es === null → connected === false); seeding from that would flash
+  // "Disconnected" on every agent switch, so stay optimistic (true) until the
+  // handshake settles unless the client has connected before.
+  if (seededFor !== agentId) {
+    setSeededFor(agentId)
+    if (agentId) {
+      const client = getOrCreateSseClient(agentId)
+      setConnected(client.hasEverConnected ? client.connected : true)
+    } else {
+      setConnected(true)
+    }
+  }
+
+  // The effect ONLY subscribes to open/error transitions — no synchronous
+  // setState in its body (the seed above owns the initial value).
+  useEffect(() => {
+    if (!agentId) return
+    const client = getOrCreateSseClient(agentId)
+    return client.subscribeConnection(setConnected)
+  }, [agentId])
+
+  return connected
+}
+
+// ── Restart lifecycle ─────────────────────────────────────────────────
+
+/**
+ * Full restart lifecycle: API call, then set agent status to `"waiting"`.
+ *
+ * The new agent's natural `Lifecycle::Running` oplog delta clears `"waiting"`
+ * back to `"idle"` via {@link foldLifecycle} in the reducers. The 15s backstop
+ * poll also replaces `"waiting"` with the ground-truth REST status. No state
+ * machine, no timers — the push plane's normal lifecycle signal is the sole
+ * clearance mechanism.
+ *
+ * `foldLifecycle` guards `"waiting"` against the old agent's `Stopping` delta
+ * (which would otherwise flash `"disconnected"` during a controlled restart).
+ */
+export function useRestartFlow(agentId: string) {
+  const mutation = useRestartAgent()
+  const client = useQueryClient()
+  const { data: agent } = useAgentMeta(agentId)
+
+  const restart = useCallback(() => {
+    if (!agentId || mutation.isPending || agent?.status === "waiting") return
+    mutation.mutate(agentId, {
+      onSuccess: () => {
+        client.setQueryData<Agent>(qk.agent(agentId), (prev) => {
+          if (!prev) return prev
+          return { ...prev, status: "waiting" as const, accent: "interactive" as const }
+        })
+      },
+    })
+  }, [agentId, mutation, agent?.status, client])
+
+  return {
+    restart,
+    restarting: mutation.isPending || agent?.status === "waiting",
+    error: mutation.error instanceof Error ? mutation.error.message : null,
+  }
+}
 
 // ── Fleet hooks ───────────────────────────────────────────────────────
 
