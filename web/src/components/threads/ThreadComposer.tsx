@@ -72,7 +72,7 @@ interface Composer {
   text: string
   caret: number
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
-  slashActive: boolean
+  slashPrefix: string | null
   canSend: (pendingFiles: number) => boolean
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
   onSelect: (e: React.SyntheticEvent<HTMLTextAreaElement>) => void
@@ -140,11 +140,14 @@ function useComposer(
   }
   useEffect(autoResize, [text])
 
-  // The line the caret sits on is exactly `/` — a lightweight in-composer
-  // trigger for the /command bubbles mid-draft (T350).
-  const slashActive = useMemo(() => {
+  // The text typed after `/` on the current line, or null if the caret isn't
+  // on a slash-prefixed line. `""` = bare `/`, `"bo"` = `/bo`. Drives both the
+  // bubble visibility and the prefix filter (T556).
+  const slashPrefix = useMemo((): string | null => {
     const { start, end } = lineBounds(text, caret)
-    return text.slice(start, end) === "/"
+    const line = text.slice(start, end)
+    if (!line.startsWith("/")) return null
+    return line.slice(1)
   }, [text, caret])
 
   const canSend = (pendingFiles: number) => text.trim().length > 0 || pendingFiles > 0
@@ -177,7 +180,9 @@ function useComposer(
     const base = s.body && s.body.trim().length > 0 ? s.body.trimEnd() : s.command
     const seeded = `${base}\n`
     const { start, end } = lineBounds(text, caret)
-    const onSlashLine = text.slice(start, end) === "/"
+    // Two modes: on a slash-prefixed line (bare `/` or partial like `/bo`),
+    // REPLACE just that line; otherwise seed the whole composer.
+    const onSlashLine = text.slice(start, end).startsWith("/")
     const next = onSlashLine ? text.slice(0, start) + seeded + text.slice(end) : seeded
     const caretPos = onSlashLine ? start + seeded.length : seeded.length
     setText(next)
@@ -251,7 +256,7 @@ function useComposer(
     text,
     caret,
     textareaRef,
-    slashActive,
+    slashPrefix,
     canSend,
     onChange,
     onSelect,
@@ -363,21 +368,11 @@ function ComposerBanner({ banner }: { banner: Banner }) {
 }
 
 /**
- * Thread composer — always active, regardless of turn status. The hint above
- * the input reflects what the agent is doing with *this* thread when it is the
- * agent's turn (`MY_TURN` / `ACTIVE`):
- *
- * - **Focused** (the one thread the agent is on right now) → an active spinner.
- * - **Not focused** (owes this thread but busy elsewhere) → a static clock.
- *
- * On the user's turn (`THEIR_TURN`) no hint shows. The textarea is always
- * usable so a message can be sent at any time.
- *
- * Structure (P8): the draft text/caret, persisted-draft round-trip, auto-grow
- * and keyboard/command-prefill handlers live in the {@link useComposer} hook,
- * the turn-status banner in {@link resolveComposerBanner}/{@link ComposerBanner},
- * and the input row in {@link ComposerInputRow}, so this render body stays
- * within the complexity/line budgets.
+ * Thread composer — always active, regardless of turn status. Turn-status
+ * banner reflects agent activity on this thread (T39/T371). Structure (P8):
+ * draft logic in {@link useComposer}, banner in {@link ComposerBanner},
+ * input row in {@link ComposerInputRow}. T556: prefix-filtered `/command`
+ * bubbles with Tab autocomplete and Space expansion.
  */
 export function ThreadComposer({
   status,
@@ -398,40 +393,20 @@ export function ThreadComposer({
   /** true when this thread has been paused by the user (T371) */
   paused?: boolean | undefined
   onSend?: ((text: string) => void) | undefined
-  /** upload one or more picked files into this thread (paperclip button). May
-   *  be async so a caller can await it (T471); the composer itself fires and
-   *  forgets. */
+  /** Upload picked files into this thread (paperclip). May be async (T471). */
   onAttach?: ((files: File[]) => void | Promise<void>) | undefined
-  /** files uploaded but not yet sent — rendered as removable chips (T331) */
+  /** Files uploaded but not yet sent — rendered as removable chips (T331). */
   pendingFiles?: UploadedFile[] | undefined
-  /** remove a staged file by its index in pendingFiles */
+  /** Remove a staged file by its index in pendingFiles. */
   onRemoveFile?: ((index: number) => void) | undefined
-  /**
-   * `/command` first-message suggestions (T348). When non-empty, each renders
-   * as a clickable bubble above the textarea; clicking prefills the composer
-   * with the command's literal text (the user can edit before sending).
-   * Callers pass these only for an EMPTY thread.
-   */
+  /** `/command` suggestions (T348). Non-empty renders clickable bubbles; click prefills. */
   suggestions?: CommandSuggestion[] | undefined
-  /**
-   * True when the thread has no messages yet (T350). Scopes the *empty-composer*
-   * auto-show of the suggestion bubbles to a first message only.
-   */
+  /** True when thread has no messages yet — scopes auto-show bubbles to first message (T350). */
   firstMessage?: boolean
-  /**
-   * Opens the "create command" dialog (T350). When provided, a pill styled like
-   * the suggestion bubbles is rendered alongside them; clicking it invokes this
-   * callback. Omit to hide the pill.
-   */
+  /** Opens the "create command" dialog (T350). Omit to hide the pill. */
   onCreateCommand?: (() => void) | undefined
-  /**
-   * localStorage key under which the UNSENT draft is persisted (T304). When
-   * provided, what you type — and **where your caret is** — survives a reload,
-   * a view switch, and switching threads; each thread keeps its own pending
-   * draft. The stored value is `{text,selStart,selEnd}` JSON (a legacy
-   * bare-string draft is still read, caret at end). Omit for an ephemeral
-   * composer.
-   */
+  /** localStorage key for persisting the unsent draft + caret per thread (T304).
+   *  Stored as `{text,selStart,selEnd}` JSON; legacy bare-string also read. */
   draftKey?: string | undefined
 }) {
   const composer = useComposer(draftKey, onSend)
@@ -445,9 +420,49 @@ export function ThreadComposer({
   const sendable = composer.canSend(pendingFiles.length)
 
   // Whether the /command bubbles should be offered right now: mid-draft on a
-  // lone `/` line (any thread), OR on a brand-new thread with an empty composer
-  // (the first-message palette). File chips show independently of this.
-  const commandsActive = composer.slashActive || (firstMessage && !composer.text.trim())
+  // slash-prefixed line (any thread), OR on a brand-new thread with an empty
+  // composer (the first-message palette). File chips show independently of this.
+  const commandsActive = composer.slashPrefix !== null || (firstMessage && !composer.text.trim())
+
+  // Filter suggestions by the typed prefix (T556). `/bo` shows only commands
+  // starting with `/bo`. A bare `/` (prefix "") shows all commands.
+  const filteredSuggestions = useMemo(() => {
+    const prefix = composer.slashPrefix
+    if (prefix === null || prefix === "") return suggestions
+    const lower = prefix.toLowerCase()
+    return suggestions.filter((s) => s.command.slice(1).toLowerCase().startsWith(lower))
+  }, [suggestions, composer.slashPrefix])
+
+  // Wrap the composer's keydown handler to intercept Tab (autocomplete first
+  // filtered suggestion) and Space (expand an exact command match) before the
+  // base handler runs (T556).
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Tab autocomplete: if slash bubbles are showing and there are matches,
+    // pick the first one instead of indenting.
+    if (e.key === "Tab" && !e.shiftKey && composer.slashPrefix !== null) {
+      const first = filteredSuggestions[0]
+      if (first) {
+        e.preventDefault()
+        composer.prefill(first)
+        return
+      }
+    }
+
+    // Space expansion: if the current line is exactly a known command (e.g.
+    // `/boss-hunt`), pressing Space replaces it with the command's body.
+    if (e.key === " " && composer.slashPrefix !== null) {
+      const match = suggestions.find(
+        (s) => s.command.slice(1).toLowerCase() === composer.slashPrefix?.toLowerCase(),
+      )
+      if (match) {
+        e.preventDefault()
+        composer.prefill(match)
+        return
+      }
+    }
+
+    composer.handleKeyDown(e)
+  }
 
   return (
     <div className="shrink-0 px-5 pt-2 pb-4">
@@ -458,7 +473,7 @@ export function ThreadComposer({
         <ComposerBubbles
           files={pendingFiles}
           onRemoveFile={onRemoveFile}
-          suggestions={commandsActive ? suggestions : []}
+          suggestions={commandsActive ? filteredSuggestions : []}
           onPick={composer.prefill}
           onCreateCommand={commandsActive ? onCreateCommand : undefined}
         />
@@ -470,7 +485,7 @@ export function ThreadComposer({
         sendable={sendable}
         onChange={composer.onChange}
         onSelect={composer.onSelect}
-        onKeyDown={composer.handleKeyDown}
+        onKeyDown={handleKeyDown}
         onSubmit={composer.handleSubmit}
         onAttach={onAttach}
       />
