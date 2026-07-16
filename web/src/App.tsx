@@ -13,7 +13,7 @@ import { AuthProvider } from "@/lib/providers/AuthProvider"
 import { DevModeProvider } from "@/lib/providers/toggles/DevModeProvider"
 import { ShowOverlayProvider } from "@/lib/providers/toggles/ShowOverlayProvider"
 import { useDevMode } from "@/lib/providers/toggles/devMode"
-import { useFleet, useAgentMeta, useSseConnected } from "@/lib/live"
+import { useFleet, useAgentMeta, useSseConnected, useRestartFlow } from "@/lib/live"
 import { TelemetryProfiler } from "@/lib/support/telemetry"
 import { TelemetryHud } from "@/components/shell/widgets/TelemetryHud"
 import type { ViewMode } from "@/lib/types"
@@ -74,9 +74,10 @@ function AppShell() {
   // fleet row makes the always-visible TopBar + StatusBar reactive instead of
   // riding the 15s fleet poll — the same gold path threads already use.
   const fleetAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
-  const { data: liveAgent } = useAgentMeta(activeAgentId)
+  const { data: liveAgent, loading: agentLoading } = useAgentMeta(activeAgentId)
   const activeAgent = liveAgent ?? fleetAgent
   const sseConnected = useSseConnected(activeAgentId)
+  const { restart: restartAgent, restarting: agentRestarting } = useRestartFlow(activeAgentId)
 
   // A persisted view of "threads"/"finder" requires a live agent to
   // render. If the fleet is still loading, or the stored agent id no longer
@@ -168,7 +169,9 @@ function AppShell() {
         agents={agents}
         activeAgent={activeAgent}
         connected={sseConnected}
-        onReconnect={() => window.location.reload()}
+        onRestart={restartAgent}
+        restarting={agentRestarting}
+        loading={agentLoading}
       />
 
       {/* Dev-mode performance HUD (gated on the Developer-mode flag inside). */}

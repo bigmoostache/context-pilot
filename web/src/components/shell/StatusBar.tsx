@@ -1,4 +1,4 @@
-import { Boxes, MessagesSquare, Wallet } from "lucide-react"
+import { Boxes, Loader2, MessagesSquare, RefreshCw, Wallet } from "lucide-react"
 import { fmtCost, fmtTokens } from "@/lib/support/panelMeta"
 import type { Agent, StreamPhase } from "@/lib/types"
 
@@ -25,20 +25,32 @@ export function StatusBar({
   agents = [],
   activeAgent,
   connected = true,
-  onReconnect,
+  onRestart,
+  restarting = false,
+  loading = false,
 }: {
   fleet?: boolean
   agents?: Agent[]
   activeAgent?: Agent | undefined
   /** False when the SSE push plane for this agent is down. */
   connected?: boolean
-  /** Fired when the user clicks the "Disconnected" label to reconnect. */
-  onReconnect?: () => void
+  /** Fires the restart API + full reconnect lifecycle (same as AgentModal Restart). */
+  onRestart?: () => void
+  /** True while the restart lifecycle is in-flight (API call through SSE reconnect). */
+  restarting?: boolean
+  /** True while the agent meta is loading after a switch (show loader, not stale phase). */
+  loading?: boolean
 }) {
   return fleet ? (
     <FleetStatus agents={agents} />
   ) : (
-    <AgentStatus agent={activeAgent} connected={connected} onReconnect={onReconnect} />
+    <AgentStatus
+      agent={activeAgent}
+      connected={connected}
+      onRestart={onRestart}
+      restarting={restarting}
+      loading={loading}
+    />
   )
 }
 
@@ -89,11 +101,15 @@ function resolvePhase(agent?: Agent): StreamPhase {
 function AgentStatus({
   agent,
   connected = true,
-  onReconnect,
+  onRestart,
+  restarting = false,
+  loading = false,
 }: {
   agent?: Agent | undefined
   connected?: boolean
-  onReconnect?: () => void
+  onRestart?: () => void
+  restarting?: boolean
+  loading?: boolean
 }) {
   // Use the LIVE execution phase folded from the PhaseTransition delta (T297)
   // so the footer distinguishes streaming · tooling · ready instead of the old
@@ -116,7 +132,17 @@ function AgentStatus({
 
   return (
     <footer className="vibrancy flex h-8 shrink-0 items-center gap-3 border-t border-border px-4 text-[12px]">
-      {connected ? (
+      {loading ? (
+        <span className="flex items-center gap-1.5">
+          <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+          <span className="text-muted-foreground">Loading…</span>
+        </span>
+      ) : restarting ? (
+        <span className="flex items-center gap-1.5">
+          <RefreshCw className="size-3.5 animate-spin text-muted-foreground" />
+          <span className="font-medium text-muted-foreground">Restarting…</span>
+        </span>
+      ) : connected ? (
         <span className="flex items-center gap-1.5">
           <span className="size-2 rounded-full" style={{ background: p.color }} />
           <span className="font-medium text-foreground/80">{p.label}</span>
@@ -124,7 +150,7 @@ function AgentStatus({
       ) : (
         <button
           type="button"
-          onClick={onReconnect}
+          onClick={onRestart}
           className="flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 transition-colors hover:bg-muted"
         >
           <span className="size-2 rounded-full bg-[var(--danger)]" />

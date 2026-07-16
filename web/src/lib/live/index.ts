@@ -21,9 +21,10 @@
 // here so `@/lib/live` stays the single import surface.
 
 import { useQueryClient } from "@tanstack/react-query"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { mergeThreadLogs, qk } from "../query/sync"
 import { getOrCreateSseClient } from "../query/sse"
+import { useRestartAgent } from "./mutations"
 import { measure } from "../support/telemetry"
 import { useLive, type LiveQueryResult } from "./core"
 import * as api from "../api"
@@ -63,6 +64,57 @@ export function useSseConnected(agentId: string): boolean {
   }, [agentId])
 
   return connected
+}
+
+// ── Restart lifecycle ─────────────────────────────────────────────────
+
+/**
+ * Full restart lifecycle: API call, spin, detect SSE drop, wait for
+ * reconnect, stop. Handles both entry points: dialog restart (SSE up)
+ * and footer restart (SSE already down). 30s failsafe timeout.
+ *
+ * State machine: waiting + !connected sets sawDrop; sawDrop + connected
+ * clears both and invalidates the fleet + agent caches.
+ */
+export function useRestartFlow(agentId: string) {
+  const mutation = useRestartAgent()
+  const client = useQueryClient()
+  const connected = useSseConnected(agentId)
+  const [waiting, setWaiting] = useState(false)
+  const [sawDrop, setSawDrop] = useState(false)
+
+  useEffect(() => {
+    if (!waiting) return
+    if (!connected && !sawDrop) setSawDrop(true)
+    if (sawDrop && connected) {
+      setWaiting(false)
+      setSawDrop(false)
+      void client.invalidateQueries({ queryKey: qk.fleet() })
+      void client.invalidateQueries({ queryKey: qk.agent(agentId) })
+    }
+  }, [waiting, connected, sawDrop, client, agentId])
+
+  useEffect(() => {
+    if (!waiting) return
+    const t = setTimeout(() => {
+      setWaiting(false)
+      setSawDrop(false)
+    }, 30_000)
+    return () => clearTimeout(t)
+  }, [waiting])
+
+  const restart = useCallback(() => {
+    if (!agentId || mutation.isPending || waiting) return
+    mutation.mutate(agentId, {
+      onSuccess: () => setWaiting(true),
+    })
+  }, [agentId, mutation, waiting])
+
+  return {
+    restart,
+    restarting: mutation.isPending || waiting,
+    error: mutation.error instanceof Error ? mutation.error.message : null,
+  }
 }
 
 // ── Fleet hooks ───────────────────────────────────────────────────────

@@ -3,7 +3,7 @@ import type { Agent } from "@/lib/types"
 import {
   useCreateAgent,
   useRenameAgent,
-  useRestartAgent,
+  useRestartFlow,
   useRetireAgent,
   useUploadAvatar,
   sendCommand,
@@ -49,14 +49,14 @@ export interface ActionsArgs {
 export function useAgentModalActions(args: ActionsArgs): Actions {
   const { isManage, agent, name, sel, providers, onClose, onFlash } = args
   const createAgent = useCreateAgent()
-  const restartAgent = useRestartAgent()
+  const { restart: doRestart, restarting: restartBusy, error: restartFlowError } = useRestartFlow(agent?.id ?? "")
   const retireAgent = useRetireAgent()
   const renameAgent = useRenameAgent()
   const uploadAvatar = useUploadAvatar()
   const [avatarBust, setAvatarBust] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const pending = createAgent.isPending || saving || restartAgent.isPending || retireAgent.isPending
+  const pending = createAgent.isPending || saving || restartBusy || retireAgent.isPending
 
   const onAvatarChange = (file: File) => {
     if (!agent) return
@@ -70,18 +70,18 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
   }
 
   /** Restart a (possibly stale-binary) agent so a fresh process can accept
-   *  commands the old binary rejected with `502 agent unreachable`. */
+   *  commands the old binary rejected with `502 agent unreachable`. Spins until
+   *  the SSE push plane reconnects (full lifecycle, not just API ack). */
   const restart = () => {
-    if (!agent || restartAgent.isPending) return
+    if (!agent || restartBusy) return
     setError(null)
-    restartAgent.mutate(agent.id, {
-      onSuccess: () => {
-        onFlash?.(`Restarting ${agent.name} — it will reconnect in a moment`)
-        onClose()
-      },
-      onError: (e) => setError(e instanceof Error ? e.message : "Could not restart the agent."),
-    })
+    doRestart()
   }
+
+  // Surface restart flow errors alongside local errors.
+  useEffect(() => {
+    if (restartFlowError) setError(restartFlowError)
+  }, [restartFlowError])
 
   /** Retire (archive) the agent: stop its process + console server, keep its
    *  folder, and move it to the dashboard's Retired section. Reversible. */
@@ -167,7 +167,7 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
     retire,
     restart,
     retireBusy: retireAgent.isPending,
-    restartBusy: restartAgent.isPending,
+    restartBusy,
     avatarBust,
     onAvatarChange,
   }
