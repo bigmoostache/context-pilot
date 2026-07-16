@@ -31,9 +31,15 @@ import type {
   ThreadQuestion,
 } from "./api/generated/types.gen"
 
-/** Agent with UI-only `accent` field (computed client-side in reducers). */
-export type Agent = GenAgent & {
+/**
+ * Agent with UI-only `accent` field (computed client-side in reducers) and a
+ * `status` widened to include the client-only `"waiting"` restart status (set
+ * by {@link useRestartFlow}; never emitted by the backend). The base
+ * `GenAgent["status"]` is the narrow backend union, so we override it here.
+ */
+export type Agent = Omit<GenAgent, "status"> & {
   accent: AccentToken
+  status: AgentStatus
 }
 
 /**
@@ -57,7 +63,12 @@ export type ThreadDetail = Omit<GenThreadDetail, "log"> & {
 
 // ── Derived type aliases (extracted from generated union literals) ────
 
-export type AgentStatus = GenAgent["status"]
+/**
+ * Agent status — backend statuses plus the client-only `"waiting"` status set
+ * by {@link useRestartFlow} during a controlled restart. The new agent's
+ * `Lifecycle::Running` delta naturally clears it back to `"idle"`.
+ */
+export type AgentStatus = GenAgent["status"] | "waiting"
 export type ThreadStatus = GenThreadDetail["status"]
 
 // ── UI-only types (no backend equivalent) ────────────────────────────

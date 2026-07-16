@@ -358,6 +358,7 @@ export type OpEntryKind = {
     name?: string;
     output_tokens?: number;
     phase?: string;
+    state?: string;
     status?: string;
     thread_id?: string;
     threshold_tokens?: number;

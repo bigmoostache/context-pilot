@@ -386,17 +386,20 @@ function foldContextUsage(prev: Agent, k: Kind): Agent {
  * live agent meta so the dashboard reacts within ~100ms of the oplog delta,
  * not on the next 2s registry scan.
  *
- * Stopping → status "disconnected" (process going down).
- * Running  → status "idle" (fresh boot, no work yet).
+ * Stopping → status "disconnected" (process going down), UNLESS the current
+ *   status is `"waiting"` (a controlled restart is in progress — the old
+ *   agent's Stopping delta must not flash "disconnected").
+ * Running  → status "idle" (fresh boot, clears both "disconnected" and the
+ *   client-only "waiting" restart status).
  */
 function foldLifecycle(prev: Agent, k: Kind): Agent {
   const state = k.state
   if (state === "stopping" || state === "stopped") {
-    if (prev.status === "disconnected") return prev
+    if (prev.status === "disconnected" || prev.status === "waiting") return prev
     return { ...prev, status: "disconnected", accent: "danger" }
   }
   if (state === "running") {
-    if (prev.status === "disconnected" || prev.status === "idle") {
+    if (["disconnected", "idle", "waiting"].includes(prev.status)) {
       return { ...prev, status: "idle", accent: "interactive" }
     }
     return prev

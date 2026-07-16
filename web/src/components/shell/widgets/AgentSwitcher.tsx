@@ -18,11 +18,13 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
   "needs-you": { label: "Needs you", color: "var(--signal)" },
   idle: { label: "Idle", color: "var(--muted-foreground)" },
   disconnected: { label: "Disconnected", color: "var(--danger)" },
+  waiting: { label: "Restarting", color: "var(--interactive)" },
 }
 
 /** Sort priority: working first, then needs-you, then idle. */
 const statusOrder: Record<AgentStatus, number> = {
   working: 0,
+  waiting: 0,
   "needs-you": 1,
   idle: 2,
   disconnected: 3,
@@ -96,8 +98,8 @@ export function AgentSwitcher({
           <DropdownMenuLabel className="text-[11px]">
             Workspaces · one agent per folder
           </DropdownMenuLabel>
-          {[...agents]
-            .sort((a, b) => statusOrder[a.status] - statusOrder[b.status])
+          {agents
+            .toSorted((a, b) => statusOrder[a.status] - statusOrder[b.status])
             .map((a) => (
             <DropdownMenuItem
               key={a.id}

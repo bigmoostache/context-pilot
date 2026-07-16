@@ -1,4 +1,5 @@
 import type { Agent } from "@/lib/types"
+import { clickable } from "@/lib/support/a11y"
 import { FinderPathBar, FinderTabs, FinderToolbar } from "../FinderChrome"
 import { FinderOverlays } from "../internal/FinderOverlays"
 import { useFinderPins } from "../internal/useFinderState"
@@ -37,8 +38,8 @@ export function FinderShell({
   ctrl: FinderController
   surfaceRef: React.RefObject<HTMLDivElement | null>
   fileInputRef: React.RefObject<HTMLInputElement | null>
-  disconnected?: boolean
-  onReconnect?: () => void
+  disconnected?: boolean | undefined
+  onReconnect?: (() => void) | undefined
 }) {
   const { root, children, displayNodes, sorted, crumbs, previewNode, relCwd } = listing
   const { pins, addPin, removePin } = useFinderPins(agent.id)
@@ -58,7 +59,11 @@ export function FinderShell({
       style={disconnected ? { filter: "blur(3px) grayscale(0.5)", transition: "filter 300ms" } : { transition: "filter 300ms" }}
     >
       {disconnected && (
-        <div onClick={onReconnect} className="absolute inset-0 z-40 cursor-pointer bg-background/30" />
+        <div
+          {...clickable(() => onReconnect?.())}
+          aria-label="Reconnect agent"
+          className="absolute inset-0 z-40 cursor-pointer bg-background/30"
+        />
       )}
       <input
         ref={fileInputRef}

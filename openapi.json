@@ -1130,6 +1130,9 @@
           "phase": {
             "type": "string"
           },
+          "state": {
+            "type": "string"
+          },
           "status": {
             "type": "string"
           },

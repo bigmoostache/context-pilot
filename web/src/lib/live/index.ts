@@ -51,21 +51,30 @@ export { useLive, type LiveQueryResult } from "./core"
  */
 export function useSseConnected(agentId: string): boolean {
   const [connected, setConnected] = useState(true)
+  const [seededFor, setSeededFor] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!agentId) {
+  // Seed the connection state when the agent changes — a render-phase
+  // adjust-state-on-prop-change (React's documented pattern), NOT an effect (a
+  // synchronous setState in an effect trips react-hooks/set-state-in-effect and
+  // costs an extra commit). A brand-new client is still mid-handshake
+  // (es === null → connected === false); seeding from that would flash
+  // "Disconnected" on every agent switch, so stay optimistic (true) until the
+  // handshake settles unless the client has connected before.
+  if (seededFor !== agentId) {
+    setSeededFor(agentId)
+    if (agentId) {
+      const client = getOrCreateSseClient(agentId)
+      setConnected(client.hasEverConnected ? client.connected : true)
+    } else {
       setConnected(true)
-      return
     }
+  }
+
+  // The effect ONLY subscribes to open/error transitions — no synchronous
+  // setState in its body (the seed above owns the initial value).
+  useEffect(() => {
+    if (!agentId) return
     const client = getOrCreateSseClient(agentId)
-    // Only seed from snapshot if the client has connected before. A brand-new
-    // client is still mid-handshake (es === null → connected === false) — seeding
-    // from that would flash "Disconnected" on every agent switch until the
-    // EventSource opens. Stay optimistic (default true) and let the subscription
-    // callback deliver the real state once the handshake settles.
-    if (client.hasEverConnected) {
-      setConnected(client.connected)
-    }
     return client.subscribeConnection(setConnected)
   }, [agentId])
 
@@ -75,73 +84,37 @@ export function useSseConnected(agentId: string): boolean {
 // ── Restart lifecycle ─────────────────────────────────────────────────
 
 /**
- * Full restart lifecycle: API call, wait for the agent to go through
- * "disconnected" (old process killed) and recover to a live status (new
- * process booted). 30s failsafe timeout with forced invalidation.
+ * Full restart lifecycle: API call, then set agent status to `"waiting"`.
  *
- * Previous implementation watched SSE connection state, but SSE connects to
- * the orchestrator — not the agent — so an agent restart never drops the SSE
- * link. This version watches the reactive `agent.status` field (fed by the
- * delta plane via `useAgentMeta`), which is the correct signal.
+ * The new agent's natural `Lifecycle::Running` oplog delta clears `"waiting"`
+ * back to `"idle"` via {@link foldLifecycle} in the reducers. The 15s backstop
+ * poll also replaces `"waiting"` with the ground-truth REST status. No state
+ * machine, no timers — the push plane's normal lifecycle signal is the sole
+ * clearance mechanism.
  *
- * State machine: waiting + status==="disconnected" sets sawDisconnect;
- * sawDisconnect + status!=="disconnected" clears both and invalidates caches.
- * Handles both entry points: dialog restart (agent is live, goes through
- * disconnect then recovery) and footer restart (agent already disconnected,
- * sawDisconnect fires immediately, waits only for recovery).
+ * `foldLifecycle` guards `"waiting"` against the old agent's `Stopping` delta
+ * (which would otherwise flash `"disconnected"` during a controlled restart).
  */
 export function useRestartFlow(agentId: string) {
   const mutation = useRestartAgent()
   const client = useQueryClient()
   const { data: agent } = useAgentMeta(agentId)
-  const [waiting, setWaiting] = useState(false)
-  const [sawDisconnect, setSawDisconnect] = useState(false)
-
-  useEffect(() => {
-    if (!waiting) return
-    const status = agent?.status
-    if (!sawDisconnect && status === "disconnected") {
-      setSawDisconnect(true)
-    }
-    if (sawDisconnect && status !== undefined && status !== "disconnected") {
-      setWaiting(false)
-      setSawDisconnect(false)
-      void client.invalidateQueries({ queryKey: qk.fleet() })
-      void client.invalidateQueries({ queryKey: qk.agent(agentId) })
-    }
-  }, [waiting, sawDisconnect, agent?.status, client, agentId])
-
-  // 30s failsafe — clear spinner AND invalidate so we don't leave stale data.
-  useEffect(() => {
-    if (!waiting) return
-    const t = setTimeout(() => {
-      setWaiting(false)
-      setSawDisconnect(false)
-      void client.invalidateQueries({ queryKey: qk.fleet() })
-      void client.invalidateQueries({ queryKey: qk.agent(agentId) })
-    }, 30_000)
-    return () => clearTimeout(t)
-  }, [waiting, client, agentId])
 
   const restart = useCallback(() => {
-    if (!agentId || mutation.isPending || waiting) return
+    if (!agentId || mutation.isPending || agent?.status === "waiting") return
     mutation.mutate(agentId, {
       onSuccess: () => {
-        setWaiting(true)
-        // The restart handler already marked StalePid on the server.
-        // Force a refetch so the REST response delivers "disconnected"
-        // before the new agent's Lifecycle::Running oplog delta lands —
-        // otherwise React batches both lifecycle deltas (Stopping +
-        // Running) into one render and the effect never sees the
-        // intermediate "disconnected" state.
-        void client.invalidateQueries({ queryKey: qk.agent(agentId) })
+        client.setQueryData<Agent>(qk.agent(agentId), (prev) => {
+          if (!prev) return prev
+          return { ...prev, status: "waiting" as const, accent: "interactive" as const }
+        })
       },
     })
-  }, [agentId, mutation, waiting])
+  }, [agentId, mutation, agent?.status, client])
 
   return {
     restart,
-    restarting: mutation.isPending || waiting,
+    restarting: mutation.isPending || agent?.status === "waiting",
     error: mutation.error instanceof Error ? mutation.error.message : null,
   }
 }

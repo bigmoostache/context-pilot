@@ -161,7 +161,10 @@ function AppShell() {
   // viewing an agent surface, blur+grey the main content and intercept all
   // clicks to trigger reconnect.
   const agentStale = activeAgent?.status === "disconnected"
-  const showDisconnectOverlay = (!sseConnected || agentStale) && effectiveView !== "fleet"
+  // Suppress the blur+grey overlay during an active restart — the spinner
+  // already communicates the transition, and flashing "Disconnected" during a
+  // controlled restart is visual noise, not a genuine failure signal.
+  const showDisconnectOverlay = (!sseConnected || agentStale) && effectiveView !== "fleet" && !agentRestarting
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
