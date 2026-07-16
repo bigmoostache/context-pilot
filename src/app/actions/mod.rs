@@ -387,50 +387,10 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.flags.ui.dirty = true;
             ActionResult::Save
         }
-        Action::ConfigSelectSecondaryProvider(provider) => {
-            state.secondary_provider = provider;
-            state.flags.ui.dirty = true;
-            ActionResult::Save
-        }
-        Action::ConfigSelectSecondaryAnthropicModel(m) => {
-            state.secondary_anthropic_model = m;
-            state.flags.ui.dirty = true;
-            ActionResult::Save
-        }
-        Action::ConfigSelectSecondaryGrokModel(m) => {
-            state.secondary_grok_model = m;
-            state.flags.ui.dirty = true;
-            ActionResult::Save
-        }
-        Action::ConfigSelectSecondaryGroqModel(m) => {
-            state.secondary_groq_model = m;
-            state.flags.ui.dirty = true;
-            ActionResult::Save
-        }
-        Action::ConfigSelectSecondaryDeepSeekModel(m) => {
-            state.secondary_deepseek_model = m;
-            state.flags.ui.dirty = true;
-            ActionResult::Save
-        }
-        Action::ConfigSelectSecondaryMiniMaxModel(m) => {
-            state.secondary_minimax_model = m;
-            state.flags.ui.dirty = true;
-            ActionResult::Save
-        }
-        Action::ConfigSelectSecondaryClaudeCodeV2Model(m) => {
-            state.secondary_claude_code_v2_model = m;
-            state.flags.ui.dirty = true;
-            ActionResult::Save
-        }
         Action::ConfigToggleReverie => {
             state.flags.config.reverie_enabled = !state.flags.config.reverie_enabled;
             state.flags.ui.dirty = true;
             ActionResult::Save
-        }
-        Action::ConfigToggleSecondaryMode => {
-            state.flags.config.config_secondary_mode = !state.flags.config.config_secondary_mode;
-            state.flags.ui.dirty = true;
-            ActionResult::Nothing
         }
         Action::CycleViewMode => {
             state.view_mode = state.view_mode.next();

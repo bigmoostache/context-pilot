@@ -87,15 +87,7 @@ pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
         | Action::ConfigToggleAutoContinue
         | Action::ConfigThinkThresholdUp
         | Action::ConfigThinkThresholdDown
-        | Action::ConfigSelectSecondaryProvider(_)
-        | Action::ConfigSelectSecondaryAnthropicModel(_)
-        | Action::ConfigSelectSecondaryGrokModel(_)
-        | Action::ConfigSelectSecondaryGroqModel(_)
-        | Action::ConfigSelectSecondaryDeepSeekModel(_)
-        | Action::ConfigSelectSecondaryMiniMaxModel(_)
-        | Action::ConfigSelectSecondaryClaudeCodeV2Model(_)
         | Action::ConfigToggleReverie
-        | Action::ConfigToggleSecondaryMode
         | Action::PageDynamicNext
         | Action::PageDynamicPrev
         | Action::CycleViewMode

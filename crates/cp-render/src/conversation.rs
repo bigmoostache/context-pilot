@@ -229,11 +229,9 @@ pub struct PerfOp {
 /// Configuration overlay (Ctrl+H).
 #[derive(Debug, Clone, Serialize)]
 pub struct ConfigOverlay {
-    /// Whether showing secondary (reverie) model tab.
-    pub secondary_mode: bool,
     /// LLM provider entries.
     pub providers: Vec<ConfigProvider>,
-    /// Section title for the model list (e.g. "Model" or "Secondary Model (Reverie)").
+    /// Section title for the model list (e.g. "Model").
     pub model_section_title: String,
     /// Model entries for the active provider.
     pub models: Vec<ConfigModel>,

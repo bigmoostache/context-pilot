@@ -82,8 +82,6 @@ pub struct UiState {
 pub struct ConfigOverlay {
     /// Configuration view is open (Ctrl+H to toggle).
     pub config_view: bool,
-    /// Whether config overlay is showing secondary model selection (Tab toggles).
-    pub config_secondary_mode: bool,
     /// Whether the reverie system is enabled (auto-trigger on threshold breach).
     pub reverie_enabled: bool,
 }

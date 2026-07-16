@@ -14,7 +14,7 @@ use cp_base::config::llm_types::StreamEvent;
 
 use super::tools;
 
-/// Build the reverie prompt and start streaming to the secondary LLM.
+/// Build the reverie prompt and start streaming to the LLM.
 ///
 /// Uses the exact same `prepare_stream_context()` as the main worker. The
 /// `ReverieContext` parameter causes it to branch at the conversation section:
