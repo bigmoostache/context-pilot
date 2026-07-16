@@ -36,6 +36,9 @@ use std::time::{Duration, SystemTime};
 
 mod seed;
 
+use cp_wire::types::LifecycleState;
+use cp_wire::types::oplog::OpEntryKind;
+
 use crate::channel::Tailer;
 use crate::registry::tee_reader::TeeReader;
 use crate::registry::{AgentRegistry, Event};
@@ -393,6 +396,11 @@ fn process_registry_events(
 }
 
 /// Poll every agent's tailer and fold new entries into the shared backend.
+///
+/// When a `Lifecycle::Stopping` entry is seen, the agent is marked stale and
+/// dirty immediately — this pushes "disconnected" to the frontend within one
+/// SSE invalidate cycle (~ms) rather than waiting for the registry scan (~2s)
+/// to notice the dead PID.
 fn tail_all_agents(backend: &Arc<Mutex<Backend>>, tailers: &mut HashMap<String, Tailer>) {
     for (id, tailer) in tailers.iter_mut() {
         let entries = match tailer.poll() {
@@ -403,8 +411,15 @@ fn tail_all_agents(backend: &Arc<Mutex<Backend>>, tailers: &mut HashMap<String, 
             continue;
         }
 
+        let has_stopping =
+            entries.iter().any(|e| matches!(&e.kind, OpEntryKind::Lifecycle { state: LifecycleState::Stopping }));
+
         if let Ok(mut b) = backend.lock() {
             b.view_mut().apply_batch(id, &entries);
+            if has_stopping {
+                let _prev = b.liveness.insert(id.clone(), crate::liveness::Liveness::StalePid);
+                b.mark_dirty(id);
+            }
         }
     }
 }

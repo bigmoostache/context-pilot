@@ -79,6 +79,15 @@ pub fn restart_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     // Kill the old process (lock-free — this can block up to the stop grace).
     supervisor::kill_pid(entry.pid);
 
+    // Mark the agent as stale IMMEDIATELY so the frontend sees "disconnected"
+    // within one SSE invalidate cycle (~ms), not after the next registry scan
+    // (~2s). The respawn below re-registers the agent; the next scan detects
+    // the new boot and sets liveness back to Live.
+    if let Ok(mut backend) = state.lock() {
+        let _prev = backend.liveness.insert(agent_id.to_owned(), crate::liveness::Liveness::StalePid);
+        backend.mark_dirty(agent_id);
+    }
+
     // Drop any stale supervised record so the respawn key is free. The pid is
     // already dead, so stop()'s grace loop returns immediately; a non-supervised
     // (external) agent yields NotFound, which we ignore.
