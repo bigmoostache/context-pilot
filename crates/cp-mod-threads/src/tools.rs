@@ -140,6 +140,22 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     let thread_name = target_thread.name.clone();
     let thread_status = target_thread.status;
 
+    // Refuse to read a paused thread unless it's already focused.
+    // Checked at both pre-flight and execution because state can change between the two.
+    if target_thread.paused {
+        let fs = FocusState::get(state);
+        if fs.focused_thread_id.as_deref() != Some(tid) {
+            return ToolResult::new(
+                tool.id.clone(),
+                format!(
+                    "Thread '{tid}' (\"{thread_name}\") is paused. Cannot read a paused \
+                     thread unless it is already focused. Unpause it first."
+                ),
+                true,
+            );
+        }
+    }
+
     // Per-thread unacknowledged counts — only threads with new messages (T343).
     // Archived threads are LLM-invisible (T9). Threads with 0 unacknowledged
     // are omitted to keep the tool result concise (the full list lives in the

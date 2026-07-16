@@ -177,11 +177,18 @@ impl Module for ThreadsModule {
                 }
             }
             "Read" => {
-                // Validate thread_id exists
-                if let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str())
-                    && !ts.threads.iter().any(|t| t.id == tid)
-                {
-                    pf.errors.push(format!("Thread '{tid}' not found"));
+                if let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str()) {
+                    if let Some(thread) = ts.threads.iter().find(|t| t.id == tid) {
+                        // Block reading a paused thread unless it's already focused.
+                        if thread.paused && fs.focused_thread_id.as_deref() != Some(tid) {
+                            pf.errors.push(format!(
+                                "Thread '{tid}' is paused. Cannot read a paused thread \
+                                 unless it is already focused. Unpause it first."
+                            ));
+                        }
+                    } else {
+                        pf.errors.push(format!("Thread '{tid}' not found"));
+                    }
                 }
             }
             _ => {}
