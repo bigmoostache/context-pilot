@@ -1,16 +1,17 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
-import { QuestionForm } from "./QuestionForm"
 import { ThreadComposer, type CommandSuggestion } from "./ThreadComposer"
 import { CreateCommandDialog } from "./CreateCommandDialog"
 import { QuickLookSheet } from "@/components/finder/QuickLookSheet"
 import { useLibrary } from "@/lib/live"
 import { sendCommand } from "@/lib/api"
 import { extractDroppedFiles, zipDropped } from "@/lib/utils"
-import { measure } from "@/lib/support/telemetry"
 import { uploadToNode, splitMessageSegments, type UploadedFile } from "./fileUpload/helpers"
+import { FormMessageRow } from "./forms/FormMessageRow"
+import { isFormMessage } from "./forms/helpers"
+import { useScrollPin, useThreadForms } from "./forms/useThreadForms"
 import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/threadMessages"
 import { FileSidebar, type ThreadFile } from "./fileUpload/FileSidebar"
 import type { ThreadDetail, ThreadMsg } from "@/lib/types"
@@ -174,14 +175,12 @@ const MessageRow = memo(
     onOpenFile,
     onShowInFinder,
     onDelete,
-    onSend,
   }: {
     msg: ThreadMsg
     agentId: string
     onOpenFile: (file: UploadedFile) => void
     onShowInFinder: ((path: string) => void) | undefined
     onDelete: (msg: ThreadMsg) => void
-    onSend: ((text: string) => void) | undefined
   }) {
     return (
       <div
@@ -198,11 +197,6 @@ const MessageRow = memo(
           onShowInFinder={onShowInFinder}
           onDelete={() => onDelete(msg)}
         />
-        {msg.questions?.map((q, i) => (
-          <div key={i} className="pb-1.5 pl-7">
-            <QuestionForm q={q} onSubmit={(answer) => onSend?.(answer)} />
-          </div>
-        ))}
         {msg.fileRef && (
           <div className="pb-1.5 pl-7">
             <span className="card-shadow inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[11.5px] text-(--interactive)">
@@ -282,7 +276,6 @@ export function ThreadConversation({
   // library (kind === "command"); each command's slash invocation is `/${id}`
   // (the id is the command's file-stem slug, e.g. "clean" → `/clean`).
   const { data: library = [] } = useLibrary(agentId)
-  const isEmpty = thread.log.length === 0
   // Command suggestions are built for EVERY thread (not just empty ones): the
   // composer surfaces them both as first-message bubbles on an empty thread AND
   // mid-draft on any thread when the caret's line is a lone `/` (T350). The
@@ -304,32 +297,8 @@ export function ThreadConversation({
   // away from the message the user is reading (T414).
   const bottomRef = useRef<HTMLDivElement>(null)
   const nonAutoCount = useMemo(() => thread.log.filter((m) => !m.auto).length, [thread.log])
-  useEffect(() => {
-    const el = bottomRef.current
-    if (!el) return
-    // Pin the conversation to the bottom on thread-open / new message. This must
-    // CONVERGE, not fire once: the `content-visibility:auto` on each row (the
-    // T510 layout fix) gives every OFF-SCREEN row only its `contain-intrinsic-
-    // size` placeholder height (5rem) until it's scrolled into view. On open all
-    // rows are off-screen, so the container's scrollHeight is an ESTIMATE — a
-    // single `scrollIntoView` lands short of the true bottom (real rows are
-    // usually taller than 5rem), which was the T512 "opens not scrolled down"
-    // regression. Re-scrolling across a few animation frames fixes it: each
-    // scroll reveals the next chunk's REAL heights, the estimate corrects, and
-    // the position converges on the actual bottom within a handful of frames.
-    // `scrollIntoView` forces a synchronous layout, so it's wrapped in measure()
-    // for freeze attribution; a bounded 6-frame loop on thread-open is
-    // imperceptible (~100ms) and not on any hot path.
-    let raf = 0
-    let tries = 0
-    const settle = () => {
-      measure("threads:scrollIntoView", () => el.scrollIntoView({ block: "end" }))
-      tries += 1
-      if (tries < 6) raf = requestAnimationFrame(settle)
-    }
-    raf = requestAnimationFrame(settle)
-    return () => cancelAnimationFrame(raf)
-  }, [thread.id, nonAutoCount])
+  // Pin to the latest message on thread-open / new non-auto message (T414/T512).
+  useScrollPin(bottomRef, thread.id, nonAutoCount)
 
   /** Delete a message from this thread via the agent command bridge. Stable
    *  across renders (deps: agentId + thread.id) so it doesn't defeat the
@@ -348,6 +317,8 @@ export function ThreadConversation({
   const segments = useMemo(() => segmentLog(thread.log), [thread.log])
 
   const threadFiles = useMemo(() => collectThreadFiles(thread.log), [thread.log])
+  // Form derivations: answered-state lookup + submit handler (docs/forms.md §5).
+  const { answersByForm, onFormSubmit } = useThreadForms(thread.log, agentId, thread.id)
 
   return (
     <main
@@ -386,6 +357,18 @@ export function ThreadConversation({
             {segments.map((seg) =>
               seg.type === "auto" ? (
                 <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
+              ) : isFormMessage(seg.msg.text ?? "") ? (
+                <FormMessageRow
+                  key={seg.msg.id}
+                  msg={seg.msg}
+                  agentId={agentId}
+                  threadId={thread.id}
+                  answersByForm={answersByForm}
+                  onFormSubmit={onFormSubmit}
+                  onOpenFile={setSheetFile}
+                  onShowInFinder={onShowInFinder}
+                  onDelete={handleDelete}
+                />
               ) : (
                 <MessageRow
                   key={seg.msg.id}
@@ -394,7 +377,6 @@ export function ThreadConversation({
                   onOpenFile={setSheetFile}
                   onShowInFinder={onShowInFinder}
                   onDelete={handleDelete}
-                  onSend={onSend}
                 />
               ),
             )}
@@ -414,7 +396,7 @@ export function ThreadConversation({
             pendingFiles={pendingFiles}
             onRemoveFile={onRemoveFile}
             suggestions={suggestions}
-            firstMessage={isEmpty}
+            firstMessage={thread.log.length === 0}
             onCreateCommand={() => setCreateCmdOpen(true)}
             draftKey={`cp-draft-${agentId}-${thread.id}`}
           />

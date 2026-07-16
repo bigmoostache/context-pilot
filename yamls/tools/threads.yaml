@@ -2,7 +2,7 @@ tools:
   Send:
     description: |
       Posts a message to a thread. The AI uses this to respond to thread messages.
-      At least one of markdown, file_path, or questions must be provided.
+      At least one of markdown or file_path must be provided.
       After sending, the thread becomes THEIR_TURN (waiting for the user) and
       focus is cleared, starting a dangling phase of 5 tool calls before the AI
       must focus on another MY_TURN thread.
@@ -32,14 +32,93 @@ tools:
       Only reference files that actually exist in the agent's folder — e.g. one
       you just wrote, or an upload under `.uploads/`.
 
+      ASKING THE USER A STRUCTURED QUESTION (```form``` block):
+      To ask the user structured questions — a single/multi choice, a
+      confirmation before a destructive action, a date, a file upload, free
+      text — embed a ```form``` fenced block inside your `markdown`, at the exact
+      spot you want the form to appear (it renders inline as an interactive
+      widget, like a file card). You may include several form blocks in one
+      message. Author the form ONCE; you never track its status — the frontend
+      derives "answered" from a matching ```form-answer``` message the user's
+      submit creates, and you read that block to learn the answers.
+
+      Format (YAML body). Pick a `form-id` that is UNIQUE WITHIN THE THREAD
+      (a short slug or UUID):
+
+        ```form
+        form-id: deploy-v0-3-0
+        title: Deploy release v0.3.0
+        submit: Confirm
+        fields:
+          - id: target
+            label: Which machine?
+            type: single
+            allow-other: true
+            options:
+              - label: gilbert
+                detail: Mac Mini arm64, prod
+              - label: asterix
+                detail: server x86_64, staging
+          - id: agents
+            label: Which agents to restart?
+            type: multi
+            options:
+              - label: opio-1
+                detail: main agent
+              - label: general-config
+                detail: config agent
+          - id: note
+            label: Deploy note
+            type: text
+          - id: count
+            label: Max attempts
+            type: number
+          - id: when
+            label: Deploy date
+            type: date
+          - id: dry-run
+            label: Dry-run mode
+            type: toggle
+          - id: artifacts
+            label: Attach build logs
+            type: files
+          - id: go
+            label: Confirm production deploy
+            type: confirm
+            confirm-word: DEPLOY
+        ```
+
+      Global keys: `form-id` (REQUIRED, thread-unique), `title` (optional),
+      `submit` (optional button label), `fields` (REQUIRED, ordered list).
+      Every field has `id` (unique in the form) + `label` + `type`. ALL fields
+      are mandatory for the user — there is no "required" flag.
+
+      Field `type` values (v1):
+        single  — radio choice; `options` list of {label, detail}. Add
+                  `allow-other: true` for a free-text "Other…" choice.
+        multi   — checkbox choice; `options` list of {label, detail}.
+        text    — free text.
+        number  — numeric.
+        date    — date picker (answer is ISO YYYY-MM-DD).
+        toggle  — neutral on/off boolean switch.
+        confirm — danger-accented button for destructive confirmations;
+                  optional `confirm-word` the user must type to arm it.
+        files   — the user answers by uploading file(s); the answer is a list
+                  of realm-relative paths.
+
+      When the user submits, a user message carrying a ```form-answer``` block
+      (same `form-id`, an `answers` list of {id, answer}) appears in the thread.
+      Read it to learn the choices (scalar for single/text/number/date/toggle/
+      confirm; list for multi/files). A malformed ```form``` block (missing
+      `form-id` or `fields`) is rejected — the Send fails with an error.
+
       MATH RENDERING:
       Single `$` is treated as a literal dollar sign (NOT inline math).
       For LaTeX math, use `$$...$$` (display block) or `\(...\)` (inline).
     parameters:
       thread_id: "Thread ID to post to (e.g., 'T1')"
-      markdown: "Markdown text content for the message"
+      markdown: "Markdown text content for the message (may embed ```file-upload``` and ```form``` blocks)"
       file_path: "File path to attach as a reference"
-      questions: "Array of question objects to embed in the message (Phase 7)"
       still_my_turn: "If true (default), the thread stays yours after sending — use for progress updates. Set false when you're done and want to hand the thread back to the user (flips to THEIR_TURN)."
 
   Read:

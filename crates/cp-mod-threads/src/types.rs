@@ -2,8 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use cp_base::state::runtime::State;
 
-use crate::questions::ThreadQuestionForm;
-
 // =============================================================================
 // Enums
 // =============================================================================
@@ -64,10 +62,6 @@ pub struct ThreadMessage {
     /// Attached file path reference (if any).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_path: Option<String>,
-    /// Embedded question form (if any). Stored as raw JSON for now;
-    /// Phase 7 introduces a typed `ThreadQuestion` struct.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub question: Option<serde_json::Value>,
     /// Creation timestamp (epoch ms).
     pub timestamp: u64,
     /// Whether the AI has acknowledged (seen via `Read`) this message.
@@ -230,11 +224,6 @@ pub struct FocusState {
     /// every tick. Cleared when the thread transitions to `THEIR_TURN`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notified_my_turn_id: Option<String>,
-    /// Active question form state for thread-embedded questions.
-    /// Set when the selected thread has pending questions that the user
-    /// hasn't answered yet. Cleared on submit or dismiss.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub active_question: Option<ThreadQuestionForm>,
 }
 
 impl Default for FocusState {
@@ -257,7 +246,6 @@ impl FocusState {
             viewing_archived: false,
             last_read_count: std::collections::BTreeMap::new(),
             notified_my_turn_id: None,
-            active_question: None,
         }
     }
 

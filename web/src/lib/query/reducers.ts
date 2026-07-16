@@ -17,7 +17,6 @@
 // P8 budgets and each concern is independently readable.
 
 import type { Agent, ThreadDetail } from "../types"
-import { mapRawQuestions } from "../api"
 
 // ── Oplog delta shape (the push-plane payload) ───────────────────────
 //
@@ -168,7 +167,6 @@ interface RawMessage {
   content?: string | null
   ts?: number
   timestamp?: number
-  question?: unknown
   fileRef?: string | null
   file_path?: string | null
   auto?: boolean
@@ -203,13 +201,11 @@ function buildLogRow(
         : fallbackTs
   const msgText = raw.text ?? raw.content ?? undefined
   const msgFileRef = raw.fileRef ?? raw.file_path ?? undefined
-  const questions = mapRawQuestions(raw.question)
   return {
     id: msgId,
     author: raw.author === "user" ? "user" : "assistant",
     ts: new Date(msgTs).toISOString(),
     ...(msgText !== undefined && { text: msgText }),
-    ...(questions !== undefined && { questions }),
     ...(msgFileRef !== undefined && { fileRef: msgFileRef }),
     ...(raw.auto !== undefined && { auto: raw.auto }),
   }

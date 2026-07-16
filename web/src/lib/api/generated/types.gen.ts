@@ -463,19 +463,9 @@ export type ThreadMsg = {
     auto?: boolean;
     fileRef?: string;
     id: string;
-    questions?: Array<ThreadQuestion>;
     text?: string;
     tool?: ToolCall;
     ts?: number;
-};
-
-export type ThreadQuestion = {
-    allowOther?: boolean;
-    answered?: Array<string>;
-    header?: string;
-    multi?: boolean;
-    options: Array<string>;
-    prompt: string;
 };
 
 export type ThreadsResponse = {

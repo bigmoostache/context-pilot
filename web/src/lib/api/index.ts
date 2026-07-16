@@ -1,8 +1,8 @@
 // ── REST API client for the orchestration backend ────────────────────
 //
 // Every endpoint uses the generated SDK from openapi.json — zero manual
-// fetch calls.  Thin presentation wrappers (formatAge, mapRawQuestions)
-// reshape backend data for UI consumption; the API contract itself is
+// fetch calls.  Thin presentation wrappers (formatAge) reshape backend
+// data for UI consumption; the API contract itself is
 // enforced by the generated types.
 //
 // The sub-modules (auth, finder, body, envKeys) are re-exported so
@@ -261,34 +261,6 @@ export function formatAge(epochMs: number): string {
   return `${days}d ago`
 }
 
-/** Map backend question JSON to frontend ThreadQuestion shape. */
-export function mapRawQuestions(raw: unknown): ThreadDetail["log"][number]["questions"] {
-  if (!raw) return undefined
-  let arr = Array.isArray(raw) ? raw : [raw]
-  if (arr.length === 1 && Array.isArray(arr[0])) arr = arr[0]
-  return arr.map((q: Record<string, unknown>) => {
-    // `header` is optional on ThreadQuestion (`header?: string`); under
-    // exactOptionalPropertyTypes an explicit `header: undefined` is NOT
-    // assignable to that slot, so OMIT it when absent via a conditional spread
-    // rather than writing `undefined` into it.
-    const header = q["header"] as string | undefined
-    return {
-      ...(header !== undefined && { header }),
-      prompt: (q["question"] as string | undefined) ?? (q["prompt"] as string | undefined) ?? "",
-      options: Array.isArray(q["options"])
-        ? q["options"].map((o: unknown) =>
-            typeof o === "string"
-              ? o
-              : ((o as Record<string, string> | undefined)?.["label"] ?? ""),
-          )
-        : [],
-      multi:
-        (q["multiSelect"] as boolean | undefined) ?? (q["multi"] as boolean | undefined) ?? false,
-      allowOther: (q["allowOther"] as boolean | undefined) ?? false,
-    }
-  })
-}
-
 export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
   const res = await sdk<{ focusedThreadId?: string | null; threads: ThreadDetail[] }>(
     getApiAgentByIdThreads({ path: { id: agentId } }),
@@ -307,10 +279,7 @@ export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
       lastActivityMs:
         typeof t.lastActivityMs === "number" ? t.lastActivityMs : typeof la === "number" ? la : 0,
       focused: focusedId != null && t.id === focusedId,
-      log: t.log.map((m) => ({
-        ...m,
-        questions: mapRawQuestions(m.questions),
-      })),
+      log: t.log,
     }
   })
 }

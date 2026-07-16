@@ -4,13 +4,13 @@
 //! across multiple concurrent threads. Each thread has a turn-based status
 //! (`MY_TURN` / `THEIR_TURN`) and its own message history.
 //!
-//! Two tools: `Send` (post message / questions to a thread) and
+//! Two tools: `Send` (post a message to a thread) and
 //! `Read` (retrieve thread messages, sets focus).
 
+/// Send-time validation of agent-authored ` ```form ` blocks.
+mod forms;
 /// Panel rendering for the thread list.
 mod panel;
-/// Thread-embedded interactive question forms.
-pub mod questions;
 /// Tool execution handlers: `Send` and `Read`.
 pub mod tools;
 /// Thread state types: `Thread`, `ThreadMessage`, `ThreadsState`, `FocusState`.
@@ -119,7 +119,6 @@ impl Module for ThreadsModule {
                 .param("thread_id", ParamType::String, true)
                 .param("markdown", ParamType::String, false)
                 .param("file_path", ParamType::String, false)
-                .param_array("questions", ParamType::Object(vec![]), false)
                 .param("still_my_turn", ParamType::Boolean, false)
                 .build(),
             ToolDefinition::from_yaml("Read", t)
@@ -168,12 +167,19 @@ impl Module for ThreadsModule {
                     pf.errors.push(format!("Thread '{tid}' not found"));
                 }
                 // Require at least one content param
-                let has_markdown = tool.input.get("markdown").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
+                let markdown = tool.input.get("markdown").and_then(|v| v.as_str());
+                let has_markdown = markdown.is_some_and(|s| !s.is_empty());
                 let has_file = tool.input.get("file_path").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
-                let has_questions =
-                    tool.input.get("questions").and_then(|v| v.as_array()).is_some_and(|a| !a.is_empty());
-                if !has_markdown && !has_file && !has_questions {
-                    pf.errors.push("Send requires at least one of: markdown, file_path, questions".to_string());
+                if !has_markdown && !has_file {
+                    pf.errors.push("Send requires at least one of: markdown, file_path".to_string());
+                }
+                // Guard: reject a malformed agent-authored ```form``` block before
+                // it lands in the thread (design doc §7 — the sole form-related
+                // Rust touch; validation only, no state, no API change).
+                if let Some(md) = markdown {
+                    for err in forms::validate_form_blocks(md) {
+                        pf.errors.push(err);
+                    }
                 }
             }
             "Read" => {

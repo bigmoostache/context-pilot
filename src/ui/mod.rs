@@ -106,7 +106,6 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
 fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &cp_render::frame::Frame) {
     // Threads mode: completely different layout (no sidebar, no panels)
     if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
-        threads_view::maybe_activate_thread_question(state);
         threads_view::render_threads_view(frame, state, area);
         return;
     }

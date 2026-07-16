@@ -16,7 +16,6 @@ export type {
   AccentToken,
   FinderKind,
   LibraryItem,
-  ThreadQuestion,
   ToolCall,
 } from "./api/generated/types.gen"
 
@@ -28,7 +27,6 @@ import type {
   FinderNode as GenFinderNode,
   ThreadDetail as GenThreadDetail,
   ThreadMsg as GenThreadMsg,
-  ThreadQuestion,
 } from "./api/generated/types.gen"
 
 /**
@@ -50,10 +48,9 @@ export type Agent = Omit<GenAgent, "status"> & {
  * string (see reducers `message_created`), and the mock fixtures use display
  * strings. Consumers normalise both (`typeof ts === "number" ? … : new Date(ts)`).
  */
-export type ThreadMsg = Omit<GenThreadMsg, "ts" | "questions"> & {
+export type ThreadMsg = Omit<GenThreadMsg, "ts"> & {
   ts?: number | string | undefined
   streaming?: boolean | undefined
-  questions?: ThreadQuestion[] | undefined
 }
 
 /** ThreadDetail re-exported as-is (field optionality matches backend). */

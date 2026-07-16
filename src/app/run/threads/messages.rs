@@ -114,7 +114,6 @@ fn build_pending(thread_id: &str, msg: &ThreadMessage, idx: usize) -> PendingMes
         "author": author,
         "text": msg.content,
         "ts": msg.timestamp,
-        "question": msg.question,
         "fileRef": msg.file_path,
         "auto": msg.auto,
     })

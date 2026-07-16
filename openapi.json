@@ -1492,12 +1492,6 @@
           "id": {
             "type": "string"
           },
-          "questions": {
-            "items": {
-              "$ref": "#/components/schemas/ThreadQuestion"
-            },
-            "type": "array"
-          },
           "text": {
             "type": "string"
           },
@@ -1511,39 +1505,6 @@
         "required": [
           "id",
           "author"
-        ],
-        "type": "object"
-      },
-      "ThreadQuestion": {
-        "properties": {
-          "allowOther": {
-            "type": "boolean"
-          },
-          "answered": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "header": {
-            "type": "string"
-          },
-          "multi": {
-            "type": "boolean"
-          },
-          "options": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "prompt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "prompt",
-          "options"
         ],
         "type": "object"
       },

@@ -192,7 +192,6 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
         author: ThreadAuthor::User,
         content: Some(content),
         file_path: None,
-        question: None,
         timestamp: crate::app::panels::now_ms(),
         acknowledged: false,
         auto: false,

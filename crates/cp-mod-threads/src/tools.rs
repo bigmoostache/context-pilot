@@ -22,8 +22,6 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     const MAX_CONTENT_BYTES: usize = 100_000;
     /// Maximum `file_path` length (bytes).
     const MAX_FILE_PATH_BYTES: usize = 1_024;
-    /// Maximum number of questions stored in a single message.
-    const MAX_STORED_QUESTIONS: usize = 50;
 
     let tid = tool.input.get("thread_id").and_then(serde_json::Value::as_str).unwrap_or("");
 
@@ -41,11 +39,6 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
             s.to_string()
         }
     });
-    let question =
-        tool.input.get("questions").and_then(serde_json::Value::as_array).filter(|a| !a.is_empty()).map(|a| {
-            let capped: Vec<serde_json::Value> = a.iter().take(MAX_STORED_QUESTIONS).cloned().collect();
-            serde_json::Value::Array(capped)
-        });
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
 
@@ -57,7 +50,6 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         author: ThreadAuthor::Assistant,
         content: markdown,
         file_path,
-        question,
         timestamp: now,
         acknowledged: true,
         auto: false,
@@ -362,9 +354,6 @@ fn build_panel_content(state: &State, focused_tid: &str, now_ms: u64) -> String 
                 }
                 if let Some(fp) = &msg.file_path {
                     _ = writeln!(output, "      file: \"{}\"", yaml_escape(fp));
-                }
-                if msg.question.is_some() {
-                    _ = writeln!(output, "      questions: true");
                 }
             }
         }
