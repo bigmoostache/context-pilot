@@ -408,6 +408,15 @@ d7a30d2f21fd675a:
   tl_dr: 'Dream layer decided: Groq API with tiny model (Llama 3.2 3B), ~200-token prompts, 30-50 token completions, fires every 2-3 min, writes to soul.journal. Cost ~$0.02/day. Local models reserved for future non-text sensing.'
   importance: high
   last_edited_ms: 0
+d9a2e890ab98776f:
+  tl_dr: 'T566 restart flow: useRestartFlow uses client-only ''waiting'' AgentStatus. Set ONLY on restart success (setQueryData). New agent Lifecycle::Running delta clears it via foldLifecycle. No state machine, no timers. Committed 33099872 on branch updates.'
+  importance: medium
+  labels:
+  - web
+  - restart
+  - waiting-status
+  - T566
+  last_edited_ms: 1784213091300
 e22b1ea921ff9aec:
   tl_dr: 'Datalab documentation site: documentation.datalab.to (Mintlify-hosted). API reference at documentation.datalab.to/api-reference/health. Has sections on limits, supported file types, SDK, on-prem, webhooks, billing.'
   importance: low

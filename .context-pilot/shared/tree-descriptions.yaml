@@ -5406,6 +5406,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+5b19a06aeb791163:
+  path: web/src/lib/live/index.ts
+  description: 'Live data hooks (TanStack Query + SSE). useAgentMeta/useThreads/useConversation/useLibrary/useFleet/useFleetMetrics/useMetrics + useSseConnected (reactive SSE connection state; render-phase seed via seededFor guard, effect only subscribes — no set-state-in-effect) + useRestartFlow (T566: on restart success sets agent status to client-only ''waiting'' via setQueryData; new agent''s Lifecycle::Running delta clears it through foldLifecycle — no state machine, no timers). ensureSync SSE watcher. sendCommand→REST. useLive+LiveQueryResult re-exported from ./core.'
+  last_edited_ms: 1784213115617
 5b1f65a3aab36b28:
   path: ui/src/App.tsx
   description: App shell with view state (threads|cockpit, default threads). TopBar switcher toggles between ThreadsView (3-pane chat) and cockpit (LeftRail+Conversation+RightInspector). StatusBar always shown.
@@ -5742,6 +5746,10 @@
   path: src/llms/claude_code_api_key/mod.rs
   description: Claude Code API Key implementation. Uses ANTHROPIC_API_KEY with Bearer auth + Claude Code headers. Replicates Claude Code request signature for Claude 4.5 model access.
   last_edited_ms: 1780565754894
+612c23875d65d174:
+  path: web/src/components/shell/widgets/AgentSwitcher.tsx
+  description: TopBar workspace switcher dropdown (one agent=one folder); switch/create/fleet. statusMeta/statusOrder include 'waiting' (label Restarting, sort priority 0 alongside working). Rows sorted via toSorted (working/waiting > needs-you > idle > disconnected). AgentDot shows avatar when hasAvatar, else accent-tinted FolderGit2.
+  last_edited_ms: 1784213115862
 6135b901cdf79a53:
   path: src/app/run/tools/mod.rs
   description: 'Sub-module declarations: checks, cleanup, pipeline, queue_flush.'
@@ -5818,6 +5826,10 @@
   path: src/modules/overview/tools/close_context.rs
   description: 'Close_panel execution. Partial close: valid panels close, undescribed/stale-description file panels are skipped (not blocked). Module on_close_context hooks. Output: closed/skipped/not_found/errors sections.'
   last_edited_ms: 0
+625f697e9044be97:
+  path: web/src/lib/types.ts
+  description: Domain types barrel. Re-exports backend types from generated/types.gen. Agent = Omit<GenAgent,'status'> & {accent, status:AgentStatus} (status widened). AgentStatus = GenAgent['status'] | 'waiting' (client-only restart status set by useRestartFlow, cleared by Lifecycle::Running). ThreadMsg/ThreadDetail Omit-widen for ts/questions/log. Optionals widened |undefined for exactOptionalPropertyTypes.
+  last_edited_ms: 1784213115722
 627ad0b53f94107a:
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only log + running ReplayState fold (heads+seen). open() seeds via replay. append(kind)=append_buffered+sync (announce-after-durable K9). append_buffered(kind)=frame+write_all+fold, NO sync (group-commit primitive). sync()=single fdatasync (the amortised group-commit point, I2). roll() fdatasyncs old segment BEFORE switching (batch spanning a roll loses nothing), stamps leading Checkpoint(Snapshot) on new seg (GAP1). write_record=sole rev point (no sync). checkpoint()/heads()/seen()/snapshot() public. 7 tests.'
@@ -9154,6 +9166,10 @@
   path: web/src/lib/api/index.ts
   description: 'REST API client barrel: fleet/agent/threads/panels/memory/todos/spine/queue/scratchpad/tree/callbacks/tools/radar/entities/metrics/vitals/usage/library + commands (sendCommand) + mintTicket + renameAgent (T328) + avatar CRUD (uploadAvatar/deleteAvatar/avatarUrl, T338). Re-exports ./auth + ./finder + shares ./client request/BASE/envelope. The @/lib/api single import surface.'
   last_edited_ms: 1782241220387
+9a40555604525287:
+  path: crates/cp-orchestrator/tests/openapi/schemas_ext.rs
+  description: Transport-layer OpenAPI schemas — receipts, auth, env-keys, filesystem, FinderKind, LLM registry, SSE delta protocol (OpEntryKind incl 'state' field for lifecycle deltas — T566), release management, Claude Code usage+login.
+  last_edited_ms: 1784213115955
 9a60d5ece4db8516:
   path: web/src/components/shell/TopBar.tsx
   description: 'Slim macOS-style title bar (T321 trimmed): app mark→fleet, agent switcher, per-agent view tabs (Threads/Finder/Cockpit/Costs), agent-config gear, UsageButton, account UserMenu. Costs tab dev-mode only. P8: view-tab cluster extracted into a ViewTabs subcomponent (moving the two devMode gates off TopBar''s complexity budget); TopBar fn now <150 lines / cx<15.'
@@ -9914,6 +9930,10 @@ a73ad7544498bcd8:
   path: src/ui/threads_view.rs
   description: 'Threads view TUI: render_threads_view (two-pane layout), render_thread_list (IR blocks → blocks_to_lines: selection+unread indicators, status badges, help hints, archive confirmation), render_message_area (scrollable messages via scroll_offset, author/timestamp headers, content). All content through IR pipeline. Tab/Shift+Tab nav.'
   last_edited_ms: 0
+a76cc7d59c5acf6e:
+  path: web/src/components/finder/Finder/shell.tsx
+  description: Finder chrome + content render (P8 split). role=application keyboard widget. Renders FinderTabs+FinderToolbar+FinderBody+FinderPathBar+FinderOverlays from vs/listing/ctrl. Owns Favorites pins (useFinderPins). Disconnected reconnect overlay uses clickable() a11y helper (role=button+keyboard, jsx-a11y compliant) instead of bare div onClick.
+  last_edited_ms: 1784213115815
 a7734897653e6d83:
   path: web/src/components/agents/UsagePage.tsx
   description: 'Cost & token Usage page — LIVE (no mock). useFleet + useFleetMetrics joined per agent: summary cards (total spend / input / output tokens), per-agent table (input/output tokens, spend, % budget, over-budget badge), $/tokens unit lens + agent filter. Honest role=note notice: month-by-month history + cache hit/miss split are NOT retained by the backend. P8: the per-agent table (header/rows/totals-footer + empty placeholder) extracted into a UsageTable subcomponent so UsagePage render stays under the 150-line budget.'
@@ -10154,6 +10174,10 @@ ab0e7def48b87f3b:
   path: web/src/components/shell/config/ConfigPanes.tsx
   description: 'Config category panes + building blocks: CATEGORIES, CategoryBody, GeneralPane (useProviders() hook + ModelPicker + apply-to-all via sendCommand configure), KeyRow (live reveal/edit via API), StatusRow, ToggleRow, DevModeToggle. Key panes lock when company-managed OR non-admin.'
   last_edited_ms: 1782486352133
+ab1bc6aefde222cd:
+  path: web/src/lib/query/reducers.ts
+  description: 'SSE delta reducers (pure folds). applyThreadDelta + applyAgentDelta thin switch dispatchers to per-kind fold helpers. foldLifecycle (T566): reads k.state — Stopping/Stopped sets ''disconnected'' UNLESS status is ''disconnected''/''waiting'' (guards controlled-restart flash); Running clears disconnected/idle/waiting to idle. mergeThreadLogs reconciles poll+delta (T123/T360). OpEntryKind flat all-optional interface (kind:string) incl ''state''.'
+  last_edited_ms: 1784213115674
 ab20a1ccf7d6a506:
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. T510 FREEZE FIX: MessageRow React.memo (comparator msg===+agentId===) + AutoRun memo + useMemo(segmentLog) + content-visibility:auto per row → delta/poll re-renders only changed row not all 1690. useConversationDrop hook (T367/T471 OS-file drag+zip). scrollIntoView measure-wrapped, 6-frame converge.'
@@ -10238,6 +10262,10 @@ ad2e04f6dd571a0f:
   path: src/ui/help/config_overlay/builder.rs
   description: Config overlay IR builder — assembles ConfigOverlay from State. ModelEntryFn type alias. Providers, models (per-provider match arms), budget bars (context/clean/target/cost), toggles (auto-continue/reverie/think).
   last_edited_ms: 0
+ad406cb2efef9153:
+  path: web/src/components/agents/FleetDashboard.tsx
+  description: Fleet welcome dashboard (live). AgentCard reads useAgentMeta (delta-folded status dot + cost). statusMeta includes 'waiting' (Restarting). §19 HealthBadge (useMetrics). RetiredSection/RetiredCard (unretire). Create/manage via AgentModal.
+  last_edited_ms: 1784213115909
 ad5869c90767ae4f:
   path: Cargo.lock
   description: Workspace lockfile
@@ -10386,6 +10414,10 @@ af59321d2fa3f0ce:
   path: Cargo.lock
   description: Workspace lockfile
   last_edited_ms: 0
+af59cf78d5438afb:
+  path: web/src/components/shell/StatusBar.tsx
+  description: 'Bottom status footer. Fleet mode: aggregates. Agent mode: AgentStatus reads live agent.phase (resolvePhase) + vitals via agentVitals() helper (extracted for complexity budget). StatusIndicator subcomponent owns the loading/restarting/connected/disconnected cascade (Loader2/RefreshCw/dot/Disconnected-button firing onRestart). ContextBar = two-segment hit/miss meter from ContextUsage delta (T297).'
+  last_edited_ms: 1784213115769
 af5db61fd6258800:
   path: ui/src/index.css
   description: 'Enterprise/macOS theme: two switchable palettes — LIGHT ''Cream'' (#FEFCF3/#F5EBE0/#F0DBDB/#DBA39A warm) + DARK ''Sea'' (#2C3333/#395B64/#A5C9CA/#E7F6F2 cool) via :root/.dark token blocks. SF Pro system font for chrome, IBM Plex Mono for data only. Soft shadows, vibrancy, no phosphor glow.'
