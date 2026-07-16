@@ -31,22 +31,11 @@ const USER_AGENT: &str = "context-pilot-orchestrator";
 
 // ── Config persistence ──────────────────────────────────────────────────
 
-/// On-disk configuration for the release manager.
-#[derive(Debug, Serialize, Deserialize)]
-struct ReleaseConfig {
-    /// Platform architecture string (e.g. `"macos-aarch64"`).
-    arch: String,
-    /// `true` when `arch` was auto-detected, `false` when manually set.
-    arch_auto: bool,
-    /// Tag of the currently selected (active) release, if any.
-    active_tag: Option<String>,
-}
-
-impl Default for ReleaseConfig {
-    fn default() -> Self {
-        Self { arch: detect_arch(), arch_auto: true, active_tag: None }
-    }
-}
+/// On-disk configuration (arch, active tag, auto-update policy) — see
+/// [`config`].
+mod config;
+use config::ReleaseConfig;
+pub use config::{MaintenanceWindow, UpdateMode};
 
 // ── Public types ────────────────────────────────────────────────────────
 
@@ -185,6 +174,58 @@ impl ReleaseStore {
     #[must_use]
     pub fn active_tag(&self) -> Option<&str> {
         self.config.active_tag.as_deref()
+    }
+
+    /// The releases root directory this store manages.
+    #[must_use]
+    pub(crate) fn dir(&self) -> &std::path::Path {
+        &self.dir
+    }
+
+    // ── Auto-update policy (update-policy v3, O4.1) ─────────────────────
+
+    /// The box's auto-update posture (`auto` / `manual` / `paused`).
+    #[must_use]
+    pub fn update_mode(&self) -> UpdateMode {
+        self.config.update_mode
+    }
+
+    /// Set the auto-update posture and persist.
+    pub fn set_update_mode(&mut self, mode: UpdateMode) {
+        self.config.update_mode = mode;
+        self.persist();
+    }
+
+    /// The channel this box follows (`stable` today).
+    #[must_use]
+    pub fn channel(&self) -> &str {
+        &self.config.channel
+    }
+
+    /// Hours between channel polls.
+    #[must_use]
+    pub fn poll_interval_hours(&self) -> u32 {
+        self.config.poll_interval_hours
+    }
+
+    /// The box-local maintenance window auto-applies are confined to.
+    #[must_use]
+    pub fn window(&self) -> &MaintenanceWindow {
+        &self.config.window
+    }
+
+    /// Set the maintenance window and persist. Rejects malformed bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either bound is not a valid `HH:MM`.
+    pub fn set_window(&mut self, window: MaintenanceWindow) -> Result<(), String> {
+        if !window.is_valid() {
+            return Err(format!("invalid window bounds: {} – {}", window.start, window.end));
+        }
+        self.config.window = window;
+        self.persist();
+        Ok(())
     }
 
     /// Select a downloaded release as active. Returns the binary path.
@@ -380,7 +421,13 @@ fn detect_arch() -> String {
         "aarch64" => "aarch64",
         _ => "unknown",
     };
-    format!("{os}-{arch}")
+    // The appliance ships the static musl bundle (deploy/ansible/tasks/
+    // fetch.yml) — a musl-built binary must self-identify as `-musl` or the
+    // updater would OTA the box onto the gnu lane (different bundle contents:
+    // the musl one has no meilisearch). Compile-time is exactly right here:
+    // the running binary IS the lane.
+    let libc = if cfg!(target_env = "musl") { "-musl" } else { "" };
+    format!("{os}-{arch}{libc}")
 }
 
 /// All known architecture targets from the release matrix.
@@ -407,7 +454,18 @@ pub fn semver_sort_key(tag: &str) -> (u32, u32, u32) {
 /// Orchestrator self-update — stage a downloaded `cp-orchestrator` over the
 /// running install path with atomic-rename + `.bak` rollback (see module docs).
 mod self_update;
-pub use self_update::{boot_check, boot_commit, stage_orchestrator_update};
+pub use self_update::{boot_check, boot_commit, boot_commit_when_healthy, stage_orchestrator_update};
+
+/// Signed update-manifest schema (update-policy §5.3).
+mod manifest;
+pub use manifest::{Manifest, ManifestArtifact};
+
+/// Manifest-signing trust anchor (update-policy §5.4).
+mod signing;
+pub use signing::UPDATE_PUBKEY;
+
+/// The on-box updater: fetch → verify → download → apply (update-policy §5.5).
+pub mod updater;
 
 #[cfg(test)]
 pub(crate) use self_update::{backup_path, pending_path};

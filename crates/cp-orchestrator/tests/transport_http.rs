@@ -30,6 +30,7 @@ use cp_mod_bridge as _;
 use cp_vault as _;
 use csv as _;
 use dotenvy as _;
+use minisign_verify as _;
 use nix as _;
 use notify as _;
 use openssl as _;
@@ -173,6 +174,20 @@ fn rest_fleet_and_agent_carry_rev_envelopes() {
 
     let missing = common::get(&h.addr, "/api/agent/ghost", &[]);
     assert_eq!(missing.status, 404, "unknown agent is a real 404");
+}
+
+// ── 1b. the /healthz readiness probe on the wire ─────────────────────────────
+
+/// V2.1a — a bound server with a readable registry (and no auth DB required)
+/// answers `200` on `/healthz` from loopback, with a booleans-only body.
+#[test]
+fn healthz_answers_200_on_the_wire() {
+    let h = harness("agent-hz", 1);
+
+    let reply = common::get(&h.addr, "/healthz", &[]);
+    assert_eq!(reply.status, 200, "healthy box: {}", reply.body);
+    assert!(reply.body.contains("\"status\":\"ok\""), "status ok: {}", reply.body);
+    assert!(!reply.body.contains('/'), "no path or secret in the body: {}", reply.body);
 }
 
 // ── 2. actions: ticket mint, command 400 ─────────────────────────────────────

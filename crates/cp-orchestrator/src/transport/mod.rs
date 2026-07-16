@@ -112,6 +112,21 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
         return;
     }
 
+    // Readiness probe (update-policy §5.2/§5.5) — top-level (not `/api`),
+    // unauthenticated, loopback-only. Served before the SPA fallback and the
+    // auth gate: its consumer is the box itself (the health-gated boot commit
+    // and the systemd-era rollback machinery), which must reach it before any
+    // session can exist. Non-loopback callers get a flat 403.
+    if method == Method::Get && segments.as_slice() == ["healthz"] {
+        let reply = if request.remote_addr().is_some_and(|a| a.ip().is_loopback()) {
+            it::health::healthz(state)
+        } else {
+            rest::HttpReply::error(403, "loopback only")
+        };
+        respond_json(request, &reply);
+        return;
+    }
+
     // Static SPA serving (P-native): when `CP_WEB_ROOT` is set, every non-`/api`
     // GET is the web UI — served straight from disk with an index.html fallback
     // for client-side routes, BEFORE the auth gate (the shell + assets must load
@@ -302,7 +317,27 @@ fn route_rest(
         (Method::Post, ["api", "fleet", "create"]) => rest::create_agent(state, body_bytes, auth_user),
         (Method::Post, ["api", "ticket"]) => rest::mint_ticket(state, auth_user),
 
-        // ── Release management (T427, admin-only) ──────────────────
+        // ── Release + update management — IT surface (can_manage_it) ──
+        // One guard for every `/api/releases/*` and `/api/update/*` arm below
+        // (update-policy §1 problem 2): a real caller without `can_manage_it`
+        // (Admin+) is refused; `None` = access control off → god-mode (§13.10).
+        (_, ["api", "releases" | "update", ..]) if auth_user.is_some_and(|u| !u.can_manage_it()) => {
+            rest::HttpReply::error(403, "IT management access required")
+        }
+        // ── Auto-update (O5.1, update-policy §5.9) ──────────────────
+        (Method::Get, ["api", "update", "status"]) => rest::update_status(state),
+        (Method::Post, ["api", "update", "check"]) => rest::update_check(state),
+        (Method::Post, ["api", "update", "apply"]) => rest::update_apply(state),
+        (Method::Put, ["api", "update", "mode"]) => rest::update_set_mode(state, body_bytes),
+        // Retired manual version-choice routes (T5.1.5): the Update pane owns
+        // the flow now; these stay only as a break-glass hatch.
+        (Method::Post, ["api", "releases", "download"])
+        | (Method::Put, ["api", "releases", "select"])
+        | (Method::Delete, ["api", "releases", _])
+            if !rest::releases_break_glass() =>
+        {
+            rest::HttpReply::error(410, "retired — auto-update owns versions (set CP_RELEASES_BREAK_GLASS=1)")
+        }
         (Method::Get, ["api", "releases"]) => rest::list_releases(state),
         (Method::Put, ["api", "releases", "arch"]) => rest::set_arch(state, body_bytes),
         (Method::Post, ["api", "releases", "download"]) => rest::download_release(state, body_bytes),

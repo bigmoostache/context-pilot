@@ -64,6 +64,52 @@ pub(super) fn deploy() -> Value {
             },
             "required": ["status", "tag", "binaryPath"]
         },
+        // ── Auto-update (O5.1, update-policy §5.9) ──────────────
+        "UpdateWindow": {
+            "type": "object",
+            "properties": { "start": { "type": "string" }, "end": { "type": "string" } },
+            "required": ["start", "end"]
+        },
+        "UpdateLastResult": {
+            "type": "object",
+            "properties": {
+                "kind": { "type": "string", "enum": ["success", "rolled_back", "failed"] },
+                "from": { "type": "string", "nullable": true },
+                "to": { "type": "string", "nullable": true },
+                "attempted": { "type": "string", "nullable": true },
+                "message": { "type": "string", "nullable": true },
+                "at_ms": { "type": "integer" }
+            },
+            "required": ["kind", "at_ms"]
+        },
+        "UpdateStatus": {
+            "type": "object",
+            "properties": {
+                "current": { "type": "string" },
+                "active_tag": { "type": "string", "nullable": true },
+                "channel": { "type": "string" },
+                "arch": { "type": "string" },
+                "mode": { "type": "string", "enum": ["auto", "manual", "paused"] },
+                "window": r("UpdateWindow"),
+                "poll_interval_hours": { "type": "integer" },
+                "available": { "type": "string", "nullable": true },
+                "notes_url": { "type": "string", "nullable": true },
+                "last_check_ms": { "type": "integer", "nullable": true },
+                "last_result": { "allOf": [r("UpdateLastResult")], "nullable": true },
+                "apply_in_flight": { "type": "boolean" }
+            },
+            "required": ["current", "channel", "arch", "mode", "window", "poll_interval_hours", "apply_in_flight"]
+        },
+        "UpdateApplyResponse": {
+            "type": "object",
+            "properties": {
+                "status": { "type": "string", "enum": ["applying", "up_to_date"] },
+                "current": { "type": "string", "nullable": true },
+                "from": { "type": "string", "nullable": true },
+                "to": { "type": "string", "nullable": true }
+            },
+            "required": ["status"]
+        },
         // ── Settings & profile (auth-rbac) ──────────────────────
         "AppSettings": {
             "type": "object",

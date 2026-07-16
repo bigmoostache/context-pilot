@@ -9,6 +9,7 @@
 //! * [`ca`] — private-CA root download + fingerprint.
 //! * [`caddy`] — dynamic Caddyfile generation + reload (`:80`/`:443`, no plane).
 //! * [`crypto`] — self-contained SHA-256 / base64 for the CA fingerprint.
+//! * [`health`] — the loopback-only `/healthz` readiness probe.
 //! * [`identity`] — box name/IP + boot-time Caddy apply.
 //! * [`state`] — durable `provisioned` flag.
 //!
@@ -18,6 +19,7 @@
 pub(crate) mod ca;
 mod caddy;
 mod crypto;
+pub(crate) mod health;
 pub(crate) mod identity;
 pub(crate) mod state;
 

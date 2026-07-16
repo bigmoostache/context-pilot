@@ -38,10 +38,12 @@ pub(crate) use config::env_keys::{env_key_reveal, env_key_update, env_keys_list,
 pub(crate) use config::it::{it_ca_fingerprint, it_get_identity, it_provisioned, it_set_identity};
 pub(crate) use config::settings::{allowed_models, onboarding_completed};
 pub use config::settings::{get_settings, update_settings};
+pub(crate) use config::update::{APPLY_IN_FLIGHT, update_apply, update_check, update_set_mode, update_status};
 pub use create::{create_agent, create_command};
 pub use lifecycle::{restart_agent, retire_agent, unretire_agent};
 pub(crate) use releases::{
-    delete_release, deploy_fleet, download_release, list_releases, restart_orchestrator, select_release, set_arch,
+    delete_release, deploy_fleet, download_release, list_releases, releases_break_glass, restart_orchestrator,
+    select_release, set_arch,
 };
 use thread_shape::{overlay_roster, reshape_thread};
 

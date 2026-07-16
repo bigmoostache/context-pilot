@@ -18,6 +18,7 @@ use cp_mod_bridge as _;
 use cp_oplog as _;
 use cp_vault as _;
 use csv as _;
+use minisign_verify as _;
 use nix as _;
 use notify as _;
 use openssl as _;
@@ -46,18 +47,14 @@ fn main() {
 
     eprintln!("cp-orchestrator v{} (protocol v{})", env!("CARGO_PKG_VERSION"), cp_wire::PROTOCOL_VERSION,);
 
-    // Self-update guard. If the "Update & Restart Orchestrator" button staged a
-    // new binary over our install path, a `.pending` marker is present. Account
-    // for this boot attempt *before* we bind anything: if the staged binary has
-    // crash-looped past the tolerance, `boot_check` rolls back to the `.bak`
-    // binary so the service self-heals. Once we've stayed up past a short grace
-    // period, a watchdog thread commits the update (clears the marker + backup).
-    if let Ok(install) = std::env::current_exe() {
-        cp_orchestrator::services::releases::boot_check(&install);
-        let _watchdog = std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_secs(5));
-            cp_orchestrator::services::releases::boot_commit(&install);
-        });
+    // Self-update guard. If a staged update replaced the binary on our install
+    // path, a `.pending` marker is present. Account for this boot attempt
+    // *before* we bind anything: if the staged binary has crash-looped past the
+    // tolerance, `boot_check` rolls back to the `.bak` binary so the service
+    // self-heals. The matching commit is health-gated below (needs the port).
+    let install = std::env::current_exe().ok();
+    if let Some(install) = install.as_deref() {
+        cp_orchestrator::services::releases::boot_check(install);
     }
 
     let config = match Config::from_env() {
@@ -68,6 +65,16 @@ fn main() {
         }
     };
 
+    // Reconcile a rolled-back update (update-policy §5.5 step 6) BEFORE the
+    // auth store opens: if a staged update crash-looped and `boot_check`
+    // restored the old binary, this restores the matching `auth.db` backup (a
+    // forward migration may have run, §5.8) and records `rolled_back`.
+    if let Some(install) = install.as_deref() {
+        let releases_dir = cp_orchestrator::services::ReleaseStore::default_dir()
+            .unwrap_or_else(|| config.agents_dir.join("releases"));
+        cp_orchestrator::services::releases::updater::boot_reconcile(&releases_dir, &config.auth_db_path, install);
+    }
+
     eprintln!("agents directory: {}", config.agents_dir.display());
     eprintln!("scan interval: {}ms", config.scan_interval.as_millis());
     eprintln!("new-agent realm root: {}", config.agents_root.display());
@@ -75,6 +82,17 @@ fn main() {
 
     let runtime = Runtime::new(config);
     let _driver = runtime.start_driver();
+
+    // Health-gated commit of a staged update (update-policy §5.5): a committer
+    // thread polls our own `/healthz` and, only after a real `200` within the
+    // deadline, commits the binary swap and promotes the release state
+    // (`active_tag`, agent binary). If the probe never turns healthy, the
+    // rollback markers stay and the next boot's `boot_check` self-heals.
+    if let Some(install) = install {
+        let _committer = runtime.start_update_committer(install.clone());
+        // Auto-update scheduler (O4.2): boot poll + nightly-window applies.
+        let _scheduler = runtime.start_update_scheduler(install);
+    }
 
     if let Err(e) = runtime.serve() {
         eprintln!("serve failed: {e}");

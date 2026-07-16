@@ -500,6 +500,42 @@ export type UnretireReceipt = {
     status: string;
 };
 
+export type UpdateApplyResponse = {
+    current?: string | null;
+    from?: string | null;
+    status: 'applying' | 'up_to_date';
+    to?: string | null;
+};
+
+export type UpdateLastResult = {
+    at_ms: number;
+    attempted?: string | null;
+    from?: string | null;
+    kind: 'success' | 'rolled_back' | 'failed';
+    message?: string | null;
+    to?: string | null;
+};
+
+export type UpdateStatus = {
+    active_tag?: string | null;
+    apply_in_flight: boolean;
+    arch: string;
+    available?: string | null;
+    channel: string;
+    current: string;
+    last_check_ms?: number | null;
+    last_result?: UpdateLastResult | null;
+    mode: 'auto' | 'manual' | 'paused';
+    notes_url?: string | null;
+    poll_interval_hours: number;
+    window: UpdateWindow;
+};
+
+export type UpdateWindow = {
+    end: string;
+    start: string;
+};
+
 export type UploadResult = {
     path: string;
     written: number;
@@ -2726,6 +2762,109 @@ export type PostApiTicketResponses = {
 };
 
 export type PostApiTicketResponse = PostApiTicketResponses[keyof PostApiTicketResponses];
+
+export type PostApiUpdateApplyData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/update/apply';
+};
+
+export type PostApiUpdateApplyErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiUpdateApplyError = PostApiUpdateApplyErrors[keyof PostApiUpdateApplyErrors];
+
+export type PostApiUpdateApplyResponses = {
+    /**
+     * Success
+     */
+    200: UpdateApplyResponse;
+};
+
+export type PostApiUpdateApplyResponse = PostApiUpdateApplyResponses[keyof PostApiUpdateApplyResponses];
+
+export type PostApiUpdateCheckData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/update/check';
+};
+
+export type PostApiUpdateCheckErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiUpdateCheckError = PostApiUpdateCheckErrors[keyof PostApiUpdateCheckErrors];
+
+export type PostApiUpdateCheckResponses = {
+    /**
+     * Success
+     */
+    200: UpdateStatus;
+};
+
+export type PostApiUpdateCheckResponse = PostApiUpdateCheckResponses[keyof PostApiUpdateCheckResponses];
+
+export type PutApiUpdateModeData = {
+    body: {
+        mode?: 'auto' | 'manual' | 'paused';
+        window?: UpdateWindow;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/update/mode';
+};
+
+export type PutApiUpdateModeErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PutApiUpdateModeError = PutApiUpdateModeErrors[keyof PutApiUpdateModeErrors];
+
+export type PutApiUpdateModeResponses = {
+    /**
+     * Success
+     */
+    200: UpdateStatus;
+};
+
+export type PutApiUpdateModeResponse = PutApiUpdateModeResponses[keyof PutApiUpdateModeResponses];
+
+export type GetApiUpdateStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/update/status';
+};
+
+export type GetApiUpdateStatusErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiUpdateStatusError = GetApiUpdateStatusErrors[keyof GetApiUpdateStatusErrors];
+
+export type GetApiUpdateStatusResponses = {
+    /**
+     * Success
+     */
+    200: UpdateStatus;
+};
+
+export type GetApiUpdateStatusResponse = GetApiUpdateStatusResponses[keyof GetApiUpdateStatusResponses];
 
 export type GetApiVaultSnapshotData = {
     body?: never;

@@ -116,6 +116,44 @@ pub fn boot_check(install: &std::path::Path) {
     }
 }
 
+/// Health-gated commit (update-policy §5.5 step 5): poll `healthy` and commit
+/// the staged update **only** once it reports `true` — `/healthz` answered
+/// `200`, i.e. socket bound + auth DB answering + registry readable. "Stayed
+/// up N seconds" is not enough to bless a new binary.
+///
+/// If the deadline passes without a healthy probe, **no commit happens**: the
+/// `.pending` marker and `.bak` backup are left in place, so the next
+/// [`boot_check`] counts this boot as a failed attempt and rolls back once the
+/// tolerance is exhausted. Returns `true` iff the update was committed.
+///
+/// No-op (`false`) when nothing is staged — a normal boot never polls.
+pub fn boot_commit_when_healthy<F: FnMut() -> bool>(
+    install: &std::path::Path,
+    mut healthy: F,
+    deadline: std::time::Duration,
+    interval: std::time::Duration,
+) -> bool {
+    if !pending_path(install).exists() {
+        return false; // Nothing staged; normal boot.
+    }
+    let start = std::time::Instant::now();
+    loop {
+        if healthy() {
+            boot_commit(install);
+            return true;
+        }
+        if start.elapsed() >= deadline {
+            eprintln!(
+                "self-update: staged update NOT committed — /healthz never returned 200 within {}s; \
+                 leaving .pending so the boot-attempt guard can roll back",
+                deadline.as_secs()
+            );
+            return false;
+        }
+        std::thread::sleep(interval);
+    }
+}
+
 /// Commit a staged update after a healthy boot: clear the `.pending` marker and
 /// delete the `.bak` backup. Call once the process is known to be running
 /// normally (e.g. after it has stayed up past a short grace period).

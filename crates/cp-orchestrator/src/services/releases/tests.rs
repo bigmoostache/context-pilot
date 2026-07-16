@@ -50,6 +50,48 @@ fn store_set_arch_persists() {
     drop(std::fs::remove_dir_all(&dir));
 }
 
+/// V4.1a — a legacy `config.json` (arch + active tag only, no update-policy
+/// fields) loads with the v3 defaults and no error.
+#[test]
+fn update_config_legacy_migrates_with_defaults() {
+    let dir = std::env::temp_dir().join(format!("cp-rel-legacy-{}", std::process::id()));
+    drop(std::fs::create_dir_all(&dir));
+    std::fs::write(dir.join("config.json"), br#"{"arch":"linux-aarch64","arch_auto":false,"active_tag":"v0.3.0"}"#)
+        .expect("write legacy config");
+
+    let store = ReleaseStore::load(dir.clone());
+    assert_eq!(store.arch(), "linux-aarch64", "legacy fields preserved");
+    assert_eq!(store.active_tag(), Some("v0.3.0"));
+    assert_eq!(store.update_mode(), UpdateMode::Auto, "default mode is auto");
+    assert_eq!(store.channel(), "stable");
+    assert_eq!(store.poll_interval_hours(), 6);
+    assert_eq!(store.window(), &MaintenanceWindow::default(), "default window 03:00–05:00");
+
+    drop(std::fs::remove_dir_all(&dir));
+}
+
+/// V4.1b — the new fields round-trip through persist + reload.
+#[test]
+fn update_config_roundtrip() {
+    let dir = std::env::temp_dir().join(format!("cp-rel-upcfg-{}", std::process::id()));
+    drop(std::fs::create_dir_all(&dir));
+
+    let mut store = ReleaseStore::load(dir.clone());
+    store.set_update_mode(UpdateMode::Manual);
+    let window = MaintenanceWindow { start: "22:30".to_owned(), end: "23:45".to_owned() };
+    store.set_window(window.clone()).expect("valid window accepted");
+    assert!(
+        store.set_window(MaintenanceWindow { start: "9:99".to_owned(), end: "05:00".to_owned() }).is_err(),
+        "malformed window rejected"
+    );
+
+    let reloaded = ReleaseStore::load(dir.clone());
+    assert_eq!(reloaded.update_mode(), UpdateMode::Manual);
+    assert_eq!(reloaded.window(), &window, "rejected write must not have clobbered the valid one");
+
+    drop(std::fs::remove_dir_all(&dir));
+}
+
 #[test]
 fn store_select_rejects_missing() {
     let dir = std::env::temp_dir().join(format!("cp-rel-sel-{}", std::process::id()));
@@ -180,6 +222,88 @@ fn boot_commit_clears_markers() {
     assert!(!backup_path(&install).exists(), "backup removed");
     // Live binary is untouched.
     assert_eq!(std::fs::read(&install).unwrap(), b"NEW-GOOD");
+
+    drop(std::fs::remove_dir_all(&dir));
+}
+
+/// V2.2a — the probe never turns healthy within the deadline → **no** commit:
+/// `.pending` and `.bak` are preserved so the next `boot_check` counts the
+/// failed attempt and can roll back.
+#[test]
+fn self_update_deadline_without_health_leaves_markers() {
+    let dir = std::env::temp_dir().join(format!("cp-selfupd-gate-ko-{}", std::process::id()));
+    drop(std::fs::create_dir_all(&dir));
+
+    let install = dir.join("cp-orchestrator");
+    drop(std::fs::write(&install, b"NEW"));
+    drop(std::fs::write(backup_path(&install), b"OLD"));
+    drop(std::fs::write(pending_path(&install), b"1"));
+
+    let committed = boot_commit_when_healthy(
+        &install,
+        || false, // /healthz answers 503 forever
+        std::time::Duration::from_millis(30),
+        std::time::Duration::from_millis(5),
+    );
+    assert!(!committed, "an unhealthy boot must not commit");
+    assert!(pending_path(&install).exists(), ".pending preserved for the boot-attempt guard");
+    assert!(backup_path(&install).exists(), ".bak preserved for rollback");
+
+    drop(std::fs::remove_dir_all(&dir));
+}
+
+/// V2.2b — the probe reports healthy before the deadline → the update is
+/// committed: `.pending` and `.bak` both removed.
+#[test]
+fn self_update_commits_once_healthy() {
+    let dir = std::env::temp_dir().join(format!("cp-selfupd-gate-ok-{}", std::process::id()));
+    drop(std::fs::create_dir_all(&dir));
+
+    let install = dir.join("cp-orchestrator");
+    drop(std::fs::write(&install, b"NEW-GOOD"));
+    drop(std::fs::write(backup_path(&install), b"OLD"));
+    drop(std::fs::write(pending_path(&install), b"1"));
+
+    // Healthy on the third poll — the gate must keep polling until then.
+    let mut polls = 0u32;
+    let committed = boot_commit_when_healthy(
+        &install,
+        || {
+            polls += 1;
+            polls >= 3
+        },
+        std::time::Duration::from_secs(5),
+        std::time::Duration::from_millis(2),
+    );
+    assert!(committed, "a healthy boot commits");
+    assert!(!pending_path(&install).exists(), ".pending removed on commit");
+    assert!(!backup_path(&install).exists(), ".bak removed on commit");
+    assert_eq!(std::fs::read(&install).unwrap(), b"NEW-GOOD", "live binary untouched");
+
+    drop(std::fs::remove_dir_all(&dir));
+}
+
+/// A normal boot (no staged update) never polls the probe at all.
+#[test]
+fn self_update_gate_noop_without_pending() {
+    let dir = std::env::temp_dir().join(format!("cp-selfupd-gate-noop-{}", std::process::id()));
+    drop(std::fs::create_dir_all(&dir));
+
+    let install = dir.join("cp-orchestrator");
+    drop(std::fs::write(&install, b"NORMAL"));
+
+    let mut polls = 0u32;
+    let committed = boot_commit_when_healthy(
+        &install,
+        || {
+            polls += 1;
+            true
+        },
+        std::time::Duration::from_secs(1),
+        std::time::Duration::from_millis(1),
+    );
+    assert!(!committed, "nothing staged, nothing committed");
+    assert_eq!(polls, 0, "no probe traffic on a normal boot");
 
     drop(std::fs::remove_dir_all(&dir));
 }

@@ -62,6 +62,10 @@ sha2 = "0.10"
 # Base64url-no-pad encoding for PKCE code_verifier and code_challenge (RFC
 # 7636 §4.2). Already a transitive dep via reqwest.
 base64 = "0.22"
+# Minisign signature verification for the OTA update manifest (pure Rust,
+# clean static musl build) — the trust anchor is the UPDATE_PUBKEY const in
+# services/releases/signing.rs (update-policy §5.4).
+minisign-verify = "0.2"
 
 [dev-dependencies]
 # Test-only: the integration suite boots a real agent and drives its command

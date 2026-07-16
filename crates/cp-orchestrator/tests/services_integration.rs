@@ -31,6 +31,7 @@ use cp_mod_bridge as _;
 use cp_vault as _;
 use csv as _;
 use dotenvy as _;
+use minisign_verify as _;
 use nix as _;
 use notify as _;
 use openssl as _;

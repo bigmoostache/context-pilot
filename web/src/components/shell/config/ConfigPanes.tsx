@@ -3,7 +3,7 @@ import type { CatId } from "./categories"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, Lock } from "lucide-react"
 import { UsagePage } from "@/components/agents/UsagePage"
-import { ReleasesPane } from "./ReleasesPane"
+import { UpdatePane } from "./UpdatePane"
 import { SecretsPane } from "./SecretsPane"
 import { ItPane } from "./ItPane"
 import { useProviders } from "@/lib/support/models"
@@ -36,8 +36,8 @@ export function CategoryBody({ cat }: { cat: CatId }) {
     case "it": {
       return <ItPane />
     }
-    case "releases": {
-      return <ReleasesPane />
+    case "update": {
+      return <UpdatePane />
     }
   }
 }
