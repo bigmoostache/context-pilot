@@ -111,3 +111,6 @@ deploy/ansible/inventory.ini
 # Ansible runtime secrets (per-client, passed with -e @file — never committed)
 deploy/ansible/*.local.yml
 .env.local
+
+# local working notes
+/todo.md
