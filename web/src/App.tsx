@@ -166,22 +166,20 @@ function AppShell() {
         agents={agents}
       />
 
-      <div className="relative min-h-0 flex-1">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         <div
+          className="h-full overflow-hidden"
           style={{
             filter: showDisconnectOverlay ? "blur(3px) grayscale(0.5)" : "none",
             transition: "filter 300ms",
           }}
-          className="h-full"
         >
           <TelemetryProfiler id={effectiveView}>{renderView()}</TelemetryProfiler>
         </div>
         {showDisconnectOverlay && (
-          <button
-            type="button"
+          <div
             onClick={restartAgent}
             className="absolute inset-0 z-40 cursor-pointer bg-background/40"
-            aria-label="Agent disconnected — click to reconnect"
           />
         )}
       </div>
