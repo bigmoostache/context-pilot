@@ -7,9 +7,10 @@
 //! socket, and oplog, and the backend then discovers, tails, hydrates, and
 //! commands that agent exactly as it will in production.
 //!
-//! * **A real booted agent is discovered live, then disappears on shutdown.**
-//!   [`AgentRegistry`] reports `Appeared`+`Live` for a freshly booted agent and
-//!   `Disappeared` once its `Boot` drops and removes the record.
+//! * **A real booted agent is discovered live, then survives graceful shutdown.**
+//!   [`AgentRegistry`] reports `Appeared`+`Live` for a freshly booted agent;
+//!   after its `Boot` drops the registry record is intentionally kept (the
+//!   agent shows as "Disconnected" in the fleet rather than vanishing).
 //! * **`Stale` fires only on a `Live → non-live` transition.** First-sight
 //!   staleness rides `Appeared`; a beat going stale later fires exactly one
 //!   `Stale`, and a still-stale agent stays quiet.
@@ -135,10 +136,10 @@ fn send_command(dedup: &str) -> Command {
     }
 }
 
-// ── 1. a real booted agent is discovered live, then disappears ──────────────
+// ── 1. a real booted agent is discovered live, then survives drop ───────────
 
 #[test]
-fn a_real_agent_is_discovered_live_then_disappears_on_shutdown() {
+fn a_real_agent_is_discovered_live_then_survives_graceful_shutdown() {
     let folder = tempdir().expect("folder");
     let agents = tempdir().expect("agents dir");
 
@@ -157,11 +158,14 @@ fn a_real_agent_is_discovered_live_then_disappears_on_shutdown() {
         // A quiet scan emits nothing while the agent keeps beating.
         assert!(reg.scan().expect("scan").is_empty(), "no change → no events");
 
-        // Tear the agent down: Drop removes the record and socket.
+        // Tear the agent down: Drop keeps the registry record (the agent
+        // shows as Disconnected rather than vanishing). The test process's
+        // PID is still alive and the last heartbeat was recent, so no state
+        // change is observed — no event emitted.
         drop(boot);
         let after = reg.scan().expect("scan");
-        assert_eq!(after, vec![Event::Disappeared(id)], "shutdown surfaces as Disappeared");
-        assert!(reg.is_empty(), "the fleet is empty again");
+        assert!(after.is_empty(), "no Disappeared — record survives graceful drop");
+        assert!(!reg.is_empty(), "the agent remains in the fleet");
     }
 }
 
