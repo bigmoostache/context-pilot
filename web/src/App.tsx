@@ -151,6 +151,10 @@ function AppShell() {
     )
   }
 
+  // When the agent is unreachable (SSE down) and we're viewing an agent surface,
+  // blur+grey the main content and intercept all clicks to trigger reconnect.
+  const showDisconnectOverlay = !sseConnected && effectiveView !== "fleet"
+
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
       <TopBar
@@ -162,7 +166,25 @@ function AppShell() {
         agents={agents}
       />
 
-      <TelemetryProfiler id={effectiveView}>{renderView()}</TelemetryProfiler>
+      <div className="relative min-h-0 flex-1">
+        <div
+          style={{
+            filter: showDisconnectOverlay ? "blur(3px) grayscale(0.5)" : "none",
+            transition: "filter 300ms",
+          }}
+          className="h-full"
+        >
+          <TelemetryProfiler id={effectiveView}>{renderView()}</TelemetryProfiler>
+        </div>
+        {showDisconnectOverlay && (
+          <button
+            type="button"
+            onClick={restartAgent}
+            className="absolute inset-0 z-40 cursor-pointer bg-background/40"
+            aria-label="Agent disconnected — click to reconnect"
+          />
+        )}
+      </div>
 
       <StatusBar
         fleet={effectiveView === "fleet"}
