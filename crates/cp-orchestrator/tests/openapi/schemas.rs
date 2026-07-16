@@ -27,7 +27,7 @@ pub(super) fn core() -> Value {
                 "branch": { "type": "string" },
                 "model": { "type": "string" },
                 "provider": { "type": "string" },
-                "status": { "type": "string", "enum": ["working", "needs-you", "idle"] },
+                "status": { "type": "string", "enum": ["working", "needs-you", "idle", "disconnected"] },
                 "phase": { "type": "string", "enum": ["idle", "streaming", "tooling"] },
                 "costUsd": { "type": "number" },
                 "inputTokens": { "type": "integer" },

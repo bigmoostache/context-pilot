@@ -17,6 +17,7 @@ const statusMeta: Record<AgentStatus, { label: string; color: string }> = {
   working: { label: "Working", color: "var(--interactive)" },
   "needs-you": { label: "Needs you", color: "var(--signal)" },
   idle: { label: "Idle", color: "var(--muted-foreground)" },
+  disconnected: { label: "Disconnected", color: "var(--danger)" },
 }
 
 /** Sort priority: working first, then needs-you, then idle. */
@@ -24,6 +25,7 @@ const statusOrder: Record<AgentStatus, number> = {
   working: 0,
   "needs-you": 1,
   idle: 2,
+  disconnected: 3,
 }
 
 /**

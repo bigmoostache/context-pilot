@@ -36,7 +36,7 @@ export type Agent = {
     outputTokens?: number;
     phase?: 'idle' | 'streaming' | 'tooling';
     provider?: string;
-    status: 'working' | 'needs-you' | 'idle';
+    status: 'working' | 'needs-you' | 'idle' | 'disconnected';
     task?: string;
     threads: number;
 };

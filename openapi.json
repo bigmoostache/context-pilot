@@ -114,7 +114,8 @@
             "enum": [
               "working",
               "needs-you",
-              "idle"
+              "idle",
+              "disconnected"
             ],
             "type": "string"
           },
