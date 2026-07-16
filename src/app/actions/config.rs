@@ -6,7 +6,7 @@ use crate::state::State;
 use super::ActionResult;
 
 /// Number of config bars available.
-const CONFIG_BAR_COUNT: usize = 3;
+const CONFIG_BAR_COUNT: usize = 2;
 
 /// Trigger an API connectivity check and save.
 pub(crate) fn api_check(state: &mut State) -> ActionResult {
@@ -46,12 +46,6 @@ pub(crate) fn handle_config_increase_bar(state: &mut State) -> ActionResult {
             // Cleaning threshold
             state.cleaning_threshold = (state.cleaning_threshold + 0.05).min(0.95);
         }
-        2 => {
-            // Max cost guard rail ($10 steps)
-            let spine = cp_mod_spine::types::SpineState::get_mut(state);
-            let current = spine.config.max_cost.unwrap_or(0.0);
-            spine.config.max_cost = Some(current + 10.0);
-        }
         _ => {}
     }
     state.flags.ui.dirty = true;
@@ -72,13 +66,6 @@ pub(crate) fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
         1 => {
             // Cleaning threshold
             state.cleaning_threshold = (state.cleaning_threshold - 0.05).max(0.30);
-        }
-        2 => {
-            // Max cost guard rail ($10 steps, min $0 = disabled)
-            let spine = cp_mod_spine::types::SpineState::get_mut(state);
-            let current = spine.config.max_cost.unwrap_or(0.0);
-            let new_val = current - 10.0;
-            spine.config.max_cost = if new_val <= 0.0 { None } else { Some(new_val) };
         }
         _ => {}
     }

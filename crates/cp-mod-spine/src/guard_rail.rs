@@ -1,6 +1,4 @@
 use cp_base::panels::now_ms;
-use cp_base::state::data::model_helpers::ModelPricing as _;
-use cp_base::state::data::model_helpers::token_cost;
 use cp_base::state::runtime::State;
 
 use crate::types::SpineState;
@@ -31,7 +29,7 @@ pub(crate) trait GuardRailStopLogic: Send + Sync {
 /// All guard rails are checked — if ANY blocks, continuation is prevented.
 pub(crate) fn all_guard_rails() -> &'static [&'static dyn GuardRailStopLogic] {
     static GUARD_RAILS: &[&dyn GuardRailStopLogic] =
-        &[&MaxOutputTokensGuard, &MaxCostGuard, &MaxDurationGuard, &MaxMessagesGuard, &MaxAutoRetriesGuard];
+        &[&MaxOutputTokensGuard, &MaxDurationGuard, &MaxMessagesGuard, &MaxAutoRetriesGuard];
     GUARD_RAILS
 }
 
@@ -57,45 +55,6 @@ impl GuardRailStopLogic for MaxOutputTokensGuard {
             state.total_output_tokens,
             SpineState::get(state).config.max_output_tokens.unwrap_or(0)
         )
-    }
-}
-
-// ============================================================================
-// Implementation: MaxCostGuard
-// ============================================================================
-
-/// Block if estimated burst cost (since last user input) exceeds the configured USD limit.
-/// Uses stream token counters which accumulate across auto-continuations and only
-/// reset when the user sends a new message.
-pub(crate) struct MaxCostGuard;
-
-impl GuardRailStopLogic for MaxCostGuard {
-    fn name(&self) -> &'static str {
-        "MaxCost"
-    }
-
-    fn should_block(&self, state: &State) -> bool {
-        SpineState::get(state).config.max_cost.is_some_and(|max_cost| Self::calculate_burst_cost(state) >= max_cost)
-    }
-
-    fn block_reason(&self, state: &State) -> String {
-        let current_cost = Self::calculate_burst_cost(state);
-        format!(
-            "Burst cost limit reached: ${:.4} / ${:.4}",
-            current_cost,
-            SpineState::get(state).config.max_cost.unwrap_or(0.0)
-        )
-    }
-}
-
-impl MaxCostGuard {
-    /// Calculate the burst cost in USD (since last user input).
-    /// Uses stream_* counters which persist across auto-continuations.
-    fn calculate_burst_cost(state: &State) -> f64 {
-        let hit_cost = token_cost(state.stream_cache_hit_tokens, state.cache_hit_price_per_mtok());
-        let miss_cost = token_cost(state.stream_cache_miss_tokens, state.cache_miss_price_per_mtok());
-        let output_cost = token_cost(state.stream_output_tokens, state.output_price_per_mtok());
-        hit_cost + miss_cost + output_cost
     }
 }
 

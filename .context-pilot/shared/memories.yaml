@@ -598,6 +598,15 @@
   - breakthrough
   - root-cause
   last_edited_ms: 0
+a330cfc0a3c317f2:
+  tl_dr: 'EVEN IF A RED CALLBACK IS PRE-EXISTING: ALWAYS TAKE OWNERSHIP OF IT AND SOLVE IT. PERIOD. EVERYONE IS RESPONSIBLE, ESPECIALLY YOU. No dismissing failures as ''pre-existing'' — fix them.'
+  importance: critical
+  labels:
+  - callback
+  - workflow
+  - ownership
+  - philosophy
+  last_edited_ms: 1784195611669
 a8b1054e0a11c2fe:
   tl_dr: 'Cache engine v2: gap-decomposition DP replaces greedy. F(Ω'')=ΣT[pₖ]×gap. DP per gap O(k×|gap|²) + enumerate across ≤5 gaps. In cache_engine.rs.'
   importance: high
@@ -814,3 +823,11 @@ fe4cc25edbfbea1f:
   tl_dr: 'User hardware: ThinkPad T14s Gen 6, Ryzen AI 7 PRO 350 (Zen 5, 8c/16t), 24GB LPDDR5x 7500MT/s, Radeon 860M iGPU, ~48 GB/s bandwidth.'
   importance: medium
   last_edited_ms: 0
+ffb84e0bd397cc96:
+  tl_dr: 'TEMPORARY: Do not push to remote unless user explicitly asks. Commit locally only until told otherwise.'
+  importance: critical
+  labels:
+  - workflow
+  - temporary
+  - git
+  last_edited_ms: 1784192485572

@@ -1,21 +1,16 @@
 import { test, expect } from "@playwright/test"
 
-// ── §19 — a tripped breaker / degraded stream is VISIBLE on the fleet board ──
+// ── §19 — degraded stream / projection lag is VISIBLE on the fleet board ──
 //
-// X868 stood up `GET /api/agent/{id}/metrics` (durable cost-breaker state,
-// stream health, view-vs-oplog rev lag). The fleet dashboard's `HealthBadge`
-// polls it and surfaces the first non-nominal condition as a coloured pill, so
-// an operator *sees* a tripped breaker at a glance instead of inferring it from
-// a silently-failing send (T121: "breaker trip must be VISIBLE in the cockpit,
-// not a silent backend latch").
+// X868 stood up `GET /api/agent/{id}/metrics` (stream health, view-vs-oplog
+// rev lag). The fleet dashboard's `HealthBadge` polls it and surfaces the
+// first non-nominal condition as a coloured pill.
 //
-// Separation of concerns (same contract as breaker.spec.ts):
+// Separation of concerns:
 //   • Backend metrics *production* is covered by the rust transport/lib tests.
 //   • This spec covers the FRONTEND's *surfacing* by intercepting the metrics
 //     GET at the network boundary with `page.route` and forcing each of the
-//     three non-nominal conditions, then asserting the matching pill renders.
-//     Deterministic regardless of the live agent's real (raised-to-$100M)
-//     budget, which never trips on its own.
+//     non-nominal conditions, then asserting the matching pill renders.
 
 /** Force every agent's metrics poll to answer with a fixed snapshot. */
 async function routeMetrics(page: import("@playwright/test").Page, body: Record<string, unknown>) {
@@ -29,25 +24,11 @@ async function routeMetrics(page: import("@playwright/test").Page, body: Record<
 }
 
 const NOMINAL = {
-  breaker: { tripped: false, spendUsd: 1, budgetUsd: 100 },
   stream: { subscribers: 1, droppedFrames: 0, degraded: false },
   rev: { view: 100, oplogHead: 100, lag: 0 },
 }
 
 test.describe("§19 fleet health badge surfacing", () => {
-  test("a tripped breaker shows an 'Over budget' alert on the agent card", async ({ page }) => {
-    await routeMetrics(page, {
-      ...NOMINAL,
-      breaker: { tripped: true, spendUsd: 580.8, budgetUsd: 100 },
-    })
-    await page.goto("/")
-    const badge = page
-      .getByRole("status")
-      .filter({ hasText: /Over budget/i })
-      .first()
-    await expect(badge).toBeVisible({ timeout: 10_000 })
-  })
-
   test("a degraded stream shows a 'Stream degraded' warning", async ({ page }) => {
     await routeMetrics(page, {
       ...NOMINAL,
@@ -85,7 +66,7 @@ test.describe("§19 fleet health badge surfacing", () => {
     await expect(
       page
         .getByRole("status")
-        .filter({ hasText: /Over budget|Stream degraded|Projection lagging/i }),
+        .filter({ hasText: /Stream degraded|Projection lagging/i }),
     ).toHaveCount(0)
   })
 })

@@ -217,10 +217,6 @@ fn build_budget_bars(state: &State) -> Vec<ConfigBudgetBar> {
     let budget_pct = (effective_budget.to_f64() / max_budget.to_f64() * 100.0).to_usize();
     let threshold_pct = (state.cleaning_threshold * 100.0).to_usize();
 
-    let spine_cfg = &cp_mod_spine::types::SpineState::get(state).config;
-    let max_cost = spine_cfg.max_cost.unwrap_or(0.0);
-    let max_display = 20.0f64;
-
     vec![
         ConfigBudgetBar {
             label: "Context Budget".into(),
@@ -239,15 +235,6 @@ fn build_budget_bars(state: &State) -> Vec<ConfigBudgetBar> {
             extra: None,
             semantic: Semantic::Warning,
             selected: state.config_selected_bar == 1,
-        },
-        ConfigBudgetBar {
-            label: "Max Cost".into(),
-            percent: 0,
-            fill_ratio: (max_cost / max_display).min(1.0),
-            value_display: if max_cost <= 0.0 { "disabled".into() } else { format!("${max_cost:.2}") },
-            extra: Some("(guard rail)".into()),
-            semantic: Semantic::Error,
-            selected: state.config_selected_bar == 2,
         },
     ]
 }
