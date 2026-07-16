@@ -126,7 +126,16 @@ export function useRestartFlow(agentId: string) {
   const restart = useCallback(() => {
     if (!agentId || mutation.isPending || waiting) return
     mutation.mutate(agentId, {
-      onSuccess: () => setWaiting(true),
+      onSuccess: () => {
+        setWaiting(true)
+        // The restart handler already marked StalePid on the server.
+        // Force a refetch so the REST response delivers "disconnected"
+        // before the new agent's Lifecycle::Running oplog delta lands —
+        // otherwise React batches both lifecycle deltas (Stopping +
+        // Running) into one render and the effect never sees the
+        // intermediate "disconnected" state.
+        void client.invalidateQueries({ queryKey: qk.agent(agentId) })
+      },
     })
   }, [agentId, mutation, waiting])
 
