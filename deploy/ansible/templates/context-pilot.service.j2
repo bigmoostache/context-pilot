@@ -34,7 +34,11 @@ EnvironmentFile=-{{ cp_root }}/seed.env
 EnvironmentFile=-{{ cp_root }}/providers.env
 ExecStartPre=/bin/mkdir -p {{ cp_root }}/home
 ExecStart={{ cp_root }}/bin/cp-orchestrator
-Restart=on-failure
+# `always`, not `on-failure`: the self-updater may end its old process with a
+# clean-looking exit (its exec fallback), and `on-failure` would leave the box
+# headless (M6 e2e, 2026-07-16). `systemctl stop` still stops for good —
+# systemd never auto-restarts after an explicit stop.
+Restart=always
 RestartSec=5
 
 [Install]
