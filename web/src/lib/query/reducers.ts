@@ -382,7 +382,31 @@ function foldContextUsage(prev: Agent, k: Kind): Agent {
 }
 
 /**
- * Fold one oplog delta into the live agent meta (phase + cost + token vitals).
+ * lifecycle — fold the agent's process lifecycle (Running / Stopping) into the
+ * live agent meta so the dashboard reacts within ~100ms of the oplog delta,
+ * not on the next 2s registry scan.
+ *
+ * Stopping → status "disconnected" (process going down).
+ * Running  → status "idle" (fresh boot, no work yet).
+ */
+function foldLifecycle(prev: Agent, k: Kind): Agent {
+  const state = k.state
+  if (state === "stopping" || state === "stopped") {
+    if (prev.status === "disconnected") return prev
+    return { ...prev, status: "disconnected", accent: "danger" }
+  }
+  if (state === "running") {
+    if (prev.status === "disconnected" || prev.status === "idle") {
+      return { ...prev, status: "idle", accent: "interactive" }
+    }
+    return prev
+  }
+  return prev
+}
+
+/**
+ * Fold one oplog delta into the live agent meta (phase + cost + token vitals +
+ * lifecycle).
  *
  * A thin dispatcher — each case delegates to a single-purpose fold helper above
  * and NEVER returns `null` for a known agent, so a phase change (notably going
@@ -401,8 +425,11 @@ export function applyAgentDelta(prev: Agent | undefined, entry: OpEntry): Agent 
     case "context_usage": {
       return foldContextUsage(prev, k)
     }
+    case "lifecycle": {
+      return foldLifecycle(prev, k)
+    }
     default: {
-      return prev // thread / lifecycle → irrelevant to meta
+      return prev // thread deltas → irrelevant to meta
     }
   }
 }
