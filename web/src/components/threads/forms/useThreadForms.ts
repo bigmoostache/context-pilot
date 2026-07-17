@@ -38,7 +38,7 @@ export function useThreadForms(log: ThreadMsg[], agentId: string, threadId: stri
     const m = new Map<string, FormAnswer>()
     for (const msg of log) {
       const a = parseFormAnswerBlock(msg.text ?? "")
-      if (a) m.set(a.formId, a)
+      if (a) m.set(a.formId, msg.ts === undefined ? a : { ...a, submittedAt: msg.ts })
     }
     return m
   }, [log])

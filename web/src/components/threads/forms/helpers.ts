@@ -55,6 +55,11 @@ export interface FormAnswerEntry {
 export interface FormAnswer {
   formId: string
   answers: FormAnswerEntry[]
+  /** `ts` of the source `form-answer` message (epoch-ms number, ISO string, or
+   *  pre-formatted relative label) — threaded in by useThreadForms so the locked
+   *  receipt can show when the form was submitted. Absent for a freshly-parsed
+   *  block that carries no message context. */
+  submittedAt?: string | number
 }
 
 const FORM_RE = /```form\n([\s\S]*?)```/g

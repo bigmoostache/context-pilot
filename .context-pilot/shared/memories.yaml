@@ -30,15 +30,15 @@
   - architecture
   last_edited_ms: 1784202976528
 136daa3a4207df23:
-  tl_dr: 'TAILSCALE SERVE: Context Pilot at https://macbook.barking-hue.ts.net (tailnet-only). Command: tailscale serve --bg --https=443 http://127.0.0.1:5174. Single-origin fix: vite proxy /api→:7878, VITE_API_URL= empty in .env.local. Requires vite+orchestrator running.'
-  importance: high
+  tl_dr: HISTORICAL (macbook node, NOT where I run now — see M156). tailscale serve pattern on guillaume's MacBook. Kept as serve-command reference only.
+  contents: 'OLD macbook node (I now run on the mac mini — see M156). On guillaume''s MacBook: Context Pilot at https://macbook.barking-hue.ts.net (tailnet-only). Command: `tailscale serve --bg --https=443 http://127.0.0.1:5174`. Single-origin: vite proxy /api->:7878, VITE_API_URL empty in .env.local. This machine (mac mini) instead serves guillaume.barking-hue.ts.net -> :7878 directly.'
+  importance: medium
   labels:
   - tailscale
-  - deploy
   - ops
-  - tailnet
-  - web
-  last_edited_ms: 1782121419935
+  - historical
+  - macbook
+  last_edited_ms: 1784290113480
 13a1d96ff4a4e7d0:
   tl_dr: 'Context Pilot: Rust TUI AI coding assistant built with Ratatui+Crossterm. Workspace has 22+ crates + 1 main binary.'
   importance: medium
@@ -118,6 +118,37 @@
   - cache-optimizer
   - architecture
   last_edited_ms: 1784202976534
+403048b6075f15c4:
+  tl_dr: I NOW RUN ON the Mac Mini 'guillaume-macmini' (Guillaume-2.local, user guillaumedraznieks, realm ~/code/cpilot), NOT guillaume's MacBook. Different node from gilbert. Local shell/git run ON this mac mini. Details in body.
+  contents: |-
+    HUGE context change (2026-07-17): agent runtime host moved from guillaume's MacBook to the Mac Mini.
+
+    MACHINE I RUN ON NOW:
+    - host: Guillaume-2.local (tailscale HostName 'Guillaume')
+    - user guillaumedraznieks, home /Users/guillaumedraznieks, realm ~/code/cpilot
+    - Macmini9,1 = Mac Mini (M1, 2020), Apple M1 8-core arm64, 16GB RAM, macOS 26.3, ~258Gi free
+
+    TAILSCALE (this node):
+    - MagicDNS guillaume.barking-hue.ts.net, IP 100.71.221.58 / fd7a:115c:a1e0::2636:dd3b
+    - tailnet barking-hue.ts.net, account g.draznieks@
+    - serve https://guillaume.barking-hue.ts.net -> now proxies / to VITE DEV (http://localhost:5174) as of T579, was http://127.0.0.1:7878 built SPA before. Let's Encrypt (YE1), exp Oct 15 2026
+    - /usr/local/bin/tailscale (client 1.100.0, tailscaled 1.98.9)
+
+    NODE TOOLCHAIN (T579): system /usr/local/bin/node is v16 (too old for vite8). Installed brew node v26.5.0 at /opt/homebrew/bin/node + pnpm 11.6.0 (npm -g). Must `export PATH=/opt/homebrew/bin:$PATH` in non-interactive shells. web deps reinstalled under node26 (CI=true to allow node_modules purge no-TTY).
+
+    FRONTEND SERVING (T579): vite dev runs `pnpm dev` in ~/code/cpilot/web, binds [::1]:5174 (IPv6 localhost ONLY, not 127.0.0.1 — tailscale serve target MUST be http://localhost:5174 not 127.0.0.1). vite.config port 5174, allowedHosts includes .ts.net. vite proxies /api -> :7878. Orchestrator still on :7878 (API + agent backend), CP_WEB_ROOT=~/cp-server/web (built SPA, now bypassed by serve).
+
+    OTHER NODES (NOT me): gilbert=gilberts-mac-mini-1 100.118.140.29 (M149/M150); asterix 100.88.204.50 (linux offline); iphone171 100.123.80.66.
+
+    CONSEQUENCE: console_easy_bash + local git_execute run ON this Mac Mini. Context Pilot (orchestrator+agent+meilisearch) installed under ~/cp-server + ~/.context-pilot here. git identity here = PLang <323260+plang@users.noreply.github.com>.
+  importance: critical
+  labels:
+  - identity
+  - runtime-host
+  - mac-mini
+  - tailscale
+  - hardware
+  last_edited_ms: 1784293022351
 45b9baa7eb6b3f01:
   tl_dr: 'T506 web-lint P0-P12 COMPLETE + pushed on web-lint. Next: P13 docs/PR (X1140). Details in contents.'
   contents: 'P0-P12 COMPLETE on web-lint branch. P12: CB8 blocking callback, as-unknown-as ban, CI frontend job, rule-census script (733 rules), hash-locked 26 config files. All green: eslint 0, tsc 0, prettier 0, stylelint 0, knip 0, type-coverage 99.86%. NEXT: P13 docs/PR (X1140).'

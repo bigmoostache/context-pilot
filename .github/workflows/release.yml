@@ -263,6 +263,10 @@ jobs:
   # a detached minisign signature on the `channels` branch. Auto-releases from
   # master pushes (v<version>-<sha>) build + release but never touch the
   # channel — tagging IS the fleet release act (update-policy v3 decision 2).
+  #
+  # The manifest pins all five published arches: the three Linux appliance
+  # targets (Photonicat fleet) plus both macOS targets, so a macOS dev box
+  # running the orchestrator can self-update too (arch match via KNOWN_ARCHS).
   manifest:
     name: Publish signed stable manifest
     needs: release
@@ -292,7 +296,7 @@ jobs:
       - name: Download published release assets
         run: |
           mkdir -p assets
-          for arch in linux-aarch64 linux-aarch64-musl linux-x86_64; do
+          for arch in linux-aarch64 linux-aarch64-musl linux-x86_64 macos-aarch64 macos-x86_64; do
             curl -fSL --retry 5 --retry-delay 10 -o "assets/cpilot-${arch}.tar.gz" \
               "https://github.com/${REPO}/releases/download/${TAG}/cpilot-${arch}.tar.gz"
           done
@@ -303,7 +307,7 @@ jobs:
           released_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           expires_at=$(date -u -d "+${EXPIRES_DAYS} days" +%Y-%m-%dT%H:%M:%SZ)
           artifacts='{}'
-          for arch in linux-aarch64 linux-aarch64-musl linux-x86_64; do
+          for arch in linux-aarch64 linux-aarch64-musl linux-x86_64 macos-aarch64 macos-x86_64; do
             f="assets/cpilot-${arch}.tar.gz"
             sha=$(sha256sum "$f" | cut -d' ' -f1)
             size=$(stat -c%s "$f")
@@ -327,7 +331,7 @@ jobs:
       # Gate the exact contract the box relies on before signing anything.
       - name: Check manifest contract
         run: |
-          jq -e '.schema and .version and .artifacts["linux-aarch64"].sha256 and .artifacts["linux-aarch64-musl"].sha256 and .artifacts["linux-x86_64"].sha256' stable.json
+          jq -e '.schema and .version and .artifacts["linux-aarch64"].sha256 and .artifacts["linux-aarch64-musl"].sha256 and .artifacts["linux-x86_64"].sha256 and .artifacts["macos-aarch64"].sha256 and .artifacts["macos-x86_64"].sha256' stable.json
           test "$(jq -r .version stable.json)" = "$TAG"
 
       - name: Sign stable.json (minisign)

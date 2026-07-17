@@ -1,4 +1,5 @@
 import { useMemo } from "react"
+import { Paperclip } from "lucide-react"
 import { FileIcon } from "@/components/finder/support/macIcons"
 import { kindOf } from "@/components/finder/support/kind"
 import type { UploadedFile } from "./helpers"
@@ -15,7 +16,8 @@ export interface ThreadFile {
  * hunting for it in the message history.
  *
  * Only rendered when the thread contains at least one `file-upload` block.
- * Clicking a chip opens the shared Quick Look drawer (same `onOpenFile` path).
+ * A sticky header labels the rail ("Attachments · N"); each row is an icon-well
+ * button that opens the shared Quick Look drawer (same `onOpenFile` path).
  */
 export function FileSidebar({
   files,
@@ -35,24 +37,35 @@ export function FileSidebar({
   }, [files])
 
   return (
-    <aside className="flex w-[200px] shrink-0 flex-col border-l border-border">
+    <aside className="flex w-[210px] shrink-0 flex-col border-l border-border/70 bg-muted/10">
+      <div className="flex items-center gap-1.5 border-b border-border/60 px-3 py-2">
+        <Paperclip className="size-3 text-muted-foreground/55" />
+        <span className="text-[10.5px] font-semibold tracking-wide text-muted-foreground/65 uppercase">
+          Attachments
+        </span>
+        <span className="ml-auto rounded-full bg-muted/60 px-1.5 py-px text-[10px] font-medium tabular-nums text-muted-foreground/70">
+          {unique.length}
+        </span>
+      </div>
       <div className="flex-1 space-y-0.5 overflow-y-auto p-1.5">
         {unique.map((f) => (
           <button
             key={f.file.path}
             type="button"
             onClick={() => onOpen(f.file)}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/50"
+            className="group flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-card hover:card-shadow"
           >
-            <FileIcon kind={kindOf(f.file.name)} size={20} />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[11.5px] font-medium text-foreground/80">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/50 transition-colors group-hover:bg-muted/70">
+              <FileIcon kind={kindOf(f.file.name)} size={20} />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col leading-tight">
+              <span className="truncate text-[11.5px] font-medium text-foreground/85 group-hover:text-foreground">
                 {f.file.name}
-              </div>
-              <div className="text-[9.5px] text-muted-foreground/50">
+              </span>
+              <span className="text-[9.5px] text-muted-foreground/50">
                 {f.role === "user" ? "You" : "Assistant"}
-              </div>
-            </div>
+              </span>
+            </span>
           </button>
         ))}
       </div>

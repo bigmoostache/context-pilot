@@ -1,4 +1,4 @@
-import { Paperclip, AlertTriangle, FolderOpen, Plus, X } from "lucide-react"
+import { AlertTriangle, FolderOpen, Plus, X } from "lucide-react"
 import { kindOf, extOf } from "@/components/finder/support/kind"
 import { FileIcon } from "@/components/finder/support/macIcons"
 import { useFs } from "@/lib/live"
@@ -81,15 +81,16 @@ export function MessageFileChip({
 }
 
 /**
- * A clickable attachment chip rendered in place of a ` ```file-upload ` block.
- * Shows the file's mac-style icon, name, and size; clicking opens the shared
- * Finder Quick Look drawer (`QuickLookSheet`) for the file.
+ * A clickable attachment card rendered in place of a ` ```file-upload ` block.
+ * A compact two-line card: a mac-style icon in a rounded well, the file name,
+ * and its on-disk size; clicking opens the shared Finder Quick Look drawer
+ * (`QuickLookSheet`) — the whole card is the click target.
  *
  * Three presentations:
- *   - **present + `onOpen`** → an interactive button (the threads chat).
- *   - **present, no `onOpen`** → a static chip (read-only surfaces).
- *   - **`missing`** → a greyed, non-interactive chip with a warning icon and the
- *     notice "This file does not exist or has been moved elsewhere." (#4).
+ *   - **present + `onOpen`** → an interactive button (chat).
+ *   - **present, no `onOpen`** → a static card (read-only surfaces).
+ *   - **`missing`** → a greyed, dashed, non-interactive card with a warning icon
+ *     and the notice "This file does not exist or has been moved elsewhere." (#4).
  */
 export function FileUploadChip({
   file,
@@ -106,42 +107,22 @@ export function FileUploadChip({
   missing?: boolean | undefined
   onAccent?: boolean | undefined
   /** the file's REAL on-disk byte size (from the listing node), or `undefined`
-   *  when unknown — the chip shows the size label only when this is a finite
+   *  when unknown — the card shows the size label only when this is a finite
    *  number, never the untrusted YAML `file.size`. */
   size?: number | undefined
 }) {
-  // ── Missing: greyed, non-interactive, with an explicit warning. ──
-  if (missing) {
-    return (
-      <span
-        className={
-          onAccent
-            ? "inline-flex max-w-full items-center gap-2 rounded-lg border border-white/25 bg-white/10 px-2.5 py-1.5 text-left text-[12px] opacity-80"
-            : "inline-flex max-w-full items-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 px-2.5 py-1.5 text-left text-[12px] opacity-80"
-        }
-        title="This file does not exist or has been moved elsewhere."
-      >
-        <AlertTriangle
-          className={onAccent ? "size-3.5 shrink-0" : "size-3.5 shrink-0 text-(--warn)"}
-        />
-        <span className="min-w-0 flex-col">
-          <span className="block truncate font-medium line-through opacity-90">{file.name}</span>
-          <span className="block truncate text-[10.5px] opacity-75">
-            This file does not exist or has been moved elsewhere.
-          </span>
-        </span>
-      </span>
-    )
-  }
+  // ── Missing: greyed, dashed, non-interactive, with an explicit warning. ──
+  if (missing) return <MissingChip file={file} onAccent={onAccent} />
 
   const base =
-    "inline-flex max-w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[12px] transition-colors"
+    "group/chip inline-flex max-w-full items-center gap-2.5 rounded-xl border px-2.5 py-1.5 text-left align-middle transition-[border-color,background-color,transform,box-shadow]"
   const skin = onAccent
-    ? "border-white/25 bg-white/15 hover:bg-white/25"
-    : "border-border bg-card card-shadow hover:border-[var(--signal)]/60 hover:bg-muted/40"
+    ? "border-white/25 bg-white/12 hover:bg-white/20 hover:-translate-y-px"
+    : "border-border/70 bg-card card-shadow hover:border-(--signal)/55 hover:bg-muted/30 hover:-translate-y-px"
 
   const body = <FileChipBody file={file} size={size} onAccent={onAccent} />
   // Static (no opener) vs. interactive trigger — same content, one wrapper each.
+  // Both carry no glyph; the whole card is the click target when interactive.
   const trigger = onOpen ? (
     <button onClick={onOpen} className={`${base} ${skin}`}>
       {body}
@@ -150,16 +131,48 @@ export function FileUploadChip({
     <span className={`${base} ${skin} cursor-default`}>{body}</span>
   )
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex items-center gap-1 align-middle">
       {trigger}
       <ShowInFinderButton onShowInFinder={onShowInFinder} onAccent={onAccent} />
     </span>
   )
 }
 
-/** The "Show in Finder" affordance beside a chip — renders nothing when no
+/** The greyed dashed card shown when the referenced file is gone (#4). Split out
+ *  so {@link FileUploadChip}'s live path stays flat against the P8 complexity
+ *  budget. */
+function MissingChip({ file, onAccent }: { file: UploadedFile; onAccent: boolean }) {
+  return (
+    <span
+      className={
+        onAccent
+          ? "inline-flex max-w-full items-center gap-2.5 rounded-xl border border-dashed border-white/25 bg-white/8 px-2.5 py-1.5 text-left align-middle opacity-80"
+          : "inline-flex max-w-full items-center gap-2.5 rounded-xl border border-dashed border-border bg-muted/30 px-2.5 py-1.5 text-left align-middle opacity-80"
+      }
+      title="This file does not exist or has been moved elsewhere."
+    >
+      <span
+        className={
+          onAccent
+            ? "flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/10"
+            : "flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted/60"
+        }
+      >
+        <AlertTriangle
+          className={onAccent ? "size-3.5 shrink-0" : "size-3.5 shrink-0 text-(--warn)"}
+        />
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate text-[12px] font-medium line-through opacity-90">{file.name}</span>
+        <span className="truncate text-[10px] opacity-75">moved or deleted — no longer here</span>
+      </span>
+    </span>
+  )
+}
+
+/** The "Show in Finder" affordance beside a card — renders nothing when no
  *  navigation handler is supplied. Extracted so {@link FileUploadChip} isn't
- *  duplicated across the static/interactive tails (each copy cost the chip two
+ *  duplicated across the static/interactive tails (each copy cost the card two
  *  branches toward the P8 complexity budget). */
 function ShowInFinderButton({
   onShowInFinder,
@@ -175,8 +188,8 @@ function ShowInFinderButton({
       title="Show in Finder"
       className={
         onAccent
-          ? "flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100"
-          : "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted/60 hover:text-foreground/80"
+          ? "flex size-7 shrink-0 items-center justify-center rounded-lg opacity-55 transition-opacity hover:opacity-100"
+          : "flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground/45 transition-colors hover:bg-muted/60 hover:text-foreground/80"
       }
     >
       <FolderOpen className="size-3.5" />
@@ -184,8 +197,9 @@ function ShowInFinderButton({
   )
 }
 
-/** A chip's inner content (icon · name · size · paperclip), shared by the static
- *  and interactive triggers. */
+/** A card's inner content (icon well · name · size), shared by the static and
+ *  interactive triggers. The mac-style file icon sits in a rounded well and the
+ *  name/size stack in a tight two-line column. */
 function FileChipBody({
   file,
   size,
@@ -197,34 +211,37 @@ function FileChipBody({
 }) {
   return (
     <>
-      <span className="shrink-0">
-        <FileIcon kind={kindOf(file.name)} ext={extOf(file.name)} size={18} />
-      </span>
       <span
         className={
           onAccent
-            ? "min-w-0 truncate font-medium"
-            : "min-w-0 truncate font-medium text-foreground/90"
+            ? "flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/15"
+            : "flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted/50"
         }
       >
-        {file.name}
+        <FileIcon kind={kindOf(file.name)} ext={extOf(file.name)} size={18} />
       </span>
-      {typeof size === "number" && (
+      <span className="flex min-w-0 flex-col leading-tight">
         <span
           className={
             onAccent
-              ? "shrink-0 text-[10.5px] tabular-nums opacity-75"
-              : "shrink-0 text-[10.5px] text-muted-foreground/70 tabular-nums"
+              ? "truncate text-[12px] font-medium"
+              : "truncate text-[12px] font-medium text-foreground/90"
           }
         >
-          {fmtSize(size)}
+          {file.name}
         </span>
-      )}
-      <Paperclip
-        className={
-          onAccent ? "size-3 shrink-0 opacity-60" : "size-3 shrink-0 text-muted-foreground/50"
-        }
-      />
+        {typeof size === "number" && (
+          <span
+            className={
+              onAccent
+                ? "truncate text-[10px] tabular-nums opacity-70"
+                : "truncate text-[10px] text-muted-foreground/60 tabular-nums"
+            }
+          >
+            {fmtSize(size)}
+          </span>
+        )}
+      </span>
     </>
   )
 }
