@@ -2815,6 +2815,7 @@ export type PostApiUpdateCheckResponse = PostApiUpdateCheckResponses[keyof PostA
 
 export type PutApiUpdateModeData = {
     body: {
+        channel?: 'stable' | 'nightly';
         mode?: 'auto' | 'manual' | 'paused';
         window?: UpdateWindow;
     };

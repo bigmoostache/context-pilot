@@ -39,7 +39,7 @@ fn temp_dir(label: &str) -> std::path::PathBuf {
 #[test]
 fn updater_verify() {
     // Valid manifest, older box → Available(v9.9.9).
-    match evaluate_manifest(VALID_JSON, VALID_SIG, "v0.3.0", NOW) {
+    match evaluate_manifest(VALID_JSON, VALID_SIG, "v0.3.0", NOW, "stable", false) {
         Ok(UpdateEvaluation::Available(m)) => assert_eq!(m.version, "v9.9.9"),
         other => panic!("valid manifest must be Available: {other:?}"),
     }
@@ -49,33 +49,45 @@ fn updater_verify() {
     let pos = tampered.iter().position(|&b| b == b'9').expect("a '9' in the fixture");
     tampered[pos] = b'8';
     assert!(
-        matches!(evaluate_manifest(&tampered, VALID_SIG, "v0.3.0", NOW), Err(super::VerifyError::Signature(_))),
+        matches!(
+            evaluate_manifest(&tampered, VALID_SIG, "v0.3.0", NOW, "stable", false),
+            Err(super::VerifyError::Signature(_))
+        ),
         "tampered manifest bytes must fail the signature check"
     );
 
     // A corrupted signature blob → signature failure.
     let bad_sig = VALID_SIG.replace('A', "B");
     assert!(
-        matches!(evaluate_manifest(VALID_JSON, &bad_sig, "v0.3.0", NOW), Err(super::VerifyError::Signature(_))),
+        matches!(
+            evaluate_manifest(VALID_JSON, &bad_sig, "v0.3.0", NOW, "stable", false),
+            Err(super::VerifyError::Signature(_))
+        ),
         "tampered signature must fail"
     );
 
     // Correctly signed but expired → freshness rejection (stale replay).
     assert!(
-        matches!(evaluate_manifest(EXPIRED_JSON, EXPIRED_SIG, "v0.3.0", NOW), Err(super::VerifyError::Expired { .. })),
+        matches!(
+            evaluate_manifest(EXPIRED_JSON, EXPIRED_SIG, "v0.3.0", NOW, "stable", false),
+            Err(super::VerifyError::Expired { .. })
+        ),
         "expired manifest must be rejected"
     );
 
     // Anti-rollback: offered (v9.9.9) below the running version.
     assert!(
-        matches!(evaluate_manifest(VALID_JSON, VALID_SIG, "v10.0.0", NOW), Err(super::VerifyError::Rollback { .. })),
+        matches!(
+            evaluate_manifest(VALID_JSON, VALID_SIG, "v10.0.0", NOW, "stable", false),
+            Err(super::VerifyError::Rollback { .. })
+        ),
         "manifest older than the running version must be rejected"
     );
 
     // min_from floor: a box on v0.1.0 may not jump (min_from is v0.2.0).
     assert!(
         matches!(
-            evaluate_manifest(VALID_JSON, VALID_SIG, "v0.1.0", NOW),
+            evaluate_manifest(VALID_JSON, VALID_SIG, "v0.1.0", NOW, "stable", false),
             Err(super::VerifyError::TooOldForJump { .. })
         ),
         "a box below min_from must be refused"
@@ -83,8 +95,93 @@ fn updater_verify() {
 
     // Same version → UpToDate (not an error, not an update).
     assert!(
-        matches!(evaluate_manifest(VALID_JSON, VALID_SIG, "v9.9.9", NOW), Ok(UpdateEvaluation::UpToDate)),
+        matches!(
+            evaluate_manifest(VALID_JSON, VALID_SIG, "v9.9.9", NOW, "stable", false),
+            Ok(UpdateEvaluation::UpToDate)
+        ),
         "equal version is up to date"
+    );
+}
+
+/// Bare manifest for the pure-decision tests — [`evaluate_parsed`] ignores
+/// artifacts, so only channel/version/expires/min_from need to be real.
+fn decision_manifest(channel: &str, version: &str, expires_at: &str, min_from: &str) -> super::super::Manifest {
+    super::super::Manifest {
+        schema: 1,
+        channel: channel.to_owned(),
+        version: version.to_owned(),
+        released_at: "2026-07-10T12:00:00Z".to_owned(),
+        expires_at: expires_at.to_owned(),
+        min_from: min_from.to_owned(),
+        notes_url: String::new(),
+        artifacts: std::collections::BTreeMap::new(),
+    }
+}
+
+/// The channel-aware "is-newer" matrix (nightly head-tracking, the
+/// channel-equality guard, and forced adoption on a switch), exercised on
+/// already-parsed manifests — the fixtures are signed with the real release key
+/// so a nightly one cannot be minted, and this logic sits after the signature.
+#[test]
+fn updater_channel_decisions() {
+    use super::VerifyError;
+    use super::verify::evaluate_parsed;
+
+    /// Fresh well past `NOW` (2027-01-15).
+    const FRESH: &str = "2126-01-01T00:00:00Z";
+
+    // Nightly head-tracking: a different sha at the same (M,m,p) is an update…
+    let m = decision_manifest("nightly", "v0.1.0-def5678", FRESH, "v0.1.0");
+    assert!(
+        matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Ok(UpdateEvaluation::Available(_))),
+        "a new nightly sha at the same semver must be Available"
+    );
+    // …and the identical version is UpToDate (no perpetual re-apply).
+    let m = decision_manifest("nightly", "v0.1.0-abc1234", FRESH, "v0.1.0");
+    assert!(
+        matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Ok(UpdateEvaluation::UpToDate)),
+        "the same nightly build is up to date"
+    );
+
+    // Nightly ignores the min_from floor (head-tracking drops anti-rollback).
+    let m = decision_manifest("nightly", "v0.1.0-def5678", FRESH, "v9.9.9");
+    assert!(
+        matches!(evaluate_parsed(m, "v0.0.1-old", NOW, "nightly", false), Ok(UpdateEvaluation::Available(_))),
+        "nightly skips the min_from floor"
+    );
+
+    // Freshness still bites on nightly: an expired manifest is a stale replay.
+    let m = decision_manifest("nightly", "v0.1.0-def5678", "2020-01-01T00:00:00Z", "v0.1.0");
+    assert!(
+        matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Err(VerifyError::Expired { .. })),
+        "an expired nightly manifest is refused"
+    );
+
+    // Channel-equality guard: a signed *stable* manifest served where nightly
+    // is expected is refused — the only guard left on the head-tracking path.
+    let m = decision_manifest("stable", "v0.2.12", FRESH, "v0.1.0");
+    assert!(
+        matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Err(VerifyError::ChannelMismatch { .. })),
+        "a cross-channel manifest must be refused"
+    );
+
+    // Forced adoption on an explicit switch: crossgrade bypasses the semver
+    // anti-rollback that would otherwise reject a lower stable version.
+    let m = decision_manifest("stable", "v0.1.0", FRESH, "v0.1.0");
+    assert!(
+        matches!(evaluate_parsed(m, "v0.2.0", NOW, "stable", false), Err(VerifyError::Rollback { .. })),
+        "without a switch a lower version is a rollback"
+    );
+    let m = decision_manifest("stable", "v0.1.0", FRESH, "v0.1.0");
+    assert!(
+        matches!(evaluate_parsed(m, "v0.2.0", NOW, "stable", true), Ok(UpdateEvaluation::Available(_))),
+        "an explicit switch adopts the target head regardless of version order"
+    );
+    // A crossgrade to the identical version is still a no-op.
+    let m = decision_manifest("stable", "v0.2.0", FRESH, "v0.1.0");
+    assert!(
+        matches!(evaluate_parsed(m, "v0.2.0", NOW, "stable", true), Ok(UpdateEvaluation::UpToDate)),
+        "crossgrade to the same version is up to date"
     );
 }
 
@@ -102,7 +199,7 @@ fn updater_no_download_on_failed_check() {
         (VALID_JSON, VALID_SIG, "v0.1.0"),          // below min_from
     ] {
         let mut downloaded = false;
-        let outcome = check_and_prepare(bytes, sig, current, NOW, |_m| {
+        let outcome = check_and_prepare(bytes, sig, current, NOW, "stable", false, |_m| {
             downloaded = true;
             Ok(())
         });
@@ -112,7 +209,7 @@ fn updater_no_download_on_failed_check() {
 
     // Up to date: no error, no download.
     let mut downloaded = false;
-    let outcome = check_and_prepare(VALID_JSON, VALID_SIG, "v9.9.9", NOW, |_m| {
+    let outcome = check_and_prepare(VALID_JSON, VALID_SIG, "v9.9.9", NOW, "stable", false, |_m| {
         downloaded = true;
         Ok(())
     });
@@ -121,7 +218,7 @@ fn updater_no_download_on_failed_check() {
 
     // Available: download runs, manifest is returned.
     let mut downloaded = false;
-    let outcome = check_and_prepare(VALID_JSON, VALID_SIG, "v0.3.0", NOW, |m| {
+    let outcome = check_and_prepare(VALID_JSON, VALID_SIG, "v0.3.0", NOW, "stable", false, |m| {
         assert_eq!(m.version, "v9.9.9");
         downloaded = true;
         Ok(())

@@ -118,9 +118,15 @@ pub(crate) struct ReleaseConfig {
     /// Auto-update posture (default `auto` — update-policy v3 decision 3).
     #[serde(default)]
     pub(crate) update_mode: UpdateMode,
-    /// Channel this box follows (only `stable` is published today).
+    /// Channel this box follows (`stable` or `nightly`).
     #[serde(default = "default_channel")]
     pub(crate) channel: String,
+    /// Set the moment an admin switches `channel`; makes the next check adopt
+    /// the new channel's head regardless of version ordering (a `stable`
+    /// `v0.2.x` box moving to a `nightly` `v0.1.0-<sha>` would otherwise read as
+    /// a downgrade). Cleared once a check on the new channel resolves.
+    #[serde(default)]
+    pub(crate) pending_channel_switch: bool,
     /// Hours between channel polls (a boot poll always happens too).
     #[serde(default = "default_poll_interval_hours")]
     pub(crate) poll_interval_hours: u32,
@@ -137,6 +143,7 @@ impl Default for ReleaseConfig {
             active_tag: None,
             update_mode: UpdateMode::default(),
             channel: default_channel(),
+            pending_channel_switch: false,
             poll_interval_hours: default_poll_interval_hours(),
             window: MaintenanceWindow::default(),
         }

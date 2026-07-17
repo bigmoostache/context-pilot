@@ -196,10 +196,50 @@ impl ReleaseStore {
         self.persist();
     }
 
-    /// The channel this box follows (`stable` today).
+    /// The channel this box follows (`stable` or `nightly`).
     #[must_use]
     pub fn channel(&self) -> &str {
         &self.config.channel
+    }
+
+    /// Whether an admin channel switch is awaiting its first check — the next
+    /// evaluation adopts the new channel's head regardless of version ordering.
+    #[must_use]
+    pub fn pending_channel_switch(&self) -> bool {
+        self.config.pending_channel_switch
+    }
+
+    /// Switch the channel this box follows and persist. Arms the crossgrade
+    /// flag and drops the now-stale "update available" hint (it pertained to
+    /// the old channel) so the pane doesn't offer a foreign version until the
+    /// next check on the new channel resolves.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `channel` is not one of `stable` / `nightly`.
+    pub fn set_channel(&mut self, channel: &str) -> Result<(), String> {
+        if !matches!(channel, "stable" | "nightly") {
+            return Err(format!("unknown channel {channel:?} (expected stable or nightly)"));
+        }
+        if self.config.channel == channel {
+            return Ok(());
+        }
+        self.config.channel = channel.to_owned();
+        self.config.pending_channel_switch = true;
+        self.persist();
+        let mut st = updater::UpdateState::load(&self.dir);
+        st.available = None;
+        st.available_notes_url = None;
+        st.save(&self.dir);
+        Ok(())
+    }
+
+    /// Clear the crossgrade flag once a check on the new channel has resolved.
+    pub fn clear_pending_switch(&mut self) {
+        if self.config.pending_channel_switch {
+            self.config.pending_channel_switch = false;
+            self.persist();
+        }
     }
 
     /// Hours between channel polls.

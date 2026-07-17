@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use crate::services::ReleaseStore;
 use crate::services::releases::updater::{
-    UpdateEvaluation, check_stable, download_artifact, restart_self, scheduler, stage_apply,
+    UpdateEvaluation, check_channel, download_artifact, restart_self, scheduler, stage_apply,
 };
 use crate::transport::Backend;
 // The process-wide apply gate is shared with `POST /api/update/apply` so the
@@ -51,6 +51,8 @@ fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> 
     let interval_hours = b.releases.poll_interval_hours().max(1);
     let arch = b.releases.arch().to_owned();
     let releases_dir = b.releases.dir().to_path_buf();
+    let channel = b.releases.channel().to_owned();
+    let crossgrade = b.releases.pending_channel_switch();
     let current = scheduler::current_version(&b.releases);
     drop(b);
 
@@ -61,7 +63,15 @@ fn tick(backend: &Arc<Mutex<Backend>>, auth_db: &PathBuf, install: &PathBuf) -> 
         now_minutes,
         &APPLY_IN_FLIGHT,
         || {
-            check_stable(&releases_dir, &current).map(|eval| match eval {
+            let result = check_channel(&releases_dir, &channel, &current, crossgrade);
+            // A verified answer on the new channel retires the crossgrade window
+            // (mirrors the REST check handler).
+            if result.is_ok() {
+                if let Ok(mut b) = backend.lock() {
+                    b.releases.clear_pending_switch();
+                }
+            }
+            result.map(|eval| match eval {
                 UpdateEvaluation::Available(manifest) => Some(manifest),
                 UpdateEvaluation::UpToDate => None,
             })
