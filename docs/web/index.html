@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Context Pilot — an agent for every project you're juggling</title>
+  <meta name="description" content="Context Pilot is a team of AI agents you can leave in charge — one per project, each staying sharp for hours while you work elsewhere. Runs on your own machines.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ── Topbar ─────────────────────────────────────────────── -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="../index.html" class="brand">
+        <span class="brand-glyph" aria-hidden="true">▮</span>
+        context&#8288;-&#8288;pilot
+      </a>
+      <nav class="topnav" aria-label="Primary">
+        <a href="#work">How it works</a>
+        <a href="#context">Staying sharp</a>
+        <a href="#box">The box</a>
+        <a href="../trust-center/">Trust</a>
+        <a href="#contact">Contact</a>
+      </nav>
+      <div class="topnav-cta">
+        <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener" class="ghost-link">GitHub&nbsp;↗</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ── Hero: the companion ──────────────────────────────── -->
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow">YOUR REMOTE-WORK COMPANION</div>
+        <h1 class="hero-title">One agent per&nbsp;project.<br><span class="accent">All of them working while you're&nbsp;away.</span></h1>
+        <p class="hero-sub">
+          Context Pilot is a team of AI agents you can leave in charge — research,
+          writing, data, ops, whatever the project needs. Post one to each of yours,
+          then step away: they keep working, checking their own results, and making
+          progress. Check in from your terminal or your browser, whenever you like.
+        </p>
+        <div class="hero-actions">
+          <a href="#contact" class="btn btn-primary">Request access <span aria-hidden="true">→</span></a>
+          <a href="#work" class="btn btn-ghost">See how it works</a>
+        </div>
+        <div class="hero-meta">
+          <span><span class="dot dot-live" aria-hidden="true"></span> one agent per project</span>
+          <span><span class="dot" aria-hidden="true"></span> keeps going while you're away</span>
+          <span><span class="dot" aria-hidden="true"></span> terminal or browser</span>
+        </div>
+      </div>
+
+      <!-- Signature: a focused agent inside a live team of projects -->
+      <div class="cockpit" aria-hidden="true">
+        <div class="fleet" id="fleet"><!-- tiles injected by app.js --></div>
+
+        <div class="term" role="img" aria-label="A Context Pilot agent working on a project">
+          <div class="term-bar">
+            <span class="term-dots"><i></i><i></i><i></i></span>
+            <span class="term-title">~/support-triage</span>
+            <span class="term-status"><span class="dot dot-live"></span> working</span>
+          </div>
+          <div class="term-body" id="term-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── How it works: the workflow ───────────────────────── -->
+    <section class="band" id="work">
+      <div class="band-head">
+        <div class="eyebrow">A COWORKER, NOT A CHATBOT</div>
+        <h2>Delegate a project. Walk away. Come back to progress.</h2>
+        <p>Working with Context Pilot feels less like prompting a tool and more like handing work to a teammate who keeps going after you log off.</p>
+      </div>
+
+      <ol class="steps">
+        <li class="step">
+          <div class="step-num">01</div>
+          <h3>Post an agent to a project</h3>
+          <p>Point an agent at a project folder and hand it the work — research to gather, a document to draft, a backlog to clear. It sets up its own workspace and gets going, no babysitting required.</p>
+        </li>
+        <li class="step">
+          <div class="step-num">02</div>
+          <h3>Step away</h3>
+          <p>Head into a meeting, or start another project of your own. Your agents keep working and checking their own results, pausing only when they genuinely need a decision from you.</p>
+        </li>
+        <li class="step">
+          <div class="step-num">03</div>
+          <h3>Check in from anywhere</h3>
+          <p>Glance at the whole team from the browser cockpit, or drop into any single agent from your terminal. Review, nudge, redirect — then leave them to it again.</p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ── Context: the differentiator ──────────────────────── -->
+    <section class="band band-alt" id="context">
+      <div class="band-head">
+        <div class="eyebrow">WHY THEY DON'T LOSE THE THREAD</div>
+        <h2>Most assistants forget where they started. These stay sharp.</h2>
+        <p>Give a typical AI assistant a long task and it slowly drowns — every message piles onto the last until its head is too full to think clearly, and the answers drift. Context Pilot's agents work differently.</p>
+      </div>
+
+      <div class="ctx">
+        <div class="ctx-compare">
+          <div class="ctx-card ctx-bad">
+            <div class="ctx-card-head">
+              <span class="ctx-label">Most agents</span>
+              <span class="ctx-tag ctx-tag-warn">context overflow</span>
+            </div>
+            <p class="ctx-card-sub">Everything they've ever seen, kept all at once.</p>
+            <div class="ctx-stack" id="ctx-bad"><!-- rows injected --></div>
+          </div>
+
+          <div class="ctx-card ctx-good">
+            <div class="ctx-card-head">
+              <span class="ctx-label">Context Pilot</span>
+              <span class="ctx-tag ctx-tag-ok">curated in real time</span>
+            </div>
+            <p class="ctx-card-sub">Only what matters to the task, right now.</p>
+            <div class="ctx-panels">
+              <div class="ctx-panel"><span class="ctx-dot"></span> The goal it was given</div>
+              <div class="ctx-panel"><span class="ctx-dot"></span> The file it's changing</div>
+              <div class="ctx-panel"><span class="ctx-dot"></span> What it just learned</div>
+              <div class="ctx-panel ctx-panel-muted">everything else — set aside, recalled on demand</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ctx-note">
+          <p>
+            Context Pilot's agents are ruthless about what they keep in view,
+            curating their own attention moment to moment. The important things
+            stay in focus — which is why they hold the thread hours into a project,
+            not just for the first few minutes.
+          </p>
+          <blockquote class="ctx-quote">Every token is gold.</blockquote>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Proof band ───────────────────────────────────────── -->
+    <section class="proof">
+      <div class="proof-inner">
+        <div class="eyebrow">PROOF IT HOLDS UP</div>
+        <p class="proof-line">
+          Context Pilot has put in <span class="accent">months</span> of
+          sustained, self-directed work — enough to build most of itself.
+          It holds the thread on long, real projects, not just quick asks.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── Private strip ────────────────────────────────────── -->
+    <section class="band sovereign">
+      <div class="sovereign-inner">
+        <div class="eyebrow">YOURS, AND ONLY YOURS</div>
+        <h2>Your coworkers answer to you alone.</h2>
+        <p>
+          Every agent runs on your own machines and keeps its work in your own
+          folders. Nothing is sent anywhere except the requests you choose to make.
+          No account to hand your work to, no telemetry, no middleman.
+        </p>
+        <a href="../trust-center/" class="btn btn-ghost">See the Trust Center <span aria-hidden="true">→</span></a>
+      </div>
+    </section>
+
+    <!-- ── Photonicat: the appliance ────────────────────────── -->
+    <section class="band" id="box">
+      <div class="appliance">
+        <div class="appliance-copy">
+          <div class="eyebrow">PLUG-IN APPLIANCE</div>
+          <h2>Or run the whole team from a little box.</h2>
+          <p>
+            Context Pilot runs on the <strong>Photonicat</strong> — a pocket-sized
+            5G Wi-Fi router. Plug it in, join its network, and your agents are
+            working on a private LAN in minutes. No server to rack, no cloud to
+            trust, nothing to configure.
+          </p>
+          <p>
+            Its own 5G uplink means it works anywhere there's signal — a new
+            office, a client site, a kitchen table. Drop one on a home or company
+            network and the whole team shares it.
+          </p>
+          <div class="appliance-flow">
+            <span>Plug in</span><span class="sep" aria-hidden="true">→</span>
+            <span>Join the Wi-Fi</span><span class="sep" aria-hidden="true">→</span>
+            <span>Delegate</span>
+          </div>
+        </div>
+
+        <div class="device" aria-hidden="true">
+          <div class="device-head">
+            <span class="device-name">Photonicat</span>
+            <span class="device-edition">Context Pilot Edition</span>
+          </div>
+          <div class="device-signal">
+            <span class="wave"></span><span class="wave"></span><span class="wave"></span>
+            <span class="device-net">5G · private LAN</span>
+          </div>
+          <ul class="device-specs">
+            <li><span class="dot dot-live"></span> 5G uplink — online anywhere</li>
+            <li><span class="dot dot-live"></span> Wi-Fi access point for the team</li>
+            <li><span class="dot dot-live"></span> Your agents, running on-box</li>
+            <li><span class="dot dot-live"></span> Nothing leaves the network</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Contact ──────────────────────────────────────────── -->
+    <section class="band band-alt" id="contact">
+      <div class="contact">
+        <div class="contact-copy">
+          <div class="eyebrow">GET STARTED</div>
+          <h2>Put a team of agents on your projects.</h2>
+          <p>
+            Trying it on a side project, rolling it out to your team, or curious
+            how it would fit your workflow? Tell us what you're building and we'll
+            get back to you.
+          </p>
+          <ul class="contact-points">
+            <li><span class="dot dot-live"></span> Set up your first agents</li>
+            <li><span class="dot"></span> Run a whole team, privately</li>
+            <li><span class="dot"></span> Questions &amp; contributing</li>
+          </ul>
+        </div>
+
+        <form class="contact-form" id="contact-form" novalidate>
+          <div class="form-row">
+            <label class="field">
+              <span class="field-label">Name</span>
+              <input type="text" name="name" autocomplete="name" required placeholder="Ada Lovelace">
+            </label>
+            <label class="field">
+              <span class="field-label">Email</span>
+              <input type="email" name="email" autocomplete="email" required placeholder="ada@yourteam.dev">
+            </label>
+          </div>
+          <label class="field">
+            <span class="field-label">Organization <span class="opt">optional</span></span>
+            <input type="text" name="org" autocomplete="organization" placeholder="Analytical Engines Ltd.">
+          </label>
+          <label class="field">
+            <span class="field-label">What brings you here?</span>
+            <div class="select-wrap">
+              <select name="interest">
+                <option value="side-project">Trying it on a side project</option>
+                <option value="team">Rolling it out to a team</option>
+                <option value="contributing">Contributing to the project</option>
+                <option value="other">Something else</option>
+              </select>
+            </div>
+          </label>
+          <label class="field">
+            <span class="field-label">Message</span>
+            <textarea name="message" rows="4" required placeholder="I'd love an agent keeping my side projects moving while I'm at work…"></textarea>
+          </label>
+
+          <button type="submit" class="btn btn-primary btn-block">Send message</button>
+
+          <div class="form-result" id="form-result" hidden aria-live="polite"></div>
+          <p class="form-note">Design mockup — submissions aren't wired to a backend yet.</p>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── Footer ─────────────────────────────────────────────── -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span class="footer-brand"><span class="brand-glyph" aria-hidden="true">▮</span> context-pilot</span>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">GitHub</a>
+        <a href="../trust-center/">Trust Center</a>
+        <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank" rel="noopener">MIT License</a>
+      </nav>
+    </div>
+    <p class="footer-fine">Runs on your machines · answers to you · fully auditable</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
