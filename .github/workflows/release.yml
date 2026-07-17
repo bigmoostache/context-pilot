@@ -219,6 +219,10 @@ jobs:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
+    # Expose the computed tag so the manifest job pins the exact same release
+    # (no re-derivation, no drift between the release and its manifest).
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
 
@@ -259,29 +263,33 @@ jobs:
           make_latest: true
 
   # ── Signed update manifest (update-policy §5.3–§5.5) ────────────────────
-  # Only a REAL `v*` tag push promotes the fleet: it publishes `stable.json` +
-  # a detached minisign signature on the `channels` branch. Auto-releases from
-  # master pushes (v<version>-<sha>) build + release but never touch the
-  # channel — tagging IS the fleet release act (update-policy v3 decision 2).
+  # Two channels, one job, published to the orphan `channels` branch:
+  #   • a REAL `v*` tag push   → `stable.json`  (promotes the fleet; 90-day expiry)
+  #   • a push to `master`     → `nightly.json` (tip-of-master; 14-day expiry)
+  # Both sign a detached minisign signature. Tagging remains the *stable* fleet
+  # release act (update-policy v3 decision 2); nightly is the opt-in fast lane.
   #
   # The manifest pins all five published arches: the three Linux appliance
-  # targets (Photonicat fleet) plus both macOS targets, so a macOS dev box
-  # running the orchestrator can self-update too (arch match via KNOWN_ARCHS).
+  # targets (Photonicat fleet — pcat is `linux-aarch64-musl`) plus both macOS
+  # targets, so a macOS dev box running the orchestrator can self-update too
+  # (arch match via KNOWN_ARCHS). Each box picks its own artifact.
   manifest:
-    name: Publish signed stable manifest
+    name: Publish signed channel manifest
     needs: release
-    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     env:
-      TAG: ${{ github.ref_name }}
+      # Same tag the release job published — no re-derivation.
+      TAG: ${{ needs.release.outputs.tag }}
       REPO: ${{ github.repository }}
+      # tag push → stable channel / 90-day freshness; master push → nightly
+      # channel / 14-day freshness (republished on every master commit).
+      CHANNEL: ${{ github.ref_type == 'tag' && 'stable' || 'nightly' }}
+      EXPIRES_DAYS: ${{ github.ref_type == 'tag' && '90' || '14' }}
       # Oldest running version this release can be applied from (update-policy
       # §5.6 anti-rollback floor). Bump deliberately when a migration or
-      # protocol break makes direct jumps unsafe.
+      # protocol break makes direct jumps unsafe. Nightly ignores this floor on
+      # the box (head-tracking), but the field stays for schema completeness.
       MIN_FROM: "v0.1.0"
-      # Manifest freshness horizon (§5.6): a manifest older than this is
-      # treated as a stale replay by the box.
-      EXPIRES_DAYS: "90"
     steps:
       - uses: actions/checkout@v4
 
@@ -302,7 +310,7 @@ jobs:
           done
           sha256sum assets/*.tar.gz
 
-      - name: Generate stable.json
+      - name: Generate channel manifest
         run: |
           released_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           expires_at=$(date -u -d "+${EXPIRES_DAYS} days" +%Y-%m-%dT%H:%M:%SZ)
@@ -316,59 +324,76 @@ jobs:
               '. + {($a): {url: $u, sha256: $s, size: $z}}' <<<"$artifacts")
           done
           jq -n \
+            --arg channel "$CHANNEL" \
             --arg version "$TAG" \
             --arg released_at "$released_at" \
             --arg expires_at "$expires_at" \
             --arg min_from "$MIN_FROM" \
             --arg notes_url "https://github.com/${REPO}/releases/tag/${TAG}" \
             --argjson artifacts "$artifacts" \
-            '{schema: 1, channel: "stable", version: $version,
+            '{schema: 1, channel: $channel, version: $version,
               released_at: $released_at, expires_at: $expires_at,
               min_from: $min_from, notes_url: $notes_url,
-              artifacts: $artifacts}' > stable.json
-          cat stable.json
+              artifacts: $artifacts}' > "${CHANNEL}.json"
+          cat "${CHANNEL}.json"
 
-      # Gate the exact contract the box relies on before signing anything.
+      # Gate the exact contract the box relies on before signing anything — all
+      # five arches must be pinned (pcat's musl lane included).
       - name: Check manifest contract
         run: |
-          jq -e '.schema and .version and .artifacts["linux-aarch64"].sha256 and .artifacts["linux-aarch64-musl"].sha256 and .artifacts["linux-x86_64"].sha256 and .artifacts["macos-aarch64"].sha256 and .artifacts["macos-x86_64"].sha256' stable.json
-          test "$(jq -r .version stable.json)" = "$TAG"
+          jq -e '.schema and .version and (.channel == env.CHANNEL) and (.artifacts | keys | length == 5) and .artifacts["linux-aarch64"].sha256 and .artifacts["linux-aarch64-musl"].sha256 and .artifacts["linux-x86_64"].sha256 and .artifacts["macos-aarch64"].sha256 and .artifacts["macos-x86_64"].sha256' "${CHANNEL}.json"
+          test "$(jq -r .version "${CHANNEL}.json")" = "$TAG"
 
-      - name: Sign stable.json (minisign)
+      - name: Sign channel manifest (minisign)
         env:
           MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
         run: |
           umask 077
           printf '%s\n' "$MINISIGN_SECRET_KEY" > minisign.key
-          minisign -S -s minisign.key -m stable.json -x stable.json.minisig \
-            -t "channel=stable version=${TAG}"
+          minisign -S -s minisign.key -m "${CHANNEL}.json" -x "${CHANNEL}.json.minisig" \
+            -t "channel=${CHANNEL} version=${TAG}"
           rm -f minisign.key
           # Verify with the embedded public key — the signature must check out
           # against the exact trust anchor shipped in the orchestrator.
           pubkey=$(grep -o '"RW[A-Za-z0-9+/=]*"' \
             crates/cp-orchestrator/src/services/releases/signing.rs | tr -d '"')
-          minisign -Vm stable.json -x stable.json.minisig -P "$pubkey"
+          minisign -Vm "${CHANNEL}.json" -x "${CHANNEL}.json.minisig" -P "$pubkey"
 
-      # Idempotent, dedicated commit on the `channels` branch (created orphan
-      # on first publish). Re-running the job for the same content is a no-op.
+      # Idempotent, dedicated commit on the `channels` branch (created orphan on
+      # first publish). Only this channel's two files are staged, so stable and
+      # nightly coexist. A tag push and a master push have DIFFERENT concurrency
+      # groups (build-release-${{ github.ref }}) and can run at once, both
+      # branching from the same `origin/channels` tip — so re-fetch + re-apply on
+      # a rejected push instead of losing the update.
       - name: Push manifest to channels branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git ls-remote --exit-code origin channels >/dev/null 2>&1; then
-            git fetch origin channels
-            git worktree add channels-wt origin/channels
-            (cd channels-wt && git checkout -B channels)
-          else
-            git worktree add --detach channels-wt
-            (cd channels-wt && git checkout --orphan channels && git rm -rfq . || true)
-          fi
-          cp stable.json stable.json.minisig channels-wt/
-          cd channels-wt
-          git add stable.json stable.json.minisig
-          if git diff --cached --quiet; then
-            echo "channels already up to date — nothing to push"
-          else
-            git commit -m "channels: stable → ${TAG}"
-            git push origin channels
-          fi
+          cp "${CHANNEL}.json" "${CHANNEL}.json.minisig" /tmp/
+          for attempt in 1 2 3 4 5; do
+            rm -rf channels-wt
+            if git ls-remote --exit-code origin channels >/dev/null 2>&1; then
+              git fetch origin channels
+              git worktree add channels-wt origin/channels
+              (cd channels-wt && git checkout -B channels)
+            else
+              git worktree add --detach channels-wt
+              (cd channels-wt && git checkout --orphan channels && git rm -rfq . || true)
+            fi
+            cp "/tmp/${CHANNEL}.json" "/tmp/${CHANNEL}.json.minisig" channels-wt/
+            cd channels-wt
+            git add "${CHANNEL}.json" "${CHANNEL}.json.minisig"
+            if git diff --cached --quiet; then
+              echo "channels already up to date — nothing to push"
+              break
+            fi
+            git commit -m "channels: ${CHANNEL} → ${TAG}"
+            if git push origin channels; then
+              echo "pushed ${CHANNEL} manifest on attempt ${attempt}"
+              break
+            fi
+            echo "push rejected (concurrent update?) — retrying (${attempt}/5)"
+            cd ..
+            git worktree remove --force channels-wt
+            sleep $((RANDOM % 5 + 2))
+          done

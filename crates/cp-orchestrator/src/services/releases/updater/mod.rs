@@ -39,13 +39,14 @@ fn channel_url(file: &str) -> String {
     format!("https://raw.githubusercontent.com/{}/channels/{file}", super::GITHUB_REPO)
 }
 
-/// Fetch the `stable` channel's manifest bytes + detached signature.
+/// Fetch a channel's manifest bytes + detached signature (`{channel}.json` +
+/// `{channel}.json.minisig`).
 ///
 /// # Errors
 ///
 /// Returns an error on network failure or a non-success HTTP status. No
 /// verification happens here — callers hand the pair to [`evaluate_manifest`].
-pub fn fetch_stable_manifest() -> Result<(Vec<u8>, String), String> {
+pub fn fetch_channel_manifest(channel: &str) -> Result<(Vec<u8>, String), String> {
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
@@ -59,14 +60,16 @@ pub fn fetch_stable_manifest() -> Result<(Vec<u8>, String), String> {
         }
         resp.bytes().map(|b| b.to_vec()).map_err(|e| format!("read {url}: {e}"))
     };
-    let manifest = fetch("stable.json")?;
-    let sig_bytes = fetch("stable.json.minisig")?;
+    let manifest = fetch(&format!("{channel}.json"))?;
+    let sig_bytes = fetch(&format!("{channel}.json.minisig"))?;
     let sig = String::from_utf8(sig_bytes).map_err(|e| format!("signature is not UTF-8: {e}"))?;
     Ok((manifest, sig))
 }
 
-/// One full **check** (read-only): fetch the stable manifest, verify it, and
-/// record the outcome in `update-state.json` under `releases_dir`.
+/// One full **check** (read-only): fetch the configured channel's manifest,
+/// verify it, and record the outcome in `update-state.json` under
+/// `releases_dir`. `allow_crossgrade` is set right after an explicit channel
+/// switch so the box adopts the new channel's head regardless of version order.
 ///
 /// A failed signature / freshness / anti-rollback check returns `Err` and the
 /// last-known state is kept (`available` is cleared only on a *verified*
@@ -75,12 +78,18 @@ pub fn fetch_stable_manifest() -> Result<(Vec<u8>, String), String> {
 /// # Errors
 ///
 /// Returns an error string on fetch failure or any failed verification.
-pub fn check_stable(releases_dir: &Path, current: &str) -> Result<UpdateEvaluation, String> {
+pub fn check_channel(
+    releases_dir: &Path,
+    channel: &str,
+    current: &str,
+    allow_crossgrade: bool,
+) -> Result<UpdateEvaluation, String> {
     let mut st = UpdateState::load(releases_dir);
     st.last_check_ms = Some(state::now_ms());
 
-    let outcome = fetch_stable_manifest().and_then(|(bytes, sig)| {
-        evaluate_manifest(&bytes, &sig, current, state::now_epoch_secs()).map_err(|e| e.to_string())
+    let outcome = fetch_channel_manifest(channel).and_then(|(bytes, sig)| {
+        evaluate_manifest(&bytes, &sig, current, state::now_epoch_secs(), channel, allow_crossgrade)
+            .map_err(|e| e.to_string())
     });
     match &outcome {
         Ok(UpdateEvaluation::Available(manifest)) => {
@@ -114,12 +123,14 @@ pub fn check_and_prepare<D>(
     signature: &str,
     current: &str,
     now_epoch_secs: u64,
+    expected_channel: &str,
+    allow_crossgrade: bool,
     download: D,
 ) -> Result<Option<Manifest>, String>
 where
     D: FnOnce(&Manifest) -> Result<(), String>,
 {
-    match evaluate_manifest(manifest_bytes, signature, current, now_epoch_secs) {
+    match evaluate_manifest(manifest_bytes, signature, current, now_epoch_secs, expected_channel, allow_crossgrade) {
         Ok(UpdateEvaluation::Available(manifest)) => {
             download(&manifest)?;
             Ok(Some(manifest))

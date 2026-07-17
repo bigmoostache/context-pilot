@@ -25,6 +25,16 @@ pub enum VerifyError {
     Signature(String),
     /// The (signed) JSON does not parse into the frozen [`Manifest`] schema.
     Parse(String),
+    /// The manifest governs a different channel than the one the box follows —
+    /// a validly-signed manifest served (or replayed) at the wrong URL. This is
+    /// the sole guard on the head-tracking path, which drops the semver
+    /// anti-rollback that would otherwise catch a cross-channel manifest.
+    ChannelMismatch {
+        /// The channel this box configured (the `{channel}.json` it fetched).
+        expected: String,
+        /// The channel the signed manifest actually governs.
+        found: String,
+    },
     /// A timestamp field is malformed.
     Timestamp {
         /// Which manifest field failed to parse.
@@ -58,6 +68,9 @@ impl std::fmt::Display for VerifyError {
         match self {
             Self::Signature(e) => write!(f, "manifest signature verification failed: {e}"),
             Self::Parse(e) => write!(f, "manifest does not match the frozen schema: {e}"),
+            Self::ChannelMismatch { expected, found } => {
+                write!(f, "manifest governs channel {found} but this box follows {expected} — refused")
+            }
             Self::Timestamp { field, value } => write!(f, "manifest {field} is not a valid timestamp: {value}"),
             Self::Expired { expires_at } => write!(f, "manifest expired at {expires_at} (stale replay?)"),
             Self::Rollback { offered, current } => {
@@ -71,7 +84,10 @@ impl std::fmt::Display for VerifyError {
 }
 
 /// Verify a fetched manifest end-to-end and decide what it means for a box
-/// running version `current` at `now_epoch_secs` (UTC seconds).
+/// running version `current` at `now_epoch_secs` (UTC seconds), following
+/// `expected_channel`. `allow_crossgrade` is set for an explicit admin channel
+/// switch, where the box adopts the target channel's head regardless of version
+/// ordering (§ nightly channel decision).
 ///
 /// # Errors
 ///
@@ -82,6 +98,8 @@ pub fn evaluate_manifest(
     signature: &str,
     current: &str,
     now_epoch_secs: u64,
+    expected_channel: &str,
+    allow_crossgrade: bool,
 ) -> Result<UpdateEvaluation, VerifyError> {
     // 1. Signature over the exact bytes, against the embedded trust anchor.
     let key = minisign_verify::PublicKey::from_base64(UPDATE_PUBKEY)
@@ -93,11 +111,59 @@ pub fn evaluate_manifest(
     // 2. Only now is the content worth parsing.
     let manifest: Manifest = serde_json::from_slice(manifest_bytes).map_err(|e| VerifyError::Parse(e.to_string()))?;
 
-    // 3. Freshness (§5.6): refuse a signed-but-stale manifest.
+    // 3. Everything past the signature is a pure decision over the parsed
+    //    manifest — split out so the channel/anti-rollback matrix is unit
+    //    testable without a valid signature (fixtures are signed with the real
+    //    release key, so a new one cannot be minted in tests).
+    evaluate_parsed(manifest, current, now_epoch_secs, expected_channel, allow_crossgrade)
+}
+
+/// Decide what a **verified** (signature already checked) manifest means for a
+/// box on `current` following `expected_channel`. Order: channel match →
+/// freshness → "is-newer".
+///
+/// The "is-newer" rule is channel-dependent:
+/// * **Head-tracking** (`expected_channel == "nightly"`, or `allow_crossgrade`
+///   for an explicit switch): adopt any version that differs from `current`.
+///   `nightly` tags are `v<ver>-<sha>` whose `semver_sort_key` collapses to the
+///   same `(M,m,p)`, so monotonic comparison can never see a newer nightly; and
+///   an explicit switch may legitimately move the version in any direction.
+///   The [`ChannelMismatch`](VerifyError::ChannelMismatch) guard above is the
+///   only thing standing in for the dropped anti-rollback here.
+/// * **Monotonic** (`stable` steady state): the original semver + `min_from`
+///   anti-rollback (§5.6).
+///
+/// # Errors
+///
+/// The first failed check as a [`VerifyError`].
+pub(crate) fn evaluate_parsed(
+    manifest: Manifest,
+    current: &str,
+    now_epoch_secs: u64,
+    expected_channel: &str,
+    allow_crossgrade: bool,
+) -> Result<UpdateEvaluation, VerifyError> {
+    // 1. Channel match — a validly-signed manifest for another channel served
+    //    at this channel's URL is refused (the head-tracking path drops the
+    //    semver guard that would otherwise catch it).
+    if manifest.channel != expected_channel {
+        return Err(VerifyError::ChannelMismatch { expected: expected_channel.to_owned(), found: manifest.channel });
+    }
+
+    // 2. Freshness (§5.6): refuse a signed-but-stale manifest.
     let expires = iso8601_to_epoch(&manifest.expires_at)
         .ok_or_else(|| VerifyError::Timestamp { field: "expires_at", value: manifest.expires_at.clone() })?;
     if expires <= now_epoch_secs {
         return Err(VerifyError::Expired { expires_at: manifest.expires_at });
+    }
+
+    // 3. "Is-newer" — head-tracking for nightly / an explicit switch, else the
+    //    monotonic anti-rollback for stable steady state.
+    if allow_crossgrade || expected_channel == "nightly" {
+        if manifest.version == current {
+            return Ok(UpdateEvaluation::UpToDate);
+        }
+        return Ok(UpdateEvaluation::Available(manifest));
     }
 
     // 4. Anti-rollback (§5.6): monotonic version + min_from floor.
@@ -145,4 +211,92 @@ pub(crate) fn iso8601_to_epoch(s: &str) -> Option<u64> {
     let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
     let days = u64::try_from(era * 146_097 + doe - 719_468).ok()?;
     Some(days * 86_400 + hour * 3_600 + minute * 60 + second)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A fixed "now" (2027-01-15) and a `expires_at` well past it.
+    const NOW: u64 = 1_800_000_000;
+    const FRESH: &str = "2126-01-01T00:00:00Z";
+
+    /// Bare manifest for the pure-decision tests — `evaluate_parsed` ignores
+    /// artifacts, so only channel/version/expires/min_from need to be real. No
+    /// signature is involved, so this exercises the channel matrix without the
+    /// real release key the signed fixtures require.
+    fn manifest(channel: &str, version: &str, expires_at: &str, min_from: &str) -> Manifest {
+        Manifest {
+            schema: 1,
+            channel: channel.to_owned(),
+            version: version.to_owned(),
+            released_at: "2026-07-10T12:00:00Z".to_owned(),
+            expires_at: expires_at.to_owned(),
+            min_from: min_from.to_owned(),
+            notes_url: String::new(),
+            artifacts: std::collections::BTreeMap::new(),
+        }
+    }
+
+    /// The channel-aware "is-newer" matrix: nightly head-tracking, the
+    /// channel-equality guard, and forced adoption on an explicit switch.
+    #[test]
+    fn channel_decisions() {
+        // Nightly head-tracking: a different sha at the same (M,m,p) is an update…
+        let m = manifest("nightly", "v0.1.0-def5678", FRESH, "v0.1.0");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Ok(UpdateEvaluation::Available(_))),
+            "a new nightly sha at the same semver must be Available"
+        );
+        // …and the identical version is UpToDate (no perpetual re-apply).
+        let m = manifest("nightly", "v0.1.0-abc1234", FRESH, "v0.1.0");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Ok(UpdateEvaluation::UpToDate)),
+            "the same nightly build is up to date"
+        );
+
+        // Nightly ignores the min_from floor (head-tracking drops anti-rollback).
+        let m = manifest("nightly", "v0.1.0-def5678", FRESH, "v9.9.9");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.0.1-old", NOW, "nightly", false), Ok(UpdateEvaluation::Available(_))),
+            "nightly skips the min_from floor"
+        );
+
+        // Freshness still bites on nightly: an expired manifest is a stale replay.
+        let m = manifest("nightly", "v0.1.0-def5678", "2020-01-01T00:00:00Z", "v0.1.0");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Err(VerifyError::Expired { .. })),
+            "an expired nightly manifest is refused"
+        );
+
+        // Channel-equality guard: a signed *stable* manifest served where nightly
+        // is expected is refused — the only guard left on the head-tracking path.
+        let m = manifest("stable", "v0.2.12", FRESH, "v0.1.0");
+        assert!(
+            matches!(
+                evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false),
+                Err(VerifyError::ChannelMismatch { .. })
+            ),
+            "a cross-channel manifest must be refused"
+        );
+
+        // Forced adoption on an explicit switch: crossgrade bypasses the semver
+        // anti-rollback that would otherwise reject a lower stable version.
+        let m = manifest("stable", "v0.1.0", FRESH, "v0.1.0");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.2.0", NOW, "stable", false), Err(VerifyError::Rollback { .. })),
+            "without a switch a lower version is a rollback"
+        );
+        let m = manifest("stable", "v0.1.0", FRESH, "v0.1.0");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.2.0", NOW, "stable", true), Ok(UpdateEvaluation::Available(_))),
+            "an explicit switch adopts the target head regardless of version order"
+        );
+        // A crossgrade to the identical version is still a no-op.
+        let m = manifest("stable", "v0.2.0", FRESH, "v0.1.0");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.2.0", NOW, "stable", true), Ok(UpdateEvaluation::UpToDate)),
+            "crossgrade to the same version is up to date"
+        );
+    }
 }

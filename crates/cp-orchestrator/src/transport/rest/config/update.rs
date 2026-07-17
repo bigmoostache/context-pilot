@@ -23,7 +23,7 @@ use serde::Deserialize;
 use super::super::{Backend, HttpReply};
 use crate::services::ReleaseStore;
 use crate::services::releases::updater::{
-    UpdateEvaluation, UpdateState, check_stable, download_artifact, restart_self, scheduler, stage_apply,
+    UpdateEvaluation, UpdateState, check_channel, download_artifact, restart_self, scheduler, stage_apply,
 };
 use crate::services::releases::{MaintenanceWindow, UpdateMode};
 
@@ -65,19 +65,28 @@ pub(crate) fn update_status(state: &Mutex<Backend>) -> HttpReply {
 /// refreshed status. A failed check (network, signature…) is a `502` and the
 /// last-known state is kept.
 pub(crate) fn update_check(state: &Mutex<Backend>) -> HttpReply {
-    let (releases_dir, current) = {
+    let (releases_dir, channel, current, crossgrade) = {
         let Ok(b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
-        (b.releases.dir().to_path_buf(), scheduler::current_version(&b.releases))
+        (
+            b.releases.dir().to_path_buf(),
+            b.releases.channel().to_owned(),
+            scheduler::current_version(&b.releases),
+            b.releases.pending_channel_switch(),
+        )
     };
     // Network I/O with the lock released.
-    let outcome = check_stable(&releases_dir, &current);
-    let Ok(b) = state.lock() else {
+    let outcome = check_channel(&releases_dir, &channel, &current, crossgrade);
+    let Ok(mut b) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
     };
     match outcome {
-        Ok(_evaluation) => HttpReply::ok(&status_json(&b)),
+        // A verified answer on the new channel retires the crossgrade window.
+        Ok(_evaluation) => {
+            b.releases.clear_pending_switch();
+            HttpReply::ok(&status_json(&b))
+        }
         Err(e) => HttpReply::error(502, &format!("check failed: {e}")),
     }
 }
@@ -90,21 +99,35 @@ pub(crate) fn update_apply(state: &Mutex<Backend>) -> HttpReply {
     let Ok(install) = std::env::current_exe() else {
         return HttpReply::error(500, "cannot resolve the running binary path");
     };
-    let (releases_dir, arch, current) = {
+    let (releases_dir, arch, channel, current, crossgrade) = {
         let Ok(b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
-        (b.releases.dir().to_path_buf(), b.releases.arch().to_owned(), scheduler::current_version(&b.releases))
+        (
+            b.releases.dir().to_path_buf(),
+            b.releases.arch().to_owned(),
+            b.releases.channel().to_owned(),
+            scheduler::current_version(&b.releases),
+            b.releases.pending_channel_switch(),
+        )
     };
 
     // 1. Fresh verified check (network, no lock).
-    let manifest = match check_stable(&releases_dir, &current) {
+    let manifest = match check_channel(&releases_dir, &channel, &current, crossgrade) {
         Err(e) => return HttpReply::error(502, &format!("check failed: {e}")),
         Ok(UpdateEvaluation::UpToDate) => {
+            if let Ok(mut b) = state.lock() {
+                b.releases.clear_pending_switch();
+            }
             return HttpReply::ok(&serde_json::json!({ "status": "up_to_date", "current": current }));
         }
         Ok(UpdateEvaluation::Available(manifest)) => manifest,
     };
+    // The switch resolved to a concrete target; retire the crossgrade window
+    // now so a mid-apply failure doesn't re-trigger head-tracking next poll.
+    if let Ok(mut b) = state.lock() {
+        b.releases.clear_pending_switch();
+    }
 
     // 2. Serialise applies across REST + scheduler.
     if APPLY_IN_FLIGHT.swap(true, Ordering::SeqCst) {
@@ -135,29 +158,52 @@ pub(crate) fn update_apply(state: &Mutex<Backend>) -> HttpReply {
     HttpReply::ok(&serde_json::json!({ "status": "applying", "from": current, "to": manifest.version }))
 }
 
-/// `PUT /api/update/mode` — set the update mode and/or the maintenance
-/// window. Body: `{ "mode": "auto"|"manual"|"paused", "window": { "start":
-/// "HH:MM", "end": "HH:MM" } }` (each field optional, at least one required).
+/// `PUT /api/update/mode` — set the update mode, channel, and/or the
+/// maintenance window. Body: `{ "mode": "auto"|"manual"|"paused", "channel":
+/// "stable"|"nightly", "window": { "start": "HH:MM", "end": "HH:MM" } }` (each
+/// field optional, at least one required).
 pub(crate) fn update_set_mode(state: &Mutex<Backend>, body: &[u8]) -> HttpReply {
+    /// The publishable channels — an unknown value yields a free `400` (like
+    /// `UpdateMode`), so the store never sees an invalid channel string.
+    #[derive(Deserialize)]
+    #[serde(rename_all = "lowercase")]
+    enum Channel {
+        Stable,
+        Nightly,
+    }
+    impl Channel {
+        fn as_str(&self) -> &'static str {
+            match self {
+                Self::Stable => "stable",
+                Self::Nightly => "nightly",
+            }
+        }
+    }
     #[derive(Deserialize)]
     struct Req {
         mode: Option<UpdateMode>,
+        channel: Option<Channel>,
         window: Option<MaintenanceWindow>,
     }
     let Ok(req) = serde_json::from_slice::<Req>(body) else {
         return HttpReply::error(
             400,
-            "expected {\"mode\":\"auto|manual|paused\",\"window\":{\"start\":..,\"end\":..}}",
+            "expected {\"mode\":\"auto|manual|paused\",\"channel\":\"stable|nightly\",\"window\":{\"start\":..,\"end\":..}}",
         );
     };
-    if req.mode.is_none() && req.window.is_none() {
-        return HttpReply::error(400, "nothing to update: provide mode and/or window");
+    if req.mode.is_none() && req.channel.is_none() && req.window.is_none() {
+        return HttpReply::error(400, "nothing to update: provide mode, channel and/or window");
     }
     let Ok(mut b) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
     };
     if let Some(window) = req.window {
         if let Err(e) = b.releases.set_window(window) {
+            return HttpReply::error(400, &e);
+        }
+    }
+    if let Some(channel) = req.channel {
+        if let Err(e) = b.releases.set_channel(channel.as_str()) {
             return HttpReply::error(400, &e);
         }
     }
@@ -203,6 +249,30 @@ mod tests {
         let reloaded = ReleaseStore::load(dir.join("releases"));
         assert_eq!(reloaded.update_mode(), UpdateMode::Manual);
         assert_eq!(reloaded.window().start, "22:00");
+
+        drop(std::fs::remove_dir_all(&dir));
+    }
+
+    /// The channel field on `PUT /api/update/mode` switches the box channel
+    /// (reflected in the next status) and rejects unknown channels with `400`.
+    #[test]
+    fn update_routes_channel_switch() {
+        let (state, dir) = backend("channel");
+
+        assert!(update_status(&state).body.contains("\"channel\":\"stable\""), "default channel");
+
+        let set = update_set_mode(&state, br#"{"channel":"nightly"}"#);
+        assert_eq!(set.status, 200, "{}", set.body);
+        assert!(set.body.contains("\"channel\":\"nightly\""), "channel switched: {}", set.body);
+
+        // Persisted server-side.
+        let reloaded = ReleaseStore::load(dir.join("releases"));
+        assert_eq!(reloaded.channel(), "nightly");
+        assert!(reloaded.pending_channel_switch(), "switch armed the crossgrade flag");
+
+        // An unknown channel is refused and changes nothing.
+        assert_eq!(update_set_mode(&state, br#"{"channel":"beta"}"#).status, 400, "unknown channel refused");
+        assert!(update_status(&state).body.contains("\"channel\":\"nightly\""));
 
         drop(std::fs::remove_dir_all(&dir));
     }

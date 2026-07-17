@@ -626,7 +626,7 @@ export const postApiUpdateApply = <ThrowOnError extends boolean = false>(options
 export const postApiUpdateCheck = <ThrowOnError extends boolean = false>(options?: Options<PostApiUpdateCheckData, ThrowOnError>): RequestResult<PostApiUpdateCheckResponses, PostApiUpdateCheckErrors, ThrowOnError> => (options?.client ?? client).post<PostApiUpdateCheckResponses, PostApiUpdateCheckErrors, ThrowOnError>({ url: '/api/update/check', ...options });
 
 /**
- * Set update mode and/or maintenance window
+ * Set update mode, channel, and/or maintenance window
  */
 export const putApiUpdateMode = <ThrowOnError extends boolean = false>(options: Options<PutApiUpdateModeData, ThrowOnError>): RequestResult<PutApiUpdateModeResponses, PutApiUpdateModeErrors, ThrowOnError> => (options.client ?? client).put<PutApiUpdateModeResponses, PutApiUpdateModeErrors, ThrowOnError>({
     url: '/api/update/mode',
