@@ -212,3 +212,91 @@ pub(crate) fn iso8601_to_epoch(s: &str) -> Option<u64> {
     let days = u64::try_from(era * 146_097 + doe - 719_468).ok()?;
     Some(days * 86_400 + hour * 3_600 + minute * 60 + second)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A fixed "now" (2027-01-15) and a `expires_at` well past it.
+    const NOW: u64 = 1_800_000_000;
+    const FRESH: &str = "2126-01-01T00:00:00Z";
+
+    /// Bare manifest for the pure-decision tests — `evaluate_parsed` ignores
+    /// artifacts, so only channel/version/expires/min_from need to be real. No
+    /// signature is involved, so this exercises the channel matrix without the
+    /// real release key the signed fixtures require.
+    fn manifest(channel: &str, version: &str, expires_at: &str, min_from: &str) -> Manifest {
+        Manifest {
+            schema: 1,
+            channel: channel.to_owned(),
+            version: version.to_owned(),
+            released_at: "2026-07-10T12:00:00Z".to_owned(),
+            expires_at: expires_at.to_owned(),
+            min_from: min_from.to_owned(),
+            notes_url: String::new(),
+            artifacts: std::collections::BTreeMap::new(),
+        }
+    }
+
+    /// The channel-aware "is-newer" matrix: nightly head-tracking, the
+    /// channel-equality guard, and forced adoption on an explicit switch.
+    #[test]
+    fn channel_decisions() {
+        // Nightly head-tracking: a different sha at the same (M,m,p) is an update…
+        let m = manifest("nightly", "v0.1.0-def5678", FRESH, "v0.1.0");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Ok(UpdateEvaluation::Available(_))),
+            "a new nightly sha at the same semver must be Available"
+        );
+        // …and the identical version is UpToDate (no perpetual re-apply).
+        let m = manifest("nightly", "v0.1.0-abc1234", FRESH, "v0.1.0");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Ok(UpdateEvaluation::UpToDate)),
+            "the same nightly build is up to date"
+        );
+
+        // Nightly ignores the min_from floor (head-tracking drops anti-rollback).
+        let m = manifest("nightly", "v0.1.0-def5678", FRESH, "v9.9.9");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.0.1-old", NOW, "nightly", false), Ok(UpdateEvaluation::Available(_))),
+            "nightly skips the min_from floor"
+        );
+
+        // Freshness still bites on nightly: an expired manifest is a stale replay.
+        let m = manifest("nightly", "v0.1.0-def5678", "2020-01-01T00:00:00Z", "v0.1.0");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Err(VerifyError::Expired { .. })),
+            "an expired nightly manifest is refused"
+        );
+
+        // Channel-equality guard: a signed *stable* manifest served where nightly
+        // is expected is refused — the only guard left on the head-tracking path.
+        let m = manifest("stable", "v0.2.12", FRESH, "v0.1.0");
+        assert!(
+            matches!(
+                evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false),
+                Err(VerifyError::ChannelMismatch { .. })
+            ),
+            "a cross-channel manifest must be refused"
+        );
+
+        // Forced adoption on an explicit switch: crossgrade bypasses the semver
+        // anti-rollback that would otherwise reject a lower stable version.
+        let m = manifest("stable", "v0.1.0", FRESH, "v0.1.0");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.2.0", NOW, "stable", false), Err(VerifyError::Rollback { .. })),
+            "without a switch a lower version is a rollback"
+        );
+        let m = manifest("stable", "v0.1.0", FRESH, "v0.1.0");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.2.0", NOW, "stable", true), Ok(UpdateEvaluation::Available(_))),
+            "an explicit switch adopts the target head regardless of version order"
+        );
+        // A crossgrade to the identical version is still a no-op.
+        let m = manifest("stable", "v0.2.0", FRESH, "v0.1.0");
+        assert!(
+            matches!(evaluate_parsed(m, "v0.2.0", NOW, "stable", true), Ok(UpdateEvaluation::UpToDate)),
+            "crossgrade to the same version is up to date"
+        );
+    }
+}

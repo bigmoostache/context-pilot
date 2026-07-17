@@ -103,87 +103,9 @@ fn updater_verify() {
     );
 }
 
-/// Bare manifest for the pure-decision tests — [`evaluate_parsed`] ignores
-/// artifacts, so only channel/version/expires/min_from need to be real.
-fn decision_manifest(channel: &str, version: &str, expires_at: &str, min_from: &str) -> super::super::Manifest {
-    super::super::Manifest {
-        schema: 1,
-        channel: channel.to_owned(),
-        version: version.to_owned(),
-        released_at: "2026-07-10T12:00:00Z".to_owned(),
-        expires_at: expires_at.to_owned(),
-        min_from: min_from.to_owned(),
-        notes_url: String::new(),
-        artifacts: std::collections::BTreeMap::new(),
-    }
-}
-
-/// The channel-aware "is-newer" matrix (nightly head-tracking, the
-/// channel-equality guard, and forced adoption on a switch), exercised on
-/// already-parsed manifests — the fixtures are signed with the real release key
-/// so a nightly one cannot be minted, and this logic sits after the signature.
-#[test]
-fn updater_channel_decisions() {
-    use super::VerifyError;
-    use super::verify::evaluate_parsed;
-
-    /// Fresh well past `NOW` (2027-01-15).
-    const FRESH: &str = "2126-01-01T00:00:00Z";
-
-    // Nightly head-tracking: a different sha at the same (M,m,p) is an update…
-    let m = decision_manifest("nightly", "v0.1.0-def5678", FRESH, "v0.1.0");
-    assert!(
-        matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Ok(UpdateEvaluation::Available(_))),
-        "a new nightly sha at the same semver must be Available"
-    );
-    // …and the identical version is UpToDate (no perpetual re-apply).
-    let m = decision_manifest("nightly", "v0.1.0-abc1234", FRESH, "v0.1.0");
-    assert!(
-        matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Ok(UpdateEvaluation::UpToDate)),
-        "the same nightly build is up to date"
-    );
-
-    // Nightly ignores the min_from floor (head-tracking drops anti-rollback).
-    let m = decision_manifest("nightly", "v0.1.0-def5678", FRESH, "v9.9.9");
-    assert!(
-        matches!(evaluate_parsed(m, "v0.0.1-old", NOW, "nightly", false), Ok(UpdateEvaluation::Available(_))),
-        "nightly skips the min_from floor"
-    );
-
-    // Freshness still bites on nightly: an expired manifest is a stale replay.
-    let m = decision_manifest("nightly", "v0.1.0-def5678", "2020-01-01T00:00:00Z", "v0.1.0");
-    assert!(
-        matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Err(VerifyError::Expired { .. })),
-        "an expired nightly manifest is refused"
-    );
-
-    // Channel-equality guard: a signed *stable* manifest served where nightly
-    // is expected is refused — the only guard left on the head-tracking path.
-    let m = decision_manifest("stable", "v0.2.12", FRESH, "v0.1.0");
-    assert!(
-        matches!(evaluate_parsed(m, "v0.1.0-abc1234", NOW, "nightly", false), Err(VerifyError::ChannelMismatch { .. })),
-        "a cross-channel manifest must be refused"
-    );
-
-    // Forced adoption on an explicit switch: crossgrade bypasses the semver
-    // anti-rollback that would otherwise reject a lower stable version.
-    let m = decision_manifest("stable", "v0.1.0", FRESH, "v0.1.0");
-    assert!(
-        matches!(evaluate_parsed(m, "v0.2.0", NOW, "stable", false), Err(VerifyError::Rollback { .. })),
-        "without a switch a lower version is a rollback"
-    );
-    let m = decision_manifest("stable", "v0.1.0", FRESH, "v0.1.0");
-    assert!(
-        matches!(evaluate_parsed(m, "v0.2.0", NOW, "stable", true), Ok(UpdateEvaluation::Available(_))),
-        "an explicit switch adopts the target head regardless of version order"
-    );
-    // A crossgrade to the identical version is still a no-op.
-    let m = decision_manifest("stable", "v0.2.0", FRESH, "v0.1.0");
-    assert!(
-        matches!(evaluate_parsed(m, "v0.2.0", NOW, "stable", true), Ok(UpdateEvaluation::UpToDate)),
-        "crossgrade to the same version is up to date"
-    );
-}
+// The channel-aware "is-newer" matrix (nightly head-tracking, the channel
+// guard, forced adoption on a switch) is unit-tested next to `evaluate_parsed`
+// in `verify.rs` — it needs no signed fixture, so it lives with the code.
 
 /// V3.1b — the download hook is provably never invoked when any verification
 /// fails; it runs exactly once on a verified available update.
