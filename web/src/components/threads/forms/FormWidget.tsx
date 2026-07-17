@@ -15,7 +15,11 @@ import type { AnswerValue, FormAnswer, FormAnswerEntry, FormField, FormSpec } fr
 
 /** Reserved id for the always-appended optional free-text comment field. */
 const COMMENT_ID = "__comment"
-const COMMENT_FIELD: FormField = { id: COMMENT_ID, label: "Anything to add? (optional)", type: "text" }
+const COMMENT_FIELD: FormField = {
+  id: COMMENT_ID,
+  label: "Anything to add? (optional)",
+  type: "text",
+}
 
 /** Append the optional comment field to a spec (unless the form already carries
  *  one under the reserved id). Every rendered form ends with a free-text box so
@@ -102,13 +106,7 @@ function FieldRow({
         </span>
         <span className={highlight ? "text-(--warn)" : undefined}>{field.label}</span>
       </label>
-      <div
-        className={
-          highlight
-            ? "rounded-lg pl-[24px] ring-1 ring-(--warn)/50"
-            : "pl-[24px]"
-        }
-      >
+      <div className={highlight ? "rounded-lg pl-[24px] ring-1 ring-(--warn)/50" : "pl-[24px]"}>
         <FieldInput
           field={field}
           value={value}
@@ -141,7 +139,7 @@ function LockedForm({ spec, answer }: { spec: FormSpec; answer: FormAnswer }) {
   })
   return (
     <div className="rise card-shadow my-1.5 overflow-hidden rounded-xl border border-(--signal)/25 bg-linear-to-b from-(--signal)/8 to-(--signal)/2">
-      <div className="flex items-center gap-2 border-b border-(--signal)/15 px-3 py-2">
+      <div className="flex items-center gap-2 border-b border-signal/15 px-3 py-2">
         <span className="flex size-5 items-center justify-center rounded-full bg-(--signal) text-(--primary-foreground)">
           <Check className="size-3" strokeWidth={3} />
         </span>

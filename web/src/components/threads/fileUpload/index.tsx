@@ -163,7 +163,9 @@ function MissingChip({ file, onAccent }: { file: UploadedFile; onAccent: boolean
         />
       </span>
       <span className="flex min-w-0 flex-col">
-        <span className="truncate text-[12px] font-medium line-through opacity-90">{file.name}</span>
+        <span className="truncate text-[12px] font-medium line-through opacity-90">
+          {file.name}
+        </span>
         <span className="truncate text-[10px] opacity-75">moved or deleted — no longer here</span>
       </span>
     </span>

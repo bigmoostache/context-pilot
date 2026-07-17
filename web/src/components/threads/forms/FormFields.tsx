@@ -61,13 +61,7 @@ function OptionRow({
           : "border-border/70 hover:border-border hover:bg-muted/40"
       } ${disabled ? "pointer-events-none opacity-60" : ""}`}
     >
-      <input
-        type={kind}
-        checked={on}
-        disabled={disabled}
-        onChange={onPick}
-        className="sr-only"
-      />
+      <input type={kind} checked={on} disabled={disabled} onChange={onPick} className="sr-only" />
       <span
         className={`mt-0.5 flex size-4 shrink-0 items-center justify-center border transition-colors ${
           kind === "radio" ? "rounded-full" : "rounded-sm"
@@ -254,7 +248,9 @@ function ToggleField({ value, onChange, disabled }: FieldProps) {
           className={`inline-block size-5 transform rounded-full bg-white shadow-sm transition-transform ${on ? "translate-x-5" : "translate-x-0.5"}`}
         />
       </button>
-      <span className="text-[11.5px] font-medium text-muted-foreground/70">{on ? "On" : "Off"}</span>
+      <span className="text-[11.5px] font-medium text-muted-foreground/70">
+        {on ? "On" : "Off"}
+      </span>
     </div>
   )
 }

@@ -43,7 +43,7 @@ export function FileSidebar({
         <span className="text-[10.5px] font-semibold tracking-wide text-muted-foreground/65 uppercase">
           Attachments
         </span>
-        <span className="ml-auto rounded-full bg-muted/60 px-1.5 py-px text-[10px] font-medium tabular-nums text-muted-foreground/70">
+        <span className="ml-auto rounded-full bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground/70 tabular-nums">
           {unique.length}
         </span>
       </div>
@@ -53,7 +53,7 @@ export function FileSidebar({
             key={f.file.path}
             type="button"
             onClick={() => onOpen(f.file)}
-            className="group flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-card hover:card-shadow"
+            className="group hover:card-shadow flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-card"
           >
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/50 transition-colors group-hover:bg-muted/70">
               <FileIcon kind={kindOf(f.file.name)} size={20} />
