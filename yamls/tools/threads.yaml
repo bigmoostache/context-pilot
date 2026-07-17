@@ -7,6 +7,38 @@ tools:
       focus is cleared, starting a dangling phase of 5 tool calls before the AI
       must focus on another MY_TURN thread.
 
+      PREFER RICH PRESENTATIONS OVER PLAIN PROSE:
+      A message is not limited to text. Two embeddable widgets — file cards
+      (```file-upload```) and interactive forms (```form```) — make your replies
+      far more useful than raw prose, and you should reach for them whenever the
+      situation fits. They are clickable, they render inline, they cut the
+      user's typing, and they collapse multi-turn back-and-forth into a single
+      exchange. Reserve plain prose for when there is genuinely no artifact to
+      show and no decision to collect.
+
+      Use a FILE CARD (```file-upload```) whenever you produce, modify, or want
+      the user to open/review/download a file — a generated report, a diff, a
+      screenshot, a spreadsheet, a config, a log. Show the card, do NOT paste a
+      bare path string: the card opens a rich preview in a drawer, a bare path
+      does nothing. If you just wrote or touched a file the user cares about,
+      present it.
+
+      Use a FORM (```form```) whenever you need the user to choose, decide,
+      confirm, or supply structured input — instead of asking in prose and
+      making them hand-type the answer. Concretely:
+        - a decision between options → a `single` (or `multi`) field, not
+          "reply with 1, 2 or 3".
+        - a destructive or irreversible action → a `confirm` field (add a
+          `confirm-word` to force a deliberate type-to-arm) rather than a
+          free-text "are you sure?".
+        - several parameters at once → ONE form with several fields, not a
+          sequence of question messages.
+        - a date, a number, a toggle, a file to hand over → the matching field
+          type, so the answer comes back clean and machine-readable in the
+          ```form-answer``` block.
+      When in doubt between prose and a form/card, prefer the widget — it is
+      almost always the higher-signal, lower-friction choice.
+
       PRESENTING A FILE TO THE USER:
       To show the user a clickable file card (which opens a rich preview —
       image / PDF / spreadsheet / code / markdown — in a drawer), embed a

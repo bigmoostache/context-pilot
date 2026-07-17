@@ -596,6 +596,11 @@ export default defineConfig([
       // nesting — both are the upstream shape we don't rewrite.
       "unicorn/filename-case": "off",
       "unicorn/max-nested-calls": "off",
+      // shadcn's Calendar passes inline render functions to DayPicker's
+      // `components` prop (Root/Chevron/WeekNumber) — the upstream canonical
+      // shape for that library's slot API, not ours to hoist. Off for the
+      // vendored ui/** surface only; app code stays at error.
+      "@eslint-react/no-nested-component-definitions": "off",
     },
   },
   {

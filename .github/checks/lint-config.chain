@@ -4702,3 +4702,48 @@ index 63a9c4c3..b60ff199 100644
    name: ts-tests
    description: TS-tests family (Playwright e2e — documented stub, exit 0 until ephemeral stack provisioned)
 # --- End entry #33 ---
+34:ea97cbc5f8722cd64b6c593c9bd8499873f258d99e2204e9e5bfd30333d755c5:5048bf2d5148a51635f6b15269d1ae18c812dc1f559c75d93739a365c8d92319:e5c651079b429a2c30020b336d9c9cdc9b6a7515ab84f66306e4775bd59c8c77
+# --- Diff for entry #34 ---
+diff --git a/web/eslint.config.ts b/web/eslint.config.ts
+index 58eeee48..db7ab3a7 100644
+--- a/web/eslint.config.ts
++++ b/web/eslint.config.ts
+@@ -596,6 +596,11 @@ export default defineConfig([
+       // nesting — both are the upstream shape we don't rewrite.
+       "unicorn/filename-case": "off",
+       "unicorn/max-nested-calls": "off",
++      // shadcn's Calendar passes inline render functions to DayPicker's
++      // `components` prop (Root/Chevron/WeekNumber) — the upstream canonical
++      // shape for that library's slot API, not ours to hoist. Off for the
++      // vendored ui/** surface only; app code stays at error.
++      "@eslint-react/no-nested-component-definitions": "off",
+     },
+   },
+   {
+diff --git a/.github/checks/allowed-eslint-exceptions.yaml b/.github/checks/allowed-eslint-exceptions.yaml
+index dcbaacaf..6948f723 100644
+--- a/.github/checks/allowed-eslint-exceptions.yaml
++++ b/.github/checks/allowed-eslint-exceptions.yaml
+@@ -176,6 +176,21 @@ exceptions:
+     strategy: >
+       Irreducible without forking shadcn.
+ 
++  - path: "web/src/components/ui/**"
++    rule: "@eslint-react/no-nested-component-definitions"
++    reason: >
++      shadcn's vendored Calendar (calendar.tsx) passes inline render functions to
++      React DayPicker's `components` slot prop (Root, Chevron, WeekNumber) — the
++      upstream canonical shape for that library's component-slot API, verbatim
++      from the shadcn registry (r/styles/new-york-v4/calendar.json). The rule
++      flags them as nested component definitions, but hoisting them would fork the
++      vendored primitive for no gain. Scoped to the ui/** vendored surface only;
++      app code (and every form/thread component) stays at error, so a genuinely
++      nested component in hand-written code is still caught.
++    strategy: >
++      Irreducible without forking shadcn's Calendar. Re-evaluate if DayPicker
++      exposes a non-inline slot API or the primitive is restructured upstream.
++
+   # ── P5 Finder mock — embedded code samples carry literal braces ──────────
+   - path: "web/src/lib/support/finderFs.ts"
+     rule: "unicorn/no-incorrect-template-string-interpolation"
+# --- End entry #34 ---
