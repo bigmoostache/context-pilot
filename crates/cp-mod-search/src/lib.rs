@@ -7,8 +7,8 @@
 //! One tool: `search` — queries both file and log indexes.
 //! Results appear as dynamic search result panels.
 
-/// Background file indexer thread and file watcher.
-pub mod indexer;
+/// File-indexing pipeline: filters, background indexer, reconciliation.
+pub mod index;
 /// Meilisearch HTTP client, server lifecycle, and binary download.
 pub mod meili;
 /// Dynamic search result panel rendering and creation.
@@ -29,6 +29,7 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
+use meili::api::MeiliClient;
 use types::{SearchPersistData, SearchState};
 
 /// Pre-start the global Meilisearch server for parallel boot.
@@ -193,6 +194,7 @@ impl Module for SearchModule {
             metrics: std::sync::Arc::new(std::sync::Mutex::new(types::SearchMetrics::default())),
             radar_cache: std::sync::Arc::new(std::sync::Mutex::new(types::RadarCache::default())),
             watchdog: None,
+            backup_tick: None,
         });
     }
 
@@ -271,16 +273,40 @@ impl Module for SearchModule {
             m.last_sent_ms.clone_from(&persist.last_sent_ms);
         }
 
-        // Start indexer + watcher (skip initial scan on reload, full scan on fresh start)
-        let is_reload = data != &serde_json::Value::Null;
+        // Compute the offline delta BEFORE the live watcher goes up, against a
+        // quiesced index (boot disk is stable). An empty index diffs to "index
+        // everything", so this subsumes the old cold-start full scan — one path.
+        let files_uid = format!("cp_{}_files", persist.project_hash);
+        let logs_uid = format!("cp_{}_logs", persist.project_hash);
+
+        // Boot order (load-bearing): ensure_indexes → reimport-on-empty →
+        // reconcile → watcher. Reimport warms an EMPTY index straight from the
+        // in-folder backup (zero Voyage) so the reconcile that follows only
+        // re-embeds files that genuinely drifted since the backup.
+        if persist.port > 0
+            && let Ok(client) = MeiliClient::new(persist.port, &persist.master_key)
+        {
+            index::backup::maybe_reimport(&client, &files_uid, &logs_uid);
+        }
+
+        let reconcile_plan = if persist.port > 0 {
+            MeiliClient::new(persist.port, &persist.master_key)
+                .ok()
+                .and_then(|c| index::reconcile::compute_plan(&c, &files_uid, std::path::Path::new(&project_path)).ok())
+        } else {
+            None
+        };
+
+        // Start indexer + watcher. `skip_initial_scan` is now always true — the
+        // reconcile plan (queued just below) replaces the built-in scan.
         let (indexer_tx, watcher) = if persist.port > 0 {
-            match indexer::start(indexer::IndexerParams {
+            match index::indexer::start(index::indexer::IndexerParams {
                 port: persist.port,
                 master_key: persist.master_key.clone(),
                 project_hash: persist.project_hash.clone(),
                 project_root: std::path::PathBuf::from(&project_path),
                 metrics: std::sync::Arc::clone(&metrics),
-                skip_initial_scan: is_reload,
+                skip_initial_scan: true,
             }) {
                 Ok((tx, w)) => (Some(tx), Some(types::WatcherHandle::new(w))),
                 Err(e) => {
@@ -292,6 +318,17 @@ impl Module for SearchModule {
             (None, None)
         };
 
+        // Inject the offline delta, then mark the scan complete.
+        if let Some(tx) = &indexer_tx {
+            if let Some(plan) = &reconcile_plan {
+                if !plan.is_empty() {
+                    log::info!("Reconcile: {} to (re)index, {} to delete", plan.to_index.len(), plan.to_delete.len());
+                }
+                index::reconcile::send_plan(plan, std::path::Path::new(&project_path), tx);
+            }
+            let _r = tx.send(types::IndexerCmd::ScanComplete);
+        }
+
         // Spawn the per-agent Meilisearch watchdog (only if the server is up).
         // It health-checks every few seconds and respawns the global server on
         // the SAME port if it dies mid-session, so a deployment self-heals with
@@ -300,6 +337,20 @@ impl Module for SearchModule {
         let watchdog = (persist.port > 0)
             .then(|| meili::watchdog::WatchdogHandle::spawn(persist.port, persist.master_key.clone()));
 
+        // Hourly reconcile + embedding-backup tick — only when the server is up
+        // AND the indexer channel exists (the tick queues its reconcile delta
+        // through it). Dropped on reload so a reload never stacks two tickers.
+        let backup_tick = match (persist.port > 0).then_some(()).and_then(|()| indexer_tx.clone()) {
+            Some(tx) => Some(index::tick::BackupTickHandle::spawn(index::tick::TickParams {
+                port: persist.port,
+                master_key: persist.master_key.clone(),
+                project_hash: persist.project_hash.clone(),
+                project_root: std::path::PathBuf::from(&project_path),
+                indexer_tx: tx,
+            })),
+            None => None,
+        };
+
         state.set_ext(SearchState {
             persist,
             indexer_tx,
@@ -307,10 +358,11 @@ impl Module for SearchModule {
             metrics,
             radar_cache: std::sync::Arc::new(std::sync::Mutex::new(types::RadarCache::default())),
             watchdog,
+            backup_tick,
         });
 
         // Backfill: push any existing logs to Meilisearch (idempotent upsert)
-        sync_logs_to_meilisearch(state);
+        index::logsync::sync_logs_to_meilisearch(state);
 
         // Pre-populate Context Radar from persisted signals + logs
         radar::refresh(state);
@@ -424,49 +476,4 @@ pub fn refresh_radar(state: &State) {
 /// `task_context` parameter.  Caps the buffer at [`types::MAX_TASK_SIGNALS`].
 pub fn push_task_signal(state: &mut State, content: &str) {
     radar::push_signal(state, content);
-}
-
-/// Push all log entries from the logs module into the Meilisearch logs index.
-///
-/// Uses upsert semantics — existing documents with the same ID are updated,
-/// new ones are inserted.  Cheap for the typical log volume (~hundreds).
-///
-/// Called from:
-/// - `load_module_data()` to backfill existing logs on boot/reload.
-/// - `handle_tool_execution()` in the main binary after `log_create` /
-///   `Close_conversation_history` finish executing (the `on_tool_complete`
-///   hook fires too early — during streaming, before execution).
-pub fn sync_logs_to_meilisearch(state: &State) {
-    let Some(ss) = state.get_ext::<SearchState>() else { return };
-    if ss.persist.port == 0 {
-        return;
-    }
-    let port = ss.persist.port;
-    let master_key = ss.persist.master_key.clone();
-    let logs_uid = format!("cp_{}_logs", ss.persist.project_hash);
-
-    let ls = cp_mod_logs::types::LogsState::get(state);
-    if ls.logs.is_empty() {
-        return;
-    }
-
-    let docs: Vec<serde_json::Value> = ls
-        .logs
-        .iter()
-        .map(|l| {
-            serde_json::json!({
-                "id": l.id,
-                "content": l.content,
-                "importance": l.importance,
-                "timestamp_ms": l.timestamp_ms,
-                "datetime": l.datetime,
-            })
-        })
-        .collect();
-
-    let Ok(client) = meili::api::MeiliClient::new(port, &master_key) else { return };
-    // Fire-and-forget: Meilisearch processes the task asynchronously (including
-    // remote Voyage AI embedding calls).  No need to wait — the documents will
-    // appear in search results within seconds, and blocking here freezes the UI.
-    let _r = client.add_documents(&logs_uid, &serde_json::Value::Array(docs));
 }

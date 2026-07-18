@@ -97,6 +97,9 @@ pub(crate) struct SearchState {
     /// came up (port 0). Dropping it (on reload) stops the old watchdog so a
     /// reload never stacks a second supervisor on the same global server.
     pub watchdog: Option<super::meili::watchdog::WatchdogHandle>,
+    /// Hourly reconcile + embedding-backup tick thread. `None` when the server
+    /// never came up. Dropped on reload so a reload never stacks two tickers.
+    pub backup_tick: Option<super::index::tick::BackupTickHandle>,
 }
 
 impl std::fmt::Debug for SearchState {
@@ -108,6 +111,7 @@ impl std::fmt::Debug for SearchState {
             .field("metrics", &self.metrics)
             .field("radar_cache", &self.radar_cache)
             .field("watchdog", &self.watchdog)
+            .field("backup_tick", &self.backup_tick)
             .finish()
     }
 }
@@ -373,70 +377,10 @@ pub(crate) struct SearchResult {
 
 // -- Configuration constants -------------------------------------------------
 
-/// Maximum file size in bytes (1 MB).
-///
-/// Files larger than this are skipped during indexing to avoid
-/// overwhelming the search index with very large generated files.
-pub(crate) const MAX_FILE_SIZE: u64 = 0x0010_0000;
-
-/// Default chunk size in characters for the fixed-size fallback splitter.
-pub(crate) const FALLBACK_CHUNK_SIZE: usize = 4000;
-
-/// Extensions that are eligible for indexing (code, config, docs, web, build).
-///
-/// Returns `true` if the extension is in the hardcoded allowlist.
-pub(crate) fn is_allowed_extension(ext: &str) -> bool {
-    matches!(
-        ext,
-        // Code
-        "rs" | "py" | "js" | "ts" | "jsx" | "tsx"
-            | "go" | "java" | "c" | "h" | "cpp" | "hpp" | "cc"
-            | "rb" | "php" | "swift" | "kt" | "scala"
-            | "ex" | "exs" | "hs" | "ml" | "lua" | "dart"
-            | "zig" | "nix" | "tf" | "sh" | "bash" | "zsh"
-            | "sql" | "cs" | "fs" | "vb" | "pl" | "pm"
-            | "r" | "jl" | "nim" | "sol" | "v" | "vy" | "move"
-        // Config / data
-        | "toml" | "yaml" | "yml" | "json" | "xml"
-            | "ini" | "cfg" | "conf" | "properties"
-        // Documentation
-        | "md" | "txt" | "rst" | "adoc" | "org" | "tex"
-        // Web
-        | "html" | "htm" | "css" | "scss" | "sass" | "less" | "svg"
-        // Build
-        | "dockerfile" | "makefile" | "cmake" | "gradle" | "sbt"
-        // Other
-        | "graphql" | "proto" | "thrift"
-    )
-}
-
-/// Directory names that are always skipped during indexing.
-const EXCLUDED_DIRS: &[&str] = &[
-    "node_modules",
-    ".git",
-    "vendor",
-    "target",
-    "dist",
-    "build",
-    "out",
-    "__pycache__",
-    ".next",
-    ".nuxt",
-    ".context-pilot",
-];
-
-/// File patterns (suffixes) that are always skipped during indexing.
-const EXCLUDED_SUFFIXES: &[&str] = &[".min.js", ".min.css", ".map", ".lock", ".sum"];
-
-/// Check if a path component is an excluded directory.
-pub(crate) fn is_excluded_dir(name: &str) -> bool {
-    EXCLUDED_DIRS.contains(&name)
-}
-
-/// Check if a filename matches an excluded suffix pattern.
-pub(crate) fn is_excluded_file(filename: &str) -> bool {
-    EXCLUDED_SUFFIXES.iter().any(|suffix| filename.ends_with(suffix))
-}
+// The indexability gates, extension allowlist, size cap and exclusion lists
+// live in the sibling `filters` module; re-exported here so existing
+// `types::is_indexable` / `types::MAX_FILE_SIZE` call-sites keep resolving.
+pub(crate) use crate::index::filters::{FALLBACK_CHUNK_SIZE, is_excluded_dir, is_indexable};
 
 /// Meilisearch settings for the **files** index.
 ///

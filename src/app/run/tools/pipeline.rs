@@ -262,7 +262,7 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
         (t.name == "log_create" || t.name == "Close_conversation_history") && !r.content.starts_with("Queued as #")
     });
     if logs_changed {
-        cp_mod_search::sync_logs_to_meilisearch(&app.state);
+        cp_mod_search::index::logsync::sync_logs_to_meilisearch(&app.state);
     }
 
     // === THINK TASK CONTEXT → CONTEXT RADAR ===

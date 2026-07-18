@@ -232,55 +232,30 @@ fn deduplicate(batch: Vec<IndexerCmd>) -> Vec<IndexerCmd> {
 /// Index a single file: read → filter → split → upload.
 fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
     let _fg = cp_base::flame!("index_file");
-    // Skip symlinks
-    if abs_path.is_symlink() {
+
+    // One stat serves every gate + the (mtime, size) fingerprint below.
+    let Ok(meta) = std::fs::metadata(abs_path) else {
+        return;
+    };
+
+    // Shared indexability gate — SAME predicate the reconcile disk-walk uses,
+    // so the two paths never disagree (see types::is_indexable).
+    if !types::is_indexable(abs_path, &ctx.project_root, &meta) {
         return;
     }
 
     // Relative path for storage
     let rel_path = abs_path.strip_prefix(&ctx.project_root).unwrap_or(abs_path);
     let rel_str = rel_path.to_string_lossy();
-
-    // Check path exclusions (directory components)
-    for component in rel_path.components() {
-        if let std::path::Component::Normal(name) = component {
-            let name_str = name.to_str().unwrap_or("");
-            if types::is_excluded_dir(name_str) {
-                return;
-            }
-        }
-    }
-
-    // Check extension allowlist (text files only)
     let ext = rel_path.extension().and_then(std::ffi::OsStr::to_str).unwrap_or("");
-    if !types::is_allowed_extension(ext) {
-        return;
-    }
-
-    // Check excluded file patterns
-    let filename = rel_path.file_name().and_then(std::ffi::OsStr::to_str).unwrap_or("");
-    if types::is_excluded_file(filename) {
-        return;
-    }
-
-    // Check file size
-    let Ok(meta) = std::fs::metadata(abs_path) else {
-        return;
-    };
-    if meta.len() > types::MAX_FILE_SIZE {
-        return;
-    }
+    let size_bytes = meta.len();
 
     // Compute mtime for deduplication — skip re-indexing unchanged files.
     // FSEvents can fire events for files whose content hasn't changed
     // (metadata updates, macOS quirks). Without this check, each event
     // triggers delete→split→upload→embed, keeping Meilisearch pegged at
     // 200%+ CPU from constant embedding regeneration.
-    let last_modified_ms = meta
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map_or(0_u64, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
+    let last_modified_ms = crate::index::reconcile::mtime_ms(&meta);
 
     if ctx.last_indexed_mtime.get(rel_str.as_ref()).is_some_and(|&t| t == last_modified_ms) {
         return; // File unchanged since last index — skip
@@ -326,6 +301,7 @@ fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
                 "char_start": chunk.char_start,
                 "char_end": chunk.char_end,
                 "last_modified_ms": last_modified_ms,
+                "size_bytes": size_bytes,
             })
         })
         .collect();
