@@ -910,6 +910,10 @@
   path: crates/cp-orchestrator/tests/openapi/schemas.rs
   description: OpenAPI core schemas — domain types (Agent, ThreadDetail, ThreadMsg, ToolCall, ContextPanel, MemoryCard, TodoItem, etc.) + shared enums (PanelKind, AccentToken). Agent.status enum includes 'disconnected'. Referenced by the spec.
   last_edited_ms: 0
+0f2741fb5d7af720:
+  path: web/src/components/threads/forms/helpers.ts
+  description: Pure form/form-answer YAML parser — indent scanner (no YAML dep). parseFormBlocks, parseFormAnswerBlock, stripFormBlocks, buildFormAnswerContent, isFormMessage.
+  last_edited_ms: 0
 0f3de8b5066995c0:
   path: web/src/lib/utils.ts
   description: 'Shared web utils. cn() (clsx+tailwind-merge). clipboard() (web-lint P3): returns navigator.clipboard honestly typed Clipboard|undefined via a function-indirection helper — a CALL result is opaque to TS control-flow-analysis, so clipboard()?.writeText stays an honest guard (navigator.clipboard is typed non-null by lib.dom but is genuinely undefined on insecure origin; an aliased const would be CFA-narrowed to non-null → dead ?.). Used by Message.tsx + markdown.tsx. T367/T471 zip-on-drop: zipFiles/zipDropped bundle dropped file(s)/folder tree into ONE .zip via fflate; extractDroppedFiles walks webkitGetAsEntry recursively (entries captured SYNC before first await). T359 list logic: resolveEnter/resolveTab + lineBounds/parseListLine. Consumed by ThreadComposer + ThreadConversation.'
@@ -4078,6 +4082,10 @@
   path: Cargo.lock
   description: Workspace lockfile
   last_edited_ms: 0
+423297fae3fdccd8:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 42391f72da58a79e:
   path: web/src/components/shell/config/DeploySection.tsx
   description: 'Deploy actions for Releases settings pane. Two buttons: "Deploy to Fleet" (POST /api/releases/deploy, select+restart all agents) and "Restart Orchestrator" (POST /api/releases/restart-orchestrator, delayed SIGTERM, auto-reload after 3s). Click-to-confirm guard on orchestrator restart. Uses generated SDK.'
@@ -4286,6 +4294,10 @@
   path: docs/trust-center/subprocessors.html
   description: 'Subprocessor Register page. 7 sections: LLM providers table (6 providers with logos), auxiliary services table (5 services with logos), local services table (4 services), change log table (4 entries), operator responsibility notice, vendor risk assessment criteria (8 criteria), data flow summary (HTML/CSS architecture diagram with real brand logos in pills). All subprocessor logos are real brand assets (local SVGs or SimpleIcons CDN), no letter avatars.'
   last_edited_ms: 1782137224712
+457110fc3b777216:
+  path: web/src/components/threads/forms/FormWidget.tsx
+  description: Interactive form widget rendered inline from ```form``` block. localStorage draft per form-id, fieldFilled client-side submit gate, LockedForm read-only view.
+  last_edited_ms: 0
 457797ff3549e45c:
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
@@ -7042,6 +7054,10 @@
   path: crates/cp-mod-scratchpad/src/lib.rs
   description: 'Scratchpad module. 3 tools: create_cell/edit_cell/wipe. Fixed SCRATCHPAD panel. Per-worker cells. Visualizer: colored create/update/delete. fixed_order=8.'
   last_edited_ms: 0
+73dd279b530a7953:
+  path: web/src/components/threads/forms/FormFields.tsx
+  description: '8 form field input renderers: single+allow-other, multi, text, number, date, toggle, confirm+confirm-word, files (immediate upload). FieldInput dispatcher.'
+  last_edited_ms: 0
 74150afab89d24d0:
   path: src/app/reverie/mod.rs
   description: 'Reverie module exports: streaming, tools, trigger submodules'
@@ -7998,6 +8014,10 @@
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups: Needs you/Active/Working in parallel. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
   last_edited_ms: 1781694654417
+836f1dd9f00762cb:
+  path: web/eslint.config.ts
+  description: Frontend ESLint flat config — Rust-parity strict stack (branch web-lint), RATCHET P0→P13. P3 strictTypeChecked+stylisticTypeChecked. P4 anti-cheat (eslint-comments no-use, ban-ts-comment). P5 unicorn. P6 React (@eslint-react/react-hooks/jsx-a11y). P7 correctness+security (regexp/promise/import-x+no-cycle/n/security/no-unsanitized/no-secrets). P8 structural budgets (max-lines 500 + complexity/params/depth/statements). Untyped plugins cast to named-property shape + declared in types.d.ts. globalIgnores dist+generated/**+e2e.
+  last_edited_ms: 0
 837d71bc2422a4c4:
   path: src/state/persistence/boot.rs
   description: 'Phase 5 boot: module init + data loading. boot_extract_module_data() + boot_init_modules() with per-module progress callback. pre_start_daemons() spawns 2 parallel threads (Meilisearch + Console). Loads .env files (project + global).'
@@ -8081,6 +8101,10 @@
 84eb7798028799fb:
   path: web/src/components/auth/AuthGuard.tsx
   description: Auth gate wrapper (Phase 9). Shows LoginPage when auth enabled + no session, passes through when disabled or authenticated. Loading spinner while probing.
+  last_edited_ms: 0
+84eef42531ad3f31:
+  path: web/package.json
+  description: 'Frontend deps. scripts: dev/build(tsc -b && vite build)/lint/preview + P2 format/format:check (prettier). engines.node ''^22.16.0 || >=24.0.0'' (P7 n/no-unsupported-features: exact code-driven floor for import.meta.dirname — n credits the ^22.16 backport + >=24, the 23.x gap is dead). @tanstack/react-query, react 19.2, tailwindcss 4.3, shadcn, vite 8, playwright, full eslint ratchet plugin roster + prettier + web-vitals.'
   last_edited_ms: 0
 850e942001747a33:
   path: crates/cp-mod-bridge/src/boot.rs
@@ -10178,6 +10202,10 @@ a786a84433055a74:
   path: crates/cp-mod-threads/src/tools.rs
   description: 'Thread tool handlers. execute_send/execute_read/build_panel_content. T353: execute_send AUTO-UNARCHIVES archived threads. build_panel_content shows paused:true for paused threads (T371). Archived threads filtered out of LLM-facing context. YAML-structured output (T372). MAX caps on content/file-path/questions/panel-messages.'
   last_edited_ms: 1782311326902
+a7937c33cb09eb73:
+  path: web/src/components/threads/forms/useThreadForms.ts
+  description: useThreadForms (answersByForm memo from log scan + onFormSubmit via sendCommand send_message) + useScrollPin (converge-scroll-to-bottom, extracted from ThreadConversation).
+  last_edited_ms: 0
 a79e5164fba1d5b2:
   path: .git/index
   description: Git index (binary). Not source.
@@ -10781,6 +10809,10 @@ b11e0fa25dde944c:
 b12087a3ac44a2de:
   path: crates/cp-oplog/src/append.rs
   description: 'OplogWriter: single-writer append-only log + running ReplayState fold (heads+seen). open() seeds via replay. append(kind)=append_buffered+sync (announce-after-durable K9). append_buffered(kind)=frame+write_all+fold, NO sync (group-commit primitive). sync()=single fdatasync (the amortised group-commit point, I2). roll() fdatasyncs old segment BEFORE switching (batch spanning a roll loses nothing), stamps leading Checkpoint(Snapshot) on new seg (GAP1). write_record=sole rev point (no sync). checkpoint()/heads()/seen()/snapshot() public. 7 tests.'
+  last_edited_ms: 0
+b12655509b935a1f:
+  path: web/src/components/threads/fileUpload/FileSidebar.tsx
+  description: Right-rail sidebar listing thread file attachments. ThreadFile type (file+role). Deduplicates by file.path via useMemo+Set (same file attached multiple times shows once). Renders FileIcon + name + role label per attachment. Click opens Quick Look drawer via onOpen callback. Only shown when thread has file-upload blocks.
   last_edited_ms: 0
 b12d49f11fbc2490:
   path: crates/cp-orchestrator/src/transport/rest/backend.rs
@@ -11778,6 +11810,10 @@ c0aeea6c744c259a:
   path: ui/src/components/shell/TopBar.tsx
   description: 'macOS title bar. App mark (Home)->fleet. ALWAYS renders / + AgentSwitcher: inside an agent it shows the workspace + per-agent segmented switcher Threads·Cockpit·Finder + cost; at fleet altitude passes activeId undefined (placeholder switcher) and picking an agent enters it (->threads). Far-right: Activity->StatsPopup (hidden at fleet) + ThemeToggle + Settings gear->ConfigModal. Both modals always-mounted, controlled open. Git branch chip removed.'
   last_edited_ms: 1781533125751
+c0b9f0743fbca9be:
+  path: .github/checks/lint-config.chain
+  description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
+  last_edited_ms: 0
 c0eb2e05f1f3f1d7:
   path: crates/cp-orchestrator/src/inspect.rs
   description: 'Read-only, mtime-cached inspection of agent on-disk state (tier-② files). StateReader: read_config (config.json with mtime cache + torn-read fallback), read_worker (states/<id>.json), list_workers, read_shared (raw bytes), list_messages, read_message, read_panel. Per-agent AgentCache. 7 tests.'
@@ -13598,6 +13634,10 @@ e204a69333e75cbe:
   path: web/src/components/shell/widgets/UserMenu.tsx
   description: 'Account avatar menu (T30). Gradient AvatarMark trigger + portaled dropdown: identity header div, Profile/Settings/Manage Users (Phase 10, admin-only)/Sign-out. Sign out wired to useAuth().logout when auth enabled. onOpenUsers callback triggers admin UsersDialog.'
   last_edited_ms: 0
+e23b05c2bda4474b:
+  path: web/src/components/threads/fileUpload/index.tsx
+  description: 'File-upload COMPONENTS: MessageFileChip (existence-check via useFs), FileUploadChip (present/static/missing), ComposerBubbles (staged files + /command row). P8: extracted ShowInFinderButton + FileChipBody subcomponents (the Show-in-Finder button was duplicated across the static/interactive tails, each copy costing complexity branches) to bring FileUploadChip under the cx15 budget. Types from ./helpers.'
+  last_edited_ms: 0
 e24004db48c12444:
   path: web/src/components/agents/AgentModal/index.tsx
   description: 'AgentModal shell (P8 split): create/manage dialog, single source for both flows (fleet dashboard + TopBar). Wires useSelectionState + useAgentModalActions into Controller, renders Header/Body/Footer subcomponents. authEnabled coerced ?? false. Backdrop = focusable sibling button.'
@@ -14906,6 +14946,10 @@ f7f200b22e897d6b:
   path: web/eslint.config.ts
   description: Frontend ESLint flat config — Rust-parity strict stack (branch web-lint), RATCHET P0→P13. P3 strictTypeChecked+stylisticTypeChecked. P4 anti-cheat (eslint-comments no-use, ban-ts-comment). P5 unicorn. P6 React (@eslint-react/react-hooks/jsx-a11y). P7 correctness+security (regexp/promise/import-x+no-cycle/n/security/no-unsanitized/no-secrets). P8 structural budgets (max-lines 500 + complexity/params/depth/statements). Untyped plugins cast to named-property shape + declared in types.d.ts. globalIgnores dist+generated/**+e2e.
   last_edited_ms: 1783497002697
+f7f3b54e551ecbe5:
+  path: .github/checks/allowed-eslint-exceptions.yaml
+  description: 'Registry of allowed CONFIG-LEVEL ESLint exceptions (web-lint, frontend twin of allowed-lint-exceptions.yaml). Inline suppression BANNED; only escape is config-level scoped rules:{off}, each registered here reason+strategy, enforced bidirectionally by check-frontend-suppressions.sh. Covers P4→P9 (P9: no-restricted-imports off for lib/api). Hash-lock deferred to P12.'
+  last_edited_ms: 0
 f80737b7b24222fa:
   path: ui/src/components/shell/CockpitView.tsx
   description: 'Cockpit (panel-centered) view assembler. TWO columns: LeftRail (controlled selection) | PanelPane (the selected surface, flex-1 star). The conversation is NO LONGER a docked side column — it''s treated as just another panel (T24): default selected id = "conversation", which PanelPane renders as the full Conversation surface. Lifts the rail''s selected-panel state.'

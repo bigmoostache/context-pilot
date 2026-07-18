@@ -99,6 +99,7 @@ export function AgentModal({
           agent={c.agent}
           avatarBust={c.avatarBust}
           onAvatarChange={c.onAvatarChange}
+          onRandomizeAvatar={c.onRandomizeAvatar}
           onClose={onClose}
         />
         <AgentModalBody c={c} />
