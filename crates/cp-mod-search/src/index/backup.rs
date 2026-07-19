@@ -237,7 +237,6 @@ pub(crate) fn maybe_reimport(client: &MeiliClient, files_uid: &str, logs_uid: &s
 }
 
 #[cfg(test)]
-#[expect(clippy::panic, reason = "backup tests panic via let-else for fs/serde setup failure messages")]
 mod tests {
     use super::*;
 
@@ -247,17 +246,23 @@ mod tests {
         row.pointer("/_vectors/default/regenerate")
     }
 
+    /// Result-returning tests: fallible setup uses `?` and mismatches return
+    /// `Err`, so no `unwrap`/`expect`/`panic`/`assert` is needed — the module
+    /// stays clean of every forbid-level lint with zero registered exception.
     #[test]
-    fn manifest_roundtrip() {
+    fn manifest_roundtrip() -> Result<(), String> {
         let m = Manifest {
             fingerprint: "abc123".to_string(),
             embedder_name: "default".to_string(),
             count_files: 42,
             count_logs: 7,
         };
-        let Ok(body) = serde_json::to_string(&m) else { panic!("serialize manifest") };
-        let Ok(back) = serde_json::from_str::<Manifest>(&body) else { panic!("deserialize manifest") };
-        assert_eq!(m, back);
+        let body = serde_json::to_string(&m).map_err(|e| format!("serialize manifest: {e}"))?;
+        let back: Manifest = serde_json::from_str(&body).map_err(|e| format!("deserialize manifest: {e}"))?;
+        if m != back {
+            return Err("manifest roundtrip mismatch".to_string());
+        }
+        Ok(())
     }
 
     #[test]
@@ -291,21 +296,28 @@ mod tests {
     }
 
     #[test]
-    fn jsonl_write_then_read_roundtrip() {
+    fn jsonl_write_then_read_roundtrip() -> Result<(), String> {
         let mut dir = std::env::temp_dir();
         let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
         dir.push(format!("cp-search-backup-{nanos}"));
-        let Ok(()) = std::fs::create_dir_all(&dir) else { panic!("mkdir temp dir") };
+        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir temp dir: {e}"))?;
         let path = dir.join("files.jsonl");
         let rows = vec![
             serde_json::json!({ "id": "a-0", "_vectors": { "default": { "embeddings": [1.0], "regenerate": true } } }),
             serde_json::json!({ "id": "b-0" }),
         ];
-        let Ok(()) = write_jsonl_atomic(&path, &rows) else { panic!("write jsonl") };
-        let Ok(read) = read_jsonl_for_reimport(&path) else { panic!("read jsonl") };
-        assert_eq!(read.len(), 2);
-        assert_eq!(read.first().and_then(regen_flag), Some(&serde_json::Value::Bool(false)));
-        assert_eq!(read.get(1).and_then(|r| r.get("id")), Some(&serde_json::Value::String("b-0".to_string())));
+        write_jsonl_atomic(&path, &rows).map_err(|e| format!("write jsonl: {e}"))?;
+        let read = read_jsonl_for_reimport(&path).map_err(|e| format!("read jsonl: {e}"))?;
+        if read.len() != 2 {
+            return Err(format!("expected 2 rows, got {}", read.len()));
+        }
+        if read.first().and_then(regen_flag) != Some(&serde_json::Value::Bool(false)) {
+            return Err("first row regenerate flag not forced false".to_string());
+        }
+        if read.get(1).and_then(|r| r.get("id")) != Some(&serde_json::Value::String("b-0".to_string())) {
+            return Err("second row id mismatch".to_string());
+        }
         drop(std::fs::remove_dir_all(&dir));
+        Ok(())
     }
 }

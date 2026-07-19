@@ -121,62 +121,83 @@ pub(crate) fn is_indexable(
 }
 
 #[cfg(test)]
-#[expect(clippy::panic, reason = "filters tests use panic for fs-setup failure messages")]
 mod tests {
     use super::*;
 
     /// Build a unique temp dir under the system temp root for fs-touching tests.
-    fn tmp_root(tag: &str) -> std::path::PathBuf {
+    fn tmp_root(tag: &str) -> Result<std::path::PathBuf, String> {
         let mut p = std::env::temp_dir();
         let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
         p.push(format!("cp-search-filters-{tag}-{nanos}"));
-        let Ok(()) = std::fs::create_dir_all(&p) else { panic!("mkdir tmp root") };
-        p
+        std::fs::create_dir_all(&p).map_err(|e| format!("mkdir tmp root: {e}"))?;
+        Ok(p)
     }
 
-    fn indexable(root: &std::path::Path, rel: &str, bytes: &[u8]) -> bool {
+    /// Write a file under `root` and report whether the shared gate accepts it.
+    /// Fallible setup surfaces as `Err` so tests need no `unwrap`/`expect`/`panic`.
+    fn indexable(root: &std::path::Path, rel: &str, bytes: &[u8]) -> Result<bool, String> {
         let abs = root.join(rel);
         if let Some(parent) = abs.parent() {
-            let Ok(()) = std::fs::create_dir_all(parent) else { panic!("mkdir parent") };
+            std::fs::create_dir_all(parent).map_err(|e| format!("mkdir parent: {e}"))?;
         }
-        let Ok(()) = std::fs::write(&abs, bytes) else { panic!("write test file") };
-        let Ok(meta) = std::fs::metadata(&abs) else { panic!("stat test file") };
-        is_indexable(&abs, root, &meta)
+        std::fs::write(&abs, bytes).map_err(|e| format!("write test file: {e}"))?;
+        let meta = std::fs::metadata(&abs).map_err(|e| format!("stat test file: {e}"))?;
+        Ok(is_indexable(&abs, root, &meta))
     }
 
     #[test]
-    fn allowlisted_source_is_indexable() {
-        let root = tmp_root("ok");
-        assert!(indexable(&root, "src/main.rs", b"fn main() {}"));
+    fn allowlisted_source_is_indexable() -> Result<(), String> {
+        let root = tmp_root("ok")?;
+        let ok = indexable(&root, "src/main.rs", b"fn main() {}")?;
         drop(std::fs::remove_dir_all(&root));
+        if !ok {
+            return Err("allowlisted source rejected".to_string());
+        }
+        Ok(())
     }
 
     #[test]
-    fn disallowed_extension_rejected() {
-        let root = tmp_root("ext");
-        assert!(!indexable(&root, "logo.png", b"\x89PNG"));
+    fn disallowed_extension_rejected() -> Result<(), String> {
+        let root = tmp_root("ext")?;
+        let ok = indexable(&root, "logo.png", b"\x89PNG")?;
         drop(std::fs::remove_dir_all(&root));
+        if ok {
+            return Err("disallowed extension accepted".to_string());
+        }
+        Ok(())
     }
 
     #[test]
-    fn excluded_dir_rejected() {
-        let root = tmp_root("dir");
-        assert!(!indexable(&root, "node_modules/pkg/index.js", b"x"));
+    fn excluded_dir_rejected() -> Result<(), String> {
+        let root = tmp_root("dir")?;
+        let ok = indexable(&root, "node_modules/pkg/index.js", b"x")?;
         drop(std::fs::remove_dir_all(&root));
+        if ok {
+            return Err("excluded dir accepted".to_string());
+        }
+        Ok(())
     }
 
     #[test]
-    fn excluded_suffix_rejected() {
-        let root = tmp_root("suf");
-        assert!(!indexable(&root, "app.min.js", b"x"));
+    fn excluded_suffix_rejected() -> Result<(), String> {
+        let root = tmp_root("suf")?;
+        let ok = indexable(&root, "app.min.js", b"x")?;
         drop(std::fs::remove_dir_all(&root));
+        if ok {
+            return Err("excluded suffix accepted".to_string());
+        }
+        Ok(())
     }
 
     #[test]
-    fn oversized_file_rejected() {
-        let root = tmp_root("big");
+    fn oversized_file_rejected() -> Result<(), String> {
+        let root = tmp_root("big")?;
         let big = vec![b'a'; usize::try_from(MAX_FILE_SIZE).unwrap_or(usize::MAX) + 1];
-        assert!(!indexable(&root, "huge.rs", &big));
+        let ok = indexable(&root, "huge.rs", &big)?;
         drop(std::fs::remove_dir_all(&root));
+        if ok {
+            return Err("oversized file accepted".to_string());
+        }
+        Ok(())
     }
 }
