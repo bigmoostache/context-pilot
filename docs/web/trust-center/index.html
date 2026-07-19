@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trust Center — Context Pilot</title>
+  <meta name="description" content="Context Pilot Trust Center. Security architecture, data privacy controls, compliance posture, and subprocessor register for enterprise evaluation.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="trust.css">
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────── -->
+  <header class="tc-header">
+    <div class="tc-header-inner">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener" class="tc-brand">
+        <div class="tc-brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <span class="tc-brand-name">Context Pilot</span>
+        <span class="tc-brand-sep">/</span>
+        <span class="tc-brand-label">Trust Center</span>
+      </a>
+      <nav class="tc-header-links">
+        <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">Repository</a>
+        <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank" rel="noopener">Security Policy</a>
+        <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank" rel="noopener">License</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="tc-layout">
+    <!-- ── Sidebar ────────────────────────────────────── -->
+    <aside class="tc-sidebar">
+      <div class="tc-sidebar-section">
+        <div class="tc-sidebar-label">Trust Center</div>
+        <ul class="tc-sidebar-nav">
+          <li><a href="index.html" class="active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Overview
+          </a></li>
+          <li><a href="security.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Security Architecture
+          </a></li>
+          <li><a href="privacy.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Data Privacy
+          </a></li>
+          <li><a href="compliance.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Compliance
+          </a></li>
+          <li><a href="subprocessors.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            Subprocessors
+          </a></li>
+        </ul>
+      </div>
+      <div class="tc-sidebar-footer">
+        <p>Document version 2.0<br>Last reviewed: June 22, 2026</p>
+      </div>
+    </aside>
+
+    <!-- ── Content ────────────────────────────────────── -->
+    <main class="tc-content">
+      <div class="tc-content-inner">
+
+        <div class="tc-breadcrumb">
+          <a href="../index.html">Context Pilot</a>
+          <span class="tc-breadcrumb-sep">/</span>
+          <span>Trust Center</span>
+        </div>
+
+        <h1 class="tc-page-title">Trust Center</h1>
+        <div class="tc-page-meta">
+          <div class="tc-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Last updated: June 22, 2026
+          </div>
+          <div class="tc-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Version 2.0
+          </div>
+        </div>
+
+        <p class="tc-page-desc">
+          This Trust Center provides comprehensive documentation of Context Pilot's security architecture, data handling practices, compliance posture, and third-party service integrations. It is designed to support enterprise security reviews, vendor risk assessments, and procurement due diligence.
+        </p>
+
+        <!-- Key guarantees -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">At a Glance</h2>
+          <p class="tc-section-desc">
+            Quick-reference summary for security review teams and procurement questionnaires.
+          </p>
+          <table class="tc-table">
+            <thead>
+              <tr>
+                <th>Question</th>
+                <th>Answer</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cell-name">Does Context Pilot collect user data?</td>
+                <td>No. No data collection infrastructure exists.</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Does Context Pilot operate cloud servers?</td>
+                <td>No. All processing occurs on the operator's workstation.</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Does Context Pilot include telemetry?</td>
+                <td>No. Zero analytics, tracking, or phone-home mechanisms.</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Where is data stored?</td>
+                <td>Locally, in <code>.context-pilot/</code> within the project directory.</td>
+              </tr>
+              <tr>
+                <td class="cell-name">What data leaves my machine?</td>
+                <td>Only data you explicitly send to your configured LLM/search/OCR providers.</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Is the source code auditable?</td>
+                <td>Yes. Fully open-source under the MIT License on GitHub.</td>
+              </tr>
+              <tr>
+                <td class="cell-name">What license?</td>
+                <td>MIT License. Permissive, no copyleft, commercial use allowed.</td>
+              </tr>
+              <tr>
+                <td class="cell-name">SOC 2 / ISO 27001 certified?</td>
+                <td>Not applicable (no cloud service). Controls are <a href="compliance.html">documented</a>.</td>
+              </tr>
+              <tr>
+                <td class="cell-name">GDPR compliant?</td>
+                <td>Compatible by architecture. See <a href="compliance.html">Compliance</a>.</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Can it run air-gapped?</td>
+                <td>Core features: yes. LLM inference requires API connectivity.</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Vulnerability reporting?</td>
+                <td><a href="https://github.com/bigmoostache/context-pilot/security" target="_blank">GitHub Security Advisories</a></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Does it use cookies?</td>
+                <td>No. Zero cookies, tracking pixels, or advertising identifiers.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Project Statistics -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">Project Statistics</h2>
+          <p class="tc-section-desc">
+            Quantitative indicators of the project's maturity, engineering rigor, and security posture.
+          </p>
+          <div class="tc-cards">
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              </div>
+              <h3>65,000+ Lines</h3>
+              <p>Rust + TypeScript source code across the agent, orchestrator, and web frontend.</p>
+            </div>
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <h3>760+ Commits</h3>
+              <p>Complete, auditable development history in a public Git repository.</p>
+            </div>
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <h3>1,001 Lint Rules</h3>
+              <p>980 at forbid level, 21 at deny. No suppressions allowed without hash chain update.</p>
+            </div>
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+              </div>
+              <h3>22 Crates</h3>
+              <p>Modular workspace architecture. Each crate has a single responsibility.</p>
+            </div>
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </div>
+              <h3>12 Protected Files</h3>
+              <p>SHA-256 hash chain prevents unauthorized changes to security-critical configuration.</p>
+            </div>
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <h3>0 Telemetry Calls</h3>
+              <p>No analytics, tracking, crash reporting, or phone-home mechanisms. Verifiable in source.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Security Posture -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">Security Posture Summary</h2>
+          <p class="tc-section-desc">
+            Context Pilot operates under a local-first architecture with no cloud infrastructure, no intermediary proxies, and no telemetry collection. The following controls are enforced at the architectural level.
+          </p>
+          <div class="tc-cards">
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              </div>
+              <h3>Local-First Execution</h3>
+              <p>All processing occurs on the operator's workstation. No cloud infrastructure exists for data to be transmitted to.</p>
+            </div>
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <h3>Zero Telemetry</h3>
+              <p>No analytics, usage tracking, crash reporting, or phone-home mechanisms. Network egress is limited to user-configured API providers.</p>
+            </div>
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+              </div>
+              <h3>Open Source (MIT)</h3>
+              <p>Complete source code is publicly auditable under the MIT license. Every network call, file operation, and tool invocation is verifiable.</p>
+            </div>
+            <div class="tc-card">
+              <div class="tc-card-icon tc-card-icon--green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <h3>API Key Isolation</h3>
+              <p>Credentials are stored locally and transmitted only to their designated provider endpoint. No cross-provider or intermediary routing occurs.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Navigation to sub-pages -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">Documentation</h2>
+          <p class="tc-section-desc">
+            Select a topic below for detailed documentation. Each section is designed to address specific categories commonly required during enterprise security assessments.
+          </p>
+          <div class="tc-nav-cards">
+            <a href="security.html" class="tc-nav-card">
+              <div class="tc-nav-card-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <h3>Security Architecture</h3>
+              </div>
+              <p>Data flow architecture, encryption practices, integrity controls, access model, and incident response procedures.</p>
+              <div class="tc-nav-card-arrow">
+                Read documentation
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </div>
+            </a>
+            <a href="privacy.html" class="tc-nav-card">
+              <div class="tc-nav-card-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <h3>Data Privacy</h3>
+              </div>
+              <p>Data classification, storage locations, retention policies, data subject rights, and privacy-by-design controls.</p>
+              <div class="tc-nav-card-arrow">
+                Read documentation
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </div>
+            </a>
+            <a href="compliance.html" class="tc-nav-card">
+              <div class="tc-nav-card-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <h3>Compliance Framework</h3>
+              </div>
+              <p>Regulatory alignment assessment including GDPR, SOC 2, ISO 27001, and open-source licensing obligations.</p>
+              <div class="tc-nav-card-arrow">
+                Read documentation
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </div>
+            </a>
+            <a href="subprocessors.html" class="tc-nav-card">
+              <div class="tc-nav-card-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                <h3>Subprocessor Register</h3>
+              </div>
+              <p>Complete inventory of third-party services, data transmitted, opt-in requirements, and provider-specific data processing details.</p>
+              <div class="tc-nav-card-arrow">
+                Read documentation
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </div>
+            </a>
+          </div>
+        </section>
+
+        <!-- Quick contact -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">Contact</h2>
+          <p class="tc-section-desc">
+            For security-related inquiries, vendor risk assessment questionnaires, or to report a vulnerability, please use the appropriate channel below.
+          </p>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank" class="tc-cta">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Report a Vulnerability
+            </a>
+            <a href="https://github.com/bigmoostache/context-pilot/issues" target="_blank" class="tc-cta">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Open an Issue
+            </a>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <footer class="tc-footer">
+    <span>Context Pilot Trust Center &middot; Version 2.0 &middot; MIT License</span>
+    <div class="tc-footer-links">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a>
+      <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank">Security Policy</a>
+      <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank">License</a>
+    </div>
+  </footer>
+
+</body>
+</html>

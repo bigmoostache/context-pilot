@@ -1,0 +1,15 @@
+{
+  "name": "daharness-site",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Daharness marketing landing + trust center — static Vite MPA build.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173"
+  },
+  "devDependencies": {
+    "vite": "^8.0.12"
+  }
+}

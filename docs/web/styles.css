@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   Context Pilot — landing page
+   Daharness — landing page
    Terminal-native aesthetic, derived from the site's shared tokens
    ═══════════════════════════════════════════════════════════ */
 
@@ -475,7 +475,7 @@ code {
 }
 .sovereign p { color: var(--text-2); font-size: 1.05rem; margin-bottom: 26px; }
 
-/* ── Photonicat appliance ───────────────────────────────── */
+/* ── The appliance: software + two modes ────────────────── */
 .appliance {
   max-width: var(--max-w);
   margin: 0 auto;
@@ -507,22 +507,17 @@ code {
 }
 .appliance-flow .sep { color: var(--accent); }
 
-/* Stylized device card */
-.device {
+/* Two-mode cards */
+.modes { display: flex; flex-direction: column; gap: 16px; }
+.mode-card {
   background: linear-gradient(180deg, var(--surface), #141417);
   border: 1px solid var(--border-hi);
   border-radius: 14px;
   padding: 24px;
   box-shadow: 0 24px 64px -28px rgba(0,0,0,.8);
 }
-.device-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
-.device-name {
-  font-family: var(--mono);
-  font-weight: 700;
-  font-size: 1.15rem;
-  letter-spacing: -.02em;
-}
-.device-edition {
+.mode-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.mode-badge {
   font-family: var(--mono);
   font-size: .66rem;
   letter-spacing: .06em;
@@ -532,6 +527,13 @@ code {
   border-radius: 20px;
   padding: 2px 9px;
 }
+.mode-name {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -.02em;
+}
+.mode-desc { color: var(--text-2); font-size: .92rem; line-height: 1.55; margin-bottom: 16px; }
 .device-signal {
   display: flex;
   align-items: center;

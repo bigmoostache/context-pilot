@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Context Pilot — an agent for every project you're juggling</title>
-  <meta name="description" content="Context Pilot is a team of AI agents you can leave in charge — one per project, each staying sharp for hours while you work elsewhere. Runs on your own machines.">
+  <title>Daharness — an agent for every project you're juggling</title>
+  <meta name="description" content="Daharness is a team of AI agents you can leave in charge — one per project, each staying sharp for hours while you work elsewhere. Built on the open-source Context Pilot core; runs on your own machines.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="styles.css">
@@ -14,15 +14,15 @@
   <!-- ── Topbar ─────────────────────────────────────────────── -->
   <header class="topbar">
     <div class="topbar-inner">
-      <a href="../index.html" class="brand">
+      <a href="/" class="brand">
         <span class="brand-glyph" aria-hidden="true">▮</span>
-        context&#8288;-&#8288;pilot
+        Daharness
       </a>
       <nav class="topnav" aria-label="Primary">
         <a href="#work">How it works</a>
         <a href="#context">Staying sharp</a>
         <a href="#box">The box</a>
-        <a href="../trust-center/">Trust</a>
+        <a href="/trust-center/">Trust</a>
         <a href="#contact">Contact</a>
       </nav>
       <div class="topnav-cta">
@@ -39,7 +39,7 @@
         <div class="eyebrow">YOUR REMOTE-WORK COMPANION</div>
         <h1 class="hero-title">One agent per&nbsp;project.<br><span class="accent">All of them working while you're&nbsp;away.</span></h1>
         <p class="hero-sub">
-          Context Pilot is a team of AI agents you can leave in charge — research,
+          Daharness is a team of AI agents you can leave in charge — research,
           writing, data, ops, whatever the project needs. Post one to each of yours,
           then step away: they keep working, checking their own results, and making
           progress. Check in from your terminal or your browser, whenever you like.
@@ -59,7 +59,7 @@
       <div class="cockpit" aria-hidden="true">
         <div class="fleet" id="fleet"><!-- tiles injected by app.js --></div>
 
-        <div class="term" role="img" aria-label="A Context Pilot agent working on a project">
+        <div class="term" role="img" aria-label="A Daharness agent working on a project">
           <div class="term-bar">
             <span class="term-dots"><i></i><i></i><i></i></span>
             <span class="term-title">~/support-triage</span>
@@ -75,7 +75,7 @@
       <div class="band-head">
         <div class="eyebrow">A COWORKER, NOT A CHATBOT</div>
         <h2>Delegate a project. Walk away. Come back to progress.</h2>
-        <p>Working with Context Pilot feels less like prompting a tool and more like handing work to a teammate who keeps going after you log off.</p>
+        <p>Working with Daharness feels less like prompting a tool and more like handing work to a teammate who keeps going after you log off.</p>
       </div>
 
       <ol class="steps">
@@ -102,7 +102,7 @@
       <div class="band-head">
         <div class="eyebrow">WHY THEY DON'T LOSE THE THREAD</div>
         <h2>Most assistants forget where they started. These stay sharp.</h2>
-        <p>Give a typical AI assistant a long task and it slowly drowns — every message piles onto the last until its head is too full to think clearly, and the answers drift. Context Pilot's agents work differently.</p>
+        <p>Give a typical AI assistant a long task and it slowly drowns — every message piles onto the last until its head is too full to think clearly, and the answers drift. Daharness works differently.</p>
       </div>
 
       <div class="ctx">
@@ -118,7 +118,7 @@
 
           <div class="ctx-card ctx-good">
             <div class="ctx-card-head">
-              <span class="ctx-label">Context Pilot</span>
+              <span class="ctx-label">Daharness</span>
               <span class="ctx-tag ctx-tag-ok">curated in real time</span>
             </div>
             <p class="ctx-card-sub">Only what matters to the task, right now.</p>
@@ -133,7 +133,7 @@
 
         <div class="ctx-note">
           <p>
-            Context Pilot's agents are ruthless about what they keep in view,
+            Daharness's agents are ruthless about what they keep in view,
             curating their own attention moment to moment. The important things
             stay in focus — which is why they hold the thread hours into a project,
             not just for the first few minutes.
@@ -148,7 +148,7 @@
       <div class="proof-inner">
         <div class="eyebrow">PROOF IT HOLDS UP</div>
         <p class="proof-line">
-          Context Pilot has put in <span class="accent">months</span> of
+          Daharness has put in <span class="accent">months</span> of
           sustained, self-directed work — enough to build most of itself.
           It holds the thread on long, real projects, not just quick asks.
         </p>
@@ -165,49 +165,71 @@
           folders. Nothing is sent anywhere except the requests you choose to make.
           No account to hand your work to, no telemetry, no middleman.
         </p>
-        <a href="../trust-center/" class="btn btn-ghost">See the Trust Center <span aria-hidden="true">→</span></a>
+        <a href="/trust-center/" class="btn btn-ghost">See the Trust Center <span aria-hidden="true">→</span></a>
       </div>
     </section>
 
-    <!-- ── Photonicat: the appliance ────────────────────────── -->
+    <!-- ── The appliance: software + two modes ──────────────── -->
     <section class="band" id="box">
       <div class="appliance">
         <div class="appliance-copy">
-          <div class="eyebrow">PLUG-IN APPLIANCE</div>
-          <h2>Or run the whole team from a little box.</h2>
+          <div class="eyebrow">SOFTWARE, MEET HARDWARE</div>
+          <h2>Run <span class="accent">Daharness</span> on your machines — or on a box of its&nbsp;own.</h2>
           <p>
-            Context Pilot runs on the <strong>Photonicat</strong> — a pocket-sized
-            5G Wi-Fi router. Plug it in, join its network, and your agents are
-            working on a private LAN in minutes. No server to rack, no cloud to
-            trust, nothing to configure.
+            Daharness is built on <strong>Context Pilot</strong>, the open-source
+            harness that keeps its agents sharp. Run it on your own machines, or let
+            the <strong>Daharness appliance</strong> — a small dedicated box — host
+            the whole team for you, alongside ready-to-use work environments.
+            Nothing to rack, nothing to configure.
           </p>
           <p>
-            Its own 5G uplink means it works anywhere there's signal — a new
-            office, a client site, a kitchen table. Drop one on a home or company
-            network and the whole team shares it.
+            The appliance fits wherever your team already is, in <strong>two&nbsp;modes</strong>.
           </p>
           <div class="appliance-flow">
             <span>Plug in</span><span class="sep" aria-hidden="true">→</span>
-            <span>Join the Wi-Fi</span><span class="sep" aria-hidden="true">→</span>
+            <span>Connect</span><span class="sep" aria-hidden="true">→</span>
             <span>Delegate</span>
           </div>
         </div>
 
-        <div class="device" aria-hidden="true">
-          <div class="device-head">
-            <span class="device-name">Photonicat</span>
-            <span class="device-edition">Context Pilot Edition</span>
+        <div class="modes" aria-hidden="true">
+          <div class="mode-card">
+            <div class="mode-head">
+              <span class="mode-badge">MODE 1</span>
+              <span class="mode-name">On your network</span>
+            </div>
+            <p class="mode-desc">
+              Drop it on your home or company network. It joins the LAN and puts
+              Daharness and its work environments within reach of everyone
+              already connected.
+            </p>
+            <ul class="device-specs">
+              <li><span class="dot dot-live"></span> Joins your existing network</li>
+              <li><span class="dot dot-live"></span> Agents &amp; work environments, shared</li>
+              <li><span class="dot dot-live"></span> Reach it from any device on the LAN</li>
+            </ul>
           </div>
-          <div class="device-signal">
-            <span class="wave"></span><span class="wave"></span><span class="wave"></span>
-            <span class="device-net">5G · private LAN</span>
+
+          <div class="mode-card">
+            <div class="mode-head">
+              <span class="mode-badge">MODE 2</span>
+              <span class="mode-name">Its own network</span>
+            </div>
+            <div class="device-signal">
+              <span class="wave"></span><span class="wave"></span><span class="wave"></span>
+              <span class="device-net">5G · private Wi-Fi</span>
+            </div>
+            <p class="mode-desc">
+              No network to join? Built-in 5G brings it online anywhere there's
+              signal, and it broadcasts its own Wi-Fi — connectivity and
+              Daharness from the same box.
+            </p>
+            <ul class="device-specs">
+              <li><span class="dot dot-live"></span> 5G uplink — online anywhere</li>
+              <li><span class="dot dot-live"></span> Broadcasts its own Wi-Fi</li>
+              <li><span class="dot dot-live"></span> Daharness on a private network</li>
+            </ul>
           </div>
-          <ul class="device-specs">
-            <li><span class="dot dot-live"></span> 5G uplink — online anywhere</li>
-            <li><span class="dot dot-live"></span> Wi-Fi access point for the team</li>
-            <li><span class="dot dot-live"></span> Your agents, running on-box</li>
-            <li><span class="dot dot-live"></span> Nothing leaves the network</li>
-          </ul>
         </div>
       </div>
     </section>
@@ -274,16 +296,16 @@
   <!-- ── Footer ─────────────────────────────────────────────── -->
   <footer class="site-footer">
     <div class="footer-inner">
-      <span class="footer-brand"><span class="brand-glyph" aria-hidden="true">▮</span> context-pilot</span>
+      <span class="footer-brand"><span class="brand-glyph" aria-hidden="true">▮</span> Daharness</span>
       <nav class="footer-links" aria-label="Footer">
-        <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">GitHub</a>
-        <a href="../trust-center/">Trust Center</a>
+        <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">Context Pilot core</a>
+        <a href="/trust-center/">Trust Center</a>
         <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank" rel="noopener">MIT License</a>
       </nav>
     </div>
-    <p class="footer-fine">Runs on your machines · answers to you · fully auditable</p>
+    <p class="footer-fine">Built on the open-source Context Pilot core · runs on your machines · answers to you · fully auditable</p>
   </footer>
 
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

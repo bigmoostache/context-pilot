@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compliance — Context Pilot Trust Center</title>
+  <meta name="description" content="Context Pilot compliance framework: GDPR, SOC 2, ISO 27001, HIPAA applicability assessment, and open-source licensing.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="trust.css">
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────── -->
+  <header class="tc-header">
+    <div class="tc-header-inner">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener" class="tc-brand">
+        <div class="tc-brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <span class="tc-brand-name">Context Pilot</span>
+        <span class="tc-brand-sep">/</span>
+        <span class="tc-brand-label">Trust Center</span>
+      </a>
+      <nav class="tc-header-links">
+        <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">Repository</a>
+        <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank" rel="noopener">Security Policy</a>
+        <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank" rel="noopener">License</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="tc-layout">
+    <!-- ── Sidebar ────────────────────────────────────── -->
+    <aside class="tc-sidebar">
+      <div class="tc-sidebar-section">
+        <div class="tc-sidebar-label">Trust Center</div>
+        <ul class="tc-sidebar-nav">
+          <li><a href="index.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Overview
+          </a></li>
+          <li><a href="security.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Security Architecture
+          </a></li>
+          <li><a href="privacy.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Data Privacy
+          </a></li>
+          <li><a href="compliance.html" class="active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Compliance
+          </a></li>
+          <li><a href="subprocessors.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            Subprocessors
+          </a></li>
+        </ul>
+      </div>
+      <div class="tc-sidebar-footer">
+        <p>Document version 2.0<br>Last reviewed: June 22, 2026</p>
+      </div>
+    </aside>
+
+    <!-- ── Content ────────────────────────────────────── -->
+    <main class="tc-content">
+      <div class="tc-content-inner">
+
+        <div class="tc-breadcrumb">
+          <a href="../index.html">Context Pilot</a>
+          <span class="tc-breadcrumb-sep">/</span>
+          <a href="index.html">Trust Center</a>
+          <span class="tc-breadcrumb-sep">/</span>
+          <span>Compliance</span>
+        </div>
+
+        <h1 class="tc-page-title">Compliance Framework</h1>
+        <div class="tc-page-meta">
+          <div class="tc-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Last updated: June 22, 2026
+          </div>
+          <div class="tc-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Policy CF-2.0
+          </div>
+        </div>
+
+        <p class="tc-page-desc">
+          This document assesses Context Pilot's alignment with major regulatory and industry compliance frameworks. As a locally-deployed, open-source tool with no cloud infrastructure, Context Pilot's compliance profile differs fundamentally from cloud-hosted SaaS applications.
+        </p>
+
+        <!-- Framework Assessment -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">1. Regulatory Framework Assessment</h2>
+          <p class="tc-section-desc">
+            The following assessments evaluate Context Pilot's applicability and alignment with each framework. Because Context Pilot is a locally-deployed tool that does not collect, process, or store user data on behalf of a service provider, many traditional compliance frameworks apply differently or are structurally satisfied.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>GDPR (General Data Protection Regulation)</h4>
+              <span class="tc-badge tc-badge--green">Compatible</span>
+            </div>
+            <p>
+              Context Pilot does not act as a data controller or data processor as defined under GDPR. No personal data is collected, stored, or processed on Context Pilot infrastructure (which does not exist). The operator is the sole data controller for any data processed locally on their workstation.
+            </p>
+            <ul>
+              <li><strong>Data minimization:</strong> Satisfied by architecture. No data is collected beyond what the operator explicitly provides to their configured LLM provider.</li>
+              <li><strong>Purpose limitation:</strong> All data processing serves the operator's immediate coding assistance needs. No secondary use occurs.</li>
+              <li><strong>Storage limitation:</strong> All data resides on the operator's filesystem under their full control. No external retention.</li>
+              <li><strong>Data subject rights:</strong> Exercisable through direct filesystem access. See the <a href="privacy.html">Data Privacy</a> page for details.</li>
+              <li><strong>Third-party transfers:</strong> LLM API calls may constitute a data transfer to the provider's jurisdiction. This is governed by the operator's agreement with their chosen provider, not by Context Pilot.</li>
+            </ul>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>SOC 2 (Service Organization Control)</h4>
+              <span class="tc-badge tc-badge--gray">Not Applicable</span>
+            </div>
+            <p>
+              SOC 2 is designed for service organizations that process, store, or transmit customer data through cloud infrastructure. Context Pilot does not operate as a service organization: there is no cloud service, no customer data processing, and no multi-tenant infrastructure. A SOC 2 engagement would be structurally inapplicable.
+            </p>
+            <p style="margin-top: 8px;">
+              However, the trust service criteria addressed by SOC 2 are substantially satisfied through Context Pilot's architectural controls:
+            </p>
+            <ul>
+              <li><strong>Security:</strong> Local-first architecture, no network attack surface, path traversal protections, SSE ticket authentication</li>
+              <li><strong>Availability:</strong> No centralized service to suffer outages; each deployment is independent</li>
+              <li><strong>Processing Integrity:</strong> SHA-256 hash chain for critical files, 1001 enforced lint rules, automated CI</li>
+              <li><strong>Confidentiality:</strong> No data collection infrastructure; credentials isolated per-provider</li>
+              <li><strong>Privacy:</strong> No telemetry, no analytics, no user tracking; all data local-only</li>
+            </ul>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>ISO 27001 (Information Security Management)</h4>
+              <span class="tc-badge tc-badge--gray">Not Certified</span>
+            </div>
+            <p>
+              Context Pilot has not pursued ISO 27001 certification as it is designed for organizations operating information security management systems for cloud services. The project implements controls aligned with ISO 27001 Annex A categories where applicable to an open-source development tool:
+            </p>
+            <ul>
+              <li><strong>A.8 Asset Management:</strong> All code assets tracked in Git with signed commits and CI enforcement</li>
+              <li><strong>A.9 Access Control:</strong> Filesystem-scoped access, credential isolation, SSE ticket system</li>
+              <li><strong>A.12 Operations Security:</strong> Automated build pipelines, dependency scanning (Dependabot), CodeQL analysis</li>
+              <li><strong>A.14 System Development:</strong> 1001 lint rules, structural enforcement (500-line/8-entry limits), hash chain integrity</li>
+              <li><strong>A.16 Incident Management:</strong> Responsible disclosure program via GitHub Security Advisories</li>
+            </ul>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>HIPAA (Health Insurance Portability and Accountability Act)</h4>
+              <span class="tc-badge tc-badge--gray">Not Applicable</span>
+            </div>
+            <p>
+              Context Pilot is a general-purpose coding assistant. It does not process Protected Health Information (PHI) by design. If an operator uses Context Pilot in a healthcare context, the operator is responsible for ensuring that no PHI is transmitted to LLM providers without appropriate Business Associate Agreements (BAAs) in place with those providers.
+            </p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>CCPA (California Consumer Privacy Act)</h4>
+              <span class="tc-badge tc-badge--green">Compatible</span>
+            </div>
+            <p>
+              Context Pilot does not sell, share, or collect personal information as defined under CCPA. The software does not have the technical capability to collect consumer data. No opt-out mechanism is required because no data collection occurs.
+            </p>
+          </div>
+        </section>
+
+        <!-- Open Source Licensing -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">2. Open-Source Licensing</h2>
+          <p class="tc-section-desc">
+            Context Pilot is distributed under the MIT License, one of the most permissive open-source licenses available.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>MIT License</h4>
+              <span class="tc-badge tc-badge--green">Permissive</span>
+            </div>
+            <p>
+              The MIT License grants the following rights without restriction:
+            </p>
+            <ul>
+              <li>Commercial use in any context, including proprietary products</li>
+              <li>Modification and distribution of source code</li>
+              <li>Private use without disclosure obligations</li>
+              <li>No copyleft or share-alike requirements</li>
+            </ul>
+            <p style="margin-top: 8px;">
+              The sole obligation is preservation of the copyright notice in distributed copies. The license includes a standard disclaimer of warranty and limitation of liability.
+            </p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Dependency License Audit</h4>
+              <span class="tc-badge tc-badge--green">Clean</span>
+            </div>
+            <p>
+              All direct dependencies use permissive open-source licenses (MIT, Apache 2.0, BSD). No copyleft (GPL, AGPL) or proprietary dependencies exist in the dependency tree. The project's <code>Cargo.lock</code> and <code>pnpm-lock.yaml</code> files provide reproducible dependency resolution for independent audit.
+            </p>
+          </div>
+        </section>
+
+        <!-- Security Testing -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">3. Security Testing and Verification</h2>
+          <p class="tc-section-desc">
+            Context Pilot employs continuous automated security verification as part of its development process. The open-source nature of the project additionally enables independent community audit.
+          </p>
+          <table class="tc-table">
+            <thead>
+              <tr>
+                <th>Control</th>
+                <th>Mechanism</th>
+                <th>Frequency</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cell-name">Static Analysis</td>
+                <td>CodeQL (GitHub Advanced Security)</td>
+                <td>Every push and pull request</td>
+                <td><span class="tc-badge tc-badge--green">Active</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Dependency Scanning</td>
+                <td>GitHub Dependabot (Rust + npm)</td>
+                <td>Continuous monitoring</td>
+                <td><span class="tc-badge tc-badge--green">Active</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Lint Enforcement</td>
+                <td>1001 compiler/Clippy rules (980 forbid, 21 deny)</td>
+                <td>Every build</td>
+                <td><span class="tc-badge tc-badge--green">Active</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Integrity Verification</td>
+                <td>SHA-256 hash chain (12 protected files)</td>
+                <td>On modification of protected files</td>
+                <td><span class="tc-badge tc-badge--green">Active</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Format Enforcement</td>
+                <td>rustfmt (Rust) + ESLint (TypeScript)</td>
+                <td>Every build and CI run</td>
+                <td><span class="tc-badge tc-badge--green">Active</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Community Audit</td>
+                <td>Open-source codebase (MIT License)</td>
+                <td>Continuous public availability</td>
+                <td><span class="tc-badge tc-badge--green">Active</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- AI-Specific Regulation -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">4. AI-Specific Regulation</h2>
+          <p class="tc-section-desc">
+            As an AI-powered development tool, Context Pilot's regulatory posture includes assessment against emerging AI-specific frameworks.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>EU AI Act</h4>
+              <span class="tc-badge tc-badge--green">Low Risk</span>
+            </div>
+            <p>
+              Under the EU AI Act risk classification framework, Context Pilot is categorized as a <strong>low-risk</strong> or <strong>minimal-risk</strong> AI system. It does not perform biometric identification, critical infrastructure management, education scoring, employment filtering, law enforcement, or any other high-risk use case enumerated in Annex III. Context Pilot is a general-purpose coding assistant that operates under direct human supervision at all times.
+            </p>
+            <ul>
+              <li><strong>Human oversight:</strong> All AI outputs require explicit human review. The tool does not make autonomous decisions affecting natural persons.</li>
+              <li><strong>Transparency:</strong> The system is clearly identified as an AI assistant. Users interact with it knowingly and intentionally.</li>
+              <li><strong>No prohibited practices:</strong> No subliminal manipulation, social scoring, or real-time biometric identification capabilities exist.</li>
+              <li><strong>General-purpose AI model:</strong> Context Pilot does not train or fine-tune AI models. It uses third-party provider APIs for inference only. GPAI obligations apply to the model providers (Anthropic, OpenAI, etc.), not to Context Pilot.</li>
+            </ul>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>NIST AI Risk Management Framework (AI RMF 1.0)</h4>
+              <span class="tc-badge tc-badge--green">Aligned</span>
+            </div>
+            <p>
+              Context Pilot's design aligns with the NIST AI RMF's core functions:
+            </p>
+            <ul>
+              <li><strong>Govern:</strong> Open-source development with public code review, documented architecture, and transparent decision-making.</li>
+              <li><strong>Map:</strong> Clear system boundaries &mdash; Context Pilot is a developer tool, not an autonomous decision system. Usage context is well-defined.</li>
+              <li><strong>Measure:</strong> All AI interactions are logged locally (conversation history) for operator review. Cost tracking provides usage visibility.</li>
+              <li><strong>Manage:</strong> Guard rails (cost limits, message limits, duration limits) prevent runaway AI operations. Human approval is required for destructive actions.</li>
+            </ul>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Responsible AI Practices</h4>
+              <span class="tc-badge tc-badge--green">Implemented</span>
+            </div>
+            <p>
+              Context Pilot implements multiple safeguards for responsible AI use:
+            </p>
+            <ul>
+              <li><strong>Cost controls:</strong> Per-agent budget limits prevent uncontrolled API spending. Circuit breakers halt operations when budgets are exceeded.</li>
+              <li><strong>Audit trail:</strong> Complete conversation history, tool call logs, and decision traces are preserved locally for operator review.</li>
+              <li><strong>Model transparency:</strong> The operator selects and configures the LLM model. Model identity is always visible. No hidden model switching occurs.</li>
+              <li><strong>Output attribution:</strong> AI-generated content is clearly distinguished from user input in the conversation interface.</li>
+              <li><strong>Operator control:</strong> The operator can interrupt, redirect, or terminate AI operations at any time through guard rails, keyboard shortcuts, or process termination.</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Export Controls -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">5. Export Controls &amp; Sanctions Compliance</h2>
+          <p class="tc-section-desc">
+            This section addresses Context Pilot's posture regarding export controls and international trade sanctions.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Encryption Export Classification</h4>
+              <span class="tc-badge tc-badge--green">Standard</span>
+            </div>
+            <p>
+              Context Pilot uses only standard, commercially available cryptographic implementations (TLS via OpenSSL/rustls, SHA-256 via the <code>sha2</code> crate). No custom or novel cryptographic algorithms are implemented. The software falls under EAR Exception TSU (Technology and Software Unrestricted) for publicly available encryption source code. As open-source software published on GitHub, it qualifies for the publicly available exemption under both US EAR and EU Dual-Use Regulation.
+            </p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Sanctions Compliance</h4>
+            </div>
+            <p>
+              Context Pilot is distributed as open-source software under the MIT License. Distribution is subject to GitHub's terms of service and applicable US export control laws. The software itself does not interact with financial systems, payment processors, or sanctioned entities. Operators are responsible for ensuring their use of third-party API providers complies with applicable sanctions in their jurisdiction.
+            </p>
+          </div>
+        </section>
+
+        <!-- Accessibility -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">6. Accessibility</h2>
+          <p class="tc-section-desc">
+            Context Pilot is committed to making its interfaces accessible to all users.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Web Interface</h4>
+              <span class="tc-badge tc-badge--amber">In Progress</span>
+            </div>
+            <p>
+              The web frontend uses semantic HTML, ARIA attributes, and keyboard-navigable controls. The interface is built with React and shadcn/ui components that include accessibility foundations. Current accessibility features include:
+            </p>
+            <ul>
+              <li>Semantic HTML structure with proper heading hierarchy</li>
+              <li>Keyboard navigation for all interactive elements</li>
+              <li>Sufficient color contrast ratios for text and interactive elements</li>
+              <li>Screen reader compatibility for core workflows</li>
+              <li>No motion-sensitive content or auto-playing media</li>
+            </ul>
+            <p style="margin-top: 8px;">
+              Formal WCAG 2.1 AA compliance audit has not yet been conducted. Accessibility improvements are accepted as contributions and prioritized alongside feature development.
+            </p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Terminal Interface (TUI)</h4>
+              <span class="tc-badge tc-badge--green">Screen Reader Compatible</span>
+            </div>
+            <p>
+              The terminal user interface (TUI) renders through standard terminal emulators and is compatible with terminal-based screen readers. All interactive elements are keyboard-driven by design (the TUI has no mouse interaction as its primary mode). Color is used for enhancement only &mdash; all information is also conveyed through text labels and structural formatting.
+            </p>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <footer class="tc-footer">
+    <span>Context Pilot Trust Center &middot; Version 2.0 &middot; MIT License</span>
+    <div class="tc-footer-links">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a>
+      <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank">Security Policy</a>
+      <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank">License</a>
+    </div>
+  </footer>
+
+</body>
+</html>

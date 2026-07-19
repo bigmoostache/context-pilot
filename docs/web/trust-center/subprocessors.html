@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subprocessor Register — Context Pilot Trust Center</title>
+  <meta name="description" content="Context Pilot subprocessor register: complete inventory of third-party services, data categories transmitted, and opt-in requirements.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="trust.css">
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────── -->
+  <header class="tc-header">
+    <div class="tc-header-inner">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener" class="tc-brand">
+        <div class="tc-brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <span class="tc-brand-name">Context Pilot</span>
+        <span class="tc-brand-sep">/</span>
+        <span class="tc-brand-label">Trust Center</span>
+      </a>
+      <nav class="tc-header-links">
+        <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">Repository</a>
+        <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank" rel="noopener">Security Policy</a>
+        <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank" rel="noopener">License</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="tc-layout">
+    <!-- ── Sidebar ────────────────────────────────────── -->
+    <aside class="tc-sidebar">
+      <div class="tc-sidebar-section">
+        <div class="tc-sidebar-label">Trust Center</div>
+        <ul class="tc-sidebar-nav">
+          <li><a href="index.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Overview
+          </a></li>
+          <li><a href="security.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Security Architecture
+          </a></li>
+          <li><a href="privacy.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Data Privacy
+          </a></li>
+          <li><a href="compliance.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Compliance
+          </a></li>
+          <li><a href="subprocessors.html" class="active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            Subprocessors
+          </a></li>
+        </ul>
+      </div>
+      <div class="tc-sidebar-footer">
+        <p>Document version 3.0<br>Last reviewed: June 22, 2026</p>
+      </div>
+    </aside>
+
+    <!-- ── Content ────────────────────────────────────── -->
+    <main class="tc-content">
+      <div class="tc-content-inner">
+
+        <div class="tc-breadcrumb">
+          <a href="../index.html">Context Pilot</a>
+          <span class="tc-breadcrumb-sep">/</span>
+          <a href="index.html">Trust Center</a>
+          <span class="tc-breadcrumb-sep">/</span>
+          <span>Subprocessors</span>
+        </div>
+
+        <h1 class="tc-page-title">Subprocessor Register</h1>
+        <div class="tc-page-meta">
+          <div class="tc-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Last updated: June 22, 2026
+          </div>
+          <div class="tc-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Register SR-3.0
+          </div>
+        </div>
+
+        <p class="tc-page-desc">
+          This register provides a complete inventory of all third-party services that Context Pilot is capable of communicating with. Context Pilot has no mandatory third-party dependencies beyond a single LLM provider. All other integrations are opt-in and require explicit operator configuration.
+        </p>
+
+        <!-- LLM Providers -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">1. LLM Inference Providers</h2>
+          <p class="tc-section-desc">
+            At least one LLM provider must be configured for AI inference capabilities. The operator selects their provider and supplies their own API key. Context Pilot supports the following providers. Only the configured provider receives data.
+          </p>
+          <table class="tc-table">
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Endpoint</th>
+                <th>Data Categories Transmitted</th>
+                <th>Opt-In Mechanism</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="cell-name"><img class="tc-logo" src="https://cdn.simpleicons.org/anthropic/334155" alt="">Anthropic</div>
+                  <div class="cell-url">api.anthropic.com</div>
+                </td>
+                <td>Direct API</td>
+                <td>System prompt, conversation messages, code context from open files, tool definitions</td>
+                <td><code>ANTHROPIC_API_KEY</code></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><img class="tc-logo" src="https://cdn.simpleicons.org/anthropic/334155" alt="">Anthropic (OAuth)</div>
+                  <div class="cell-url">api.claude.ai</div>
+                </td>
+                <td>Claude Code OAuth</td>
+                <td>System prompt, conversation messages, code context from open files, tool definitions</td>
+                <td>Claude Code CLI credentials</td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><img class="tc-logo" src="logos/openai.svg" alt="">OpenAI</div>
+                  <div class="cell-url">api.openai.com</div>
+                </td>
+                <td>Direct API</td>
+                <td>System prompt, conversation messages, code context from open files, tool definitions</td>
+                <td><code>OPENAI_API_KEY</code></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><img class="tc-logo" src="https://cdn.simpleicons.org/google/334155" alt="">Google AI</div>
+                  <div class="cell-url">generativelanguage.googleapis.com</div>
+                </td>
+                <td>Generative Language API</td>
+                <td>System prompt, conversation messages, code context from open files, tool definitions</td>
+                <td><code>GOOGLE_AI_API_KEY</code></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><img class="tc-logo" src="https://cdn.simpleicons.org/mistralai/334155" alt="">Mistral AI</div>
+                  <div class="cell-url">api.mistral.ai</div>
+                </td>
+                <td>Direct API</td>
+                <td>System prompt, conversation messages, code context from open files, tool definitions</td>
+                <td><code>MISTRAL_API_KEY</code></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><img class="tc-logo" src="logos/groq.svg" alt="">Groq</div>
+                  <div class="cell-url">api.groq.com</div>
+                </td>
+                <td>Direct API</td>
+                <td>Short prompts for auxiliary inference (soul journal)</td>
+                <td><code>GROQ_API_KEY</code></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><span class="tc-logo-letter" style="background:#6366f1;">M</span>MiniMax</div>
+                  <div class="cell-url">api.minimaxi.com</div>
+                </td>
+                <td>Direct API</td>
+                <td>System prompt, conversation messages, code context from open files, tool definitions</td>
+                <td><code>MINIMAX_API_KEY</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Auxiliary Services -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">2. Auxiliary Services</h2>
+          <p class="tc-section-desc">
+            The following services provide optional capabilities. Each requires explicit operator configuration. None are active by default.
+          </p>
+          <table class="tc-table">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Endpoint</th>
+                <th>Purpose</th>
+                <th>Data Categories Transmitted</th>
+                <th>Opt-In Mechanism</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="cell-name"><img class="tc-logo" src="logos/voyageai.svg" alt="">Voyage AI</div>
+                  <div class="cell-url">api.voyageai.com</div>
+                </td>
+                <td>REST API</td>
+                <td>Text embedding generation for hybrid semantic search (voyage-code-3 model)</td>
+                <td>Code and text chunks from indexed project files</td>
+                <td><code>VOYAGE_API_KEY</code></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><img class="tc-logo" src="https://cdn.simpleicons.org/brave/334155" alt="">Brave Search</div>
+                  <div class="cell-url">api.search.brave.com</div>
+                </td>
+                <td>REST API</td>
+                <td>Web search (result snippets and deep content extraction)</td>
+                <td>Search query strings</td>
+                <td><code>BRAVE_API_KEY</code></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><img class="tc-logo" src="logos/firecrawl.svg" alt="">Firecrawl</div>
+                  <div class="cell-url">api.firecrawl.dev</div>
+                </td>
+                <td>REST API</td>
+                <td>Web page scraping, crawling, and structured content extraction</td>
+                <td>Target URLs for scraping</td>
+                <td><code>FIRECRAWL_API_KEY</code></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><img class="tc-logo" src="logos/datalab.svg" alt="">Datalab (Surya)</div>
+                  <div class="cell-url">www.datalab.to</div>
+                </td>
+                <td>REST API</td>
+                <td>OCR and document-to-text conversion</td>
+                <td>Document files (PDF, images) submitted for text extraction</td>
+                <td><code>DATALAB_API_KEY</code></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><img class="tc-logo" src="https://cdn.simpleicons.org/github/334155" alt="">GitHub</div>
+                  <div class="cell-url">api.github.com</div>
+                </td>
+                <td>REST API (via <code>gh</code> CLI)</td>
+                <td>Repository operations (issues, pull requests, releases)</td>
+                <td>Git operations scoped to operator's authenticated repositories</td>
+                <td><code>GITHUB_TOKEN</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Local Services -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">3. Local Services</h2>
+          <p class="tc-section-desc">
+            The following services run locally on the operator's workstation. No data leaves the machine through these services.
+          </p>
+          <table class="tc-table">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Binding</th>
+                <th>Purpose</th>
+                <th>External Traffic</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="cell-name"><img class="tc-logo" src="https://cdn.simpleicons.org/meilisearch/334155" alt="">Meilisearch</div>
+                  <div class="cell-url">127.0.0.1 (localhost)</div>
+                </td>
+                <td>Loopback only</td>
+                <td>Full-text and semantic project search indexing</td>
+                <td><span class="tc-badge tc-badge--green">None</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><span class="tc-logo-letter" style="background:#475569;">C</span>Console Server</div>
+                  <div class="cell-url">Unix domain socket</div>
+                </td>
+                <td>Unix socket (filesystem)</td>
+                <td>Child process lifecycle management (build commands, shells)</td>
+                <td><span class="tc-badge tc-badge--green">None</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><span class="tc-logo-letter" style="background:#1e40af;">O</span>Orchestrator</div>
+                  <div class="cell-url">127.0.0.1:7878</div>
+                </td>
+                <td>Loopback only</td>
+                <td>Multi-agent fleet management, SSE streaming, REST API</td>
+                <td><span class="tc-badge tc-badge--green">None</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cell-name"><img class="tc-logo" src="https://cdn.simpleicons.org/sqlite/334155" alt="">SQLite (Entities)</div>
+                  <div class="cell-url">Embedded library</div>
+                </td>
+                <td>In-process</td>
+                <td>Structured entity and domain knowledge storage</td>
+                <td><span class="tc-badge tc-badge--green">None</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Subprocessor Change Log -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">4. Subprocessor Compliance Matrix</h2>
+          <p class="tc-section-desc">
+            Detailed compliance posture for each external subprocessor, based on independent research conducted June 2026. Operators subject to regulatory requirements should verify all claims directly with each provider.
+          </p>
+
+          <table class="tc-table" style="font-size: 0.82rem;">
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Trust Center</th>
+                <th>SOC 2</th>
+                <th>ISO 27001</th>
+                <th>DPA</th>
+                <th>API Data Retention</th>
+                <th>Training on API Data</th>
+                <th>Data Location</th>
+                <th>Risk</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cell-name">Anthropic</td>
+                <td><a href="https://trust.anthropic.com/" target="_blank">trust.anthropic.com</a></td>
+                <td><span class="tc-badge tc-badge--green">Type II</span></td>
+                <td><span class="tc-badge tc-badge--green">27001</span></td>
+                <td><a href="https://www.anthropic.com/policies/commercial-terms" target="_blank">Auto-included</a></td>
+                <td>7 days (ZDR avail.)</td>
+                <td><span class="tc-badge tc-badge--green">No</span></td>
+                <td>US (EU via Bedrock/Vertex)</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">OpenAI</td>
+                <td><a href="https://trust.openai.com/" target="_blank">trust.openai.com</a></td>
+                <td><span class="tc-badge tc-badge--green">Type 2</span></td>
+                <td><span class="tc-badge tc-badge--green">27001</span></td>
+                <td><a href="https://openai.com/policies/data-processing-addendum/" target="_blank">Public DPA</a></td>
+                <td>30 days (ZDR avail.)</td>
+                <td><span class="tc-badge tc-badge--green">No</span></td>
+                <td>US (EU avail. Enterprise)</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Google AI</td>
+                <td><a href="https://cloud.google.com/security/compliance" target="_blank">Cloud Compliance</a></td>
+                <td><span class="tc-badge tc-badge--green">Type 2</span></td>
+                <td><span class="tc-badge tc-badge--green">27001</span></td>
+                <td><a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank">Cloud DPA</a></td>
+                <td>55 days (paid API)</td>
+                <td><span class="tc-badge tc-badge--green">No (paid)</span></td>
+                <td>Global (EU via Vertex)</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Mistral AI</td>
+                <td><a href="https://trust.mistral.ai/" target="_blank">trust.mistral.ai</a></td>
+                <td><span class="tc-badge tc-badge--green">Type II</span></td>
+                <td><span class="tc-badge tc-badge--amber">Aligned</span></td>
+                <td><a href="https://legal.mistral.ai/terms/data-processing-addendum" target="_blank">Public DPA</a></td>
+                <td>30 days</td>
+                <td><span class="tc-badge tc-badge--green">No</span></td>
+                <td>EU + US (since Feb 2025)</td>
+                <td><span class="tc-badge tc-badge--amber">Medium</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Groq</td>
+                <td><a href="https://trust.groq.com" target="_blank">trust.groq.com</a></td>
+                <td><span class="tc-badge tc-badge--green">Type II</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><a href="https://console.groq.com/docs/legal/customer-data-processing-addendum" target="_blank">Public DPA</a></td>
+                <td>Transient (no storage)</td>
+                <td><span class="tc-badge tc-badge--green">N/A</span></td>
+                <td>US only</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">MiniMax</td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><span class="tc-badge tc-badge--red">Not public</span></td>
+                <td>Not documented</td>
+                <td><span class="tc-badge tc-badge--amber">Unclear</span></td>
+                <td>China</td>
+                <td><span class="tc-badge tc-badge--red">High</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Brave Search</td>
+                <td><a href="https://api-dashboard.search.brave.com/app/documentation/general/security" target="_blank">API Security</a></td>
+                <td><span class="tc-badge tc-badge--green">Type II</span></td>
+                <td><span class="tc-badge tc-badge--amber">Aligned</span></td>
+                <td><a href="https://cdn.search.brave.com/search-api/web/v1/client/_app/immutable/assets/brave-search-api-dpa-2025-09-09.DRXCoye6.pdf" target="_blank">Public DPA</a></td>
+                <td>90 days (query logs)</td>
+                <td><span class="tc-badge tc-badge--green">N/A</span></td>
+                <td>US</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Firecrawl</td>
+                <td><a href="https://www.firecrawl.dev/enterprise" target="_blank">Enterprise</a></td>
+                <td><span class="tc-badge tc-badge--green">Type II</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td>Available (not public)</td>
+                <td>Transient (ZDR default)</td>
+                <td><span class="tc-badge tc-badge--green">N/A</span></td>
+                <td>US (self-host avail.)</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Voyage AI</td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td><span class="tc-badge tc-badge--red">Not public</span></td>
+                <td>Not documented</td>
+                <td><span class="tc-badge tc-badge--red">Default YES</span></td>
+                <td>US</td>
+                <td><span class="tc-badge tc-badge--red">High</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Datalab</td>
+                <td>SOC 2 badge (no portal)</td>
+                <td><span class="tc-badge tc-badge--green">Type II</span></td>
+                <td><span class="tc-badge tc-badge--red">None</span></td>
+                <td>Custom (VPC tier)</td>
+                <td>Transient (OCR)</td>
+                <td><span class="tc-badge tc-badge--amber">Unclear</span></td>
+                <td>US (self-host avail.)</td>
+                <td><span class="tc-badge tc-badge--amber">Medium</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">GitHub</td>
+                <td><a href="https://trust.github.com/" target="_blank">trust.github.com</a></td>
+                <td><span class="tc-badge tc-badge--green">Type 2</span></td>
+                <td><span class="tc-badge tc-badge--green">27001</span></td>
+                <td>Enterprise Agreement</td>
+                <td>Per service (90d audit logs)</td>
+                <td><span class="tc-badge tc-badge--green">No (gh CLI)</span></td>
+                <td>US (EU preview)</td>
+                <td><span class="tc-badge tc-badge--green">Low</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Detailed Compliance Notes -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">5. Detailed Compliance Notes</h2>
+          <p class="tc-section-desc">
+            Material compliance observations for each subprocessor, including certifications, jurisdictional considerations, and known risks. Research conducted June 2026.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Anthropic (Low Risk)</h4></div>
+            <p>SOC 2 Type II + ISO 27001:2022 + ISO/IEC 42001:2023 (AI Management System). API data retention reduced to 7 days (Sept 2025). Zero Data Retention available for Enterprise. DPA with SCCs auto-included in Commercial Terms. HIPAA BAA available. EU data residency for Team/Enterprise (Aug 2025). FedRAMP in progress. API data never used for training.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>OpenAI (Low Risk)</h4></div>
+            <p>SOC 2 Type 2 + ISO 27001/27017/27018/27701 + CSA STAR + PCI-DSS. Public DPA (effective Dec 2025) and public subprocessor list (updated Feb 2026). 30-day default retention; ZDR approval-gated. EU data residency available for Enterprise/Edu/API Projects (Nov 2025). HIPAA BAA available. AES-256 at rest. EU-US DPF certified.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Google AI — Gemini (Low Risk)</h4></div>
+            <p>Context Pilot uses the <strong>paid Gemini API tier</strong> (not free AI Studio). Inherits Google Cloud certifications: SOC 1/2/3, ISO 27001/27017/27018/27701, ISO 42001 (AI Management), FedRAMP High, PCI-DSS v4.0. 55-day retention for abuse monitoring only. Section 17 "Training Restriction" contractually prohibits training. Cloud DPA auto-incorporated for EEA. <strong>Note:</strong> Free AI Studio tier has no DPA, is prohibited for EEA/UK users, and uses data for training — operators must not use the free tier.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Mistral AI (Medium Risk)</h4></div>
+            <p>French company (Paris), directly subject to GDPR. SOC 2 Type I+II. ISO 27001/27701 framework alignment (not explicitly certified). Public DPA with SCCs. 30-day API retention, no training. <strong>Risks:</strong> (1) US processing added Feb 2025 creates CLOUD Act exposure despite EU headquarters; (2) CNIL complaint (Feb 2025) regarding free-tier opt-out difficulty — decision pending. Self-deployment option eliminates both risks.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Groq (Low Risk)</h4></div>
+            <p>Inference platform (LPU hardware) running third-party open-source models — not a model developer. SOC 2 Type II. Data transient by design (not stored beyond request lifecycle). Formal DPA with SCCs covering GDPR/CCPA/PDPL. US-only (GCP). HIPAA explicitly not available. Training question is N/A since Groq does not train models.</p>
+          </div>
+
+          <div class="tc-policy" style="border-left-color: var(--tc-red, #dc2626);">
+            <div class="tc-policy-header"><h4>MiniMax (High Risk)</h4></div>
+            <p><strong>Chinese company</strong> (Shanghai/Beijing) subject to PIPL, Cybersecurity Law, and Data Security Law. No trust center, no SOC 2, no ISO 27001, no public DPA, no public subprocessor list. Data retention and training policies not clearly documented. <strong>Key risks:</strong> Chinese jurisdiction enables government data access under domestic law; no Western-standard certifications; limited public transparency; PIPL cross-border transfer restrictions. Operators handling regulated data should avoid this provider or evaluate jurisdictional exposure carefully.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Brave Search (Low Risk)</h4></div>
+            <p>SOC 2 Type II (Oct 2025). External pentests (HackerOne). ISO 27001/27701 framework aligned but not yet certified. Public DPA with SCCs — note: DPA does not cover Search Query Data (Brave's legal position: API queries are machine-to-machine, not personal data). 90-day query log retention; ZDR available for Enterprise. Independent 40B+ page search index. TEE for AI features.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Firecrawl (Low Risk)</h4></div>
+            <p>SOC 2 Type II. Fundamentally transient processing: web pages processed in memory and immediately deleted — zero data retention by default. DPA available but not publicly linked. Full self-host option for air-gapped deployments. 99.9% SLA on Enterprise tier. Context Pilot sends only target URLs; scraped content returned and discarded by Firecrawl.</p>
+          </div>
+
+          <div class="tc-policy" style="border-left-color: var(--tc-red, #dc2626);">
+            <div class="tc-policy-header"><h4>Voyage AI (High Risk)</h4></div>
+            <p>No trust center, no SOC 2, no ISO 27001, no public DPA. <strong>Critical:</strong> Privacy policy grants Voyage AI a "worldwide, irrevocable, perpetual, royalty-free license" to use customer content for training by default. Opt-out requires explicit request. No public subprocessor list. Limited compliance maturity. <strong>Mitigating factor:</strong> Context Pilot sends only code chunks and log entries for embedding generation (semantic search indexing), not conversation content or prompts. Operators concerned about code exposure should consider disabling the Voyage AI embedder (<code>VOYAGE_API_KEY</code> is optional — keyword search works without it).</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>Datalab / Surya (Medium Risk)</h4></div>
+            <p>SOC 2 Type II for Managed Cloud tier. Open-source models (Surya 56.6k stars, Marker 11.1k stars on GitHub) — fully auditable code. Three deployment tiers: Managed Cloud (SOC 2, pay-as-you-go), VPC (AWS/GCP/Azure, custom BAA/DPA), and On-prem/Air-gapped (zero internet). Trusted by Anthropic, Siemens Healthineers, Stanford, MIT. Context Pilot sends documents temporarily for OCR processing. Self-host option eliminates external data transfer entirely.</p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header"><h4>GitHub (Low Risk)</h4></div>
+            <p>Microsoft subsidiary. SOC 1/2 Type 2, SOC 3, ISO 27001, CSA CAIQ, FedRAMP authorized. DPA included in Enterprise Customer Agreement; Microsoft DPA apparatus inherited. EU data residency in preview. Context Pilot uses the <code>gh</code> CLI for repository operations (issues, PRs) — not GitHub Copilot. Private repos not used for training without consent. EU-US DPF certified (via Microsoft).</p>
+          </div>
+        </section>
+
+        <!-- Subprocessor Change Log -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">6. Subprocessor Change Log</h2>
+          <p class="tc-section-desc">
+            Material changes to the subprocessor register are documented below. Enterprise customers evaluating Context Pilot for procurement may reference this log to track third-party dependency changes across versions.
+          </p>
+          <table class="tc-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Change Type</th>
+                <th>Service</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cell-name">June 2026</td>
+                <td><span class="tc-badge tc-badge--blue">Added</span></td>
+                <td>MiniMax</td>
+                <td>Added as optional LLM provider. Note: Chinese jurisdiction — see Compliance Matrix for risk assessment</td>
+              </tr>
+              <tr>
+                <td class="cell-name">June 2026</td>
+                <td><span class="tc-badge tc-badge--green">Enhanced</span></td>
+                <td>All providers</td>
+                <td>Independent compliance research conducted: trust centers, certifications, DPA availability, data retention, training policies documented per subprocessor</td>
+              </tr>
+              <tr>
+                <td class="cell-name">June 2026</td>
+                <td><span class="tc-badge tc-badge--blue">Added</span></td>
+                <td>Groq</td>
+                <td>Added as optional LLM provider for auxiliary inference workloads</td>
+              </tr>
+              <tr>
+                <td class="cell-name">May 2026</td>
+                <td><span class="tc-badge tc-badge--blue">Added</span></td>
+                <td>Voyage AI</td>
+                <td>Added for text embedding generation (hybrid search). Optional; keyword search works without it</td>
+              </tr>
+              <tr>
+                <td class="cell-name">May 2026</td>
+                <td><span class="tc-badge tc-badge--blue">Added</span></td>
+                <td>Datalab (Surya)</td>
+                <td>Added for OCR and document conversion. Optional service</td>
+              </tr>
+              <tr>
+                <td class="cell-name">April 2026</td>
+                <td><span class="tc-badge tc-badge--green">Initial</span></td>
+                <td>All others</td>
+                <td>Initial subprocessor register published with Anthropic, OpenAI, Google AI, Mistral, Brave, Firecrawl, GitHub, Meilisearch</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Notice -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">7. Important Notice</h2>
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Operator Responsibility</h4>
+            </div>
+            <p>
+              The operator is solely responsible for evaluating the data handling practices of their selected third-party providers. Context Pilot facilitates connections to these services but does not act as an intermediary, does not negotiate data processing terms on behalf of operators, and does not have access to data transmitted between the operator's workstation and the provider's endpoint.
+            </p>
+            <p style="margin-top: 8px;">
+              Operators subject to regulatory requirements (GDPR, HIPAA, CCPA, etc.) should independently verify that their chosen providers offer appropriate data processing agreements, data residency options, and contractual safeguards for their jurisdiction and use case.
+            </p>
+          </div>
+        </section>
+
+        <!-- Vendor Risk Assessment -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">8. Vendor Risk Assessment Criteria</h2>
+          <p class="tc-section-desc">
+            The following criteria are evaluated when considering new third-party service integrations for Context Pilot. This framework ensures that any addition to the subprocessor register meets minimum security and privacy standards.
+          </p>
+
+          <table class="tc-table">
+            <thead>
+              <tr>
+                <th>Criterion</th>
+                <th>Requirement</th>
+                <th>Weight</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cell-name">API-key authentication</td>
+                <td>Provider must support API key authentication (no OAuth flows that require Context Pilot to hold session tokens on behalf of users)</td>
+                <td><span class="tc-badge tc-badge--green">Mandatory</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">TLS encryption</td>
+                <td>Provider must serve all API endpoints over HTTPS with TLS 1.2 or higher</td>
+                <td><span class="tc-badge tc-badge--green">Mandatory</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Published privacy policy</td>
+                <td>Provider must publish a clear privacy policy describing data handling, retention, and processing purposes</td>
+                <td><span class="tc-badge tc-badge--green">Mandatory</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Opt-in activation</td>
+                <td>Integration must require explicit operator configuration (API key provisioning). No provider may be active by default.</td>
+                <td><span class="tc-badge tc-badge--green">Mandatory</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">Data minimization</td>
+                <td>Only data strictly necessary for the service's function is transmitted (e.g., search queries for search, code context for inference)</td>
+                <td><span class="tc-badge tc-badge--green">Mandatory</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">No training on API data</td>
+                <td>Provider should not use API-submitted data for model training without explicit opt-in from the operator</td>
+                <td><span class="tc-badge tc-badge--amber">Strong preference</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">DPA availability</td>
+                <td>Provider should offer a Data Processing Agreement for enterprise customers</td>
+                <td><span class="tc-badge tc-badge--amber">Preferred</span></td>
+              </tr>
+              <tr>
+                <td class="cell-name">SOC 2 / ISO 27001</td>
+                <td>Provider should hold recognized security certifications or demonstrate equivalent controls</td>
+                <td><span class="tc-badge tc-badge--amber">Preferred</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Data Flow Diagram -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">9. Data Flow Summary</h2>
+          <p class="tc-section-desc">
+            The following diagram summarizes the data flow architecture. All arrows represent operator-initiated, operator-configured connections. No connection exists that is not explicitly listed below.
+          </p>
+
+          <!-- Workstation box -->
+          <div class="tc-diagram">
+            <div class="tc-diagram-box">
+              <div class="tc-diagram-box-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                Operator's Workstation
+                <span class="tc-diagram-box-note">All processes local — no inbound connections</span>
+              </div>
+              <div class="tc-diagram-grid">
+                <div class="tc-diagram-node tc-diagram-node--primary">
+                  <div class="tc-diagram-node-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                  </div>
+                  <strong>TUI Agent</strong>
+                  <span>Rust binary</span>
+                </div>
+                <div class="tc-diagram-node tc-diagram-node--primary">
+                  <div class="tc-diagram-node-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                  </div>
+                  <strong>Orchestrator</strong>
+                  <span>:7878 (loopback)</span>
+                </div>
+                <div class="tc-diagram-node tc-diagram-node--primary">
+                  <div class="tc-diagram-node-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  </div>
+                  <strong>Web Frontend</strong>
+                  <span>React / Vite</span>
+                </div>
+                <div class="tc-diagram-node tc-diagram-node--secondary">
+                  <div class="tc-diagram-node-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  </div>
+                  <strong>Meilisearch</strong>
+                  <span>localhost only</span>
+                </div>
+                <div class="tc-diagram-node tc-diagram-node--secondary">
+                  <div class="tc-diagram-node-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                  </div>
+                  <strong>Console Server</strong>
+                  <span>Unix socket</span>
+                </div>
+                <div class="tc-diagram-node tc-diagram-node--secondary">
+                  <div class="tc-diagram-node-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                  </div>
+                  <strong>SQLite Entities</strong>
+                  <span>Embedded</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Arrow -->
+            <div class="tc-diagram-arrow">
+              <div class="tc-diagram-arrow-line"></div>
+              <div class="tc-diagram-arrow-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                TLS 1.2+ &middot; Outbound only &middot; Operator-initiated
+              </div>
+              <div class="tc-diagram-arrow-head"></div>
+            </div>
+
+            <!-- Providers box -->
+            <div class="tc-diagram-box tc-diagram-box--external">
+              <div class="tc-diagram-box-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                Configured API Providers
+                <span class="tc-diagram-box-note">Operator's API keys — only configured providers receive data</span>
+              </div>
+              <div class="tc-diagram-provider-group">
+                <div class="tc-diagram-provider-label">LLM Inference</div>
+                <div class="tc-diagram-providers">
+                  <span class="tc-diagram-pill"><img class="tc-logo-sm" src="https://cdn.simpleicons.org/anthropic/64748b" alt="">Anthropic</span>
+                  <span class="tc-diagram-pill"><img class="tc-logo-sm" src="logos/openai.svg" alt="">OpenAI</span>
+                  <span class="tc-diagram-pill"><img class="tc-logo-sm" src="https://cdn.simpleicons.org/google/64748b" alt="">Google AI</span>
+                  <span class="tc-diagram-pill"><img class="tc-logo-sm" src="https://cdn.simpleicons.org/mistralai/64748b" alt="">Mistral AI</span>
+                  <span class="tc-diagram-pill"><img class="tc-logo-sm" src="logos/groq.svg" alt="">Groq</span>
+                  <span class="tc-diagram-pill"><span class="tc-logo-letter tc-logo-letter--sm" style="background:#6366f1;">M</span>MiniMax</span>
+                </div>
+              </div>
+              <div class="tc-diagram-provider-group">
+                <div class="tc-diagram-provider-label">Auxiliary Services</div>
+                <div class="tc-diagram-providers">
+                  <span class="tc-diagram-pill"><img class="tc-logo-sm" src="https://cdn.simpleicons.org/brave/64748b" alt="">Brave Search</span>
+                  <span class="tc-diagram-pill"><img class="tc-logo-sm" src="logos/firecrawl.svg" alt="">Firecrawl</span>
+                  <span class="tc-diagram-pill"><img class="tc-logo-sm" src="logos/voyageai.svg" alt="">Voyage AI</span>
+                  <span class="tc-diagram-pill"><img class="tc-logo-sm" src="logos/datalab.svg" alt="">Datalab</span>
+                  <span class="tc-diagram-pill"><img class="tc-logo-sm" src="https://cdn.simpleicons.org/github/64748b" alt="">GitHub</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <footer class="tc-footer">
+    <span>Context Pilot Trust Center &middot; Version 3.0 &middot; MIT License</span>
+    <div class="tc-footer-links">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a>
+      <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank">Security Policy</a>
+      <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank">License</a>
+    </div>
+  </footer>
+
+</body>
+</html>

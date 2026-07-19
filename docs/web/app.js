@@ -1,4 +1,4 @@
-/* Context Pilot landing — fleet render, hero typewriter, reveal, contact form.
+/* Daharness landing — fleet render, hero typewriter, reveal, contact form.
    No dependencies. Degrades to a static, readable page without JS or motion. */
 (function () {
   'use strict';
@@ -52,7 +52,7 @@
   /* ── Hero terminal typewriter (a delegated task) ──────── */
   var script = [
     { cls: 'prompt', text: '› ', follow: 'user', followText: 'flag the recurring problems in last month\'s support tickets' },
-    { cls: 'muted',  text: 'context-pilot · on it' },
+    { cls: 'muted',  text: 'daharness · on it' },
     { cls: 'tool',   text: '⚙ read   tickets/2026-06  (214 items)' },
     { cls: 'tool',   text: '⚙ search common themes' },
     { cls: 'asst',   text: 'Three issues account for most of the' },
@@ -188,7 +188,7 @@
         result.hidden = false;
         result.innerHTML =
           '<span class="ok">✓ message queued</span>\n' +
-          '<span class="muted">context-pilot › thanks, </span>' +
+          '<span class="muted">daharness › thanks, </span>' +
           '<span class="accent">' + esc(who) + '</span>\n' +
           '<span class="muted">we\'ll reply to </span><span class="accent">' + esc(addr) + '</span>';
       }

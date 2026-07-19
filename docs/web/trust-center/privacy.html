@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Privacy — Context Pilot Trust Center</title>
+  <meta name="description" content="Context Pilot data privacy: data classification, storage, retention, handling practices, and privacy-by-design controls.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="trust.css">
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────── -->
+  <header class="tc-header">
+    <div class="tc-header-inner">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener" class="tc-brand">
+        <div class="tc-brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <span class="tc-brand-name">Context Pilot</span>
+        <span class="tc-brand-sep">/</span>
+        <span class="tc-brand-label">Trust Center</span>
+      </a>
+      <nav class="tc-header-links">
+        <a href="https://github.com/bigmoostache/context-pilot" target="_blank" rel="noopener">Repository</a>
+        <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank" rel="noopener">Security Policy</a>
+        <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank" rel="noopener">License</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="tc-layout">
+    <!-- ── Sidebar ────────────────────────────────────── -->
+    <aside class="tc-sidebar">
+      <div class="tc-sidebar-section">
+        <div class="tc-sidebar-label">Trust Center</div>
+        <ul class="tc-sidebar-nav">
+          <li><a href="index.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Overview
+          </a></li>
+          <li><a href="security.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Security Architecture
+          </a></li>
+          <li><a href="privacy.html" class="active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Data Privacy
+          </a></li>
+          <li><a href="compliance.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Compliance
+          </a></li>
+          <li><a href="subprocessors.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            Subprocessors
+          </a></li>
+        </ul>
+      </div>
+      <div class="tc-sidebar-footer">
+        <p>Document version 2.0<br>Last reviewed: June 22, 2026</p>
+      </div>
+    </aside>
+
+    <!-- ── Content ────────────────────────────────────── -->
+    <main class="tc-content">
+      <div class="tc-content-inner">
+
+        <div class="tc-breadcrumb">
+          <a href="../index.html">Context Pilot</a>
+          <span class="tc-breadcrumb-sep">/</span>
+          <a href="index.html">Trust Center</a>
+          <span class="tc-breadcrumb-sep">/</span>
+          <span>Data Privacy</span>
+        </div>
+
+        <h1 class="tc-page-title">Data Privacy</h1>
+        <div class="tc-page-meta">
+          <div class="tc-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Last updated: June 22, 2026
+          </div>
+          <div class="tc-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Policy DP-2.0
+          </div>
+        </div>
+
+        <p class="tc-page-desc">
+          This document describes how Context Pilot handles data throughout its lifecycle, including classification, storage, transmission, and retention. Context Pilot's privacy posture is defined by a fundamental architectural property: we do not operate data-receiving infrastructure, making data collection structurally impossible.
+        </p>
+
+        <!-- Data Classification -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">1. Data Classification</h2>
+          <p class="tc-section-desc">
+            The following table categorizes all data types processed by Context Pilot, their storage locations, and transmission characteristics.
+          </p>
+          <table class="tc-table">
+            <thead>
+              <tr>
+                <th>Data Category</th>
+                <th>Storage Location</th>
+                <th>Transmission</th>
+                <th>Classification</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cell-name">Source code context</td>
+                <td>Assembled in-memory during active sessions</td>
+                <td><span class="tc-badge tc-badge--amber">To configured LLM provider</span></td>
+                <td>Confidential</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Conversation history</td>
+                <td><code>.context-pilot/</code> &mdash; YAML files</td>
+                <td><span class="tc-badge tc-badge--green">Local only</span></td>
+                <td>Internal</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Entity database</td>
+                <td><code>.context-pilot/shared/entities/</code> &mdash; SQLite</td>
+                <td><span class="tc-badge tc-badge--green">Local only</span></td>
+                <td>Internal</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Memory store</td>
+                <td><code>.context-pilot/</code> &mdash; YAML files</td>
+                <td><span class="tc-badge tc-badge--green">Local only</span></td>
+                <td>Internal</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Log entries</td>
+                <td><code>.context-pilot/</code> &mdash; YAML files</td>
+                <td><span class="tc-badge tc-badge--green">Local only</span></td>
+                <td>Internal</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Search index</td>
+                <td>Meilisearch on <code>127.0.0.1</code> (local sidecar)</td>
+                <td><span class="tc-badge tc-badge--green">Local only</span></td>
+                <td>Internal</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Text embeddings</td>
+                <td>Indexed locally in Meilisearch</td>
+                <td><span class="tc-badge tc-badge--amber">To Voyage AI (if configured)</span></td>
+                <td>Confidential</td>
+              </tr>
+              <tr>
+                <td class="cell-name">API credentials</td>
+                <td><code>.env</code> file or environment variables</td>
+                <td><span class="tc-badge tc-badge--amber">To designated provider only</span></td>
+                <td>Secret</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Search queries</td>
+                <td>Not persisted</td>
+                <td><span class="tc-badge tc-badge--amber">To Brave Search (if configured)</span></td>
+                <td>Internal</td>
+              </tr>
+              <tr>
+                <td class="cell-name">OCR documents</td>
+                <td>Cached at <code>~/.context-pilot/ocr-cache/</code></td>
+                <td><span class="tc-badge tc-badge--amber">To Datalab (if configured)</span></td>
+                <td>Confidential</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Privacy Controls -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">2. Privacy-by-Design Controls</h2>
+          <p class="tc-section-desc">
+            The following controls are enforced at the architectural level. They are not configurable options &mdash; they are structural properties of the system design.
+          </p>
+          <div class="tc-controls">
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>No data collection infrastructure</h4>
+                <p>Context Pilot does not operate servers, databases, APIs, or any other infrastructure capable of receiving user data. The organization has no technical ability to access, collect, or process user data. This is a structural guarantee, not a policy commitment.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>No telemetry or analytics</h4>
+                <p>The software contains no telemetry endpoints, analytics SDKs, crash reporting services, feature flags, or usage tracking mechanisms. This can be independently verified by auditing the open-source codebase for any HTTP call not attributable to a user-configured provider.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Credential isolation</h4>
+                <p>API keys are stored in local files (<code>.env</code>) or system environment variables. Each credential is routed exclusively to its designated provider endpoint. No credential aggregation, cross-provider sharing, or centralized key management exists.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Opt-in external services</h4>
+                <p>Every third-party service integration is explicitly opt-in. The operator must provide an API key to enable each service. No service communicates with external endpoints without explicit operator configuration.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Data Retention -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">3. Data Retention Policy</h2>
+          <p class="tc-section-desc">
+            As all data resides on the operator's local filesystem, retention is fully under operator control. Context Pilot does not enforce retention schedules &mdash; the operator manages data lifecycle through standard filesystem operations.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Local Data</h4>
+              <span class="tc-badge tc-badge--blue">Operator-Controlled</span>
+            </div>
+            <p>
+              All persistent data under <code>.context-pilot/</code> can be deleted, archived, or backed up by the operator at any time using standard filesystem tools. No special tooling or API calls are required for data deletion.
+            </p>
+            <ul>
+              <li>Conversation history: YAML files, deletable individually or in bulk</li>
+              <li>Entity database: SQLite file, deletable or exportable</li>
+              <li>Memory and log stores: YAML files, deletable individually</li>
+              <li>Search index: Meilisearch data directory, deletable for full re-index</li>
+              <li>OCR cache: File-based cache, deletable for space reclamation</li>
+            </ul>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Provider-Transmitted Data</h4>
+              <span class="tc-badge tc-badge--amber">Provider-Dependent</span>
+            </div>
+            <p>
+              Data transmitted to third-party providers (LLM inference requests, search queries, embedding vectors) is subject to each provider's own data retention and processing policies. Context Pilot does not control post-transmission data handling. Operators should review their provider agreements independently.
+            </p>
+            <ul>
+              <li>Anthropic API: Does not train on API data by default (see <a href="https://www.anthropic.com/policies" target="_blank">Anthropic's data policy</a>)</li>
+              <li>OpenAI API: Configurable data retention (see <a href="https://openai.com/policies" target="_blank">OpenAI's data policy</a>)</li>
+              <li>Other providers: Refer to each provider's published data processing terms</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Data Subject Rights -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">4. Data Subject Rights</h2>
+          <p class="tc-section-desc">
+            Context Pilot's local-first architecture simplifies data subject rights compliance. Because no personal data is collected by Context Pilot, the following rights are satisfied by architecture.
+          </p>
+          <table class="tc-table">
+            <thead>
+              <tr>
+                <th>Right</th>
+                <th>Applicability</th>
+                <th>Mechanism</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cell-name">Right of Access</td>
+                <td>All data is on the operator's local filesystem</td>
+                <td>Direct filesystem access</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Right to Erasure</td>
+                <td>Operator has full control over local data</td>
+                <td>Delete <code>.context-pilot/</code> directory</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Right to Portability</td>
+                <td>Data stored in standard formats (YAML, SQLite)</td>
+                <td>Copy/archive the project directory</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Right to Restrict Processing</td>
+                <td>Operator controls all processing locally</td>
+                <td>Disable specific modules or stop the application</td>
+              </tr>
+              <tr>
+                <td class="cell-name">Right to Object</td>
+                <td>No automated decision-making by Context Pilot</td>
+                <td>Not applicable &mdash; all actions are user-initiated</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- FAQ -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">5. Frequently Asked Questions</h2>
+          <div class="tc-faq">
+            <div class="tc-faq-item">
+              <button class="tc-faq-q" onclick="this.parentElement.classList.toggle('open')">
+                Does Context Pilot send my code to your servers?
+                <svg class="tc-faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <div class="tc-faq-a"><div class="tc-faq-a-inner">
+                No. Context Pilot does not operate servers. The software runs entirely on your workstation. The only network calls are to LLM providers you configure with your own API keys. You can verify this by auditing the open-source codebase.
+              </div></div>
+            </div>
+            <div class="tc-faq-item">
+              <button class="tc-faq-q" onclick="this.parentElement.classList.toggle('open')">
+                What data does my LLM provider receive?
+                <svg class="tc-faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <div class="tc-faq-a"><div class="tc-faq-a-inner">
+                Your LLM provider receives the assembled conversation context (system prompt, tool definitions, conversation messages, and code context from open files) for each inference request. The specific data transmitted depends on which files you have open and what context the AI is working with. Provider data handling is governed by your agreement with that provider.
+              </div></div>
+            </div>
+            <div class="tc-faq-item">
+              <button class="tc-faq-q" onclick="this.parentElement.classList.toggle('open')">
+                Can Context Pilot operate in an air-gapped environment?
+                <svg class="tc-faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <div class="tc-faq-a"><div class="tc-faq-a-inner">
+                Core functionality works offline. File management, local search (keyword-based), memory systems, entity databases, and conversation management do not require network access. LLM inference requires API connectivity to your configured provider. Semantic search requires the Voyage AI embedding service. Web search and scraping require their respective services. All external services are opt-in.
+              </div></div>
+            </div>
+            <div class="tc-faq-item">
+              <button class="tc-faq-q" onclick="this.parentElement.classList.toggle('open')">
+                Is there any telemetry I need to disable?
+                <svg class="tc-faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <div class="tc-faq-a"><div class="tc-faq-a-inner">
+                No. There is no telemetry to disable because none exists. The software does not contain analytics endpoints, tracking pixels, crash reporters, or phone-home mechanisms. This is verifiable in the source code.
+              </div></div>
+            </div>
+            <div class="tc-faq-item">
+              <button class="tc-faq-q" onclick="this.parentElement.classList.toggle('open')">
+                How do I completely remove all Context Pilot data?
+                <svg class="tc-faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <div class="tc-faq-a"><div class="tc-faq-a-inner">
+                Delete the <code>.context-pilot/</code> directory in your project root. For global configuration, delete <code>~/.context-pilot/</code>. These are the only two locations where Context Pilot writes persistent data. No external cleanup is required on our side because we hold no data.
+              </div></div>
+            </div>
+            <div class="tc-faq-item">
+              <button class="tc-faq-q" onclick="this.parentElement.classList.toggle('open')">
+                Does Context Pilot comply with my company's data loss prevention (DLP) policy?
+                <svg class="tc-faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <div class="tc-faq-a"><div class="tc-faq-a-inner">
+                Context Pilot transmits data only to explicitly configured API providers. All outbound connections are enumerable and predictable (see the <a href="subprocessors.html">Subprocessor Register</a>). If your DLP policy restricts data transmission to specific endpoints, you can verify compliance by reviewing the configured provider list. No undocumented or hidden network calls exist. For maximum control, you can operate Context Pilot with only a locally-hosted LLM provider, achieving zero data egress.
+              </div></div>
+            </div>
+            <div class="tc-faq-item">
+              <button class="tc-faq-q" onclick="this.parentElement.classList.toggle('open')">
+                Can I use Context Pilot with confidential or classified data?
+                <svg class="tc-faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <div class="tc-faq-a"><div class="tc-faq-a-inner">
+                Context Pilot itself does not transmit data to any Context Pilot-operated infrastructure. However, it does transmit code context to your configured LLM provider for inference. Whether this is acceptable depends on your LLM provider's data handling terms and your organization's classification requirements. For highest sensitivity, consider using a locally-hosted LLM (via an OpenAI-compatible API endpoint) to keep all data on-premises.
+              </div></div>
+            </div>
+            <div class="tc-faq-item">
+              <button class="tc-faq-q" onclick="this.parentElement.classList.toggle('open')">
+                Does Context Pilot store any biometric data or PII?
+                <svg class="tc-faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <div class="tc-faq-a"><div class="tc-faq-a-inner">
+                No. Context Pilot does not collect, process, or store biometric data, personally identifiable information (PII), or any form of personal data. The only "user data" that exists is the operator's own project files, which Context Pilot reads (with filesystem-level permissions) to provide coding assistance. Context Pilot has no concept of user identity, user accounts, or user profiles.
+              </div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Cookie and Tracking -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">6. Cookie &amp; Tracking Policy</h2>
+          <p class="tc-section-desc">
+            Context Pilot has no cookie or tracking infrastructure. This section exists to provide a definitive, auditable answer for compliance questionnaires.
+          </p>
+
+          <div class="tc-controls">
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Zero cookies</h4>
+                <p>Context Pilot does not set, read, or transmit HTTP cookies. The orchestration backend does not issue <code>Set-Cookie</code> headers. No session cookies, authentication cookies, tracking cookies, or third-party cookies exist in the application.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Zero tracking pixels</h4>
+                <p>No tracking pixels, web beacons, fingerprinting scripts, or third-party analytics SDKs are included in any part of the application. The web frontend loads only first-party JavaScript from the local development server.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>No advertising identifiers</h4>
+                <p>No advertising IDs, device fingerprints, Google Analytics, Mixpanel, Amplitude, Segment, Heap, Hotjar, FullStory, or equivalent services are integrated. No consent banner is needed because there is nothing to consent to.</p>
+              </div>
+            </div>
+            <div class="tc-control">
+              <div class="tc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="tc-control-text">
+                <h4>Local storage usage</h4>
+                <p>The web frontend uses the browser's <code>localStorage</code> API for user preferences only (active view, active agent, thread selection, draft composer text). This data never leaves the browser and is fully controlled by the operator. It can be cleared via standard browser developer tools at any time.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- International Data Transfers -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">7. International Data Transfers</h2>
+          <p class="tc-section-desc">
+            Context Pilot's local-first architecture means no data crosses international borders through Context Pilot infrastructure. However, operator-configured API integrations may involve cross-border data transfers.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Context Pilot Infrastructure</h4>
+              <span class="tc-badge tc-badge--green">No Transfer</span>
+            </div>
+            <p>
+              Context Pilot does not operate servers in any jurisdiction. All data processing occurs on the operator's workstation in the operator's jurisdiction. No data crosses borders through Context Pilot-controlled infrastructure because no such infrastructure exists.
+            </p>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Third-Party Provider Transfers</h4>
+              <span class="tc-badge tc-badge--amber">Operator Responsibility</span>
+            </div>
+            <p>
+              When the operator configures API integrations (LLM providers, search, OCR), data may be transmitted to servers in the provider's jurisdiction. The operator is responsible for evaluating the data transfer implications:
+            </p>
+            <ul>
+              <li><strong>Anthropic:</strong> US-based. Processes API data in the United States. See <a href="https://www.anthropic.com/policies" target="_blank">Anthropic's privacy policy</a> for SCCs and adequacy measures.</li>
+              <li><strong>OpenAI:</strong> US-based. Data processed in the United States. Enterprise agreements may include EU data residency. See <a href="https://openai.com/policies" target="_blank">OpenAI's data policy</a>.</li>
+              <li><strong>Google AI:</strong> Global infrastructure. Data processing location depends on the operator's Google Cloud configuration.</li>
+              <li><strong>Mistral AI:</strong> EU-based (Paris, France). Data processed within the European Union.</li>
+              <li><strong>Brave Search:</strong> US-based. Search queries processed in the United States.</li>
+              <li><strong>Voyage AI:</strong> US-based. Text chunks processed for embedding generation.</li>
+            </ul>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>GDPR Transfer Mechanisms</h4>
+            </div>
+            <p>
+              Operators subject to GDPR who transmit data to non-EU providers should verify that their provider offers appropriate transfer mechanisms: Standard Contractual Clauses (SCCs), adequacy decisions, or Binding Corporate Rules (BCRs). Context Pilot cannot negotiate or enforce these mechanisms on behalf of operators, as it is not a party to the data processing relationship.
+            </p>
+          </div>
+        </section>
+
+        <!-- DPA Framework -->
+        <section class="tc-section">
+          <h2 class="tc-section-title">8. Data Processing Agreement Framework</h2>
+          <p class="tc-section-desc">
+            Context Pilot's architecture fundamentally differs from cloud SaaS products. This section addresses the applicability of Data Processing Agreements.
+          </p>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>DPA Applicability Assessment</h4>
+            </div>
+            <p>
+              A Data Processing Agreement (DPA) is a contractual arrangement between a data controller and a data processor. Context Pilot does not process data on behalf of operators &mdash; it is software that runs on the operator's own infrastructure. Context Pilot's legal relationship to the operator is that of a <strong>software licensor</strong>, not a data processor. Therefore:
+            </p>
+            <ul>
+              <li>A DPA between the operator and Context Pilot is <strong>not applicable</strong> &mdash; no data is processed on our infrastructure</li>
+              <li>DPAs between the operator and their configured <strong>API providers</strong> (Anthropic, OpenAI, etc.) <strong>may be required</strong> depending on the operator's regulatory obligations</li>
+              <li>The operator should evaluate each provider's DPA independently based on their use case and jurisdiction</li>
+            </ul>
+          </div>
+
+          <div class="tc-policy">
+            <div class="tc-policy-header">
+              <h4>Provider DPA Availability</h4>
+            </div>
+            <table class="tc-table" style="margin-top: 12px;">
+              <thead>
+                <tr>
+                  <th>Provider</th>
+                  <th>DPA Available</th>
+                  <th>Standard Terms</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="cell-name">Anthropic</td>
+                  <td>Yes (enterprise agreements)</td>
+                  <td><a href="https://www.anthropic.com/policies" target="_blank">Terms of Service</a></td>
+                </tr>
+                <tr>
+                  <td class="cell-name">OpenAI</td>
+                  <td>Yes (DPA available on request)</td>
+                  <td><a href="https://openai.com/policies" target="_blank">Terms of Use</a></td>
+                </tr>
+                <tr>
+                  <td class="cell-name">Google AI</td>
+                  <td>Yes (Google Cloud DPA)</td>
+                  <td><a href="https://cloud.google.com/terms" target="_blank">Service Terms</a></td>
+                </tr>
+                <tr>
+                  <td class="cell-name">Mistral AI</td>
+                  <td>Yes (EU-based, GDPR-native)</td>
+                  <td><a href="https://mistral.ai/terms" target="_blank">Terms of Service</a></td>
+                </tr>
+                <tr>
+                  <td class="cell-name">Brave Search</td>
+                  <td>Privacy-focused by design</td>
+                  <td><a href="https://brave.com/privacy/browser/" target="_blank">Privacy Policy</a></td>
+                </tr>
+                <tr>
+                  <td class="cell-name">Voyage AI</td>
+                  <td>Contact provider</td>
+                  <td><a href="https://www.voyageai.com" target="_blank">voyageai.com</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <footer class="tc-footer">
+    <span>Context Pilot Trust Center &middot; Version 2.0 &middot; MIT License</span>
+    <div class="tc-footer-links">
+      <a href="https://github.com/bigmoostache/context-pilot" target="_blank">GitHub</a>
+      <a href="https://github.com/bigmoostache/context-pilot/security" target="_blank">Security Policy</a>
+      <a href="https://github.com/bigmoostache/context-pilot/blob/master/LICENSE" target="_blank">License</a>
+    </div>
+  </footer>
+
+</body>
+</html>
