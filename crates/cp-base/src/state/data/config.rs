@@ -14,6 +14,10 @@ use crate::state::context::Kind;
 /// `Threads` replaces the entire layout with a dedicated threads view.
 /// Ctrl+V toggles between them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "view-mode contract: ViewMode already carries #[serde(other)] on Normal for forward-compat; the set is otherwise closed and constructed cross-crate, so #[non_exhaustive] would forbid that construction while adding nothing"
+)]
 pub enum ViewMode {
     /// Threads view: dedicated layout for thread management (no panels).
     Threads,

@@ -67,6 +67,10 @@ const BODIES_DIR: &str = "bodies";
 /// tells the caller *how* to make the reference durable (embed the bytes vs.
 /// reference the already-durable file).
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "body-disposition contract: Stored is a closed Inline/Spilled set returned by Store::put and matched exhaustively by callers routing the durability barrier; #[non_exhaustive] would forbid that construction"
+)]
 pub enum Stored {
     /// A small body: embed `bytes` in the same oplog entry that references it,
     /// so the body shares that entry's `fdatasync` (the barrier is trivial).

@@ -74,6 +74,10 @@ fn u32_from_le(bytes: [u8; 4]) -> u32 {
 
 /// Framing-level decode/encode error.
 #[derive(Debug, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "framing error taxonomy is a closed wire contract: every decode failure mode is enumerated and callers match them exhaustively; a new variant is a deliberate breaking change, and #[non_exhaustive] would force cross-crate wildcard arms that the forbidden wildcard_enum_match_arm lint rejects"
+)]
 pub enum FrameError {
     /// Not enough bytes to read the header or the full payload.
     Incomplete,

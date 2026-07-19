@@ -309,6 +309,8 @@ fn preflight_skill_load(tool: &ToolUse, state: &State) -> Verdict {
             pf.errors.push(format!("Skill '{id}' not found"));
         } else if PromptState::get(state).loaded_skill_ids.contains(&id.to_owned()) {
             pf.warnings.push(format!("Skill '{id}' is already loaded"));
+        } else {
+            // Skill exists and is not yet loaded — no warning.
         }
     }
     pf

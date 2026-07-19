@@ -139,6 +139,8 @@ fn walk(root: &Path, dir: &Path, map: &mut HashMap<String, FilePrint>) {
             }
             let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().to_string();
             let _prev = map.insert(rel, FilePrint { mtime: mtime_ms(&meta), size: meta.len() });
+        } else {
+            // Neither a regular file nor a directory (socket, fifo, …) — skip.
         }
     }
 }

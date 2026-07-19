@@ -38,6 +38,10 @@ pub struct Command {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "wire-protocol contract: Kind carries an Unknown catch-all for N-1 tolerance; its variant set is otherwise closed and constructed cross-crate (orchestrator builds commands, agent matches them exhaustively), so #[non_exhaustive] would forbid that construction"
+)]
 pub enum Kind {
     /// Send a message to a thread (the primary user action).
     #[serde(rename = "send_message")]

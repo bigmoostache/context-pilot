@@ -85,6 +85,10 @@ const OFF_CRC: usize = OFF_BOOT_ID + BOOT_ID_LEN;
 
 /// Why a heartbeat record could not be encoded or decoded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "heartbeat error taxonomy is a closed wire contract: every encode/decode failure mode is enumerated and callers match them exhaustively; #[non_exhaustive] would force cross-crate wildcard arms that the forbidden wildcard_enum_match_arm lint rejects"
+)]
 pub enum Error {
     /// The `boot_id` was not exactly [`BOOT_ID_LEN`] ASCII bytes (encode only).
     BadBootId,

@@ -201,6 +201,8 @@ fn build_search_results_content(results: &[crate::types::SearchResult]) -> Strin
         } else if let Some(desc) = &(result.description) {
             content.push_str(desc);
             content.push_str("\n\n");
+        } else {
+            // Neither markdown nor description present — nothing to append.
         }
         if let Some(links) = &result.links
             && !links.is_empty()

@@ -387,6 +387,8 @@ fn scan_directory(tx: &mpsc::Sender<IndexerCmd>, dir: &Path) {
             }
         } else if path.is_file() {
             let _r = tx.send(IndexerCmd::IndexFile(path));
+        } else {
+            // Neither a regular file nor a directory (socket, fifo, …) — skip.
         }
     }
 }

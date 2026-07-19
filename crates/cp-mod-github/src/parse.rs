@@ -127,6 +127,8 @@ fn extract_json_string(json: &str, key: &str) -> Option<String> {
                 escaped = true;
             } else if ch == '"' {
                 break;
+            } else {
+                // Ordinary body character — no special handling.
             }
             end = end.saturating_add(ch.len_utf8());
         }

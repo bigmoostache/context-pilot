@@ -44,6 +44,10 @@ pub struct Frame {
 /// forward compatibility.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "wire-protocol contract: the stream-frame Kind carries an Unknown catch-all for forward-compat; its variant set is otherwise closed and constructed cross-crate (the agent emits frames, the backend fans them out), so #[non_exhaustive] would forbid that construction"
+)]
 pub enum Kind {
     /// Latency hint that a new message is starting (self-describing so the
     /// frontend can paint before the oplog entry lands).

@@ -180,6 +180,8 @@ impl Module for TreeModule {
                                 pf.warnings.push(format!("Path '{path}' does not exist"));
                             } else if !p.is_dir() {
                                 pf.warnings.push(format!("'{path}' is not a directory"));
+                            } else {
+                                // Existing directory — valid, no warning.
                             }
                         }
                     }

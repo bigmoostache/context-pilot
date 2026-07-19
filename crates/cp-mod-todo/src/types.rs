@@ -6,6 +6,10 @@ use std::str::FromStr;
 /// Todo item status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "todo-status contract: TodoStatus is a closed Pending/InProgress/Done set serde-persisted and constructed cross-crate, matched exhaustively by icon()/FromStr; #[non_exhaustive] would forbid that construction"
+)]
 pub enum TodoStatus {
     #[default]
     /// Not started.

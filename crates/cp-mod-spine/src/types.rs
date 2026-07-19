@@ -5,6 +5,10 @@ use serde::{Deserialize, Serialize};
 /// Notification type -- what triggered this notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "notification-kind contract: NotificationType is a closed set serde-persisted and constructed cross-crate, matched exhaustively by label() and the continuation builder; #[non_exhaustive] would forbid that construction"
+)]
 pub enum NotificationType {
     /// User sent a message
     UserMessage,
@@ -29,6 +33,10 @@ impl NotificationType {
 /// Status of a notification in the spine system
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "notification-status contract: NotificationStatus is a closed Unprocessed/Blocked/Processed set serde-persisted and constructed cross-crate, matched exhaustively by the spine state machine; #[non_exhaustive] would forbid that construction"
+)]
 pub enum NotificationStatus {
     /// Not yet handled — triggers auto-continuation
     Unprocessed,
@@ -86,6 +94,10 @@ impl Notification {
 
 /// What action to take when an auto-continuation fires
 #[derive(Debug, Clone)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "continuation-action contract: ContinuationAction is a closed SyntheticMessage/Relaunch set constructed by the continuation builder and matched exhaustively by apply_continuation; #[non_exhaustive] would forbid that construction"
+)]
 pub enum ContinuationAction {
     /// Create a synthetic user message and start streaming
     SyntheticMessage(String),

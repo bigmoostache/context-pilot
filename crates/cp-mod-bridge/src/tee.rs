@@ -78,6 +78,10 @@ const MAX_WRITE_ATTEMPTS: u32 = 50;
 
 /// The fate of a [`Tee::publish`] call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "tee-outcome contract: Outcome is a closed Published/Dropped binary set returned by Tee::publish and matched exhaustively by callers; #[non_exhaustive] adds nothing to a binary outcome"
+)]
 pub enum Outcome {
     /// The frame was enqueued for the publisher (not a delivery guarantee —
     /// tier-③ traffic is best-effort all the way down).

@@ -23,6 +23,10 @@ pub mod reverie {
 
     /// The kind of reverie running.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[expect(
+        clippy::exhaustive_enums,
+        reason = "reverie-kind contract: Kind is a closed set constructed cross-crate by the optimizer trigger and matched exhaustively by its Display impl; #[non_exhaustive] would forbid that construction"
+    )]
     pub enum Kind {
         /// Context optimizer — reshapes context for relevance and budget.
         ContextOptimizer,

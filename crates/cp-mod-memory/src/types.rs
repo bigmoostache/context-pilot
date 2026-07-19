@@ -6,6 +6,10 @@ use cp_base::state::runtime::State;
 /// Memory importance level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "importance contract: MemoryImportance is a closed Low/Medium/High/Critical set serde-persisted and constructed cross-crate, matched exhaustively by as_str()/FromStr; #[non_exhaustive] would forbid that construction"
+)]
 pub enum MemoryImportance {
     /// Low priority — nice-to-have context.
     Low,

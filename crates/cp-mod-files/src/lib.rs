@@ -124,6 +124,8 @@ fn preflight_edit_oldstring(tool: &ToolUse, state: &State, target: &EditTarget<'
         ));
     } else if !current_ok && !virtual_ok {
         pf.errors.push(format!("old_string not found in '{path_str}' — open the file to see current content"));
+    } else {
+        // current ✓ virtual ✓, or current ✗ virtual ✓ — the edit applies cleanly.
     }
     // current ✗ virtual ✓ → fine (model edits post-queue state)
     // current ✓ virtual ✓ → fine (no conflict)

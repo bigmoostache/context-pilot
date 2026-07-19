@@ -38,6 +38,10 @@ pub struct OpEntry {
 /// [`Unknown`](OpEntryKind::Unknown).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "wire-protocol contract: OpEntryKind carries an Unknown catch-all for N-1 tolerance; its variant set is otherwise closed and constructed cross-crate (the agent emits every kind, observers fold them exhaustively), so #[non_exhaustive] would forbid that construction"
+)]
 pub enum OpEntryKind {
     /// A command was accepted and its effect applied (I6/I11).
     #[serde(rename = "command_effect")]

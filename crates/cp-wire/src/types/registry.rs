@@ -60,6 +60,10 @@ pub struct Entry {
 /// derive a richer verdict (design doc §10).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "wire-protocol contract: AgentStatus is a closed lifecycle set written cross-crate into the registry entry and matched exhaustively by the backend; #[non_exhaustive] would forbid that construction"
+)]
 pub enum AgentStatus {
     /// Agent is booting (bridge init in progress).
     Starting,

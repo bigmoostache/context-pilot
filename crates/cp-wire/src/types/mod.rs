@@ -155,6 +155,10 @@ const fn hex_nibble(b: u8) -> Option<u8> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "wire-protocol contract: the Phase variant set is closed; adding one is a deliberate breaking change every peer must handle, so exhaustive cross-crate matching is intentional and #[non_exhaustive] would both hide the break and forbid the cross-crate construction this enum requires"
+)]
 pub enum Phase {
     /// No LLM call or tool execution in progress.
     Idle,
@@ -169,6 +173,10 @@ pub enum Phase {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "wire-protocol contract: the LifecycleState variant set is closed; a new state is a deliberate breaking change every peer must handle, so exhaustive cross-crate matching is intentional and #[non_exhaustive] would forbid the cross-crate construction this enum requires"
+)]
 pub enum LifecycleState {
     /// Agent is initialising (bridge boot sequence).
     Starting,
@@ -193,6 +201,10 @@ pub enum LifecycleState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "wire-protocol contract: ThreadTurn already carries an Unknown catch-all for N-1 forward-compat; the variant set is otherwise closed and constructed cross-crate, so #[non_exhaustive] would forbid that construction while adding nothing the Unknown variant does not already provide"
+)]
 pub enum ThreadTurn {
     /// The thread is waiting on the human — it needs a user response.
     MyTurn,

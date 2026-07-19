@@ -116,6 +116,10 @@ impl ToolResult {
 /// JSON Schema type for a tool parameter. Recursive via [`Array`] and [`Object`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "JSON-schema param type: ParamType is constructed by every tool definition cross-crate and matched exhaustively by to_json_schema; the set is closed and #[non_exhaustive] would forbid that construction"
+)]
 pub enum ParamType {
     /// Free-form string.
     String,

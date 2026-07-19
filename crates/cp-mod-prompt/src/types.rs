@@ -5,6 +5,10 @@ use cp_base::state::runtime::State;
 /// Discriminator for the three kinds of prompt library entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "prompt-kind contract: PromptType is a closed Agent/Skill/Command set serde-persisted and constructed cross-crate, matched exhaustively by Display/dir_for; #[non_exhaustive] would forbid that construction"
+)]
 pub enum PromptType {
     /// System prompt defining the AI's identity and behavior.
     Agent,

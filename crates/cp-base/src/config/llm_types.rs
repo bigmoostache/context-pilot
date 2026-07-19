@@ -7,6 +7,10 @@ use crate::tools::ToolUse;
 
 /// Events emitted by the LLM during streaming.
 #[derive(Debug)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "stream-event contract: StreamEvent is constructed by every LLM provider and matched exhaustively by the streaming pipeline; the variant set is closed and #[non_exhaustive] would forbid that cross-crate construction"
+)]
 pub enum StreamEvent {
     /// Text chunk from the response.
     Chunk(String),
@@ -101,6 +105,10 @@ pub trait ModelInfo {
 /// API client, auth flow, and model roster.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "provider-roster contract: LlmProvider is a closed set constructed cross-crate by config/dispatch and matched exhaustively across the client factory and config UI; #[non_exhaustive] would forbid that construction"
+)]
 pub enum LlmProvider {
     /// Direct Anthropic Messages API (API-key auth).
     #[default]

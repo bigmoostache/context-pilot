@@ -4,6 +4,10 @@ use cp_base::state::runtime::State;
 
 /// Classification of how a file was changed in the working tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "git-change taxonomy: GitChangeType is a closed set constructed cross-crate by the status parser and matched exhaustively by the diff renderer; #[non_exhaustive] would forbid that construction"
+)]
 pub enum GitChangeType {
     /// Content modified.
     Modified,

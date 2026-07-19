@@ -42,6 +42,10 @@ impl fmt::Debug for SecretString {
 
 /// Errors that can occur during vault operations.
 #[derive(Debug)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "vault error taxonomy is a closed set (MissingKey/Io/Network) constructed within cp-vault and matched exhaustively by callers; #[non_exhaustive] would force cross-crate wildcard arms that the forbidden wildcard_enum_match_arm lint rejects"
+)]
 pub enum VaultError {
     /// Requested key is not configured anywhere in the resolution cascade.
     MissingKey(String),
