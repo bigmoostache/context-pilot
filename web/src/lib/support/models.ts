@@ -83,12 +83,25 @@ function enrichProviders(raw: GenProviderDef[]): ProviderDef[] {
  *  module-level binding from inside a function. */
 const providerCache: { value: ProviderDef[] | null } = { value: null }
 
+/** Drop the memoised registry so the next `fetchProviders` re-asks the server.
+ *  Call after any event that can change provider *usability* — a Claude OAuth
+ *  login, account switch, or token refresh — then invalidate the `["providers"]`
+ *  query so mounted pickers refetch instead of reading a stale singleton. */
+export function resetProviderCache(): void {
+  providerCache.value = null
+}
+
 /** Fetch the full usable provider registry (cached after first call). The
  *  backend already drops providers without a configured key and stamps each
  *  model with its canonical `key`, so this is the admin-facing catalog (every
  *  usable model, unfiltered by the org allowlist). */
 export async function fetchProviders(): Promise<ProviderDef[]> {
-  if (providerCache.value) return providerCache.value
+  // An empty registry is a valid but *transient* state — it means nothing was
+  // usable when we last asked (e.g. before the Claude OAuth login). Memoising it
+  // would be fatal: `[]` is truthy, so it would pin "No models available"
+  // forever, even after login makes providers appear. Only cache a non-empty
+  // result; otherwise fall through and re-ask the server on the next call.
+  if (providerCache.value?.length) return providerCache.value
   const data = await fetchProviderDefs()
   providerCache.value = enrichProviders(data)
   return providerCache.value

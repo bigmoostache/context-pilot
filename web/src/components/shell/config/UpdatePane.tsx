@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  AlertTriangle,
   ArrowUpCircle,
   CheckCircle2,
   ExternalLink,
@@ -79,6 +80,7 @@ export function UpdatePane() {
     <div className="flex flex-col gap-5">
       <VersionCard status={data} onApplying={setApplying} />
       <ModeSection status={data} />
+      <ChannelSection status={data} />
       {/* Keyed on the server value: when the box reports a new window the
           editor remounts and re-seeds its inputs — no state-sync effect. */}
       <WindowSection key={`${data.window.start}-${data.window.end}`} status={data} />
@@ -258,6 +260,71 @@ function ModeSection({ status }: { status: UpdateStatus }) {
       </div>
       {setMode.isError && (
         <span className="text-[11px] text-(--danger)">Could not save: {setMode.error.message}</span>
+      )}
+    </section>
+  )
+}
+
+/**
+ * Nightly opt-in — a single checkbox that flips the box channel
+ * `stable ↔ nightly`. Nightly tracks the tip of `master` (every push), so it
+ * is untested and may be unstable; the warning banner makes that explicit. The
+ * box keeps its existing mode/window, so an `auto` box applies nightly builds
+ * in its maintenance window.
+ */
+function ChannelSection({ status }: { status: UpdateStatus }) {
+  const qc = useQueryClient()
+  const nightly = status.channel === "nightly"
+  const setChannel = useMutation({
+    mutationFn: (channel: "stable" | "nightly") => setUpdateMode({ channel }),
+    onSuccess: (fresh) => qc.setQueryData(["update-status"], fresh),
+  })
+
+  return (
+    <section className="flex flex-col gap-2">
+      <span className="text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground/80 uppercase">
+        Release channel
+      </span>
+      <label
+        htmlFor="update-nightly"
+        className="card-shadow flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3"
+      >
+        <input
+          id="update-nightly"
+          data-testid="update-channel-nightly"
+          type="checkbox"
+          aria-label="Receive nightly builds"
+          checked={nightly}
+          disabled={setChannel.isPending}
+          onChange={(e) => setChannel.mutate(e.target.checked ? "nightly" : "stable")}
+          className="size-4 shrink-0 accent-(--interactive)"
+        />
+        <span className="flex min-w-0 flex-col">
+          <span className="text-[13px] font-medium text-foreground/90">
+            Receive nightly builds (unstable)
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            Follow the tip of the development branch instead of stable releases
+          </span>
+        </span>
+      </label>
+      {nightly && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-(--danger)/40 bg-card px-3 py-2.5 text-[11.5px] text-foreground/80"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-(--danger)" />
+          <span>
+            Nightly builds ship straight from the latest commit on <code>master</code> with no
+            release testing — they can be unstable or break features. Uncheck to return to stable;
+            your box will move back to the latest stable release on its next check.
+          </span>
+        </div>
+      )}
+      {setChannel.isError && (
+        <span className="text-[11px] text-(--danger)">
+          Could not save: {setChannel.error.message}
+        </span>
       )}
     </section>
   )

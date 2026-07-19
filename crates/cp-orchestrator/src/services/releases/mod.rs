@@ -37,6 +37,10 @@ mod config;
 use config::ReleaseConfig;
 pub use config::{MaintenanceWindow, UpdateMode};
 
+/// OTA channel selection (`stable`/`nightly`) + the crossgrade flag — see
+/// [`channel`].
+mod channel;
+
 // ── Public types ────────────────────────────────────────────────────────
 
 /// A locally downloaded release (tag + binary presence).
@@ -196,11 +200,8 @@ impl ReleaseStore {
         self.persist();
     }
 
-    /// The channel this box follows (`stable` today).
-    #[must_use]
-    pub fn channel(&self) -> &str {
-        &self.config.channel
-    }
+    // Channel selection (`channel`, `set_channel`, the crossgrade flag) lives in
+    // the sibling `channel` module — see `channel.rs`.
 
     /// Hours between channel polls.
     #[must_use]

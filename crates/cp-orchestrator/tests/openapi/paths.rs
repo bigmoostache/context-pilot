@@ -345,11 +345,12 @@ pub(super) fn paths() -> Value {
         "/api/update/check": post("update", "Force a channel poll now", None, r("UpdateStatus")),
         "/api/update/apply": post("update", "Verify, download and apply the channel version now (off-window)", None, r("UpdateApplyResponse")),
         "/api/update/mode": json!({ "put": {
-            "tags": ["update"], "summary": "Set update mode and/or maintenance window",
+            "tags": ["update"], "summary": "Set update mode, channel, and/or maintenance window",
             "requestBody": { "required": true, "content": { "application/json": { "schema": {
                 "type": "object",
                 "properties": {
                     "mode": { "type": "string", "enum": ["auto", "manual", "paused"] },
+                    "channel": { "type": "string", "enum": ["stable", "nightly"] },
                     "window": r("UpdateWindow")
                 }
             }}}},

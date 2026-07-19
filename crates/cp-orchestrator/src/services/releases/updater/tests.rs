@@ -39,7 +39,7 @@ fn temp_dir(label: &str) -> std::path::PathBuf {
 #[test]
 fn updater_verify() {
     // Valid manifest, older box → Available(v9.9.9).
-    match evaluate_manifest(VALID_JSON, VALID_SIG, "v0.3.0", NOW) {
+    match evaluate_manifest(VALID_JSON, VALID_SIG, "v0.3.0", NOW, "stable", false) {
         Ok(UpdateEvaluation::Available(m)) => assert_eq!(m.version, "v9.9.9"),
         other => panic!("valid manifest must be Available: {other:?}"),
     }
@@ -49,33 +49,45 @@ fn updater_verify() {
     let pos = tampered.iter().position(|&b| b == b'9').expect("a '9' in the fixture");
     tampered[pos] = b'8';
     assert!(
-        matches!(evaluate_manifest(&tampered, VALID_SIG, "v0.3.0", NOW), Err(super::VerifyError::Signature(_))),
+        matches!(
+            evaluate_manifest(&tampered, VALID_SIG, "v0.3.0", NOW, "stable", false),
+            Err(super::VerifyError::Signature(_))
+        ),
         "tampered manifest bytes must fail the signature check"
     );
 
     // A corrupted signature blob → signature failure.
     let bad_sig = VALID_SIG.replace('A', "B");
     assert!(
-        matches!(evaluate_manifest(VALID_JSON, &bad_sig, "v0.3.0", NOW), Err(super::VerifyError::Signature(_))),
+        matches!(
+            evaluate_manifest(VALID_JSON, &bad_sig, "v0.3.0", NOW, "stable", false),
+            Err(super::VerifyError::Signature(_))
+        ),
         "tampered signature must fail"
     );
 
     // Correctly signed but expired → freshness rejection (stale replay).
     assert!(
-        matches!(evaluate_manifest(EXPIRED_JSON, EXPIRED_SIG, "v0.3.0", NOW), Err(super::VerifyError::Expired { .. })),
+        matches!(
+            evaluate_manifest(EXPIRED_JSON, EXPIRED_SIG, "v0.3.0", NOW, "stable", false),
+            Err(super::VerifyError::Expired { .. })
+        ),
         "expired manifest must be rejected"
     );
 
     // Anti-rollback: offered (v9.9.9) below the running version.
     assert!(
-        matches!(evaluate_manifest(VALID_JSON, VALID_SIG, "v10.0.0", NOW), Err(super::VerifyError::Rollback { .. })),
+        matches!(
+            evaluate_manifest(VALID_JSON, VALID_SIG, "v10.0.0", NOW, "stable", false),
+            Err(super::VerifyError::Rollback { .. })
+        ),
         "manifest older than the running version must be rejected"
     );
 
     // min_from floor: a box on v0.1.0 may not jump (min_from is v0.2.0).
     assert!(
         matches!(
-            evaluate_manifest(VALID_JSON, VALID_SIG, "v0.1.0", NOW),
+            evaluate_manifest(VALID_JSON, VALID_SIG, "v0.1.0", NOW, "stable", false),
             Err(super::VerifyError::TooOldForJump { .. })
         ),
         "a box below min_from must be refused"
@@ -83,10 +95,17 @@ fn updater_verify() {
 
     // Same version → UpToDate (not an error, not an update).
     assert!(
-        matches!(evaluate_manifest(VALID_JSON, VALID_SIG, "v9.9.9", NOW), Ok(UpdateEvaluation::UpToDate)),
+        matches!(
+            evaluate_manifest(VALID_JSON, VALID_SIG, "v9.9.9", NOW, "stable", false),
+            Ok(UpdateEvaluation::UpToDate)
+        ),
         "equal version is up to date"
     );
 }
+
+// The channel-aware "is-newer" matrix (nightly head-tracking, the channel
+// guard, forced adoption on a switch) is unit-tested next to `evaluate_parsed`
+// in `verify.rs` — it needs no signed fixture, so it lives with the code.
 
 /// V3.1b — the download hook is provably never invoked when any verification
 /// fails; it runs exactly once on a verified available update.
@@ -102,7 +121,7 @@ fn updater_no_download_on_failed_check() {
         (VALID_JSON, VALID_SIG, "v0.1.0"),          // below min_from
     ] {
         let mut downloaded = false;
-        let outcome = check_and_prepare(bytes, sig, current, NOW, |_m| {
+        let outcome = check_and_prepare(bytes, sig, current, NOW, "stable", false, |_m| {
             downloaded = true;
             Ok(())
         });
@@ -112,7 +131,7 @@ fn updater_no_download_on_failed_check() {
 
     // Up to date: no error, no download.
     let mut downloaded = false;
-    let outcome = check_and_prepare(VALID_JSON, VALID_SIG, "v9.9.9", NOW, |_m| {
+    let outcome = check_and_prepare(VALID_JSON, VALID_SIG, "v9.9.9", NOW, "stable", false, |_m| {
         downloaded = true;
         Ok(())
     });
@@ -121,7 +140,7 @@ fn updater_no_download_on_failed_check() {
 
     // Available: download runs, manifest is returned.
     let mut downloaded = false;
-    let outcome = check_and_prepare(VALID_JSON, VALID_SIG, "v0.3.0", NOW, |m| {
+    let outcome = check_and_prepare(VALID_JSON, VALID_SIG, "v0.3.0", NOW, "stable", false, |m| {
         assert_eq!(m.version, "v9.9.9");
         downloaded = true;
         Ok(())

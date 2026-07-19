@@ -5429,6 +5429,13 @@
             "application/json": {
               "schema": {
                 "properties": {
+                  "channel": {
+                    "enum": [
+                      "stable",
+                      "nightly"
+                    ],
+                    "type": "string"
+                  },
                   "mode": {
                     "enum": [
                       "auto",
@@ -5469,7 +5476,7 @@
             "description": "Error"
           }
         },
-        "summary": "Set update mode and/or maintenance window",
+        "summary": "Set update mode, channel, and/or maintenance window",
         "tags": [
           "update"
         ]

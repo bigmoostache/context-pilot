@@ -92,6 +92,45 @@ fn update_config_roundtrip() {
     drop(std::fs::remove_dir_all(&dir));
 }
 
+/// A channel switch validates its input, arms the crossgrade flag, clears the
+/// stale "available" hint, and round-trips through persist + reload; clearing
+/// the flag persists too.
+#[test]
+fn store_set_channel_roundtrip() {
+    let dir = std::env::temp_dir().join(format!("cp-rel-chan-{}", std::process::id()));
+    drop(std::fs::create_dir_all(&dir));
+    let releases = dir.join("releases");
+
+    let mut store = ReleaseStore::load(releases.clone());
+    assert_eq!(store.channel(), "stable", "default channel");
+    assert!(!store.pending_channel_switch());
+
+    // A stale availability hint from the old channel must be dropped on switch.
+    let mut st = updater::UpdateState::load(&releases);
+    st.available = Some("v9.9.9".to_owned());
+    st.save(&releases);
+
+    assert!(store.set_channel("bogus").is_err(), "unknown channel refused");
+    store.set_channel("nightly").expect("nightly accepted");
+    assert_eq!(store.channel(), "nightly");
+    assert!(store.pending_channel_switch(), "switch arms the crossgrade flag");
+    assert!(updater::UpdateState::load(&releases).available.is_none(), "stale available cleared");
+
+    // Persisted: a reload sees the switch and the armed flag.
+    let reloaded = ReleaseStore::load(releases.clone());
+    assert_eq!(reloaded.channel(), "nightly");
+    assert!(reloaded.pending_channel_switch());
+
+    // Clearing the flag persists; a no-op re-set of the same channel is inert.
+    store.clear_pending_switch();
+    assert!(!store.pending_channel_switch());
+    store.set_channel("nightly").expect("same channel is a no-op");
+    assert!(!store.pending_channel_switch(), "re-setting the current channel does not re-arm");
+    assert!(!ReleaseStore::load(releases).pending_channel_switch(), "clear persisted");
+
+    drop(std::fs::remove_dir_all(&dir));
+}
+
 #[test]
 fn store_select_rejects_missing() {
     let dir = std::env::temp_dir().join(format!("cp-rel-sel-{}", std::process::id()));

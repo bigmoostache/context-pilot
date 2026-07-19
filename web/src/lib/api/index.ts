@@ -199,6 +199,7 @@ export function applyUpdate(): Promise<import("./generated/types.gen").UpdateApp
 
 export function setUpdateMode(body: {
   mode?: "auto" | "manual" | "paused"
+  channel?: "stable" | "nightly"
   window?: import("./generated/types.gen").UpdateWindow
 }): Promise<import("./generated/types.gen").UpdateStatus> {
   return sdk(putApiUpdateMode({ body }))

@@ -11,6 +11,7 @@ import {
   refreshClaudeLogin,
 } from "@/lib/api"
 import { cn } from "@/lib/utils"
+import { resetProviderCache } from "@/lib/support/models"
 import { StoredAccounts } from "./StoredAccounts"
 import { UsageLimits } from "./UsageLimits"
 
@@ -322,12 +323,22 @@ export function UsageButton() {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
 
+  // A token change can flip the OAuth providers between usable and not, so every
+  // token-affecting success must also refresh the provider registry — drop the
+  // memoised singleton (which never expires on its own) and invalidate the
+  // `["providers"]` query (prefix-matches the picker's `["providers","picker"]`
+  // too) so mounted model pickers refetch instead of showing "No models
+  // available" until a full page reload.
+  const invalidateTokenDependents = () => {
+    void queryClient.invalidateQueries({ queryKey: ["claude-token-status"] })
+    void queryClient.invalidateQueries({ queryKey: ["claude-usage"] })
+    resetProviderCache()
+    void queryClient.invalidateQueries({ queryKey: ["providers"] })
+  }
+
   const refreshMutation = useMutation({
     mutationFn: refreshClaudeLogin,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["claude-token-status"] })
-      void queryClient.invalidateQueries({ queryKey: ["claude-usage"] })
-    },
+    onSuccess: invalidateTokenDependents,
   })
 
   const tokenStatus = useQuery({
@@ -391,10 +402,7 @@ export function UsageButton() {
     }
   }, [tokenStatus.data])
 
-  const handleLoginDone = () => {
-    void queryClient.invalidateQueries({ queryKey: ["claude-token-status"] })
-    void queryClient.invalidateQueries({ queryKey: ["claude-usage"] })
-  }
+  const handleLoginDone = invalidateTokenDependents
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
