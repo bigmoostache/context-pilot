@@ -14,6 +14,10 @@
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
   last_edited_ms: 0
+00513ee56aa163da:
+  path: .github/workflows/release.yml
+  description: 'Release workflow (push tags v*). 5-target build matrix (tui+cp-console-server) + appliance bundle (aarch64 musl: cp-orchestrator+tui+SPA) + GitHub Release. pnpm action-setup pinned to 11.6.0 (matches lockfile origin, see ci.yml).'
+  last_edited_ms: 0
 00648889f8efe17b:
   path: crates/cp-orchestrator/src/transport/rest.rs
   description: 'REST handlers: HttpReply, Envelope<T>{rev,data}, CommandReceipt. fleet/agent/mint_ticket/body/command/threads. resolve_entry reads <id>.json. Locks Backend briefly, never across blocking agent I/O. reshape_thread/reshape_message for maquette ThreadDetail. 8 tests.'
@@ -190,6 +194,10 @@
   path: crates/cp-orchestrator/src/transport/inspect/finder/download.rs
   description: 'Finder file/folder download + inline raw-serve (split from finder.rs). fs_download: files as raw bytes (10MiB cap, Content-Disposition attachment), folders zipped to /tmp via system `zip -r -q` (100MiB cap) then cleaned up. fs_raw (T281/T286): serves a file''s raw bytes INLINE (Content-Type inferred via content_type_for for images+PDF, Content-Disposition: inline, 10MiB cap) so the browser renders image/PDF previews directly via <img>/<object>. Confined to realm via support::confined_path.'
   last_edited_ms: 0
+0331e1901cb066f0:
+  path: src/ui/help/commands.rs
+  description: 'PaletteCommand struct: ID/label/description/keywords, match scoring, get_available_commands(state)'
+  last_edited_ms: 0
 033610530c3bec8d:
   path: web/src/components/finder/FinderPreview.tsx
   description: 'QuickLook preview pane — kind-aware. T272 live .md/code/json/doc fetch via useFsPreview. X906: live markdown routes through EditableMarkdown (view⇄WYSIWYG-edit toggle: Edit pencil → MarkdownEditor seeded with content, Save→useWriteFile/fs-write→invalidate fsPreview, Cancel discards; truncated files read-only — saving the head would drop the tail). T281/T286 live image (<img>)+PDF (<object>) via rawUrl→/fs/raw. Mock path unchanged. agentId prop threads the realm.'
@@ -273,6 +281,10 @@
 03fe0d1d840caf1d:
   path: src/main.rs
   description: Entry point. Phased boot screen (6 steps), FileLogger, raise_fd_limit() via rlimit, flame::init()/flush(), panic hook. use openssl as _ for vendored cross-compilation. Creates App + event channels, runs main loop.
+  last_edited_ms: 0
+04371fcbb2d21d4b:
+  path: web/src/components/agents/AgentModal/index.tsx
+  description: 'AgentModal shell (P8 split): create/manage dialog, single source for both flows (fleet dashboard + TopBar). Wires useSelectionState + useAgentModalActions into Controller, renders Header/Body/Footer subcomponents. authEnabled coerced ?? false. Backdrop = focusable sibling button.'
   last_edited_ms: 0
 0449de8bb372191f:
   path: crates/cp-oplog/src/segment.rs
@@ -1286,6 +1298,10 @@
   path: src/llms/minimax/mod.rs
   description: MiniMax provider — Anthropic-compatible API via Token Plan. SSE streaming identical to Anthropic protocol. API key from vault ("minimax").
   last_edited_ms: 0
+14cb099d35293bd7:
+  path: crates/cp-mod-search/src/lib.rs
+  description: 'Search module. 1 tool: search. Global Meilisearch server bootstrap, per-project indexes. load_module_data spawns the meili WatchdogHandle (T295, only if persist.port>0) into SearchState for self-healing supervision. sync_logs_to_meilisearch() fire-and-forget. Context Radar refresh_radar()/push_task_signal() via background thread. Overlay info delegation.'
+  last_edited_ms: 0
 14ce5498e3a0c82c:
   path: mobile/analysis_options.yaml
   description: 'Strict Dart analysis: strict-casts/inference/raw-types + ~90 lint rules (error prevention + style enforcement)'
@@ -1558,6 +1574,10 @@
   path: .github/checks/lint-config.chain
   description: 'Hash chain for protected lint configuration files. Each entry: prev_hash:content_hash:chain_hash. Verified by check-lint-config.sh. Currently 15 entries.'
   last_edited_ms: 0
+193c247ea990965f:
+  path: crates/cp-mod-github/src/panel.rs
+  description: 'GithubResultPanel: static gh command output panel (no auto-refresh). Token redaction, tab-delimited PR/issue table rendering. Refreshes only when explicitly dirtied by mutating commands.'
+  last_edited_ms: 0
 195b3a15fb448d34:
   path: crates/cp-mod-search/src/types.rs
   description: Core types + config constants. SearchPersistData (with recompute tracking + task_signals ring buffer), SearchState (with SharedRadarCache Arc<Mutex>), Chunk, SearchResult (no tags), SearchMetrics, SearchOverlayInfo (with meili_cpu_pct/meili_memory_bytes), MeiliLiveStats (with meili_cpu_ticks for delta), IndexerCmd, WatcherHandle. logs_index_settings without tags.
@@ -1653,6 +1673,10 @@
 1ade9fcb344ece17:
   path: crates/cp-orchestrator/tests/fleet_soak.rs
   description: Phase 9.4 (X869) multi-agent soak + fleet-scale fault-matrix slice (2 tests). 16 agents concurrent contended workloads, gap-free+isolated projections. Flooded reordered subscriber coalesces then reconciles.
+  last_edited_ms: 0
+1af574d9755cb302:
+  path: web/src/components/agents/AgentModal/actions.ts
+  description: 'AgentModal mutations hook (P8 split): useAgentModalActions bundles create/rename/restart/retire/avatar mutations + Esc/⌘↵ key handler (bound once via latest-refs). ActionsArgs object bundles 7 params (max-params 4). saveManage sends configure+rename; create maps apiName.'
   last_edited_ms: 0
 1afe94a8c7de43e8:
   path: crates/cp-orchestrator/tests/registry_channel.rs
@@ -2782,6 +2806,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+2c885252ce7527a2:
+  path: .github/checks/lint-config.chain
+  description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
+  last_edited_ms: 0
 2c9a637c8ec007d3:
   path: crates/cp-oplog/src/lib.rs
   description: 'Oplog crate root. Doc: durability tier ①, why-separate-crate (agent writes+replays, backend tails), announce-after-durable. Declares append + compact + error + replay + segment + service modules. Phase 4-8 done.'
@@ -2929,6 +2957,10 @@
 2f676dc40971f21d:
   path: web/src/components/agents/ModelPicker.tsx
   description: Shared two-level LLM provider+model picker. Receives providers[] as prop (pure component). Provider rail (pills) above model cards. Guards against empty providers (returns null while API loading). Used by AgentModal (manage) and ConfigPanel (defaults).
+  last_edited_ms: 0
+2f7c3205184cf704:
+  path: crates/cp-orchestrator/tests/openapi/paths.rs
+  description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL, providers, releases, settings, vault/snapshot, claude-usage+login+refresh). Includes deploy + restart-orchestrator paths.
   last_edited_ms: 0
 2f941a6980e1731d:
   path: web/src/components/threads/ThreadConversation.tsx
@@ -4542,6 +4574,10 @@
   path: web/src/lib/utils.ts
   description: 'Shared web utils. cn() (clsx+tailwind-merge). clipboard() (web-lint P3): returns navigator.clipboard honestly typed Clipboard|undefined via a function-indirection helper — a CALL result is opaque to TS control-flow-analysis, so clipboard()?.writeText stays an honest guard (navigator.clipboard is typed non-null by lib.dom but is genuinely undefined on insecure origin; an aliased const would be CFA-narrowed to non-null → dead ?.). Used by Message.tsx + markdown.tsx. T367/T471 zip-on-drop: zipFiles/zipDropped bundle dropped file(s)/folder tree into ONE .zip via fflate; extractDroppedFiles walks webkitGetAsEntry recursively (entries captured SYNC before first await). T359 list logic: resolveEnter/resolveTab + lineBounds/parseListLine. Consumed by ThreadComposer + ThreadConversation.'
   last_edited_ms: 0
+49ee9d662f242df4:
+  path: crates/cp-mod-scratchpad/src/tools.rs
+  description: 'Scratchpad tools with flame!("scratch_create"), flame!("scratch_edit"), flame!("scratch_wipe"). Cell CRUD. Wipe: empty array = all, otherwise by ID.'
+  last_edited_ms: 0
 49f43f5e9718e31f:
   path: .github/checks/allowed-lint-exceptions.yaml
   description: 'Curated list of allowed #[expect]/#[allow] annotations (10 entries). Every occurrence in the codebase MUST have an entry here. Fields: path, match, reason, strategy.'
@@ -4590,6 +4626,10 @@
   path: web/src/components/finder/preview/SheetGrid.tsx
   description: 'Univer spreadsheet viewer/editor (95 lines). Full spreadsheet engine: range selection, formatting, formulas, sheet tabs, merge cells, context menus, undo/redo — all free Apache 2.0 tier. Mounts Univer via createUniver + UniverSheetsCorePreset into container ref. FR locale. Download XLSX button exports live state via ExcelJS (sheetState.ts).'
   last_edited_ms: 1784126136731
+4b767884a16a3ebb:
+  path: src/app/run/tools/pipeline.rs
+  description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. No PendingForm guard or __QUESTION_PENDING__ block. flame!("tool_pipeline") + flame!("callbacks").
+  last_edited_ms: 0
 4b78f125520168d6:
   path: web/src/components/agents/FleetDashboard.tsx
   description: 'Fleet welcome dashboard (live). AgentCard reads useAgentMeta(agent.id) (delta-folded; ensureSync per card) for live status dot + cost, falling back to the polled fleet row (T297). Shows agent avatar (T338) or FolderGit2 fallback. §19 HealthBadge (useMetrics) surfaces first non-nominal condition. RetiredSection/RetiredCard (T271 unretire). Create/manage via AgentModal. web-lint P7: FLEET_MAX_W imported from lib/support/panelMeta (was ./FleetShell) — cycle break.'
@@ -4726,6 +4766,10 @@
   path: web/src/lib/query/reducers.ts
   description: 'SSE delta reducers: applyThreadDelta folds thread_created/archived/restored/paused/resumed/deleted/status_changed/focus_changed/message_created into TanStack cache. mergeThreadLogs reconciles poll+delta. applyAgentDelta folds phase/cost/context.'
   last_edited_ms: 1782315774800
+4dabb4653b6969ea:
+  path: crates/cp-mod-search/src/types.rs
+  description: Core types + config constants. SearchPersistData (recompute tracking + task_signals ring), SearchState (SharedRadarCache Arc<Mutex> + T295 watchdog:Option<WatchdogHandle> — dropped on reload to stop the old meili supervisor), Chunk, SearchResult, SearchMetrics, SearchOverlayInfo (meili_cpu_pct/memory_bytes), MeiliLiveStats, IndexerCmd, WatcherHandle(RecommendedWatcher). logs_index_settings.
+  last_edited_ms: 0
 4dbb8631408985d3:
   path: crates/cp-mod-github/src/lib.rs
   description: 'GitHub module. 1 tool: gh_execute. Dynamic github_result panels. Depends on git module. classify sub-module for read-only vs mutating. Tool visualizer for PR/issue status coloring.'
@@ -4778,6 +4822,10 @@
   path: crates/cp-orchestrator/src/services/auth/backup.rs
   description: 'Auth.db backup system (NFR-19/20): BackupScheduler (rolling 5min overwrite + daily AM/PM permanent snapshots). AuthStore::backup_to via SQLite online backup API. epoch_to_ymd_h (Hinnant civil-time algorithm). Wired into runtime.rs slow cadence. 6 tests.'
   last_edited_ms: 1782240566118
+4eb4f1e5138a8720:
+  path: crates/cp-mod-git/src/result_panel.rs
+  description: 'GitResultPanel: static read-only command output panel (no auto-refresh). Timeout execution, diff-aware syntax coloring. Refreshes only when explicitly dirtied by mutating commands.'
+  last_edited_ms: 0
 4ec220d0ce208288:
   path: .github/checks/check-frontend-suppressions.sh
   description: 'Frontend anti-suppression guard (web-lint P4, twin of check-vault-bypass.sh). Two invariants, CI-side, independent of ESLint config: (1) STOWAWAY — no inline eslint-disable/@ts-ignore/@ts-nocheck/@ts-expect-error/@ts-check in web/src (excl generated/**); the BANNED regex anchors to real directive position `(//|/*)<ws>keyword` so backtick-wrapped mentions in prose don''t false-positive. (2) bidirectional config⇄registry audit — every `"<rule>": "off"` scoped override in eslint.config.ts must have a matching entry in allowed-eslint-exceptions.yaml and vice-versa (the ''*'' wildcard globalIgnore doc is exempt). Dual-mode: no args = full CI scan (both invariants); with args = callback stowaway-grep on given files. BSD/macOS-safe ([[:space:]] not \s). Wired in ci.yml Structure job.'
@@ -5198,6 +5246,10 @@
   path: devis-attali-context-pilot.md
   description: 'Commercial brief for DF: Context Pilot as-a-Service deployment to cabinet Attali. 7 sections: service description, pricing grid (750€ setup / 250€/month / 500€/day support), financial summary, cost transparency (1/4 sub-service mutualization, 48% margin), scope, contractual terms (12-month auto-renew), DF notes.'
   last_edited_ms: 1782140719490
+54261ed5f72eb69b:
+  path: web/src/lib/api/index.ts
+  description: 'REST API client barrel. SDK layer: 28 endpoints via generated SDK. Re-exports ./auth+./finder+./body+./envKeys (env-keys.ts renamed envKeys.ts in web-lint P5 filename-case).'
+  last_edited_ms: 0
 54351bd4bd052680:
   path: .git/index
   description: Git index (binary). Not source.
@@ -5526,6 +5578,10 @@
   path: web/src/components/finder/Finder.tsx
   description: 'Per-agent Finder file manager (confined to agent realm). useFs(agentId, relCwd) for live listings. T273: toolbar Upload button + drag-drop both wired to real uploads via a hidden multi-file <input> + useUploadFiles(agent.id) mutation → uploadFiles(files) POSTs each into relCwd then invalidates the listing (toast progress/result). Both FinderPreview usages pass agentId for live text previews (T272). Tabs+history+nav+selection+drag-drop+statusbar+marquee. PinnedFolder localStorage. ContextMenu wired onOpen/onDownload/onTag/onPin. Quick Look CLOSED by default; opens on single-click of a file.'
   last_edited_ms: 1781887097591
+5acf53f43d918f89:
+  path: crates/cp-mod-memory/src/tools.rs
+  description: Memory tools with flame!("memory_create") and flame!("memory_update"). tl_dr validation (80 token cap). Importance/labels. Batch create/update/delete.
+  last_edited_ms: 0
 5ad145bbfc6acacb:
   path: .github/checks/clippy_compare.py
   description: Compares clippy lint defaults (from clippy_lints_list.md) against Cargo.toml overrides. Outputs clippy_compared_list.md — hides forbid-level lints, shows remaining with emoji indicators.
@@ -7602,6 +7658,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+7c82cf2108bfa8a6:
+  path: Cargo.toml
+  description: Workspace root. 26 crate members (incl cp-vault). Binary 'tui'. Edition 2024. Strict lint config (980 forbid, 21 deny). openssl vendored.
+  last_edited_ms: 0
 7c8d1c712f95c232:
   path: src/modules/mod.rs
   description: Module registry. 21 modules via all_modules(). dispatch_tool() with flame!("tool_{name}"). create_panel() factory. module_toggle tool. rebuild_tools(). Dependency validation.
@@ -7822,6 +7882,10 @@
   path: .gitignore
   description: Git ignore rules
   last_edited_ms: 0
+803f7e01831179df:
+  path: openapi.json
+  description: Generated OpenAPI 3.0.3 spec (70KB). Source of truth for TypeScript client codegen. Regenerated from Rust types via tests/openapi.rs.
+  last_edited_ms: 0
 80619247f5c1d0f5:
   path: web/src/components/shell/widgets/UserMenu.tsx
   description: 'Account avatar menu (T30). Gradient AvatarMark trigger + portaled dropdown: identity header div, Profile/Settings/Manage Users (Phase 10, admin-only)/Sign-out. Sign out wired to useAuth().logout when auth enabled. onOpenUsers callback triggers admin UsersDialog.'
@@ -7982,6 +8046,10 @@
   path: crates/cp-mod-search/src/panel.rs
   description: Search result panel + YAML formatter. format_results() groups file chunks by path, includes log entries. visualize_search_output() for conversation view highlighting. Same metadata persistence pattern. No tags.
   last_edited_ms: 0
+82c130616020f870:
+  path: .git/index
+  description: Git index (binary). Not source.
+  last_edited_ms: 0
 82d56e6e7ecb79d2:
   path: yamls/tools/threads.yaml
   description: 'Threads tools YAML. 2 tools: Send (thread_id, markdown, file_path, questions), Read (thread_id, count).'
@@ -8034,6 +8102,10 @@
   path: tedx.md
   description: 'Talk outline: 3×7min30 structure (WHYs/HOWs/WOWs)'
   last_edited_ms: 1781078806798
+83e48bd957ca4911:
+  path: src/modules/overview/blocks.rs
+  description: 'IR builders: token_usage (progress bar), git (changes table), context_elements (10-col table), statistics'
+  last_edited_ms: 0
 84010ff7379a6553:
   path: web/src/components/threads/ThreadList.tsx
   description: 'Left rail of threads view — ALWAYS OPEN. Working search filters by name+last-preview. Groups: Needs you/Active/Working in parallel. Per-row hover Archive/Restore. Footer Archived toggle. New Thread button.'
@@ -8806,6 +8878,10 @@
   path: src/llms/oai_providers/deepseek.rs
   description: DeepSeek client. OpenAI-compatible with reasoning_content for deepseek-reasoner. DsMessage wrapper. Cache hit/miss tokens. API key from vault ("deepseek").
   last_edited_ms: 0
+8ff9099c78662ac1:
+  path: web/src/lib/api/generated/sdk.gen.ts
+  description: Auto-generated typed SDK functions from openapi.json. One function per REST endpoint (getApiFleetMeta, getApiAgentByIdThreads, postApiAuthLogin, etc). Uses @hey-api client runtime, NOT the manual request() wrapper.
+  last_edited_ms: 0
 8ffa84ce12a491bc:
   path: src/app/actions/streaming.rs
   description: 'Streaming action handlers: AppendChars (typewriter), StreamDone (token accounting, cache correction), StreamError (logging, truncation). Per-stream/total/tick token accumulation in apply_token_usage().'
@@ -9506,6 +9582,10 @@
   path: src/app/run/tools/pipeline.rs
   description: Main tool execution pipeline. Pre-flight → queue intercept (with auto-flush on trap defusal) → execute → callbacks → tempo break → sentinel deferral. History cleanup trap. Queue flush replay. Context Radar signals, Meilisearch log sync. Whole-pipeline timing. flame!("tool_pipeline") + flame!("callbacks").
   last_edited_ms: 0
+9c17efd45666d76f:
+  path: src/app/actions/input.rs
+  description: 'InputSubmit handler (context switching, message creation, notifications, clears selection) + ClearConversation. Thread input routing: handle_thread_input_submit resolves selected_thread_idx through ThreadsState::visible_indices(viewing_archived) — the selection is a VISIBLE-slice position (T9 archive refactor), so the virtual ''+ New Thread'' row is detected as selected_idx >= visible.len() (active view only) and message-send maps the visible position back to a real storage index. handle_thread_create stores the new thread''s VISIBLE index. Thread struct includes paused:false default. MAX_THREAD_NAME_LEN=200. Paste sentinel expansion. /command replacement.'
+  last_edited_ms: 0
 9c4f1036d1e6b6cd:
   path: crates/cp-mod-search/src/meili/mod.rs
   description: 'Meilisearch sub-module hub: bootstrap, client(api), download, overlay, server, tasks, watchdog (T295 supervision).'
@@ -9954,6 +10034,10 @@ a24ca6a492b02678:
   path: src/llms/claude_code/mod.rs
   description: Claude Code OAuth client. Token from macOS Keychain or ~/.claude/.credentials.json. Mimics claude-cli/2.1.37 headers. Cache breakpoint placement. Billing header injection. System reminder for validation. Debug helpers extracted to debug.rs.
   last_edited_ms: 1780565754920
+a2600c529864a2b0:
+  path: web/src/lib/support/models.ts
+  description: LLM provider+model frontend layer. Fetches GET /api/providers via fetchProviderDefs (from @/lib/api barrel, P9 repoint off generated). enriches with Lucide icons. useProviders/usePickerProviders TanStack hooks. Lookup helpers. providerCache singleton. getCachedProviders REMOVED in P10 (dead export).
+  last_edited_ms: 0
 a2ab866cbb42292d:
   path: crates/cp-wire/src/types/mod.rs
   description: 'ContentHash (SHA-256, Copy, hex serde: of/to_hex/from_hex). Phase enum (Idle/Streaming/Tooling), LifecycleState (Starting/Running/Stopping/Stopped), ThreadTurn (MyTurn/TheirTurn/Unknown, snake_case) — wire mirror of threads ThreadStatus, defined here (not imported from cp-mod-threads) to keep layering one-directional. Declares+re-exports ack/body/command/oplog/registry/snapshot/stream. SHA-256 vector + round-trip + ThreadTurn tolerant-decode tests.'
@@ -10706,6 +10790,10 @@ af63a1c3cc1bf35d:
   path: crates/cp-orchestrator/Cargo.toml
   description: 'Backend deps: cp-wire + cp-oplog + nix 0.30 (signal, kill signal-0 pid-liveness) + serde + serde_json + tiny_http (0.12, transport). dev: cp-mod-bridge (test-only seam validation, never a runtime dep) + tempfile. lib+bin package. Workspace lints.'
   last_edited_ms: 1781650132119
+af6ba6ab6249e566:
+  path: web/src/components/agents/AgentModal/parts.tsx
+  description: 'AgentModal render subcomponents (P8 split): AgentModalHeader (avatar file-picker label in manage mode, gradient hero), AgentModalBody (name+realm+ModelPicker form, manage adds SessionVitals+AgentAclSection), AgentModalFooter (Retire/Restart with ''Restarting…'' text while busy/submit). Controller interface bundles all props; submitLabel covers create/manage×idle/pending.'
+  last_edited_ms: 0
 af6dd95d8269c492:
   path: web/src/components/finder/Finder.tsx
   description: Per-agent Finder file manager (confined to agent realm). Uses useFs(agentId, relCwd) for live directory listings — converts absolute cwd to relative path for the backend API. Tabs+history+nav+selection+drag-drop+statusbar. buildCrumbs/pathName helpers. Four view modes (grid/list/columns/gallery), keyboard control, marquee selection.
@@ -10737,6 +10825,10 @@ afd31e44bf857b9c:
 afd5f6a171e03b31:
   path: website/docs/keyboard.html
   description: 'Docs: keyboard shortcuts reference'
+  last_edited_ms: 0
+afe5d75b7caf8fb8:
+  path: web/src/components/shell/widgets/UsageButton.tsx
+  description: 'Claude Code OAuth usage button. Anthropic "A" logomark trigger opens popover: account email, token status (valid/expired + expiry + refresh), session/weekly usage bars, LoginFlow (PKCE). Camembert (conic-gradient) background behind logo shows session usage % at a glance (emerald/amber/red, 25% opacity). Auto-refresh: background polls token status every 5min (300s), triggers refresh when expiry < 30min via ref-pattern useEffect + autoRefreshAttempted guard. Usage query also always-on when token valid (feeds camembert). T472 login-trap fix: waiting_for_code auto-poller snapshots current token expiry into baselineExpiryRef and only auto-completes on a token whose expiry STRICTLY exceeds baseline. P8: extracted TokenStatusRow and UsageLimits (bars/loading/error/empty) so UsageButton stays under 500 lines; WaitingForCode extracted so LoginFlow stays under 150 lines.'
   last_edited_ms: 0
 afe620da388bb90f:
   path: src/app/run/threads/messages.rs
@@ -11505,6 +11597,10 @@ bc5938e8ec061e8b:
 bc5ac1da77d81f0d:
   path: src/app/actions/mod.rs
   description: Central action dispatch (Elm/Redux-style). CycleViewMode resets scroll_offset + user_scrolled. Thread actions extracted to threads.rs. Secondary model handlers removed.
+  last_edited_ms: 0
+bc5c78a280958c10:
+  path: .github/workflows/ci.yml
+  description: 'Unified CI: 3 jobs — rust (fmt+clippy+build+test), structure (file-lengths/folder-sizes/lint-exceptions/lint-config-hashchain/web-structure/vault-bypass/frontend-suppressions), contract (OpenAPI+TS drift). web-lint P4 added the ''Check frontend suppressions'' step (check-frontend-suppressions.sh) to the Structure job after vault-bypass. Contract job installs web deps via pnpm; action-setup pinned to pnpm 11.6.0 (matches pnpm-11 lockfile + web/pnpm-workspace.yaml allowBuilds/packages). Triggers: push/PR to master.'
   last_edited_ms: 0
 bc5d0e87b26ec54a:
   path: ui/src/components/threads/ThreadList.tsx
@@ -13050,6 +13146,10 @@ d66af40c87661284:
   path: web/src/components/auth/UsersDialog.tsx
   description: Admin user management dialog (Phase 10). Lists all users with RoleBadge, create user form (collapsible), delete user with confirmation, force-logout (revoke all sessions). TanStack Query hooks. Accessible from UserMenu when admin.
   last_edited_ms: 1782241802371
+d67930113fc8018c:
+  path: crates/cp-mod-files/src/tools/edit_file.rs
+  description: 'execute_edit: replace old_string with new_string. flame!("file_edit"). Normalized matching for trailing whitespace. Unified diff display. Panel reference in LLM result. Closest-match error hints.'
+  last_edited_ms: 0
 d679e9d5f7e34ec1:
   path: web/src/components/shell/TopBar.tsx
   description: 'macOS title bar. Accepts agents prop for AgentSwitcher + activeAgent lookup. View switcher Threads·Finder·Cockpit. Right cluster: cost, Activity→StatsPopup(agentId), theme, agent config (AgentModal), UserMenu (Profile+Settings).'
@@ -14234,6 +14334,10 @@ ece5fde37c551550:
   path: web/src/components/finder/preview/FinderPreview.tsx
   description: 'Quick Look preview shell + Body() kind router. Routes node → mock previews (mockPreviews), live fetchers (livePreviews), or shared leaf renderers (previewParts). T306: the drawer header''s Download button is wired to downloadFile(agentId, node.path) (streams the realm file via the backend attachment endpoint) — actionable only in the live Finder (agentId scopes the realm), inert in the mock; hidden for folders. Share button still decorative.'
   last_edited_ms: 1782053476346
+ecee652be98cb24a:
+  path: crates/cp-orchestrator/src/services/releases/mod.rs
+  description: Local release management — architecture detection, GitHub release listing, download + extraction, and active-binary selection. ReleaseStore manages ~/.context-pilot/releases/ directory. KNOWN_ARCHS, semver_sort_key(). 7 unit tests.
+  last_edited_ms: 0
 ecfba54941046db5:
   path: web/src/lib/live/index.ts
   description: Live data hooks barrel — TanStack Query + SSE push plane. useLive() wraps useQuery into legacy LiveQueryResult{data,loading,error,refetch}; ensureSync(agentId) guarantees the per-agent SSE→cache bridge. All agent-scoped hooks (useThreads/useMemory/useTodos/…/useMetrics) + useStreamingTokens (rAF-batched §7 token plane). Re-exports ./mutations. The @/lib/live single import surface.
@@ -14638,6 +14742,10 @@ f379d2a878f22b32:
   path: crates/cp-mod-github/Cargo.toml
   description: 'GitHub module deps: cp-base, cp-render, crossterm, regex, cp-mod-utilities, serde_json, secrecy.'
   last_edited_ms: 1780565428722
+f37bfe564015388b:
+  path: crates/cp-mod-files/src/lib.rs
+  description: 'Files module. Core/global. 3 tools: Open, Edit, Write. Pre-flight: queue auto-activate, old_string match against both disk and virtual (post-queue) content via build_virtual_content(). 4-way matrix: disk✓/virtual✓→OK, disk✓/virtual✗→ERROR, disk✗/virtual✓→OK, disk✗/virtual✗→ERROR.'
+  last_edited_ms: 0
 f384173f6c84e64e:
   path: crates/cp-oplog/src/service.rs
   description: 'OplogService — off-loop group-commit thread + GAP2/I2 asymmetric backpressure. Durability::of: PhaseTransition|CostAggregate|ContextUsage|ThreadFocusChanged=BestEffort (disposable/self-healing), all else (roster mutations incl ThreadPaused/ThreadResumed/ThreadDeleted + MessageDeleted + Lifecycle + Unknown)=Durable. THREE submit paths: append_durable (blocks+awaits sync — intake/I11), submit_durable (non-blocking durable, detached ack — I2 main loop), append_best_effort (try_send drop-on-full — phase/cost/focus). commit_loop drains batch, ONE fdatasync. Tests in sibling service_tests.rs.'
