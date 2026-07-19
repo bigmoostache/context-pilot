@@ -75,36 +75,7 @@ fn render_normal(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
     }
 
     // Dynamic entries with pagination
-    let total_dynamic = dynamic_entries.len();
-    if total_dynamic > 0 {
-        // Find which page the selected entry is on
-        let total_pages = if total_dynamic == 0 { 1 } else { total_dynamic.div_ceil(MAX_DYNAMIC_PER_PAGE) };
-        let current_page = dynamic_entries
-            .iter()
-            .position(|e| e.active)
-            .map_or(0, |pos| pos.checked_div(MAX_DYNAMIC_PER_PAGE).unwrap_or(0));
-
-        // Separator with embedded page indicator: ──────── 1/2 ─
-        if total_pages > 1 {
-            let page_text = format!("{}/{}", current_page.saturating_add(1), total_pages);
-            let suffix_len = page_text.len().saturating_add(3); // space + text + space + trailing ─
-            let fill = cw.saturating_sub(suffix_len);
-            lines.push(padded(vec![
-                Span::styled("─".repeat(fill), Style::default().fg(theme::border_muted())),
-                Span::styled(format!(" {page_text} "), Style::default().fg(theme::text_muted())),
-                Span::styled("─", Style::default().fg(theme::border_muted())),
-            ]));
-        } else {
-            lines.push(padded(vec![Span::styled("─".repeat(cw), Style::default().fg(theme::border_muted()))]));
-        }
-
-        let page_start = current_page.saturating_mul(MAX_DYNAMIC_PER_PAGE);
-        let page_end = page_start.saturating_add(MAX_DYNAMIC_PER_PAGE).min(total_dynamic);
-
-        for entry in dynamic_entries.get(page_start..page_end).unwrap_or(&[]) {
-            render_normal_entry(&mut lines, entry, cw);
-        }
-    }
+    render_dynamic_entries(&mut lines, &dynamic_entries, cw);
 
     // PR card
     if let Some(pr) = &(sidebar.pr_card) {
@@ -122,7 +93,45 @@ fn render_normal(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
     let Some(&context_area) = sidebar_layout.first() else { return };
     frame.render_widget(paragraph, context_area);
 
-    // Help hints at bottom
+    render_help_hints(frame, sidebar, base_style, sidebar_layout.get(1).copied());
+}
+
+/// Render the paginated dynamic-entry section: page-indicator separator plus the
+/// current page's entries. No-op when there are no dynamic entries.
+fn render_dynamic_entries(lines: &mut Vec<Line<'static>>, dynamic_entries: &[&SidebarEntry], cw: usize) {
+    let total_dynamic = dynamic_entries.len();
+    if total_dynamic == 0 {
+        return;
+    }
+    let total_pages = total_dynamic.div_ceil(MAX_DYNAMIC_PER_PAGE);
+    let current_page = dynamic_entries
+        .iter()
+        .position(|e| e.active)
+        .map_or(0, |pos| pos.checked_div(MAX_DYNAMIC_PER_PAGE).unwrap_or(0));
+
+    // Separator with embedded page indicator: ──────── 1/2 ─
+    if total_pages > 1 {
+        let page_text = format!("{}/{}", current_page.saturating_add(1), total_pages);
+        let suffix_len = page_text.len().saturating_add(3); // space + text + space + trailing ─
+        let fill = cw.saturating_sub(suffix_len);
+        lines.push(padded(vec![
+            Span::styled("─".repeat(fill), Style::default().fg(theme::border_muted())),
+            Span::styled(format!(" {page_text} "), Style::default().fg(theme::text_muted())),
+            Span::styled("─", Style::default().fg(theme::border_muted())),
+        ]));
+    } else {
+        lines.push(padded(vec![Span::styled("─".repeat(cw), Style::default().fg(theme::border_muted()))]));
+    }
+
+    let page_start = current_page.saturating_mul(MAX_DYNAMIC_PER_PAGE);
+    let page_end = page_start.saturating_add(MAX_DYNAMIC_PER_PAGE).min(total_dynamic);
+    for entry in dynamic_entries.get(page_start..page_end).unwrap_or(&[]) {
+        render_normal_entry(lines, entry, cw);
+    }
+}
+
+/// Render the bottom help-hint block into its layout chunk.
+fn render_help_hints(frame: &mut Frame<'_>, sidebar: &Sidebar, base_style: Style, help_area: Option<Rect>) {
     let mut help_lines: Vec<Line<'_>> = Vec::new();
     help_lines.push(Line::from("")); // separator line for visibility
     help_lines.extend(sidebar.help_hints.iter().map(|hint| {
@@ -133,7 +142,7 @@ fn render_normal(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
     }));
 
     let help_paragraph = Paragraph::new(help_lines).style(base_style);
-    let Some(&help_area) = sidebar_layout.get(1) else { return };
+    let Some(help_area) = help_area else { return };
     frame.render_widget(help_paragraph, help_area);
 }
 
@@ -208,99 +217,23 @@ fn render_token_bar_box(lines: &mut Vec<Line<'static>>, token_bar: &TokenBar, cw
     let budget = format_number(token_bar.budget.to_usize());
 
     // Build content lines
-    let mut content: Vec<Line<'static>> = Vec::new();
-
-    // Line 1: ⚓ Context Pilot
-    content.push(Line::from(vec![
-        Span::styled("⚓ ", Style::default().fg(theme::accent())),
-        Span::styled("Context Pilot", Style::default().fg(theme::text()).bold()),
-    ]));
-
-    // Line 2: used / threshold / budget
-    content.push(Line::from(vec![
-        Span::styled(current, Style::default().fg(theme::text()).bold()),
-        Span::styled(" / ", Style::default().fg(theme::border_muted())),
-        Span::styled(threshold, Style::default().fg(theme::warning())),
-        Span::styled(" / ", Style::default().fg(theme::border_muted())),
-        Span::styled(budget, Style::default().fg(theme::accent())),
-    ]));
-
-    // Line 3: gauge bar (using animated fractional positions)
-    let bar_width = inner_width;
-    let bar_width_f = bar_width.to_f64();
-
-    // Fractional fill positions for smooth animation
-    let hit_filled_f = anim.hit_pct * bar_width_f / 100.0f64;
-    let miss_filled_f = anim.miss_pct * bar_width_f / 100.0f64;
-    let total_filled_f = (hit_filled_f + miss_filled_f).min(bar_width_f);
-
-    // Integer positions for cell-level decisions
-    let hit_filled = hit_filled_f.floor().to_usize().min(bar_width);
-    let total_filled = total_filled_f.floor().to_usize().min(bar_width);
-
-    // Fractional remainder at boundaries for color crossfade
-    let hit_frac = hit_filled_f.fract();
-    let total_frac = total_filled_f.fract();
-
-    let threshold_pos = if token_bar.budget > 0 {
-        cp_base::panels::time_arith::div_const::<100>(
-            token_bar
-                .threshold
-                .to_usize()
-                .saturating_mul(100)
-                .checked_div(token_bar.budget.to_usize())
-                .unwrap_or(0)
-                .saturating_mul(bar_width)
-                .checked_div(100)
-                .unwrap_or(0)
-                .saturating_mul(100),
-        )
-    } else {
-        0
-    };
-
-    let hit_color = theme::success();
-    let miss_color = theme::warning();
-    let empty_color = theme::bg_elevated();
-
-    let mut bar_spans: Vec<Span<'static>> = Vec::new();
-    for i in 0..bar_width {
-        let is_threshold = i == threshold_pos && threshold_pos < bar_width;
-
-        // Determine the base fill color for this cell
-        let base_color = if i < hit_filled {
-            hit_color
-        } else if i == hit_filled && hit_frac > 0.01f64 && total_filled_f > hit_filled_f {
-            // Boundary cell: crossfade from hit → miss
-            super::bar_animation::lerp_color(miss_color, hit_color, hit_frac)
-        } else if i < total_filled {
-            miss_color
-        } else if i == total_filled && total_frac > 0.01f64 {
-            // Boundary cell: crossfade from filled → empty
-            let fill = if hit_filled_f > total_filled_f.floor() { hit_color } else { miss_color };
-            super::bar_animation::lerp_color(empty_color, fill, total_frac)
-        } else {
-            empty_color
-        };
-
-        // Apply streaming pulse to filled cells
-        let is_filled_cell = i < total_filled || (i == total_filled && total_frac > 0.01f64);
-        let color = anim.pulse_brightness.map_or(base_color, |brightness| {
-            if is_filled_cell { super::bar_animation::pulse_color(base_color, brightness) } else { base_color }
-        });
-
-        if is_threshold {
-            bar_spans.push(Span::styled("|", Style::default().fg(theme::warning()).bg(color)));
-        } else {
-            let ch = if i < total_filled || (i == total_filled && total_frac > 0.5f64) {
-                chars::BLOCK_FULL
-            } else {
-                chars::BLOCK_LIGHT
-            };
-            bar_spans.push(Span::styled(ch, Style::default().fg(color)));
-        }
-    }
-    content.push(Line::from(bar_spans));
+    let content: Vec<Line<'static>> = vec![
+        // Line 1: ⚓ Context Pilot
+        Line::from(vec![
+            Span::styled("⚓ ", Style::default().fg(theme::accent())),
+            Span::styled("Context Pilot", Style::default().fg(theme::text()).bold()),
+        ]),
+        // Line 2: used / threshold / budget
+        Line::from(vec![
+            Span::styled(current, Style::default().fg(theme::text()).bold()),
+            Span::styled(" / ", Style::default().fg(theme::border_muted())),
+            Span::styled(threshold, Style::default().fg(theme::warning())),
+            Span::styled(" / ", Style::default().fg(theme::border_muted())),
+            Span::styled(budget, Style::default().fg(theme::accent())),
+        ]),
+        // Line 3: gauge bar (using animated fractional positions)
+        Line::from(build_bar_spans(token_bar, &anim, inner_width)),
+    ];
 
     // Wrap in rounded border
     // Top: ╭───...───╮
@@ -330,6 +263,104 @@ fn render_token_bar_box(lines: &mut Vec<Line<'static>>, token_bar: &TokenBar, cw
         Span::styled("─".repeat(inner_width), border_style),
         Span::styled("╯", border_style),
     ]));
+}
+
+/// Build the animated gauge-bar spans (hit/miss segments, threshold marker,
+/// fractional-boundary color crossfade, and streaming pulse).
+fn build_bar_spans(
+    token_bar: &TokenBar,
+    anim: &super::bar_animation::AnimatedBar,
+    bar_width: usize,
+) -> Vec<Span<'static>> {
+    let bar_width_f = bar_width.to_f64();
+
+    // Fractional fill positions for smooth animation
+    let hit_filled_f = anim.hit_pct * bar_width_f / 100.0f64;
+    let miss_filled_f = anim.miss_pct * bar_width_f / 100.0f64;
+    let total_filled_f = (hit_filled_f + miss_filled_f).min(bar_width_f);
+
+    let hit_filled = hit_filled_f.floor().to_usize().min(bar_width);
+    let total_filled = total_filled_f.floor().to_usize().min(bar_width);
+    let hit_frac = hit_filled_f.fract();
+    let total_frac = total_filled_f.fract();
+
+    let threshold_pos = if token_bar.budget > 0 {
+        cp_base::panels::time_arith::div_const::<100>(
+            token_bar
+                .threshold
+                .to_usize()
+                .saturating_mul(100)
+                .checked_div(token_bar.budget.to_usize())
+                .unwrap_or(0)
+                .saturating_mul(bar_width)
+                .checked_div(100)
+                .unwrap_or(0)
+                .saturating_mul(100),
+        )
+    } else {
+        0
+    };
+
+    let geom = BarGeom { hit_filled, total_filled, hit_filled_f, total_filled_f, hit_frac, total_frac };
+    let mut bar_spans: Vec<Span<'static>> = Vec::new();
+    for i in 0..bar_width {
+        let is_threshold = i == threshold_pos && threshold_pos < bar_width;
+        let base_color = bar_cell_color(i, &geom);
+        let is_filled_cell = i < total_filled || (i == total_filled && total_frac > 0.01f64);
+        let color = anim.pulse_brightness.map_or(base_color, |brightness| {
+            if is_filled_cell { super::bar_animation::pulse_color(base_color, brightness) } else { base_color }
+        });
+
+        if is_threshold {
+            bar_spans.push(Span::styled("|", Style::default().fg(theme::warning()).bg(color)));
+        } else {
+            let ch = if i < total_filled || (i == total_filled && total_frac > 0.5f64) {
+                chars::BLOCK_FULL
+            } else {
+                chars::BLOCK_LIGHT
+            };
+            bar_spans.push(Span::styled(ch, Style::default().fg(color)));
+        }
+    }
+    bar_spans
+}
+
+/// Geometry of the gauge bar fill for per-cell color decisions.
+struct BarGeom {
+    /// Integer count of fully hit-filled cells.
+    hit_filled: usize,
+    /// Integer count of fully filled (hit + miss) cells.
+    total_filled: usize,
+    /// Fractional hit fill position.
+    hit_filled_f: f64,
+    /// Fractional total fill position.
+    total_filled_f: f64,
+    /// Fractional remainder at the hit boundary.
+    hit_frac: f64,
+    /// Fractional remainder at the total-fill boundary.
+    total_frac: f64,
+}
+
+/// Resolve the base fill color for bar cell `i` (hit / miss / crossfade / empty).
+fn bar_cell_color(i: usize, geom: &BarGeom) -> ratatui::style::Color {
+    let hit_color = theme::success();
+    let miss_color = theme::warning();
+    let empty_color = theme::bg_elevated();
+
+    if i < geom.hit_filled {
+        hit_color
+    } else if i == geom.hit_filled && geom.hit_frac > 0.01f64 && geom.total_filled_f > geom.hit_filled_f {
+        // Boundary cell: crossfade from hit → miss
+        super::bar_animation::lerp_color(miss_color, hit_color, geom.hit_frac)
+    } else if i < geom.total_filled {
+        miss_color
+    } else if i == geom.total_filled && geom.total_frac > 0.01f64 {
+        // Boundary cell: crossfade from filled → empty
+        let fill = if geom.hit_filled_f > geom.total_filled_f.floor() { hit_color } else { miss_color };
+        super::bar_animation::lerp_color(empty_color, fill, geom.total_frac)
+    } else {
+        empty_color
+    }
 }
 
 // ── PR card ──────────────────────────────────────────────────────────

@@ -161,3 +161,115 @@ where
     let path = format!("{dir}/{worker_id}_{provider}_last_request.json");
     let _r2 = std::fs::write(path, serde_json::to_string_pretty(request).unwrap_or_default());
 }
+
+// ───────────────────────────────────────────────────────────────────
+// Shared SSE consume loop (Grok / Groq / DeepSeek)
+// ───────────────────────────────────────────────────────────────────
+
+use std::io::{BufRead as _, BufReader};
+use std::sync::mpsc::Sender;
+
+use super::super::StreamEvent;
+use super::super::error::LlmError;
+
+/// Token/stop-reason totals accumulated while consuming an OpenAI-compatible
+/// SSE stream. Cache fields stay zero for providers that don't report them.
+#[derive(Default)]
+pub(crate) struct SseAccum {
+    /// Prompt (input) tokens reported by the final usage frame.
+    pub input_tokens: usize,
+    /// Completion (output) tokens reported by the final usage frame.
+    pub output_tokens: usize,
+    /// Prompt tokens served from cache (DeepSeek only; else 0).
+    pub cache_hit_tokens: usize,
+    /// Prompt tokens that missed the cache (DeepSeek only; else 0).
+    pub cache_miss_tokens: usize,
+    /// Normalized stop reason from the last choice's `finish_reason`.
+    pub stop_reason: Option<String>,
+}
+
+/// Fold a usage frame's token counts into `acc`.
+const fn apply_usage(acc: &mut SseAccum, usage: &StreamUsage) {
+    if let Some(inp) = usage.prompt {
+        acc.input_tokens = inp;
+    }
+    if let Some(out) = usage.completion {
+        acc.output_tokens = out;
+    }
+    if let Some(hit) = usage.prompt_cache_hit {
+        acc.cache_hit_tokens = hit;
+    }
+    if let Some(miss) = usage.prompt_cache_miss {
+        acc.cache_miss_tokens = miss;
+    }
+}
+
+/// Emit content chunk + tool-progress events from one streaming delta.
+fn emit_delta_events(delta: StreamDelta, tx: &Sender<StreamEvent>, tool_acc: &mut ToolCallAccumulator) {
+    if let Some(content) = delta.content
+        && !content.is_empty()
+    {
+        let _r = tx.send(StreamEvent::Chunk(content));
+    }
+    let Some(calls) = delta.tool_calls else { return };
+    for call in &calls {
+        if let Some((name, input_so_far)) = tool_acc.feed(call) {
+            let _r = tx.send(StreamEvent::ToolProgress { name, input_so_far });
+        }
+    }
+}
+
+/// Process one streaming choice: emit content chunks + tool progress from the
+/// delta, and (on `finish_reason`) record the stop reason + drain tool calls.
+fn process_choice(
+    choice: StreamChoice,
+    tx: &Sender<StreamEvent>,
+    tool_acc: &mut ToolCallAccumulator,
+    acc: &mut SseAccum,
+) {
+    if let Some(delta) = choice.delta {
+        emit_delta_events(delta, tx, tool_acc);
+    }
+    if let Some(reason) = &(choice.finish_reason) {
+        acc.stop_reason = Some(normalize_stop_reason(reason));
+        for tool_use in tool_acc.drain() {
+            let _r = tx.send(StreamEvent::ToolUse(tool_use));
+        }
+    }
+}
+
+/// Fold one parsed SSE frame into `acc` + emit its chunks/tool events.
+fn process_response(
+    resp: StreamResponse,
+    tx: &Sender<StreamEvent>,
+    tool_acc: &mut ToolCallAccumulator,
+    acc: &mut SseAccum,
+) {
+    if let Some(usage) = resp.usage {
+        apply_usage(acc, &usage);
+    }
+    for choice in resp.choices {
+        process_choice(choice, tx, tool_acc, acc);
+    }
+}
+
+/// Read an OpenAI-compatible SSE response to completion, streaming chunks and
+/// tool events to `tx`. Returns accumulated token/stop-reason totals. The caller
+/// sends the terminal `StreamEvent::Done` from the returned `SseAccum`.
+pub(crate) fn consume_sse_stream<R>(
+    reader: BufReader<R>,
+    tx: &Sender<StreamEvent>,
+    tool_acc: &mut ToolCallAccumulator,
+) -> Result<SseAccum, LlmError>
+where
+    R: std::io::Read,
+{
+    let mut acc = SseAccum::default();
+    for line in reader.lines() {
+        let line = line.map_err(|e| LlmError::StreamRead(e.to_string()))?;
+        if let Some(resp) = parse_sse_line(&line) {
+            process_response(resp, tx, tool_acc, &mut acc);
+        }
+    }
+    Ok(acc)
+}

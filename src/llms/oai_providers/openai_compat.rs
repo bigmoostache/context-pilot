@@ -153,11 +153,8 @@ pub(crate) fn build_messages(
     build_from_raw(messages, context_items, opts)
 }
 
-/// Convert pre-assembled `Vec<ApiMessage>` to OpenAI-compatible format.
-fn build_from_api_messages(api_messages: &[super::super::ApiMessage], opts: &BuildOptions) -> Vec<OaiMessage> {
-    let mut out: Vec<OaiMessage> = Vec::new();
-
-    // System message
+/// Push the leading system message (system prompt + optional provider suffix).
+fn push_system_message(out: &mut Vec<OaiMessage>, opts: &BuildOptions) {
     let mut system_content = opts.system_prompt.clone().unwrap_or_else(|| library::default_agent_content().to_owned());
     if let Some(suffix) = &(opts.system_suffix) {
         system_content.push_str("\n\n");
@@ -169,90 +166,234 @@ fn build_from_api_messages(api_messages: &[super::super::ApiMessage], opts: &Bui
         tool_calls: None,
         tool_call_id: None,
     });
+}
 
-    // Convert each ApiMessage
-    for msg in api_messages {
-        // Check if it contains tool_use blocks → convert to tool_calls
-        let has_tool_use = msg.content.iter().any(|b| matches!(b, super::super::ContentBlock::ToolUse { .. }));
-        let has_tool_result = msg.content.iter().any(|b| matches!(b, super::super::ContentBlock::ToolResult { .. }));
-
-        if has_tool_result {
-            // Tool results → individual tool messages
-            for block in &msg.content {
-                if let super::super::ContentBlock::ToolResult { tool_use_id, content } = block {
-                    out.push(OaiMessage {
-                        role: "tool".to_owned(),
-                        content: Some(content.clone()),
-                        tool_calls: None,
-                        tool_call_id: Some(tool_use_id.clone()),
-                    });
-                }
-            }
-        } else if has_tool_use {
-            // Assistant message with text + tool calls
-            let text_parts: Vec<&str> = msg
-                .content
-                .iter()
-                .filter_map(
-                    |b| if let super::super::ContentBlock::Text { text } = b { Some(text.as_str()) } else { None },
-                )
-                .collect();
-            let text = if text_parts.is_empty() { None } else { Some(text_parts.join("\n")) };
-
-            let calls: Vec<OaiToolCall> = msg
-                .content
-                .iter()
-                .filter_map(|b| {
-                    if let super::super::ContentBlock::ToolUse { id, name, input } = b {
-                        Some(OaiToolCall {
-                            id: id.clone(),
-                            call_type: "function".to_owned(),
-                            function: OaiFunction {
-                                name: name.clone(),
-                                arguments: serde_json::to_string(input).unwrap_or_default(),
-                            },
-                        })
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            out.push(OaiMessage {
-                role: msg.role.clone(),
-                content: text,
-                tool_calls: if calls.is_empty() { None } else { Some(calls) },
-                tool_call_id: None,
-            });
-        } else {
-            // Pure text message
-            let text: String = msg
-                .content
-                .iter()
-                .filter_map(
-                    |b| if let super::super::ContentBlock::Text { text } = b { Some(text.as_str()) } else { None },
-                )
-                .collect::<Vec<_>>()
-                .join("\n");
-
-            if !text.is_empty() {
-                out.push(OaiMessage {
-                    role: msg.role.clone(),
-                    content: Some(text),
-                    tool_calls: None,
-                    tool_call_id: None,
-                });
-            }
-        }
-    }
-
-    // Extra context (cleaner mode)
+/// Push the cleaner-mode extra-context user message, when present.
+fn push_extra_context(out: &mut Vec<OaiMessage>, opts: &BuildOptions) {
     if let Some(ctx) = &(opts.extra_context) {
         let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace("{context}", ctx);
         out.push(OaiMessage { role: "user".to_owned(), content: Some(msg), tool_calls: None, tool_call_id: None });
     }
+}
 
+/// Emit one `tool` message per `ToolResult` block in an assistant `ApiMessage`.
+fn push_api_tool_results(out: &mut Vec<OaiMessage>, msg: &super::super::ApiMessage) {
+    for block in &msg.content {
+        if let super::super::ContentBlock::ToolResult { tool_use_id, content } = block {
+            out.push(OaiMessage {
+                role: "tool".to_owned(),
+                content: Some(content.clone()),
+                tool_calls: None,
+                tool_call_id: Some(tool_use_id.clone()),
+            });
+        }
+    }
+}
+
+/// Emit an assistant message carrying text + `tool_calls` from an `ApiMessage`.
+fn push_api_tool_calls(out: &mut Vec<OaiMessage>, msg: &super::super::ApiMessage) {
+    let text_parts: Vec<&str> = msg
+        .content
+        .iter()
+        .filter_map(|b| if let super::super::ContentBlock::Text { text } = b { Some(text.as_str()) } else { None })
+        .collect();
+    let text = if text_parts.is_empty() { None } else { Some(text_parts.join("\n")) };
+
+    let calls: Vec<OaiToolCall> = msg
+        .content
+        .iter()
+        .filter_map(|b| {
+            if let super::super::ContentBlock::ToolUse { id, name, input } = b {
+                Some(OaiToolCall {
+                    id: id.clone(),
+                    call_type: "function".to_owned(),
+                    function: OaiFunction {
+                        name: name.clone(),
+                        arguments: serde_json::to_string(input).unwrap_or_default(),
+                    },
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    out.push(OaiMessage {
+        role: msg.role.clone(),
+        content: text,
+        tool_calls: if calls.is_empty() { None } else { Some(calls) },
+        tool_call_id: None,
+    });
+}
+
+/// Emit a pure-text message (no tool blocks) from an `ApiMessage`, if non-empty.
+fn push_api_plain_text(out: &mut Vec<OaiMessage>, msg: &super::super::ApiMessage) {
+    let text: String = msg
+        .content
+        .iter()
+        .filter_map(|b| if let super::super::ContentBlock::Text { text } = b { Some(text.as_str()) } else { None })
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !text.is_empty() {
+        out.push(OaiMessage { role: msg.role.clone(), content: Some(text), tool_calls: None, tool_call_id: None });
+    }
+}
+
+/// Convert pre-assembled `Vec<ApiMessage>` to OpenAI-compatible format.
+fn build_from_api_messages(api_messages: &[super::super::ApiMessage], opts: &BuildOptions) -> Vec<OaiMessage> {
+    let mut out: Vec<OaiMessage> = Vec::new();
+    push_system_message(&mut out, opts);
+
+    for msg in api_messages {
+        let has_tool_use = msg.content.iter().any(|b| matches!(b, super::super::ContentBlock::ToolUse { .. }));
+        let has_tool_result = msg.content.iter().any(|b| matches!(b, super::super::ContentBlock::ToolResult { .. }));
+
+        if has_tool_result {
+            push_api_tool_results(&mut out, msg);
+        } else if has_tool_use {
+            push_api_tool_calls(&mut out, msg);
+        } else {
+            push_api_plain_text(&mut out, msg);
+        }
+    }
+
+    push_extra_context(&mut out, opts);
     out
+}
+
+/// Inject collected panels as synthetic assistant/tool message pairs, framed by
+/// a header on the first panel and a footer acknowledgement after the last.
+fn push_panel_injection(out: &mut Vec<OaiMessage>, context_items: &[crate::app::panels::ContextItem]) {
+    let fake_panels = prepare_panel_messages(context_items);
+    if fake_panels.is_empty() {
+        return;
+    }
+    let current_ms = now_ms();
+
+    for (idx, panel) in fake_panels.iter().enumerate() {
+        let timestamp_text = panel_timestamp_text(panel.timestamp_ms);
+        let text = if idx == 0 { format!("{}\n\n{}", panel_header_text(), timestamp_text) } else { timestamp_text };
+
+        out.push(OaiMessage {
+            role: "assistant".to_owned(),
+            content: Some(text),
+            tool_calls: Some(vec![OaiToolCall {
+                id: format!("panel_{}", panel.panel_id),
+                call_type: "function".to_owned(),
+                function: OaiFunction {
+                    name: "dynamic_panel".to_owned(),
+                    arguments: format!(r#"{{"id":"{}"}}"#, panel.panel_id),
+                },
+            }]),
+            tool_call_id: None,
+        });
+        out.push(OaiMessage {
+            role: "tool".to_owned(),
+            content: Some(panel.content.clone()),
+            tool_calls: None,
+            tool_call_id: Some(format!("panel_{}", panel.panel_id)),
+        });
+    }
+
+    let footer = panel_footer_text(current_ms);
+    out.push(OaiMessage {
+        role: "assistant".to_owned(),
+        content: Some(footer),
+        tool_calls: Some(vec![OaiToolCall {
+            id: "panel_footer".to_owned(),
+            call_type: "function".to_owned(),
+            function: OaiFunction {
+                name: "dynamic_panel".to_owned(),
+                arguments: r#"{"action":"end_panels"}"#.to_owned(),
+            },
+        }]),
+        tool_call_id: None,
+    });
+    out.push(OaiMessage {
+        role: "tool".to_owned(),
+        content: Some(prompts::panel_footer_ack().to_owned()),
+        tool_calls: None,
+        tool_call_id: Some("panel_footer".to_owned()),
+    });
+}
+
+/// Emit `tool` messages for each result whose `tool_use_id` is in `included`.
+fn push_raw_tool_results(out: &mut Vec<OaiMessage>, msg: &Message, included: &HashSet<String>) {
+    for result in &msg.tool_results {
+        if included.contains(&result.tool_use_id) {
+            out.push(OaiMessage {
+                role: "tool".to_owned(),
+                content: Some(result.content.clone()),
+                tool_calls: None,
+                tool_call_id: Some(result.tool_use_id.clone()),
+            });
+        }
+    }
+}
+
+/// Emit (or merge into the prior assistant message) the tool calls of a
+/// `ToolCall` message, keeping only calls with matching results in `included`.
+fn push_raw_tool_calls(out: &mut Vec<OaiMessage>, msg: &Message, included: &HashSet<String>) {
+    let calls: Vec<OaiToolCall> = msg
+        .tool_uses
+        .iter()
+        .filter(|tu| included.contains(&tu.id))
+        .map(|tu| OaiToolCall {
+            id: tu.id.clone(),
+            call_type: "function".to_owned(),
+            function: OaiFunction {
+                name: tu.name.clone(),
+                arguments: serde_json::to_string(&tu.input).unwrap_or_default(),
+            },
+        })
+        .collect();
+    if calls.is_empty() {
+        return;
+    }
+    // Merge into the last assistant message so consecutive tool calls become one
+    // assistant message with multiple tool_calls (required by OpenAI-compat APIs).
+    let should_merge = out.last().is_some_and(|last| last.role == "assistant" && last.tool_calls.is_some());
+    if should_merge {
+        if let Some(last) = out.last_mut()
+            && let Some(ref mut existing_calls) = last.tool_calls
+        {
+            existing_calls.extend(calls);
+        }
+    } else {
+        out.push(OaiMessage {
+            role: "assistant".to_owned(),
+            content: None,
+            tool_calls: Some(calls),
+            tool_call_id: None,
+        });
+    }
+}
+
+/// Convert one conversation `Message` to OAI form (skips deleted/empty), routing
+/// tool results, tool calls, and plain text to their respective emitters.
+fn push_conversation_message(out: &mut Vec<OaiMessage>, msg: &Message, included: &HashSet<String>) {
+    if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
+        return;
+    }
+    if msg.content.is_empty() && msg.tool_uses.is_empty() && msg.tool_results.is_empty() {
+        return;
+    }
+    if msg.msg_type == MsgKind::ToolResult {
+        push_raw_tool_results(out, msg, included);
+        return;
+    }
+    if msg.msg_type == MsgKind::ToolCall {
+        push_raw_tool_calls(out, msg, included);
+        return;
+    }
+    if !msg.content.is_empty() {
+        out.push(OaiMessage {
+            role: msg.role.clone(),
+            content: Some(msg.content.clone()),
+            tool_calls: None,
+            tool_call_id: None,
+        });
+    }
 }
 
 /// Build from raw messages + `context_items` (legacy fallback path).
@@ -262,163 +403,13 @@ fn build_from_raw(
     opts: &BuildOptions,
 ) -> Vec<OaiMessage> {
     let mut out: Vec<OaiMessage> = Vec::new();
+    push_system_message(&mut out, opts);
+    push_panel_injection(&mut out, context_items);
+    push_extra_context(&mut out, opts);
 
-    // ── System message ──────────────────────────────────────────
-    let mut system_content = opts.system_prompt.clone().unwrap_or_else(|| library::default_agent_content().to_owned());
-
-    if let Some(suffix) = &(opts.system_suffix) {
-        system_content.push_str("\n\n");
-        system_content.push_str(suffix);
-    }
-
-    out.push(OaiMessage {
-        role: "system".to_owned(),
-        content: Some(system_content),
-        tool_calls: None,
-        tool_call_id: None,
-    });
-
-    // ── Panel injection ─────────────────────────────────────────
-    let fake_panels = prepare_panel_messages(context_items);
-    let current_ms = now_ms();
-
-    if !fake_panels.is_empty() {
-        for (idx, panel) in fake_panels.iter().enumerate() {
-            let timestamp_text = panel_timestamp_text(panel.timestamp_ms);
-            let text = if idx == 0 { format!("{}\n\n{}", panel_header_text(), timestamp_text) } else { timestamp_text };
-
-            // Assistant message with tool_call
-            out.push(OaiMessage {
-                role: "assistant".to_owned(),
-                content: Some(text),
-                tool_calls: Some(vec![OaiToolCall {
-                    id: format!("panel_{}", panel.panel_id),
-                    call_type: "function".to_owned(),
-                    function: OaiFunction {
-                        name: "dynamic_panel".to_owned(),
-                        arguments: format!(r#"{{"id":"{}"}}"#, panel.panel_id),
-                    },
-                }]),
-                tool_call_id: None,
-            });
-
-            // Tool result message
-            out.push(OaiMessage {
-                role: "tool".to_owned(),
-                content: Some(panel.content.clone()),
-                tool_calls: None,
-                tool_call_id: Some(format!("panel_{}", panel.panel_id)),
-            });
-        }
-
-        // Footer after all panels
-        let footer = panel_footer_text(current_ms);
-        out.push(OaiMessage {
-            role: "assistant".to_owned(),
-            content: Some(footer),
-            tool_calls: Some(vec![OaiToolCall {
-                id: "panel_footer".to_owned(),
-                call_type: "function".to_owned(),
-                function: OaiFunction {
-                    name: "dynamic_panel".to_owned(),
-                    arguments: r#"{"action":"end_panels"}"#.to_owned(),
-                },
-            }]),
-            tool_call_id: None,
-        });
-        out.push(OaiMessage {
-            role: "tool".to_owned(),
-            content: Some(prompts::panel_footer_ack().to_owned()),
-            tool_calls: None,
-            tool_call_id: Some("panel_footer".to_owned()),
-        });
-    }
-
-    // ── Extra context (cleaner mode) ────────────────────────────
-    if let Some(ctx) = &(opts.extra_context) {
-        let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace("{context}", ctx);
-        out.push(OaiMessage { role: "user".to_owned(), content: Some(msg), tool_calls: None, tool_call_id: None });
-    }
-
-    // ── Tool pairing ────────────────────────────────────────────
     let included_tool_ids = collect_included_tool_ids(messages, &opts.pending_tool_result_ids);
-
-    // ── Conversation messages ───────────────────────────────────
     for msg in messages {
-        if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
-            continue;
-        }
-        if msg.content.is_empty() && msg.tool_uses.is_empty() && msg.tool_results.is_empty() {
-            continue;
-        }
-
-        // Tool results
-        if msg.msg_type == MsgKind::ToolResult {
-            for result in &msg.tool_results {
-                if included_tool_ids.contains(&result.tool_use_id) {
-                    out.push(OaiMessage {
-                        role: "tool".to_owned(),
-                        content: Some(result.content.clone()),
-                        tool_calls: None,
-                        tool_call_id: Some(result.tool_use_id.clone()),
-                    });
-                }
-            }
-            continue;
-        }
-
-        // Tool calls — only include if they have matching results.
-        // Merge into the last assistant message if possible, so consecutive
-        // tool calls from the same turn become one assistant message with
-        // multiple tool_calls (required by OpenAI-compat APIs).
-        if msg.msg_type == MsgKind::ToolCall {
-            let calls: Vec<OaiToolCall> = msg
-                .tool_uses
-                .iter()
-                .filter(|tu| included_tool_ids.contains(&tu.id))
-                .map(|tu| OaiToolCall {
-                    id: tu.id.clone(),
-                    call_type: "function".to_owned(),
-                    function: OaiFunction {
-                        name: tu.name.clone(),
-                        arguments: serde_json::to_string(&tu.input).unwrap_or_default(),
-                    },
-                })
-                .collect();
-
-            if !calls.is_empty() {
-                // Try to merge into the last assistant message so consecutive
-                // tool calls become one assistant message (required by OpenAI APIs)
-                let should_merge = out.last().is_some_and(|last| last.role == "assistant" && last.tool_calls.is_some());
-
-                if should_merge {
-                    if let Some(last) = out.last_mut()
-                        && let Some(ref mut existing_calls) = last.tool_calls
-                    {
-                        existing_calls.extend(calls);
-                    }
-                } else {
-                    out.push(OaiMessage {
-                        role: "assistant".to_owned(),
-                        content: None,
-                        tool_calls: Some(calls),
-                        tool_call_id: None,
-                    });
-                }
-            }
-            continue;
-        }
-
-        let message_content = msg.content.clone();
-
-        if !message_content.is_empty() {
-            out.push(OaiMessage {
-                role: msg.role.clone(),
-                content: Some(message_content),
-                tool_calls: None,
-                tool_call_id: None,
-            });
-        }
+        push_conversation_message(&mut out, msg, &included_tool_ids);
     }
 
     out

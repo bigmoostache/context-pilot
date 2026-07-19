@@ -58,7 +58,16 @@ fn placeholder_results(ids: &[String]) -> Vec<ContentBlock> {
 /// - stray `tool_result` blocks whose id has no matching `tool_use` in the
 ///   immediately-preceding assistant message are dropped (the symmetric invariant).
 pub(super) fn repair_tool_pairing(messages: &mut Vec<ApiMessage>) {
-    // Forward pass: every assistant tool_use gets an adjacent result.
+    ensure_adjacent_results(messages);
+    drop_stray_results(messages);
+    // Prune any user message left empty by stray-result removal.
+    messages.retain(|m| !(m.role == "user" && m.content.is_empty()));
+}
+
+/// Forward pass: every assistant `tool_use` gets an adjacent user `tool_result`
+/// (missing ids prepended as placeholders; a user message inserted/appended when
+/// none suitably follows).
+fn ensure_adjacent_results(messages: &mut Vec<ApiMessage>) {
     let mut idx = 0;
     while idx < messages.len() {
         let tool_use_ids = messages.get(idx).map(tool_use_ids_of).unwrap_or_default();
@@ -94,8 +103,11 @@ pub(super) fn repair_tool_pairing(messages: &mut Vec<ApiMessage>) {
         }
         idx = idx.saturating_add(2);
     }
+}
 
-    // Symmetric pass: drop stray tool_results whose call isn't in the message before.
+/// Symmetric pass: drop stray `tool_result` blocks whose matching `tool_use`
+/// isn't in the immediately-preceding message.
+fn drop_stray_results(messages: &mut [ApiMessage]) {
     for pos in 1..messages.len() {
         let prior_ids: std::collections::HashSet<String> =
             messages.get(pos.saturating_sub(1)).map(tool_use_ids_of).unwrap_or_default().into_iter().collect();
@@ -114,8 +126,6 @@ pub(super) fn repair_tool_pairing(messages: &mut Vec<ApiMessage>) {
             });
         }
     }
-    // Prune any user message left empty by stray-result removal.
-    messages.retain(|m| !(m.role == "user" && m.content.is_empty()));
 }
 
 #[cfg(test)]

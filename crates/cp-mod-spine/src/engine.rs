@@ -26,6 +26,76 @@ pub enum SpineDecision {
     Continue(ContinuationAction),
 }
 
+/// True while inside the exponential backoff window after consecutive
+/// continuation errors (2^errors seconds, capped 60s).
+fn in_backoff(state: &State) -> bool {
+    let cfg = &SpineState::get(state).config;
+    let Some(last_err_ms) = cfg.last_continuation_error_ms else {
+        return false;
+    };
+    if cfg.consecutive_continuation_errors == 0 {
+        return false;
+    }
+    let backoff_secs = (1u64 << cfg.consecutive_continuation_errors.min(6)).min(60);
+    now_ms().saturating_sub(last_err_ms) < backoff_secs.saturating_mul(1000)
+}
+
+/// True when the last non-tool-result user message was a synthetic
+/// auto-continuation the assistant hasn't answered yet (double-synthetic guard).
+fn last_synthetic_unanswered(state: &State) -> bool {
+    let synthetic_pos = state
+        .messages
+        .iter()
+        .rposition(|m| m.role == "user" && m.msg_type != cp_base::state::data::message::MsgKind::ToolResult);
+    let Some(pos) = synthetic_pos else {
+        return false;
+    };
+    let Some(msg) = state.messages.get(pos) else {
+        return false;
+    };
+    let content = msg.content.trim();
+    let is_synthetic = content.starts_with("/* Auto-continuation:")
+        || content == INJECTIONS.spine.continue_msg.trim()
+        || content == INJECTIONS.spine.reload_complete.trim();
+    if !is_synthetic {
+        return false;
+    }
+    // Assistant responded anywhere after the synthetic message (not just last).
+    let assistant_responded = state.messages.get(pos..).is_some_and(|slice| {
+        slice.iter().any(|m| m.role == "assistant" && (!m.content.is_empty() || !m.tool_uses.is_empty()))
+    });
+    !assistant_responded
+}
+
+/// Run all guard rails; on the first block, emit a deduplicated notification,
+/// mark unprocessed notifications as blocked, and return the block reason.
+fn check_guard_rails(state: &mut State) -> Option<String> {
+    for &guard in all_guard_rails() {
+        if !guard.should_block(state) {
+            continue;
+        }
+        let reason = guard.block_reason(state);
+        // Deduplicate block notifications
+        let source_tag = format!("guard_rail:{}", guard.name());
+        let already_notified = SpineState::get(state)
+            .notifications
+            .iter()
+            .any(|n| !n.is_processed() && n.kind == NotificationType::Custom && n.source == source_tag);
+        if !already_notified {
+            drop(SpineState::create_notification(
+                state,
+                NotificationType::Custom,
+                source_tag,
+                format!("Auto-continuation blocked by {}: {}", guard.name(), reason),
+            ));
+        }
+        // Persistent watchers recreate notifications next poll; re-evaluated then.
+        SpineState::mark_all_unprocessed_as_blocked(state);
+        return Some(reason);
+    }
+    None
+}
+
 /// Evaluate the spine: check for unprocessed notifications, apply guard rails, decide action.
 ///
 /// Returns a `SpineDecision` telling the caller what to do.
@@ -37,26 +107,16 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
         return SpineDecision::Idle;
     }
 
-    // User explicitly stopped streaming (Esc). This is an absolute hard stop —
-    // nothing bypasses it. Notifications queue up until the user re-engages
-    // by sending a message (which clears user_stopped via on_user_message).
+    // User explicitly stopped streaming (Esc). Absolute hard stop — nothing
+    // bypasses it. Notifications queue until the user re-engages (which clears
+    // user_stopped via on_user_message).
     if SpineState::get(state).config.user_stopped {
         return SpineDecision::Idle;
     }
 
-    // Backoff after consecutive failed continuations (errors with all retries exhausted).
-    // Delay: 2^errors seconds, capped at 60s. Prevents runaway loops on persistent API failures.
-    {
-        let cfg = &SpineState::get(state).config;
-        if cfg.consecutive_continuation_errors > 0
-            && let Some(last_err_ms) = cfg.last_continuation_error_ms
-        {
-            let backoff_secs = (1u64 << cfg.consecutive_continuation_errors.min(6)).min(60);
-            let elapsed_ms = now_ms().saturating_sub(last_err_ms);
-            if elapsed_ms < backoff_secs.saturating_mul(1000) {
-                return SpineDecision::Idle;
-            }
-        }
+    // Backoff after consecutive failed continuations.
+    if in_backoff(state) {
+        return SpineDecision::Idle;
     }
 
     // Nothing to do if no unprocessed notifications
@@ -64,67 +124,17 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
         return SpineDecision::Idle;
     }
 
-    // === Guardrail 2: No two synthetic messages in a row ===
-    // If the last non-error user message was a synthetic auto-continuation AND
-    // the assistant hasn't responded yet, don't fire another one.
-    // Once the assistant has responded (stream completed), it's safe to inject
-    // a new synthetic message for the next notification.
-    {
-        let synthetic_pos = state
-            .messages
-            .iter()
-            .rposition(|m| m.role == "user" && m.msg_type != cp_base::state::data::message::MsgKind::ToolResult);
-        if let Some(pos) = synthetic_pos
-            && let Some(msg) = state.messages.get(pos)
-        {
-            let content = msg.content.trim();
-            let is_synthetic = content.starts_with("/* Auto-continuation:")
-                || content == INJECTIONS.spine.continue_msg.trim()
-                || content == INJECTIONS.spine.reload_complete.trim();
-            if is_synthetic {
-                // Check if the assistant has responded ANYWHERE after the synthetic
-                // message — not just as the very last message. With auto-Read
-                // injection or tool pipelines, the last message may be a tool_result
-                // or an empty assistant, even though the AI did respond earlier.
-                let assistant_responded = state.messages.get(pos..).is_some_and(|slice| {
-                    slice.iter().any(|m| m.role == "assistant" && (!m.content.is_empty() || !m.tool_uses.is_empty()))
-                });
-                if !assistant_responded {
-                    return SpineDecision::Idle;
-                }
-            }
-        }
+    // Guardrail 2: no two synthetic messages in a row before the assistant answers.
+    if last_synthetic_unanswered(state) {
+        return SpineDecision::Idle;
     }
 
     // Build the continuation action from unprocessed notifications
     let action = build_continuation_from_notifications(state);
 
     // Check guard rails before firing
-    let guard_rails = all_guard_rails();
-    for &guard in guard_rails {
-        if guard.should_block(state) {
-            let reason = guard.block_reason(state);
-            // Deduplicate block notifications
-            let source_tag = format!("guard_rail:{}", guard.name());
-            let already_notified = SpineState::get(state)
-                .notifications
-                .iter()
-                .any(|n| !n.is_processed() && n.kind == NotificationType::Custom && n.source == source_tag);
-            if !already_notified {
-                drop(SpineState::create_notification(
-                    state,
-                    NotificationType::Custom,
-                    source_tag,
-                    format!("Auto-continuation blocked by {}: {}", guard.name(), reason),
-                ));
-            }
-            // Mark all unprocessed notifications as blocked — they were evaluated
-            // and the decision was "blocked." Persistent watchers will recreate new
-            // notifications on the next poll, and we'll re-evaluate then.
-            SpineState::mark_all_unprocessed_as_blocked(state);
-
-            return SpineDecision::Blocked(reason);
-        }
+    if let Some(reason) = check_guard_rails(state) {
+        return SpineDecision::Blocked(reason);
     }
 
     // All guard rails passed — fire the continuation

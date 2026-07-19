@@ -207,6 +207,96 @@ fn parse_log_hit(hit: &serde_json::Value) -> SearchResult {
 /// Local server, but semantic search involves remote Voyage AI embedder calls.
 const ASYNC_TIMEOUT_SECS: u64 = 30;
 
+/// Static parameters shared by both legs of a dual (keyword+semantic) search.
+struct DualSearchSpec<'spec> {
+    /// Index UID to query.
+    uid: &'spec str,
+    /// Keyword-leg query string (may carry a path-prefix).
+    keyword_query: &'spec str,
+    /// Semantic-leg query string (the fabricated example).
+    semantic_query: &'spec str,
+    /// Optional Meilisearch filter expression.
+    filter: Option<&'spec str>,
+    /// Optional sort directive.
+    sort: Option<&'spec str>,
+    /// Per-leg result cap.
+    limit: u32,
+}
+
+/// Run a keyword+semantic multi-search on one index, parse hits via `parse`,
+/// dedup by score, and truncate to the limit. Logs and swallows query errors
+/// (returns whatever parsed, possibly empty).
+fn search_index_dual(
+    client: &MeiliClient,
+    spec: &DualSearchSpec<'_>,
+    parse: impl Fn(&serde_json::Value) -> SearchResult,
+) -> Vec<SearchResult> {
+    let keyword_params = crate::meili::api::SearchParams {
+        uid: spec.uid,
+        query: spec.keyword_query,
+        filter: spec.filter,
+        sort: spec.sort,
+        limit: spec.limit,
+        semantic_ratio: Some(0.0f64),
+    };
+    let semantic_params = crate::meili::api::SearchParams {
+        uid: spec.uid,
+        query: spec.semantic_query,
+        filter: spec.filter,
+        sort: spec.sort,
+        limit: spec.limit,
+        semantic_ratio: Some(1.0f64),
+    };
+
+    let mut results: Vec<SearchResult> = Vec::new();
+    match client.multi_search(&[keyword_params, semantic_params]) {
+        Ok(result_sets) => {
+            for result_set in &result_sets {
+                if let Some(hits) = result_set.get("hits").and_then(|h| h.as_array()) {
+                    for hit in hits {
+                        results.push(parse(hit));
+                    }
+                }
+            }
+            dedup_by_score(&mut results, spec.limit);
+        }
+        Err(e) => log::warn!("multi-search on {} failed: {e}", spec.uid),
+    }
+    results
+}
+
+/// Keyword-only search of the entities index (no embedder there). Silently
+/// skips on error — the index may not exist when the entities module is unused.
+fn search_entities_block(
+    client: &MeiliClient,
+    entities_uid: &str,
+    query: &str,
+    limit: u32,
+) -> Vec<crate::panel::EntityHit> {
+    let entity_params = crate::meili::api::SearchParams {
+        uid: entities_uid,
+        query,
+        filter: None,
+        sort: None,
+        limit,
+        semantic_ratio: None,
+    };
+    let Ok(result) = client.search(&entity_params) else {
+        return Vec::new();
+    };
+    let Some(hits) = result.get("hits").and_then(|h| h.as_array()) else {
+        return Vec::new();
+    };
+    hits.iter()
+        .map(|hit| {
+            let table = hit.get("entity_table").and_then(serde_json::Value::as_str).unwrap_or("unknown").to_owned();
+            let all_text = hit.get("_all_text").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
+            let score = hit.get("_rankingScore").and_then(serde_json::Value::as_f64);
+            crate::panel::EntityHit { table, all_text, score }
+        })
+        .collect()
+}
+
 /// Execute the `search` tool.
 ///
 /// Runs Meilisearch HTTP queries on a worker thread to avoid blocking the main event loop.
@@ -270,111 +360,48 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     let entities_uid = format!("cp_{project_hash}_entities");
 
     spawn_async_tool(state, tool, ASYNC_TIMEOUT_SECS, move || {
-        let mut file_results: Vec<SearchResult> = Vec::new();
-        let mut log_results: Vec<SearchResult> = Vec::new();
-
         // --- Search files ----------------------------------------------------
 
-        if search_files {
-            let keyword_params = crate::meili::api::SearchParams {
-                uid: &files_uid,
-                query: &effective_query,
-                filter: file_filter.as_deref(),
-                sort: file_sort,
-                limit,
-                semantic_ratio: Some(0.0f64),
-            };
-            let semantic_params = crate::meili::api::SearchParams {
-                uid: &files_uid,
-                query: &semantic_query,
-                filter: file_filter.as_deref(),
-                sort: file_sort,
-                limit,
-                semantic_ratio: Some(1.0f64),
-            };
-            match client.multi_search(&[keyword_params, semantic_params]) {
-                Ok(results) => {
-                    for result_set in &results {
-                        if let Some(hits) = result_set.get("hits").and_then(|h| h.as_array()) {
-                            for hit in hits {
-                                file_results.push(parse_file_hit(hit));
-                            }
-                        }
-                    }
-                    dedup_by_score(&mut file_results, limit);
-                }
-                Err(e) => log::warn!("File multi-search failed: {e}"),
-            }
-        }
+        let file_results: Vec<SearchResult> = if search_files {
+            search_index_dual(
+                &client,
+                &DualSearchSpec {
+                    uid: &files_uid,
+                    keyword_query: &effective_query,
+                    semantic_query: &semantic_query,
+                    filter: file_filter.as_deref(),
+                    sort: file_sort,
+                    limit,
+                },
+                parse_file_hit,
+            )
+        } else {
+            Vec::new()
+        };
 
         // --- Search logs -----------------------------------------------------
 
-        if search_logs {
-            let keyword_params = crate::meili::api::SearchParams {
-                uid: &logs_uid,
-                query: &query,
-                filter: log_filter.as_deref(),
-                sort: log_sort,
-                limit,
-                semantic_ratio: Some(0.0f64),
-            };
-            let semantic_params = crate::meili::api::SearchParams {
-                uid: &logs_uid,
-                query: &semantic_query,
-                filter: log_filter.as_deref(),
-                sort: log_sort,
-                limit,
-                semantic_ratio: Some(1.0f64),
-            };
-            match client.multi_search(&[keyword_params, semantic_params]) {
-                Ok(results) => {
-                    for result_set in &results {
-                        if let Some(hits) = result_set.get("hits").and_then(|h| h.as_array()) {
-                            for hit in hits {
-                                log_results.push(parse_log_hit(hit));
-                            }
-                        }
-                    }
-                    dedup_by_score(&mut log_results, limit);
-                }
-                Err(e) => log::warn!("Log multi-search failed: {e}"),
-            }
-        }
+        let log_results: Vec<SearchResult> = if search_logs {
+            search_index_dual(
+                &client,
+                &DualSearchSpec {
+                    uid: &logs_uid,
+                    keyword_query: &query,
+                    semantic_query: &semantic_query,
+                    filter: log_filter.as_deref(),
+                    sort: log_sort,
+                    limit,
+                },
+                parse_log_hit,
+            )
+        } else {
+            Vec::new()
+        };
 
         // --- Search entities -------------------------------------------------
 
-        let mut entity_results: Vec<crate::panel::EntityHit> = Vec::new();
-        if search_entities {
-            let entity_params = crate::meili::api::SearchParams {
-                uid: &entities_uid,
-                query: &query,
-                filter: None,
-                sort: None,
-                limit,
-                semantic_ratio: None, // keyword only — no embedder on entities index
-            };
-            match client.search(&entity_params) {
-                Ok(result) => {
-                    if let Some(hits) = result.get("hits").and_then(|h| h.as_array()) {
-                        for hit in hits {
-                            let table = hit
-                                .get("entity_table")
-                                .and_then(serde_json::Value::as_str)
-                                .unwrap_or("unknown")
-                                .to_owned();
-                            let all_text =
-                                hit.get("_all_text").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
-                            let rank_score = hit.get("_rankingScore").and_then(serde_json::Value::as_f64);
-                            entity_results.push(crate::panel::EntityHit { table, all_text, score: rank_score });
-                        }
-                    }
-                }
-                Err(e) => {
-                    // Silently skip — index may not exist if entities module unused
-                    log::debug!("Entity search skipped: {e}");
-                }
-            }
-        }
+        let entity_results: Vec<crate::panel::EntityHit> =
+            if search_entities { search_entities_block(&client, &entities_uid, &query, limit) } else { Vec::new() };
 
         // --- Build output ----------------------------------------------------
 

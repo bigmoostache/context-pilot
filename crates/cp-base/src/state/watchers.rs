@@ -201,6 +201,23 @@ impl Default for WatcherRegistry {
     }
 }
 
+/// Route a fired watcher result into the blocking or async bucket.
+///
+/// Both `poll_all` firing paths (condition met, timeout) share this split, so
+/// factoring it out keeps `poll_all`'s control-flow flat.
+fn route_result(
+    result: WatcherResult,
+    is_blocking: bool,
+    blocking: &mut Vec<WatcherResult>,
+    async_results: &mut Vec<WatcherResult>,
+) {
+    if is_blocking {
+        blocking.push(result);
+    } else {
+        async_results.push(result);
+    }
+}
+
 impl WatcherRegistry {
     /// Create an empty watcher registry.
     #[must_use]
@@ -230,11 +247,7 @@ impl WatcherRegistry {
 
             // Check condition first (before timeout) to avoid race
             if let Some(result) = watcher.check(state) {
-                if watcher.is_blocking() {
-                    blocking.push(result);
-                } else {
-                    async_results.push(result);
-                }
+                route_result(result, watcher.is_blocking(), &mut blocking, &mut async_results);
                 // Persistent watchers survive after firing
                 if watcher.is_persistent() {
                     remaining.push(watcher);
@@ -244,11 +257,7 @@ impl WatcherRegistry {
 
             // Then check timeout
             if let Some(result) = watcher.check_timeout() {
-                if watcher.is_blocking() {
-                    blocking.push(result);
-                } else {
-                    async_results.push(result);
-                }
+                route_result(result, watcher.is_blocking(), &mut blocking, &mut async_results);
                 continue;
             }
 

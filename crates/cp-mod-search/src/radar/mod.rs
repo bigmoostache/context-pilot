@@ -6,8 +6,10 @@
 //!
 //! See `docs/design-logs-panel.md` for the full design.
 
+/// Context Radar YAML rendering (split for the line budget).
+mod yaml;
+
 use std::collections::HashMap;
-use std::fmt::Write as _;
 
 use crossterm::event::KeyEvent;
 
@@ -46,20 +48,20 @@ const RECENT_LOGS_COUNT: usize = 10;
 /// A log that is 100 entries behind the current log count has half the
 /// weight of the newest log.  This makes decay independent of wall-clock
 /// time — vacations, breaks, and coding intensity don't affect scoring.
-const HALF_LIFE_LOGS: f64 = 100.0;
+pub(crate) const HALF_LIFE_LOGS: f64 = 100.0;
 
 /// A scored log result before dedup.
-struct ScoredResult {
+pub(crate) struct ScoredResult {
     /// Unique log entry identifier (e.g. `"L42"`).
-    log_id: String,
+    pub log_id: String,
     /// ISO 8601 datetime when the log was created.
-    datetime: String,
+    pub datetime: String,
     /// Importance level (`"low"`, `"medium"`, `"high"`, `"critical"`).
-    importance: String,
+    pub importance: String,
     /// Log entry text.
-    content: String,
+    pub content: String,
     /// Combined score: `relevance × query_decay × result_decay`.
-    score: f64,
+    pub score: f64,
 }
 
 /// Exponential decay with floor: `0.5 + 0.5 × exp(-ln(2) × age / half_life)`.
@@ -72,22 +74,6 @@ fn decay(age_ms: f64, half_life_ms: f64) -> f64 {
         return 1.0;
     }
     0.5f64.mul_add((-f64::ln(2.0) * age_ms / half_life_ms).exp(), 0.5)
-}
-
-/// Append YAML lines for a single radar entry.
-fn write_entry(yaml: &mut String, entry: &ScoredResult) {
-    let _w0 = writeln!(yaml, "  - content: \"{}\"", entry.content.replace('"', "\\\""));
-    let _w1 = writeln!(yaml, "    datetime: \"{}\"", entry.datetime);
-    let _w2 = writeln!(yaml, "    importance: {}", entry.importance);
-    let _w4 = writeln!(yaml, "    score: {:.3}", entry.score);
-}
-
-/// Format a millisecond timestamp as ISO 8601, or `"unknown"` if zero/out-of-range.
-fn format_timestamp_ms(ms: u64) -> String {
-    if ms == 0 {
-        return "unknown".to_owned();
-    }
-    i64::try_from(ms).ok().and_then(cp_mod_utilities::time::epoch_ms_to_rfc3339).unwrap_or_else(|| "unknown".to_owned())
 }
 
 /// Read the cached radar YAML from state, with fallback messages.
@@ -263,6 +249,83 @@ struct RefreshJob {
     radar_cache: crate::types::SharedRadarCache,
 }
 
+/// Score all hits for a single task signal into [`ScoredResult`]s.
+///
+/// `q_decay` is the signal's own log-distance decay; each hit is additionally
+/// decayed by its own log-number distance. Returns an empty vec on query
+/// failure or a malformed response (never errors — a bad signal is skipped).
+#[expect(
+    clippy::cast_precision_loss,
+    clippy::as_conversions,
+    reason = "log number as f64 — decay math requires floating point"
+)]
+fn query_signal_results(
+    client: &MeiliClient,
+    logs_uid: &str,
+    signal: &crate::types::TaskSignal,
+    current_log_count_f: f64,
+) -> Vec<ScoredResult> {
+    let q_distance = current_log_count_f - signal.log_count as f64;
+    let q_decay = decay(q_distance, HALF_LIFE_LOGS);
+
+    let Ok(json) = client.search(&SearchParams {
+        uid: logs_uid,
+        query: &signal.content,
+        filter: None,
+        sort: None,
+        limit: RESULTS_PER_QUERY,
+        semantic_ratio: Some(SEMANTIC_RATIO),
+    }) else {
+        return Vec::new();
+    };
+
+    let Some(hits) = json.get("hits").and_then(serde_json::Value::as_array) else {
+        return Vec::new();
+    };
+
+    hits.iter()
+        .map(|hit| {
+            let relevance = hit.get("_rankingScore").and_then(serde_json::Value::as_f64).unwrap_or(0.0f64);
+
+            // Parse log number from ID (e.g. "L42" → 42) for count-based decay
+            let log_number = hit
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+                .and_then(|id| id.strip_prefix('L'))
+                .and_then(|n| n.parse::<u64>().ok())
+                .unwrap_or(0);
+            let r_distance = current_log_count_f - log_number as f64;
+            let r_decay = decay(r_distance, HALF_LIFE_LOGS);
+
+            ScoredResult {
+                log_id: hit.get("id").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
+                datetime: hit.get("datetime").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
+                importance: hit.get("importance").and_then(serde_json::Value::as_str).unwrap_or("medium").to_owned(),
+                content: hit.get("content").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
+                score: relevance * q_decay * r_decay,
+            }
+        })
+        .collect()
+}
+
+/// Deduplicate scored results by log ID, keeping the max score per unique ID.
+fn dedup_best_by_id(all_results: Vec<ScoredResult>) -> HashMap<String, ScoredResult> {
+    let mut best_by_id: HashMap<String, ScoredResult> = HashMap::new();
+    for result in all_results {
+        match best_by_id.entry(result.log_id.clone()) {
+            std::collections::hash_map::Entry::Occupied(mut e) => {
+                if result.score > e.get().score {
+                    let _prev = e.insert(result);
+                }
+            }
+            std::collections::hash_map::Entry::Vacant(e) => {
+                let _prev = e.insert(result);
+            }
+        }
+    }
+    best_by_id
+}
+
 /// Inner refresh logic — runs on a background thread.
 ///
 /// Queries the Meilisearch logs index for each task signal, scores results
@@ -283,65 +346,12 @@ fn refresh_inner(job: &RefreshJob) {
 
     // Query logs index for each signal
     let mut all_results: Vec<ScoredResult> = Vec::new();
-
     for signal in &job.signals {
-        // Log-count-based decay: distance = how many logs created since this signal
-        let q_distance = current_log_count_f - signal.log_count as f64;
-        let q_decay = decay(q_distance, HALF_LIFE_LOGS);
-
-        let Ok(json) = client.search(&SearchParams {
-            uid: &logs_uid,
-            query: &signal.content,
-            filter: None,
-            sort: None,
-            limit: RESULTS_PER_QUERY,
-            semantic_ratio: Some(SEMANTIC_RATIO),
-        }) else {
-            continue;
-        };
-
-        let Some(hits) = json.get("hits").and_then(serde_json::Value::as_array) else {
-            continue;
-        };
-
-        for hit in hits {
-            let relevance = hit.get("_rankingScore").and_then(serde_json::Value::as_f64).unwrap_or(0.0f64);
-
-            // Parse log number from ID (e.g. "L42" → 42) for count-based decay
-            let log_number = hit
-                .get("id")
-                .and_then(serde_json::Value::as_str)
-                .and_then(|id| id.strip_prefix('L'))
-                .and_then(|n| n.parse::<u64>().ok())
-                .unwrap_or(0);
-            let r_distance = current_log_count_f - log_number as f64;
-            let r_decay = decay(r_distance, HALF_LIFE_LOGS);
-
-            let score = relevance * q_decay * r_decay;
-
-            let log_id = hit.get("id").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
-            let datetime = hit.get("datetime").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
-            let importance = hit.get("importance").and_then(serde_json::Value::as_str).unwrap_or("medium").to_owned();
-            let content = hit.get("content").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
-
-            all_results.push(ScoredResult { log_id, datetime, importance, content, score });
-        }
+        all_results.extend(query_signal_results(&client, &logs_uid, signal, current_log_count_f));
     }
 
     // Dedup by log ID — keep max score per unique ID
-    let mut best_by_id: HashMap<String, ScoredResult> = HashMap::new();
-    for result in all_results {
-        match best_by_id.entry(result.log_id.clone()) {
-            std::collections::hash_map::Entry::Occupied(mut e) => {
-                if result.score > e.get().score {
-                    let _prev = e.insert(result);
-                }
-            }
-            std::collections::hash_map::Entry::Vacant(e) => {
-                let _prev = e.insert(result);
-            }
-        }
-    }
+    let best_by_id = dedup_best_by_id(all_results);
 
     // Collect the recent log IDs so we can exclude them from the semantic pool
     let recent_ids: std::collections::HashSet<String> = job.recent_logs.iter().map(|l| l.id.clone()).collect();
@@ -366,29 +376,7 @@ fn refresh_inner(job: &RefreshJob) {
     // Selection was score-based; display is chronological.
     ranked.sort_by(|a, b| b.datetime.cmp(&a.datetime));
 
-    // Build YAML output
-    let mut yaml = String::with_capacity(4096);
-    let _h0 = writeln!(yaml, "# Context Radar — {} results from {} signals", ranked.len(), job.signals.len());
-    let _h1 = writeln!(yaml, "# Half-life: {HALF_LIFE_LOGS:.0} logs");
-
-    // Show all task signals as anchors with timestamps (most recent first)
-    if !job.signals.is_empty() {
-        let _h2 = writeln!(yaml, "anchors:");
-        for sig in job.signals.iter().rev() {
-            let datetime = format_timestamp_ms(sig.timestamp_ms);
-            let _h3 = writeln!(yaml, "  - time: \"{datetime}\"");
-            let _h4 = writeln!(yaml, "    signal: \"{}\"", sig.content.replace('"', "\\\""));
-        }
-    }
-
-    if ranked.is_empty() {
-        let _h4 = writeln!(yaml, "# No matching logs found");
-    } else {
-        let _h5 = writeln!(yaml, "results:");
-        for entry in &ranked {
-            write_entry(&mut yaml, entry);
-        }
-    }
+    let yaml = yaml::build_radar_yaml(&ranked, &job.signals);
 
     // Store in shared cache — the panel picks this up on next render
     if let Ok(mut cache) = job.radar_cache.lock() {
@@ -397,6 +385,7 @@ fn refresh_inner(job: &RefreshJob) {
     }
 }
 
+/// Build the radar YAML: header + anchors (signals) + ranked results.
 /// Fixed panel that shows Context Radar results.
 pub(crate) struct ContextRadarPanel;
 

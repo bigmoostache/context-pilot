@@ -104,6 +104,24 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
     best_match.map(|(line, _, preview)| (line, preview))
 }
 
+/// Build the "no match found" error `ToolResult`, enriched with the closest
+/// partial-match line when one exists.
+fn no_match_result(tool: &ToolUse, content: &str, old_string: &str) -> ToolResult {
+    let hint = if let Some((line, preview)) = find_closest_match(content, old_string) {
+        format!(" (closest match at line {line}: \"{preview}\")")
+    } else {
+        String::new()
+    };
+
+    let needle_preview = if old_string.len() > 50 {
+        format!("{}...", old_string.get(..old_string.floor_char_boundary(50)).unwrap_or(""))
+    } else {
+        old_string.to_owned()
+    };
+
+    ToolResult::new(tool.id.clone(), format!("No match found for \"{needle_preview}\"{hint}"), true)
+}
+
 /// Execute the Edit tool: replace `old_string` with `new_string` in a file.
 pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("file_edit");
@@ -141,27 +159,10 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Try normalized matching (handles trailing whitespace differences).
     // Clone the match to break the borrow on `content`, allowing mutation below.
     let actual_match = find_normalized_match(&content, old_string).map(str::to_owned);
-    let replaced = actual_match.is_some();
-    if let Some(actual_match) = actual_match {
-        content = content.replacen(actual_match.as_str(), new_string, 1);
-    }
-
-    if !replaced {
-        // Provide helpful error with closest match
-        let hint = if let Some((line, preview)) = find_closest_match(&content, old_string) {
-            format!(" (closest match at line {line}: \"{preview}\")")
-        } else {
-            String::new()
-        };
-
-        let needle_preview = if old_string.len() > 50 {
-            format!("{}...", old_string.get(..old_string.floor_char_boundary(50)).unwrap_or(""))
-        } else {
-            old_string.to_owned()
-        };
-
-        return ToolResult::new(tool.id.clone(), format!("No match found for \"{needle_preview}\"{hint}"), true);
-    }
+    let Some(actual_match) = actual_match else {
+        return no_match_result(tool, &content, old_string);
+    };
+    content = content.replacen(actual_match.as_str(), new_string, 1);
 
     // Write file
     if let Err(e) = fs::write(path, &content) {

@@ -86,6 +86,25 @@ pub(super) fn free_region_anchor(bp_indices: &[usize], culprit_idx: usize) -> us
     bp_indices.iter().copied().filter(|&i| i <= culprit_idx).max().unwrap_or(culprit_idx)
 }
 
+/// Whether `item` breaks the cache under the current freeze policy: a panel that
+/// vanished (no matching `Entry`), or one whose content changed AND the policy
+/// would emit it Fresh (not freeze it).
+fn item_is_culprit(item: &crate::app::panels::ContextItem, state: &State, cond: FreezeConditions) -> bool {
+    use crate::state::cache::hash_content;
+    let fresh_hash = hash_content(&item.content);
+    match state.context.iter().find(|c| c.id == item.id) {
+        None => true,
+        Some(entry) => {
+            let changed = entry.emitted.hash.as_deref().is_none_or(|lh| lh != fresh_hash);
+            if !changed {
+                return false;
+            }
+            let panel = crate::app::panels::get_panel(&entry.context_type);
+            cond.freeze_panel(false, entry.freeze_count, panel.max_freezes()) == FreezeDecision::Fresh
+        }
+    }
+}
+
 /// Pre-pass: compute the BP-anchored free-region start index (T509).
 ///
 /// Finds the culprit under the current freeze policy, then widens the
@@ -99,8 +118,6 @@ pub(super) fn compute_force_break_at(
     state: &State,
     cond: FreezeConditions,
 ) -> usize {
-    use crate::state::cache::hash_content;
-
     let bp_ids: std::collections::HashSet<&str> =
         state.previous_breakpoint_panel_ids.iter().map(String::as_str).collect();
     let mut culprit_idx: Option<usize> = None;
@@ -113,20 +130,8 @@ pub(super) fn compute_force_break_at(
         if bp_ids.contains(item.id.as_str()) {
             bp_indices.push(idx);
         }
-        if culprit_idx.is_none() {
-            let fresh_hash = hash_content(&item.content);
-            match state.context.iter().find(|c| c.id == item.id) {
-                None => culprit_idx = Some(idx),
-                Some(entry) => {
-                    let changed = entry.emitted.hash.as_deref().is_none_or(|lh| lh != fresh_hash);
-                    if changed {
-                        let panel = crate::app::panels::get_panel(&entry.context_type);
-                        if cond.freeze_panel(false, entry.freeze_count, panel.max_freezes()) == FreezeDecision::Fresh {
-                            culprit_idx = Some(idx);
-                        }
-                    }
-                }
-            }
+        if culprit_idx.is_none() && item_is_culprit(item, state, cond) {
+            culprit_idx = Some(idx);
         }
         idx = idx.saturating_add(1);
     }

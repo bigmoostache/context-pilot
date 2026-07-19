@@ -9,43 +9,61 @@ pub enum CommandClass {
     Mutating,
 }
 
-/// Parse a command string into arguments, respecting single and double quotes.
-fn parse_shell_args(command: &str) -> Result<Vec<String>, String> {
-    let mut args = Vec::new();
-    let mut current = String::new();
-    let mut in_single = false;
-    let mut in_double = false;
+/// Accumulator state for the quote-aware shell-args lexer.
+struct ShellLexer {
+    /// Inside a single-quoted span (double quotes then lose their meaning).
+    in_single: bool,
+    /// Inside a double-quoted span (single quotes then lose their meaning).
+    in_double: bool,
+    /// Completed argument tokens.
+    args: Vec<String>,
+    /// Token currently being built.
+    current: String,
+}
 
-    for c in command.chars() {
+impl ShellLexer {
+    /// Fresh lexer with empty accumulators.
+    const fn new() -> Self {
+        Self { in_single: false, in_double: false, args: Vec::new(), current: String::new() }
+    }
+
+    /// Feed one character, updating quote state and flushing tokens on unquoted
+    /// whitespace. Kept flat so [`parse_shell_args`] stays a plain iteration.
+    fn feed(&mut self, c: char) {
         match c {
-            '\'' if !in_double => {
-                in_single = !in_single;
-            }
-            '"' if !in_single => {
-                in_double = !in_double;
-            }
-            ws if ws.is_whitespace() && !in_single && !in_double => {
-                if !current.is_empty() {
-                    args.push(std::mem::take(&mut current));
+            '\'' if !self.in_double => self.in_single = !self.in_single,
+            '"' if !self.in_single => self.in_double = !self.in_double,
+            ws if ws.is_whitespace() && !self.in_single && !self.in_double => {
+                if !self.current.is_empty() {
+                    self.args.push(std::mem::take(&mut self.current));
                 }
             }
-            _ => {
-                current.push(c);
-            }
+            _ => self.current.push(c),
         }
     }
 
-    if in_single {
-        return Err("Unterminated single quote".to_owned());
+    /// Finalize: error on an unterminated quote, else flush the trailing token.
+    fn finish(mut self) -> Result<Vec<String>, String> {
+        if self.in_single {
+            return Err("Unterminated single quote".to_owned());
+        }
+        if self.in_double {
+            return Err("Unterminated double quote".to_owned());
+        }
+        if !self.current.is_empty() {
+            self.args.push(self.current);
+        }
+        Ok(self.args)
     }
-    if in_double {
-        return Err("Unterminated double quote".to_owned());
-    }
-    if !current.is_empty() {
-        args.push(current);
-    }
+}
 
-    Ok(args)
+/// Parse a command string into arguments, respecting single and double quotes.
+fn parse_shell_args(command: &str) -> Result<Vec<String>, String> {
+    let mut lexer = ShellLexer::new();
+    for c in command.chars() {
+        lexer.feed(c);
+    }
+    lexer.finish()
 }
 
 /// Check for shell metacharacters outside of quoted strings.

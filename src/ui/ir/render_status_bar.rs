@@ -15,6 +15,123 @@ use crate::state::State;
 use crate::ui::{helpers::spinner, theme};
 use cp_base::cast::Safe as _;
 
+/// Push a card span followed by a base-style separator space.
+fn push_card(spans: &mut Vec<Span<'static>>, label: String, style: Style, base: Style) {
+    spans.push(Span::styled(label, style));
+    spans.push(Span::styled(" ", base));
+}
+
+/// Retry + loading badges (both spinner-driven counters).
+fn push_retry_loading(spans: &mut Vec<Span<'static>>, status: &StatusBar, spin: &str, base: Style) {
+    if status.retry_count > 0 {
+        push_card(
+            spans,
+            format!(" RETRY {}/{} ", status.retry_count, status.max_retries),
+            Style::default().fg(theme::bg_base()).bg(theme::error()).bold(),
+            base,
+        );
+    }
+    if status.loading_count > 0 {
+        push_card(
+            spans,
+            format!(" {spin} LOADING {} ", status.loading_count),
+            Style::default().fg(theme::bg_base()).bg(theme::text_muted()).bold(),
+            base,
+        );
+    }
+}
+
+/// Stop-reason + agent + skill cards.
+fn push_stop_agent_skills(spans: &mut Vec<Span<'static>>, status: &StatusBar, base: Style) {
+    if let Some(sr) = &(status.stop_reason) {
+        let label = sr.reason.to_uppercase();
+        let style = if sr.semantic == Semantic::Error {
+            Style::default().fg(theme::bg_base()).bg(theme::error()).bold()
+        } else {
+            Style::default().fg(theme::text()).bg(theme::bg_elevated())
+        };
+        push_card(spans, format!(" {label} "), style, base);
+    }
+    if let Some(agent) = &(status.agent) {
+        push_card(
+            spans,
+            format!(" 🤖 {} ", agent.name),
+            Style::default().fg(theme::card_text()).bg(theme::card_agent_bg()).bold(),
+            base,
+        );
+    }
+    for skill in &status.skills {
+        push_card(
+            spans,
+            format!(" 📚 {} ", skill.name),
+            Style::default().fg(theme::bg_base()).bg(theme::assistant()).bold(),
+            base,
+        );
+    }
+}
+
+/// Git branch + additions/deletions/net changes.
+fn push_git(spans: &mut Vec<Span<'static>>, status: &StatusBar, base: Style) {
+    let Some(git) = &(status.git) else {
+        return;
+    };
+    push_card(spans, format!(" {} ", git.branch), Style::default().fg(theme::card_text()).bg(theme::accent()), base);
+
+    if git.files_changed > 0 {
+        let net = i64::from(git.additions).saturating_sub(i64::from(git.deletions));
+        let (net_prefix, net_color) = if net >= 0 { ("+", theme::success()) } else { ("", theme::error()) };
+        let bg = theme::bg_elevated();
+
+        spans.push(Span::styled(format!(" +{}", git.additions), Style::default().fg(theme::success()).bg(bg).bold()));
+        spans.push(Span::styled(format!("/-{}", git.deletions), Style::default().fg(theme::error()).bg(bg).bold()));
+        spans.push(Span::styled(
+            format!("/{}{} ", net_prefix, net.unsigned_abs()),
+            Style::default().fg(net_color).bg(bg).bold(),
+        ));
+        spans.push(Span::styled(" ", base));
+    }
+}
+
+/// Auto-continue + reverie + queue + think cards.
+fn push_activity_cards(spans: &mut Vec<Span<'static>>, status: &StatusBar, spin: &str, base: Style) {
+    if let Some(ac) = &(status.auto_continue) {
+        let (icon, bg_color) = if ac.max.is_some() {
+            (normalize_icon("🔁"), theme::warning())
+        } else {
+            (normalize_icon("🔄"), theme::text_muted())
+        };
+        let label = if ac.max.is_some() { "Auto-continue" } else { "No Auto-continue" };
+        push_card(spans, format!(" {icon}{label} "), Style::default().fg(theme::bg_base()).bg(bg_color).bold(), base);
+    }
+
+    for rev in &status.reveries {
+        push_card(
+            spans,
+            format!(" {spin} 🧠 {} ({} tools) ", rev.agent, rev.tool_count),
+            Style::default().fg(theme::card_text()).bg(theme::card_reverie_bg()).bold(),
+            base,
+        );
+    }
+
+    if let Some(queue) = &(status.queue) {
+        push_card(
+            spans,
+            format!(" ⏳ Queue ({}) ", queue.count),
+            Style::default().fg(theme::card_text()).bg(theme::card_queue_bg()).bold(),
+            base,
+        );
+    }
+
+    if let Some(think) = &(status.think) {
+        push_card(
+            spans,
+            format!(" 🧠 Think ({}) ", think.balance),
+            Style::default().fg(theme::card_text()).bg(theme::card_think_bg()).bold(),
+            base,
+        );
+    }
+}
+
 /// Render the status bar from its IR snapshot.
 pub(crate) fn render_status_bar_from_ir(frame: &mut Frame<'_>, status: &StatusBar, area: Rect) {
     let base_style = Style::default().bg(theme::bg_base()).fg(theme::text_muted());
@@ -32,119 +149,10 @@ pub(crate) fn render_status_bar_from_ir(frame: &mut Frame<'_>, status: &StatusBa
     spans.push(Span::styled(badge_label, Style::default().fg(fg_badge).bg(bg_badge).bold()));
     spans.push(Span::styled(" ", base_style));
 
-    // === Retry badge ===
-    if status.retry_count > 0 {
-        spans.push(Span::styled(
-            format!(" RETRY {}/{} ", status.retry_count, status.max_retries),
-            Style::default().fg(theme::bg_base()).bg(theme::error()).bold(),
-        ));
-        spans.push(Span::styled(" ", base_style));
-    }
-
-    // === Loading badge ===
-    if status.loading_count > 0 {
-        spans.push(Span::styled(
-            format!(" {spin} LOADING {} ", status.loading_count),
-            Style::default().fg(theme::bg_base()).bg(theme::text_muted()).bold(),
-        ));
-        spans.push(Span::styled(" ", base_style));
-    }
-
-    // === Stop reason ===
-    if let Some(sr) = &(status.stop_reason) {
-        let label = sr.reason.to_uppercase();
-        let style = if sr.semantic == Semantic::Error {
-            Style::default().fg(theme::bg_base()).bg(theme::error()).bold()
-        } else {
-            Style::default().fg(theme::text()).bg(theme::bg_elevated())
-        };
-        spans.push(Span::styled(format!(" {label} "), style));
-        spans.push(Span::styled(" ", base_style));
-    }
-
-    // === Agent card ===
-    if let Some(agent) = &(status.agent) {
-        spans.push(Span::styled(
-            format!(" 🤖 {} ", agent.name),
-            Style::default().fg(theme::card_text()).bg(theme::card_agent_bg()).bold(),
-        ));
-        spans.push(Span::styled(" ", base_style));
-    }
-
-    // === Skill cards ===
-    for skill in &status.skills {
-        spans.push(Span::styled(
-            format!(" 📚 {} ", skill.name),
-            Style::default().fg(theme::bg_base()).bg(theme::assistant()).bold(),
-        ));
-        spans.push(Span::styled(" ", base_style));
-    }
-
-    // === Git branch + changes ===
-    if let Some(git) = &(status.git) {
-        spans.push(Span::styled(
-            format!(" {} ", git.branch),
-            Style::default().fg(theme::card_text()).bg(theme::accent()),
-        ));
-        spans.push(Span::styled(" ", base_style));
-
-        if git.files_changed > 0 {
-            let net = i64::from(git.additions).saturating_sub(i64::from(git.deletions));
-            let (net_prefix, net_color) = if net >= 0 { ("+", theme::success()) } else { ("", theme::error()) };
-            let bg = theme::bg_elevated();
-
-            spans.push(Span::styled(
-                format!(" +{}", git.additions),
-                Style::default().fg(theme::success()).bg(bg).bold(),
-            ));
-            spans.push(Span::styled(format!("/-{}", git.deletions), Style::default().fg(theme::error()).bg(bg).bold()));
-            spans.push(Span::styled(
-                format!("/{}{} ", net_prefix, net.unsigned_abs()),
-                Style::default().fg(net_color).bg(bg).bold(),
-            ));
-            spans.push(Span::styled(" ", base_style));
-        }
-    }
-
-    // === Auto-continue ===
-    if let Some(ac) = &(status.auto_continue) {
-        let (icon, bg_color) = if ac.max.is_some() {
-            (normalize_icon("🔁"), theme::warning())
-        } else {
-            (normalize_icon("🔄"), theme::text_muted())
-        };
-        let label = if ac.max.is_some() { "Auto-continue" } else { "No Auto-continue" };
-        spans.push(Span::styled(format!(" {icon}{label} "), Style::default().fg(theme::bg_base()).bg(bg_color).bold()));
-        spans.push(Span::styled(" ", base_style));
-    }
-
-    // === Reverie cards ===
-    for rev in &status.reveries {
-        let rev_spin = format!("{spin} ");
-        spans.push(Span::styled(
-            format!(" {rev_spin}🧠 {} ({} tools) ", rev.agent, rev.tool_count),
-            Style::default().fg(theme::card_text()).bg(theme::card_reverie_bg()).bold(),
-        ));
-        spans.push(Span::styled(" ", base_style));
-    }
-
-    // === Queue card ===
-    if let Some(queue) = &(status.queue) {
-        spans.push(Span::styled(
-            format!(" ⏳ Queue ({}) ", queue.count),
-            Style::default().fg(theme::card_text()).bg(theme::card_queue_bg()).bold(),
-        ));
-        spans.push(Span::styled(" ", base_style));
-    }
-
-    // === Think balance card ===
-    if let Some(think) = &(status.think) {
-        spans.push(Span::styled(
-            format!(" 🧠 Think ({}) ", think.balance),
-            Style::default().fg(theme::card_text()).bg(theme::card_think_bg()).bold(),
-        ));
-        spans.push(Span::styled(" ", base_style));
-    }
+    push_retry_loading(&mut spans, status, spin, base_style);
+    push_stop_agent_skills(&mut spans, status, base_style);
+    push_git(&mut spans, status, base_style);
+    push_activity_cards(&mut spans, status, spin, base_style);
 
     // === Right-aligned char count ===
     let right_info =
@@ -155,7 +163,7 @@ pub(crate) fn render_status_bar_from_ir(frame: &mut Frame<'_>, status: &StatusBa
     let padding = (area.width.to_usize()).saturating_sub(left_width.saturating_add(right_width));
 
     spans.push(Span::styled(" ".repeat(padding), base_style));
-    spans.push(Span::styled(&right_info, base_style));
+    spans.push(Span::styled(right_info, base_style));
 
     let paragraph = Paragraph::new(Line::from(spans));
     frame.render_widget(paragraph, area);

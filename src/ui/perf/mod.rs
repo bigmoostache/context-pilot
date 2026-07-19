@@ -188,23 +188,37 @@ fn read_proc_stat() -> Option<(u64, u64)> {
 fn parse_ps_cputime(raw: &str) -> Option<u64> {
     let (main_part, centis_str) = raw.rsplit_once('.')?;
     let centis: u64 = centis_str.parse().ok()?;
-    let segments: Vec<&str> = main_part.split(':').collect();
-    let total_secs: u64 = match segments.len() {
-        1 => segments.first()?.parse().ok()?,
-        2 => {
-            let mins: u64 = segments.first()?.parse().ok()?;
-            let secs: u64 = segments.get(1)?.parse().ok()?;
-            mins.saturating_mul(60).saturating_add(secs)
-        }
-        3 => {
-            let hours: u64 = segments.first()?.parse().ok()?;
-            let mins: u64 = segments.get(1)?.parse().ok()?;
-            let secs: u64 = segments.get(2)?.parse().ok()?;
-            hours.saturating_mul(3600).saturating_add(mins.saturating_mul(60)).saturating_add(secs)
-        }
-        _ => return None,
-    };
+    let total_secs = parse_hms_secs(main_part)?;
     Some(total_secs.saturating_mul(100).saturating_add(centis))
+}
+
+/// Parse a `SS` / `MM:SS` / `H:MM:SS` colon-separated duration into seconds.
+#[cfg(target_os = "macos")]
+fn parse_hms_secs(main_part: &str) -> Option<u64> {
+    let segments: Vec<&str> = main_part.split(':').collect();
+    match segments.len() {
+        1 => segments.first()?.parse().ok(),
+        2 => parse_ms_secs(&segments),
+        3 => parse_hms_triple(&segments),
+        _ => None,
+    }
+}
+
+/// Parse `[MM, SS]` colon segments into total seconds.
+#[cfg(target_os = "macos")]
+fn parse_ms_secs(segments: &[&str]) -> Option<u64> {
+    let mins: u64 = segments.first()?.parse().ok()?;
+    let secs: u64 = segments.get(1)?.parse().ok()?;
+    Some(mins.saturating_mul(60).saturating_add(secs))
+}
+
+/// Parse `[H, MM, SS]` colon segments into total seconds.
+#[cfg(target_os = "macos")]
+fn parse_hms_triple(segments: &[&str]) -> Option<u64> {
+    let hours: u64 = segments.first()?.parse().ok()?;
+    let mins: u64 = segments.get(1)?.parse().ok()?;
+    let secs: u64 = segments.get(2)?.parse().ok()?;
+    Some(hours.saturating_mul(3600).saturating_add(mins.saturating_mul(60)).saturating_add(secs))
 }
 
 /// Fallback for unsupported platforms — no CPU/memory data available.

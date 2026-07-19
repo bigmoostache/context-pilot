@@ -50,22 +50,7 @@ pub(crate) fn render_autocomplete_popup(frame: &mut Frame<'_>, ac: &Autocomplete
         lines.push(Line::from(vec![Span::styled("  No matches", Style::default().fg(theme::text_muted()))]));
     } else {
         for (i, entry) in ac.entries.iter().enumerate() {
-            let is_selected = i == ac.selected_index;
-
-            let cursor_marker = if is_selected { ">" } else { " " };
-            let path_style = if is_selected {
-                Style::default().fg(theme::accent()).bold()
-            } else {
-                Style::default().fg(theme::text())
-            };
-
-            let suffix = if entry.is_dir { "/" } else { "" };
-            let icon = if entry.is_dir { "📁 " } else { "   " };
-            lines.push(Line::from(vec![
-                Span::styled(format!(" {cursor_marker} "), Style::default().fg(theme::accent())),
-                Span::styled(icon.to_owned(), Style::default()),
-                Span::styled(format!("{}{}", entry.label, suffix), path_style),
-            ]));
+            lines.push(autocomplete_entry_line(entry, i == ac.selected_index));
         }
     }
 
@@ -83,4 +68,18 @@ pub(crate) fn render_autocomplete_popup(frame: &mut Frame<'_>, ac: &Autocomplete
     let paragraph = Paragraph::new(lines).block(block);
     frame.render_widget(Clear, popup_area);
     frame.render_widget(paragraph, popup_area);
+}
+
+/// Build one autocomplete entry line: cursor marker, dir/file icon, label + `/` suffix.
+fn autocomplete_entry_line(entry: &cp_render::conversation::AutocompleteEntry, is_selected: bool) -> Line<'static> {
+    let cursor_marker = if is_selected { ">" } else { " " };
+    let path_style =
+        if is_selected { Style::default().fg(theme::accent()).bold() } else { Style::default().fg(theme::text()) };
+    let suffix = if entry.is_dir { "/" } else { "" };
+    let icon = if entry.is_dir { "📁 " } else { "   " };
+    Line::from(vec![
+        Span::styled(format!(" {cursor_marker} "), Style::default().fg(theme::accent())),
+        Span::styled(icon.to_owned(), Style::default()),
+        Span::styled(format!("{}{}", entry.label, suffix), path_style),
+    ])
 }

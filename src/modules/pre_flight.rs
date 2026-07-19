@@ -22,41 +22,11 @@ pub(crate) fn pre_flight_tool(tool: &ToolUse, state: &State, active_modules: &Ha
     // If another queued item already targets the same panel, reject early.
     // Skip when trap is active — queued items are frozen (queue flush blocked),
     // and Close_conversation_history executes directly during trap.
-    if tool.name == "Close_conversation_history" {
-        let qs = cp_mod_queue::types::QueueState::get(state);
-        if !qs.trap_active {
-            // Extract panel_ids from this call
-            let new_ids: Vec<&str> = tool
-                .input
-                .get("panels")
-                .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|p| p.get("panel_id").and_then(serde_json::Value::as_str)).collect())
-                .unwrap_or_default();
-
-            // Extract panel_ids from all queued Close_conversation_history calls
-            let queued_ids: Vec<&str> = qs
-                .queued_calls
-                .iter()
-                .filter(|q| q.tool_name == "Close_conversation_history")
-                .flat_map(|q| {
-                    q.input
-                        .get("panels")
-                        .and_then(|v| v.as_array())
-                        .into_iter()
-                        .flatten()
-                        .filter_map(|p| p.get("panel_id").and_then(serde_json::Value::as_str))
-                })
-                .collect();
-
-            for id in &new_ids {
-                if queued_ids.contains(id) {
-                    result.errors.push(format!(
-                        "Panel '{id}' is already queued for closing by another Close_conversation_history call",
-                    ));
-                    return result;
-                }
-            }
-        }
+    if tool.name == "Close_conversation_history"
+        && let Some(dup_err) = check_duplicate_close(tool, state)
+    {
+        result.errors.push(dup_err);
+        return result;
     }
 
     // Phase 1: Global schema validation against ToolDefinition
@@ -88,6 +58,43 @@ pub(crate) fn pre_flight_tool(tool: &ToolUse, state: &State, active_modules: &Ha
     }
 
     result
+}
+
+/// Reject a `Close_conversation_history` call whose target panel is already
+/// queued for closing by another such call. Returns `None` when the trap is
+/// active (queued items frozen, closes execute directly) or no clash exists.
+fn check_duplicate_close(tool: &ToolUse, state: &State) -> Option<String> {
+    let qs = cp_mod_queue::types::QueueState::get(state);
+    if qs.trap_active {
+        return None;
+    }
+    // Extract panel_ids from this call
+    let new_ids: Vec<&str> = tool
+        .input
+        .get("panels")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(|p| p.get("panel_id").and_then(serde_json::Value::as_str)).collect())
+        .unwrap_or_default();
+
+    // Extract panel_ids from all queued Close_conversation_history calls
+    let queued_ids: Vec<&str> = qs
+        .queued_calls
+        .iter()
+        .filter(|q| q.tool_name == "Close_conversation_history")
+        .flat_map(|q| {
+            q.input
+                .get("panels")
+                .and_then(|v| v.as_array())
+                .into_iter()
+                .flatten()
+                .filter_map(|p| p.get("panel_id").and_then(serde_json::Value::as_str))
+        })
+        .collect();
+
+    new_ids
+        .iter()
+        .find(|id| queued_ids.contains(id))
+        .map(|id| format!("Panel '{id}' is already queued for closing by another Close_conversation_history call"))
 }
 
 /// Validate tool input JSON against the parameter schema.

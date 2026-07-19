@@ -111,50 +111,54 @@ fn build_entries(state: &State) -> Vec<SidebarEntry> {
         if ctx.context_type == Kind::new(Kind::CONVERSATION) {
             continue;
         }
-
-        let is_loading = ctx.cached_content.is_none() && ctx.context_type.needs_cache();
-
-        let is_fixed = ctx.context_type.is_fixed();
-        let is_console = ctx.context_type.as_str() == "console";
-        let is_running_console =
-            is_console && ctx.get_meta_str("console_status").is_some_and(|s| s.starts_with("running"));
-
-        let badge = if is_fixed {
-            fixed_panel_badge(ctx.context_type.as_str(), state)
-        } else if ctx.total_pages > 1 {
-            Some(format!("{}/{}", ctx.current_page.saturating_add(1), ctx.total_pages))
-        } else {
-            None
-        };
-
-        let shortcut = if is_fixed {
-            // Don't show "0" — empty string hides the badge
-            fixed_panel_badge(ctx.context_type.as_str(), state).filter(|s| s != "0").unwrap_or_default()
-        } else if is_running_console {
-            spinner().to_owned()
-        } else {
-            ctx.id.clone()
-        };
-
-        let label = {
-            let name = crate::ui::helpers::truncate_string(&ctx.name, 18);
-            if is_loading { format!("{name} {spin}", spin = spinner()) } else { name }
-        };
-
-        entries.push(SidebarEntry {
-            id: ctx.id.clone(),
-            icon: ctx.context_type.icon(),
-            shortcut,
-            label,
-            tokens: ctx.token_count.to_u32(),
-            active: i == state.selected_context,
-            frozen: ctx.freeze_count > 0 && ctx.freeze_count < u8::MAX,
-            badge,
-            fixed: is_fixed,
-        });
+        entries.push(context_to_entry(ctx, state, i == state.selected_context));
     }
 
     entries
+}
+
+/// Build one sidebar entry from a context element (non-conversation).
+/// Resolves fixed-panel badges/shortcuts, running-console spinner, and the
+/// loading-spinner label suffix.
+fn context_to_entry(ctx: &crate::state::Entry, state: &State, active: bool) -> SidebarEntry {
+    let is_loading = ctx.cached_content.is_none() && ctx.context_type.needs_cache();
+    let is_fixed = ctx.context_type.is_fixed();
+    let is_console = ctx.context_type.as_str() == "console";
+    let is_running_console = is_console && ctx.get_meta_str("console_status").is_some_and(|s| s.starts_with("running"));
+
+    let badge = if is_fixed {
+        fixed_panel_badge(ctx.context_type.as_str(), state)
+    } else if ctx.total_pages > 1 {
+        Some(format!("{}/{}", ctx.current_page.saturating_add(1), ctx.total_pages))
+    } else {
+        None
+    };
+
+    let shortcut = if is_fixed {
+        // Don't show "0" — empty string hides the badge
+        fixed_panel_badge(ctx.context_type.as_str(), state).filter(|s| s != "0").unwrap_or_default()
+    } else if is_running_console {
+        spinner().to_owned()
+    } else {
+        ctx.id.clone()
+    };
+
+    let label = {
+        let name = crate::ui::helpers::truncate_string(&ctx.name, 18);
+        if is_loading { format!("{name} {spin}", spin = spinner()) } else { name }
+    };
+
+    SidebarEntry {
+        id: ctx.id.clone(),
+        icon: ctx.context_type.icon(),
+        shortcut,
+        label,
+        tokens: ctx.token_count.to_u32(),
+        active,
+        frozen: ctx.freeze_count > 0 && ctx.freeze_count < u8::MAX,
+        badge,
+        fixed: is_fixed,
+    }
 }
 
 // ── Token bar ────────────────────────────────────────────────────────

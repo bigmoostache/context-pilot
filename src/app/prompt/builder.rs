@@ -51,72 +51,7 @@ pub(crate) fn assemble_prompt(
 
     // ── Phase 2: Conversation messages ──────────────────────────
     for (idx, msg) in messages.iter().enumerate() {
-        if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
-            continue;
-        }
-
-        if msg.content.is_empty() && msg.tool_uses.is_empty() && msg.tool_results.is_empty() {
-            continue;
-        }
-
-        let mut content_blocks: Vec<ContentBlock> = Vec::new();
-
-        if msg.msg_type == MsgKind::ToolResult {
-            for result in &msg.tool_results {
-                // Guard: only include tool results whose matching tool_use
-                // exists in the same message slice. After conversation
-                // detachment, orphaned results (call detached, result remains)
-                // would cause API errors if sent without their pair.
-                let has_matching_call = messages.get(..idx).is_some_and(|preceding| {
-                    preceding
-                        .iter()
-                        .filter(|m| m.msg_type == MsgKind::ToolCall)
-                        .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
-                        .any(|m| m.tool_uses.iter().any(|t| t.id == result.tool_use_id))
-                });
-                if has_matching_call {
-                    content_blocks.push(ContentBlock::ToolResult {
-                        tool_use_id: result.tool_use_id.clone(),
-                        content: result.content.clone(),
-                    });
-                }
-            }
-            if !content_blocks.is_empty() {
-                api_messages.push(ApiMessage { role: "user".to_owned(), content: content_blocks });
-            }
-            continue;
-        }
-
-        if msg.msg_type == MsgKind::ToolCall {
-            if let Some(blocks) = build_tool_call_blocks(msg, messages, idx) {
-                if let Some(last_api_msg) = api_messages.last_mut()
-                    && last_api_msg.role == "assistant"
-                {
-                    last_api_msg.content.extend(blocks);
-                    continue;
-                }
-                content_blocks = blocks;
-            } else {
-                continue;
-            }
-        } else {
-            let message_content = msg.content.clone();
-
-            if !message_content.is_empty() {
-                content_blocks.push(ContentBlock::Text { text: message_content });
-            }
-
-            let is_last = idx == messages.len().saturating_sub(1);
-            if msg.role == "assistant" && include_last_tool_uses && is_last && !msg.tool_uses.is_empty() {
-                for tool_use in &msg.tool_uses {
-                    content_blocks.push(tool_use_block(tool_use));
-                }
-            }
-        }
-
-        if !content_blocks.is_empty() {
-            api_messages.push(ApiMessage { role: msg.role.clone(), content: content_blocks });
-        }
+        convert_conversation_message(&mut api_messages, &ConvertCtx { messages, idx, msg, include_last_tool_uses });
     }
 
     // ── Phase 3: Message alternation ──────────────────────────
@@ -134,6 +69,99 @@ pub(crate) fn assemble_prompt(
     super::repair::repair_tool_pairing(&mut api_messages);
 
     api_messages
+}
+
+/// Per-message inputs for [`convert_conversation_message`]: the full slice, the
+/// current index, the message, and whether the last turn's tool-uses are kept.
+struct ConvertCtx<'conv> {
+    /// Full conversation slice (for tool-pairing lookups).
+    messages: &'conv [Message],
+    /// Index of `msg` within `messages`.
+    idx: usize,
+    /// The message being converted.
+    msg: &'conv Message,
+    /// Keep the last assistant turn's `tool_use` blocks.
+    include_last_tool_uses: bool,
+}
+
+/// Convert one conversation message into `ApiMessage`(s) and push them, or merge
+/// tool-call blocks into a trailing assistant message. No-op for deleted /
+/// detached / fully-empty messages.
+fn convert_conversation_message(api_messages: &mut Vec<ApiMessage>, ctx: &ConvertCtx<'_>) {
+    let ConvertCtx { messages, idx, msg, include_last_tool_uses } = *ctx;
+    if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
+        return;
+    }
+    if msg.content.is_empty() && msg.tool_uses.is_empty() && msg.tool_results.is_empty() {
+        return;
+    }
+
+    if msg.msg_type == MsgKind::ToolResult {
+        push_tool_result_message(api_messages, messages, idx, msg);
+        return;
+    }
+
+    let content_blocks = if msg.msg_type == MsgKind::ToolCall {
+        let Some(blocks) = build_tool_call_blocks(msg, messages, idx) else { return };
+        if let Some(last_api_msg) = api_messages.last_mut()
+            && last_api_msg.role == "assistant"
+        {
+            last_api_msg.content.extend(blocks);
+            return;
+        }
+        blocks
+    } else {
+        build_text_message_blocks(msg, idx, messages.len(), include_last_tool_uses)
+    };
+
+    if !content_blocks.is_empty() {
+        api_messages.push(ApiMessage { role: msg.role.clone(), content: content_blocks });
+    }
+}
+
+/// Push a `ToolResult` message, keeping only results whose matching `tool_use`
+/// exists earlier in the slice (drops orphans left by conversation detachment).
+fn push_tool_result_message(api_messages: &mut Vec<ApiMessage>, messages: &[Message], idx: usize, msg: &Message) {
+    let mut content_blocks: Vec<ContentBlock> = Vec::new();
+    for result in &msg.tool_results {
+        let has_matching_call = messages.get(..idx).is_some_and(|preceding| {
+            preceding
+                .iter()
+                .filter(|m| m.msg_type == MsgKind::ToolCall)
+                .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
+                .any(|m| m.tool_uses.iter().any(|t| t.id == result.tool_use_id))
+        });
+        if has_matching_call {
+            content_blocks.push(ContentBlock::ToolResult {
+                tool_use_id: result.tool_use_id.clone(),
+                content: result.content.clone(),
+            });
+        }
+    }
+    if !content_blocks.is_empty() {
+        api_messages.push(ApiMessage { role: "user".to_owned(), content: content_blocks });
+    }
+}
+
+/// Build the content blocks for a plain text message: its text plus, for the
+/// last assistant turn when requested, its tool-use blocks.
+fn build_text_message_blocks(
+    msg: &Message,
+    idx: usize,
+    total: usize,
+    include_last_tool_uses: bool,
+) -> Vec<ContentBlock> {
+    let mut content_blocks: Vec<ContentBlock> = Vec::new();
+    if !msg.content.is_empty() {
+        content_blocks.push(ContentBlock::Text { text: msg.content.clone() });
+    }
+    let is_last = idx == total.saturating_sub(1);
+    if msg.role == "assistant" && include_last_tool_uses && is_last && !msg.tool_uses.is_empty() {
+        for tool_use in &msg.tool_uses {
+            content_blocks.push(tool_use_block(tool_use));
+        }
+    }
+    content_blocks
 }
 
 // ── Message alternation ─────────────────────────────────────────

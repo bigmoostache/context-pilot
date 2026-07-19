@@ -1,139 +1,140 @@
 use crate::infra::tools::{ToolResult, ToolUse};
-use crate::modules::all_modules;
-use crate::state::{Kind, State};
+use crate::modules::{Module, all_modules};
+use crate::state::{Entry, Kind, State};
 use std::fmt::Write as _;
+
+/// Outcome accumulators for a `Close_panel` batch.
+#[derive(Default)]
+struct CloseTally {
+    /// Panels successfully closed (with their display descriptions).
+    closed: Vec<String>,
+    /// Panels skipped (protected, describe-gated, or module-rejected).
+    skipped: Vec<String>,
+    /// Requested ids that matched no live panel.
+    not_found: Vec<String>,
+    /// Malformed id entries (non-string JSON values).
+    errors: Vec<String>,
+}
+
+/// Whether a file panel must be skipped because its tree description is missing
+/// or stale (and no `tree_describe` is queued). Only applies when the tree
+/// module is active and the file still exists on disk (T355 exemption).
+fn file_panel_needs_describe(state: &State, ctx: &Entry) -> Option<String> {
+    if !state.active_modules.contains("tree") || ctx.context_type.as_str() != Kind::FILE {
+        return None;
+    }
+    let file_path = ctx.get_meta_str("file_path")?;
+    if !std::path::Path::new(file_path).exists() {
+        return None;
+    }
+    let cwd = std::env::current_dir().and_then(|d| d.canonicalize()).ok()?;
+    let rel = std::path::Path::new(file_path).strip_prefix(&cwd).ok()?;
+    let rel_str = rel.to_string_lossy();
+    let ts = cp_mod_tree::types::TreeState::get(state);
+    let needs_skip = ts.descriptions.iter().find(|d| d.path == rel_str.as_ref()).map_or_else(
+        || !has_pending_tree_describe(state, rel_str.as_ref()),
+        |desc| {
+            let current_hash =
+                cp_mod_tree::tools::compute_file_hash(std::path::Path::new(file_path)).unwrap_or_default();
+            !desc.file_hash.is_empty()
+                && desc.file_hash != current_hash
+                && !has_pending_tree_describe(state, rel_str.as_ref())
+        },
+    );
+    needs_skip.then(|| format!("{} ({rel_str}) — needs tree_describe before closing", ctx.id))
+}
+
+/// Remove one context panel (already validated) and ask modules for special
+/// close handling, recording the outcome into `tally`. `at` is the panel's
+/// `(index, id)` in `state.context`.
+fn close_one_panel(state: &mut State, at: (usize, &str), modules: &[Box<dyn Module>], tally: &mut CloseTally) {
+    let (idx, id) = at;
+    let ctx = state.context.remove(idx);
+    let mut close_result: Option<Result<String, String>> = None;
+    for module in modules {
+        if let Some(result) = module.on_close_context(&ctx, state) {
+            close_result = Some(result);
+            break;
+        }
+    }
+    match close_result {
+        Some(Ok(desc)) => tally.closed.push(format!("{id} ({desc})")),
+        Some(Err(msg)) => {
+            state.context.insert(idx, ctx);
+            tally.skipped.push(msg);
+        }
+        None => {
+            let detail = modules.iter().find_map(|m| m.context_detail(&ctx)).unwrap_or_else(|| ctx.name.clone());
+            tally.closed.push(format!("{id} ({detail})"));
+        }
+    }
+}
+
+/// Route one requested id to its outcome: not-found, protected, describe-skip,
+/// or an actual close.
+fn process_close_id(state: &mut State, id: &str, modules: &[Box<dyn Module>], tally: &mut CloseTally) {
+    let Some(idx) = state.context.iter().position(|c| c.id == id) else {
+        tally.not_found.push(id.to_owned());
+        return;
+    };
+    let Some(ctx_elem) = state.context.get(idx) else {
+        tally.not_found.push(id.to_owned());
+        return;
+    };
+    if ctx_elem.context_type.is_fixed() {
+        tally.skipped.push(format!("{id} (protected)"));
+        return;
+    }
+    if let Some(skip_msg) = file_panel_needs_describe(state, ctx_elem) {
+        tally.skipped.push(skip_msg);
+        return;
+    }
+    close_one_panel(state, (idx, id), modules, tally);
+}
+
+/// Assemble the tool-result text from a completed close batch.
+fn build_close_output(tally: &CloseTally) -> String {
+    let mut output = String::new();
+    if !tally.closed.is_empty() {
+        let _r = write!(output, "Closed {}:\n{}", tally.closed.len(), tally.closed.join("\n"));
+    }
+    for (label, items) in [("Skipped", &tally.skipped), ("Not found", &tally.not_found), ("Errors", &tally.errors)] {
+        if items.is_empty() {
+            continue;
+        }
+        if !output.is_empty() {
+            output.push_str("\n\n");
+        }
+        if label == "Not found" {
+            let _r = write!(output, "Not found: {}", items.join(", "));
+        } else {
+            let _r = write!(output, "{label} {}:\n{}", items.len(), items.join("\n"));
+        }
+    }
+    output
+}
 
 /// Execute the `Close_panel` tool to remove context panels.
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(ids) = tool.input.get("ids").and_then(serde_json::Value::as_array) else {
         return ToolResult::new(tool.id.clone(), "Missing 'ids' array parameter".to_owned(), true);
     };
-
     if ids.is_empty() {
         return ToolResult::new(tool.id.clone(), "Empty 'ids' array".to_owned(), true);
     }
 
-    let mut closed: Vec<String> = Vec::new();
-    let mut skipped: Vec<String> = Vec::new();
-    let mut not_found: Vec<String> = Vec::new();
-    let mut errors: Vec<String> = Vec::new();
-
     let modules = all_modules();
+    let mut tally = CloseTally::default();
 
     for id_value in ids {
-        let Some(id) = id_value.as_str() else {
-            errors.push("Invalid ID (not a string)".to_owned());
-            continue;
-        };
-
-        // Find the context element
-        let ctx_idx = state.context.iter().position(|c| c.id == id);
-
-        let Some(idx) = ctx_idx else {
-            not_found.push(id.to_owned());
-            continue;
-        };
-
-        // Fixed panels are always protected
-        let Some(ctx_elem) = state.context.get(idx) else {
-            not_found.push(id.to_owned());
-            continue;
-        };
-        if ctx_elem.context_type.is_fixed() {
-            skipped.push(format!("{id} (protected)"));
-            continue;
-        }
-
-        // Guard: file panels need a current tree description before closing.
-        // EXCEPTION: a file that no longer exists on disk is exempt (T355) — a
-        // deleted / branch-switched-away file can't be tree_described (the tool
-        // rejects "path not found"), so demanding a description would block the
-        // close forever. Such panels must be freely closable.
-        if state.active_modules.contains("tree")
-            && ctx_elem.context_type.as_str() == Kind::FILE
-            && let Some(file_path) = ctx_elem.get_meta_str("file_path")
-            && std::path::Path::new(file_path).exists()
-            && let Ok(cwd) = std::env::current_dir().and_then(|d| d.canonicalize())
-            && let Ok(rel) = std::path::Path::new(file_path).strip_prefix(&cwd)
-        {
-            let rel_str = rel.to_string_lossy();
-            let ts = cp_mod_tree::types::TreeState::get(state);
-            let needs_skip = ts.descriptions.iter().find(|d| d.path == rel_str.as_ref()).map_or_else(
-                || !has_pending_tree_describe(state, rel_str.as_ref()),
-                |desc| {
-                    let current_hash =
-                        cp_mod_tree::tools::compute_file_hash(std::path::Path::new(file_path)).unwrap_or_default();
-                    !desc.file_hash.is_empty()
-                        && desc.file_hash != current_hash
-                        && !has_pending_tree_describe(state, rel_str.as_ref())
-                },
-            );
-            if needs_skip {
-                skipped.push(format!("{id} ({rel_str}) — needs tree_describe before closing"));
-                continue;
-            }
-        }
-
-        // Take the context element out so modules can mutate state without borrow conflicts
-        let ctx = state.context.remove(idx);
-
-        // Ask modules for special close handling
-        let mut close_result: Option<Result<String, String>> = None;
-        for module in &modules {
-            if let Some(result) = module.on_close_context(&ctx, state) {
-                close_result = Some(result);
-                break;
-            }
-        }
-
-        match close_result {
-            Some(Ok(desc)) => {
-                // Context already removed
-                closed.push(format!("{id} ({desc})"));
-            }
-            Some(Err(msg)) => {
-                // Put it back — close was rejected
-                state.context.insert(idx, ctx);
-                skipped.push(msg);
-            }
-            None => {
-                // Default: use context_detail for description
-                let detail = modules.iter().find_map(|m| m.context_detail(&ctx)).unwrap_or_else(|| ctx.name.clone());
-                // Context already removed
-                closed.push(format!("{id} ({detail})"));
-            }
+        match id_value.as_str() {
+            Some(id) => process_close_id(state, id, &modules, &mut tally),
+            None => tally.errors.push("Invalid ID (not a string)".to_owned()),
         }
     }
 
-    // Build response
-    let mut output = String::new();
-
-    if !closed.is_empty() {
-        let _r = write!(output, "Closed {}:\n{}", closed.len(), closed.join("\n"));
-    }
-
-    if !skipped.is_empty() {
-        if !output.is_empty() {
-            output.push_str("\n\n");
-        }
-        let _r = write!(output, "Skipped {}:\n{}", skipped.len(), skipped.join("\n"));
-    }
-
-    if !not_found.is_empty() {
-        if !output.is_empty() {
-            output.push_str("\n\n");
-        }
-        let _r = write!(output, "Not found: {}", not_found.join(", "));
-    }
-
-    if !errors.is_empty() {
-        if !output.is_empty() {
-            output.push_str("\n\n");
-        }
-        let _r = write!(output, "Errors:\n{}", errors.join("\n"));
-    }
-
-    let mut result = ToolResult::new(tool.id.clone(), output, closed.is_empty() && skipped.is_empty());
+    let output = build_close_output(&tally);
+    let mut result = ToolResult::new(tool.id.clone(), output, tally.closed.is_empty() && tally.skipped.is_empty());
     result.preserves_tempo = true;
     result
 }

@@ -7,6 +7,8 @@
 
 /// Panel implementation for the directory tree view.
 mod panel;
+/// Read-only tree-string rendering (directory walk), split from tools.rs.
+mod render;
 /// YAML-backed persistent storage for tree descriptions.
 mod storage;
 /// Tool implementations for tree filtering, toggling, and describing.

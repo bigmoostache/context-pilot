@@ -178,32 +178,45 @@ pub fn fire_callback(
     Ok(FireResult { session_key, replaced })
 }
 
+/// Dispatch parameters distinguishing async vs blocking callback fan-out.
+struct FanOut<'fan> {
+    /// Sentinel tool-use id for blocking callbacks (`None` for async).
+    blocking_id: Option<&'fan str>,
+    /// Verb shown on success ("dispatched" vs "running (blocking)").
+    running_word: &'fan str,
+    /// Suffix labeling a dedup replacement (async vs blocking wording).
+    replaced_suffix: &'fan str,
+}
+
+/// Fire one matched callback, fanning out to one invocation per file for
+/// local callbacks (or a single all-files invocation for global ones), and
+/// push a compact summary line per invocation into `summaries`.
+fn fire_one(state: &mut State, cb: &MatchedCallback, fan: &FanOut<'_>, summaries: &mut Vec<String>) {
+    let name = &cb.definition.name;
+    let files: Vec<Option<String>> =
+        if cb.definition.is_global { vec![None] } else { cb.matched_files.iter().map(|f| Some(f.clone())).collect() };
+
+    for file in files {
+        let scope = file.as_ref().map(|f| format!(" ({f})")).unwrap_or_default();
+        match fire_callback(state, cb, fan.blocking_id, file.as_deref()) {
+            Ok(r) => {
+                let suffix = if r.replaced { fan.replaced_suffix } else { "" };
+                summaries.push(format!("· {name} {}{scope}{suffix}", fan.running_word));
+            }
+            Err(e) => summaries.push(format!("· {name} FAILED to spawn{scope}: {e}")),
+        }
+    }
+}
+
 /// Fire all matched non-blocking callbacks.
 /// Global: fires once with all files. Local: fires once per matched file.
 /// Returns one summary line per invocation in compact format.
 pub fn fire_async_callbacks(state: &mut State, callbacks: &[MatchedCallback]) -> Vec<String> {
     let _fg = cp_base::flame!("cb_fire_async");
+    let fan = FanOut { blocking_id: None, running_word: "dispatched", replaced_suffix: " (replaced previous run)" };
     let mut summaries = Vec::new();
     for cb in callbacks {
-        if cb.definition.is_global {
-            match fire_callback(state, cb, None, None) {
-                Ok(r) => {
-                    let suffix = if r.replaced { " (replaced previous run)" } else { "" };
-                    summaries.push(format!("· {} dispatched{suffix}", cb.definition.name));
-                }
-                Err(e) => summaries.push(format!("· {} FAILED to spawn: {}", cb.definition.name, e)),
-            }
-        } else {
-            for file in &cb.matched_files {
-                match fire_callback(state, cb, None, Some(file)) {
-                    Ok(r) => {
-                        let suffix = if r.replaced { " (replaced previous run)" } else { "" };
-                        summaries.push(format!("· {} dispatched ({}){suffix}", cb.definition.name, file));
-                    }
-                    Err(e) => summaries.push(format!("· {} FAILED to spawn for {}: {}", cb.definition.name, file, e)),
-                }
-            }
-        }
+        fire_one(state, cb, &fan, &mut summaries);
     }
     summaries
 }
@@ -213,27 +226,14 @@ pub fn fire_async_callbacks(state: &mut State, callbacks: &[MatchedCallback]) ->
 /// Each gets a sentinel `tool_use_id` so `tool_pipeline` can track them.
 pub fn fire_blocking_callbacks(state: &mut State, callbacks: &[MatchedCallback], tool_use_id: &str) -> Vec<String> {
     let _fg = cp_base::flame!("cb_fire_blocking");
+    let fan = FanOut {
+        blocking_id: Some(tool_use_id),
+        running_word: "running (blocking)",
+        replaced_suffix: " — replaced timed-out run",
+    };
     let mut summaries = Vec::new();
     for cb in callbacks {
-        if cb.definition.is_global {
-            match fire_callback(state, cb, Some(tool_use_id), None) {
-                Ok(r) => {
-                    let suffix = if r.replaced { " — replaced timed-out run" } else { "" };
-                    summaries.push(format!("· {} running (blocking){suffix}", cb.definition.name));
-                }
-                Err(e) => summaries.push(format!("· {} FAILED to spawn: {}", cb.definition.name, e)),
-            }
-        } else {
-            for file in &cb.matched_files {
-                match fire_callback(state, cb, Some(tool_use_id), Some(file)) {
-                    Ok(r) => {
-                        let suffix = if r.replaced { " — replaced timed-out run" } else { "" };
-                        summaries.push(format!("· {} running (blocking, {}){suffix}", cb.definition.name, file));
-                    }
-                    Err(e) => summaries.push(format!("· {} FAILED to spawn for {}: {}", cb.definition.name, file, e)),
-                }
-            }
-        }
+        fire_one(state, cb, &fan, &mut summaries);
     }
     summaries
 }

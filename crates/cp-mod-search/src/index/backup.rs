@@ -190,6 +190,31 @@ fn count_nonempty_lines(body: &str) -> u64 {
 /// One index's reimport target: `(uid, jsonl path, manifest count, label)`.
 type ReimportTarget<'plan> = (&'plan str, &'plan Path, u64, &'plan str);
 
+/// Attempt reimport for one index plan (files or logs). Count-validates the
+/// jsonl against the manifest, gates on [`should_reimport`], and restores.
+fn reimport_one_plan(client: &MeiliClient, plan: &ReimportTarget<'_>, manifest_fp: &str, current_fp: &str) {
+    let (uid, jsonl, expected, label) = *plan;
+    let present = jsonl.is_file();
+    let count = client.index_stats(uid).map_or(0, |(c, _)| c);
+
+    // Count-validate: a half-written jsonl (line count != manifest) is rejected.
+    if present {
+        let actual = std::fs::read_to_string(jsonl).map_or(0, |b| count_nonempty_lines(&b));
+        if actual != expected {
+            log::warn!("Backup {label}.jsonl has {actual} rows, manifest says {expected} — skipping reimport");
+            return;
+        }
+    }
+
+    if !should_reimport(count, present, manifest_fp, current_fp) {
+        return;
+    }
+    match apply_reimport(client, uid, jsonl) {
+        Ok(n) => log::info!("Reimported {n} {label} documents from backup (zero Voyage)"),
+        Err(e) => log::warn!("Backup reimport for {label} failed: {e}"),
+    }
+}
+
 /// Boot-time reimport-on-empty for both indexes.
 ///
 /// For each index: if it is empty, a backup is present, its row count matches
@@ -213,26 +238,8 @@ pub(crate) fn maybe_reimport(client: &MeiliClient, files_uid: &str, logs_uid: &s
         (logs_uid, logs_jsonl.as_path(), manifest.count_logs, "logs"),
     ];
 
-    for (uid, jsonl, expected, label) in plans {
-        let present = jsonl.is_file();
-        let count = client.index_stats(uid).map_or(0, |(c, _)| c);
-
-        // Count-validate: a half-written jsonl (line count != manifest) is rejected.
-        if present {
-            let actual = std::fs::read_to_string(jsonl).map_or(0, |b| count_nonempty_lines(&b));
-            if actual != expected {
-                log::warn!("Backup {label}.jsonl has {actual} rows, manifest says {expected} — skipping reimport");
-                continue;
-            }
-        }
-
-        if !should_reimport(count, present, &manifest.fingerprint, &current_fp) {
-            continue;
-        }
-        match apply_reimport(client, uid, jsonl) {
-            Ok(n) => log::info!("Reimported {n} {label} documents from backup (zero Voyage)"),
-            Err(e) => log::warn!("Backup reimport for {label} failed: {e}"),
-        }
+    for plan in &plans {
+        reimport_one_plan(client, plan, &manifest.fingerprint, &current_fp);
     }
 }
 

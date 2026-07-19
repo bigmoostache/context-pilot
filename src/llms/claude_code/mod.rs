@@ -8,8 +8,8 @@ mod check_api;
 mod debug;
 mod message_format;
 mod stream_types;
+mod streaming;
 
-use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
 use cp_mod_utilities::secret::Redacted;
@@ -19,7 +19,7 @@ use serde_json::Value;
 use super::error::LlmError;
 use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::constants::{API_VERSION, library};
-use crate::infra::tools::{ToolUse, build_api};
+use crate::infra::tools::build_api;
 use cp_base::config::INJECTIONS;
 use stream_types::StreamMessage;
 
@@ -241,148 +241,14 @@ impl ClaudeCodeClient {
             .collect::<Vec<_>>()
             .join("\n");
 
-        let mut reader = BufReader::new(response);
-        let mut input_tokens = 0;
-        let mut output_tokens = 0;
-        let mut cache_hit_tokens = 0;
-        let mut cache_miss_tokens = 0;
-        let mut current_tool: Option<(String, String, String)> = None;
-        let mut stop_reason: Option<String> = None;
-        let mut total_bytes: usize = 0;
-        let mut line_count: usize = 0;
-        let mut last_lines: Vec<String> = Vec::new();
-
-        loop {
-            let mut line = String::new();
-            match reader.read_line(&mut line) {
-                Ok(0) => break, // EOF
-                Ok(n) => {
-                    total_bytes = total_bytes.saturating_add(n);
-                    line_count = line_count.saturating_add(1);
-                }
-                Err(e) => {
-                    let verbose = debug::build_stream_read_error(&debug::StreamErrorContext {
-                        err: &e,
-                        current_tool: current_tool.as_ref(),
-                        total_bytes,
-                        line_count,
-                        resp_headers: &resp_headers,
-                        last_lines: &last_lines,
-                    });
-                    return Err(LlmError::StreamRead(verbose));
-                }
-            }
-            let line = line.trim_end_matches('\n').trim_end_matches('\r');
-
-            if !line.starts_with("data: ") {
-                continue;
-            }
-
-            // Keep last 5 data lines for error context
-            if last_lines.len() >= 5 {
-                let _r = last_lines.remove(0);
-            }
-            last_lines.push(line.to_owned());
-
-            let json_str = line.get(6..).unwrap_or("");
-            if json_str == "[DONE]" {
-                break;
-            }
-
-            if let Ok(event) = serde_json::from_str::<StreamMessage>(json_str) {
-                match event.event_type.as_str() {
-                    "content_block_start" => {
-                        if let Some(block) = event.content_block
-                            && block.block_type.as_deref() == Some("tool_use")
-                        {
-                            let name = block.name.unwrap_or_default();
-                            let _r =
-                                tx.send(StreamEvent::ToolProgress { name: name.clone(), input_so_far: String::new() });
-                            current_tool = Some((block.id.unwrap_or_default(), name, String::new()));
-                        }
-                    }
-                    "content_block_delta" => {
-                        if let Some(delta) = event.delta {
-                            match delta.delta_type.as_deref() {
-                                Some("text_delta") => {
-                                    if let Some(text) = delta.text {
-                                        let _r = tx.send(StreamEvent::Chunk(text));
-                                    }
-                                }
-                                Some("input_json_delta") => {
-                                    if let Some(json) = delta.partial_json
-                                        && let Some((_, name, input)) = current_tool.as_mut()
-                                    {
-                                        input.push_str(&json);
-                                        let _r = tx.send(StreamEvent::ToolProgress {
-                                            name: name.clone(),
-                                            input_so_far: input.clone(),
-                                        });
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                    "content_block_stop" => {
-                        if let Some((id, name, input_json)) = current_tool.take() {
-                            let input: Value = serde_json::from_str(&input_json)
-                                .unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
-                            let _r = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
-                        }
-                    }
-                    "message_start" => {
-                        if let Some(msg_body) = event.message
-                            && let Some(usage) = msg_body.usage
-                        {
-                            if let Some(hit) = usage.cache_read {
-                                cache_hit_tokens = hit;
-                            }
-                            if let Some(miss) = usage.cache_creation {
-                                cache_miss_tokens = miss;
-                            }
-                            if let Some(inp) = usage.input {
-                                input_tokens = inp;
-                            }
-                        }
-                    }
-                    "message_delta" => {
-                        if let Some(delta) = &event.delta
-                            && let Some(reason) = &delta.stop_reason
-                        {
-                            stop_reason = Some(reason.clone());
-                        }
-                        if let Some(usage) = event.usage {
-                            if let Some(inp) = usage.input {
-                                input_tokens = inp;
-                            }
-                            if let Some(out) = usage.output {
-                                output_tokens = out;
-                            }
-                        }
-                    }
-                    "message_stop" => break,
-                    "error" => {
-                        crate::llms::log_sse_error(&crate::llms::SseErrorContext {
-                            provider: "claude_code",
-                            json_str,
-                            total_bytes,
-                            line_count,
-                            last_lines: &last_lines,
-                        });
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-        }
+        let totals = streaming::consume_cc_stream(response, &resp_headers, tx)?;
 
         let _r = tx.send(StreamEvent::Done {
-            input_tokens,
-            output_tokens,
-            cache_hit_tokens,
-            cache_miss_tokens,
-            stop_reason,
+            input_tokens: totals.input_tokens,
+            output_tokens: totals.output_tokens,
+            cache_hit_tokens: totals.cache_hit_tokens,
+            cache_miss_tokens: totals.cache_miss_tokens,
+            stop_reason: totals.stop_reason,
             bp_hashes,
             bp_panel_ids,
             alive_count,

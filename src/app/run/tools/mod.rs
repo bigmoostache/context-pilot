@@ -1,3 +1,5 @@
+/// Edit-callback firing: match file edits against active callbacks (async + blocking).
+pub(crate) mod callbacks;
 /// Post-tool-execution checks: panel readiness, deferred sleeps, and question forms.
 pub(crate) mod checks;
 /// Watcher-sentinel replacement, blocking-result accumulation, and queue-flush execution.

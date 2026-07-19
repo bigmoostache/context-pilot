@@ -5,6 +5,8 @@
 
 /// Incarnation-agnostic embedding backup: export + reimport-on-empty.
 pub mod backup;
+/// Boot-time server + indexer wiring (split from lib.rs for the line budget).
+pub mod boot;
 /// File indexability gates (extension allowlist, exclusions, size cap, `is_indexable`).
 pub(crate) mod filters;
 /// Background file indexer thread and file watcher.

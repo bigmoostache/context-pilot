@@ -86,6 +86,24 @@ fn add_ancestor_folders(file_path: &str, cwd: &Path, folders: &mut HashSet<Strin
     }
 }
 
+/// Add every path from a single `tree_toggle(action="open")` tool use to
+/// `folders`. No-op for other tools or non-`open` actions.
+fn collect_from_tool_use(tu: &cp_base::state::data::message::ToolUseRecord, folders: &mut HashSet<String>) {
+    if tu.name != "tree_toggle" {
+        return;
+    }
+    let action = tu.input.get("action").and_then(serde_json::Value::as_str).unwrap_or("");
+    if action != "open" {
+        return;
+    }
+    let Some(paths) = tu.input.get("paths").and_then(serde_json::Value::as_array) else { return };
+    for p in paths {
+        if let Some(s) = p.as_str() {
+            let _new = folders.insert(s.to_owned());
+        }
+    }
+}
+
 /// Scan a message slice for `tree_toggle(action="open")` tool calls and add
 /// every path from those calls to `folders`.
 ///
@@ -98,20 +116,7 @@ fn collect_opened_folders_from_messages(messages: &[Message], folders: &mut Hash
             continue;
         }
         for tu in &msg.tool_uses {
-            if tu.name != "tree_toggle" {
-                continue;
-            }
-            let action = tu.input.get("action").and_then(serde_json::Value::as_str).unwrap_or("");
-            if action != "open" {
-                continue;
-            }
-            if let Some(paths) = tu.input.get("paths").and_then(serde_json::Value::as_array) {
-                for p in paths {
-                    if let Some(s) = p.as_str() {
-                        let _new = folders.insert(s.to_owned());
-                    }
-                }
-            }
+            collect_from_tool_use(tu, folders);
         }
     }
 }

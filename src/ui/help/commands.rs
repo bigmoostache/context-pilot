@@ -46,32 +46,44 @@ impl PaletteCommand {
         if query.is_empty() {
             return 0;
         }
-        let query_lower = query.to_lowercase();
+        let q = query.to_lowercase();
+        self.id_score(&q).saturating_add(self.label_score(&q)).saturating_add(self.keyword_score(&q))
+    }
+
+    /// Exact id match scores 1000, id prefix 500, else 0.
+    fn id_score(&self, q: &str) -> i32 {
+        let id = self.id.to_lowercase();
+        if id == q {
+            1000
+        } else if id.starts_with(q) {
+            500
+        } else {
+            0
+        }
+    }
+
+    /// Label prefix scores 100, label substring 50, else 0.
+    fn label_score(&self, q: &str) -> i32 {
+        let label = self.label.to_lowercase();
+        if label.starts_with(q) {
+            100
+        } else if label.contains(q) {
+            50
+        } else {
+            0
+        }
+    }
+
+    /// Sum per-keyword: prefix 30, substring 10.
+    fn keyword_score(&self, q: &str) -> i32 {
         let mut score = 0i32;
-
-        // Exact ID match (highest priority)
-        if self.id.to_lowercase() == query_lower {
-            score = score.saturating_add(1000);
-        } else if self.id.to_lowercase().starts_with(&query_lower) {
-            score = score.saturating_add(500);
-        }
-
-        // Label match
-        if self.label.to_lowercase().starts_with(&query_lower) {
-            score = score.saturating_add(100);
-        } else if self.label.to_lowercase().contains(&query_lower) {
-            score = score.saturating_add(50);
-        }
-
-        // Keyword match
         for keyword in &self.keywords {
-            if keyword.starts_with(&query_lower) {
+            if keyword.starts_with(q) {
                 score = score.saturating_add(30);
-            } else if keyword.contains(&query_lower) {
+            } else if keyword.contains(q) {
                 score = score.saturating_add(10);
             }
         }
-
         score
     }
 }

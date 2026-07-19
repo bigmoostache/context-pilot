@@ -62,6 +62,152 @@ pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &State, area: Re
     }
 }
 
+/// Selected-entry line range within the thread-list IR blocks.
+#[derive(Default)]
+struct SelRange {
+    /// First block index of the selected entry.
+    start: Option<usize>,
+    /// One-past-last block index of the selected entry.
+    end: Option<usize>,
+}
+
+/// Push the archived-mode header tag. No-op in the active view.
+fn push_archived_header(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
+    if viewing_archived {
+        blocks.push(IrBlock::Line(vec![
+            S::styled("  ".to_owned(), Semantic::Muted),
+            S::styled("⌗ ARCHIVED".to_owned(), Semantic::AccentDim),
+        ]));
+        blocks.push(IrBlock::Empty);
+    }
+}
+
+/// Mutable accumulator threaded through the thread-list block builders:
+/// the growing IR block vec, the selected-entry range, and the pane width.
+struct ListBuild<'build> {
+    /// Growing IR block list for the thread list.
+    blocks: &'build mut Vec<IrBlock>,
+    /// Selected-entry line range, filled as entries are pushed.
+    sel: &'build mut SelRange,
+    /// Inner pane width (columns) for name truncation.
+    inner_width: u16,
+}
+
+/// Push the virtual "+ New Thread" entry (active view only, 2-line format),
+/// recording its line range into `sel` when it is the selected entry.
+fn push_new_thread_entry(lb: &mut ListBuild<'_>, state: &State, on_virtual: bool) {
+    let new_sem = if on_virtual { Semantic::Accent } else { Semantic::Muted };
+    if on_virtual {
+        lb.sel.start = Some(lb.blocks.len());
+    }
+    let new_name = if on_virtual && !state.input.is_empty() {
+        truncate_str(&state.input, lb.inner_width.saturating_sub(6).into())
+    } else {
+        "New Thread".to_owned()
+    };
+    lb.blocks.push(IrBlock::Line(vec![
+        S::styled("  ".to_owned(), new_sem),
+        S::styled("● ".to_owned(), new_sem),
+        S::styled(new_name, new_sem),
+    ]));
+    lb.blocks.push(IrBlock::Line(vec![S::new("  ".to_owned()), S::styled("[NEW THREAD]".to_owned(), new_sem)]));
+    if on_virtual {
+        lb.sel.end = Some(lb.blocks.len());
+    }
+}
+
+/// Semantic + badge for one thread's status (focused wins over turn state).
+const fn thread_status_style(thread: &cp_mod_threads::types::Thread, is_focused: bool) -> (Semantic, &'static str) {
+    if is_focused {
+        return (Semantic::Accent, "[FOCUSED]");
+    }
+    match thread.status {
+        ThreadStatus::MyTurn => (Semantic::Warning, "[MY_TURN]"),
+        ThreadStatus::TheirTurn => (Semantic::Success, "[THEIR_TURN]"),
+    }
+}
+
+/// Push one thread's 2-line entry, recording its selected line range.
+fn push_thread_entry(
+    lb: &mut ListBuild<'_>,
+    thread: &cp_mod_threads::types::Thread,
+    focus: &FocusState,
+    is_selected: bool,
+) {
+    let last_read = focus.last_read_count.get(&thread.id).copied().unwrap_or(0);
+    let has_unread = thread.messages.len() > last_read;
+    let is_focused = focus.focused_thread_id.as_deref() == Some(thread.id.as_str());
+    let (status_sem, badge) = thread_status_style(thread, is_focused);
+
+    let indicator = if has_unread && !is_selected { "● " } else { "  " };
+    let indicator_sem = if has_unread { Semantic::Warning } else { Semantic::Default };
+    let name = truncate_str(&thread.name, lb.inner_width.saturating_sub(6).into());
+
+    if is_selected {
+        lb.sel.start = Some(lb.blocks.len());
+    }
+    lb.blocks.push(IrBlock::Line(vec![
+        S::styled(indicator.to_owned(), indicator_sem),
+        S::styled("● ".to_owned(), status_sem),
+        S::new(name),
+    ]));
+    lb.blocks.push(IrBlock::Line(vec![
+        S::new("  ".to_owned()),
+        S::styled(badge.to_owned(), status_sem),
+        S::muted(format!("  {} msg", thread.messages.len())),
+    ]));
+    if is_selected {
+        lb.sel.end = Some(lb.blocks.len());
+    }
+}
+
+/// Push the bottom help / confirm hint line for the current mode.
+fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool, confirming: bool) {
+    if confirming {
+        let (verb, key_sem) =
+            if viewing_archived { (" Restore? ", Semantic::KeyHint) } else { (" Archive? ", Semantic::KeyHint) };
+        blocks.push(IrBlock::Line(vec![
+            S::warning(verb.to_owned()),
+            S::styled("y".to_owned(), key_sem),
+            S::muted("/any to cancel".to_owned()),
+        ]));
+    } else if viewing_archived {
+        blocks.push(IrBlock::Line(vec![
+            S::styled(" Ctrl+A".to_owned(), Semantic::KeyHint),
+            S::muted(" restore  ".to_owned()),
+            S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
+            S::muted(" active".to_owned()),
+        ]));
+    } else {
+        blocks.push(IrBlock::Line(vec![
+            S::styled(" Ctrl+A".to_owned(), Semantic::KeyHint),
+            S::muted(" arch  ".to_owned()),
+            S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
+            S::muted(" arch'd  ".to_owned()),
+            S::styled("Ctrl+V".to_owned(), Semantic::KeyHint),
+            S::muted(" back".to_owned()),
+        ]));
+    }
+}
+
+/// Apply the surface-bg highlight (full width) to the selected entry's lines.
+fn apply_selection_highlight(lines: &mut [ratatui::text::Line<'static>], sel: &SelRange, inner_width: u16) {
+    let (Some(start), Some(end)) = (sel.start, sel.end) else {
+        return;
+    };
+    let full_width = inner_width.to_usize();
+    for line in lines.get_mut(start..end).into_iter().flatten() {
+        line.style = line.style.bg(theme::bg_surface());
+        let current_width: usize = line.spans.iter().map(ratatui::text::Span::width).sum();
+        if current_width < full_width {
+            line.spans.push(ratatui::text::Span::styled(
+                " ".repeat(full_width.saturating_sub(current_width)),
+                Style::default().bg(theme::bg_surface()),
+            ));
+        }
+    }
+}
+
 /// Render the left-pane thread list via IR blocks.
 ///
 /// Layout chrome (right border) is direct ratatui. All visible content
@@ -86,43 +232,14 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
 
     // ── Build IR blocks ──────────────────────────────────────────────
     let mut ir_blocks: Vec<IrBlock> = Vec::new();
+    let mut sel = SelRange::default();
 
-    // Track which line indices belong to the selected entry for bg highlight
-    let mut selected_line_start: Option<usize> = None;
-    let mut selected_line_end: Option<usize> = None;
+    push_archived_header(&mut ir_blocks, viewing_archived);
 
-    // Header tag when viewing the archived list, so the mode is unmistakable.
-    if viewing_archived {
-        ir_blocks.push(IrBlock::Line(vec![
-            S::styled("  ".to_owned(), Semantic::Muted),
-            S::styled("⌗ ARCHIVED".to_owned(), Semantic::AccentDim),
-        ]));
-        ir_blocks.push(IrBlock::Empty);
-    }
-
-    // Virtual "+ New Thread" entry — active view only, 2-line format.
     let on_virtual = show_new && selected >= visible.len();
+    let mut lb = ListBuild { blocks: &mut ir_blocks, sel: &mut sel, inner_width: inner.width };
     if show_new {
-        let new_sem = if on_virtual { Semantic::Accent } else { Semantic::Muted };
-        if on_virtual {
-            selected_line_start = Some(ir_blocks.len());
-        }
-        // Line 1: indicator + dot + typed name (or placeholder)
-        let new_name = if on_virtual && !state.input.is_empty() {
-            truncate_str(&state.input, inner.width.saturating_sub(6).into())
-        } else {
-            "New Thread".to_owned()
-        };
-        ir_blocks.push(IrBlock::Line(vec![
-            S::styled("  ".to_owned(), new_sem),
-            S::styled("● ".to_owned(), new_sem),
-            S::styled(new_name, new_sem),
-        ]));
-        // Line 2: badge
-        ir_blocks.push(IrBlock::Line(vec![S::new("  ".to_owned()), S::styled("[NEW THREAD]".to_owned(), new_sem)]));
-        if on_virtual {
-            selected_line_end = Some(ir_blocks.len());
-        }
+        push_new_thread_entry(&mut lb, state, on_virtual);
     }
 
     // `i` is the position in the visible slice; `real` indexes `ts.threads`.
@@ -130,57 +247,7 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         let Some(thread) = ts.threads.get(real) else {
             continue;
         };
-        let is_selected = i == selected;
-
-        // Unread detection: messages beyond last-read count
-        let last_read = focus.last_read_count.get(&thread.id).copied().unwrap_or(0);
-        let has_unread = thread.messages.len() > last_read;
-
-        // Semantic for status: accent=focused, warning=MY_TURN, success=THEIR_TURN
-        let is_focused = focus.focused_thread_id.as_deref() == Some(thread.id.as_str());
-        let status_sem = if is_focused {
-            Semantic::Accent
-        } else {
-            match thread.status {
-                ThreadStatus::MyTurn => Semantic::Warning,
-                ThreadStatus::TheirTurn => Semantic::Success,
-            }
-        };
-
-        // Unread indicator (only when not selected)
-        let indicator = if has_unread && !is_selected { "● " } else { "  " };
-        let indicator_sem = if has_unread { Semantic::Warning } else { Semantic::Default };
-        let name = truncate_str(&thread.name, inner.width.saturating_sub(6).into());
-
-        if is_selected {
-            selected_line_start = Some(ir_blocks.len());
-        }
-
-        // Line 1: indicator + status dot + thread name
-        ir_blocks.push(IrBlock::Line(vec![
-            S::styled(indicator.to_owned(), indicator_sem),
-            S::styled("● ".to_owned(), status_sem),
-            S::new(name),
-        ]));
-
-        // Line 2: status badge + message count
-        let (badge, badge_sem) = if is_focused {
-            ("[FOCUSED]", Semantic::Accent)
-        } else {
-            match thread.status {
-                ThreadStatus::MyTurn => ("[MY_TURN]", Semantic::Warning),
-                ThreadStatus::TheirTurn => ("[THEIR_TURN]", Semantic::Success),
-            }
-        };
-        ir_blocks.push(IrBlock::Line(vec![
-            S::new("  ".to_owned()),
-            S::styled(badge.to_owned(), badge_sem),
-            S::muted(format!("  {} msg", thread.messages.len())),
-        ]));
-
-        if is_selected {
-            selected_line_end = Some(ir_blocks.len());
-        }
+        push_thread_entry(&mut lb, thread, focus, i == selected);
     }
 
     // Empty-state hint when the archived list has nothing in it.
@@ -197,51 +264,11 @@ fn render_thread_list(frame: &mut Frame<'_>, state: &State, area: Rect) {
         }
     }
 
-    // Help / confirmation hint
-    if confirming {
-        let (verb, key_sem) =
-            if viewing_archived { (" Restore? ", Semantic::KeyHint) } else { (" Archive? ", Semantic::KeyHint) };
-        ir_blocks.push(IrBlock::Line(vec![
-            S::warning(verb.to_owned()),
-            S::styled("y".to_owned(), key_sem),
-            S::muted("/any to cancel".to_owned()),
-        ]));
-    } else if viewing_archived {
-        ir_blocks.push(IrBlock::Line(vec![
-            S::styled(" Ctrl+A".to_owned(), Semantic::KeyHint),
-            S::muted(" restore  ".to_owned()),
-            S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
-            S::muted(" active".to_owned()),
-        ]));
-    } else {
-        ir_blocks.push(IrBlock::Line(vec![
-            S::styled(" Ctrl+A".to_owned(), Semantic::KeyHint),
-            S::muted(" arch  ".to_owned()),
-            S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
-            S::muted(" arch'd  ".to_owned()),
-            S::styled("Ctrl+V".to_owned(), Semantic::KeyHint),
-            S::muted(" back".to_owned()),
-        ]));
-    }
+    push_help_hint(&mut ir_blocks, viewing_archived, confirming);
 
     // Convert IR → ratatui and render
     let mut lines = ir::blocks_to_lines(&ir_blocks);
-
-    // Apply bg highlight to the selected entry's lines (layout chrome)
-    if let (Some(start), Some(end)) = (selected_line_start, selected_line_end) {
-        let full_width = inner.width.to_usize();
-        for line in lines.get_mut(start..end).into_iter().flatten() {
-            line.style = line.style.bg(theme::bg_surface());
-            // Pad with spaces so bg covers the full sidebar width
-            let current_width: usize = line.spans.iter().map(ratatui::text::Span::width).sum();
-            if current_width < full_width {
-                line.spans.push(ratatui::text::Span::styled(
-                    " ".repeat(full_width.saturating_sub(current_width)),
-                    Style::default().bg(theme::bg_surface()),
-                ));
-            }
-        }
-    }
+    apply_selection_highlight(&mut lines, &sel, inner.width);
 
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);

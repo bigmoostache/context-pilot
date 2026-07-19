@@ -264,6 +264,39 @@ fn handle_thread_create(state: &mut State) -> ActionResult {
     ActionResult::Save
 }
 
+/// Consume one paste sentinel starting at the opening `\x00` (index `start`),
+/// append its resolved buffer content (or the literal bytes on a malformed /
+/// unterminated marker) to `result`, and return the new scan index.
+fn expand_one_sentinel(input: &str, start: usize, paste_buffers: &[String], result: &mut String) -> usize {
+    let bytes = input.as_bytes();
+    let mut i = start.saturating_add(1);
+    let idx_start = i;
+    while let Some(&b) = bytes.get(i) {
+        if b == 0 {
+            break;
+        }
+        i = i.saturating_add(1);
+    }
+    if i >= bytes.len() {
+        // No closing \x00 — keep as-is.
+        result.push_str(input.get(start..).unwrap_or(""));
+        return i;
+    }
+    let idx_str = input.get(idx_start..i).unwrap_or("");
+    i = i.saturating_add(1); // skip closing \x00
+    match idx_str.parse::<usize>() {
+        Ok(idx) => {
+            if let Some(content) = paste_buffers.get(idx) {
+                result.push_str(content);
+            }
+            // Out-of-bounds index: silently drop the sentinel.
+        }
+        // Invalid index — keep the original bytes.
+        Err(_e) => result.push_str(input.get(start..i).unwrap_or("")),
+    }
+    i
+}
+
 /// Expand paste sentinel markers (\x00{idx}\x00) with actual paste buffer content.
 fn expand_paste_sentinels(input: &str, paste_buffers: &[String]) -> String {
     if !input.contains('\x00') {
@@ -277,34 +310,7 @@ fn expand_paste_sentinels(input: &str, paste_buffers: &[String]) -> String {
     while i < bytes.len() {
         let Some(&current_byte) = bytes.get(i) else { break };
         if current_byte == 0 {
-            // Found sentinel start — find the index and closing \x00
-            let start = i;
-            i = i.saturating_add(1);
-            let idx_start = i;
-            while let Some(&b) = bytes.get(i) {
-                if b == 0 {
-                    break;
-                }
-                i = i.saturating_add(1);
-            }
-            if i < bytes.len() {
-                // Found closing \x00
-                let idx_str = input.get(idx_start..i).unwrap_or("");
-                i = i.saturating_add(1); // skip closing \x00
-
-                if let Ok(idx) = idx_str.parse::<usize>() {
-                    if let Some(content) = paste_buffers.get(idx) {
-                        result.push_str(content);
-                    }
-                    // If index out of bounds, silently drop the sentinel
-                } else {
-                    // Invalid index — keep original bytes
-                    result.push_str(input.get(start..i).unwrap_or(""));
-                }
-            } else {
-                // No closing \x00 — keep as-is
-                result.push_str(input.get(start..).unwrap_or(""));
-            }
+            i = expand_one_sentinel(input, i, paste_buffers, &mut result);
         } else {
             let Some(ch) = input.get(i..).unwrap_or("").chars().next() else { break };
             result.push(ch);

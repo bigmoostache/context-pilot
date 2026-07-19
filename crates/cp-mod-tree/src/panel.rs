@@ -130,7 +130,7 @@ impl Panel for TreePanel {
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
         let req = request.data.downcast::<TreeCacheRequest>().ok()?;
         let TreeCacheRequest { context_id, tree_filter, tree_open_folders, tree_descriptions } = *req;
-        let content = crate::tools::generate_tree_string(&tree_filter, &tree_open_folders, &tree_descriptions);
+        let content = crate::render::generate_tree_string(&tree_filter, &tree_open_folders, &tree_descriptions);
         let token_count = estimate_tokens(&content);
         Some(CacheUpdate::Content { context_id, content, token_count })
     }

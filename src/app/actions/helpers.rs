@@ -149,28 +149,41 @@ pub(super) fn create_new_context(state: &mut State) -> ActionResult {
 /// Maximum dynamic entries per sidebar page (must match `render_sidebar.rs`).
 const DYNAMIC_PAGE_SIZE: usize = 10;
 
+/// Numeric panel-ID sort key (`P12` → 12), `usize::MAX` when unparsable.
+fn panel_id_key(state: &State, idx: usize) -> usize {
+    state
+        .context
+        .get(idx)
+        .and_then(|el| el.id.strip_prefix('P'))
+        .and_then(|n| n.parse::<usize>().ok())
+        .unwrap_or(usize::MAX)
+}
+
+/// Context indices sorted by numeric panel ID (shared ordering).
+fn sorted_by_panel_id(state: &State) -> Vec<usize> {
+    let mut sorted: Vec<usize> = (0..state.context.len()).collect();
+    sorted.sort_by_key(|&a| panel_id_key(state, a));
+    sorted
+}
+
+/// Page to jump to from a dynamic panel (wraps circularly).
+const fn next_dynamic_page(current_page: usize, total_pages: usize, forward: bool) -> usize {
+    if forward {
+        if current_page >= total_pages.saturating_sub(1) { 0 } else { current_page.saturating_add(1) }
+    } else if current_page == 0 {
+        total_pages.saturating_sub(1)
+    } else {
+        current_page.saturating_sub(1)
+    }
+}
+
 /// Navigate to the next (`forward=true`) or previous (`forward=false`) context panel,
 /// sorted by numeric panel ID.
 pub(super) fn select_context(state: &mut State, forward: bool) {
     if state.context.is_empty() {
         return;
     }
-    let mut sorted: Vec<usize> = (0..state.context.len()).collect();
-    sorted.sort_by(|&a, &b| {
-        let id_a = state
-            .context
-            .get(a)
-            .and_then(|el| el.id.strip_prefix('P'))
-            .and_then(|n| n.parse::<usize>().ok())
-            .unwrap_or(usize::MAX);
-        let id_b = state
-            .context
-            .get(b)
-            .and_then(|el| el.id.strip_prefix('P'))
-            .and_then(|n| n.parse::<usize>().ok())
-            .unwrap_or(usize::MAX);
-        id_a.cmp(&id_b)
-    });
+    let sorted = sorted_by_panel_id(state);
     let cur = sorted.iter().position(|&i| i == state.selected_context).unwrap_or(0);
     let next = if forward {
         config::wrap_next(cur, sorted.len())
@@ -191,23 +204,7 @@ pub(super) fn page_dynamic(state: &mut State, forward: bool) {
     if state.context.is_empty() {
         return;
     }
-    // Sort indices by panel ID numerically (same ordering as select_context / sidebar).
-    let mut sorted: Vec<usize> = (0..state.context.len()).collect();
-    sorted.sort_by(|&a, &b| {
-        let id_a = state
-            .context
-            .get(a)
-            .and_then(|el| el.id.strip_prefix('P'))
-            .and_then(|n| n.parse::<usize>().ok())
-            .unwrap_or(usize::MAX);
-        let id_b = state
-            .context
-            .get(b)
-            .and_then(|el| el.id.strip_prefix('P'))
-            .and_then(|n| n.parse::<usize>().ok())
-            .unwrap_or(usize::MAX);
-        id_a.cmp(&id_b)
-    });
+    let sorted = sorted_by_panel_id(state);
 
     // Collect dynamic panel indices only (preserving sorted order).
     let dynamic_indices: Vec<usize> =
@@ -223,16 +220,9 @@ pub(super) fn page_dynamic(state: &mut State, forward: bool) {
     let current_is_dynamic = state.context.get(state.selected_context).is_some_and(|c| !c.context_type.is_fixed());
 
     let target_page = if current_is_dynamic {
-        // Find which page the current selection is on, then move to next/prev.
         let pos = dynamic_indices.iter().position(|&i| i == state.selected_context).unwrap_or(0);
         let current_page = pos.checked_div(DYNAMIC_PAGE_SIZE).unwrap_or(0);
-        if forward {
-            if current_page >= total_pages.saturating_sub(1) { 0 } else { current_page.saturating_add(1) }
-        } else if current_page == 0 {
-            total_pages.saturating_sub(1)
-        } else {
-            current_page.saturating_sub(1)
-        }
+        next_dynamic_page(current_page, total_pages, forward)
     } else {
         // From a fixed panel: forward → last page, backward → first page.
         if forward { total_pages.saturating_sub(1) } else { 0 }

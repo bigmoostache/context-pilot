@@ -30,6 +30,92 @@ use crate::state::{Kind, State, StreamPhase};
 // Re-export Action/ActionResult from cp-base (shared with module crates)
 pub(crate) use cp_base::state::actions::{Action, ActionResult};
 
+/// Stop an in-progress stream: mark idle, roll back streaming token estimate,
+/// and append a `[Stopped]` marker to the last assistant message.
+fn handle_stop_streaming(state: &mut State) -> ActionResult {
+    if !state.flags.stream.phase.is_streaming() {
+        return ActionResult::Nothing;
+    }
+    state.flags.stream.phase.transition(StreamPhase::Idle);
+    if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+        ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
+    }
+    state.streaming_estimated_tokens = 0;
+    if let Some(msg) = state.messages.last_mut()
+        && msg.role == "assistant"
+        && !msg.content.is_empty()
+    {
+        msg.content.push_str("\n[Stopped]");
+    }
+    ActionResult::StopStream
+}
+
+/// Copy the Ctrl+I index overlay's plain-text form to the clipboard via `pbcopy`.
+fn handle_copy_index_overlay(state: &mut State) {
+    let ir = crate::ui::search_overlay::build_search_index_overlay(state);
+    let text = crate::ui::search_overlay::text::build_overlay_text(&ir);
+    if let Ok(mut child) = std::process::Command::new("pbcopy").stdin(std::process::Stdio::piped()).spawn() {
+        if let Some(mut stdin) = child.stdin.take() {
+            use std::io::Write as _;
+            let _r = stdin.write_all(text.as_bytes());
+        }
+        let _r = child.wait();
+    }
+    state.flags.overlays.copied_flash_ms = crate::app::panels::now_ms();
+    state.flags.ui.dirty = true;
+}
+
+/// Insert a typed character at the cursor, replacing any active selection,
+/// then trigger `@`-autocomplete or `/command` expansion when warranted.
+fn handle_input_char(state: &mut State, ch: char) {
+    // Delete selection if any, then insert
+    let _r = cursor::delete_selection(state);
+    state.input.insert(state.input_cursor, ch);
+    state.input_cursor = state.input_cursor.saturating_add(ch.len_utf8());
+
+    // Check if '@' was typed and should trigger autocomplete
+    if ch == '@' {
+        let anchor_pos = state.input_cursor.saturating_sub(1); // position of '@'
+        // Trigger if at start of input OR preceded by whitespace
+        let should_trigger = anchor_pos == 0
+            || state
+                .input
+                .as_bytes()
+                .get(anchor_pos.saturating_sub(1))
+                .is_some_and(|&b| b == b' ' || b == b'\n' || b == b'\t');
+        if should_trigger {
+            // Populate entries for root directory
+            let filter = cp_mod_tree::types::TreeState::get(state).filter.clone();
+            let entries = cp_mod_tree::tools::list_dir_entries(&filter, "", "");
+            if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() {
+                ac.activate(anchor_pos);
+                ac.set_matches(entries);
+            }
+        }
+    }
+
+    // After typing a space or newline, check if preceding text is a /command
+    if (ch == ' ' || ch == '\n')
+        && !cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command).is_empty()
+    {
+        cursor::handle_command_expansion(state);
+    }
+}
+
+/// Handle `Action::InputSubmit`: record the trimmed input into prompt history
+/// (resetting nav), then delegate to the input module's submit handler.
+fn handle_input_submit_action(state: &mut State) -> ActionResult {
+    // Reset prompt history navigation and push new entry
+    history::ensure_history_nav(state);
+    let trimmed = state.input.trim_end().to_owned();
+    let nav = state.ext_mut::<history::PromptHistoryNav>();
+    if !trimmed.is_empty() {
+        nav.push(trimmed);
+    }
+    nav.reset_nav();
+    input::handle_input_submit(state)
+}
+
 /// Dispatch an `Action` to the appropriate handler, returning the resulting `ActionResult`.
 pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
     // Reset scroll acceleration on non-scroll actions
@@ -39,39 +125,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
 
     match action {
         Action::InputChar(ch) => {
-            // Delete selection if any, then insert
-            let _r = cursor::delete_selection(state);
-            state.input.insert(state.input_cursor, ch);
-            state.input_cursor = state.input_cursor.saturating_add(ch.len_utf8());
-
-            // Check if '@' was typed and should trigger autocomplete
-            if ch == '@' {
-                let anchor_pos = state.input_cursor.saturating_sub(1); // position of '@'
-                // Trigger if at start of input OR preceded by whitespace
-                let should_trigger = anchor_pos == 0
-                    || state
-                        .input
-                        .as_bytes()
-                        .get(anchor_pos.saturating_sub(1))
-                        .is_some_and(|&b| b == b' ' || b == b'\n' || b == b'\t');
-                if should_trigger {
-                    // Populate entries for root directory
-                    let filter = cp_mod_tree::types::TreeState::get(state).filter.clone();
-                    let entries = cp_mod_tree::tools::list_dir_entries(&filter, "", "");
-                    if let Some(ac) = state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() {
-                        ac.activate(anchor_pos);
-                        ac.set_matches(entries);
-                    }
-                }
-            }
-
-            // After typing a space or newline, check if preceding text is a /command
-            if (ch == ' ' || ch == '\n')
-                && !cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command).is_empty()
-            {
-                cursor::handle_command_expansion(state);
-            }
-
+            handle_input_char(state, ch);
             ActionResult::Nothing
         }
         Action::InsertText(text) => {
@@ -175,17 +229,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         }
 
         // === Delegated to submodules ===
-        Action::InputSubmit => {
-            // Reset prompt history navigation and push new entry
-            history::ensure_history_nav(state);
-            let trimmed = state.input.trim_end().to_owned();
-            let nav = state.ext_mut::<history::PromptHistoryNav>();
-            if !trimmed.is_empty() {
-                nav.push(trimmed);
-            }
-            nav.reset_nav();
-            input::handle_input_submit(state)
-        }
+        Action::InputSubmit => handle_input_submit_action(state),
         Action::ClearConversation => input::handle_clear_conversation(state),
 
         Action::NewContext => helpers::create_new_context(state),
@@ -233,24 +277,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             state.scroll_accel = (state.scroll_accel + SCROLL_ACCEL_INCREMENT).min(SCROLL_ACCEL_MAX);
             ActionResult::Nothing
         }
-        Action::StopStreaming => {
-            if state.flags.stream.phase.is_streaming() {
-                state.flags.stream.phase.transition(StreamPhase::Idle);
-                if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
-                    ctx.token_count = ctx.token_count.saturating_sub(state.streaming_estimated_tokens);
-                }
-                state.streaming_estimated_tokens = 0;
-                if let Some(msg) = state.messages.last_mut()
-                    && msg.role == "assistant"
-                    && !msg.content.is_empty()
-                {
-                    msg.content.push_str("\n[Stopped]");
-                }
-                ActionResult::StopStream
-            } else {
-                ActionResult::Nothing
-            }
-        }
+        Action::StopStreaming => handle_stop_streaming(state),
         Action::TmuxSendKeys { pane_id, keys } => {
             use std::process::Command;
             let _r = Command::new("tmux").args(["send-keys", "-t", &pane_id, &keys]).output();
@@ -294,19 +321,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             ActionResult::Nothing
         }
         Action::CopyIndexOverlay => {
-            let ir = crate::ui::search_overlay::build_search_index_overlay(state);
-            let text = crate::ui::search_overlay::text::build_overlay_text(&ir);
-            // Copy to clipboard via pbcopy (macOS)
-            if let Ok(mut child) = std::process::Command::new("pbcopy").stdin(std::process::Stdio::piped()).spawn() {
-                if let Some(mut stdin) = child.stdin.take() {
-                    use std::io::Write as _;
-                    let _r = stdin.write_all(text.as_bytes());
-                }
-                let _r = child.wait();
-            }
-            // Set flash timestamp for UI feedback
-            state.flags.overlays.copied_flash_ms = crate::app::panels::now_ms();
-            state.flags.ui.dirty = true;
+            handle_copy_index_overlay(state);
             ActionResult::Nothing
         }
         Action::ConfigSelectProvider(provider) => {

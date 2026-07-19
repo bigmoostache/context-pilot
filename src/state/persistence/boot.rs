@@ -25,11 +25,10 @@ pub(crate) fn boot_extract_module_data(cfg: &BootConfig) -> BootModuleData {
     BootModuleData { global: cfg.shared.modules.clone(), worker: cfg.worker.modules.clone() }
 }
 
-/// Phase 5: Initialize all modules and load their persisted data.
-///
-/// Calls `progress(module_name)` before each module so the caller can
-/// render per-module progress on the boot loading screen.
-pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData, mut progress: impl FnMut(&str)) {
+/// Load `.env` files (project-local then global override) and warn about any
+/// missing vault credentials. Global wins so the settings-page writes take
+/// effect over stale shell/project values.
+fn load_boot_env_and_check_vault() {
     // Load .env files FIRST — modules read env vars during init_state
     // (e.g. DATALAB_API_KEY for OCR, GITHUB_TOKEN for gh).
     // Override mode so file values always win over stale shell env vars
@@ -47,6 +46,29 @@ pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData,
     for def in cp_vault::vault().health() {
         log::warn!("Missing credential: {} ({})", def.display, def.env_var);
     }
+}
+
+/// Load persisted per-module data (global or worker map) plus the `_worker`
+/// suffix map into `state` for one module.
+fn load_one_module_data(module: &dyn crate::modules::Module, module_data: &BootModuleData, state: &mut State) {
+    let null = serde_json::Value::Null;
+    let data = if module.is_global() {
+        module_data.global.get(module.id()).unwrap_or(&null)
+    } else {
+        module_data.worker.get(module.id()).unwrap_or(&null)
+    };
+    module.load_module_data(data, state);
+
+    let worker_data = module_data.worker.get(&format!("{}_worker", module.id())).unwrap_or(&null);
+    module.load_worker_data(worker_data, state);
+}
+
+/// Phase 5: Initialize all modules and load their persisted data.
+///
+/// Calls `progress(module_name)` before each module so the caller can
+/// render per-module progress on the boot loading screen.
+pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData, mut progress: impl FnMut(&str)) {
+    load_boot_env_and_check_vault();
 
     // Pre-start heavy daemons in parallel — the biggest boot perf win.
     // Meilisearch and Console server start concurrently.
@@ -61,18 +83,9 @@ pub(crate) fn boot_init_modules(state: &mut State, module_data: &BootModuleData,
         module.init_state(state);
     }
 
-    let null = serde_json::Value::Null;
     for module in &modules {
         progress(module.name());
-        let data = if module.is_global() {
-            module_data.global.get(module.id()).unwrap_or(&null)
-        } else {
-            module_data.worker.get(module.id()).unwrap_or(&null)
-        };
-        module.load_module_data(data, state);
-
-        let worker_data = module_data.worker.get(&format!("{}_worker", module.id())).unwrap_or(&null);
-        module.load_worker_data(worker_data, state);
+        load_one_module_data(module.as_ref(), module_data, state);
     }
 
     if state.tools.is_empty() {

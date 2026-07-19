@@ -4,7 +4,7 @@
 //! Message building is delegated to the shared `openai_compat` module,
 //! with a thin wrapper to add `reasoning_content` for deepseek-reasoner.
 
-use std::io::{BufRead as _, BufReader};
+use std::io::BufReader;
 use std::sync::mpsc::Sender;
 
 use cp_mod_utilities::secret::Redacted;
@@ -170,66 +170,17 @@ impl LlmClient for DeepSeekClient {
             return Err(LlmError::Api { status, body });
         }
 
-        // Stream SSE using shared helpers
+        // Stream SSE using shared consumer (cache hit/miss folded in for DeepSeek)
         let reader = BufReader::new(response);
-        let mut input_tokens = 0;
-        let mut output_tokens = 0;
-        let mut cache_hit_tokens = 0;
-        let mut cache_miss_tokens = 0;
-        let mut stop_reason: Option<String> = None;
         let mut tool_acc = ToolCallAccumulator::new();
-
-        for line in reader.lines() {
-            let line = line.map_err(|e| LlmError::StreamRead(e.to_string()))?;
-
-            if let Some(resp) = super::openai_streaming::parse_sse_line(&line) {
-                if let Some(usage) = resp.usage {
-                    if let Some(inp) = usage.prompt {
-                        input_tokens = inp;
-                    }
-                    if let Some(out) = usage.completion {
-                        output_tokens = out;
-                    }
-                    // DeepSeek-specific cache fields
-                    if let Some(hit) = usage.prompt_cache_hit {
-                        cache_hit_tokens = hit;
-                    }
-                    if let Some(miss) = usage.prompt_cache_miss {
-                        cache_miss_tokens = miss;
-                    }
-                }
-
-                for choice in resp.choices {
-                    if let Some(delta) = choice.delta {
-                        if let Some(content) = delta.content
-                            && !content.is_empty()
-                        {
-                            let _r = tx.send(StreamEvent::Chunk(content));
-                        }
-                        if let Some(calls) = delta.tool_calls {
-                            for call in &calls {
-                                if let Some((name, input_so_far)) = tool_acc.feed(call) {
-                                    let _r = tx.send(StreamEvent::ToolProgress { name, input_so_far });
-                                }
-                            }
-                        }
-                    }
-                    if let Some(reason) = &(choice.finish_reason) {
-                        stop_reason = Some(super::openai_streaming::normalize_stop_reason(reason));
-                        for tool_use in tool_acc.drain() {
-                            let _r = tx.send(StreamEvent::ToolUse(tool_use));
-                        }
-                    }
-                }
-            }
-        }
+        let acc = super::openai_streaming::consume_sse_stream(reader, &tx, &mut tool_acc)?;
 
         let _r = tx.send(StreamEvent::Done {
-            input_tokens,
-            output_tokens,
-            cache_hit_tokens,
-            cache_miss_tokens,
-            stop_reason,
+            input_tokens: acc.input_tokens,
+            output_tokens: acc.output_tokens,
+            cache_hit_tokens: acc.cache_hit_tokens,
+            cache_miss_tokens: acc.cache_miss_tokens,
+            stop_reason: acc.stop_reason,
             bp_hashes: vec![],
             bp_panel_ids: vec![],
             alive_count: 0,

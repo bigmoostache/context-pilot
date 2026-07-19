@@ -5016,3 +5016,58 @@ index f29019da..bd6dd160 100644
  
  
 # --- End entry #38 ---
+39:ce09294893e2db004d43007f0dd0de6c6b34a395721fd8d9da50ddf9045395c6:b6fed75381507cafb15699a5935d99d2f2f9541633abe7d455ee6b86f53c4d33:cc5039d1ca90c2f580377cfbb036d3d0027d531e404bef925addee8f7176fe6e
+# --- Diff for entry #39 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index e24751c9..a8931aa5 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -337,6 +337,7 @@ cloned_ref_to_slice_refs = "forbid"
+ cmp_null = "forbid"
+ cmp_owned = "forbid"
+ coerce_container_to_any = "forbid"
++cognitive_complexity = "forbid"
+ collapsible_else_if = "forbid"
+ collapsible_if = "forbid"
+ collapsible_match = "forbid"
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index bd6dd160..98ba44ea 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -97,7 +97,7 @@ exceptions:
+ 
+   # ── cp-mod-search/radar.rs: numeric casts ────────────────────────────
+ 
+-  - path: "crates/cp-mod-search/src/radar.rs"
++  - path: "crates/cp-mod-search/src/radar/mod.rs"
+     match: "timestamp ms as f64 — decay math requires floating point"
+     reason: >
+       refresh_inner() casts u64 timestamps and log counts to f64 for
+@@ -106,19 +106,15 @@ exceptions:
+     strategy: >
+       Irreducible — f64 arithmetic is required for exponential decay.
+ 
+-  # ── render_input_blocks.rs: too_many_lines on render_input_blocks ────
+-
+-  - path: "src/modules/conversation/render_input_blocks.rs"
+-    match: "rendering pipeline with selection logic"
++  - path: "crates/cp-mod-search/src/radar/mod.rs"
++    match: "log number as f64 — decay math requires floating point"
+     reason: >
+-      render_input_blocks() is a single rendering pipeline that handles
+-      cursor insertion, paste sentinel expansion, selection highlighting,
+-      command hints, and line wrapping. Splitting it would scatter tightly
+-      coupled rendering logic across functions with no reuse benefit.
++      query_signal_results() casts the parsed log number and the current
++      log count to f64 for the per-hit exponential decay factor. Extracted
++      from refresh_inner during the cognitive_complexity split; the cast is
++      the same irreducible decay math.
+     strategy: >
+-      Could extract sub-phases into helper functions, but each phase
+-      depends on state from previous phases (byte offsets, selection range).
+-      The linear flow is clearer than scattered helpers.
++      Irreducible — f64 arithmetic is required for exponential decay.
+ 
+   # ── cp-base test functions: panic for clear assertion messages ────
+ 
+# --- End entry #39 ---

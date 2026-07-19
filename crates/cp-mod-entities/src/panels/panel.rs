@@ -176,6 +176,33 @@ fn build_context_text(es: &EntitiesState) -> String {
 // Populated blocks (IR rendering)
 // =============================================================================
 
+/// Build the display blocks for a single table (name + columns + foreign keys).
+fn table_blocks(table: &crate::types::TableInfo) -> Vec<Block> {
+    let mut blocks = vec![Block::Line(vec![
+        Span::styled(table.name.clone(), Semantic::Accent).bold(),
+        Span::new(format!(" ({} rows)", table.row_count)),
+    ])];
+
+    for col in &table.columns {
+        let pk_marker = if col.is_pk { " PK" } else { "" };
+        let nn_marker = if col.is_not_null { " NOT NULL" } else { "" };
+        blocks.push(Block::Line(vec![
+            Span::new(format!("  {} ", col.name)),
+            Span::styled(format!("{}{pk_marker}{nn_marker}", col.col_type), Semantic::Code),
+        ]));
+    }
+
+    for fk in &table.foreign_keys {
+        blocks.push(Block::Line(vec![Span::styled(
+            format!("  FK: {} → {}({})", fk.from_col, fk.to_table, fk.to_col),
+            Semantic::Muted,
+        )]));
+    }
+
+    blocks.push(Block::empty());
+    blocks
+}
+
 /// Blocks for a populated database.
 fn populated_blocks(es: &EntitiesState) -> Vec<Block> {
     let Some(cache) = &es.schema_cache else {
@@ -206,31 +233,7 @@ fn populated_blocks(es: &EntitiesState) -> Vec<Block> {
     }
 
     for table in &cache.tables {
-        // Table name + row count
-        blocks.push(Block::Line(vec![
-            Span::styled(table.name.clone(), Semantic::Accent).bold(),
-            Span::new(format!(" ({} rows)", table.row_count)),
-        ]));
-
-        // Columns
-        for col in &table.columns {
-            let pk_marker = if col.is_pk { " PK" } else { "" };
-            let nn_marker = if col.is_not_null { " NOT NULL" } else { "" };
-            blocks.push(Block::Line(vec![
-                Span::new(format!("  {} ", col.name)),
-                Span::styled(format!("{}{pk_marker}{nn_marker}", col.col_type), Semantic::Code),
-            ]));
-        }
-
-        // Foreign keys
-        for fk in &table.foreign_keys {
-            blocks.push(Block::Line(vec![Span::styled(
-                format!("  FK: {} → {}({})", fk.from_col, fk.to_table, fk.to_col),
-                Semantic::Muted,
-            )]));
-        }
-
-        blocks.push(Block::empty());
+        blocks.extend(table_blocks(table));
     }
 
     blocks

@@ -4,6 +4,41 @@ use crate::state::State;
 /// The ID of this tool - it cannot be disabled
 pub(crate) const MANAGE_TOOLS_ID: &str = "manage_tools";
 
+/// Apply one enable/disable change. Returns `Ok(msg)` on success (including
+/// no-op "already enabled") or `Err(msg)` on validation failure. `idx` is the
+/// zero-based change index (for human-readable error prefixes).
+fn apply_one_change(state: &mut State, change: &serde_json::Value, idx: usize) -> Result<String, String> {
+    let n = idx.saturating_add(1);
+    let Some(tool_name) = change.get("tool").and_then(serde_json::Value::as_str) else {
+        return Err(format!("Change {n}: missing 'tool'"));
+    };
+    let Some(action) = change.get("action").and_then(serde_json::Value::as_str) else {
+        return Err(format!("Change {n}: missing 'action'"));
+    };
+    if tool_name == MANAGE_TOOLS_ID && action == "disable" {
+        return Err(format!("Change {n}: cannot disable '{MANAGE_TOOLS_ID}'"));
+    }
+    if tool_name == "panel_goto_page" {
+        return Err(format!("Change {n}: '{tool_name}' is automatically managed (enabled when panels are paginated)"));
+    }
+    let Some(t) = state.tools.iter_mut().find(|t| t.id == tool_name) else {
+        return Err(format!("Change {n}: tool '{tool_name}' not found"));
+    };
+    match action {
+        "enable" if t.enabled => Ok(format!("'{tool_name}' already enabled")),
+        "enable" => {
+            t.enabled = true;
+            Ok(format!("enabled '{tool_name}'"))
+        }
+        "disable" if t.enabled => {
+            t.enabled = false;
+            Ok(format!("disabled '{tool_name}'"))
+        }
+        "disable" => Ok(format!("'{tool_name}' already disabled")),
+        _ => Err(format!("Change {n}: invalid action '{action}' (use 'enable' or 'disable')")),
+    }
+}
+
 /// Execute the `tool_manage` tool to enable or disable tools.
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(changes) = tool.input.get("changes").and_then(serde_json::Value::as_array) else {
@@ -18,64 +53,9 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut failures: Vec<String> = Vec::new();
 
     for (i, change) in changes.iter().enumerate() {
-        let Some(tool_name) = change.get("tool").and_then(serde_json::Value::as_str) else {
-            failures.push(format!("Change {}: missing 'tool'", i.saturating_add(1)));
-            continue;
-        };
-
-        let Some(action) = change.get("action").and_then(serde_json::Value::as_str) else {
-            failures.push(format!("Change {}: missing 'action'", i.saturating_add(1)));
-            continue;
-        };
-
-        // Cannot disable the manage_tools tool itself
-        if tool_name == MANAGE_TOOLS_ID && action == "disable" {
-            failures.push(format!("Change {}: cannot disable '{}'", i.saturating_add(1), MANAGE_TOOLS_ID));
-            continue;
-        }
-
-        // panel_goto_page is system-managed — cannot be manually toggled
-        if tool_name == "panel_goto_page" {
-            failures.push(format!(
-                "Change {}: '{}' is automatically managed (enabled when panels are paginated)",
-                i.saturating_add(1),
-                tool_name
-            ));
-            continue;
-        }
-
-        // Find the tool
-        let tool_entry = state.tools.iter_mut().find(|t| t.id == tool_name);
-
-        match tool_entry {
-            Some(t) => match action {
-                "enable" => {
-                    if t.enabled {
-                        successes.push(format!("'{tool_name}' already enabled"));
-                    } else {
-                        t.enabled = true;
-                        successes.push(format!("enabled '{tool_name}'"));
-                    }
-                }
-                "disable" => {
-                    if t.enabled {
-                        t.enabled = false;
-                        successes.push(format!("disabled '{tool_name}'"));
-                    } else {
-                        successes.push(format!("'{tool_name}' already disabled"));
-                    }
-                }
-                _ => {
-                    failures.push(format!(
-                        "Change {}: invalid action '{}' (use 'enable' or 'disable')",
-                        i.saturating_add(1),
-                        action
-                    ));
-                }
-            },
-            None => {
-                failures.push(format!("Change {}: tool '{}' not found", i.saturating_add(1), tool_name));
-            }
+        match apply_one_change(state, change, i) {
+            Ok(msg) => successes.push(msg),
+            Err(msg) => failures.push(msg),
         }
     }
 

@@ -14,12 +14,12 @@ mod panel;
 mod storage;
 /// Tool dispatch: upsert, toggle, open/close editor.
 pub mod tools;
-/// Upsert tool internals: create, update, delete callback definitions.
-mod tools_upsert;
 /// Glob matching and callback trigger on file edits.
 pub mod trigger;
 /// Callback state types: `CallbackDefinition`, `CallbackState`.
 pub mod types;
+/// Upsert tool internals: create, update, delete callback definitions.
+mod upsert;
 
 use serde_json::json;
 

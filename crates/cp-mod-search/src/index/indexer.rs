@@ -135,6 +135,39 @@ pub(crate) fn start(params: IndexerParams) -> Result<(mpsc::Sender<IndexerCmd>, 
 
 // -- Indexer loop ------------------------------------------------------------
 
+/// Collect a debounced batch: block on `first`, then drain more commands for
+/// up to [`DEBOUNCE_MS`]. Returns `None` if the channel disconnects mid-drain.
+fn collect_batch(rx: &mpsc::Receiver<IndexerCmd>, first: IndexerCmd) -> Option<Vec<IndexerCmd>> {
+    let mut batch = vec![first];
+    let deadline = Instant::now().checked_add(Duration::from_millis(DEBOUNCE_MS)).unwrap_or_else(Instant::now);
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        match rx.recv_timeout(remaining) {
+            Ok(cmd) => batch.push(cmd),
+            Err(mpsc::RecvTimeoutError::Timeout) => break,
+            Err(mpsc::RecvTimeoutError::Disconnected) => return None,
+        }
+    }
+    Some(batch)
+}
+
+/// Dispatch a single deduplicated command against the indexer context.
+fn dispatch_cmd(ctx: &mut IndexerCtx, cmd: IndexerCmd) {
+    match cmd {
+        IndexerCmd::IndexFile(path) => index_one_file(ctx, &path),
+        IndexerCmd::DeleteFile(path) => delete_one_file(ctx, &path),
+        IndexerCmd::ScanComplete => {
+            if let Ok(mut m) = ctx.metrics.lock() {
+                m.scan_complete = true;
+            }
+            log::info!("Initial project scan complete");
+        }
+    }
+}
+
 /// Main loop of the background indexer thread.
 ///
 /// Blocks on the receiver, debounces incoming events for 200 ms,
@@ -158,42 +191,12 @@ fn indexer_loop(rx: &mpsc::Receiver<IndexerCmd>, params: &IndexerParams) {
     };
 
     while let Ok(first) = rx.recv() {
-        let mut batch = vec![first];
-
-        // Debounce: collect more events for DEBOUNCE_MS
-        let deadline = Instant::now().checked_add(Duration::from_millis(DEBOUNCE_MS)).unwrap_or_else(Instant::now);
-        loop {
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            if remaining.is_zero() {
-                break;
-            }
-            match rx.recv_timeout(remaining) {
-                Ok(cmd) => {
-                    batch.push(cmd);
-                }
-                Err(mpsc::RecvTimeoutError::Timeout) => break,
-                Err(mpsc::RecvTimeoutError::Disconnected) => return,
-            }
-        }
-
+        let Some(batch) = collect_batch(rx, first) else {
+            return; // channel disconnected
+        };
         // Deduplicate: keep only the latest operation per path
-        let unique = deduplicate(batch);
-
-        for cmd in unique {
-            match cmd {
-                IndexerCmd::IndexFile(path) => {
-                    index_one_file(&mut ctx, &path);
-                }
-                IndexerCmd::DeleteFile(path) => {
-                    delete_one_file(&mut ctx, &path);
-                }
-                IndexerCmd::ScanComplete => {
-                    if let Ok(mut m) = ctx.metrics.lock() {
-                        m.scan_complete = true;
-                    }
-                    log::info!("Initial project scan complete");
-                }
-            }
+        for cmd in deduplicate(batch) {
+            dispatch_cmd(&mut ctx, cmd);
         }
     }
 }

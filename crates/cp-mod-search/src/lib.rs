@@ -29,7 +29,6 @@ use cp_base::state::runtime::State;
 use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
-use meili::api::MeiliClient;
 use types::{SearchPersistData, SearchState};
 
 /// Pre-start the global Meilisearch server for parallel boot.
@@ -83,6 +82,11 @@ pub fn project_hash(state: &State) -> Option<String> {
     }
     Some(ss.persist.project_hash.clone())
 }
+
+/// Connect to (or start) the global Meilisearch server and stamp the resolved
+/// port/master-key onto `persist`. Registers the project for orphan cleanup and
+/// prunes stale indexes. On failure, zeroes the port (keyword-less fallback).
+use index::boot::{bootstrap_server, compute_boot_plan, spawn_indexer_pipeline};
 
 /// Lazily-loaded tool description texts parsed from the YAML definition file.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
@@ -231,29 +235,8 @@ impl Module for SearchModule {
         let project_hash = meili::bootstrap::hash_project_path(&project_path);
         persist.project_hash.clone_from(&project_hash);
 
-        // Start or reconnect to the global Meilisearch server
-        match meili::server::ensure_server_running() {
-            Ok(info) => {
-                persist.port = info.port;
-                persist.master_key = info.master_key;
-                // Register this project for orphan cleanup
-                let _r = meili::server::register_project(&project_path, &project_hash);
-                // Clean up stale indexes from deleted projects
-                meili::server::cleanup_orphan_indexes(persist.port, &persist.master_key);
-            }
-            Err(e) => {
-                log::warn!("Meilisearch server not available: {e}");
-                persist.port = 0;
-                persist.master_key = String::new();
-            }
-        }
-
-        // Ensure indexes + embedders exist (idempotent)
-        if persist.port > 0
-            && let Err(e) = meili::bootstrap::ensure_indexes(persist.port, &persist.master_key, &persist.project_hash)
-        {
-            log::warn!("Failed to ensure Meilisearch indexes: {e}");
-        }
+        // Start/reconnect the server, ensure indexes exist (stamps port + key).
+        bootstrap_server(&mut persist, &project_path);
 
         let metrics = std::sync::Arc::new(std::sync::Mutex::new(types::SearchMetrics::default()));
 
@@ -273,61 +256,13 @@ impl Module for SearchModule {
             m.last_sent_ms.clone_from(&persist.last_sent_ms);
         }
 
-        // Compute the offline delta BEFORE the live watcher goes up, against a
-        // quiesced index (boot disk is stable). An empty index diffs to "index
-        // everything", so this subsumes the old cold-start full scan — one path.
-        let files_uid = format!("cp_{}_files", persist.project_hash);
-        let logs_uid = format!("cp_{}_logs", persist.project_hash);
-
         // Boot order (load-bearing): ensure_indexes → reimport-on-empty →
-        // reconcile → watcher. Reimport warms an EMPTY index straight from the
-        // in-folder backup (zero Voyage) so the reconcile that follows only
-        // re-embeds files that genuinely drifted since the backup.
-        if persist.port > 0
-            && let Ok(client) = MeiliClient::new(persist.port, &persist.master_key)
-        {
-            index::backup::maybe_reimport(&client, &files_uid, &logs_uid);
-        }
+        // reconcile → watcher. The plan is computed against a quiesced index
+        // BEFORE the live watcher goes up (boot disk is stable).
+        let reconcile_plan = compute_boot_plan(&persist, &project_path);
 
-        let reconcile_plan = if persist.port > 0 {
-            MeiliClient::new(persist.port, &persist.master_key)
-                .ok()
-                .and_then(|c| index::reconcile::compute_plan(&c, &files_uid, std::path::Path::new(&project_path)).ok())
-        } else {
-            None
-        };
-
-        // Start indexer + watcher. `skip_initial_scan` is now always true — the
-        // reconcile plan (queued just below) replaces the built-in scan.
-        let (indexer_tx, watcher) = if persist.port > 0 {
-            match index::indexer::start(index::indexer::IndexerParams {
-                port: persist.port,
-                master_key: persist.master_key.clone(),
-                project_hash: persist.project_hash.clone(),
-                project_root: std::path::PathBuf::from(&project_path),
-                metrics: std::sync::Arc::clone(&metrics),
-                skip_initial_scan: true,
-            }) {
-                Ok((tx, w)) => (Some(tx), Some(types::WatcherHandle::new(w))),
-                Err(e) => {
-                    log::warn!("Failed to start search indexer: {e}");
-                    (None, None)
-                }
-            }
-        } else {
-            (None, None)
-        };
-
-        // Inject the offline delta, then mark the scan complete.
-        if let Some(tx) = &indexer_tx {
-            if let Some(plan) = &reconcile_plan {
-                if !plan.is_empty() {
-                    log::info!("Reconcile: {} to (re)index, {} to delete", plan.to_index.len(), plan.to_delete.len());
-                }
-                index::reconcile::send_plan(plan, std::path::Path::new(&project_path), tx);
-            }
-            let _r = tx.send(types::IndexerCmd::ScanComplete);
-        }
+        // Start indexer + watcher, inject the offline delta, mark scan complete.
+        let (indexer_tx, watcher) = spawn_indexer_pipeline(&persist, &project_path, &metrics, reconcile_plan.as_ref());
 
         // Spawn the per-agent Meilisearch watchdog (only if the server is up).
         // It health-checks every few seconds and respawns the global server on

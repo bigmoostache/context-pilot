@@ -4,8 +4,8 @@ use cp_base::config::constants;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
-use crate::tools_upsert;
 use crate::types::CallbackState;
+use crate::upsert;
 
 /// Execute the `Callback_upsert` tool (create/update/delete callbacks).
 pub fn execute_upsert(tool: &ToolUse, state: &mut State) -> ToolResult {
@@ -18,9 +18,9 @@ pub fn execute_upsert(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     match action {
-        "create" => tools_upsert::execute_create(tool, state),
-        "update" => tools_upsert::execute_update(tool, state),
-        "delete" => tools_upsert::execute_delete(tool, state),
+        "create" => upsert::execute_create(tool, state),
+        "update" => upsert::execute_update(tool, state),
+        "delete" => upsert::execute_delete(tool, state),
         _ => ToolResult::new(
             tool.id.clone(),
             format!("Invalid action '{action}'. Use 'create', 'update', or 'delete'."),

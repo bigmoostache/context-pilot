@@ -6,11 +6,23 @@
 use cp_base::state::data::model_helpers::ModelPricing as _;
 use cp_render::{Align, Block, Cell, Column, ProgressSegment, Semantic, Span};
 
-use crate::modules::all_modules;
+use crate::modules::{Module, all_modules};
 use crate::state::{State, get_context_type_meta};
 use crate::ui::helpers::format_number as fmt_num;
 use cp_base::cast::Safe as _;
 use cp_mod_git::types::GitChangeType;
+
+/// Progress-bar color for current occupancy relative to the cleaning threshold:
+/// error at/over threshold, warning within 10% below, else accent.
+fn token_bar_semantic(total_tokens: usize, threshold: usize) -> Semantic {
+    if total_tokens >= threshold {
+        Semantic::Error
+    } else if total_tokens.to_f64() >= threshold.to_f64() * 0.9f64 {
+        Semantic::Warning
+    } else {
+        Semantic::Accent
+    }
+}
 
 /// TOKEN USAGE section: header, usage line, and progress bar.
 pub(super) fn token_usage_blocks(state: &State) -> Vec<Block> {
@@ -28,30 +40,18 @@ pub(super) fn token_usage_blocks(state: &State) -> Vec<Block> {
     out.push(Block::Header(vec![Span::styled("TOKEN USAGE".to_owned(), Semantic::Muted)]));
     out.push(Block::Empty);
 
-    let current = fmt_num(total_tokens);
-    let threshold_str = fmt_num(threshold);
-    let budget_str = fmt_num(budget);
     let pct = format!("{usage_pct:.1}%");
-
     out.push(Block::line(vec![
-        Span::new(format!(" {current}")).bold(),
+        Span::new(format!(" {}", fmt_num(total_tokens))).bold(),
         Span::muted(" / ".to_owned()),
-        Span::warning(threshold_str),
+        Span::warning(fmt_num(threshold)),
         Span::muted(" / ".to_owned()),
-        Span::accent(budget_str).bold(),
+        Span::accent(fmt_num(budget)).bold(),
         Span::muted(format!(" ({pct})")),
     ]));
 
-    // Progress bar with two segments: used + remaining
     let used_pct = usage_pct.round().to_u8();
-    let bar_semantic = if total_tokens >= threshold {
-        Semantic::Error
-    } else if total_tokens.to_f64() >= threshold.to_f64() * 0.9f64 {
-        Semantic::Warning
-    } else {
-        Semantic::Accent
-    };
-
+    let bar_semantic = token_bar_semantic(total_tokens, threshold);
     let threshold_pct = (state.cleaning_threshold * 100.0).round().to_u8();
     let label = format!("│ threshold {threshold_pct}%");
 
@@ -61,6 +61,54 @@ pub(super) fn token_usage_blocks(state: &State) -> Vec<Block> {
     });
 
     out
+}
+
+/// Semantic color for a signed net line-change count.
+const fn net_semantic(net: i32) -> Semantic {
+    match (net > 0i32, net < 0i32) {
+        (true, _) => Semantic::Success,
+        (_, true) => Semantic::Error,
+        _ => Semantic::Muted,
+    }
+}
+
+/// Format a signed net count (`+N` / `N`).
+fn net_str(net: i32) -> String {
+    if net > 0i32 { format!("+{net}") } else { format!("{net}") }
+}
+
+/// Build one file-change table row (path with type char, +adds, -dels, net).
+fn git_file_row(file: &cp_mod_git::types::GitFileChange) -> Vec<Cell> {
+    let net = file.additions.saturating_sub(file.deletions);
+    let type_char = match file.change_type {
+        GitChangeType::Added => "A",
+        GitChangeType::Untracked => "U",
+        GitChangeType::Deleted => "D",
+        GitChangeType::Modified => "M",
+        GitChangeType::Renamed => "R",
+    };
+    let display_path = if file.path.len() > 38 {
+        format!("{}...{}", type_char, file.path.get(file.path.len().saturating_sub(35)..).unwrap_or(""))
+    } else {
+        format!("{type_char} {}", file.path)
+    };
+    vec![
+        Cell::styled(display_path, Semantic::Default),
+        Cell::right(Span::success(format!("+{}", file.additions))),
+        Cell::right(Span::error(format!("-{}", file.deletions))),
+        Cell::right(Span::styled(net_str(net), net_semantic(net))),
+    ]
+}
+
+/// Build the totals footer row from cumulative add/del counts.
+fn git_total_row(total_add: i32, total_del: i32) -> Vec<Cell> {
+    let total_net = total_add.saturating_sub(total_del);
+    vec![
+        Cell::styled("Total".to_owned(), Semantic::Default),
+        Cell::right(Span::success(format!("+{total_add}"))),
+        Cell::right(Span::error(format!("-{total_del}"))),
+        Cell::right(Span::styled(net_str(total_net), net_semantic(total_net))),
+    ]
 }
 
 /// GIT section: branch + file changes table.
@@ -86,74 +134,112 @@ pub(super) fn git_blocks(state: &State) -> Vec<Block> {
 
     if gs.file_changes.is_empty() {
         out.push(Block::line(vec![Span::success(" Working tree clean".to_owned())]));
-    } else {
-        out.push(Block::Empty);
-
-        let columns = vec![
-            Column { header: "File".to_owned(), align: Align::Left },
-            Column { header: "+".to_owned(), align: Align::Right },
-            Column { header: "-".to_owned(), align: Align::Right },
-            Column { header: "Net".to_owned(), align: Align::Right },
-        ];
-
-        let mut total_add: i32 = 0;
-        let mut total_del: i32 = 0;
-
-        let mut rows: Vec<Vec<Cell>> = Vec::new();
-        for file in &gs.file_changes {
-            total_add = total_add.saturating_add(file.additions);
-            total_del = total_del.saturating_add(file.deletions);
-            let net = file.additions.saturating_sub(file.deletions);
-
-            let type_char = match file.change_type {
-                GitChangeType::Added => "A",
-                GitChangeType::Untracked => "U",
-                GitChangeType::Deleted => "D",
-                GitChangeType::Modified => "M",
-                GitChangeType::Renamed => "R",
-            };
-
-            let display_path = if file.path.len() > 38 {
-                format!("{}...{}", type_char, file.path.get(file.path.len().saturating_sub(35)..).unwrap_or(""))
-            } else {
-                format!("{type_char} {}", file.path)
-            };
-
-            let net_semantic = match net.cmp(&0i32) {
-                std::cmp::Ordering::Greater => Semantic::Success,
-                std::cmp::Ordering::Less => Semantic::Error,
-                std::cmp::Ordering::Equal => Semantic::Muted,
-            };
-            let net_str = if net > 0i32 { format!("+{net}") } else { format!("{net}") };
-
-            rows.push(vec![
-                Cell::styled(display_path, Semantic::Default),
-                Cell::right(Span::success(format!("+{}", file.additions))),
-                Cell::right(Span::error(format!("-{}", file.deletions))),
-                Cell::right(Span::styled(net_str, net_semantic)),
-            ]);
-        }
-
-        // Footer row (totals)
-        let total_net = total_add.saturating_sub(total_del);
-        let total_net_semantic = match total_net.cmp(&0i32) {
-            std::cmp::Ordering::Greater => Semantic::Success,
-            std::cmp::Ordering::Less => Semantic::Error,
-            std::cmp::Ordering::Equal => Semantic::Muted,
-        };
-        let total_net_str = if total_net > 0i32 { format!("+{total_net}") } else { format!("{total_net}") };
-
-        rows.push(vec![
-            Cell::styled("Total".to_owned(), Semantic::Default),
-            Cell::right(Span::success(format!("+{total_add}"))),
-            Cell::right(Span::error(format!("-{total_del}"))),
-            Cell::right(Span::styled(total_net_str, total_net_semantic)),
-        ]);
-
-        out.push(Block::Table { columns, rows });
+        return out;
     }
 
+    out.push(Block::Empty);
+    let columns = vec![
+        Column { header: "File".to_owned(), align: Align::Left },
+        Column { header: "+".to_owned(), align: Align::Right },
+        Column { header: "-".to_owned(), align: Align::Right },
+        Column { header: "Net".to_owned(), align: Align::Right },
+    ];
+
+    let mut total_add: i32 = 0;
+    let mut total_del: i32 = 0;
+    let mut rows: Vec<Vec<Cell>> = Vec::new();
+    for file in &gs.file_changes {
+        total_add = total_add.saturating_add(file.additions);
+        total_del = total_del.saturating_add(file.deletions);
+        rows.push(git_file_row(file));
+    }
+    rows.push(git_total_row(total_add, total_del));
+
+    out.push(Block::Table { columns, rows });
     out
+}
+
+/// The `(hit-string, semantic)` cell for a panel's cache status: served-from-
+/// cache tick, frozen (`n/max`), or a fresh miss.
+fn panel_hit_cell(ctx: &crate::state::Entry) -> (String, Semantic) {
+    if ctx.panel_cache_hit {
+        ("\u{2713}".to_owned(), Semantic::Success)
+    } else if ctx.freeze_count > 0 {
+        let panel = crate::app::panels::get_panel(&ctx.context_type);
+        (format!("\u{2717} ({}/{})", ctx.freeze_count, panel.max_freezes()), Semantic::Warning)
+    } else {
+        ("\u{2717}".to_owned(), Semantic::Error)
+    }
+}
+
+/// The human-readable "time ago" cell for a panel's last refresh (sentinel `—`
+/// for never-refreshed, `now` for future/equal timestamps).
+fn panel_refreshed_str(ctx: &crate::state::Entry, now_ms: u64) -> String {
+    if ctx.last_refresh_ms < 1_577_836_800_000 {
+        "—".to_owned()
+    } else if now_ms > ctx.last_refresh_ms {
+        crate::ui::helpers::format_time_ago(now_ms.saturating_sub(ctx.last_refresh_ms))
+    } else {
+        "now".to_owned()
+    }
+}
+
+/// Build one panel's 10-cell context-table row. `accumulated` is the running
+/// token total (already including this panel).
+fn panel_row_cells(
+    ctx: &crate::state::Entry,
+    accumulated: usize,
+    now_ms: u64,
+    modules: &[Box<dyn Module>],
+) -> Vec<Cell> {
+    let type_name =
+        get_context_type_meta(ctx.context_type.as_str()).map_or(ctx.context_type.as_str(), |m| m.display_name);
+
+    let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
+    let truncated_details = if details.len() > 30 {
+        format!("{}...", details.get(..details.floor_char_boundary(27)).unwrap_or(""))
+    } else {
+        details
+    };
+
+    let id_with_icon = format!("{}{}", ctx.context_type.icon(), ctx.id);
+    let cost_str = format!("${:.2}", ctx.panel_total_cost);
+    let (hit_str, hit_semantic) = panel_hit_cell(ctx);
+
+    let freeze_str = if ctx.total_freezes > 0 { format!("{}", ctx.total_freezes) } else { String::new() };
+    let freeze_semantic = if ctx.total_freezes > 0 { Semantic::AccentDim } else { Semantic::Muted };
+    let miss_str = if ctx.total_cache_misses > 0 { format!("{}", ctx.total_cache_misses) } else { String::new() };
+    let miss_semantic = if ctx.total_cache_misses > 0 { Semantic::Warning } else { Semantic::Muted };
+
+    vec![
+        Cell::styled(id_with_icon, Semantic::AccentDim),
+        Cell::styled(type_name.to_owned(), Semantic::Muted),
+        Cell::right(Span::accent(fmt_num(ctx.token_count))),
+        Cell::right(Span::muted(fmt_num(accumulated))),
+        Cell::right(Span::muted(cost_str)),
+        Cell::styled(hit_str, hit_semantic),
+        Cell::right(Span::styled(freeze_str, freeze_semantic)),
+        Cell::right(Span::styled(miss_str, miss_semantic)),
+        Cell::styled(panel_refreshed_str(ctx, now_ms), Semantic::Muted),
+        Cell::styled(truncated_details, Semantic::Muted),
+    ]
+}
+
+/// A fixed non-panel table row (system-prompt / tool-defs): id, label, token
+/// count, running accumulator, and em-dash placeholders for the cache columns.
+fn non_panel_row(label: String, tokens: usize, accumulated: usize) -> Vec<Cell> {
+    vec![
+        Cell::styled("--".to_owned(), Semantic::Muted),
+        Cell::styled(label, Semantic::Muted),
+        Cell::right(Span::accent(fmt_num(tokens))),
+        Cell::right(Span::muted(fmt_num(accumulated))),
+        Cell::styled("—".to_owned(), Semantic::Muted),
+        Cell::styled("—".to_owned(), Semantic::Muted),
+        Cell::right(Span::muted("—".to_owned())),
+        Cell::right(Span::muted("—".to_owned())),
+        Cell::styled("—".to_owned(), Semantic::Muted),
+        Cell::empty(),
+    ]
 }
 
 /// CONTEXT ELEMENTS section: big table of all panels with token/cache info.
@@ -179,105 +265,30 @@ pub(super) fn context_elements_blocks(state: &State) -> Vec<Block> {
     let mut accumulated = 0usize;
     let now_ms = crate::app::panels::now_ms();
     let modules = all_modules();
-
     let mut rows: Vec<Vec<Cell>> = Vec::new();
 
-    // System prompt entry
+    // System prompt entry (×2 — sent in system field + seed re-injection)
     let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
     let system_prompt_tokens = crate::state::estimate_tokens(&system_prompt).saturating_mul(2);
     accumulated = accumulated.saturating_add(system_prompt_tokens);
-    rows.push(vec![
-        Cell::styled("--".to_owned(), Semantic::Muted),
-        Cell::styled("system-prompt (×2)".to_owned(), Semantic::Muted),
-        Cell::right(Span::accent(fmt_num(system_prompt_tokens))),
-        Cell::right(Span::muted(fmt_num(accumulated))),
-        Cell::styled("—".to_owned(), Semantic::Muted),
-        Cell::styled("—".to_owned(), Semantic::Muted),
-        Cell::right(Span::muted("—".to_owned())),
-        Cell::right(Span::muted("—".to_owned())),
-        Cell::styled("—".to_owned(), Semantic::Muted),
-        Cell::empty(),
-    ]);
+    rows.push(non_panel_row("system-prompt (×2)".to_owned(), system_prompt_tokens, accumulated));
 
     // Tool definitions entry
     let tool_def_tokens = super::context::estimate_tool_definitions_tokens(state);
     let enabled_count = state.tools.iter().filter(|t| t.enabled).count();
     accumulated = accumulated.saturating_add(tool_def_tokens);
-    rows.push(vec![
-        Cell::styled("--".to_owned(), Semantic::Muted),
-        Cell::styled(format!("tool-defs ({enabled_count} enabled)"), Semantic::Muted),
-        Cell::right(Span::accent(fmt_num(tool_def_tokens))),
-        Cell::right(Span::muted(fmt_num(accumulated))),
-        Cell::styled("—".to_owned(), Semantic::Muted),
-        Cell::styled("—".to_owned(), Semantic::Muted),
-        Cell::right(Span::muted("—".to_owned())),
-        Cell::right(Span::muted("—".to_owned())),
-        Cell::styled("—".to_owned(), Semantic::Muted),
-        Cell::empty(),
-    ]);
+    rows.push(non_panel_row(format!("tool-defs ({enabled_count} enabled)"), tool_def_tokens, accumulated));
 
     // Panels sorted by last_refresh_ms, conversation forced to end
     let mut sorted_contexts: Vec<&crate::state::Entry> = state.context.iter().collect();
     sorted_contexts.sort_by_key(|ctx| ctx.last_refresh_ms);
-
     let (mut panels, mut conversation): (Vec<_>, Vec<_>) =
         sorted_contexts.into_iter().partition(|ctx| ctx.id != "chat");
     panels.append(&mut conversation);
 
     for ctx in &panels {
-        let type_name =
-            get_context_type_meta(ctx.context_type.as_str()).map_or(ctx.context_type.as_str(), |m| m.display_name);
-
-        let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
-
-        let truncated_details = if details.len() > 30 {
-            format!("{}...", details.get(..details.floor_char_boundary(27)).unwrap_or(""))
-        } else {
-            details
-        };
-
-        let refreshed = if ctx.last_refresh_ms < 1_577_836_800_000 {
-            "—".to_owned()
-        } else if now_ms > ctx.last_refresh_ms {
-            crate::ui::helpers::format_time_ago(now_ms.saturating_sub(ctx.last_refresh_ms))
-        } else {
-            "now".to_owned()
-        };
-
-        let icon = ctx.context_type.icon();
-        let id_with_icon = format!("{icon}{}", ctx.id);
-
-        let cost_str = format!("${:.2}", ctx.panel_total_cost);
-        let (hit_str, hit_semantic) = if ctx.panel_cache_hit {
-            ("\u{2713}".to_owned(), Semantic::Success)
-        } else if ctx.freeze_count > 0 {
-            let panel = crate::app::panels::get_panel(&ctx.context_type);
-            let max = panel.max_freezes();
-            (format!("\u{2717} ({}/{})", ctx.freeze_count, max), Semantic::Warning)
-        } else {
-            ("\u{2717}".to_owned(), Semantic::Error)
-        };
-
-        let freeze_str = if ctx.total_freezes > 0 { format!("{}", ctx.total_freezes) } else { String::new() };
-        let freeze_semantic = if ctx.total_freezes > 0 { Semantic::AccentDim } else { Semantic::Muted };
-
-        let miss_str = if ctx.total_cache_misses > 0 { format!("{}", ctx.total_cache_misses) } else { String::new() };
-        let miss_semantic = if ctx.total_cache_misses > 0 { Semantic::Warning } else { Semantic::Muted };
-
         accumulated = accumulated.saturating_add(ctx.token_count);
-
-        rows.push(vec![
-            Cell::styled(id_with_icon, Semantic::AccentDim),
-            Cell::styled(type_name.to_owned(), Semantic::Muted),
-            Cell::right(Span::accent(fmt_num(ctx.token_count))),
-            Cell::right(Span::muted(fmt_num(accumulated))),
-            Cell::right(Span::muted(cost_str)),
-            Cell::styled(hit_str, hit_semantic),
-            Cell::right(Span::styled(freeze_str, freeze_semantic)),
-            Cell::right(Span::styled(miss_str, miss_semantic)),
-            Cell::styled(refreshed, Semantic::Muted),
-            Cell::styled(truncated_details, Semantic::Muted),
-        ]);
+        rows.push(panel_row_cells(ctx, accumulated, now_ms, &modules));
     }
 
     out.push(Block::Table { columns, rows });

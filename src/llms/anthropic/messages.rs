@@ -30,62 +30,81 @@ pub(in crate::llms) fn messages_to_api(
     }
 
     for (idx, msg) in messages.iter().enumerate() {
-        if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
-            continue;
-        }
-
-        if msg.content.is_empty() && msg.tool_uses.is_empty() && msg.tool_results.is_empty() {
-            continue;
-        }
-
-        let mut content_blocks: Vec<ContentBlock> = Vec::new();
-
-        if msg.msg_type == MsgKind::ToolResult {
-            for result in &msg.tool_results {
-                content_blocks.push(ContentBlock::ToolResult {
-                    tool_use_id: result.tool_use_id.clone(),
-                    content: result.content.clone(),
-                });
-            }
-            if !content_blocks.is_empty() {
-                api_messages.push(ApiMessage { role: "user".to_owned(), content: content_blocks });
-            }
-            continue;
-        }
-
-        if msg.msg_type == MsgKind::ToolCall {
-            if let Some(blocks) = build_tool_call_blocks(msg, messages, idx) {
-                if let Some(last_api_msg) = api_messages.last_mut()
-                    && last_api_msg.role == "assistant"
-                {
-                    last_api_msg.content.extend(blocks);
-                    continue;
-                }
-                content_blocks = blocks;
-            } else {
-                continue;
-            }
-        } else {
-            let message_content = msg.content.clone();
-
-            if !message_content.is_empty() {
-                content_blocks.push(ContentBlock::Text { text: message_content });
-            }
-
-            let is_last = idx == messages.len().saturating_sub(1);
-            if msg.role == "assistant" && include_last_tool_uses && is_last && !msg.tool_uses.is_empty() {
-                for tool_use in &msg.tool_uses {
-                    content_blocks.push(tool_use_block(tool_use));
-                }
-            }
-        }
-
-        if !content_blocks.is_empty() {
-            api_messages.push(ApiMessage { role: msg.role.clone(), content: content_blocks });
-        }
+        push_converted_message(&mut api_messages, msg, &MsgConvertCtx { all: messages, idx, include_last_tool_uses });
     }
 
     api_messages
+}
+
+/// Positional context for converting one message: the full slice, this
+/// message's index, and whether the last assistant turn's tool uses ship.
+struct MsgConvertCtx<'ctx> {
+    /// Full message slice (for tool-call/result pairing lookups).
+    all: &'ctx [Message],
+    /// Index of the message being converted.
+    idx: usize,
+    /// Whether the last assistant message's `tool_uses` are emitted.
+    include_last_tool_uses: bool,
+}
+
+/// Convert one internal message and push the resulting `ApiMessage`(s), or merge
+/// tool-call blocks into a trailing assistant message. No-op for deleted /
+/// detached / fully-empty messages.
+fn push_converted_message(api_messages: &mut Vec<ApiMessage>, msg: &Message, ctx: &MsgConvertCtx<'_>) {
+    if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
+        return;
+    }
+    if msg.content.is_empty() && msg.tool_uses.is_empty() && msg.tool_results.is_empty() {
+        return;
+    }
+
+    if msg.msg_type == MsgKind::ToolResult {
+        let blocks: Vec<ContentBlock> = msg
+            .tool_results
+            .iter()
+            .map(|result| ContentBlock::ToolResult {
+                tool_use_id: result.tool_use_id.clone(),
+                content: result.content.clone(),
+            })
+            .collect();
+        if !blocks.is_empty() {
+            api_messages.push(ApiMessage { role: "user".to_owned(), content: blocks });
+        }
+        return;
+    }
+
+    let content_blocks = if msg.msg_type == MsgKind::ToolCall {
+        let Some(blocks) = build_tool_call_blocks(msg, ctx.all, ctx.idx) else { return };
+        if let Some(last_api_msg) = api_messages.last_mut()
+            && last_api_msg.role == "assistant"
+        {
+            last_api_msg.content.extend(blocks);
+            return;
+        }
+        blocks
+    } else {
+        build_text_message_blocks(msg, ctx)
+    };
+
+    if !content_blocks.is_empty() {
+        api_messages.push(ApiMessage { role: msg.role.clone(), content: content_blocks });
+    }
+}
+
+/// Build the content blocks for a plain text message: its text plus, for the
+/// last assistant turn when requested, its tool-use blocks.
+fn build_text_message_blocks(msg: &Message, ctx: &MsgConvertCtx<'_>) -> Vec<ContentBlock> {
+    let mut content_blocks: Vec<ContentBlock> = Vec::new();
+    if !msg.content.is_empty() {
+        content_blocks.push(ContentBlock::Text { text: msg.content.clone() });
+    }
+    let is_last = ctx.idx == ctx.all.len().saturating_sub(1);
+    if msg.role == "assistant" && ctx.include_last_tool_uses && is_last && !msg.tool_uses.is_empty() {
+        for tool_use in &msg.tool_uses {
+            content_blocks.push(tool_use_block(tool_use));
+        }
+    }
+    content_blocks
 }
 
 /// Context needed for panel injection into the prompt.
@@ -182,16 +201,4 @@ fn build_tool_call_blocks(msg: &Message, messages: &[Message], idx: usize) -> Op
 fn tool_use_block(tool_use: &crate::state::ToolUseRecord) -> ContentBlock {
     let input = if tool_use.input.is_null() { Value::Object(serde_json::Map::new()) } else { tool_use.input.clone() };
     ContentBlock::ToolUse { id: tool_use.id.clone(), name: tool_use.name.clone(), input }
-}
-
-/// Log an SSE error event to `.context-pilot/errors/` for post-mortem debugging.
-/// Appends to `sse_errors.log` so multiple occurrences are visible.
-pub(in crate::llms) fn log_sse_error(json_str: &str, total_bytes: usize, line_count: usize, last_lines: &[String]) {
-    crate::llms::log_sse_error(&crate::llms::SseErrorContext {
-        provider: "anthropic",
-        json_str,
-        total_bytes,
-        line_count,
-        last_lines,
-    });
 }

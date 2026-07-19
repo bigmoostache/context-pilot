@@ -156,6 +156,28 @@ pub(crate) fn checkpoint(conn: &Connection) {
 // Dump to file
 // =============================================================================
 
+/// Build the schema (`CREATE TABLE IF NOT EXISTS …`) and data
+/// (`INSERT OR IGNORE …`) bodies for every table, returned as `(schema, data)`.
+fn build_table_bodies(conn: &Connection, table_names: &[String]) -> (String, String) {
+    let mut schema = String::new();
+    let mut data = String::new();
+    for table in table_names {
+        if let Some(create_sql) = table_create_sql(conn, table) {
+            schema.push_str(&make_if_not_exists(&create_sql));
+            schema.push_str(";\n\n");
+        }
+        let row_inserts = table_insert_statements(conn, table);
+        for insert in &row_inserts {
+            data.push_str(insert);
+            data.push('\n');
+        }
+        if !row_inserts.is_empty() {
+            data.push('\n');
+        }
+    }
+    (schema, data)
+}
+
 /// Dump the full schema + data to a SQL file for recovery.
 ///
 /// Generates `CREATE TABLE IF NOT EXISTS` + `INSERT OR IGNORE` for all tables
@@ -172,27 +194,8 @@ pub(crate) fn dump_to_file(conn: &Connection, dump_path: &Path) -> Result<(), St
 
     // Get ALL tables (including _meta, but not sqlite_%)
     let table_names = all_table_names(conn);
-    let mut data_lines = String::new();
-    let mut data_too_large = false;
-
-    for table in &table_names {
-        // Schema: get original CREATE statement and make it IF NOT EXISTS
-        if let Some(create_sql) = table_create_sql(conn, table) {
-            let idempotent = make_if_not_exists(&create_sql);
-            output.push_str(&idempotent);
-            output.push_str(";\n\n");
-        }
-
-        // Data: INSERT OR IGNORE for each row
-        let row_inserts = table_insert_statements(conn, table);
-        for insert in &row_inserts {
-            data_lines.push_str(insert);
-            data_lines.push('\n');
-        }
-        if !row_inserts.is_empty() {
-            data_lines.push('\n');
-        }
-    }
+    let (schema_body, data_lines) = build_table_bodies(conn, &table_names);
+    output.push_str(&schema_body);
 
     // Non-table objects: views, triggers, user-created indexes
     let non_table_stmts = non_table_create_statements(conn);
@@ -206,10 +209,7 @@ pub(crate) fn dump_to_file(conn: &Connection, dump_path: &Path) -> Result<(), St
     if total_size > 0x10_0000 {
         output.push_str("-- WARNING: Data exceeds 1 MB cap. INSERT statements omitted.\n");
         output.push_str("-- Only schema is preserved. Re-populate data manually.\n\n");
-        data_too_large = true;
-    }
-
-    if !data_too_large {
+    } else {
         output.push_str(&data_lines);
     }
 

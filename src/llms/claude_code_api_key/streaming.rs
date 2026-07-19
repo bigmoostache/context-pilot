@@ -79,6 +79,183 @@ pub(crate) struct StreamUsage {
 /// Parsed SSE stream result: (`input_tokens`, `output_tokens`, `cache_hit`, `cache_miss`, `stop_reason`).
 pub(crate) type SseStreamResult = (usize, usize, usize, usize, Option<String>);
 
+/// Mutable state accumulated while consuming a Claude SSE stream.
+#[derive(Default)]
+struct SseState {
+    /// Prompt (input) tokens reported by usage frames.
+    input_tokens: usize,
+    /// Completion (output) tokens reported by usage frames.
+    output_tokens: usize,
+    /// Prompt tokens served from cache.
+    cache_hit_tokens: usize,
+    /// Prompt tokens that missed the cache (fresh cache writes).
+    cache_miss_tokens: usize,
+    /// In-flight tool call: `(id, name, partial_input_json)`.
+    current_tool: Option<(String, String, String)>,
+    /// Normalized stop reason from the terminal `message_delta`.
+    stop_reason: Option<String>,
+}
+
+/// Handle a `content_block_delta` event: stream text chunks or accumulate
+/// partial tool-input JSON (emitting tool progress as it grows).
+fn handle_block_delta(delta: StreamDelta, tx: &Sender<StreamEvent>, st: &mut SseState) {
+    match delta.delta_type.as_deref() {
+        Some("text_delta") => {
+            if let Some(text) = delta.text {
+                let _r = tx.send(StreamEvent::Chunk(text));
+            }
+        }
+        Some("input_json_delta") => {
+            if let Some(json) = delta.partial_json
+                && let Some((_, name, input)) = st.current_tool.as_mut()
+            {
+                input.push_str(&json);
+                let _r = tx.send(StreamEvent::ToolProgress { name: name.clone(), input_so_far: input.clone() });
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Fold a `message_start` usage frame (input + cache token counts) into `st`.
+const fn handle_message_start(msg_body: StreamMessageBody, st: &mut SseState) {
+    let Some(usage) = msg_body.usage else { return };
+    if let Some(hit) = usage.cache_read {
+        st.cache_hit_tokens = hit;
+    }
+    if let Some(miss) = usage.cache_creation {
+        st.cache_miss_tokens = miss;
+    }
+    if let Some(inp) = usage.input {
+        st.input_tokens = inp;
+    }
+}
+
+/// Fold a `message_delta` event (stop reason + running token usage) into `st`.
+fn handle_message_delta(event: &StreamMessage, st: &mut SseState) {
+    if let Some(delta) = &event.delta
+        && let Some(reason) = &delta.stop_reason
+    {
+        st.stop_reason = Some(reason.clone());
+    }
+    if let Some(usage) = &event.usage {
+        if let Some(inp) = usage.input {
+            st.input_tokens = inp;
+        }
+        if let Some(out) = usage.output {
+            st.output_tokens = out;
+        }
+    }
+}
+
+/// Dispatch one parsed SSE event. Returns `true` when the stream should stop
+/// (`message_stop` or a logged `error` event).
+fn handle_sse_event(event: StreamMessage, tx: &Sender<StreamEvent>, st: &mut SseState, ctx: &SseErrorCtx<'_>) -> bool {
+    match event.event_type.as_str() {
+        "content_block_start" => {
+            if let Some(block) = event.content_block
+                && block.block_type.as_deref() == Some("tool_use")
+            {
+                let name = block.name.unwrap_or_default();
+                let _r = tx.send(StreamEvent::ToolProgress { name: name.clone(), input_so_far: String::new() });
+                st.current_tool = Some((block.id.unwrap_or_default(), name, String::new()));
+            }
+            false
+        }
+        "content_block_delta" => {
+            if let Some(delta) = event.delta {
+                handle_block_delta(delta, tx, st);
+            }
+            false
+        }
+        "content_block_stop" => {
+            if let Some((id, name, input_json)) = st.current_tool.take() {
+                let input: Value =
+                    serde_json::from_str(&input_json).unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
+                let _r = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
+            }
+            false
+        }
+        "message_start" => {
+            if let Some(msg_body) = event.message {
+                handle_message_start(msg_body, st);
+            }
+            false
+        }
+        "message_delta" => {
+            handle_message_delta(&event, st);
+            false
+        }
+        "message_stop" => true,
+        "error" => {
+            log_sse_error(ctx.json_str, ctx.total_bytes, ctx.line_count, ctx.last_lines);
+            true
+        }
+        _ => false,
+    }
+}
+
+/// Fields needed to log a raw SSE `error` event for post-mortem.
+struct SseErrorCtx<'ctx> {
+    /// Raw JSON payload of the error event.
+    json_str: &'ctx str,
+    /// Total bytes read from the stream so far.
+    total_bytes: usize,
+    /// Number of SSE lines read so far.
+    line_count: usize,
+    /// Last few SSE data lines, for context.
+    last_lines: &'ctx [String],
+}
+
+/// Context for building the verbose SSE stream-read error message.
+struct ReadErrorCtx<'ctx> {
+    /// In-flight tool call at the time of failure, if any.
+    current_tool: Option<&'ctx (String, String, String)>,
+    /// Total bytes read from the stream so far.
+    total_bytes: usize,
+    /// Number of SSE lines read so far.
+    line_count: usize,
+    /// Raw HTTP response headers, for post-mortem.
+    resp_headers: &'ctx str,
+    /// Last few SSE data lines, for context.
+    last_lines: &'ctx [String],
+}
+
+/// Build the verbose stream-read error string (error kind, root cause, position,
+/// in-flight tool, response headers, last SSE lines).
+fn build_read_error(e: &std::io::Error, ctx: &ReadErrorCtx<'_>) -> String {
+    let error_kind = format!("{:?}", e.kind());
+    let mut root_cause = String::new();
+    let mut source: Option<&dyn std::error::Error> = std::error::Error::source(e);
+    while let Some(s) = source {
+        root_cause = format!("{s}");
+        source = std::error::Error::source(s);
+    }
+    let tool_ctx = match ctx.current_tool {
+        Some((id, name, partial)) => {
+            format!("In-flight tool: {} (id={}), partial input: {} bytes", name, id, partial.len())
+        }
+        None => "No tool in progress".to_owned(),
+    };
+    let recent = if ctx.last_lines.is_empty() { "(no lines read)".to_owned() } else { ctx.last_lines.join("\n") };
+    format!(
+        "{}\n\
+         Error kind: {} | Root cause: {}\n\
+         Stream position: {} bytes, {} lines read\n\
+         {}\n\
+         Response headers:\n{}\n\
+         Last SSE lines:\n{}",
+        e,
+        error_kind,
+        if root_cause.is_empty() { "(none)".to_owned() } else { root_cause },
+        ctx.total_bytes,
+        ctx.line_count,
+        tool_ctx,
+        ctx.resp_headers,
+        recent
+    )
+}
+
 /// Parse an SSE stream from a Claude API response, sending events to the channel.
 /// Returns (`input_tokens`, `output_tokens`, `cache_hit_tokens`, `cache_miss_tokens`, `stop_reason`).
 pub(crate) fn parse_sse_stream(
@@ -87,12 +264,7 @@ pub(crate) fn parse_sse_stream(
     tx: &Sender<StreamEvent>,
 ) -> Result<SseStreamResult, LlmError> {
     let mut reader = BufReader::new(response);
-    let mut input_tokens = 0;
-    let mut output_tokens = 0;
-    let mut cache_hit_tokens = 0;
-    let mut cache_miss_tokens = 0;
-    let mut current_tool: Option<(String, String, String)> = None;
-    let mut stop_reason: Option<String> = None;
+    let mut st = SseState::default();
     let mut total_bytes: usize = 0;
     let mut line_count: usize = 0;
     let mut last_lines: Vec<String> = Vec::new();
@@ -106,35 +278,15 @@ pub(crate) fn parse_sse_stream(
                 line_count = line_count.saturating_add(1);
             }
             Err(e) => {
-                let error_kind = format!("{:?}", e.kind());
-                let mut root_cause = String::new();
-                let mut source: Option<&dyn std::error::Error> = std::error::Error::source(&e);
-                while let Some(s) = source {
-                    root_cause = format!("{s}");
-                    source = std::error::Error::source(s);
-                }
-                let tool_ctx = match &current_tool {
-                    Some((id, name, partial)) => {
-                        format!("In-flight tool: {} (id={}), partial input: {} bytes", name, id, partial.len())
-                    }
-                    None => "No tool in progress".to_owned(),
-                };
-                let recent = if last_lines.is_empty() { "(no lines read)".to_owned() } else { last_lines.join("\n") };
-                let verbose = format!(
-                    "{}\n\
-                     Error kind: {} | Root cause: {}\n\
-                     Stream position: {} bytes, {} lines read\n\
-                     {}\n\
-                     Response headers:\n{}\n\
-                     Last SSE lines:\n{}",
-                    e,
-                    error_kind,
-                    if root_cause.is_empty() { "(none)".to_owned() } else { root_cause },
-                    total_bytes,
-                    line_count,
-                    tool_ctx,
-                    resp_headers,
-                    recent
+                let verbose = build_read_error(
+                    &e,
+                    &ReadErrorCtx {
+                        current_tool: st.current_tool.as_ref(),
+                        total_bytes,
+                        line_count,
+                        resp_headers,
+                        last_lines: &last_lines,
+                    },
                 );
                 return Err(LlmError::StreamRead(verbose));
             }
@@ -156,90 +308,14 @@ pub(crate) fn parse_sse_stream(
         }
 
         if let Ok(event) = serde_json::from_str::<StreamMessage>(json_str) {
-            match event.event_type.as_str() {
-                "content_block_start" => {
-                    if let Some(block) = event.content_block
-                        && block.block_type.as_deref() == Some("tool_use")
-                    {
-                        let name = block.name.unwrap_or_default();
-                        let _r = tx.send(StreamEvent::ToolProgress { name: name.clone(), input_so_far: String::new() });
-                        current_tool = Some((block.id.unwrap_or_default(), name, String::new()));
-                    }
-                }
-                "content_block_delta" => {
-                    if let Some(delta) = event.delta {
-                        match delta.delta_type.as_deref() {
-                            Some("text_delta") => {
-                                if let Some(text) = delta.text {
-                                    let _r = tx.send(StreamEvent::Chunk(text));
-                                }
-                            }
-                            Some("input_json_delta") => {
-                                if let Some(json) = delta.partial_json
-                                    && let Some((_, name, input)) = current_tool.as_mut()
-                                {
-                                    input.push_str(&json);
-                                    let _r = tx.send(StreamEvent::ToolProgress {
-                                        name: name.clone(),
-                                        input_so_far: input.clone(),
-                                    });
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                "content_block_stop" => {
-                    if let Some((id, name, input_json)) = current_tool.take() {
-                        let input: Value =
-                            serde_json::from_str(&input_json).unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
-                        let _r = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
-                    }
-                }
-                "message_start" => {
-                    if let Some(msg_body) = event.message
-                        && let Some(usage) = msg_body.usage
-                    {
-                        if let Some(hit) = usage.cache_read {
-                            cache_hit_tokens = hit;
-                        }
-                        if let Some(miss) = usage.cache_creation {
-                            cache_miss_tokens = miss;
-                        }
-                        if let Some(inp) = usage.input {
-                            input_tokens = inp;
-                        }
-                    }
-                }
-                "message_delta" => {
-                    if let Some(delta) = &event.delta
-                        && let Some(reason) = &delta.stop_reason
-                    {
-                        stop_reason = Some(reason.clone());
-                    }
-                    if let Some(usage) = event.usage {
-                        if let Some(inp) = usage.input {
-                            input_tokens = inp;
-                        }
-                        if let Some(out) = usage.output {
-                            output_tokens = out;
-                        }
-                    }
-                }
-                "message_stop" => break,
-                "error" => {
-                    // Log the raw SSE error event to disk for debugging.
-                    // Don't alter the return flow — caller still gets Ok(...)
-                    // so StreamEvent::Done fires as before, but now we have a trace.
-                    log_sse_error(json_str, total_bytes, line_count, &last_lines);
-                    break;
-                }
-                _ => {}
+            let ctx = SseErrorCtx { json_str, total_bytes, line_count, last_lines: &last_lines };
+            if handle_sse_event(event, tx, &mut st, &ctx) {
+                break;
             }
         }
     }
 
-    Ok((input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason))
+    Ok((st.input_tokens, st.output_tokens, st.cache_hit_tokens, st.cache_miss_tokens, st.stop_reason))
 }
 
 /// Log an SSE error event to `.context-pilot/errors/` for post-mortem debugging.

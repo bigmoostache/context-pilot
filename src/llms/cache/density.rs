@@ -118,21 +118,30 @@ impl ConversationTailDensity {
 
         let mut block_offset = 0usize;
         for (msg_idx, msg) in api_messages.iter().enumerate() {
-            let is_user = msg.role == "user";
-            let is_last_user = last_user_msg_idx == Some(msg_idx);
-            let is_panel_user = is_user && Self::is_panel_message(msg);
-
-            for blk_idx in 0..msg.content.len() {
-                let global_idx = block_offset.saturating_add(blk_idx);
-                if let Some(slot) = hot_blocks.get_mut(global_idx) {
-                    // Hot if: panel user-side block OR last user message in conversation
-                    *slot = is_panel_user || is_last_user;
-                }
-            }
+            let is_hot = Self::message_is_hot(msg, msg_idx, last_user_msg_idx);
+            Self::mark_blocks(&mut hot_blocks, block_offset, msg.content.len(), is_hot);
             block_offset = block_offset.saturating_add(msg.content.len());
         }
 
         Self { hot_blocks }
+    }
+
+    /// Whether every block of `msg` is hot: a panel user-side block, or the last
+    /// user message in the conversation.
+    fn message_is_hot(msg: &ApiMessage, msg_idx: usize, last_user_msg_idx: Option<usize>) -> bool {
+        let is_user = msg.role == "user";
+        let is_last_user = last_user_msg_idx == Some(msg_idx);
+        let is_panel_user = is_user && Self::is_panel_message(msg);
+        is_panel_user || is_last_user
+    }
+
+    /// Set `hot_blocks[offset..offset+len]` to `hot`.
+    fn mark_blocks(hot_blocks: &mut [bool], offset: usize, len: usize, hot: bool) {
+        for blk_idx in 0..len {
+            if let Some(slot) = hot_blocks.get_mut(offset.saturating_add(blk_idx)) {
+                *slot = hot;
+            }
+        }
     }
 
     /// Check if a user message is a panel injection (contains `ToolResult` with `panel_*` id).
@@ -271,31 +280,28 @@ impl DensityKind {
 mod tests {
     use super::*;
 
+    /// Assert every weight is non-negative and finite.
+    fn assert_weights_valid(density: &dyn DivergenceDensity, weights: &[f64]) {
+        for (idx, &w_val) in weights.iter().enumerate() {
+            assert!(w_val >= 0.0f64, "{density:?}: weight[{idx}] = {w_val} is negative");
+            assert!(w_val.is_finite(), "{density:?}: weight[{idx}] = {w_val} is not finite");
+        }
+    }
+
+    /// Assert the weights sum to a positive value that normalizes to ≈ 1.0.
+    fn assert_weights_normalizable(density: &dyn DivergenceDensity, weights: &[f64]) {
+        let total: f64 = weights.iter().sum();
+        assert!(total > 0.0f64, "{density:?}: total weight {total} is not positive");
+        let norm_sum: f64 = weights.iter().map(|&w_val| w_val / total).sum();
+        assert!((norm_sum - 1.0).abs() < 1e-10f64, "{density:?}: normalized sum {norm_sum} != 1.0");
+    }
+
     /// Validate fundamental properties that ALL densities must satisfy.
     fn assert_density_properties(density: &dyn DivergenceDensity, num_blocks: usize) {
         let weights = density.weights(num_blocks);
-
-        // Correct length
         assert_eq!(weights.len(), num_blocks, "{density:?}: expected {num_blocks} weights, got {}", weights.len());
-
-        // All non-negative
-        for (idx, &w_val) in weights.iter().enumerate() {
-            assert!(w_val >= 0.0f64, "{density:?}: weight[{idx}] = {w_val} is negative");
-        }
-
-        // All finite
-        for (idx, &w_val) in weights.iter().enumerate() {
-            assert!(w_val.is_finite(), "{density:?}: weight[{idx}] = {w_val} is not finite");
-        }
-
-        // Sum is positive (normalizable)
-        let total: f64 = weights.iter().sum();
-        assert!(total > 0.0f64, "{density:?}: total weight {total} is not positive");
-
-        // Normalized sum ≈ 1.0
-        let normalized: Vec<f64> = weights.iter().map(|&w_val| w_val / total).collect();
-        let norm_sum: f64 = normalized.iter().sum();
-        assert!((norm_sum - 1.0).abs() < 1e-10f64, "{density:?}: normalized sum {norm_sum} != 1.0");
+        assert_weights_valid(density, &weights);
+        assert_weights_normalizable(density, &weights);
     }
 
     // ── Property tests for all densities ────────────────────────────────

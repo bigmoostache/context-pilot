@@ -10,6 +10,46 @@ use crate::types::{MemoryImportance, MemoryState};
 use cp_base::panels::scroll_key_action;
 use std::fmt::Write as _;
 
+/// Importance sort key (critical first).
+const fn importance_rank(imp: MemoryImportance) -> i32 {
+    match imp {
+        MemoryImportance::Critical => 0i32,
+        MemoryImportance::High => 1i32,
+        MemoryImportance::Medium => 2i32,
+        MemoryImportance::Low => 3i32,
+    }
+}
+
+/// Push the rendered blocks for one memory item (header + key/values +
+/// optional contents body) onto `blocks`.
+fn push_memory_blocks(blocks: &mut Vec<cp_render::Block>, memory: &crate::types::MemoryItem) {
+    use cp_render::{Block, Semantic, Span as S};
+
+    let imp_sem = match memory.importance {
+        MemoryImportance::Critical => Semantic::Warning,
+        MemoryImportance::High => Semantic::Accent,
+        MemoryImportance::Medium => Semantic::Code,
+        MemoryImportance::Low => Semantic::Muted,
+    };
+    blocks.push(Block::Line(vec![S::new(" ".into()), S::accent(format!("{}:", memory.id)).bold()]));
+    blocks.push(Block::KeyValue(vec![
+        (vec![S::muted("   tl_dr: ".into())], vec![S::new(memory.tl_dr.clone())]),
+        (vec![S::muted("   importance: ".into())], vec![S::styled(memory.importance.as_str().into(), imp_sem)]),
+    ]));
+    if !memory.labels.is_empty() {
+        blocks.push(Block::KeyValue(vec![(
+            vec![S::muted("   labels: ".into())],
+            vec![S::styled(format!("[{}]", memory.labels.join(", ")), Semantic::Code)],
+        )]));
+    }
+    if !memory.contents.is_empty() {
+        blocks.push(Block::Line(vec![S::muted("   contents: |".into())]));
+        for line in memory.contents.lines() {
+            blocks.push(Block::Line(vec![S::new("     ".into()), S::styled(line.to_owned(), Semantic::Code)]));
+        }
+    }
+}
+
 /// Panel that renders memory items and provides LLM context.
 pub(crate) struct MemoryPanel;
 
@@ -24,12 +64,7 @@ impl MemoryPanel {
 
         // Sort by importance (critical first)
         let mut sorted: Vec<_> = ms.memories.iter().collect();
-        sorted.sort_by_key(|m| match m.importance {
-            MemoryImportance::Critical => 0i32,
-            MemoryImportance::High => 1i32,
-            MemoryImportance::Medium => 2i32,
-            MemoryImportance::Low => 3i32,
-        });
+        sorted.sort_by_key(|m| importance_rank(m.importance));
 
         let mut output = String::new();
 
@@ -61,7 +96,7 @@ impl Panel for MemoryPanel {
     }
 
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
-        use cp_render::{Block, Semantic, Span as S};
+        use cp_render::{Block, Span as S};
 
         let ms = MemoryState::get(state);
 
@@ -71,12 +106,7 @@ impl Panel for MemoryPanel {
 
         // Sort by importance (critical first)
         let mut sorted: Vec<_> = ms.memories.iter().collect();
-        sorted.sort_by_key(|m| match m.importance {
-            MemoryImportance::Critical => 0i32,
-            MemoryImportance::High => 1i32,
-            MemoryImportance::Medium => 2i32,
-            MemoryImportance::Low => 3i32,
-        });
+        sorted.sort_by_key(|m| importance_rank(m.importance));
 
         let mut blocks = Vec::new();
 
@@ -85,29 +115,7 @@ impl Panel for MemoryPanel {
             if i > 0 {
                 blocks.push(Block::Empty);
             }
-            let imp_sem = match memory.importance {
-                MemoryImportance::Critical => Semantic::Warning,
-                MemoryImportance::High => Semantic::Accent,
-                MemoryImportance::Medium => Semantic::Code,
-                MemoryImportance::Low => Semantic::Muted,
-            };
-            blocks.push(Block::Line(vec![S::new(" ".into()), S::accent(format!("{}:", memory.id)).bold()]));
-            blocks.push(Block::KeyValue(vec![
-                (vec![S::muted("   tl_dr: ".into())], vec![S::new(memory.tl_dr.clone())]),
-                (vec![S::muted("   importance: ".into())], vec![S::styled(memory.importance.as_str().into(), imp_sem)]),
-            ]));
-            if !memory.labels.is_empty() {
-                blocks.push(Block::KeyValue(vec![(
-                    vec![S::muted("   labels: ".into())],
-                    vec![S::styled(format!("[{}]", memory.labels.join(", ")), Semantic::Code)],
-                )]));
-            }
-            if !memory.contents.is_empty() {
-                blocks.push(Block::Line(vec![S::muted("   contents: |".into())]));
-                for line in memory.contents.lines() {
-                    blocks.push(Block::Line(vec![S::new("     ".into()), S::styled(line.to_owned(), Semantic::Code)]));
-                }
-            }
+            push_memory_blocks(&mut blocks, memory);
         }
 
         blocks

@@ -32,6 +32,26 @@ pub(crate) fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 }
 
+/// Format the undo result line from removed/not-found indices and queue state.
+fn format_undo_result(removed: &[String], not_found: &[String], remaining: usize, deactivated: bool) -> String {
+    let mut msg = String::new();
+    if !removed.is_empty() {
+        let _r = write!(msg, "Removed: #{}", removed.join(", #"));
+    }
+    if !not_found.is_empty() {
+        if !msg.is_empty() {
+            msg.push_str(". ");
+        }
+        let _r = write!(msg, "Not found: #{}", not_found.join(", #"));
+    }
+    if deactivated {
+        let _r = write!(msg, ". Queue empty — deactivated.");
+    } else {
+        let _r = write!(msg, ". {remaining} action(s) remaining.");
+    }
+    msg
+}
+
 /// Execute `Queue_undo`: remove specific queued action(s) by index.
 pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("queue_undo");
@@ -61,25 +81,13 @@ pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     }
 
-    let mut msg = String::new();
-    if !removed.is_empty() {
-        let _r = write!(msg, "Removed: #{}", removed.join(", #"));
-    }
-    if !not_found.is_empty() {
-        if !msg.is_empty() {
-            msg.push_str(". ");
-        }
-        let _r = write!(msg, "Not found: #{}", not_found.join(", #"));
-    }
-
     // Auto-deactivate when the queue is drained completely
-    if qs.queued_calls.is_empty() && qs.active {
+    let deactivated = qs.queued_calls.is_empty() && qs.active;
+    if deactivated {
         qs.active = false;
         qs.next_index = 1;
-        let _r = write!(msg, ". Queue empty — deactivated.");
-    } else {
-        let _r = write!(msg, ". {} action(s) remaining.", qs.queued_calls.len());
     }
+    let msg = format_undo_result(&removed, &not_found, qs.queued_calls.len(), deactivated);
 
     ToolResult {
         tool_use_id: tool.id.clone(),

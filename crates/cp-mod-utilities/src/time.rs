@@ -211,6 +211,22 @@ pub fn parse_rfc3339_to_epoch_ms(s: &str) -> Option<i64> {
     Some(adjusted.saturating_mul(1000))
 }
 
+/// Parse the fixed `YYYY-MM-DDTHH:MM:SS` prefix into [`Parts`].
+///
+/// Shared by the RFC 3339 and local-datetime parsers: both read the six
+/// components from the same byte offsets, so factoring the `?`-chain out keeps
+/// each caller's control-flow simple.
+fn parse_datetime_fields(s: &str) -> Option<Parts> {
+    Some(Parts {
+        year: s.get(..4)?.parse().ok()?,
+        month: s.get(5..7)?.parse().ok()?,
+        day: s.get(8..10)?.parse().ok()?,
+        hour: s.get(11..13)?.parse().ok()?,
+        minute: s.get(14..16)?.parse().ok()?,
+        second: s.get(17..19)?.parse().ok()?,
+    })
+}
+
 /// Parse a local datetime string `YYYY-MM-DDTHH:MM:SS` to epoch
 /// milliseconds, assuming local timezone.
 ///
@@ -220,14 +236,7 @@ pub fn parse_local_datetime_to_epoch_ms(s: &str) -> Option<i64> {
     if s.len() < 19 {
         return None;
     }
-    let parts = Parts {
-        year: s.get(..4)?.parse::<i32>().ok()?,
-        month: s.get(5..7)?.parse::<u8>().ok()?,
-        day: s.get(8..10)?.parse::<u8>().ok()?,
-        hour: s.get(11..13)?.parse::<u8>().ok()?,
-        minute: s.get(14..16)?.parse::<u8>().ok()?,
-        second: s.get(17..19)?.parse::<u8>().ok()?,
-    };
+    let parts = parse_datetime_fields(s)?;
     let epoch = compose_epoch_secs(&parts)?;
     let offset = local_utc_offset_secs();
     let adjusted = epoch.checked_sub(i64::from(offset))?;
@@ -339,14 +348,7 @@ const fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
 
 /// Parse RFC 3339 into components + UTC offset in seconds.
 fn parse_rfc3339_parts(s: &str) -> Option<(Parts, i32)> {
-    let parts = Parts {
-        year: s.get(..4)?.parse::<i32>().ok()?,
-        month: s.get(5..7)?.parse::<u8>().ok()?,
-        day: s.get(8..10)?.parse::<u8>().ok()?,
-        hour: s.get(11..13)?.parse::<u8>().ok()?,
-        minute: s.get(14..16)?.parse::<u8>().ok()?,
-        second: s.get(17..19)?.parse::<u8>().ok()?,
-    };
+    let parts = parse_datetime_fields(s)?;
 
     let tz_part = s.get(19..)?.trim();
     let offset_secs = parse_tz_suffix(tz_part)?;

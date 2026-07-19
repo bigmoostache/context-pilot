@@ -89,7 +89,7 @@ mod tests {
         let md = "```form\nfields:\n  - id: a\n```";
         let errs = validate_form_blocks(md);
         assert_eq!(errs.len(), 1);
-        assert!(errs[0].contains("form-id"));
+        assert!(errs.first().is_some_and(|e| e.contains("form-id")));
     }
 
     #[test]
@@ -97,7 +97,7 @@ mod tests {
         let md = "```form\nform-id: x\n```";
         let errs = validate_form_blocks(md);
         assert_eq!(errs.len(), 1);
-        assert!(errs[0].contains("fields"));
+        assert!(errs.first().is_some_and(|e| e.contains("fields")));
     }
 
     #[test]
@@ -117,6 +117,6 @@ mod tests {
         let md = "```form\nform-id: a\nfields: []\n```\n```form\nfields: []\n```";
         let errs = validate_form_blocks(md);
         assert_eq!(errs.len(), 1);
-        assert!(errs[0].contains("#2"));
+        assert!(errs.first().is_some_and(|e| e.contains("#2")));
     }
 }

@@ -16,24 +16,14 @@ use super::writer::{DeleteOp, WriteBatch, WriteOp};
 /// Errors directory name
 const ERRORS_DIR: &str = "errors";
 
-/// Serialize all config, worker state, panels, and history messages
-/// into a batch of file write/delete operations.
-pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
-    let _guard = crate::profile!("persist::build_save_batch");
-    let _fg = cp_base::flame!("save_batch");
-    let dir = PathBuf::from(STORE_DIR);
-    let mut writes = Vec::new();
-    let mut deletes = Vec::new();
-    let ensure_dirs = vec![
-        dir.clone(),
-        dir.join(crate::infra::constants::STATES_DIR),
-        dir.join(crate::infra::constants::PANELS_DIR),
-        dir.join(crate::infra::constants::MESSAGES_DIR),
-        dir.join(cp_mod_logs::LOGS_DIR),
-        dir.join(cp_mod_console::CONSOLE_DIR),
-    ];
+/// (global, worker) module-data maps keyed by module id.
+type ModuleDataMaps = (HashMap<String, serde_json::Value>, HashMap<String, serde_json::Value>);
 
-    // Build module data maps
+/// (`important_panel_uids` by kind, `panel_uid` → local id) worker maps.
+type PanelUidMaps = (HashMap<Kind, String>, HashMap<String, String>);
+
+/// Build global + per-worker module-data maps by polling every registered module.
+fn build_module_data_maps(state: &State) -> ModuleDataMaps {
     let mut global_modules = HashMap::new();
     let mut worker_modules = HashMap::new();
     for module in crate::modules::all_modules() {
@@ -50,13 +40,145 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
             let _r = worker_modules.insert(format!("{}_worker", module.id()), worker_data);
         }
     }
-
     // Cache optimization engine (survives reloads via worker state)
     if let Some(json) = &state.cache_engine_json
         && let Ok(val) = serde_json::from_str::<serde_json::Value>(json)
     {
         let _r = worker_modules.insert("cache_engine".to_owned(), val);
     }
+    (global_modules, worker_modules)
+}
+
+/// The message UIDs (falling back to local id) for a panel's persisted body:
+/// live conversation messages, or a history panel's frozen chunk, else empty.
+fn panel_message_uids(ctx: &crate::state::Entry, state: &State) -> Vec<String> {
+    if ctx.context_type.as_str() == Kind::CONVERSATION {
+        state.messages.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect()
+    } else if ctx.context_type.as_str() == Kind::CONVERSATION_HISTORY {
+        ctx.history_messages
+            .as_ref()
+            .map(|msgs: &Vec<Message>| msgs.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect())
+            .unwrap_or_default()
+    } else {
+        vec![]
+    }
+}
+
+/// Emit one `{uid}.json` write op per persistable panel and record every seen UID
+/// (used afterward to prune orphaned panel files).
+fn build_panel_write_ops(
+    state: &State,
+    panels_dir: &std::path::Path,
+    known_uids: &mut std::collections::HashSet<String>,
+) -> Vec<WriteOp> {
+    let mut writes = Vec::new();
+    for ctx in &state.context {
+        if ctx.context_type.as_str() == Kind::SYSTEM || ctx.context_type.as_str() == Kind::LIBRARY {
+            continue;
+        }
+        let Some(uid) = &ctx.uid else { continue };
+        let _r = known_uids.insert(String::clone(uid));
+        let panel_data = PanelData {
+            uid: uid.clone(),
+            panel_type: ctx.context_type.clone(),
+            name: ctx.name.clone(),
+            token_count: ctx.token_count,
+            last_refresh_ms: ctx.last_refresh_ms,
+            message_uids: panel_message_uids(ctx, state),
+            metadata: ctx.metadata.clone(),
+            content_hash: ctx.content_hash.clone(),
+            panel_total_cost: (ctx.panel_total_cost > 0.0f64).then_some(ctx.panel_total_cost),
+            total_freezes: ctx.total_freezes,
+            total_cache_misses: ctx.total_cache_misses,
+        };
+        if let Ok(json) = serde_json::to_string_pretty(&panel_data) {
+            writes.push(WriteOp { path: panels_dir.join(format!("{uid}.json")), content: json.into_bytes() });
+        }
+    }
+    writes
+}
+
+/// Emit one `{uid}.yaml` write op per message held in a `ConversationHistory` panel.
+fn build_history_message_ops(state: &State, messages_dir: &std::path::Path) -> Vec<WriteOp> {
+    let mut writes = Vec::new();
+    for ctx in &state.context {
+        if ctx.context_type.as_str() == Kind::CONVERSATION_HISTORY
+            && let Some(msgs) = &ctx.history_messages
+        {
+            for msg in msgs {
+                let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
+                if let Ok(yaml) = serde_yaml::to_string(msg) {
+                    writes.push(WriteOp {
+                        path: messages_dir.join(format!("{file_id}.yaml")),
+                        content: yaml.into_bytes(),
+                    });
+                }
+            }
+        }
+    }
+    writes
+}
+
+/// Scan the panels dir and emit a delete op for every `{uid}.json` whose UID is
+/// no longer live in `known_uids`.
+fn collect_orphan_deletes(
+    panels_dir: &std::path::Path,
+    known_uids: &std::collections::HashSet<String>,
+) -> Vec<DeleteOp> {
+    let mut deletes = Vec::new();
+    if let Ok(entries) = fs::read_dir(panels_dir) {
+        for entry in entries.filter_map(Result::ok) {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+            if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+                && !known_uids.contains(stem)
+            {
+                deletes.push(DeleteOp { path });
+            }
+        }
+    }
+    deletes
+}
+
+/// Build `important_panel_uids` + `panel_uid_to_local_id` maps for the worker state.
+fn build_panel_uid_maps(state: &State) -> PanelUidMaps {
+    let mut important_uids: HashMap<Kind, String> = HashMap::new();
+    for ctx in &state.context {
+        let dominated = (ctx.context_type.is_fixed() || ctx.context_type.as_str() == Kind::CONVERSATION)
+            && ctx.context_type.as_str() != Kind::SYSTEM
+            && ctx.context_type.as_str() != Kind::LIBRARY;
+        if dominated && let Some(uid) = &ctx.uid {
+            let _r = important_uids.insert(ctx.context_type.clone(), String::clone(uid));
+        }
+    }
+    let panel_uid_to_local_id: HashMap<String, String> = state
+        .context
+        .iter()
+        .filter(|c| c.uid.is_some() && !c.context_type.is_fixed() && c.context_type.as_str() != Kind::CONVERSATION)
+        .filter_map(|c| c.uid.as_ref().map(|uid: &String| (uid.clone(), c.id.clone())))
+        .collect();
+    (important_uids, panel_uid_to_local_id)
+}
+
+/// Serialize all config, worker state, panels, and history messages
+/// into a batch of file write/delete operations.
+pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
+    let _guard = crate::profile!("persist::build_save_batch");
+    let _fg = cp_base::flame!("save_batch");
+    let dir = PathBuf::from(STORE_DIR);
+    let mut writes = Vec::new();
+    let ensure_dirs = vec![
+        dir.clone(),
+        dir.join(crate::infra::constants::STATES_DIR),
+        dir.join(crate::infra::constants::PANELS_DIR),
+        dir.join(crate::infra::constants::MESSAGES_DIR),
+        dir.join(cp_mod_logs::LOGS_DIR),
+        dir.join(cp_mod_console::CONSOLE_DIR),
+    ];
+
+    let (global_modules, worker_modules) = build_module_data_maps(state);
 
     // Shared config
     let shared_config = SharedConfig {
@@ -82,24 +204,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
             .map(|(path, content)| WriteOp { path, content }),
     );
 
-    // Build important_panel_uids
-    let mut important_uids: HashMap<Kind, String> = HashMap::new();
-    for ctx in &state.context {
-        let dominated = (ctx.context_type.is_fixed() || ctx.context_type.as_str() == Kind::CONVERSATION)
-            && ctx.context_type.as_str() != Kind::SYSTEM
-            && ctx.context_type.as_str() != Kind::LIBRARY;
-        if dominated && let Some(uid) = &ctx.uid {
-            let _r = important_uids.insert(ctx.context_type.clone(), String::clone(uid));
-        }
-    }
-
-    // Build panel_uid_to_local_id (dynamic panels only — excludes fixed and Conversation)
-    let panel_uid_to_local_id: HashMap<String, String> = state
-        .context
-        .iter()
-        .filter(|c| c.uid.is_some() && !c.context_type.is_fixed() && c.context_type.as_str() != Kind::CONVERSATION)
-        .filter_map(|c| c.uid.as_ref().map(|uid: &String| (uid.clone(), c.id.clone())))
-        .collect();
+    let (important_uids, panel_uid_to_local_id) = build_panel_uid_maps(state);
 
     // WorkerState
     let worker_state = WorkerState {
@@ -118,78 +223,13 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         });
     }
 
-    // Panels
+    // Panels + history messages + orphan pruning
     let panels_dir = dir.join(crate::infra::constants::PANELS_DIR);
-    let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
-
-    for ctx in &state.context {
-        if ctx.context_type.as_str() == Kind::SYSTEM || ctx.context_type.as_str() == Kind::LIBRARY {
-            continue;
-        }
-        if let Some(uid) = &ctx.uid {
-            let _r = known_uids.insert(String::clone(uid));
-            let panel_data = PanelData {
-                uid: uid.clone(),
-                panel_type: ctx.context_type.clone(),
-                name: ctx.name.clone(),
-                token_count: ctx.token_count,
-                last_refresh_ms: ctx.last_refresh_ms,
-                message_uids: if ctx.context_type.as_str() == Kind::CONVERSATION {
-                    state.messages.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect()
-                } else if ctx.context_type.as_str() == Kind::CONVERSATION_HISTORY {
-                    ctx.history_messages
-                        .as_ref()
-                        .map(|msgs: &Vec<Message>| {
-                            msgs.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect()
-                        })
-                        .unwrap_or_default()
-                } else {
-                    vec![]
-                },
-                metadata: ctx.metadata.clone(),
-                content_hash: ctx.content_hash.clone(),
-                panel_total_cost: (ctx.panel_total_cost > 0.0f64).then_some(ctx.panel_total_cost),
-                total_freezes: ctx.total_freezes,
-                total_cache_misses: ctx.total_cache_misses,
-            };
-            if let Ok(json) = serde_json::to_string_pretty(&panel_data) {
-                writes.push(WriteOp { path: panels_dir.join(format!("{uid}.json")), content: json.into_bytes() });
-            }
-        }
-    }
-
-    // History messages for ConversationHistory panels
     let messages_dir = dir.join(crate::infra::constants::MESSAGES_DIR);
-    for ctx in &state.context {
-        if ctx.context_type.as_str() == Kind::CONVERSATION_HISTORY
-            && let Some(msgs) = &ctx.history_messages
-        {
-            for msg in msgs {
-                let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
-                if let Ok(yaml) = serde_yaml::to_string(msg) {
-                    writes.push(WriteOp {
-                        path: messages_dir.join(format!("{file_id}.yaml")),
-                        content: yaml.into_bytes(),
-                    });
-                }
-            }
-        }
-    }
-
-    // Orphan panel deletion
-    if let Ok(entries) = fs::read_dir(&panels_dir) {
-        for entry in entries.filter_map(Result::ok) {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("json") {
-                continue;
-            }
-            if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
-                && !known_uids.contains(stem)
-            {
-                deletes.push(DeleteOp { path });
-            }
-        }
-    }
+    let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    writes.extend(build_panel_write_ops(state, &panels_dir, &mut known_uids));
+    writes.extend(build_history_message_ops(state, &messages_dir));
+    let deletes = collect_orphan_deletes(&panels_dir, &known_uids);
 
     WriteBatch { writes, deletes, ensure_dirs }
 }
@@ -202,35 +242,44 @@ pub(crate) fn build_message_op(msg: &Message) -> WriteOp {
     WriteOp { path: dir.join(format!("{file_id}.yaml")), content: yaml.into_bytes() }
 }
 
+/// Execute one write op synchronously (create parent dir, then write).
+fn exec_write_op(op: &WriteOp) {
+    if let Some(parent) = op.path.parent()
+        && let Err(e) = fs::create_dir_all(parent)
+    {
+        drop(writeln!(std::io::stderr(), "[persistence] failed to create dir {}: {}", parent.display(), e));
+        return;
+    }
+    if let Err(e) = fs::write(&op.path, &op.content) {
+        drop(writeln!(std::io::stderr(), "[persistence] failed to write {}: {}", op.path.display(), e));
+    }
+}
+
+/// Execute one delete op synchronously (ignoring not-found).
+fn exec_delete_op(op: &DeleteOp) {
+    if let Err(e) = fs::remove_file(&op.path)
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        drop(writeln!(std::io::stderr(), "[persistence] failed to delete {}: {}", op.path.display(), e));
+    }
+}
+
 /// Save state synchronously (blocking I/O on calling thread).
 /// Used for shutdown paths and places where the `PersistenceWriter` is not available.
 /// Prefer `build_save_batch` + `PersistenceWriter::send_batch` in the main event loop.
 pub(crate) fn save_state(state: &State) {
     let _fg = cp_base::flame!("save_state");
     let batch = build_save_batch(state);
-    // Execute synchronously
     for dir in &batch.ensure_dirs {
         if let Err(e) = fs::create_dir_all(dir) {
             drop(writeln!(std::io::stderr(), "[persistence] failed to create dir {}: {}", dir.display(), e));
         }
     }
     for op in &batch.writes {
-        if let Some(parent) = op.path.parent()
-            && let Err(e) = fs::create_dir_all(parent)
-        {
-            drop(writeln!(std::io::stderr(), "[persistence] failed to create dir {}: {}", parent.display(), e));
-            continue;
-        }
-        if let Err(e) = fs::write(&op.path, &op.content) {
-            drop(writeln!(std::io::stderr(), "[persistence] failed to write {}: {}", op.path.display(), e));
-        }
+        exec_write_op(op);
     }
     for op in &batch.deletes {
-        if let Err(e) = fs::remove_file(&op.path)
-            && e.kind() != std::io::ErrorKind::NotFound
-        {
-            drop(writeln!(std::io::stderr(), "[persistence] failed to delete {}: {}", op.path.display(), e));
-        }
+        exec_delete_op(op);
     }
 }
 

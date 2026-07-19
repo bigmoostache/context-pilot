@@ -30,6 +30,93 @@ use cp_base::cast::Safe;
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/core.yaml")));
 
+/// Restore `active_modules` from persisted config, then auto-add any newly
+/// introduced default modules absent from the saved set.
+fn load_active_modules(data: &serde_json::Value, state: &mut State) {
+    let Some(arr) = data.get("active_modules").and_then(|v| v.as_array()) else { return };
+    state.active_modules = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
+    let mut all_defaults: Vec<_> = crate::modules::default_active_modules().into_iter().collect();
+    all_defaults.sort();
+    for module_id in &all_defaults {
+        if !state.active_modules.contains(module_id) {
+            let _r = state.active_modules.insert(module_id.clone());
+        }
+    }
+}
+
+/// Deserialize a single persisted enum field into `slot` when present + valid.
+fn load_enum_field<T>(data: &serde_json::Value, key: &str, slot: &mut T)
+where
+    T: serde::de::DeserializeOwned,
+{
+    if let Some(v) = data.get(key)
+        && let Ok(parsed) = serde_json::from_value(v.clone())
+    {
+        *slot = parsed;
+    }
+}
+
+/// Restore the LLM provider selection and all per-provider model choices.
+fn load_provider_models(data: &serde_json::Value, state: &mut State) {
+    load_enum_field(data, "llm_provider", &mut state.llm_provider);
+    load_enum_field(data, "anthropic_model", &mut state.anthropic_model);
+    load_enum_field(data, "grok_model", &mut state.grok_model);
+    load_enum_field(data, "groq_model", &mut state.groq_model);
+    load_enum_field(data, "deepseek_model", &mut state.deepseek_model);
+    load_enum_field(data, "minimax_model", &mut state.minimax_model);
+    load_enum_field(data, "claude_code_v2_model", &mut state.claude_code_v2_model);
+}
+
+/// Restore context budgets, cleaning threshold, and UID counter.
+fn load_budgets_and_costs(data: &serde_json::Value, state: &mut State) {
+    if let Some(v) = data.get("cleaning_threshold").and_then(serde_json::Value::as_f64) {
+        state.cleaning_threshold = v.to_f32();
+    }
+    if let Some(v) = data.get("context_budget") {
+        state.context_budget = v.as_u64().map(Safe::to_usize);
+    }
+    if let Some(v) = data.get("global_next_uid").and_then(serde_json::Value::as_u64) {
+        state.global_next_uid = v.to_usize();
+    }
+    load_token_cost_accumulators(data, state);
+}
+
+/// Restore cumulative token counters and dollar-cost accumulators.
+fn load_token_cost_accumulators(data: &serde_json::Value, state: &mut State) {
+    if let Some(v) = data.get("cache_hit_tokens").and_then(serde_json::Value::as_u64) {
+        state.cache_hit_tokens = v.to_usize();
+    }
+    if let Some(v) = data.get("cache_miss_tokens").and_then(serde_json::Value::as_u64) {
+        state.cache_miss_tokens = v.to_usize();
+    }
+    if let Some(v) = data.get("total_output_tokens").and_then(serde_json::Value::as_u64) {
+        state.total_output_tokens = v.to_usize();
+    }
+    if let Some(v) = data.get("cost_hit_usd").and_then(serde_json::Value::as_f64) {
+        state.cost_hit_usd = v;
+    }
+    if let Some(v) = data.get("cost_miss_usd").and_then(serde_json::Value::as_f64) {
+        state.cost_miss_usd = v;
+    }
+    if let Some(v) = data.get("cost_output_usd").and_then(serde_json::Value::as_f64) {
+        state.cost_output_usd = v;
+    }
+}
+
+/// Rebuild the tool list for the active modules, then disable the tools named in
+/// the persisted `disabled_tools` set (except the always-on meta tools).
+fn load_disabled_tools(data: &serde_json::Value, state: &mut State) {
+    let Some(arr) = data.get("disabled_tools").and_then(|v| v.as_array()) else { return };
+    let disabled: Vec<String> = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
+    state.tools = crate::modules::active_tool_definitions(&state.active_modules);
+    state.tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
+    for tool in &mut state.tools {
+        if tool.id != "tool_manage" && tool.id != "module_toggle" && disabled.contains(&tool.id) {
+            tool.enabled = false;
+        }
+    }
+}
+
 /// Module that provides the overview panel, tools panel, and system tools.
 pub(crate) struct OverviewModule;
 
@@ -87,95 +174,16 @@ impl Module for OverviewModule {
         })
     }
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
-        if let Some(arr) = data.get("active_modules").and_then(|v| v.as_array()) {
-            state.active_modules = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
-            // Auto-add newly introduced modules that aren't in the persisted config.
-            let mut all_defaults: Vec<_> = crate::modules::default_active_modules().into_iter().collect();
-            all_defaults.sort();
-            for module_id in &all_defaults {
-                if !state.active_modules.contains(module_id) {
-                    let _r = state.active_modules.insert(module_id.clone());
-                }
-            }
-        }
+        load_active_modules(data, state);
         if let Some(v) = data.get("dev_mode").and_then(serde_json::Value::as_bool) {
             state.flags.ui.dev_mode = v;
         }
-        if let Some(v) = data.get("llm_provider")
-            && let Ok(p) = serde_json::from_value(v.clone())
-        {
-            state.llm_provider = p;
-        }
-        if let Some(v) = data.get("anthropic_model")
-            && let Ok(m) = serde_json::from_value(v.clone())
-        {
-            state.anthropic_model = m;
-        }
-        if let Some(v) = data.get("grok_model")
-            && let Ok(m) = serde_json::from_value(v.clone())
-        {
-            state.grok_model = m;
-        }
-        if let Some(v) = data.get("groq_model")
-            && let Ok(m) = serde_json::from_value(v.clone())
-        {
-            state.groq_model = m;
-        }
-        if let Some(v) = data.get("deepseek_model")
-            && let Ok(m) = serde_json::from_value(v.clone())
-        {
-            state.deepseek_model = m;
-        }
-        if let Some(v) = data.get("minimax_model")
-            && let Ok(m) = serde_json::from_value(v.clone())
-        {
-            state.minimax_model = m;
-        }
-        if let Some(v) = data.get("claude_code_v2_model")
-            && let Ok(m) = serde_json::from_value(v.clone())
-        {
-            state.claude_code_v2_model = m;
-        }
+        load_provider_models(data, state);
         if let Some(v) = data.get("reverie_enabled").and_then(serde_json::Value::as_bool) {
             state.flags.config.reverie_enabled = v;
         }
-        if let Some(v) = data.get("cleaning_threshold").and_then(serde_json::Value::as_f64) {
-            state.cleaning_threshold = v.to_f32();
-        }
-        if let Some(v) = data.get("context_budget") {
-            state.context_budget = v.as_u64().map(Safe::to_usize);
-        }
-        if let Some(v) = data.get("global_next_uid").and_then(serde_json::Value::as_u64) {
-            state.global_next_uid = v.to_usize();
-        }
-        if let Some(v) = data.get("cache_hit_tokens").and_then(serde_json::Value::as_u64) {
-            state.cache_hit_tokens = v.to_usize();
-        }
-        if let Some(v) = data.get("cache_miss_tokens").and_then(serde_json::Value::as_u64) {
-            state.cache_miss_tokens = v.to_usize();
-        }
-        if let Some(v) = data.get("total_output_tokens").and_then(serde_json::Value::as_u64) {
-            state.total_output_tokens = v.to_usize();
-        }
-        if let Some(v) = data.get("cost_hit_usd").and_then(serde_json::Value::as_f64) {
-            state.cost_hit_usd = v;
-        }
-        if let Some(v) = data.get("cost_miss_usd").and_then(serde_json::Value::as_f64) {
-            state.cost_miss_usd = v;
-        }
-        if let Some(v) = data.get("cost_output_usd").and_then(serde_json::Value::as_f64) {
-            state.cost_output_usd = v;
-        }
-        if let Some(arr) = data.get("disabled_tools").and_then(|v| v.as_array()) {
-            let disabled: Vec<String> = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
-            state.tools = crate::modules::active_tool_definitions(&state.active_modules);
-            state.tools.push(crate::app::reverie::tools::optimize_context_tool_definition());
-            for tool in &mut state.tools {
-                if tool.id != "tool_manage" && tool.id != "module_toggle" && disabled.contains(&tool.id) {
-                    tool.enabled = false;
-                }
-            }
-        }
+        load_budgets_and_costs(data, state);
+        load_disabled_tools(data, state);
     }
 
     fn fixed_panel_types(&self) -> Vec<Kind> {

@@ -65,6 +65,44 @@ pub(crate) const CRAWL_POLL_INTERVAL: Duration = Duration::from_secs(5);
 /// Maximum number of poll iterations before giving up internally.
 pub(crate) const CRAWL_MAX_POLLS: u32 = 60;
 
+/// Append the `## Metadata` section (title / description / URL) when present.
+fn push_scrape_metadata(content: &mut String, data: &crate::types::ScrapeData) {
+    let Some(meta) = &(data.metadata) else {
+        return;
+    };
+    content.push_str("## Metadata\n\n");
+    if let Some(t) = &(meta.title) {
+        let _r = writeln!(content, "**Title:** {t}");
+    }
+    if let Some(d) = &(meta.description) {
+        let _r = writeln!(content, "**Description:** {d}");
+    }
+    if let Some(u) = &(meta.source_url) {
+        let _r = writeln!(content, "**URL:** {u}");
+    }
+    content.push('\n');
+}
+
+/// Build the markdown panel body for a scrape result (metadata + content + links).
+fn build_scrape_panel_content(data: &crate::types::ScrapeData) -> String {
+    let mut content = String::new();
+    push_scrape_metadata(&mut content, data);
+    if let Some(md) = &(data.markdown) {
+        content.push_str("## Content\n\n");
+        content.push_str(md);
+        content.push_str("\n\n");
+    }
+    if let Some(links) = &data.links
+        && !links.is_empty()
+    {
+        content.push_str("## Links\n\n");
+        for link in links {
+            let _r = writeln!(content, "- {link}");
+        }
+    }
+    content
+}
+
 /// Execute the `firecrawl_scrape` tool: scrape a single URL for content.
 ///
 /// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
@@ -127,36 +165,8 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
                     };
                 };
 
-                let title = data.metadata.as_ref().and_then(|m| m.title.as_deref()).unwrap_or("untitled");
-
-                // Build panel content
-                let mut content = String::new();
-                if let Some(meta) = &(data.metadata) {
-                    content.push_str("## Metadata\n\n");
-                    if let Some(t) = &(meta.title) {
-                        let _r = writeln!(content, "**Title:** {t}");
-                    }
-                    if let Some(d) = &(meta.description) {
-                        let _r = writeln!(content, "**Description:** {d}");
-                    }
-                    if let Some(u) = &(meta.source_url) {
-                        let _r = writeln!(content, "**URL:** {u}");
-                    }
-                    content.push('\n');
-                }
-                if let Some(md) = &(data.markdown) {
-                    content.push_str("## Content\n\n");
-                    content.push_str(md);
-                    content.push_str("\n\n");
-                }
-                if let Some(links) = &data.links
-                    && !links.is_empty()
-                {
-                    content.push_str("## Links\n\n");
-                    for link in links {
-                        let _r = writeln!(content, "- {link}");
-                    }
-                }
+                let title = data.metadata.as_ref().and_then(|m| m.title.as_deref()).unwrap_or("untitled").to_owned();
+                let content = build_scrape_panel_content(&data);
 
                 let dyn_panel = DynPanel {
                     context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(),
@@ -178,6 +188,34 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     })
 }
+/// Build the markdown panel body from scraped search results (one section each).
+fn build_search_results_content(results: &[crate::types::SearchResult]) -> String {
+    let mut content = String::new();
+    for (i, result) in results.iter().enumerate() {
+        let page_title = result.title.as_deref().unwrap_or("untitled");
+        let page_url = result.url.as_deref().unwrap_or("unknown");
+        let _r1 = write!(content, "## Result {} — {} ({})\n\n", i.saturating_add(1), page_title, page_url);
+        if let Some(md) = &(result.markdown) {
+            content.push_str(md);
+            content.push_str("\n\n");
+        } else if let Some(desc) = &(result.description) {
+            content.push_str(desc);
+            content.push_str("\n\n");
+        }
+        if let Some(links) = &result.links
+            && !links.is_empty()
+        {
+            content.push_str("**Links:**\n");
+            for link in links.iter().take(10) {
+                let _r2 = writeln!(content, "- {link}");
+            }
+            content.push('\n');
+        }
+        content.push_str("---\n\n");
+    }
+    content
+}
+
 /// Execute the `firecrawl_search` tool: search and scrape in one call.
 ///
 /// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
@@ -276,29 +314,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
 
                 // Build panel: concatenated markdown per page
-                let mut content = String::new();
-                for (i, result) in results.iter().enumerate() {
-                    let page_title = result.title.as_deref().unwrap_or("untitled");
-                    let page_url = result.url.as_deref().unwrap_or("unknown");
-                    let _r1 = write!(content, "## Result {} — {} ({})\n\n", i.saturating_add(1), page_title, page_url);
-                    if let Some(md) = &(result.markdown) {
-                        content.push_str(md);
-                        content.push_str("\n\n");
-                    } else if let Some(desc) = &(result.description) {
-                        content.push_str(desc);
-                        content.push_str("\n\n");
-                    }
-                    if let Some(links) = &result.links
-                        && !links.is_empty()
-                    {
-                        content.push_str("**Links:**\n");
-                        for link in links.iter().take(10) {
-                            let _r2 = writeln!(content, "- {link}");
-                        }
-                        content.push('\n');
-                    }
-                    content.push_str("---\n\n");
-                }
+                let content = build_search_results_content(&results);
 
                 let dyn_panel = DynPanel {
                     context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(),

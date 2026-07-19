@@ -11,272 +11,281 @@ use crate::state::State;
 /// under the 500-line structure limit).
 mod models;
 
+/// Outcome of a partial key-dispatch helper: quit the app, produce an action,
+/// or decline (let the caller fall through to the next handler).
+enum Dispatch {
+    /// Quit signal (Ctrl+Q).
+    Quit,
+    /// Handled — produced this action.
+    Act(Action),
+    /// Not handled here — fall through to the next stage.
+    Fallthrough,
+}
+
 /// Map a terminal event to an application action.
 ///
 /// Returns `None` for Ctrl+Q (quit signal), `Some(Action)` for everything else.
 pub(crate) fn handle_event(event: &Event, state: &State) -> Option<Action> {
     match event {
-        Event::Key(key) => {
-            let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-
-            // Global Ctrl shortcuts (always handled first)
-            if ctrl {
-                // Threads view overrides for Ctrl+A / Ctrl+U (before the global
-                // select-all / history-prev bindings).
-                if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
-                    let viewing_archived = cp_mod_threads::types::FocusState::get(state).viewing_archived;
-                    match key.code {
-                        // Ctrl+A: archive (active view, with confirm) or restore
-                        // immediately (archived view — restoring is non-destructive).
-                        KeyCode::Char('a') => {
-                            return Some(if viewing_archived {
-                                Action::ThreadArchiveConfirm
-                            } else {
-                                Action::ThreadArchiveStart
-                            });
-                        }
-                        // Ctrl+U: toggle between active and archived thread lists.
-                        KeyCode::Char('u') => return Some(Action::ThreadToggleArchivedView),
-                        KeyCode::Backspace
-                        | KeyCode::Enter
-                        | KeyCode::Left
-                        | KeyCode::Right
-                        | KeyCode::Up
-                        | KeyCode::Down
-                        | KeyCode::Home
-                        | KeyCode::End
-                        | KeyCode::PageUp
-                        | KeyCode::PageDown
-                        | KeyCode::Tab
-                        | KeyCode::BackTab
-                        | KeyCode::Delete
-                        | KeyCode::Insert
-                        | KeyCode::F(_)
-                        | KeyCode::Char(_)
-                        | KeyCode::Null
-                        | KeyCode::Esc
-                        | KeyCode::CapsLock
-                        | KeyCode::ScrollLock
-                        | KeyCode::NumLock
-                        | KeyCode::PrintScreen
-                        | KeyCode::Pause
-                        | KeyCode::Menu
-                        | KeyCode::KeypadBegin
-                        | KeyCode::Media(_)
-                        | KeyCode::Modifier(_) => {}
-                    }
-                }
-                match key.code {
-                    KeyCode::Char('q') => return None, // Quit
-                    KeyCode::Char('l') => return Some(Action::ClearConversation),
-                    KeyCode::Char('n') => return Some(Action::NewContext),
-                    KeyCode::Char('h') => return Some(Action::ToggleConfigView),
-                    KeyCode::Char('i') => return Some(Action::ToggleIndexOverlay),
-                    KeyCode::Char('v') => return Some(Action::CycleViewMode),
-                    KeyCode::Char('o') => return Some(Action::ResetSessionCosts),
-                    KeyCode::Char('p') => return Some(Action::OpenCommandPalette),
-                    KeyCode::Char('u') => return Some(Action::HistoryPrev),
-                    KeyCode::Char('d') => return Some(Action::HistoryNext),
-                    KeyCode::Char('c') => {
-                        return if state.flags.overlays.index_status {
-                            Some(Action::CopyIndexOverlay)
-                        } else {
-                            Some(Action::CopyPanelContent)
-                        };
-                    }
-                    // All other keys: fall through to normal handling
-                    KeyCode::Backspace
-                    | KeyCode::Enter
-                    | KeyCode::Left
-                    | KeyCode::Right
-                    | KeyCode::Up
-                    | KeyCode::Down
-                    | KeyCode::Home
-                    | KeyCode::End
-                    | KeyCode::PageUp
-                    | KeyCode::PageDown
-                    | KeyCode::Tab
-                    | KeyCode::BackTab
-                    | KeyCode::Delete
-                    | KeyCode::Insert
-                    | KeyCode::F(_)
-                    | KeyCode::Char(_)
-                    | KeyCode::Null
-                    | KeyCode::Esc
-                    | KeyCode::CapsLock
-                    | KeyCode::ScrollLock
-                    | KeyCode::NumLock
-                    | KeyCode::PrintScreen
-                    | KeyCode::Pause
-                    | KeyCode::Menu
-                    | KeyCode::KeypadBegin
-                    | KeyCode::Media(_)
-                    | KeyCode::Modifier(_) => {}
-                }
-            }
-
-            // Config view handles its own keys when open
-            if state.flags.config.config_view {
-                return Some(handle_config_event(key, state));
-            }
-
-            // Index overlay: Esc dismisses, Ctrl+C copies, all other keys consumed
-            if state.flags.overlays.index_status {
-                return Some(match key.code {
-                    KeyCode::Esc => Action::ToggleIndexOverlay,
-                    KeyCode::Backspace
-                    | KeyCode::Enter
-                    | KeyCode::Left
-                    | KeyCode::Right
-                    | KeyCode::Up
-                    | KeyCode::Down
-                    | KeyCode::Home
-                    | KeyCode::End
-                    | KeyCode::PageUp
-                    | KeyCode::PageDown
-                    | KeyCode::Tab
-                    | KeyCode::BackTab
-                    | KeyCode::Delete
-                    | KeyCode::Insert
-                    | KeyCode::F(_)
-                    | KeyCode::Char(_)
-                    | KeyCode::Null
-                    | KeyCode::CapsLock
-                    | KeyCode::ScrollLock
-                    | KeyCode::NumLock
-                    | KeyCode::PrintScreen
-                    | KeyCode::Pause
-                    | KeyCode::Menu
-                    | KeyCode::KeypadBegin
-                    | KeyCode::Media(_)
-                    | KeyCode::Modifier(_) => Action::None,
-                });
-            }
-
-            // Escape stops streaming
-            if key.code == KeyCode::Esc && state.flags.stream.phase.is_streaming() {
-                return Some(Action::StopStreaming);
-            }
-
-            // Threads view: intercept navigation keys before panel/scroll handling
-            if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
-                let shift = key.modifiers.contains(KeyModifiers::SHIFT);
-                let confirming = cp_mod_threads::types::FocusState::get(state).confirming_archive;
-                match key.code {
-                    // During archive confirmation: y confirms, any other key cancels
-                    KeyCode::Char('y') if confirming => return Some(Action::ThreadArchiveConfirm),
-                    _ if confirming => return Some(Action::ThreadArchiveCancel),
-                    // Thread sidebar navigation (Tab/Shift+Tab only — Up/Down scroll messages)
-                    KeyCode::Tab if !shift => {
-                        return Some(Action::ThreadSelectNext);
-                    }
-                    KeyCode::BackTab => return Some(Action::ThreadSelectPrev),
-                    KeyCode::Esc => return Some(Action::CycleViewMode),
-                    KeyCode::Backspace
-                    | KeyCode::Enter
-                    | KeyCode::Left
-                    | KeyCode::Right
-                    | KeyCode::Up
-                    | KeyCode::Down
-                    | KeyCode::Home
-                    | KeyCode::End
-                    | KeyCode::PageUp
-                    | KeyCode::PageDown
-                    | KeyCode::Tab
-                    | KeyCode::Delete
-                    | KeyCode::Insert
-                    | KeyCode::F(_)
-                    | KeyCode::Char(_)
-                    | KeyCode::Null
-                    | KeyCode::CapsLock
-                    | KeyCode::ScrollLock
-                    | KeyCode::NumLock
-                    | KeyCode::PrintScreen
-                    | KeyCode::Pause
-                    | KeyCode::Menu
-                    | KeyCode::KeypadBegin
-                    | KeyCode::Media(_)
-                    | KeyCode::Modifier(_) => {} // fall through to normal handling
-                }
-            }
-
-            // F12 toggles performance monitor
-            if key.code == KeyCode::F(12) {
-                return Some(Action::TogglePerfMonitor);
-            }
-
-            // Enter or Space on context pattern (p1, P2, etc.) submits immediately
-            // But not if modifier keys are held (Ctrl/Shift/Alt+Enter = newline)
-            let has_modifier = key.modifiers.contains(KeyModifiers::CONTROL)
-                || key.modifiers.contains(KeyModifiers::SHIFT)
-                || key.modifiers.contains(KeyModifiers::ALT);
-            if ((key.code == KeyCode::Enter && !has_modifier) || key.code == KeyCode::Char(' '))
-                && let Some(id) = parse_context_pattern(&state.input)
-                && find_context_by_id(state, &id).is_some()
-            {
-                return Some(Action::InputSubmit);
-            }
-
-            // Let the current panel handle the key first.
-            // In Threads view, always use the conversation panel for input routing
-            // regardless of which panel was selected — the threads view always has
-            // an active input area that needs character/cursor/submit handling.
-            if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
-                if let Some(ctx) =
-                    state.context.iter().find(|c| c.context_type.as_str() == crate::state::Kind::CONVERSATION)
-                {
-                    let panel = get_panel(&ctx.context_type);
-                    if let Some(action) = panel.handle_key(key, state) {
-                        return Some(action);
-                    }
-                }
-            } else if let Some(ctx) = state.context.get(state.selected_context) {
-                let panel = get_panel(&ctx.context_type);
-                if let Some(action) = panel.handle_key(key, state) {
-                    return Some(action);
-                }
-            }
-
-            // Global fallback handling (scrolling, context switching)
-            let shift = key.modifiers.contains(KeyModifiers::SHIFT);
-            let action = match key.code {
-                KeyCode::Tab if shift => Action::SelectPrevContext,
-                KeyCode::Tab => Action::SelectNextContext,
-                KeyCode::BackTab => Action::SelectPrevContext, // Shift+Tab on some terminals
-                KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => {
-                    return scroll_key_action(key);
-                }
-                KeyCode::Backspace
-                | KeyCode::Enter
-                | KeyCode::Left
-                | KeyCode::Right
-                | KeyCode::Home
-                | KeyCode::End
-                | KeyCode::Insert
-                | KeyCode::Delete
-                | KeyCode::F(_)
-                | KeyCode::Char(_)
-                | KeyCode::Null
-                | KeyCode::Esc
-                | KeyCode::CapsLock
-                | KeyCode::ScrollLock
-                | KeyCode::NumLock
-                | KeyCode::PrintScreen
-                | KeyCode::Pause
-                | KeyCode::Menu
-                | KeyCode::KeypadBegin
-                | KeyCode::Media(_)
-                | KeyCode::Modifier(_) => Action::None,
-            };
-            Some(action)
-        }
-        // Bracketed paste: store in buffer, insert placeholder sentinel
-        // Normalize line endings: terminals may send \r\n or \r instead of \n
+        Event::Key(key) => Some(handle_key_event(key, state)?),
+        // Bracketed paste: store in buffer, insert placeholder sentinel.
+        // Normalize line endings: terminals may send \r\n or \r instead of \n.
         Event::Paste(text) => {
             let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
             Some(Action::PasteText(normalized))
         }
         Event::FocusGained | Event::FocusLost | Event::Mouse(_) | Event::Resize(_, _) => Some(Action::None),
+    }
+}
+
+/// Handle a key event through the staged pipeline. `None` = quit.
+fn handle_key_event(key: &KeyEvent, state: &State) -> Option<Action> {
+    // Global Ctrl shortcuts (always handled first).
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        match handle_ctrl_shortcuts(key, state) {
+            Dispatch::Quit => return None,
+            Dispatch::Act(action) => return Some(action),
+            Dispatch::Fallthrough => {}
+        }
+    }
+
+    // Config view handles its own keys when open.
+    if state.flags.config.config_view {
+        return Some(handle_config_event(key, state));
+    }
+
+    if let Some(action) = handle_index_overlay_key(key, state) {
+        return Some(action);
+    }
+
+    // Escape stops streaming.
+    if key.code == KeyCode::Esc && state.flags.stream.phase.is_streaming() {
+        return Some(Action::StopStreaming);
+    }
+
+    // Threads view: intercept navigation keys before panel/scroll handling.
+    if state.view_mode == cp_base::state::data::config::ViewMode::Threads
+        && let Dispatch::Act(action) = handle_threads_nav(key, state)
+    {
+        return Some(action);
+    }
+
+    // F12 toggles performance monitor.
+    if key.code == KeyCode::F(12) {
+        return Some(Action::TogglePerfMonitor);
+    }
+
+    if let Some(action) = handle_context_pattern_submit(key, state) {
+        return Some(action);
+    }
+
+    if let Some(action) = handle_panel_key(key, state) {
+        return Some(action);
+    }
+
+    Some(handle_global_fallback(key))
+}
+
+/// Ctrl+key shortcuts. Handles the Threads-view Ctrl+A/Ctrl+U overrides first,
+/// then the global bindings.
+fn handle_ctrl_shortcuts(key: &KeyEvent, state: &State) -> Dispatch {
+    if state.view_mode == cp_base::state::data::config::ViewMode::Threads
+        && let Some(action) = handle_threads_ctrl(key, state)
+    {
+        return Dispatch::Act(action);
+    }
+    match key.code {
+        KeyCode::Char('q') => Dispatch::Quit,
+        KeyCode::Char('l') => Dispatch::Act(Action::ClearConversation),
+        KeyCode::Char('n') => Dispatch::Act(Action::NewContext),
+        KeyCode::Char('h') => Dispatch::Act(Action::ToggleConfigView),
+        KeyCode::Char('i') => Dispatch::Act(Action::ToggleIndexOverlay),
+        KeyCode::Char('v') => Dispatch::Act(Action::CycleViewMode),
+        KeyCode::Char('o') => Dispatch::Act(Action::ResetSessionCosts),
+        KeyCode::Char('p') => Dispatch::Act(Action::OpenCommandPalette),
+        KeyCode::Char('u') => Dispatch::Act(Action::HistoryPrev),
+        KeyCode::Char('d') => Dispatch::Act(Action::HistoryNext),
+        KeyCode::Char('c') => Dispatch::Act(if state.flags.overlays.index_status {
+            Action::CopyIndexOverlay
+        } else {
+            Action::CopyPanelContent
+        }),
+        KeyCode::Backspace
+        | KeyCode::Enter
+        | KeyCode::Left
+        | KeyCode::Right
+        | KeyCode::Up
+        | KeyCode::Down
+        | KeyCode::Home
+        | KeyCode::End
+        | KeyCode::PageUp
+        | KeyCode::PageDown
+        | KeyCode::Tab
+        | KeyCode::BackTab
+        | KeyCode::Delete
+        | KeyCode::Insert
+        | KeyCode::F(_)
+        | KeyCode::Char(_)
+        | KeyCode::Null
+        | KeyCode::Esc
+        | KeyCode::CapsLock
+        | KeyCode::ScrollLock
+        | KeyCode::NumLock
+        | KeyCode::PrintScreen
+        | KeyCode::Pause
+        | KeyCode::Menu
+        | KeyCode::KeypadBegin
+        | KeyCode::Media(_)
+        | KeyCode::Modifier(_) => Dispatch::Fallthrough,
+    }
+}
+
+/// Threads-view Ctrl overrides: Ctrl+A archive/restore, Ctrl+U toggle archived
+/// view. `None` = not one of these (fall through to global Ctrl bindings).
+fn handle_threads_ctrl(key: &KeyEvent, state: &State) -> Option<Action> {
+    let viewing_archived = cp_mod_threads::types::FocusState::get(state).viewing_archived;
+    match key.code {
+        KeyCode::Char('a') => {
+            Some(if viewing_archived { Action::ThreadArchiveConfirm } else { Action::ThreadArchiveStart })
+        }
+        KeyCode::Char('u') => Some(Action::ThreadToggleArchivedView),
+        KeyCode::Backspace
+        | KeyCode::Enter
+        | KeyCode::Left
+        | KeyCode::Right
+        | KeyCode::Up
+        | KeyCode::Down
+        | KeyCode::Home
+        | KeyCode::End
+        | KeyCode::PageUp
+        | KeyCode::PageDown
+        | KeyCode::Tab
+        | KeyCode::BackTab
+        | KeyCode::Delete
+        | KeyCode::Insert
+        | KeyCode::F(_)
+        | KeyCode::Char(_)
+        | KeyCode::Null
+        | KeyCode::Esc
+        | KeyCode::CapsLock
+        | KeyCode::ScrollLock
+        | KeyCode::NumLock
+        | KeyCode::PrintScreen
+        | KeyCode::Pause
+        | KeyCode::Menu
+        | KeyCode::KeypadBegin
+        | KeyCode::Media(_)
+        | KeyCode::Modifier(_) => None,
+    }
+}
+
+/// Index-overlay keys: Esc dismisses, all other keys are consumed (return
+/// `Action::None`). `None` when the overlay is closed.
+fn handle_index_overlay_key(key: &KeyEvent, state: &State) -> Option<Action> {
+    if !state.flags.overlays.index_status {
+        return None;
+    }
+    Some(if key.code == KeyCode::Esc { Action::ToggleIndexOverlay } else { Action::None })
+}
+
+/// Threads-view navigation (non-Ctrl): archive-confirm y/n, Tab/BackTab select,
+/// Esc exit. `Fallthrough` when the key isn't a threads-nav key.
+fn handle_threads_nav(key: &KeyEvent, state: &State) -> Dispatch {
+    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+    let confirming = cp_mod_threads::types::FocusState::get(state).confirming_archive;
+    match key.code {
+        KeyCode::Char('y') if confirming => Dispatch::Act(Action::ThreadArchiveConfirm),
+        _ if confirming => Dispatch::Act(Action::ThreadArchiveCancel),
+        KeyCode::Tab if !shift => Dispatch::Act(Action::ThreadSelectNext),
+        KeyCode::BackTab => Dispatch::Act(Action::ThreadSelectPrev),
+        KeyCode::Esc => Dispatch::Act(Action::CycleViewMode),
+        KeyCode::Backspace
+        | KeyCode::Enter
+        | KeyCode::Left
+        | KeyCode::Right
+        | KeyCode::Up
+        | KeyCode::Down
+        | KeyCode::Home
+        | KeyCode::End
+        | KeyCode::PageUp
+        | KeyCode::PageDown
+        | KeyCode::Tab
+        | KeyCode::Delete
+        | KeyCode::Insert
+        | KeyCode::F(_)
+        | KeyCode::Char(_)
+        | KeyCode::Null
+        | KeyCode::CapsLock
+        | KeyCode::ScrollLock
+        | KeyCode::NumLock
+        | KeyCode::PrintScreen
+        | KeyCode::Pause
+        | KeyCode::Menu
+        | KeyCode::KeypadBegin
+        | KeyCode::Media(_)
+        | KeyCode::Modifier(_) => Dispatch::Fallthrough,
+    }
+}
+
+/// Enter/Space on a context pattern (p1, P2, …) submits immediately — unless a
+/// modifier is held (Ctrl/Shift/Alt+Enter = newline). `None` when not applicable.
+fn handle_context_pattern_submit(key: &KeyEvent, state: &State) -> Option<Action> {
+    let has_modifier = key.modifiers.contains(KeyModifiers::CONTROL)
+        || key.modifiers.contains(KeyModifiers::SHIFT)
+        || key.modifiers.contains(KeyModifiers::ALT);
+    let is_submit = (key.code == KeyCode::Enter && !has_modifier) || key.code == KeyCode::Char(' ');
+    if is_submit
+        && let Some(id) = parse_context_pattern(&state.input)
+        && find_context_by_id(state, &id).is_some()
+    {
+        return Some(Action::InputSubmit);
+    }
+    None
+}
+
+/// Let the active panel handle the key. In Threads view the conversation panel
+/// always owns input routing. `None` when no panel consumes the key.
+fn handle_panel_key(key: &KeyEvent, state: &State) -> Option<Action> {
+    if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+        let ctx = state.context.iter().find(|c| c.context_type.as_str() == crate::state::Kind::CONVERSATION)?;
+        return get_panel(&ctx.context_type).handle_key(key, state);
+    }
+    let ctx = state.context.get(state.selected_context)?;
+    get_panel(&ctx.context_type).handle_key(key, state)
+}
+
+/// Global fallback: scrolling + context switching. Returns `Action::None` for
+/// unhandled keys.
+fn handle_global_fallback(key: &KeyEvent) -> Action {
+    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+    match key.code {
+        KeyCode::Tab if shift => Action::SelectPrevContext,
+        KeyCode::Tab => Action::SelectNextContext,
+        KeyCode::BackTab => Action::SelectPrevContext,
+        KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => {
+            scroll_key_action(key).unwrap_or(Action::None)
+        }
+        KeyCode::Backspace
+        | KeyCode::Enter
+        | KeyCode::Left
+        | KeyCode::Right
+        | KeyCode::Home
+        | KeyCode::End
+        | KeyCode::Delete
+        | KeyCode::Insert
+        | KeyCode::F(_)
+        | KeyCode::Char(_)
+        | KeyCode::Null
+        | KeyCode::Esc
+        | KeyCode::CapsLock
+        | KeyCode::ScrollLock
+        | KeyCode::NumLock
+        | KeyCode::PrintScreen
+        | KeyCode::Pause
+        | KeyCode::Menu
+        | KeyCode::KeypadBegin
+        | KeyCode::Media(_)
+        | KeyCode::Modifier(_) => Action::None,
     }
 }
 

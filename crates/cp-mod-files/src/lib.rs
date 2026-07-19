@@ -69,6 +69,117 @@ fn build_virtual_content(disk_content: &str, canonical_path: &str, state: &State
     virtual_content
 }
 
+/// Pre-flight for `Open`: validate each path exists, is a file, and warn if
+/// already open in context.
+fn preflight_open(tool: &ToolUse, state: &State) -> Verdict {
+    let mut pf = Verdict::new();
+    let paths: Vec<String> = match tool.input.get("path") {
+        Some(serde_json::Value::String(s)) => vec![s.clone()],
+        Some(serde_json::Value::Array(arr)) => arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
+        _ => return pf,
+    };
+    for path in &paths {
+        let p = std::path::Path::new(path);
+        if !p.exists() {
+            pf.errors.push(format!("File '{path}' not found"));
+        } else if !p.is_file() {
+            pf.errors.push(format!("'{path}' is not a file"));
+        } else {
+            let canonical = p.canonicalize().map_or_else(|_| path.clone(), |cp| cp.to_string_lossy().to_string());
+            if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(&canonical)) {
+                pf.warnings.push(format!("File '{path}' is already open in context"));
+            }
+        }
+    }
+    pf
+}
+
+/// Resolved edit target: on-disk path plus its canonical string form.
+struct EditTarget<'target> {
+    /// The filesystem path being edited.
+    path: &'target std::path::Path,
+    /// Canonicalized path string, matched against open context entries.
+    canonical: &'target str,
+}
+
+/// Verify `old_string` against both disk and post-queue virtual content,
+/// pushing an error onto `pf` when the edit cannot apply. See the truth matrix
+/// inline for the four current/virtual outcomes.
+fn preflight_edit_oldstring(tool: &ToolUse, state: &State, target: &EditTarget<'_>, pf: &mut Verdict) {
+    let path_str = target.path.to_string_lossy();
+    let Some(old_string) = tool.input.get("old_string").and_then(|v| v.as_str()) else {
+        return;
+    };
+    let Ok(content) = std::fs::read_to_string(target.path) else {
+        return;
+    };
+    let current_ok = tools::edit_file::find_normalized_match(&content, old_string).is_some();
+    let virtual_content = build_virtual_content(&content, target.canonical, state);
+    let virtual_ok =
+        virtual_content.as_ref().is_some_and(|vc| tools::edit_file::find_normalized_match(vc, old_string).is_some());
+
+    if current_ok && !virtual_ok && virtual_content.is_some() {
+        pf.errors.push(format!(
+            "old_string found in '{path_str}' on disk but a pending Queue edit conflicts — the queued changes remove this text"
+        ));
+    } else if !current_ok && !virtual_ok {
+        pf.errors.push(format!("old_string not found in '{path_str}' — open the file to see current content"));
+    }
+    // current ✗ virtual ✓ → fine (model edits post-queue state)
+    // current ✓ virtual ✓ → fine (no conflict)
+}
+
+/// Pre-flight for `Edit`: activate queue, validate path, warn if not open,
+/// then verify `old_string` against disk + virtual content.
+fn preflight_edit(tool: &ToolUse, state: &State) -> Verdict {
+    let mut pf = Verdict::new();
+    // File edits are destructive — auto-activate queue for batching
+    pf.activate_queue = true;
+    let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) else {
+        return pf;
+    };
+    let p = std::path::Path::new(path_str);
+    if !p.exists() {
+        pf.errors.push(format!("File '{path_str}' not found"));
+        return pf;
+    }
+    if !p.is_file() {
+        pf.errors.push(format!("'{path_str}' is not a file"));
+        return pf;
+    }
+    let canonical = p.canonicalize().map_or_else(|_| path_str.to_owned(), |cp| cp.to_string_lossy().to_string());
+    let is_open = state
+        .context
+        .iter()
+        .any(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical));
+    if !is_open {
+        pf.warnings.push(format!("File '{path_str}' is not open in context. Edit will proceed if old_string has a unique match, but open the file to see current content."));
+    }
+    preflight_edit_oldstring(tool, state, &EditTarget { path: p, canonical: &canonical }, &mut pf);
+    pf
+}
+
+/// Pre-flight for `Write`: activate queue, warn if parent dir is missing (it is
+/// auto-created).
+fn preflight_write(tool: &ToolUse) -> Verdict {
+    let mut pf = Verdict::new();
+    // File writes are destructive — auto-activate queue for batching
+    pf.activate_queue = true;
+    if let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) {
+        let p = std::path::Path::new(path_str);
+        if let Some(parent) = p.parent()
+            && !parent.as_os_str().is_empty()
+            && !parent.exists()
+        {
+            pf.warnings.push(format!(
+                "Parent directory '{}' does not exist — it will be created automatically",
+                parent.display()
+            ));
+        }
+    }
+    pf
+}
+
 /// Files module: Open, Edit, Write tools for file manipulation.
 #[derive(Debug, Clone, Copy)]
 pub struct FilesModule;
@@ -129,102 +240,9 @@ impl Module for FilesModule {
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
-            "Open" => {
-                let mut pf = Verdict::new();
-                let paths: Vec<String> = match tool.input.get("path") {
-                    Some(serde_json::Value::String(s)) => vec![s.clone()],
-                    Some(serde_json::Value::Array(arr)) => {
-                        arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
-                    }
-                    _ => return Some(pf),
-                };
-                for path in &paths {
-                    let p = std::path::Path::new(path);
-                    if !p.exists() {
-                        pf.errors.push(format!("File '{path}' not found"));
-                    } else if !p.is_file() {
-                        pf.errors.push(format!("'{path}' is not a file"));
-                    } else {
-                        // Canonicalize for consistent comparison with stored paths
-                        let canonical =
-                            p.canonicalize().map_or_else(|_| path.clone(), |cp| cp.to_string_lossy().to_string());
-                        if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(&canonical)) {
-                            pf.warnings.push(format!("File '{path}' is already open in context"));
-                        }
-                    }
-                }
-                Some(pf)
-            }
-            "Edit" => {
-                let mut pf = Verdict::new();
-                // File edits are destructive — auto-activate queue for batching
-                pf.activate_queue = true;
-                if let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) {
-                    let p = std::path::Path::new(path_str);
-                    if !p.exists() {
-                        pf.errors.push(format!("File '{path_str}' not found"));
-                    } else if !p.is_file() {
-                        pf.errors.push(format!("'{path_str}' is not a file"));
-                    } else {
-                        // Canonicalize for consistent comparison with stored paths
-                        let canonical = p
-                            .canonicalize()
-                            .map_or_else(|_| path_str.to_owned(), |cp| cp.to_string_lossy().to_string());
-                        let is_open = state.context.iter().any(|c| {
-                            c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical)
-                        });
-                        if !is_open {
-                            pf.warnings.push(format!("File '{path_str}' is not open in context. Edit will proceed if old_string has a unique match, but open the file to see current content."));
-                        }
-                        // Verify old_string against current disk AND virtual (post-queue) content.
-                        // Matrix:
-                        //   current ✓, virtual ✓ → OK
-                        //   current ✓, virtual ✗ → ERROR (pending queue edit conflicts)
-                        //   current ✗, virtual ✓ → OK (model edits post-queue state)
-                        //   current ✗, virtual ✗ → ERROR (not found anywhere)
-                        if let Some(old_string) = tool.input.get("old_string").and_then(|v| v.as_str())
-                            && let Ok(content) = std::fs::read_to_string(p)
-                        {
-                            let current_ok = tools::edit_file::find_normalized_match(&content, old_string).is_some();
-                            let virtual_content = build_virtual_content(&content, &canonical, state);
-                            let virtual_ok = virtual_content
-                                .as_ref()
-                                .is_some_and(|vc| tools::edit_file::find_normalized_match(vc, old_string).is_some());
-
-                            if current_ok && !virtual_ok && virtual_content.is_some() {
-                                pf.errors.push(format!(
-                                    "old_string found in '{path_str}' on disk but a pending Queue edit conflicts — the queued changes remove this text"
-                                ));
-                            } else if !current_ok && !virtual_ok {
-                                pf.errors.push(format!(
-                                    "old_string not found in '{path_str}' — open the file to see current content"
-                                ));
-                            }
-                            // current ✗ virtual ✓ → fine (model is being smart)
-                            // current ✓ virtual ✓ → fine (no conflict)
-                        }
-                    }
-                }
-                Some(pf)
-            }
-            "Write" => {
-                let mut pf = Verdict::new();
-                // File writes are destructive — auto-activate queue for batching
-                pf.activate_queue = true;
-                if let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) {
-                    let p = std::path::Path::new(path_str);
-                    if let Some(parent) = p.parent()
-                        && !parent.as_os_str().is_empty()
-                        && !parent.exists()
-                    {
-                        pf.warnings.push(format!(
-                            "Parent directory '{}' does not exist — it will be created automatically",
-                            parent.display()
-                        ));
-                    }
-                }
-                Some(pf)
-            }
+            "Open" => Some(preflight_open(tool, state)),
+            "Edit" => Some(preflight_edit(tool, state)),
+            "Write" => Some(preflight_write(tool)),
             _ => None,
         }
     }
@@ -333,6 +351,20 @@ impl Module for FilesModule {
     }
 }
 
+/// Style one line inside a diff fenced block: red deletes, green adds,
+/// muted context.
+fn style_diff_block_line(line: &str, width: usize) -> cp_render::Block {
+    use cp_render::{Block, Semantic, Span};
+    let semantic = if line.starts_with("- ") {
+        Semantic::DiffRemove
+    } else if line.starts_with("+ ") {
+        Semantic::DiffAdd
+    } else {
+        Semantic::Muted
+    };
+    Block::Line(vec![Span::styled(truncate_line(line, width), semantic)])
+}
+
 /// Visualizer for Edit and Write tool results.
 ///
 /// Parses diff blocks and renders deleted lines in red, added lines in green.
@@ -340,7 +372,7 @@ impl Module for FilesModule {
 /// Non-diff content is rendered in secondary text color.
 #[must_use]
 pub fn visualize_diff(content: &str, width: usize) -> Vec<cp_render::Block> {
-    use cp_render::{Block, Semantic, Span};
+    use cp_render::{Block, Span};
 
     let mut blocks = Vec::new();
     let mut in_diff_block = false;
@@ -358,18 +390,8 @@ pub fn visualize_diff(content: &str, width: usize) -> Vec<cp_render::Block> {
 
         if line.is_empty() {
             blocks.push(Block::empty());
-            continue;
-        }
-
-        if in_diff_block {
-            let semantic = if line.starts_with("- ") {
-                Semantic::DiffRemove
-            } else if line.starts_with("+ ") {
-                Semantic::DiffAdd
-            } else {
-                Semantic::Muted
-            };
-            blocks.push(Block::Line(vec![Span::styled(truncate_line(line, width), semantic)]));
+        } else if in_diff_block {
+            blocks.push(style_diff_block_line(line, width));
         } else if let Some(styled) = style_callback_line_ir(line, width) {
             blocks.push(styled);
         } else {

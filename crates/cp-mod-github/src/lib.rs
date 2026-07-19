@@ -198,10 +198,58 @@ impl Module for GithubModule {
     }
 }
 
+/// Panel notices and error lines.
+fn gh_notice_semantic(line: &str) -> Option<cp_render::Semantic> {
+    use cp_render::Semantic;
+    if line.starts_with("Panel created:") || line.starts_with("Panel updated:") {
+        Some(Semantic::Success)
+    } else if line.starts_with("Error:") {
+        Some(Semantic::Error)
+    } else if line.starts_with('#') {
+        Some(Semantic::Muted)
+    } else {
+        None
+    }
+}
+
+/// PR/issue state badges (open/merged/closed/draft).
+fn gh_state_semantic(line: &str) -> Option<cp_render::Semantic> {
+    use cp_render::Semantic;
+    if line.contains("OPEN") || line.contains("MERGED") || line.contains('✓') {
+        Some(Semantic::Success)
+    } else if line.contains("CLOSED") || line.contains('✗') {
+        Some(Semantic::Error)
+    } else if line.contains("DRAFT") || line.contains("PENDING") {
+        Some(Semantic::Warning)
+    } else {
+        None
+    }
+}
+
+/// URLs and issue/PR number references.
+fn gh_ref_semantic(line: &str) -> Option<cp_render::Semantic> {
+    use cp_render::Semantic;
+    if line.contains("http://") || line.contains("https://") {
+        Some(Semantic::Accent)
+    } else if line.contains('#') && line.chars().any(|c| c.is_ascii_digit()) {
+        Some(Semantic::Info)
+    } else {
+        None
+    }
+}
+
+/// Pick the semantic color for one line of `gh_execute` output.
+fn gh_line_semantic(line: &str) -> cp_render::Semantic {
+    gh_notice_semantic(line)
+        .or_else(|| gh_state_semantic(line))
+        .or_else(|| gh_ref_semantic(line))
+        .unwrap_or(cp_render::Semantic::Default)
+}
+
 /// Visualizer for `gh_execute` tool results.
 /// Color-codes PR/issue output with status badges, labels, authors, and highlights URLs and PR numbers.
 fn visualize_gh_output(content: &str, width: usize) -> Vec<cp_render::Block> {
-    use cp_render::{Block, Semantic, Span};
+    use cp_render::{Block, Span};
 
     content
         .lines()
@@ -209,25 +257,7 @@ fn visualize_gh_output(content: &str, width: usize) -> Vec<cp_render::Block> {
             if line.is_empty() {
                 return Block::empty();
             }
-            let semantic = if line.starts_with("Panel created:") || line.starts_with("Panel updated:") {
-                Semantic::Success
-            } else if line.starts_with("Error:") {
-                Semantic::Error
-            } else if line.contains("OPEN") || line.contains("MERGED") || line.contains("✓") {
-                Semantic::Success
-            } else if line.contains("CLOSED") || line.contains("✗") {
-                Semantic::Error
-            } else if line.contains("DRAFT") || line.contains("PENDING") {
-                Semantic::Warning
-            } else if line.contains("http://") || line.contains("https://") {
-                Semantic::Accent
-            } else if line.contains('#') && line.chars().any(|c| c.is_ascii_digit()) {
-                Semantic::Info
-            } else if line.starts_with('#') {
-                Semantic::Muted
-            } else {
-                Semantic::Default
-            };
+            let semantic = gh_line_semantic(line);
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {

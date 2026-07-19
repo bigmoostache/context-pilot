@@ -2,21 +2,20 @@
 
 use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
-use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
 use super::error::LlmError;
 use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::constants::{API_ENDPOINT, API_VERSION, library};
-use crate::infra::tools::ToolUse;
 use crate::infra::tools::build_api;
 use cp_base::config::INJECTIONS;
 
 pub(in crate::llms) mod messages;
+pub(in crate::llms) mod streaming;
 
-use messages::{log_sse_error, messages_to_api};
+use messages::messages_to_api;
 
 /// Anthropic Claude client
 pub(crate) struct AnthropicClient {
@@ -51,58 +50,6 @@ struct AnthropicRequest {
     tools: Value,
     /// Whether to stream the response
     stream: bool,
-}
-
-/// Content block metadata from SSE stream events.
-#[derive(Debug, Deserialize)]
-struct StreamContentBlock {
-    /// Block type (e.g. "text", "`tool_use`")
-    #[serde(rename = "type")]
-    block_type: Option<String>,
-    /// Block ID (for `tool_use` blocks)
-    id: Option<String>,
-    /// Tool name (for `tool_use` blocks)
-    name: Option<String>,
-}
-
-/// Delta payload from SSE stream events.
-#[derive(Debug, Deserialize)]
-struct StreamDelta {
-    /// Delta type (e.g. "`text_delta`", "`input_json_delta`")
-    #[serde(rename = "type")]
-    delta_type: Option<String>,
-    /// Text content delta
-    text: Option<String>,
-    /// Partial JSON for tool input
-    partial_json: Option<String>,
-    /// Stop reason (e.g. "`end_turn`", "`tool_use`")
-    stop_reason: Option<String>,
-}
-
-/// Top-level SSE stream event from the Anthropic API.
-#[derive(Debug, Deserialize)]
-struct StreamMessage {
-    /// Event type (e.g. "`content_block_start`", "`message_delta`")
-    #[serde(rename = "type")]
-    event_type: String,
-    /// Content block index (unused but present in API)
-    #[serde(default)]
-    _index: Option<usize>,
-    /// Content block metadata (for `block_start` events)
-    content_block: Option<StreamContentBlock>,
-    /// Delta payload (for delta events)
-    delta: Option<StreamDelta>,
-    /// Token usage statistics
-    usage: Option<StreamUsage>,
-}
-
-/// Token usage statistics from the Anthropic API.
-#[derive(Debug, Deserialize)]
-struct StreamUsage {
-    /// Number of input tokens consumed
-    input_tokens: Option<usize>,
-    /// Number of output tokens generated
-    output_tokens: Option<usize>,
 }
 
 impl LlmClient for AnthropicClient {
@@ -185,126 +132,14 @@ impl LlmClient for AnthropicClient {
             return Err(LlmError::Api { status, body });
         }
 
-        let mut reader = BufReader::new(response);
-        let mut input_tokens = 0;
-        let mut output_tokens = 0;
-        let mut current_tool: Option<(String, String, String)> = None;
-        let mut stop_reason: Option<String> = None;
-        let mut total_bytes: usize = 0;
-        let mut line_count: usize = 0;
-        let mut last_lines: Vec<String> = Vec::new();
-
-        loop {
-            let mut line = String::new();
-            match reader.read_line(&mut line) {
-                Ok(0) => break, // EOF
-                Ok(n) => {
-                    total_bytes = total_bytes.saturating_add(n);
-                    line_count = line_count.saturating_add(1);
-                }
-                Err(e) => {
-                    let tool_ctx = current_tool.as_ref().map_or_else(
-                        || "No tool in progress".to_owned(),
-                        |(id, name, partial)| {
-                            format!("In-flight tool: {} (id={}), partial: {} bytes", name, id, partial.len())
-                        },
-                    );
-                    let recent =
-                        if last_lines.is_empty() { "(no lines read)".to_owned() } else { last_lines.join("\n") };
-                    return Err(LlmError::StreamRead(format!(
-                        "{e}\nStream position: {total_bytes} bytes, {line_count} lines read\n{tool_ctx}\nLast SSE lines:\n{recent}"
-                    )));
-                }
-            }
-            let line = line.trim_end_matches('\n').trim_end_matches('\r');
-
-            if !line.starts_with("data: ") {
-                continue;
-            }
-
-            if last_lines.len() >= 5 {
-                let _r = last_lines.remove(0);
-            }
-            last_lines.push(line.to_owned());
-
-            let json_str = line.get(6..).unwrap_or("");
-            if json_str == "[DONE]" {
-                break;
-            }
-
-            if let Ok(event) = serde_json::from_str::<StreamMessage>(json_str) {
-                match event.event_type.as_str() {
-                    "content_block_start" => {
-                        if let Some(block) = event.content_block
-                            && block.block_type.as_deref() == Some("tool_use")
-                        {
-                            let name = block.name.unwrap_or_default();
-                            let _r =
-                                tx.send(StreamEvent::ToolProgress { name: name.clone(), input_so_far: String::new() });
-                            current_tool = Some((block.id.unwrap_or_default(), name, String::new()));
-                        }
-                    }
-                    "content_block_delta" => {
-                        if let Some(delta) = event.delta {
-                            match delta.delta_type.as_deref() {
-                                Some("text_delta") => {
-                                    if let Some(text) = delta.text {
-                                        let _r = tx.send(StreamEvent::Chunk(text));
-                                    }
-                                }
-                                Some("input_json_delta") => {
-                                    if let Some(json) = delta.partial_json
-                                        && let Some((_, name, input)) = current_tool.as_mut()
-                                    {
-                                        input.push_str(&json);
-                                        let _r = tx.send(StreamEvent::ToolProgress {
-                                            name: name.clone(),
-                                            input_so_far: input.clone(),
-                                        });
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                    "content_block_stop" => {
-                        if let Some((id, name, input_json)) = current_tool.take() {
-                            let input: Value = serde_json::from_str(&input_json)
-                                .unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
-                            let _r = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
-                        }
-                    }
-                    "message_delta" => {
-                        if let Some(delta) = &event.delta
-                            && let Some(reason) = &delta.stop_reason
-                        {
-                            stop_reason = Some(reason.clone());
-                        }
-                        if let Some(usage) = event.usage {
-                            if let Some(inp) = usage.input_tokens {
-                                input_tokens = inp;
-                            }
-                            if let Some(out) = usage.output_tokens {
-                                output_tokens = out;
-                            }
-                        }
-                    }
-                    "message_stop" => break,
-                    "error" => {
-                        log_sse_error(json_str, total_bytes, line_count, &last_lines);
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-        }
+        let totals = streaming::consume_anthropic_stream(response, &tx, "anthropic")?;
 
         let _r = tx.send(StreamEvent::Done {
-            input_tokens,
-            output_tokens,
+            input_tokens: totals.input_tokens,
+            output_tokens: totals.output_tokens,
             cache_hit_tokens: 0,
             cache_miss_tokens: 0,
-            stop_reason,
+            stop_reason: totals.stop_reason,
             bp_hashes: vec![],
             bp_panel_ids: vec![],
             alive_count: 0,

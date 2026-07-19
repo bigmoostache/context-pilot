@@ -89,6 +89,51 @@ pub(crate) fn context_hit_miss(state: &State) -> (usize, usize) {
     (hit, miss)
 }
 
+/// The compact cache-status token for a panel's context line: hit tick, frozen
+/// (`n/max`), or miss cross.
+fn panel_hit_miss_token(ctx: &crate::state::Entry) -> String {
+    if ctx.panel_cache_hit {
+        "\u{2713}".to_owned()
+    } else if ctx.freeze_count > 0 {
+        let panel = crate::app::panels::get_panel(&ctx.context_type);
+        format!("\u{2717} ({}/{})", ctx.freeze_count, panel.max_freezes())
+    } else {
+        "\u{2717}".to_owned()
+    }
+}
+
+/// Append one panel's context line to `output` (id, type, optional details,
+/// tokens, cost, cache status, freeze/miss counters, running accumulator).
+fn write_panel_line(
+    output: &mut String,
+    ctx: &crate::state::Entry,
+    accumulated: usize,
+    modules: &[Box<dyn crate::modules::Module>],
+) {
+    let type_name =
+        get_context_type_meta(ctx.context_type.as_str()).map_or(ctx.context_type.as_str(), |m| m.short_name);
+    let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
+    let hit_miss = panel_hit_miss_token(ctx);
+    let cost = format!("${:.2}", ctx.panel_total_cost);
+    let freeze_info = if ctx.total_freezes > 0 { format!(" ❄{}", ctx.total_freezes) } else { String::new() };
+    let miss_info =
+        if ctx.total_cache_misses > 0 { format!(" miss:{}", ctx.total_cache_misses) } else { String::new() };
+
+    if details.is_empty() {
+        let _r = writeln!(
+            output,
+            "  {} {}: {} tokens {} {}{}{} (acc: {})",
+            ctx.id, type_name, ctx.token_count, cost, hit_miss, freeze_info, miss_info, accumulated
+        );
+    } else {
+        let _r = writeln!(
+            output,
+            "  {} {} ({}): {} tokens {} {}{}{} (acc: {})",
+            ctx.id, type_name, details, ctx.token_count, cost, hit_miss, freeze_info, miss_info, accumulated
+        );
+    }
+}
+
 /// Generates the plain-text/markdown context content sent to the LLM.
 /// This is separate from the TUI rendering (`overview_render.rs`).
 pub(crate) fn generate_context_content(state: &State) -> String {
@@ -136,40 +181,8 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     let modules = all_modules();
 
     for ctx in &panels {
-        let type_name =
-            get_context_type_meta(ctx.context_type.as_str()).map_or(ctx.context_type.as_str(), |m| m.short_name);
-
-        let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
-
-        let hit_miss = if ctx.panel_cache_hit {
-            "\u{2713}".to_owned()
-        } else if ctx.freeze_count > 0 {
-            let panel = crate::app::panels::get_panel(&ctx.context_type);
-            let max = panel.max_freezes();
-            format!("\u{2717} ({}/{})", ctx.freeze_count, max)
-        } else {
-            "\u{2717}".to_owned()
-        };
-        let cost = format!("${:.2}", ctx.panel_total_cost);
-        let freeze_info = if ctx.total_freezes > 0 { format!(" ❄{}", ctx.total_freezes) } else { String::new() };
-        let miss_info =
-            if ctx.total_cache_misses > 0 { format!(" miss:{}", ctx.total_cache_misses) } else { String::new() };
-
         accumulated = accumulated.saturating_add(ctx.token_count);
-
-        if details.is_empty() {
-            let _r3 = writeln!(
-                output,
-                "  {} {}: {} tokens {} {}{}{} (acc: {})",
-                ctx.id, type_name, ctx.token_count, cost, hit_miss, freeze_info, miss_info, accumulated
-            );
-        } else {
-            let _r4 = writeln!(
-                output,
-                "  {} {} ({}): {} tokens {} {}{}{} (acc: {})",
-                ctx.id, type_name, details, ctx.token_count, cost, hit_miss, freeze_info, miss_info, accumulated
-            );
-        }
+        write_panel_line(&mut output, ctx, accumulated, &modules);
     }
 
     // Statistics

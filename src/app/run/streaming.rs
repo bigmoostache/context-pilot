@@ -68,43 +68,46 @@ pub(super) fn process_stream_events(app: &mut App, rx: &Receiver<StreamEvent>) {
                 // API call succeeded — reset retry counter immediately at tick level
                 app.state.api_retry_count = 0;
             }
-            StreamEvent::Error(e) => {
-                app.typewriter.reset();
-                // Log every error to disk for debugging
-                let attempt = app.state.api_retry_count.saturating_add(1);
-                let will_retry = attempt <= MAX_API_RETRIES;
-                let provider = format!("{:?}", app.state.llm_provider);
-                let model = app.state.current_model();
-                let log_msg = format!(
-                    "Attempt {}/{} ({})\n\
-                     Provider: {} | Model: {}\n\
-                     Last request dump: .context-pilot/last_requests/\n\n\
-                     {}\n",
-                    attempt,
-                    MAX_API_RETRIES + 1,
-                    if will_retry { "will retry" } else { "giving up" },
-                    provider,
-                    model,
-                    e
-                );
-                let _log = crate::state::persistence::log_error(&log_msg);
-
-                // Check if we should retry
-                if will_retry {
-                    app.state.api_retry_count = app.state.api_retry_count.saturating_add(1);
-                    app.pending_retry_error = Some(e);
-                } else {
-                    // Max retries reached, show error
-                    app.state.api_retry_count = 0;
-                    // Track consecutive failed continuations for backoff
-                    let spine = cp_mod_spine::types::SpineState::get_mut(&mut app.state);
-                    spine.config.consecutive_continuation_errors =
-                        spine.config.consecutive_continuation_errors.saturating_add(1);
-                    spine.config.last_continuation_error_ms = Some(crate::app::panels::now_ms());
-                    let _action = apply_action(&mut app.state, Action::StreamError(e));
-                }
-            }
+            StreamEvent::Error(e) => handle_stream_error_event(app, e),
         }
+    }
+}
+
+/// Handle a `StreamEvent::Error`: log to disk, then either flag a retry (under
+/// the retry cap) or surface the error + record a continuation-error backoff.
+fn handle_stream_error_event(app: &mut App, e: String) {
+    app.typewriter.reset();
+    // Log every error to disk for debugging
+    let attempt = app.state.api_retry_count.saturating_add(1);
+    let will_retry = attempt <= MAX_API_RETRIES;
+    let provider = format!("{:?}", app.state.llm_provider);
+    let model = app.state.current_model();
+    let log_msg = format!(
+        "Attempt {}/{} ({})\n\
+         Provider: {} | Model: {}\n\
+         Last request dump: .context-pilot/last_requests/\n\n\
+         {}\n",
+        attempt,
+        MAX_API_RETRIES + 1,
+        if will_retry { "will retry" } else { "giving up" },
+        provider,
+        model,
+        e
+    );
+    let _log = crate::state::persistence::log_error(&log_msg);
+
+    // Check if we should retry
+    if will_retry {
+        app.state.api_retry_count = app.state.api_retry_count.saturating_add(1);
+        app.pending_retry_error = Some(e);
+    } else {
+        // Max retries reached, show error
+        app.state.api_retry_count = 0;
+        // Track consecutive failed continuations for backoff
+        let spine = cp_mod_spine::types::SpineState::get_mut(&mut app.state);
+        spine.config.consecutive_continuation_errors = spine.config.consecutive_continuation_errors.saturating_add(1);
+        spine.config.last_continuation_error_ms = Some(crate::app::panels::now_ms());
+        let _action = apply_action(&mut app.state, Action::StreamError(e));
     }
 }
 

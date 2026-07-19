@@ -52,6 +52,19 @@ fn schema_marker_path() -> PathBuf {
     logs_dir().join(".schema_v2")
 }
 
+/// Delete all `chunk_*.json` and `next_id.json` files in the logs directory.
+fn purge_chunk_files(dir: &std::path::Path) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.filter_map(Result::ok) {
+        let path = entry.path();
+        if path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("chunk_") || n == "next_id.json") {
+            let _r = fs::remove_file(&path);
+        }
+    }
+}
+
 /// Perform clean-slate migration to the v2 schema (tags + importance, no summaries).
 ///
 /// If the marker file `.schema_v2` does not exist in the logs directory,
@@ -64,18 +77,7 @@ fn migrate_if_needed() {
 
     let dir = logs_dir();
     if dir.is_dir() {
-        if let Ok(entries) = fs::read_dir(&dir) {
-            for entry in entries.filter_map(Result::ok) {
-                let path = entry.path();
-                if path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.starts_with("chunk_") || n == "next_id.json")
-                {
-                    let _r = fs::remove_file(&path);
-                }
-            }
-        }
+        purge_chunk_files(&dir);
     } else {
         let _r = fs::create_dir_all(&dir);
     }

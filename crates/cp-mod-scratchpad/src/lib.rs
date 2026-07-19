@@ -240,10 +240,30 @@ impl Module for ScratchpadModule {
     }
 }
 
+/// Classify a scratchpad output line into a display semantic.
+fn scratchpad_line_semantic(line: &str) -> cp_render::Semantic {
+    use cp_render::Semantic;
+    if line.starts_with("Error:") {
+        Semantic::Error
+    } else if line.starts_with("Created cell") {
+        Semantic::Success
+    } else if line.starts_with("Updated") {
+        Semantic::Info
+    } else if line.starts_with("Deleted") {
+        Semantic::Error
+    } else if line.starts_with('C') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
+        Semantic::Info
+    } else if line.contains(':') {
+        Semantic::Muted
+    } else {
+        Semantic::Default
+    }
+}
+
 /// Visualizer for scratchpad tool results.
 /// Highlights cell titles and shows creation vs edit vs deletion actions.
 fn visualize_scratchpad_output(content: &str, width: usize) -> Vec<cp_render::Block> {
-    use cp_render::{Block, Semantic, Span};
+    use cp_render::{Block, Span};
 
     content
         .lines()
@@ -251,21 +271,7 @@ fn visualize_scratchpad_output(content: &str, width: usize) -> Vec<cp_render::Bl
             if line.is_empty() {
                 return Block::empty();
             }
-            let semantic = if line.starts_with("Error:") {
-                Semantic::Error
-            } else if line.starts_with("Created cell") {
-                Semantic::Success
-            } else if line.starts_with("Updated") {
-                Semantic::Info
-            } else if line.starts_with("Deleted") {
-                Semantic::Error
-            } else if line.starts_with('C') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
-                Semantic::Info
-            } else if line.contains(':') {
-                Semantic::Muted
-            } else {
-                Semantic::Default
-            };
+            let semantic = scratchpad_line_semantic(line);
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {

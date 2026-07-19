@@ -304,24 +304,7 @@ fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
         return;
     };
 
-    let is_assistant = thread.messages.get(idx).is_some_and(|m| m.author == ThreadAuthor::Assistant);
-
-    // Collect timestamps to delete: the target + any trailing auto messages.
-    let mut to_delete: Vec<u64> = vec![message_ts];
-
-    if is_assistant {
-        // Walk backward from idx-1 collecting consecutive auto messages
-        // (tool-call traces that produced this response).
-        if let Some(preceding) = thread.messages.get(..idx) {
-            for msg in preceding.iter().rev() {
-                if msg.auto {
-                    to_delete.push(msg.timestamp);
-                } else {
-                    break;
-                }
-            }
-        }
-    }
+    let to_delete = collect_delete_timestamps(thread, idx, message_ts);
 
     // Remove all collected messages.
     let delete_set: std::collections::HashSet<u64> = to_delete.iter().copied().collect();
@@ -343,6 +326,27 @@ fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
 
     state.flags.ui.dirty = true;
     log::info!("bridge: deleted {} message(s) from thread {thread_id} (target ts={message_ts})", to_delete.len());
+}
+
+/// Timestamps to delete for a `DeleteMessage`: the target plus, when the target
+/// is an assistant message, all *consecutive* `auto:true` messages immediately
+/// *preceding* it (tool-trace cleanup — stops at the first non-auto message).
+fn collect_delete_timestamps(thread: &cp_mod_threads::types::Thread, idx: usize, message_ts: u64) -> Vec<u64> {
+    let mut to_delete: Vec<u64> = vec![message_ts];
+    let is_assistant = thread.messages.get(idx).is_some_and(|m| m.author == ThreadAuthor::Assistant);
+    if !is_assistant {
+        return to_delete;
+    }
+    if let Some(preceding) = thread.messages.get(..idx) {
+        for msg in preceding.iter().rev() {
+            if msg.auto {
+                to_delete.push(msg.timestamp);
+            } else {
+                break;
+            }
+        }
+    }
+    to_delete
 }
 
 // ── Stop / Interrupt ────────────────────────────────────────────────────
