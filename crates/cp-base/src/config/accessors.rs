@@ -17,7 +17,7 @@ static CACHED_THEME_IDX: AtomicU8 = AtomicU8::new(u8::MAX);
 
 /// Resolve a theme-order index to its theme reference.
 fn theme_by_index(idx: u8) -> Option<&'static Theme> {
-    let id = THEME_ORDER.get(idx as usize)?;
+    let id = THEME_ORDER.get(usize::from(idx))?;
     THEMES.themes.get(*id)
 }
 

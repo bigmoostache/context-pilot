@@ -142,5 +142,55 @@ exceptions:
     strategy: >
       Irreducible — expect_used is forbid-level so .expect() cannot be used.
 
+  # ── as_conversions: const-fn casts (try_from/From not const-callable) ──
+
+  - path: "crates/cp-wire/src/heartbeat.rs"
+    match: "const-fn narrowing after `& BYTE_MASK_U32` is provably exact"
+    reason: >
+      u32_to_le() masks the low 8 bits with `& BYTE_MASK_U32` before each
+      `as u8`, so the narrowing is provably exact. try_from/From are not
+      const-callable, and to_le_bytes is a forbidden host-order shortcut
+      (the byte order is a wire contract, spelled out by hand).
+    strategy: >
+      Irreducible until fallible/From conversions are const-stable in std.
+
+  - path: "crates/cp-wire/src/heartbeat.rs"
+    match: "const-fn narrowing after `& BYTE_MASK_U64` is provably exact"
+    reason: >
+      u64_to_le() masks the low 8 bits with `& BYTE_MASK_U64` before each
+      `as u8`, so the narrowing is provably exact. try_from/From are not
+      const-callable, and to_le_bytes is a forbidden host-order shortcut
+      (the byte order is a wire contract, spelled out by hand).
+    strategy: >
+      Irreducible until fallible/From conversions are const-stable in std.
+
+  - path: "crates/cp-wire/src/framing.rs"
+    match: "const-fn narrowing after `& BYTE_MASK` is provably exact"
+    reason: >
+      u32_to_le() masks the low 8 bits with `& BYTE_MASK` before each
+      `as u8`, so the narrowing is provably exact. try_from/From are not
+      const-callable, and to_le_bytes is a forbidden host-order shortcut
+      (the byte order is an on-disk contract, spelled out by hand).
+    strategy: >
+      Irreducible until fallible/From conversions are const-stable in std.
+
+  - path: "crates/cp-mod-utilities/src/time.rs"
+    match: "const-fn widening (u8/i32 -> i64) is always exact"
+    reason: >
+      compose_epoch_secs() is a const fn that widens u8/i32 date-time
+      components to i64 (always exact). From/i64::from are not callable in
+      a const fn, so `as` is the only const-compatible widening.
+    strategy: >
+      Irreducible until From is const-callable in stable const fn.
+
+  - path: "src/ui/ir/render_sidebar.rs"
+    match: "const-fn widening (u16 -> usize) is always exact"
+    reason: >
+      content_width() is a const fn that widens the u16 area width to usize
+      (always exact). usize::from is not const-callable on stable, so `as`
+      is the only const-compatible widening.
+    strategy: >
+      Irreducible until From is const-callable in stable const fn.
+
 
 

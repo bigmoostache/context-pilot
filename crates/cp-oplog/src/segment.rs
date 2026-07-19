@@ -143,7 +143,7 @@ pub fn scan_bytes(data: &[u8]) -> Scan {
         }
     }
 
-    scan.valid_len = offset as u64;
+    scan.valid_len = u64::try_from(offset).unwrap_or(u64::MAX);
     scan
 }
 

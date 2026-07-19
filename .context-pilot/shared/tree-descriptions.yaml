@@ -6778,6 +6778,10 @@
   path: crates/cp-orchestrator/src/services/materialized_view.rs
   description: 'Phase 18 + X835/X836a: MaterializedView in-mem fleet projection folded from OpEntry (one AgentView per agent). AgentView{rev,heads,roster,phase,lifecycle,cost}. RosterEntry{thread_id,name,status:ThreadTurn,archived,last_activity_ms,msg_count} = the live thread list /threads serves from view (no disk). apply: Checkpoint=authoritative heads reset (roster NOT yet in snapshot — cold-restart-after-compaction gap tracked for X836b/X850), MessageCreated=set_thread_head + bump roster msg_count/last_activity, ThreadCreated=insert-or-update idempotent, ThreadArchived/Restored=toggle archived, ThreadStatusChanged=set status, Phase/Lifecycle/Cost=latest-wins, CommandEffect/SeenMark/Unknown=inert. 93 lib tests incl roster_create_archive_restore_cycle + thread_created_folds_idempotently_on_replay + message_created_bumps_roster_count_and_activity.'
   last_edited_ms: 0
+69186228775cb03d:
+  path: crates/cp-mod-spine/src/tools.rs
+  description: 'Spine tool handlers: execute_mark_processed (batch notification marking, marked/already/not_found breakdown) + execute_configure (guard-rail limits with zero-value rejection, counter reset).'
+  last_edited_ms: 1784478268902
 6918b64b9ccc1f46:
   path: crates/cp-mod-threads/src/lib.rs
   description: 'Threads module. 2 tools: Send, Read. Global, non-core. Pre-flight: thread_id exists, Send requires content, THEIR_TURN block, count positive. TOOL_TEXTS LazyLock from threads.yaml. fixed_order=5.'
@@ -13126,6 +13130,10 @@ c93c3261319b3b55:
   path: crates/cp-mod-utilities/Cargo.toml
   description: Zero external deps. Workspace lints.
   last_edited_ms: 0
+c951a0a40f59c0b2:
+  path: crates/cp-mod-queue/src/panel.rs
+  description: 'QueuePanel: renders queue status (Active/Paused) + queued tool-call list with truncated params. Static content panel, max_freezes=0, shared main+reverie note. No cache.'
+  last_edited_ms: 1784478268820
 c96098d3b0d9c0d0:
   path: crates/cp-orchestrator/tests/openapi/paths.rs
   description: OpenAPI path definitions — all REST endpoints grouped by tag (fleet, agent, fs, auth, env, ACL, providers, releases, settings, vault/snapshot, claude-usage+login+refresh). Includes deploy + restart-orchestrator paths.

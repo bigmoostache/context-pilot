@@ -268,7 +268,11 @@ struct RefreshJob {
 /// Queries the Meilisearch logs index for each task signal, scores results
 /// with adaptive decay, deduplicates, and writes the YAML to the shared
 /// [`RadarCache`].
-#[expect(clippy::cast_precision_loss, reason = "timestamp ms as f64 — decay math requires floating point")]
+#[expect(
+    clippy::cast_precision_loss,
+    clippy::as_conversions,
+    reason = "timestamp ms as f64 — decay math requires floating point"
+)]
 fn refresh_inner(job: &RefreshJob) {
     let current_log_count_f = job.current_log_count as f64;
     let logs_uid = format!("cp_{}_logs", job.project_hash);

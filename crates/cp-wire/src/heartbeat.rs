@@ -245,6 +245,10 @@ const BYTE_MASK_U64: u64 = 0xFF;
 
 /// Encode a `u32` as four little-endian bytes. Each `& BYTE_MASK_U32` proves
 /// the value fits in a `u8`, so the cast is exact.
+#[expect(
+    clippy::as_conversions,
+    reason = "const-fn narrowing after `& BYTE_MASK_U32` is provably exact; try_from/From are not const-callable and to_le_bytes is a forbidden host-order shortcut (wire contract)"
+)]
 const fn u32_to_le(value: u32) -> [u8; 4] {
     [
         (value & BYTE_MASK_U32) as u8,
@@ -261,6 +265,10 @@ fn u32_from_le(bytes: [u8; 4]) -> u32 {
 }
 
 /// Encode a `u64` as eight little-endian bytes.
+#[expect(
+    clippy::as_conversions,
+    reason = "const-fn narrowing after `& BYTE_MASK_U64` is provably exact; try_from/From are not const-callable and to_le_bytes is a forbidden host-order shortcut (wire contract)"
+)]
 const fn u64_to_le(value: u64) -> [u8; 8] {
     [
         (value & BYTE_MASK_U64) as u8,

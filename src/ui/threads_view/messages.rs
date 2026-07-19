@@ -215,7 +215,7 @@ fn calculate_input_height(state: &State, width: u16, available_height: u16) -> u
     }
     let line_count = state.input.lines().count().max(1);
     // Account for wrapping
-    let wrap_width = (width as usize).saturating_sub(10).max(20);
+    let wrap_width = usize::from(width).saturating_sub(10).max(20);
     let wrapped_lines: usize =
         state.input.lines().map(|l| if l.is_empty() { 1 } else { l.len().div_ceil(wrap_width).max(1) }).sum();
     let total = wrapped_lines.max(line_count);

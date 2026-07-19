@@ -21,7 +21,10 @@ fn next_alpha_marker(marker: &str) -> String {
     // Convert to number (a=0, b=1, ..., z=25, aa=26, ab=27, ...)
     let mut num: usize = 0;
     for c in &chars {
-        num = num.saturating_mul(26).saturating_add(c.to_ascii_lowercase() as usize).saturating_sub(b'a' as usize);
+        num = num
+            .saturating_mul(26)
+            .saturating_add(usize::try_from(u32::from(c.to_ascii_lowercase())).unwrap_or(0))
+            .saturating_sub(usize::from(b'a'));
     }
     num = num.saturating_add(1); // Increment
 
@@ -42,7 +45,7 @@ fn alpha_from_number(num: usize, base: u8) -> String {
         Some(next)
     }) {
         let rem = n.checked_rem(26).unwrap_or(0);
-        result.insert(0, base.saturating_add(rem.to_u8()) as char);
+        result.insert(0, char::from(base.saturating_add(rem.to_u8())));
     }
     result
 }

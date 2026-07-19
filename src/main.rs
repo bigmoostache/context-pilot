@@ -67,7 +67,7 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
         let area = frame.area();
 
         // Centered box: 50 wide, 2 (title) + steps + 2 (gauge + padding)
-        let raw_height = steps.len().saturating_add(5).min(area.height as usize);
+        let raw_height = steps.len().saturating_add(5).min(usize::from(area.height));
         let box_height = u16::try_from(raw_height).unwrap_or(area.height);
         let box_width = 50.min(area.width);
         // center horizontally: (width - box_width) / 2

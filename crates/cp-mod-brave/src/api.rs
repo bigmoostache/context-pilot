@@ -182,7 +182,7 @@ fn urlenc(s: &str) -> String {
     for b in s.bytes() {
         match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                result.push(b as char);
+                result.push(char::from(b));
             }
             _ => {
                 let _r = write!(result, "%{b:02X}");

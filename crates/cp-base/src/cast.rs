@@ -75,6 +75,7 @@ impl Safe for u16 {
 /// values of wider integer types. This is fundamental, not fixable.
 #[expect(
     clippy::cast_precision_loss,
+    clippy::as_conversions,
     reason = "lossy int→float: mantissa too narrow — inherent floating-point limitation"
 )]
 mod lossy_float {
@@ -252,6 +253,7 @@ mod lossy_float {
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
+    clippy::as_conversions,
     reason = "saturating float→int: no TryFrom<float> for integers in std"
 )]
 mod float_to_int {

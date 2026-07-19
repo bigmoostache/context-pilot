@@ -119,6 +119,26 @@ impl Step {
         }
     }
 
+    /// Encode to the stored discriminant. Explicit per-variant literals avoid
+    /// an `as` cast on the `#[repr(u8)]` enum; kept in lockstep with [`from_u8`].
+    const fn as_u8(self) -> u8 {
+        match self {
+            Self::Idle => 0,
+            Self::Input => 1,
+            Self::Bridge => 2,
+            Self::ThreadsEmit => 3,
+            Self::Stream => 4,
+            Self::Cache => 5,
+            Self::Watchers => 6,
+            Self::Tools => 7,
+            Self::Spine => 8,
+            Self::Reverie => 9,
+            Self::PanelRefresh => 10,
+            Self::Render => 11,
+            Self::Save => 12,
+        }
+    }
+
     /// Decode a stored discriminant, falling back to [`Step::Idle`] for any
     /// unknown byte (forward-compatible, never panics).
     const fn from_u8(v: u8) -> Self {
@@ -148,7 +168,7 @@ pub(crate) fn beat() {
 
 /// Record the step the loop is about to execute, so a wedge dump can name it.
 pub(crate) fn mark(step: Step) {
-    CURRENT_STEP.store(step as u8, Ordering::Relaxed);
+    CURRENT_STEP.store(step.as_u8(), Ordering::Relaxed);
     STEP_SINCE_MS.store(now_ms(), Ordering::Relaxed);
 }
 
@@ -283,7 +303,7 @@ fn cpu_busy_pct() -> Option<f64> {
     let t1 = ticks()?;
     let delta = u32::try_from(t1.saturating_sub(t0)).unwrap_or(u32::MAX);
     let dticks = f64::from(delta);
-    let secs = f64::from(CPU_SAMPLE_MS) / 1_000.0_f64;
+    let secs = f64::from(CPU_SAMPLE_MS) / 1000.0f64;
     Some((dticks / CLK_TCK / secs) * 100.0)
 }
 

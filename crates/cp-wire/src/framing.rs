@@ -51,6 +51,10 @@ const BYTE_MASK: u32 = 0xFF;
 /// rather than delegated to `to_le_bytes` (which would read as
 /// host-dependent to a reviewer). Each `& BYTE_MASK` guarantees the value
 /// fits in a `u8`, so the cast is exact.
+#[expect(
+    clippy::as_conversions,
+    reason = "const-fn narrowing after `& BYTE_MASK` is provably exact; try_from/From are not const-callable and to_le_bytes is a forbidden host-order shortcut (wire contract)"
+)]
 const fn u32_to_le(value: u32) -> [u8; 4] {
     [
         (value & BYTE_MASK) as u8,

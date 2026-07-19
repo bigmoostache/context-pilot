@@ -20,6 +20,10 @@ const MAX_DYNAMIC_PER_PAGE: usize = 10;
 const CONTENT_INDENT: usize = 1;
 
 /// Compute available content width given the full area width and the left indent.
+#[expect(
+    clippy::as_conversions,
+    reason = "const-fn widening (u16 -> usize) is always exact; From::from is not const-callable in a const fn"
+)]
 const fn content_width(area_width: u16) -> usize {
     (area_width as usize).saturating_sub(CONTENT_INDENT)
 }

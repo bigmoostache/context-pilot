@@ -292,6 +292,10 @@ fn civil_from_days(days: i64) -> (i32, u8, u8) {
 /// Compose date-time parts into epoch seconds.
 ///
 /// Inverse of [`decompose_utc`]. Returns `None` for invalid dates.
+#[expect(
+    clippy::as_conversions,
+    reason = "const-fn widening (u8/i32 -> i64) is always exact; From/i64::from are not callable in a const fn"
+)]
 const fn compose_epoch_secs(dt: &Parts) -> Option<i64> {
     if dt.month < 1 || dt.month > 12 || dt.day < 1 || dt.day > 31 || dt.hour > 23 || dt.minute > 59 || dt.second > 60 {
         return None;

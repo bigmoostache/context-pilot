@@ -162,7 +162,7 @@ fn dedup_by_score(results: &mut Vec<SearchResult>, limit: u32) {
             .partial_cmp(&a.ranking_score.unwrap_or(0.0f64))
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    results.truncate(limit as usize);
+    results.truncate(usize::try_from(limit).unwrap_or(usize::MAX));
 }
 
 /// Parse a single Meilisearch hit from the files index.

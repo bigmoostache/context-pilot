@@ -43,7 +43,7 @@ pub(crate) fn render_message_blocks(msg: &Message, opts: &MessageBlockOpts) -> V
     if msg.msg_type == MsgKind::ToolCall {
         let icon = icons::msg_tool_call();
         let prefix_width = unicode_width::UnicodeWidthStr::width(icon.as_str()).saturating_add(1);
-        let wrap_width = (viewport_width as usize).saturating_sub(prefix_width.saturating_add(2)).max(20);
+        let wrap_width = usize::from(viewport_width).saturating_sub(prefix_width.saturating_add(2)).max(20);
 
         for tool_use in &msg.tool_uses {
             blocks.push(Block::line(vec![
@@ -82,7 +82,7 @@ pub(crate) fn render_message_blocks(msg: &Message, opts: &MessageBlockOpts) -> V
             };
 
             let prefix_width: usize = 4;
-            let wrap_width = (viewport_width as usize).saturating_sub(prefix_width.saturating_add(1)).max(20);
+            let wrap_width = usize::from(viewport_width).saturating_sub(prefix_width.saturating_add(1)).max(20);
 
             // Check for custom module visualizer
             let registry = get_visualizer_registry();
@@ -190,7 +190,7 @@ pub(crate) fn render_message_blocks(msg: &Message, opts: &MessageBlockOpts) -> V
     let content = &msg.content;
     let prefix = format!("{role_icon}{status_icon}");
     let prefix_width = unicode_width::UnicodeWidthStr::width(prefix.as_str());
-    let wrap_width = (viewport_width as usize).saturating_sub(prefix_width.saturating_add(2)).max(20);
+    let wrap_width = usize::from(viewport_width).saturating_sub(prefix_width.saturating_add(2)).max(20);
 
     if content.trim().is_empty() {
         if msg.role == "assistant" && opts.is_streaming {
@@ -361,7 +361,7 @@ pub(crate) fn render_streaming_tool_blocks(name: &str, partial_json: &str, viewp
 
     let icon = icons::msg_tool_call();
     let prefix_width = unicode_width::UnicodeWidthStr::width(icon.as_str()).saturating_add(1);
-    let wrap_width = (viewport_width as usize).saturating_sub(prefix_width.saturating_add(2)).max(20);
+    let wrap_width = usize::from(viewport_width).saturating_sub(prefix_width.saturating_add(2)).max(20);
 
     // Tool name header
     blocks.push(Block::line(vec![

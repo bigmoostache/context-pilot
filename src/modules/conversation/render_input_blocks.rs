@@ -39,7 +39,7 @@ pub(crate) fn render_input_blocks(
     let mut blocks: Vec<Block> = Vec::new();
     let role_icon = icons::msg_user();
     let prefix_width: usize = 8;
-    let wrap_width = (ctx.viewport_width as usize).saturating_sub(prefix_width.saturating_add(2)).max(20);
+    let wrap_width = usize::from(ctx.viewport_width).saturating_sub(prefix_width.saturating_add(2)).max(20);
     let cursor_char = "\u{258e}";
     let cursor_char_len = cursor_char.len();
 

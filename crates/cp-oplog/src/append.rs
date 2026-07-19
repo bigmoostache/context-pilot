@@ -218,7 +218,7 @@ impl OplogWriter {
         // decision, so a zeroed placeholder is fine.)
         let probe =
             OpEntry { schema_version: WRITER_SCHEMA_VERSION, rev: self.next_rev, timestamp_ms: 0, kind: kind.clone() };
-        let frame_len = framing::encode_entry(&probe)?.len() as u64;
+        let frame_len = u64::try_from(framing::encode_entry(&probe)?.len()).unwrap_or(u64::MAX);
 
         if self.segment_has_record && self.segment_bytes.wrapping_add(frame_len) > self.segment_limit {
             self.roll()?;
@@ -290,7 +290,7 @@ impl OplogWriter {
 
         self.file.write_all(&frame)?;
 
-        self.segment_bytes = self.segment_bytes.wrapping_add(frame.len() as u64);
+        self.segment_bytes = self.segment_bytes.wrapping_add(u64::try_from(frame.len()).unwrap_or(u64::MAX));
         self.next_rev = self.next_rev.wrapping_add(1);
         if is_record {
             self.segment_has_record = true;
