@@ -152,7 +152,10 @@ impl ToolCallAccumulator {
 // ───────────────────────────────────────────────────────────────────
 
 /// Dump an API request to disk for debugging.
-pub(crate) fn dump_request<T>(worker_id: &str, provider: &str, request: &T) where T: Serialize {
+pub(crate) fn dump_request<T>(worker_id: &str, provider: &str, request: &T)
+where
+    T: Serialize,
+{
     let dir = ".context-pilot/last_requests";
     let _r1 = std::fs::create_dir_all(dir);
     let path = format!("{dir}/{worker_id}_{provider}_last_request.json");

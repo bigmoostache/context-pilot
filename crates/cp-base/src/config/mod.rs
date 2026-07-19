@@ -376,7 +376,10 @@ pub const THEME_ORDER: &[&str] = &["dnd", "modern", "futuristic", "forest", "sea
 ///
 /// Panics via [`invariant_panic`] if the YAML content doesn't match the target type.
 #[must_use]
-pub fn parse_yaml<T>(name: &str, content: &str) -> T where T: for<'de> Deserialize<'de> {
+pub fn parse_yaml<T>(name: &str, content: &str) -> T
+where
+    T: for<'de> Deserialize<'de>,
+{
     serde_yaml::from_str(content).unwrap_or_else(|e| invariant_panic(&format!("Failed to parse {name}: {e}")))
 }
 
@@ -453,7 +456,6 @@ pub fn normalize_icon(icon: &str) -> String {
 
 // =============================================================================
 // Accessor sub-modules (theme colors, chars, icons, library, prompts)
-// =============================================================================
 
 /// Thin accessor modules: theme colors, UI chars, icons, library, prompt templates.
 pub mod accessors;

@@ -299,12 +299,18 @@ impl State {
 
     /// Get a reference to module-owned state by type.
     #[must_use]
-    pub fn get_ext<T>(&self) -> Option<&T> where T: 'static + Send + Sync {
+    pub fn get_ext<T>(&self) -> Option<&T>
+    where
+        T: 'static + Send + Sync,
+    {
         self.module_data.get(&TypeId::of::<T>()).and_then(|v| v.downcast_ref())
     }
 
     /// Get a mutable reference to module-owned state by type.
-    pub fn get_ext_mut<T>(&mut self) -> Option<&mut T> where T: 'static + Send + Sync {
+    pub fn get_ext_mut<T>(&mut self) -> Option<&mut T>
+    where
+        T: 'static + Send + Sync,
+    {
         self.module_data.get_mut(&TypeId::of::<T>()).and_then(|v| v.downcast_mut())
     }
 
@@ -318,7 +324,10 @@ impl State {
     ///
     /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
     #[must_use]
-    pub fn ext<T>(&self) -> &T where T: 'static + Send + Sync {
+    pub fn ext<T>(&self) -> &T
+    where
+        T: 'static + Send + Sync,
+    {
         self.get_ext::<T>().unwrap_or_else(|| {
             crate::config::invariant_panic("module state not initialized — was init_state() called?")
         })
@@ -329,14 +338,20 @@ impl State {
     /// # Panics
     ///
     /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
-    pub fn ext_mut<T>(&mut self) -> &mut T where T: 'static + Send + Sync {
+    pub fn ext_mut<T>(&mut self) -> &mut T
+    where
+        T: 'static + Send + Sync,
+    {
         self.get_ext_mut::<T>().unwrap_or_else(|| {
             crate::config::invariant_panic("module state not initialized — was init_state() called?")
         })
     }
 
     /// Set module-owned state by type. Replaces any existing value of this type.
-    pub fn set_ext<T>(&mut self, val: T) where T: 'static + Send + Sync {
+    pub fn set_ext<T>(&mut self, val: T)
+    where
+        T: 'static + Send + Sync,
+    {
         drop(self.module_data.insert(TypeId::of::<T>(), Box::new(val)));
     }
 

@@ -302,13 +302,19 @@ pub struct Entry {
 impl Entry {
     /// Get a typed value from the metadata bag.
     #[must_use]
-    pub fn get_meta<T>(&self, key: &str) -> Option<T> where T: DeserializeOwned {
+    pub fn get_meta<T>(&self, key: &str) -> Option<T>
+    where
+        T: DeserializeOwned,
+    {
         let v = self.metadata.get(key)?;
         serde_json::from_value(v.clone()).ok()
     }
 
     /// Set a typed value in the metadata bag.
-    pub fn set_meta<T>(&mut self, key: &str, value: &T) where T: Serialize {
+    pub fn set_meta<T>(&mut self, key: &str, value: &T)
+    where
+        T: Serialize,
+    {
         if let Ok(v) = serde_json::to_value(value) {
             drop(self.metadata.insert(key.to_owned(), v));
         }

@@ -135,7 +135,10 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
 ///
 /// Returns [`Error::Io`](crate::error::Error::Io) if a segment
 /// cannot be listed or read.
-pub fn replay<P>(dir: P) -> OplogResult<Recovered> where P: AsRef<Path> {
+pub fn replay<P>(dir: P) -> OplogResult<Recovered>
+where
+    P: AsRef<Path>,
+{
     let dir = dir.as_ref();
     let indices = segment::indices(dir)?;
 

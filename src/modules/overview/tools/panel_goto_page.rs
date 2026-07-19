@@ -21,7 +21,8 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(
             tool.id.clone(),
             "Missing 'current_page_description' — you MUST summarize what you see on the CURRENT page \
-(the one you are leaving) before navigating. Its raw content will be discarded; this note is all you keep.".to_owned(),
+(the one you are leaving) before navigating. Its raw content will be discarded; this note is all you keep."
+                .to_owned(),
             true,
         );
     }

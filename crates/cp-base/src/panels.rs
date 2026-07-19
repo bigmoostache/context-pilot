@@ -335,12 +335,12 @@ pub struct ContextItem {
 
 impl ContextItem {
     /// Create a context item from its components.
-    pub fn new<I, H, C>(
-        id: I,
-        header: H,
-        content: C,
-        last_refresh_ms: u64,
-    ) -> Self where I: Into<String>, H: Into<String>, C: Into<String> {
+    pub fn new<I, H, C>(id: I, header: H, content: C, last_refresh_ms: u64) -> Self
+    where
+        I: Into<String>,
+        H: Into<String>,
+        C: Into<String>,
+    {
         Self { id: id.into(), header: header.into(), content: content.into(), last_refresh_ms }
     }
 }

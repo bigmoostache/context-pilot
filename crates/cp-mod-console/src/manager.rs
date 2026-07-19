@@ -161,7 +161,10 @@ pub fn find_or_create_server() -> Result<(), String> {
 
 /// Kill orphaned processes by asking the server for its session list and
 /// comparing against known session keys.
-pub fn kill_orphaned_processes<S>(known_keys: &HashSet<String, S>) where S: BuildHasher {
+pub fn kill_orphaned_processes<S>(known_keys: &HashSet<String, S>)
+where
+    S: BuildHasher,
+{
     let list = serde_json::json!({"cmd": "list"});
     if let Ok(resp) = server_request(&list)
         && let Some(sessions) = resp.get("sessions").and_then(|v| v.as_array())

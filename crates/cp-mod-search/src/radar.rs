@@ -87,10 +87,7 @@ fn format_timestamp_ms(ms: u64) -> String {
     if ms == 0 {
         return "unknown".to_owned();
     }
-    i64::try_from(ms)
-        .ok()
-        .and_then(cp_mod_utilities::time::epoch_ms_to_rfc3339)
-        .unwrap_or_else(|| "unknown".to_owned())
+    i64::try_from(ms).ok().and_then(cp_mod_utilities::time::epoch_ms_to_rfc3339).unwrap_or_else(|| "unknown".to_owned())
 }
 
 /// Read the cached radar YAML from state, with fallback messages.

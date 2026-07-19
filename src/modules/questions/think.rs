@@ -58,7 +58,8 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(
             tool.id.clone(),
             "Missing or empty 'task_context' parameter. You MUST provide a short (1-2 sentence) \
-             description of what you're currently working on. This feeds the Context Radar panel.".to_owned(),
+             description of what you're currently working on. This feeds the Context Radar panel."
+                .to_owned(),
             true,
         );
     }

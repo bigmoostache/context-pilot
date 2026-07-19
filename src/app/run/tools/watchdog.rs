@@ -283,7 +283,7 @@ fn cpu_busy_pct() -> Option<f64> {
     let t1 = ticks()?;
     let delta = u32::try_from(t1.saturating_sub(t0)).unwrap_or(u32::MAX);
     let dticks = f64::from(delta);
-    let secs = f64::from(CPU_SAMPLE_MS) / 1000.0;
+    let secs = f64::from(CPU_SAMPLE_MS) / 1_000.0_f64;
     Some((dticks / CLK_TCK / secs) * 100.0)
 }
 

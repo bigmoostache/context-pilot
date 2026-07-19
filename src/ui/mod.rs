@@ -92,9 +92,11 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     }
 
     // Render Meilisearch indexing status overlay if active (from IR overlays)
-    if let Some(search_overlay) = ir_frame.overlays.iter().find_map(|o| {
-        if let cp_render::conversation::Overlay::SearchIndex(s) = o { Some(s.as_ref()) } else { None }
-    }) {
+    if let Some(search_overlay) = ir_frame
+        .overlays
+        .iter()
+        .find_map(|o| if let cp_render::conversation::Overlay::SearchIndex(s) = o { Some(s.as_ref()) } else { None })
+    {
         search_overlay::render_search_index_overlay(frame, search_overlay, area);
     }
 

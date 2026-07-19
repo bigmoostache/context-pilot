@@ -157,7 +157,10 @@ fn dedup_by_score(results: &mut Vec<SearchResult>, limit: u32) {
     // Collect, sort by score descending, truncate
     *results = best.into_values().collect();
     results.sort_by(|a, b| {
-        b.ranking_score.unwrap_or(0.0f64).partial_cmp(&a.ranking_score.unwrap_or(0.0f64)).unwrap_or(std::cmp::Ordering::Equal)
+        b.ranking_score
+            .unwrap_or(0.0f64)
+            .partial_cmp(&a.ranking_score.unwrap_or(0.0f64))
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
     results.truncate(limit as usize);
 }
@@ -228,7 +231,8 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
             "Missing or empty 'semantic_query' parameter. You MUST provide a fabricated example of what the \
              target content looks like — NOT a description of what you're looking for, but an uneducated guess \
              at the actual text/code. Semantic embeddings find near-neighbors, so a fake snippet that resembles \
-             the real content yields dramatically better results than a high-level description.".to_owned(),
+             the real content yields dramatically better results than a high-level description."
+                .to_owned(),
         );
     };
 
@@ -356,7 +360,8 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                             let table = hit
                                 .get("entity_table")
                                 .and_then(serde_json::Value::as_str)
-                                .unwrap_or("unknown").to_owned();
+                                .unwrap_or("unknown")
+                                .to_owned();
                             let all_text =
                                 hit.get("_all_text").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
                             let rank_score = hit.get("_rankingScore").and_then(serde_json::Value::as_f64);

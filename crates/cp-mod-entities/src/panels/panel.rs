@@ -256,10 +256,7 @@ fn empty_state_blocks() -> Vec<Block> {
             "  CREATE TABLE people (id INTEGER PRIMARY KEY, name TEXT, role TEXT,".to_owned(),
             Semantic::Code,
         )]),
-        Block::Line(vec![Span::styled(
-            "    company_id INTEGER REFERENCES companies(id));".to_owned(),
-            Semantic::Code,
-        )]),
+        Block::Line(vec![Span::styled("    company_id INTEGER REFERENCES companies(id));".to_owned(), Semantic::Code)]),
         Block::Line(vec![Span::styled(
             "  INSERT INTO companies (name, country) VALUES ('Acme', 'France') RETURNING *;".to_owned(),
             Semantic::Code,

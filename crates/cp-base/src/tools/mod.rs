@@ -194,14 +194,7 @@ impl ToolParam {
     /// Create a parameter with name and type. Defaults to optional, no description.
     #[must_use]
     pub fn new(name: &str, param_type: ParamType) -> Self {
-        Self {
-            name: name.to_owned(),
-            param_type,
-            description: None,
-            required: false,
-            enum_values: None,
-            default: None,
-        }
+        Self { name: name.to_owned(), param_type, description: None, required: false, enum_values: None, default: None }
     }
 
     /// Set a description (builder pattern).

@@ -78,7 +78,10 @@ impl YamlSync {
     /// On parse failure, attempts to restore from backup.
     /// Returns an empty map if both fail.
     #[must_use]
-    pub fn load<E>(&self) -> BTreeMap<String, E> where E: SyncEntry {
+    pub fn load<E>(&self) -> BTreeMap<String, E>
+    where
+        E: SyncEntry,
+    {
         // Try shared YAML
         if let Some(map) = try_parse::<E>(&self.shared_path) {
             self.write_backup(&map);
@@ -97,7 +100,10 @@ impl YamlSync {
     }
 
     /// Write the full map to the shared YAML file.
-    fn write_yaml<E>(&self, map: &BTreeMap<String, E>) where E: SyncEntry {
+    fn write_yaml<E>(&self, map: &BTreeMap<String, E>)
+    where
+        E: SyncEntry,
+    {
         let Some(parent) = self.shared_path.parent() else { return };
         let _mkdir = fs::create_dir_all(parent);
         let Ok(yaml_str) = serde_yaml::to_string(map) else { return };
@@ -105,7 +111,10 @@ impl YamlSync {
     }
 
     /// Save the map as a worker-local backup.
-    fn write_backup<E>(&self, map: &BTreeMap<String, E>) where E: SyncEntry {
+    fn write_backup<E>(&self, map: &BTreeMap<String, E>)
+    where
+        E: SyncEntry,
+    {
         let Some(parent) = self.backup_path.parent() else { return };
         let _mkdir = fs::create_dir_all(parent);
         let Ok(yaml_str) = serde_yaml::to_string(map) else { return };
@@ -124,7 +133,10 @@ impl YamlSync {
     /// 5. Writes the merged result back to disk.
     ///
     /// Returns `true` if `memory` was modified.
-    pub fn sync<E>(&self, memory: &mut BTreeMap<String, E>) -> bool where E: SyncEntry {
+    pub fn sync<E>(&self, memory: &mut BTreeMap<String, E>) -> bool
+    where
+        E: SyncEntry,
+    {
         let yaml_map = self.load::<E>();
         if yaml_map.is_empty() && memory.is_empty() {
             return false;
@@ -184,7 +196,10 @@ impl YamlSync {
     /// Insert or update a single entry.
     ///
     /// Automatically sets `last_edited_ms` to the current time.
-    pub fn upsert<E>(&self, key: &str, entry: &mut E) where E: SyncEntry {
+    pub fn upsert<E>(&self, key: &str, entry: &mut E)
+    where
+        E: SyncEntry,
+    {
         entry.set_last_edited_ms(now_ms());
         let mut map = self.load::<E>();
         let _prev = map.insert(key.to_owned(), entry.clone());
@@ -193,7 +208,10 @@ impl YamlSync {
     }
 
     /// Remove an entry by key.
-    pub fn remove<E>(&self, key: &str) where E: SyncEntry {
+    pub fn remove<E>(&self, key: &str)
+    where
+        E: SyncEntry,
+    {
         let mut map = self.load::<E>();
         if map.remove(key).is_some() {
             self.write_yaml(&map);
@@ -204,7 +222,11 @@ impl YamlSync {
     /// Remove all entries matching a predicate.
     ///
     /// Returns the number of entries removed.
-    pub fn remove_where<E, F>(&self, predicate: F) -> usize where E: SyncEntry, F: Fn(&str, &E) -> bool {
+    pub fn remove_where<E, F>(&self, predicate: F) -> usize
+    where
+        E: SyncEntry,
+        F: Fn(&str, &E) -> bool,
+    {
         let mut map = self.load::<E>();
         let before = map.len();
         map.retain(|k, v| !predicate(k, v));
@@ -222,7 +244,10 @@ impl YamlSync {
     ///
     /// Existing YAML entries are **never** overwritten. This is an
     /// idempotent first-run migration from in-memory to YAML.
-    pub fn migrate<E>(&self, entries: &BTreeMap<String, E>) where E: SyncEntry {
+    pub fn migrate<E>(&self, entries: &BTreeMap<String, E>)
+    where
+        E: SyncEntry,
+    {
         if entries.is_empty() {
             return;
         }
@@ -246,7 +271,10 @@ impl YamlSync {
 // ---------------------------------------------------------------------------
 
 /// Attempt to parse a YAML file. Returns `None` on any failure.
-fn try_parse<E>(path: &Path) -> Option<BTreeMap<String, E>> where E: DeserializeOwned {
+fn try_parse<E>(path: &Path) -> Option<BTreeMap<String, E>>
+where
+    E: DeserializeOwned,
+{
     let contents = fs::read_to_string(path).ok()?;
     serde_yaml::from_str(&contents).ok()
 }

@@ -264,9 +264,7 @@ pub(crate) fn format_results(query: &str, output: &SearchOutput<'_>, hide_conten
 /// Build a JSON value for a single file chunk.
 fn build_chunk_value(chunk: &SearchResult, hide_contents: bool) -> serde_json::Value {
     let mut obj = serde_json::Map::new();
-    drop(
-        obj.insert("type".into(), serde_json::Value::String(chunk.chunk_type.as_deref().unwrap_or("raw").to_owned())),
-    );
+    drop(obj.insert("type".into(), serde_json::Value::String(chunk.chunk_type.as_deref().unwrap_or("raw").to_owned())));
     if let Some(name) = &chunk.chunk_name
         && !name.is_empty()
     {

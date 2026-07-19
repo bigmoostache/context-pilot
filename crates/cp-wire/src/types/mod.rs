@@ -90,13 +90,19 @@ impl ContentHash {
 
 /// Hex-encode for JSON/YAML readability.
 impl Serialize for ContentHash {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
         serializer.serialize_str(&self.to_hex())
     }
 }
 
 impl<'de> Deserialize<'de> for ContentHash {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
         let s = <String as Deserialize>::deserialize(deserializer)?;
         if s.len() != 64 {
             return Err(serde::de::Error::invalid_length(s.len(), &"64 hex chars"));
@@ -120,7 +126,10 @@ impl<'de> Deserialize<'de> for ContentHash {
         Ok(Self(bytes))
     }
 
-    fn deserialize_in_place<D>(deserializer: D, place: &mut Self) -> Result<(), D::Error> where D: serde::Deserializer<'de> {
+    fn deserialize_in_place<D>(deserializer: D, place: &mut Self) -> Result<(), D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
         *place = Self::deserialize(deserializer)?;
         Ok(())
     }

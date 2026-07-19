@@ -40,7 +40,10 @@ pub struct FullCache {
 }
 
 /// Hash helper for cache invalidation.
-pub fn hash_values<T>(values: &[T]) -> u64 where T: Hash {
+pub fn hash_values<T>(values: &[T]) -> u64
+where
+    T: Hash,
+{
     let mut hasher = DefaultHasher::new();
     for v in values {
         v.hash(&mut hasher);

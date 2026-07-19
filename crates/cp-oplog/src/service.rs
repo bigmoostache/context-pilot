@@ -173,7 +173,10 @@ impl Service {
     /// # Errors
     ///
     /// Returns [`Error::Io`] if the oplog cannot be opened.
-    pub fn spawn<P>(dir: P) -> OplogResult<Self> where P: AsRef<Path> {
+    pub fn spawn<P>(dir: P) -> OplogResult<Self>
+    where
+        P: AsRef<Path>,
+    {
         Self::spawn_inner(dir.as_ref(), DEFAULT_SEGMENT_LIMIT, DEFAULT_QUEUE_CAPACITY)
     }
 
@@ -183,7 +186,10 @@ impl Service {
     /// # Errors
     ///
     /// Returns [`Error::Io`] if the oplog cannot be opened.
-    pub fn spawn_with_segment_limit<P>(dir: P, segment_limit: u64) -> OplogResult<Self> where P: AsRef<Path> {
+    pub fn spawn_with_segment_limit<P>(dir: P, segment_limit: u64) -> OplogResult<Self>
+    where
+        P: AsRef<Path>,
+    {
         Self::spawn_inner(dir.as_ref(), segment_limit, DEFAULT_QUEUE_CAPACITY)
     }
 
@@ -284,7 +290,10 @@ impl Drop for Service {
 
 /// Build an [`Error::Io`] from a message (the channel carries error text
 /// because [`Error`] is not `Clone`).
-fn stopped<M>(message: M) -> Error where M: Into<String> {
+fn stopped<M>(message: M) -> Error
+where
+    M: Into<String>,
+{
     Error::Io(io::Error::other(message.into()))
 }
 

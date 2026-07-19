@@ -23,8 +23,7 @@ impl CallbackPanel {
         }
 
         let mut lines = Vec::new();
-        lines
-            .push("| ID | Name | Pattern | Description | Blocking | Timeout | Scope | Success Msg | CWD |".to_owned());
+        lines.push("| ID | Name | Pattern | Description | Blocking | Timeout | Scope | Success Msg | CWD |".to_owned());
         lines.push(
             "|------|------|---------|-------------|----------|---------|-------|-------------|-----|".to_owned(),
         );

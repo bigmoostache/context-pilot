@@ -190,7 +190,8 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     if has_diff && has_full_script {
         return ToolResult::new(
             tool.id.clone(),
-            "Cannot use both 'script_content' and 'old_string'/'new_string' in the same update. Use one or the other.".to_owned(),
+            "Cannot use both 'script_content' and 'old_string'/'new_string' in the same update. Use one or the other."
+                .to_owned(),
             true,
         );
     }
@@ -402,13 +403,15 @@ fn validate_script_env_vars(script: &str, is_global: bool) -> Result<(), String>
         // Match: $CP_CHANGED_FILE followed by non-S char, or ${CP_CHANGED_FILE}
         if script.contains("${CP_CHANGED_FILE}") || has_singular_env_var(script) {
             return Err("Global callbacks should use $CP_CHANGED_FILES (plural), not $CP_CHANGED_FILE (singular). \
-                 Global callbacks receive all changed files at once.".to_owned());
+                 Global callbacks receive all changed files at once."
+                .to_owned());
         }
     } else {
         // Check for plural ($CP_CHANGED_FILES or ${CP_CHANGED_FILES})
         if script.contains("CP_CHANGED_FILES") {
             return Err("Local callbacks should use $CP_CHANGED_FILE (singular), not $CP_CHANGED_FILES (plural). \
-                 Local callbacks fire once per file and receive one file path.".to_owned());
+                 Local callbacks fire once per file and receive one file path."
+                .to_owned());
         }
     }
     Ok(())

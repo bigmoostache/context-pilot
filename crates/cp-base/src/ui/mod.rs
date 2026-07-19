@@ -29,11 +29,17 @@ pub struct TextCell {
 
 impl TextCell {
     /// Create a left-aligned text cell.
-    pub fn left<T>(text: T) -> Self where T: Into<String> {
+    pub fn left<T>(text: T) -> Self
+    where
+        T: Into<String>,
+    {
         Self { text: text.into(), align: Align::Left }
     }
     /// Create a right-aligned text cell.
-    pub fn right<T>(text: T) -> Self where T: Into<String> {
+    pub fn right<T>(text: T) -> Self
+    where
+        T: Into<String>,
+    {
         Self { text: text.into(), align: Align::Right }
     }
 }

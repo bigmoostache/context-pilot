@@ -369,8 +369,8 @@ impl MeiliClient {
         if let Some(s) = params.sort
             && let Some(obj) = body.as_object_mut()
         {
-            let _prev = obj
-                .insert("sort".to_owned(), serde_json::Value::Array(vec![serde_json::Value::String(s.to_owned())]));
+            let _prev =
+                obj.insert("sort".to_owned(), serde_json::Value::Array(vec![serde_json::Value::String(s.to_owned())]));
         }
         if let Some(ratio) = params.semantic_ratio
             && let Some(obj) = body.as_object_mut()

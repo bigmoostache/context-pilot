@@ -90,11 +90,7 @@ pub(crate) fn save_flushed_tool_call_message(app: &mut App, tool: &cp_base::tool
         content: String::new(),
         content_token_count: 0,
         status: MsgStatus::Full,
-        tool_uses: vec![ToolUseRecord {
-            id: tool.id.clone(),
-            name: "Tool_execution".to_owned(),
-            input: compact_input,
-        }],
+        tool_uses: vec![ToolUseRecord { id: tool.id.clone(), name: "Tool_execution".to_owned(), input: compact_input }],
         tool_results: Vec::new(),
         input_tokens: 0,
         timestamp_ms: now_ms(),

@@ -49,14 +49,20 @@ impl Verdict {
 
     /// Append a blocking error (builder pattern).
     #[must_use]
-    pub fn error<M>(mut self, msg: M) -> Self where M: Into<String> {
+    pub fn error<M>(mut self, msg: M) -> Self
+    where
+        M: Into<String>,
+    {
         self.errors.push(msg.into());
         self
     }
 
     /// Append a non-blocking warning (builder pattern).
     #[must_use]
-    pub fn warning<M>(mut self, msg: M) -> Self where M: Into<String> {
+    pub fn warning<M>(mut self, msg: M) -> Self
+    where
+        M: Into<String>,
+    {
         self.warnings.push(msg.into());
         self
     }

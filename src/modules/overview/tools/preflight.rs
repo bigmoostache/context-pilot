@@ -87,7 +87,8 @@ pub(crate) fn pre_flight(tool: &ToolUse, state: &State) -> Option<Verdict> {
             if !has_desc {
                 pf.errors.push(
                     "Missing 'current_page_description' — summarize what you see on the CURRENT page \
-before leaving it; its raw content will be discarded and this note is all you keep.".to_owned(),
+before leaving it; its raw content will be discarded and this note is all you keep."
+                        .to_owned(),
                 );
             }
             if let Some(panel_id) = tool.input.get("panel_id").and_then(serde_json::Value::as_str) {

@@ -194,12 +194,8 @@ pub(super) fn check_my_turn_threads(app: &mut App) {
         "Thread \"{tname}\" ({tid}) is MY_TURN — it has user input awaiting your response.\n\
          Use Read(thread_id=\"{tid}\") to see the conversation and respond.",
     );
-    let _r = SpineState::create_notification(
-        &mut app.state,
-        NotificationType::Custom,
-        "my_turn_thread".to_owned(),
-        content,
-    );
+    let _r =
+        SpineState::create_notification(&mut app.state, NotificationType::Custom, "my_turn_thread".to_owned(), content);
 }
 
 /// Extract thread IDs from notification content embedded in a synthetic message.

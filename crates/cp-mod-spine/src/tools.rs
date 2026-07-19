@@ -72,7 +72,8 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
             if n == 0 {
                 return ToolResult::new(
                     tool.id.clone(),
-                    "Error: max_output_tokens = 0 would permanently block all auto-continuation. Use null to disable.".to_owned(),
+                    "Error: max_output_tokens = 0 would permanently block all auto-continuation. Use null to disable."
+                        .to_owned(),
                     true,
                 );
             }
@@ -89,7 +90,8 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
             if n == 0 {
                 return ToolResult::new(
                     tool.id.clone(),
-                    "Error: max_duration_secs = 0 would permanently block all auto-continuation. Use null to disable.".to_owned(),
+                    "Error: max_duration_secs = 0 would permanently block all auto-continuation. Use null to disable."
+                        .to_owned(),
                     true,
                 );
             }
@@ -106,7 +108,8 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
             if n == 0 {
                 return ToolResult::new(
                     tool.id.clone(),
-                    "Error: max_messages = 0 would permanently block all auto-continuation. Use null to disable.".to_owned(),
+                    "Error: max_messages = 0 would permanently block all auto-continuation. Use null to disable."
+                        .to_owned(),
                     true,
                 );
             }
@@ -123,7 +126,8 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
             if n == 0 {
                 return ToolResult::new(
                     tool.id.clone(),
-                    "Error: max_auto_retries = 0 would permanently block all auto-continuation. Use null to disable.".to_owned(),
+                    "Error: max_auto_retries = 0 would permanently block all auto-continuation. Use null to disable."
+                        .to_owned(),
                     true,
                 );
             }
@@ -142,11 +146,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
     state.touch_panel(Kind::SPINE);
 
     if changes.is_empty() {
-        ToolResult::new(
-            tool.id.clone(),
-            "No changes made. Pass at least one parameter to configure.".to_owned(),
-            false,
-        )
+        ToolResult::new(tool.id.clone(), "No changes made. Pass at least one parameter to configure.".to_owned(), false)
     } else {
         ToolResult::new(
             tool.id.clone(),

@@ -223,7 +223,10 @@ impl FirecrawlClient {
     }
 
     /// GET JSON with 5xx retry (2 attempts, 1s delay).
-    fn get_json<T>(&self, path: &str) -> Result<T, String> where T: serde::de::DeserializeOwned {
+    fn get_json<T>(&self, path: &str) -> Result<T, String>
+    where
+        T: serde::de::DeserializeOwned,
+    {
         let url = format!("{FIRECRAWL_BASE_URL}{path}");
 
         for attempt in 0i32..3i32 {
@@ -256,7 +259,10 @@ impl FirecrawlClient {
     }
 
     /// POST JSON with 5xx retry (2 attempts, 1s delay).
-    fn post_json<T>(&self, path: &str, body: &serde_json::Value) -> Result<T, String> where T: serde::de::DeserializeOwned {
+    fn post_json<T>(&self, path: &str, body: &serde_json::Value) -> Result<T, String>
+    where
+        T: serde::de::DeserializeOwned,
+    {
         let url = format!("{FIRECRAWL_BASE_URL}{path}");
 
         for attempt in 0i32..3i32 {
