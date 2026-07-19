@@ -114,7 +114,7 @@ pub(super) fn git_blocks(state: &State) -> Vec<Block> {
             };
 
             let display_path = if file.path.len() > 38 {
-                format!("{}...{}", type_char, &file.path.get(file.path.len().saturating_sub(35)..).unwrap_or(""))
+                format!("{}...{}", type_char, file.path.get(file.path.len().saturating_sub(35)..).unwrap_or(""))
             } else {
                 format!("{type_char} {}", file.path)
             };
@@ -231,7 +231,7 @@ pub(super) fn context_elements_blocks(state: &State) -> Vec<Block> {
         let details = modules.iter().find_map(|m| m.context_detail(ctx)).unwrap_or_default();
 
         let truncated_details = if details.len() > 30 {
-            format!("{}...", &details.get(..details.floor_char_boundary(27)).unwrap_or(""))
+            format!("{}...", details.get(..details.floor_char_boundary(27)).unwrap_or(""))
         } else {
             details
         };

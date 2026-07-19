@@ -31,7 +31,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(Kind::SCRATCHPAD);
 
     let preview = if contents.len() > 50 {
-        format!("{}...", &contents.get(..contents.floor_char_boundary(47)).unwrap_or(""))
+        format!("{}...", contents.get(..contents.floor_char_boundary(47)).unwrap_or(""))
     } else {
         contents
     };

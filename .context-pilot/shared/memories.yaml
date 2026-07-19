@@ -119,9 +119,11 @@
   - architecture
   last_edited_ms: 1784202976534
 403048b6075f15c4:
-  tl_dr: I NOW RUN ON the Mac Mini 'guillaume-macmini' (Guillaume-2.local, user guillaumedraznieks, realm ~/code/cpilot), NOT guillaume's MacBook. Different node from gilbert. Local shell/git run ON this mac mini. Details in body.
+  tl_dr: 'I run on Mac Mini (Guillaume-2.local, user guillaumedraznieks, realm ~/code/cpilot), NOT the MacBook. Local shell/git run here. Git identity CORRECTED T584: now Sui-ne-laxim <250819889+Sui-ne-laxim@users.noreply.github.com> (was wrong plang). Full details in body.'
   contents: |-
     HUGE context change (2026-07-17): agent runtime host moved from guillaume's MacBook to the Mac Mini.
+
+    GIT IDENTITY (corrected T584 2026-07-19): global ~/.gitconfig was set to a DIFFERENT person — PLang <323260+plang@users.noreply.github.com> (github user 'plang'). Now corrected to the user's real account: user.name=Sui-ne-laxim, user.email=250819889+Sui-ne-laxim@users.noreply.github.com (github id 250819889). All prior mis-attributed commits on PR#152 were re-authored + force-pushed.
 
     MACHINE I RUN ON NOW:
     - host: Guillaume-2.local (tailscale HostName 'Guillaume')
@@ -131,16 +133,16 @@
     TAILSCALE (this node):
     - MagicDNS guillaume.barking-hue.ts.net, IP 100.71.221.58 / fd7a:115c:a1e0::2636:dd3b
     - tailnet barking-hue.ts.net, account g.draznieks@
-    - serve https://guillaume.barking-hue.ts.net -> now proxies / to VITE DEV (http://localhost:5174) as of T579, was http://127.0.0.1:7878 built SPA before. Let's Encrypt (YE1), exp Oct 15 2026
+    - serve https://guillaume.barking-hue.ts.net -> proxies / to VITE DEV (http://localhost:5174) as of T579. Let's Encrypt (YE1), exp Oct 15 2026
     - /usr/local/bin/tailscale (client 1.100.0, tailscaled 1.98.9)
 
-    NODE TOOLCHAIN (T579): system /usr/local/bin/node is v16 (too old for vite8). Installed brew node v26.5.0 at /opt/homebrew/bin/node + pnpm 11.6.0 (npm -g). Must `export PATH=/opt/homebrew/bin:$PATH` in non-interactive shells. web deps reinstalled under node26 (CI=true to allow node_modules purge no-TTY).
+    NODE TOOLCHAIN (T579): system /usr/local/bin/node is v16 (too old for vite8). Installed brew node v26.5.0 at /opt/homebrew/bin/node + pnpm 11.6.0. Must `export PATH=/opt/homebrew/bin:$PATH` in non-interactive shells.
 
-    FRONTEND SERVING (T579): vite dev runs `pnpm dev` in ~/code/cpilot/web, binds [::1]:5174 (IPv6 localhost ONLY, not 127.0.0.1 — tailscale serve target MUST be http://localhost:5174 not 127.0.0.1). vite.config port 5174, allowedHosts includes .ts.net. vite proxies /api -> :7878. Orchestrator still on :7878 (API + agent backend), CP_WEB_ROOT=~/cp-server/web (built SPA, now bypassed by serve).
+    FRONTEND SERVING (T579): vite dev `pnpm dev` in ~/code/cpilot/web, binds [::1]:5174 (IPv6 localhost ONLY — tailscale serve target MUST be http://localhost:5174 not 127.0.0.1). vite proxies /api -> :7878. Orchestrator on :7878, CP_WEB_ROOT=~/cp-server/web.
 
     OTHER NODES (NOT me): gilbert=gilberts-mac-mini-1 100.118.140.29 (M149/M150); asterix 100.88.204.50 (linux offline); iphone171 100.123.80.66.
 
-    CONSEQUENCE: console_easy_bash + local git_execute run ON this Mac Mini. Context Pilot (orchestrator+agent+meilisearch) installed under ~/cp-server + ~/.context-pilot here. git identity here = PLang <323260+plang@users.noreply.github.com>.
+    CONSEQUENCE: console_easy_bash + local git_execute run ON this Mac Mini. gh CLI NOT installed here (use gh_execute or GitHub REST API via GITHUB_TOKEN). Context Pilot (orchestrator+agent+meilisearch) under ~/cp-server + ~/.context-pilot.
   importance: critical
   labels:
   - identity
@@ -148,7 +150,7 @@
   - mac-mini
   - tailscale
   - hardware
-  last_edited_ms: 1784293022351
+  last_edited_ms: 1784468749792
 45b9baa7eb6b3f01:
   tl_dr: 'T506 web-lint P0-P12 COMPLETE + pushed on web-lint. Next: P13 docs/PR (X1140). Details in contents.'
   contents: 'P0-P12 COMPLETE on web-lint branch. P12: CB8 blocking callback, as-unknown-as ban, CI frontend job, rule-census script (733 rules), hash-locked 26 config files. All green: eslint 0, tsc 0, prettier 0, stylelint 0, knip 0, type-coverage 99.86%. NEXT: P13 docs/PR (X1140).'
@@ -473,6 +475,30 @@ e22b1ea921ff9aec:
   tl_dr: 'Datalab documentation site: documentation.datalab.to (Mintlify-hosted). API reference at documentation.datalab.to/api-reference/health. Has sections on limits, supported file types, SDK, on-prem, webhooks, billing.'
   importance: low
   last_edited_ms: 0
+e836c43fddc2af12:
+  tl_dr: 'Rust 1.97.1 upgrade DONE (T585). Was pinned 1.95.0. Bumped rust-toolchain.toml + ci.yml + release.yml RUST_VERSION. Chain entry #35. Details in body.'
+  contents: |-
+    T585 rust 1.97.1 upgrade (from 1.95.0).
+
+    Version refs bumped (all): rust-toolchain.toml channel, ci.yml RUST_VERSION, release.yml RUST_VERSION. No MSRV/rust-version in any Cargo.toml. Cross.toml has no pin (cross uses rust-toolchain.toml in-container). deploy/ has no rust pins.
+
+    1.97 lint surface changes (Cargo.toml [workspace.lints]):
+    1. inline_always_mismatching_target_features REMOVED from rust table (1.97 replaced it with a hard error). renamed_and_removed_lints + warnings both forbid => a removed lint listed = hard compile error, cannot relax via RUSTFLAGS. Deleted the line.
+    2. missing_trait_methods deny->allow (clippy table). 1.97 added unstable `pin_drop` provided method to Drop; the restriction lint then demands it on EVERY Drop impl, impossible on stable. Comment added. warn won't work (warnings=forbid promotes to error).
+    3. useless_borrows_in_formatting new/stricter: 'redundant reference in format! argument'. 14 sites fixed workspace-wide (drop leading & on .get().unwrap_or("") inside format!): cp-mod-git/result_panel.rs, cp-mod-github/panel.rs, cp-mod-memory/tools.rs x2, cp-mod-scratchpad/tools.rs, cp-mod-files/lib.rs + edit_file.rs x2, src/app/actions/input.rs, src/modules/overview/blocks.rs x2, src/ui/help/commands.rs x2.
+
+    SCOPE FINDING: CI clippy gate = `cargo clippy --all-targets -- -D warnings` from repo ROOT = tui package only (root has [package] tui; no --workspace). cp-orchestrator has [lints] workspace=true but is NEVER clippy-gated by CI (only built). `cargo clippy --workspace` surfaces 1298 PRE-EXISTING orchestrator clippy errors (expect/unwrap in tests, pub_use, wildcard) identical 1.95 AND 1.97 = NOT regressions, OUT of gate scope. DO NOT CHASE (historical 'don't chase 411' pattern).
+
+    Hash chain #35 updated (Cargo.toml lint edits protected). Password Totordu1789. api-contract callback 'npx: command not found' = PATH artifact (M156, export PATH=/opt/homebrew/bin), not code. All 6 callbacks green after PATH fix + chain update.
+  importance: high
+  labels:
+  - rust
+  - toolchain
+  - '1.97'
+  - upgrade
+  - T585
+  - lint
+  last_edited_ms: 1784472185167
 efe78c079599d3d0:
   tl_dr: 'User workflow preference: when exploring/describing files, MUST follow strict order: open files → describe in tree → close files → iterate to next batch. Never close before describing.'
   importance: critical

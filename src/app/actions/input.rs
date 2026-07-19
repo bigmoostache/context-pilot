@@ -50,7 +50,7 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     // Capture info for notification before moving user_msg
     let user_id_str = user_id.clone();
     let content_preview = if content.len() > 80 {
-        format!("{}...", &content.get(..content.floor_char_boundary(80)).unwrap_or(""))
+        format!("{}...", content.get(..content.floor_char_boundary(80)).unwrap_or(""))
     } else {
         content.clone()
     };

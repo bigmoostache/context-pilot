@@ -42,11 +42,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
 
         if let Err(e) = validate_tldr(&content) {
-            errors.push(format!(
-                "Memory '{}...': {}",
-                &content.get(..content.floor_char_boundary(30)).unwrap_or(""),
-                e
-            ));
+            errors.push(format!("Memory '{}...': {}", content.get(..content.floor_char_boundary(30)).unwrap_or(""), e));
             continue;
         }
 
@@ -76,7 +72,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
 
         let preview = if content.len() > 40 {
-            format!("{}...", &content.get(..content.floor_char_boundary(37)).unwrap_or(""))
+            format!("{}...", content.get(..content.floor_char_boundary(37)).unwrap_or(""))
         } else {
             content
         };

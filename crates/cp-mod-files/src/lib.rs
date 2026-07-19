@@ -384,7 +384,7 @@ pub fn visualize_diff(content: &str, width: usize) -> Vec<cp_render::Block> {
 /// Truncate a line to fit within the given width.
 fn truncate_line(line: &str, width: usize) -> String {
     if line.len() > width {
-        format!("{}…", &line.get(..line.floor_char_boundary(width.saturating_sub(1))).unwrap_or(""))
+        format!("{}…", line.get(..line.floor_char_boundary(width.saturating_sub(1))).unwrap_or(""))
     } else {
         line.to_string()
     }

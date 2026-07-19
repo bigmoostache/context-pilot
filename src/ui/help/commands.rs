@@ -125,8 +125,8 @@ pub(super) fn get_available_commands(state: &State) -> Vec<PaletteCommand> {
         commands.push(
             PaletteCommand::new(
                 &ctx.id,
-                format!("{} {} {}", &ctx.id, icon, &ctx.name),
-                format!("Go to {} panel", &ctx.name),
+                format!("{} {} {}", ctx.id, icon, ctx.name),
+                format!("Go to {} panel", ctx.name),
             )
             .with_keywords(&[&ctx.name, "panel", "go", "navigate"]),
         );

@@ -93,7 +93,7 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
 
         if total_score > 0 && best_match.as_ref().is_none_or(|b| total_score > b.1) {
             let preview = if norm_line.len() > 60 {
-                format!("{}...", &norm_line.get(..norm_line.floor_char_boundary(60)).unwrap_or(""))
+                format!("{}...", norm_line.get(..norm_line.floor_char_boundary(60)).unwrap_or(""))
             } else {
                 norm_line.to_string()
             };
@@ -155,7 +155,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
 
         let needle_preview = if old_string.len() > 50 {
-            format!("{}...", &old_string.get(..old_string.floor_char_boundary(50)).unwrap_or(""))
+            format!("{}...", old_string.get(..old_string.floor_char_boundary(50)).unwrap_or(""))
         } else {
             old_string.to_string()
         };

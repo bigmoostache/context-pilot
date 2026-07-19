@@ -137,7 +137,7 @@ impl Panel for GitResultPanel {
             && let Some(cmd) = ctx.get_meta_str("result_command")
         {
             let short = if cmd.len() > 40 {
-                format!("{}...", &cmd.get(..cmd.floor_char_boundary(37)).unwrap_or(""))
+                format!("{}...", cmd.get(..cmd.floor_char_boundary(37)).unwrap_or(""))
             } else {
                 cmd.to_string()
             };
