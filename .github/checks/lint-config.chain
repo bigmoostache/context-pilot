@@ -4806,3 +4806,49 @@ index 00718037..c0f05146 100644
  permissions:
    contents: read
 # --- End entry #35 ---
+36:d8a9cf8a3c83012b91741de13180e1b95f8f81c5c91cc93e773d298e3149086e:30e9d09302c9bec46e3a3520026a2f1894f3ed08112f9d54fc008652ccd70fa1:287c6b96aefb76bc2b6387058e7a314f9b48da3d0723b2b30308dc2ca2a28c4d
+# --- Diff for entry #36 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index e1e2af42..22a0054f 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -564,6 +564,7 @@ manual_bits = "forbid"
+ manual_c_str_literals = "forbid"
+ manual_checked_ops = "forbid"
+ manual_clamp = "forbid"
++manual_clear = "forbid"
+ manual_contains = "forbid"
+ manual_dangling_ptr = "forbid"
+ manual_div_ceil = "forbid"
+@@ -589,11 +590,14 @@ manual_map = "forbid"
+ manual_memcpy = "forbid"
+ manual_midpoint = "forbid"
+ manual_next_back = "forbid"
++manual_noop_waker = "forbid"
+ manual_non_exhaustive = "forbid"
+ manual_ok_err = "forbid"
+ manual_ok_or = "forbid"
+ manual_option_as_slice = "forbid"
++manual_option_zip = "forbid"
+ manual_pattern_char_comparison = "forbid"
++manual_pop_if = "forbid"
+ manual_range_contains = "forbid"
+ manual_range_patterns = "forbid"
+ manual_rem_euclid = "forbid"
+@@ -876,6 +880,7 @@ size_of_ref = "forbid"
+ skip_while_next = "forbid"
+ sliced_string_as_bytes = "forbid"
+ slow_vector_initialization = "forbid"
++some_filter = "forbid"
+ stable_sort_primitive = "forbid"
+ str_split_at_newline = "forbid"
+ string_add = "forbid"
+@@ -1009,6 +1014,7 @@ used_underscore_binding = "forbid"
+ used_underscore_items = "forbid"
+ useless_asref = "forbid"
+ useless_attribute = "deny"
++useless_borrows_in_formatting = "forbid"
+ useless_concat = "forbid"
+ useless_conversion = "forbid"
+ useless_format = "forbid"
+# --- End entry #36 ---
