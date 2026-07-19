@@ -29,7 +29,7 @@ use crate::types::{KeyStatus, SecretString, Vault, VaultError};
 const DEFAULT_ORCH_URL: &str = "http://127.0.0.1:7878";
 
 /// Interval between background cache refreshes.
-const REFRESH_INTERVAL: Duration = Duration::from_secs(300);
+const REFRESH_INTERVAL: Duration = Duration::from_mins(5);
 
 /// HTTP connect timeout for orchestrator requests.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);

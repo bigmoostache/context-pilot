@@ -77,14 +77,14 @@ fn combinations(items: &[usize], count: usize) -> Vec<Vec<usize>> {
 
 #[test]
 fn brute_force_uniform_small() {
-    for num_blocks in 6_usize..=12 {
+    for num_blocks in 6usize..=12 {
         let tokens: Vec<u32> = (1..=num_blocks).map(|i| u32::try_from(i).unwrap_or(0)).collect();
-        let weights: Vec<f64> = vec![1.0; num_blocks];
-        for k_val in 1..=3_usize.min(num_blocks.saturating_sub(1)) {
+        let weights: Vec<f64> = vec![1.0f64; num_blocks];
+        for k_val in 1..=3usize.min(num_blocks.saturating_sub(1)) {
             let dp_result = optimize_gamma(&tokens, &weights, &[], k_val);
             let (_, bf_cost) = brute_force_optimal(&tokens, &weights, &[], k_val);
             assert!(
-                (dp_result.cost - bf_cost).abs() < 1e-9,
+                (dp_result.cost - bf_cost).abs() < 1e-9f64,
                 "N={num_blocks}, K={k_val}: DP cost {:.6} != BF cost {bf_cost:.6}",
                 dp_result.cost
             );
@@ -94,14 +94,14 @@ fn brute_force_uniform_small() {
 
 #[test]
 fn brute_force_quadratic_density() {
-    for num_blocks in 8_usize..=14 {
+    for num_blocks in 8usize..=14 {
         let tokens: Vec<u32> = vec![10; num_blocks];
         let weights: Vec<f64> = (1..=num_blocks).map(|i: usize| usize_as_f64(i.saturating_mul(i))).collect();
-        for k_val in 1..=3_usize.min(num_blocks.saturating_sub(1)) {
+        for k_val in 1..=3usize.min(num_blocks.saturating_sub(1)) {
             let dp_result = optimize_gamma(&tokens, &weights, &[], k_val);
             let (_, bf_cost) = brute_force_optimal(&tokens, &weights, &[], k_val);
             assert!(
-                (dp_result.cost - bf_cost).abs() < 1e-9,
+                (dp_result.cost - bf_cost).abs() < 1e-9f64,
                 "N={num_blocks}, K={k_val}: DP cost {:.6} != BF cost {bf_cost:.6}",
                 dp_result.cost
             );
@@ -113,14 +113,14 @@ fn brute_force_quadratic_density() {
 fn brute_force_with_omega() {
     let num_blocks = 10;
     let tokens: Vec<u32> = vec![5; num_blocks];
-    let weights: Vec<f64> = vec![1.0; num_blocks];
+    let weights: Vec<f64> = vec![1.0f64; num_blocks];
     let omega = vec![3, 7];
 
     let dp_result = optimize_gamma(&tokens, &weights, &omega, 2);
     let (_, bf_cost) = brute_force_optimal(&tokens, &weights, &omega, 2);
 
     assert!(
-        (dp_result.cost - bf_cost).abs() < 1e-9,
+        (dp_result.cost - bf_cost).abs() < 1e-9f64,
         "With omega: DP cost {:.6} != BF cost {bf_cost:.6}",
         dp_result.cost
     );
@@ -133,18 +133,18 @@ fn brute_force_with_omega() {
 fn brute_force_random_densities() {
     let mut seed: u64 = 42;
 
-    for num_blocks in 10_usize..=18 {
+    for num_blocks in 10usize..=18 {
         let tokens: Vec<u32> = std::iter::repeat_with(|| next_rand_u32(&mut seed).checked_rem(50).unwrap_or(0).max(1))
             .take(num_blocks)
             .collect();
         let weights: Vec<f64> =
             std::iter::repeat_with(|| f64::from(next_rand_u32(&mut seed)).max(0.01)).take(num_blocks).collect();
 
-        for k_val in 1..=3_usize.min(num_blocks.saturating_sub(1)) {
+        for k_val in 1..=3usize.min(num_blocks.saturating_sub(1)) {
             let dp_result = optimize_gamma(&tokens, &weights, &[], k_val);
             let (_, bf_cost) = brute_force_optimal(&tokens, &weights, &[], k_val);
             assert!(
-                (dp_result.cost - bf_cost).abs() < 1e-6,
+                (dp_result.cost - bf_cost).abs() < 1e-6f64,
                 "Random N={num_blocks}, K={k_val}: DP cost {:.6} != BF cost {bf_cost:.6}",
                 dp_result.cost
             );
@@ -156,7 +156,7 @@ fn brute_force_random_densities() {
 fn brute_force_random_with_omega() {
     let mut seed: u64 = 1337;
 
-    for num_blocks in 12_usize..=16 {
+    for num_blocks in 12usize..=16 {
         let tokens: Vec<u32> = std::iter::repeat_with(|| next_rand_u32(&mut seed).checked_rem(30).unwrap_or(0).max(1))
             .take(num_blocks)
             .collect();
@@ -173,7 +173,7 @@ fn brute_force_random_with_omega() {
         let dp_result = optimize_gamma(&tokens, &weights, &omega, 2);
         let (_, bf_cost) = brute_force_optimal(&tokens, &weights, &omega, 2);
         assert!(
-            (dp_result.cost - bf_cost).abs() < 1e-6,
+            (dp_result.cost - bf_cost).abs() < 1e-6f64,
             "Random+omega N={num_blocks}: DP cost {:.6} != BF cost {bf_cost:.6}",
             dp_result.cost
         );
@@ -185,13 +185,13 @@ fn brute_force_random_with_omega() {
 #[test]
 fn cost_monotone_in_k() {
     let tokens: Vec<u32> = vec![10; 50];
-    let weights: Vec<f64> = (1..=50_usize).map(|i| usize_as_f64(i.saturating_mul(i))).collect();
+    let weights: Vec<f64> = (1..=50usize).map(|i| usize_as_f64(i.saturating_mul(i))).collect();
 
     let mut prev_cost = f64::INFINITY;
     for k_val in 0..=5 {
         let result = optimize_gamma(&tokens, &weights, &[], k_val);
         assert!(
-            result.cost <= prev_cost + 1e-9,
+            result.cost <= prev_cost + 1e-9f64,
             "Cost increased: K={k_val} cost {:.6} > K={} cost {prev_cost:.6}",
             result.cost,
             k_val.saturating_sub(1)
@@ -203,7 +203,7 @@ fn cost_monotone_in_k() {
 #[test]
 fn gamma_disjoint_from_omega() {
     let tokens: Vec<u32> = vec![10; 20];
-    let weights: Vec<f64> = vec![1.0; 20];
+    let weights: Vec<f64> = vec![1.0f64; 20];
     let omega = vec![5, 10, 15];
 
     let result = optimize_gamma(&tokens, &weights, &omega, 3);
@@ -215,7 +215,7 @@ fn gamma_disjoint_from_omega() {
 #[test]
 fn gamma_positions_in_range() {
     let tokens: Vec<u32> = vec![10; 30];
-    let weights: Vec<f64> = vec![1.0; 30];
+    let weights: Vec<f64> = vec![1.0f64; 30];
 
     let result = optimize_gamma(&tokens, &weights, &[], 3);
     for &g_pos in &result.gamma {
@@ -226,7 +226,7 @@ fn gamma_positions_in_range() {
 #[test]
 fn gamma_sorted() {
     let tokens: Vec<u32> = vec![10; 50];
-    let weights: Vec<f64> = (1..=50_usize).map(|i| usize_as_f64(i.saturating_mul(i))).collect();
+    let weights: Vec<f64> = (1..=50usize).map(|i| usize_as_f64(i.saturating_mul(i))).collect();
 
     let result = optimize_gamma(&tokens, &weights, &[], 3);
     for pair in result.gamma.windows(2) {
@@ -255,30 +255,30 @@ fn tail_heavy_density_shifts_gamma_right() {
 fn empty_input() {
     let result = optimize_gamma(&[], &[], &[], 3);
     assert!(result.gamma.is_empty());
-    assert!((result.cost - 0.0).abs() < 1e-9);
+    assert!((result.cost - 0.0).abs() < 1e-9f64);
 }
 
 #[test]
 fn single_block() {
-    let result = optimize_gamma(&[42], &[1.0], &[], 3);
+    let result = optimize_gamma(&[42], &[1.0f64], &[], 3);
     assert!(result.gamma.is_empty());
-    assert!((result.cost - 42.0).abs() < 1e-9);
+    assert!((result.cost - 42.0).abs() < 1e-9f64);
 }
 
 #[test]
 fn k_zero() {
     let tokens: Vec<u32> = vec![10; 10];
-    let weights: Vec<f64> = vec![1.0; 10];
+    let weights: Vec<f64> = vec![1.0f64; 10];
     let result = optimize_gamma(&tokens, &weights, &[], 0);
     assert!(result.gamma.is_empty());
     // Uniform: p_x = 0.1, T_x = 10x → L(∅) = Σ 0.1·10x = 55
-    assert!((result.cost - 55.0).abs() < 1e-9, "K=0: cost {:.6} != expected 55.0", result.cost);
+    assert!((result.cost - 55.0).abs() < 1e-9f64, "K=0: cost {:.6} != expected 55.0", result.cost);
 }
 
 #[test]
 fn k_exceeds_available_slots() {
     let tokens: Vec<u32> = vec![10; 5];
-    let weights: Vec<f64> = vec![1.0; 5];
+    let weights: Vec<f64> = vec![1.0f64; 5];
     let omega = vec![2, 4];
 
     let result = optimize_gamma(&tokens, &weights, &omega, 10);
@@ -289,7 +289,7 @@ fn k_exceeds_available_slots() {
 fn omega_at_every_position() {
     let num_blocks = 5;
     let tokens: Vec<u32> = vec![10; num_blocks];
-    let weights: Vec<f64> = vec![1.0; num_blocks];
+    let weights: Vec<f64> = vec![1.0f64; num_blocks];
     let omega: Vec<usize> = (1..num_blocks).collect();
 
     let result = optimize_gamma(&tokens, &weights, &omega, 3);
@@ -298,16 +298,16 @@ fn omega_at_every_position() {
 
 #[test]
 fn two_blocks() {
-    let tokens = vec![10_u32, 20];
-    let weights = vec![1.0, 1.0];
+    let tokens = vec![10u32, 20];
+    let weights = vec![1.0f64, 1.0f64];
 
     // Without cut: p1·T1 + p2·T2 = 0.5·10 + 0.5·30 = 20
     let no_cut = optimize_gamma(&tokens, &weights, &[], 0);
-    assert!((no_cut.cost - 20.0).abs() < 1e-9);
+    assert!((no_cut.cost - 20.0).abs() < 1e-9f64);
 
     // With cut at 1: p1·T1 + p2·(T2−T1) = 0.5·10 + 0.5·20 = 15
     let with_cut = optimize_gamma(&tokens, &weights, &[], 1);
-    assert!((with_cut.cost - 15.0).abs() < 1e-9);
+    assert!((with_cut.cost - 15.0).abs() < 1e-9f64);
     assert_eq!(with_cut.gamma, vec![1]);
 }
 
@@ -319,5 +319,5 @@ fn deterministic() {
     let r1 = optimize_gamma(&tokens, &weights, &[], 2);
     let r2 = optimize_gamma(&tokens, &weights, &[], 2);
     assert_eq!(r1.gamma, r2.gamma);
-    assert!((r1.cost - r2.cost).abs() < 1e-15);
+    assert!((r1.cost - r2.cost).abs() < 1e-15f64);
 }

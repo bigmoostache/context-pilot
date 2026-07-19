@@ -51,7 +51,7 @@ pub(crate) fn render_status_bar_from_ir(frame: &mut Frame<'_>, status: &StatusBa
     }
 
     // === Stop reason ===
-    if let Some(ref sr) = status.stop_reason {
+    if let Some(sr) = &(status.stop_reason) {
         let label = sr.reason.to_uppercase();
         let style = if sr.semantic == Semantic::Error {
             Style::default().fg(theme::bg_base()).bg(theme::error()).bold()
@@ -63,7 +63,7 @@ pub(crate) fn render_status_bar_from_ir(frame: &mut Frame<'_>, status: &StatusBa
     }
 
     // === Agent card ===
-    if let Some(ref agent) = status.agent {
+    if let Some(agent) = &(status.agent) {
         spans.push(Span::styled(
             format!(" 🤖 {} ", agent.name),
             Style::default().fg(theme::card_text()).bg(theme::card_agent_bg()).bold(),
@@ -81,7 +81,7 @@ pub(crate) fn render_status_bar_from_ir(frame: &mut Frame<'_>, status: &StatusBa
     }
 
     // === Git branch + changes ===
-    if let Some(ref git) = status.git {
+    if let Some(git) = &(status.git) {
         spans.push(Span::styled(
             format!(" {} ", git.branch),
             Style::default().fg(theme::card_text()).bg(theme::accent()),
@@ -107,7 +107,7 @@ pub(crate) fn render_status_bar_from_ir(frame: &mut Frame<'_>, status: &StatusBa
     }
 
     // === Auto-continue ===
-    if let Some(ref ac) = status.auto_continue {
+    if let Some(ac) = &(status.auto_continue) {
         let (icon, bg_color) = if ac.max.is_some() {
             (normalize_icon("🔁"), theme::warning())
         } else {
@@ -129,7 +129,7 @@ pub(crate) fn render_status_bar_from_ir(frame: &mut Frame<'_>, status: &StatusBa
     }
 
     // === Queue card ===
-    if let Some(ref queue) = status.queue {
+    if let Some(queue) = &(status.queue) {
         spans.push(Span::styled(
             format!(" ⏳ Queue ({}) ", queue.count),
             Style::default().fg(theme::card_text()).bg(theme::card_queue_bg()).bold(),
@@ -138,7 +138,7 @@ pub(crate) fn render_status_bar_from_ir(frame: &mut Frame<'_>, status: &StatusBa
     }
 
     // === Think balance card ===
-    if let Some(ref think) = status.think {
+    if let Some(think) = &(status.think) {
         spans.push(Span::styled(
             format!(" 🧠 Think ({}) ", think.balance),
             Style::default().fg(theme::card_text()).bg(theme::card_think_bg()).bold(),
@@ -349,7 +349,7 @@ fn build_stop_reason(state: &State) -> Option<StopReason> {
 /// Build think tool balance card (only shown when balance is negative).
 fn build_think(state: &State) -> Option<ThinkCard> {
     let ts = state.get_ext::<crate::modules::questions::ThinkState>()?;
-    if ts.consecutive_count >= 0 {
+    if ts.consecutive_count >= 0i32 {
         return None;
     }
     Some(ThinkCard { balance: ts.consecutive_count })

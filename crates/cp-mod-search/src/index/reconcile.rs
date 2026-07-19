@@ -53,7 +53,7 @@ pub(crate) fn mtime_ms(meta: &std::fs::Metadata) -> u64 {
     meta.modified()
         .ok()
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map_or(0_u64, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+        .map_or(0u64, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
 }
 
 /// Pure diff between the index's fingerprints and the disk's fingerprints.
@@ -102,7 +102,7 @@ fn index_map(client: &MeiliClient, files_uid: &str) -> Result<HashMap<String, Fi
         };
         let mtime = row.get("last_modified_ms").and_then(serde_json::Value::as_u64).unwrap_or(0);
         let size = row.get("size_bytes").and_then(serde_json::Value::as_u64).unwrap_or(0);
-        let _prev = map.insert(path.to_string(), FilePrint { mtime, size });
+        let _prev = map.insert(path.to_owned(), FilePrint { mtime, size });
     }
     Ok(map)
 }

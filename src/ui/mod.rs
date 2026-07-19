@@ -61,7 +61,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     if let Some(perf_overlay) = ir_frame
         .overlays
         .iter()
-        .find_map(|o| if let cp_render::conversation::Overlay::Perf(ref p) = *o { Some(p) } else { None })
+        .find_map(|o| if let cp_render::conversation::Overlay::Perf(p) = o { Some(p) } else { None })
     {
         perf::render_perf_overlay_from_ir(frame, area, perf_overlay);
     }
@@ -86,14 +86,14 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     if let Some(config_overlay) = ir_frame
         .overlays
         .iter()
-        .find_map(|o| if let cp_render::conversation::Overlay::Config(ref c) = *o { Some(c) } else { None })
+        .find_map(|o| if let cp_render::conversation::Overlay::Config(c) = o { Some(c) } else { None })
     {
         help::config_overlay::render_config_overlay(frame, config_overlay, area);
     }
 
     // Render Meilisearch indexing status overlay if active (from IR overlays)
     if let Some(search_overlay) = ir_frame.overlays.iter().find_map(|o| {
-        if let cp_render::conversation::Overlay::SearchIndex(ref s) = *o { Some(s.as_ref()) } else { None }
+        if let cp_render::conversation::Overlay::SearchIndex(s) = o { Some(s.as_ref()) } else { None }
     }) {
         search_overlay::render_search_index_overlay(frame, search_overlay, area);
     }

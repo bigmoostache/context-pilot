@@ -70,13 +70,13 @@ pub(crate) fn collect_pending_coucous(state: &State) -> Vec<CoucouData> {
         .filter(|w| w.source_tag() == "coucou")
         .filter_map(|w| {
             Some(CoucouData {
-                watcher_id: w.id().to_string(),
-                message: w.message()?.to_string(),
+                watcher_id: w.id().to_owned(),
+                message: w.message()?.to_owned(),
                 registered_at_ms: w.registered_ms(),
                 fire_at_ms: w.fire_at_ms()?,
-                thread_id: w.thread_id().map(str::to_string),
+                thread_id: w.thread_id().map(str::to_owned),
                 interval_ms: w.interval_ms(),
-                recurrence_label: w.recurrence_label().map(str::to_string),
+                recurrence_label: w.recurrence_label().map(str::to_owned),
             })
         })
         .collect()
@@ -90,7 +90,7 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
     // Pure numeric → treat as seconds
     if let Ok(secs) = s.parse::<u64>() {
         if secs == 0 {
-            return Err("Duration must be greater than 0".to_string());
+            return Err("Duration must be greater than 0".to_owned());
         }
         return Ok(secs.saturating_mul(1000));
     }
@@ -120,7 +120,7 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
     }
 
     if total_ms == 0 {
-        return Err("Duration must be greater than 0".to_string());
+        return Err("Duration must be greater than 0".to_owned());
     }
 
     Ok(total_ms)
@@ -141,7 +141,7 @@ fn parse_datetime_ms(s: &str) -> Result<u64, String> {
     let ms = cp_mod_utilities::time::parse_rfc3339_to_epoch_ms(&rfc3339)
         .ok_or_else(|| format!("Invalid datetime: '{normalized}'. Expected format: YYYY-MM-DDTHH:MM:SS"))?;
 
-    u64::try_from(ms).map_err(|_e| "DateTime is before epoch".to_string())
+    u64::try_from(ms).map_err(|_e| "DateTime is before epoch".to_owned())
 }
 
 /// Format milliseconds as a human-friendly duration string.
@@ -304,15 +304,15 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(mode) = tool.input.get("mode").and_then(|v| v.as_str()) else {
         return ToolResult::new(
             tool.id.clone(),
-            "Missing required 'mode' parameter. Use 'timer' or 'datetime'.".to_string(),
+            "Missing required 'mode' parameter. Use 'timer' or 'datetime'.".to_owned(),
             true,
         );
     };
 
     let message = match tool.input.get("message").and_then(|v| v.as_str()) {
-        Some(m) => m.to_string(),
+        Some(m) => m.to_owned(),
         None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'message' parameter.".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing required 'message' parameter.".to_owned(), true);
         }
     };
 
@@ -322,16 +322,16 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
     let recurrence_str = tool.input.get("recurrence").and_then(|v| v.as_str()).unwrap_or("once");
     let (interval_ms, recurrence_label): (u64, Option<String>) = match recurrence_str {
         "once" => (0, None),
-        "hourly" => (3_600_000, Some("hourly".to_string())),
-        "daily" => (86_400_000, Some("daily".to_string())),
-        "weekly" => (604_800_000, Some("weekly".to_string())),
+        "hourly" => (3_600_000, Some("hourly".to_owned())),
+        "daily" => (86_400_000, Some("daily".to_owned())),
+        "weekly" => (604_800_000, Some("weekly".to_owned())),
         "custom" => {
             /// Minimum recurrence interval to prevent notification spam (60 seconds).
             const MIN_RECURRENCE_MS: u64 = 60_000;
             let Some(interval_str) = tool.input.get("interval").and_then(|v| v.as_str()) else {
                 return ToolResult::new(
                     tool.id.clone(),
-                    "Missing 'interval' parameter for custom recurrence. Examples: '30m', '2h', '1d'".to_string(),
+                    "Missing 'interval' parameter for custom recurrence. Examples: '30m', '2h', '1d'".to_owned(),
                     true,
                 );
             };
@@ -369,7 +369,7 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
             let Some(delay_str) = tool.input.get("delay").and_then(|v| v.as_str()) else {
                 return ToolResult::new(
                     tool.id.clone(),
-                    "Missing 'delay' parameter for timer mode. Examples: '30s', '5m', '1h30m'".to_string(),
+                    "Missing 'delay' parameter for timer mode. Examples: '30s', '5m', '1h30m'".to_owned(),
                     true,
                 );
             };
@@ -388,7 +388,7 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
             let Some(dt_str) = tool.input.get("datetime").and_then(|v| v.as_str()) else {
                 return ToolResult::new(
                     tool.id.clone(),
-                    "Missing 'datetime' parameter. Format: YYYY-MM-DDTHH:MM:SS".to_string(),
+                    "Missing 'datetime' parameter. Format: YYYY-MM-DDTHH:MM:SS".to_owned(),
                     true,
                 );
             };

@@ -181,11 +181,11 @@ fn indexer_loop(rx: &mpsc::Receiver<IndexerCmd>, params: &IndexerParams) {
 
         for cmd in unique {
             match cmd {
-                IndexerCmd::IndexFile(ref path) => {
-                    index_one_file(&mut ctx, path);
+                IndexerCmd::IndexFile(path) => {
+                    index_one_file(&mut ctx, &path);
                 }
-                IndexerCmd::DeleteFile(ref path) => {
-                    delete_one_file(&mut ctx, path);
+                IndexerCmd::DeleteFile(path) => {
+                    delete_one_file(&mut ctx, &path);
                 }
                 IndexerCmd::ScanComplete => {
                     if let Ok(mut m) = ctx.metrics.lock() {
@@ -316,7 +316,7 @@ fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
         m.files_indexed = m.files_indexed.saturating_add(1);
         let chunk_count = u64::try_from(chunks.len()).unwrap_or(0);
         m.chunks_indexed = m.chunks_indexed.saturating_add(chunk_count);
-        let count = m.extension_counts.entry(ext.to_string()).or_insert(0);
+        let count = m.extension_counts.entry(ext.to_owned()).or_insert(0);
         *count = count.saturating_add(1);
         for chunk in &chunks {
             if chunk.kind == "raw" {

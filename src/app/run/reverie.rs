@@ -54,7 +54,7 @@ pub(super) fn process_reverie_events(app: &mut App) {
                             rev.messages.push(crate::state::Message {
                                 id: format!("rev-{}", rev.messages.len()),
                                 uid: None,
-                                role: "assistant".to_string(),
+                                role: "assistant".to_owned(),
                                 content: String::new(),
                                 msg_type: crate::state::MsgKind::TextMessage,
                                 status: crate::state::MsgStatus::Full,
@@ -88,7 +88,7 @@ pub(super) fn process_reverie_events(app: &mut App) {
                     let _notif = cp_mod_spine::types::SpineState::create_notification(
                         &mut app.state,
                         cp_mod_spine::types::NotificationType::Custom,
-                        "Reverie".to_string(),
+                        "Reverie".to_owned(),
                         format!("Reverie '{agent_id}' error: {e}. Destroying session."),
                     );
                     // Discard any queued actions from the failed reverie
@@ -131,7 +131,7 @@ pub(super) fn handle_reverie_tools(app: &mut App) {
                 let _notif_cap = cp_mod_spine::types::SpineState::create_notification(
                     &mut app.state,
                     cp_mod_spine::types::NotificationType::Custom,
-                    "Reverie".to_string(),
+                    "Reverie".to_owned(),
                     format!("Tool cap ({cap}) reached for '{agent_id}'. Force-stopping."),
                 );
                 QueueState::get_mut(&mut app.state).clear();
@@ -157,8 +157,8 @@ pub(super) fn handle_reverie_tools(app: &mut App) {
                     let _notif_report = cp_mod_spine::types::SpineState::create_notification(
                         &mut app.state,
                         cp_mod_spine::types::NotificationType::Custom,
-                        "Reverie".to_string(),
-                        summary.to_string(),
+                        "Reverie".to_owned(),
+                        summary.to_owned(),
                     );
                     if let Some(stream) = app.reverie_streams.get_mut(&agent_id) {
                         stream.report_called = true;
@@ -199,7 +199,7 @@ pub(super) fn handle_reverie_tools(app: &mut App) {
                 rev.messages.push(crate::state::Message {
                     id: format!("rev-tc-{}", rev.messages.len()),
                     uid: None,
-                    role: "assistant".to_string(),
+                    role: "assistant".to_owned(),
                     content: String::new(),
                     msg_type: crate::state::MsgKind::ToolCall,
                     status: crate::state::MsgStatus::Full,
@@ -216,7 +216,7 @@ pub(super) fn handle_reverie_tools(app: &mut App) {
                 rev.messages.push(crate::state::Message {
                     id: format!("rev-tr-{}", rev.messages.len()),
                     uid: None,
-                    role: "user".to_string(),
+                    role: "user".to_owned(),
                     content: String::new(),
                     msg_type: crate::state::MsgKind::ToolResult,
                     status: crate::state::MsgStatus::Full,
@@ -243,7 +243,7 @@ pub(super) fn handle_reverie_tools(app: &mut App) {
             if let Some(rev) = app.state.reveries.get_mut(&agent_id) {
                 for msg in &mut rev.messages {
                     if msg.role == "assistant" {
-                        msg.content = msg.content.trim_end().to_string();
+                        msg.content = msg.content.trim_end().to_owned();
                     }
                 }
                 rev.is_streaming = true;
@@ -278,7 +278,7 @@ pub(super) fn check_reverie_end_turn(app: &mut App) {
             let _notif_end = cp_mod_spine::types::SpineState::create_notification(
                 &mut app.state,
                 cp_mod_spine::types::NotificationType::Custom,
-                "Reverie".to_string(),
+                "Reverie".to_owned(),
                 format!("Reverie '{agent_id}' ended without Report after retry. Force-destroying."),
             );
             QueueState::get_mut(&mut app.state).clear();
@@ -294,15 +294,15 @@ pub(super) fn check_reverie_end_turn(app: &mut App) {
 
             for msg in &mut rev.messages {
                 if msg.role == "assistant" {
-                    msg.content = msg.content.trim_end().to_string();
+                    msg.content = msg.content.trim_end().to_owned();
                 }
             }
 
             rev.messages.push(crate::state::Message {
                 id: format!("rev-nudge-{}", rev.messages.len()),
                 uid: None,
-                role: "user".to_string(),
-                content: REVERIE.report_nudge.trim_end().to_string(),
+                role: "user".to_owned(),
+                content: REVERIE.report_nudge.trim_end().to_owned(),
                 msg_type: crate::state::MsgKind::TextMessage,
                 status: crate::state::MsgStatus::Full,
                 content_token_count: 0,

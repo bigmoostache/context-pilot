@@ -40,7 +40,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
     match action {
         Action::InputChar(ch) => {
             // Delete selection if any, then insert
-            let _ = cursor::delete_selection(state);
+            let _r = cursor::delete_selection(state);
             state.input.insert(state.input_cursor, ch);
             state.input_cursor = state.input_cursor.saturating_add(ch.len_utf8());
 
@@ -75,14 +75,14 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
             ActionResult::Nothing
         }
         Action::InsertText(text) => {
-            let _ = cursor::delete_selection(state);
+            let _r = cursor::delete_selection(state);
             state.input.insert_str(state.input_cursor, &text);
             state.input_cursor = state.input_cursor.saturating_add(text.len());
             ActionResult::Nothing
         }
         Action::PasteText(text) => {
             // Delete selection first, then store in paste buffers and insert sentinel
-            let _ = cursor::delete_selection(state);
+            let _r = cursor::delete_selection(state);
             let idx = state.paste_buffers.len();
             state.paste_buffers.push(text);
             state.paste_buffer_labels.push(None);
@@ -178,7 +178,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::InputSubmit => {
             // Reset prompt history navigation and push new entry
             history::ensure_history_nav(state);
-            let trimmed = state.input.trim_end().to_string();
+            let trimmed = state.input.trim_end().to_owned();
             let nav = state.ext_mut::<history::PromptHistoryNav>();
             if !trimmed.is_empty() {
                 nav.push(trimmed);
@@ -208,7 +208,7 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
 
         // === Streaming (delegated) ===
         Action::AppendChars(text) => streaming::handle_append_chars(state, &text),
-        Action::StreamDone { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, ref stop_reason } => {
+        Action::StreamDone { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason } => {
             let event = streaming::StreamDoneEvent {
                 input_tokens,
                 output_tokens,

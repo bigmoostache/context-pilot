@@ -76,7 +76,7 @@ impl Panel for SkillPanel {
                 return format!("Skill: {}", skill.name);
             }
         }
-        "Skill".to_string()
+        "Skill".to_owned()
     }
 
     fn refresh(&self, state: &mut State) {
@@ -86,7 +86,7 @@ impl Panel for SkillPanel {
             .iter()
             .enumerate()
             .filter(|(_, c)| c.context_type == Kind::new(Kind::SKILL))
-            .filter_map(|(idx, c)| c.get_meta_str("skill_prompt_id").map(|sid| (sid.to_string(), idx)))
+            .filter_map(|(idx, c)| c.get_meta_str("skill_prompt_id").map(|sid| (sid.to_owned(), idx)))
             .collect();
 
         // Load all skills from disk once

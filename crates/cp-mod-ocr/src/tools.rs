@@ -39,12 +39,12 @@ fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("ocr_exec");
     // --- Validate DATALAB_API_KEY ---
     let Some(api_key) = api_key_from_env() else {
-        return err(tool, "DATALAB_API_KEY not set in environment.".to_string());
+        return err(tool, "DATALAB_API_KEY not set in environment.".to_owned());
     };
 
     // --- Validate path ---
     let Some(path_str) = tool.input.get("path").and_then(|v| v.as_str()) else {
-        return err(tool, "Missing required parameter 'path'.".to_string());
+        return err(tool, "Missing required parameter 'path'.".to_owned());
     };
     let path = PathBuf::from(path_str);
     if !path.exists() {
@@ -61,7 +61,7 @@ fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // --- Validate mode ---
     let Some(mode_str) = tool.input.get("mode").and_then(|v| v.as_str()) else {
-        return err(tool, "Missing required parameter 'mode'. Use 'markdown' or 'text_boxes'.".to_string());
+        return err(tool, "Missing required parameter 'mode'. Use 'markdown' or 'text_boxes'.".to_owned());
     };
     let mode = match OcrMode::from_str(mode_str) {
         Ok(m) => m,
@@ -70,7 +70,7 @@ fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // --- Validate output ---
     let Some(output_str) = tool.input.get("output").and_then(|v| v.as_str()) else {
-        return err(tool, "Missing required parameter 'output'.".to_string());
+        return err(tool, "Missing required parameter 'output'.".to_owned());
     };
     let output_path = PathBuf::from(output_str);
 
@@ -84,8 +84,8 @@ fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // --- Spawn background thread + non-blocking watcher ---
-    let path_display = path_str.to_string();
-    let output_display = output_str.to_string();
+    let path_display = path_str.to_owned();
+    let output_display = output_str.to_owned();
     let (tx, rx) = mpsc::channel();
 
     // Clone for the closure — originals are used in the tool result after spawn.
@@ -105,7 +105,7 @@ fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
             Ok(result) => {
                 if let Err(e) = std::fs::write(&output_path, &result.text) {
                     let _r =
-                        tx.send(format!("❌ OCR succeeded but failed to write output to '{output_for_closure}': {e}",));
+                        tx.send(format!("❌ OCR succeeded but failed to write output to '{output_for_closure}': {e}"));
                     return;
                 }
                 let cached_note = if result.cached { " (from cache)" } else { "" };
@@ -120,7 +120,7 @@ fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     });
 
-    if let Err(ref e) = handle {
+    if let Err(e) = &(handle) {
         return err(tool, format!("Failed to spawn OCR worker thread: {e}"));
     }
 
@@ -225,7 +225,7 @@ impl Watcher for OcrWatcher {
     fn check(&self, _state: &State) -> Option<WatcherResult> {
         let Ok(rx) = self.rx.lock() else {
             return Some(WatcherResult {
-                description: "❌ OCR watcher failed (lock poisoned)".to_string(),
+                description: "❌ OCR watcher failed (lock poisoned)".to_owned(),
                 panel_id: None,
                 tool_use_id: None,
                 close_panel: false,
@@ -249,7 +249,7 @@ impl Watcher for OcrWatcher {
                 preserves_tempo: false,
             }),
             Err(TryRecvError::Disconnected) => Some(WatcherResult {
-                description: "❌ OCR worker thread died unexpectedly".to_string(),
+                description: "❌ OCR worker thread died unexpectedly".to_owned(),
                 panel_id: None,
                 tool_use_id: None,
                 close_panel: false,

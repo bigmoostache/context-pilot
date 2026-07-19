@@ -37,7 +37,7 @@ impl TodoPanel {
 
         let ts = TodoState::get(state);
         if ts.todos.is_empty() {
-            return "No todos".to_string();
+            return "No todos".to_owned();
         }
 
         let mut output = String::new();
@@ -45,7 +45,7 @@ impl TodoPanel {
             output.push_str(&format_todo(todo, &ts.todos, 0));
         }
 
-        output.trim_end().to_string()
+        output.trim_end().to_owned()
     }
 }
 
@@ -107,7 +107,7 @@ impl Panel for TodoPanel {
         blocks
     }
     fn title(&self, _state: &State) -> String {
-        "Todo".to_string()
+        "Todo".to_owned()
     }
 
     fn refresh(&self, state: &mut State) {
@@ -117,7 +117,7 @@ impl Panel for TodoPanel {
         for ctx in &mut state.context {
             if ctx.context_type.as_str() == Kind::TODO {
                 ctx.token_count = token_count;
-                let _ = cp_base::panels::update_if_changed(ctx, &todo_content);
+                let _changed = cp_base::panels::update_if_changed(ctx, &todo_content);
                 break;
             }
         }

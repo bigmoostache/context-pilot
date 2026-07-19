@@ -12,10 +12,10 @@ pub fn ensure_default_agent(state: &mut State) {
     let ps_mut = PromptState::get_mut(state);
     if let Some(active_id) = &ps_mut.active_agent_id {
         if !agents.iter().any(|a| a.id == *active_id) {
-            ps_mut.active_agent_id = Some(default_id.to_string());
+            ps_mut.active_agent_id = Some(default_id.to_owned());
         }
     } else {
-        ps_mut.active_agent_id = Some(default_id.to_string());
+        ps_mut.active_agent_id = Some(default_id.to_owned());
     }
 }
 

@@ -243,7 +243,7 @@ fn expand_paste_sentinels(
     ctx: &InputBlockCtx<'_>,
 ) -> (String, usize, Option<usize>) {
     if !raw_input.contains(SENTINEL_CHAR) {
-        return (raw_input.to_string(), raw_cursor, raw_anchor);
+        return (raw_input.to_owned(), raw_cursor, raw_anchor);
     }
 
     let paste_buffers = ctx.paste_buffers;

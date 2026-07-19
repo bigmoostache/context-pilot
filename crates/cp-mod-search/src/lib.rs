@@ -403,7 +403,7 @@ impl Module for SearchModule {
         let port = ss.persist.port;
 
         if port == 0 {
-            return Some("Search: server not available\n".to_string());
+            return Some("Search: server not available\n".to_owned());
         }
 
         let (chunks, files, scan_complete) = {

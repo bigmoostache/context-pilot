@@ -77,10 +77,10 @@ fn markdown_display_width(text: &str) -> usize {
 /// Returns a Vec of lines, each fitting within `width` characters.
 fn wrap_cell_text(text: &str, width: usize) -> Vec<String> {
     if width == 0 {
-        return vec![text.to_string()];
+        return vec![text.to_owned()];
     }
     if markdown_display_width(text) <= width {
-        return vec![text.to_string()];
+        return vec![text.to_owned()];
     }
 
     let mut result_lines = Vec::new();
@@ -158,7 +158,7 @@ pub(crate) fn render_markdown_table(table_lines: &[&str], max_width: usize) -> V
         let trimmed = line.trim();
         // Remove leading and trailing pipes
         let inner = trimmed.trim_start_matches('|').trim_end_matches('|');
-        let cells: Vec<String> = inner.split('|').map(|c| c.trim().to_string()).collect();
+        let cells: Vec<String> = inner.split('|').map(|c| c.trim().to_owned()).collect();
 
         // Check if this is a separator row (contains only dashes and colons)
         let is_sep = cells.iter().all(|c| c.chars().all(|ch| ch == '-' || ch == ':' || ch == ' '));

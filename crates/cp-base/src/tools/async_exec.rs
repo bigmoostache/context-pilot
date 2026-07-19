@@ -95,7 +95,7 @@ where
         let _r = tx.send(result);
     });
 
-    if let Err(ref e) = handle {
+    if let Err(e) = &handle {
         // Thread spawn failed — return error synchronously
         return ToolResult {
             tool_use_id: tool.id.clone(),
@@ -114,7 +114,7 @@ where
 
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: BLOCKING_TOOL_SENTINEL.to_string(),
+        content: BLOCKING_TOOL_SENTINEL.to_owned(),
         display: None,
         tldr: None,
         is_error: false,

@@ -20,7 +20,7 @@ use super::download;
 pub(super) fn global_meili_dir() -> Result<PathBuf, String> {
     std::env::var("HOME")
         .map(|h| PathBuf::from(h).join(".context-pilot/meilisearch"))
-        .map_err(|_e| "Cannot determine HOME directory".to_string())
+        .map_err(|_e| "Cannot determine HOME directory".to_owned())
 }
 
 /// Path to the Meilisearch binary: `~/.context-pilot/meilisearch/bin/meilisearch`.
@@ -208,7 +208,7 @@ fn write_master_key(key: &str) -> Result<(), String> {
 pub(super) fn read_master_key() -> Option<String> {
     let path = key_path().ok()?;
     let content = std::fs::read_to_string(path).ok()?;
-    let trimmed = content.trim().to_string();
+    let trimmed = content.trim().to_owned();
     if trimmed.is_empty() { None } else { Some(trimmed) }
 }
 
@@ -399,7 +399,7 @@ pub(crate) fn cleanup_orphan_indexes(port: u16, master_key: &str) {
         .iter()
         .filter_map(|(proj_path, hash_val)| {
             let hash = hash_val.as_str()?;
-            (!std::path::Path::new(proj_path).exists()).then(|| (proj_path.clone(), hash.to_string()))
+            (!std::path::Path::new(proj_path).exists()).then(|| (proj_path.clone(), hash.to_owned()))
         })
         .collect();
 
@@ -451,7 +451,7 @@ pub(crate) fn register_project(project_path: &str, hash: &str) -> Result<(), Str
         serde_json::Map::new()
     };
 
-    let _prev = projects.insert(project_path.to_string(), serde_json::Value::String(hash.to_string()));
+    let _prev = projects.insert(project_path.to_owned(), serde_json::Value::String(hash.to_owned()));
 
     let json = serde_json::to_string_pretty(&projects).map_err(|e| format!("Cannot serialize projects.json: {e}"))?;
 

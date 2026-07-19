@@ -69,7 +69,7 @@ pub(crate) struct StreamDoneEvent<'ev> {
 /// Handle `StreamDone` action — finalize streaming, correct token counts.
 pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>) -> ActionResult {
     state.flags.stream.phase.transition(StreamPhase::Idle);
-    state.last_stop_reason = event.stop_reason.map(ToString::to_string);
+    state.last_stop_reason = event.stop_reason.map(str::to_owned);
 
     let usage = TokenUsage {
         output: event.output_tokens,
@@ -165,7 +165,7 @@ pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResul
 
     // Truncate error for inline display (~1000 chars, UTF-8 safe)
     let preview = if error.len() <= INLINE_LIMIT {
-        error.to_string()
+        error.to_owned()
     } else {
         let boundary =
             error.char_indices().map(|(i, _)| i).take_while(|&i| i <= INLINE_LIMIT).last().unwrap_or(INLINE_LIMIT);

@@ -28,7 +28,7 @@ impl Panel for GitResultPanel {
         let command = ctx.get_meta_str("result_command")?;
         Some(CacheRequest {
             context_type: Kind::new(Kind::GIT_RESULT),
-            data: Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.to_string() }),
+            data: Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.to_owned() }),
         })
     }
 
@@ -52,7 +52,7 @@ impl Panel for GitResultPanel {
                 }
                 ctx.cache_deprecated = false;
                 let content_ref = ctx.cached_content.clone().unwrap_or_default();
-                let _ = update_if_changed(ctx, &content_ref);
+                let _changed = update_if_changed(ctx, &content_ref);
                 true
             }
             CacheUpdate::Unchanged { .. } | CacheUpdate::ModuleSpecific { .. } => false,
@@ -67,7 +67,7 @@ impl Panel for GitResultPanel {
         let args = super::classify::validate_git_command(&command).ok()?;
 
         let mut cmd = std::process::Command::new("git");
-        let _ = cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
+        let _c = cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
         let output = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
 
         match output {
@@ -139,11 +139,11 @@ impl Panel for GitResultPanel {
             let short = if cmd.len() > 40 {
                 format!("{}...", cmd.get(..cmd.floor_char_boundary(37)).unwrap_or(""))
             } else {
-                cmd.to_string()
+                cmd.to_owned()
             };
             return short;
         }
-        "Git Result".to_string()
+        "Git Result".to_owned()
     }
 
     fn max_freezes(&self) -> u8 {

@@ -74,7 +74,7 @@ impl ClaudeCodeClient {
                     auth_ok: false,
                     streaming_ok: false,
                     tools_ok: false,
-                    error: Some("OAuth token not found or expired".to_string()),
+                    error: Some("OAuth token not found or expired".to_owned()),
                 };
             }
         };
@@ -96,7 +96,7 @@ impl ClaudeCodeClient {
         .send();
         let auth_ok = auth_result.as_ref().is_ok_and(|r| r.status().is_success());
         if !auth_ok {
-            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
+            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_owned()));
             return ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
         }
 
@@ -145,7 +145,7 @@ impl ClaudeCodeClient {
 
         // Handle cleaner mode or custom system prompt
         let system_text =
-            request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_string(), Clone::clone);
+            request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_owned(), Clone::clone);
 
         // Build messages from pre-assembled API messages or raw data
         let super::CcJsonResult { mut json_messages, bp_hashes, bp_panel_ids, alive_count, alive_positions_permille } =
@@ -162,7 +162,7 @@ impl ClaudeCodeClient {
             };
 
         // Handle cleaner mode extra context
-        if let Some(ref context) = request.extra_context {
+        if let Some(context) = &(request.extra_context) {
             let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
             json_messages.push(serde_json::json!({
                 "role": "user",
@@ -282,7 +282,7 @@ impl ClaudeCodeClient {
             if last_lines.len() >= 5 {
                 let _r = last_lines.remove(0);
             }
-            last_lines.push(line.to_string());
+            last_lines.push(line.to_owned());
 
             let json_str = line.get(6..).unwrap_or("");
             if json_str == "[DONE]" {
@@ -311,7 +311,7 @@ impl ClaudeCodeClient {
                                 }
                                 Some("input_json_delta") => {
                                     if let Some(json) = delta.partial_json
-                                        && let Some((_, ref name, ref mut input)) = current_tool
+                                        && let Some((_, name, input)) = current_tool.as_mut()
                                     {
                                         input.push_str(&json);
                                         let _r = tx.send(StreamEvent::ToolProgress {
@@ -347,8 +347,8 @@ impl ClaudeCodeClient {
                         }
                     }
                     "message_delta" => {
-                        if let Some(ref delta) = event.delta
-                            && let Some(ref reason) = delta.stop_reason
+                        if let Some(delta) = &event.delta
+                            && let Some(reason) = &delta.stop_reason
                         {
                             stop_reason = Some(reason.clone());
                         }

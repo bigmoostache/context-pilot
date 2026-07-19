@@ -49,7 +49,7 @@ impl TreeState {
     /// Create a default tree state (root folder open, standard filter).
     #[must_use]
     pub fn new() -> Self {
-        Self { filter: DEFAULT_TREE_FILTER.to_string(), open_folders: vec![".".to_string()], descriptions: vec![] }
+        Self { filter: DEFAULT_TREE_FILTER.to_owned(), open_folders: vec![".".to_owned()], descriptions: vec![] }
     }
 
     /// Get shared ref from State's `TypeMap`.

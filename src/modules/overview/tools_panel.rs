@@ -18,7 +18,7 @@ impl Panel for ToolsPanel {
         super::tools_blocks::tools_blocks(state)
     }
     fn title(&self, _state: &State) -> String {
-        "Tools".to_string()
+        "Tools".to_owned()
     }
 
     fn max_freezes(&self) -> u8 {

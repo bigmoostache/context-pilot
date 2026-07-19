@@ -28,17 +28,17 @@ pub(super) fn extract_json_fields(partial: &str) -> Vec<(String, String)> {
     // Skip opening brace
     while let Some(&(_, c)) = chars.peek() {
         if c == '{' {
-            let _ = chars.next();
+            let _r = chars.next();
             break;
         }
-        let _ = chars.next();
+        let _r = chars.next();
     }
 
     loop {
         // Skip whitespace and commas
         while let Some(&(_, c)) = chars.peek() {
             if c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == ',' {
-                let _ = chars.next();
+                let _r = chars.next();
             } else {
                 break;
             }
@@ -50,7 +50,7 @@ pub(super) fn extract_json_fields(partial: &str) -> Vec<(String, String)> {
         // Skip colon
         while let Some(&(_, c)) = chars.peek() {
             if c == ':' || c == ' ' {
-                let _ = chars.next();
+                let _r = chars.next();
             } else {
                 break;
             }
@@ -70,7 +70,7 @@ fn read_json_string(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>) 
     if chars.peek().map(|&(_, c)| c) != Some('"') {
         return None;
     }
-    let _ = chars.next(); // consume opening quote
+    let _r = chars.next(); // consume opening quote
 
     let mut s = String::new();
     let mut escaped = false;
@@ -114,7 +114,7 @@ fn read_json_value(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>, f
                     }
                 }
             }
-            full.get(start..end).unwrap_or("").to_string()
+            full.get(start..end).unwrap_or("").to_owned()
         }
         Some(_) => {
             // Number, bool, null — read until delimiter
@@ -124,9 +124,9 @@ fn read_json_value(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>, f
                     break;
                 }
                 val.push(c);
-                let _ = chars.next();
+                let _r = chars.next();
             }
-            val.trim().to_string()
+            val.trim().to_owned()
         }
         None => String::new(),
     }

@@ -50,7 +50,7 @@ pub fn now_utc_rfc3339_secs() -> String {
 pub fn now_utc_compact() -> String {
     let epoch_secs = now_epoch_ms().wrapping_div(1000);
     let Some(dt) = decompose_utc(epoch_secs) else {
-        return "19700101T000000".to_string();
+        return "19700101T000000".to_owned();
     };
     format!("{:04}{:02}{:02}T{:02}{:02}{:02}", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
 }
@@ -278,11 +278,11 @@ fn civil_from_days(days: i64) -> (i32, u8, u8) {
         .wrapping_div(365);
     let year_long = yoe.saturating_add(era.saturating_mul(400));
     let doy = doe
-        .saturating_sub(365_i64.saturating_mul(yoe))
+        .saturating_sub(365i64.saturating_mul(yoe))
         .saturating_sub(yoe.wrapping_div(4))
         .saturating_add(yoe.wrapping_div(100));
-    let mp = 5_i64.saturating_mul(doy).saturating_add(2).wrapping_div(153);
-    let raw_day = doy.saturating_sub(153_i64.saturating_mul(mp).saturating_add(2).wrapping_div(5)).saturating_add(1);
+    let mp = 5i64.saturating_mul(doy).saturating_add(2).wrapping_div(153);
+    let raw_day = doy.saturating_sub(153i64.saturating_mul(mp).saturating_add(2).wrapping_div(5)).saturating_add(1);
     let month = if mp < 10 { mp.saturating_add(3) } else { mp.saturating_sub(9) };
     let year = if month <= 2 { year_long.saturating_add(1) } else { year_long };
 
@@ -322,8 +322,8 @@ const fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let era = (if yr >= 0 { yr } else { yr.saturating_sub(399) }).wrapping_div(400);
     let yoe = yr.saturating_sub(era.saturating_mul(400));
     let mp = if month > 2 { month.saturating_sub(3) } else { month.saturating_add(9) };
-    let doy = 153_i64.saturating_mul(mp).saturating_add(2).wrapping_div(5).saturating_add(day).saturating_sub(1);
-    let doe = 365_i64
+    let doy = 153i64.saturating_mul(mp).saturating_add(2).wrapping_div(5).saturating_add(day).saturating_sub(1);
+    let doe = 365i64
         .saturating_mul(yoe)
         .saturating_add(yoe.wrapping_div(4))
         .saturating_sub(yoe.wrapping_div(100))
@@ -396,7 +396,7 @@ fn local_utc_offset_secs() -> i32 {
             .ok()
             .and_then(|o| String::from_utf8(o.stdout).ok())
             .and_then(|s| parse_tz_offset(s.trim()))
-            .unwrap_or(0)
+            .unwrap_or(0i32)
     })
 }
 
@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     fn civil_roundtrip() {
-        for days in [0_i64, 1, 365, 730, 18628, 20000] {
+        for days in [0i64, 1, 365, 730, 18628, 20000] {
             let (year, month, day) = civil_from_days(days);
             let rt = days_from_civil(i64::from(year), i64::from(month), i64::from(day));
             assert_eq!(days, rt, "roundtrip failed for day {days}");

@@ -63,14 +63,14 @@ pub(crate) fn render_autocomplete_popup(frame: &mut Frame<'_>, ac: &Autocomplete
             let icon = if entry.is_dir { "📁 " } else { "   " };
             lines.push(Line::from(vec![
                 Span::styled(format!(" {cursor_marker} "), Style::default().fg(theme::accent())),
-                Span::styled(icon.to_string(), Style::default()),
+                Span::styled(icon.to_owned(), Style::default()),
                 Span::styled(format!("{}{}", entry.label, suffix), path_style),
             ]));
         }
     }
 
     // Count indicator
-    let dir_label = if ac.dir_prefix.is_empty() { ".".to_string() } else { ac.dir_prefix.clone() };
+    let dir_label = if ac.dir_prefix.is_empty() { ".".to_owned() } else { ac.dir_prefix.clone() };
     let count_text = format!(" @{} — {}/{} in {}/ ", ac.query, ac.total_matches, ac.total_matches, dir_label);
 
     let block = Block::default()

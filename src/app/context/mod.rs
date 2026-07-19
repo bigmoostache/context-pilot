@@ -149,7 +149,7 @@ pub(super) fn prepare_stream_context(
         state.tick_telemetry = Some(TickTelemetry {
             tick_start_ms: crate::app::panels::now_ms(),
             three_last_tools,
-            culprit_type: "none".to_string(),
+            culprit_type: "none".to_owned(),
             tokens_before_culprit: prompt_prefix_tokens.saturating_add(total_panel_tokens),
             tokens_culprit: 0,
             tokens_after_culprit: conversation_tokens,
@@ -227,7 +227,7 @@ pub(super) fn prepare_stream_context(
                     let decision = cond.freeze_panel(broken_for_decision, entry.freeze_count, panel.max_freezes());
 
                     if decision == FreezeDecision::Freeze
-                        && let Some(ref frozen) = entry.emitted.context
+                        && let Some(frozen) = &entry.emitted.context
                     {
                         // FREEZE: restore the full snapshot (content + header + timestamp)
                         *item = frozen.clone();
@@ -274,7 +274,7 @@ pub(super) fn prepare_stream_context(
                 let price = if is_hit { hit_price } else { miss_price };
 
                 if let Some(ctx) = state.context.iter_mut().find(|c| c.id == panel_id) {
-                    let cost = ctx.token_count.to_f64() * f64::from(price) / 1_000_000.0;
+                    let cost = ctx.token_count.to_f64() * f64::from(price) / 1_000_000.0f64;
                     ctx.panel_cache_hit = is_hit;
                     ctx.panel_total_cost += cost;
                 }
@@ -348,7 +348,7 @@ pub(super) fn prepare_stream_context(
             state.tick_telemetry = Some(TickTelemetry {
                 tick_start_ms: crate::app::panels::now_ms(),
                 three_last_tools,
-                culprit_type: culprit_type.unwrap_or_else(|| "none".to_string()),
+                culprit_type: culprit_type.unwrap_or_else(|| "none".to_owned()),
                 tokens_before_culprit: prompt_prefix_tokens.saturating_add(tokens_before),
                 tokens_culprit: tok_culprit,
                 tokens_after_culprit: tokens_after.saturating_add(conversation_tokens),
@@ -387,8 +387,8 @@ pub(super) fn prepare_stream_context(
                 .collect::<Vec<_>>(),
         );
         context_items.push(ContextItem {
-            id: "P-main-conv".to_string(),
-            header: "Main Agent Conversation (read-only)".to_string(),
+            id: "P-main-conv".to_owned(),
+            header: "Main Agent Conversation (read-only)".to_owned(),
             content: main_conv_content,
             last_refresh_ms: crate::app::panels::now_ms(),
         });
@@ -421,8 +421,8 @@ pub(super) fn prepare_stream_context(
                 .push_str("\n## Reverie Conversation\n(Your messages follow in the conversation below)\n");
         }
         context_items.push(ContextItem {
-            id: "P-reverie".to_string(),
-            header: "Reverie Context (tool restrictions + conversation)".to_string(),
+            id: "P-reverie".to_owned(),
+            header: "Reverie Context (tool restrictions + conversation)".to_owned(),
             content: reverie_panel_content,
             last_refresh_ms: crate::app::panels::now_ms(),
         });
@@ -479,7 +479,7 @@ pub(crate) fn build_stream_params(
         tools: ctx.tools,
         system_prompt,
         seed_content,
-        worker_id: crate::infra::constants::DEFAULT_WORKER_ID.to_string(),
+        worker_id: crate::infra::constants::DEFAULT_WORKER_ID.to_owned(),
         cache_engine_json: state.cache_engine_json.clone(),
     }
 }

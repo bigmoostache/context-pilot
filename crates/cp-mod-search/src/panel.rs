@@ -51,7 +51,7 @@ impl Panel for SearchResultPanel {
         let content = ctx.metadata.get(META_CONTENT)?.as_str()?;
         Some(CacheRequest {
             context_type: Kind::new(SEARCH_PANEL_TYPE),
-            data: Box::new(RestoreRequest { context_id: ctx.id.clone(), content: content.to_string() }),
+            data: Box::new(RestoreRequest { context_id: ctx.id.clone(), content: content.to_owned() }),
         })
     }
 
@@ -73,7 +73,7 @@ impl Panel for SearchResultPanel {
                 ctx.token_count = token_count;
             }
             ctx.cache_deprecated = false;
-            let _ = update_if_changed(ctx, &content);
+            let _changed = update_if_changed(ctx, &content);
             true
         } else {
             false
@@ -107,7 +107,7 @@ impl Panel for SearchResultPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        state.context.get(state.selected_context).map_or_else(|| "Search Results".to_string(), |ctx| ctx.name.clone())
+        state.context.get(state.selected_context).map_or_else(|| "Search Results".to_owned(), |ctx| ctx.name.clone())
     }
 
     fn max_freezes(&self) -> u8 {
@@ -156,7 +156,7 @@ pub(crate) fn visualize_search_output(content: &str, width: usize) -> Vec<cp_ren
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
 
             let semantic = if line.starts_with("Results for") || line.starts_with("No results") {
@@ -213,7 +213,7 @@ pub(crate) fn format_results(query: &str, output: &SearchOutput<'_>, hide_conten
     let total = output.files.len().saturating_add(output.logs.len()).saturating_add(output.entities.len());
 
     let mut root = serde_json::Map::new();
-    drop(root.insert("query".into(), serde_json::Value::String(query.to_string())));
+    drop(root.insert("query".into(), serde_json::Value::String(query.to_owned())));
     drop(root.insert("total_results".into(), serde_json::json!(total)));
 
     // -- File results, grouped by path ---------------------------------------
@@ -221,7 +221,7 @@ pub(crate) fn format_results(query: &str, output: &SearchOutput<'_>, hide_conten
     if !output.files.is_empty() {
         let mut by_path: BTreeMap<String, Vec<&SearchResult>> = BTreeMap::new();
         for r in output.files {
-            let path = r.file_path.as_deref().unwrap_or("unknown").to_string();
+            let path = r.file_path.as_deref().unwrap_or("unknown").to_owned();
             by_path.entry(path).or_default().push(r);
         }
 
@@ -230,7 +230,7 @@ pub(crate) fn format_results(query: &str, output: &SearchOutput<'_>, hide_conten
             let ext = chunks.first().and_then(|c| c.extension.as_deref()).unwrap_or("");
             let mut file_obj = serde_json::Map::new();
             drop(file_obj.insert("path".into(), serde_json::Value::String(path.clone())));
-            drop(file_obj.insert("extension".into(), serde_json::Value::String(ext.to_string())));
+            drop(file_obj.insert("extension".into(), serde_json::Value::String(ext.to_owned())));
 
             let chunks_arr: Vec<serde_json::Value> =
                 chunks.iter().map(|chunk| build_chunk_value(chunk, hide_contents)).collect();
@@ -265,9 +265,9 @@ pub(crate) fn format_results(query: &str, output: &SearchOutput<'_>, hide_conten
 fn build_chunk_value(chunk: &SearchResult, hide_contents: bool) -> serde_json::Value {
     let mut obj = serde_json::Map::new();
     drop(
-        obj.insert("type".into(), serde_json::Value::String(chunk.chunk_type.as_deref().unwrap_or("raw").to_string())),
+        obj.insert("type".into(), serde_json::Value::String(chunk.chunk_type.as_deref().unwrap_or("raw").to_owned())),
     );
-    if let Some(ref name) = chunk.chunk_name
+    if let Some(name) = &chunk.chunk_name
         && !name.is_empty()
     {
         drop(obj.insert("name".into(), serde_json::Value::String(name.clone())));
@@ -290,13 +290,13 @@ fn build_chunk_value(chunk: &SearchResult, hide_contents: bool) -> serde_json::V
 /// Build a JSON value for a single log result.
 fn build_log_value(r: &SearchResult, hide_contents: bool) -> serde_json::Value {
     let mut obj = serde_json::Map::new();
-    if let Some(ref id) = r.log_id {
+    if let Some(id) = &(r.log_id) {
         drop(obj.insert("id".into(), serde_json::Value::String(id.clone())));
     }
-    if let Some(ref dt) = r.datetime {
+    if let Some(dt) = &(r.datetime) {
         drop(obj.insert("datetime".into(), serde_json::Value::String(dt.clone())));
     }
-    if let Some(ref imp) = r.importance {
+    if let Some(imp) = &(r.importance) {
         drop(obj.insert("importance".into(), serde_json::Value::String(imp.clone())));
     }
     if let Some(score) = r.ranking_score {

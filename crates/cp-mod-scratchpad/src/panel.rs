@@ -16,7 +16,7 @@ impl ScratchpadPanel {
     fn format_cells_for_context(state: &State) -> String {
         let ss = ScratchpadState::get(state);
         if ss.scratchpad_cells.is_empty() {
-            return "No scratchpad cells".to_string();
+            return "No scratchpad cells".to_owned();
         }
 
         let mut output = String::new();
@@ -26,7 +26,7 @@ impl ScratchpadPanel {
             output.push_str("\n\n");
         }
 
-        output.trim_end().to_string()
+        output.trim_end().to_owned()
     }
 }
 
@@ -57,7 +57,7 @@ impl Panel for ScratchpadPanel {
             ]));
 
             for line in cell.content.lines() {
-                blocks.push(Block::Line(vec![S::new("   ".into()), S::muted(line.to_string())]));
+                blocks.push(Block::Line(vec![S::new("   ".into()), S::muted(line.to_owned())]));
             }
 
             blocks.push(Block::Empty);
@@ -66,7 +66,7 @@ impl Panel for ScratchpadPanel {
         blocks
     }
     fn title(&self, _state: &State) -> String {
-        "Scratchpad".to_string()
+        "Scratchpad".to_owned()
     }
 
     fn refresh(&self, state: &mut State) {
@@ -76,7 +76,7 @@ impl Panel for ScratchpadPanel {
         for ctx in &mut state.context {
             if ctx.context_type.as_str() == Kind::SCRATCHPAD {
                 ctx.token_count = token_count;
-                let _ = cp_base::panels::update_if_changed(ctx, &content);
+                let _changed = cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }

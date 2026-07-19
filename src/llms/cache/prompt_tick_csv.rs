@@ -75,7 +75,7 @@ pub(crate) fn dump_prompt_tick_csv(api_messages: &[ApiMessage]) {
             };
 
             let full_hash = crate::state::cache::hash_content(raw_text);
-            let short_hash = full_hash.get(..16).unwrap_or(&full_hash).to_string();
+            let short_hash = full_hash.get(..16).unwrap_or(&full_hash).to_owned();
             let tokens = cp_base::state::context::estimate_tokens(raw_text);
 
             let preview: String = raw_text
@@ -91,7 +91,7 @@ pub(crate) fn dump_prompt_tick_csv(api_messages: &[ApiMessage]) {
     // Second pass: compute accumulated and reverse-accumulated token counts
     let total_tokens: usize = row_data.iter().map(|r| r.tokens).sum();
     let mut acc: usize = 0;
-    let mut rows: Vec<String> = vec!["hash,role,type,context,tokens,acc_tokens,rev_acc_tokens,preview".to_string()];
+    let mut rows: Vec<String> = vec!["hash,role,type,context,tokens,acc_tokens,rev_acc_tokens,preview".to_owned()];
 
     for row in &row_data {
         acc = acc.saturating_add(row.tokens);
@@ -110,28 +110,28 @@ pub(crate) fn dump_prompt_tick_csv(api_messages: &[ApiMessage]) {
 fn classify_text_context(text: &str, role: &str) -> String {
     // Panel header (first text in the panel injection sequence)
     if text.contains("Beginning of dynamic panel display") {
-        return "panel_header".to_string();
+        return "panel_header".to_owned();
     }
     // Panel timestamp lines
     if text.starts_with("Panel automatically generated at") {
-        return "panel_timestamp".to_string();
+        return "panel_timestamp".to_owned();
     }
     // Panel footer
     if text.contains("End of dynamic panel display") {
-        return "panel_footer".to_string();
+        return "panel_footer".to_owned();
     }
     // Seed re-injection header
     if text.contains("System instructions") {
-        return "seed_reinjection".to_string();
+        return "seed_reinjection".to_owned();
     }
     // Seed re-injection ack
     if role == "assistant" && text.contains("Understood") && text.len() < 100 {
-        return "seed_ack".to_string();
+        return "seed_ack".to_owned();
     }
     // Footer ack
     if role == "user" && text.contains("Proceeding with conversation") {
-        return "footer_ack".to_string();
+        return "footer_ack".to_owned();
     }
     // Conversation messages
-    if role == "user" { "conversation:user".to_string() } else { "conversation:assistant".to_string() }
+    if role == "user" { "conversation:user".to_owned() } else { "conversation:assistant".to_owned() }
 }

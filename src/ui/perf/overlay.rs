@@ -49,7 +49,7 @@ pub(crate) fn render_perf_overlay_from_ir(frame: &mut Frame<'_>, area: Rect, per
     ]));
 
     // Meilisearch process stats
-    if let Some(ref meili) = perf.meili {
+    if let Some(meili) = &(perf.meili) {
         lines.push(Line::from(vec![
             Span::styled(format!(" Meili CPU: {:.1}%", meili.cpu_pct), semantic_to_style(meili.cpu_semantic)),
             Span::styled(format!("  RAM: {:.1} MB", meili.memory_mb), semantic_to_style(Semantic::Muted)),
@@ -96,7 +96,7 @@ pub(crate) fn render_perf_overlay_from_ir(frame: &mut Frame<'_>, area: Rect, per
 /// Render a budget bar from IR data.
 fn render_budget_bar(budget_bar: &cp_render::conversation::PerfBudgetBar) -> Line<'static> {
     let bar_width = 30usize;
-    let filled = ((budget_bar.percent / 100.0) * bar_width.to_f64()).to_usize();
+    let filled = ((budget_bar.percent / 100.0f64) * bar_width.to_f64()).to_usize();
 
     Line::from(vec![
         Span::styled(format!(" {:<6}", budget_bar.label), semantic_to_style(Semantic::Muted)),
@@ -120,7 +120,7 @@ fn render_sparkline(values: &[f64]) -> Line<'static> {
         ]);
     }
 
-    let max_val = values.iter().copied().fold(1.0_f64, f64::max);
+    let max_val = values.iter().copied().fold(1.0f64, f64::max);
     let sparkline: String = values
         .iter()
         .map(|&v| {

@@ -38,7 +38,7 @@ impl StreamPhase {
         if from != to {
             let loc = std::panic::Location::caller();
             // No-op until a log backend (env_logger, tracing, etc.) is registered in the binary.
-            log::trace!("[StreamPhase] {from:?} → {to:?} ({}:{})", loc.file(), loc.line(),);
+            log::trace!("[StreamPhase] {from:?} → {to:?} ({}:{})", loc.file(), loc.line());
         }
         *self = to;
     }

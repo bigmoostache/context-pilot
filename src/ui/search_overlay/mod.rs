@@ -112,7 +112,7 @@ fn build_server(info: &cp_mod_search::types::SearchOverlayInfo) -> SearchServer 
 
 /// Build core index statistics from overlay info.
 fn build_index(info: &cp_mod_search::types::SearchOverlayInfo) -> SearchIndex {
-    let last = if info.last_activity_ms > 0 { format_ago(info.last_activity_ms) } else { "never".to_string() };
+    let last = if info.last_activity_ms > 0 { format_ago(info.last_activity_ms) } else { "never".to_owned() };
     SearchIndex {
         files_indexed: info.files_indexed,
         chunks_indexed: info.chunks_indexed,
@@ -157,7 +157,7 @@ fn build_splitter(info: &cp_mod_search::types::SearchOverlayInfo) -> Option<Sear
         tree_sitter_chunks: info.tree_sitter_chunks,
         tree_sitter_pct: ts_pct,
         fallback_chunks: info.fallback_chunks,
-        fallback_pct: 100_u64.saturating_sub(ts_pct),
+        fallback_pct: 100u64.saturating_sub(ts_pct),
     })
 }
 
@@ -213,7 +213,7 @@ fn build_recently_sent(info: &cp_mod_search::types::SearchOverlayInfo) -> Vec<Se
     info.recently_sent
         .iter()
         .map(|(p, ts_ms)| {
-            let ago = if *ts_ms > 0 { format_ago(*ts_ms) } else { "?".to_string() };
+            let ago = if *ts_ms > 0 { format_ago(*ts_ms) } else { "?".to_owned() };
             SearchRecentFile { path: truncate_path(p, 42), ago }
         })
         .collect()
@@ -292,7 +292,7 @@ pub(crate) fn format_ago(ms_then: u64) -> String {
 /// Truncate a file path to fit within `max_len` characters.
 fn truncate_path(path: &str, max_len: usize) -> String {
     if path.len() <= max_len {
-        return path.to_string();
+        return path.to_owned();
     }
     let start = path.len().saturating_sub(max_len.saturating_sub(1));
     format!("…{}", path.get(start..).unwrap_or(path))

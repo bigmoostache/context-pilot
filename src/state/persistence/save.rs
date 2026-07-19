@@ -40,9 +40,9 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         let data = module.save_module_data(state);
         if !data.is_null() {
             if module.is_global() {
-                let _r = global_modules.insert(module.id().to_string(), data);
+                let _r = global_modules.insert(module.id().to_owned(), data);
             } else {
-                let _r = worker_modules.insert(module.id().to_string(), data);
+                let _r = worker_modules.insert(module.id().to_owned(), data);
             }
         }
         let worker_data = module.save_worker_data(state);
@@ -52,10 +52,10 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     }
 
     // Cache optimization engine (survives reloads via worker state)
-    if let Some(ref json) = state.cache_engine_json
+    if let Some(json) = &state.cache_engine_json
         && let Ok(val) = serde_json::from_str::<serde_json::Value>(json)
     {
-        let _r = worker_modules.insert("cache_engine".to_string(), val);
+        let _r = worker_modules.insert("cache_engine".to_owned(), val);
     }
 
     // Shared config
@@ -104,7 +104,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     // WorkerState
     let worker_state = WorkerState {
         schema_version: crate::state::config::SCHEMA_VERSION,
-        worker_id: DEFAULT_WORKER_ID.to_string(),
+        worker_id: DEFAULT_WORKER_ID.to_owned(),
         important_panel_uids: important_uids,
         panel_uid_to_local_id,
         next_tool_id: state.next_tool_id,
@@ -148,7 +148,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
                 },
                 metadata: ctx.metadata.clone(),
                 content_hash: ctx.content_hash.clone(),
-                panel_total_cost: (ctx.panel_total_cost > 0.0).then_some(ctx.panel_total_cost),
+                panel_total_cost: (ctx.panel_total_cost > 0.0f64).then_some(ctx.panel_total_cost),
                 total_freezes: ctx.total_freezes,
                 total_cache_misses: ctx.total_cache_misses,
             };
@@ -162,7 +162,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     let messages_dir = dir.join(crate::infra::constants::MESSAGES_DIR);
     for ctx in &state.context {
         if ctx.context_type.as_str() == Kind::CONVERSATION_HISTORY
-            && let Some(ref msgs) = ctx.history_messages
+            && let Some(msgs) = &ctx.history_messages
         {
             for msg in msgs {
                 let file_id = msg.uid.as_ref().unwrap_or(&msg.id);

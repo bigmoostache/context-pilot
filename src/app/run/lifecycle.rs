@@ -57,8 +57,8 @@ impl App {
             let _r = SpineState::create_notification(
                 &mut self.state,
                 NotificationType::ReloadResume,
-                "reload_resume".to_string(),
-                "Resuming after TUI reload".to_string(),
+                "reload_resume".to_owned(),
+                "Resuming after TUI reload".to_owned(),
             );
             save_state(&self.state);
         }
@@ -391,7 +391,7 @@ impl App {
         let _r = SpineState::create_notification(
             &mut self.state,
             NotificationType::Custom,
-            "todo_continuation".to_string(),
+            "todo_continuation".to_owned(),
             format!("Non-completed todo items ({}). First: {first}", summary.len()),
         );
     }

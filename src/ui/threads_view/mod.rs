@@ -279,7 +279,7 @@ fn render_new_thread_prompt(frame: &mut Frame<'_>, state: &State, area: Rect) {
 /// Truncate a string to `max_len` characters, appending "…" if truncated.
 pub(super) fn truncate_str(s: &str, max_len: usize) -> String {
     if s.chars().count() <= max_len {
-        s.to_string()
+        s.to_owned()
     } else {
         let mut result: String = s.chars().take(max_len.saturating_sub(1)).collect();
         result.push('…');

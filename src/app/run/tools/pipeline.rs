@@ -76,7 +76,7 @@ fn save_tool_call_message(app: &mut App, tool: &cp_base::tools::ToolUse) {
     let tool_msg = Message {
         id: tool_id,
         uid: Some(tool_global_uid),
-        role: "assistant".to_string(),
+        role: "assistant".to_owned(),
         msg_type: MsgKind::ToolCall,
         content: String::new(),
         content_token_count: 0,
@@ -292,10 +292,10 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     for tr in &tool_results {
         if let Some(rest) = tr.content.strip_prefix("REVERIE_START:") {
             let mut lines = rest.lines();
-            let agent_id = lines.next().unwrap_or("cleaner").to_string();
+            let agent_id = lines.next().unwrap_or("cleaner").to_owned();
             let context_line = lines.next().unwrap_or("");
-            let context = if context_line.is_empty() { None } else { Some(context_line.to_string()) };
-            let _ = crate::app::reverie::trigger::start_manual_reverie(&mut app.state, agent_id, context);
+            let context = if context_line.is_empty() { None } else { Some(context_line.to_owned()) };
+            let _r = crate::app::reverie::trigger::start_manual_reverie(&mut app.state, agent_id, context);
             break;
         }
     }
@@ -362,7 +362,7 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
                 // Store original content so we can reconstruct: original + callback output.
                 for tr in tool_results.iter_mut().rev() {
                     if tr.tool_name == "Edit" || tr.tool_name == "Write" {
-                        tr.content = format!("{}{}{}", CONSOLE_WAIT_BLOCKING_SENTINEL, sentinel_id, tr.content,);
+                        tr.content = format!("{}{}{}", CONSOLE_WAIT_BLOCKING_SENTINEL, sentinel_id, tr.content);
                         // Append spawn failure summaries so they're visible in the final result
                         // (not silently discarded). Successful spawns show "running (blocking)".
                         if !summaries.is_empty() {
@@ -420,7 +420,7 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     let result_msg = Message {
         id: result_id,
         uid: Some(result_global_uid),
-        role: "user".to_string(),
+        role: "user".to_owned(),
         msg_type: MsgKind::ToolResult,
         content: String::new(),
         content_token_count: 0,
@@ -447,7 +447,7 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     let new_assistant_msg = Message {
         id: assistant_id,
         uid: Some(assistant_global_uid),
-        role: "assistant".to_string(),
+        role: "assistant".to_owned(),
         msg_type: MsgKind::TextMessage,
         content: String::new(),
         content_token_count: 0,
@@ -480,7 +480,7 @@ pub(crate) fn handle_tool_execution(app: &mut App, tx: &Sender<StreamEvent>) {
     }
 
     // Trigger background cache refresh for dirty file panels (non-blocking)
-    let _ = trigger_dirty_panel_refresh(&app.state, &app.cache_tx);
+    let _r = trigger_dirty_panel_refresh(&app.state, &app.cache_tx);
 
     // Check if we need to wait for panels before continuing stream
     if has_dirty_file_panels(&app.state) {

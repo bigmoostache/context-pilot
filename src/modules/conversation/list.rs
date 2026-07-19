@@ -13,7 +13,7 @@ pub(super) enum ListAction {
 fn next_alpha_marker(marker: &str) -> String {
     let chars: Vec<char> = marker.chars().collect();
     let Some(&first_char) = chars.first() else {
-        return "a".to_string();
+        return "a".to_owned();
     };
     let is_upper = first_char.is_ascii_uppercase();
     let base = if is_upper { b'A' } else { b'a' };

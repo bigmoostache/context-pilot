@@ -46,7 +46,7 @@ pub(super) fn token_usage_blocks(state: &State) -> Vec<Block> {
     let used_pct = usage_pct.round().to_u8();
     let bar_semantic = if total_tokens >= threshold {
         Semantic::Error
-    } else if total_tokens.to_f64() >= threshold.to_f64() * 0.9 {
+    } else if total_tokens.to_f64() >= threshold.to_f64() * 0.9f64 {
         Semantic::Warning
     } else {
         Semantic::Accent
@@ -119,12 +119,12 @@ pub(super) fn git_blocks(state: &State) -> Vec<Block> {
                 format!("{type_char} {}", file.path)
             };
 
-            let net_semantic = match net.cmp(&0) {
+            let net_semantic = match net.cmp(&0i32) {
                 std::cmp::Ordering::Greater => Semantic::Success,
                 std::cmp::Ordering::Less => Semantic::Error,
                 std::cmp::Ordering::Equal => Semantic::Muted,
             };
-            let net_str = if net > 0 { format!("+{net}") } else { format!("{net}") };
+            let net_str = if net > 0i32 { format!("+{net}") } else { format!("{net}") };
 
             rows.push(vec![
                 Cell::styled(display_path, Semantic::Default),
@@ -136,12 +136,12 @@ pub(super) fn git_blocks(state: &State) -> Vec<Block> {
 
         // Footer row (totals)
         let total_net = total_add.saturating_sub(total_del);
-        let total_net_semantic = match total_net.cmp(&0) {
+        let total_net_semantic = match total_net.cmp(&0i32) {
             std::cmp::Ordering::Greater => Semantic::Success,
             std::cmp::Ordering::Less => Semantic::Error,
             std::cmp::Ordering::Equal => Semantic::Muted,
         };
-        let total_net_str = if total_net > 0 { format!("+{total_net}") } else { format!("{total_net}") };
+        let total_net_str = if total_net > 0i32 { format!("+{total_net}") } else { format!("{total_net}") };
 
         rows.push(vec![
             Cell::styled("Total".to_owned(), Semantic::Default),
@@ -237,11 +237,11 @@ pub(super) fn context_elements_blocks(state: &State) -> Vec<Block> {
         };
 
         let refreshed = if ctx.last_refresh_ms < 1_577_836_800_000 {
-            "—".to_string()
+            "—".to_owned()
         } else if now_ms > ctx.last_refresh_ms {
             crate::ui::helpers::format_time_ago(now_ms.saturating_sub(ctx.last_refresh_ms))
         } else {
-            "now".to_string()
+            "now".to_owned()
         };
 
         let icon = ctx.context_type.icon();
@@ -249,13 +249,13 @@ pub(super) fn context_elements_blocks(state: &State) -> Vec<Block> {
 
         let cost_str = format!("${:.2}", ctx.panel_total_cost);
         let (hit_str, hit_semantic) = if ctx.panel_cache_hit {
-            ("\u{2713}".to_string(), Semantic::Success)
+            ("\u{2713}".to_owned(), Semantic::Success)
         } else if ctx.freeze_count > 0 {
             let panel = crate::app::panels::get_panel(&ctx.context_type);
             let max = panel.max_freezes();
             (format!("\u{2717} ({}/{})", ctx.freeze_count, max), Semantic::Warning)
         } else {
-            ("\u{2717}".to_string(), Semantic::Error)
+            ("\u{2717}".to_owned(), Semantic::Error)
         };
 
         let freeze_str = if ctx.total_freezes > 0 { format!("{}", ctx.total_freezes) } else { String::new() };

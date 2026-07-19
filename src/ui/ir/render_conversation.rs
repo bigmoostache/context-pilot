@@ -108,7 +108,7 @@ pub(crate) fn render_autocomplete_if_active(
 ) {
     let Some(ac) = overlays
         .iter()
-        .find_map(|o| if let cp_render::conversation::Overlay::Autocomplete(ref a) = *o { Some(a) } else { None })
+        .find_map(|o| if let cp_render::conversation::Overlay::Autocomplete(a) = o { Some(a) } else { None })
     else {
         return;
     };

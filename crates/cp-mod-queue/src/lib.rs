@@ -134,14 +134,14 @@ impl Module for QueueModule {
             "Queue_pause" => {
                 let mut pf = Verdict::new();
                 if !qs.active {
-                    pf.warnings.push("Queue is not active".to_string());
+                    pf.warnings.push("Queue is not active".to_owned());
                 }
                 Some(pf)
             }
             "Queue_execute" => {
                 let mut pf = Verdict::new();
                 if qs.queued_calls.is_empty() {
-                    pf.warnings.push("Queue is empty — nothing to execute".to_string());
+                    pf.warnings.push("Queue is empty — nothing to execute".to_owned());
                 }
                 Some(pf)
             }

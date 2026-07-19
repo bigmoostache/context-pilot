@@ -61,9 +61,9 @@ impl Panel for FilePanel {
             |ctx| {
                 let path = ctx.get_meta_str("file_path").unwrap_or("");
                 let content = ctx.cached_content.clone().unwrap_or_else(|| {
-                    if ctx.cache_deprecated { "Loading...".to_string() } else { "No content".to_string() }
+                    if ctx.cache_deprecated { "Loading...".to_owned() } else { "No content".to_owned() }
                 });
-                (content, path.to_string())
+                (content, path.to_owned())
             },
         );
 
@@ -82,15 +82,15 @@ impl Panel for FilePanel {
                 let line_num = i.saturating_add(1);
                 blocks.push(cp_render::Block::Line(vec![
                     cp_render::Span::muted(format!(" {line_num:4} ")),
-                    cp_render::Span::new(" ".to_string()),
-                    cp_render::Span::new(line.to_string()),
+                    cp_render::Span::new(" ".to_owned()),
+                    cp_render::Span::new(line.to_owned()),
                 ]));
             }
         } else {
             for (i, spans) in highlighted.iter().enumerate() {
                 let line_num = i.saturating_add(1);
                 let mut line_spans =
-                    vec![cp_render::Span::muted(format!(" {line_num:4} ")), cp_render::Span::new(" ".to_string())];
+                    vec![cp_render::Span::muted(format!(" {line_num:4} ")), cp_render::Span::new(" ".to_owned())];
                 line_spans.extend(spans.iter().cloned());
                 blocks.push(cp_render::Block::Line(line_spans));
             }
@@ -99,7 +99,7 @@ impl Panel for FilePanel {
         blocks
     }
     fn title(&self, state: &State) -> String {
-        state.context.get(state.selected_context).map_or_else(|| "File".to_string(), |ctx| ctx.name.clone())
+        state.context.get(state.selected_context).map_or_else(|| "File".to_owned(), |ctx| ctx.name.clone())
     }
 
     fn build_cache_request(&self, ctx: &Entry, _state: &State) -> Option<CacheRequest> {
@@ -108,7 +108,7 @@ impl Panel for FilePanel {
             context_type: Kind::new(Kind::FILE),
             data: Box::new(FileCacheRequest {
                 context_id: ctx.id.clone(),
-                file_path: path.to_string(),
+                file_path: path.to_owned(),
                 current_source_hash: ctx.source_hash.clone(),
             }),
         })
@@ -137,7 +137,7 @@ impl Panel for FilePanel {
         }
         ctx.cache_deprecated = false;
         let content_ref = ctx.cached_content.clone().unwrap_or_default();
-        let _ = update_if_changed(ctx, &content_ref);
+        let _changed = update_if_changed(ctx, &content_ref);
         true
     }
 

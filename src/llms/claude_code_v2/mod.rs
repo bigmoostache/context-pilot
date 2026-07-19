@@ -77,7 +77,7 @@ impl ClaudeCodeV2Client {
 
         // System prompt
         let system_text =
-            request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_string(), Clone::clone);
+            request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_owned(), Clone::clone);
 
         // Convert pre-assembled API messages to JSON with cache breakpoints
         let super::CcJsonResult { mut json_messages, bp_hashes, bp_panel_ids, alive_count, alive_positions_permille } =
@@ -94,7 +94,7 @@ impl ClaudeCodeV2Client {
             };
 
         // Cleaner mode extra context
-        if let Some(ref context) = request.extra_context {
+        if let Some(context) = &(request.extra_context) {
             let msg = cp_base::config::INJECTIONS
                 .providers
                 .cleaner_mode
@@ -210,7 +210,7 @@ impl ClaudeCodeV2Client {
                     auth_ok: false,
                     streaming_ok: false,
                     tools_ok: false,
-                    error: Some("OAuth token not found or expired".to_string()),
+                    error: Some("OAuth token not found or expired".to_owned()),
                 };
             }
         };
@@ -225,7 +225,7 @@ impl ClaudeCodeV2Client {
         // Test 1: Basic auth
         let auth_body = serde_json::json!({
             "model": mapped_model,
-            "max_tokens": 32,
+            "max_tokens": 32i32,
             "system": system_json,
             "messages": [{"role": "user", "content": "Hi"}],
             "stream": false
@@ -240,14 +240,14 @@ impl ClaudeCodeV2Client {
             .send();
         let auth_ok = auth_result.as_ref().is_ok_and(|r| r.status().is_success());
         if !auth_ok {
-            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
+            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_owned()));
             return ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
         }
 
         // Test 2: Streaming
         let stream_body = serde_json::json!({
             "model": mapped_model,
-            "max_tokens": 32,
+            "max_tokens": 32i32,
             "system": system_json,
             "messages": [{"role": "user", "content": "Say ok"}],
             "stream": true
@@ -265,7 +265,7 @@ impl ClaudeCodeV2Client {
         // Test 3: Tool calling
         let tools_body = serde_json::json!({
             "model": mapped_model,
-            "max_tokens": 32,
+            "max_tokens": 32i32,
             "system": system_json,
             "messages": [{"role": "user", "content": "Hi"}],
             "tools": [{"name": "test_tool", "description": "A test tool", "input_schema": {"type": "object", "properties": {}, "required": []}}],

@@ -101,7 +101,7 @@ pub(crate) fn server_request(req: &serde_json::Value) -> Result<serde_json::Valu
         Ok(resp)
     } else {
         let err = resp.get("error").and_then(|v| v.as_str()).unwrap_or("unknown error");
-        Err(err.to_string())
+        Err(err.to_owned())
     }
 }
 
@@ -156,12 +156,12 @@ pub fn find_or_create_server() -> Result<(), String> {
         interval = interval.saturating_mul(2).min(max_interval);
     }
 
-    Err("Console server failed to start within 3 seconds".to_string())
+    Err("Console server failed to start within 3 seconds".to_owned())
 }
 
 /// Kill orphaned processes by asking the server for its session list and
 /// comparing against known session keys.
-pub fn kill_orphaned_processes<S: BuildHasher>(known_keys: &HashSet<String, S>) {
+pub fn kill_orphaned_processes<S>(known_keys: &HashSet<String, S>) where S: BuildHasher {
     let list = serde_json::json!({"cmd": "list"});
     if let Ok(resp) = server_request(&list)
         && let Some(sessions) = resp.get("sessions").and_then(|v| v.as_array())
@@ -244,10 +244,10 @@ impl SessionHandle {
             "command": command,
             "log_path": log_path_str,
         });
-        if let Some(ref dir) = cwd
+        if let Some(dir) = &cwd
             && let Some(obj) = req.as_object_mut()
         {
-            let _prev = obj.insert("cwd".to_string(), serde_json::Value::String(dir.clone()));
+            let _prev = obj.insert("cwd".to_owned(), serde_json::Value::String(dir.clone()));
         }
 
         let resp = if let Ok(r) = server_request(&req) {

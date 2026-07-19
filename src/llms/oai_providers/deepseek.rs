@@ -134,7 +134,7 @@ impl LlmClient for DeepSeekClient {
         if let Some(results) = &request.tool_results {
             for result in results {
                 ds_messages.push(DsMessage {
-                    role: "tool".to_string(),
+                    role: "tool".to_owned(),
                     content: Some(result.content.clone()),
                     reasoning_content: None,
                     tool_calls: None,
@@ -144,7 +144,7 @@ impl LlmClient for DeepSeekClient {
         }
 
         let tools = openai_compat::tools_to_oai(&request.tools);
-        let tool_choice = if tools.is_empty() { None } else { Some("auto".to_string()) };
+        let tool_choice = if tools.is_empty() { None } else { Some("auto".to_owned()) };
 
         let api_request = DsRequest {
             model: request.model.clone(),
@@ -214,7 +214,7 @@ impl LlmClient for DeepSeekClient {
                             }
                         }
                     }
-                    if let Some(ref reason) = choice.finish_reason {
+                    if let Some(reason) = &(choice.finish_reason) {
                         stop_reason = Some(super::openai_streaming::normalize_stop_reason(reason));
                         for tool_use in tool_acc.drain() {
                             let _r = tx.send(StreamEvent::ToolUse(tool_use));
@@ -244,7 +244,7 @@ impl LlmClient for DeepSeekClient {
                 auth_ok: false,
                 streaming_ok: false,
                 tools_ok: false,
-                error: Some("DEEPSEEK_API_KEY not set".to_string()),
+                error: Some("DEEPSEEK_API_KEY not set".to_owned()),
             };
         };
 
@@ -257,7 +257,7 @@ impl LlmClient for DeepSeekClient {
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,
-                "max_tokens": 10,
+                "max_tokens": 10i32,
                 "messages": [{"role": "user", "content": "Hi"}]
             }))
             .send();
@@ -265,7 +265,7 @@ impl LlmClient for DeepSeekClient {
         let auth_ok = auth_result.as_ref().is_ok_and(|r| r.status().is_success());
 
         if !auth_ok {
-            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
+            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_owned()));
             return super::super::ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
         }
 
@@ -276,7 +276,7 @@ impl LlmClient for DeepSeekClient {
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,
-                "max_tokens": 10,
+                "max_tokens": 10i32,
                 "stream": true,
                 "messages": [{"role": "user", "content": "Say ok"}]
             }))
@@ -291,7 +291,7 @@ impl LlmClient for DeepSeekClient {
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": model,
-                "max_tokens": 50,
+                "max_tokens": 50i32,
                 "tools": [{
                     "type": "function",
                     "function": {

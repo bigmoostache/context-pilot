@@ -22,12 +22,12 @@ pub fn create(state: &mut State, title: &str, content: &str) -> String {
 
     let mut elem = cp_base::state::context::make_default_entry(&panel_id, Kind::new(BRAVE_PANEL_TYPE), title, false);
     elem.uid = Some(uid);
-    elem.cached_content = Some(content.to_string());
+    elem.cached_content = Some(content.to_owned());
     elem.token_count = estimate_tokens(content);
     elem.full_token_count = elem.token_count;
     elem.total_pages = compute_total_pages(elem.token_count);
     // Store content in metadata so it persists across reloads
-    drop(elem.metadata.insert(META_CONTENT.to_string(), serde_json::Value::String(content.to_string())));
+    drop(elem.metadata.insert(META_CONTENT.to_owned(), serde_json::Value::String(content.to_owned())));
 
     state.context.push(elem);
     panel_id
@@ -58,7 +58,7 @@ impl Panel for Results {
         let content = ctx.metadata.get(META_CONTENT)?.as_str()?;
         Some(CacheRequest {
             context_type: Kind::new(BRAVE_PANEL_TYPE),
-            data: Box::new(BraveRestoreRequest { context_id: ctx.id.clone(), content: content.to_string() }),
+            data: Box::new(BraveRestoreRequest { context_id: ctx.id.clone(), content: content.to_owned() }),
         })
     }
 
@@ -80,7 +80,7 @@ impl Panel for Results {
                 ctx.token_count = token_count;
             }
             ctx.cache_deprecated = false;
-            let _ = update_if_changed(ctx, &content);
+            let _changed = update_if_changed(ctx, &content);
             true
         } else {
             false
@@ -113,7 +113,7 @@ impl Panel for Results {
         content.lines().map(|line| Block::text(format!(" {line}"))).collect()
     }
     fn title(&self, state: &State) -> String {
-        state.context.get(state.selected_context).map_or_else(|| "Brave Result".to_string(), |ctx| ctx.name.clone())
+        state.context.get(state.selected_context).map_or_else(|| "Brave Result".to_owned(), |ctx| ctx.name.clone())
     }
 
     fn max_freezes(&self) -> u8 {

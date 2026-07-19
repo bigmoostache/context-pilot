@@ -80,7 +80,7 @@ impl Kind {
     /// Create a new context type from a string ID.
     #[must_use]
     pub fn new(id: &str) -> Self {
-        Self(id.to_string())
+        Self(id.to_owned())
     }
 
     /// Return the raw string ID.
@@ -302,15 +302,15 @@ pub struct Entry {
 impl Entry {
     /// Get a typed value from the metadata bag.
     #[must_use]
-    pub fn get_meta<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
+    pub fn get_meta<T>(&self, key: &str) -> Option<T> where T: DeserializeOwned {
         let v = self.metadata.get(key)?;
         serde_json::from_value(v.clone()).ok()
     }
 
     /// Set a typed value in the metadata bag.
-    pub fn set_meta<T: Serialize>(&mut self, key: &str, value: &T) {
+    pub fn set_meta<T>(&mut self, key: &str, value: &T) where T: Serialize {
         if let Ok(v) = serde_json::to_value(value) {
-            drop(self.metadata.insert(key.to_string(), v));
+            drop(self.metadata.insert(key.to_owned(), v));
         }
     }
 
@@ -345,10 +345,10 @@ pub const fn compute_total_pages(token_count: usize) -> usize {
 #[must_use]
 pub fn make_default_entry(id: &str, context_type: Kind, name: &str, cache_deprecated: bool) -> Entry {
     Entry {
-        id: id.to_string(),
+        id: id.to_owned(),
         uid: None,
         context_type,
-        name: name.to_string(),
+        name: name.to_owned(),
         token_count: 0,
         metadata: HashMap::new(),
         cached_content: None,

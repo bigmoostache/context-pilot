@@ -99,7 +99,7 @@ impl Default for Shared {
         Self {
             schema_version: SCHEMA_VERSION,
             reload_requested: false,
-            active_theme: crate::config::DEFAULT_THEME.to_string(),
+            active_theme: crate::config::DEFAULT_THEME.to_owned(),
             owner_pid: None,
             selected_context: 0,
             draft_input: String::new(),
@@ -146,7 +146,7 @@ impl Default for WorkerState {
     fn default() -> Self {
         Self {
             schema_version: SCHEMA_VERSION,
-            worker_id: crate::config::constants::DEFAULT_WORKER_ID.to_string(),
+            worker_id: crate::config::constants::DEFAULT_WORKER_ID.to_owned(),
             important_panel_uids: HashMap::new(),
             panel_uid_to_local_id: HashMap::new(),
             next_tool_id: 1,
@@ -209,7 +209,7 @@ const fn default_schema_version() -> u32 {
 
 /// Returns the default theme ID string for serde `default` attributes.
 fn default_theme() -> String {
-    crate::config::DEFAULT_THEME.to_string()
+    crate::config::DEFAULT_THEME.to_owned()
 }
 
 /// Returns 1, used as serde `default` for ID counters that start at 1.

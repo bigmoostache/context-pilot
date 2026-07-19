@@ -139,7 +139,7 @@ impl FirecrawlClient {
             if !p.sources.is_empty() {
                 drop(obj.insert("sources".into(), serde_json::json!(p.sources)));
             }
-            if let Some(ref cats) = p.categories {
+            if let Some(cats) = &(p.categories) {
                 drop(obj.insert("categories".into(), serde_json::json!(cats)));
             }
             if let Some(tbs) = p.tbs {
@@ -202,10 +202,10 @@ impl FirecrawlClient {
             if let Some(depth) = p.max_depth {
                 drop(obj.insert("maxDepth".into(), serde_json::json!(depth)));
             }
-            if let Some(ref paths) = p.include_paths {
+            if let Some(paths) = &(p.include_paths) {
                 drop(obj.insert("includePaths".into(), serde_json::json!(paths)));
             }
-            if let Some(ref paths) = p.exclude_paths {
+            if let Some(paths) = &(p.exclude_paths) {
                 drop(obj.insert("excludePaths".into(), serde_json::json!(paths)));
             }
         }
@@ -223,10 +223,10 @@ impl FirecrawlClient {
     }
 
     /// GET JSON with 5xx retry (2 attempts, 1s delay).
-    fn get_json<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, String> {
+    fn get_json<T>(&self, path: &str) -> Result<T, String> where T: serde::de::DeserializeOwned {
         let url = format!("{FIRECRAWL_BASE_URL}{path}");
 
-        for attempt in 0..3 {
+        for attempt in 0i32..3i32 {
             let resp = self
                 .client
                 .get(&url)
@@ -244,7 +244,7 @@ impl FirecrawlClient {
                 429 => {
                     return Err(format!("Rate limited (429). Response: {}", truncate(&resp_body, 200)));
                 }
-                500..=599 if attempt < 2 => {
+                500..=599 if attempt < 2i32 => {
                     std::thread::sleep(Duration::from_secs(1));
                 }
                 _ => {
@@ -252,14 +252,14 @@ impl FirecrawlClient {
                 }
             }
         }
-        Err("Max retries exceeded".to_string())
+        Err("Max retries exceeded".to_owned())
     }
 
     /// POST JSON with 5xx retry (2 attempts, 1s delay).
-    fn post_json<T: serde::de::DeserializeOwned>(&self, path: &str, body: &serde_json::Value) -> Result<T, String> {
+    fn post_json<T>(&self, path: &str, body: &serde_json::Value) -> Result<T, String> where T: serde::de::DeserializeOwned {
         let url = format!("{FIRECRAWL_BASE_URL}{path}");
 
-        for attempt in 0..3 {
+        for attempt in 0i32..3i32 {
             let resp = self
                 .client
                 .post(&url)
@@ -285,7 +285,7 @@ impl FirecrawlClient {
                         truncate(&resp_body, 200)
                     ));
                 }
-                500..=599 if attempt < 2 => {
+                500..=599 if attempt < 2i32 => {
                     std::thread::sleep(Duration::from_secs(1));
                 }
                 _ => {
@@ -293,7 +293,7 @@ impl FirecrawlClient {
                 }
             }
         }
-        Err("Max retries exceeded".to_string())
+        Err("Max retries exceeded".to_owned())
     }
 }
 

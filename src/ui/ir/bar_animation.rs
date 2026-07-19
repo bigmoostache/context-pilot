@@ -16,10 +16,10 @@ use ratatui::style::Color;
 use cp_base::cast::Safe as _;
 
 /// Default transition duration (ease-out cubic).
-const TRANSITION_DURATION: Duration = Duration::from_millis(1000);
+const TRANSITION_DURATION: Duration = Duration::from_secs(1);
 
 /// Pulse period during streaming (one full sine cycle).
-const PULSE_PERIOD: Duration = Duration::from_millis(2000);
+const PULSE_PERIOD: Duration = Duration::from_secs(2);
 
 /// Pulse amplitude: ±12% brightness swing.
 const PULSE_AMPLITUDE: f64 = 0.12;
@@ -50,7 +50,7 @@ impl BarTransition {
     /// Update the target. If it changed, start a new transition from the
     /// current interpolated position.
     fn update(&mut self, target: f64) {
-        if (self.to - target).abs() < 0.01 {
+        if (self.to - target).abs() < 0.01f64 {
             return; // no meaningful change
         }
         self.from = self.current();
@@ -63,12 +63,12 @@ impl BarTransition {
     fn current(&self) -> f64 {
         let elapsed = self.start.elapsed().as_secs_f64();
         let total = self.duration.as_secs_f64();
-        if total <= 0.0 {
+        if total <= 0.0f64 {
             return self.to;
         }
         let t = (elapsed / total).clamp(0.0, 1.0);
         // Ease-out cubic: fast start, smooth deceleration
-        let eased = 1.0 - (1.0 - t).powi(3);
+        let eased = 1.0f64 - (1.0 - t).powi(3);
         (self.to - self.from).mul_add(eased, self.from)
     }
 }

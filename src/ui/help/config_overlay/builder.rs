@@ -138,7 +138,7 @@ fn build_budget_bars(state: &State) -> Vec<ConfigBudgetBar> {
     let effective_budget = state.effective_context_budget();
     let fmt = crate::ui::helpers::format_number;
 
-    let budget_pct = (effective_budget.to_f64() / max_budget.to_f64() * 100.0).to_usize();
+    let budget_pct = (effective_budget.to_f64() / max_budget.to_f64() * 100.0f64).to_usize();
     let threshold_pct = (state.cleaning_threshold * 100.0).to_usize();
 
     vec![
@@ -169,7 +169,7 @@ fn build_toggles(state: &State) -> Vec<ConfigToggle> {
     let auto_on = spine_cfg.continue_until_todos_done;
     let rev_on = state.flags.config.reverie_enabled;
     let think_threshold =
-        state.get_ext::<crate::modules::questions::ThinkState>().map_or(-5, |ts| ts.reminder_threshold);
+        state.get_ext::<crate::modules::questions::ThinkState>().map_or(-5i32, |ts| ts.reminder_threshold);
 
     vec![
         ConfigToggle {

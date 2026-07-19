@@ -82,7 +82,7 @@ pub(crate) fn assemble_prompt(
                 }
             }
             if !content_blocks.is_empty() {
-                api_messages.push(ApiMessage { role: "user".to_string(), content: content_blocks });
+                api_messages.push(ApiMessage { role: "user".to_owned(), content: content_blocks });
             }
             continue;
         }
@@ -172,8 +172,8 @@ fn ensure_message_alternation(messages: &mut Vec<ApiMessage>) {
         } else {
             // Different content types (tool_result vs text) — insert separator
             result.push(ApiMessage {
-                role: "assistant".to_string(),
-                content: vec![ContentBlock::Text { text: "ok".to_string() }],
+                role: "assistant".to_owned(),
+                content: vec![ContentBlock::Text { text: "ok".to_owned() }],
             });
             result.push(msg);
         }
@@ -183,7 +183,7 @@ fn ensure_message_alternation(messages: &mut Vec<ApiMessage>) {
     if result.first().is_some_and(|m| m.role == "assistant") {
         result.insert(
             0,
-            ApiMessage { role: "user".to_string(), content: vec![ContentBlock::Text { text: "ok".to_string() }] },
+            ApiMessage { role: "user".to_owned(), content: vec![ContentBlock::Text { text: "ok".to_owned() }] },
         );
     }
 
@@ -209,18 +209,18 @@ fn inject_panel_messages(api_messages: &mut Vec<ApiMessage>, ctx: &PanelInjectio
         let text = if idx == 0 { format!("{}\n\n{}", panel_header_text(), timestamp_text) } else { timestamp_text };
 
         api_messages.push(ApiMessage {
-            role: "assistant".to_string(),
+            role: "assistant".to_owned(),
             content: vec![
                 ContentBlock::Text { text },
                 ContentBlock::ToolUse {
                     id: format!("panel_{}", panel.panel_id),
-                    name: "dynamic_panel".to_string(),
+                    name: "dynamic_panel".to_owned(),
                     input: serde_json::json!({ "id": panel.panel_id }),
                 },
             ],
         });
         api_messages.push(ApiMessage {
-            role: "user".to_string(),
+            role: "user".to_owned(),
             content: vec![ContentBlock::ToolResult {
                 tool_use_id: format!("panel_{}", panel.panel_id),
                 content: panel.content.clone(),
@@ -231,21 +231,21 @@ fn inject_panel_messages(api_messages: &mut Vec<ApiMessage>, ctx: &PanelInjectio
     // Footer after all panels
     let footer = panel_footer_text(ctx.current_ms);
     api_messages.push(ApiMessage {
-        role: "assistant".to_string(),
+        role: "assistant".to_owned(),
         content: vec![
             ContentBlock::Text { text: footer },
             ContentBlock::ToolUse {
-                id: "panel_footer".to_string(),
-                name: "dynamic_panel".to_string(),
+                id: "panel_footer".to_owned(),
+                name: "dynamic_panel".to_owned(),
                 input: serde_json::json!({ "action": "end_panels" }),
             },
         ],
     });
     api_messages.push(ApiMessage {
-        role: "user".to_string(),
+        role: "user".to_owned(),
         content: vec![ContentBlock::ToolResult {
-            tool_use_id: "panel_footer".to_string(),
-            content: crate::infra::constants::prompts::panel_footer_ack().to_string(),
+            tool_use_id: "panel_footer".to_owned(),
+            content: crate::infra::constants::prompts::panel_footer_ack().to_owned(),
         }],
     });
 
@@ -253,11 +253,11 @@ fn inject_panel_messages(api_messages: &mut Vec<ApiMessage>, ctx: &PanelInjectio
     if let Some(seed) = ctx.seed_content {
         let header = &INJECTIONS.providers.seed_reinjection_header;
         api_messages.push(ApiMessage {
-            role: "user".to_string(),
+            role: "user".to_owned(),
             content: vec![ContentBlock::Text { text: format!("{header}\n\n{seed}") }],
         });
         api_messages.push(ApiMessage {
-            role: "assistant".to_string(),
+            role: "assistant".to_owned(),
             content: vec![ContentBlock::Text { text: INJECTIONS.providers.seed_reinjection_ack.clone() }],
         });
     }

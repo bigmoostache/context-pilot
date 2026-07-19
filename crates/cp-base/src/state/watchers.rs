@@ -357,8 +357,8 @@ impl ChannelWatcher {
         let now = crate::panels::now_ms();
         Self {
             id: format!("async_tool_{tool_use_id}"),
-            desc: description.to_string(),
-            tuid: tool_use_id.to_string(),
+            desc: description.to_owned(),
+            tuid: tool_use_id.to_owned(),
             rx: Mutex::new(rx),
             registered_at_ms: now,
             deadline_ms: now.saturating_add(timeout_ms),
@@ -386,7 +386,7 @@ impl Watcher for ChannelWatcher {
     fn check(&self, _state: &State) -> Option<WatcherResult> {
         let Ok(rx) = self.rx.lock() else {
             return Some(WatcherResult {
-                description: "Async tool watcher failed (lock poisoned)".to_string(),
+                description: "Async tool watcher failed (lock poisoned)".to_owned(),
                 panel_id: None,
                 tool_use_id: Some(self.tuid.clone()),
                 close_panel: false,
@@ -400,7 +400,7 @@ impl Watcher for ChannelWatcher {
         match rx.try_recv() {
             Ok(result) => Some(result),
             Err(TryRecvError::Disconnected) => Some(WatcherResult {
-                description: "Async tool execution failed (worker thread panicked or dropped)".to_string(),
+                description: "Async tool execution failed (worker thread panicked or dropped)".to_owned(),
                 panel_id: None,
                 tool_use_id: Some(self.tuid.clone()),
                 close_panel: false,

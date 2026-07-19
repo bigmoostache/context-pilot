@@ -111,7 +111,7 @@ impl Module for GithubModule {
 
     fn context_detail(&self, ctx: &cp_base::state::context::Entry) -> Option<String> {
         (ctx.context_type.as_str() == Kind::GITHUB_RESULT)
-            .then(|| ctx.get_meta_str("result_command").unwrap_or("").to_string())
+            .then(|| ctx.get_meta_str("result_command").unwrap_or("").to_owned())
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
@@ -231,7 +231,7 @@ fn visualize_gh_output(content: &str, width: usize) -> Vec<cp_render::Block> {
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
             Block::Line(vec![Span::styled(display, semantic)])
         })

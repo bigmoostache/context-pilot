@@ -20,11 +20,11 @@ pub(super) fn render_token_stats(lines: &mut Vec<Line<'static>>, stats: &TokenSt
 
     let format_cost = |cost: Option<f64>| -> String {
         cost.map_or(String::new(), |c| {
-            if c >= 1000.0 {
-                format!("${:.1}K", c / 1000.0)
-            } else if c < 0.01 {
+            if c >= 1_000.0f64 {
+                format!("${:.1}K", c / 1_000.0f64)
+            } else if c < 0.01f64 {
                 format!("${c:.3}")
-            } else if c < 1.0 {
+            } else if c < 1.0f64 {
                 format!("${c:.2}")
             } else {
                 format!("${c:.1}")
@@ -36,9 +36,9 @@ pub(super) fn render_token_stats(lines: &mut Vec<Line<'static>>, stats: &TokenSt
 
     let mut content: Vec<Line<'static>> = Vec::new();
 
-    let hit_icon = chars::ARROW_UP.to_string();
-    let miss_icon = chars::CROSS.to_string();
-    let out_icon = chars::ARROW_DOWN.to_string();
+    let hit_icon = chars::ARROW_UP.to_owned();
+    let miss_icon = chars::CROSS.to_owned();
+    let out_icon = chars::ARROW_DOWN.to_owned();
 
     // Render table manually with border_muted separators
     // Column widths: label(4), hit(6), miss(6), out(6)
@@ -145,9 +145,9 @@ pub(super) fn render_token_stats(lines: &mut Vec<Line<'static>>, stats: &TokenSt
 
     // Total cost
     if let Some(total) = stats.total_cost {
-        let total_str = if total >= 1000.0 {
-            format!("${:.1}K", total / 1000.0)
-        } else if total < 0.01 {
+        let total_str = if total >= 1_000.0f64 {
+            format!("${:.1}K", total / 1_000.0f64)
+        } else if total < 0.01f64 {
             format!("${total:.3}")
         } else {
             format!("${total:.2}")

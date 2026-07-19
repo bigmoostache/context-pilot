@@ -27,16 +27,16 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let markdown = tool.input.get("markdown").and_then(serde_json::Value::as_str).map(|s| {
         if s.len() > MAX_CONTENT_BYTES {
-            s.get(..s.floor_char_boundary(MAX_CONTENT_BYTES)).unwrap_or(s).to_string()
+            s.get(..s.floor_char_boundary(MAX_CONTENT_BYTES)).unwrap_or(s).to_owned()
         } else {
-            s.to_string()
+            s.to_owned()
         }
     });
     let file_path = tool.input.get("file_path").and_then(serde_json::Value::as_str).map(|s| {
         if s.len() > MAX_FILE_PATH_BYTES {
-            s.get(..s.floor_char_boundary(MAX_FILE_PATH_BYTES)).unwrap_or(s).to_string()
+            s.get(..s.floor_char_boundary(MAX_FILE_PATH_BYTES)).unwrap_or(s).to_owned()
         } else {
-            s.to_string()
+            s.to_owned()
         }
     });
 
@@ -59,12 +59,12 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     let (thread_name, msg_preview) = {
         let ts = ThreadsState::get(state);
         let thread = ts.threads.iter().find(|t| t.id == tid);
-        let name = thread.map_or_else(|| tid.to_string(), |t| t.name.clone());
+        let name = thread.map_or_else(|| tid.to_owned(), |t| t.name.clone());
         let preview = msg.content.as_deref().unwrap_or("[attachment]");
         let truncated = if preview.len() > 80 {
             format!("{}...", preview.get(..preview.floor_char_boundary(77)).unwrap_or(""))
         } else {
-            preview.to_string()
+            preview.to_owned()
         };
         (name, truncated)
     };
@@ -96,7 +96,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     if !still_my_turn {
         let fs = FocusState::get_mut(state);
         fs.focused_thread_id = None;
-        fs.dangling_remaining = 5;
+        fs.dangling_remaining = 5i32;
         fs.escalation_level = 0;
         // Reset debounce so next MY_TURN transition fires a new notification.
         fs.notified_my_turn_id = None;
@@ -179,7 +179,7 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
             let preview = if content.len() > 60 {
                 format!("{}…", content.get(..content.floor_char_boundary(57)).unwrap_or(""))
             } else {
-                content.to_string()
+                content.to_owned()
             };
             format!("[{}] {preview}", m.author)
         })
@@ -196,8 +196,8 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
     // --- Phase 3: Set focus ---
     if thread_status == ThreadStatus::MyTurn {
         let fs = FocusState::get_mut(state);
-        fs.focused_thread_id = Some(tid.to_string());
-        fs.dangling_remaining = 0;
+        fs.focused_thread_id = Some(tid.to_owned());
+        fs.dangling_remaining = 0i32;
         fs.escalation_level = 0;
     }
 
@@ -230,7 +230,7 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
         .context
         .iter()
         .find(|c| c.context_type.as_str() == Kind::THREADS)
-        .map_or_else(|| "??".to_string(), |c| c.id.clone());
+        .map_or_else(|| "??".to_owned(), |c| c.id.clone());
 
     // Preview of the most recent message in the focused thread.
     let last_msg_preview = ThreadsState::get(state)
@@ -240,21 +240,21 @@ pub fn execute_read(tool: &ToolUse, state: &mut State) -> ToolResult {
         .and_then(|t| t.messages.last())
         .and_then(|m| m.content.as_deref())
         .map_or_else(
-            || "[no messages]".to_string(),
+            || "[no messages]".to_owned(),
             |c| {
                 if c.len() > 80 {
                     format!("{}…", c.get(..c.floor_char_boundary(77)).unwrap_or(""))
                 } else {
-                    c.to_string()
+                    c.to_owned()
                 }
             },
         );
 
     let mut result_lines = vec![format!("Thread {tid} \"{thread_name}\" [{thread_status}] — now focused.\n")];
     if thread_summaries.is_empty() {
-        result_lines.push("No unacknowledged messages across active threads.".to_string());
+        result_lines.push("No unacknowledged messages across active threads.".to_owned());
     } else {
-        result_lines.push("Unacknowledged messages:".to_string());
+        result_lines.push("Unacknowledged messages:".to_owned());
         result_lines.extend(thread_summaries);
     }
 

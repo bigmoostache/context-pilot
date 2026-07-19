@@ -82,7 +82,7 @@ impl FileWatcher {
         if let Ok(mut files) = self.watched_files.lock()
             && !files.contains_key(&canonical)
         {
-            let _r = files.insert(canonical.clone(), path.to_string());
+            let _r = files.insert(canonical.clone(), path.to_owned());
             self.watcher.watch(&canonical, RecursiveMode::NonRecursive)?;
         }
         Ok(())
@@ -101,7 +101,7 @@ impl FileWatcher {
         if let Ok(mut dirs) = self.watched_dirs.lock()
             && !dirs.contains_key(&canonical)
         {
-            let _r = dirs.insert(canonical.clone(), path.to_string());
+            let _r = dirs.insert(canonical.clone(), path.to_owned());
             self.watcher.watch(&canonical, RecursiveMode::NonRecursive)?;
         }
         Ok(())
@@ -119,7 +119,7 @@ impl FileWatcher {
         if let Ok(mut dirs) = self.watched_dirs.lock()
             && !dirs.contains_key(&canonical)
         {
-            let _r = dirs.insert(canonical.clone(), path.to_string());
+            let _r = dirs.insert(canonical.clone(), path.to_owned());
             self.watcher.watch(&canonical, RecursiveMode::Recursive)?;
         }
         Ok(())
@@ -143,7 +143,7 @@ impl FileWatcher {
 
         // Ensure mapping is up-to-date
         if let Ok(mut files) = self.watched_files.lock() {
-            let _r = files.insert(canonical, path.to_string());
+            let _r = files.insert(canonical, path.to_owned());
         }
 
         Ok(())

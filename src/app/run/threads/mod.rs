@@ -147,7 +147,7 @@ pub(super) fn inject_tool_call(app: &mut App, tool: ToolUse) {
     app.pending_tools.push(tool);
     // Synthetic "stream finished with a tool_use" receipt: zero tokens/cost,
     // no breakpoint hashes — see the doc comment for why each field is zero.
-    let synthetic_done: PendingDone = (0, 0, 0, 0, Some("tool_use".to_string()), Vec::new(), Vec::new(), 0, Vec::new());
+    let synthetic_done: PendingDone = (0, 0, 0, 0, Some("tool_use".to_owned()), Vec::new(), Vec::new(), 0, Vec::new());
     app.pending_done = Some(synthetic_done);
 }
 
@@ -197,7 +197,7 @@ pub(super) fn check_my_turn_threads(app: &mut App) {
     let _r = SpineState::create_notification(
         &mut app.state,
         NotificationType::Custom,
-        "my_turn_thread".to_string(),
+        "my_turn_thread".to_owned(),
         content,
     );
 }
@@ -217,7 +217,7 @@ fn extract_thread_ids(content: &str) -> Vec<String> {
         };
         if let Some(end_offset) = content.get(start..).and_then(|s| s.find('"')) {
             if let Some(id_str) = start.checked_add(end_offset).and_then(|end| content.get(start..end)) {
-                ids.push(id_str.to_string());
+                ids.push(id_str.to_owned());
             }
             search_from = start.saturating_add(end_offset).saturating_add(1);
         } else {

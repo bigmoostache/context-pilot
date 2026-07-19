@@ -120,7 +120,7 @@ pub fn try_recover(state: &mut State) {
 
     match Boot::try_start(&folder, &model) {
         Ok(boot) => {
-            log::error!("bridge: RECOVERED — orchestration plane is live again ({})", folder.display(),);
+            log::error!("bridge: RECOVERED — orchestration plane is live again ({})", folder.display());
             activate(boot, state);
         }
         // Still contended (predecessor not yet dead) — remain pending, the next

@@ -269,7 +269,7 @@ fn visualize_scratchpad_output(content: &str, width: usize) -> Vec<cp_render::Bl
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
             Block::Line(vec![Span::styled(display, semantic)])
         })

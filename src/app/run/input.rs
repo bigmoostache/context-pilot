@@ -109,8 +109,8 @@ impl App {
                         return;
                     };
                     ac_query.set_query(new_query);
-                    let dir = ac_query.current_dir().to_string();
-                    let prefix = ac_query.current_prefix().to_string();
+                    let dir = ac_query.current_dir().to_owned();
+                    let prefix = ac_query.current_prefix().to_owned();
                     let entries = cp_mod_tree::tools::list_dir_entries(&filter, &dir, &prefix);
                     let Some(ac_matches) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() else {
                         return;
@@ -161,8 +161,8 @@ impl App {
                     let Some(ac_dir) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() else {
                         return;
                     };
-                    let dir = ac_dir.current_dir().to_string();
-                    let prefix = ac_dir.current_prefix().to_string();
+                    let dir = ac_dir.current_dir().to_owned();
+                    let prefix = ac_dir.current_prefix().to_owned();
                     let entries = cp_mod_tree::tools::list_dir_entries(&filter, &dir, &prefix);
                     let Some(ac_set) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() else {
                         return;
@@ -198,8 +198,8 @@ impl App {
                     let Some(ac_refresh) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() else {
                         return;
                     };
-                    let dir = ac_refresh.current_dir().to_string();
-                    let prefix = ac_refresh.current_prefix().to_string();
+                    let dir = ac_refresh.current_dir().to_owned();
+                    let prefix = ac_refresh.current_prefix().to_owned();
                     let entries = cp_mod_tree::tools::list_dir_entries(&filter, &dir, &prefix);
                     let Some(ac_update) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() else {
                         return;

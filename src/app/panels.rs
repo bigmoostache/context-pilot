@@ -25,7 +25,7 @@ impl Panel for FallbackPanel {
         Vec::new()
     }
     fn title(&self, _state: &State) -> String {
-        "(removed)".to_string()
+        "(removed)".to_owned()
     }
     fn handle_key(&self, _key: &crossterm::event::KeyEvent, _state: &State) -> Option<cp_base::state::actions::Action> {
         None

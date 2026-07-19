@@ -26,7 +26,7 @@ impl Panel for GithubResultPanel {
     }
 
     fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
-        let command = ctx.get_meta_str("result_command")?.to_string();
+        let command = ctx.get_meta_str("result_command")?.to_owned();
         let token = GithubState::get(state).github_token.as_ref()?;
         Some(CacheRequest {
             context_type: Kind::new(Kind::GITHUB_RESULT),
@@ -166,11 +166,11 @@ impl Panel for GithubResultPanel {
             let short = if cmd.len() > 40 {
                 format!("{}...", cmd.get(..cmd.floor_char_boundary(37)).unwrap_or(""))
             } else {
-                cmd.to_string()
+                cmd.to_owned()
             };
             return short;
         }
-        "GitHub Result".to_string()
+        "GitHub Result".to_owned()
     }
 
     fn max_freezes(&self) -> u8 {

@@ -35,7 +35,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
 
     // --- Session cleanup for inline easy_bash results (no panel to close) ---
     for result in blocking_results.iter().chain(async_results.iter()) {
-        if let Some(ref name) = result.kill_session {
+        if let Some(name) = &(result.kill_session) {
             let log_path = {
                 let cs = cp_mod_console::types::ConsoleState::get(&app.state);
                 cs.sessions.get(name).map(|h| h.log_path.clone()).unwrap_or_default()
@@ -55,7 +55,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     if !async_results.is_empty() {
         // Handle deferred panel creation FIRST (so we have panel IDs for notifications)
         for result in &mut async_results {
-            if let Some(ref dp) = result.create_panel {
+            if let Some(dp) = &(result.create_panel) {
                 let panel_id = app.state.next_available_context_id();
                 let uid = format!("UID_{}_P", app.state.global_next_uid);
                 app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
@@ -72,7 +72,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
                 ctx.set_meta("console_description", &dp.description);
                 ctx.set_meta("callback_id", &dp.callback_id);
                 ctx.set_meta("callback_name", &dp.callback_name);
-                if let Some(ref dir) = dp.cwd {
+                if let Some(dir) = &(dp.cwd) {
                     ctx.set_meta("console_cwd", dir);
                 }
                 app.state.context.push(ctx);
@@ -83,7 +83,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
                 result.description.push_str(" (already loaded, read it directly)");
             }
             // Handle DynPanel creation for async tool results (generic panels)
-            if let Some(ref dp) = result.create_dyn_panel {
+            if let Some(dp) = &(result.create_dyn_panel) {
                 let panel_id = app.state.next_available_context_id();
                 let uid = format!("UID_{}_P", app.state.global_next_uid);
                 app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
@@ -98,7 +98,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
                 for (key, value) in &dp.metadata {
                     ctx.set_meta(key, value);
                 }
-                if let Some(ref content) = dp.content {
+                if let Some(content) = &(dp.content) {
                     ctx.cached_content = Some(content.clone());
                     ctx.token_count = cp_base::state::context::estimate_tokens(content);
                     ctx.full_token_count = ctx.token_count;
@@ -111,7 +111,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
             }
             // Auto-close panels for watchers that request it
             if result.close_panel
-                && let Some(ref panel_id) = result.panel_id
+                && let Some(panel_id) = &result.panel_id
             {
                 if let Some(ctx) = app.state.context.iter().find(|c| c.id == *panel_id)
                     && let Some(name) = ctx.get_meta::<String>("console_name")
@@ -127,7 +127,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
             let nid = SpineState::create_notification(
                 &mut app.state,
                 NotificationType::Custom,
-                "watcher".to_string(),
+                "watcher".to_owned(),
                 result.description.clone(),
             );
             if result.processed_already {
@@ -179,7 +179,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     // Handle deferred panel creation FIRST — so descriptions include panel IDs
     // before we copy them into tool results during sentinel replacement.
     for result in &mut merged_blocking {
-        if let Some(ref dp) = result.create_panel {
+        if let Some(dp) = &(result.create_panel) {
             let panel_id = app.state.next_available_context_id();
             let uid = format!("UID_{}_P", app.state.global_next_uid);
             app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
@@ -196,7 +196,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
             ctx.set_meta("console_description", &dp.description);
             ctx.set_meta("callback_id", &dp.callback_id);
             ctx.set_meta("callback_name", &dp.callback_name);
-            if let Some(ref dir) = dp.cwd {
+            if let Some(dir) = &(dp.cwd) {
                 ctx.set_meta("console_cwd", dir);
             }
             app.state.context.push(ctx);
@@ -207,7 +207,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
             result.description.push_str(" (already loaded, read it directly)");
         }
         // Handle DynPanel creation for async tool results (generic panels)
-        if let Some(ref dp) = result.create_dyn_panel {
+        if let Some(dp) = &(result.create_dyn_panel) {
             let panel_id = app.state.next_available_context_id();
             let uid = format!("UID_{}_P", app.state.global_next_uid);
             app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
@@ -222,7 +222,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
             for (key, value) in &dp.metadata {
                 ctx.set_meta(key, value);
             }
-            if let Some(ref content) = dp.content {
+            if let Some(content) = &(dp.content) {
                 ctx.cached_content = Some(content.clone());
                 ctx.token_count = cp_base::state::context::estimate_tokens(content);
                 ctx.full_token_count = ctx.token_count;
@@ -243,7 +243,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
                 // Async tools encode error status via ASYNC_ERROR_PREFIX in the description
                 // (WatcherResult can't carry is_error due to struct_excessive_bools forbid).
                 if let Some(stripped) = result.description.strip_prefix(ASYNC_ERROR_PREFIX) {
-                    tr.content = stripped.to_string();
+                    tr.content = stripped.to_owned();
                     tr.is_error = true;
                 } else {
                     tr.content = result.description.clone();
@@ -298,7 +298,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
 
         for tr in &mut tool_results {
             if tr.content == CONSOLE_WAIT_BLOCKING_SENTINEL {
-                tr.content = "Console wait result unavailable (watcher expired or was interrupted)".to_string();
+                "Console wait result unavailable (watcher expired or was interrupted)".clone_into(&mut tr.content);
             } else if tr.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
                 // Callback sentinel: extract original content after sentinel+id prefix
                 let after = &tr.content.get(CONSOLE_WAIT_BLOCKING_SENTINEL.len()..).unwrap_or("");
@@ -337,7 +337,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     let result_msg = Message {
         id: result_id,
         uid: Some(result_global_uid),
-        role: "user".to_string(),
+        role: "user".to_owned(),
         msg_type: MsgKind::ToolResult,
         content: String::new(),
         content_token_count: 0,
@@ -363,7 +363,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     let new_assistant_msg = Message {
         id: assistant_id,
         uid: Some(assistant_global_uid),
-        role: "assistant".to_string(),
+        role: "assistant".to_owned(),
         msg_type: MsgKind::TextMessage,
         content: String::new(),
         content_token_count: 0,
@@ -388,7 +388,7 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     app.save_state_async();
     app.state.flags.ui.dirty = true;
 
-    let _ = crate::app::run::streaming::trigger_dirty_panel_refresh(&app.state, &app.cache_tx);
+    let _r = crate::app::run::streaming::trigger_dirty_panel_refresh(&app.state, &app.cache_tx);
     if crate::app::run::streaming::has_dirty_file_panels(&app.state) {
         app.state.flags.lifecycle.waiting_for_panels = true;
         app.wait_started_ms = now_ms();
@@ -428,7 +428,7 @@ pub(crate) fn flush_pending_tool_results_as_interrupted(app: &mut App) {
             .collect();
         if !stale_ids.is_empty() {
             let registry = WatcherRegistry::get_mut(&mut app.state);
-            registry.watchers.retain(|w| w.tool_use_id().is_none_or(|tid| !stale_ids.contains(&tid.to_string())));
+            registry.watchers.retain(|w| w.tool_use_id().is_none_or(|tid| !stale_ids.contains(&tid.to_owned())));
         }
     }
 
@@ -446,7 +446,7 @@ pub(crate) fn flush_pending_tool_results_as_interrupted(app: &mut App) {
         .iter()
         .map(|r| {
             // Strip any callback blocking sentinel prefix from content
-            let content = interrupted_msg.to_string();
+            let content = interrupted_msg.to_owned();
             ToolResultRecord {
                 tool_use_id: r.tool_use_id.clone(),
                 content,
@@ -461,7 +461,7 @@ pub(crate) fn flush_pending_tool_results_as_interrupted(app: &mut App) {
     let result_msg = Message {
         id: result_id,
         uid: Some(result_global_uid),
-        role: "user".to_string(),
+        role: "user".to_owned(),
         msg_type: MsgKind::ToolResult,
         content: String::new(),
         content_token_count: 0,

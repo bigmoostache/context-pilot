@@ -39,7 +39,7 @@ pub(crate) mod render_panel {
             .style(base_style)
             .title(Span::styled(format!(" {} ", panel_content.title), Style::default().fg(theme::accent()).bold()));
 
-        if let Some(ref bottom) = panel_content.refreshed_ago {
+        if let Some(bottom) = &(panel_content.refreshed_ago) {
             block = block.title_bottom(Span::styled(format!(" {bottom} "), Style::default().fg(theme::text_muted())));
         }
 

@@ -232,7 +232,7 @@ fn execute_dry_run(conn: &Connection, sql: &str, kind: SqlKind, state: &State) -
         SqlKind::Select => execute_select(conn, sql, state),
         SqlKind::Dml => execute_dml_stmts(conn, &stmts),
         SqlKind::Ddl => {
-            conn.execute_batch(sql).map_err(|e| format!("{e}")).map(|()| "Schema changes would be applied.".to_string())
+            conn.execute_batch(sql).map_err(|e| format!("{e}")).map(|()| "Schema changes would be applied.".to_owned())
         }
     };
 
@@ -311,7 +311,7 @@ fn execute_dml_stmts(conn: &Connection, stmts: &[&str]) -> Result<String, String
         if returns_rows {
             if is_last {
                 // Final row-returning statement (SELECT or RETURNING) — format as table.
-                let col_names: Vec<String> = prep.column_names().iter().map(|s| (*s).to_string()).collect();
+                let col_names: Vec<String> = prep.column_names().iter().map(|s| (*s).to_owned()).collect();
                 let mut rows_data: Vec<Vec<String>> = Vec::new();
 
                 let mut rows = prep.query([]).map_err(|e| format!("{e}"))?;
@@ -383,7 +383,7 @@ fn query_to_markdown(conn: &Connection, sql: &str, state: &State) -> Result<Stri
 fn err(tool: &ToolUse, msg: &str) -> ToolResult {
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: msg.to_string(),
+        content: msg.to_owned(),
         display: None,
         tldr: None,
         is_error: true,

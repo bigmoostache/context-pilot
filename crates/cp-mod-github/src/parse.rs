@@ -14,13 +14,13 @@ pub fn api_response(stdout: &str) -> (Option<String>, Option<u64>, String) {
     } else if let Some(pos) = stdout.find("\n\n") {
         (stdout.get(..pos).unwrap_or(""), stdout.get(pos.saturating_add(2)..).unwrap_or(""))
     } else {
-        return (None, None, stdout.to_string());
+        return (None, None, stdout.to_owned());
     };
 
     let etag = extract_header(headers, "etag");
     let poll_interval = extract_header(headers, "x-poll-interval").and_then(|v| v.parse::<u64>().ok());
 
-    (etag, poll_interval, body.to_string())
+    (etag, poll_interval, body.to_owned())
 }
 
 /// Extract a specific HTTP header value (case-insensitive key match).
@@ -28,7 +28,7 @@ pub fn api_response(stdout: &str) -> (Option<String>, Option<u64>, String) {
 pub fn extract_header(headers: &str, name: &str) -> Option<String> {
     let prefix = format!("{name}:");
     headers.lines().find_map(|line| {
-        line.to_lowercase().starts_with(&prefix).then(|| line.get(prefix.len()..).unwrap_or("").trim().to_string())
+        line.to_lowercase().starts_with(&prefix).then(|| line.get(prefix.len()..).unwrap_or("").trim().to_owned())
     })
 }
 
@@ -48,7 +48,7 @@ pub fn sha256_hex(input: &str) -> String {
 /// Replace a GitHub token in output with `[REDACTED]` for safe display.
 #[must_use]
 pub fn redact_token(output: &str, token: &str) -> String {
-    if token.len() >= 8 && output.contains(token) { output.replace(token, "[REDACTED]") } else { output.to_string() }
+    if token.len() >= 8 && output.contains(token) { output.replace(token, "[REDACTED]") } else { output.to_owned() }
 }
 
 /// Poll for a PR associated with the given branch.
@@ -102,7 +102,7 @@ pub fn poll_branch_pr(
 fn parse_pr_json(json_str: &str) -> Option<crate::types::BranchPrInfo> {
     let number = extract_json_u64(json_str, "number")?;
     let title = extract_json_string(json_str, "title")?;
-    let state = extract_json_string(json_str, "state").unwrap_or_else(|| "OPEN".to_string());
+    let state = extract_json_string(json_str, "state").unwrap_or_else(|| "OPEN".to_owned());
     let url = extract_json_string(json_str, "url").unwrap_or_default();
     let additions = extract_json_u64(json_str, "additions");
     let deletions = extract_json_u64(json_str, "deletions");
@@ -130,7 +130,7 @@ fn extract_json_string(json: &str, key: &str) -> Option<String> {
             }
             end = end.saturating_add(ch.len_utf8());
         }
-        return Some(rest.get(..end).unwrap_or("").to_string());
+        return Some(rest.get(..end).unwrap_or("").to_owned());
     }
     None
 }
@@ -171,11 +171,11 @@ fn parse_checks_status(json: &str) -> Option<String> {
         .saturating_add(json.matches("\"status\":\"PENDING\"").count());
 
     if failure > 0 {
-        Some("failing".to_string())
+        Some("failing".to_owned())
     } else if pending > 0 {
-        Some("pending".to_string())
+        Some("pending".to_owned())
     } else if success > 0 {
-        Some("passing".to_string())
+        Some("passing".to_owned())
     } else {
         None
     }

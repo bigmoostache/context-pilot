@@ -81,7 +81,7 @@ fn migrate_if_needed() {
     }
 
     // Write reset next_id.json
-    let next_id_json = serde_json::json!({ "next_log_id": 1 });
+    let next_id_json = serde_json::json!({ "next_log_id": 1i32 });
     if let Ok(s) = serde_json::to_string_pretty(&next_id_json) {
         let _r = fs::write(dir.join("next_id.json"), s);
     }
@@ -276,11 +276,11 @@ impl Module for LogsModule {
 
                 // Panels array: must exist and be non-empty
                 let Some(panels) = tool.input.get("panels").and_then(|v| v.as_array()) else {
-                    pf.errors.push("Missing required 'panels' array".to_string());
+                    pf.errors.push("Missing required 'panels' array".to_owned());
                     return Some(pf);
                 };
                 if panels.is_empty() {
-                    pf.errors.push("Empty 'panels' array — provide at least one panel to close".to_string());
+                    pf.errors.push("Empty 'panels' array — provide at least one panel to close".to_owned());
                     return Some(pf);
                 }
 
@@ -433,7 +433,7 @@ fn visualize_logs_output(content: &str, width: usize) -> Vec<cp_render::Block> {
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
             Block::Line(vec![Span::styled(display, semantic)])
         })

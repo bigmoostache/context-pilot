@@ -316,6 +316,6 @@ fn truncate_mem_line(line: &str, width: usize) -> String {
     if line.len() > width {
         format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
     } else {
-        line.to_string()
+        line.to_owned()
     }
 }

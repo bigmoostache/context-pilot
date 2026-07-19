@@ -19,16 +19,16 @@ impl MemoryPanel {
     fn format_memories_for_context(state: &State) -> String {
         let ms = MemoryState::get(state);
         if ms.memories.is_empty() {
-            return "No memories".to_string();
+            return "No memories".to_owned();
         }
 
         // Sort by importance (critical first)
         let mut sorted: Vec<_> = ms.memories.iter().collect();
         sorted.sort_by_key(|m| match m.importance {
-            MemoryImportance::Critical => 0,
-            MemoryImportance::High => 1,
-            MemoryImportance::Medium => 2,
-            MemoryImportance::Low => 3,
+            MemoryImportance::Critical => 0i32,
+            MemoryImportance::High => 1i32,
+            MemoryImportance::Medium => 2i32,
+            MemoryImportance::Low => 3i32,
         });
 
         let mut output = String::new();
@@ -51,7 +51,7 @@ impl MemoryPanel {
             }
         }
 
-        output.trim_end().to_string()
+        output.trim_end().to_owned()
     }
 }
 
@@ -72,10 +72,10 @@ impl Panel for MemoryPanel {
         // Sort by importance (critical first)
         let mut sorted: Vec<_> = ms.memories.iter().collect();
         sorted.sort_by_key(|m| match m.importance {
-            MemoryImportance::Critical => 0,
-            MemoryImportance::High => 1,
-            MemoryImportance::Medium => 2,
-            MemoryImportance::Low => 3,
+            MemoryImportance::Critical => 0i32,
+            MemoryImportance::High => 1i32,
+            MemoryImportance::Medium => 2i32,
+            MemoryImportance::Low => 3i32,
         });
 
         let mut blocks = Vec::new();
@@ -105,7 +105,7 @@ impl Panel for MemoryPanel {
             if !memory.contents.is_empty() {
                 blocks.push(Block::Line(vec![S::muted("   contents: |".into())]));
                 for line in memory.contents.lines() {
-                    blocks.push(Block::Line(vec![S::new("     ".into()), S::styled(line.to_string(), Semantic::Code)]));
+                    blocks.push(Block::Line(vec![S::new("     ".into()), S::styled(line.to_owned(), Semantic::Code)]));
                 }
             }
         }
@@ -113,7 +113,7 @@ impl Panel for MemoryPanel {
         blocks
     }
     fn title(&self, _state: &State) -> String {
-        "Memory".to_string()
+        "Memory".to_owned()
     }
 
     fn refresh(&self, state: &mut State) {
@@ -123,7 +123,7 @@ impl Panel for MemoryPanel {
         for ctx in &mut state.context {
             if ctx.context_type.as_str() == Kind::MEMORY {
                 ctx.token_count = token_count;
-                let _ = cp_base::panels::update_if_changed(ctx, &memory_content);
+                let _changed = cp_base::panels::update_if_changed(ctx, &memory_content);
                 break;
             }
         }

@@ -45,7 +45,7 @@ impl Panel for LibraryPanel {
     }
 
     fn title(&self, _state: &State) -> String {
-        "Library".to_string()
+        "Library".to_owned()
     }
 
     fn refresh(&self, state: &mut State) {
@@ -54,7 +54,7 @@ impl Panel for LibraryPanel {
             let total: usize = items.iter().map(|i| cp_base::state::context::estimate_tokens(&i.content)).sum();
             ctx.token_count = total;
             let combined: String = items.iter().map(|i| i.content.as_str()).collect::<Vec<_>>().join("\n");
-            let _ = cp_base::panels::update_if_changed(ctx, &combined);
+            let _changed = cp_base::panels::update_if_changed(ctx, &combined);
         }
     }
 

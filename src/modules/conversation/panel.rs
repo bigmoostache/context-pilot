@@ -75,7 +75,7 @@ impl ConversationPanel {
         }
 
         // Hash streaming tool state (invalidate when tool preview changes)
-        if let Some(ref st) = state.streaming_tool {
+        if let Some(st) = &(state.streaming_tool) {
             std::hash::Hash::hash(&st.name, &mut hasher);
             std::hash::Hash::hash(&st.input_so_far, &mut hasher);
         }
@@ -97,7 +97,7 @@ impl ConversationPanel {
         let full_hash = Self::compute_full_content_hash(state, viewport_width);
 
         // Check full content cache first - if valid, return immediately
-        if let Some(ref cached) = state.full_content_cache
+        if let Some(cached) = &state.full_content_cache
             && cached.content_hash == full_hash
         {
             return cached.blocks.to_vec();
@@ -120,7 +120,7 @@ impl ConversationPanel {
             history_panels.sort_by_key(|c| c.last_refresh_ms);
 
             for ctx in &history_panels {
-                if let Some(ref msgs) = ctx.history_messages {
+                if let Some(msgs) = &(ctx.history_messages) {
                     // Separator header
                     blocks.push(Block::line(vec![
                         cp_render::Span::styled(format!("── {} ──", ctx.name), cp_render::Semantic::Muted).bold(),
@@ -209,7 +209,7 @@ impl ConversationPanel {
         }
 
         // Render streaming tool preview (between messages and input)
-        if let Some(ref streaming_tool) = state.streaming_tool {
+        if let Some(streaming_tool) = &(state.streaming_tool) {
             blocks.extend(render_blocks::render_streaming_tool_blocks(
                 &streaming_tool.name,
                 &streaming_tool.input_so_far,
@@ -221,7 +221,7 @@ impl ConversationPanel {
         let input_hash =
             Self::compute_input_hash(&state.input, state.input_cursor, state.input_selection_anchor, viewport_width);
 
-        if let Some(ref cached) = state.input_cache {
+        if let Some(cached) = &(state.input_cache) {
             if cached.input_hash == input_hash && cached.viewport_width == viewport_width {
                 // Cache hit
                 let block_count = cached.blocks.len();
@@ -281,7 +281,7 @@ impl ConversationPanel {
         }
 
         // Padding at end for scroll
-        for _ in 0..3 {
+        for _ in 0i32..3i32 {
             blocks.push(Block::empty());
         }
 
@@ -306,7 +306,7 @@ impl Panel for ConversationPanel {
         Vec::new()
     }
     fn title(&self, state: &State) -> String {
-        if state.flags.stream.phase.is_streaming() { "Conversation *".to_string() } else { "Conversation".to_string() }
+        if state.flags.stream.phase.is_streaming() { "Conversation *".to_owned() } else { "Conversation".to_owned() }
     }
 
     fn handle_key(&self, key: &KeyEvent, state: &State) -> Option<Action> {

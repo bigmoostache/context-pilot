@@ -63,7 +63,7 @@ fn build_left_display(o: &SearchIndexOverlay) -> Vec<Line<'static>> {
             Span::styled("Docs  ", Style::default().fg(theme::text_muted())),
             Span::styled(o.index.docs_display.clone(), Style::default().fg(theme::text())),
         ]));
-        if let Some(ref avg) = o.index.avg_chunk {
+        if let Some(avg) = &(o.index.avg_chunk) {
             lines.push(Line::from(vec![
                 Span::raw("  Avg chunk  "),
                 Span::styled(avg.clone(), Style::default().fg(theme::text())),
@@ -106,7 +106,7 @@ fn build_right_display(o: &SearchIndexOverlay) -> Vec<Line<'static>> {
     let sem = crate::ui::ir::semantic_to_style;
 
     // Splitter
-    if let Some(ref sp) = o.splitter {
+    if let Some(sp) = &(o.splitter) {
         lines.push(Line::from(""));
         lines.push(section_header("Splitter"));
         lines.push(Line::from(vec![
@@ -122,7 +122,7 @@ fn build_right_display(o: &SearchIndexOverlay) -> Vec<Line<'static>> {
     }
 
     // Embeddings
-    if let Some(ref emb) = o.embeddings {
+    if let Some(emb) = &(o.embeddings) {
         lines.push(Line::from(""));
         lines.push(section_header("Embeddings"));
         if !emb.model.is_empty() {
@@ -192,7 +192,7 @@ fn build_right_display(o: &SearchIndexOverlay) -> Vec<Line<'static>> {
 
 /// Render a section header line with dashes.
 fn section_header(title: &str) -> Line<'static> {
-    let dashes = "─".repeat(48_usize.saturating_sub(title.len()).saturating_sub(4));
+    let dashes = "─".repeat(48usize.saturating_sub(title.len()).saturating_sub(4));
     Line::from(vec![
         Span::styled(format!("  ── {title} "), Style::default().fg(theme::accent())),
         Span::styled(dashes, Style::default().fg(theme::text_muted())),

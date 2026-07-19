@@ -123,7 +123,7 @@ pub mod flame {
             if !is_enabled() {
                 return None;
             }
-            SPAN_STACK.with(|s| s.borrow_mut().push((name.to_string(), 0)));
+            SPAN_STACK.with(|s| s.borrow_mut().push((name.to_owned(), 0)));
             Some(Self { start: Instant::now() })
         }
     }
@@ -201,12 +201,12 @@ mod tests {
     #[test]
     fn config_yaml_deserialization() {
         // Each access forces the LazyLock to parse — panics if YAML is malformed.
-        let _ = &*super::config::PROMPTS;
-        let _ = &*super::config::LIBRARY;
-        let _ = &*super::config::UI;
-        let _ = &*super::config::THEMES;
-        let _ = &*super::config::INJECTIONS;
-        let _ = &*super::config::REVERIE;
+        let _: &Prompts = &super::config::PROMPTS;
+        let _: &Library = &super::config::LIBRARY;
+        let _: &Ui = &super::config::UI;
+        let _: &Themes = &super::config::THEMES;
+        let _: &Injections = &super::config::INJECTIONS;
+        let _: &Reverie = &super::config::REVERIE;
     }
 
     /// Validate every tool YAML file parses into `ToolTexts`.

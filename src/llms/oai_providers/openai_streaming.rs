@@ -77,10 +77,10 @@ pub(crate) struct StreamUsage {
 /// Normalize provider-specific stop reasons to our internal format.
 pub(crate) fn normalize_stop_reason(reason: &str) -> String {
     match reason {
-        "length" => "max_tokens".to_string(),
-        "stop" => "end_turn".to_string(),
-        "tool_calls" => "tool_use".to_string(),
-        other => other.to_string(),
+        "length" => "max_tokens".to_owned(),
+        "stop" => "end_turn".to_owned(),
+        "tool_calls" => "tool_use".to_owned(),
+        other => other.to_owned(),
     }
 }
 
@@ -115,14 +115,14 @@ impl ToolCallAccumulator {
         let idx = call.index.unwrap_or(0);
         let entry = self.calls.entry(idx).or_insert_with(|| (String::new(), String::new(), String::new()));
 
-        if let Some(ref id) = call.id {
+        if let Some(id) = &(call.id) {
             entry.0.clone_from(id);
         }
-        if let Some(ref func) = call.function {
-            if let Some(ref name) = func.name {
+        if let Some(func) = &(call.function) {
+            if let Some(name) = &(func.name) {
                 entry.1.clone_from(name);
             }
-            if let Some(ref args) = func.arguments {
+            if let Some(args) = &(func.arguments) {
                 entry.2.push_str(args);
             }
         }
@@ -152,7 +152,7 @@ impl ToolCallAccumulator {
 // ───────────────────────────────────────────────────────────────────
 
 /// Dump an API request to disk for debugging.
-pub(crate) fn dump_request<T: Serialize>(worker_id: &str, provider: &str, request: &T) {
+pub(crate) fn dump_request<T>(worker_id: &str, provider: &str, request: &T) where T: Serialize {
     let dir = ".context-pilot/last_requests";
     let _r1 = std::fs::create_dir_all(dir);
     let path = format!("{dir}/{worker_id}_{provider}_last_request.json");

@@ -34,7 +34,7 @@ pub(crate) fn build_overlay_text(overlay: &SearchIndexOverlay) -> String {
             overlay.index.disk_used, overlay.index.disk_total, overlay.index.docs_display,
         )
         .unwrap_or(());
-        if let Some(ref avg) = overlay.index.avg_chunk {
+        if let Some(avg) = &(overlay.index.avg_chunk) {
             writeln!(out, "Avg chunk  {avg}").unwrap_or(());
         }
         out.push('\n');
@@ -62,7 +62,7 @@ pub(crate) fn build_overlay_text(overlay: &SearchIndexOverlay) -> String {
     }
 
     // Splitter
-    if let Some(ref sp) = overlay.splitter {
+    if let Some(sp) = &(overlay.splitter) {
         writeln!(
             out,
             "\n── Splitter ──\nTree-sitter  {} chunks ({}%)\nFallback     {} chunks ({}%)",
@@ -72,7 +72,7 @@ pub(crate) fn build_overlay_text(overlay: &SearchIndexOverlay) -> String {
     }
 
     // Embeddings
-    if let Some(ref emb) = overlay.embeddings {
+    if let Some(emb) = &(overlay.embeddings) {
         out.push_str("\n── Embeddings ──\n");
         if !emb.model.is_empty() {
             writeln!(out, "Model   {}", emb.model).unwrap_or(());

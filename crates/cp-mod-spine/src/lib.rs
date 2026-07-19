@@ -327,7 +327,7 @@ fn visualize_spine_output(content: &str, width: usize) -> Vec<cp_render::Block> 
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
             Block::Line(vec![Span::styled(display, semantic)])
         })
@@ -340,7 +340,7 @@ fn prune_notifications(notifications: &mut Vec<Notification>) {
     if processed_count <= 10 {
         return;
     }
-    let mut processed_seen = 0_usize;
+    let mut processed_seen = 0usize;
     let drop_count = processed_count.saturating_sub(10);
     notifications.retain(|n| {
         if n.is_processed() {

@@ -26,7 +26,7 @@ const INLINE_MAX_DURATION_MS: u128 = 10_000;
 
 /// Redact a GitHub token from command output if accidentally leaked.
 fn redact_token(output: &str, token: &str) -> String {
-    if token.len() >= 8 && output.contains(token) { output.replace(token, "[REDACTED]") } else { output.to_string() }
+    if token.len() >= 8 && output.contains(token) { output.replace(token, "[REDACTED]") } else { output.to_owned() }
 }
 
 /// Execute a raw gh (GitHub CLI) command.
@@ -42,14 +42,14 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
         None => {
             return ToolResult::new(
                 tool.id.clone(),
-                "Error: GITHUB_TOKEN not set. Add GITHUB_TOKEN to your .env file or environment.".to_string(),
+                "Error: GITHUB_TOKEN not set. Add GITHUB_TOKEN to your .env file or environment.".to_owned(),
                 true,
             );
         }
     };
 
     let Some(command) = tool.input.get("command").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Error: 'command' parameter is required".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Error: 'command' parameter is required".to_owned(), true);
     };
 
     // Validate
@@ -81,7 +81,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
     }
 
     // All commands: run async, decide inline vs panel on completion.
-    let command_owned = command.to_string();
+    let command_owned = command.to_owned();
 
     spawn_async_tool(state, tool, GH_CMD_TIMEOUT_SECS.saturating_add(5), move || {
         let start = Instant::now();
@@ -101,7 +101,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
             Ok(output) => format_gh_output(&output, &command_owned, &token, elapsed_ms),
             Err(e) => {
                 let content = if e.kind() == std::io::ErrorKind::NotFound {
-                    "gh CLI not found. Install: https://cli.github.com".to_string()
+                    "gh CLI not found. Install: https://cli.github.com".to_owned()
                 } else {
                     format!("Error running gh: {e}")
                 };
@@ -116,9 +116,9 @@ fn format_gh_output(output: &std::process::Output, command: &str, token: &str, e
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     let combined = if stderr.trim().is_empty() {
-        stdout.trim().to_string()
+        stdout.trim().to_owned()
     } else if stdout.trim().is_empty() {
-        stderr.trim().to_string()
+        stderr.trim().to_owned()
     } else {
         format!("{}\n{}", stdout.trim(), stderr.trim())
     };
@@ -128,9 +128,9 @@ fn format_gh_output(output: &std::process::Output, command: &str, token: &str, e
     // Empty output — always inline.
     if combined.is_empty() {
         let content = if is_error {
-            "Command failed with no output".to_string()
+            "Command failed with no output".to_owned()
         } else {
-            "Command completed successfully".to_string()
+            "Command completed successfully".to_owned()
         };
         return ToolOutput { content, is_error, create_panel: None, preserves_tempo: !is_error };
     }
@@ -146,15 +146,15 @@ fn format_gh_output(output: &std::process::Output, command: &str, token: &str, e
     let display_name = if command.len() > 40 {
         format!("{}...", command.get(..command.floor_char_boundary(37)).unwrap_or(""))
     } else {
-        command.to_string()
+        command.to_owned()
     };
     ToolOutput {
         content: format!("Panel created: {DYN_PANEL_ID_PLACEHOLDER}"),
         is_error,
         create_panel: Some(DynPanel {
-            context_type: Kind::GITHUB_RESULT.to_string(),
+            context_type: Kind::GITHUB_RESULT.to_owned(),
             display_name,
-            metadata: vec![("result_command".to_string(), command.to_string())],
+            metadata: vec![("result_command".to_owned(), command.to_owned())],
             content: Some(combined),
         }),
         preserves_tempo: false,

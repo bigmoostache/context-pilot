@@ -147,7 +147,7 @@ fn refresh_live_stats(ss: &SearchState) {
 
     let db_size = stats.get("databaseSize").and_then(serde_json::Value::as_u64).unwrap_or(0);
     let db_used = stats.get("usedDatabaseSize").and_then(serde_json::Value::as_u64).unwrap_or(0);
-    let last_update = stats.get("lastUpdate").and_then(serde_json::Value::as_str).unwrap_or("").to_string();
+    let last_update = stats.get("lastUpdate").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
 
     let indexes = stats.get("indexes");
 
@@ -177,9 +177,9 @@ fn refresh_live_stats(ss: &SearchState) {
                 .filter_map(|t| {
                     Some(crate::types::MeiliTask {
                         uid: t.get("uid")?.as_u64()?,
-                        task_type: t.get("type")?.as_str()?.to_string(),
-                        status: t.get("status")?.as_str()?.to_string(),
-                        duration: t.get("duration").and_then(serde_json::Value::as_str).unwrap_or("").to_string(),
+                        task_type: t.get("type")?.as_str()?.to_owned(),
+                        status: t.get("status")?.as_str()?.to_owned(),
+                        duration: t.get("duration").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
                     })
                 })
                 .collect()
@@ -300,18 +300,18 @@ fn read_process_stats(_pid: u32) -> Option<(u64, u64)> {
 /// Shorten Meilisearch task type names for compact display.
 fn shorten_task_type(task_type: &str) -> String {
     match task_type {
-        "documentAdditionOrUpdate" => "docAdd".to_string(),
-        "documentDeletion" => "docDel".to_string(),
-        "settingsUpdate" => "settings".to_string(),
-        "indexCreation" => "create".to_string(),
-        "indexUpdate" => "update".to_string(),
-        "indexDeletion" => "delete".to_string(),
-        "indexSwap" => "swap".to_string(),
-        "taskCancelation" => "cancel".to_string(),
-        "taskDeletion" => "taskDel".to_string(),
-        "dumpCreation" => "dump".to_string(),
-        "snapshotCreation" => "snapshot".to_string(),
-        other => other.to_string(),
+        "documentAdditionOrUpdate" => "docAdd".to_owned(),
+        "documentDeletion" => "docDel".to_owned(),
+        "settingsUpdate" => "settings".to_owned(),
+        "indexCreation" => "create".to_owned(),
+        "indexUpdate" => "update".to_owned(),
+        "indexDeletion" => "delete".to_owned(),
+        "indexSwap" => "swap".to_owned(),
+        "taskCancelation" => "cancel".to_owned(),
+        "taskDeletion" => "taskDel".to_owned(),
+        "dumpCreation" => "dump".to_owned(),
+        "snapshotCreation" => "snapshot".to_owned(),
+        other => other.to_owned(),
     }
 }
 
@@ -319,7 +319,7 @@ fn shorten_task_type(task_type: &str) -> String {
 /// human-readable form (e.g. "0.25s"). Returns "—" for empty strings.
 fn humanize_duration(iso: &str) -> String {
     if iso.is_empty() {
-        return "\u{2014}".to_string(); // em-dash
+        return "\u{2014}".to_owned(); // em-dash
     }
 
     // Strip "PT" prefix and "S" suffix: "PT0.254092S" → "0.254092"

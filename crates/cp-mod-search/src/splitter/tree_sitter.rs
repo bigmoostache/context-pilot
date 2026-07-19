@@ -241,8 +241,8 @@ impl Splitter for TreeSitterSplitter {
                         if !trimmed.is_empty() {
                             let pre_end_line = node.start_position().row.saturating_add(1);
                             chunks.push(Chunk {
-                                content: pre_content.to_string(),
-                                kind: "preamble".to_string(),
+                                content: pre_content.to_owned(),
+                                kind: "preamble".to_owned(),
                                 name: String::new(),
                                 line_start: preamble_start_line,
                                 line_end: u32::try_from(pre_end_line).unwrap_or(u32::MAX),
@@ -263,8 +263,8 @@ impl Splitter for TreeSitterSplitter {
                 let end_line = node.end_position().row.saturating_add(1);
 
                 chunks.push(Chunk {
-                    content: node_content.to_string(),
-                    kind: label.to_string(),
+                    content: node_content.to_owned(),
+                    kind: label.to_owned(),
                     name,
                     line_start: u32::try_from(start_line).unwrap_or(u32::MAX),
                     line_end: u32::try_from(end_line).unwrap_or(u32::MAX),
@@ -290,8 +290,8 @@ impl Splitter for TreeSitterSplitter {
             if !trimmed.is_empty() {
                 let total_lines = content.lines().count();
                 chunks.push(Chunk {
-                    content: pre_content.to_string(),
-                    kind: "preamble".to_string(),
+                    content: pre_content.to_owned(),
+                    kind: "preamble".to_owned(),
                     name: String::new(),
                     line_start: preamble_start_line,
                     line_end: u32::try_from(total_lines).unwrap_or(u32::MAX),

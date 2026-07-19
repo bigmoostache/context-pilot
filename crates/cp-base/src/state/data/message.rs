@@ -105,7 +105,7 @@ impl Message {
         Self {
             id,
             uid: Some(uid),
-            role: "user".to_string(),
+            role: "user".to_owned(),
             msg_type: MsgKind::TextMessage,
             content,
             content_token_count: token_count,
@@ -123,7 +123,7 @@ impl Message {
         Self {
             id,
             uid: Some(uid),
-            role: "assistant".to_string(),
+            role: "assistant".to_owned(),
             msg_type: MsgKind::TextMessage,
             content: String::new(),
             content_token_count: 0,
@@ -156,7 +156,7 @@ pub mod test_helpers {
                 msg: Message {
                     id,
                     uid: None,
-                    role: role.to_string(),
+                    role: role.to_owned(),
                     msg_type,
                     content: String::new(),
                     content_token_count: 0,
@@ -175,7 +175,7 @@ pub mod test_helpers {
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
             let mut b = Self::base(format!("U{n}"), "user", MsgKind::TextMessage);
-            b.msg.content = content.to_string();
+            b.msg.content = String::from(content);
             b
         }
 
@@ -185,7 +185,7 @@ pub mod test_helpers {
             static COUNTER: AtomicUsize = AtomicUsize::new(1);
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
             let mut b = Self::base(format!("A{n}"), "assistant", MsgKind::TextMessage);
-            b.msg.content = content.to_string();
+            b.msg.content = String::from(content);
             b
         }
 
@@ -196,7 +196,7 @@ pub mod test_helpers {
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
             let id = format!("T{n}");
             let mut b = Self::base(id.clone(), "assistant", MsgKind::ToolCall);
-            b.msg.tool_uses.push(ToolUseRecord { id, name: name.to_string(), input });
+            b.msg.tool_uses.push(ToolUseRecord { id, name: name.to_owned(), input });
             b
         }
 
@@ -207,8 +207,8 @@ pub mod test_helpers {
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
             let mut b = Self::base(format!("R{n}"), "user", MsgKind::ToolResult);
             b.msg.tool_results.push(ToolResultRecord {
-                tool_use_id: tool_use_id.to_string(),
-                content: content.to_string(),
+                tool_use_id: tool_use_id.to_owned(),
+                content: content.to_owned(),
                 display: None,
                 tldr: None,
                 is_error: false,

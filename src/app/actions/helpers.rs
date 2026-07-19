@@ -37,13 +37,13 @@ pub(crate) fn clean_llm_id_prefix(content: &str) -> String {
     // First trim leading whitespace
     let trimmed = content.trim_start();
 
-    let cleaned = RE_ID_PREFIX.as_ref().map_or_else(|| trimmed.to_string(), |re| re.replace(trimmed, "").to_string());
+    let cleaned = RE_ID_PREFIX.as_ref().map_or_else(|| trimmed.to_owned(), |re| re.replace(trimmed, "").to_string());
 
     let result =
         RE_ID_MULTILINE.as_ref().map_or_else(|| cleaned.clone(), |re| re.replace_all(&cleaned, "").to_string());
 
     // Strip leading/trailing whitespace and newlines after cleaning
-    result.trim().to_string()
+    result.trim().to_owned()
 }
 
 /// Parse context selection patterns like p1, p-1, `p_1`, P1, P-1, `P_1`.

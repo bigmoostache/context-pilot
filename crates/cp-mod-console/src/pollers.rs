@@ -93,7 +93,7 @@ impl StatusPoller {
                     {
                         let mut s = self.status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                         if !s.is_terminal() {
-                            *s = if code == 0 { ProcessStatus::Finished(code) } else { ProcessStatus::Failed(code) };
+                            *s = if code == 0i32 { ProcessStatus::Finished(code) } else { ProcessStatus::Failed(code) };
                         }
                     }
                     {

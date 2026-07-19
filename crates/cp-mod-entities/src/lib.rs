@@ -290,7 +290,7 @@ fn visualize_entity_output(content: &str, width: usize) -> Vec<cp_render::Block>
             let display = if line.len() > width {
                 format!("{}…", line.get(..line.floor_char_boundary(width.saturating_sub(1))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
 
             // Error lines
@@ -334,7 +334,7 @@ fn visualize_entity_output(content: &str, width: usize) -> Vec<cp_render::Block>
                             spans.push(Span::muted("NULL".into()).dim());
                         }
                         if !part.is_empty() {
-                            spans.push(Span::new(part.to_string()));
+                            spans.push(Span::new(part.to_owned()));
                         }
                         spans
                     })

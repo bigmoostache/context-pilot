@@ -288,7 +288,7 @@ pub(super) fn handle_command_expansion(state: &mut State) {
             .find(|cmd| cmd.id == cmd_name)
             .map(|cmd| cmd.content.clone());
         if let Some(content) = cmd_content {
-            let label = cmd_name.to_string();
+            let label = cmd_name.to_owned();
             let idx = state.paste_buffers.len();
             state.paste_buffers.push(content);
             state.paste_buffer_labels.push(Some(label));

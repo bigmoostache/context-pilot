@@ -38,7 +38,7 @@ fn build_virtual_content(disk_content: &str, canonical_path: &str, state: &State
         let path_val = call.input.get("file_path").and_then(|v| v.as_str()).unwrap_or("");
         let call_canonical = std::path::Path::new(path_val)
             .canonicalize()
-            .map_or_else(|_| path_val.to_string(), |p| p.to_string_lossy().to_string());
+            .map_or_else(|_| path_val.to_owned(), |p| p.to_string_lossy().to_string());
         if call_canonical != canonical_path {
             continue;
         }
@@ -46,7 +46,7 @@ fn build_virtual_content(disk_content: &str, canonical_path: &str, state: &State
         match call.tool_name.as_str() {
             "Write" => {
                 if let Some(contents) = call.input.get("contents").and_then(|v| v.as_str()) {
-                    virtual_content = Some(contents.to_string());
+                    virtual_content = Some(contents.to_owned());
                 }
             }
             "Edit" => {
@@ -56,7 +56,7 @@ fn build_virtual_content(disk_content: &str, canonical_path: &str, state: &State
 
                 if let Some(actual) = tools::edit_file::find_normalized_match(base, old) {
                     let actual = actual.to_owned();
-                    let mut buf = base.to_string();
+                    let mut buf = base.to_owned();
                     buf = buf.replacen(&actual, new, 1);
                     virtual_content = Some(buf);
                 }
@@ -169,7 +169,7 @@ impl Module for FilesModule {
                         // Canonicalize for consistent comparison with stored paths
                         let canonical = p
                             .canonicalize()
-                            .map_or_else(|_| path_str.to_string(), |cp| cp.to_string_lossy().to_string());
+                            .map_or_else(|_| path_str.to_owned(), |cp| cp.to_string_lossy().to_string());
                         let is_open = state.context.iter().any(|c| {
                             c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical)
                         });
@@ -257,7 +257,7 @@ impl Module for FilesModule {
     }
 
     fn context_detail(&self, ctx: &cp_base::state::context::Entry) -> Option<String> {
-        (ctx.context_type.as_str() == Kind::FILE).then(|| ctx.get_meta_str("file_path").unwrap_or("").to_string())
+        (ctx.context_type.as_str() == Kind::FILE).then(|| ctx.get_meta_str("file_path").unwrap_or("").to_owned())
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
@@ -269,7 +269,7 @@ impl Module for FilesModule {
             .context
             .iter()
             .filter(|c| c.context_type.as_str() == Kind::FILE)
-            .filter_map(|c| c.get_meta_str("file_path").map(|p| cp_base::panels::WatchSpec::File(p.to_string())))
+            .filter_map(|c| c.get_meta_str("file_path").map(|p| cp_base::panels::WatchSpec::File(p.to_owned())))
             .collect()
     }
 
@@ -386,7 +386,7 @@ fn truncate_line(line: &str, width: usize) -> String {
     if line.len() > width {
         format!("{}…", line.get(..line.floor_char_boundary(width.saturating_sub(1))).unwrap_or(""))
     } else {
-        line.to_string()
+        line.to_owned()
     }
 }
 
@@ -404,7 +404,7 @@ fn style_callback_line_ir(line: &str, width: usize) -> Option<cp_render::Block> 
 
     // "· name passed ..." or "· name FAILED ..." etc.
     if let Some(rest) = trimmed.strip_prefix("· ") {
-        let mut spans = vec![Span::muted("· ".to_string())];
+        let mut spans = vec![Span::muted("· ".to_owned())];
 
         let status_patterns: &[(&str, Semantic)] = &[
             (" passed", Semantic::Success),
@@ -418,20 +418,20 @@ fn style_callback_line_ir(line: &str, width: usize) -> Option<cp_render::Block> 
         for &(pattern, semantic) in status_patterns {
             if let Some(pos) = rest.find(pattern) {
                 let name = rest.get(..pos).unwrap_or("");
-                spans.push(Span::muted(name.to_string()));
-                spans.push(Span::styled(pattern.to_string(), semantic));
+                spans.push(Span::muted(name.to_owned()));
+                spans.push(Span::styled(pattern.to_owned(), semantic));
                 let after_start = pos.saturating_add(pattern.len());
                 if let Some(after) = rest.get(after_start..)
                     && !after.is_empty()
                 {
-                    spans.push(Span::muted(after.to_string()));
+                    spans.push(Span::muted(after.to_owned()));
                 }
                 matched = true;
                 break;
             }
         }
         if !matched {
-            spans.push(Span::muted(rest.to_string()));
+            spans.push(Span::muted(rest.to_owned()));
         }
         return Some(Block::line(spans));
     }

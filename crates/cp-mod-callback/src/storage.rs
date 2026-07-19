@@ -108,7 +108,7 @@ fn read_script_body(name: &str) -> Option<String> {
     let script_path = PathBuf::from(constants::STORE_DIR).join("scripts").join(format!("{name}.sh"));
     let content = fs::read_to_string(&script_path).ok()?;
     let body = strip_script_header(&content);
-    Some(body.to_string())
+    Some(body.to_owned())
 }
 
 /// Strip the auto-generated bash header, returning only the user's script body.

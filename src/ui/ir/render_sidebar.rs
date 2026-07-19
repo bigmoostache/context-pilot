@@ -58,7 +58,7 @@ fn render_normal(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
     let mut lines: Vec<Line<'_>> = Vec::new();
 
     // Token bar in rounded border box (above entries)
-    if let Some(ref tb) = sidebar.token_bar {
+    if let Some(tb) = &(sidebar.token_bar) {
         render_token_bar_box(&mut lines, tb, cw);
     }
 
@@ -103,13 +103,13 @@ fn render_normal(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
     }
 
     // PR card
-    if let Some(ref pr) = sidebar.pr_card {
+    if let Some(pr) = &(sidebar.pr_card) {
         lines.push(Line::from(""));
         render_pr_card(&mut lines, pr, cw);
     }
 
     // Token stats (rendered with rounded border)
-    if let Some(ref stats) = sidebar.token_stats {
+    if let Some(stats) = &(sidebar.token_stats) {
         lines.push(Line::from(""));
         render_token_stats(&mut lines, stats, cw);
     }
@@ -226,8 +226,8 @@ fn render_token_bar_box(lines: &mut Vec<Line<'static>>, token_bar: &TokenBar, cw
     let bar_width_f = bar_width.to_f64();
 
     // Fractional fill positions for smooth animation
-    let hit_filled_f = anim.hit_pct * bar_width_f / 100.0;
-    let miss_filled_f = anim.miss_pct * bar_width_f / 100.0;
+    let hit_filled_f = anim.hit_pct * bar_width_f / 100.0f64;
+    let miss_filled_f = anim.miss_pct * bar_width_f / 100.0f64;
     let total_filled_f = (hit_filled_f + miss_filled_f).min(bar_width_f);
 
     // Integer positions for cell-level decisions
@@ -266,12 +266,12 @@ fn render_token_bar_box(lines: &mut Vec<Line<'static>>, token_bar: &TokenBar, cw
         // Determine the base fill color for this cell
         let base_color = if i < hit_filled {
             hit_color
-        } else if i == hit_filled && hit_frac > 0.01 && total_filled_f > hit_filled_f {
+        } else if i == hit_filled && hit_frac > 0.01f64 && total_filled_f > hit_filled_f {
             // Boundary cell: crossfade from hit → miss
             super::bar_animation::lerp_color(miss_color, hit_color, hit_frac)
         } else if i < total_filled {
             miss_color
-        } else if i == total_filled && total_frac > 0.01 {
+        } else if i == total_filled && total_frac > 0.01f64 {
             // Boundary cell: crossfade from filled → empty
             let fill = if hit_filled_f > total_filled_f.floor() { hit_color } else { miss_color };
             super::bar_animation::lerp_color(empty_color, fill, total_frac)
@@ -280,7 +280,7 @@ fn render_token_bar_box(lines: &mut Vec<Line<'static>>, token_bar: &TokenBar, cw
         };
 
         // Apply streaming pulse to filled cells
-        let is_filled_cell = i < total_filled || (i == total_filled && total_frac > 0.01);
+        let is_filled_cell = i < total_filled || (i == total_filled && total_frac > 0.01f64);
         let color = anim.pulse_brightness.map_or(base_color, |brightness| {
             if is_filled_cell { super::bar_animation::pulse_color(base_color, brightness) } else { base_color }
         });
@@ -288,7 +288,7 @@ fn render_token_bar_box(lines: &mut Vec<Line<'static>>, token_bar: &TokenBar, cw
         if is_threshold {
             bar_spans.push(Span::styled("|", Style::default().fg(theme::warning()).bg(color)));
         } else {
-            let ch = if i < total_filled || (i == total_filled && total_frac > 0.5) {
+            let ch = if i < total_filled || (i == total_filled && total_frac > 0.5f64) {
                 chars::BLOCK_FULL
             } else {
                 chars::BLOCK_LIGHT
@@ -345,7 +345,7 @@ fn render_pr_card(lines: &mut Vec<Line<'static>>, pr: &cp_render::frame::PrCard,
         detail_spans.push(Span::styled(format!("+{}", pr.additions), Style::default().fg(theme::success())));
         detail_spans.push(Span::styled(format!(" -{}", pr.deletions), Style::default().fg(theme::error())));
     }
-    if let Some(ref review) = pr.review_status {
+    if let Some(review) = &(pr.review_status) {
         let (icon, color) = match review.as_str() {
             "APPROVED" => (" ✓", theme::success()),
             "CHANGES_REQUESTED" => (" ✗", theme::error()),
@@ -354,7 +354,7 @@ fn render_pr_card(lines: &mut Vec<Line<'static>>, pr: &cp_render::frame::PrCard,
         };
         detail_spans.push(Span::styled(icon, Style::default().fg(color)));
     }
-    if let Some(ref checks) = pr.checks_status {
+    if let Some(checks) = &(pr.checks_status) {
         let (icon, color) = match checks.as_str() {
             "passing" => (" ●", theme::success()),
             "failing" => (" ●", theme::error()),

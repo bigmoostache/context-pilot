@@ -59,7 +59,7 @@ impl Panel for QueuePanel {
     }
     fn title(&self, state: &State) -> String {
         let qs = QueueState::get(state);
-        if qs.active { format!("Queue ({})", qs.queued_calls.len()) } else { "Queue".to_string() }
+        if qs.active { format!("Queue ({})", qs.queued_calls.len()) } else { "Queue".to_owned() }
     }
 
     fn refresh(&self, state: &mut State) {
@@ -72,7 +72,7 @@ impl Panel for QueuePanel {
                 // This ensures the panel sorts correctly in context ordering —
                 // unchanged panels stay near the top (cache-friendly), changed panels
                 // float to the end (near conversation) so they don't break the prefix.
-                let _ = cp_base::panels::update_if_changed(ctx, &content);
+                let _changed = cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }

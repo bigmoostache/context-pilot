@@ -122,7 +122,7 @@ fn tool_result_to_ir(tr: &ToolResultRecord) -> ToolResultPreview {
         let boundary = source.floor_char_boundary(77);
         format!("{}...", source.get(..boundary).unwrap_or(""))
     } else {
-        source.to_string()
+        source.to_owned()
     };
 
     ToolResultPreview { tool_name: tr.tool_name.clone(), summary, success: !tr.is_error }
@@ -240,7 +240,7 @@ fn fd_semantic(open: u32, limit: u64) -> Semantic {
     if limit == 0 {
         return Semantic::Muted;
     }
-    let pct = f64::from(open) / f64::from(u32::try_from(limit).unwrap_or(u32::MAX)) * 100.0;
+    let pct = f64::from(open) / f64::from(u32::try_from(limit).unwrap_or(u32::MAX)) * 100.0f64;
     if pct < 50.0 {
         Semantic::Success
     } else if pct < 80.0 {
@@ -256,14 +256,14 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
 
     let snapshot = PERF.snapshot();
 
-    let fps = if snapshot.frame_avg_ms > 0.0 { 1000.0 / snapshot.frame_avg_ms } else { 0.0 };
+    let fps = if snapshot.frame_avg_ms > 0.0f64 { 1_000.0f64 / snapshot.frame_avg_ms } else { 0.0f64 };
 
     // Meilisearch stats
     let meili = cp_mod_search::overlay_info(state).and_then(|info| {
         if info.meili_memory_bytes == 0 && info.meili_cpu_pct <= 0.0 {
             return None;
         }
-        let mb = info.meili_memory_bytes.to_f64() / (1024.0 * 1024.0);
+        let mb = info.meili_memory_bytes.to_f64() / (1_024.0f64 * 1_024.0f64);
         Some(PerfMeiliStats {
             cpu_pct: f64::from(info.meili_cpu_pct),
             cpu_semantic: cpu_semantic(f64::from(info.meili_cpu_pct)),
@@ -274,9 +274,9 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
     // Budget bars
     let build_bar = |label: &str, budget_ms: f64| -> PerfBudgetBar {
         let pct = (snapshot.frame_avg_ms / budget_ms * 100.0).min(150.0);
-        let semantic = if pct <= 80.0 {
+        let semantic = if pct <= 80.0f64 {
             Semantic::Success
-        } else if pct <= 100.0 {
+        } else if pct <= 100.0f64 {
             Semantic::Warning
         } else {
             Semantic::Error
@@ -294,25 +294,25 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
         .iter()
         .take(10)
         .map(|op| {
-            let pct = if total_time > 0.0 { op.total_ms / total_time * 100.0 } else { 0.0 };
-            let is_hotspot = pct > 30.0;
+            let pct = if total_time > 0.0f64 { op.total_ms / total_time * 100.0f64 } else { 0.0f64 };
+            let is_hotspot = pct > 30.0f64;
 
             let name = if op.name.len() <= 24 {
-                op.name.to_string()
+                op.name.to_owned()
             } else {
                 let tail_start = op.name.len().saturating_sub(22);
                 format!("..{}", op.name.get(tail_start..).unwrap_or(""))
             };
 
-            let total_display = if op.total_ms >= 1000.0 {
-                format!("{:.1}s", op.total_ms / 1000.0)
+            let total_display = if op.total_ms >= 1_000.0f64 {
+                format!("{:.1}s", op.total_ms / 1_000.0f64)
             } else {
                 format!("{:.0}ms", op.total_ms)
             };
 
-            let std_semantic = if op.std_ms < 1.0 {
+            let std_semantic = if op.std_ms < 1.0f64 {
                 Semantic::Success
-            } else if op.std_ms < 5.0 {
+            } else if op.std_ms < 5.0f64 {
                 Semantic::Warning
             } else {
                 Semantic::Error

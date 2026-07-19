@@ -110,7 +110,7 @@ pub(crate) fn collect_included_tool_ids(messages: &[Message], pending_tool_resul
 
         if has_result {
             for id in tool_use_ids {
-                let _r = included.insert(id.to_string());
+                let _r = included.insert(id.to_owned());
             }
         }
     }
@@ -158,13 +158,13 @@ fn build_from_api_messages(api_messages: &[super::super::ApiMessage], opts: &Bui
     let mut out: Vec<OaiMessage> = Vec::new();
 
     // System message
-    let mut system_content = opts.system_prompt.clone().unwrap_or_else(|| library::default_agent_content().to_string());
-    if let Some(ref suffix) = opts.system_suffix {
+    let mut system_content = opts.system_prompt.clone().unwrap_or_else(|| library::default_agent_content().to_owned());
+    if let Some(suffix) = &(opts.system_suffix) {
         system_content.push_str("\n\n");
         system_content.push_str(suffix);
     }
     out.push(OaiMessage {
-        role: "system".to_string(),
+        role: "system".to_owned(),
         content: Some(system_content),
         tool_calls: None,
         tool_call_id: None,
@@ -181,7 +181,7 @@ fn build_from_api_messages(api_messages: &[super::super::ApiMessage], opts: &Bui
             for block in &msg.content {
                 if let super::super::ContentBlock::ToolResult { tool_use_id, content } = block {
                     out.push(OaiMessage {
-                        role: "tool".to_string(),
+                        role: "tool".to_owned(),
                         content: Some(content.clone()),
                         tool_calls: None,
                         tool_call_id: Some(tool_use_id.clone()),
@@ -206,7 +206,7 @@ fn build_from_api_messages(api_messages: &[super::super::ApiMessage], opts: &Bui
                     if let super::super::ContentBlock::ToolUse { id, name, input } = b {
                         Some(OaiToolCall {
                             id: id.clone(),
-                            call_type: "function".to_string(),
+                            call_type: "function".to_owned(),
                             function: OaiFunction {
                                 name: name.clone(),
                                 arguments: serde_json::to_string(input).unwrap_or_default(),
@@ -247,9 +247,9 @@ fn build_from_api_messages(api_messages: &[super::super::ApiMessage], opts: &Bui
     }
 
     // Extra context (cleaner mode)
-    if let Some(ref ctx) = opts.extra_context {
+    if let Some(ctx) = &(opts.extra_context) {
         let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace("{context}", ctx);
-        out.push(OaiMessage { role: "user".to_string(), content: Some(msg), tool_calls: None, tool_call_id: None });
+        out.push(OaiMessage { role: "user".to_owned(), content: Some(msg), tool_calls: None, tool_call_id: None });
     }
 
     out
@@ -264,15 +264,15 @@ fn build_from_raw(
     let mut out: Vec<OaiMessage> = Vec::new();
 
     // ── System message ──────────────────────────────────────────
-    let mut system_content = opts.system_prompt.clone().unwrap_or_else(|| library::default_agent_content().to_string());
+    let mut system_content = opts.system_prompt.clone().unwrap_or_else(|| library::default_agent_content().to_owned());
 
-    if let Some(ref suffix) = opts.system_suffix {
+    if let Some(suffix) = &(opts.system_suffix) {
         system_content.push_str("\n\n");
         system_content.push_str(suffix);
     }
 
     out.push(OaiMessage {
-        role: "system".to_string(),
+        role: "system".to_owned(),
         content: Some(system_content),
         tool_calls: None,
         tool_call_id: None,
@@ -289,13 +289,13 @@ fn build_from_raw(
 
             // Assistant message with tool_call
             out.push(OaiMessage {
-                role: "assistant".to_string(),
+                role: "assistant".to_owned(),
                 content: Some(text),
                 tool_calls: Some(vec![OaiToolCall {
                     id: format!("panel_{}", panel.panel_id),
-                    call_type: "function".to_string(),
+                    call_type: "function".to_owned(),
                     function: OaiFunction {
-                        name: "dynamic_panel".to_string(),
+                        name: "dynamic_panel".to_owned(),
                         arguments: format!(r#"{{"id":"{}"}}"#, panel.panel_id),
                     },
                 }]),
@@ -304,7 +304,7 @@ fn build_from_raw(
 
             // Tool result message
             out.push(OaiMessage {
-                role: "tool".to_string(),
+                role: "tool".to_owned(),
                 content: Some(panel.content.clone()),
                 tool_calls: None,
                 tool_call_id: Some(format!("panel_{}", panel.panel_id)),
@@ -314,30 +314,30 @@ fn build_from_raw(
         // Footer after all panels
         let footer = panel_footer_text(current_ms);
         out.push(OaiMessage {
-            role: "assistant".to_string(),
+            role: "assistant".to_owned(),
             content: Some(footer),
             tool_calls: Some(vec![OaiToolCall {
-                id: "panel_footer".to_string(),
-                call_type: "function".to_string(),
+                id: "panel_footer".to_owned(),
+                call_type: "function".to_owned(),
                 function: OaiFunction {
-                    name: "dynamic_panel".to_string(),
-                    arguments: r#"{"action":"end_panels"}"#.to_string(),
+                    name: "dynamic_panel".to_owned(),
+                    arguments: r#"{"action":"end_panels"}"#.to_owned(),
                 },
             }]),
             tool_call_id: None,
         });
         out.push(OaiMessage {
-            role: "tool".to_string(),
-            content: Some(prompts::panel_footer_ack().to_string()),
+            role: "tool".to_owned(),
+            content: Some(prompts::panel_footer_ack().to_owned()),
             tool_calls: None,
-            tool_call_id: Some("panel_footer".to_string()),
+            tool_call_id: Some("panel_footer".to_owned()),
         });
     }
 
     // ── Extra context (cleaner mode) ────────────────────────────
-    if let Some(ref ctx) = opts.extra_context {
+    if let Some(ctx) = &(opts.extra_context) {
         let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace("{context}", ctx);
-        out.push(OaiMessage { role: "user".to_string(), content: Some(msg), tool_calls: None, tool_call_id: None });
+        out.push(OaiMessage { role: "user".to_owned(), content: Some(msg), tool_calls: None, tool_call_id: None });
     }
 
     // ── Tool pairing ────────────────────────────────────────────
@@ -357,7 +357,7 @@ fn build_from_raw(
             for result in &msg.tool_results {
                 if included_tool_ids.contains(&result.tool_use_id) {
                     out.push(OaiMessage {
-                        role: "tool".to_string(),
+                        role: "tool".to_owned(),
                         content: Some(result.content.clone()),
                         tool_calls: None,
                         tool_call_id: Some(result.tool_use_id.clone()),
@@ -378,7 +378,7 @@ fn build_from_raw(
                 .filter(|tu| included_tool_ids.contains(&tu.id))
                 .map(|tu| OaiToolCall {
                     id: tu.id.clone(),
-                    call_type: "function".to_string(),
+                    call_type: "function".to_owned(),
                     function: OaiFunction {
                         name: tu.name.clone(),
                         arguments: serde_json::to_string(&tu.input).unwrap_or_default(),
@@ -399,7 +399,7 @@ fn build_from_raw(
                     }
                 } else {
                     out.push(OaiMessage {
-                        role: "assistant".to_string(),
+                        role: "assistant".to_owned(),
                         content: None,
                         tool_calls: Some(calls),
                         tool_call_id: None,
@@ -434,7 +434,7 @@ pub(crate) fn tools_to_oai(tools: &[ToolDefinition]) -> Vec<OaiTool> {
         .iter()
         .filter(|t| t.enabled)
         .map(|t| OaiTool {
-            tool_type: "function".to_string(),
+            tool_type: "function".to_owned(),
             function: OaiFunctionDef {
                 name: t.id.clone(),
                 description: t.description.clone(),

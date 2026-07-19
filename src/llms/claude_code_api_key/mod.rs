@@ -51,7 +51,7 @@ impl ClaudeCodeApiKeyClient {
                     auth_ok: false,
                     streaming_ok: false,
                     tools_ok: false,
-                    error: Some("ANTHROPIC_API_KEY not found in environment".to_string()),
+                    error: Some("ANTHROPIC_API_KEY not found in environment".to_owned()),
                 };
             }
         };
@@ -76,7 +76,7 @@ impl ClaudeCodeApiKeyClient {
         let auth_result = apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), api_key, "application/json")
             .json(&serde_json::json!({
                 "model": mapped_model,
-                "max_tokens": 10,
+                "max_tokens": 10i32,
                 "system": system,
                 "messages": [user_msg]
             }))
@@ -85,7 +85,7 @@ impl ClaudeCodeApiKeyClient {
         let auth_ok = auth_result.as_ref().is_ok_and(|resp| resp.status().is_success());
 
         if !auth_ok {
-            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
+            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_owned()));
             return ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
         }
 
@@ -100,7 +100,7 @@ impl ClaudeCodeApiKeyClient {
         let stream_result = apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), api_key, "text/event-stream")
             .json(&serde_json::json!({
                 "model": mapped_model,
-                "max_tokens": 10,
+                "max_tokens": 10i32,
                 "stream": true,
                 "system": system,
                 "messages": [stream_msg]
@@ -120,7 +120,7 @@ impl ClaudeCodeApiKeyClient {
         let tools_result = apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), api_key, "application/json")
             .json(&serde_json::json!({
                 "model": mapped_model,
-                "max_tokens": 50,
+                "max_tokens": 50i32,
                 "system": system,
                 "tools": [{
                     "name": "test_tool",
@@ -156,7 +156,7 @@ impl LlmClient for ClaudeCodeApiKeyClient {
 
         // Handle cleaner mode or custom system prompt
         let system_text =
-            request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_string(), Clone::clone);
+            request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_owned(), Clone::clone);
 
         // Build messages from pre-assembled API messages or raw data
         let super::CcJsonResult { mut json_messages, bp_hashes, bp_panel_ids, alive_count, alive_positions_permille } =
@@ -173,7 +173,7 @@ impl LlmClient for ClaudeCodeApiKeyClient {
             };
 
         // Handle cleaner mode extra context
-        if let Some(ref context) = request.extra_context {
+        if let Some(context) = &(request.extra_context) {
             let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
             json_messages.push(serde_json::json!({
                 "role": "user",

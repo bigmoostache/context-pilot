@@ -54,7 +54,7 @@ pub(crate) fn inject_system_reminder(messages: &mut Vec<Value>) {
         // Convert string content to array format and prepend reminder
         let content = msg.get("content").unwrap_or(&NULL);
         if content.is_string() {
-            let text = content.as_str().unwrap_or("").to_string();
+            let text = content.as_str().unwrap_or("").to_owned();
             msg["content"] = serde_json::json!([
                 reminder,
                 {"type": "text", "text": text}

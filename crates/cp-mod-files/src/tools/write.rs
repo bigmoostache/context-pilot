@@ -10,12 +10,12 @@ use std::fmt::Write as _;
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("file_write");
     let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_owned(), true);
     };
 
     let Some(contents) = tool.input.get("contents").or_else(|| tool.input.get("content")).and_then(|v| v.as_str())
     else {
-        return ToolResult::new(tool.id.clone(), "Missing required parameter: contents".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: contents".to_owned(), true);
     };
 
     let path = Path::new(path_str);
@@ -58,7 +58,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let uid = format!("UID_{}_P", state.global_next_uid);
         state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-        let file_name = path.file_name().map_or_else(|| path_str.to_string(), |n| n.to_string_lossy().to_string());
+        let file_name = path.file_name().map_or_else(|| path_str.to_owned(), |n| n.to_string_lossy().to_string());
 
         let mut elem = Entry {
             id: context_id,
@@ -67,7 +67,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             name: file_name,
             token_count,
             metadata: std::collections::HashMap::new(),
-            cached_content: Some(contents.to_string()),
+            cached_content: Some(contents.to_owned()),
             history_messages: None,
             cache_deprecated: true,
             cache_in_flight: false,
@@ -86,7 +86,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
             total_cache_misses: 0,
             emitted: cp_base::state::context::EmittedState::default(),
         };
-        elem.set_meta("file_path", &path_str.to_string());
+        elem.set_meta("file_path", &path_str.to_owned());
         state.context.push(elem);
 
         // Invalidate tree cache

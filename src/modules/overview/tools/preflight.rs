@@ -70,7 +70,7 @@ pub(crate) fn pre_flight(tool: &ToolUse, state: &State) -> Option<Verdict> {
                         if !state.tools.iter().any(|t| t.id == tool_id) {
                             pf.errors.push(format!("Tool '{tool_id}' not found"));
                         } else if tool_id == "tool_manage" {
-                            pf.errors.push("Cannot disable 'tool_manage' — it protects itself".to_string());
+                            pf.errors.push("Cannot disable 'tool_manage' — it protects itself".to_owned());
                         }
                     }
                 }
@@ -87,8 +87,7 @@ pub(crate) fn pre_flight(tool: &ToolUse, state: &State) -> Option<Verdict> {
             if !has_desc {
                 pf.errors.push(
                     "Missing 'current_page_description' — summarize what you see on the CURRENT page \
-before leaving it; its raw content will be discarded and this note is all you keep."
-                        .to_string(),
+before leaving it; its raw content will be discarded and this note is all you keep.".to_owned(),
                 );
             }
             if let Some(panel_id) = tool.input.get("panel_id").and_then(serde_json::Value::as_str) {

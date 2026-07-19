@@ -37,7 +37,7 @@ pub(crate) fn recompute_tree_folders(state: &mut State) {
 
     let mut folders: HashSet<String> = HashSet::new();
     // Root is always expanded.
-    let _new = folders.insert(".".to_string());
+    let _new = folders.insert(".".to_owned());
 
     // ── 1. Ancestor folders of every open file panel ────────────────────
     for ctx in &state.context {
@@ -57,7 +57,7 @@ pub(crate) fn recompute_tree_folders(state: &mut State) {
         if ctx.context_type.as_str() != Kind::CONVERSATION_HISTORY {
             continue;
         }
-        if let Some(ref msgs) = ctx.history_messages {
+        if let Some(msgs) = &(ctx.history_messages) {
             collect_opened_folders_from_messages(msgs, &mut folders);
         }
     }
@@ -108,7 +108,7 @@ fn collect_opened_folders_from_messages(messages: &[Message], folders: &mut Hash
             if let Some(paths) = tu.input.get("paths").and_then(serde_json::Value::as_array) {
                 for p in paths {
                     if let Some(s) = p.as_str() {
-                        let _new = folders.insert(s.to_string());
+                        let _new = folders.insert(s.to_owned());
                     }
                 }
             }
@@ -123,14 +123,14 @@ mod tests {
 
     fn make_tool_call(name: &str, input: serde_json::Value) -> Message {
         Message {
-            id: "T1".to_string(),
+            id: "T1".to_owned(),
             uid: None,
-            role: "assistant".to_string(),
+            role: "assistant".to_owned(),
             msg_type: MsgKind::ToolCall,
             content: String::new(),
             content_token_count: 0,
             status: MsgStatus::Full,
-            tool_uses: vec![ToolUseRecord { id: "tu1".to_string(), name: name.to_string(), input }],
+            tool_uses: vec![ToolUseRecord { id: "tu1".to_owned(), name: name.to_owned(), input }],
             tool_results: Vec::new(),
             input_tokens: 0,
             timestamp_ms: 0,

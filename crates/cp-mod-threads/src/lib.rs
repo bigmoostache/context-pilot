@@ -142,7 +142,7 @@ impl Module for ThreadsModule {
 
         // Only enforce when MY_TURN threads exist and AI is unfocused.
         if ts.has_my_turn_threads() && fs.focused_thread_id.is_none() {
-            if fs.dangling_remaining > 0 && !is_focus_exempt {
+            if fs.dangling_remaining > 0i32 && !is_focus_exempt {
                 // Dangling phase — warn but allow.
                 pf.warnings.push(format!(
                     "\u{26a0}\u{fe0f} Dangling phase: {} tool call(s) remaining \
@@ -171,7 +171,7 @@ impl Module for ThreadsModule {
                 let has_markdown = markdown.is_some_and(|s| !s.is_empty());
                 let has_file = tool.input.get("file_path").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
                 if !has_markdown && !has_file {
-                    pf.errors.push("Send requires at least one of: markdown, file_path".to_string());
+                    pf.errors.push("Send requires at least one of: markdown, file_path".to_owned());
                 }
                 // Guard: reject a malformed agent-authored ```form``` block before
                 // it lands in the thread (design doc §7 — the sole form-related
@@ -275,14 +275,14 @@ impl Module for ThreadsModule {
         let fs = FocusState::get_mut(state);
 
         // Dangling countdown: decrement on each non-exempt tool call.
-        if fs.dangling_remaining > 0 && !is_countdown_exempt {
+        if fs.dangling_remaining > 0i32 && !is_countdown_exempt {
             fs.dangling_remaining = fs.dangling_remaining.saturating_sub(1);
         }
 
         // Escalation: bump when dangling expired, unfocused, and MY_TURN exists.
         // This fires on exempt tools (Think) that complete while the AI
         // still hasn't focused — driving the escalation level up.
-        if fs.dangling_remaining <= 0 && fs.focused_thread_id.is_none() && has_my_turn {
+        if fs.dangling_remaining <= 0i32 && fs.focused_thread_id.is_none() && has_my_turn {
             fs.escalation_level = fs.escalation_level.saturating_add(1);
         }
     }
@@ -310,9 +310,9 @@ impl Module for ThreadsModule {
 /// - 30+: nuclear (with level number)
 fn escalation_message(level: u32) -> String {
     match level {
-        0..=5 => "🧵 Please focus on an available thread using Read.".to_string(),
-        6..=15 => "🧵 You MUST focus on a thread. Use Read(thread_id) now.".to_string(),
-        16..=29 => "🧵 STOP. Focus on a thread immediately. Use Read(thread_id).".to_string(),
+        0..=5 => "🧵 Please focus on an available thread using Read.".to_owned(),
+        6..=15 => "🧵 You MUST focus on a thread. Use Read(thread_id) now.".to_owned(),
+        16..=29 => "🧵 STOP. Focus on a thread immediately. Use Read(thread_id).".to_owned(),
         _ => format!(
             "🧵 FOCUS. ON. A. THREAD. NOW. Read(thread_id). \
              (escalation level {level})"

@@ -162,6 +162,7 @@ pub fn now_ms() -> u64 {
 /// `clippy::integer_division_remainder_used`.
 #[expect(
     clippy::integer_division_remainder_used,
+    clippy::integer_division,
     clippy::arithmetic_side_effects,
     reason = "sole choke-point for truncating time/division arithmetic"
 )]
@@ -261,7 +262,7 @@ pub fn paginate_content(
     use crate::config::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
 
     if total_pages <= 1 {
-        return full_content.to_string();
+        return full_content.to_owned();
     }
 
     let chars_per_page = PANEL_PAGE_TOKENS.to_f32() * CHARS_PER_TOKEN;
@@ -334,12 +335,12 @@ pub struct ContextItem {
 
 impl ContextItem {
     /// Create a context item from its components.
-    pub fn new<I: Into<String>, H: Into<String>, C: Into<String>>(
+    pub fn new<I, H, C>(
         id: I,
         header: H,
         content: C,
         last_refresh_ms: u64,
-    ) -> Self {
+    ) -> Self where I: Into<String>, H: Into<String>, C: Into<String> {
         Self { id: id.into(), header: header.into(), content: content.into(), last_refresh_ms }
     }
 }

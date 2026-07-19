@@ -73,11 +73,11 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
         // center horizontally: (width - box_width) / 2
         let x = {
             let diff = area.width.saturating_sub(box_width);
-            diff >> 1 // equivalent to / 2 without triggering the lint
+            diff >> 1i32 // equivalent to / 2 without triggering the lint
         };
         let y = {
             let diff = area.height.saturating_sub(box_height);
-            diff >> 1
+            diff >> 1i32
         };
         let boot_area = Rect::new(x, y, box_width, box_height);
 
@@ -325,11 +325,11 @@ fn main() -> ExitCode {
 
         // Phase 5: Initialize modules (with per-module progress)
         boot_init_modules(&mut assembled_state, &module_data, |module_name| {
-            set_step_detail(&mut steps, STEP_MODULES, module_name.to_string());
+            set_step_detail(&mut steps, STEP_MODULES, module_name.to_owned());
             render_boot_screen(&mut terminal, &steps);
         });
         mark_step_done(&mut steps, STEP_MODULES);
-        set_step_detail(&mut steps, STEP_WORKSPACE, "registering types".to_string());
+        set_step_detail(&mut steps, STEP_WORKSPACE, "registering types".to_owned());
         render_boot_screen(&mut terminal, &steps);
 
         assembled_state
@@ -356,9 +356,9 @@ fn main() -> ExitCode {
             .iter()
             .flat_map(|m| {
                 let mut types: Vec<String> =
-                    m.dynamic_panel_types().into_iter().map(|ct| ct.as_str().to_string()).collect();
-                types.extend(m.fixed_panel_types().into_iter().map(|ct| ct.as_str().to_string()));
-                types.extend(m.context_type_metadata().into_iter().map(|meta| meta.context_type.to_string()));
+                    m.dynamic_panel_types().into_iter().map(|ct| ct.as_str().to_owned()).collect();
+                types.extend(m.fixed_panel_types().into_iter().map(|ct| ct.as_str().to_owned()));
+                types.extend(m.context_type_metadata().into_iter().map(|meta| meta.context_type.to_owned()));
                 types
             })
             .collect();
@@ -398,7 +398,7 @@ fn main() -> ExitCode {
         use std::os::unix::process::CommandExt as _;
         let mut exec_args: Vec<String> = std::env::args().skip(1).collect();
         if !exec_args.iter().any(|a| a == "--resume-stream") {
-            exec_args.push("--resume-stream".to_string());
+            exec_args.push("--resume-stream".to_owned());
         }
         // Replaces the current process — never returns on success
         let _err = std::process::Command::new(exe_path).args(&exec_args).exec();

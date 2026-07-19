@@ -29,7 +29,7 @@ const INLINE_MAX_DURATION_MS: u128 = 10_000;
 pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("git_exec");
     let Some(command) = tool.input.get("command").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Error: 'command' parameter is required".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Error: 'command' parameter is required".to_owned(), true);
     };
 
     // Validate
@@ -61,14 +61,14 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
     }
 
     // All commands: run async, decide inline vs panel on completion.
-    let command_owned = command.to_string();
+    let command_owned = command.to_owned();
     let github_token = cp_vault::vault().get("github").map(|s| s.expose().to_owned());
 
     spawn_async_tool(state, tool, GIT_CMD_TIMEOUT_SECS.saturating_add(5), move || {
         let start = Instant::now();
 
         let mut cmd = Command::new("git");
-        let _ = cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
+        let _c = cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
 
         // HTTPS auth via GIT_ASKPASS when GITHUB_TOKEN is available.
         let askpass_tempfile = github_token.as_ref().and_then(|token| {
@@ -78,9 +78,9 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::PermissionsExt as _;
-                    let _ = std::fs::set_permissions(&askpass_path, std::fs::Permissions::from_mode(0o700)).ok();
+                    drop(std::fs::set_permissions(&askpass_path, std::fs::Permissions::from_mode(0o700)));
                 }
-                let _ = cmd.env("GIT_ASKPASS", &askpass_path);
+                let _ca = cmd.env("GIT_ASKPASS", &askpass_path);
                 askpass_path
             })
         });
@@ -89,7 +89,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
         let elapsed_ms = start.elapsed().as_millis();
 
         // Clean up temp askpass script
-        if let Some(ref path) = askpass_tempfile {
+        if let Some(path) = &(askpass_tempfile) {
             drop(std::fs::remove_file(path));
         }
 
@@ -97,7 +97,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
             Ok(output) => format_git_output(&output, &command_owned, elapsed_ms),
             Err(e) => {
                 let content = if e.kind() == std::io::ErrorKind::NotFound {
-                    "git not found. Ensure git is installed and on PATH.".to_string()
+                    "git not found. Ensure git is installed and on PATH.".to_owned()
                 } else {
                     format!("Error running git: {e}")
                 };
@@ -112,9 +112,9 @@ fn format_git_output(output: &std::process::Output, command: &str, elapsed_ms: u
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     let combined = if stderr.trim().is_empty() {
-        stdout.trim().to_string()
+        stdout.trim().to_owned()
     } else if stdout.trim().is_empty() {
-        stderr.trim().to_string()
+        stderr.trim().to_owned()
     } else {
         format!("{}\n{}", stdout.trim(), stderr.trim())
     };
@@ -123,9 +123,9 @@ fn format_git_output(output: &std::process::Output, command: &str, elapsed_ms: u
     // Empty output — always inline.
     if combined.is_empty() {
         let content = if is_error {
-            "Command failed with no output".to_string()
+            "Command failed with no output".to_owned()
         } else {
-            "Command completed successfully".to_string()
+            "Command completed successfully".to_owned()
         };
         return ToolOutput { content, is_error, create_panel: None, preserves_tempo: !is_error };
     }
@@ -141,15 +141,15 @@ fn format_git_output(output: &std::process::Output, command: &str, elapsed_ms: u
     let display_name = if command.len() > 40 {
         format!("{}...", command.get(..command.floor_char_boundary(37)).unwrap_or(""))
     } else {
-        command.to_string()
+        command.to_owned()
     };
     ToolOutput {
         content: format!("Panel created: {DYN_PANEL_ID_PLACEHOLDER}"),
         is_error,
         create_panel: Some(DynPanel {
-            context_type: Kind::GIT_RESULT.to_string(),
+            context_type: Kind::GIT_RESULT.to_owned(),
             display_name,
-            metadata: vec![("result_command".to_string(), command.to_string())],
+            metadata: vec![("result_command".to_owned(), command.to_owned())],
             content: Some(combined),
         }),
         preserves_tempo: false,

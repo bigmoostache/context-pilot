@@ -4,7 +4,7 @@ use unicode_width::UnicodeWidthStr as _;
 /// Truncate a string to fit within `max_width` display columns, appending '…' if truncated.
 pub(crate) fn truncate_string(s: &str, max_width: usize) -> String {
     if s.width() <= max_width {
-        s.to_string()
+        s.to_owned()
     } else {
         let mut result = String::new();
         let mut width = 0usize;
@@ -52,7 +52,7 @@ pub(crate) fn format_time_ago(delta_ms: u64) -> String {
 /// Word-wrap text to fit within a given width.
 pub(crate) fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     if max_width == 0 {
-        return vec![text.to_string()];
+        return vec![text.to_owned()];
     }
 
     let mut lines = Vec::new();
@@ -64,7 +64,7 @@ pub(crate) fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
 
         if current_width == 0 {
             // First word on line
-            current_line = word.to_string();
+            word.clone_into(&mut current_line);
             current_width = word_width;
         } else if current_width.saturating_add(1).saturating_add(word_width) <= max_width {
             // Word fits on current line
@@ -73,8 +73,8 @@ pub(crate) fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
             current_width = current_width.saturating_add(1).saturating_add(word_width);
         } else {
             // Word doesn't fit, start new line
-            lines.push(current_line);
-            current_line = word.to_string();
+            lines.push(std::mem::take(&mut current_line));
+            word.clone_into(&mut current_line);
             current_width = word_width;
         }
     }
@@ -223,7 +223,7 @@ fn do_highlight_ir(path: &str, content: &str) -> IrHighlightResult {
         let spans: Vec<cp_render::Span> = ranges
             .into_iter()
             .map(|(style, text)| {
-                let text = text.trim_end_matches('\n').to_string();
+                let text = text.trim_end_matches('\n').to_owned();
                 cp_render::Span::rgb(text, style.foreground.r, style.foreground.g, style.foreground.b)
             })
             .collect();
@@ -283,7 +283,7 @@ impl TypewriterBuffer {
         self.chunk_sizes.clear();
         self.last_chunk_time = None;
         self.last_char_time = Instant::now();
-        self.chars_per_ms = 1.0 / TYPEWRITER_DEFAULT_DELAY_MS;
+        self.chars_per_ms = 1.0f64 / TYPEWRITER_DEFAULT_DELAY_MS;
         self.stream_done = false;
     }
 
@@ -319,16 +319,16 @@ impl TypewriterBuffer {
             return;
         }
 
-        let total_interval_ms: f64 = self.chunk_intervals.iter().map(|d| d.as_secs_f64() * 1000.0).sum();
+        let total_interval_ms: f64 = self.chunk_intervals.iter().map(|d| d.as_secs_f64() * 1_000.0f64).sum();
         let avg_interval_ms = total_interval_ms / self.chunk_intervals.len().to_f64();
 
         let total_chars: usize = self.chunk_sizes.iter().sum();
         let avg_chunk_size = total_chars.to_f64() / self.chunk_sizes.len().to_f64();
 
-        if avg_interval_ms > 0.0 && avg_chunk_size > 0.0 {
+        if avg_interval_ms > 0.0f64 && avg_chunk_size > 0.0f64 {
             let calculated_delay = avg_interval_ms / avg_chunk_size;
             let clamped_delay = calculated_delay.clamp(TYPEWRITER_MIN_DELAY_MS, TYPEWRITER_MAX_DELAY_MS);
-            self.chars_per_ms = 1.0 / clamped_delay;
+            self.chars_per_ms = 1.0f64 / clamped_delay;
         }
     }
 
@@ -345,7 +345,7 @@ impl TypewriterBuffer {
         }
 
         let now = Instant::now();
-        let elapsed_ms = now.duration_since(self.last_char_time).as_secs_f64() * 1000.0;
+        let elapsed_ms = now.duration_since(self.last_char_time).as_secs_f64() * 1_000.0f64;
         let chars_to_release = (elapsed_ms * self.chars_per_ms).floor().to_usize();
 
         if chars_to_release == 0 {

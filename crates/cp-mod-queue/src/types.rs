@@ -77,10 +77,9 @@ impl QueueState {
     }
 
     /// Queue a tool call. Returns the assigned index.
-    pub fn enqueue(&mut self, call: QueuedToolCall) -> usize {
+    pub fn enqueue(&mut self, mut call: QueuedToolCall) -> usize {
         let index = self.next_index;
         self.next_index = self.next_index.saturating_add(1);
-        let mut call = call;
         call.index = index;
         self.queued_calls.push(call);
         index

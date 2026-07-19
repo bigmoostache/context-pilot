@@ -22,9 +22,9 @@ pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> 
 
 /// Get a `MeiliClient` from the persisted state.
 fn get_client(state: &State) -> Result<MeiliClient, String> {
-    let ss = state.get_ext::<SearchState>().ok_or_else(|| "Search module not initialized".to_string())?;
+    let ss = state.get_ext::<SearchState>().ok_or_else(|| "Search module not initialized".to_owned())?;
     if ss.persist.port == 0 {
-        return Err("Meilisearch server not running".to_string());
+        return Err("Meilisearch server not running".to_owned());
     }
     MeiliClient::new(ss.persist.port, &ss.persist.master_key)
 }
@@ -91,7 +91,7 @@ fn build_log_filter(from_date: Option<&str>, to_date: Option<&str>) -> Option<St
 /// Accepts date-only (`YYYY-MM-DD`) or full RFC 3339 datetime.
 /// Returns `None` if parsing fails.
 fn iso_to_ms(s: &str) -> Option<u64> {
-    let s_full = if s.len() == 10 { format!("{s}T00:00:00Z") } else { s.to_string() };
+    let s_full = if s.len() == 10 { format!("{s}T00:00:00Z") } else { s.to_owned() };
     let ms = cp_mod_utilities::time::parse_rfc3339_to_epoch_ms(&s_full)?;
     u64::try_from(ms).ok()
 }
@@ -144,7 +144,7 @@ fn dedup_by_score(results: &mut Vec<SearchResult>, limit: u32) {
 
         match best.entry(key) {
             std::collections::hash_map::Entry::Occupied(mut e) => {
-                if r.ranking_score.unwrap_or(0.0) > e.get().ranking_score.unwrap_or(0.0) {
+                if r.ranking_score.unwrap_or(0.0f64) > e.get().ranking_score.unwrap_or(0.0f64) {
                     let _prev = e.insert(r);
                 }
             }
@@ -157,14 +157,14 @@ fn dedup_by_score(results: &mut Vec<SearchResult>, limit: u32) {
     // Collect, sort by score descending, truncate
     *results = best.into_values().collect();
     results.sort_by(|a, b| {
-        b.ranking_score.unwrap_or(0.0).partial_cmp(&a.ranking_score.unwrap_or(0.0)).unwrap_or(std::cmp::Ordering::Equal)
+        b.ranking_score.unwrap_or(0.0f64).partial_cmp(&a.ranking_score.unwrap_or(0.0f64)).unwrap_or(std::cmp::Ordering::Equal)
     });
     results.truncate(limit as usize);
 }
 
 /// Parse a single Meilisearch hit from the files index.
 fn parse_file_hit(hit: &serde_json::Value) -> SearchResult {
-    let content = hit.get("content").and_then(serde_json::Value::as_str).unwrap_or("").to_string();
+    let content = hit.get("content").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
 
     SearchResult {
         content,
@@ -183,7 +183,7 @@ fn parse_file_hit(hit: &serde_json::Value) -> SearchResult {
 
 /// Parse a single Meilisearch hit from the logs index.
 fn parse_log_hit(hit: &serde_json::Value) -> SearchResult {
-    let content = hit.get("content").and_then(serde_json::Value::as_str).unwrap_or("").to_string();
+    let content = hit.get("content").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
 
     SearchResult {
         content,
@@ -217,7 +217,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     // --- Extract parameters (sync, needs State) ------------------------------
 
     let Some(query) = tool.input.get("query").and_then(serde_json::Value::as_str) else {
-        return err_result(tool, "Missing required parameter 'query'".to_string());
+        return err_result(tool, "Missing required parameter 'query'".to_owned());
     };
 
     let Some(semantic_query) =
@@ -228,8 +228,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
             "Missing or empty 'semantic_query' parameter. You MUST provide a fabricated example of what the \
              target content looks like — NOT a description of what you're looking for, but an uneducated guess \
              at the actual text/code. Semantic embeddings find near-neighbors, so a fake snippet that resembles \
-             the real content yields dramatically better results than a high-level description."
-                .to_string(),
+             the real content yields dramatically better results than a high-level description.".to_owned(),
         );
     };
 
@@ -243,7 +242,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         .input
         .get("limit")
         .and_then(serde_json::Value::as_u64)
-        .map_or(20_u32, |n| u32::try_from(n.min(50)).unwrap_or(50));
+        .map_or(20u32, |n| u32::try_from(n.min(50)).unwrap_or(50));
     let hide_contents = tool.input.get("hide_contents").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
     // --- Resolve index UIDs (needs State) ------------------------------------
@@ -254,8 +253,8 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // --- Extract owned values for the closure --------------------------------
 
-    let query = query.to_string();
-    let semantic_query = semantic_query.to_string();
+    let query = query.to_owned();
+    let semantic_query = semantic_query.to_owned();
     let effective_query = path_prefix.map_or_else(|| query.clone(), |prefix| format!("{prefix} {query}"));
     let search_files = scope == "all" || scope == "project";
     let search_logs = scope == "all" || scope == "logs";
@@ -279,7 +278,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 filter: file_filter.as_deref(),
                 sort: file_sort,
                 limit,
-                semantic_ratio: Some(0.0),
+                semantic_ratio: Some(0.0f64),
             };
             let semantic_params = crate::meili::api::SearchParams {
                 uid: &files_uid,
@@ -287,7 +286,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 filter: file_filter.as_deref(),
                 sort: file_sort,
                 limit,
-                semantic_ratio: Some(1.0),
+                semantic_ratio: Some(1.0f64),
             };
             match client.multi_search(&[keyword_params, semantic_params]) {
                 Ok(results) => {
@@ -313,7 +312,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 filter: log_filter.as_deref(),
                 sort: log_sort,
                 limit,
-                semantic_ratio: Some(0.0),
+                semantic_ratio: Some(0.0f64),
             };
             let semantic_params = crate::meili::api::SearchParams {
                 uid: &logs_uid,
@@ -321,7 +320,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 filter: log_filter.as_deref(),
                 sort: log_sort,
                 limit,
-                semantic_ratio: Some(1.0),
+                semantic_ratio: Some(1.0f64),
             };
             match client.multi_search(&[keyword_params, semantic_params]) {
                 Ok(results) => {
@@ -357,10 +356,9 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                             let table = hit
                                 .get("entity_table")
                                 .and_then(serde_json::Value::as_str)
-                                .unwrap_or("unknown")
-                                .to_string();
+                                .unwrap_or("unknown").to_owned();
                             let all_text =
-                                hit.get("_all_text").and_then(serde_json::Value::as_str).unwrap_or("").to_string();
+                                hit.get("_all_text").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
                             let rank_score = hit.get("_rankingScore").and_then(serde_json::Value::as_f64);
                             entity_results.push(crate::panel::EntityHit { table, all_text, score: rank_score });
                         }
@@ -387,9 +385,9 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
 
         let dyn_panel = DynPanel {
-            context_type: crate::panel::SEARCH_PANEL_TYPE.to_string(),
+            context_type: crate::panel::SEARCH_PANEL_TYPE.to_owned(),
             display_name: format!("search: {query}"),
-            metadata: vec![("result_content".to_string(), panel_content.clone())],
+            metadata: vec![("result_content".to_owned(), panel_content.clone())],
             content: Some(panel_content),
         };
 

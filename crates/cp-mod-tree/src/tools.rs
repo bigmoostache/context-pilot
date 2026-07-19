@@ -67,7 +67,7 @@ pub(crate) fn generate_tree_string(
 pub fn compute_file_hash(path: &Path) -> Option<String> {
     let content = fs::read(path).ok()?;
     let hex = cp_mod_utilities::hash::compute(&content);
-    Some(hex.get(..8).unwrap_or(&hex).to_string())
+    Some(hex.get(..8).unwrap_or(&hex).to_owned())
 }
 
 /// Execute `tree_toggle_folders` tool - open or close folders
@@ -83,7 +83,7 @@ pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolR
     let action = tool.input.get("action").and_then(|v| v.as_str()).unwrap_or("toggle");
 
     if paths.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Missing 'paths' parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing 'paths' parameter".to_owned(), true);
     }
 
     let mut opened = Vec::new();
@@ -114,7 +114,7 @@ pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolR
             "close" => {
                 // Don't allow closing root
                 if normalized == "." {
-                    errors.push("Cannot close root folder".to_string());
+                    errors.push("Cannot close root folder".to_owned());
                     continue;
                 }
                 if is_open {
@@ -160,7 +160,7 @@ pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolR
 
     let mut tool_result = ToolResult::new(
         tool.id.clone(),
-        if result.is_empty() { "No changes".to_string() } else { result.join("\n") },
+        if result.is_empty() { "No changes".to_owned() } else { result.join("\n") },
         false,
     );
     // Closing folders reduces context content — safe to preserve tempo.
@@ -177,7 +177,7 @@ pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolR
     let descriptions = tool.input.get("descriptions").and_then(|v| v.as_array());
 
     let Some(descriptions) = descriptions else {
-        return ToolResult::new(tool.id.clone(), "Missing 'descriptions' parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing 'descriptions' parameter".to_owned(), true);
     };
 
     let mut added = Vec::new();
@@ -191,7 +191,7 @@ pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolR
 
     for desc_obj in descriptions {
         let Some(path_str) = desc_obj.get("path").and_then(|v| v.as_str()) else {
-            errors.push("Missing 'path' in description".to_string());
+            errors.push("Missing 'path' in description".to_owned());
             continue;
         };
 
@@ -208,7 +208,7 @@ pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolR
         }
 
         let description = if let Some(d) = desc_obj.get("description").and_then(|v| v.as_str()) {
-            d.to_string()
+            d.to_owned()
         } else {
             errors.push(format!("{path_str}: missing 'description'"));
             continue;
@@ -236,7 +236,7 @@ pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolR
 
         // Auto-close the file's open panel unless close_panel=false
         let should_close = desc_obj.get("close_panel").and_then(serde_json::Value::as_bool).unwrap_or(true);
-        if should_close && let Some(ref cwd) = cwd {
+        if should_close && let Some(cwd) = &cwd {
             let abs_path = cwd.join(&normalized).to_string_lossy().to_string();
             if let Some(pos) = state
                 .context
@@ -284,7 +284,7 @@ pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolR
 
     ToolResult::new(
         tool.id.clone(),
-        if result.is_empty() { "No changes".to_string() } else { result.join("\n") },
+        if result.is_empty() { "No changes".to_owned() } else { result.join("\n") },
         !errors.is_empty() && added.is_empty() && updated.is_empty() && removed.is_empty(),
     )
 }
@@ -293,10 +293,10 @@ pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolR
 pub(crate) fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("tree_filter");
     let Some(filter) = tool.input.get("filter").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'filter' parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing 'filter' parameter".to_owned(), true);
     };
 
-    TreeState::get_mut(state).filter = filter.to_string();
+    filter.clone_into(&mut TreeState::get_mut(state).filter);
 
     // Invalidate tree cache to trigger refresh
     invalidate_tree_cache(state);
@@ -309,7 +309,7 @@ fn normalize_path(path: &Path) -> String {
     let path_str = path.to_string_lossy();
     let normalized = path_str.trim_start_matches("./").trim_end_matches('/');
 
-    if normalized.is_empty() || normalized == "." { ".".to_string() } else { normalized.to_string() }
+    if normalized.is_empty() || normalized == "." { ".".to_owned() } else { normalized.to_owned() }
 }
 
 /// List directory entries (files + folders) matching a prefix, respecting the gitignore filter.
@@ -356,7 +356,7 @@ pub fn list_dir_entries(
             }
 
             // Apply gitignore filter
-            if let Some(ref gi) = gitignore
+            if let Some(gi) = &gitignore
                 && gi.matched(&path, is_dir).is_ignore()
             {
                 return None;

@@ -275,12 +275,12 @@ fn make_if_not_exists(sql: &str) -> String {
     // Only if "IF NOT EXISTS" isn't already present.
     let upper = sql.to_uppercase();
     if upper.contains("IF NOT EXISTS") {
-        return sql.to_string();
+        return sql.to_owned();
     }
 
     // Find "CREATE TABLE" prefix and insert "IF NOT EXISTS" after it
     upper.find("CREATE TABLE").map_or_else(
-        || sql.to_string(),
+        || sql.to_owned(),
         |pos| {
             let insert_at = pos.saturating_add("CREATE TABLE".len());
             let mut result = String::with_capacity(sql.len().saturating_add(20));
@@ -322,11 +322,11 @@ fn format_sql_value(row: &rusqlite::Row<'_>, idx: usize) -> String {
     use rusqlite::types::ValueRef;
 
     let Ok(val) = row.get_ref(idx) else {
-        return "NULL".to_string();
+        return "NULL".to_owned();
     };
 
     match val {
-        ValueRef::Null => "NULL".to_string(),
+        ValueRef::Null => "NULL".to_owned(),
         ValueRef::Integer(n) => n.to_string(),
         ValueRef::Real(f) => f.to_string(),
         ValueRef::Text(bytes) => {
@@ -410,11 +410,11 @@ fn format_display_value(row: &rusqlite::Row<'_>, idx: usize, max_len: usize) -> 
     use rusqlite::types::ValueRef;
 
     let Ok(val) = row.get_ref(idx) else {
-        return "NULL".to_string();
+        return "NULL".to_owned();
     };
 
     let raw = match val {
-        ValueRef::Null => return "NULL".to_string(),
+        ValueRef::Null => return "NULL".to_owned(),
         ValueRef::Integer(n) => n.to_string(),
         ValueRef::Real(f) => f.to_string(),
         ValueRef::Text(bytes) => String::from_utf8_lossy(bytes).into_owned(),

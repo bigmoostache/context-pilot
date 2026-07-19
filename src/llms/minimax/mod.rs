@@ -82,19 +82,19 @@ impl LlmClient for MiniMaxClient {
                     content: r.content.clone(),
                 })
                 .collect();
-            api_messages.push(ApiMessage { role: "user".to_string(), content: tool_result_blocks });
+            api_messages.push(ApiMessage { role: "user".to_owned(), content: tool_result_blocks });
         }
 
         // Handle system prompt
-        let system_prompt = if let Some(ref prompt) = request.system_prompt {
-            if let Some(ref context) = request.extra_context {
+        let system_prompt = if let Some(prompt) = &(request.system_prompt) {
+            if let Some(context) = &(request.extra_context) {
                 let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
                 api_messages
-                    .push(ApiMessage { role: "user".to_string(), content: vec![ContentBlock::Text { text: msg }] });
+                    .push(ApiMessage { role: "user".to_owned(), content: vec![ContentBlock::Text { text: msg }] });
             }
             prompt.clone()
         } else {
-            library::default_agent_content().to_string()
+            library::default_agent_content().to_owned()
         };
 
         let api_request = MiniMaxRequest {
@@ -148,13 +148,13 @@ impl LlmClient for MiniMaxClient {
                 }
                 Err(e) => {
                     let tool_ctx = current_tool.as_ref().map_or_else(
-                        || "No tool in progress".to_string(),
+                        || "No tool in progress".to_owned(),
                         |(id, name, partial)| {
                             format!("In-flight tool: {} (id={}), partial: {} bytes", name, id, partial.len())
                         },
                     );
                     let recent =
-                        if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
+                        if last_lines.is_empty() { "(no lines read)".to_owned() } else { last_lines.join("\n") };
                     return Err(LlmError::StreamRead(format!(
                         "{e}\nStream position: {total_bytes} bytes, {line_count} lines read\n{tool_ctx}\nLast SSE lines:\n{recent}"
                     )));
@@ -169,7 +169,7 @@ impl LlmClient for MiniMaxClient {
             if last_lines.len() >= 5 {
                 let _r = last_lines.remove(0);
             }
-            last_lines.push(line.to_string());
+            last_lines.push(line.to_owned());
 
             let json_str = line.get(6..).unwrap_or("");
             if json_str == "[DONE]" {
@@ -198,7 +198,7 @@ impl LlmClient for MiniMaxClient {
                                 }
                                 Some("input_json_delta") => {
                                     if let Some(json) = delta.partial_json
-                                        && let Some((_, ref name, ref mut input)) = current_tool
+                                        && let Some((_, name, input)) = current_tool.as_mut()
                                     {
                                         input.push_str(&json);
                                         let _r = tx.send(StreamEvent::ToolProgress {
@@ -219,8 +219,8 @@ impl LlmClient for MiniMaxClient {
                         }
                     }
                     "message_delta" => {
-                        if let Some(ref delta) = event.delta
-                            && let Some(ref reason) = delta.stop_reason
+                        if let Some(delta) = &event.delta
+                            && let Some(reason) = &delta.stop_reason
                         {
                             stop_reason = Some(reason.clone());
                         }
@@ -263,7 +263,7 @@ impl LlmClient for MiniMaxClient {
                 auth_ok: false,
                 streaming_ok: false,
                 tools_ok: false,
-                error: Some("MINIMAX_API_KEY not set".to_string()),
+                error: Some("MINIMAX_API_KEY not set".to_owned()),
             };
         };
 
@@ -279,7 +279,7 @@ impl LlmClient for MiniMaxClient {
         // Test 1: Basic auth
         let auth_ok = base()
             .json(&serde_json::json!({
-                "model": model, "max_tokens": 10,
+                "model": model, "max_tokens": 10i32,
                 "messages": [{"role": "user", "content": "Hi"}]
             }))
             .send()
@@ -290,14 +290,14 @@ impl LlmClient for MiniMaxClient {
                 auth_ok: false,
                 streaming_ok: false,
                 tools_ok: false,
-                error: Some("Auth failed — check MINIMAX_API_KEY".to_string()),
+                error: Some("Auth failed — check MINIMAX_API_KEY".to_owned()),
             };
         }
 
         // Test 2: Streaming
         let streaming_ok = base()
             .json(&serde_json::json!({
-                "model": model, "max_tokens": 10, "stream": true,
+                "model": model, "max_tokens": 10i32, "stream": true,
                 "messages": [{"role": "user", "content": "Say ok"}]
             }))
             .send()
@@ -306,7 +306,7 @@ impl LlmClient for MiniMaxClient {
         // Test 3: Tools
         let tools_ok = base()
             .json(&serde_json::json!({
-                "model": model, "max_tokens": 50,
+                "model": model, "max_tokens": 50i32,
                 "tools": [{"name": "test_tool", "description": "A test tool",
                     "input_schema": {"type": "object", "properties": {}, "required": []}}],
                 "messages": [{"role": "user", "content": "Hi"}]

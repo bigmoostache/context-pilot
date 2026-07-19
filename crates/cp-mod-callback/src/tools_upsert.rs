@@ -15,23 +15,23 @@ use std::fmt::Write as _;
 pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Extract required params
     let vessel_name = match tool.input.get("name").and_then(|v| v.as_str()) {
-        Some(n) => n.to_string(),
+        Some(n) => n.to_owned(),
         None => {
-            return ToolResult::new(tool.id.clone(), "Missing required parameter 'name'".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing required parameter 'name'".to_owned(), true);
         }
     };
 
     let chart_pattern = match tool.input.get("pattern").and_then(|v| v.as_str()) {
-        Some(p) => p.to_string(),
+        Some(p) => p.to_owned(),
         None => {
-            return ToolResult::new(tool.id.clone(), "Missing required parameter 'pattern'".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing required parameter 'pattern'".to_owned(), true);
         }
     };
 
     let cargo_script = match tool.input.get("script_content").and_then(|v| v.as_str()) {
-        Some(s) => s.to_string(),
+        Some(s) => s.to_owned(),
         None => {
-            return ToolResult::new(tool.id.clone(), "Missing required parameter 'script_content'".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing required parameter 'script_content'".to_owned(), true);
         }
     };
 
@@ -41,11 +41,11 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Extract optional params
-    let description = tool.input.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let description = tool.input.get("description").and_then(|v| v.as_str()).unwrap_or("").to_owned();
     let blocking = tool.input.get("blocking").and_then(serde_json::Value::as_bool).unwrap_or(false);
     let timeout_secs = tool.input.get("timeout").and_then(serde_json::Value::as_u64);
-    let success_message = tool.input.get("success_message").and_then(|v| v.as_str()).map(ToString::to_string);
-    let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(ToString::to_string);
+    let success_message = tool.input.get("success_message").and_then(|v| v.as_str()).map(str::to_owned);
+    let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(str::to_owned);
     let is_global = tool.input.get("is_global").and_then(serde_json::Value::as_bool).unwrap_or(true);
 
     // Non-blocking callbacks must always be global (dedup requires one-session-per-def).
@@ -55,7 +55,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     if blocking && timeout_secs.is_none() {
         return ToolResult::new(
             tool.id.clone(),
-            "Blocking callbacks require a 'timeout' parameter (max execution time in seconds).".to_string(),
+            "Blocking callbacks require a 'timeout' parameter (max execution time in seconds).".to_owned(),
             true,
         );
     }
@@ -147,7 +147,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut msg = format!(
         "Created callback {final_id} [{vessel_name}]:\n  Pattern: {chart_pattern}\n  Blocking: {blocking}\n  Script: .context-pilot/scripts/{vessel_name}.sh",
     );
-    if let Some(ref sm) = success_message {
+    if let Some(sm) = &(success_message) {
         let _r = write!(msg, "\n  Success message: {sm}");
     }
     if let Some(t) = timeout_secs {
@@ -163,11 +163,11 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// Update an existing callback (full replace or diff-based script edit).
 pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let key = match tool.input.get("id").and_then(|v| v.as_str()) {
-        Some(id) => id.to_string(),
+        Some(id) => id.to_owned(),
         None => {
             return ToolResult::new(
                 tool.id.clone(),
-                "Missing required parameter 'id' for update action".to_string(),
+                "Missing required parameter 'id' for update action".to_owned(),
                 true,
             );
         }
@@ -190,8 +190,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     if has_diff && has_full_script {
         return ToolResult::new(
             tool.id.clone(),
-            "Cannot use both 'script_content' and 'old_string'/'new_string' in the same update. Use one or the other."
-                .to_string(),
+            "Cannot use both 'script_content' and 'old_string'/'new_string' in the same update. Use one or the other.".to_owned(),
             true,
         );
     }
@@ -219,18 +218,18 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Update metadata fields if provided
     if let Some(name) = tool.input.get("name").and_then(|v| v.as_str()) {
-        def.name = name.to_string();
+        name.clone_into(&mut def.name);
         changes.push(format!("name → {name}"));
     }
     if let Some(desc) = tool.input.get("description").and_then(|v| v.as_str()) {
-        def.description = desc.to_string();
-        changes.push("description updated".to_string());
+        desc.clone_into(&mut def.description);
+        changes.push("description updated".to_owned());
     }
     if let Some(pattern) = tool.input.get("pattern").and_then(|v| v.as_str()) {
         if let Err(e) = Glob::new(pattern) {
             return ToolResult::new(tool.id.clone(), format!("Invalid glob pattern '{pattern}': {e}"), true);
         }
-        def.pattern = pattern.to_string();
+        pattern.clone_into(&mut def.pattern);
         changes.push(format!("pattern → {pattern}"));
     }
     if let Some(blocking) = tool.input.get("blocking").and_then(serde_json::Value::as_bool) {
@@ -242,11 +241,11 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         changes.push(format!("timeout → {timeout}s"));
     }
     if let Some(msg) = tool.input.get("success_message").and_then(|v| v.as_str()) {
-        def.success_message = Some(msg.to_string());
-        changes.push("success_message updated".to_string());
+        def.success_message = Some(msg.to_owned());
+        changes.push("success_message updated".to_owned());
     }
     if let Some(cwd) = tool.input.get("cwd").and_then(|v| v.as_str()) {
-        def.cwd = Some(cwd.to_string());
+        def.cwd = Some(cwd.to_owned());
         changes.push(format!("cwd → {cwd}"));
     }
     if let Some(is_global) = tool.input.get("is_global").and_then(serde_json::Value::as_bool) {
@@ -258,7 +257,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Non-blocking callbacks must always be global (dedup requires one-session-per-def).
     if !def.blocking && !def.is_global {
         def.is_global = true;
-        changes.push("scope → global (forced: non-blocking callbacks must be global)".to_string());
+        changes.push("scope → global (forced: non-blocking callbacks must be global)".to_owned());
     }
 
     // Handle script updates
@@ -268,7 +267,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     if has_full_script {
         // Full script replacement
         let Some(cargo_script) = tool.input.get("script_content").and_then(|v| v.as_str()) else {
-            return ToolResult::new(tool.id.clone(), "Missing 'script_content' parameter".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing 'script_content' parameter".to_owned(), true);
         };
         let full_script = format!(
             "#!/usr/bin/env bash\nset -euo pipefail\n\n# Callback: {name}\n# Pattern: {pattern}\n\n{script}",
@@ -279,11 +278,11 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         if let Err(e) = fs::write(&script_path, &full_script) {
             return ToolResult::new(tool.id.clone(), format!("Failed to write script: {e}"), true);
         }
-        changes.push("script replaced".to_string());
+        changes.push("script replaced".to_owned());
     } else if has_diff {
         // Diff-based script edit
         let Some(old_str) = tool.input.get("old_string").and_then(|v| v.as_str()) else {
-            return ToolResult::new(tool.id.clone(), "Missing 'old_string' parameter".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing 'old_string' parameter".to_owned(), true);
         };
         let new_str = tool.input.get("new_string").and_then(|v| v.as_str()).unwrap_or("");
 
@@ -297,7 +296,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         if !current_script.contains(old_str) {
             return ToolResult::new(
                 tool.id.clone(),
-                "old_string not found in script file. Use Callback_open_editor to view current content.".to_string(),
+                "old_string not found in script file. Use Callback_open_editor to view current content.".to_owned(),
                 true,
             );
         }
@@ -306,7 +305,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         if let Err(e) = fs::write(&script_path, &updated_script) {
             return ToolResult::new(tool.id.clone(), format!("Failed to write script: {e}"), true);
         }
-        changes.push("script edited (diff)".to_string());
+        changes.push("script edited (diff)".to_owned());
     }
 
     // Handle name rename (move script file)
@@ -316,7 +315,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         let old_path = scripts_dir.join(format!("{vessel_name}.sh"));
         let new_path = scripts_dir.join(format!("{new_name}.sh"));
         if old_path.exists() {
-            let _ = fs::rename(&old_path, &new_path).ok();
+            let _renamed = fs::rename(&old_path, &new_path);
         }
     }
 
@@ -335,11 +334,11 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// Delete a callback and its script file.
 pub(crate) fn execute_delete(tool: &ToolUse, state: &mut State) -> ToolResult {
     let key = match tool.input.get("id").and_then(|v| v.as_str()) {
-        Some(id) => id.to_string(),
+        Some(id) => id.to_owned(),
         None => {
             return ToolResult::new(
                 tool.id.clone(),
-                "Missing required parameter 'id' for delete action".to_string(),
+                "Missing required parameter 'id' for delete action".to_owned(),
                 true,
             );
         }
@@ -403,15 +402,13 @@ fn validate_script_env_vars(script: &str, is_global: bool) -> Result<(), String>
         // Match: $CP_CHANGED_FILE followed by non-S char, or ${CP_CHANGED_FILE}
         if script.contains("${CP_CHANGED_FILE}") || has_singular_env_var(script) {
             return Err("Global callbacks should use $CP_CHANGED_FILES (plural), not $CP_CHANGED_FILE (singular). \
-                 Global callbacks receive all changed files at once."
-                .to_string());
+                 Global callbacks receive all changed files at once.".to_owned());
         }
     } else {
         // Check for plural ($CP_CHANGED_FILES or ${CP_CHANGED_FILES})
         if script.contains("CP_CHANGED_FILES") {
             return Err("Local callbacks should use $CP_CHANGED_FILE (singular), not $CP_CHANGED_FILES (plural). \
-                 Local callbacks fire once per file and receive one file path."
-                .to_string());
+                 Local callbacks fire once per file and receive one file path.".to_owned());
         }
     }
     Ok(())

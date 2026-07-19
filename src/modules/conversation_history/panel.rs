@@ -30,19 +30,19 @@ fn render_message_blocks(msg: &cp_base::state::data::message::Message) -> Vec<cp
             // Content lines
             if !msg.content.is_empty() {
                 for line in msg.content.lines() {
-                    blocks.push(cp_render::Block::Line(vec![cp_render::Span::new(line.to_string())]));
+                    blocks.push(cp_render::Block::Line(vec![cp_render::Span::new(line.to_owned())]));
                 }
             }
             blocks.push(cp_render::Block::Empty);
         }
         MsgKind::ToolCall => {
             blocks.push(cp_render::Block::Line(vec![
-                cp_render::Span::styled("🔧 ".to_string(), cp_render::Semantic::Info),
+                cp_render::Span::styled("🔧 ".to_owned(), cp_render::Semantic::Info),
                 cp_render::Span::styled(format!("[{}] tool_call", msg.id), cp_render::Semantic::Info).bold(),
             ]));
             for tu in &msg.tool_uses {
                 blocks.push(cp_render::Block::Line(vec![
-                    cp_render::Span::muted("  → ".to_string()),
+                    cp_render::Span::muted("  → ".to_owned()),
                     cp_render::Span::styled(tu.name.clone(), cp_render::Semantic::Accent),
                 ]));
             }
@@ -50,7 +50,7 @@ fn render_message_blocks(msg: &cp_base::state::data::message::Message) -> Vec<cp
         }
         MsgKind::ToolResult => {
             blocks.push(cp_render::Block::Line(vec![
-                cp_render::Span::styled("📋 ".to_string(), cp_render::Semantic::Muted),
+                cp_render::Span::styled("📋 ".to_owned(), cp_render::Semantic::Muted),
                 cp_render::Span::styled(format!("[{}] tool_result", msg.id), cp_render::Semantic::Muted),
             ]));
             for tr in &msg.tool_results {
@@ -59,10 +59,10 @@ fn render_message_blocks(msg: &cp_base::state::data::message::Message) -> Vec<cp
                 let truncated = if preview.len() > 80 {
                     format!("{}…", preview.get(..80).unwrap_or(preview))
                 } else {
-                    preview.to_string()
+                    preview.to_owned()
                 };
                 blocks.push(cp_render::Block::Line(vec![
-                    cp_render::Span::muted("  ".to_string()),
+                    cp_render::Span::muted("  ".to_owned()),
                     cp_render::Span::muted(truncated),
                 ]));
             }
@@ -83,20 +83,20 @@ impl Panel for ConversationHistoryPanel {
             Some(c) if c.context_type.as_str() == Kind::CONVERSATION_HISTORY => c,
             _ => {
                 return vec![cp_render::Block::Line(vec![
-                    cp_render::Span::muted("No conversation history.".to_string()).italic(),
+                    cp_render::Span::muted("No conversation history.".to_owned()).italic(),
                 ])];
             }
         };
 
         // Prefer rendering from history_messages (structured message data)
-        if let Some(ref msgs) = ctx.history_messages {
+        if let Some(msgs) = &(ctx.history_messages) {
             let mut blocks = Vec::new();
             for msg in msgs {
                 blocks.extend(render_message_blocks(msg));
             }
             if blocks.is_empty() {
                 blocks.push(cp_render::Block::Line(vec![
-                    cp_render::Span::muted("No messages in this history block.".to_string()).italic(),
+                    cp_render::Span::muted("No messages in this history block.".to_owned()).italic(),
                 ]));
             }
             return blocks;
@@ -106,12 +106,12 @@ impl Panel for ConversationHistoryPanel {
         if let Some(content) = &ctx.cached_content {
             return content
                 .lines()
-                .map(|line| cp_render::Block::Line(vec![cp_render::Span::muted(line.to_string())]))
+                .map(|line| cp_render::Block::Line(vec![cp_render::Span::muted(line.to_owned())]))
                 .collect();
         }
 
         vec![cp_render::Block::Line(vec![
-            cp_render::Span::muted("No messages in this history block.".to_string()).italic(),
+            cp_render::Span::muted("No messages in this history block.".to_owned()).italic(),
         ])]
     }
     fn title(&self, state: &State) -> String {
@@ -119,7 +119,7 @@ impl Panel for ConversationHistoryPanel {
             .context
             .get(state.selected_context)
             .filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY)
-            .map_or_else(|| "Chat History".to_string(), |c| c.name.clone())
+            .map_or_else(|| "Chat History".to_owned(), |c| c.name.clone())
     }
 
     fn max_freezes(&self) -> u8 {

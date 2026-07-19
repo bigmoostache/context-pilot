@@ -40,7 +40,7 @@ fn tool_result_ids_of(msg: &ApiMessage) -> Vec<String> {
 
 /// Build a single synthetic placeholder `tool_result` for an orphaned `tool_use` id.
 fn placeholder_result(id: &str) -> ContentBlock {
-    ContentBlock::ToolResult { tool_use_id: id.to_string(), content: MISSING_TOOL_RESULT.to_string() }
+    ContentBlock::ToolResult { tool_use_id: id.to_owned(), content: MISSING_TOOL_RESULT.to_owned() }
 }
 
 /// Build synthetic placeholder `tool_result` blocks for a set of `tool_use` ids.
@@ -70,14 +70,14 @@ pub(super) fn repair_tool_pairing(messages: &mut Vec<ApiMessage>) {
         let next = idx.saturating_add(1);
         let Some(next_msg) = messages.get(next) else {
             // No message follows — append one carrying placeholders for all ids.
-            messages.push(ApiMessage { role: "user".to_string(), content: placeholder_results(&tool_use_ids) });
+            messages.push(ApiMessage { role: "user".to_owned(), content: placeholder_results(&tool_use_ids) });
             idx = idx.saturating_add(2);
             continue;
         };
 
         if next_msg.role != "user" {
             // A non-user message follows — insert a user result message between them.
-            messages.insert(next, ApiMessage { role: "user".to_string(), content: placeholder_results(&tool_use_ids) });
+            messages.insert(next, ApiMessage { role: "user".to_owned(), content: placeholder_results(&tool_use_ids) });
             idx = idx.saturating_add(2);
             continue;
         }
@@ -123,19 +123,19 @@ mod tests {
     use super::*;
 
     fn tu(id: &str) -> ContentBlock {
-        ContentBlock::ToolUse { id: id.to_string(), name: "t".to_string(), input: serde_json::Value::Null }
+        ContentBlock::ToolUse { id: id.to_owned(), name: "t".to_owned(), input: serde_json::Value::Null }
     }
     fn tr(id: &str) -> ContentBlock {
-        ContentBlock::ToolResult { tool_use_id: id.to_string(), content: "ok".to_string() }
+        ContentBlock::ToolResult { tool_use_id: id.to_owned(), content: "ok".to_owned() }
     }
     fn text(t: &str) -> ContentBlock {
-        ContentBlock::Text { text: t.to_string() }
+        ContentBlock::Text { text: t.to_owned() }
     }
     fn asst(content: Vec<ContentBlock>) -> ApiMessage {
-        ApiMessage { role: "assistant".to_string(), content }
+        ApiMessage { role: "assistant".to_owned(), content }
     }
     fn user(content: Vec<ContentBlock>) -> ApiMessage {
-        ApiMessage { role: "user".to_string(), content }
+        ApiMessage { role: "user".to_owned(), content }
     }
 
     /// Ids of `tool_result` blocks in a message, in order.
@@ -154,7 +154,7 @@ mod tests {
         let mut msgs = vec![asst(vec![tu("A")]), user(vec![text("hi")])];
         repair_tool_pairing(&mut msgs);
         // The following user message now leads with a synthetic result for A.
-        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_string()]));
+        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_owned()]));
         // Original text is preserved after the injected result.
         assert_eq!(msgs.get(1).map(|m| has_text(m, "hi")), Some(true));
     }
@@ -173,9 +173,9 @@ mod tests {
         // flush_1's assistant message (idx 0) must now be immediately followed by a
         // user message carrying flush_1's result.
         assert_eq!(msgs.first().map(|m| m.role.as_str()), Some("assistant"));
-        assert_eq!(msgs.first().map(tool_use_ids_of), Some(vec!["flush_1".to_string()]));
+        assert_eq!(msgs.first().map(tool_use_ids_of), Some(vec!["flush_1".to_owned()]));
         assert_eq!(msgs.get(1).map(|m| m.role.as_str()), Some("user"));
-        assert_eq!(msgs.get(1).map(|m| result_ids(m).contains(&"flush_1".to_string())), Some(true));
+        assert_eq!(msgs.get(1).map(|m| result_ids(m).contains(&"flush_1".to_owned())), Some(true));
     }
 
     #[test]
@@ -185,7 +185,7 @@ mod tests {
         repair_tool_pairing(&mut msgs);
         assert_eq!(msgs.len(), 2);
         assert_eq!(msgs.get(1).map(|m| m.role.as_str()), Some("user"));
-        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_string()]));
+        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_owned()]));
     }
 
     #[test]
@@ -194,7 +194,7 @@ mod tests {
         let before = msgs.clone();
         repair_tool_pairing(&mut msgs);
         assert_eq!(msgs.len(), before.len());
-        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_string(), "B".to_string()]));
+        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_owned(), "B".to_owned()]));
         // No placeholder content injected.
         let has_placeholder = msgs.get(1).map(|m| {
             m.content

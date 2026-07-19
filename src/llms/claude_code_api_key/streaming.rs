@@ -117,9 +117,9 @@ pub(crate) fn parse_sse_stream(
                     Some((id, name, partial)) => {
                         format!("In-flight tool: {} (id={}), partial input: {} bytes", name, id, partial.len())
                     }
-                    None => "No tool in progress".to_string(),
+                    None => "No tool in progress".to_owned(),
                 };
-                let recent = if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
+                let recent = if last_lines.is_empty() { "(no lines read)".to_owned() } else { last_lines.join("\n") };
                 let verbose = format!(
                     "{}\n\
                      Error kind: {} | Root cause: {}\n\
@@ -129,7 +129,7 @@ pub(crate) fn parse_sse_stream(
                      Last SSE lines:\n{}",
                     e,
                     error_kind,
-                    if root_cause.is_empty() { "(none)".to_string() } else { root_cause },
+                    if root_cause.is_empty() { "(none)".to_owned() } else { root_cause },
                     total_bytes,
                     line_count,
                     tool_ctx,
@@ -148,7 +148,7 @@ pub(crate) fn parse_sse_stream(
         if last_lines.len() >= 5 {
             let _r = last_lines.remove(0);
         }
-        last_lines.push(line.to_string());
+        last_lines.push(line.to_owned());
 
         let json_str = line.get(6..).unwrap_or("");
         if json_str == "[DONE]" {
@@ -176,7 +176,7 @@ pub(crate) fn parse_sse_stream(
                             }
                             Some("input_json_delta") => {
                                 if let Some(json) = delta.partial_json
-                                    && let Some((_, ref name, ref mut input)) = current_tool
+                                    && let Some((_, name, input)) = current_tool.as_mut()
                                 {
                                     input.push_str(&json);
                                     let _r = tx.send(StreamEvent::ToolProgress {
@@ -212,8 +212,8 @@ pub(crate) fn parse_sse_stream(
                     }
                 }
                 "message_delta" => {
-                    if let Some(ref delta) = event.delta
-                        && let Some(ref reason) = delta.stop_reason
+                    if let Some(delta) = &event.delta
+                        && let Some(reason) = &delta.stop_reason
                     {
                         stop_reason = Some(reason.clone());
                     }
@@ -252,7 +252,7 @@ fn log_sse_error(json_str: &str, total_bytes: usize, line_count: usize, last_lin
     let path = dir.join("sse_errors.log");
 
     let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
-    let recent = if last_lines.is_empty() { "(none)".to_string() } else { last_lines.join("\n") };
+    let recent = if last_lines.is_empty() { "(none)".to_owned() } else { last_lines.join("\n") };
     let entry = format!(
         "[{ts}] SSE error event (claude_code_api_key)\n\
          Stream position: {total_bytes} bytes, {line_count} lines\n\

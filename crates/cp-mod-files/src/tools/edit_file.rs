@@ -34,7 +34,7 @@ pub(crate) fn find_normalized_match<'haystack>(haystack: &'haystack str, needle:
     }
 
     let haystack_lines: Vec<&str> = haystack.lines().collect();
-    let haystack_lines_normalized: Vec<String> = haystack_lines.iter().map(|l| l.trim_end().to_string()).collect();
+    let haystack_lines_normalized: Vec<String> = haystack_lines.iter().map(|l| l.trim_end().to_owned()).collect();
 
     // Try to find needle_lines sequence in haystack_lines_normalized
     'outer: for start_idx in 0..haystack_lines.len() {
@@ -95,7 +95,7 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
             let preview = if norm_line.len() > 60 {
                 format!("{}...", norm_line.get(..norm_line.floor_char_boundary(60)).unwrap_or(""))
             } else {
-                norm_line.to_string()
+                norm_line.to_owned()
             };
             best_match = Some((idx.saturating_add(1), total_score, preview));
         }
@@ -109,22 +109,22 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("file_edit");
     // Get file_path (required)
     let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_owned(), true);
     };
 
     // Get old_string (required)
     let Some(old_string) = tool.input.get("old_string").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing required parameter: old_string".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: old_string".to_owned(), true);
     };
 
     // Get new_string (required)
     let Some(new_string) = tool.input.get("new_string").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing required parameter: new_string".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: new_string".to_owned(), true);
     };
 
     // Check if file is open in context (canonicalize for consistent comparison)
     let path = Path::new(path_str);
-    let canonical = path.canonicalize().map_or_else(|_| path_str.to_string(), |p| p.to_string_lossy().to_string());
+    let canonical = path.canonicalize().map_or_else(|_| path_str.to_owned(), |p| p.to_string_lossy().to_string());
     let is_open = state
         .context
         .iter()
@@ -157,7 +157,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         let needle_preview = if old_string.len() > 50 {
             format!("{}...", old_string.get(..old_string.floor_char_boundary(50)).unwrap_or(""))
         } else {
-            old_string.to_string()
+            old_string.to_owned()
         };
 
         return ToolResult::new(tool.id.clone(), format!("No match found for \"{needle_preview}\"{hint}"), true);
@@ -217,7 +217,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
     writeln!(llm_msg, "Edited '{path_str}': ~{lines_changed} lines changed").unwrap_or(());
     // Sail ho! Tell the LLM its panel already has the fresh cargo aboard
-    if let Some(ref pid) = panel_ref {
+    if let Some(pid) = &(panel_ref) {
         writeln!(
             llm_msg,
             "Panel {pid} has been UPDATED and now shows the current file content — do NOT expect to see stale content there."

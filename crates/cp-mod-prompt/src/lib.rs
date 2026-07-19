@@ -180,7 +180,7 @@ impl Module for PromptModule {
                     let skills = storage::load_prompts_for(PromptType::Skill);
                     if !skills.iter().any(|s| s.id == id) {
                         pf.errors.push(format!("Skill '{id}' not found"));
-                    } else if PromptState::get(state).loaded_skill_ids.contains(&id.to_string()) {
+                    } else if PromptState::get(state).loaded_skill_ids.contains(&id.to_owned()) {
                         pf.warnings.push(format!("Skill '{id}' is already loaded"));
                     }
                 }
@@ -237,7 +237,7 @@ impl Module for PromptModule {
             return None;
         }
         let name = ctx.name.clone();
-        if let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(ToString::to_string) {
+        if let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(str::to_owned) {
             PromptState::get_mut(state).loaded_skill_ids.retain(|s| s != &skill_id);
         }
         Some(Ok(format!("skill: {name}")))
@@ -381,7 +381,7 @@ fn visualize_prompt_output(content: &str, width: usize) -> Vec<cp_render::Block>
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
             Block::Line(vec![Span::styled(display, semantic)])
         })

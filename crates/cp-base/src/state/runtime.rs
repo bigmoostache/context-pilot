@@ -237,7 +237,7 @@ impl Default for State {
             tools: vec![],
             active_modules: std::collections::HashSet::new(),
             config_selected_bar: 0,
-            active_theme: crate::config::DEFAULT_THEME.to_string(),
+            active_theme: crate::config::DEFAULT_THEME.to_owned(),
             llm_provider: LlmProvider::default(),
             anthropic_model: crate::config::models::AnthropicModel::default(),
             grok_model: crate::config::models::GrokModel::default(),
@@ -299,12 +299,12 @@ impl State {
 
     /// Get a reference to module-owned state by type.
     #[must_use]
-    pub fn get_ext<T: 'static + Send + Sync>(&self) -> Option<&T> {
+    pub fn get_ext<T>(&self) -> Option<&T> where T: 'static + Send + Sync {
         self.module_data.get(&TypeId::of::<T>()).and_then(|v| v.downcast_ref())
     }
 
     /// Get a mutable reference to module-owned state by type.
-    pub fn get_ext_mut<T: 'static + Send + Sync>(&mut self) -> Option<&mut T> {
+    pub fn get_ext_mut<T>(&mut self) -> Option<&mut T> where T: 'static + Send + Sync {
         self.module_data.get_mut(&TypeId::of::<T>()).and_then(|v| v.downcast_mut())
     }
 
@@ -318,7 +318,7 @@ impl State {
     ///
     /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
     #[must_use]
-    pub fn ext<T: 'static + Send + Sync>(&self) -> &T {
+    pub fn ext<T>(&self) -> &T where T: 'static + Send + Sync {
         self.get_ext::<T>().unwrap_or_else(|| {
             crate::config::invariant_panic("module state not initialized — was init_state() called?")
         })
@@ -329,14 +329,14 @@ impl State {
     /// # Panics
     ///
     /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
-    pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
+    pub fn ext_mut<T>(&mut self) -> &mut T where T: 'static + Send + Sync {
         self.get_ext_mut::<T>().unwrap_or_else(|| {
             crate::config::invariant_panic("module state not initialized — was init_state() called?")
         })
     }
 
     /// Set module-owned state by type. Replaces any existing value of this type.
-    pub fn set_ext<T: 'static + Send + Sync>(&mut self, val: T) {
+    pub fn set_ext<T>(&mut self, val: T) where T: 'static + Send + Sync {
         drop(self.module_data.insert(TypeId::of::<T>(), Box::new(val)));
     }
 
@@ -419,9 +419,9 @@ impl State {
         self.tick_cache_miss_tokens = 0;
         self.tick_output_tokens = 0;
         self.tick_uncached_input_tokens = 0;
-        self.tick_cost_hit_usd = 0.0;
-        self.tick_cost_miss_usd = 0.0;
-        self.tick_cost_output_usd = 0.0;
+        self.tick_cost_hit_usd = 0.0f64;
+        self.tick_cost_miss_usd = 0.0f64;
+        self.tick_cost_output_usd = 0.0f64;
     }
 }
 

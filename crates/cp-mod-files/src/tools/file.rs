@@ -12,12 +12,12 @@ pub(crate) fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
         Some(serde_json::Value::String(s)) => vec![s.clone()],
         Some(serde_json::Value::Array(arr)) => arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
         _ => {
-            return ToolResult::new(tool.id.clone(), "Missing 'path' parameter".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing 'path' parameter".to_owned(), true);
         }
     };
 
     if paths.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Empty path list".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Empty path list".to_owned(), true);
     }
 
     let mut results = Vec::new();
@@ -44,14 +44,14 @@ fn open_single_file(path: &str, state: &mut State) -> String {
     }
 
     // Canonicalize to absolute path so lookups match regardless of relative/absolute input
-    let canonical = path_obj.canonicalize().map_or_else(|_| path.to_string(), |p| p.to_string_lossy().to_string());
+    let canonical = path_obj.canonicalize().map_or_else(|_| path.to_owned(), |p| p.to_string_lossy().to_string());
 
     // Check if file is already open (using canonical path)
     if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(&canonical)) {
         return format!("File '{path}' is already open in context");
     }
 
-    let file_name = path_obj.file_name().map_or_else(|| path.to_string(), |n| n.to_string_lossy().to_string());
+    let file_name = path_obj.file_name().map_or_else(|| path.to_owned(), |n| n.to_string_lossy().to_string());
 
     // Generate context ID (fills gaps) and UID
     let context_id = state.next_available_context_id();

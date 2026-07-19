@@ -55,7 +55,7 @@ impl Splitter for FixedSizeSplitter {
 
                 chunks.push(Chunk {
                     content: buf.clone(),
-                    kind: "raw".to_string(),
+                    kind: "raw".to_owned(),
                     name: String::new(),
                     line_start: chunk_start_line,
                     line_end: chunk_end_line,
@@ -80,7 +80,7 @@ impl Splitter for FixedSizeSplitter {
 
             chunks.push(Chunk {
                 content: buf,
-                kind: "raw".to_string(),
+                kind: "raw".to_owned(),
                 name: String::new(),
                 line_start: chunk_start_line,
                 line_end: chunk_end_line,

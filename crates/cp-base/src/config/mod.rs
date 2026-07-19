@@ -376,7 +376,7 @@ pub const THEME_ORDER: &[&str] = &["dnd", "modern", "futuristic", "forest", "sea
 ///
 /// Panics via [`invariant_panic`] if the YAML content doesn't match the target type.
 #[must_use]
-pub fn parse_yaml<T: for<'de> Deserialize<'de>>(name: &str, content: &str) -> T {
+pub fn parse_yaml<T>(name: &str, content: &str) -> T where T: for<'de> Deserialize<'de> {
     serde_yaml::from_str(content).unwrap_or_else(|e| invariant_panic(&format!("Failed to parse {name}: {e}")))
 }
 

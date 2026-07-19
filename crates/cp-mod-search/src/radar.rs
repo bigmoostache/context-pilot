@@ -68,7 +68,7 @@ struct ScoredResult {
 /// Old logs always retain at least half their relevance weight,
 /// preventing semantically relevant older entries from vanishing.
 fn decay(age_ms: f64, half_life_ms: f64) -> f64 {
-    if half_life_ms <= 0.0 {
+    if half_life_ms <= 0.0f64 {
         return 1.0;
     }
     0.5f64.mul_add((-f64::ln(2.0) * age_ms / half_life_ms).exp(), 0.5)
@@ -85,22 +85,22 @@ fn write_entry(yaml: &mut String, entry: &ScoredResult) {
 /// Format a millisecond timestamp as ISO 8601, or `"unknown"` if zero/out-of-range.
 fn format_timestamp_ms(ms: u64) -> String {
     if ms == 0 {
-        return "unknown".to_string();
+        return "unknown".to_owned();
     }
     i64::try_from(ms)
         .ok()
         .and_then(cp_mod_utilities::time::epoch_ms_to_rfc3339)
-        .unwrap_or_else(|| "unknown".to_string())
+        .unwrap_or_else(|| "unknown".to_owned())
 }
 
 /// Read the cached radar YAML from state, with fallback messages.
 fn get_radar_yaml(state: &State) -> String {
     state.get_ext::<SearchState>().map_or_else(
-        || "# Context Radar — search module not initialized\n".to_string(),
+        || "# Context Radar — search module not initialized\n".to_owned(),
         |ss| {
             let cache = ss.radar_cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             if cache.yaml.is_empty() {
-                "# Context Radar — no task signals yet\n".to_string()
+                "# Context Radar — no task signals yet\n".to_owned()
             } else {
                 cache.yaml.clone()
             }
@@ -128,7 +128,7 @@ pub(crate) fn sanitize_signal(raw: &str) -> String {
         .trim();
 
     if content.len() <= MAX_SIGNAL_LEN {
-        content.to_string()
+        content.to_owned()
     } else {
         let boundary = content.floor_char_boundary(MAX_SIGNAL_LEN);
         format!("{}…", content.get(..boundary).unwrap_or(content))
@@ -304,7 +304,7 @@ fn refresh_inner(job: &RefreshJob) {
         };
 
         for hit in hits {
-            let relevance = hit.get("_rankingScore").and_then(serde_json::Value::as_f64).unwrap_or(0.0);
+            let relevance = hit.get("_rankingScore").and_then(serde_json::Value::as_f64).unwrap_or(0.0f64);
 
             // Parse log number from ID (e.g. "L42" → 42) for count-based decay
             let log_number = hit
@@ -318,10 +318,10 @@ fn refresh_inner(job: &RefreshJob) {
 
             let score = relevance * q_decay * r_decay;
 
-            let log_id = hit.get("id").and_then(serde_json::Value::as_str).unwrap_or("").to_string();
-            let datetime = hit.get("datetime").and_then(serde_json::Value::as_str).unwrap_or("").to_string();
-            let importance = hit.get("importance").and_then(serde_json::Value::as_str).unwrap_or("medium").to_string();
-            let content = hit.get("content").and_then(serde_json::Value::as_str).unwrap_or("").to_string();
+            let log_id = hit.get("id").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
+            let datetime = hit.get("datetime").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
+            let importance = hit.get("importance").and_then(serde_json::Value::as_str).unwrap_or("medium").to_owned();
+            let content = hit.get("content").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
 
             all_results.push(ScoredResult { log_id, datetime, importance, content, score });
         }
@@ -401,7 +401,7 @@ pub(crate) struct ContextRadarPanel;
 
 impl Panel for ContextRadarPanel {
     fn title(&self, _state: &State) -> String {
-        RADAR_PANEL_NAME.to_string()
+        RADAR_PANEL_NAME.to_owned()
     }
 
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
@@ -429,7 +429,7 @@ impl Panel for ContextRadarPanel {
                     Semantic::Default
                 };
 
-                Block::Line(vec![Span::styled(line.to_string(), semantic)])
+                Block::Line(vec![Span::styled(line.to_owned(), semantic)])
             })
             .collect()
     }

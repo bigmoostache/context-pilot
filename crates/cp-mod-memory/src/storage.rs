@@ -83,7 +83,7 @@ impl SyncEntry for YamlMemoryEntry {
 #[must_use]
 pub(crate) fn generate_yaml_key(tl_dr: &str) -> String {
     let hex = cp_mod_utilities::hash::compute_str(tl_dr);
-    hex.get(..16).unwrap_or(&hex).to_string()
+    hex.get(..16).unwrap_or(&hex).to_owned()
 }
 
 /// Ensure a memory item has a `yaml_key`, generating one if missing.

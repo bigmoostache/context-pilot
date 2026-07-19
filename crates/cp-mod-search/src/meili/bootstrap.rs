@@ -9,7 +9,7 @@ use crate::types;
 /// Compute an 8-character hex hash of a path for per-project index naming.
 pub(crate) fn hash_project_path(path: &str) -> String {
     let hex = cp_mod_utilities::hash::compute_str(path);
-    hex.get(..8).unwrap_or(&hex).to_string()
+    hex.get(..8).unwrap_or(&hex).to_owned()
 }
 
 /// Create per-project Meilisearch indexes if they don't already exist.

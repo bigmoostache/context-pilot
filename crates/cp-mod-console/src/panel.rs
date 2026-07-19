@@ -126,10 +126,10 @@ impl Panel for ConsolePanel {
         ctx.total_pages = compute_total_pages(token_count);
         ctx.current_page = 0;
         ctx.cache_deprecated = false;
-        let _ = update_if_changed(ctx, &content);
+        let _changed = update_if_changed(ctx, &content);
 
         // Also update status metadata from session handle
-        if let Some(session_name) = ctx.get_meta_str("console_name").map(ToString::to_string) {
+        if let Some(session_name) = ctx.get_meta_str("console_name").map(str::to_owned) {
             let cs = ConsoleState::get(state);
             if let Some(handle) = cs.sessions.get(&session_name) {
                 let status_label = handle.get_status().label();
@@ -146,10 +146,10 @@ impl Panel for ConsolePanel {
             || (String::new(), String::new(), String::new()),
             |ctx| {
                 let content = ctx.cached_content.clone().unwrap_or_else(|| {
-                    if ctx.cache_deprecated { "Loading...".to_string() } else { "No output".to_string() }
+                    if ctx.cache_deprecated { "Loading...".to_owned() } else { "No output".to_owned() }
                 });
-                let cmd = ctx.get_meta_str("console_command").unwrap_or("").to_string();
-                let st = ctx.get_meta_str("console_status").unwrap_or("?").to_string();
+                let cmd = ctx.get_meta_str("console_command").unwrap_or("").to_owned();
+                let st = ctx.get_meta_str("console_status").unwrap_or("?").to_owned();
                 (content, cmd, st)
             },
         );
@@ -178,7 +178,7 @@ impl Panel for ConsolePanel {
     }
     fn title(&self, state: &State) -> String {
         state.context.get(state.selected_context).map_or_else(
-            || "Console".to_string(),
+            || "Console".to_owned(),
             |ctx| {
                 let desc = ctx
                     .get_meta_str("console_description")

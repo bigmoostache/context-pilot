@@ -213,13 +213,13 @@ pub(crate) struct FakePanelMessage {
 /// Convert milliseconds since UNIX epoch to ISO 8601 format.
 fn ms_to_iso8601(ms: u64) -> String {
     let ms_i64 = i64::try_from(ms).unwrap_or(i64::MAX);
-    cp_mod_utilities::time::epoch_ms_to_rfc3339(ms_i64).unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string())
+    cp_mod_utilities::time::epoch_ms_to_rfc3339(ms_i64).unwrap_or_else(|| "1970-01-01T00:00:00Z".to_owned())
 }
 
 /// Convert milliseconds since UNIX epoch to date-only format (YYYY-MM-DD).
 fn ms_to_date(ms: u64) -> String {
     let ms_i64 = i64::try_from(ms).unwrap_or(i64::MAX);
-    cp_mod_utilities::time::epoch_ms_to_utc_date(ms_i64).unwrap_or_else(|| "1970-01-01".to_string())
+    cp_mod_utilities::time::epoch_ms_to_utc_date(ms_i64).unwrap_or_else(|| "1970-01-01".to_owned())
 }
 
 /// Generate the header text for dynamic panel display
@@ -235,7 +235,7 @@ pub(crate) fn panel_timestamp_text(timestamp_ms: u64) -> String {
     // Check for zero/invalid timestamp (1970-01-01 or very old)
     // Consider anything before year 2020 as invalid (timestamp < ~1_577_836_800_000)
     if timestamp_ms < 1_577_836_800_000 {
-        return prompts::panel_timestamp_unknown().to_string();
+        return prompts::panel_timestamp_unknown().to_owned();
     }
 
     let iso_time = ms_to_iso8601(timestamp_ms);
@@ -302,7 +302,7 @@ fn message_panel_id(msg: &ApiMessage) -> Option<String> {
             ContentBlock::ToolResult { tool_use_id, .. } => tool_use_id,
             ContentBlock::Text { .. } => return None,
         };
-        raw.strip_prefix("panel_").filter(|id| *id != "footer").map(str::to_string)
+        raw.strip_prefix("panel_").filter(|id| *id != "footer").map(str::to_owned)
     })
 }
 
@@ -341,14 +341,14 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage], engine_json: 
                     ContentBlock::Text { text } => {
                         let mut obj = serde_json::json!({"type": "text", "text": text});
                         if should_tag && let Some(o) = obj.as_object_mut() {
-                            let _prev = o.insert("cache_control".to_string(), serde_json::json!({"type": "ephemeral"}));
+                            let _prev = o.insert("cache_control".to_owned(), serde_json::json!({"type": "ephemeral"}));
                         }
                         obj
                     }
                     ContentBlock::ToolUse { id, name, input } => {
                         let mut obj = serde_json::json!({"type": "tool_use", "id": id, "name": name, "input": input});
                         if should_tag && let Some(o) = obj.as_object_mut() {
-                            let _prev = o.insert("cache_control".to_string(), serde_json::json!({"type": "ephemeral"}));
+                            let _prev = o.insert("cache_control".to_owned(), serde_json::json!({"type": "ephemeral"}));
                         }
                         obj
                     }
@@ -356,7 +356,7 @@ pub(crate) fn api_messages_to_cc_json(api_messages: &[ApiMessage], engine_json: 
                         let mut obj =
                             serde_json::json!({"type": "tool_result", "tool_use_id": tool_use_id, "content": content});
                         if should_tag && let Some(o) = obj.as_object_mut() {
-                            let _prev = o.insert("cache_control".to_string(), serde_json::json!({"type": "ephemeral"}));
+                            let _prev = o.insert("cache_control".to_owned(), serde_json::json!({"type": "ephemeral"}));
                         }
                         obj
                     }
@@ -413,7 +413,7 @@ pub(crate) fn log_sse_error(ctx: &SseErrorContext<'_>) {
     let path = dir.join("sse_errors.log");
 
     let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
-    let recent = if ctx.last_lines.is_empty() { "(none)".to_string() } else { ctx.last_lines.join("\n") };
+    let recent = if ctx.last_lines.is_empty() { "(none)".to_owned() } else { ctx.last_lines.join("\n") };
     let entry = format!(
         "[{ts}] SSE error event ({})\n\
          Stream position: {} bytes, {} lines\n\

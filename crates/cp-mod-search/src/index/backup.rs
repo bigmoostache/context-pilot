@@ -112,7 +112,7 @@ fn write_manifest_atomic(dir: &Path, manifest: &Manifest) -> Result<(), String> 
 /// fails.
 pub(crate) fn export_backup(client: &MeiliClient, files_uid: &str, logs_uid: &str) -> Result<(), String> {
     let Some(fp) = fingerprint(client, files_uid) else {
-        return Err("no embedder configured — nothing to back up".to_string());
+        return Err("no embedder configured — nothing to back up".to_owned());
     };
 
     let files_rows = tasks::fetch_all_with_vectors(client, files_uid)?;
@@ -126,7 +126,7 @@ pub(crate) fn export_backup(client: &MeiliClient, files_uid: &str, logs_uid: &st
 
     let manifest = Manifest {
         fingerprint: fp,
-        embedder_name: EMBEDDER.to_string(),
+        embedder_name: EMBEDDER.to_owned(),
         count_files: u64::try_from(files_rows.len()).unwrap_or(u64::MAX),
         count_logs: u64::try_from(logs_rows.len()).unwrap_or(u64::MAX),
     };
@@ -166,7 +166,7 @@ fn force_regenerate_false(row: &mut serde_json::Value) {
     let Some(entry) = vectors.get_mut(EMBEDDER).and_then(serde_json::Value::as_object_mut) else {
         return;
     };
-    let _prev = entry.insert("regenerate".to_string(), serde_json::Value::Bool(false));
+    let _prev = entry.insert("regenerate".to_owned(), serde_json::Value::Bool(false));
 }
 
 /// Reimport one index's rows in batches, waiting for each batch. Returns the

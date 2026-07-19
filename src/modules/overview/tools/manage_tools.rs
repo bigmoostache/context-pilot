@@ -7,11 +7,11 @@ pub(crate) const MANAGE_TOOLS_ID: &str = "manage_tools";
 /// Execute the `tool_manage` tool to enable or disable tools.
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(changes) = tool.input.get("changes").and_then(serde_json::Value::as_array) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'changes' parameter (expected array)".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing 'changes' parameter (expected array)".to_owned(), true);
     };
 
     if changes.is_empty() {
-        return ToolResult::new(tool.id.clone(), "No changes provided".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "No changes provided".to_owned(), true);
     }
 
     let mut successes: Vec<String> = Vec::new();

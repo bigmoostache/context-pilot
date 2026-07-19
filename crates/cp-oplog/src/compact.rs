@@ -68,7 +68,7 @@ pub const DEFAULT_COMPACT_THRESHOLD: u64 = 256 * 1024 * 1024;
 /// which is a handful of `fdatasync`s on a single writer thread. 60 s is vastly
 /// larger, so an in-flight spilled body is always referenced before it becomes
 /// GC-eligible; only crash-orphans are ever collected.
-pub const DEFAULT_GC_GRACE: Duration = Duration::from_secs(60);
+pub const DEFAULT_GC_GRACE: Duration = Duration::from_mins(1);
 
 /// The outcome of a [`compact`] pass.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -95,7 +95,7 @@ pub struct Report {
 ///
 /// Returns [`Error::Io`](crate::error::Error::Io) if a segment
 /// cannot be listed, read, removed, or if the directory cannot be `fsync`'d.
-pub fn compact<P: AsRef<Path>>(dir: P) -> OplogResult<Report> {
+pub fn compact<P>(dir: P) -> OplogResult<Report> where P: AsRef<Path> {
     let dir = dir.as_ref();
     let indices = segment::indices(dir)?;
 
@@ -146,7 +146,7 @@ fn sync_dir(dir: &Path) -> OplogResult<()> {
 ///
 /// Returns [`Error::Io`](crate::error::Error::Io) if the directory
 /// cannot be listed or a segment's metadata cannot be read.
-pub fn total_bytes<P: AsRef<Path>>(dir: P) -> OplogResult<u64> {
+pub fn total_bytes<P>(dir: P) -> OplogResult<u64> where P: AsRef<Path> {
     let dir = dir.as_ref();
     let mut total: u64 = 0;
     for index in segment::indices(dir)? {

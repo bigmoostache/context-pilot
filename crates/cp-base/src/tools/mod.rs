@@ -151,12 +151,12 @@ impl ParamType {
                     if let Some(desc) = &param.description
                         && let Some(obj) = schema.as_object_mut()
                     {
-                        drop(obj.insert("description".to_string(), json!(desc)));
+                        drop(obj.insert("description".to_owned(), json!(desc)));
                     }
                     if let Some(enum_vals) = &param.enum_values
                         && let Some(obj) = schema.as_object_mut()
                     {
-                        drop(obj.insert("enum".to_string(), json!(enum_vals)));
+                        drop(obj.insert("enum".to_owned(), json!(enum_vals)));
                     }
                     drop(properties.insert(param.name.clone(), schema));
                     if param.required {
@@ -195,7 +195,7 @@ impl ToolParam {
     #[must_use]
     pub fn new(name: &str, param_type: ParamType) -> Self {
         Self {
-            name: name.to_string(),
+            name: name.to_owned(),
             param_type,
             description: None,
             required: false,
@@ -207,7 +207,7 @@ impl ToolParam {
     /// Set a description (builder pattern).
     #[must_use]
     pub fn desc(mut self, d: &str) -> Self {
-        self.description = Some(d.to_string());
+        self.description = Some(d.to_owned());
         self
     }
 
@@ -228,7 +228,7 @@ impl ToolParam {
     /// Set a default value hint (builder pattern).
     #[must_use]
     pub fn default_val(mut self, val: &str) -> Self {
-        self.default = Some(val.to_string());
+        self.default = Some(val.to_owned());
         self
     }
 }
@@ -273,8 +273,8 @@ impl ToolDefinition {
             .get(id)
             .unwrap_or_else(|| crate::config::invariant_panic(&format!("Tool '{id}' not found in YAML")));
         ToolDefBuilder {
-            id: id.to_string(),
-            description: text.description.trim().to_string(),
+            id: id.to_owned(),
+            description: text.description.trim().to_owned(),
             param_descs: &text.parameters,
             params: Vec::new(),
             short_desc: String::new(),
@@ -295,12 +295,12 @@ impl ToolDefinition {
             if let Some(desc) = &param.description
                 && let Some(obj) = schema.as_object_mut()
             {
-                drop(obj.insert("description".to_string(), json!(desc)));
+                drop(obj.insert("description".to_owned(), json!(desc)));
             }
             if let Some(enum_vals) = &param.enum_values
                 && let Some(obj) = schema.as_object_mut()
             {
-                drop(obj.insert("enum".to_string(), json!(enum_vals)));
+                drop(obj.insert("enum".to_owned(), json!(enum_vals)));
             }
             drop(properties.insert(param.name.clone(), schema));
             if param.required {
@@ -343,14 +343,14 @@ impl ToolDefBuilder<'_> {
     /// Set sidebar short description.
     #[must_use]
     pub fn short_desc(mut self, s: &str) -> Self {
-        self.short_desc = s.to_string();
+        self.short_desc = String::from(s);
         self
     }
 
     /// Set tool category for grouping.
     #[must_use]
     pub fn category(mut self, c: &str) -> Self {
-        self.category = c.to_string();
+        self.category = String::from(c);
         self
     }
 
@@ -401,7 +401,7 @@ impl ToolDefBuilder<'_> {
         let desc = self.param_descs.get(name).cloned();
         let mut p = ToolParam::new(name, param_type);
         p.description = desc;
-        p.default = Some(default.to_string());
+        p.default = Some(default.to_owned());
         self.params.push(p);
         self
     }

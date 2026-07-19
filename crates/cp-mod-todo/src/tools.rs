@@ -9,11 +9,11 @@ use std::fmt::Write as _;
 pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("todo_create");
     let Some(todos) = tool.input.get("todos").and_then(|v| v.as_array()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'todos' array parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing 'todos' array parameter".to_owned(), true);
     };
 
     if todos.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Empty 'todos' array".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Empty 'todos' array".to_owned(), true);
     }
 
     let mut created: Vec<String> = Vec::new();
@@ -21,13 +21,13 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     for todo_value in todos {
         let name = if let Some(n) = todo_value.get("name").and_then(|v| v.as_str()) {
-            n.to_string()
+            n.to_owned()
         } else {
-            errors.push("Missing 'name' in todo".to_string());
+            errors.push("Missing 'name' in todo".to_owned());
             continue;
         };
 
-        let description = todo_value.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let description = todo_value.get("description").and_then(|v| v.as_str()).unwrap_or("").to_owned();
 
         // Normalize parent_id: treat "none", "null", "" as None
         let parent_id = todo_value
@@ -42,16 +42,16 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let lower = s.to_lowercase();
                 !s.is_empty() && lower != "none" && lower != "null"
             })
-            .map(ToString::to_string);
+            .map(str::to_owned);
 
         // Validate parent exists if specified
         let ts = TodoState::get(state);
-        if let Some(ref pid) = parent_id
+        if let Some(pid) = &parent_id
             && !ts.todos.iter().any(|t| t.id == *pid)
         {
             let available: Vec<&str> = ts.todos.iter().map(|t| t.id.as_str()).collect();
             let available_str = if available.is_empty() {
-                "no todos exist yet".to_string()
+                "no todos exist yet".to_owned()
             } else {
                 format!("available: {}", available.join(", "))
             };
@@ -96,11 +96,11 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("todo_update");
     let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_owned(), true);
     };
 
     if updates.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Empty 'updates' array".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Empty 'updates' array".to_owned(), true);
     }
 
     let mut modified: Vec<String> = Vec::new();
@@ -115,12 +115,12 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             u.get("delete").and_then(serde_json::Value::as_bool).unwrap_or(false)
                 || u.get("status").and_then(|v| v.as_str()) == Some("deleted")
         })
-        .filter_map(|u| u.get("id").and_then(|v| v.as_str()).map(ToString::to_string))
+        .filter_map(|u| u.get("id").and_then(|v| v.as_str()).map(str::to_owned))
         .collect();
 
     for update_value in updates {
         let Some(id) = update_value.get("id").and_then(|v| v.as_str()) else {
-            errors.push("Missing 'id' in update".to_string());
+            errors.push("Missing 'id' in update".to_owned());
             continue;
         };
 
@@ -158,9 +158,9 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             let initial_len = ts_del.todos.len();
             ts_del.todos.retain(|t| t.id != id);
             if ts_del.todos.len() < initial_len {
-                deleted.push(id.to_string());
+                deleted.push(id.to_owned());
             } else {
-                not_found.push(id.to_string());
+                not_found.push(id.to_owned());
             }
             continue;
         }
@@ -184,14 +184,14 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                         let available: Vec<&str> =
                             ts.todos.iter().filter(|t| t.id != id).map(|t| t.id.as_str()).collect();
                         let available_str = if available.is_empty() {
-                            "no other todos exist".to_string()
+                            "no other todos exist".to_owned()
                         } else {
                             format!("available: {}", available.join(", "))
                         };
                         errors.push(format!("{id}: parent '{pid}' not found ({available_str})"));
                         continue;
                     }
-                    Some(Some(pid.to_string()))
+                    Some(Some(pid.to_owned()))
                 }
             } else {
                 None // no change
@@ -228,12 +228,12 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let mut changes = Vec::new();
 
                 if let Some(name) = update_value.get("name").and_then(|v| v.as_str()) {
-                    t.name = name.to_string();
+                    name.clone_into(&mut t.name);
                     changes.push("name");
                 }
 
                 if let Some(desc) = update_value.get("description").and_then(|v| v.as_str()) {
-                    t.description = desc.to_string();
+                    desc.clone_into(&mut t.description);
                     changes.push("description");
                 }
 
@@ -255,7 +255,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
             }
             None => {
-                not_found.push(id.to_string());
+                not_found.push(id.to_owned());
             }
         }
     }
@@ -271,7 +271,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
             let ts_prop = TodoState::get_mut(state);
             // Walk up parent chain
             let mut current_id = ts_prop.todos.iter().find(|t| t.id == id).and_then(|t| t.parent_id.clone());
-            while let Some(ref pid) = current_id {
+            while let Some(pid) = &current_id {
                 if let Some(parent) = ts_prop.todos.iter_mut().find(|t| t.id == *pid) {
                     if parent.status == TodoStatus::Pending {
                         parent.status = TodoStatus::InProgress;
@@ -331,7 +331,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 pub(crate) fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("todo_move");
     let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'id' parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing 'id' parameter".to_owned(), true);
     };
 
     // Normalize after_id: treat null, "none", "null", "" as None (move to top)
@@ -378,7 +378,7 @@ pub(crate) fn execute_move(tool: &ToolUse, state: &mut State) -> ToolResult {
     ts_mut.todos.insert(insert_idx, item);
     state.touch_panel(Kind::TODO);
 
-    let position_desc = after_id.map_or_else(|| "top".to_string(), |aid| format!("after {aid}"));
+    let position_desc = after_id.map_or_else(|| "top".to_owned(), |aid| format!("after {aid}"));
 
     ToolResult::new(tool.id.clone(), format!("Moved {id} to {position_desc}"), false)
 }

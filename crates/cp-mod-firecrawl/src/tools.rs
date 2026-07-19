@@ -76,13 +76,13 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let Some(url) = tool.input.get("url").and_then(|v| v.as_str()) else {
-        return err_result(tool, "Missing required parameter 'url'".to_string());
+        return err_result(tool, "Missing required parameter 'url'".to_owned());
     };
 
     // Extract all params to owned types for the closure
-    let url = url.to_string();
+    let url = url.to_owned();
     let formats_val: Vec<String> = tool.input.get("formats").and_then(|v| v.as_array()).map_or_else(
-        || vec!["markdown".to_string(), "links".to_string()],
+        || vec!["markdown".to_owned(), "links".to_owned()],
         |arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
     );
     let country_val = tool
@@ -109,7 +109,7 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
         match client.scrape(&params) {
             Ok(resp) => {
                 if !resp.success {
-                    let msg = resp.error.unwrap_or_else(|| "Unknown error".to_string());
+                    let msg = resp.error.unwrap_or_else(|| "Unknown error".to_owned());
                     return ToolOutput {
                         content: format!("Firecrawl scrape failed: {msg}"),
                         is_error: true,
@@ -120,7 +120,7 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
 
                 let Some(data) = resp.data else {
                     return ToolOutput {
-                        content: "Scrape returned no data".to_string(),
+                        content: "Scrape returned no data".to_owned(),
                         is_error: true,
                         create_panel: None,
                         preserves_tempo: false,
@@ -131,25 +131,25 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
 
                 // Build panel content
                 let mut content = String::new();
-                if let Some(ref meta) = data.metadata {
+                if let Some(meta) = &(data.metadata) {
                     content.push_str("## Metadata\n\n");
-                    if let Some(ref t) = meta.title {
+                    if let Some(t) = &(meta.title) {
                         let _r = writeln!(content, "**Title:** {t}");
                     }
-                    if let Some(ref d) = meta.description {
+                    if let Some(d) = &(meta.description) {
                         let _r = writeln!(content, "**Description:** {d}");
                     }
-                    if let Some(ref u) = meta.source_url {
+                    if let Some(u) = &(meta.source_url) {
                         let _r = writeln!(content, "**URL:** {u}");
                     }
                     content.push('\n');
                 }
-                if let Some(ref md) = data.markdown {
+                if let Some(md) = &(data.markdown) {
                     content.push_str("## Content\n\n");
                     content.push_str(md);
                     content.push_str("\n\n");
                 }
-                if let Some(ref links) = data.links
+                if let Some(links) = &data.links
                     && !links.is_empty()
                 {
                     content.push_str("## Links\n\n");
@@ -159,9 +159,9 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
 
                 let dyn_panel = DynPanel {
-                    context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_string(),
+                    context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(),
                     display_name: format!("firecrawl_scrape: {url}"),
-                    metadata: vec![("result_content".to_string(), content.clone())],
+                    metadata: vec![("result_content".to_owned(), content.clone())],
                     content: Some(content),
                 };
 
@@ -189,14 +189,14 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let Some(query) = tool.input.get("query").and_then(|v| v.as_str()) else {
-        return err_result(tool, "Missing required parameter 'query'".to_string());
+        return err_result(tool, "Missing required parameter 'query'".to_owned());
     };
 
     // Extract all params to owned types for the closure
-    let query = query.to_string();
+    let query = query.to_owned();
     let limit = tool.input.get("limit").and_then(serde_json::Value::as_u64).unwrap_or(3).to_u32();
     let sources_val: Vec<String> = tool.input.get("sources").and_then(|v| v.as_array()).map_or_else(
-        || vec!["web".to_string()],
+        || vec!["web".to_owned()],
         |arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
     );
     let cats_val: Option<Vec<String>> = tool
@@ -223,7 +223,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         match client.search(&params) {
             Ok(resp) => {
                 if !resp.success {
-                    let msg = resp.error.unwrap_or_else(|| "Unknown error".to_string());
+                    let msg = resp.error.unwrap_or_else(|| "Unknown error".to_owned());
                     return ToolOutput {
                         content: format!("Firecrawl search failed: {msg}"),
                         is_error: true,
@@ -250,9 +250,9 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                     // Fallback: dump as YAML
                     let panel_content = serde_yaml::to_string(&data).unwrap_or_else(|_| format!("{data:#}"));
                     let dyn_panel = DynPanel {
-                        context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_string(),
+                        context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(),
                         display_name: format!("firecrawl_search: {query}"),
-                        metadata: vec![("result_content".to_string(), panel_content.clone())],
+                        metadata: vec![("result_content".to_owned(), panel_content.clone())],
                         content: Some(panel_content),
                     };
                     return ToolOutput {
@@ -281,14 +281,14 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                     let page_title = result.title.as_deref().unwrap_or("untitled");
                     let page_url = result.url.as_deref().unwrap_or("unknown");
                     let _r1 = write!(content, "## Result {} — {} ({})\n\n", i.saturating_add(1), page_title, page_url);
-                    if let Some(ref md) = result.markdown {
+                    if let Some(md) = &(result.markdown) {
                         content.push_str(md);
                         content.push_str("\n\n");
-                    } else if let Some(ref desc) = result.description {
+                    } else if let Some(desc) = &(result.description) {
                         content.push_str(desc);
                         content.push_str("\n\n");
                     }
-                    if let Some(ref links) = result.links
+                    if let Some(links) = &result.links
                         && !links.is_empty()
                     {
                         content.push_str("**Links:**\n");
@@ -301,9 +301,9 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
 
                 let dyn_panel = DynPanel {
-                    context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_string(),
+                    context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(),
                     display_name: format!("firecrawl_search: {query}"),
-                    metadata: vec![("result_content".to_string(), content.clone())],
+                    metadata: vec![("result_content".to_owned(), content.clone())],
                     content: Some(content),
                 };
 
@@ -331,11 +331,11 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let Some(url) = tool.input.get("url").and_then(|v| v.as_str()) else {
-        return err_result(tool, "Missing required parameter 'url'".to_string());
+        return err_result(tool, "Missing required parameter 'url'".to_owned());
     };
 
     // Extract all params to owned types for the closure
-    let url = url.to_string();
+    let url = url.to_owned();
     let limit = tool.input.get("limit").and_then(serde_json::Value::as_u64).unwrap_or(50).to_u32();
     let search_val = tool.input.get("search").and_then(|v| v.as_str()).map(String::from);
     let include_subdomains = tool.input.get("include_subdomains").and_then(serde_json::Value::as_bool).unwrap_or(false);
@@ -369,7 +369,7 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
         match client.map(&params) {
             Ok(resp) => {
                 if !resp.success {
-                    let msg = resp.error.unwrap_or_else(|| "Unknown error".to_string());
+                    let msg = resp.error.unwrap_or_else(|| "Unknown error".to_owned());
                     return ToolOutput {
                         content: format!("Firecrawl map failed: {msg}"),
                         is_error: true,
@@ -406,9 +406,9 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
                     url.trim_start_matches("https://").trim_start_matches("http://").split('/').next().unwrap_or(&url);
 
                 let dyn_panel = DynPanel {
-                    context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_string(),
+                    context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(),
                     display_name: format!("firecrawl_map: {domain}"),
-                    metadata: vec![("result_content".to_string(), panel_content.clone())],
+                    metadata: vec![("result_content".to_owned(), panel_content.clone())],
                     content: Some(panel_content),
                 };
 

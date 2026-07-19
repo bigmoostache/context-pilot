@@ -21,16 +21,16 @@ pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> 
 /// Create a new behaviour (agent, skill, or command) as a `.md` file.
 /// Fails if a file with that ID already exists.
 fn behaviour_create(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let name = tool.input.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let name = tool.input.get("name").and_then(|v| v.as_str()).unwrap_or("").to_owned();
     let type_str = tool.input.get("type").and_then(|v| v.as_str()).unwrap_or("");
-    let description = tool.input.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let content = tool.input.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let description = tool.input.get("description").and_then(|v| v.as_str()).unwrap_or("").to_owned();
+    let content = tool.input.get("content").and_then(|v| v.as_str()).unwrap_or("").to_owned();
 
     if name.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required 'name' parameter".to_owned(), true);
     }
     if content.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Missing required 'content' parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required 'content' parameter".to_owned(), true);
     }
 
     let prompt_type = match type_str {
@@ -50,7 +50,7 @@ fn behaviour_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     if id.is_empty() {
         return ToolResult::new(
             tool.id.clone(),
-            "Name must contain at least one alphanumeric character".to_string(),
+            "Name must contain at least one alphanumeric character".to_owned(),
             true,
         );
     }
@@ -85,7 +85,7 @@ fn agent_load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = tool.input.get("id").and_then(|v| v.as_str());
 
     let Some(id) = id.filter(|s| !s.is_empty()) else {
-        PromptState::get_mut(state).active_agent_id = Some(library::default_agent_id().to_string());
+        PromptState::get_mut(state).active_agent_id = Some(library::default_agent_id().to_owned());
         state.touch_panel(Kind::SYSTEM);
         state.touch_panel(Kind::LIBRARY);
         return ToolResult::new(
@@ -101,7 +101,7 @@ fn agent_load(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), format!("Agent '{id}' not found"), true);
     }
 
-    PromptState::get_mut(state).active_agent_id = Some(id.to_string());
+    PromptState::get_mut(state).active_agent_id = Some(id.to_owned());
     state.touch_panel(Kind::SYSTEM);
     state.touch_panel(Kind::LIBRARY);
 
@@ -114,7 +114,7 @@ fn skill_load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) if !id.is_empty() => id,
         _ => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_owned(), true);
         }
     };
 
@@ -128,7 +128,7 @@ fn skill_load(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Check if already loaded
-    if PromptState::get(state).loaded_skill_ids.contains(&id.to_string()) {
+    if PromptState::get(state).loaded_skill_ids.contains(&id.to_owned()) {
         return ToolResult::new(tool.id.clone(), format!("Skill '{id}' is already loaded"), true);
     }
 
@@ -142,12 +142,12 @@ fn skill_load(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut elem = cp_base::state::context::make_default_entry(&panel_id, Kind::new(Kind::SKILL), &skill.name, false);
     elem.uid = Some(uid);
     elem.token_count = tokens;
-    elem.set_meta("skill_prompt_id", &id.to_string());
+    elem.set_meta("skill_prompt_id", &id.to_owned());
     elem.cached_content = Some(content);
     elem.last_refresh_ms = cp_base::panels::now_ms();
 
     state.context.push(elem);
-    PromptState::get_mut(state).loaded_skill_ids.push(id.to_string());
+    PromptState::get_mut(state).loaded_skill_ids.push(id.to_owned());
 
     state.touch_panel(Kind::LIBRARY);
 

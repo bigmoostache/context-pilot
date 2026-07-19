@@ -32,7 +32,7 @@ pub(crate) fn execute_queue_flush(
         return (
             crate::infra::tools::ToolResult::new(
                 tool.id.clone(),
-                "Queue is empty — nothing to execute.".to_string(),
+                "Queue is empty — nothing to execute.".to_owned(),
                 false,
             ),
             Vec::new(),
@@ -85,14 +85,14 @@ pub(crate) fn save_flushed_tool_call_message(app: &mut App, tool: &cp_base::tool
     let tool_msg = Message {
         id: tool_id,
         uid: Some(tool_global_uid),
-        role: "assistant".to_string(),
+        role: "assistant".to_owned(),
         msg_type: MsgKind::ToolCall,
         content: String::new(),
         content_token_count: 0,
         status: MsgStatus::Full,
         tool_uses: vec![ToolUseRecord {
             id: tool.id.clone(),
-            name: "Tool_execution".to_string(),
+            name: "Tool_execution".to_owned(),
             input: compact_input,
         }],
         tool_results: Vec::new(),
@@ -136,7 +136,7 @@ pub(crate) fn augment_remaining_history_panels(
     remaining.retain(|id| !queued_closes.contains(&id.as_str()));
 
     let suffix = if remaining.is_empty() {
-        "\nNo conversation history panels remaining.".to_string()
+        "\nNo conversation history panels remaining.".to_owned()
     } else {
         format!("\nRemaining conversation history panels: {}", remaining.join(", "))
     };

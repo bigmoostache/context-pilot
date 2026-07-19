@@ -59,9 +59,9 @@ pub(super) fn build_stream_read_error(ctx: &StreamErrorContext<'_>) -> String {
         Some((id, name, partial)) => {
             format!("In-flight tool: {} (id={}), partial input: {} bytes", name, id, partial.len())
         }
-        None => "No tool in progress".to_string(),
+        None => "No tool in progress".to_owned(),
     };
-    let recent = if ctx.last_lines.is_empty() { "(no lines read)".to_string() } else { ctx.last_lines.join("\n") };
+    let recent = if ctx.last_lines.is_empty() { "(no lines read)".to_owned() } else { ctx.last_lines.join("\n") };
     format!(
         "{}\n\
          Error kind: {error_kind} | Root cause: {}\n\
@@ -70,7 +70,7 @@ pub(super) fn build_stream_read_error(ctx: &StreamErrorContext<'_>) -> String {
          Response headers:\n{}\n\
          Last SSE lines:\n{recent}",
         ctx.err,
-        if root_cause.is_empty() { "(none)".to_string() } else { root_cause },
+        if root_cause.is_empty() { "(none)".to_owned() } else { root_cause },
         ctx.total_bytes,
         ctx.line_count,
         ctx.resp_headers,

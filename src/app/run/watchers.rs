@@ -49,7 +49,7 @@ fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpda
     let _fg = cp_base::flame!("cache_updates");
     while let Ok(update) = cache_rx.try_recv() {
         // Handle Unchanged early — just clear in_flight, no panel dispatch needed
-        if let CacheUpdate::Unchanged { ref context_id } = update {
+        if let CacheUpdate::Unchanged { context_id } = &(update) {
             if let Some(ctx) = state.context.iter_mut().find(|c| c.id == *context_id) {
                 ctx.cache_in_flight = false;
                 ctx.cache_deprecated = false;
@@ -58,7 +58,7 @@ fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpda
         }
 
         // ModuleSpecific: match by context_type
-        if let CacheUpdate::ModuleSpecific { ref context_type, .. } = update {
+        if let CacheUpdate::ModuleSpecific { context_type, .. } = &(update) {
             let idx = state.context.iter().position(|c| c.context_type == *context_type);
             let Some(idx) = idx else { continue };
             let mut ctx = state.context.remove(idx);
@@ -71,7 +71,7 @@ fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpda
         }
 
         // Content: match by context_id
-        let CacheUpdate::Content { ref context_id, .. } = update else { continue };
+        let CacheUpdate::Content { context_id, .. } = &(update) else { continue };
         let idx = state.context.iter().position(|c| c.id == *context_id);
         let Some(idx) = idx else { continue };
         let mut ctx = state.context.remove(idx);
@@ -275,10 +275,10 @@ fn sync_file_watchers(app: &mut App) {
         for spec in module.watch_paths(&app.state) {
             match spec {
                 WatchSpec::File(path) => {
-                    let _ = wanted_files.insert(path);
+                    let _r = wanted_files.insert(path);
                 }
                 WatchSpec::Dir(path) | WatchSpec::DirRecursive(path) => {
-                    let _ = wanted_dirs.insert(path);
+                    let _r = wanted_dirs.insert(path);
                 }
             }
         }
@@ -289,19 +289,19 @@ fn sync_file_watchers(app: &mut App) {
         app.watched_file_paths.iter().filter(|p| !wanted_files.contains(*p)).cloned().collect();
     for path in &stale_files {
         watcher.unwatch_file(path);
-        let _ = app.watched_file_paths.remove(path);
+        let _r = app.watched_file_paths.remove(path);
     }
 
     let stale_dirs: Vec<String> = app.watched_dir_paths.iter().filter(|p| !wanted_dirs.contains(*p)).cloned().collect();
     for path in &stale_dirs {
         watcher.unwatch_dir(path);
-        let _ = app.watched_dir_paths.remove(path);
+        let _r = app.watched_dir_paths.remove(path);
     }
 
     // Add watches for new paths
     for path in wanted_files {
         if !app.watched_file_paths.contains(&path) && watcher.watch_file(&path).is_ok() {
-            let _ = app.watched_file_paths.insert(path);
+            let _r = app.watched_file_paths.insert(path);
         }
     }
     for module in &modules {
@@ -310,12 +310,12 @@ fn sync_file_watchers(app: &mut App) {
                 WatchSpec::File(_) => {} // Already handled above
                 WatchSpec::Dir(path) => {
                     if !app.watched_dir_paths.contains(&path) && watcher.watch_dir(&path).is_ok() {
-                        let _ = app.watched_dir_paths.insert(path);
+                        let _r = app.watched_dir_paths.insert(path);
                     }
                 }
                 WatchSpec::DirRecursive(path) => {
                     if !app.watched_dir_paths.contains(&path) && watcher.watch_dir_recursive(&path).is_ok() {
-                        let _ = app.watched_dir_paths.insert(path);
+                        let _r = app.watched_dir_paths.insert(path);
                     }
                 }
             }

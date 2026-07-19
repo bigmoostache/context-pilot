@@ -34,7 +34,7 @@ impl Panel for OverviewPanel {
         blocks
     }
     fn title(&self, _state: &State) -> String {
-        "Statistics".to_string()
+        "Statistics".to_owned()
     }
 
     fn max_freezes(&self) -> u8 {

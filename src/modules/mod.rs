@@ -138,7 +138,7 @@ pub(crate) fn all_modules() -> Vec<Box<dyn Module>> {
 
 /// Returns the default set of active module IDs (all modules).
 pub(crate) fn default_active_modules() -> HashSet<String> {
-    all_modules().iter().map(|m| m.id().to_string()).collect()
+    all_modules().iter().map(|m| m.id().to_owned()).collect()
 }
 
 /// Build a registry of tool visualizers from all modules.
@@ -148,7 +148,7 @@ pub(crate) fn build_visualizer_registry() -> HashMap<String, ToolVisualizer> {
     let mut registry = HashMap::new();
     for module in all_modules() {
         for (tool_id, visualizer) in module.tool_visualizers() {
-            let _r = registry.insert(tool_id.to_string(), visualizer);
+            let _r = registry.insert(tool_id.to_owned(), visualizer);
         }
     }
     registry
@@ -267,7 +267,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(changes) = tool.input.get("changes").and_then(serde_json::Value::as_array) else {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: "Missing 'changes' parameter (expected array)".to_string(),
+            content: "Missing 'changes' parameter (expected array)".to_owned(),
             display: None,
             tldr: None,
             is_error: true,
@@ -303,13 +303,13 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
                 if state.active_modules.contains(module_id) {
                     successes.push(format!("'{module_id}' already active"));
                 } else {
-                    let _r = state.active_modules.insert(module_id.to_string());
+                    let _r = state.active_modules.insert(module_id.to_owned());
                     // Rebuild tools list
                     rebuild_tools(state);
                     let description = all_mods
                         .iter()
                         .find(|m| m.id() == module_id)
-                        .map_or_else(|| "unknown".to_string(), |m| format!("'{}' ({})", m.name(), m.description()));
+                        .map_or_else(|| "unknown".to_owned(), |m| format!("'{}' ({})", m.name(), m.description()));
                     successes.push(format!("activated {description}"));
                 }
             }

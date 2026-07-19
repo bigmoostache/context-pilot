@@ -19,10 +19,10 @@ const BASE_URL: &str = "https://www.datalab.to/api/v1";
 const MAX_FILE_SIZE: u64 = 25 * 1024 * 1024;
 
 /// Maximum time to wait for a single conversion to complete.
-const MAX_POLL_DURATION: Duration = Duration::from_secs(300);
+const MAX_POLL_DURATION: Duration = Duration::from_mins(5);
 
 /// Initial delay between poll requests.
-const POLL_INITIAL_DELAY: Duration = Duration::from_millis(2_000);
+const POLL_INITIAL_DELAY: Duration = Duration::from_secs(2);
 
 /// Maximum delay between poll requests.
 const POLL_MAX_DELAY: Duration = Duration::from_secs(30);
@@ -94,11 +94,11 @@ impl DatalabClient {
     /// Returns an error if the HTTP client cannot be built.
     pub(crate) fn new(api_key: &str) -> Result<Self, String> {
         let http = reqwest::blocking::Client::builder()
-            .timeout(Duration::from_secs(120))
+            .timeout(Duration::from_mins(2))
             .build()
             .map_err(|e| format!("Cannot create Datalab HTTP client: {e}"))?;
 
-        Ok(Self { api_key: api_key.to_string(), http })
+        Ok(Self { api_key: api_key.to_owned(), http })
     }
 
     /// Convert a file via the Datalab API.
@@ -115,7 +115,7 @@ impl DatalabClient {
         // Validate file exists and check size.
         let meta = std::fs::metadata(path).map_err(|e| format!("Cannot read file '{}': {e}", path.display()))?;
         if meta.len() > MAX_FILE_SIZE {
-            return Err(format!("File '{}' is {} MB — exceeds 25 MB limit", path.display(), meta.len() >> 20,));
+            return Err(format!("File '{}' is {} MB — exceeds 25 MB limit", path.display(), meta.len() >> 20));
         }
 
         let file_bytes = std::fs::read(path).map_err(|e| format!("Cannot read file '{}': {e}", path.display()))?;
@@ -129,7 +129,7 @@ impl DatalabClient {
         }
 
         // Cache miss — call the Datalab API.
-        let file_name = path.file_name().and_then(std::ffi::OsStr::to_str).unwrap_or("document").to_string();
+        let file_name = path.file_name().and_then(std::ffi::OsStr::to_str).unwrap_or("document").to_owned();
 
         let request_id = self.submit(&file_bytes, &file_name, mode)?;
 
@@ -173,13 +173,13 @@ impl DatalabClient {
         let mime = mime_for_extension(ext).unwrap_or("application/octet-stream");
 
         let file_part = reqwest::blocking::multipart::Part::bytes(file_bytes.to_vec())
-            .file_name(file_name.to_string())
+            .file_name(file_name.to_owned())
             .mime_str(mime)
             .map_err(|e| format!("Cannot set MIME type: {e}"))?;
 
         let form = reqwest::blocking::multipart::Form::new()
             .part("file", file_part)
-            .text("output_format", mode.api_format().to_string())
+            .text("output_format", mode.api_format().to_owned())
             .text("mode", "fast")
             .text("disable_image_extraction", "true");
 
@@ -196,12 +196,12 @@ impl DatalabClient {
 
         if status == 200 || status == 202 {
             if let Some(id) = body.get("request_id").and_then(serde_json::Value::as_str) {
-                return Ok(id.to_string());
+                return Ok(id.to_owned());
             }
             if let Some(url_str) = body.get("request_check_url").and_then(serde_json::Value::as_str)
                 && let Some(id) = url_str.rsplit('/').next()
             {
-                return Ok(id.to_string());
+                return Ok(id.to_owned());
             }
             return Err(format!("OCR submit: response missing request_id: {body}"));
         }

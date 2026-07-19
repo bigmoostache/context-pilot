@@ -100,7 +100,7 @@ impl OplogWriter {
     ///
     /// Returns [`OplogError::Io`] if the directory or segment files cannot be
     /// created, read, scanned, or `fsync`'d.
-    pub fn open<P: AsRef<Path>>(dir: P) -> OplogResult<Self> {
+    pub fn open<P>(dir: P) -> OplogResult<Self> where P: AsRef<Path> {
         Self::open_with_segment_limit(dir, DEFAULT_SEGMENT_LIMIT)
     }
 
@@ -111,7 +111,7 @@ impl OplogWriter {
     ///
     /// Returns [`OplogError::Io`] for any filesystem failure during open,
     /// scan, torn-tail truncation, or initial-segment creation.
-    pub fn open_with_segment_limit<P: AsRef<Path>>(dir: P, segment_limit: u64) -> OplogResult<Self> {
+    pub fn open_with_segment_limit<P>(dir: P, segment_limit: u64) -> OplogResult<Self> where P: AsRef<Path> {
         let dir = dir.as_ref().to_path_buf();
         fs::create_dir_all(&dir)?;
 

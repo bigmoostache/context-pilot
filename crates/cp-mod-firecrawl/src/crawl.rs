@@ -22,13 +22,13 @@ pub(crate) fn exec_crawl(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let Some(url) = tool.input.get("url").and_then(|v| v.as_str()) else {
-        return err_result(tool, "Missing required parameter 'url'".to_string());
+        return err_result(tool, "Missing required parameter 'url'".to_owned());
     };
     let Some(output) = tool.input.get("output").and_then(|v| v.as_str()) else {
-        return err_result(tool, "Missing required parameter 'output'".to_string());
+        return err_result(tool, "Missing required parameter 'output'".to_owned());
     };
 
-    let url = url.to_string();
+    let url = url.to_owned();
     let output = std::path::PathBuf::from(output);
     let limit = tool.input.get("limit").and_then(serde_json::Value::as_u64).unwrap_or(10).min(100).to_u32();
     let max_depth = tool.input.get("max_depth").and_then(serde_json::Value::as_u64).map(Safe::to_u32);
@@ -63,7 +63,7 @@ pub(crate) fn exec_crawl(tool: &ToolUse, state: &mut State) -> ToolResult {
             Err(e) => return ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
         };
         if !start.success {
-            let msg = start.error.unwrap_or_else(|| "Unknown error".to_string());
+            let msg = start.error.unwrap_or_else(|| "Unknown error".to_owned());
             return ToolOutput {
                 content: format!("Crawl failed to start: {msg}"),
                 is_error: true,
@@ -73,7 +73,7 @@ pub(crate) fn exec_crawl(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
         let Some(job_id) = start.id else {
             return ToolOutput {
-                content: "Crawl started but no job ID returned".to_string(),
+                content: "Crawl started but no job ID returned".to_owned(),
                 is_error: true,
                 create_panel: None,
                 preserves_tempo: false,
@@ -81,7 +81,7 @@ pub(crate) fn exec_crawl(tool: &ToolUse, state: &mut State) -> ToolResult {
         };
 
         // 2. Poll until complete
-        let mut last_completed = 0_u32;
+        let mut last_completed = 0u32;
         for _ in 0..CRAWL_MAX_POLLS {
             std::thread::sleep(CRAWL_POLL_INTERVAL);
             let status = match client.poll_crawl(&job_id) {
@@ -102,7 +102,7 @@ pub(crate) fn exec_crawl(tool: &ToolUse, state: &mut State) -> ToolResult {
                     return write_crawl_output(&url, &output, status);
                 }
                 "failed" => {
-                    let msg = status.error.unwrap_or_else(|| "Unknown error".to_string());
+                    let msg = status.error.unwrap_or_else(|| "Unknown error".to_owned());
                     return ToolOutput {
                         content: format!("Crawl failed: {msg}"),
                         is_error: true,
@@ -151,7 +151,7 @@ fn write_crawl_output(url: &str, output: &std::path::Path, status: crate::types:
         let title = page.metadata.as_ref().and_then(|m| m.title.as_deref()).unwrap_or("untitled");
         let page_url = page.metadata.as_ref().and_then(|m| m.source_url.as_deref()).unwrap_or("unknown");
         writeln!(md, "## Page {} — {} ({})\n", i.saturating_add(1), title, page_url).unwrap_or(());
-        if let Some(ref content) = page.markdown {
+        if let Some(content) = &(page.markdown) {
             md.push_str(content);
             md.push_str("\n\n");
         }

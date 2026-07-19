@@ -103,7 +103,7 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
              2. Send a short acknowledgement (still_my_turn=true)",
         );
         let _r =
-            SpineState::create_notification(state, NotificationType::Custom, "focused_thread_input".to_string(), notif);
+            SpineState::create_notification(state, NotificationType::Custom, "focused_thread_input".to_owned(), notif);
     }
 
     for module in crate::modules::all_modules() {
@@ -171,7 +171,7 @@ fn apply_archive_thread(state: &mut State, thread_id: &str) {
     let focus = FocusState::get_mut(state);
     if focus.focused_thread_id.as_deref() == Some(thread_id) {
         focus.focused_thread_id = None;
-        focus.dangling_remaining = 0;
+        focus.dangling_remaining = 0i32;
         focus.escalation_level = 0;
     }
     let _prev = focus.last_read_count.remove(thread_id);
@@ -258,7 +258,7 @@ fn apply_delete_thread(state: &mut State, thread_id: &str) {
     let focus = FocusState::get_mut(state);
     if focus.focused_thread_id.as_deref() == Some(thread_id) {
         focus.focused_thread_id = None;
-        focus.dangling_remaining = 0;
+        focus.dangling_remaining = 0i32;
         focus.escalation_level = 0;
     }
     let _prev = focus.last_read_count.remove(thread_id);
@@ -342,7 +342,7 @@ fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
     }
 
     state.flags.ui.dirty = true;
-    log::info!("bridge: deleted {} message(s) from thread {thread_id} (target ts={message_ts})", to_delete.len(),);
+    log::info!("bridge: deleted {} message(s) from thread {thread_id} (target ts={message_ts})", to_delete.len());
 }
 
 // ── Stop / Interrupt ────────────────────────────────────────────────────

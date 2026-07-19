@@ -287,7 +287,7 @@ fn write_all_bounded(stream: &mut UnixStream, bytes: &[u8]) -> bool {
                 written = written.wrapping_add(n);
                 attempts = 0;
             }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                 attempts = attempts.wrapping_add(1);
                 if attempts >= MAX_WRITE_ATTEMPTS {
                     return false;

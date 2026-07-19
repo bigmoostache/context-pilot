@@ -309,7 +309,7 @@ impl PerfMetrics {
         // Extract frame data and release lock before processing ops
         let frame_samples: Vec<f64> = {
             let frame_times = self.frame_times.read().unwrap_or_else(std::sync::PoisonError::into_inner);
-            frame_times.recent(40).iter().map(|&us| us.to_f64() / 1000.0).collect()
+            frame_times.recent(40).iter().map(|&us| us.to_f64() / 1_000.0f64).collect()
         };
 
         // Extract op data under lock, then process without holding it
@@ -333,7 +333,7 @@ impl PerfMetrics {
                 let count = recent.len();
 
                 // Calculate mean
-                let mean_us = if count > 0 { recent.iter().sum::<u64>().to_f64() / count.to_f64() } else { 0.0 };
+                let mean_us = if count > 0 { recent.iter().sum::<u64>().to_f64() / count.to_f64() } else { 0.0f64 };
 
                 // Calculate standard deviation
                 let std_us = if count > 1 {
@@ -347,7 +347,7 @@ impl PerfMetrics {
                         / count.saturating_sub(1).to_f64();
                     variance.sqrt()
                 } else {
-                    0.0
+                    0.0f64
                 };
 
                 OpSnapshot {
@@ -363,11 +363,11 @@ impl PerfMetrics {
         op_snapshots.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
 
         let frame_avg_ms = if frame_samples.is_empty() {
-            0.0
+            0.0f64
         } else {
             frame_samples.iter().sum::<f64>() / frame_samples.len().to_f64()
         };
-        let frame_max_ms = frame_samples.iter().copied().fold(0.0, f64::max);
+        let frame_max_ms = frame_samples.iter().copied().fold(0.0f64, f64::max);
 
         PerfSnapshot {
             ops: op_snapshots,

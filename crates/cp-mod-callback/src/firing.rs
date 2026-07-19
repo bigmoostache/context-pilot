@@ -76,7 +76,7 @@ pub fn fire_callback(
     // Local:  CP_CHANGED_FILE  (singular, one file per invocation)
     let (env_key, env_val) = single_file.map_or_else(
         || ("CP_CHANGED_FILES", build_changed_files_env(&matched.matched_files)),
-        |file| ("CP_CHANGED_FILE", file.to_string()),
+        |file| ("CP_CHANGED_FILE", file.to_owned()),
     );
     let project_root = std::env::current_dir().unwrap_or_default().to_string_lossy().to_string();
 
@@ -105,7 +105,7 @@ pub fn fire_callback(
 
         // Check script exists and is readable before spawning
         if !script_path.exists() {
-            return Err(format!("Callback '{}' script not found: {}", def.name, script_path.display(),));
+            return Err(format!("Callback '{}' script not found: {}", def.name, script_path.display()));
         }
 
         format!(
@@ -153,7 +153,7 @@ pub fn fire_callback(
         callback_tag: Box::leak(format!("callback_{}", def.id).into_boxed_str()),
         success_message: def.success_message.clone(),
         blocking: is_blocking,
-        tool_use_id: blocking_tool_use_id.map(ToString::to_string),
+        tool_use_id: blocking_tool_use_id.map(str::to_owned),
         registered_at_ms: now,
         deadline_ms,
         desc: watcher_desc,
@@ -305,12 +305,12 @@ impl Watcher for CallbackWatcher {
             return None;
         }
 
-        let exit_code = handle.get_status().exit_code().unwrap_or(-1);
+        let exit_code = handle.get_status().exit_code().unwrap_or(-1i32);
 
         // Exit code 7 = "nothing to do" — silent success, suppress entirely.
         // Used by callbacks that fire broadly (e.g., pattern "*") but often have nothing to do.
         // Returning None consumes the watcher without producing any visible result.
-        if exit_code == 7 {
+        if exit_code == 7i32 {
             return Some(WatcherResult {
                 description: String::new(),
                 panel_id: None,
@@ -373,7 +373,7 @@ impl Watcher for CallbackWatcher {
         }
         let elapsed_s = ms_to_secs(now.saturating_sub(self.registered_at_ms));
         Some(WatcherResult {
-            description: format!("· {} TIMED OUT ({}s)", self.callback_name, elapsed_s,),
+            description: format!("· {} TIMED OUT ({}s)", self.callback_name, elapsed_s),
             panel_id: None,
             tool_use_id: self.tool_use_id.clone(),
             close_panel: false,

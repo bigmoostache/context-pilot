@@ -73,7 +73,7 @@ impl Module for TreeModule {
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(v) = data.get("tree_filter").and_then(|v| v.as_str()) {
-            TreeState::get_mut(state).filter = v.to_string();
+            v.clone_into(&mut TreeState::get_mut(state).filter);
         }
         if let Some(arr) = data.get("tree_descriptions")
             && let Ok(v) = serde_json::from_value(arr.clone())
@@ -86,8 +86,8 @@ impl Module for TreeModule {
         {
             let ts = TreeState::get_mut(state);
             ts.open_folders = v;
-            if !ts.open_folders.contains(&".".to_string()) {
-                ts.open_folders.insert(0, ".".to_string());
+            if !ts.open_folders.contains(&".".to_owned()) {
+                ts.open_folders.insert(0, ".".to_owned());
             }
         }
         // YAML backing store: migrate existing descriptions, then populate gaps
@@ -109,8 +109,8 @@ impl Module for TreeModule {
             let ts = TreeState::get_mut(state);
             ts.open_folders = v;
             // Ensure root is always open
-            if !ts.open_folders.contains(&".".to_string()) {
-                ts.open_folders.insert(0, ".".to_string());
+            if !ts.open_folders.contains(&".".to_owned()) {
+                ts.open_folders.insert(0, ".".to_owned());
             }
         }
     }
@@ -356,7 +356,7 @@ fn visualize_tree_output(content: &str, width: usize) -> Vec<cp_render::Block> {
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
             Block::Line(vec![Span::styled(display, semantic)])
         })

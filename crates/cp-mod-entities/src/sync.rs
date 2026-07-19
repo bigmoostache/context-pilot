@@ -37,7 +37,7 @@ pub(crate) fn ensure_index(port: u16, key: &str, index_uid: &str) -> Result<(), 
         "sortableAttributes": [],
         "typoTolerance": {
             "enabled": true,
-            "minWordSizeForTypos": { "oneTypo": 4, "twoTypos": 8 }
+            "minWordSizeForTypos": { "oneTypo": 4i32, "twoTypos": 8i32 }
         }
     });
     let _task = client.update_settings(index_uid, &settings)?;
@@ -376,11 +376,11 @@ fn format_cell_value(row: &rusqlite::Row<'_>, idx: usize) -> String {
     use rusqlite::types::ValueRef;
 
     let Ok(val) = row.get_ref(idx) else {
-        return "NULL".to_string();
+        return "NULL".to_owned();
     };
 
     match val {
-        ValueRef::Null => "NULL".to_string(),
+        ValueRef::Null => "NULL".to_owned(),
         ValueRef::Integer(n) => n.to_string(),
         ValueRef::Real(f) => f.to_string(),
         ValueRef::Text(bytes) => {

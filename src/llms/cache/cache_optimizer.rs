@@ -66,16 +66,16 @@ impl PrefixSums {
         let num_blocks = tokens.len();
         let prob = normalize_density(density_weights);
 
-        let mut big_t = vec![0.0_f64; num_blocks.saturating_add(1)];
-        let mut s_p = vec![0.0_f64; num_blocks.saturating_add(1)];
-        let mut s_pt = vec![0.0_f64; num_blocks.saturating_add(1)];
+        let mut big_t = vec![0.0f64; num_blocks.saturating_add(1)];
+        let mut s_p = vec![0.0f64; num_blocks.saturating_add(1)];
+        let mut s_pt = vec![0.0f64; num_blocks.saturating_add(1)];
 
         for idx in 1..=num_blocks {
             let tok = tokens.get(idx.saturating_sub(1)).copied().unwrap_or(0);
-            let p_val = prob.get(idx.saturating_sub(1)).copied().unwrap_or(0.0);
-            let prev_t = big_t.get(idx.saturating_sub(1)).copied().unwrap_or(0.0);
-            let prev_sp = s_p.get(idx.saturating_sub(1)).copied().unwrap_or(0.0);
-            let prev_spt = s_pt.get(idx.saturating_sub(1)).copied().unwrap_or(0.0);
+            let p_val = prob.get(idx.saturating_sub(1)).copied().unwrap_or(0.0f64);
+            let prev_t = big_t.get(idx.saturating_sub(1)).copied().unwrap_or(0.0f64);
+            let prev_sp = s_p.get(idx.saturating_sub(1)).copied().unwrap_or(0.0f64);
+            let prev_spt = s_pt.get(idx.saturating_sub(1)).copied().unwrap_or(0.0f64);
 
             let cur_t = prev_t + tok.to_f64();
             if let Some(slot) = big_t.get_mut(idx) {
@@ -99,13 +99,13 @@ impl PrefixSums {
     /// ```
     #[inline]
     fn block_cost(&self, left: usize, right: usize) -> f64 {
-        let cum_pt_right = self.s_pt.get(right).copied().unwrap_or(0.0);
-        let cum_pt_left = self.s_pt.get(left).copied().unwrap_or(0.0);
-        let tok_left = self.big_t.get(left).copied().unwrap_or(0.0);
-        let cum_prob_right = self.s_p.get(right).copied().unwrap_or(0.0);
-        let cum_prob_left = self.s_p.get(left).copied().unwrap_or(0.0);
+        let cum_pt_right = self.s_pt.get(right).copied().unwrap_or(0.0f64);
+        let cum_pt_left = self.s_pt.get(left).copied().unwrap_or(0.0f64);
+        let tok_left = self.big_t.get(left).copied().unwrap_or(0.0f64);
+        let cum_prob_right = self.s_p.get(right).copied().unwrap_or(0.0f64);
+        let cum_prob_left = self.s_p.get(left).copied().unwrap_or(0.0f64);
 
-        (cum_pt_right - cum_pt_left) - tok_left * (cum_prob_right - cum_prob_left)
+        tok_left.mul_add(-(cum_prob_right - cum_prob_left), cum_pt_right - cum_pt_left)
     }
 }
 
@@ -150,7 +150,7 @@ pub(crate) fn optimize_gamma(
 
     // ── Build super-block boundaries from Ω ─────────────────────────────
     let mut boundaries = Vec::with_capacity(omega.len().saturating_add(2));
-    boundaries.push(0_usize); // left sentinel
+    boundaries.push(0usize); // left sentinel
     boundaries.extend_from_slice(omega);
     boundaries.push(num_blocks); // right sentinel
     boundaries.sort_unstable();
@@ -193,12 +193,12 @@ pub(crate) fn optimize_gamma(
     let dp_rows = num_superblocks.saturating_add(1);
     let dp_cols = budget.saturating_add(1);
     let mut dp_table = vec![vec![f64::INFINITY; dp_cols]; dp_rows];
-    let mut choice = vec![vec![0_usize; dp_cols]; dp_rows];
+    let mut choice = vec![vec![0usize; dp_cols]; dp_rows];
 
     if let Some(row) = dp_table.get_mut(0)
         && let Some(cell) = row.get_mut(0)
     {
-        *cell = 0.0;
+        *cell = 0.0f64;
     }
 
     for blk in 1..=num_superblocks {
@@ -235,7 +235,7 @@ pub(crate) fn optimize_gamma(
     }
 
     // Find the best total number of cuts ≤ budget
-    let mut best_j = 0_usize;
+    let mut best_j = 0usize;
     let mut best_cost = dp_table.get(num_superblocks).and_then(|row| row.first()).copied().unwrap_or(f64::INFINITY);
 
     for total_j in 1..=budget {
@@ -276,12 +276,12 @@ pub(crate) fn optimize_gamma(
 /// Falls back to uniform if weights sum to zero or are degenerate.
 fn normalize_density(weights: &[f64]) -> Vec<f64> {
     let total: f64 = weights.iter().copied().sum();
-    if total <= 0.0 || !total.is_finite() {
+    if total <= 0.0f64 || !total.is_finite() {
         let len = weights.len();
         if len == 0 {
             return vec![];
         }
-        let uniform = 1.0 / len.to_f64();
+        let uniform = 1.0f64 / len.to_f64();
         return vec![uniform; len];
     }
     weights.iter().map(|&w| w.max(0.0) / total).collect()

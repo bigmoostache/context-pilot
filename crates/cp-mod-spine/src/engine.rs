@@ -191,11 +191,11 @@ fn build_transparent_continuation(unprocessed: &[&Notification], state: &State) 
         if last_role == Some("user") {
             ContinuationAction::Relaunch
         } else {
-            ContinuationAction::SyntheticMessage(INJECTIONS.spine.user_message_during_stream.trim_end().to_string())
+            ContinuationAction::SyntheticMessage(INJECTIONS.spine.user_message_during_stream.trim_end().to_owned())
         }
     } else {
         // Pure ReloadResume
-        ContinuationAction::SyntheticMessage(INJECTIONS.spine.reload_complete.trim_end().to_string())
+        ContinuationAction::SyntheticMessage(INJECTIONS.spine.reload_complete.trim_end().to_owned())
     }
 }
 
@@ -205,8 +205,8 @@ fn build_transparent_continuation(unprocessed: &[&Notification], state: &State) 
 pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool {
     match action {
         ContinuationAction::SyntheticMessage(content) => {
-            let _ = state.push_user_message(content);
-            let _ = state.push_empty_assistant();
+            let _idx = state.push_user_message(content);
+            let _ai = state.push_empty_assistant();
             state.begin_streaming();
             true
         }
@@ -219,10 +219,10 @@ pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool
                 .map(|m| m.role.as_str());
 
             if last_role != Some("user") {
-                let _ = state.push_user_message(INJECTIONS.spine.continue_msg.trim_end().to_string());
+                let _idx = state.push_user_message(INJECTIONS.spine.continue_msg.trim_end().to_owned());
             }
 
-            let _ = state.push_empty_assistant();
+            let _ai = state.push_empty_assistant();
             state.begin_streaming();
             true
         }

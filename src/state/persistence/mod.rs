@@ -215,7 +215,7 @@ pub(crate) fn load_state() -> State {
 /// Convert `PanelData` to `Entry`
 fn panel_to_context(panel: &PanelData, local_id: &str) -> Entry {
     Entry {
-        id: local_id.to_string(),
+        id: local_id.to_owned(),
         uid: Some(panel.uid.clone()),
         context_type: panel.panel_type.clone(),
         name: panel.name.clone(),

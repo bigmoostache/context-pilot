@@ -187,12 +187,12 @@ pub(super) fn finalize_stream(app: &mut App) {
         output_tokens,
         cache_hit_tokens,
         cache_miss_tokens,
-        ref stop_reason,
-        ref bp_hashes,
-        ref bp_panel_ids,
+        stop_reason,
+        bp_hashes,
+        bp_panel_ids,
         alive_count,
-        ref alive_positions_permille,
-    )) = app.pending_done
+        alive_positions_permille,
+    )) = &app.pending_done
         && app.typewriter.pending_chars.is_empty()
         && app.pending_tools.is_empty()
     {
@@ -200,7 +200,13 @@ pub(super) fn finalize_stream(app: &mut App) {
         let stop_reason = stop_reason.clone();
         match apply_action(
             &mut app.state,
-            Action::StreamDone { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason },
+            Action::StreamDone {
+                input_tokens: *input_tokens,
+                output_tokens: *output_tokens,
+                cache_hit_tokens: *cache_hit_tokens,
+                cache_miss_tokens: *cache_miss_tokens,
+                stop_reason,
+            },
         ) {
             ActionResult::SaveMessage(id) => {
                 if let Some(msg) = app.state.messages.iter().find(|m| m.id == id) {
@@ -237,7 +243,7 @@ pub(super) fn finalize_stream(app: &mut App) {
             );
             engine.prune(now_ms);
             engine.record_breakpoints(bp_hashes, now_ms);
-            app.state.tick_alive_breakpoints = alive_count;
+            app.state.tick_alive_breakpoints = *alive_count;
             app.state.tick_alive_bp_positions = alive_positions_permille.clone();
             app.state.cache_engine_json = Some(engine.to_json());
         }

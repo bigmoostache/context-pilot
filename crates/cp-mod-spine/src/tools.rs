@@ -8,14 +8,14 @@ use cp_base::cast::Safe as _;
 /// Execute the `notification_mark_processed` tool
 pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolResult {
     let all_ids: Vec<String> = match tool.input.get("ids").and_then(|v| v.as_array()) {
-        Some(arr) => arr.iter().filter_map(|v| v.as_str().map(ToString::to_string)).collect(),
+        Some(arr) => arr.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect(),
         None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'ids' parameter.".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing required 'ids' parameter.".to_owned(), true);
         }
     };
 
     if all_ids.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Empty 'ids' array.".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Empty 'ids' array.".to_owned(), true);
     }
 
     let mut marked = Vec::new();
@@ -31,7 +31,7 @@ pub(crate) fn execute_mark_processed(tool: &ToolUse, state: &mut State) -> ToolR
         match status {
             Some(true) => already.push(id.as_str()),
             Some(false) => {
-                let _ = SpineState::mark_notification_processed(state, id);
+                let _marked = SpineState::mark_notification_processed(state, id);
                 marked.push(id.as_str());
             }
             None => not_found.push(id.as_str()),
@@ -67,13 +67,12 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
     if let Some(v) = tool.input.get("max_output_tokens") {
         if v.is_null() {
             SpineState::get_mut(state).config.max_output_tokens = None;
-            changes.push("max_output_tokens = disabled".to_string());
+            changes.push("max_output_tokens = disabled".to_owned());
         } else if let Some(n) = v.as_u64() {
             if n == 0 {
                 return ToolResult::new(
                     tool.id.clone(),
-                    "Error: max_output_tokens = 0 would permanently block all auto-continuation. Use null to disable."
-                        .to_string(),
+                    "Error: max_output_tokens = 0 would permanently block all auto-continuation. Use null to disable.".to_owned(),
                     true,
                 );
             }
@@ -85,13 +84,12 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
     if let Some(v) = tool.input.get("max_duration_secs") {
         if v.is_null() {
             SpineState::get_mut(state).config.max_duration_secs = None;
-            changes.push("max_duration_secs = disabled".to_string());
+            changes.push("max_duration_secs = disabled".to_owned());
         } else if let Some(n) = v.as_u64() {
             if n == 0 {
                 return ToolResult::new(
                     tool.id.clone(),
-                    "Error: max_duration_secs = 0 would permanently block all auto-continuation. Use null to disable."
-                        .to_string(),
+                    "Error: max_duration_secs = 0 would permanently block all auto-continuation. Use null to disable.".to_owned(),
                     true,
                 );
             }
@@ -103,13 +101,12 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
     if let Some(v) = tool.input.get("max_messages") {
         if v.is_null() {
             SpineState::get_mut(state).config.max_messages = None;
-            changes.push("max_messages = disabled".to_string());
+            changes.push("max_messages = disabled".to_owned());
         } else if let Some(n) = v.as_u64() {
             if n == 0 {
                 return ToolResult::new(
                     tool.id.clone(),
-                    "Error: max_messages = 0 would permanently block all auto-continuation. Use null to disable."
-                        .to_string(),
+                    "Error: max_messages = 0 would permanently block all auto-continuation. Use null to disable.".to_owned(),
                     true,
                 );
             }
@@ -121,13 +118,12 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
     if let Some(v) = tool.input.get("max_auto_retries") {
         if v.is_null() {
             SpineState::get_mut(state).config.max_auto_retries = None;
-            changes.push("max_auto_retries = disabled".to_string());
+            changes.push("max_auto_retries = disabled".to_owned());
         } else if let Some(n) = v.as_u64() {
             if n == 0 {
                 return ToolResult::new(
                     tool.id.clone(),
-                    "Error: max_auto_retries = 0 would permanently block all auto-continuation. Use null to disable."
-                        .to_string(),
+                    "Error: max_auto_retries = 0 would permanently block all auto-continuation. Use null to disable.".to_owned(),
                     true,
                 );
             }
@@ -140,7 +136,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
     if tool.input.get("reset_counters").and_then(serde_json::Value::as_bool) == Some(true) {
         SpineState::get_mut(state).config.auto_continuation_count = 0;
         SpineState::get_mut(state).config.autonomous_start_ms = None;
-        changes.push("reset runtime counters".to_string());
+        changes.push("reset runtime counters".to_owned());
     }
 
     state.touch_panel(Kind::SPINE);
@@ -148,7 +144,7 @@ pub(crate) fn execute_configure(tool: &ToolUse, state: &mut State) -> ToolResult
     if changes.is_empty() {
         ToolResult::new(
             tool.id.clone(),
-            "No changes made. Pass at least one parameter to configure.".to_string(),
+            "No changes made. Pass at least one parameter to configure.".to_owned(),
             false,
         )
     } else {

@@ -91,16 +91,16 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     state.stream_cache_miss_tokens = 0;
     state.stream_output_tokens = 0;
     state.stream_uncached_input_tokens = 0;
-    state.stream_cost_hit_usd = 0.0;
-    state.stream_cost_miss_usd = 0.0;
-    state.stream_cost_output_usd = 0.0;
+    state.stream_cost_hit_usd = 0.0f64;
+    state.stream_cost_miss_usd = 0.0f64;
+    state.stream_cost_output_usd = 0.0f64;
     state.tick_cache_hit_tokens = 0;
     state.tick_cache_miss_tokens = 0;
     state.tick_output_tokens = 0;
     state.tick_uncached_input_tokens = 0;
-    state.tick_cost_hit_usd = 0.0;
-    state.tick_cost_miss_usd = 0.0;
-    state.tick_cost_output_usd = 0.0;
+    state.tick_cost_hit_usd = 0.0f64;
+    state.tick_cost_miss_usd = 0.0f64;
+    state.tick_cost_output_usd = 0.0f64;
 
     // Return Save — the spine check in handle_action will detect the unprocessed
     // notification and start streaming synchronously for responsive feel.
@@ -132,8 +132,8 @@ fn create_user_notification(state: &mut State, user_id: &str, content_preview: &
     let _r = SpineState::create_notification(
         state,
         NotificationType::UserMessage,
-        user_id.to_string(),
-        content_preview.to_string(),
+        user_id.to_owned(),
+        content_preview.to_owned(),
     );
 }
 
@@ -220,7 +220,7 @@ fn handle_thread_create(state: &mut State) -> ActionResult {
     /// Maximum thread name length to prevent state bloat.
     const MAX_THREAD_NAME_LEN: usize = 200;
 
-    let name = state.input.trim().to_string();
+    let name = state.input.trim().to_owned();
 
     // Clear input regardless of outcome
     state.input.clear();
@@ -233,7 +233,7 @@ fn handle_thread_create(state: &mut State) -> ActionResult {
 
     // Cap thread name length
     let name = if name.len() > MAX_THREAD_NAME_LEN {
-        name.get(..name.floor_char_boundary(MAX_THREAD_NAME_LEN)).unwrap_or(&name).to_string()
+        name.get(..name.floor_char_boundary(MAX_THREAD_NAME_LEN)).unwrap_or(&name).to_owned()
     } else {
         name
     };
@@ -267,7 +267,7 @@ fn handle_thread_create(state: &mut State) -> ActionResult {
 /// Expand paste sentinel markers (\x00{idx}\x00) with actual paste buffer content.
 fn expand_paste_sentinels(input: &str, paste_buffers: &[String]) -> String {
     if !input.contains('\x00') {
-        return input.to_string();
+        return input.to_owned();
     }
 
     let mut result = String::new();
@@ -319,7 +319,7 @@ fn expand_paste_sentinels(input: &str, paste_buffers: &[String]) -> String {
 /// Only replaces at line start (after optional whitespace).
 fn replace_commands(input: &str, commands: &[PromptItem]) -> String {
     if commands.is_empty() || !input.contains('/') {
-        return input.to_string();
+        return input.to_owned();
     }
 
     input
@@ -327,7 +327,7 @@ fn replace_commands(input: &str, commands: &[PromptItem]) -> String {
         .map(|line| {
             let trimmed = line.trim_start();
             if !trimmed.starts_with('/') {
-                return line.to_string();
+                return line.to_owned();
             }
             // Extract the command token after /
             let token = trimmed.get(1..).unwrap_or("");
@@ -337,7 +337,7 @@ fn replace_commands(input: &str, commands: &[PromptItem]) -> String {
             commands
                 .iter()
                 .find(|cmd| cmd.id == cmd_id)
-                .map_or_else(|| line.to_string(), |cmd| format!("{}{}", cmd.content.trim_end(), rest))
+                .map_or_else(|| line.to_owned(), |cmd| format!("{}{}", cmd.content.trim_end(), rest))
         })
         .collect::<Vec<_>>()
         .join("\n")

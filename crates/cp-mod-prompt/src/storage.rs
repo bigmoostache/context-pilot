@@ -42,19 +42,19 @@ pub(crate) fn parse_prompt_file(content: &str) -> (String, String, String) {
     let trimmed = content.trim_start();
     if !trimmed.starts_with("---") {
         // No frontmatter — treat entire content as body
-        return (String::new(), String::new(), content.to_string());
+        return (String::new(), String::new(), content.to_owned());
     }
 
     // Find the closing ---
     let after_first = trimmed.get(3..).unwrap_or("");
     let Some(end) = after_first.find("\n---") else {
         // No closing --- found, treat as plain content
-        return (String::new(), String::new(), content.to_string());
+        return (String::new(), String::new(), content.to_owned());
     };
 
     let yaml_block = after_first.get(..end).unwrap_or("");
     let body_start = end.saturating_add(4); // skip \n---
-    let body = after_first.get(body_start..).unwrap_or("").trim_start_matches('\n').to_string();
+    let body = after_first.get(body_start..).unwrap_or("").trim_start_matches('\n').to_owned();
 
     let fm: Frontmatter = serde_yaml::from_str(yaml_block).unwrap_or_default();
     (fm.name, fm.description, body)
@@ -76,7 +76,7 @@ pub(crate) fn load_prompts_from_dir(dir: &Path, prompt_type: PromptType) -> Vec<
             continue;
         }
 
-        let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
+        let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_owned();
 
         if id.is_empty() {
             continue;
@@ -157,17 +157,17 @@ pub fn validate_frontmatter(content: &str) -> Result<(), String> {
 
     let trimmed = content.trim_start();
     if !trimmed.starts_with("---") {
-        return Err("File must start with YAML frontmatter (---)".to_string());
+        return Err("File must start with YAML frontmatter (---)".to_owned());
     }
     let after_first = trimmed.get(3..).unwrap_or("");
     let Some(end) = after_first.find("\n---") else {
-        return Err("Missing closing frontmatter delimiter (---)".to_string());
+        return Err("Missing closing frontmatter delimiter (---)".to_owned());
     };
     let yaml_block = after_first.get(..end).unwrap_or("");
 
     let fm: Fm = serde_yaml::from_str(yaml_block).map_err(|e| format!("Invalid YAML frontmatter: {e}"))?;
     if fm.name.as_deref().unwrap_or("").is_empty() {
-        return Err("Frontmatter must include a non-empty 'name' field".to_string());
+        return Err("Frontmatter must include a non-empty 'name' field".to_owned());
     }
     Ok(())
 }

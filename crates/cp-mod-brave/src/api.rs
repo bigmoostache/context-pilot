@@ -144,7 +144,7 @@ impl BraveClient {
 
     /// GET with 5xx retry (2 attempts, 1s delay).
     fn get_with_retry(&self, url: &str) -> Result<String, String> {
-        for attempt in 0..3 {
+        for attempt in 0i32..3i32 {
             let resp = self
                 .client
                 .get(url)
@@ -164,7 +164,7 @@ impl BraveClient {
                 403 => {
                     return Err(format!("Forbidden (403). Check API key. Response: {}", truncate(&body, 200)));
                 }
-                500..=599 if attempt < 2 => {
+                500..=599 if attempt < 2i32 => {
                     std::thread::sleep(Duration::from_secs(1));
                 }
                 _ => {
@@ -172,7 +172,7 @@ impl BraveClient {
                 }
             }
         }
-        Err("Max retries exceeded".to_string())
+        Err("Max retries exceeded".to_owned())
     }
 }
 

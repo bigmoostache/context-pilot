@@ -331,7 +331,7 @@ fn visualize_todo_output(content: &str, width: usize) -> Vec<cp_render::Block> {
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
             Block::Line(vec![Span::styled(display, semantic)])
         })

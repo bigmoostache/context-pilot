@@ -34,14 +34,14 @@ fn inject_global_params(schema: &mut Value) {
     if let Some(obj) = schema.as_object_mut() {
         if let Some(props) = obj.get_mut("properties").and_then(Value::as_object_mut) {
             drop(props.insert(
-                "intent".to_string(),
+                "intent".to_owned(),
                 json!({
                     "type": "string",
                     "description": "One-sentence TLDR"
                 }),
             ));
             drop(props.insert(
-                "verb".to_string(),
+                "verb".to_owned(),
                 json!({
                     "type": "string",
                     "description": "One-word TLDR"

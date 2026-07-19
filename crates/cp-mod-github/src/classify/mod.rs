@@ -24,7 +24,7 @@ fn parse_shell_args(command: &str) -> Result<Vec<String>, String> {
             '"' if !in_single => {
                 in_double = !in_double;
             }
-            c if c.is_whitespace() && !in_single && !in_double => {
+            ws if ws.is_whitespace() && !in_single && !in_double => {
                 if !current.is_empty() {
                     args.push(std::mem::take(&mut current));
                 }
@@ -36,10 +36,10 @@ fn parse_shell_args(command: &str) -> Result<Vec<String>, String> {
     }
 
     if in_single {
-        return Err("Unterminated single quote".to_string());
+        return Err("Unterminated single quote".to_owned());
     }
     if in_double {
-        return Err("Unterminated double quote".to_string());
+        return Err("Unterminated double quote".to_owned());
     }
     if !current.is_empty() {
         args.push(current);
@@ -63,13 +63,13 @@ fn check_shell_operators(command: &str) -> Result<(), String> {
                 return Err(format!("Shell operator '{c}' is not allowed"));
             }
             '$' if chars.get(i.saturating_add(1)) == Some(&'(') => {
-                return Err("Shell operator '$(' is not allowed".to_string());
+                return Err("Shell operator '$(' is not allowed".to_owned());
             }
             '&' if chars.get(i.saturating_add(1)) == Some(&'&') => {
-                return Err("Shell operator '&&' is not allowed".to_string());
+                return Err("Shell operator '&&' is not allowed".to_owned());
             }
             '\n' | '\r' => {
-                return Err("Newlines are not allowed outside of quoted strings".to_string());
+                return Err("Newlines are not allowed outside of quoted strings".to_owned());
             }
             _ => {}
         }
@@ -87,7 +87,7 @@ fn check_shell_operators(command: &str) -> Result<(), String> {
 pub fn validate_gh_command(command: &str) -> Result<Vec<String>, String> {
     let trimmed = command.trim();
     if !trimmed.starts_with("gh ") && trimmed != "gh" {
-        return Err("Command must start with 'gh '".to_string());
+        return Err("Command must start with 'gh '".to_owned());
     }
 
     check_shell_operators(trimmed)?;
@@ -97,7 +97,7 @@ pub fn validate_gh_command(command: &str) -> Result<Vec<String>, String> {
     let args: Vec<String> = all_args.into_iter().skip(1).collect();
 
     if args.is_empty() {
-        return Err("No gh subcommand specified".to_string());
+        return Err("No gh subcommand specified".to_owned());
     }
 
     Ok(args)

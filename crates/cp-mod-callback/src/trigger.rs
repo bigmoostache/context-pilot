@@ -46,7 +46,7 @@ pub fn collect_changed_files(tools: &[cp_base::tools::ToolUse]) -> Vec<ChangedFi
                     if let Some(relative) = anchor_path.strip_prefix(&project_root) {
                         anchor_path = relative.strip_prefix('/').unwrap_or(relative);
                     }
-                    let anchor_str = anchor_path.to_string();
+                    let anchor_str = anchor_path.to_owned();
 
                     // Parse skip_callbacks: string array of callback names
                     let skip_names = parse_skip_callbacks(&tool.input);
@@ -75,7 +75,7 @@ fn parse_skip_callbacks(input: &serde_json::Value) -> Vec<String> {
     input
         .get("skip_callbacks")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|item| item.as_str().map(ToString::to_string)).collect())
+        .map(|arr| arr.iter().filter_map(|item| item.as_str().map(str::to_owned)).collect())
         .unwrap_or_default()
 }
 
@@ -150,9 +150,9 @@ fn validate_skip_names(cs: &CallbackState, names: &[&str], warnings: &mut Vec<St
         if seen.contains(name) {
             continue;
         }
-        let _ = seen.insert(*name);
+        let _inserted = seen.insert(*name);
         if !cs.definitions.iter().any(|d| d.name == *name) {
-            warnings.push(format!("skip_callbacks: '{name}' does not match any defined callback",));
+            warnings.push(format!("skip_callbacks: '{name}' does not match any defined callback"));
         }
     }
 }

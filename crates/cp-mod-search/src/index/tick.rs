@@ -24,7 +24,7 @@ use crate::meili::api::MeiliClient;
 use crate::types::IndexerCmd;
 
 /// How often the tick runs (1 hour).
-const TICK_INTERVAL: Duration = Duration::from_secs(3600);
+const TICK_INTERVAL: Duration = Duration::from_hours(1);
 
 /// Everything the tick thread needs, bundled so `spawn` stays single-param.
 pub(crate) struct TickParams {

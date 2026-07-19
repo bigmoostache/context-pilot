@@ -41,10 +41,10 @@ impl ProcessStatus {
     #[must_use]
     pub fn label(self) -> String {
         match self {
-            Self::Running => "running".to_string(),
+            Self::Running => "running".to_owned(),
             Self::Finished(code) => format!("exited({code})"),
             Self::Failed(code) => format!("failed({code})"),
-            Self::Killed => "killed".to_string(),
+            Self::Killed => "killed".to_owned(),
         }
     }
 
@@ -131,7 +131,7 @@ impl ConsoleState {
 /// Format a wait result message for the LLM.
 #[must_use]
 pub fn format_wait_result(name: &str, exit_code: Option<i32>, panel_id: &str, last_lines: &str) -> String {
-    let code_str = exit_code.map_or_else(|| "?".to_string(), |c| c.to_string());
+    let code_str = exit_code.map_or_else(|| "?".to_owned(), |c| c.to_string());
     let now = now_ms();
     format!(
         "Console '{name}' condition met (exit_code={code_str}, panel={panel_id}, time={now}ms)\nLast output:\n{last_lines}"
@@ -245,9 +245,9 @@ impl Watcher for ConsoleWatcher {
                 close_panel: false,
                 create_panel: Some(DeferredPanel {
                     session_key: self.session_name.clone(),
-                    display_name: truncate_str(&self.command, 30).to_string(),
+                    display_name: truncate_str(&self.command, 30).to_owned(),
                     command: self.command.clone(),
-                    description: truncate_str(&self.command, 60).to_string(),
+                    description: truncate_str(&self.command, 60).to_owned(),
                     cwd: self.cwd.clone(),
                     callback_id: String::new(),
                     callback_name: String::new(),
@@ -292,9 +292,9 @@ impl Watcher for ConsoleWatcher {
                 close_panel: false,
                 create_panel: Some(DeferredPanel {
                     session_key: self.session_name.clone(),
-                    display_name: truncate_str(&self.command, 30).to_string(),
+                    display_name: truncate_str(&self.command, 30).to_owned(),
                     command: self.command.clone(),
-                    description: truncate_str(&self.command, 60).to_string(),
+                    description: truncate_str(&self.command, 60).to_owned(),
                     cwd: self.cwd.clone(),
                     callback_id: String::new(),
                     callback_name: String::new(),

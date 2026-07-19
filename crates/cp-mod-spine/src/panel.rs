@@ -78,7 +78,7 @@ impl SpinePanel {
                     let age_s = cp_base::panels::time_arith::ms_to_secs(now.saturating_sub(w.registered_ms()));
                     let mode = if w.is_blocking() { "blocking" } else { "async" };
                     let recurrence = if w.interval_ms() > 0 {
-                        w.recurrence_label().map_or_else(|| " recurrent".to_string(), |l| format!(" {l}"))
+                        w.recurrence_label().map_or_else(|| " recurrent".to_owned(), |l| format!(" {l}"))
                     } else {
                         String::new()
                     };
@@ -88,7 +88,7 @@ impl SpinePanel {
             }
         }
 
-        output.trim_end().to_string()
+        output.trim_end().to_owned()
     }
 }
 
@@ -222,7 +222,7 @@ impl Panel for SpinePanel {
                     };
                     blocks.push(Block::Line(vec![
                         S::styled(format!("  {mode_icon} "), mode_sem),
-                        S::new(w.description().to_string()),
+                        S::new(w.description().to_owned()),
                         S::styled(recurrence_span, Semantic::Accent),
                         S::muted(format!(" ({age_s}s)")),
                     ]));
@@ -233,7 +233,7 @@ impl Panel for SpinePanel {
         blocks
     }
     fn title(&self, _state: &State) -> String {
-        "Spine".to_string()
+        "Spine".to_owned()
     }
 
     fn refresh(&self, state: &mut State) {
@@ -243,7 +243,7 @@ impl Panel for SpinePanel {
         for ctx in &mut state.context {
             if ctx.context_type.as_str() == Kind::SPINE {
                 ctx.token_count = token_count;
-                let _ = cp_base::panels::update_if_changed(ctx, &content);
+                let _changed = cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }

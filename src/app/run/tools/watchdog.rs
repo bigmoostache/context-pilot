@@ -218,14 +218,14 @@ fn dump_diagnostic(w: &Wedge) {
     let cpu = cpu_busy_pct();
     let cpu_line = cpu.map_or_else(|| "CPU usage: (unavailable)".to_owned(), |pct| format!("CPU usage: {pct:.0}%"));
     let interpretation = match cpu {
-        Some(p) if p >= 70.0 => {
+        Some(p) if p >= 70.0f64 => {
             format!(
                 "→ CPU is HIGH: a busy-loop / runaway computation in step '{}' \
                      (e.g. tree rehash, infinite loop).",
                 step.name()
             )
         }
-        Some(p) if p <= 15.0 => {
+        Some(p) if p <= 15.0f64 => {
             format!(
                 "→ CPU is LOW: a blocked syscall or lock (network/socket/disk/mutex) \
                      in step '{}'.",

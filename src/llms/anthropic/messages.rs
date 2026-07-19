@@ -48,7 +48,7 @@ pub(in crate::llms) fn messages_to_api(
                 });
             }
             if !content_blocks.is_empty() {
-                api_messages.push(ApiMessage { role: "user".to_string(), content: content_blocks });
+                api_messages.push(ApiMessage { role: "user".to_owned(), content: content_blocks });
             }
             continue;
         }
@@ -105,18 +105,18 @@ fn inject_panel_messages(api_messages: &mut Vec<ApiMessage>, ctx: &PanelInjectio
         let text = if idx == 0 { format!("{}\n\n{}", panel_header_text(), timestamp_text) } else { timestamp_text };
 
         api_messages.push(ApiMessage {
-            role: "assistant".to_string(),
+            role: "assistant".to_owned(),
             content: vec![
                 ContentBlock::Text { text },
                 ContentBlock::ToolUse {
                     id: format!("panel_{}", panel.panel_id),
-                    name: "dynamic_panel".to_string(),
+                    name: "dynamic_panel".to_owned(),
                     input: serde_json::json!({ "id": panel.panel_id }),
                 },
             ],
         });
         api_messages.push(ApiMessage {
-            role: "user".to_string(),
+            role: "user".to_owned(),
             content: vec![ContentBlock::ToolResult {
                 tool_use_id: format!("panel_{}", panel.panel_id),
                 content: panel.content.clone(),
@@ -127,35 +127,35 @@ fn inject_panel_messages(api_messages: &mut Vec<ApiMessage>, ctx: &PanelInjectio
     // Footer after all panels
     let footer = panel_footer_text(ctx.current_ms);
     api_messages.push(ApiMessage {
-        role: "assistant".to_string(),
+        role: "assistant".to_owned(),
         content: vec![
             ContentBlock::Text { text: footer },
             ContentBlock::ToolUse {
-                id: "panel_footer".to_string(),
-                name: "dynamic_panel".to_string(),
+                id: "panel_footer".to_owned(),
+                name: "dynamic_panel".to_owned(),
                 input: serde_json::json!({ "action": "end_panels" }),
             },
         ],
     });
     api_messages.push(ApiMessage {
-        role: "user".to_string(),
+        role: "user".to_owned(),
         content: vec![ContentBlock::ToolResult {
-            tool_use_id: "panel_footer".to_string(),
-            content: crate::infra::constants::prompts::panel_footer_ack().to_string(),
+            tool_use_id: "panel_footer".to_owned(),
+            content: crate::infra::constants::prompts::panel_footer_ack().to_owned(),
         }],
     });
 
     // Re-inject seed/system prompt after panels
     if let Some(seed) = ctx.seed_content {
         api_messages.push(ApiMessage {
-            role: "user".to_string(),
+            role: "user".to_owned(),
             content: vec![ContentBlock::Text {
                 text: format!("System instructions (repeated for emphasis):\n\n{seed}"),
             }],
         });
         api_messages.push(ApiMessage {
-            role: "assistant".to_string(),
-            content: vec![ContentBlock::Text { text: "Understood. I will follow these instructions.".to_string() }],
+            role: "assistant".to_owned(),
+            content: vec![ContentBlock::Text { text: "Understood. I will follow these instructions.".to_owned() }],
         });
     }
 }

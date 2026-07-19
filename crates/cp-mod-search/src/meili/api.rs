@@ -49,7 +49,7 @@ impl MeiliClient {
             .build()
             .map_err(|e| format!("Cannot create HTTP client: {e}"))?;
 
-        Ok(Self { base_url: format!("http://127.0.0.1:{port}"), api_key: api_key.to_string(), http })
+        Ok(Self { base_url: format!("http://127.0.0.1:{port}"), api_key: api_key.to_owned(), http })
     }
 
     /// Base URL for the Meilisearch server.
@@ -328,7 +328,7 @@ impl MeiliClient {
             .map_err(|e| format!("version request failed: {e}"))?;
 
         let json: serde_json::Value = resp.json().map_err(|e| format!("version parse failed: {e}"))?;
-        Ok(json.get("pkgVersion").and_then(serde_json::Value::as_str).unwrap_or("unknown").to_string())
+        Ok(json.get("pkgVersion").and_then(serde_json::Value::as_str).unwrap_or("unknown").to_owned())
     }
 
     /// Get recent tasks filtered to specific index UIDs (`GET /tasks?limit=N&indexUids=...`).
@@ -364,19 +364,19 @@ impl MeiliClient {
         if let Some(f) = params.filter
             && let Some(obj) = body.as_object_mut()
         {
-            let _prev = obj.insert("filter".to_string(), serde_json::Value::String(f.to_string()));
+            let _prev = obj.insert("filter".to_owned(), serde_json::Value::String(f.to_owned()));
         }
         if let Some(s) = params.sort
             && let Some(obj) = body.as_object_mut()
         {
             let _prev = obj
-                .insert("sort".to_string(), serde_json::Value::Array(vec![serde_json::Value::String(s.to_string())]));
+                .insert("sort".to_owned(), serde_json::Value::Array(vec![serde_json::Value::String(s.to_owned())]));
         }
         if let Some(ratio) = params.semantic_ratio
             && let Some(obj) = body.as_object_mut()
         {
             let _prev = obj.insert(
-                "hybrid".to_string(),
+                "hybrid".to_owned(),
                 serde_json::json!({
                     "semanticRatio": ratio,
                     "embedder": "default"
@@ -431,7 +431,7 @@ impl MeiliClient {
             .map(|params| {
                 let mut body = Self::build_search_body(params);
                 if let Some(obj) = body.as_object_mut() {
-                    let _prev = obj.insert("indexUid".to_string(), serde_json::Value::String(params.uid.to_string()));
+                    let _prev = obj.insert("indexUid".to_owned(), serde_json::Value::String(params.uid.to_owned()));
                 }
                 body
             })
@@ -469,11 +469,11 @@ impl MeiliClient {
     pub fn facet_distribution(&self, uid: &str, facets: &[&str]) -> Result<serde_json::Value, String> {
         let url = format!("{}/indexes/{uid}/search", self.base_url);
         let facet_arr: Vec<serde_json::Value> =
-            facets.iter().map(|f| serde_json::Value::String((*f).to_string())).collect();
+            facets.iter().map(|f| serde_json::Value::String((*f).to_owned())).collect();
 
         let body = serde_json::json!({
             "q": "",
-            "limit": 0,
+            "limit": 0i32,
             "facets": facet_arr,
         });
 

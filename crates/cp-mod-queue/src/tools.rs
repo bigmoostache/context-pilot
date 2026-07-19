@@ -11,7 +11,7 @@ pub(crate) fn execute_pause(tool: &ToolUse, state: &mut State) -> ToolResult {
     if !qs.active {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: "Queue is already paused/inactive.".to_string(),
+            content: "Queue is already paused/inactive.".to_owned(),
             display: None,
             tldr: None,
             is_error: false,
@@ -40,7 +40,7 @@ pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
         None => {
             return ToolResult {
                 tool_use_id: tool.id.clone(),
-                content: "Missing 'indices' parameter (expected array of numbers).".to_string(),
+                content: "Missing 'indices' parameter (expected array of numbers).".to_owned(),
                 display: None,
                 tldr: None,
                 is_error: true,

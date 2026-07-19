@@ -19,19 +19,19 @@ impl CallbackPanel {
         let cs = CallbackState::get(state);
 
         if cs.definitions.is_empty() {
-            return "No callbacks configured.".to_string();
+            return "No callbacks configured.".to_owned();
         }
 
         let mut lines = Vec::new();
         lines
-            .push("| ID | Name | Pattern | Description | Blocking | Timeout | Scope | Success Msg | CWD |".to_string());
+            .push("| ID | Name | Pattern | Description | Blocking | Timeout | Scope | Success Msg | CWD |".to_owned());
         lines.push(
-            "|------|------|---------|-------------|----------|---------|-------|-------------|-----|".to_string(),
+            "|------|------|---------|-------------|----------|---------|-------|-------------|-----|".to_owned(),
         );
 
         for def in &cs.definitions {
             let blocking = if def.blocking { "yes" } else { "no" };
-            let timeout = def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{t}s"));
+            let timeout = def.timeout_secs.map_or_else(|| "—".to_owned(), |t| format!("{t}s"));
             let success = def.success_message.as_deref().unwrap_or("—");
             let cwd = def.cwd.as_deref().unwrap_or("project root");
             let scope = if def.is_global { "global" } else { "local" };
@@ -43,7 +43,7 @@ impl CallbackPanel {
         }
 
         // If editor is open, append the script content below the table with warning
-        if let Some(ref editor_name) = cs.editor_open
+        if let Some(editor_name) = &cs.editor_open
             && let Some(def) = cs.definitions.iter().find(|d| d.name == *editor_name)
         {
             lines.push(String::new());
@@ -56,16 +56,16 @@ impl CallbackPanel {
                 "Pattern: {} | Blocking: {} | Timeout: {}",
                 def.pattern,
                 if def.blocking { "yes" } else { "no" },
-                def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{t}s")),
+                def.timeout_secs.map_or_else(|| "—".to_owned(), |t| format!("{t}s")),
             ));
             lines.push(String::new());
 
             let script_path = PathBuf::from(constants::STORE_DIR).join("scripts").join(format!("{}.sh", def.name));
             match fs::read_to_string(&script_path) {
                 Ok(content) => {
-                    lines.push("```bash".to_string());
+                    lines.push("```bash".to_owned());
                     lines.push(content);
-                    lines.push("`".to_string());
+                    lines.push("`".to_owned());
                 }
                 Err(e) => {
                     lines.push(format!("Error reading script: {e}"));
@@ -134,7 +134,7 @@ impl Panel for CallbackPanel {
         let mut rows = Vec::new();
         for def in &cs.definitions {
             let blocking = if def.blocking { "yes" } else { "no" };
-            let timeout = def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{t}s"));
+            let timeout = def.timeout_secs.map_or_else(|| "—".to_owned(), |t| format!("{t}s"));
             let scope = if def.is_global { "global" } else { "local" };
             let success = def.success_message.as_deref().unwrap_or("—");
             let cwd = def.cwd.as_deref().unwrap_or("project root");
@@ -167,7 +167,7 @@ impl Panel for CallbackPanel {
         ));
 
         // If editor is open, render the script content below the table
-        if let Some(ref editor_name) = cs.editor_open
+        if let Some(editor_name) = &cs.editor_open
             && let Some(def) = cs.definitions.iter().find(|d| d.name == *editor_name)
         {
             blocks.push(Block::Empty);
@@ -189,7 +189,7 @@ impl Panel for CallbackPanel {
                     "Pattern: {} | Blocking: {} | Timeout: {}",
                     def.pattern,
                     if def.blocking { "yes" } else { "no" },
-                    def.timeout_secs.map_or_else(|| "—".to_string(), |t| format!("{t}s")),
+                    def.timeout_secs.map_or_else(|| "—".to_owned(), |t| format!("{t}s")),
                 ),
                 Semantic::Code,
             )]));
@@ -199,7 +199,7 @@ impl Panel for CallbackPanel {
             match fs::read_to_string(&script_path) {
                 Ok(content) => {
                     for line in content.lines() {
-                        blocks.push(Block::Line(vec![S::styled(line.to_string(), Semantic::Success)]));
+                        blocks.push(Block::Line(vec![S::styled(line.to_owned(), Semantic::Success)]));
                     }
                 }
                 Err(e) => {
@@ -211,7 +211,7 @@ impl Panel for CallbackPanel {
         blocks
     }
     fn title(&self, _state: &State) -> String {
-        "Callbacks".to_string()
+        "Callbacks".to_owned()
     }
 
     fn refresh(&self, state: &mut State) {
@@ -221,7 +221,7 @@ impl Panel for CallbackPanel {
         for ctx in &mut state.context {
             if ctx.context_type.as_str() == Kind::CALLBACK {
                 ctx.token_count = token_count;
-                let _ = cp_base::panels::update_if_changed(ctx, &content);
+                let _changed = cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }

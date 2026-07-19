@@ -40,7 +40,7 @@ pub fn refresh_git_status(state: &mut State) {
 
     // Get current branch
     if let Ok(output) = Command::new("git").args(["branch", "--show-current"]).output() {
-        let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let branch = String::from_utf8_lossy(&output.stdout).trim().to_owned();
         if branch.is_empty() {
             // Detached HEAD
             if let Ok(o2) = Command::new("git").args(["rev-parse", "--short", "HEAD"]).output() {
@@ -68,9 +68,9 @@ pub fn refresh_git_status(state: &mut State) {
             let [add_str, del_str, path_str, ..] = parts.as_slice() else {
                 continue;
             };
-            let additions = add_str.parse::<i32>().unwrap_or(0);
-            let deletions = del_str.parse::<i32>().unwrap_or(0);
-            let path = (*path_str).to_string();
+            let additions = add_str.parse::<i32>().unwrap_or(0i32);
+            let deletions = del_str.parse::<i32>().unwrap_or(0i32);
+            let path = (*path_str).to_owned();
 
             // Check if file exists to determine if deleted
             let change_type =
@@ -89,9 +89,9 @@ pub fn refresh_git_status(state: &mut State) {
             let [add_str, del_str, path_str, ..] = parts.as_slice() else {
                 continue;
             };
-            let additions = add_str.parse::<i32>().unwrap_or(0);
-            let deletions = del_str.parse::<i32>().unwrap_or(0);
-            let path = (*path_str).to_string();
+            let additions = add_str.parse::<i32>().unwrap_or(0i32);
+            let deletions = del_str.parse::<i32>().unwrap_or(0i32);
+            let path = (*path_str).to_owned();
 
             // Skip if already in the list
             if file_changes.iter().any(|f| f.path == path) {
@@ -107,12 +107,12 @@ pub fn refresh_git_status(state: &mut State) {
         && output.status.success()
     {
         for line in String::from_utf8_lossy(&output.stdout).lines() {
-            let path = line.trim().to_string();
+            let path = line.trim().to_owned();
             if path.is_empty() {
                 continue;
             }
             // Count lines for untracked files
-            let line_count = std::fs::read_to_string(&path).map_or(0, |c| c.lines().count().to_i32());
+            let line_count = std::fs::read_to_string(&path).map_or(0i32, |c| c.lines().count().to_i32());
 
             file_changes.push(GitFileChange {
                 path,
@@ -186,7 +186,7 @@ impl Module for GitModule {
 
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(v) = data.get("git_diff_base").and_then(|v| v.as_str()) {
-            GitState::get_mut(state).diff_base = Some(v.to_string());
+            GitState::get_mut(state).diff_base = Some(v.to_owned());
         }
     }
 
@@ -246,7 +246,7 @@ impl Module for GitModule {
 
     fn context_detail(&self, ctx: &cp_base::state::context::Entry) -> Option<String> {
         (ctx.context_type.as_str() == Kind::GIT_RESULT)
-            .then(|| ctx.get_meta_str("result_command").unwrap_or("").to_string())
+            .then(|| ctx.get_meta_str("result_command").unwrap_or("").to_owned())
     }
 
     fn overview_context_section(&self, state: &State) -> Option<String> {
@@ -270,12 +270,12 @@ impl Module for GitModule {
                 total_add = total_add.saturating_add(file.additions);
                 total_del = total_del.saturating_add(file.deletions);
                 let net = file.additions.saturating_sub(file.deletions);
-                let net_str = if net >= 0 { format!("+{net}") } else { format!("{net}") };
+                let net_str = if net >= 0i32 { format!("+{net}") } else { format!("{net}") };
                 let _r =
                     writeln!(output, "| {} | +{} | -{} | {} |", file.path, file.additions, file.deletions, net_str);
             }
             let total_net = total_add.saturating_sub(total_del);
-            let total_net_str = if total_net >= 0 { format!("+{total_net}") } else { format!("{total_net}") };
+            let total_net_str = if total_net >= 0i32 { format!("+{total_net}") } else { format!("{total_net}") };
             let _r = writeln!(output, "| **Total** | **+{total_add}** | **-{total_del}** | **{total_net_str}** |");
         }
         // Hard cap: a broken .gitignore (e.g. mid-rebase) can make git report
@@ -307,14 +307,14 @@ impl Module for GitModule {
     fn watch_paths(&self, _state: &State) -> Vec<cp_base::panels::WatchSpec> {
         use cp_base::panels::WatchSpec;
         vec![
-            WatchSpec::File(".git/HEAD".to_string()),
-            WatchSpec::File(".git/index".to_string()),
-            WatchSpec::File(".git/MERGE_HEAD".to_string()),
-            WatchSpec::File(".git/REBASE_HEAD".to_string()),
-            WatchSpec::File(".git/CHERRY_PICK_HEAD".to_string()),
-            WatchSpec::DirRecursive(".git/refs/heads".to_string()),
-            WatchSpec::DirRecursive(".git/refs/tags".to_string()),
-            WatchSpec::DirRecursive(".git/refs/remotes".to_string()),
+            WatchSpec::File(".git/HEAD".to_owned()),
+            WatchSpec::File(".git/index".to_owned()),
+            WatchSpec::File(".git/MERGE_HEAD".to_owned()),
+            WatchSpec::File(".git/REBASE_HEAD".to_owned()),
+            WatchSpec::File(".git/CHERRY_PICK_HEAD".to_owned()),
+            WatchSpec::DirRecursive(".git/refs/heads".to_owned()),
+            WatchSpec::DirRecursive(".git/refs/tags".to_owned()),
+            WatchSpec::DirRecursive(".git/refs/remotes".to_owned()),
         ]
     }
 
@@ -409,7 +409,7 @@ fn visualize_git_output(content: &str, width: usize) -> Vec<cp_render::Block> {
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
             Block::Line(vec![Span::styled(display, semantic)])
         })

@@ -149,7 +149,7 @@ impl Module for QuestionsModule {
         // Non-Think tool: drift counter toward (and below) zero
         let fire = {
             let ts = state.ext_mut::<ThinkState>();
-            ts.consecutive_count = ts.consecutive_count.saturating_sub(1).min(0);
+            ts.consecutive_count = ts.consecutive_count.saturating_sub(1).min(0i32);
             // Check if we've hit the next notification point
             if ts.consecutive_count == ts.next_notification_at {
                 ts.next_notification_at = ts.next_notification_at.saturating_add(ts.reminder_threshold);

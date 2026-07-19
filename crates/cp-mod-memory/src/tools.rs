@@ -23,11 +23,11 @@ fn validate_tldr(text: &str) -> Result<(), String> {
 pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("memory_create");
     let Some(memories) = tool.input.get("memories").and_then(|v| v.as_array()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'memories' array parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing 'memories' array parameter".to_owned(), true);
     };
 
     if memories.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Empty 'memories' array".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Empty 'memories' array".to_owned(), true);
     }
 
     let mut created: Vec<String> = Vec::new();
@@ -35,9 +35,9 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     for memory_value in memories {
         let content = if let Some(c) = memory_value.get("content").and_then(|v| v.as_str()) {
-            c.to_string()
+            c.to_owned()
         } else {
-            errors.push("Missing 'content' in memory".to_string());
+            errors.push("Missing 'content' in memory".to_owned());
             continue;
         };
 
@@ -58,7 +58,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
             .unwrap_or_default();
 
-        let contents = memory_value.get("contents").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let contents = memory_value.get("contents").and_then(|v| v.as_str()).unwrap_or("").to_owned();
 
         let ms = MemoryState::get_mut(state);
         let id = format!("M{}", ms.next_memory_id);
@@ -100,11 +100,11 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("memory_update");
     let Some(updates) = tool.input.get("updates").and_then(|v| v.as_array()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing 'updates' array parameter".to_owned(), true);
     };
 
     if updates.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Empty 'updates' array".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Empty 'updates' array".to_owned(), true);
     }
 
     let mut modified: Vec<String> = Vec::new();
@@ -114,7 +114,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     for update_value in updates {
         let Some(id) = update_value.get("id").and_then(|v| v.as_str()) else {
-            errors.push("Missing 'id' in update".to_string());
+            errors.push("Missing 'id' in update".to_owned());
             continue;
         };
 
@@ -130,9 +130,9 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 if let Some(key) = yaml_key {
                     storage::remove_yaml_entry(&key);
                 }
-                deleted.push(id.to_string());
+                deleted.push(id.to_owned());
             } else {
-                not_found.push(id.to_string());
+                not_found.push(id.to_owned());
             }
             continue;
         }
@@ -150,12 +150,12 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                         errors.push(format!("{id}: {e}"));
                         continue;
                     }
-                    m.tl_dr = content.to_string();
+                    content.clone_into(&mut m.tl_dr);
                     changes.push("content");
                 }
 
                 if let Some(contents) = update_value.get("contents").and_then(|v| v.as_str()) {
-                    m.contents = contents.to_string();
+                    contents.clone_into(&mut m.contents);
                     changes.push("contents");
                 }
 
@@ -178,7 +178,7 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
             }
             None => {
-                not_found.push(id.to_string());
+                not_found.push(id.to_owned());
             }
         }
     }
