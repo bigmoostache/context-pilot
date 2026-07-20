@@ -6576,3 +6576,40 @@ index 7715743e..6b36fef9 100644
  
    - path: "crates/cp-mod-bridge/src/error.rs"
 # --- End entry #59 ---
+60:89e68751a82495eb51bcd86669db051bb6b68e0d07c7b66402e33763fe9cd10b:2d0ea833bc0c6575598781603f4717dce9c325b6cf999af3359aa294a59bff0b:dbaf0052271db919f0f79c24b564f50ed3b1702b6ce7458c8c35489be87f8370
+# --- Diff for entry #60 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 6b36fef9..a404dff5 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -367,14 +367,6 @@ exceptions:
+     strategy: >
+       Irreducible — closed error taxonomy, wildcard arms are forbidden.
+ 
+-  - path: "crates/cp-render/src/frame.rs"
+-    match: "IR rendering contract: SidebarMode is a closed set"
+-    reason: >
+-      SidebarMode is a closed IR set constructed by the frame builder and matched
+-      exhaustively by the adapter; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-render/src/lib.rs"
+     match: "IR rendering contract: Align is a closed three-way set"
+     reason: >
+@@ -446,14 +438,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/state/data/mod.rs"
+-    match: "cache-break telemetry taxonomy"
+-    reason: >
+-      CacheBreakKind is a closed partition matched exhaustively by as_tsv and constructed
+-      cross-crate by the freeze pass; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/state/runtime/reverie.rs"
+     match: "reverie-kind contract"
+     reason: >
+# --- End entry #60 ---
