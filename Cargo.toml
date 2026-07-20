@@ -907,6 +907,19 @@ should_panic_without_expect = "forbid"
 significant_drop_in_scrutinee = "forbid"
 significant_drop_tightening = "forbid"
 similar_names = "forbid"
+# single_call_fn fires on every fn called exactly once in-crate. It is a
+# clippy "restriction" lint the upstream docs explicitly scope to niche audits,
+# NOT general use — it fights modular decomposition. Raising it would force
+# inlining named helper extractions (parser sub-steps like take_code/take_bold/
+# table_end, wire codec primitives u32_to_le/u64_from_le, API convenience
+# wrappers like hash::compute_str) back into their callers, ballooning those
+# parents past cognitive_complexity=forbid (threshold 7) + excessive_nesting=
+# forbid + the 500-line file cap, and scattering the per-fn #[expect] anchors
+# (e.g. the as_conversions expects on the wire narrowing fns) across call sites.
+# 53 workspace hits, every one a legitimate readability/doc extraction the lint
+# is simply wrong about. It stays at its default allow — like redundant_pub_crate,
+# a beacon that here points the wrong way against lints already at forbid.
+single_call_fn = "allow"
 single_char_add_str = "forbid"
 single_char_lifetime_names = "forbid"
 single_char_pattern = "forbid"

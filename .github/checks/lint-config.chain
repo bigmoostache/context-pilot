@@ -5998,3 +5998,30 @@ index c92accd0..5368b744 100644
  shadow_unrelated = "forbid"
  short_circuit_statement = "forbid"
 # --- End entry #49 ---
+50:3a4e936123c79a1f2e16303c19e1f11c3300280c3f0d6b19fd33e14e58957574:9a6fa98d93da194a00ba6b6c4db5e3d19cf81bf98ca51b3885754345c2902f98:c8e8d770d9b15a0ec2ec36f86800c995a3ad9f7a7e801b48f0c6c72b65b86631
+# --- Diff for entry #50 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 5368b744..6a304f52 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -907,6 +907,19 @@ should_panic_without_expect = "forbid"
+ significant_drop_in_scrutinee = "forbid"
+ significant_drop_tightening = "forbid"
+ similar_names = "forbid"
++# single_call_fn fires on every fn called exactly once in-crate. It is a
++# clippy "restriction" lint the upstream docs explicitly scope to niche audits,
++# NOT general use — it fights modular decomposition. Raising it would force
++# inlining named helper extractions (parser sub-steps like take_code/take_bold/
++# table_end, wire codec primitives u32_to_le/u64_from_le, API convenience
++# wrappers like hash::compute_str) back into their callers, ballooning those
++# parents past cognitive_complexity=forbid (threshold 7) + excessive_nesting=
++# forbid + the 500-line file cap, and scattering the per-fn #[expect] anchors
++# (e.g. the as_conversions expects on the wire narrowing fns) across call sites.
++# 53 workspace hits, every one a legitimate readability/doc extraction the lint
++# is simply wrong about. It stays at its default allow — like redundant_pub_crate,
++# a beacon that here points the wrong way against lints already at forbid.
++single_call_fn = "allow"
+ single_char_add_str = "forbid"
+ single_char_lifetime_names = "forbid"
+ single_char_pattern = "forbid"
+# --- End entry #50 ---

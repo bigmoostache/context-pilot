@@ -410,15 +410,16 @@ b5af3513e41563ec:
     Per-site buckets: (1) #[non_exhaustive]+constructor for in-crate-only construction; (2) add ::new/builder THEN non_exhaustive for cross-crate literal; (3) #[expect] last-resort (cap 5).
 
     A5 DONE+pushed f2fce464. exhaustive_structs=deny. Exactly 5 expects.
-    A6 float_arithmetic DONE+pushed. Chokepoint cast/float_math.rs. Chain #43.
+    A6 float_arithmetic DONE+pushed. Chokepoint cast/float_math.rs. Chain #43. (watchdog.rs linux-cfg-gated regression later folded into A11 commit.)
     A7 inline_modules DONE (chain #44). Structural, no gate.
     A8 non_ascii_literal DONE (chain #45). ZERO expects, glyphs escaped \u{XXXX}.
     A9 pattern_type_mismatch DONE+pushed c82ad408. forbid. ZERO NEW expects (4 pre-existing chokepoints). Chain #47.
-    A10 redundant_pub_crate DONE+pushed a4f052de. NOT RAISABLE — mutually exclusive with unreachable_pub=forbid (proven empirically: pub(crate)-in-private-module trips redundant_pub_crate wanting pub; pub trips unreachable_pub wanting pub(crate); deadlock). Kept at default allow, DOCUMENTED in Cargo.toml clippy table. Only 3 real hits (all cp-vault/dotenv.rs), census ~1202 was noise. Manual cleanup: global_env_path pub(crate)->private (own-module-only). read_env_key/write_env_entry stay pub(crate) (cross-module). Chain #48.
+    A10 redundant_pub_crate DONE+pushed a4f052de. NOT RAISABLE — mutually exclusive with unreachable_pub=forbid. Kept default allow, DOCUMENTED in Cargo.toml. global_env_path pub(crate)->private. Chain #48.
+    A11 shadow_reuse DONE+pushed b3f1ebe8. shadow_reuse=deny. ZERO expects (pure naming). ~66 sites renamed workspace-wide (source->raw_*/commanded/*_opt/*_var, keep processed value under orig name). Root gate + workspace clippy both 0 'is shadowed'. Chain #49. watchdog A6 float regression folded in.
 
-    Now A11 shadow_reuse (X1201): rename reused shadows. ~101 sites est. Autofixable? No — rename is contextual. MANUAL.
+    Now A12 single_call_fn (X1202): inline once-called fns OR assess anti-modular blocker. ~1075 sites est. NO autofix — inlining is contextual. Likely NOT raisable cleanly (would fight modular decomposition + 500-line caps). Assess feasibility first like A10.
 
-    GATE discipline: cargo clippy --all-targets from ROOT. chain.sh --password Totordu1789 (NO --update flag — auto-updates). git push plain (-25308 keychain warning benign). npx needs export PATH=/opt/homebrew/bin:$PATH.
+    GATE discipline: cargo clippy --all-targets from ROOT + cargo clippy --workspace for full census (per-crate deny aborts mask downstream). chain.sh via `printf 'Totordu1789\n' | ./chain.sh` (auto-updates). git push plain (-25308 keychain warning benign). npx needs export PATH=/opt/homebrew/bin:$PATH.
   importance: critical
   labels:
   - T588
@@ -426,7 +427,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784542079818
+  last_edited_ms: 1784543710622
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high
