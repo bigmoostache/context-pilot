@@ -367,14 +367,6 @@ exceptions:
     strategy: >
       Irreducible — closed error taxonomy, wildcard arms are forbidden.
 
-  - path: "crates/cp-render/src/lib.rs"
-    match: "IR rendering contract: Align is a closed three-way set"
-    reason: >
-      Align is a closed Left/Center/Right IR set constructed exhaustively across the
-      tui adapter; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
   - path: "crates/cp-vault/src/types.rs"
     match: "vault error taxonomy is a closed set"
     reason: >
@@ -446,14 +438,6 @@ exceptions:
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
-  - path: "crates/cp-base/src/ui/mod.rs"
-    match: "text-table alignment"
-    reason: >
-      This Align is a closed Left/Right set constructed cross-crate on TextCell and matched
-      exhaustively by pad_cell; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
   # ── exhaustive_enums: cp-oplog service/error contracts ───────────────
 
   - path: "crates/cp-oplog/src/error.rs"
@@ -473,14 +457,6 @@ exceptions:
       matched exhaustively by callers; non_exhaustive would force forbidden wildcard arms.
     strategy: >
       Irreducible — closed error taxonomy, wildcard arms are forbidden.
-
-  - path: "crates/cp-mod-spine/src/types.rs"
-    match: "notification-kind contract"
-    reason: >
-      NotificationType is a closed set serde-persisted and constructed cross-crate, matched
-      exhaustively by label() and the continuation builder; non_exhaustive would forbid it.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
   # ── exhaustive_structs: wide wire records where a constructor is worse ──
   # These public structs are legitimately exhaustive: each is a fixed-layout

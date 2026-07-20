@@ -5,10 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Notification type -- what triggered this notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "notification-kind contract: NotificationType is a closed set serde-persisted and constructed cross-crate, matched exhaustively by label() and the continuation builder; #[non_exhaustive] would forbid that construction"
-)]
+#[non_exhaustive]
 pub enum NotificationType {
     /// User sent a message
     UserMessage,

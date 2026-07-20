@@ -6613,3 +6613,55 @@ index 6b36fef9..a404dff5 100644
      match: "reverie-kind contract"
      reason: >
 # --- End entry #60 ---
+61:dbaf0052271db919f0f79c24b564f50ed3b1702b6ce7458c8c35489be87f8370:965efa7afb12e2da8a1c2b9a0723ef157604da9efa39baa9e07636d3fa8238b4:919da9bea5caccd9ce3afb494fd103ef116790ba1420be86642085cbd6d163c2
+# --- Diff for entry #61 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index a404dff5..c49a623f 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -367,14 +367,6 @@ exceptions:
+     strategy: >
+       Irreducible — closed error taxonomy, wildcard arms are forbidden.
+ 
+-  - path: "crates/cp-render/src/lib.rs"
+-    match: "IR rendering contract: Align is a closed three-way set"
+-    reason: >
+-      Align is a closed Left/Center/Right IR set constructed exhaustively across the
+-      tui adapter; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-vault/src/types.rs"
+     match: "vault error taxonomy is a closed set"
+     reason: >
+@@ -446,14 +438,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/ui/mod.rs"
+-    match: "text-table alignment"
+-    reason: >
+-      This Align is a closed Left/Right set constructed cross-crate on TextCell and matched
+-      exhaustively by pad_cell; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   # ── exhaustive_enums: cp-oplog service/error contracts ───────────────
+ 
+   - path: "crates/cp-oplog/src/error.rs"
+@@ -474,14 +458,6 @@ exceptions:
+     strategy: >
+       Irreducible — closed error taxonomy, wildcard arms are forbidden.
+ 
+-  - path: "crates/cp-mod-spine/src/types.rs"
+-    match: "notification-kind contract"
+-    reason: >
+-      NotificationType is a closed set serde-persisted and constructed cross-crate, matched
+-      exhaustively by label() and the continuation builder; non_exhaustive would forbid it.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   # ── exhaustive_structs: wide wire records where a constructor is worse ──
+   # These public structs are legitimately exhaustive: each is a fixed-layout
+   # wire record built cross-crate at a single site, and a constructor would take
+# --- End entry #61 ---

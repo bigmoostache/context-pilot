@@ -215,10 +215,7 @@ impl Span {
 
 /// Horizontal alignment for table cells.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "IR rendering contract: Align is a closed three-way set (Left/Center/Right) constructed exhaustively across the tui adapter; #[non_exhaustive] would forbid that cross-crate construction"
-)]
+#[non_exhaustive]
 pub enum Align {
     /// Left-aligned (default).
     Left,

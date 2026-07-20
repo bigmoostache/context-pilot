@@ -291,21 +291,17 @@ fn render_data_row(ctx: &RowCtx<'_>, row: &[cp_render::Cell], lines: &mut Vec<Li
 
 /// Push one aligned cell's spans (with padding) into a row's span list.
 fn push_cell_spans(spans: &mut Vec<Span<'static>>, cell: &cp_render::Cell, align: Align, padding: usize) {
-    match align {
-        Align::Right => {
-            spans.push(Span::raw(" ".repeat(padding)));
-            spans.extend(cell.spans.iter().map(ir_span_to_ratatui));
-        }
-        Align::Center => {
-            let (left_pad, right_pad) = center_padding(padding);
-            spans.push(Span::raw(" ".repeat(left_pad)));
-            spans.extend(cell.spans.iter().map(ir_span_to_ratatui));
-            spans.push(Span::raw(" ".repeat(right_pad)));
-        }
-        Align::Left => {
-            spans.extend(cell.spans.iter().map(ir_span_to_ratatui));
-            spans.push(Span::raw(" ".repeat(padding)));
-        }
+    if matches!(align, Align::Right) {
+        spans.push(Span::raw(" ".repeat(padding)));
+        spans.extend(cell.spans.iter().map(ir_span_to_ratatui));
+    } else if matches!(align, Align::Center) {
+        let (left_pad, right_pad) = center_padding(padding);
+        spans.push(Span::raw(" ".repeat(left_pad)));
+        spans.extend(cell.spans.iter().map(ir_span_to_ratatui));
+        spans.push(Span::raw(" ".repeat(right_pad)));
+    } else {
+        spans.extend(cell.spans.iter().map(ir_span_to_ratatui));
+        spans.push(Span::raw(" ".repeat(padding)));
     }
 }
 
@@ -341,13 +337,13 @@ const fn center_padding(total: usize) -> (usize, usize) {
 /// Pad a string to a given width with the specified alignment.
 fn pad_str(s: &str, width: usize, align: Align) -> String {
     let padding = width.saturating_sub(s.width());
-    match align {
-        Align::Left => format!("{s}{}", " ".repeat(padding)),
-        Align::Right => format!("{}{s}", " ".repeat(padding)),
-        Align::Center => {
-            let (left, right) = center_padding(padding);
-            format!("{}{s}{}", " ".repeat(left), " ".repeat(right))
-        }
+    if matches!(align, Align::Right) {
+        format!("{}{s}", " ".repeat(padding))
+    } else if matches!(align, Align::Center) {
+        let (left, right) = center_padding(padding);
+        format!("{}{s}{}", " ".repeat(left), " ".repeat(right))
+    } else {
+        format!("{s}{}", " ".repeat(padding))
     }
 }
 
