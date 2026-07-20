@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::infra::tools::{ParamType, ToolParam, ToolUse, Verdict};
+use crate::infra::tools::{ToolParam, ToolUse, Verdict};
 use crate::state::State;
 
 use super::all_modules;
@@ -116,11 +116,11 @@ fn validate_schema(input: &serde_json::Value, params: &[ToolParam], result: &mut
 
         // Type check if value present
         if let Some(val) = value {
-            if !check_type(val, &param.param_type) {
+            if !param.param_type.check_json(val) {
                 result.errors.push(format!(
                     "Parameter '{}': expected {}, got {}",
                     param.name,
-                    type_name(&param.param_type),
+                    param.param_type.type_name(),
                     json_type_name(val)
                 ));
             }
@@ -142,32 +142,6 @@ fn validate_schema(input: &serde_json::Value, params: &[ToolParam], result: &mut
 }
 
 // Here be dragons (and type mismatches)
-
-/// Check if a JSON value matches the expected `ParamType`.
-/// Lenient for arrays: a single value matching the inner type is accepted
-/// (common LLM mistake — sending `"path": "foo.rs"` instead of `"path": ["foo.rs"]`).
-fn check_type(value: &serde_json::Value, expected: &ParamType) -> bool {
-    cp_base::deref_match!(expected, {
-        ParamType::String => value.is_string(),
-        ParamType::Integer => value.is_i64() || value.is_u64(),
-        ParamType::Number => value.is_number(),
-        ParamType::Boolean => value.is_boolean(),
-        ParamType::Array(ref inner) => value.is_array() || check_type(value, inner),
-        ParamType::Object(_) => value.is_object(),
-    })
-}
-
-/// Human-readable name for a `ParamType`.
-const fn type_name(pt: &ParamType) -> &'static str {
-    match *pt {
-        ParamType::String => "string",
-        ParamType::Integer => "integer",
-        ParamType::Number => "number",
-        ParamType::Boolean => "boolean",
-        ParamType::Array(_) => "array",
-        ParamType::Object(_) => "object",
-    }
-}
 
 /// Human-readable name for a JSON value type.
 const fn json_type_name(val: &serde_json::Value) -> &'static str {

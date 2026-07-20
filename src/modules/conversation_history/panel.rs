@@ -73,10 +73,12 @@ fn render_toolresult_hist(msg: &cp_base::state::data::message::Message) -> Vec<c
 
 /// Render a single message into IR blocks (simplified history view).
 fn render_message_blocks(msg: &cp_base::state::data::message::Message) -> Vec<cp_render::Block> {
-    match msg.msg_type {
-        MsgKind::TextMessage => render_text_hist(msg),
-        MsgKind::ToolCall => render_toolcall_hist(msg),
-        MsgKind::ToolResult => render_toolresult_hist(msg),
+    if msg.msg_type == MsgKind::ToolCall {
+        render_toolcall_hist(msg)
+    } else if msg.msg_type == MsgKind::ToolResult {
+        render_toolresult_hist(msg)
+    } else {
+        render_text_hist(msg)
     }
 }
 

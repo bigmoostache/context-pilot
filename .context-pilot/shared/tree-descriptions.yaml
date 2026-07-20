@@ -502,6 +502,10 @@
   path: web/src/components/finder/Finder/shell.tsx
   description: Finder chrome + content render (P8 split). role=application keyboard-widget surface (jsx-a11y/no-noninteractive-{element-interactions,tabindex} scoped-off here in eslint.config.ts + registered — repath from old Finder.tsx). Renders FinderTabs+FinderToolbar+FinderBody+FinderPathBar+FinderOverlays from vs/listing/ctrl. Owns Favorites pins (useFinderPins) consumed by body+overlay.
   last_edited_ms: 1783460309907
+0624ab18e3b302a5:
+  path: .github/checks/check-rust-lints.sh
+  description: 'RUST-LINTS family guard (CI + rust-lints callback, --ci/--callback flags). Sub-checks: cargo fmt --check, clippy --all-targets -D warnings, cargo check (--ci only), lint-exception registry (delegates check-lint-exceptions.sh), vault-bypass full scan. Self-locating via git root.'
+  last_edited_ms: 1784563125006
 064c633984a0d856:
   path: crates/cp-mod-queue/src/types.rs
   description: 'QueueState + QueuedToolCall types. Trap fields: trap_active, trap_panel_ids, trap_optional_ids. Methods: enqueue, remove_by_index, flush, clear, is_queue_tool.'
@@ -1994,6 +1998,10 @@
   path: ui/src/components/shell/AgentSwitcher.tsx
   description: 'TopBar workspace switcher dropdown (1 agent=1 folder). activeId optional: with an agent it shows name+folder; at fleet altitude (undefined) it shows a neutral ''Select an agent'' placeholder (dashed-folder PlaceholderDot) so the card never vanishes. Items wrapped in DropdownMenuGroup (Base UI fix). Switch agent inline; New-agent/Manage jump to fleet (onFleet).'
   last_edited_ms: 1781533125740
+1aba8e48eab3d6d4:
+  path: crates/cp-wire/src/types/snapshot/mod.rs
+  description: 'Bounded replay snapshot: Snapshot (heads+seen+roster) + RosterThread #[non_exhaustive]+RosterThread::new(RosterEntryInit bundle). Heads/SeenSet fold helpers. RosterEntryInit exhaustive_structs #[expect] (7-field cross-crate literal). ThreadCreation borrowed payload.'
+  last_edited_ms: 1784563124920
 1abd5881ea46d04b:
   path: crates/cp-base/src/state/runtime.rs
   description: 'State struct — monolithic runtime: context/messages/input, flags, token+cost accumulators (total/stream/tick), LLM config, cache engine, tempo, render cache, TypeMap module_data (get_ext/ext/set_ext). Message creation helpers.'
@@ -2182,6 +2190,10 @@
   path: web/src/components/finder/GetInfo.tsx
   description: macOS-style 'Get Info' inspector modal for Finder nodes. Large kind icon, name, kind/size/dates, tags, dimensions/duration, 'where' path. Esc-to-close. Currently unused after T265 removal of Get Info from Finder.
   last_edited_ms: 1781877377336
+1d984b9a2e978c14:
+  path: crates/cp-mod-git/src/types.rs
+  description: 'Git types. GitChangeType enum #[non_exhaustive] (boss-hunt r9 kill — added in-crate const fn code() accessor M/A/U/D/R; downstream blocks.rs match rewritten to code(), import removed). GitFileChange, GitState, GitResultRequest.'
+  last_edited_ms: 1784562497438
 1d9f8b14df8b4372:
   path: crates/cp-base/src/lib.rs
   description: 'Foundation crate entry. Inline flame graph telemetry module (Guard RAII, folded-stack output, CP_FLAMEGRAPH=1 toggle). 7 modules: cast, config, flame, modules, panels, state, tools, ui. Tests: compile-time YAML validation (20 tool + 6 config YAML files) with #[expect(clippy::panic)].'
@@ -6982,6 +6994,10 @@
   path: src/app/run/threads/commands.rs
   description: 'Bridge command APPLICATION (K7 mutation half). apply_command dispatches SendMessage/CreateThread(paused:false)/ArchiveThread/RestoreThread/PauseThread(T371)/ResumeThread(T371)/DeleteThread(T371 permanent delete)/DeleteMessage(T416 per-message delete by epoch-ms timestamp)/Stop|Interrupt/Configure. DeleteThread removes thread from ThreadsState, cleans focus+bridge memos, emits durable ThreadDeleted. DeleteMessage removes single message by timestamp, emits durable MessageDeleted, updates bridge thread_msg_counts so emit_messages correctly detects subsequent appends (T418 fix). Cascade: deleting an assistant message also removes all consecutive auto:true messages following it (tool-trace cleanup), one MessageDeleted delta per removed message.'
   last_edited_ms: 0
+5cf286f61549dbb4:
+  path: crates/cp-mod-threads/src/types.rs
+  description: 'Thread types: ThreadStatus + ThreadAuthor enums #[non_exhaustive] (boss-hunt r9 kills — downstream matches in threads_view + app/run/threads rewritten to matches!(x,Variant), const-fn-safe). ThreadMessage, Thread, ThreadsState, FocusState.'
+  last_edited_ms: 1784562497552
 5d1e1686cb8c117b:
   path: ui/src/components/shell/ConfigPanel.tsx
   description: 'Shared settings body (macOS System-Settings: category rail + detail pane). variant=''dialog'' (DialogClose chrome) | ''inline'' (Save button). NO per-category title header (T20 — sidebar focus already names the page); dialog variant keeps only a slim close-only chrome bar. Categories: General/Usage & Cost/Providers/Search/DocAI/Web/Integrations. Usage renders <UsagePage/> full-bleed in a ''flex min-h-0 flex-1 flex-col overflow-hidden'' wrapper so UsagePage''s inner ScrollArea (flex-1/min-h-0) gets a flex parent and actually scrolls (T20 fix). Masked keys w/ reveal, Connected pills, toggles, default-model picker.'
@@ -6994,6 +7010,10 @@
   path: web/src/components/threads/fileUpload/FileSidebar.tsx
   description: Right-rail sidebar listing thread file attachments. ThreadFile type (file+role). Renders FileIcon + name + role label per attachment. Click opens Quick Look drawer via onOpen callback. Only shown when thread has file-upload blocks.
   last_edited_ms: 1784125252676
+5d56056f20646cb5:
+  path: crates/cp-mod-bridge/src/body.rs
+  description: 'Body Store (I13 content-addressed barrier). Stored enum (Inline/Spilled) #[non_exhaustive] (boss-hunt r9 kill — downstream match in app/run/threads/messages.rs rewritten to if-let). put inline-small/spill-large durable, get integrity-check, gc GAP3 grace.'
+  last_edited_ms: 1784562497637
 5d59dd38eaa87708:
   path: crates/cp-wire/src/types/oplog.rs
   description: 'OpEntry + OpEntryKind internally-tagged enum: CommandEffect, SeenMark, PhaseTransition, MessageCreated{...,inline_body}, MessageDeleted{thread_id,message_ts}, ThreadCreated/Archived/Restored/Paused/Resumed/Deleted/StatusChanged, ThreadFocusChanged, Lifecycle, CostAggregate, ContextUsage{used,threshold,budget,hit_tokens,miss_tokens (T297 cache split, #[serde(default)] N-1)}, Checkpoint, Unknown. Framed (len+CRC). round-trip + tolerant-decode + roster + stable-tag tests.'

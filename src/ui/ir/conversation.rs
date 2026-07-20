@@ -82,24 +82,20 @@ fn msg_to_ir(msg: &crate::state::Message) -> IrMessage {
 
 /// Build content blocks for a message based on its type.
 fn build_message_content(msg: &crate::state::Message) -> Vec<Block> {
-    match msg.msg_type {
-        MsgKind::TextMessage => {
-            if msg.content.is_empty() {
-                Vec::new()
-            } else {
-                // Each line becomes a Block::Line. Markdown rendering
-                // is deferred to the adapter layer (Phase 5).
-                msg.content.lines().map(|line| Block::text(line.to_owned())).collect()
-            }
+    if msg.msg_type == MsgKind::TextMessage {
+        if msg.content.is_empty() {
+            Vec::new()
+        } else {
+            // Each line becomes a Block::Line. Markdown rendering
+            // is deferred to the adapter layer (Phase 5).
+            msg.content.lines().map(|line| Block::text(line.to_owned())).collect()
         }
-        MsgKind::ToolCall => {
-            // Tool calls are represented via tool_uses, content is usually empty
-            if msg.content.is_empty() { Vec::new() } else { vec![Block::text(msg.content.clone())] }
-        }
-        MsgKind::ToolResult => {
-            // Tool results are represented via tool_results, content is usually empty
-            if msg.content.is_empty() { Vec::new() } else { vec![Block::text(msg.content.clone())] }
-        }
+    } else if msg.content.is_empty() {
+        // Tool calls / results carry their payload in tool_uses / tool_results;
+        // content is usually empty.
+        Vec::new()
+    } else {
+        vec![Block::text(msg.content.clone())]
     }
 }
 

@@ -401,21 +401,19 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'BOSS-HUNT (T595-T603): 13 total lint kills. r1=2 clippy::panic. r2=5 + r3=5 exhaustive_enums->non_exhaustive (crate-local enums). r8=1 ViewMode (downstream-match rewrite). Registry 81->68. Details in body.'
+  tl_dr: 'BOSS-HUNT (T595-T603): 22 total lint kills. Registry 81->53. r1=2 clippy::panic. r2=5+r3=5+r9=5(r3-refought) exhaustive_enums. r8=1 ViewMode. r10=4 (StreamPhase/MsgKind/MsgStatus/ParamType, downstream matches rewritten if/else + matches!). Details in body.'
   contents: |-
     T588 A5-A13 lints-as-beacons directive still governs. BOSS-HUNT rounds T595-T603:
 
     r1: 2 wins cp-base/src/lib.rs clippy::panic (panic!->assert!). Commit 824f6075.
+    r2: 5 wins exhaustive_enums->non_exhaustive crate-local: ProcessStatus, NotificationStatus, ContinuationAction, KeyCategory, AuthMechanism. c7db69ac. 79->74.
+    r3: 5 more: Outcome, CommandClass, MemoryImportance, PromptType, TodoStatus. 74->69.
+    r8: ViewMode. Downstream exhaustive match rewritten to if/==. 69->68.
+    r9: re-fought r3 losers, all won via match-rewrite (57b53cfe, 68->63): GitChangeType(const fn code() accessor), Stored(if-let), ThreadStatus+ThreadAuthor(matches!), SpineDecision(if-let/else-if chain).
+    r10: 6 model enums (Anthropic/Grok/Groq/DeepSeek/MiniMax/ClaudeCodeV2, all in-crate match *self) 63->57. Then 4 cp-base: StreamPhase(flags.rs), MsgKind+MsgStatus(message.rs), ParamType(tools.rs) -> non_exhaustive; 8 downstream exhaustive matches rewritten if/else + matches! (conversation panel/render_blocks/history, ui/ir/conversation, pre_flight already deref). 57->53. ParamType extraction: enum stays tools/mod.rs (path unchanged, pub_use FORBIDDEN by clippy::pub-use, so NO re-export), impl block moved to private sibling param_type.rs (inherent impl not path-scoped, applies globally); to_json_schema pub(super). mod.rs 510->440. Chain #58.
 
-    r2: 5 wins exhaustive_enums->non_exhaustive on crate-local enums: ProcessStatus (cp-mod-console), NotificationStatus + ContinuationAction (cp-mod-spine), KeyCategory + AuthMechanism (cp-vault). Commit c7db69ac. Registry 79->74.
-
-    r3: 5 more wins same technique: Outcome (cp-mod-bridge/tee), CommandClass (cp-mod-github/classify), MemoryImportance (cp-mod-memory), PromptType (cp-mod-prompt), TodoStatus (cp-mod-todo). Registry 74->69. chain #55.
-
-    r8 (T603 'You've gone lazy?'): WIN #13 ViewMode (cp-base/state/data/config.rs). KEY BREAKTHROUGH: a downstream-exhaustive-matched enum CAN take #[non_exhaustive] if you rewrite the match site to NOT need exhaustiveness. ViewMode had exactly ONE exhaustive match (src/ui/ir/sidebar.rs:44-45); rewrote it as `if view_mode==Threads {Hidden} else {Normal}` (== works, ViewMode: PartialEq). All other sites are == comparisons or .next() in-crate. non_exhaustive on ENUM does NOT block downstream construction of known variants (only STRUCTS block construction) - only blocks exhaustive match. Root clippy --all-targets clean, 0 E0004/E0639. Registry 69->68. chain re-append.
-
-    COROLLARY: r3 losers (SpineDecision/ThreadStatus/ThreadAuthor/Stored/GitChangeType) may now be BEATABLE via same match-rewrite technique - reassess before declaring irreducible. Each needs its downstream exhaustive match rewritten to if/== or a meaningful catch-all.
-
-    KEY INSIGHT: non_exhaustive only forbids exhaustive-match (E0004) + struct-construction (E0639) in DOWNSTREAM crates. Enum known-variant construction still allowed downstream. So an enum loses ONLY if a downstream exhaustive match can't be rewritten. Arbiter: root `cargo clippy --all-targets` E0004/E0639 count. cargo clippy --workspace floods 1298 pre-existing orchestrator errors (M157, out of gate scope).
+    KEY INSIGHT: non_exhaustive on ENUM only forbids downstream exhaustive-match (E0004) + struct construction (E0639, structs only); known-variant construction stays legal. Enum loses ONLY if downstream exhaustive match can't be rewritten to if/matches!/if-let. Arbiter: root cargo clippy --all-targets E0004/E0639 count.
+    GOTCHAS: const fn can't == enum (use matches!); else{if} collapsible_else_if forbid (else if); if-let chain needs trailing else; removing downstream match orphans import; clippy::pub-use forbids re-export (split inherent impl to sibling instead of pub use).
   importance: critical
   labels:
   - T588
@@ -423,7 +421,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784561927304
+  last_edited_ms: 1784563301364
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high

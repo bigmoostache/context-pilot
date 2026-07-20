@@ -13,6 +13,10 @@ pub mod async_exec;
 /// LLM API schema builder — injects global `intent`/`verb` into every tool.
 pub mod api_schema;
 
+/// Recursive JSON-Schema type of a tool parameter — the [`ParamType`] enum's
+/// inherent `impl` block lives in the private `param_type` sibling module.
+mod param_type;
+
 // =============================================================================
 // YAML Tool Text — deserialized from yamls/tools/*.yaml
 // =============================================================================
@@ -128,13 +132,14 @@ impl ToolResult {
 // Tool Definitions
 // =============================================================================
 
-/// JSON Schema type for a tool parameter. Recursive via [`Array`] and [`Object`].
+/// JSON Schema type for a tool parameter.
+///
+/// Recursive via [`Array`](ParamType::Array) and [`Object`](ParamType::Object).
+/// Its inherent methods live in the sibling `param_type` module (kept there for
+/// the 500-line structure limit).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "JSON-schema param type: ParamType is constructed by every tool definition cross-crate and matched exhaustively by to_json_schema; the set is closed and #[non_exhaustive] would forbid that construction"
-)]
+#[non_exhaustive]
 pub enum ParamType {
     /// Free-form string.
     String,
@@ -148,48 +153,6 @@ pub enum ParamType {
     Array(Box<Self>),
     /// Nested object with named fields.
     Object(Vec<ToolParam>),
-}
-
-impl ParamType {
-    /// Emit the JSON Schema representation (recursive for nested types).
-    fn to_json_schema(&self) -> Value {
-        crate::deref_match!(self, {
-            Self::String => json!({"type": "string"}),
-            Self::Integer => json!({"type": "integer"}),
-            Self::Number => json!({"type": "number"}),
-            Self::Boolean => json!({"type": "boolean"}),
-            Self::Array(ref inner) => json!({
-                "type": "array",
-                "items": inner.to_json_schema()
-            }),
-            Self::Object(ref params) => {
-                let mut properties = serde_json::Map::new();
-                let mut required = Vec::new();
-                for param in params {
-                    let mut schema = param.param_type.to_json_schema();
-                    if let Some(desc) = param.description.as_ref()
-                        && let Some(obj) = schema.as_object_mut()
-                    {
-                        drop(obj.insert("description".to_owned(), json!(desc)));
-                    }
-                    if let Some(enum_vals) = param.enum_values.as_ref()
-                        && let Some(obj) = schema.as_object_mut()
-                    {
-                        drop(obj.insert("enum".to_owned(), json!(enum_vals)));
-                    }
-                    drop(properties.insert(param.name.clone(), schema));
-                    if param.required {
-                        required.push(param.name.clone());
-                    }
-                }
-                json!({
-                    "type": "object",
-                    "properties": properties,
-                    "required": required
-                })
-            }
-        })
-    }
 }
 
 /// A single tool parameter in a [`ToolDefinition`] schema.

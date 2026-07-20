@@ -414,54 +414,6 @@ exceptions:
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
-  - path: "crates/cp-base/src/config/models.rs"
-    match: "AnthropicModel is a closed pricing/capability table"
-    reason: >
-      AnthropicModel is constructed cross-crate by model dispatch and matched exhaustively
-      by its ModelInfo impl; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-base/src/config/models.rs"
-    match: "GrokModel is a closed pricing/capability table"
-    reason: >
-      GrokModel is constructed cross-crate by model dispatch and matched exhaustively
-      by its ModelInfo impl; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-base/src/config/models.rs"
-    match: "GroqModel is a closed pricing/capability table"
-    reason: >
-      GroqModel is constructed cross-crate by model dispatch and matched exhaustively
-      by its ModelInfo impl; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-base/src/config/models.rs"
-    match: "DeepSeekModel is a closed pricing/capability table"
-    reason: >
-      DeepSeekModel is constructed cross-crate by model dispatch and matched exhaustively
-      by its ModelInfo impl; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-base/src/config/models.rs"
-    match: "MiniMaxModel is a closed pricing/capability table"
-    reason: >
-      MiniMaxModel is constructed cross-crate by model dispatch and matched exhaustively
-      by its ModelInfo impl; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-base/src/config/models.rs"
-    match: "ClaudeCodeV2Model is a closed pricing/capability table"
-    reason: >
-      ClaudeCodeV2Model is constructed cross-crate by model dispatch and matched exhaustively
-      by its ModelInfo impl; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
   - path: "crates/cp-base/src/panels.rs"
     match: "cache-update protocol"
     reason: >
@@ -494,22 +446,6 @@ exceptions:
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
-  - path: "crates/cp-base/src/state/data/message.rs"
-    match: "message-shape discriminator"
-    reason: >
-      MsgKind is constructed cross-crate on every Message and matched exhaustively by the
-      formatter; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-base/src/state/data/message.rs"
-    match: "message-status contract"
-    reason: >
-      MsgStatus is constructed cross-crate and matched exhaustively by context management;
-      non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
   - path: "crates/cp-base/src/state/data/mod.rs"
     match: "cache-break telemetry taxonomy"
     reason: >
@@ -518,27 +454,11 @@ exceptions:
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
-  - path: "crates/cp-base/src/state/flags.rs"
-    match: "stream-phase state machine"
-    reason: >
-      StreamPhase is a closed 3-state set constructed cross-crate via transition() and matched
-      exhaustively by is_streaming/is_tooling; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
   - path: "crates/cp-base/src/state/runtime/reverie.rs"
     match: "reverie-kind contract"
     reason: >
       Reverie Kind is a closed set constructed cross-crate by the optimizer trigger and matched
       exhaustively by its Display impl; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-base/src/tools/mod.rs"
-    match: "JSON-schema param type"
-    reason: >
-      ParamType is constructed by every tool definition cross-crate and matched exhaustively by
-      to_json_schema; non_exhaustive would forbid that construction.
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 

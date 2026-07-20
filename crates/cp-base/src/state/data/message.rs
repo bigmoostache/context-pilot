@@ -3,10 +3,7 @@ use serde::{Deserialize, Serialize};
 /// Discriminator for the three message shapes in a conversation.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "message-shape discriminator: MsgKind is constructed cross-crate on every Message and matched exhaustively by the formatter; the set is closed and #[non_exhaustive] would forbid that construction"
-)]
+#[non_exhaustive]
 pub enum MsgKind {
     /// Plain text (user or assistant).
     #[default]
@@ -20,10 +17,7 @@ pub enum MsgKind {
 /// Message status for context management
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "message-status contract: MsgStatus is constructed cross-crate and matched exhaustively by context management; the set is closed and #[non_exhaustive] would forbid that construction"
-)]
+#[non_exhaustive]
 pub enum MsgStatus {
     /// Included in full in the LLM prompt.
     #[default]

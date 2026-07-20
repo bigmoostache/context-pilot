@@ -16,10 +16,7 @@ pub type HighlightIrFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<cp_render::Spa
 /// Transitions are tracked via [`StreamPhase::transition`] using `#[track_caller]`
 /// so every state change logs its source location automatically.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "stream-phase state machine: StreamPhase is a closed 3-state set constructed cross-crate via transition() and matched exhaustively by is_streaming/is_tooling; #[non_exhaustive] would forbid that construction"
-)]
+#[non_exhaustive]
 pub enum StreamPhase {
     /// Not streaming — between conversation turns.
     #[default]
