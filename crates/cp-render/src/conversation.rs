@@ -97,7 +97,6 @@ pub struct InputArea {
 
 /// A modal overlay rendered on top of the main UI.
 #[derive(Debug, Clone, Serialize)]
-#[non_exhaustive]
 pub enum Overlay {
     /// Multiple-choice question form.
     QuestionForm(QuestionForm),

@@ -33,7 +33,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Todo module: hierarchical task tracking with status and nesting.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct TodoModule;
 
 impl Default for TodoModule {

@@ -1,10 +1,6 @@
 /// User or system action dispatched through the event loop.
 /// Each variant maps to a keybinding, mouse event, or internal trigger.
 #[derive(Debug, Clone)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "central Elm action enum: Action is constructed by every event handler and matched exhaustively by apply_action; the variant set is closed by design and #[non_exhaustive] would forbid that cross-crate construction"
-)]
 pub enum Action {
     // === Text input ===
     /// Single character typed into the input field.
@@ -184,7 +180,6 @@ pub enum Action {
 
 /// Outcome of processing an [`Action`] — tells the event loop what to do next.
 #[derive(Debug)]
-#[non_exhaustive]
 pub enum ActionResult {
     /// No further work needed.
     Nothing,

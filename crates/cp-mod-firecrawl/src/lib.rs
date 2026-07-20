@@ -29,7 +29,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Firecrawl module: web scraping and content extraction via Firecrawl API.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct FirecrawlModule;
 
 impl Default for FirecrawlModule {

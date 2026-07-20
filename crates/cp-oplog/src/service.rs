@@ -74,7 +74,6 @@ pub const MAX_BATCH: usize = 1024;
 
 /// How a record must be treated under queue pressure (design doc GAP 2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum Durability {
     /// Must never be lost — the submitter blocks rather than drop it.
     Durable,
@@ -121,7 +120,6 @@ impl Durability {
 
 /// The fate of an [`append_best_effort`](OplogService::append_best_effort) call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum BestEffortOutcome {
     /// Accepted into the queue (it will be written on the next group commit).
     /// Acceptance is *not* durability — a best-effort record is never awaited.

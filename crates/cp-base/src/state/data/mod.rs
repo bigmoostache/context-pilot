@@ -17,7 +17,6 @@ pub mod model_helpers;
 /// - `PanelAppeared`: a brand-new panel entered the prompt (no existing panel changed).
 /// - `PanelDisappeared`: a panel from SA was removed from SB (no existing panel changed).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum CacheBreakKind {
     /// No cache break — all panels unchanged.
     #[default]
@@ -49,7 +48,6 @@ impl CacheBreakKind {
 /// token layout, recent tools). Consumed by cost-tracking append once the stream
 /// finalizes and token costs are known.
 #[derive(Debug, Default)]
-#[non_exhaustive]
 pub struct TickTelemetry {
     /// Epoch milliseconds when the tick started.
     pub tick_start_ms: u64,

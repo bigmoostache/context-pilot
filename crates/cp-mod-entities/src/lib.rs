@@ -37,7 +37,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Entities module: persistent relational entity database.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct EntitiesModule;
 
 impl Default for EntitiesModule {

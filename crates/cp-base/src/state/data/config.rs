@@ -14,7 +14,6 @@ use crate::state::context::Kind;
 /// `Threads` replaces the entire layout with a dedicated threads view.
 /// Ctrl+V toggles between them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[non_exhaustive]
 pub enum ViewMode {
     /// Threads view: dedicated layout for thread management (no panels).
     Threads,
@@ -62,7 +61,6 @@ pub const SCHEMA_VERSION: u32 = 1;
 /// Shared configuration (`config.json`)
 /// Infrastructure fields + module data under "modules" key
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct Shared {
     // === Infrastructure ===
     /// Schema version for forward/backward compatibility
@@ -154,7 +152,6 @@ impl Shared {
 /// Worker-specific state (states/{worker}.json)
 /// Infrastructure fields + module data under "modules" key
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct WorkerState {
     /// Schema version for forward/backward compatibility
     #[serde(default = "default_schema_version")]
@@ -237,7 +234,6 @@ impl WorkerState {
 /// Panel data stored in panels/{uid}.json
 /// All panels are stored here - fixed (System, Conversation, Tree, etc.) and dynamic (File, Glob, Grep, Tmux)
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct PanelData {
     /// UID of this panel
     pub uid: String,

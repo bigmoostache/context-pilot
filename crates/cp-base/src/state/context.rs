@@ -16,10 +16,6 @@ use crate::panels::ContextItem;
 
 /// Metadata for a context type, provided by the owning module.
 #[derive(Debug, Clone, Copy)]
-#[expect(
-    clippy::exhaustive_structs,
-    reason = "module-metadata registry record: TypeMeta is a flat 9-field descriptor built by struct literal at 25 sites — one per module's context_type_metadata() — cross-crate; a 9-arg constructor would trip too_many_arguments and every module fills all fields, so the exhaustive literal is the honest shape"
-)]
 pub struct TypeMeta {
     /// The context type string (e.g., "todo", "`git_result`")
     pub context_type: &'static str,
@@ -191,7 +187,6 @@ impl std::fmt::Display for Kind {
 /// the old snapshot is reused as-is. Downstream logic never needs to
 /// know which path was taken — it just reads `emitted.context`.
 #[derive(Debug, Clone, Default)]
-#[non_exhaustive]
 pub struct EmittedState {
     /// Full `ContextItem` last sent to the LLM (id, header, content, timestamp).
     pub context: Option<ContextItem>,
@@ -214,7 +209,6 @@ impl EmittedState {
 
 /// Per-panel scroll state, saved when switching away and restored when switching back.
 #[derive(Debug, Clone, Copy, Default)]
-#[non_exhaustive]
 pub struct ScrollState {
     /// Vertical scroll offset (lines from top).
     pub offset: f32,
@@ -229,7 +223,6 @@ pub struct ScrollState {
 /// A single context panel in the LLM prompt — the core unit of the context window.
 /// Fixed panels (P1–P7) are always present; dynamic panels (P8+) are created by tools.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct Entry {
     /// Display ID (e.g., P1, P2, ... for UI/LLM)
     pub id: String,

@@ -17,7 +17,6 @@ use crate::types::{ContinuationAction, Notification, NotificationType, SpineStat
 
 /// Result of a spine check — tells the caller what to do.
 #[derive(Debug)]
-#[non_exhaustive]
 pub enum SpineDecision {
     /// Nothing to do — no continuation needed
     Idle,

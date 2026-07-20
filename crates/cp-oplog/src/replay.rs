@@ -34,7 +34,6 @@ use std::path::Path;
 /// The recovered state of an oplog: its highest durable `rev` and the bounded
 /// snapshot (heads + seen-set + roster) as of that `rev`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[non_exhaustive]
 pub struct Recovered {
     /// The highest durable `rev` in the log, or `None` if the log is empty.
     pub rev_head: Option<u64>,

@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 /// Notification type -- what triggered this notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[non_exhaustive]
 pub enum NotificationType {
     /// User sent a message
     UserMessage,
@@ -30,7 +29,6 @@ impl NotificationType {
 /// Status of a notification in the spine system
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[non_exhaustive]
 pub enum NotificationStatus {
     /// Not yet handled — triggers auto-continuation
     Unprocessed,
@@ -42,7 +40,6 @@ pub enum NotificationStatus {
 
 /// A notification in the spine system -- the universal trigger mechanism
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct Notification {
     /// Notification ID (e.g., "N1", "N2")
     pub id: String,
@@ -89,7 +86,6 @@ impl Notification {
 
 /// What action to take when an auto-continuation fires
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub enum ContinuationAction {
     /// Create a synthetic user message and start streaming
     SyntheticMessage(String),
@@ -99,7 +95,6 @@ pub enum ContinuationAction {
 
 /// Configuration for spine module (per-worker, persisted)
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct SpineConfig {
     /// Whether to continue until all todos are done
     #[serde(default)]
@@ -144,7 +139,6 @@ pub struct SpineConfig {
 
 /// Module-owned state for the Spine module
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct SpineState {
     /// All notifications (unprocessed, blocked, and processed).
     pub notifications: Vec<Notification>,

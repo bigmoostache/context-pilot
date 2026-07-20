@@ -31,7 +31,6 @@ pub struct Frame {
 
 /// Sidebar display mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[non_exhaustive]
 pub enum SidebarMode {
     /// Full sidebar with entries, token bar, help hints.
     Normal,

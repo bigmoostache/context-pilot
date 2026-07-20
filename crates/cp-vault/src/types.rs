@@ -42,7 +42,6 @@ impl fmt::Debug for SecretString {
 
 /// Errors that can occur during vault operations.
 #[derive(Debug)]
-#[non_exhaustive]
 pub enum VaultError {
     /// Requested key is not configured anywhere in the resolution cascade.
     MissingKey(String),
@@ -73,7 +72,6 @@ impl fmt::Display for VaultError {
 /// `#[non_exhaustive]`: constructed only in-crate by vault backends;
 /// callers read `definition`/`available`, so a new field is not breaking.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct KeyStatus {
     /// The key's static definition from the registry.
     pub definition: &'static KeyDefinition,

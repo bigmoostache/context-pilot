@@ -39,7 +39,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Tree module: directory tree view with filtering, descriptions, and auto-refresh.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct TreeModule;
 
 impl Default for TreeModule {

@@ -24,7 +24,6 @@ pub const BLOCKING_TOOL_SENTINEL: &str = "__CONSOLE_WAIT_BLOCKING__";
 /// Sent through the channel to [`ChannelWatcher`],
 /// which converts it into a [`WatcherResult`] for sentinel replacement.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct ToolOutput {
     /// Content string that replaces the sentinel in the tool result.
     /// This is what the LLM sees in the conversation.

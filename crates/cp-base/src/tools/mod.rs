@@ -23,7 +23,6 @@ mod param_type;
 
 /// Root structure of a tool YAML file.
 #[derive(Debug, Clone, Deserialize)]
-#[non_exhaustive]
 pub struct ToolTexts {
     /// Map of tool ID → tool text (description + parameter descriptions).
     pub tools: HashMap<String, ToolText>,
@@ -42,7 +41,6 @@ impl ToolTexts {
 
 /// LLM-facing text for a single tool: description + parameter descriptions.
 #[derive(Debug, Clone, Deserialize)]
-#[non_exhaustive]
 pub struct ToolText {
     /// Full tool description shown to the LLM.
     pub description: String,
@@ -53,7 +51,6 @@ pub struct ToolText {
 
 /// A tool invocation requested by the LLM during streaming.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct ToolUse {
     /// Unique ID assigned by the LLM (used to correlate with [`ToolResult`]).
     pub id: String,
@@ -73,10 +70,6 @@ impl ToolUse {
 
 /// Result returned after executing a tool, sent back to the LLM.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[expect(
-    clippy::exhaustive_structs,
-    reason = "tool-return contract: ToolResult is the closed struct every tool fills and is built by struct literal at 116 sites cross-crate; the constructors (new/with_name) can't cover the display/tldr/preserves_tempo field combinations each site sets, and a 7-arg constructor would trip too_many_arguments, so the exhaustive literal is the honest shape"
-)]
 pub struct ToolResult {
     /// Correlates with [`ToolUse::id`].
     pub tool_use_id: String,
@@ -139,7 +132,6 @@ impl ToolResult {
 /// the 500-line structure limit).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[non_exhaustive]
 pub enum ParamType {
     /// Free-form string.
     String,
@@ -157,7 +149,6 @@ pub enum ParamType {
 
 /// A single tool parameter in a [`ToolDefinition`] schema.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct ToolParam {
     /// Parameter name (JSON key).
     pub name: String,
@@ -212,7 +203,6 @@ impl ToolParam {
 /// A complete tool definition: identity, schema, and runtime flags.
 /// Serialized to JSON Schema for the LLM API.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct ToolDefinition {
     /// Tool identifier (e.g., `"Open"`, `"git_execute"`).
     pub id: String,

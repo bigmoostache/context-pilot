@@ -33,7 +33,6 @@ const SUFFIX: &str = ".log";
 
 /// The decoded contents of a segment up to its last valid record boundary.
 #[derive(Debug, Default)]
-#[non_exhaustive]
 pub struct Scan {
     /// Every entry that decoded cleanly, in file order.
     pub entries: Vec<OpEntry>,

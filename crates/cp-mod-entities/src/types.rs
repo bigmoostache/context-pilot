@@ -14,7 +14,6 @@ use cp_base::state::runtime::State;
 /// Stored in `State` via `state.set_ext()`. Use [`EntitiesState::get`] and
 /// [`EntitiesState::get_mut`] for typed access.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct EntitiesState {
     /// Path to the `SQLite` database file (`.context-pilot/entities.db`).
     pub db_path: PathBuf,
@@ -86,7 +85,6 @@ impl EntitiesState {
 
 /// Cached snapshot of the `SQLite` schema, refreshed after DDL and on init.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct SchemaCache {
     /// All user tables (excludes `sqlite_%` and `_meta`).
     pub tables: Vec<TableInfo>,
@@ -96,7 +94,6 @@ pub struct SchemaCache {
 
 /// Metadata for a single user table.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct TableInfo {
     /// Table name.
     pub name: String,
@@ -110,7 +107,6 @@ pub struct TableInfo {
 
 /// Column metadata from `PRAGMA table_info`.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct ColumnInfo {
     /// Column name.
     pub name: String,
@@ -124,7 +120,6 @@ pub struct ColumnInfo {
 
 /// Foreign key metadata from `PRAGMA foreign_key_list`.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct ForeignKeyInfo {
     /// Column in this table.
     pub from_col: String,

@@ -17,7 +17,6 @@ pub mod reverie;
 // Runtime State
 
 /// Runtime state (messages loaded in memory)
-#[non_exhaustive]
 pub struct State {
     /// Active context panels (dynamic + fixed), ordered by recency for LLM injection.
     pub context: Vec<Entry>,

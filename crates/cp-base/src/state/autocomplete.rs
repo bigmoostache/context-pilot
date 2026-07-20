@@ -13,7 +13,6 @@ const MAX_VISIBLE: usize = 10;
 
 /// A single entry in the autocomplete list.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct Completion {
     /// Display name (just the file/folder name, not the full path).
     pub name: String,
@@ -34,7 +33,6 @@ impl Completion {
 
 /// State for the @-triggered file path autocomplete popup.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct Suggestions {
     /// Whether the autocomplete popup is currently visible.
     pub active: bool,

@@ -2,7 +2,6 @@
 
 /// Whether a `gh` subcommand reads or mutates state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum CommandClass {
     /// Safe to auto-refresh in a panel (e.g., `gh pr list`).
     ReadOnly,

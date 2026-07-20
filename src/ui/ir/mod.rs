@@ -108,8 +108,8 @@ pub(crate) fn semantic_to_style(semantic: Semantic) -> Style {
         Semantic::Error | Semantic::DiffRemove => Style::default().fg(theme::error()),
         Semantic::Code => Style::default().fg(theme::text_secondary()),
         Semantic::Border => Style::default().fg(theme::border()),
-        // Default, Bold, and any future non-exhaustive variants.
-        Semantic::Default | Semantic::Bold | _ => Style::default().fg(theme::text()),
+        // Default and Bold render as plain text foreground.
+        Semantic::Default | Semantic::Bold => Style::default().fg(theme::text()),
     }
 }
 
@@ -179,8 +179,8 @@ fn render_block(block: &cp_render::Block, lines: &mut Vec<Line<'static>>) {
                 lines.push(Line::from(spans));
             }
         }
-        // Empty, and any future block variants — render as empty line.
-        B::Empty | _ => lines.push(Line::from("")),
+        // Empty renders as a blank line.
+        B::Empty => lines.push(Line::from("")),
     }
 }
 

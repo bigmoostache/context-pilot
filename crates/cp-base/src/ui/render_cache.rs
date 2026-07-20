@@ -10,7 +10,6 @@ use std::rc::Rc;
 
 /// Cached rendered blocks for a message.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct MessageCache {
     /// Pre-rendered IR blocks for this message.
     pub blocks: Rc<[cp_render::Block]>,
@@ -30,7 +29,6 @@ impl MessageCache {
 
 /// Cached rendered blocks for input area.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct InputCache {
     /// Pre-rendered IR blocks for input.
     pub blocks: Rc<[cp_render::Block]>,
@@ -50,7 +48,6 @@ impl InputCache {
 
 /// Top-level cache for entire conversation content.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct FullCache {
     /// Complete rendered IR blocks.
     pub blocks: Rc<[cp_render::Block]>,

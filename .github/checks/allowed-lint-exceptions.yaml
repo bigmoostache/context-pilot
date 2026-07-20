@@ -344,44 +344,6 @@ exceptions:
   # construction, wildcard_enum_match_arm on the matches). They are closed
   # contracts by design.
 
-  - path: "crates/cp-base/src/config/llm_types.rs"
-    match: "provider-roster contract"
-    reason: >
-      LlmProvider is a closed set constructed cross-crate by config/dispatch and matched
-      exhaustively across the client factory and config UI; non_exhaustive would forbid it.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-base/src/state/actions.rs"
-    match: "central Elm action enum"
-    reason: >
-      Action is constructed by every event handler and matched exhaustively by apply_action;
-      the set is closed by design and non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-base/src/state/runtime/reverie.rs"
-    match: "reverie-kind contract"
-    reason: >
-      Reverie Kind is a closed set constructed cross-crate by the optimizer trigger and matched
-      exhaustively by its Display impl; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  # ── exhaustive_enums: cp-oplog service/error contracts ───────────────
-
-
-
-  # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
-
-  - path: "crates/cp-mod-bridge/src/error.rs"
-    match: "bridge boot error taxonomy is a closed AlreadyRunning/Io set"
-    reason: >
-      Bridge boot Error is a closed AlreadyRunning/Io set constructed within cp-mod-bridge and
-      matched exhaustively by callers; non_exhaustive would force forbidden wildcard arms.
-    strategy: >
-      Irreducible — closed error taxonomy, wildcard arms are forbidden.
-
   # ── exhaustive_structs: wide wire records where a constructor is worse ──
   # These public structs are legitimately exhaustive: each is a fixed-layout
   # wire record built cross-crate at a single site, and a constructor would take
@@ -420,50 +382,3 @@ exceptions:
     strategy: >
       Irreducible — the bundle must be literal-constructible cross-crate; a 7-arg constructor
       trips too_many_arguments. The exhaustive carrier is the honest shape.
-  # One crate-level #![expect] covers every IR type in cp-render. They are
-  # all built by struct literal cross-crate by the tui adapter (src/ui/ir,
-  # src/ui/search_overlay) and read field-by-field by the renderer, so
-  # #[non_exhaustive] forbids the construction (E0639); the wide records
-  # (Message, SearchIndex, SearchEmbeddings, StatusBar, …) would trip the
-  # forbidden too_many_arguments under any flat constructor. The IR is a
-  # single closed builder↔adapter contract — one reviewed decision, not 56.
-
-  - path: "crates/cp-render/src/lib.rs"
-    match: "IR data-carrier layer: every type is built by struct literal cross-crate"
-    reason: >
-      Crate-level #![expect] for all cp-render IR structs: each is adapter-built by struct literal
-      cross-crate and read field-by-field by the renderer; #[non_exhaustive] forbids that (E0639)
-      and wide records trip too_many_arguments under a flat constructor.
-    strategy: >
-      Irreducible — closed builder↔adapter IR contract; non_exhaustive+constructor is impossible
-      for the wide records.
-
-  # ── exhaustive_structs: cp-base wide cross-crate records ─────────────
-  # Two cp-base structs are built by struct literal at many sites across every
-  # module crate. Both are flat, wide records where a constructor would take so
-  # many positional arguments it trips the forbidden too_many_arguments lint
-  # (max 4). #[non_exhaustive] is impossible (E0639 on the cross-crate
-  # construction). Every OTHER cross-crate cp-base struct took a constructor or
-  # builder (ToolOutput::ok/error, CacheRequest::new, WatcherResult::new+setters)
-  # instead; these two are the irreducible remainder.
-
-  - path: "crates/cp-base/src/tools/mod.rs"
-    match: "tool-return contract: ToolResult is the closed struct every tool fills"
-    reason: >
-      ToolResult is the closed tool-return contract built by struct literal at 116 sites across
-      every module crate; the new/with_name constructors can't cover the display/tldr/preserves_tempo
-      field combinations each site sets, and a 7-arg constructor would trip too_many_arguments.
-    strategy: >
-      Irreducible — a 7-arg constructor trips too_many_arguments; the exhaustive literal is honest.
-
-  - path: "crates/cp-base/src/state/context.rs"
-    match: "module-metadata registry record: TypeMeta is a flat 9-field descriptor"
-    reason: >
-      TypeMeta is a flat 9-field module-metadata descriptor built by struct literal at 25 sites —
-      one per module's context_type_metadata() — cross-crate; a 9-arg constructor would trip
-      too_many_arguments and every module fills all fields.
-    strategy: >
-      Irreducible — a 9-arg constructor trips too_many_arguments; the exhaustive literal is honest.
-
-
-

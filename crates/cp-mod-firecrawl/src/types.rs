@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 /// Firecrawl scrape API response.
 #[derive(Debug, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct ScrapeResponse {
     /// Whether the scrape request succeeded.
     pub success: bool,
@@ -14,7 +13,6 @@ pub struct ScrapeResponse {
 
 /// Extracted content from a scraped page.
 #[derive(Debug, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct ScrapeData {
     /// Page content as clean Markdown.
     pub markdown: Option<String>,
@@ -28,7 +26,6 @@ pub struct ScrapeData {
 
 /// Metadata extracted from a scraped page.
 #[derive(Debug, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct ScrapeMetadata {
     /// HTML `<title>` content.
     pub title: Option<String>,
@@ -52,7 +49,6 @@ pub struct ScrapeMetadata {
 ///
 /// We use `serde_json::Value` and parse manually.
 #[derive(Debug, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct SearchResponse {
     /// Whether the search request succeeded.
     pub success: bool,
@@ -64,7 +60,6 @@ pub struct SearchResponse {
 
 /// A single search result with full scraped content.
 #[derive(Debug, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct SearchResult {
     /// Page URL.
     pub url: Option<String>,
@@ -82,7 +77,6 @@ pub struct SearchResult {
 
 /// Firecrawl map API response.
 #[derive(Debug, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct MapResponse {
     /// Whether the map request succeeded.
     pub success: bool,
@@ -95,7 +89,6 @@ pub struct MapResponse {
 /// A link discovered during domain mapping.
 /// Title and description may not always be present.
 #[derive(Debug, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct MapLink {
     /// Full URL.
     pub url: Option<String>,
@@ -107,7 +100,6 @@ pub struct MapLink {
 
 /// Response from `POST /v2/crawl` (start a crawl job).
 #[derive(Debug, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct CrawlStartResponse {
     /// Whether the crawl was accepted.
     pub success: bool,
@@ -119,7 +111,6 @@ pub struct CrawlStartResponse {
 
 /// Response from `GET /v2/crawl/{id}` (poll crawl status).
 #[derive(Debug, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct CrawlStatusResponse {
     /// Job status: `"scraping"`, `"completed"`, or `"failed"`.
     pub status: String,
@@ -138,7 +129,6 @@ pub struct CrawlStatusResponse {
 
 /// A single page from a completed crawl.
 #[derive(Debug, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct CrawlPageData {
     /// Page content as clean Markdown.
     pub markdown: Option<String>,

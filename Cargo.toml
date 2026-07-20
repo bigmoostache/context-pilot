@@ -419,8 +419,16 @@ err_expect = "forbid"
 error_impl_error = "forbid"
 excessive_nesting = "forbid"
 excessive_precision = "forbid"
-exhaustive_enums = "deny"
-exhaustive_structs = "deny"
+# exhaustive_enums / exhaustive_structs are SemVer-for-published-libraries
+# lints: they force #[non_exhaustive] on every public type so a downstream
+# crate you cannot recompile keeps building when you add a variant/field. Our
+# internal crates have no such downstream — every consumer lives in this
+# workspace and recompiles atomically, so there we WANT the exhaustive-match
+# compile error (it walks us to every site on a new variant). Allowed here and
+# re-denied only in cp-wire (the real agent<->orchestrator version boundary)
+# via #![deny(...)] in its lib.rs.
+exhaustive_enums = "allow"
+exhaustive_structs = "allow"
 exit = "forbid"
 expect_fun_call = "forbid"
 expect_used = "forbid"

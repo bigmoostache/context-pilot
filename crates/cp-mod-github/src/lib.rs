@@ -38,7 +38,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// GitHub module: PR/issue management via `gh` CLI.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct GithubModule;
 
 impl Default for GithubModule {

@@ -165,7 +165,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Git module: version control tools, status tracking, and result panels.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct GitModule;
 
 impl Default for GitModule {

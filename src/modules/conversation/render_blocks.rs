@@ -148,8 +148,7 @@ fn flatten_visualizer_blocks(blocks: &mut Vec<Block>, vis_blocks: &[Block], ctx:
             | Block::ProgressBar { .. }
             | Block::Tree(_)
             | Block::Separator
-            | Block::KeyValue(_)
-            | _ => {
+            | Block::KeyValue(_) => {
                 // Complex blocks (Table, Tree, …) — emit a bare icon line first
                 // (no current visualizer produces these), then pass through.
                 if is_first {

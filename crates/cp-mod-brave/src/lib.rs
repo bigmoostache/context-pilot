@@ -25,7 +25,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Brave Search module: web search and LLM context API integration.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct BraveModule;
 
 impl Default for BraveModule {

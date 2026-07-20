@@ -75,7 +75,6 @@ pub const fn scroll_key_action(key: &KeyEvent) -> Option<Action> {
 // =============================================================================
 
 /// Result of a background cache operation
-#[non_exhaustive]
 pub enum CacheUpdate {
     /// Generic content update (used by File, Tree, Glob, Grep, Tmux, `GitResult`, `GithubResult`)
     Content {
@@ -148,7 +147,6 @@ impl fmt::Debug for CacheUpdate {
 
 /// Generic request for background cache operations.
 /// Each module defines its own request data struct and wraps it in `data`.
-#[non_exhaustive]
 pub struct CacheRequest {
     /// Panel type that originated this request.
     pub context_type: Kind,
@@ -182,7 +180,6 @@ pub fn hash_content(content: &str) -> String {
 
 /// Specification for a filesystem path to watch.
 #[derive(Debug)]
-#[non_exhaustive]
 pub enum WatchSpec {
     /// Watch a single file (non-recursive)
     File(String),
@@ -366,7 +363,6 @@ you need NOW; prefer searching/opening a specific range over walking pages.]\n{p
 
 /// A single context item to be sent to the LLM
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct ContextItem {
     /// Context element ID (e.g., "P7", "P8") for LLM reference
     pub id: String,

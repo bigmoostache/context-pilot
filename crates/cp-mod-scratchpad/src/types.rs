@@ -4,7 +4,6 @@ use cp_base::state::runtime::State;
 
 /// A scratchpad cell for storing temporary notes/data
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 pub struct ScratchpadCell {
     /// Cell ID (C1, C2, ...)
     pub id: String,
@@ -16,7 +15,6 @@ pub struct ScratchpadCell {
 
 /// Module-owned state for the Scratchpad module
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct ScratchpadState {
     /// All scratchpad cells, ordered by creation.
     pub scratchpad_cells: Vec<ScratchpadCell>,

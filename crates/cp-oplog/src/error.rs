@@ -19,7 +19,6 @@ use cp_wire::framing::FrameError;
 
 /// An error from oplog operations.
 #[derive(Debug)]
-#[non_exhaustive]
 pub enum Error {
     /// An underlying filesystem operation failed (open, write, sync, …).
     Io(io::Error),

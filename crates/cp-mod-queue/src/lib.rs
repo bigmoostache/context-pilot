@@ -32,7 +32,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Queue module: batch tool calls and flush them atomically.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct QueueModule;
 
 impl Default for QueueModule {

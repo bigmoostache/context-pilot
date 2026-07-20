@@ -45,7 +45,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Console module: spawns child processes, manages sessions, provides interactive I/O.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct ConsoleModule;
 
 impl Default for ConsoleModule {

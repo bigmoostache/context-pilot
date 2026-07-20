@@ -35,7 +35,6 @@ pub fn create(state: &mut State, title: &str, content: &str) -> String {
 
 /// Panel renderer for Brave search result panels.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct Results;
 
 /// Cache request for restoring content from metadata after reload

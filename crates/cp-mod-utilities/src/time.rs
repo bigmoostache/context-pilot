@@ -123,7 +123,6 @@ pub fn decompose_epoch_secs(epoch_secs: i64) -> Option<Local> {
 /// `#[non_exhaustive]`: built only in-crate (`now_local`, `decompose_epoch_secs`);
 /// callers read fields, never construct — so a new field is not a breaking change.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct Local {
     /// Full year (e.g. 2026).
     pub year: i32,

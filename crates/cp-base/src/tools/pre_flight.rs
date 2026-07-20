@@ -10,7 +10,6 @@
 /// Result of pre-flight validation. Errors block execution; warnings are
 /// attached to the result but the tool still runs.
 #[derive(Debug, Clone, Default)]
-#[non_exhaustive]
 pub struct Verdict {
     /// Blocking errors — tool execution will be refused.
     pub errors: Vec<String>,

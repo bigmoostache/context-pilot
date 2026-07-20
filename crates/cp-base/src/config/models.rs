@@ -8,7 +8,6 @@ use super::llm_types::ModelInfo;
 /// Anthropic model variants with per-model pricing and context limits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[non_exhaustive]
 pub enum AnthropicModel {
     /// Claude Opus 4.5 — highest capability, largest output window.
     #[default]
@@ -83,7 +82,6 @@ impl ModelInfo for AnthropicModel {
 /// xAI Grok model variants (fast models optimized for tool calling).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[non_exhaustive]
 pub enum GrokModel {
     /// Grok 4.1 Fast — latest iteration, 2M context.
     #[default]
@@ -144,7 +142,6 @@ impl ModelInfo for GrokModel {
 /// - Llama models: Custom tools only
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[non_exhaustive]
 pub enum GroqModel {
     /// GPT-OSS 120B — large, with built-in web search.
     #[default]
@@ -218,7 +215,6 @@ impl ModelInfo for GroqModel {
 /// aliases for V4 Flash.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[non_exhaustive]
 pub enum DeepSeekModel {
     /// `DeepSeek` V4 Flash — fast and cheap, 1M context.
     #[default]
@@ -282,7 +278,6 @@ impl ModelInfo for DeepSeekModel {
 /// `MiniMax` model variants (Anthropic-compatible API via Token Plan).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[non_exhaustive]
 pub enum MiniMaxModel {
     /// `MiniMax` M2.7 — flagship model, 204K context.
     #[default]
@@ -350,7 +345,6 @@ impl ModelInfo for MiniMaxModel {
 /// Claude Code V2 model variants (OAuth, updated request format).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[non_exhaustive]
 pub enum ClaudeCodeV2Model {
     /// Claude Opus 4.8 — latest flagship model.
     #[default]

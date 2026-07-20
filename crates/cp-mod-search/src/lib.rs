@@ -97,7 +97,6 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 /// Manages an embedded Meilisearch server, background file indexer,
 /// and a unified `search` tool for querying project files and logs.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
 pub struct SearchModule;
 
 impl Default for SearchModule {
