@@ -6827,3 +6827,25 @@ index 09c61aa9..9ae4e8b0 100644
      match: "framing error taxonomy is a closed wire contract"
      reason: >
 # --- End entry #67 ---
+68:1ae43e4232a3ec779f0b58d4bb63b28e20e9ae9b056cca0e77232a63a8e339c2:7043900c92e88bd56bc93b352bde9a5fe7fdd655decb016b6388a612720d2187:189f39930783fc6f426594f6a6204ed55920699c1d0f582ec6d82ec814e6fe15
+# --- Diff for entry #68 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 9ae4e8b0..832b99ff 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -286,14 +286,6 @@ exceptions:
+   # catch-all for N-1 forward compatibility, covering the only real use case
+   # #[non_exhaustive] would serve.
+ 
+-  - path: "crates/cp-wire/src/types/mod.rs"
+-    match: "the Phase variant set is closed"
+-    reason: >
+-      Phase is a wire-protocol contract constructed cross-crate; a new phase
+-      is a deliberate breaking change every peer must handle exhaustively.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-wire/src/types/mod.rs"
+     match: "ThreadTurn already carries an Unknown catch-all"
+     reason: >
+# --- End entry #68 ---

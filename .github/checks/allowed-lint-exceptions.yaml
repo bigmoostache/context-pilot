@@ -287,14 +287,6 @@ exceptions:
   # #[non_exhaustive] would serve.
 
   - path: "crates/cp-wire/src/types/mod.rs"
-    match: "the Phase variant set is closed"
-    reason: >
-      Phase is a wire-protocol contract constructed cross-crate; a new phase
-      is a deliberate breaking change every peer must handle exhaustively.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-wire/src/types/mod.rs"
     match: "ThreadTurn already carries an Unknown catch-all"
     reason: >
       ThreadTurn already has an Unknown catch-all for N-1 forward-compat and is

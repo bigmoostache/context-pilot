@@ -155,10 +155,7 @@ const fn hex_nibble(b: u8) -> Option<u8> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "wire-protocol contract: the Phase variant set is closed; adding one is a deliberate breaking change every peer must handle, so exhaustive cross-crate matching is intentional and #[non_exhaustive] would both hide the break and forbid the cross-crate construction this enum requires"
-)]
+#[non_exhaustive]
 pub enum Phase {
     /// No LLM call or tool execution in progress.
     Idle,
