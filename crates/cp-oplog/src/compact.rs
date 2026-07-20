@@ -82,6 +82,16 @@ pub struct Report {
     pub oldest_index: Option<u64>,
 }
 
+impl Report {
+    /// Bundle a compaction outcome. A constructor keeps [`Report`]
+    /// `#[non_exhaustive]` across cross-crate builders (integration tests
+    /// assert against a constructed expected value).
+    #[must_use]
+    pub const fn new(segments_removed: u64, oldest_index: Option<u64>) -> Self {
+        Self { segments_removed, oldest_index }
+    }
+}
+
 /// Compact the oplog in `dir`: delete every segment older than the newest
 /// checkpoint-bearing segment.
 ///

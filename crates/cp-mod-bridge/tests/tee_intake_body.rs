@@ -55,17 +55,15 @@ const TOKEN: &str = "cap-token-256bit-secret";
 
 /// A framed [`CommandFrame`] authenticated by `auth`, keyed by `dedup`.
 fn command_frame(auth: &str, dedup: &str) -> Vec<u8> {
-    let cf = CommandFrame {
-        schema_version: 1,
-        auth: auth.to_owned(),
-        command: Command {
-            schema_version: 1,
-            id: format!("cmd-{dedup}"),
-            seq: 1,
-            dedup_token: dedup.to_owned(),
-            kind: CommandKind::SendMessage { thread_id: "T1".to_owned(), content: "hi".to_owned() },
-        },
-    };
+    let cf = CommandFrame::new(
+        auth.to_owned(),
+        Command::new(
+            format!("cmd-{dedup}"),
+            1,
+            dedup.to_owned(),
+            CommandKind::SendMessage { thread_id: "T1".to_owned(), content: "hi".to_owned() },
+        ),
+    );
     framing::encode_raw(&serde_json::to_vec(&cf).expect("serialise frame")).expect("frame")
 }
 
