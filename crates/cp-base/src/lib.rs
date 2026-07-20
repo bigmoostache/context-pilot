@@ -243,7 +243,6 @@ mod tests {
 
     /// Validate every tool YAML file parses into `ToolTexts`.
     #[test]
-    #[expect(clippy::panic, reason = "test assertions use panic for tool YAML validation")]
     fn tool_yaml_deserialization() {
         let yamls: Vec<(&str, &str)> = vec![
             ("brave", include_str!("../../../yamls/tools/brave.yaml")),
@@ -267,42 +266,31 @@ mod tests {
             ("tree", include_str!("../../../yamls/tools/tree.yaml")),
         ];
         for &(name, content) in &yamls {
-            // Panics with a clear message if schema doesn't match ToolTexts
-            drop(
-                serde_yaml::from_str::<ToolTexts>(content)
-                    .unwrap_or_else(|e| panic!("yamls/tools/{name}.yaml failed to parse: {e}")),
-            );
+            // `assert!` reports a clear schema-mismatch message on failure
+            // without tripping clippy::panic (which flags `panic!`) or
+            // expect_used (which flags `.expect()`).
+            let parsed = serde_yaml::from_str::<ToolTexts>(content);
+            assert!(parsed.is_ok(), "yamls/tools/{name}.yaml failed to parse: {:?}", parsed.err());
         }
     }
 
     /// Validate config YAML files parse into their specific types directly
     /// (not via `LazyLock` — catches type mismatches even if statics change).
     #[test]
-    #[expect(clippy::panic, reason = "test assertions use panic for config YAML validation")]
     fn config_yaml_direct_parse() {
-        drop(
-            serde_yaml::from_str::<Prompts>(include_str!("../../../yamls/prompts.yaml"))
-                .unwrap_or_else(|e| panic!("prompts.yaml schema mismatch: {e}")),
-        );
-        drop(
-            serde_yaml::from_str::<Library>(include_str!("../../../yamls/library.yaml"))
-                .unwrap_or_else(|e| panic!("library.yaml schema mismatch: {e}")),
-        );
-        drop(
-            serde_yaml::from_str::<Ui>(include_str!("../../../yamls/ui.yaml"))
-                .unwrap_or_else(|e| panic!("ui.yaml schema mismatch: {e}")),
-        );
-        drop(
-            serde_yaml::from_str::<Themes>(include_str!("../../../yamls/themes.yaml"))
-                .unwrap_or_else(|e| panic!("themes.yaml schema mismatch: {e}")),
-        );
-        drop(
-            serde_yaml::from_str::<Injections>(include_str!("../../../yamls/injections.yaml"))
-                .unwrap_or_else(|e| panic!("injections.yaml schema mismatch: {e}")),
-        );
-        drop(
-            serde_yaml::from_str::<Reverie>(include_str!("../../../yamls/reverie.yaml"))
-                .unwrap_or_else(|e| panic!("reverie.yaml schema mismatch: {e}")),
-        );
+        // Each `assert!` names the offending file on a schema mismatch without
+        // tripping clippy::panic (`panic!`) or expect_used (`.expect()`).
+        let prompts = serde_yaml::from_str::<Prompts>(include_str!("../../../yamls/prompts.yaml"));
+        assert!(prompts.is_ok(), "prompts.yaml schema mismatch: {:?}", prompts.err());
+        let library = serde_yaml::from_str::<Library>(include_str!("../../../yamls/library.yaml"));
+        assert!(library.is_ok(), "library.yaml schema mismatch: {:?}", library.err());
+        let ui = serde_yaml::from_str::<Ui>(include_str!("../../../yamls/ui.yaml"));
+        assert!(ui.is_ok(), "ui.yaml schema mismatch: {:?}", ui.err());
+        let themes = serde_yaml::from_str::<Themes>(include_str!("../../../yamls/themes.yaml"));
+        assert!(themes.is_ok(), "themes.yaml schema mismatch: {:?}", themes.err());
+        let injections = serde_yaml::from_str::<Injections>(include_str!("../../../yamls/injections.yaml"));
+        assert!(injections.is_ok(), "injections.yaml schema mismatch: {:?}", injections.err());
+        let reverie = serde_yaml::from_str::<Reverie>(include_str!("../../../yamls/reverie.yaml"));
+        assert!(reverie.is_ok(), "reverie.yaml schema mismatch: {:?}", reverie.err());
     }
 }

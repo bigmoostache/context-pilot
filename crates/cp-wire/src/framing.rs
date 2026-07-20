@@ -48,12 +48,12 @@ const BYTE_MASK: u32 = 0xFF;
 /// Encode a `u32` as four little-endian bytes.
 ///
 /// The byte order is part of the on-disk contract, so it is spelled out
-/// rather than delegated to `to_le_bytes` (which would read as
-/// host-dependent to a reviewer). Each `& BYTE_MASK` guarantees the value
+/// rather than delegated to `to_le_bytes` (which the workspace forbids via
+/// `clippy::little_endian_bytes`). Each `& BYTE_MASK` guarantees the value
 /// fits in a `u8`, so the cast is exact.
 #[expect(
     clippy::as_conversions,
-    reason = "const-fn narrowing after `& BYTE_MASK` is provably exact; try_from/From are not const-callable and to_le_bytes is a forbidden host-order shortcut (wire contract)"
+    reason = "const-fn narrowing after `& BYTE_MASK` is provably exact; try_from/From are not const-callable and clippy::little_endian_bytes forbids the to_le_bytes shortcut"
 )]
 const fn u32_to_le(value: u32) -> [u8; 4] {
     [

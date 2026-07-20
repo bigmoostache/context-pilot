@@ -247,9 +247,8 @@ impl Heartbeat {
 // ── fixed little-endian field codec (explicit, host-independent) ─────────
 //
 // The byte order is a wire contract, so it is spelled out by hand rather than
-// delegated to `to_le_bytes`/`from_le_bytes` (which read as host-dependent to a
-// reviewer, and which the workspace forbids for exactly that reason — see
-// `framing.rs`).
+// delegated to `to_le_bytes`/`from_le_bytes` (which the workspace forbids via
+// clippy::little_endian_bytes — see `framing.rs`).
 
 /// Byte mask isolating the low 8 bits of a `u32`.
 const BYTE_MASK_U32: u32 = 0xFF;
@@ -261,7 +260,7 @@ const BYTE_MASK_U64: u64 = 0xFF;
 /// the value fits in a `u8`, so the cast is exact.
 #[expect(
     clippy::as_conversions,
-    reason = "const-fn narrowing after `& BYTE_MASK_U32` is provably exact; try_from/From are not const-callable and to_le_bytes is a forbidden host-order shortcut (wire contract)"
+    reason = "const-fn narrowing after `& BYTE_MASK_U32` is provably exact; try_from/From are not const-callable and clippy::little_endian_bytes forbids the to_le_bytes shortcut"
 )]
 const fn u32_to_le(value: u32) -> [u8; 4] {
     [
@@ -281,7 +280,7 @@ fn u32_from_le(bytes: [u8; 4]) -> u32 {
 /// Encode a `u64` as eight little-endian bytes.
 #[expect(
     clippy::as_conversions,
-    reason = "const-fn narrowing after `& BYTE_MASK_U64` is provably exact; try_from/From are not const-callable and to_le_bytes is a forbidden host-order shortcut (wire contract)"
+    reason = "const-fn narrowing after `& BYTE_MASK_U64` is provably exact; try_from/From are not const-callable and clippy::little_endian_bytes forbids the to_le_bytes shortcut"
 )]
 const fn u64_to_le(value: u64) -> [u8; 8] {
     [

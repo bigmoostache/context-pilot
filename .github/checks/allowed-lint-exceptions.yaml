@@ -221,57 +221,41 @@ exceptions:
 
   # ── cp-base test functions: panic for clear assertion messages ────
 
-  - path: "crates/cp-base/src/lib.rs"
-    match: 'test assertions use panic for tool YAML validation'
-    reason: >
-      tool_yaml_deserialization() uses unwrap_or_else(|e| panic!(...)) to
-      give clear schema-mismatch messages. The forbid-level expect_used
-      lint prevents .expect(), so panic! via unwrap_or_else is the only
-      way to get descriptive test failures.
-    strategy: >
-      Irreducible — expect_used is forbid-level so .expect() cannot be used.
-
-  - path: "crates/cp-base/src/lib.rs"
-    match: 'test assertions use panic for config YAML validation'
-    reason: >
-      config_yaml_direct_parse() uses unwrap_or_else(|e| panic!(...)) to
-      give clear schema-mismatch messages. The forbid-level expect_used
-      lint prevents .expect(), so panic! via unwrap_or_else is the only
-      way to get descriptive test failures.
-    strategy: >
-      Irreducible — expect_used is forbid-level so .expect() cannot be used.
-
   # ── as_conversions: const-fn casts (try_from/From not const-callable) ──
-
-  - path: "crates/cp-wire/src/heartbeat.rs"
-    match: "const-fn narrowing after `& BYTE_MASK_U32` is provably exact"
-    reason: >
-      u32_to_le() masks the low 8 bits with `& BYTE_MASK_U32` before each
-      `as u8`, so the narrowing is provably exact. try_from/From are not
-      const-callable, and to_le_bytes is a forbidden host-order shortcut
-      (the byte order is a wire contract, spelled out by hand).
-    strategy: >
-      Irreducible until fallible/From conversions are const-stable in std.
-
-  - path: "crates/cp-wire/src/heartbeat.rs"
-    match: "const-fn narrowing after `& BYTE_MASK_U64` is provably exact"
-    reason: >
-      u64_to_le() masks the low 8 bits with `& BYTE_MASK_U64` before each
-      `as u8`, so the narrowing is provably exact. try_from/From are not
-      const-callable, and to_le_bytes is a forbidden host-order shortcut
-      (the byte order is a wire contract, spelled out by hand).
-    strategy: >
-      Irreducible until fallible/From conversions are const-stable in std.
 
   - path: "crates/cp-wire/src/framing.rs"
     match: "const-fn narrowing after `& BYTE_MASK` is provably exact"
     reason: >
       u32_to_le() masks the low 8 bits with `& BYTE_MASK` before each
       `as u8`, so the narrowing is provably exact. try_from/From are not
-      const-callable, and to_le_bytes is a forbidden host-order shortcut
-      (the byte order is an on-disk contract, spelled out by hand).
+      const-callable, and clippy::little_endian_bytes (forbid) rejects the
+      to_le_bytes shortcut — the two restriction lints leave the masked `as`
+      form as the only path.
     strategy: >
-      Irreducible until fallible/From conversions are const-stable in std.
+      Irreducible — clippy::little_endian_bytes forbids to_le_bytes and From
+      is not const-stable, so the masked const-fn narrowing is the only option.
+
+  - path: "crates/cp-wire/src/heartbeat.rs"
+    match: "const-fn narrowing after `& BYTE_MASK_U32` is provably exact"
+    reason: >
+      u32_to_le() masks the low 8 bits with `& BYTE_MASK_U32` before each
+      `as u8`, so the narrowing is provably exact. try_from/From are not
+      const-callable, and clippy::little_endian_bytes (forbid) rejects the
+      to_le_bytes shortcut — the masked `as` form is the only path.
+    strategy: >
+      Irreducible — clippy::little_endian_bytes forbids to_le_bytes and From
+      is not const-stable, so the masked const-fn narrowing is the only option.
+
+  - path: "crates/cp-wire/src/heartbeat.rs"
+    match: "const-fn narrowing after `& BYTE_MASK_U64` is provably exact"
+    reason: >
+      u64_to_le() masks the low 8 bits with `& BYTE_MASK_U64` before each
+      `as u8`, so the narrowing is provably exact. try_from/From are not
+      const-callable, and clippy::little_endian_bytes (forbid) rejects the
+      to_le_bytes shortcut — the masked `as` form is the only path.
+    strategy: >
+      Irreducible — clippy::little_endian_bytes forbids to_le_bytes and From
+      is not const-stable, so the masked const-fn narrowing is the only option.
 
   - path: "crates/cp-mod-utilities/src/time.rs"
     match: "const-fn widening (u8/i32 -> i64) is always exact"
