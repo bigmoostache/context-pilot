@@ -6768,3 +6768,25 @@ index 2dc047a6..6892f601 100644
      match: "provider-roster contract"
      reason: >
 # --- End entry #65 ---
+66:aa8292c62cd891abeca7db28cc9f7f91d628cdf949197ee068101091c5ea1266:30496ae51ea486e57a6be131f34123fe31173354012b74f47a29f82c4a21550f:6e0bba3197e18cdb87eb3090a8609d0e1a51433ff6efe1dc681c7908021004e6
+# --- Diff for entry #66 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 6892f601..09c61aa9 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -392,14 +392,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/state/actions.rs"
+-    match: "action-result contract"
+-    reason: >
+-      ActionResult is constructed by action handlers and matched exhaustively by the event
+-      loop; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/state/runtime/reverie.rs"
+     match: "reverie-kind contract"
+     reason: >
+# --- End entry #66 ---

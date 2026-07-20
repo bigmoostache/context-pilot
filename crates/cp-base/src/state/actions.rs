@@ -184,10 +184,7 @@ pub enum Action {
 
 /// Outcome of processing an [`Action`] — tells the event loop what to do next.
 #[derive(Debug)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "action-result contract: ActionResult is constructed by action handlers and matched exhaustively by the event loop; the variant set is closed and #[non_exhaustive] would forbid that cross-crate construction"
-)]
+#[non_exhaustive]
 pub enum ActionResult {
     /// No further work needed.
     Nothing,

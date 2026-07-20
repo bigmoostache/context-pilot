@@ -238,18 +238,20 @@ fn apply_stream_done(app: &mut App, done: StreamDonePayload) {
     ) = done;
 
     app.state.flags.ui.dirty = true;
-    match apply_action(
+    // `if let` chain (not an exhaustive match) so ActionResult stays #[non_exhaustive].
+    let result = apply_action(
         &mut app.state,
         Action::StreamDone { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason },
-    ) {
-        ActionResult::SaveMessage(id) => {
-            if let Some(msg) = app.state.messages.iter().find(|m| m.id == id) {
-                app.save_message_async(msg);
-            }
-            app.save_state_async();
+    );
+    if let ActionResult::SaveMessage(id) = result {
+        if let Some(msg) = app.state.messages.iter().find(|m| m.id == id) {
+            app.save_message_async(msg);
         }
-        ActionResult::Save => app.save_state_async(),
-        ActionResult::Nothing | ActionResult::StopStream | ActionResult::StartApiCheck => {}
+        app.save_state_async();
+    } else if matches!(result, ActionResult::Save) {
+        app.save_state_async();
+    } else {
+        // Nothing / StopStream / StartApiCheck + future non_exhaustive variants: no-op here.
     }
 
     // Reset auto-continuation count on each successful tick (stream completion).

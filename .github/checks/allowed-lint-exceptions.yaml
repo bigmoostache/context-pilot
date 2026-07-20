@@ -392,14 +392,6 @@ exceptions:
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
-  - path: "crates/cp-base/src/state/actions.rs"
-    match: "action-result contract"
-    reason: >
-      ActionResult is constructed by action handlers and matched exhaustively by the event
-      loop; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
   - path: "crates/cp-base/src/state/runtime/reverie.rs"
     match: "reverie-kind contract"
     reason: >
