@@ -383,22 +383,6 @@ exceptions:
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
-  - path: "crates/cp-vault/src/registry.rs"
-    match: "credential-registry taxonomy: KeyCategory is a closed set"
-    reason: >
-      KeyCategory is a closed set constructed in the ALL_KEYS table and matched
-      exhaustively by health/UI code; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-vault/src/registry.rs"
-    match: "credential-registry taxonomy: AuthMechanism is a closed set"
-    reason: >
-      AuthMechanism is a closed set constructed in the ALL_KEYS table and matched
-      exhaustively by the resolution cascade; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
   - path: "crates/cp-vault/src/types.rs"
     match: "vault error taxonomy is a closed set"
     reason: >
@@ -626,14 +610,6 @@ exceptions:
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
-  - path: "crates/cp-mod-console/src/types.rs"
-    match: "process-status contract"
-    reason: >
-      ProcessStatus is a closed lifecycle set constructed cross-crate by the session manager
-      and matched exhaustively by label()/exit_code(); non_exhaustive would forbid it.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
   - path: "crates/cp-mod-bridge/src/body.rs"
     match: "body-disposition contract"
     reason: >
@@ -687,23 +663,6 @@ exceptions:
     reason: >
       NotificationType is a closed set serde-persisted and constructed cross-crate, matched
       exhaustively by label() and the continuation builder; non_exhaustive would forbid it.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-mod-spine/src/types.rs"
-    match: "notification-status contract"
-    reason: >
-      NotificationStatus is a closed Unprocessed/Blocked/Processed set serde-persisted and
-      constructed cross-crate, matched exhaustively by the spine state machine; non_exhaustive
-      would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-mod-spine/src/types.rs"
-    match: "continuation-action contract"
-    reason: >
-      ContinuationAction is a closed SyntheticMessage/Relaunch set constructed by the continuation
-      builder and matched exhaustively by apply_continuation; non_exhaustive would forbid it.
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 

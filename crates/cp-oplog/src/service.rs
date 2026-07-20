@@ -126,7 +126,7 @@ impl Durability {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[expect(
     clippy::exhaustive_enums,
-    reason = "best-effort outcome is a closed binary set (Submitted/Dropped) returned cross-crate and matched exhaustively by callers; #[non_exhaustive] would forbid that construction and adds nothing to a binary outcome"
+    reason = "best-effort outcome is a closed binary set (Submitted/Dropped) matched exhaustively by cross-crate callers (the tests/service_group_commit.rs integration target); #[non_exhaustive] would force a wildcard arm there that the forbidden wildcard_enum_match_arm lint rejects, and adds nothing to a binary outcome"
 )]
 pub enum BestEffortOutcome {
     /// Accepted into the queue (it will be written on the next group commit).

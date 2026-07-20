@@ -6202,3 +6202,72 @@ index 3f19a105..8ce64176 100644
    - path: "crates/cp-mod-utilities/src/time.rs"
      match: "const-fn widening (u8/i32 -> i64) is always exact"
 # --- End entry #53 ---
+54:5a6e46adece6d5b6608c9ca58575fb1d6589aec50891551629d1a9f32ee3d1a0:52c38fa94cf570f514300789407055d38227cce89cdea1954e3404c24b43342c:19f1635885c70e4b9a7cf0a112ef748c1701d6a94ddf1fe4cac6984889ed8719
+# --- Diff for entry #54 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 8ce64176..09b96315 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -383,22 +383,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-vault/src/registry.rs"
+-    match: "credential-registry taxonomy: KeyCategory is a closed set"
+-    reason: >
+-      KeyCategory is a closed set constructed in the ALL_KEYS table and matched
+-      exhaustively by health/UI code; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-vault/src/registry.rs"
+-    match: "credential-registry taxonomy: AuthMechanism is a closed set"
+-    reason: >
+-      AuthMechanism is a closed set constructed in the ALL_KEYS table and matched
+-      exhaustively by the resolution cascade; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-vault/src/types.rs"
+     match: "vault error taxonomy is a closed set"
+     reason: >
+@@ -626,14 +610,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-mod-console/src/types.rs"
+-    match: "process-status contract"
+-    reason: >
+-      ProcessStatus is a closed lifecycle set constructed cross-crate by the session manager
+-      and matched exhaustively by label()/exit_code(); non_exhaustive would forbid it.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-mod-bridge/src/body.rs"
+     match: "body-disposition contract"
+     reason: >
+@@ -690,23 +666,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-mod-spine/src/types.rs"
+-    match: "notification-status contract"
+-    reason: >
+-      NotificationStatus is a closed Unprocessed/Blocked/Processed set serde-persisted and
+-      constructed cross-crate, matched exhaustively by the spine state machine; non_exhaustive
+-      would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-mod-spine/src/types.rs"
+-    match: "continuation-action contract"
+-    reason: >
+-      ContinuationAction is a closed SyntheticMessage/Relaunch set constructed by the continuation
+-      builder and matched exhaustively by apply_continuation; non_exhaustive would forbid it.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-mod-threads/src/types.rs"
+     match: "thread-turn contract: ThreadStatus is a closed MyTurn/TheirTurn set"
+     reason: >
+# --- End entry #54 ---

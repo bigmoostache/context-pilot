@@ -27,10 +27,7 @@ pub struct SessionMeta {
 
 /// Process lifecycle status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "process-status contract: ProcessStatus is a closed lifecycle set constructed cross-crate by the session manager and matched exhaustively by label()/exit_code(); #[non_exhaustive] would forbid that construction"
-)]
+#[non_exhaustive]
 pub enum ProcessStatus {
     /// Process is actively running.
     Running,

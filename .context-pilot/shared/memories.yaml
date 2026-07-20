@@ -401,25 +401,19 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'A5-A13 DIRECTIVE (T588): lints are BEACONS. Max 5 #[expect] per step. No blanket-suppress. Commit AND push after each step. A5-A10 done+pushed. Next A11 shadow_reuse.'
+  tl_dr: 'BOSS-HUNT (T595): r1=2 wins (clippy::panic->assert!), r2=5 wins (exhaustive_enums->non_exhaustive on crate-local enums). Registry 79->74. chain #54. Details in body.'
   contents: |-
-    T588 user directive, valid A5 through A13:
+    T588 A5-A13 lints-as-beacons directive still governs. BOSS-HUNT rounds on T595:
 
-    Lints are beacons toward better code, NOT nuisances to suppress. Hard cap: 5 #[expect] per step. Commit AND push after each step (CI runs in background).
+    r1: 2 wins in cp-base/src/lib.rs, both clippy::panic (panic!("...{e}") -> assert!(x.is_ok(), "...{:?}", err())). 3 reverted irreducible (cp-wire as_conversions blocked by little_endian_bytes forbid). Commit 824f6075.
 
-    Per-site buckets: (1) #[non_exhaustive]+constructor for in-crate-only construction; (2) add ::new/builder THEN non_exhaustive for cross-crate literal; (3) #[expect] last-resort (cap 5).
+    r2: 5 wins converting #[expect(clippy::exhaustive_enums)] -> #[non_exhaustive] on CRATE-LOCAL enums: ProcessStatus (cp-mod-console), NotificationStatus + ContinuationAction (cp-mod-spine), KeyCategory + AuthMechanism (cp-vault). All exit 0 per-crate clippy.
 
-    A5 DONE+pushed f2fce464. exhaustive_structs=deny. Exactly 5 expects.
-    A6 float_arithmetic DONE+pushed. Chokepoint cast/float_math.rs. Chain #43. (watchdog.rs linux-cfg-gated regression later folded into A11 commit.)
-    A7 inline_modules DONE (chain #44). Structural, no gate.
-    A8 non_ascii_literal DONE (chain #45). ZERO expects, glyphs escaped \u{XXXX}.
-    A9 pattern_type_mismatch DONE+pushed c82ad408. forbid. ZERO NEW expects (4 pre-existing chokepoints). Chain #47.
-    A10 redundant_pub_crate DONE+pushed a4f052de. NOT RAISABLE — mutually exclusive with unreachable_pub=forbid. Kept default allow, DOCUMENTED in Cargo.toml. global_env_path pub(crate)->private. Chain #48.
-    A11 shadow_reuse DONE+pushed b3f1ebe8. shadow_reuse=deny. ZERO expects (pure naming). ~66 sites renamed workspace-wide (source->raw_*/commanded/*_opt/*_var, keep processed value under orig name). Root gate + workspace clippy both 0 'is shadowed'. Chain #49. watchdog A6 float regression folded in.
+    KEY INSIGHT: non_exhaustive only forbids construction/match in DOWNSTREAM crates. Crate-local enums (constructed+matched only within their own crate) convert clean. The 53 exhaustive_enums entries had rote copy-paste reasons claiming cross-crate; never per-enum verified. Grep+per-crate-compile arbitrates truth.
 
-    Now A12 single_call_fn (X1202): inline once-called fns OR assess anti-modular blocker. ~1075 sites est. NO autofix — inlining is contextual. Likely NOT raisable cleanly (would fight modular decomposition + 500-line caps). Assess feasibility first like A10.
+    BestEffortOutcome (cp-oplog) LOST: matched exhaustively by tests/service_group_commit.rs:145 (integration target = separate downstream crate), non_exhaustive forces wildcard = wildcard_enum_match_arm (forbid). Reverted with updated reason.
 
-    GATE discipline: cargo clippy --all-targets from ROOT + cargo clippy --workspace for full census (per-crate deny aborts mask downstream). chain.sh via `printf 'Totordu1789\n' | ./chain.sh` (auto-updates). git push plain (-25308 keychain warning benign). npx needs export PATH=/opt/homebrew/bin:$PATH.
+    GATE: cargo clippy --workspace floods 1298 pre-existing orchestrator/console-server errors (M157, out of CI gate scope). Use per-crate clippy -p X --lib OR root cargo clippy --all-targets. Registry 79->74. chain #54.
   importance: critical
   labels:
   - T588
@@ -427,7 +421,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784543710622
+  last_edited_ms: 1784561048734
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high
