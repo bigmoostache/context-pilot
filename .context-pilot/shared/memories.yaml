@@ -401,7 +401,7 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'T604 RESCOPE (supersedes boss-hunt enum metric): exhaustive_enums/structs now allow workspace-wide, re-denied only in cp-wire. Commit e3fdd855, chain #70. Details in body.'
+  tl_dr: 'T604 + FIGHT: exhaustive_enums/structs allow workspace-wide, re-denied only in cp-wire. FIGHT batch 1: 1 clean kill (RosterEntryInit removed via RosterThread builder). Registry 28 entries. Commits e3fdd855, 8787e8b6. Chain #71. Body has full triage.'
   contents: |-
     T604 (user-driven, supersedes the boss-hunt 81->36 enum-flip scoreboard): exhaustive_enums + exhaustive_structs are library-SemVer lints, WRONG as blanket workspace deny (internal crates recompile atomically with consumers, so E0004-on-add is a FEATURE not a break). RIGHT only for cp-wire (real agent/orchestrator version boundary, unknown variant/field at runtime).
 
@@ -417,7 +417,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784575101278
+  last_edited_ms: 1784576922310
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high
