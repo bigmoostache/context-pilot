@@ -250,46 +250,11 @@ fn fd_semantic(open: u32, limit: u64) -> Semantic {
     }
 }
 
-/// Build the perf overlay IR data from the perf metrics snapshot.
-fn build_perf_overlay(state: &State) -> PerfOverlay {
-    use crate::ui::perf::PERF;
-
-    let snapshot = PERF.snapshot();
-
-    let fps = if snapshot.frame_avg_ms > 0.0f64 { float_math::div(1_000.0f64, snapshot.frame_avg_ms) } else { 0.0f64 };
-
-    // Meilisearch stats
-    let meili = cp_mod_search::overlay_info(state).and_then(|info| {
-        if info.meili_memory_bytes == 0 && info.meili_cpu_pct <= 0.0 {
-            return None;
-        }
-        let mb = float_math::div_u64(info.meili_memory_bytes, 1_048_576.0f64);
-        Some(PerfMeiliStats {
-            cpu_pct: f64::from(info.meili_cpu_pct),
-            cpu_semantic: cpu_semantic(f64::from(info.meili_cpu_pct)),
-            memory_mb: mb,
-        })
-    });
-
-    // Budget bars
-    let build_bar = |label: &str, budget_ms: f64| -> PerfBudgetBar {
-        let pct = float_math::percent(snapshot.frame_avg_ms, budget_ms).min(150.0);
-        let semantic = if pct <= 80.0f64 {
-            Semantic::Success
-        } else if pct <= 100.0f64 {
-            Semantic::Warning
-        } else {
-            Semantic::Error
-        };
-        PerfBudgetBar { label: label.into(), percent: pct, semantic }
-    };
-
-    let budget_bars = vec![build_bar("60fps", FRAME_BUDGET_60FPS), build_bar("30fps", FRAME_BUDGET_30FPS)];
-
-    // Operations
+/// Build the per-operation perf rows (top 10 by total time) from a snapshot.
+fn build_perf_ops(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<PerfOp> {
     let total_time: f64 = snapshot.ops.iter().map(|o| o.total_ms).sum();
 
-    let operations = snapshot
+    snapshot
         .ops
         .iter()
         .take(10)
@@ -328,7 +293,49 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
                 is_hotspot,
             }
         })
-        .collect();
+        .collect()
+}
+
+/// Build the optional Meilisearch stats row for the perf overlay (None when no
+/// meili process is running or it reports no CPU/memory).
+fn build_perf_meili(state: &State) -> Option<PerfMeiliStats> {
+    let info = cp_mod_search::overlay_info(state)?;
+    if info.meili_memory_bytes == 0 && info.meili_cpu_pct <= 0.0 {
+        return None;
+    }
+    let mb = float_math::div_u64(info.meili_memory_bytes, 1_048_576.0f64);
+    Some(PerfMeiliStats {
+        cpu_pct: f64::from(info.meili_cpu_pct),
+        cpu_semantic: cpu_semantic(f64::from(info.meili_cpu_pct)),
+        memory_mb: mb,
+    })
+}
+
+/// Build the two frame-budget bars (60fps / 30fps) from the average frame time.
+fn build_perf_budget_bars(frame_avg_ms: f64) -> Vec<PerfBudgetBar> {
+    let build_bar = |label: &str, budget_ms: f64| -> PerfBudgetBar {
+        let pct = float_math::percent(frame_avg_ms, budget_ms).min(150.0);
+        let semantic = if pct <= 80.0f64 {
+            Semantic::Success
+        } else if pct <= 100.0f64 {
+            Semantic::Warning
+        } else {
+            Semantic::Error
+        };
+        PerfBudgetBar { label: label.into(), percent: pct, semantic }
+    };
+    vec![build_bar("60fps", FRAME_BUDGET_60FPS), build_bar("30fps", FRAME_BUDGET_30FPS)]
+}
+
+/// Build the perf overlay IR data from the perf metrics snapshot.
+fn build_perf_overlay(state: &State) -> PerfOverlay {
+    use crate::ui::perf::PERF;
+
+    let snapshot = PERF.snapshot();
+
+    let fps = if snapshot.frame_avg_ms > 0.0f64 { float_math::div(1_000.0f64, snapshot.frame_avg_ms) } else { 0.0f64 };
+
+    let operations = build_perf_ops(&snapshot);
 
     PerfOverlay {
         fps,
@@ -341,8 +348,8 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
         open_fds: snapshot.open_fds,
         fd_limit_soft: snapshot.fd_limit_soft,
         fd_semantic: fd_semantic(snapshot.open_fds, snapshot.fd_limit_soft),
-        meili,
-        budget_bars,
+        meili: build_perf_meili(state),
+        budget_bars: build_perf_budget_bars(snapshot.frame_avg_ms),
         sparkline: snapshot.frame_times_ms,
         operations,
     }

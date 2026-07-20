@@ -66,46 +66,53 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
     let github_token = cp_vault::vault().get("github").map(|s| s.expose().to_owned());
 
     spawn_async_tool(state, tool, GIT_CMD_TIMEOUT_SECS.saturating_add(5), move || {
-        let start = Instant::now();
-
-        let mut cmd = Command::new("git");
-        let _c = cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
-
-        // HTTPS auth via GIT_ASKPASS when GITHUB_TOKEN is available.
-        let askpass_tempfile = github_token.as_ref().and_then(|token| {
-            let askpass_path = std::env::temp_dir().join(format!("cpilot_askpass_{}", std::process::id()));
-            let script = format!("#!/bin/sh\necho '{}'", token.replace('\'', "'\\''"));
-            std::fs::write(&askpass_path, &script).is_ok().then(|| {
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt as _;
-                    drop(std::fs::set_permissions(&askpass_path, std::fs::Permissions::from_mode(0o700)));
-                }
-                let _ca = cmd.env("GIT_ASKPASS", &askpass_path);
-                askpass_path
-            })
-        });
-
-        let result = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
-        let elapsed_ms = start.elapsed().as_millis();
-
-        // Clean up temp askpass script
-        if let Some(path) = askpass_tempfile.as_ref() {
-            drop(std::fs::remove_file(path));
-        }
-
-        match result {
-            Ok(output) => format_git_output(&output, &command_owned, elapsed_ms),
-            Err(e) => {
-                let content = if e.kind() == std::io::ErrorKind::NotFound {
-                    "git not found. Ensure git is installed and on PATH.".to_owned()
-                } else {
-                    format!("Error running git: {e}")
-                };
-                ToolOutput::error(content)
-            }
-        }
+        run_git_command(&args, github_token.as_ref(), &command_owned)
     })
+}
+
+/// Run one git invocation off the main loop: wire up `GIT_ASKPASS` from a
+/// token-bearing temp script (when a token is present), execute with a timeout,
+/// clean the script up, and fold the result into a [`ToolOutput`].
+fn run_git_command(args: &[String], github_token: Option<&String>, command_owned: &str) -> ToolOutput {
+    let start = Instant::now();
+
+    let mut cmd = Command::new("git");
+    let _c = cmd.args(args).env("GIT_TERMINAL_PROMPT", "0");
+
+    // HTTPS auth via GIT_ASKPASS when GITHUB_TOKEN is available.
+    let askpass_tempfile = github_token.and_then(|token| {
+        let askpass_path = std::env::temp_dir().join(format!("cpilot_askpass_{}", std::process::id()));
+        let script = format!("#!/bin/sh\necho '{}'", token.replace('\'', "'\\''"));
+        std::fs::write(&askpass_path, &script).is_ok().then(|| {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt as _;
+                drop(std::fs::set_permissions(&askpass_path, std::fs::Permissions::from_mode(0o700)));
+            }
+            let _ca = cmd.env("GIT_ASKPASS", &askpass_path);
+            askpass_path
+        })
+    });
+
+    let result = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
+    let elapsed_ms = start.elapsed().as_millis();
+
+    // Clean up temp askpass script
+    if let Some(path) = askpass_tempfile.as_ref() {
+        drop(std::fs::remove_file(path));
+    }
+
+    match result {
+        Ok(output) => format_git_output(&output, command_owned, elapsed_ms),
+        Err(e) => {
+            let content = if e.kind() == std::io::ErrorKind::NotFound {
+                "git not found. Ensure git is installed and on PATH.".to_owned()
+            } else {
+                format!("Error running git: {e}")
+            };
+            ToolOutput::error(content)
+        }
+    }
 }
 
 /// Decide inline-vs-panel for a completed git command.

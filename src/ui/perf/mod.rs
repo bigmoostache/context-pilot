@@ -342,41 +342,8 @@ impl PerfMetrics {
                 .collect()
         };
 
-        let mut op_snapshots: Vec<OpSnapshot> = raw_ops
-            .iter()
-            .map(|entry| {
-                let (name, total_us, recent) = (entry.0, entry.1, &entry.2);
-                let count = recent.len();
-
-                // Calculate mean
-                let mean_us = if count > 0 {
-                    float_math::div(recent.iter().sum::<u64>().to_f64(), count.to_f64())
-                } else {
-                    0.0f64
-                };
-
-                // Calculate standard deviation
-                let std_us = if count > 1 {
-                    let variance = float_math::div(
-                        float_math::sum_iter(recent.iter().map(|&x| {
-                            let diff = float_math::sub(x.to_f64(), mean_us);
-                            float_math::mul(diff, diff)
-                        })),
-                        count.saturating_sub(1).to_f64(),
-                    );
-                    variance.sqrt()
-                } else {
-                    0.0f64
-                };
-
-                OpSnapshot {
-                    name,
-                    total_ms: float_math::div_u64(total_us, 1000.0f64),
-                    mean_ms: float_math::div(mean_us, 1000.0f64),
-                    std_ms: float_math::div(std_us, 1000.0f64),
-                }
-            })
-            .collect();
+        let mut op_snapshots: Vec<OpSnapshot> =
+            raw_ops.iter().map(|entry| compute_op_snapshot(entry.0, entry.1, &entry.2)).collect();
 
         // Sort by total time descending (hotspots first)
         op_snapshots.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
@@ -413,6 +380,35 @@ impl PerfMetrics {
             self.refresh_system_stats();
         }
         new_state
+    }
+}
+
+/// Compute one operation's display snapshot (total/mean/std in ms) from its
+/// accumulated total and recent-sample ring. `recent` drives mean + std;
+/// std needs ≥2 samples (sample variance, `n-1` divisor).
+fn compute_op_snapshot(name: &'static str, total_us: u64, recent: &[u64]) -> OpSnapshot {
+    let count = recent.len();
+
+    let mean_us = if count > 0 { float_math::div(recent.iter().sum::<u64>().to_f64(), count.to_f64()) } else { 0.0f64 };
+
+    let std_us = if count > 1 {
+        let variance = float_math::div(
+            float_math::sum_iter(recent.iter().map(|&x| {
+                let diff = float_math::sub(x.to_f64(), mean_us);
+                float_math::mul(diff, diff)
+            })),
+            count.saturating_sub(1).to_f64(),
+        );
+        variance.sqrt()
+    } else {
+        0.0f64
+    };
+
+    OpSnapshot {
+        name,
+        total_ms: float_math::div_u64(total_us, 1000.0f64),
+        mean_ms: float_math::div(mean_us, 1000.0f64),
+        std_ms: float_math::div(std_us, 1000.0f64),
     }
 }
 

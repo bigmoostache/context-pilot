@@ -52,6 +52,44 @@ struct AnthropicRequest {
     stream: bool,
 }
 
+/// Assemble the Anthropic `messages` array and resolved system prompt from a
+/// request: prefer pre-built `api_messages` (fallback to raw assembly), append
+/// any tool-result blocks, then pick the custom system prompt (injecting the
+/// cleaner-mode context block) or the default agent prompt.
+pub(in crate::llms) fn build_messages_and_system(request: &LlmRequest) -> (Vec<ApiMessage>, String) {
+    let include_tool_uses = request.tool_results.is_some();
+    let mut api_messages = if request.api_messages.is_empty() {
+        messages_to_api(&request.messages, &request.context_items, include_tool_uses, request.seed_content.as_deref())
+    } else {
+        request.api_messages.clone()
+    };
+
+    if let Some(results) = request.tool_results.as_ref() {
+        let tool_result_blocks: Vec<ContentBlock> = results
+            .iter()
+            .map(|r: &crate::infra::tools::ToolResult| ContentBlock::ToolResult {
+                tool_use_id: r.tool_use_id.clone(),
+                content: r.content.clone(),
+            })
+            .collect();
+        api_messages.push(ApiMessage { role: "user".to_owned(), content: tool_result_blocks });
+    }
+
+    let system_prompt = request.system_prompt.as_ref().map_or_else(
+        || library::default_agent_content().to_owned(),
+        |prompt| {
+            if let Some(context) = request.extra_context.as_ref() {
+                let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
+                api_messages
+                    .push(ApiMessage { role: "user".to_owned(), content: vec![ContentBlock::Text { text: msg }] });
+            }
+            prompt.clone()
+        },
+    );
+
+    (api_messages, system_prompt)
+}
+
 impl LlmClient for AnthropicClient {
     fn stream(&self, request: LlmRequest, tx: Sender<StreamEvent>) -> Result<(), LlmError> {
         let api_key = self.api_key.as_ref().ok_or_else(|| LlmError::Auth("ANTHROPIC_API_KEY not set".into()))?;
@@ -61,45 +99,7 @@ impl LlmClient for AnthropicClient {
         // silent stream drops mid-response (same fix applied to Claude Code providers).
         let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 
-        // Build API messages
-        let include_tool_uses = request.tool_results.is_some();
-        // Use pre-assembled API messages from prompt_builder (centralized assembly)
-        let mut api_messages = if request.api_messages.is_empty() {
-            // Fallback: build from raw data (should only happen for api_check etc.)
-            messages_to_api(
-                &request.messages,
-                &request.context_items,
-                include_tool_uses,
-                request.seed_content.as_deref(),
-            )
-        } else {
-            request.api_messages.clone()
-        };
-
-        // Add tool results if present
-        if let Some(results) = request.tool_results.as_ref() {
-            let tool_result_blocks: Vec<ContentBlock> = results
-                .iter()
-                .map(|r: &crate::infra::tools::ToolResult| ContentBlock::ToolResult {
-                    tool_use_id: r.tool_use_id.clone(),
-                    content: r.content.clone(),
-                })
-                .collect();
-
-            api_messages.push(ApiMessage { role: "user".to_owned(), content: tool_result_blocks });
-        }
-
-        // Handle cleaner mode or custom system prompt
-        let system_prompt = if let Some(prompt) = request.system_prompt.as_ref() {
-            if let Some(context) = request.extra_context.as_ref() {
-                let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
-                api_messages
-                    .push(ApiMessage { role: "user".to_owned(), content: vec![ContentBlock::Text { text: msg }] });
-            }
-            prompt.clone()
-        } else {
-            library::default_agent_content().to_owned()
-        };
+        let (api_messages, system_prompt) = build_messages_and_system(&request);
 
         let api_request = AnthropicRequest {
             model: request.model.clone(),
@@ -195,12 +195,6 @@ impl LlmClient for AnthropicClient {
             .send()
             .is_ok_and(|r| r.status().is_success());
 
-        {
-            let mut r = super::ApiCheckResult::default();
-            r.auth_ok = auth_ok;
-            r.streaming_ok = streaming_ok;
-            r.tools_ok = tools_ok;
-            r
-        }
+        super::ApiCheckResult::checks([auth_ok, streaming_ok, tools_ok])
     }
 }

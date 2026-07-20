@@ -9,6 +9,90 @@ use std::fmt::Write as _;
 use crate::api::CrawlParams;
 use crate::tools::{ASYNC_TIMEOUT_CRAWL_SECS, CRAWL_MAX_POLLS, CRAWL_POLL_INTERVAL, err_result, get_client};
 
+/// Owned crawl parameters handed to the worker thread by [`exec_crawl`].
+struct CrawlJob {
+    /// Starting URL.
+    url: String,
+    /// Destination file for combined markdown output.
+    output: std::path::PathBuf,
+    /// Max pages to crawl.
+    limit: u32,
+    /// Optional max link-following depth.
+    max_depth: Option<u32>,
+    /// Optional include-path regex patterns.
+    include_paths: Option<Vec<String>>,
+    /// Optional exclude-path regex patterns.
+    exclude_paths: Option<Vec<String>>,
+    /// Whether to follow subdomain links.
+    allow_subdomains: bool,
+}
+
+/// Run one recursive crawl off the main loop: start the job, poll to completion
+/// (or failure/timeout), then write combined markdown to disk.
+fn run_crawl(client: &crate::api::FirecrawlClient, job: &CrawlJob) -> ToolOutput {
+    let url = &job.url;
+    let output = &job.output;
+    let limit = &job.limit;
+    let max_depth = &job.max_depth;
+    let include_paths = &job.include_paths;
+    let exclude_paths = &job.exclude_paths;
+    let allow_subdomains = &job.allow_subdomains;
+    let inc_refs: Option<Vec<&str>> = include_paths.as_ref().map(|v| v.iter().map(String::as_str).collect());
+    let exc_refs: Option<Vec<&str>> = exclude_paths.as_ref().map(|v| v.iter().map(String::as_str).collect());
+
+    let params = CrawlParams {
+        url,
+        limit: *limit,
+        max_depth: *max_depth,
+        include_paths: inc_refs,
+        exclude_paths: exc_refs,
+        allow_subdomains: *allow_subdomains,
+    };
+
+    // 1. Start the crawl job
+    let start = match client.start_crawl(&params) {
+        Ok(r) => r,
+        Err(e) => return ToolOutput::error(e),
+    };
+    if !start.success {
+        let msg = start.error.unwrap_or_else(|| "Unknown error".to_owned());
+        return ToolOutput::error(format!("Crawl failed to start: {msg}"));
+    }
+    let Some(job_id) = start.id else {
+        return ToolOutput::error("Crawl started but no job ID returned".to_owned());
+    };
+
+    // 2. Poll until complete
+    let mut last_completed = 0u32;
+    for _ in 0..CRAWL_MAX_POLLS {
+        std::thread::sleep(CRAWL_POLL_INTERVAL);
+        let status = match client.poll_crawl(&job_id) {
+            Ok(s) => s,
+            Err(e) => {
+                return ToolOutput::error(format!("Crawl poll failed: {e}"));
+            }
+        };
+        last_completed = status.completed.unwrap_or(0);
+
+        match status.status.as_str() {
+            "completed" => {
+                return write_crawl_output(url, output, status);
+            }
+            "failed" => {
+                let msg = status.error.unwrap_or_else(|| "Unknown error".to_owned());
+                return ToolOutput::error(format!("Crawl failed: {msg}"));
+            }
+            _ => {} // still scraping, keep polling
+        }
+    }
+
+    let timeout_secs = CRAWL_MAX_POLLS.saturating_mul(CRAWL_POLL_INTERVAL.as_secs().to_u32());
+    ToolOutput::error(format!(
+        "Crawl timed out after {timeout_secs}s ({last_completed} pages scraped). \
+             Job '{job_id}' may still be running on Firecrawl servers.",
+    ))
+}
+
 /// Execute the `firecrawl_crawl` tool: recursively crawl a site.
 ///
 /// Starts an async crawl job, polls until complete, then writes combined
@@ -44,62 +128,8 @@ pub(crate) fn exec_crawl(tool: &ToolUse, state: &mut State) -> ToolResult {
         .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect());
     let allow_subdomains = tool.input.get("allow_subdomains").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
-    spawn_async_tool(state, tool, ASYNC_TIMEOUT_CRAWL_SECS, move || {
-        let inc_refs: Option<Vec<&str>> = include_paths.as_ref().map(|v| v.iter().map(String::as_str).collect());
-        let exc_refs: Option<Vec<&str>> = exclude_paths.as_ref().map(|v| v.iter().map(String::as_str).collect());
-
-        let params = CrawlParams {
-            url: &url,
-            limit,
-            max_depth,
-            include_paths: inc_refs,
-            exclude_paths: exc_refs,
-            allow_subdomains,
-        };
-
-        // 1. Start the crawl job
-        let start = match client.start_crawl(&params) {
-            Ok(r) => r,
-            Err(e) => return ToolOutput::error(e),
-        };
-        if !start.success {
-            let msg = start.error.unwrap_or_else(|| "Unknown error".to_owned());
-            return ToolOutput::error(format!("Crawl failed to start: {msg}"));
-        }
-        let Some(job_id) = start.id else {
-            return ToolOutput::error("Crawl started but no job ID returned".to_owned());
-        };
-
-        // 2. Poll until complete
-        let mut last_completed = 0u32;
-        for _ in 0..CRAWL_MAX_POLLS {
-            std::thread::sleep(CRAWL_POLL_INTERVAL);
-            let status = match client.poll_crawl(&job_id) {
-                Ok(s) => s,
-                Err(e) => {
-                    return ToolOutput::error(format!("Crawl poll failed: {e}"));
-                }
-            };
-            last_completed = status.completed.unwrap_or(0);
-
-            match status.status.as_str() {
-                "completed" => {
-                    return write_crawl_output(&url, &output, status);
-                }
-                "failed" => {
-                    let msg = status.error.unwrap_or_else(|| "Unknown error".to_owned());
-                    return ToolOutput::error(format!("Crawl failed: {msg}"));
-                }
-                _ => {} // still scraping, keep polling
-            }
-        }
-
-        let timeout_secs = CRAWL_MAX_POLLS.saturating_mul(CRAWL_POLL_INTERVAL.as_secs().to_u32());
-        ToolOutput::error(format!(
-            "Crawl timed out after {timeout_secs}s ({last_completed} pages scraped). \
-                 Job '{job_id}' may still be running on Firecrawl servers.",
-        ))
-    })
+    let job = CrawlJob { url, output, limit, max_depth, include_paths, exclude_paths, allow_subdomains };
+    spawn_async_tool(state, tool, ASYNC_TIMEOUT_CRAWL_SECS, move || run_crawl(&client, &job))
 }
 
 /// Write crawl results to a combined markdown file.

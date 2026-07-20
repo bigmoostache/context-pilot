@@ -10,10 +10,8 @@ use serde_json::Value;
 use std::sync::mpsc::Sender;
 
 use super::error::LlmError;
-use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent};
-use crate::infra::constants::library;
+use super::{ApiMessage, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::tools::build_api;
-use cp_base::config::INJECTIONS;
 
 /// `MiniMax` Anthropic-compatible API endpoint.
 const MINIMAX_ENDPOINT: &str = "https://api.minimax.io/anthropic/v1/messages";
@@ -58,42 +56,7 @@ impl LlmClient for MiniMaxClient {
 
         let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 
-        // Use pre-assembled API messages from prompt_builder
-        let include_tool_uses = request.tool_results.is_some();
-        let mut api_messages = if request.api_messages.is_empty() {
-            super::anthropic::messages::messages_to_api(
-                &request.messages,
-                &request.context_items,
-                include_tool_uses,
-                request.seed_content.as_deref(),
-            )
-        } else {
-            request.api_messages.clone()
-        };
-
-        // Append tool results if present
-        if let Some(results) = request.tool_results.as_ref() {
-            let tool_result_blocks: Vec<ContentBlock> = results
-                .iter()
-                .map(|r: &crate::infra::tools::ToolResult| ContentBlock::ToolResult {
-                    tool_use_id: r.tool_use_id.clone(),
-                    content: r.content.clone(),
-                })
-                .collect();
-            api_messages.push(ApiMessage { role: "user".to_owned(), content: tool_result_blocks });
-        }
-
-        // Handle system prompt
-        let system_prompt = if let Some(prompt) = request.system_prompt.as_ref() {
-            if let Some(context) = request.extra_context.as_ref() {
-                let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
-                api_messages
-                    .push(ApiMessage { role: "user".to_owned(), content: vec![ContentBlock::Text { text: msg }] });
-            }
-            prompt.clone()
-        } else {
-            library::default_agent_content().to_owned()
-        };
+        let (api_messages, system_prompt) = super::anthropic::build_messages_and_system(&request);
 
         let api_request = MiniMaxRequest {
             model: request.model.clone(),
@@ -189,12 +152,6 @@ impl LlmClient for MiniMaxClient {
             .send()
             .is_ok_and(|r| r.status().is_success());
 
-        {
-            let mut r = super::ApiCheckResult::default();
-            r.auth_ok = auth_ok;
-            r.streaming_ok = streaming_ok;
-            r.tools_ok = tools_ok;
-            r
-        }
+        super::ApiCheckResult::checks([auth_ok, streaming_ok, tools_ok])
     }
 }

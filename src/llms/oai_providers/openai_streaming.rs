@@ -273,3 +273,114 @@ where
     }
     Ok(acc)
 }
+
+// ───────────────────────────────────────────────────────────────────
+// Shared request/probe helpers (Grok / Groq / DeepSeek)
+// ───────────────────────────────────────────────────────────────────
+
+use reqwest::blocking::Client;
+use serde_json::json;
+
+/// One OpenAI-compatible endpoint: HTTP client + URL + bearer key. Bundling
+/// these three keeps the shared helpers under the 4-argument cap.
+pub(crate) struct OaiEndpoint<'ep> {
+    /// Blocking HTTP client to issue requests with.
+    pub client: &'ep Client,
+    /// Chat-completions endpoint URL.
+    pub url: &'ep str,
+    /// Bearer API key (already exposed).
+    pub key: &'ep str,
+}
+
+/// POST `request` to the endpoint and consume the SSE response to completion,
+/// streaming chunks + tool events to `tx`. Returns the accumulated token/stop
+/// totals, or an [`LlmError`] on a transport failure or non-2xx status.
+pub(crate) fn run_oai_stream<T>(
+    ep: &OaiEndpoint<'_>,
+    request: &T,
+    tx: &Sender<StreamEvent>,
+) -> Result<SseAccum, LlmError>
+where
+    T: Serialize,
+{
+    let response = ep
+        .client
+        .post(ep.url)
+        .header("Authorization", format!("Bearer {}", ep.key))
+        .header("Content-Type", "application/json")
+        .json(request)
+        .send()?;
+
+    if !response.status().is_success() {
+        let status = response.status().as_u16();
+        let body = response.text().unwrap_or_default();
+        return Err(LlmError::Api { status, body });
+    }
+
+    let reader = BufReader::new(response);
+    let mut tool_acc = ToolCallAccumulator::new();
+    consume_sse_stream(reader, tx, &mut tool_acc)
+}
+
+/// Send the terminal [`StreamEvent::Done`] from an accumulated `SseAccum`.
+/// Cache-hit/miss come straight from `acc` (zero for providers that don't
+/// report them); breakpoint + alive fields are empty for OpenAI-compatible APIs.
+pub(crate) fn send_stream_done(tx: &Sender<StreamEvent>, acc: SseAccum) {
+    let _r = tx.send(StreamEvent::Done {
+        input_tokens: acc.input_tokens,
+        output_tokens: acc.output_tokens,
+        cache_hit_tokens: acc.cache_hit_tokens,
+        cache_miss_tokens: acc.cache_miss_tokens,
+        stop_reason: acc.stop_reason,
+        bp_hashes: vec![],
+        bp_panel_ids: vec![],
+        alive_count: 0,
+        alive_positions_permille: vec![],
+    });
+}
+
+/// Issue a single probe request, returning `true` on a 2xx response.
+fn probe_ok(ep: &OaiEndpoint<'_>, body: &Value) -> bool {
+    ep.client
+        .post(ep.url)
+        .header("Authorization", format!("Bearer {}", ep.key))
+        .header("Content-Type", "application/json")
+        .json(body)
+        .send()
+        .is_ok_and(|r| r.status().is_success())
+}
+
+/// Shared `check_api` for OpenAI-compatible providers: runs the auth, streaming,
+/// and tools probes against `ep`. `tokens_field` selects the max-tokens key name
+/// (`"max_tokens"` vs Groq's `"max_completion_tokens"`).
+pub(crate) fn oai_check_api(ep: &OaiEndpoint<'_>, model: &str, tokens_field: &str) -> super::super::ApiCheckResult {
+    let auth_body = json!({ "model": model, tokens_field: 10i32, "messages": [{"role": "user", "content": "Hi"}] });
+    if !probe_ok(ep, &auth_body) {
+        return super::super::ApiCheckResult::failure(Some("Auth failed".to_owned()));
+    }
+
+    let stream_body = json!({
+        "model": model, tokens_field: 10i32, "stream": true,
+        "messages": [{"role": "user", "content": "Say ok"}]
+    });
+    let streaming_ok = probe_ok(ep, &stream_body);
+
+    let tools_body = json!({
+        "model": model, tokens_field: 50i32,
+        "tools": [{
+            "type": "function",
+            "function": {
+                "name": "test_tool", "description": "A test tool",
+                "parameters": { "type": "object", "properties": {}, "required": [] }
+            }
+        }],
+        "messages": [{"role": "user", "content": "Hi"}]
+    });
+    let tools_ok = probe_ok(ep, &tools_body);
+
+    let mut r = super::super::ApiCheckResult::default();
+    r.auth_ok = true;
+    r.streaming_ok = streaming_ok;
+    r.tools_ok = tools_ok;
+    r
+}

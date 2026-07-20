@@ -75,6 +75,38 @@ impl Response {
     }
 }
 
+/// Map a single-character escape letter to its byte value (`\n` → 0x0A, …).
+/// Returns `None` for letters that are not simple one-byte escapes (e.g. `x`).
+const fn simple_escape(letter: u8) -> Option<u8> {
+    match letter {
+        b'n' => Some(0x0A),
+        b'r' => Some(0x0D),
+        b't' => Some(0x09),
+        b'\\' => Some(b'\\'),
+        b'e' => Some(0x1B),
+        b'0' => Some(0x00),
+        _ => None,
+    }
+}
+
+/// Decode a `\xHH` escape starting at `bs[i]` (`i` points at the backslash).
+///
+/// On a well-formed two-hex-digit sequence, pushes the decoded byte and returns
+/// the index just past it. Otherwise pushes a literal `\` and advances by one.
+fn hex_escape(bs: &[u8], i: usize, out: &mut Vec<u8>) -> usize {
+    let hi_opt = i.checked_add(2).and_then(|j| bs.get(j)).copied();
+    let lo_opt = i.checked_add(3).and_then(|j| bs.get(j)).copied();
+    if let (Some(hi), Some(lo)) = (hi_opt, lo_opt)
+        && i.saturating_add(3) < bs.len()
+        && let (Some(h), Some(l)) = (hex_digit(hi), hex_digit(lo))
+    {
+        out.push((h << 4) | l);
+        return i.saturating_add(4);
+    }
+    out.push(b'\\');
+    i.saturating_add(1)
+}
+
 /// Interpret escape sequences in input strings.
 /// Handles: \n, \r, \t, \\, \e, \0, \xHH
 pub(crate) fn interpret_escapes(input: &str) -> Vec<u8> {
@@ -83,59 +115,23 @@ pub(crate) fn interpret_escapes(input: &str) -> Vec<u8> {
     let mut i = 0;
     while i < bytes.len() {
         let Some(cur) = bytes.get(i).copied() else { break };
-        if cur == b'\\' {
-            match i.checked_add(1).and_then(|j| bytes.get(j)).copied() {
-                Some(b'n') => {
-                    out.push(0x0A);
-                    i = i.saturating_add(2);
-                }
-                Some(b'r') => {
-                    out.push(0x0D);
-                    i = i.saturating_add(2);
-                }
-                Some(b't') => {
-                    out.push(0x09);
-                    i = i.saturating_add(2);
-                }
-                Some(b'\\') => {
-                    out.push(b'\\');
-                    i = i.saturating_add(2);
-                }
-                Some(b'e') => {
-                    out.push(0x1B);
-                    i = i.saturating_add(2);
-                }
-                Some(b'0') => {
-                    out.push(0x00);
-                    i = i.saturating_add(2);
-                }
-                Some(b'x') => {
-                    let hi_opt = i.checked_add(2).and_then(|j| bytes.get(j)).copied();
-                    let lo_opt = i.checked_add(3).and_then(|j| bytes.get(j)).copied();
-                    match (hi_opt, lo_opt) {
-                        (Some(hi), Some(lo)) if i.saturating_add(3) < bytes.len() => {
-                            if let (Some(h), Some(l)) = (hex_digit(hi), hex_digit(lo)) {
-                                out.push((h << 4) | l);
-                                i = i.saturating_add(4);
-                            } else {
-                                out.push(b'\\');
-                                i = i.saturating_add(1);
-                            }
-                        }
-                        _ => {
-                            out.push(b'\\');
-                            i = i.saturating_add(1);
-                        }
-                    }
-                }
-                _ => {
-                    out.push(b'\\');
-                    i = i.saturating_add(1);
-                }
-            }
-        } else {
+        if cur != b'\\' {
             out.push(cur);
             i = i.saturating_add(1);
+            continue;
+        }
+        match i.checked_add(1).and_then(|j| bytes.get(j)).copied() {
+            Some(letter) if simple_escape(letter).is_some() => {
+                if let Some(byte) = simple_escape(letter) {
+                    out.push(byte);
+                }
+                i = i.saturating_add(2);
+            }
+            Some(b'x') => i = hex_escape(bytes, i, &mut out),
+            _ => {
+                out.push(b'\\');
+                i = i.saturating_add(1);
+            }
         }
     }
     out

@@ -172,58 +172,100 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), format!("Sent input to console '{panel_id}'"), false)
 }
 
-/// Handle `console_wait`: register a blocking watcher for exit or pattern match.
-pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let _fg = cp_base::flame!("console_wait");
+/// Validated common inputs shared by `console_wait` and `console_watch`.
+struct WatchRequest {
+    /// Panel ID the watcher targets (e.g. "P11").
+    panel_id: String,
+    /// Watch mode — "exit" or "pattern".
+    mode: String,
+    /// Optional regex pattern (required when `mode == "pattern"`).
+    pattern: Option<String>,
+    /// Resolved internal session key for `panel_id`.
+    session_key: String,
+}
+
+/// Parse + validate the `id`/`mode`/`pattern` inputs shared by wait & watch and
+/// resolve the session key. On any failure returns the error `ToolResult` to
+/// bubble straight back to the caller.
+fn parse_watch_request(tool: &ToolUse, state: &State) -> Result<WatchRequest, Box<ToolResult>> {
     let panel_id = match tool.input.get("id").and_then(|v| v.as_str()) {
         Some(id) => id.to_owned(),
-        None => return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_owned(), true),
+        None => {
+            return Err(Box::new(ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_owned(), true)));
+        }
     };
     let mode = match tool.input.get("mode").and_then(|v| v.as_str()) {
         Some(m) => m.to_owned(),
-        None => return ToolResult::new(tool.id.clone(), "Missing required 'mode' parameter".to_owned(), true),
+        None => {
+            return Err(Box::new(ToolResult::new(
+                tool.id.clone(),
+                "Missing required 'mode' parameter".to_owned(),
+                true,
+            )));
+        }
     };
     let pattern = tool.input.get("pattern").and_then(|v| v.as_str()).map(str::to_owned);
-    let max_wait: u64 = tool.input.get("max_wait").and_then(serde_json::Value::as_u64).unwrap_or(30).clamp(1, 30);
 
-    // Validate mode
     if mode != "exit" && mode != "pattern" {
-        return ToolResult::new(tool.id.clone(), format!("Invalid mode '{mode}'. Must be 'exit' or 'pattern'."), true);
+        let msg = format!("Invalid mode '{mode}'. Must be 'exit' or 'pattern'.");
+        return Err(Box::new(ToolResult::new(tool.id.clone(), msg, true)));
     }
-
     if mode == "pattern" && pattern.is_none() {
-        return ToolResult::new(tool.id.clone(), "Mode 'pattern' requires a 'pattern' parameter".to_owned(), true);
+        let msg = "Mode 'pattern' requires a 'pattern' parameter".to_owned();
+        return Err(Box::new(ToolResult::new(tool.id.clone(), msg, true)));
     }
 
     let session_key = match resolve_session_key(state, &panel_id) {
         Ok(k) => k,
-        Err(e) => return ToolResult::new(tool.id.clone(), e, true),
+        Err(e) => return Err(Box::new(ToolResult::new(tool.id.clone(), e, true))),
     };
+    Ok(WatchRequest { panel_id, mode, pattern, session_key })
+}
 
-    // Check if session exists
+/// If the session is missing, return its not-found error; if the watch condition
+/// is already satisfied, return the completed-result. `Ok(None)` means the caller
+/// should register a live watcher.
+fn early_watch_result(
+    tool: &ToolUse,
+    state: &State,
+    req: &WatchRequest,
+) -> Result<Option<ToolResult>, Box<ToolResult>> {
     let cs = ConsoleState::get(state);
-    let Some(handle) = cs.sessions.get(&session_key) else {
-        return ToolResult::new(tool.id.clone(), format!("Session for '{panel_id}' not found"), true);
+    let Some(handle) = cs.sessions.get(&req.session_key) else {
+        let msg = format!("Session for '{}' not found", req.panel_id);
+        return Err(Box::new(ToolResult::new(tool.id.clone(), msg, true)));
     };
-
-    // Check if condition is already met
-    let already_met = match mode.as_str() {
+    let already_met = match req.mode.as_str() {
         "exit" => handle.get_status().is_terminal(),
-        "pattern" => pattern.as_ref().is_some_and(|pat| handle.buffer.contains_pattern(pat)),
+        "pattern" => req.pattern.as_ref().is_some_and(|pat| handle.buffer.contains_pattern(pat)),
         _ => false,
     };
+    if !already_met {
+        return Ok(None);
+    }
+    let exit_code = handle.get_status().exit_code();
+    let last_lines = handle.buffer.last_n_lines(5);
+    let body = format_wait_result(&req.session_key, exit_code, &req.panel_id, &last_lines);
+    Ok(Some(ToolResult::new(tool.id.clone(), body, false)))
+}
 
-    if already_met {
-        let exit_code = handle.get_status().exit_code();
-        let last_lines = handle.buffer.last_n_lines(5);
-        return ToolResult::new(
-            tool.id.clone(),
-            format_wait_result(&session_key, exit_code, &panel_id, &last_lines),
-            false,
-        );
+/// Handle `console_wait`: register a blocking watcher for exit or pattern match.
+pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("console_wait");
+    let req = match parse_watch_request(tool, state) {
+        Ok(r) => r,
+        Err(e) => return *e,
+    };
+    let max_wait: u64 = tool.input.get("max_wait").and_then(serde_json::Value::as_u64).unwrap_or(30).clamp(1, 30);
+
+    match early_watch_result(tool, state, &req) {
+        Ok(Some(done)) => return done,
+        Err(e) => return *e,
+        Ok(None) => {}
     }
 
     let now = now_ms();
+    let WatchRequest { panel_id, mode, pattern, session_key } = req;
     let desc = match mode.as_str() {
         "exit" => format!("⏳ Waiting for {panel_id} to exit"),
         "pattern" => format!("⏳ Waiting for pattern '{}' in {}", pattern.as_deref().unwrap_or("?"), panel_id),
@@ -255,54 +297,19 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// Handle `console_watch`: register an async (non-blocking) watcher with spine notification.
 pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("console_watch");
-    let panel_id = match tool.input.get("id").and_then(|v| v.as_str()) {
-        Some(id) => id.to_owned(),
-        None => return ToolResult::new(tool.id.clone(), "Missing required 'id' parameter".to_owned(), true),
-    };
-    let mode = match tool.input.get("mode").and_then(|v| v.as_str()) {
-        Some(m) => m.to_owned(),
-        None => return ToolResult::new(tool.id.clone(), "Missing required 'mode' parameter".to_owned(), true),
-    };
-    let pattern = tool.input.get("pattern").and_then(|v| v.as_str()).map(str::to_owned);
-
-    // Validate mode
-    if mode != "exit" && mode != "pattern" {
-        return ToolResult::new(tool.id.clone(), format!("Invalid mode '{mode}'. Must be 'exit' or 'pattern'."), true);
-    }
-
-    if mode == "pattern" && pattern.is_none() {
-        return ToolResult::new(tool.id.clone(), "Mode 'pattern' requires a 'pattern' parameter".to_owned(), true);
-    }
-
-    let session_key = match resolve_session_key(state, &panel_id) {
-        Ok(k) => k,
-        Err(e) => return ToolResult::new(tool.id.clone(), e, true),
+    let req = match parse_watch_request(tool, state) {
+        Ok(r) => r,
+        Err(e) => return *e,
     };
 
-    // Check if session exists
-    let cs = ConsoleState::get(state);
-    let Some(handle) = cs.sessions.get(&session_key) else {
-        return ToolResult::new(tool.id.clone(), format!("Session for '{panel_id}' not found"), true);
-    };
-
-    // Check if condition is already met — return immediately
-    let already_met = match mode.as_str() {
-        "exit" => handle.get_status().is_terminal(),
-        "pattern" => pattern.as_ref().is_some_and(|pat| handle.buffer.contains_pattern(pat)),
-        _ => false,
-    };
-
-    if already_met {
-        let exit_code = handle.get_status().exit_code();
-        let last_lines = handle.buffer.last_n_lines(5);
-        return ToolResult::new(
-            tool.id.clone(),
-            format_wait_result(&session_key, exit_code, &panel_id, &last_lines),
-            false,
-        );
+    match early_watch_result(tool, state, &req) {
+        Ok(Some(done)) => return done,
+        Err(e) => return *e,
+        Ok(None) => {}
     }
 
     let now = now_ms();
+    let WatchRequest { panel_id, mode, pattern, session_key } = req;
     let desc = match mode.as_str() {
         "exit" => format!("👁 Watching {panel_id} for exit"),
         "pattern" => format!("👁 Watching {} for '{}'", panel_id, pattern.as_deref().unwrap_or("?")),

@@ -203,6 +203,95 @@ fn build_search_results_content(results: &[crate::types::SearchResult]) -> Strin
     content
 }
 
+/// Owned search parameters handed to the worker thread by [`exec_search`].
+struct SearchJob {
+    /// Search query text.
+    query: String,
+    /// Max results to scrape.
+    limit: u32,
+    /// Source kinds ("web"/"news"/"images").
+    sources_val: Vec<String>,
+    /// Optional category filter.
+    cats_val: Option<Vec<String>>,
+    /// Optional time-based search filter.
+    tbs_val: Option<String>,
+    /// Optional geo location.
+    loc_val: Option<String>,
+}
+
+/// Run one Firecrawl search off the main loop: issue the request, parse the
+/// polymorphic `data` field (array vs web/news/images dict), and fold it into a
+/// panel-bearing [`ToolOutput`].
+fn run_search(client: &FirecrawlClient, job: &SearchJob) -> ToolOutput {
+    let query = &job.query;
+    let limit = &job.limit;
+    let sources_val = &job.sources_val;
+    let cats_val = &job.cats_val;
+    let tbs_val = &job.tbs_val;
+    let loc_val = &job.loc_val;
+    let sources: Vec<&str> = sources_val.iter().map(String::as_str).collect();
+    let cats_refs: Option<Vec<&str>> = cats_val.as_ref().map(|v| v.iter().map(String::as_str).collect());
+
+    let params = SearchParams {
+        query,
+        limit: *limit,
+        sources,
+        categories: cats_refs,
+        tbs: tbs_val.as_deref(),
+        location: loc_val.as_deref(),
+    };
+
+    match client.search(&params) {
+        Ok(resp) => {
+            if !resp.success {
+                let msg = resp.error.unwrap_or_else(|| "Unknown error".to_owned());
+                return ToolOutput::error(format!("Firecrawl search failed: {msg}"));
+            }
+
+            let Some(data) = resp.data else {
+                return ToolOutput::ok(format!("No results found for '{query}'"));
+            };
+
+            // Parse data — can be array (scraped results) or object (web/news/images dict)
+            let results: Vec<crate::types::SearchResult> = if data.is_array() {
+                serde_json::from_value(data).unwrap_or_default()
+            } else if let Some(web_arr) = data.get("web").and_then(|v| v.as_array()) {
+                web_arr.iter().filter_map(|v| serde_json::from_value(v.clone()).ok()).collect()
+            } else {
+                // Fallback: dump as YAML
+                let panel_content = serde_yaml::to_string(&data).unwrap_or_else(|_| format!("{data:#}"));
+                let dyn_panel =
+                    DynPanel::new(crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(), format!("firecrawl_search: {query}"))
+                        .metadata(vec![("result_content".to_owned(), panel_content.clone())])
+                        .content(panel_content);
+                return ToolOutput::ok(format!(
+                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: results for '{query}'{PANEL_WARNING}",
+                ))
+                .with_panel(dyn_panel);
+            };
+
+            let count = results.len();
+            if count == 0 {
+                return ToolOutput::ok(format!("No results found for '{query}'"));
+            }
+
+            // Build panel: concatenated markdown per page
+            let content = build_search_results_content(&results);
+
+            let dyn_panel =
+                DynPanel::new(crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(), format!("firecrawl_search: {query}"))
+                    .metadata(vec![("result_content".to_owned(), content.clone())])
+                    .content(content);
+
+            ToolOutput::ok(format!(
+                "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {count} results for '{query}'{PANEL_WARNING}",
+            ))
+            .with_panel(dyn_panel)
+        }
+        Err(e) => ToolOutput::error(e),
+    }
+}
+
 /// Execute the `firecrawl_search` tool: search and scrape in one call.
 ///
 /// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
@@ -232,72 +321,83 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     let tbs_val = tool.input.get("tbs").and_then(|v| v.as_str()).map(String::from);
     let loc_val = tool.input.get("location").and_then(|v| v.as_str()).map(String::from);
 
-    spawn_async_tool(state, tool, ASYNC_TIMEOUT_SCRAPE_SECS, move || {
-        let sources: Vec<&str> = sources_val.iter().map(String::as_str).collect();
-        let cats_refs: Option<Vec<&str>> = cats_val.as_ref().map(|v| v.iter().map(String::as_str).collect());
+    let job = SearchJob { query, limit, sources_val, cats_val, tbs_val, loc_val };
+    spawn_async_tool(state, tool, ASYNC_TIMEOUT_SCRAPE_SECS, move || run_search(&client, &job))
+}
+/// Owned map parameters handed to the worker thread by [`exec_map`].
+struct MapJob {
+    /// Root URL to map.
+    url: String,
+    /// Max URLs to return.
+    limit: u32,
+    /// Optional keyword filter on discovered URLs.
+    search_val: Option<String>,
+    /// Whether to include subdomains.
+    include_subdomains: bool,
+    /// Optional geo country.
+    country_val: Option<String>,
+    /// Optional language list.
+    languages_val: Option<Vec<String>>,
+}
 
-        let params = SearchParams {
-            query: &query,
-            limit,
-            sources,
-            categories: cats_refs,
-            tbs: tbs_val.as_deref(),
-            location: loc_val.as_deref(),
-        };
+/// Run one Firecrawl map off the main loop: discover URLs on the domain and
+/// fold the YAML-serialized link list into a panel-bearing [`ToolOutput`].
+fn run_map(client: &FirecrawlClient, job: &MapJob) -> ToolOutput {
+    let url = &job.url;
+    let limit = &job.limit;
+    let search_val = &job.search_val;
+    let include_subdomains = &job.include_subdomains;
+    let country_val = &job.country_val;
+    let languages_val = &job.languages_val;
+    let langs_refs: Option<Vec<&str>> = languages_val.as_ref().map(|v| v.iter().map(String::as_str).collect());
 
-        match client.search(&params) {
-            Ok(resp) => {
-                if !resp.success {
-                    let msg = resp.error.unwrap_or_else(|| "Unknown error".to_owned());
-                    return ToolOutput::error(format!("Firecrawl search failed: {msg}"));
+    let params = MapParams {
+        url,
+        limit: *limit,
+        search: search_val.as_deref(),
+        include_subdomains: *include_subdomains,
+        country: country_val.as_deref(),
+        languages: langs_refs,
+    };
+
+    match client.map(&params) {
+        Ok(resp) => {
+            if !resp.success {
+                let msg = resp.error.unwrap_or_else(|| "Unknown error".to_owned());
+                return ToolOutput::error(format!("Firecrawl map failed: {msg}"));
+            }
+
+            let links = resp.links.unwrap_or_default();
+            let count = links.len();
+
+            if count == 0 {
+                return ToolOutput::ok(format!("No URLs discovered on '{url}'"));
+            }
+
+            let panel_content = match serde_yaml::to_string(&links) {
+                Ok(yaml) => yaml,
+                Err(e) => {
+                    return ToolOutput::error(format!("Failed to serialize response: {e}"));
                 }
+            };
 
-                let Some(data) = resp.data else {
-                    return ToolOutput::ok(format!("No results found for '{query}'"));
-                };
+            let domain =
+                url.trim_start_matches("https://").trim_start_matches("http://").split('/').next().unwrap_or(url);
 
-                // Parse data — can be array (scraped results) or object (web/news/images dict)
-                let results: Vec<crate::types::SearchResult> = if data.is_array() {
-                    serde_json::from_value(data).unwrap_or_default()
-                } else if let Some(web_arr) = data.get("web").and_then(|v| v.as_array()) {
-                    web_arr.iter().filter_map(|v| serde_json::from_value(v.clone()).ok()).collect()
-                } else {
-                    // Fallback: dump as YAML
-                    let panel_content = serde_yaml::to_string(&data).unwrap_or_else(|_| format!("{data:#}"));
-                    let dyn_panel = DynPanel::new(
-                        crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(),
-                        format!("firecrawl_search: {query}"),
-                    )
+            let dyn_panel =
+                DynPanel::new(crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(), format!("firecrawl_map: {domain}"))
                     .metadata(vec![("result_content".to_owned(), panel_content.clone())])
                     .content(panel_content);
-                    return ToolOutput::ok(format!(
-                        "Created panel {DYN_PANEL_ID_PLACEHOLDER}: results for '{query}'{PANEL_WARNING}",
-                    ))
-                    .with_panel(dyn_panel);
-                };
 
-                let count = results.len();
-                if count == 0 {
-                    return ToolOutput::ok(format!("No results found for '{query}'"));
-                }
-
-                // Build panel: concatenated markdown per page
-                let content = build_search_results_content(&results);
-
-                let dyn_panel =
-                    DynPanel::new(crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(), format!("firecrawl_search: {query}"))
-                        .metadata(vec![("result_content".to_owned(), content.clone())])
-                        .content(content);
-
-                ToolOutput::ok(format!(
-                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {count} results for '{query}'{PANEL_WARNING}",
-                ))
-                .with_panel(dyn_panel)
-            }
-            Err(e) => ToolOutput::error(e),
+            ToolOutput::ok(format!(
+                "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {count} URLs discovered on '{domain}'{PANEL_WARNING}",
+            ))
+            .with_panel(dyn_panel)
         }
-    })
+        Err(e) => ToolOutput::error(e),
+    }
 }
+
 /// Execute the `firecrawl_map` tool: discover all URLs on a domain.
 ///
 /// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
@@ -332,53 +432,6 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
         .and_then(|v| v.as_array())
         .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect());
 
-    spawn_async_tool(state, tool, ASYNC_TIMEOUT_MAP_SECS, move || {
-        let langs_refs: Option<Vec<&str>> = languages_val.as_ref().map(|v| v.iter().map(String::as_str).collect());
-
-        let params = MapParams {
-            url: &url,
-            limit,
-            search: search_val.as_deref(),
-            include_subdomains,
-            country: country_val.as_deref(),
-            languages: langs_refs,
-        };
-
-        match client.map(&params) {
-            Ok(resp) => {
-                if !resp.success {
-                    let msg = resp.error.unwrap_or_else(|| "Unknown error".to_owned());
-                    return ToolOutput::error(format!("Firecrawl map failed: {msg}"));
-                }
-
-                let links = resp.links.unwrap_or_default();
-                let count = links.len();
-
-                if count == 0 {
-                    return ToolOutput::ok(format!("No URLs discovered on '{url}'"));
-                }
-
-                let panel_content = match serde_yaml::to_string(&links) {
-                    Ok(yaml) => yaml,
-                    Err(e) => {
-                        return ToolOutput::error(format!("Failed to serialize response: {e}"));
-                    }
-                };
-
-                let domain =
-                    url.trim_start_matches("https://").trim_start_matches("http://").split('/').next().unwrap_or(&url);
-
-                let dyn_panel =
-                    DynPanel::new(crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(), format!("firecrawl_map: {domain}"))
-                        .metadata(vec![("result_content".to_owned(), panel_content.clone())])
-                        .content(panel_content);
-
-                ToolOutput::ok(format!(
-                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {count} URLs discovered on '{domain}'{PANEL_WARNING}",
-                ))
-                .with_panel(dyn_panel)
-            }
-            Err(e) => ToolOutput::error(e),
-        }
-    })
+    let job = MapJob { url, limit, search_val, include_subdomains, country_val, languages_val };
+    spawn_async_tool(state, tool, ASYNC_TIMEOUT_MAP_SECS, move || run_map(&client, &job))
 }

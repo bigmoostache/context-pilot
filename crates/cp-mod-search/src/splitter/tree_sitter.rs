@@ -27,96 +27,81 @@ impl TreeSitterSplitter {
     }
 }
 
+/// Rust top-level semantic node kinds.
+const RUST_KINDS: &[&str] = &[
+    "function_item",
+    "struct_item",
+    "enum_item",
+    "impl_item",
+    "trait_item",
+    "mod_item",
+    "const_item",
+    "static_item",
+    "type_item",
+    "macro_definition",
+];
+
+/// Python top-level semantic node kinds.
+const PYTHON_KINDS: &[&str] = &["function_definition", "class_definition", "decorated_definition"];
+
+/// JavaScript/JSX top-level semantic node kinds.
+const JS_KINDS: &[&str] =
+    &["function_declaration", "class_declaration", "export_statement", "lexical_declaration", "variable_declaration"];
+
+/// TypeScript/TSX top-level semantic node kinds.
+const TS_KINDS: &[&str] = &[
+    "function_declaration",
+    "class_declaration",
+    "interface_declaration",
+    "type_alias_declaration",
+    "enum_declaration",
+    "export_statement",
+    "lexical_declaration",
+    "variable_declaration",
+];
+
+/// Go top-level semantic node kinds.
+const GO_KINDS: &[&str] =
+    &["function_declaration", "method_declaration", "type_declaration", "const_declaration", "var_declaration"];
+
+/// Java top-level semantic node kinds.
+const JAVA_KINDS: &[&str] = &[
+    "class_declaration",
+    "interface_declaration",
+    "enum_declaration",
+    "annotation_type_declaration",
+    "record_declaration",
+];
+
+/// C top-level semantic node kinds.
+const C_KINDS: &[&str] =
+    &["function_definition", "struct_specifier", "enum_specifier", "type_definition", "declaration"];
+
+/// C++ top-level semantic node kinds.
+const CPP_KINDS: &[&str] = &[
+    "function_definition",
+    "class_specifier",
+    "struct_specifier",
+    "namespace_definition",
+    "template_declaration",
+    "enum_specifier",
+    "type_definition",
+    "declaration",
+];
+
 /// Map a file extension to a tree-sitter [`Language`] and its
 /// set of top-level node kinds that constitute "semantic items".
 fn language_for_ext(ext: &str) -> Option<(Language, &'static [&'static str])> {
     match ext {
-        "rs" => Some((
-            tree_sitter_rust::LANGUAGE.into(),
-            &[
-                "function_item",
-                "struct_item",
-                "enum_item",
-                "impl_item",
-                "trait_item",
-                "mod_item",
-                "const_item",
-                "static_item",
-                "type_item",
-                "macro_definition",
-            ],
-        )),
-        "py" => Some((
-            tree_sitter_python::LANGUAGE.into(),
-            &["function_definition", "class_definition", "decorated_definition"],
-        )),
-        "js" | "jsx" => Some((
-            tree_sitter_javascript::LANGUAGE.into(),
-            &[
-                "function_declaration",
-                "class_declaration",
-                "export_statement",
-                "lexical_declaration",
-                "variable_declaration",
-            ],
-        )),
-        "ts" => Some((
-            tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
-            &[
-                "function_declaration",
-                "class_declaration",
-                "interface_declaration",
-                "type_alias_declaration",
-                "enum_declaration",
-                "export_statement",
-                "lexical_declaration",
-                "variable_declaration",
-            ],
-        )),
-        "tsx" => Some((
-            tree_sitter_typescript::LANGUAGE_TSX.into(),
-            &[
-                "function_declaration",
-                "class_declaration",
-                "interface_declaration",
-                "type_alias_declaration",
-                "enum_declaration",
-                "export_statement",
-                "lexical_declaration",
-                "variable_declaration",
-            ],
-        )),
-        "go" => Some((
-            tree_sitter_go::LANGUAGE.into(),
-            &["function_declaration", "method_declaration", "type_declaration", "const_declaration", "var_declaration"],
-        )),
-        "java" => Some((
-            tree_sitter_java::LANGUAGE.into(),
-            &[
-                "class_declaration",
-                "interface_declaration",
-                "enum_declaration",
-                "annotation_type_declaration",
-                "record_declaration",
-            ],
-        )),
-        "c" | "h" => Some((
-            tree_sitter_c::LANGUAGE.into(),
-            &["function_definition", "struct_specifier", "enum_specifier", "type_definition", "declaration"],
-        )),
-        "cpp" | "hpp" | "cc" => Some((
-            tree_sitter_cpp::LANGUAGE.into(),
-            &[
-                "function_definition",
-                "class_specifier",
-                "struct_specifier",
-                "namespace_definition",
-                "template_declaration",
-                "enum_specifier",
-                "type_definition",
-                "declaration",
-            ],
-        )),
+        "rs" => Some((tree_sitter_rust::LANGUAGE.into(), RUST_KINDS)),
+        "py" => Some((tree_sitter_python::LANGUAGE.into(), PYTHON_KINDS)),
+        "js" | "jsx" => Some((tree_sitter_javascript::LANGUAGE.into(), JS_KINDS)),
+        "ts" => Some((tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(), TS_KINDS)),
+        "tsx" => Some((tree_sitter_typescript::LANGUAGE_TSX.into(), TS_KINDS)),
+        "go" => Some((tree_sitter_go::LANGUAGE.into(), GO_KINDS)),
+        "java" => Some((tree_sitter_java::LANGUAGE.into(), JAVA_KINDS)),
+        "c" | "h" => Some((tree_sitter_c::LANGUAGE.into(), C_KINDS)),
+        "cpp" | "hpp" | "cc" => Some((tree_sitter_cpp::LANGUAGE.into(), CPP_KINDS)),
         _ => None,
     }
 }

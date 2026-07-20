@@ -134,18 +134,43 @@ fn apply_diff_script(tool: &ToolUse, script_path: &std::path::Path, changes: &mu
     None
 }
 
-/// Update an existing callback (full replace or diff-based script edit).
-pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
+/// Resolved target for an update: definition index + identity + which script
+/// edit mode (full replace vs diff) the caller requested.
+struct UpdateTarget {
+    /// Index of the definition in `CallbackState.definitions`.
+    def_idx: usize,
+    /// Definition display name.
+    def_name: String,
+    /// Definition ID (e.g. "CB3").
+    def_id: String,
+    /// Whether an `old_string` diff edit was requested.
+    has_diff: bool,
+    /// Whether a full `script_content` replace was requested.
+    has_full_script: bool,
+}
+
+/// Resolve + validate an update request before any mutation: find the
+/// definition, reject a simultaneous full-replace + diff edit, and require the
+/// editor be open for a diff edit. Returns the error `ToolResult` on any failure.
+fn validate_update_preconditions(tool: &ToolUse, state: &State) -> Result<UpdateTarget, Box<ToolResult>> {
     let Some(key) = tool.input.get("id").and_then(|v| v.as_str()).map(str::to_owned) else {
-        return ToolResult::new(tool.id.clone(), "Missing required parameter 'id' for update action".to_owned(), true);
+        return Err(Box::new(ToolResult::new(
+            tool.id.clone(),
+            "Missing required parameter 'id' for update action".to_owned(),
+            true,
+        )));
     };
 
     let cs = CallbackState::get(state);
     let Some(def_idx) = cs.position_by_name_or_id(&key) else {
-        return ToolResult::new(tool.id.clone(), format!("Callback '{key}' not found"), true);
+        return Err(Box::new(ToolResult::new(tool.id.clone(), format!("Callback '{key}' not found"), true)));
     };
     let Some(matched_def) = cs.definitions.get(def_idx) else {
-        return ToolResult::new(tool.id.clone(), format!("Definition index {def_idx} out of bounds"), true);
+        return Err(Box::new(ToolResult::new(
+            tool.id.clone(),
+            format!("Definition index {def_idx} out of bounds"),
+            true,
+        )));
     };
     let def_name = matched_def.name.clone();
     let def_id = matched_def.id.clone();
@@ -154,24 +179,86 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
     let has_full_script = tool.input.get("script_content").and_then(|v| v.as_str()).is_some();
 
     if has_diff && has_full_script {
-        return ToolResult::new(
+        return Err(Box::new(ToolResult::new(
             tool.id.clone(),
             "Cannot use both 'script_content' and 'old_string'/'new_string' in the same update. Use one or the other."
                 .to_owned(),
             true,
-        );
+        )));
     }
 
     // Diff-based edits require the editor open first (so the AI saw current content).
     if has_diff && CallbackState::get(state).editor_open.as_deref() != Some(&def_name) {
-        return ToolResult::new(
+        return Err(Box::new(ToolResult::new(
             tool.id.clone(),
             format!(
                 "Diff-based script editing requires the editor to be open. Use Callback_open_editor with id='{key}' first to view current script content."
             ),
             true,
-        );
+        )));
     }
+
+    Ok(UpdateTarget { def_idx, def_name, def_id, has_diff, has_full_script })
+}
+
+/// Which script-edit mode + identity a resolved update should apply.
+struct ScriptRenamePlan<'plan> {
+    /// The callback's current on-disk name (script file stem to edit/rename from).
+    vessel_name: &'plan str,
+    /// The name after any metadata rename (script header + rename target).
+    updated_name: &'plan str,
+    /// The glob pattern after any metadata update (script header).
+    updated_pattern: &'plan str,
+    /// Whether a full `script_content` replace was requested.
+    has_full_script: bool,
+    /// Whether an `old_string` diff edit was requested.
+    has_diff: bool,
+}
+
+/// Rewrite the script file (full replace or diff edit) and move it if the
+/// callback was renamed. Returns the error `ToolResult` on any I/O failure.
+fn apply_script_and_rename(
+    tool: &ToolUse,
+    plan: &ScriptRenamePlan<'_>,
+    changes: &mut Vec<String>,
+) -> Option<ToolResult> {
+    let scripts_dir = PathBuf::from(constants::STORE_DIR).join("scripts");
+    let script_path = scripts_dir.join(format!("{}.sh", plan.vessel_name));
+
+    let script_err = if plan.has_full_script {
+        apply_full_script(
+            tool,
+            &ScriptMeta { name: plan.updated_name, pattern: plan.updated_pattern },
+            &script_path,
+            changes,
+        )
+    } else if plan.has_diff {
+        apply_diff_script(tool, &script_path, changes)
+    } else {
+        None
+    };
+    if script_err.is_some() {
+        return script_err;
+    }
+
+    // Handle name rename (move script file)
+    if plan.updated_name != plan.vessel_name {
+        let old_path = scripts_dir.join(format!("{}.sh", plan.vessel_name));
+        let new_path = scripts_dir.join(format!("{}.sh", plan.updated_name));
+        if old_path.exists() {
+            let _renamed = fs::rename(&old_path, &new_path);
+        }
+    }
+    None
+}
+
+/// Update an existing callback (full replace or diff-based script edit).
+pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let UpdateTarget { def_idx, def_name, def_id, has_diff, has_full_script } =
+        match validate_update_preconditions(tool, state) {
+            Ok(t) => t,
+            Err(e) => return *e,
+        };
 
     let cs_mut = CallbackState::get_mut(state);
     let Some(def) = cs_mut.definitions.get_mut(def_idx) else {
@@ -184,34 +271,16 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         return err;
     }
 
-    let scripts_dir = PathBuf::from(constants::STORE_DIR).join("scripts");
-    let script_path = scripts_dir.join(format!("{vessel_name}.sh"));
     let (updated_name, updated_pattern) = (def.name.clone(), def.pattern.clone());
-    let script_err = if has_full_script {
-        apply_full_script(
-            tool,
-            &ScriptMeta { name: &updated_name, pattern: &updated_pattern },
-            &script_path,
-            &mut changes,
-        )
-    } else if has_diff {
-        apply_diff_script(tool, &script_path, &mut changes)
-    } else {
-        None
+    let plan = ScriptRenamePlan {
+        vessel_name: &vessel_name,
+        updated_name: &updated_name,
+        updated_pattern: &updated_pattern,
+        has_full_script,
+        has_diff,
     };
-    if let Some(err) = script_err {
+    if let Some(err) = apply_script_and_rename(tool, &plan, &mut changes) {
         return err;
-    }
-
-    // Handle name rename (move script file)
-    if let Some(new_name) = tool.input.get("name").and_then(|v| v.as_str())
-        && new_name != vessel_name
-    {
-        let old_path = scripts_dir.join(format!("{vessel_name}.sh"));
-        let new_path = scripts_dir.join(format!("{new_name}.sh"));
-        if old_path.exists() {
-            let _renamed = fs::rename(&old_path, &new_path);
-        }
     }
 
     if changes.is_empty() {

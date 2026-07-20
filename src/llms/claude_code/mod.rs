@@ -14,13 +14,11 @@ use std::sync::mpsc::Sender;
 
 use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
-use serde_json::Value;
 
 use super::error::LlmError;
 use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::constants::{API_VERSION, library};
 use crate::infra::tools::build_api;
-use cp_base::config::INJECTIONS;
 use stream_types::StreamMessage;
 
 /// API endpoint with beta flag required for Claude 4.5 access
@@ -44,6 +42,37 @@ fn map_model_name(model: &str) -> &str {
         "claude-haiku-4-5" => "claude-haiku-4-5-20251001",
         _ => model,
     }
+}
+
+/// POST an assembled request body to the Claude Code endpoint with the full
+/// CLI header signature (Bearer OAuth, beta flags, stainless UA). Extracted so
+/// `do_stream` stays under the line cap; the header set is the OAuth-CLI
+/// contract required for Claude 4.5 access.
+fn send_cc_request(
+    client: &Client,
+    access_token: &str,
+    api_request: &serde_json::Value,
+) -> Result<reqwest::blocking::Response, LlmError> {
+    client
+        .post(CLAUDE_CODE_ENDPOINT)
+        .header("accept", "text/event-stream")
+        .header("authorization", format!("Bearer {access_token}"))
+        .header("anthropic-version", API_VERSION)
+        .header("anthropic-beta", OAUTH_BETA_HEADER)
+        .header("anthropic-dangerous-direct-browser-access", "true")
+        .header("content-type", "application/json")
+        .header("user-agent", "claude-cli/2.1.37 (external, cli)")
+        .header("x-app", "cli")
+        .header("x-stainless-arch", "x64")
+        .header("x-stainless-lang", "js")
+        .header("x-stainless-os", "Linux")
+        .header("x-stainless-package-version", "0.70.0")
+        .header("x-stainless-retry-count", "0")
+        .header("x-stainless-runtime", "node")
+        .header("x-stainless-runtime-version", "v24.3.0")
+        .json(api_request)
+        .send()
+        .map_err(LlmError::from)
 }
 
 /// Claude Code OAuth client
@@ -126,13 +155,7 @@ impl ClaudeCodeClient {
         .send();
         let tools_ok = tools_result.as_ref().is_ok_and(|r| r.status().is_success());
 
-        {
-            let mut r = ApiCheckResult::default();
-            r.auth_ok = auth_ok;
-            r.streaming_ok = streaming_ok;
-            r.tools_ok = tools_ok;
-            r
-        }
+        ApiCheckResult::checks([auth_ok, streaming_ok, tools_ok])
     }
 
     /// Execute a streaming request against the Claude Code API.
@@ -148,46 +171,9 @@ impl ClaudeCodeClient {
         let system_text =
             request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_owned(), Clone::clone);
 
-        // Build messages from pre-assembled API messages or raw data
+        // Build messages (api-message conversion + cleaner context + tool results)
         let super::CcJsonResult { mut json_messages, bp_hashes, bp_panel_ids, alive_count, alive_positions_permille } =
-            if request.api_messages.is_empty() {
-                super::CcJsonResult {
-                    json_messages: Vec::new(),
-                    bp_hashes: Vec::new(),
-                    bp_panel_ids: Vec::new(),
-                    alive_count: 0,
-                    alive_positions_permille: Vec::new(),
-                }
-            } else {
-                super::api_messages_to_cc_json(&request.api_messages, request.cache_engine_json.as_deref())
-            };
-
-        // Handle cleaner mode extra context
-        if let Some(context) = request.extra_context.as_ref() {
-            let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
-            json_messages.push(serde_json::json!({
-                "role": "user",
-                "content": msg
-            }));
-        }
-
-        // Add pending tool results
-        if let Some(results) = request.tool_results.as_ref() {
-            let tool_results: Vec<Value> = results
-                .iter()
-                .map(|r: &crate::infra::tools::ToolResult| {
-                    serde_json::json!({
-                        "type": "tool_result",
-                        "tool_use_id": r.tool_use_id,
-                        "content": r.content
-                    })
-                })
-                .collect();
-            json_messages.push(serde_json::json!({
-                "role": "user",
-                "content": tool_results
-            }));
-        }
+            super::claude_code_api_key::helpers::build_cc_json_messages(request);
 
         // System-reminder injection for Claude Code validation
         message_format::inject_system_reminder(&mut json_messages);
@@ -208,25 +194,7 @@ impl ClaudeCodeClient {
         // Always dump last request for debugging (overwritten each call)
         debug::dump_last_request(&request.worker_id, &api_request);
 
-        let response = client
-            .post(CLAUDE_CODE_ENDPOINT)
-            .header("accept", "text/event-stream")
-            .header("authorization", format!("Bearer {}", access_token.expose_secret()))
-            .header("anthropic-version", API_VERSION)
-            .header("anthropic-beta", OAUTH_BETA_HEADER)
-            .header("anthropic-dangerous-direct-browser-access", "true")
-            .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.37 (external, cli)")
-            .header("x-app", "cli")
-            .header("x-stainless-arch", "x64")
-            .header("x-stainless-lang", "js")
-            .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.70.0")
-            .header("x-stainless-retry-count", "0")
-            .header("x-stainless-runtime", "node")
-            .header("x-stainless-runtime-version", "v24.3.0")
-            .json(&api_request)
-            .send()?;
+        let response = send_cc_request(&client, access_token.expose_secret(), &api_request)?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();

@@ -4,7 +4,6 @@
 //! Message building is delegated to the shared `openai_compat` module,
 //! with a thin wrapper to add `reasoning_content` for deepseek-reasoner.
 
-use std::io::BufReader;
 use std::sync::mpsc::Sender;
 
 use cp_mod_utilities::secret::Redacted;
@@ -14,7 +13,6 @@ use serde::Serialize;
 use super::super::error::LlmError;
 use super::super::{LlmClient, LlmRequest, StreamEvent};
 use super::openai_compat::{self, BuildOptions, OaiMessage};
-use super::openai_streaming::ToolCallAccumulator;
 
 /// `DeepSeek` chat completions API endpoint.
 const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
@@ -157,35 +155,13 @@ impl LlmClient for DeepSeekClient {
 
         super::openai_streaming::dump_request(&request.worker_id, "deepseek", &api_request);
 
-        let response = client
-            .post(DEEPSEEK_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
-            .header("Content-Type", "application/json")
-            .json(&api_request)
-            .send()?;
-
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let body = response.text().unwrap_or_default();
-            return Err(LlmError::Api { status, body });
-        }
-
-        // Stream SSE using shared consumer (cache hit/miss folded in for DeepSeek)
-        let reader = BufReader::new(response);
-        let mut tool_acc = ToolCallAccumulator::new();
-        let acc = super::openai_streaming::consume_sse_stream(reader, &tx, &mut tool_acc)?;
-
-        let _r = tx.send(StreamEvent::Done {
-            input_tokens: acc.input_tokens,
-            output_tokens: acc.output_tokens,
-            cache_hit_tokens: acc.cache_hit_tokens,
-            cache_miss_tokens: acc.cache_miss_tokens,
-            stop_reason: acc.stop_reason,
-            bp_hashes: vec![],
-            bp_panel_ids: vec![],
-            alive_count: 0,
-            alive_positions_permille: vec![],
-        });
+        let ep = super::openai_streaming::OaiEndpoint {
+            client: &client,
+            url: DEEPSEEK_API_ENDPOINT,
+            key: api_key.expose_secret(),
+        };
+        let acc = super::openai_streaming::run_oai_stream(&ep, &api_request, &tx)?;
+        super::openai_streaming::send_stream_done(&tx, acc);
         Ok(())
     }
 
@@ -193,75 +169,12 @@ impl LlmClient for DeepSeekClient {
         let Some(api_key) = self.api_key.as_ref() else {
             return super::super::ApiCheckResult::failure(Some("DEEPSEEK_API_KEY not set".to_owned()));
         };
-
         let client = Client::new();
-
-        // Test 1: Basic auth
-        let auth_result = client
-            .post(DEEPSEEK_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "model": model,
-                "max_tokens": 10i32,
-                "messages": [{"role": "user", "content": "Hi"}]
-            }))
-            .send();
-
-        let auth_ok = auth_result.as_ref().is_ok_and(|r| r.status().is_success());
-
-        if !auth_ok {
-            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_owned()));
-            return super::super::ApiCheckResult::failure(error);
-        }
-
-        // Test 2: Streaming
-        let stream_result = client
-            .post(DEEPSEEK_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "model": model,
-                "max_tokens": 10i32,
-                "stream": true,
-                "messages": [{"role": "user", "content": "Say ok"}]
-            }))
-            .send();
-
-        let streaming_ok = stream_result.as_ref().is_ok_and(|r| r.status().is_success());
-
-        // Test 3: Tools
-        let tools_result = client
-            .post(DEEPSEEK_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "model": model,
-                "max_tokens": 50i32,
-                "tools": [{
-                    "type": "function",
-                    "function": {
-                        "name": "test_tool",
-                        "description": "A test tool",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {},
-                            "required": []
-                        }
-                    }
-                }],
-                "messages": [{"role": "user", "content": "Hi"}]
-            }))
-            .send();
-
-        let tools_ok = tools_result.as_ref().is_ok_and(|r| r.status().is_success());
-
-        {
-            let mut r = super::super::ApiCheckResult::default();
-            r.auth_ok = auth_ok;
-            r.streaming_ok = streaming_ok;
-            r.tools_ok = tools_ok;
-            r
-        }
+        let ep = super::openai_streaming::OaiEndpoint {
+            client: &client,
+            url: DEEPSEEK_API_ENDPOINT,
+            key: api_key.expose_secret(),
+        };
+        super::openai_streaming::oai_check_api(&ep, model, "max_tokens")
     }
 }

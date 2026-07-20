@@ -2,6 +2,52 @@
 
 use serde_json::Value;
 
+use super::super::{CcJsonResult, LlmRequest};
+
+/// Assemble the Claude Code `json_messages` array (with cache-breakpoint
+/// metadata) shared by every Claude Code provider's stream path: convert the
+/// pre-built API messages to CC JSON, append the cleaner-mode context block,
+/// then append any pending tool-result blocks. The caller injects the
+/// system-reminder afterward (its placement rules differ per provider).
+pub(crate) fn build_cc_json_messages(request: &LlmRequest) -> CcJsonResult {
+    let mut result = if request.api_messages.is_empty() {
+        CcJsonResult {
+            json_messages: Vec::new(),
+            bp_hashes: Vec::new(),
+            bp_panel_ids: Vec::new(),
+            alive_count: 0,
+            alive_positions_permille: Vec::new(),
+        }
+    } else {
+        super::super::api_messages_to_cc_json(&request.api_messages, request.cache_engine_json.as_deref())
+    };
+
+    if let Some(context) = request.extra_context.as_ref() {
+        let msg = cp_base::config::INJECTIONS
+            .providers
+            .cleaner_mode
+            .trim_end()
+            .replace(concat!("{", "context", "}"), context);
+        result.json_messages.push(serde_json::json!({ "role": "user", "content": msg }));
+    }
+
+    if let Some(results) = request.tool_results.as_ref() {
+        let tool_results: Vec<Value> = results
+            .iter()
+            .map(|r| {
+                serde_json::json!({
+                    "type": "tool_result",
+                    "tool_use_id": r.tool_use_id,
+                    "content": r.content
+                })
+            })
+            .collect();
+        result.json_messages.push(serde_json::json!({ "role": "user", "content": tool_results }));
+    }
+
+    result
+}
+
 /// System reminder injected into first user message for Claude Code validation
 pub(crate) const SYSTEM_REMINDER: &str =
     "<system-reminder>\nThe following skills are available for use with the Skill tool:\n</system-reminder>";

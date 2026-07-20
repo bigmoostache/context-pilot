@@ -239,15 +239,50 @@ fn classify_and_check(stmts: &[&str], sql: &str, live: bool) -> Result<SqlKind, 
     Ok(kind)
 }
 
-/// Execute the `entity_sql` tool call.
-///
-/// Opens a per-call connection, classifies the SQL, executes, formats the
-/// result, and handles post-execution bookkeeping (panel refresh, migration
-/// capture, dump regeneration, schema cache update).
-pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let _fg = cp_base::flame!("entity_sql");
+/// Statement-execution plan: how to run the SQL (kind + dry-run) and the paths
+/// DDL needs for dump/migration capture. Bundled to stay under the arg cap.
+struct ExecPlan<'plan> {
+    /// Statement kind (Select / Dml / Ddl).
+    kind: SqlKind,
+    /// Dry run — savepoint-rollback, no persistent effect.
+    dry_run: bool,
+    /// Dump-file path (DDL regenerates it).
+    dump_path: &'plan Path,
+    /// Migrations dir (DDL captures a migration here).
+    migrations_dir: &'plan Path,
+}
 
-    // ── Parse parameters ────────────────────────────────────────────────
+/// Run the SQL against `conn` per `plan`, returning the formatted result text
+/// (or an execution error string).
+fn run_statement(conn: &Connection, sql: &str, plan: &ExecPlan<'_>, state: &State) -> Result<String, String> {
+    if plan.dry_run {
+        return exec::execute_dry_run(conn, sql, plan.kind, state);
+    }
+    match plan.kind {
+        SqlKind::Select => exec::execute_select(conn, sql, state),
+        SqlKind::Dml => exec::execute_dml(conn, sql),
+        SqlKind::Ddl => exec::execute_ddl(conn, sql, plan.dump_path, plan.migrations_dir),
+    }
+}
+
+/// Resolved, owned `entity_sql` inputs after flag parsing, mutual-exclusion
+/// validation, and SQL-source resolution — produced by [`parse_inputs`].
+struct Inputs {
+    /// Resolved SQL text (inline `sql` or the `request_path` file contents).
+    sql_text: String,
+    /// `live=true` — auto-refreshing panel mode.
+    live: bool,
+    /// `output_path` present — file-output mode.
+    has_output: bool,
+    /// Destination path for `output_path` mode (empty when unused).
+    output_path_str: String,
+    /// `dry_run=true` — savepoint-rollback mode.
+    dry_run: bool,
+}
+
+/// Parse the tool's input flags, reject conflicting combinations, and resolve
+/// the SQL text. Returns the ready-to-run [`Inputs`] or a formatted error string.
+fn parse_inputs(tool: &ToolUse) -> Result<Inputs, String> {
     let sql_param = tool.input.get("sql").and_then(serde_json::Value::as_str).unwrap_or_default();
     let request_path = tool.input.get("request_path").and_then(serde_json::Value::as_str).unwrap_or_default();
     let live = tool.input.get("live").and_then(serde_json::Value::as_bool).unwrap_or(false);
@@ -258,15 +293,23 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let has_request = !request_path.trim().is_empty();
     let has_output = !output_path_str.trim().is_empty();
 
-    // ── Validate mutual exclusions ──────────────────────────────────────
     let flags = ParamFlags { source: SqlSource::from_flags(has_sql, has_request), live, has_output, dry_run };
-    if let Err(msg) = flags.validate() {
-        return err(tool, msg);
-    }
+    flags.validate().map_err(str::to_owned)?;
 
-    // ── Resolve SQL source ──────────────────────────────────────────────
-    let sql_text = match resolve_sql_text(has_request, request_path, sql_param) {
-        Ok(s) => s,
+    let sql_text = resolve_sql_text(has_request, request_path, sql_param)?;
+    Ok(Inputs { sql_text, live, has_output, output_path_str: output_path_str.to_owned(), dry_run })
+}
+
+/// Execute the `entity_sql` tool call.
+///
+/// Opens a per-call connection, classifies the SQL, executes, formats the
+/// result, and handles post-execution bookkeeping (panel refresh, migration
+/// capture, dump regeneration, schema cache update).
+pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("entity_sql");
+
+    let Inputs { sql_text, live, has_output, output_path_str, dry_run } = match parse_inputs(tool) {
+        Ok(i) => i,
         Err(e) => return err(tool, &e),
     };
     let sql = sql_text.as_str();
@@ -292,22 +335,22 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(msg) => return err(tool, msg),
     };
 
-    // ── Execute ─────────────────────────────────────────────────────────
-    let result_content = if dry_run {
-        exec::execute_dry_run(&conn, sql, kind, state)
-    } else {
-        match kind {
-            SqlKind::Select => exec::execute_select(&conn, sql, state),
-            SqlKind::Dml => exec::execute_dml(&conn, sql),
-            SqlKind::Ddl => exec::execute_ddl(&conn, sql, &dump_path, &migrations_dir),
-        }
-    };
+    let plan = ExecPlan { kind, dry_run, dump_path: &dump_path, migrations_dir: &migrations_dir };
+    let result_content = run_statement(&conn, sql, &plan, state);
 
     // ── Route results ───────────────────────────────────────────────────
     let (content, is_error, preserves_tempo) = match result_content {
         Ok(text) => {
-            let ctx =
-                RouteCtx { sql, text: &text, live, has_output, output_path_str, db_path: &db_path, kind, dry_run };
+            let ctx = RouteCtx {
+                sql,
+                text: &text,
+                live,
+                has_output,
+                output_path_str: &output_path_str,
+                db_path: &db_path,
+                kind,
+                dry_run,
+            };
             match route_ok(state, &ctx) {
                 Ok(routed) => routed,
                 Err(e) => return err(tool, &e),

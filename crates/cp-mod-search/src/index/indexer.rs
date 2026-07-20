@@ -232,6 +232,84 @@ fn deduplicate(batch: Vec<IndexerCmd>) -> Vec<IndexerCmd> {
 
 // -- File indexing -----------------------------------------------------------
 
+/// Per-file metadata stamped onto every chunk document by [`build_index_docs`].
+struct IndexDocMeta<'meta> {
+    /// Project-relative file path (also the document `file_path`).
+    rel_str: &'meta str,
+    /// File extension (no dot).
+    ext: &'meta str,
+    /// File mtime in ms since epoch.
+    last_modified_ms: u64,
+    /// File size in bytes.
+    size_bytes: u64,
+}
+
+/// Build Meilisearch documents for one file's chunks.
+///
+/// Meilisearch IDs allow only `[a-zA-Z0-9_-]`, so every `{path}-{i}` id is
+/// sanitised (any other char becomes `_`).
+fn build_index_docs(chunks: &[types::Chunk], meta: &IndexDocMeta<'_>) -> Vec<serde_json::Value> {
+    let IndexDocMeta { rel_str, ext, last_modified_ms, size_bytes } = *meta;
+    chunks
+        .iter()
+        .enumerate()
+        .map(|(i, chunk)| {
+            let safe_id: String = format!("{rel_str}-{i}")
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+                .collect();
+            serde_json::json!({
+                "id": safe_id,
+                "file_path": rel_str,
+                "content": chunk.content,
+                "extension": ext,
+                "chunk_type": chunk.kind,
+                "chunk_name": chunk.name,
+                "line_start": chunk.line_start,
+                "line_end": chunk.line_end,
+                "char_start": chunk.char_start,
+                "char_end": chunk.char_end,
+                "last_modified_ms": last_modified_ms,
+                "size_bytes": size_bytes,
+            })
+        })
+        .collect()
+}
+
+/// Fold one indexed file into the shared metrics: bump file/chunk counters,
+/// per-extension + tree-sitter-vs-fallback tallies, and per-file recompute
+/// counts + last-sent timestamps.
+fn record_index_metrics(
+    metrics: &std::sync::Arc<std::sync::Mutex<types::SearchMetrics>>,
+    ext: &str,
+    chunks: &[types::Chunk],
+    rel_str: &str,
+) {
+    let Ok(mut m) = metrics.lock() else {
+        return;
+    };
+    m.files_indexed = m.files_indexed.saturating_add(1);
+    let chunk_count = u64::try_from(chunks.len()).unwrap_or(0);
+    m.chunks_indexed = m.chunks_indexed.saturating_add(chunk_count);
+    let count = m.extension_counts.entry(ext.to_owned()).or_insert(0);
+    *count = count.saturating_add(1);
+    for chunk in chunks {
+        if chunk.kind == "raw" {
+            m.fallback_chunks = m.fallback_chunks.saturating_add(1);
+        } else {
+            m.tree_sitter_chunks = m.tree_sitter_chunks.saturating_add(1);
+        }
+    }
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
+    m.last_activity_ms = now_ms;
+
+    let rc = m.recompute_counts.entry(rel_str.to_owned()).or_insert(0);
+    *rc = rc.saturating_add(1);
+    let _prev = m.last_sent_ms.insert(rel_str.to_owned(), now_ms);
+}
+
 /// Index a single file: read → filter → split → upload.
 fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
     let _fg = cp_base::flame!("index_file");
@@ -282,62 +360,13 @@ fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
         return;
     }
 
-    // Build Meilisearch documents
-    let docs: Vec<serde_json::Value> = chunks
-        .iter()
-        .enumerate()
-        .map(|(i, chunk)| {
-            // Meilisearch IDs: only [a-zA-Z0-9_-] allowed.
-            let safe_id: String = format!("{rel_str}-{i}")
-                .chars()
-                .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
-                .collect();
-            serde_json::json!({
-                "id": safe_id,
-                "file_path": rel_str,
-                "content": chunk.content,
-                "extension": ext,
-                "chunk_type": chunk.kind,
-                "chunk_name": chunk.name,
-                "line_start": chunk.line_start,
-                "line_end": chunk.line_end,
-                "char_start": chunk.char_start,
-                "char_end": chunk.char_end,
-                "last_modified_ms": last_modified_ms,
-                "size_bytes": size_bytes,
-            })
-        })
-        .collect();
-
-    // Send to Meilisearch
+    // Build + send Meilisearch documents
+    let docs = build_index_docs(&chunks, &IndexDocMeta { rel_str: &rel_str, ext, last_modified_ms, size_bytes });
     if let Ok(task) = ctx.client.add_documents(&ctx.files_uid, &serde_json::Value::Array(docs)) {
         let _r = crate::meili::tasks::wait_for_task(&ctx.client, task);
     }
 
-    // Update metrics
-    if let Ok(mut m) = ctx.metrics.lock() {
-        m.files_indexed = m.files_indexed.saturating_add(1);
-        let chunk_count = u64::try_from(chunks.len()).unwrap_or(0);
-        m.chunks_indexed = m.chunks_indexed.saturating_add(chunk_count);
-        let count = m.extension_counts.entry(ext.to_owned()).or_insert(0);
-        *count = count.saturating_add(1);
-        for chunk in &chunks {
-            if chunk.kind == "raw" {
-                m.fallback_chunks = m.fallback_chunks.saturating_add(1);
-            } else {
-                m.tree_sitter_chunks = m.tree_sitter_chunks.saturating_add(1);
-            }
-        }
-        let now_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
-        m.last_activity_ms = now_ms;
-
-        // Track per-file recompute counts and last-sent timestamps
-        let rc = m.recompute_counts.entry(rel_str.to_string()).or_insert(0);
-        *rc = rc.saturating_add(1);
-        let _prev = m.last_sent_ms.insert(rel_str.to_string(), now_ms);
-    }
+    record_index_metrics(&ctx.metrics, ext, &chunks, &rel_str);
 
     // Record mtime so subsequent watcher events for this unchanged
     // file are skipped (the key optimisation that prevents phantom re-indexing).

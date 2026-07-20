@@ -122,6 +122,62 @@ fn no_match_result(tool: &ToolUse, content: &str, old_string: &str) -> ToolResul
     ToolResult::new(tool.id.clone(), format!("No match found for \"{needle_preview}\"{hint}"), true)
 }
 
+/// Inputs for [`build_edit_messages`] — bundled to stay within the argument cap.
+struct EditReport<'report> {
+    /// Path of the edited file (as given by the caller).
+    path_str: &'report str,
+    /// Approximate count of changed lines.
+    lines_changed: usize,
+    /// Whether the file was open in context before the edit.
+    is_open: bool,
+    /// The replaced text (for the diff).
+    old_string: &'report str,
+    /// The replacement text (for the diff).
+    new_string: &'report str,
+    /// The file panel's ID, when one is open (for the refresh note).
+    panel_ref: Option<&'report str>,
+}
+
+/// Build the user-facing display (with diff) and the LLM-facing content
+/// (summary + panel-refresh note) for a successful edit.
+fn build_edit_messages(report: &EditReport<'_>) -> (String, String) {
+    let EditReport { path_str, lines_changed, is_open, old_string, new_string, panel_ref } = *report;
+    let mut display_msg = String::new();
+
+    // Warn if file was not open in context (edit still succeeded via unique match)
+    if !is_open {
+        let _r = writeln!(
+            display_msg,
+            "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
+        );
+    }
+
+    // Header line + diff markers for UI rendering
+    let _r = writeln!(display_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
+    display_msg.push_str("```diff\n");
+    display_msg.push_str(&generate_unified_diff(old_string, new_string));
+    display_msg.push_str("```");
+
+    // LLM-facing content: short summary + panel reference. The file panel is
+    // already updated (instant refresh), so tell the LLM explicitly.
+    let mut llm_msg = String::new();
+    if !is_open {
+        writeln!(
+            llm_msg,
+            "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
+        ).unwrap_or(());
+    }
+    writeln!(llm_msg, "Edited '{path_str}': ~{lines_changed} lines changed").unwrap_or(());
+    if let Some(pid) = panel_ref {
+        writeln!(
+            llm_msg,
+            "Panel {pid} has been UPDATED and now shows the current file content — do NOT expect to see stale content there."
+        ).unwrap_or(());
+    }
+
+    (display_msg, llm_msg)
+}
+
 /// Execute the Edit tool: replace `old_string` with `new_string` in a file.
 pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("file_edit");
@@ -181,49 +237,20 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Count approximate lines changed
     let lines_changed = new_string.lines().count().max(old_string.lines().count());
 
-    // Build the user-facing display with full diff
-    let mut display_msg = String::new();
-
-    // Warn if file was not open in context (edit still succeeded via unique match)
-    if !is_open {
-        let _r = writeln!(
-            display_msg,
-            "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
-        );
-    }
-
-    // Header line
-    let _r = writeln!(display_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
-
-    // Add diff markers for UI rendering
-    display_msg.push_str("```diff\n");
-    let diff_lines = generate_unified_diff(old_string, new_string);
-    display_msg.push_str(&diff_lines);
-    display_msg.push_str("```");
-
-    // Build the LLM-facing content: short summary + panel reference
-    // The file panel is already updated (instant refresh), so tell the LLM explicitly.
     let panel_ref = state
         .context
         .iter()
         .find(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical))
         .map(|c| c.id.clone());
 
-    let mut llm_msg = String::new();
-    if !is_open {
-        writeln!(
-            llm_msg,
-            "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
-        ).unwrap_or(());
-    }
-    writeln!(llm_msg, "Edited '{path_str}': ~{lines_changed} lines changed").unwrap_or(());
-    // Sail ho! Tell the LLM its panel already has the fresh cargo aboard
-    if let Some(pid) = panel_ref.as_ref() {
-        writeln!(
-            llm_msg,
-            "Panel {pid} has been UPDATED and now shows the current file content — do NOT expect to see stale content there."
-        ).unwrap_or(());
-    }
+    let (display_msg, llm_msg) = build_edit_messages(&EditReport {
+        path_str,
+        lines_changed,
+        is_open,
+        old_string,
+        new_string,
+        panel_ref: panel_ref.as_deref(),
+    });
 
     let mut result = ToolResult::new(tool.id.clone(), llm_msg, false);
     result.display = Some(display_msg);

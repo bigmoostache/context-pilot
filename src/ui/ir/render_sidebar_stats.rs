@@ -55,25 +55,15 @@ fn push_bp_lines(content: &mut Vec<Line<'static>>, stats: &TokenStats, inner_wid
     }
 }
 
-/// Render the token statistics table from IR, wrapped in rounded borders.
-pub(super) fn render_token_stats(lines: &mut Vec<Line<'static>>, stats: &TokenStats, cw: usize) {
+/// Push the token-table header row (icon labels) + its separator rule.
+/// `widths` = (label, hit, miss, out) column widths.
+fn push_stats_header(content: &mut Vec<Line<'static>>, widths: (usize, usize, usize, usize)) {
+    let (col_label_w, col_hit_w, col_miss_w, col_out_w) = widths;
     let border_style = Style::default().fg(theme::border_muted());
-    let inner_width = cw.saturating_sub(2); // space between │ and │
-
-    // ── Build content lines (no indent — borders handle alignment) ───
-
-    let mut content: Vec<Line<'static>> = Vec::new();
 
     let hit_icon = chars::ARROW_UP.to_owned();
     let miss_icon = chars::CROSS.to_owned();
     let out_icon = chars::ARROW_DOWN.to_owned();
-
-    // Render table manually with border_muted separators
-    // Column widths: label(4), hit(6), miss(6), out(6)
-    let col_label_w = 4usize;
-    let col_hit_w = 6usize;
-    let col_miss_w = 6usize;
-    let col_out_w = 6usize;
 
     // Header row
     content.push(Line::from(vec![
@@ -96,9 +86,23 @@ pub(super) fn render_token_stats(lines: &mut Vec<Line<'static>>, stats: &TokenSt
         Span::styled("\u{2500}\u{253c}\u{2500}", border_style),
         Span::styled("\u{2500}".repeat(col_out_w), border_style),
     ]));
+}
+
+/// Render the token statistics table from IR, wrapped in rounded borders.
+pub(super) fn render_token_stats(lines: &mut Vec<Line<'static>>, stats: &TokenStats, cw: usize) {
+    let border_style = Style::default().fg(theme::border_muted());
+    let inner_width = cw.saturating_sub(2); // space between │ and │
+
+    // ── Build content lines (no indent — borders handle alignment) ───
+
+    let mut content: Vec<Line<'static>> = Vec::new();
+
+    // Column widths: label(4), hit(6), miss(6), out(6)
+    let widths = (4usize, 6usize, 6usize, 6usize);
+    push_stats_header(&mut content, widths);
 
     for row in &stats.rows {
-        push_stat_row(&mut content, row, &format_cost, (col_label_w, col_hit_w, col_miss_w, col_out_w));
+        push_stat_row(&mut content, row, &format_cost, widths);
     }
 
     // Uncached input tokens

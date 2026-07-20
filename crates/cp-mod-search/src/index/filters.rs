@@ -151,7 +151,7 @@ mod tests {
         let ok = indexable(&root, "src/main.rs", b"fn main() {}")?;
         drop(std::fs::remove_dir_all(&root));
         if !ok {
-            return Err("allowlisted source rejected".to_string());
+            return Err("allowlisted source rejected".to_owned());
         }
         Ok(())
     }
@@ -162,7 +162,7 @@ mod tests {
         let ok = indexable(&root, "logo.png", b"\x89PNG")?;
         drop(std::fs::remove_dir_all(&root));
         if ok {
-            return Err("disallowed extension accepted".to_string());
+            return Err("disallowed extension accepted".to_owned());
         }
         Ok(())
     }
@@ -173,7 +173,7 @@ mod tests {
         let ok = indexable(&root, "node_modules/pkg/index.js", b"x")?;
         drop(std::fs::remove_dir_all(&root));
         if ok {
-            return Err("excluded dir accepted".to_string());
+            return Err("excluded dir accepted".to_owned());
         }
         Ok(())
     }
@@ -184,7 +184,7 @@ mod tests {
         let ok = indexable(&root, "app.min.js", b"x")?;
         drop(std::fs::remove_dir_all(&root));
         if ok {
-            return Err("excluded suffix accepted".to_string());
+            return Err("excluded suffix accepted".to_owned());
         }
         Ok(())
     }
@@ -196,7 +196,7 @@ mod tests {
         let ok = indexable(&root, "huge.rs", &big)?;
         drop(std::fs::remove_dir_all(&root));
         if ok {
-            return Err("oversized file accepted".to_string());
+            return Err("oversized file accepted".to_owned());
         }
         Ok(())
     }

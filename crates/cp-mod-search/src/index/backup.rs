@@ -259,15 +259,15 @@ mod tests {
     #[test]
     fn manifest_roundtrip() -> Result<(), String> {
         let m = Manifest {
-            fingerprint: "abc123".to_string(),
-            embedder_name: "default".to_string(),
+            fingerprint: "abc123".to_owned(),
+            embedder_name: "default".to_owned(),
             count_files: 42,
             count_logs: 7,
         };
         let body = serde_json::to_string(&m).map_err(|e| format!("serialize manifest: {e}"))?;
         let back: Manifest = serde_json::from_str(&body).map_err(|e| format!("deserialize manifest: {e}"))?;
         if m != back {
-            return Err("manifest roundtrip mismatch".to_string());
+            return Err("manifest roundtrip mismatch".to_owned());
         }
         Ok(())
     }
@@ -284,7 +284,7 @@ mod tests {
     fn force_regenerate_false_sets_flag() {
         let mut row = serde_json::json!({
             "id": "x",
-            "_vectors": { "default": { "embeddings": [0.1, 0.2], "regenerate": true } }
+            "_vectors": { "default": { "embeddings": [0.1f64, 0.2f64], "regenerate": true } }
         });
         force_regenerate_false(&mut row);
         assert_eq!(regen_flag(&row), Some(&serde_json::Value::Bool(false)));
@@ -310,7 +310,7 @@ mod tests {
         std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir temp dir: {e}"))?;
         let path = dir.join("files.jsonl");
         let rows = vec![
-            serde_json::json!({ "id": "a-0", "_vectors": { "default": { "embeddings": [1.0], "regenerate": true } } }),
+            serde_json::json!({ "id": "a-0", "_vectors": { "default": { "embeddings": [1.0f64], "regenerate": true } } }),
             serde_json::json!({ "id": "b-0" }),
         ];
         write_jsonl_atomic(&path, &rows).map_err(|e| format!("write jsonl: {e}"))?;
@@ -319,10 +319,10 @@ mod tests {
             return Err(format!("expected 2 rows, got {}", read.len()));
         }
         if read.first().and_then(regen_flag) != Some(&serde_json::Value::Bool(false)) {
-            return Err("first row regenerate flag not forced false".to_string());
+            return Err("first row regenerate flag not forced false".to_owned());
         }
-        if read.get(1).and_then(|r| r.get("id")) != Some(&serde_json::Value::String("b-0".to_string())) {
-            return Err("second row id mismatch".to_string());
+        if read.get(1).and_then(|r| r.get("id")) != Some(&serde_json::Value::String("b-0".to_owned())) {
+            return Err("second row id mismatch".to_owned());
         }
         drop(std::fs::remove_dir_all(&dir));
         Ok(())

@@ -6025,3 +6025,72 @@ index 5368b744..6a304f52 100644
  single_char_lifetime_names = "forbid"
  single_char_pattern = "forbid"
 # --- End entry #50 ---
+51:c8e8d770d9b15a0ec2ec36f86800c995a3ad9f7a7e801b48f0c6c72b65b86631:ef8233970ab18219b7e07be8a6b356a77084ca28285ea5b77c61038fcf9a6647:71f92ae3d2c8e5c41737b7bdb4b73189deae28d5c3c710334da89477f873455a
+# --- Diff for entry #51 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 6a304f52..6f9f93c0 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -974,6 +974,10 @@ to_string_trait_impl = "forbid"
+ todo = "forbid"
+ too_long_first_doc_paragraph = "forbid"
+ too_many_arguments = "forbid"
++# too_many_lines (threshold 60, set in clippy.toml, unchanged) is deny not forbid
++# so the single audited State::default flat-record initializer can carry its
++# #[expect] — every other over-long fn is split into named helpers.
++too_many_lines = "deny"
+ toplevel_ref_arg = "forbid"
+ trailing_empty_array = "forbid"
+ trait_duplication_in_bounds = "forbid"
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 1996939f..2334a7e6 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -72,6 +72,23 @@ exceptions:
+       Irreducible — the two restriction lints are mutually exclusive and this
+       foundational crate cannot reach the shared macro chokepoint.
+ 
++  # ── too_many_lines: flat aggregate root-state initializer ────────────
++
++  - path: "crates/cp-base/src/state/runtime/default.rs"
++    match: "flat aggregate root-state initializer; sub-grouping fields would churn 136 access sites for no gain"
++    reason: >
++      State is the flat aggregate root of the whole application (~80 leaf fields:
++      UI cursors, id counters, model selections, cache/stream/tick token + USD
++      telemetry, panel-diff snapshots, per-frame caches). Its Default impl is a
++      single linear struct literal — one `field: value` line each — at 82 lines
++      over the 60-line threshold. Grouping the telemetry counters into sub-structs
++      to shave lines would ripple across 136 field-access sites for zero
++      behavioural gain, so the initializer stays flat and carries the length
++      expect. Threshold is unchanged (still 60).
++    strategy: >
++      Irreducible without a 136-site sub-struct refactor that trades a linear
++      initializer for cross-cutting churn; the flat literal is the honest shape.
++
+   # ── cast.rs: Safe numeric casting infrastructure ─────────────────
+ 
+   - path: "crates/cp-base/src/cast/mod.rs"
+@@ -106,6 +123,22 @@ exceptions:
+       Fundamentally irreducible — float ratio/price/decay math has no integer
+       equivalent. Chokepoint mirrors the time_arith integer-division module.
+ 
++  - path: "src/app/actions/mod.rs"
++    match: "exhaustive dispatch over ~70 Action variants; splitting requires either a forbidden wildcard catch-all (wildcard_enum_match_arm) or a duplicated giant or-pattern, both worse than one flat variant→handler table — the dispatch twin of the flat State::default initializer"
++    reason: >
++      apply_action is a single flat match over the closed ~70-variant Action enum
++      (the Elm/Redux update loop). Every arm is a one-line delegation to a handler.
++      Splitting the match across sub-dispatchers is impossible under the 60-line cap:
++      Rust requires each match to be exhaustive, and a _/bare-binding catch-all trips
++      clippy::wildcard_enum_match_arm (forbid); a pass-back Result chain needs the same
++      catch-all; borrowing the scrutinee (match &action) to split by payload trips
++      clippy::pattern_type_mismatch. The only residual is length, intrinsic to a
++      70-action enum, so the fn carries one #[expect(clippy::too_many_lines)] — the
++      dispatch twin of the State::default flat-initializer expect. Threshold unchanged (60).
++    strategy: >
++      Irreducible — a closed 70-variant dispatch cannot be split under the line cap
++      without a forbidden wildcard catch-all; the flat delegating match is the honest shape.
++
+   # ── config/mod.rs: invariant_panic ──────────────────────────────────
+ 
+   - path: "crates/cp-base/src/config/mod.rs"
+# --- End entry #51 ---

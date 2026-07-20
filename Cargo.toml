@@ -974,6 +974,10 @@ to_string_trait_impl = "forbid"
 todo = "forbid"
 too_long_first_doc_paragraph = "forbid"
 too_many_arguments = "forbid"
+# too_many_lines (threshold 60, set in clippy.toml, unchanged) is deny not forbid
+# so the single audited State::default flat-record initializer can carry its
+# #[expect] — every other over-long fn is split into named helpers.
+too_many_lines = "deny"
 toplevel_ref_arg = "forbid"
 trailing_empty_array = "forbid"
 trait_duplication_in_bounds = "forbid"

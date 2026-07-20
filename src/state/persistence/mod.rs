@@ -95,6 +95,26 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
     }
 
     // Dynamic panels (P8+)
+    let dynamic_panels = load_dynamic_panels(cfg);
+    panel_count = panel_count.saturating_add(dynamic_panels.len());
+    for (_, elem) in dynamic_panels {
+        context.push(elem);
+    }
+
+    // Extract message UIDs for Phase 3
+    let message_uids: Vec<String> = important
+        .get(&Kind::new(Kind::CONVERSATION))
+        .and_then(|uid| panel::load_panel(uid))
+        .map(|p| p.message_uids)
+        .unwrap_or_default();
+
+    BootPanels { context, message_uids, panel_count }
+}
+
+/// Load the dynamic panels (P8+) from disk, sorted by their numeric local id.
+/// Conversation-history panels also get their message bodies hydrated + a page
+/// count computed so the boot render matches steady state.
+fn load_dynamic_panels(cfg: &BootConfig) -> Vec<(String, Entry)> {
     let mut dynamic_panels: Vec<(String, Entry)> = cfg
         .worker
         .panel_uid_to_local_id
@@ -128,19 +148,7 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
         let b_num: usize = b.0.trim_start_matches('P').parse().unwrap_or(999);
         a_num.cmp(&b_num)
     });
-    panel_count = panel_count.saturating_add(dynamic_panels.len());
-    for (_, elem) in dynamic_panels {
-        context.push(elem);
-    }
-
-    // Extract message UIDs for Phase 3
-    let message_uids: Vec<String> = important
-        .get(&Kind::new(Kind::CONVERSATION))
-        .and_then(|uid| panel::load_panel(uid))
-        .map(|p| p.message_uids)
-        .unwrap_or_default();
-
-    BootPanels { context, message_uids, panel_count }
+    dynamic_panels
 }
 
 /// Phase 3: Load conversation messages from individual YAML files.

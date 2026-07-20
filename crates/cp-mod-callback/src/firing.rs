@@ -55,6 +55,51 @@ fn kill_existing_callback(state: &mut State, callback_id: &str) -> bool {
     true
 }
 
+/// Build the shell command for a callback: either its inline `built_in_command`
+/// or a `bash <script>` invocation, with the changed-files env, project root,
+/// and callback name baked in as leading `KEY=VAL` assignments.
+///
+/// # Errors
+///
+/// Returns `Err` when a non-built-in callback's script file is missing.
+fn build_callback_command(
+    def: &crate::types::CallbackDefinition,
+    env_key: &str,
+    env_val: &str,
+    project_root: &str,
+) -> Result<String, String> {
+    if def.built_in {
+        let base_cmd = def.built_in_command.as_deref().unwrap_or("echo 'no built_in_command set'");
+        return Ok(format!(
+            "{env_key}={changed} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} {cmd}",
+            changed = shell_escape(env_val),
+            root = shell_escape(project_root),
+            name = shell_escape(&def.name),
+            cmd = base_cmd,
+        ));
+    }
+
+    let scripts_dir = std::path::PathBuf::from(constants::STORE_DIR).join("scripts");
+    let script_path = scripts_dir.join(format!("{}.sh", def.name));
+    let script_path_str = if script_path.is_absolute() {
+        script_path.to_string_lossy().to_string()
+    } else {
+        format!("{}/{}", project_root, script_path.to_string_lossy())
+    };
+
+    if !script_path.exists() {
+        return Err(format!("Callback '{}' script not found: {}", def.name, script_path.display()));
+    }
+
+    Ok(format!(
+        "{env_key}={changed} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} bash {script}",
+        changed = shell_escape(env_val),
+        root = shell_escape(project_root),
+        name = shell_escape(&def.name),
+        script = shell_escape(&script_path_str),
+    ))
+}
+
 /// Fire a single callback by spawning its script via the console server.
 /// Creates a console session + watcher (no panel — deferred until failure).
 ///
@@ -85,39 +130,7 @@ pub fn fire_callback(
     // Use the callback's cwd if set, otherwise project root
     let cwd = def.cwd.clone().or_else(|| Some(project_root.clone()));
 
-    // Build the script path — uses constants::STORE_DIR for scripts dir
-    // For built-in callbacks, use the built_in_command directly instead of a script file.
-    let command = if def.built_in {
-        let base_cmd = def.built_in_command.as_deref().unwrap_or("echo 'no built_in_command set'");
-        format!(
-            "{env_key}={changed} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} {cmd}",
-            changed = shell_escape(&env_val),
-            root = shell_escape(&project_root),
-            name = shell_escape(&def.name),
-            cmd = base_cmd,
-        )
-    } else {
-        let scripts_dir = std::path::PathBuf::from(constants::STORE_DIR).join("scripts");
-        let script_path = scripts_dir.join(format!("{}.sh", def.name));
-        let script_path_str = if script_path.is_absolute() {
-            script_path.to_string_lossy().to_string()
-        } else {
-            format!("{}/{}", project_root, script_path.to_string_lossy())
-        };
-
-        // Check script exists and is readable before spawning
-        if !script_path.exists() {
-            return Err(format!("Callback '{}' script not found: {}", def.name, script_path.display()));
-        }
-
-        format!(
-            "{env_key}={changed} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} bash {script}",
-            changed = shell_escape(&env_val),
-            root = shell_escape(&project_root),
-            name = shell_escape(&def.name),
-            script = shell_escape(&script_path_str),
-        )
-    };
+    let command = build_callback_command(def, env_key, &env_val, &project_root)?;
 
     // Dedup: kill any existing session for the same callback definition
     let replaced = kill_existing_callback(state, &def.id);

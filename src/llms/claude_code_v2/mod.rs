@@ -13,7 +13,6 @@ use std::sync::mpsc::Sender;
 
 use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
-use serde_json::Value;
 
 use super::claude_code_api_key::helpers;
 use super::claude_code_api_key::streaming;
@@ -48,6 +47,37 @@ const BETA_HEADER: &str = "\
 const BILLING_HEADER: &str =
     "x-anthropic-billing-header: cc_version=2.1.170.6bc; cc_entrypoint=sdk-cli; cch=3d037; cc_is_subagent=true;";
 
+/// POST an assembled V2 request body to the endpoint with the full CLI v2.1.170
+/// header signature (Bearer OAuth, 9 beta flags, stainless UA). Extracted so
+/// `do_stream` stays under the line cap.
+fn send_v2_request(
+    client: &Client,
+    access_token: &str,
+    api_request: &serde_json::Value,
+) -> Result<reqwest::blocking::Response, LlmError> {
+    client
+        .post(ENDPOINT)
+        .header("accept", "text/event-stream")
+        .header("authorization", format!("Bearer {access_token}"))
+        .header("anthropic-version", API_VERSION)
+        .header("anthropic-beta", BETA_HEADER)
+        .header("anthropic-dangerous-direct-browser-access", "true")
+        .header("content-type", "application/json")
+        .header("user-agent", "claude-cli/2.1.170 (external, sdk-cli)")
+        .header("x-app", "cli")
+        .header("x-stainless-arch", "x64")
+        .header("x-stainless-lang", "js")
+        .header("x-stainless-os", "Linux")
+        .header("x-stainless-package-version", "0.94.0")
+        .header("x-stainless-retry-count", "0")
+        .header("x-stainless-runtime", "node")
+        .header("x-stainless-runtime-version", "v24.3.0")
+        .header("x-stainless-timeout", "600")
+        .json(api_request)
+        .send()
+        .map_err(LlmError::from)
+}
+
 /// Claude Code V2 OAuth client.
 pub(crate) struct ClaudeCodeV2Client {
     /// OAuth access token from the vault (Keychain or credentials file).
@@ -79,50 +109,9 @@ impl ClaudeCodeV2Client {
         let system_text =
             request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_owned(), Clone::clone);
 
-        // Convert pre-assembled API messages to JSON with cache breakpoints
+        // Build messages (api-message conversion + cleaner context + tool results)
         let super::CcJsonResult { mut json_messages, bp_hashes, bp_panel_ids, alive_count, alive_positions_permille } =
-            if request.api_messages.is_empty() {
-                super::CcJsonResult {
-                    json_messages: Vec::new(),
-                    bp_hashes: Vec::new(),
-                    bp_panel_ids: Vec::new(),
-                    alive_count: 0,
-                    alive_positions_permille: Vec::new(),
-                }
-            } else {
-                super::api_messages_to_cc_json(&request.api_messages, request.cache_engine_json.as_deref())
-            };
-
-        // Cleaner mode extra context
-        if let Some(context) = request.extra_context.as_ref() {
-            let msg = cp_base::config::INJECTIONS
-                .providers
-                .cleaner_mode
-                .trim_end()
-                .replace(concat!("{", "context", "}"), context);
-            json_messages.push(serde_json::json!({
-                "role": "user",
-                "content": msg
-            }));
-        }
-
-        // Pending tool results
-        if let Some(results) = request.tool_results.as_ref() {
-            let tool_results: Vec<Value> = results
-                .iter()
-                .map(|r| {
-                    serde_json::json!({
-                        "type": "tool_result",
-                        "tool_use_id": r.tool_use_id,
-                        "content": r.content
-                    })
-                })
-                .collect();
-            json_messages.push(serde_json::json!({
-                "role": "user",
-                "content": tool_results
-            }));
-        }
+            helpers::build_cc_json_messages(request);
 
         // System-reminder injection for Claude Code validation
         helpers::inject_system_reminder(&mut json_messages);
@@ -148,26 +137,7 @@ impl ClaudeCodeV2Client {
         helpers::dump_last_request(&request.worker_id, &api_request);
 
         // Build and send request with V2 headers
-        let response = client
-            .post(ENDPOINT)
-            .header("accept", "text/event-stream")
-            .header("authorization", format!("Bearer {}", access_token.expose_secret()))
-            .header("anthropic-version", API_VERSION)
-            .header("anthropic-beta", BETA_HEADER)
-            .header("anthropic-dangerous-direct-browser-access", "true")
-            .header("content-type", "application/json")
-            .header("user-agent", "claude-cli/2.1.170 (external, sdk-cli)")
-            .header("x-app", "cli")
-            .header("x-stainless-arch", "x64")
-            .header("x-stainless-lang", "js")
-            .header("x-stainless-os", "Linux")
-            .header("x-stainless-package-version", "0.94.0")
-            .header("x-stainless-retry-count", "0")
-            .header("x-stainless-runtime", "node")
-            .header("x-stainless-runtime-version", "v24.3.0")
-            .header("x-stainless-timeout", "600")
-            .json(&api_request)
-            .send()?;
+        let response = send_v2_request(&client, access_token.expose_secret(), &api_request)?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
@@ -216,73 +186,43 @@ impl ClaudeCodeV2Client {
             {"type": "text", "text": BILLING_HEADER},
             {"type": "text", "text": "You are a helpful assistant."}
         ]);
+        // Post one probe body with V2 headers; report whether it succeeded.
+        let probe = |body: &serde_json::Value| {
+            client
+                .post(ENDPOINT)
+                .header("authorization", format!("Bearer {access_token}"))
+                .header("anthropic-version", API_VERSION)
+                .header("anthropic-beta", BETA_HEADER)
+                .header("content-type", "application/json")
+                .json(body)
+                .send()
+                .is_ok_and(|r| r.status().is_success())
+        };
 
         // Test 1: Basic auth
-        let auth_body = serde_json::json!({
-            "model": mapped_model,
-            "max_tokens": 32i32,
-            "system": system_json,
-            "messages": [{"role": "user", "content": "Hi"}],
-            "stream": false
-        });
-        let auth_result = client
-            .post(ENDPOINT)
-            .header("authorization", format!("Bearer {access_token}"))
-            .header("anthropic-version", API_VERSION)
-            .header("anthropic-beta", BETA_HEADER)
-            .header("content-type", "application/json")
-            .json(&auth_body)
-            .send();
-        let auth_ok = auth_result.as_ref().is_ok_and(|r| r.status().is_success());
+        let auth_ok = probe(&serde_json::json!({
+            "model": mapped_model, "max_tokens": 32i32, "system": system_json,
+            "messages": [{"role": "user", "content": "Hi"}], "stream": false
+        }));
         if !auth_ok {
-            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_owned()));
-            return ApiCheckResult::failure(error);
+            return ApiCheckResult::failure(Some("Auth failed".to_owned()));
         }
 
         // Test 2: Streaming
-        let stream_body = serde_json::json!({
-            "model": mapped_model,
-            "max_tokens": 32i32,
-            "system": system_json,
-            "messages": [{"role": "user", "content": "Say ok"}],
-            "stream": true
-        });
-        let stream_result = client
-            .post(ENDPOINT)
-            .header("authorization", format!("Bearer {access_token}"))
-            .header("anthropic-version", API_VERSION)
-            .header("anthropic-beta", BETA_HEADER)
-            .header("content-type", "application/json")
-            .json(&stream_body)
-            .send();
-        let streaming_ok = stream_result.as_ref().is_ok_and(|r| r.status().is_success());
+        let streaming_ok = probe(&serde_json::json!({
+            "model": mapped_model, "max_tokens": 32i32, "system": system_json,
+            "messages": [{"role": "user", "content": "Say ok"}], "stream": true
+        }));
 
         // Test 3: Tool calling
-        let tools_body = serde_json::json!({
-            "model": mapped_model,
-            "max_tokens": 32i32,
-            "system": system_json,
+        let tools_ok = probe(&serde_json::json!({
+            "model": mapped_model, "max_tokens": 32i32, "system": system_json,
             "messages": [{"role": "user", "content": "Hi"}],
             "tools": [{"name": "test_tool", "description": "A test tool", "input_schema": {"type": "object", "properties": {}, "required": []}}],
             "stream": false
-        });
-        let tools_result = client
-            .post(ENDPOINT)
-            .header("authorization", format!("Bearer {access_token}"))
-            .header("anthropic-version", API_VERSION)
-            .header("anthropic-beta", BETA_HEADER)
-            .header("content-type", "application/json")
-            .json(&tools_body)
-            .send();
-        let tools_ok = tools_result.as_ref().is_ok_and(|r| r.status().is_success());
+        }));
 
-        {
-            let mut r = ApiCheckResult::default();
-            r.auth_ok = auth_ok;
-            r.streaming_ok = streaming_ok;
-            r.tools_ok = tools_ok;
-            r
-        }
+        ApiCheckResult::checks([auth_ok, streaming_ok, tools_ok])
     }
 }
 

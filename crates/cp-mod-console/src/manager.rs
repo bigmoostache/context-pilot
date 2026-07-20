@@ -231,6 +231,50 @@ pub struct ReconnectMeta {
     pub started_at: u64,
 }
 
+/// Ask the server whether a reconnected session is still alive, folding a
+/// dead/exited answer straight into the shared status handles.
+///
+/// Returns `true` if the session is still running (caller should start pollers),
+/// `false` if the server doesn't know it or reports it exited — in which case
+/// `status`/`finished_at`/`stop_polling` are updated to a terminal state here.
+fn probe_session_alive(
+    name: &str,
+    status: &Arc<Mutex<ProcessStatus>>,
+    finished_at: &Arc<Mutex<Option<u64>>>,
+    stop_polling: &Arc<AtomicBool>,
+) -> bool {
+    let mark_terminal = |code: i32| {
+        {
+            let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            *s = ProcessStatus::Finished(code);
+        }
+        {
+            let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            *fin = Some(now_ms());
+        }
+        stop_polling.store(true, Ordering::Relaxed);
+    };
+
+    let req = serde_json::json!({"cmd": "status", "key": name});
+    server_request(&req).map_or_else(
+        |_| {
+            // Server doesn't know about this session — mark dead.
+            mark_terminal(-1i32);
+            false
+        },
+        |resp| {
+            let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
+            if st.starts_with("exited") {
+                let code = resp.get("exit_code").and_then(serde_json::Value::as_i64).unwrap_or(-1).to_i32();
+                mark_terminal(code);
+                false
+            } else {
+                true // running
+            }
+        },
+    )
+}
+
 impl SessionHandle {
     /// Spawn a new child process via the console server.
     ///
@@ -325,42 +369,7 @@ impl SessionHandle {
         });
 
         // Check if server knows about this session
-        let server_alive = {
-            let req = serde_json::json!({"cmd": "status", "key": name});
-            server_request(&req).map_or_else(
-                |_| {
-                    // Server doesn't know about this session — mark dead
-                    {
-                        let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                        *s = ProcessStatus::Finished(-1);
-                    }
-                    {
-                        let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                        *fin = Some(now_ms());
-                    }
-                    stop_polling.store(true, Ordering::Relaxed);
-                    false
-                },
-                |resp| {
-                    let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
-                    if st.starts_with("exited") {
-                        let code = resp.get("exit_code").and_then(serde_json::Value::as_i64).unwrap_or(-1).to_i32();
-                        {
-                            let mut s = status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                            *s = ProcessStatus::Finished(code);
-                        }
-                        {
-                            let mut fin = finished_at.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                            *fin = Some(now_ms());
-                        }
-                        stop_polling.store(true, Ordering::Relaxed);
-                        false
-                    } else {
-                        true // running
-                    }
-                },
-            )
-        };
+        let server_alive = probe_session_alive(&name, &status, &finished_at, &stop_polling);
 
         if server_alive {
             // File poller from offset

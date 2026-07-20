@@ -279,6 +279,112 @@ impl Watcher for CoucouWatcher {
 /// Monotonic counter for generating unique coucou watcher IDs.
 static COUCOU_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
+/// Minimum recurrence interval to prevent notification spam (60 seconds).
+const MIN_RECURRENCE_MS: u64 = 60_000;
+
+/// Parsed recurrence: interval in ms (0 = one-shot) + human-readable label.
+type Recurrence = (u64, Option<String>);
+
+/// Resolved schedule: absolute fire time (ms since epoch) + delay description.
+type FireTime = (u64, String);
+
+/// Boxed error result — keeps the fallible parse signatures under the
+/// `type_complexity` threshold.
+type CoucouErr = Box<ToolResult>;
+
+/// Parse the `recurrence` (+ `interval` for custom) params into an interval in
+/// ms (0 = one-shot) and a human-readable label. Returns the error `ToolResult`
+/// on an unknown recurrence or an invalid/too-short custom interval.
+fn parse_recurrence(tool: &ToolUse) -> Result<Recurrence, CoucouErr> {
+    let recurrence_str = tool.input.get("recurrence").and_then(|v| v.as_str()).unwrap_or("once");
+    match recurrence_str {
+        "once" => Ok((0, None)),
+        "hourly" => Ok((3_600_000, Some("hourly".to_owned()))),
+        "daily" => Ok((86_400_000, Some("daily".to_owned()))),
+        "weekly" => Ok((604_800_000, Some("weekly".to_owned()))),
+        "custom" => {
+            let Some(interval_str) = tool.input.get("interval").and_then(|v| v.as_str()) else {
+                return Err(Box::new(ToolResult::new(
+                    tool.id.clone(),
+                    "Missing 'interval' parameter for custom recurrence. Examples: '30m', '2h', '1d'".to_owned(),
+                    true,
+                )));
+            };
+            match parse_duration_ms(interval_str) {
+                Ok(ms) if ms < MIN_RECURRENCE_MS => Err(Box::new(ToolResult::new(
+                    tool.id.clone(),
+                    format!(
+                        "Recurrence interval '{interval_str}' is too short. Minimum is 60s to prevent notification spam."
+                    ),
+                    true,
+                ))),
+                Ok(ms) => Ok((ms, Some(format!("every {}", format_duration(ms))))),
+                Err(e) => Err(Box::new(ToolResult::new(
+                    tool.id.clone(),
+                    format!("Invalid interval '{interval_str}': {e}"),
+                    true,
+                ))),
+            }
+        }
+        _ => Err(Box::new(ToolResult::new(
+            tool.id.clone(),
+            format!("Unknown recurrence '{recurrence_str}'. Use 'once', 'hourly', 'daily', 'weekly', or 'custom'."),
+            true,
+        ))),
+    }
+}
+
+/// Resolve the absolute fire time (ms since epoch) and a human-readable delay
+/// description for the given `mode` ("timer" or "datetime"). Returns the error
+/// `ToolResult` on a missing/invalid delay or datetime, or a past datetime.
+fn resolve_fire_time(tool: &ToolUse, mode: &str, now: u64) -> Result<FireTime, CoucouErr> {
+    match mode {
+        "timer" => {
+            let Some(delay_str) = tool.input.get("delay").and_then(|v| v.as_str()) else {
+                return Err(Box::new(ToolResult::new(
+                    tool.id.clone(),
+                    "Missing 'delay' parameter for timer mode. Examples: '30s', '5m', '1h30m'".to_owned(),
+                    true,
+                )));
+            };
+            match parse_duration_ms(delay_str) {
+                Ok(delay_ms) => Ok((now.saturating_add(delay_ms), format!("in {}", format_duration(delay_ms)))),
+                Err(e) => {
+                    Err(Box::new(ToolResult::new(tool.id.clone(), format!("Invalid delay '{delay_str}': {e}"), true)))
+                }
+            }
+        }
+        "datetime" => {
+            let Some(dt_str) = tool.input.get("datetime").and_then(|v| v.as_str()) else {
+                return Err(Box::new(ToolResult::new(
+                    tool.id.clone(),
+                    "Missing 'datetime' parameter. Format: YYYY-MM-DDTHH:MM:SS".to_owned(),
+                    true,
+                )));
+            };
+            match parse_datetime_ms(dt_str) {
+                Ok(target_ms) if target_ms <= now => Err(Box::new(ToolResult::new(
+                    tool.id.clone(),
+                    format!("DateTime '{dt_str}' is in the past!"),
+                    true,
+                ))),
+                Ok(target_ms) => {
+                    let remaining = format_duration(target_ms.saturating_sub(now));
+                    Ok((target_ms, format!("at {dt_str} ({remaining})")))
+                }
+                Err(e) => {
+                    Err(Box::new(ToolResult::new(tool.id.clone(), format!("Invalid datetime '{dt_str}': {e}"), true)))
+                }
+            }
+        }
+        _ => Err(Box::new(ToolResult::new(
+            tool.id.clone(),
+            format!("Unknown mode '{mode}'. Use 'timer' or 'datetime'."),
+            true,
+        ))),
+    }
+}
+
 /// Execute the coucou tool — schedule a notification or cancel an existing one.
 pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
     // === Cancel path ===
@@ -309,103 +415,16 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     let thread_id = tool.input.get("thread_id").and_then(|v| v.as_str()).map(String::from);
 
-    // Parse recurrence
-    let recurrence_str = tool.input.get("recurrence").and_then(|v| v.as_str()).unwrap_or("once");
-    let (interval_ms, recurrence_label): (u64, Option<String>) = match recurrence_str {
-        "once" => (0, None),
-        "hourly" => (3_600_000, Some("hourly".to_owned())),
-        "daily" => (86_400_000, Some("daily".to_owned())),
-        "weekly" => (604_800_000, Some("weekly".to_owned())),
-        "custom" => {
-            /// Minimum recurrence interval to prevent notification spam (60 seconds).
-            const MIN_RECURRENCE_MS: u64 = 60_000;
-            let Some(interval_str) = tool.input.get("interval").and_then(|v| v.as_str()) else {
-                return ToolResult::new(
-                    tool.id.clone(),
-                    "Missing 'interval' parameter for custom recurrence. Examples: '30m', '2h', '1d'".to_owned(),
-                    true,
-                );
-            };
-            match parse_duration_ms(interval_str) {
-                Ok(ms) if ms < MIN_RECURRENCE_MS => {
-                    return ToolResult::new(
-                        tool.id.clone(),
-                        format!(
-                            "Recurrence interval '{interval_str}' is too short. Minimum is 60s to prevent notification spam."
-                        ),
-                        true,
-                    );
-                }
-                Ok(ms) => (ms, Some(format!("every {}", format_duration(ms)))),
-                Err(e) => {
-                    return ToolResult::new(tool.id.clone(), format!("Invalid interval '{interval_str}': {e}"), true);
-                }
-            }
-        }
-        _ => {
-            return ToolResult::new(
-                tool.id.clone(),
-                format!("Unknown recurrence '{recurrence_str}'. Use 'once', 'hourly', 'daily', 'weekly', or 'custom'."),
-                true,
-            );
-        }
+    let (interval_ms, recurrence_label) = match parse_recurrence(tool) {
+        Ok(r) => r,
+        Err(e) => return *e,
     };
 
     let now = now_ms();
-    let fire_at_ms: u64;
-    let delay_desc: String;
-
-    match mode {
-        "timer" => {
-            let Some(delay_str) = tool.input.get("delay").and_then(|v| v.as_str()) else {
-                return ToolResult::new(
-                    tool.id.clone(),
-                    "Missing 'delay' parameter for timer mode. Examples: '30s', '5m', '1h30m'".to_owned(),
-                    true,
-                );
-            };
-
-            match parse_duration_ms(delay_str) {
-                Ok(delay_ms) => {
-                    fire_at_ms = now.saturating_add(delay_ms);
-                    delay_desc = format!("in {}", format_duration(delay_ms));
-                }
-                Err(e) => {
-                    return ToolResult::new(tool.id.clone(), format!("Invalid delay '{delay_str}': {e}"), true);
-                }
-            }
-        }
-        "datetime" => {
-            let Some(dt_str) = tool.input.get("datetime").and_then(|v| v.as_str()) else {
-                return ToolResult::new(
-                    tool.id.clone(),
-                    "Missing 'datetime' parameter. Format: YYYY-MM-DDTHH:MM:SS".to_owned(),
-                    true,
-                );
-            };
-
-            match parse_datetime_ms(dt_str) {
-                Ok(target_ms) => {
-                    if target_ms <= now {
-                        return ToolResult::new(tool.id.clone(), format!("DateTime '{dt_str}' is in the past!"), true);
-                    }
-                    fire_at_ms = target_ms;
-                    let remaining = format_duration(target_ms.saturating_sub(now));
-                    delay_desc = format!("at {dt_str} ({remaining})");
-                }
-                Err(e) => {
-                    return ToolResult::new(tool.id.clone(), format!("Invalid datetime '{dt_str}': {e}"), true);
-                }
-            }
-        }
-        _ => {
-            return ToolResult::new(
-                tool.id.clone(),
-                format!("Unknown mode '{mode}'. Use 'timer' or 'datetime'."),
-                true,
-            );
-        }
-    }
+    let (fire_at_ms, delay_desc) = match resolve_fire_time(tool, mode, now) {
+        Ok(r) => r,
+        Err(e) => return *e,
+    };
 
     let counter = COUCOU_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let watcher_id = format!("coucou_{counter}");

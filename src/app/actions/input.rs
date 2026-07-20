@@ -86,7 +86,16 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
 
     state.messages.push(user_msg);
 
-    // Reset per-stream and per-tick token counters for new user-initiated stream
+    reset_stream_and_tick_counters(state);
+
+    // Return Save — the spine check in handle_action will detect the unprocessed
+    // notification and start streaming synchronously for responsive feel.
+    ActionResult::Save
+}
+
+/// Zero the per-stream and per-tick token + USD telemetry counters ahead of a
+/// new user-initiated stream, so the next stream's stats start from a clean base.
+const fn reset_stream_and_tick_counters(state: &mut State) {
     state.stream_cache_hit_tokens = 0;
     state.stream_cache_miss_tokens = 0;
     state.stream_output_tokens = 0;
@@ -101,10 +110,6 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     state.tick_cost_hit_usd = 0.0f64;
     state.tick_cost_miss_usd = 0.0f64;
     state.tick_cost_output_usd = 0.0f64;
-
-    // Return Save — the spine check in handle_action will detect the unprocessed
-    // notification and start streaming synchronously for responsive feel.
-    ActionResult::Save
 }
 
 /// Handle `ClearConversation` action.

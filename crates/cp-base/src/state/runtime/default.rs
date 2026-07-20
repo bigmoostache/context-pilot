@@ -8,6 +8,17 @@ use super::State;
 use crate::config::llm_types::LlmProvider;
 
 impl Default for State {
+    // State is the flat aggregate root of the whole application — ~80 leaf
+    // fields (UI cursors, id counters, model selections, cache/stream/tick token
+    // + USD telemetry, panel-diff snapshots, per-frame caches). The Default impl
+    // is a single linear struct literal: one `field: value` line each. Grouping
+    // the telemetry counters into sub-structs to shave lines would ripple across
+    // 136 field-access sites for zero behavioural gain, so the initializer stays
+    // flat and this one impl carries the length expect (threshold 60, unchanged).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "flat aggregate root-state initializer; sub-grouping fields would churn 136 access sites for no gain"
+    )]
     fn default() -> Self {
         Self {
             // NOTE: context and tools are initialized empty here.

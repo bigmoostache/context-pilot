@@ -57,21 +57,6 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     render_body(frame, state, body_area, &ir_frame);
     ir::render_status_bar::render_status_bar_from_ir(frame, &ir_frame.status_bar, status_area);
 
-    // Render performance overlay if active (from IR overlays)
-    if let Some(perf_overlay) = ir_frame.overlays.iter().find_map(|o| {
-        cp_base::deref_match!(o, {
-            cp_render::conversation::Overlay::Perf(ref p) => Some(p),
-            cp_render::conversation::Overlay::QuestionForm(_)
-            | cp_render::conversation::Overlay::Autocomplete(_)
-            | cp_render::conversation::Overlay::Config(_)
-            | cp_render::conversation::Overlay::CommandPalette(_)
-            | cp_render::conversation::Overlay::SearchIndex(_)
-            | _ => None,
-        })
-    }) {
-        perf::render_perf_overlay_from_ir(frame, area, perf_overlay);
-    }
-
     // Render autocomplete popup if active (via IR overlays).
     // In Threads mode the input lives inside the right pane (past the thread
     // list), so offset by THREAD_LIST_WIDTH instead of the sidebar width.
@@ -88,8 +73,32 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
         ir::render_conversation::render_autocomplete_if_active(frame, content_area, &ir_frame.overlays);
     }
 
+    render_modal_overlays(frame, area, &ir_frame.overlays);
+
+    PERF.frame_end();
+}
+
+/// Render the full-area modal overlays (perf monitor, config, search-index) from
+/// the IR overlay stack. The autocomplete popup is handled separately (it needs
+/// the content-area offset), so it is not touched here.
+fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_render::conversation::Overlay]) {
+    // Render performance overlay if active (from IR overlays)
+    if let Some(perf_overlay) = overlays.iter().find_map(|o| {
+        cp_base::deref_match!(o, {
+            cp_render::conversation::Overlay::Perf(ref p) => Some(p),
+            cp_render::conversation::Overlay::QuestionForm(_)
+            | cp_render::conversation::Overlay::Autocomplete(_)
+            | cp_render::conversation::Overlay::Config(_)
+            | cp_render::conversation::Overlay::CommandPalette(_)
+            | cp_render::conversation::Overlay::SearchIndex(_)
+            | _ => None,
+        })
+    }) {
+        perf::render_perf_overlay_from_ir(frame, area, perf_overlay);
+    }
+
     // Render config overlay if active (from IR overlays)
-    if let Some(config_overlay) = ir_frame.overlays.iter().find_map(|o| {
+    if let Some(config_overlay) = overlays.iter().find_map(|o| {
         cp_base::deref_match!(o, {
             cp_render::conversation::Overlay::Config(ref c) => Some(c),
             cp_render::conversation::Overlay::QuestionForm(_)
@@ -104,7 +113,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     }
 
     // Render Meilisearch indexing status overlay if active (from IR overlays)
-    if let Some(search_overlay) = ir_frame.overlays.iter().find_map(|o| {
+    if let Some(search_overlay) = overlays.iter().find_map(|o| {
         cp_base::deref_match!(o, {
             cp_render::conversation::Overlay::SearchIndex(ref s) => Some(s.as_ref()),
             cp_render::conversation::Overlay::QuestionForm(_)
@@ -117,8 +126,6 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     }) {
         search_overlay::render_search_index_overlay(frame, search_overlay, area);
     }
-
-    PERF.frame_end();
 }
 
 /// Render the body area: sidebar (if visible) and main content panel,

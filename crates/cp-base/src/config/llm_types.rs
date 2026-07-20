@@ -77,6 +77,15 @@ impl ApiCheckResult {
         Self { auth_ok: false, streaming_ok: false, tools_ok: false, error }
     }
 
+    /// Build a result from the three probe outcomes (`[auth, streaming, tools]`),
+    /// no error message. The shared tail of every provider's `check_api`. Takes
+    /// the outcomes as an array — three separate `bool` params trip
+    /// `fn_params_excessive_bools`.
+    #[must_use]
+    pub const fn checks([auth_ok, streaming_ok, tools_ok]: [bool; 3]) -> Self {
+        Self { auth_ok, streaming_ok, tools_ok, error: None }
+    }
+
     /// `true` only when auth, streaming, and tool-use all passed.
     #[must_use]
     pub const fn all_ok(&self) -> bool {

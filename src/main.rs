@@ -58,6 +58,43 @@ struct BootStep {
     done: bool,
 }
 
+/// Build the step list lines: a ✓ for done steps, a ▸ for the in-progress one
+/// (`done_count`), blank otherwise, each with its label + optional detail.
+fn boot_step_lines(steps: &[BootStep], done_count: usize) -> Vec<Line<'static>> {
+    steps
+        .iter()
+        .enumerate()
+        .map(|(i, step)| {
+            let (icon, style) = if step.done {
+                ("  \u{2713} ", Style::default().fg(theme::success()))
+            } else if i == done_count {
+                ("  \u{25b8} ", Style::default().fg(theme::warning()))
+            } else {
+                ("    ", Style::default().fg(theme::text_muted()))
+            };
+            let detail = step.detail.as_deref().unwrap_or("");
+            let text = if detail.is_empty() {
+                format!("{icon}{}", step.label)
+            } else {
+                format!("{icon}{} ({detail})", step.label)
+            };
+            Line::from(Span::styled(text, style))
+        })
+        .collect()
+}
+
+/// Build the progress gauge line (filled/empty blocks + percentage) for the
+/// given completed/total counts and rendered gauge width.
+fn boot_gauge_line(done_count: usize, total: usize, gauge_width: u16) -> Line<'static> {
+    let pct = done_count.saturating_mul(100).checked_div(total).unwrap_or(0);
+    let filled_usize = done_count.saturating_mul(usize::from(gauge_width)).checked_div(total).unwrap_or(0);
+    let mut gauge_bar = "\u{2588}".repeat(filled_usize);
+    gauge_bar.push_str(
+        &"\u{2591}".repeat(usize::from(gauge_width.saturating_sub(u16::try_from(filled_usize).unwrap_or(gauge_width)))),
+    );
+    Line::from(vec![Span::styled(gauge_bar, Style::default().fg(theme::accent())), Span::raw(format!(" {pct}%"))])
+}
+
 /// Render the boot screen with completed/in-progress steps and a progress bar.
 fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, steps: &[BootStep]) {
     let done_count = steps.iter().filter(|s| s.done).count();
@@ -106,41 +143,11 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
         frame.render_widget(title, title_area);
 
         // Steps
-        let step_lines: Vec<Line<'_>> = steps
-            .iter()
-            .enumerate()
-            .map(|(i, step)| {
-                let (icon, style) = if step.done {
-                    ("  \u{2713} ", Style::default().fg(theme::success()))
-                } else if i == done_count {
-                    ("  \u{25b8} ", Style::default().fg(theme::warning()))
-                } else {
-                    ("    ", Style::default().fg(theme::text_muted()))
-                };
-                let detail = step.detail.as_deref().unwrap_or("");
-                let text = if detail.is_empty() {
-                    format!("{icon}{}", step.label)
-                } else {
-                    format!("{icon}{} ({detail})", step.label)
-                };
-                Line::from(Span::styled(text, style))
-            })
-            .collect();
-        let steps_widget = ratatui::widgets::Paragraph::new(step_lines);
+        let steps_widget = ratatui::widgets::Paragraph::new(boot_step_lines(steps, done_count));
         frame.render_widget(steps_widget, steps_area);
 
-        // Progress gauge — pure integer arithmetic to avoid float cast lints
-        let pct = done_count.saturating_mul(100).checked_div(total).unwrap_or(0);
-        let gauge_width = gauge_area.width;
-        let filled_usize = done_count.saturating_mul(usize::from(gauge_width)).checked_div(total).unwrap_or(0);
-        let filled = u16::try_from(filled_usize).unwrap_or(gauge_width);
-        let mut gauge_bar = "\u{2588}".repeat(filled_usize);
-        gauge_bar.push_str(&"\u{2591}".repeat(usize::from(gauge_width.saturating_sub(filled))));
-        let gauge_line = Line::from(vec![
-            Span::styled(gauge_bar, Style::default().fg(theme::accent())),
-            Span::raw(format!(" {pct}%")),
-        ]);
-        frame.render_widget(gauge_line, gauge_area);
+        // Progress gauge
+        frame.render_widget(boot_gauge_line(done_count, total, gauge_area.width), gauge_area);
     }));
 }
 
@@ -216,45 +223,17 @@ use state::persistence::{
     boot_load_panels, load_state,
 };
 
-fn main() -> ExitCode {
-    /// Helper to mark a boot step as done, with bounds checking.
-    fn mark_step_done(steps: &mut [BootStep], idx: usize) {
-        if let Some(step) = steps.get_mut(idx) {
-            step.done = true;
-        }
-    }
-
-    /// Helper to set a boot step's detail, with bounds checking.
-    fn set_step_detail(steps: &mut [BootStep], idx: usize, detail: String) {
-        if let Some(step) = steps.get_mut(idx) {
-            step.detail = Some(detail);
-        }
-    }
-
-    init_file_logger();
-    raise_fd_limit();
-    infra::flame::init();
-
-    // Parse CLI args
-    let args: Vec<String> = std::env::args().collect();
-    let resume_stream = args.iter().any(|a| a == "--resume-stream");
-
-    // --bridge: activate the orchestration bridge (equivalent to CP_BRIDGE=1).
-    // Uses a safe OnceLock flag so BridgeModule::init_state picks it up during boot.
-    if args.iter().any(|a| a == "--bridge") {
-        cp_mod_bridge::request_bridge();
-    }
-
-    // Panic hook: restore terminal state and log the panic to disk.
-    // Without this, a panic leaves the terminal in raw mode + alternate screen,
-    // which corrupts the SSH session and the error is lost.
+/// Install the panic hook: restore terminal state (raw mode, bracketed paste,
+/// alternate screen) and append the panic + backtrace to
+/// `.context-pilot/errors/panic.log` before delegating to the default hook.
+/// Without this a panic leaves the terminal wedged and the error lost.
+fn install_panic_hook() {
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let _r_raw = disable_raw_mode();
         let _r_paste = io::stdout().execute(DisableBracketedPaste);
         let _r_screen = io::stdout().execute(LeaveAlternateScreen);
 
-        // Write panic info to .context-pilot/errors/panic.log
         let error_dir = std::path::Path::new(".context-pilot").join("errors");
         let _r_mkdir = std::fs::create_dir_all(&error_dir);
         let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
@@ -269,32 +248,53 @@ fn main() -> ExitCode {
 
         default_hook(info);
     }));
+}
 
-    let Ok(()) = enable_raw_mode() else {
-        drop(writeln!(io::stderr(), "Fatal: failed to enable raw mode"));
-        return ExitCode::FAILURE;
-    };
-    let _r_enter = io::stdout().execute(EnterAlternateScreen);
-    let _r_paste_on = io::stdout().execute(EnableBracketedPaste);
-    let Ok(mut terminal) = Terminal::new(CrosstermBackend::new(io::stdout())) else {
-        let _r_cleanup = disable_raw_mode();
-        drop(writeln!(io::stderr(), "Fatal: failed to create terminal"));
-        return ExitCode::FAILURE;
-    };
+/// Restore the terminal (raw mode, bracketed paste, alternate screen) and flush
+/// flame telemetry. On a pending reload (outside the run.sh supervisor) `exec()`
+/// the same binary with `--resume-stream` so `cpilot` self-restarts; on exec
+/// failure it falls through to a normal exit.
+fn teardown_and_maybe_reexec(reload_pending: bool) {
+    let _r_raw_off = disable_raw_mode();
+    let _r_paste_off = io::stdout().execute(DisableBracketedPaste);
+    let _r_leave = io::stdout().execute(LeaveAlternateScreen);
+    infra::flame::flush();
 
-    // ─── Phased boot with progress rendering ────────────────────────────
-    let mut steps = vec![
-        BootStep { label: "Loading config", detail: None, done: false },
-        BootStep { label: "Loading panels", detail: None, done: false },
-        BootStep { label: "Loading messages", detail: None, done: false },
-        BootStep { label: "Assembling state", detail: None, done: false },
-        BootStep { label: "Initializing modules", detail: None, done: false },
-        BootStep { label: "Preparing workspace", detail: None, done: false },
-    ];
+    #[cfg(unix)]
+    if reload_pending
+        && std::env::var_os("CP_RUN_SH").is_none()
+        && let Ok(exe_path) = std::env::current_exe()
+    {
+        use std::os::unix::process::CommandExt as _;
+        let mut exec_args: Vec<String> = std::env::args().skip(1).collect();
+        if !exec_args.iter().any(|a| a == "--resume-stream") {
+            exec_args.push("--resume-stream".to_owned());
+        }
+        // Replaces the current process — never returns on success
+        let _err = std::process::Command::new(exe_path).args(&exec_args).exec();
+    }
+}
 
-    // Show initial boot screen immediately — banish the black void
-    render_boot_screen(&mut terminal, &steps);
+/// Mark a boot step as done, with bounds checking.
+fn mark_step_done(steps: &mut [BootStep], idx: usize) {
+    if let Some(step) = steps.get_mut(idx) {
+        step.done = true;
+    }
+}
 
+/// Set a boot step's detail string, with bounds checking.
+fn set_step_detail(steps: &mut [BootStep], idx: usize, detail: String) {
+    if let Some(step) = steps.get_mut(idx) {
+        step.detail = Some(detail);
+    }
+}
+
+/// Run the phased boot and assemble the fully-initialized [`State`], rendering
+/// per-phase progress on `terminal`. Loads config/panels/messages from disk for
+/// an existing project, or creates a fresh default state; then initializes
+/// modules, prunes orphaned context elements, and ensures default contexts +
+/// agent. `steps` is mutated in place so the boot screen reflects progress.
+fn boot_app_state(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, steps: &mut [BootStep]) -> state::State {
     // Detect new vs fresh-start format
     let new_format = std::path::Path::new(".context-pilot").join("config.json").exists();
 
@@ -302,46 +302,46 @@ fn main() -> ExitCode {
         // Phase 1: Load config + worker state
         let cfg = boot_load_config();
         let module_data = boot_extract_module_data(&cfg);
-        mark_step_done(&mut steps, STEP_CONFIG);
-        render_boot_screen(&mut terminal, &steps);
+        mark_step_done(steps, STEP_CONFIG);
+        render_boot_screen(terminal, steps);
 
         // Phase 2: Build context from panel JSONs
         let panels = boot_load_panels(&cfg);
-        set_step_detail(&mut steps, STEP_PANELS, format!("{} panels", panels.panel_count));
-        mark_step_done(&mut steps, STEP_PANELS);
-        render_boot_screen(&mut terminal, &steps);
+        set_step_detail(steps, STEP_PANELS, format!("{} panels", panels.panel_count));
+        mark_step_done(steps, STEP_PANELS);
+        render_boot_screen(terminal, steps);
 
         // Phase 3: Load conversation messages from YAML
         let msg_count = panels.message_uids.len();
         let messages = boot_load_messages(&panels.message_uids);
-        set_step_detail(&mut steps, STEP_MESSAGES, format!("{msg_count} messages"));
-        mark_step_done(&mut steps, STEP_MESSAGES);
-        render_boot_screen(&mut terminal, &steps);
+        set_step_detail(steps, STEP_MESSAGES, format!("{msg_count} messages"));
+        mark_step_done(steps, STEP_MESSAGES);
+        render_boot_screen(terminal, steps);
 
         // Phase 4: Assemble state (without module init)
         let mut assembled_state = boot_assemble_state(cfg, panels, messages);
-        mark_step_done(&mut steps, STEP_ASSEMBLE);
-        render_boot_screen(&mut terminal, &steps);
+        mark_step_done(steps, STEP_ASSEMBLE);
+        render_boot_screen(terminal, steps);
 
         // Phase 5: Initialize modules (with per-module progress)
         boot_init_modules(&mut assembled_state, &module_data, |module_name| {
-            set_step_detail(&mut steps, STEP_MODULES, module_name.to_owned());
-            render_boot_screen(&mut terminal, &steps);
+            set_step_detail(steps, STEP_MODULES, module_name.to_owned());
+            render_boot_screen(terminal, steps);
         });
-        mark_step_done(&mut steps, STEP_MODULES);
-        set_step_detail(&mut steps, STEP_WORKSPACE, "registering types".to_owned());
-        render_boot_screen(&mut terminal, &steps);
+        mark_step_done(steps, STEP_MODULES);
+        set_step_detail(steps, STEP_WORKSPACE, "registering types".to_owned());
+        render_boot_screen(terminal, steps);
 
         assembled_state
     } else {
         // Fresh start — no files to load, just create default state
         let s = load_state();
-        mark_step_done(&mut steps, STEP_CONFIG);
-        mark_step_done(&mut steps, STEP_PANELS);
-        mark_step_done(&mut steps, STEP_MESSAGES);
-        mark_step_done(&mut steps, STEP_ASSEMBLE);
-        mark_step_done(&mut steps, STEP_MODULES);
-        render_boot_screen(&mut terminal, &steps);
+        mark_step_done(steps, STEP_CONFIG);
+        mark_step_done(steps, STEP_PANELS);
+        mark_step_done(steps, STEP_MESSAGES);
+        mark_step_done(steps, STEP_ASSEMBLE);
+        mark_step_done(steps, STEP_MODULES);
+        render_boot_screen(terminal, steps);
         s
     };
 
@@ -368,8 +368,56 @@ fn main() -> ExitCode {
     // Phase 6: Prepare workspace
     ensure_default_contexts(&mut state);
     ensure_default_agent(&mut state);
-    mark_step_done(&mut steps, STEP_WORKSPACE);
+    mark_step_done(steps, STEP_WORKSPACE);
+    render_boot_screen(terminal, steps);
+
+    state
+}
+
+fn main() -> ExitCode {
+    init_file_logger();
+    raise_fd_limit();
+    infra::flame::init();
+
+    // Parse CLI args
+    let args: Vec<String> = std::env::args().collect();
+    let resume_stream = args.iter().any(|a| a == "--resume-stream");
+
+    // --bridge: activate the orchestration bridge (equivalent to CP_BRIDGE=1).
+    // Uses a safe OnceLock flag so BridgeModule::init_state picks it up during boot.
+    if args.iter().any(|a| a == "--bridge") {
+        cp_mod_bridge::request_bridge();
+    }
+
+    // Panic hook: restore terminal state and log the panic to disk.
+    install_panic_hook();
+
+    let Ok(()) = enable_raw_mode() else {
+        drop(writeln!(io::stderr(), "Fatal: failed to enable raw mode"));
+        return ExitCode::FAILURE;
+    };
+    let _r_enter = io::stdout().execute(EnterAlternateScreen);
+    let _r_paste_on = io::stdout().execute(EnableBracketedPaste);
+    let Ok(mut terminal) = Terminal::new(CrosstermBackend::new(io::stdout())) else {
+        let _r_cleanup = disable_raw_mode();
+        drop(writeln!(io::stderr(), "Fatal: failed to create terminal"));
+        return ExitCode::FAILURE;
+    };
+
+    // ─── Phased boot with progress rendering ────────────────────────────
+    let mut steps = vec![
+        BootStep { label: "Loading config", detail: None, done: false },
+        BootStep { label: "Loading panels", detail: None, done: false },
+        BootStep { label: "Loading messages", detail: None, done: false },
+        BootStep { label: "Assembling state", detail: None, done: false },
+        BootStep { label: "Initializing modules", detail: None, done: false },
+        BootStep { label: "Preparing workspace", detail: None, done: false },
+    ];
+
+    // Show initial boot screen immediately — banish the black void
     render_boot_screen(&mut terminal, &steps);
+
+    let state = boot_app_state(&mut terminal, &mut steps);
 
     // Create channels
     let (tx, rx) = mpsc::channel::<StreamEvent>();
@@ -380,29 +428,8 @@ fn main() -> ExitCode {
     let ch = app::run::lifecycle::EventChannels { tx: &tx, rx: &rx, cache_rx: &cache_rx };
     let run_result = app.run(&mut terminal, &ch);
 
-    // Cleanup
-    let _r_raw_off = disable_raw_mode();
-    let _r_paste_off = io::stdout().execute(DisableBracketedPaste);
-    let _r_leave = io::stdout().execute(LeaveAlternateScreen);
-    infra::flame::flush();
-
-    // Self-restart on reload — lets `cpilot` work without the run.sh supervisor loop.
-    // exec() replaces this process with a fresh instance (same binary, same env).
-    // Skipped when run.sh supervises (CP_RUN_SH=1) — the supervisor rebuilds via cargo run.
-    // If exec fails, fall through to normal exit (run.sh catches it as before).
-    #[cfg(unix)]
-    if app.state.flags.lifecycle.reload_pending
-        && std::env::var_os("CP_RUN_SH").is_none()
-        && let Ok(exe_path) = std::env::current_exe()
-    {
-        use std::os::unix::process::CommandExt as _;
-        let mut exec_args: Vec<String> = std::env::args().skip(1).collect();
-        if !exec_args.iter().any(|a| a == "--resume-stream") {
-            exec_args.push("--resume-stream".to_owned());
-        }
-        // Replaces the current process — never returns on success
-        let _err = std::process::Command::new(exe_path).args(&exec_args).exec();
-    }
+    // Cleanup + self-restart on reload (see helper).
+    teardown_and_maybe_reexec(app.state.flags.lifecycle.reload_pending);
 
     if let Err(e) = run_result {
         drop(writeln!(io::stderr(), "Fatal: {e}"));
