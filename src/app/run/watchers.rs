@@ -312,13 +312,13 @@ fn collect_wanted_paths(app: &App) -> (std::collections::BTreeSet<String>, std::
     let mut wanted_dirs = std::collections::BTreeSet::new();
     for module in &crate::modules::all_modules() {
         for spec in module.watch_paths(&app.state) {
-            match spec {
-                WatchSpec::File(path) => {
-                    let _r = wanted_files.insert(path);
-                }
-                WatchSpec::Dir(path) | WatchSpec::DirRecursive(path) => {
-                    let _r = wanted_dirs.insert(path);
-                }
+            // `if let` (not exhaustive match) so WatchSpec stays #[non_exhaustive].
+            if let WatchSpec::File(path) = spec {
+                let _r = wanted_files.insert(path);
+            } else if let WatchSpec::Dir(path) | WatchSpec::DirRecursive(path) = spec {
+                let _r = wanted_dirs.insert(path);
+            } else {
+                // Future non_exhaustive variants: ignored by the watcher sync.
             }
         }
     }
@@ -363,18 +363,19 @@ fn add_dir_watches(app: &mut App) {
     let Some(watcher) = app.file_watcher.as_mut() else { return };
     for module in &crate::modules::all_modules() {
         for spec in module.watch_paths(&app.state) {
-            match spec {
-                WatchSpec::File(_) => {} // handled by add_file_watches
-                WatchSpec::Dir(path) => {
-                    if !app.watched_dir_paths.contains(&path) && watcher.watch_dir(&path).is_ok() {
-                        let _r = app.watched_dir_paths.insert(path);
-                    }
+            // File specs are handled by add_file_watches; here we only add dir
+            // watches. `if let` (not exhaustive match) so WatchSpec stays #[non_exhaustive].
+            if let WatchSpec::Dir(path) = spec {
+                if !app.watched_dir_paths.contains(&path) && watcher.watch_dir(&path).is_ok() {
+                    let _r = app.watched_dir_paths.insert(path);
                 }
-                WatchSpec::DirRecursive(path) => {
-                    if !app.watched_dir_paths.contains(&path) && watcher.watch_dir_recursive(&path).is_ok() {
-                        let _r = app.watched_dir_paths.insert(path);
-                    }
-                }
+            } else if let WatchSpec::DirRecursive(path) = spec
+                && !app.watched_dir_paths.contains(&path)
+                && watcher.watch_dir_recursive(&path).is_ok()
+            {
+                let _r = app.watched_dir_paths.insert(path);
+            } else {
+                // File specs (handled by add_file_watches) + future non_exhaustive variants.
             }
         }
     }

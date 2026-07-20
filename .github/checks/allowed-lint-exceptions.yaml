@@ -392,14 +392,6 @@ exceptions:
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
-  - path: "crates/cp-base/src/panels.rs"
-    match: "watch-spec contract"
-    reason: >
-      WatchSpec is constructed by every module's watch_paths and matched exhaustively by
-      the watcher sync; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
   - path: "crates/cp-base/src/state/actions.rs"
     match: "central Elm action enum"
     reason: >

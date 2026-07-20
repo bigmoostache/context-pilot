@@ -6724,3 +6724,25 @@ index ab58762d..eb67cc06 100644
      match: "watch-spec contract"
      reason: >
 # --- End entry #63 ---
+64:c6e1825bc9e79e876b79208e1443aff691f9b4d571ab875f941747e49d94fa2c:d4a801571e003de821f39ddbd9d8f526f96ef6d75ef5321b7640d85fc96f3e6e:4cf3d60b3bf5dd2849bae6b2ccd1ed802cffec23fe65477c3f736bfc4bec1b49
+# --- Diff for entry #64 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index eb67cc06..2dc047a6 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -392,14 +392,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/panels.rs"
+-    match: "watch-spec contract"
+-    reason: >
+-      WatchSpec is constructed by every module's watch_paths and matched exhaustively by
+-      the watcher sync; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/state/actions.rs"
+     match: "central Elm action enum"
+     reason: >
+# --- End entry #64 ---
