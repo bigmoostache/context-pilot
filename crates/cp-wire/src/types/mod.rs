@@ -173,10 +173,7 @@ pub enum Phase {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "wire-protocol contract: the LifecycleState variant set is closed; a new state is a deliberate breaking change every peer must handle, so exhaustive cross-crate matching is intentional and #[non_exhaustive] would forbid the cross-crate construction this enum requires"
-)]
+#[non_exhaustive]
 pub enum LifecycleState {
     /// Agent is initialising (bridge boot sequence).
     Starting,

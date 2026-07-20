@@ -6790,3 +6790,40 @@ index 6892f601..09c61aa9 100644
      match: "reverie-kind contract"
      reason: >
 # --- End entry #66 ---
+67:6e0bba3197e18cdb87eb3090a8609d0e1a51433ff6efe1dc681c7908021004e6:239128fdb80ffca962691617114a7f7d81a6f8be860edd86c9688915f7b22a4c:1ae43e4232a3ec779f0b58d4bb63b28e20e9ae9b056cca0e77232a63a8e339c2
+# --- Diff for entry #67 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 09c61aa9..9ae4e8b0 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -294,14 +294,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-wire/src/types/mod.rs"
+-    match: "the LifecycleState variant set is closed"
+-    reason: >
+-      LifecycleState is a wire-protocol contract constructed cross-crate; a new
+-      state is a deliberate breaking change every peer handles exhaustively.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-wire/src/types/mod.rs"
+     match: "ThreadTurn already carries an Unknown catch-all"
+     reason: >
+@@ -342,14 +334,6 @@ exceptions:
+     strategy: >
+       Irreducible — a binary outcome gains nothing from non_exhaustive.
+ 
+-  - path: "crates/cp-wire/src/types/registry.rs"
+-    match: "AgentStatus is a closed lifecycle set written cross-crate"
+-    reason: >
+-      AgentStatus is a closed lifecycle set written cross-crate into the registry
+-      entry and matched exhaustively by the backend; non_exhaustive would forbid it.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-wire/src/framing.rs"
+     match: "framing error taxonomy is a closed wire contract"
+     reason: >
+# --- End entry #67 ---

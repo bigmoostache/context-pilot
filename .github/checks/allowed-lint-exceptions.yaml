@@ -295,14 +295,6 @@ exceptions:
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
   - path: "crates/cp-wire/src/types/mod.rs"
-    match: "the LifecycleState variant set is closed"
-    reason: >
-      LifecycleState is a wire-protocol contract constructed cross-crate; a new
-      state is a deliberate breaking change every peer handles exhaustively.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-wire/src/types/mod.rs"
     match: "ThreadTurn already carries an Unknown catch-all"
     reason: >
       ThreadTurn already has an Unknown catch-all for N-1 forward-compat and is
@@ -341,14 +333,6 @@ exceptions:
       and matched exhaustively by the agent; non_exhaustive would forbid that construction.
     strategy: >
       Irreducible — a binary outcome gains nothing from non_exhaustive.
-
-  - path: "crates/cp-wire/src/types/registry.rs"
-    match: "AgentStatus is a closed lifecycle set written cross-crate"
-    reason: >
-      AgentStatus is a closed lifecycle set written cross-crate into the registry
-      entry and matched exhaustively by the backend; non_exhaustive would forbid it.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
   - path: "crates/cp-wire/src/framing.rs"
     match: "framing error taxonomy is a closed wire contract"
