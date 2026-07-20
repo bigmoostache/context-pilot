@@ -74,10 +74,7 @@ pub const MAX_BATCH: usize = 1024;
 
 /// How a record must be treated under queue pressure (design doc GAP 2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "durability policy is a closed binary set (Durable/BestEffort) constructed by Durability::of and matched exhaustively by the commit routing; #[non_exhaustive] would forbid that construction and adds nothing to a binary outcome"
-)]
+#[non_exhaustive]
 pub enum Durability {
     /// Must never be lost — the submitter blocks rather than drop it.
     Durable,
@@ -124,10 +121,7 @@ impl Durability {
 
 /// The fate of an [`append_best_effort`](OplogService::append_best_effort) call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "best-effort outcome is a closed binary set (Submitted/Dropped) matched exhaustively by cross-crate callers (the tests/service_group_commit.rs integration target); #[non_exhaustive] would force a wildcard arm there that the forbidden wildcard_enum_match_arm lint rejects, and adds nothing to a binary outcome"
-)]
+#[non_exhaustive]
 pub enum BestEffortOutcome {
     /// Accepted into the queue (it will be written on the next group commit).
     /// Acceptance is *not* durability — a best-effort record is never awaited.

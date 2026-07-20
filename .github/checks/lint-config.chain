@@ -6546,3 +6546,33 @@ index 2ca3042f..7715743e 100644
      match: "text-table alignment"
      reason: >
 # --- End entry #58 ---
+59:5ee3ada5434d8d53a73b4759be8e330af395ec35a9b54ffabcb29da9bc515a49:54894c52798c5bbc22ee5dc180ce0d715f2aef52acfc2a425a81d7cf992db2f2:89e68751a82495eb51bcd86669db051bb6b68e0d07c7b66402e33763fe9cd10b
+# --- Diff for entry #59 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 7715743e..6b36fef9 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -480,22 +480,6 @@ exceptions:
+     strategy: >
+       Irreducible — closed error taxonomy, wildcard arms are forbidden.
+ 
+-  - path: "crates/cp-oplog/src/service.rs"
+-    match: "durability policy is a closed binary set"
+-    reason: >
+-      Durability is a closed Durable/BestEffort set constructed by Durability::of and matched
+-      exhaustively by commit routing; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — a binary outcome gains nothing from non_exhaustive.
+-
+-  - path: "crates/cp-oplog/src/service.rs"
+-    match: "best-effort outcome is a closed binary set"
+-    reason: >
+-      BestEffortOutcome is a closed Submitted/Dropped set returned cross-crate and matched
+-      exhaustively by callers; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — a binary outcome gains nothing from non_exhaustive.
+-
+   # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
+ 
+   - path: "crates/cp-mod-bridge/src/error.rs"
+# --- End entry #59 ---
