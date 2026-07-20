@@ -13,7 +13,7 @@ use fs2::FileExt as _;
 use crate::types::VaultError;
 
 /// Path to the global environment file: `~/.context-pilot/.env`.
-pub(crate) fn global_env_path() -> Option<PathBuf> {
+fn global_env_path() -> Option<PathBuf> {
     std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".context-pilot").join(".env"))
 }
 

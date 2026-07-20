@@ -5959,3 +5959,27 @@ index 3489ba00..1996939f 100644
  
    - path: "crates/cp-base/src/cast/mod.rs"
 # --- End entry #47 ---
+48:26bead20924d59b86dfa04e963a0af36e40444236cbc209a6835f341a02f904a:3614dda0983d6f7afb2b16866c16e4d1c13fdd0c0efd980a0e4ed7c688d73b44:1888a68cbdc6ed6bbdeee313eb6d5e43e3139a5c13e675c8b9a5aa68bbe966f1
+# --- Diff for entry #48 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 2efa8642..c92accd0 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -841,6 +841,16 @@ redundant_iter_cloned = "forbid"
+ redundant_locals = "forbid"
+ redundant_pattern = "forbid"
+ redundant_pattern_matching = "forbid"
++# redundant_pub_crate and unreachable_pub (rust table, forbid) are mutually
++# exclusive restriction lints. For any item inside a private module:
++# `pub(crate)` trips redundant_pub_crate ("pub(crate) inside private module",
++# wants `pub`), while `pub` trips unreachable_pub ("unreachable pub item", wants
++# `pub(crate)`). Both cannot hold. unreachable_pub is the more valuable of the
++# pair — it catches accidental over-exposure of the crate's API surface — so it
++# stays forbid and redundant_pub_crate stays at its default allow. Genuinely
++# redundant pub(crate) items (only used within their own module) are dropped to
++# private by hand instead, satisfying both lints.
++redundant_pub_crate = "allow"
+ redundant_slicing = "forbid"
+ redundant_static_lifetimes = "forbid"
+ redundant_test_prefix = "forbid"
+# --- End entry #48 ---
