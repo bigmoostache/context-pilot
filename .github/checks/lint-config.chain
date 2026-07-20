@@ -6702,3 +6702,25 @@ index c49a623f..ab58762d 100644
    # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
  
 # --- End entry #62 ---
+63:8da63e393e76d5eba22b1b0558a88fb6d270eee817fe403d6d1cd0e2b64c3983:5e0282cdb889c562ad4056ab284d2ea66eddf94f25ea2d5519ab0656ea212ce9:c6e1825bc9e79e876b79208e1443aff691f9b4d571ab875f941747e49d94fa2c
+# --- Diff for entry #63 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index ab58762d..eb67cc06 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -392,14 +392,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/panels.rs"
+-    match: "cache-update protocol"
+-    reason: >
+-      CacheUpdate is constructed by every module's refresh_cache and matched exhaustively
+-      by the apply loop; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/panels.rs"
+     match: "watch-spec contract"
+     reason: >
+# --- End entry #63 ---

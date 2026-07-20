@@ -75,10 +75,7 @@ pub const fn scroll_key_action(key: &KeyEvent) -> Option<Action> {
 // =============================================================================
 
 /// Result of a background cache operation
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "cache-update protocol: CacheUpdate is constructed by every module's refresh_cache and matched exhaustively by the apply loop; the variant set is closed and #[non_exhaustive] would forbid that cross-crate construction"
-)]
+#[non_exhaustive]
 pub enum CacheUpdate {
     /// Generic content update (used by File, Tree, Glob, Grep, Tmux, `GitResult`, `GithubResult`)
     Content {

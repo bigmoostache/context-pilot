@@ -33,29 +33,30 @@ impl Panel for GitResultPanel {
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {
-        match update {
-            CacheUpdate::Content { content, token_count, .. } => {
-                ctx.cached_content = Some(content);
-                ctx.full_token_count = token_count;
-                ctx.total_pages = compute_total_pages(token_count);
-                ctx.current_page = 0;
-                if ctx.total_pages > 1 {
-                    let page_content = paginate_content(
-                        ctx.cached_content.as_deref().unwrap_or(""),
-                        ctx.current_page,
-                        ctx.total_pages,
-                        &ctx.page_descriptions,
-                    );
-                    ctx.token_count = estimate_tokens(&page_content);
-                } else {
-                    ctx.token_count = token_count;
-                }
-                ctx.cache_deprecated = false;
-                let content_ref = ctx.cached_content.clone().unwrap_or_default();
-                let _changed = update_if_changed(ctx, &content_ref);
-                true
+        // Only a Content update carries new bytes; Unchanged/ModuleSpecific are no-ops.
+        // `if let` (not an exhaustive match) so CacheUpdate can stay #[non_exhaustive].
+        if let CacheUpdate::Content { content, token_count, .. } = update {
+            ctx.cached_content = Some(content);
+            ctx.full_token_count = token_count;
+            ctx.total_pages = compute_total_pages(token_count);
+            ctx.current_page = 0;
+            if ctx.total_pages > 1 {
+                let page_content = paginate_content(
+                    ctx.cached_content.as_deref().unwrap_or(""),
+                    ctx.current_page,
+                    ctx.total_pages,
+                    &ctx.page_descriptions,
+                );
+                ctx.token_count = estimate_tokens(&page_content);
+            } else {
+                ctx.token_count = token_count;
             }
-            CacheUpdate::Unchanged { .. } | CacheUpdate::ModuleSpecific { .. } => false,
+            ctx.cache_deprecated = false;
+            let content_ref = ctx.cached_content.clone().unwrap_or_default();
+            let _changed = update_if_changed(ctx, &content_ref);
+            true
+        } else {
+            false
         }
     }
 
