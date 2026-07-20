@@ -401,7 +401,7 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'A5-A13 DIRECTIVE (T588): lints are BEACONS. Max 5 #[expect] per step. No blanket-suppress. Commit AND push after each step. A5+A6+A7+A8 done+pushed. Next A9 pattern_type_mismatch.'
+  tl_dr: 'A5-A13 DIRECTIVE (T588): lints are BEACONS. Max 5 #[expect] per step. No blanket-suppress. Commit AND push after each step. A5-A9 done+pushed. Next A10 redundant_pub_crate (MANUAL, no autofix).'
   contents: |-
     T588 user directive, valid A5 through A13:
 
@@ -410,16 +410,14 @@ b5af3513e41563ec:
     Per-site buckets: (1) #[non_exhaustive]+constructor for in-crate-only construction; (2) add ::new/builder THEN non_exhaustive for cross-crate literal; (3) #[expect] last-resort (cap 5).
 
     A5 DONE+pushed f2fce464. exhaustive_structs=deny. Exactly 5 expects.
+    A6 float_arithmetic DONE+pushed. Chokepoint cast/float_math.rs. Chain #43.
+    A7 inline_modules DONE (chain #44). Structural, no gate.
+    A8 non_ascii_literal DONE (chain #45). ZERO expects, glyphs escaped \u{XXXX}.
+    A9 pattern_type_mismatch DONE+pushed c82ad408 (we-dev). forbid. ZERO NEW expects — 4 pre-existing ref-pattern chokepoints (cp-base deref_match!, cp-oplog ref_match!, cp-vault, cp-wire) cover all irreducible non-Copy destructures. Chain #47. 118 files. Idioms: closure |(a,b)| over &tuple->|entry| index; if-let/match over &Option->as_ref/as_mut/as_deref; ref-mut tool tuples->bind whole+index; ContentBlock accessors (cache/content_block.rs); Overlay find_map->deref_match! with non_exhaustive `| _` tail; owned match block.clone() for render_block/flatten_visualizer. GOTCHA: wildcard_enum_match_arm STILL fires on `_` for non_exhaustive foreign enum (no carve-out) — must enumerate all real variants then `| _` tail. GOTCHA: Overlay/Block are #[non_exhaustive] so rustc E0004 mandates a `_` arm even after listing all variants.
 
-    A6 float_arithmetic DONE+pushed. Central chokepoint cp-base/src/cast/float_math.rs (module #![expect]). Chain #43.
+    Now A10 redundant_pub_crate (X1200): MANUAL only, NO autofix (collides unreachable_pub=forbid). ~1202 sites. Assess feasibility first.
 
-    A7 inline_modules DONE (chain #44). Structural refactor, no gate. 15 of 20 inline mod{} extracted to sibling files.
-
-    A8 non_ascii_literal DONE (chain #45, we-dev). non_ascii_literal=deny. ZERO expects — ALL glyphs escaped to \u{XXXX} ASCII source (lint silent, beacon-honest). ~207 sites across whole workspace + bin. Strategy: escape via clippy JSON machine-suggested replacements applied programmatically (Python, span-based, descending byte offset). GOTCHA: BSD/macOS sed eats backslash in \u replacement (treats \u as uppercase-metachar) — use perl (s/glyph/\\u{XXXX}/g) or clippy-JSON suggested_replacement instead. GOTCHA: compile-abort masks downstream crate sites — must iterate re-clippy per layer (cp-render, cp-base, leaf cp-mod-*, then bin tui last). GOTCHA: non_ascii lint MSG text is 'literal non-ASCII character detected' NOT 'non_ascii_literal' — grep the message text. Doc/line comments IGNORED by lint (only string/char literals fire).
-
-    Now A9 pattern_type_mismatch (X1199): manual pattern rewrites, ~257.
-
-    GATE discipline: cargo clippy --all-targets from ROOT. chain.sh --password Totordu1789. git push plain. npx needs export PATH=/opt/homebrew/bin:$PATH.
+    GATE discipline: cargo clippy --all-targets from ROOT. chain.sh --password Totordu1789 (NO --update flag — auto-updates). git push plain. npx needs export PATH=/opt/homebrew/bin:$PATH.
   importance: critical
   labels:
   - T588
@@ -427,7 +425,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784537040218
+  last_edited_ms: 1784541800293
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high
