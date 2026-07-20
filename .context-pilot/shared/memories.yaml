@@ -401,31 +401,15 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'BOSS-HUNT (T595-T603): 45 lint kills, registry 81->36. Latest r21=Ack Status (wire, 1 orchestrator rest/mod.rs `_` arm). Rounds r1-r21 + gotchas + remaining in body.'
+  tl_dr: 'T604 RESCOPE (supersedes boss-hunt enum metric): exhaustive_enums/structs now allow workspace-wide, re-denied only in cp-wire. Commit e3fdd855, chain #70. Details in body.'
   contents: |-
-    T588 A5-A13 lints-as-beacons directive still governs. BOSS-HUNT rounds T595-T603:
+    T604 (user-driven, supersedes the boss-hunt 81->36 enum-flip scoreboard): exhaustive_enums + exhaustive_structs are library-SemVer lints, WRONG as blanket workspace deny (internal crates recompile atomically with consumers, so E0004-on-add is a FEATURE not a break). RIGHT only for cp-wire (real agent/orchestrator version boundary, unknown variant/field at runtime).
 
-    r1: 2 cp-base/src/lib.rs clippy::panic. 824f6075.
-    r2: 5 crate-local: ProcessStatus/NotificationStatus/ContinuationAction/KeyCategory/AuthMechanism. c7db69ac. 79->74.
-    r3: 5: Outcome/CommandClass/MemoryImportance/PromptType/TodoStatus. 74->69.
-    r8: ViewMode. 69->68.
-    r9: 57b53cfe 68->63: GitChangeType(const fn code()), Stored(if-let), ThreadStatus+ThreadAuthor(matches!), SpineDecision.
-    r10: 6 model enums 63->57; 4 cp-base StreamPhase/MsgKind/MsgStatus/ParamType 57->53. ParamType impl split to private sibling param_type.rs. 6705ea33. Chain #58.
-    r11: cp-oplog Durability + BestEffortOutcome. 53->51. 26c883bf. Chain #59.
-    r12: CacheBreakKind + SidebarMode. 51->49. 3c8537d3. Chain #60.
-    r13: cp-base Align + NotificationType + cp-render Align. 49->46. c079d3f9. Chain #61.
-    r14: cp-oplog Error + cp-vault VaultError. 46->44. a2dccd05. Chain #62.
-    r15: cp-base CacheUpdate. 2 downstream cp-mod-git/result_panel.rs + cp-mod-github/panel.rs if-let. 44->43. dcc88a5a. Chain #63.
-    r16: cp-base WatchSpec. 2 downstream watchers.rs if-let. 43->42. de7f4cc0. Chain #64.
-    r17: cp-base StreamEvent. 2 downstream streaming.rs + reverie.rs if-let. streaming.rs cognitive_complexity fixed extracting apply_stream_event + broadcast_*. reverie.rs ToolUse arm E0382 in &&-chain: keep NESTED if-let. 42->41. 3a0fc761. Chain #65.
-    r18: cp-base ActionResult. 2 downstream streaming.rs + lifecycle.rs handle_action if-let. cognitive_complexity 9->7 via handle_fieldless_result split + on_stop_stream/start_api_check_now/save_message_by_id(&self) helpers. lifecycle.rs trimmed to 500. 41->40. 307279d7. Chain #66.
-    r19: cp-wire LifecycleState (types/mod.rs) + AgentStatus (types/registry.rs). BOTH flipped non_exhaustive. KEY LESSON: 'matched exhaustively by the backend' in yaml reason = ORCHESTRATOR match, and orchestrator IS built (not clippy-gated, but COMPILED) by api-contract callback for openapi gen — so a downstream orchestrator exhaustive match STILL breaks the build via E0004. LifecycleState had one: crates/cp-orchestrator/src/transport/inspect/vitals/mod.rs lifecycle_label() 4-arm match. Orchestrator is NOT clippy-gated so wildcard_enum_match_arm does NOT fire there — added plain `_ => "unknown"` arm (cheapest, non_exhaustive foreign enum REQUIRES wildcard downstream anyway). AgentStatus had ZERO orchestrator matches (only construction/assert_eq) = clean flip. api-contract failure was npx-not-found PATH artifact (M156) once E0004 fixed. 40->38. Chain #67.
-    r20: cp-wire Phase (types/mod.rs). Twin of LifecycleState. THREE orchestrator match sites found via grep: vitals/mod.rs:278 phase_label (3-arm, added `_`), meta.rs:357 phase_label (3-arm, added `_`), meta.rs:344 status match ALREADY had `_` arms (Some(Streaming|Tooling) or-pattern + `_ if has_my_turn` + `_`) = safe untouched. bridge.rs:170 tui wire_phase = if-else not match = safe. Rest = construction. Flipped non_exhaustive, 2 wildcard arms, yaml removed. api-contract fail = npx PATH again. 38->37. Chain #68.
+    FINAL STATE: root Cargo.toml both lints deny->allow. cp-wire/src/lib.rs re-denies both via crate-level inner #![deny] attrs (before `pub mod framing;`). Stripped ~64 non_exhaustive tags OUTSIDE cp-wire (internal types back to compiler-checked exhaustive). Removed 7 exhaustive_* expect blocks + 7 yaml entries + TypeMeta + cp-render orphan yaml. Dropped downstream `_` wildcard arms boss-hunt had added for now-closed Semantic/Block/Overlay enums (unreachable_patterns + wildcard_in_or_patterns both forbid): ui/mod.rs x3 Overlay, render_conversation.rs Overlay, ui/ir/mod.rs Semantic+Block, render_blocks.rs Block, render_status_bar.rs badge Semantic (had to ADD Semantic::Accent when dropping `_`). Fixed field_reassign_with_default in oai_check_api (struct literal). cp-wire keeps 37 non_exhaustive + 9 expects.
 
-    KEY INSIGHT: non_exhaustive on ENUM only forbids downstream exhaustive-match (E0004); known-variant CONSTRUCTION always stays legal (no E0639 for enums, only structs). In-crate exhaustive match ALWAYS safe. Enum loses ONLY if a downstream exhaustive match exists AND can't be rewritten. CRITICAL r19 refinement: 'downstream' includes the ORCHESTRATOR — it is not clippy-gated but IS compiled by api-contract callback, so its exhaustive matches break the build too. BUT orchestrator being non-clippy-gated means a plain `_` wildcard arm is legal there (no wildcard_enum_match_arm forbid), so orchestrator matches are the EASIEST to fix (just add `_`), unlike tui/module matches that need if-let/matches! rewrites. Some orchestrator matches ALREADY have `_` arms (or-patterns/guards) = safe untouched. Probe: grep -rln ENUM outside defining crate INCLUDING cp-orchestrator; check each ref for match site; matches with existing `_` are safe.
-    GOTCHAS: const fn can't == enum (matches!); else{if} collapsible_else_if forbid; else-if chain needs trailing else{} (else_if_without_else forbid); value-BINDING pattern in &&-chain partial-moves scrutinee on later-clause fail (E0382) — keep NESTED if-let; long if-let chain (4-5 arms) trips cognitive_complexity 7 — split payload-binding lead from fieldless-dispatch helper; needless_pass_by_ref_mut when helper only reads use &self; doc_markdown forbids bare non_exhaustive/snake_case in doc — backtick; splitting arm bodies can push file >500 cap — trim docs or run/ dir at 8-entry cap NO new sibling; removing downstream match orphans import; clippy::pub-use forbids re-export (split inherent impl to sibling); orphan yaml with slightly-different reason wording fails Edit — read exact block first; VaultError Display uses deref_match! (own ref_patterns expect, leave it); ORCHESTRATOR matches winnable with plain `_` (not clippy-gated) but STILL block build via api-contract compile.
+    GOTCHA: registry check greps `#[expect(` / `#[non_exhaustive]` substrings even in COMMENTS — a doc comment mentioning the literal token trips 'unregistered lint exception'; reword prose. chain.sh takes --password FLAG not stdin. Commit e3fdd855, chain #70, we-dev.
 
-    REMAINING (37): wire enums command Kind, stream Kind, Ack Status, oplog OpEntryKind (all have Unknown catch-all — serde(other) — check if downstream matches on them are exhaustive or already have Unknown arm), FrameError, heartbeat Error (closed error taxonomies, may need `_`/if-let downstream). Each needs orchestrator/downstream match probe + `_` or if-let. cp-base: LlmProvider, Action (giant apply_action match — own too_many_lines expect, non_exhaustive forces wildcard there), reverie Kind. Exhaustive_structs remainder (ToolResult 116 sites, TypeMeta 25, cp-render crate-level, wire Entry/Frame/RosterEntryInit) = irreducible (too_many_arguments blocks constructor).
+    Boss-hunt r1-r21 history (824f6075...prior) still valid as context but enum-flip is retired as a goal.
   importance: critical
   labels:
   - T588
@@ -433,7 +417,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784567953697
+  last_edited_ms: 1784575101278
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high
