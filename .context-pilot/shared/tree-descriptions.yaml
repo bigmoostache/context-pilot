@@ -90,6 +90,10 @@
   path: .git/index
   description: Git index (binary). Not source.
   last_edited_ms: 0
+017d9e0866235457:
+  path: crates/cp-base/src/state/data/config.rs
+  description: 'Shared/WorkerState/PanelData serde structs. ViewMode enum #[non_exhaustive] (boss-hunt r8 WIN #13 — sole downstream exhaustive match at src/ui/ir/sidebar.rs rewritten to if/== so non_exhaustive holds; serde(other) on Normal for N-1).'
+  last_edited_ms: 1784561933926
 017ef8213f00286d:
   path: .gitignore
   description: Git ignore rules. Includes *.sourced_pdf, .uploads, bridge runtime artifacts, harbor outputs, mitmproxy captures, .DS_Store, docs/slides build artifacts. devis-attali-context-pilot.md added after security incident. .context-pilot/* blocks messages/ (116K conversation YAMLs) from accidental commit.
@@ -13318,6 +13322,10 @@ b06fd3473859545f:
   path: src/ui/perf/mod.rs
   description: 'In-memory perf system. A9: snapshot op closure |entry| destructure (name/total_us/recent). A6 float_math routed (CPU%/frame/mem/mean/variance). LazyLock PerfMetrics, RingBuffer, F12.'
   last_edited_ms: 0
+b098c3e1b5f0a6a4:
+  path: src/ui/ir/sidebar.rs
+  description: 'build_sidebar. ViewMode match rewritten to `if view_mode==Threads {Hidden} else {Normal}` (boss-hunt r8) so ViewMode could take #[non_exhaustive].'
+  last_edited_ms: 1784561934014
 b09d3f648d35d051:
   path: .git/index
   description: Git index (binary). Not source.

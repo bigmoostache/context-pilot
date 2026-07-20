@@ -401,9 +401,9 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'BOSS-HUNT (T595/T596): r1=2 wins (clippy::panic->assert!), r2=5 wins + r3=5 wins (exhaustive_enums->non_exhaustive on crate-local enums). Registry 79->69. chain #55. Details in body.'
+  tl_dr: 'BOSS-HUNT (T595-T603): 13 total lint kills. r1=2 clippy::panic. r2=5 + r3=5 exhaustive_enums->non_exhaustive (crate-local enums). r8=1 ViewMode (downstream-match rewrite). Registry 81->68. Details in body.'
   contents: |-
-    T588 A5-A13 lints-as-beacons directive still governs. BOSS-HUNT rounds on T595/T596:
+    T588 A5-A13 lints-as-beacons directive still governs. BOSS-HUNT rounds T595-T603:
 
     r1: 2 wins cp-base/src/lib.rs clippy::panic (panic!->assert!). Commit 824f6075.
 
@@ -411,11 +411,11 @@ b5af3513e41563ec:
 
     r3: 5 more wins same technique: Outcome (cp-mod-bridge/tee), CommandClass (cp-mod-github/classify), MemoryImportance (cp-mod-memory), PromptType (cp-mod-prompt), TodoStatus (cp-mod-todo). Registry 74->69. chain #55.
 
-    r3 LOSERS (reverted, IRREDUCIBLE): SpineDecision, ThreadStatus, ThreadAuthor, Stored, GitChangeType. All matched exhaustively in tui bin src/ (downstream crate) - root gate `cargo clippy --all-targets` shows E0004, non_exhaustive forces wildcard = wildcard_enum_match_arm (forbid).
+    r8 (T603 'You've gone lazy?'): WIN #13 ViewMode (cp-base/state/data/config.rs). KEY BREAKTHROUGH: a downstream-exhaustive-matched enum CAN take #[non_exhaustive] if you rewrite the match site to NOT need exhaustiveness. ViewMode had exactly ONE exhaustive match (src/ui/ir/sidebar.rs:44-45); rewrote it as `if view_mode==Threads {Hidden} else {Normal}` (== works, ViewMode: PartialEq). All other sites are == comparisons or .next() in-crate. non_exhaustive on ENUM does NOT block downstream construction of known variants (only STRUCTS block construction) - only blocks exhaustive match. Root clippy --all-targets clean, 0 E0004/E0639. Registry 69->68. chain re-append.
 
-    KEY INSIGHT: non_exhaustive only forbids construction/match in DOWNSTREAM crates. Crate-local + downstream-reads-only enums convert clean; downstream-exhaustive-match enums lose. Arbiter: root `cargo clippy --all-targets` E0004/E0639 count (covers all src/ consumers) + per-crate for cross-crate consumers. cargo clippy --workspace floods 1298 pre-existing orchestrator/console-server errors (M157, out of gate scope).
+    COROLLARY: r3 losers (SpineDecision/ThreadStatus/ThreadAuthor/Stored/GitChangeType) may now be BEATABLE via same match-rewrite technique - reassess before declaring irreducible. Each needs its downstream exhaustive match rewritten to if/== or a meaningful catch-all.
 
-    BestEffortOutcome (cp-oplog) also lost r2 (matched by tests/ integration target).
+    KEY INSIGHT: non_exhaustive only forbids exhaustive-match (E0004) + struct-construction (E0639) in DOWNSTREAM crates. Enum known-variant construction still allowed downstream. So an enum loses ONLY if a downstream exhaustive match can't be rewritten. Arbiter: root `cargo clippy --all-targets` E0004/E0639 count. cargo clippy --workspace floods 1298 pre-existing orchestrator errors (M157, out of gate scope).
   importance: critical
   labels:
   - T588
@@ -423,7 +423,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784561403072
+  last_edited_ms: 1784561927304
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high

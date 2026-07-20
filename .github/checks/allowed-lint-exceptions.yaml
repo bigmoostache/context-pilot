@@ -494,14 +494,6 @@ exceptions:
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
-  - path: "crates/cp-base/src/state/data/config.rs"
-    match: "view-mode contract"
-    reason: >
-      ViewMode already carries #[serde(other)] on Normal for forward-compat and is constructed
-      cross-crate; non_exhaustive adds nothing and forbids that construction.
-    strategy: >
-      Irreducible — the serde(other) variant already provides forward-compat.
-
   - path: "crates/cp-base/src/state/data/message.rs"
     match: "message-shape discriminator"
     reason: >

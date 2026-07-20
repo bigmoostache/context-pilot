@@ -6339,3 +6339,25 @@ index 09b96315..c8de17ce 100644
      match: "spine-decision contract"
      reason: >
 # --- End entry #55 ---
+56:0eebc92838928c52a03181e503fdbfe99eb4aaf7d223483a888e6f7788c2f13b:5c0b550e189fd17a1407d026c5e99a00f0bec29df3861d4535a6411a40472717:7d89ed865962fb0dc8f1d87a246a7b6e202a46f37df8c1bbc1c62cdf16a8d210
+# --- Diff for entry #56 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c8de17ce..de04410b 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -494,14 +494,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/state/data/config.rs"
+-    match: "view-mode contract"
+-    reason: >
+-      ViewMode already carries #[serde(other)] on Normal for forward-compat and is constructed
+-      cross-crate; non_exhaustive adds nothing and forbids that construction.
+-    strategy: >
+-      Irreducible — the serde(other) variant already provides forward-compat.
+-
+   - path: "crates/cp-base/src/state/data/message.rs"
+     match: "message-shape discriminator"
+     reason: >
+# --- End entry #56 ---

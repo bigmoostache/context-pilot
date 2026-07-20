@@ -40,9 +40,10 @@ fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String> {
 /// Build the sidebar region from application state.
 #[must_use]
 pub(crate) fn build_sidebar(state: &State) -> Sidebar {
-    let mode = match state.view_mode {
-        cp_base::state::data::config::ViewMode::Normal => SidebarMode::Normal,
-        cp_base::state::data::config::ViewMode::Threads => SidebarMode::Hidden,
+    let mode = if state.view_mode == cp_base::state::data::config::ViewMode::Threads {
+        SidebarMode::Hidden
+    } else {
+        SidebarMode::Normal
     };
 
     if matches!(mode, SidebarMode::Hidden) {
