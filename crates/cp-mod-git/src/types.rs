@@ -6,7 +6,7 @@ use cp_base::state::runtime::State;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[expect(
     clippy::exhaustive_enums,
-    reason = "git-change taxonomy: GitChangeType is a closed set constructed cross-crate by the status parser and matched exhaustively by the diff renderer; #[non_exhaustive] would forbid that construction"
+    reason = "git-change taxonomy: GitChangeType is a closed set constructed by the status parser and matched exhaustively cross-crate by the tui diff renderer (src/modules/overview/blocks.rs); #[non_exhaustive] would force a wildcard arm there that the forbidden wildcard_enum_match_arm lint rejects"
 )]
 pub enum GitChangeType {
     /// Content modified.

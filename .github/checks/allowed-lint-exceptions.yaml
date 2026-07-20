@@ -586,27 +586,11 @@ exceptions:
 
   # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
 
-  - path: "crates/cp-mod-github/src/classify/mod.rs"
-    match: "command-class contract"
-    reason: >
-      CommandClass is a closed ReadOnly/Mutating set returned by classify() and matched
-      exhaustively by the executor; non_exhaustive adds nothing to a binary outcome.
-    strategy: >
-      Irreducible — a binary outcome gains nothing from non_exhaustive.
-
   - path: "crates/cp-mod-git/src/types.rs"
     match: "git-change taxonomy"
     reason: >
       GitChangeType is a closed set constructed cross-crate by the status parser and matched
       exhaustively by the diff renderer; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-mod-todo/src/types.rs"
-    match: "todo-status contract"
-    reason: >
-      TodoStatus is a closed Pending/InProgress/Done set serde-persisted and constructed
-      cross-crate, matched exhaustively by icon()/FromStr; non_exhaustive would forbid it.
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
@@ -625,30 +609,6 @@ exceptions:
       matched exhaustively by callers; non_exhaustive would force forbidden wildcard arms.
     strategy: >
       Irreducible — closed error taxonomy, wildcard arms are forbidden.
-
-  - path: "crates/cp-mod-bridge/src/tee.rs"
-    match: "tee-outcome contract"
-    reason: >
-      Outcome is a closed Published/Dropped binary set returned by Tee::publish and matched
-      exhaustively by callers; non_exhaustive adds nothing to a binary outcome.
-    strategy: >
-      Irreducible — a binary outcome gains nothing from non_exhaustive.
-
-  - path: "crates/cp-mod-prompt/src/types.rs"
-    match: "prompt-kind contract"
-    reason: >
-      PromptType is a closed Agent/Skill/Command set serde-persisted and constructed cross-crate,
-      matched exhaustively by Display/dir_for; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-mod-memory/src/types.rs"
-    match: "importance contract"
-    reason: >
-      MemoryImportance is a closed Low/Medium/High/Critical set serde-persisted and constructed
-      cross-crate, matched exhaustively by as_str()/FromStr; non_exhaustive would forbid it.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
   - path: "crates/cp-mod-spine/src/engine.rs"
     match: "spine-decision contract"

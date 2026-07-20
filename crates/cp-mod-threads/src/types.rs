@@ -10,7 +10,7 @@ use cp_base::state::runtime::State;
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[expect(
     clippy::exhaustive_enums,
-    reason = "thread-turn contract: ThreadStatus is a closed MyTurn/TheirTurn set constructed cross-crate and matched exhaustively by the bridge and threads view; #[non_exhaustive] would force cross-crate wildcard arms the forbidden wildcard_enum_match_arm lint rejects"
+    reason = "thread-turn contract: ThreadStatus is a closed MyTurn/TheirTurn set matched exhaustively cross-crate by the tui bridge and threads view (src/app/run/threads, src/ui/threads_view); #[non_exhaustive] would force wildcard arms there that the forbidden wildcard_enum_match_arm lint rejects"
 )]
 pub enum ThreadStatus {
     /// The AI's turn — thread has user input awaiting response.
@@ -33,7 +33,7 @@ impl std::fmt::Display for ThreadStatus {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[expect(
     clippy::exhaustive_enums,
-    reason = "thread-author contract: ThreadAuthor is a closed User/Assistant set constructed cross-crate and matched exhaustively by the message renderer; #[non_exhaustive] would force cross-crate wildcard arms the forbidden wildcard_enum_match_arm lint rejects"
+    reason = "thread-author contract: ThreadAuthor is a closed User/Assistant set matched exhaustively cross-crate by the tui message renderer (src/app/run/threads/messages.rs, src/ui/threads_view/messages.rs); #[non_exhaustive] would force wildcard arms there that the forbidden wildcard_enum_match_arm lint rejects"
 )]
 pub enum ThreadAuthor {
     /// Message from the human user.

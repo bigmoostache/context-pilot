@@ -401,19 +401,21 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'BOSS-HUNT (T595): r1=2 wins (clippy::panic->assert!), r2=5 wins (exhaustive_enums->non_exhaustive on crate-local enums). Registry 79->74. chain #54. Details in body.'
+  tl_dr: 'BOSS-HUNT (T595/T596): r1=2 wins (clippy::panic->assert!), r2=5 wins + r3=5 wins (exhaustive_enums->non_exhaustive on crate-local enums). Registry 79->69. chain #55. Details in body.'
   contents: |-
-    T588 A5-A13 lints-as-beacons directive still governs. BOSS-HUNT rounds on T595:
+    T588 A5-A13 lints-as-beacons directive still governs. BOSS-HUNT rounds on T595/T596:
 
-    r1: 2 wins in cp-base/src/lib.rs, both clippy::panic (panic!("...{e}") -> assert!(x.is_ok(), "...{:?}", err())). 3 reverted irreducible (cp-wire as_conversions blocked by little_endian_bytes forbid). Commit 824f6075.
+    r1: 2 wins cp-base/src/lib.rs clippy::panic (panic!->assert!). Commit 824f6075.
 
-    r2: 5 wins converting #[expect(clippy::exhaustive_enums)] -> #[non_exhaustive] on CRATE-LOCAL enums: ProcessStatus (cp-mod-console), NotificationStatus + ContinuationAction (cp-mod-spine), KeyCategory + AuthMechanism (cp-vault). All exit 0 per-crate clippy.
+    r2: 5 wins exhaustive_enums->non_exhaustive on crate-local enums: ProcessStatus (cp-mod-console), NotificationStatus + ContinuationAction (cp-mod-spine), KeyCategory + AuthMechanism (cp-vault). Commit c7db69ac. Registry 79->74.
 
-    KEY INSIGHT: non_exhaustive only forbids construction/match in DOWNSTREAM crates. Crate-local enums (constructed+matched only within their own crate) convert clean. The 53 exhaustive_enums entries had rote copy-paste reasons claiming cross-crate; never per-enum verified. Grep+per-crate-compile arbitrates truth.
+    r3: 5 more wins same technique: Outcome (cp-mod-bridge/tee), CommandClass (cp-mod-github/classify), MemoryImportance (cp-mod-memory), PromptType (cp-mod-prompt), TodoStatus (cp-mod-todo). Registry 74->69. chain #55.
 
-    BestEffortOutcome (cp-oplog) LOST: matched exhaustively by tests/service_group_commit.rs:145 (integration target = separate downstream crate), non_exhaustive forces wildcard = wildcard_enum_match_arm (forbid). Reverted with updated reason.
+    r3 LOSERS (reverted, IRREDUCIBLE): SpineDecision, ThreadStatus, ThreadAuthor, Stored, GitChangeType. All matched exhaustively in tui bin src/ (downstream crate) - root gate `cargo clippy --all-targets` shows E0004, non_exhaustive forces wildcard = wildcard_enum_match_arm (forbid).
 
-    GATE: cargo clippy --workspace floods 1298 pre-existing orchestrator/console-server errors (M157, out of CI gate scope). Use per-crate clippy -p X --lib OR root cargo clippy --all-targets. Registry 79->74. chain #54.
+    KEY INSIGHT: non_exhaustive only forbids construction/match in DOWNSTREAM crates. Crate-local + downstream-reads-only enums convert clean; downstream-exhaustive-match enums lose. Arbiter: root `cargo clippy --all-targets` E0004/E0639 count (covers all src/ consumers) + per-crate for cross-crate consumers. cargo clippy --workspace floods 1298 pre-existing orchestrator/console-server errors (M157, out of gate scope).
+
+    BestEffortOutcome (cp-oplog) also lost r2 (matched by tests/ integration target).
   importance: critical
   labels:
   - T588
@@ -421,7 +423,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784561048734
+  last_edited_ms: 1784561403072
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high

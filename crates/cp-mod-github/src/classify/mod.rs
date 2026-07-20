@@ -2,10 +2,7 @@
 
 /// Whether a `gh` subcommand reads or mutates state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "command-class contract: CommandClass is a closed ReadOnly/Mutating set constructed by classify() and matched exhaustively by the executor; #[non_exhaustive] adds nothing to a binary outcome"
-)]
+#[non_exhaustive]
 pub enum CommandClass {
     /// Safe to auto-refresh in a panel (e.g., `gh pr list`).
     ReadOnly,

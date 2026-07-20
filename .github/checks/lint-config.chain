@@ -6271,3 +6271,71 @@ index 8ce64176..09b96315 100644
      match: "thread-turn contract: ThreadStatus is a closed MyTurn/TheirTurn set"
      reason: >
 # --- End entry #54 ---
+55:19f1635885c70e4b9a7cf0a112ef748c1701d6a94ddf1fe4cac6984889ed8719:3f6e8d6c106d424e0f2b5b9b8259adcfd1ea9279d4cc48f370971ac38977579f:0eebc92838928c52a03181e503fdbfe99eb4aaf7d223483a888e6f7788c2f13b
+# --- Diff for entry #55 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 09b96315..c8de17ce 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -586,14 +586,6 @@ exceptions:
+ 
+   # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
+ 
+-  - path: "crates/cp-mod-github/src/classify/mod.rs"
+-    match: "command-class contract"
+-    reason: >
+-      CommandClass is a closed ReadOnly/Mutating set returned by classify() and matched
+-      exhaustively by the executor; non_exhaustive adds nothing to a binary outcome.
+-    strategy: >
+-      Irreducible — a binary outcome gains nothing from non_exhaustive.
+-
+   - path: "crates/cp-mod-git/src/types.rs"
+     match: "git-change taxonomy"
+     reason: >
+@@ -602,14 +594,6 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-mod-todo/src/types.rs"
+-    match: "todo-status contract"
+-    reason: >
+-      TodoStatus is a closed Pending/InProgress/Done set serde-persisted and constructed
+-      cross-crate, matched exhaustively by icon()/FromStr; non_exhaustive would forbid it.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-mod-bridge/src/body.rs"
+     match: "body-disposition contract"
+     reason: >
+@@ -626,30 +610,6 @@ exceptions:
+     strategy: >
+       Irreducible — closed error taxonomy, wildcard arms are forbidden.
+ 
+-  - path: "crates/cp-mod-bridge/src/tee.rs"
+-    match: "tee-outcome contract"
+-    reason: >
+-      Outcome is a closed Published/Dropped binary set returned by Tee::publish and matched
+-      exhaustively by callers; non_exhaustive adds nothing to a binary outcome.
+-    strategy: >
+-      Irreducible — a binary outcome gains nothing from non_exhaustive.
+-
+-  - path: "crates/cp-mod-prompt/src/types.rs"
+-    match: "prompt-kind contract"
+-    reason: >
+-      PromptType is a closed Agent/Skill/Command set serde-persisted and constructed cross-crate,
+-      matched exhaustively by Display/dir_for; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+-  - path: "crates/cp-mod-memory/src/types.rs"
+-    match: "importance contract"
+-    reason: >
+-      MemoryImportance is a closed Low/Medium/High/Critical set serde-persisted and constructed
+-      cross-crate, matched exhaustively by as_str()/FromStr; non_exhaustive would forbid it.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-mod-spine/src/engine.rs"
+     match: "spine-decision contract"
+     reason: >
+# --- End entry #55 ---

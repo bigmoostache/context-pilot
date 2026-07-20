@@ -1286,6 +1286,10 @@
   path: src/app/actions/cursor.rs
   description: Cursor movement, text editing, selection management, command expansion. Selection helpers (delete/clear/extend). Sentinel detection + skip. Single-char and word movement with selection variants. handle_command_expansion, handle_input_backspace, handle_delete_word_left.
   last_edited_ms: 0
+111b9491a07f9b61:
+  path: crates/cp-mod-memory/src/types.rs
+  description: 'MemoryItem/MemoryState. MemoryImportance enum #[non_exhaustive] (boss-hunt r3 win — matched only in-crate as_str/FromStr, downstream reads only).'
+  last_edited_ms: 1784561389182
 1125f87ce79548a3:
   path: crates/cp-mod-search/src/index/logsync.rs
   description: 'sync_logs_to_meilisearch: pushes all logs-module entries into per-project logs index (upsert, fire-and-forget). Called from load_module_data + after log_create/Close_conversation_history.'
@@ -3158,6 +3162,10 @@
   path: crates/cp-orchestrator/src/transport/rest/create.rs
   description: 'POST /api/fleet/create + POST /api/agent/{id}/library/command handlers. create_agent: parse {name,folder?,model?}, slugify, mkdir, supervisor.spawn_pty → 202. Auto-grants agent-admin ACL (T447). create_command: write .md file to commands dir. yaml_scalar helper. slugify is pub(super).'
   last_edited_ms: 1782845619465
+2a0ca30dbee72c24:
+  path: crates/cp-mod-todo/src/types.rs
+  description: 'Todo types. TodoStatus enum (Pending/InProgress/Done) #[non_exhaustive] (boss-hunt r3 win — matched only in-crate icon/FromStr), serde snake_case + FromStr + icon(). TodoItem, TodoState.'
+  last_edited_ms: 1784561389354
 2a1060634f094bbc:
   path: crates/cp-orchestrator/tests/openapi/schemas_ext.rs
   description: Transport-layer OpenAPI schemas — receipts, auth, env-keys, filesystem, FinderKind enum, LLM registry (ModelDef/ProviderDef), SSE delta protocol, release management, Claude Code usage+login (ClaudeTokenStatus/LoginStart/LoginComplete schemas).
@@ -6346,6 +6354,10 @@
   path: src/app/actions/mod.rs
   description: 'Central action dispatch (Elm/Redux-style). Maps Action variants to state mutations. Delegates to sub-modules: input, streaming, config, cursor, history, navigation. Selection-aware InputChar/Delete/InsertText/PasteText. @-autocomplete trigger. Scroll acceleration.'
   last_edited_ms: 1780563355099
+53aa85505f873287:
+  path: crates/cp-mod-github/src/classify/mod.rs
+  description: 'gh command classifier. CommandClass enum #[non_exhaustive] (boss-hunt r3 win — no downstream exhaustive match). ShellLexer quote-aware arg parser, READ_ONLY_GROUPS/ACTIONS tables, classify().'
+  last_edited_ms: 1784561389062
 53cb141bae692733:
   path: web/src/lib/query/sse.ts
   description: 'Reconnecting SSE client for one agent''s event stream. EventSource with ticket auth, last_rev resume param (T268 fix), exponential backoff (1s→30s). Singleton per agent via getOrCreateSseClient. Named event listeners: delta/stream/resync/invalidate. Wildcard ''*'' subscriber support. web-lint P3: `closed` flag read through an isClosed() getter at the onerror + catch sites — a direct !closed is CFA-narrowed to always-true (its only mutation is in the deferred close()), a function call is opaque to CFA.'
@@ -6750,6 +6762,10 @@
   path: ui/src/components/panels/cockpit/StatsPanel.tsx
   description: 'Cockpit Statistics maquette: context-budget meter, session stat grid, cache-economics chips, per-panel token weight bars. Reads mock stats/tokenBudget/cacheStats/panels.'
   last_edited_ms: 1781600050397
+59af1f9b10e9e506:
+  path: crates/cp-mod-spine/src/engine.rs
+  description: 'Spine engine check_spine. SpineDecision enum #[expect(exhaustive_enums)] — IRREDUCIBLE: matched exhaustively by tui src/app/run/lifecycle.rs (downstream), non_exhaustive forces wildcard_enum_match_arm (forbid).'
+  last_edited_ms: 1784561389610
 59bafbb282776af9:
   path: web/src/lib/utils.ts
   description: 'Shared web utils. cn() (clsx+tailwind-merge). T367 zip-on-drop: zipFiles(files)->Promise<File> bundles dropped file(s) into ONE .zip client-side via fflate (DEFLATE level 6); single file -> `<name>.zip` (macOS Compress convention), many -> `dropped-<n>-files.zip`; uniqueZipEntry dedups colliding basenames inside the archive; rejects on read/fflate error (caller falls back to raw upload). T359 list logic: resolveEnter (send/newline/continue/remove, ordered marker auto-increment numeric+bijective-base26 alpha, unordered pretty bullets •◦▪‣ per depth) + resolveTab (Tab/Shift+Tab indent/outdent, ordered resumes sibling count via siblingOrderedMarkerAtDepth) + lineBounds + parseListLine. Consumed by ThreadComposer + ThreadConversation.'
@@ -11250,6 +11266,10 @@
   path: src/ui/mod.rs
   description: 'Top-level render(). A9: Overlay find_map via cp_base::deref_match! enumerating 6 variants + | _ (non_exhaustive foreign enum needs wildcard). IR frame build -> sidebar+content+status+overlays.'
   last_edited_ms: 1784542900265
+957a091f158945d6:
+  path: crates/cp-mod-git/src/types.rs
+  description: 'Git types. GitChangeType enum #[expect(exhaustive_enums)] — IRREDUCIBLE: matched exhaustively by tui src/modules/overview/blocks.rs (downstream), non_exhaustive forces wildcard_enum_match_arm (forbid). GitFileChange, GitState, GitResultRequest.'
+  last_edited_ms: 1784561389524
 957b3657940f0c34:
   path: crates/cp-mod-memory/src/panel.rs
   description: Memory panel. blocks() split via importance_rank (const fn sort key) + push_memory_blocks helper (A2). format_memories_for_context YAML output for LLM. Importance-colored labels. needs_cache=false.
@@ -12886,6 +12906,10 @@ ab20a1ccf7d6a506:
   path: web/src/components/threads/ThreadConversation.tsx
   description: 'Center pane: thread conversation + composer. T510 FREEZE FIX: MessageRow React.memo (comparator msg===+agentId===) + AutoRun memo + useMemo(segmentLog) + content-visibility:auto per row → delta/poll re-renders only changed row not all 1690. useConversationDrop hook (T367/T471 OS-file drag+zip). scrollIntoView measure-wrapped, 6-frame converge.'
   last_edited_ms: 1783496990773
+ab2654cb6d54ef6c:
+  path: crates/cp-mod-prompt/src/types.rs
+  description: 'PromptItem/PromptState/PromptType. PromptType enum #[non_exhaustive] (boss-hunt r3 win — no downstream exhaustive match).'
+  last_edited_ms: 1784561389267
 ab41a783291bfe79:
   path: web/src/components/shell/costs/CostsView.tsx
   description: 'Cost Analysis dashboard page. Summary cards, culprit donut, cost timeline, cost/tool/culprit-cost/max-freeze bars, two token distribution bars (panel-estimated + API-reported). Tempo/queue/breakKind AND-filters (BreakKindFilter: 5-button group for no_break/content_changed/panel_appeared/panel_disappeared). Copy as Markdown button. TanStack useQuery + fetchFsPreview 15s refetch.'
@@ -13354,6 +13378,10 @@ b14647cdbc400559:
   path: src/app/run/input.rs
   description: App::new() constructor (inits timers incl last_bridge_recover_ms), save_state/message_async(), handle_autocomplete/palette events.
   last_edited_ms: 1782988305502
+b14fb334d966735f:
+  path: crates/cp-mod-bridge/src/tee.rs
+  description: 'Stream tee (tier-3 fan-out). Outcome enum (Published/Dropped) #[non_exhaustive] (boss-hunt r3 win — no downstream exhaustive match). Non-blocking try_send, bounded channel, degraded on drop, publisher thread.'
+  last_edited_ms: 1784561389439
 b15c976b1b6f7804:
   path: src/llms/claude_code/debug.rs
   description: 'Debug helpers: dump_last_request (writes API request JSON to disk) + StreamErrorContext/build_stream_read_error (verbose stream failure diagnostics).'
@@ -17782,6 +17810,10 @@ ee609bc8fce0f570:
   path: .github/checks/lint-config.chain
   description: 'Cryptographic hash chain protecting 12 critical lint/config files. Entries include inline git diffs since entry #19.'
   last_edited_ms: 0
+ee6350f9cb907601:
+  path: crates/cp-mod-threads/src/types.rs
+  description: 'Thread types: ThreadStatus + ThreadAuthor enums #[expect(exhaustive_enums)] — IRREDUCIBLE: matched exhaustively by tui src/app/run/threads + src/ui/threads_view (downstream), non_exhaustive forces wildcard_enum_match_arm (forbid). ThreadMessage, Thread, ThreadsState, FocusState.'
+  last_edited_ms: 1784561389695
 ee7435b5e0e5f5f5:
   path: crates/cp-orchestrator/src/services/materialized_view/tests.rs
   description: 'Unit tests for materialized view fold: message head tracking, checkpoint authoritative reset (heads + roster), roster lifecycle (create/archive/restore/delete/pause), phase/lifecycle/cost latest-wins, batch folding, durability-only entries inert, remove drops agent.'

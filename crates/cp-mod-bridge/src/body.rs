@@ -69,7 +69,7 @@ const BODIES_DIR: &str = "bodies";
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[expect(
     clippy::exhaustive_enums,
-    reason = "body-disposition contract: Stored is a closed Inline/Spilled set returned by Store::put and matched exhaustively by callers routing the durability barrier; #[non_exhaustive] would forbid that construction"
+    reason = "body-disposition contract: Stored is a closed Inline/Spilled set returned by Store::put and matched exhaustively cross-crate by the tui agent (src/app/run/threads/messages.rs) to route the durability barrier; #[non_exhaustive] would force a wildcard arm there that the forbidden wildcard_enum_match_arm lint rejects"
 )]
 pub enum Stored {
     /// A small body: embed `bytes` in the same oplog entry that references it,
