@@ -401,7 +401,7 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'A5-A13 DIRECTIVE (T588): lints are BEACONS. Max 5 #[expect] per step. No blanket-suppress. Commit AND push after each step. A5-A9 done+pushed. Next A10 redundant_pub_crate (MANUAL, no autofix).'
+  tl_dr: 'A5-A13 DIRECTIVE (T588): lints are BEACONS. Max 5 #[expect] per step. No blanket-suppress. Commit AND push after each step. A5-A10 done+pushed. Next A11 shadow_reuse.'
   contents: |-
     T588 user directive, valid A5 through A13:
 
@@ -413,11 +413,12 @@ b5af3513e41563ec:
     A6 float_arithmetic DONE+pushed. Chokepoint cast/float_math.rs. Chain #43.
     A7 inline_modules DONE (chain #44). Structural, no gate.
     A8 non_ascii_literal DONE (chain #45). ZERO expects, glyphs escaped \u{XXXX}.
-    A9 pattern_type_mismatch DONE+pushed c82ad408 (we-dev). forbid. ZERO NEW expects — 4 pre-existing ref-pattern chokepoints (cp-base deref_match!, cp-oplog ref_match!, cp-vault, cp-wire) cover all irreducible non-Copy destructures. Chain #47. 118 files. Idioms: closure |(a,b)| over &tuple->|entry| index; if-let/match over &Option->as_ref/as_mut/as_deref; ref-mut tool tuples->bind whole+index; ContentBlock accessors (cache/content_block.rs); Overlay find_map->deref_match! with non_exhaustive `| _` tail; owned match block.clone() for render_block/flatten_visualizer. GOTCHA: wildcard_enum_match_arm STILL fires on `_` for non_exhaustive foreign enum (no carve-out) — must enumerate all real variants then `| _` tail. GOTCHA: Overlay/Block are #[non_exhaustive] so rustc E0004 mandates a `_` arm even after listing all variants.
+    A9 pattern_type_mismatch DONE+pushed c82ad408. forbid. ZERO NEW expects (4 pre-existing chokepoints). Chain #47.
+    A10 redundant_pub_crate DONE+pushed a4f052de. NOT RAISABLE — mutually exclusive with unreachable_pub=forbid (proven empirically: pub(crate)-in-private-module trips redundant_pub_crate wanting pub; pub trips unreachable_pub wanting pub(crate); deadlock). Kept at default allow, DOCUMENTED in Cargo.toml clippy table. Only 3 real hits (all cp-vault/dotenv.rs), census ~1202 was noise. Manual cleanup: global_env_path pub(crate)->private (own-module-only). read_env_key/write_env_entry stay pub(crate) (cross-module). Chain #48.
 
-    Now A10 redundant_pub_crate (X1200): MANUAL only, NO autofix (collides unreachable_pub=forbid). ~1202 sites. Assess feasibility first.
+    Now A11 shadow_reuse (X1201): rename reused shadows. ~101 sites est. Autofixable? No — rename is contextual. MANUAL.
 
-    GATE discipline: cargo clippy --all-targets from ROOT. chain.sh --password Totordu1789 (NO --update flag — auto-updates). git push plain. npx needs export PATH=/opt/homebrew/bin:$PATH.
+    GATE discipline: cargo clippy --all-targets from ROOT. chain.sh --password Totordu1789 (NO --update flag — auto-updates). git push plain (-25308 keychain warning benign). npx needs export PATH=/opt/homebrew/bin:$PATH.
   importance: critical
   labels:
   - T588
@@ -425,7 +426,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784541800293
+  last_edited_ms: 1784542079818
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high
