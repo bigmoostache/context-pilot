@@ -100,7 +100,10 @@ impl OplogWriter {
     ///
     /// Returns [`OplogError::Io`] if the directory or segment files cannot be
     /// created, read, scanned, or `fsync`'d.
-    pub fn open<P: AsRef<Path>>(dir: P) -> OplogResult<Self> {
+    pub fn open<P>(dir: P) -> OplogResult<Self>
+    where
+        P: AsRef<Path>,
+    {
         Self::open_with_segment_limit(dir, DEFAULT_SEGMENT_LIMIT)
     }
 
@@ -111,8 +114,11 @@ impl OplogWriter {
     ///
     /// Returns [`OplogError::Io`] for any filesystem failure during open,
     /// scan, torn-tail truncation, or initial-segment creation.
-    pub fn open_with_segment_limit<P: AsRef<Path>>(dir: P, segment_limit: u64) -> OplogResult<Self> {
-        let dir = dir.as_ref().to_path_buf();
+    pub fn open_with_segment_limit<P>(path: P, segment_limit: u64) -> OplogResult<Self>
+    where
+        P: AsRef<Path>,
+    {
+        let dir = path.as_ref().to_path_buf();
         fs::create_dir_all(&dir)?;
 
         let indices = segment::indices(&dir)?;
@@ -121,11 +127,11 @@ impl OplogWriter {
         let next_rev = recovered.rev_head.map_or(0, |rev| rev.wrapping_add(1));
 
         if let Some(index) = indices.last().copied() {
-            let path = segment::path(&dir, index);
-            let scan = segment::read(&path)?;
+            let seg_path = segment::path(&dir, index);
+            let scan = segment::read(&seg_path)?;
             let segment_has_record =
                 scan.entries.iter().any(|entry| !matches!(entry.kind, OpEntryKind::Checkpoint { .. }));
-            let mut file = OpenOptions::new().read(true).write(true).open(&path)?;
+            let mut file = OpenOptions::new().read(true).write(true).open(&seg_path)?;
             if scan.torn_tail {
                 file.set_len(scan.valid_len)?;
                 file.sync_data()?;
@@ -210,9 +216,8 @@ impl OplogWriter {
         // Probe the framed size to decide whether this record would overflow
         // the segment. (The probe re-encodes; `rev`/timestamp do not affect the
         // decision, so a zeroed placeholder is fine.)
-        let probe =
-            OpEntry { schema_version: WRITER_SCHEMA_VERSION, rev: self.next_rev, timestamp_ms: 0, kind: kind.clone() };
-        let frame_len = framing::encode_entry(&probe)?.len() as u64;
+        let probe = OpEntry::new(WRITER_SCHEMA_VERSION, self.next_rev, 0, kind.clone());
+        let frame_len = u64::try_from(framing::encode_entry(&probe)?.len()).unwrap_or(u64::MAX);
 
         if self.segment_has_record && self.segment_bytes.wrapping_add(frame_len) > self.segment_limit {
             self.roll()?;
@@ -279,12 +284,12 @@ impl OplogWriter {
     /// is assigned.
     fn write_record(&mut self, kind: OpEntryKind, is_record: bool) -> OplogResult<u64> {
         let rev = self.next_rev;
-        let entry = OpEntry { schema_version: WRITER_SCHEMA_VERSION, rev, timestamp_ms: now_ms(), kind };
+        let entry = OpEntry::new(WRITER_SCHEMA_VERSION, rev, now_ms(), kind);
         let frame = framing::encode_entry(&entry)?;
 
         self.file.write_all(&frame)?;
 
-        self.segment_bytes = self.segment_bytes.wrapping_add(frame.len() as u64);
+        self.segment_bytes = self.segment_bytes.wrapping_add(u64::try_from(frame.len()).unwrap_or(u64::MAX));
         self.next_rev = self.next_rev.wrapping_add(1);
         if is_record {
             self.segment_has_record = true;
@@ -321,7 +326,7 @@ impl OplogWriter {
     /// written into a checkpoint record.
     #[must_use]
     pub fn snapshot(&self) -> Snapshot {
-        Snapshot { heads: self.state.heads.clone(), seen: self.state.seen.clone(), roster: self.state.roster.clone() }
+        Snapshot::new(self.state.heads.clone(), self.state.seen.clone(), self.state.roster.clone())
     }
 }
 

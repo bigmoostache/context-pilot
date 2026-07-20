@@ -85,7 +85,7 @@ fn compute_description_key(path: &str, content: &[u8]) -> String {
     data.extend_from_slice(path.as_bytes());
     data.extend_from_slice(content);
     let hex = cp_mod_utilities::hash::compute(&data);
-    hex.get(..16).unwrap_or(&hex).to_string()
+    hex.get(..16).unwrap_or(&hex).to_owned()
 }
 
 // ---------------------------------------------------------------------------
@@ -101,13 +101,13 @@ pub(crate) fn upsert_yaml_entry(path: &str, description: &str) {
     let Ok(content) = std::fs::read(file_path) else { return };
     let key = compute_description_key(path, &content);
 
-    let mut entry = YamlEntry { path: path.to_string(), description: description.to_string(), last_edited_ms: 0 };
+    let mut entry = YamlEntry { path: path.to_owned(), description: description.to_owned(), last_edited_ms: 0 };
     sync().upsert(&key, &mut entry);
 }
 
 /// Remove all YAML entries for a given path.
 pub(crate) fn remove_yaml_entry(path: &str) {
-    let owned_path = path.to_string();
+    let owned_path = path.to_owned();
     let _removed = sync().remove_where::<YamlEntry, _>(|_key, entry| entry.path == owned_path);
 }
 

@@ -30,46 +30,7 @@ pub(crate) fn ensure_default_contexts(state: &mut State) {
     let defaults = modules::all_fixed_panel_defaults();
 
     for (pos, d) in defaults.iter().enumerate() {
-        // Core modules always get their panels; non-core only if active
-        if !d.is_core && !state.active_modules.contains(d.module_id) {
-            continue;
-        }
-
-        // Skip if panel already exists
-        if state.context.iter().any(|c| c.context_type == d.context_type) {
-            continue;
-        }
-
-        // pos is 0-indexed in FIXED_PANEL_ORDER, but IDs start at P1
-        let id = format!("P{}", pos.saturating_add(1));
-
-        // Evict any dynamic panel squatting on this fixed panel's ID.
-        // This happens when a module is activated after dynamic panels already
-        // claimed the slot (e.g., module was inactive at boot → slot looked free
-        // → `next_available_context_id` assigned it to a dynamic panel → module
-        // activated later → collision). Two panels sharing one ID breaks the
-        // freeze system, cost tracking, and cache prefix matching.
-        let squatter_new_id = state
-            .context
-            .iter()
-            .any(|c| c.id == id && c.context_type != d.context_type)
-            .then(|| state.next_available_context_id());
-        if let Some(new_id) = squatter_new_id
-            && let Some(squatter) = state.context.iter_mut().find(|c| c.id == id && c.context_type != d.context_type)
-        {
-            log::warn!(
-                "Evicting panel '{}' (type={}) from ID {} → {new_id} to make room for fixed panel '{}'",
-                squatter.name,
-                squatter.context_type,
-                id,
-                d.display_name,
-            );
-            squatter.id = new_id;
-        }
-
-        let insert_pos = pos.saturating_add(1).min(state.context.len()); // +1 for Conversation at index 0
-        let elem = modules::make_default_entry(&id, d.context_type.clone(), d.display_name, d.cache_deprecated);
-        state.context.insert(insert_pos, elem);
+        insert_fixed_panel(state, pos, d);
     }
 
     // Assign UID to Conversation (needed for panels/ storage — it holds message_uids)
@@ -81,5 +42,57 @@ pub(crate) fn ensure_default_contexts(state: &mut State) {
         if d.context_type.as_str() != Kind::LIBRARY && state.context.iter().any(|c| c.context_type == d.context_type) {
             assign_panel_uid(state, d.context_type.as_str());
         }
+    }
+}
+
+/// Create one fixed panel at its ordered slot: skip if inactive/non-core or
+/// already present, evict any dynamic squatter on the target ID, then insert.
+/// `pos` is the 0-indexed slot in `FIXED_PANEL_ORDER` (ID = `P{pos+1}`).
+fn insert_fixed_panel(state: &mut State, pos: usize, d: &modules::FixedPanelDefault) {
+    // Core modules always get their panels; non-core only if active
+    if !d.is_core && !state.active_modules.contains(d.module_id) {
+        return;
+    }
+
+    // Skip if panel already exists
+    if state.context.iter().any(|c| c.context_type == d.context_type) {
+        return;
+    }
+
+    // pos is 0-indexed in FIXED_PANEL_ORDER, but IDs start at P1
+    let id = format!("P{}", pos.saturating_add(1));
+
+    evict_squatter(state, &id, &d.context_type, d.display_name);
+
+    let insert_pos = pos.saturating_add(1).min(state.context.len()); // +1 for Conversation at index 0
+    let elem = modules::make_default_entry(&id, d.context_type.clone(), d.display_name, d.cache_deprecated);
+    state.context.insert(insert_pos, elem);
+}
+
+/// Evict any dynamic panel squatting on a fixed panel's `id`, reassigning it a
+/// fresh id.
+///
+/// Happens when a module is activated after dynamic panels already claimed the
+/// slot (module inactive at boot → slot looked free → `next_available_context_id`
+/// gave it to a dynamic panel → module activated later → collision). Two panels
+/// sharing one id breaks the freeze system, cost tracking, and cache prefix
+/// matching.
+fn evict_squatter(state: &mut State, id: &str, wanted_type: &Kind, display_name: &str) {
+    let squatter_new_id = state
+        .context
+        .iter()
+        .any(|c| c.id == id && c.context_type != *wanted_type)
+        .then(|| state.next_available_context_id());
+    if let Some(new_id) = squatter_new_id
+        && let Some(squatter) = state.context.iter_mut().find(|c| c.id == id && c.context_type != *wanted_type)
+    {
+        log::warn!(
+            "Evicting panel '{}' (type={}) from ID {} → {new_id} to make room for fixed panel '{}'",
+            squatter.name,
+            squatter.context_type,
+            id,
+            display_name,
+        );
+        squatter.id = new_id;
     }
 }

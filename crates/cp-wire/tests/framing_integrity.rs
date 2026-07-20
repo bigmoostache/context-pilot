@@ -29,17 +29,17 @@ use cp_wire::types::oplog::{OpEntry, OpEntryKind};
 /// boundaries (string fields, a 32-byte hash, small integers).
 fn rich_entry(rev: u64) -> OpEntry {
     let tag = u8::try_from(rev & 0xFF).unwrap_or(0);
-    OpEntry {
-        schema_version: 1,
+    OpEntry::new(
+        1,
         rev,
-        timestamp_ms: 1_718_000_000_000_u64.wrapping_add(rev),
-        kind: OpEntryKind::MessageCreated {
+        1_718_000_000_000_u64.wrapping_add(rev),
+        OpEntryKind::MessageCreated {
             thread_id: format!("T{rev}"),
             message_id: format!("m{rev}-body"),
             head: ContentHash::new([tag; 32]),
             inline_body: None,
         },
-    }
+    )
 }
 
 /// Build a buffer of `n` concatenated frames, returning the bytes plus the

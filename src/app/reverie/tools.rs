@@ -17,7 +17,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 /// LLM knows its constraints, even though it sees ALL tool definitions in the prompt.
 pub(crate) fn build_tool_restrictions_text(tools: &[ToolDefinition]) -> String {
     let r = &REVERIE.tool_restrictions;
-    let mut text = r.header.trim_end().to_string();
+    let mut text = r.header.trim_end().to_owned();
     text.push('\n');
 
     for tool in tools {
@@ -103,7 +103,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
 
     // Agent is configurable — default to "cleaner" if not provided
     let agent_id =
-        tool.input.get("agent").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).unwrap_or("cleaner").to_string();
+        tool.input.get("agent").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).unwrap_or("cleaner").to_owned();
 
     // Guard: this specific agent type is already running
     if state.reveries.contains_key(&agent_id) {
@@ -118,15 +118,15 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
         };
     }
 
-    let context = tool.input.get("directive").and_then(|v| v.as_str()).map(ToString::to_string);
+    let context = tool.input.get("directive").and_then(|v| v.as_str()).map(str::to_owned);
 
     // Signal to the event loop that a reverie should be started.
     // Sentinel format: REVERIE_START:<agent_id>\n<context_or_empty>\n<human_readable_msg>
-    let msg = match &context {
+    let msg = match context.as_deref() {
         Some(c) if !c.is_empty() => format!(
             "Context optimizer activated with directive: \"{c}\". It will run in the background and report when done."
         ),
-        _ => "Context optimizer activated. It will run in the background and report when done.".to_string(),
+        _ => "Context optimizer activated. It will run in the background and report when done.".to_owned(),
     };
 
     ToolResult {

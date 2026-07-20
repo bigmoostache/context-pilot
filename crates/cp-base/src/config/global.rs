@@ -40,6 +40,7 @@ const KEY_ENV_MAP: &[(&str, &str)] = &[
 
 /// Serialized form of `~/.config/context-pilot/config.json`.
 #[derive(Debug, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Config {
     /// API keys and tokens, keyed by canonical name (e.g. `"anthropic"`,
     /// `"telegram_bot"`).
@@ -104,12 +105,12 @@ fn save(cfg: &Config) -> Result<(), String> {
 #[must_use]
 pub fn resolve_api_key(name: &str) -> Option<String> {
     // 1. Try env var (if a mapping exists)
-    if let Some(env_var) = KEY_ENV_MAP.iter().find(|(k, _)| *k == name).map(|(_, v)| *v)
+    if let Some(env_var) = KEY_ENV_MAP.iter().find(|entry| entry.0 == name).map(|entry| entry.1)
         && let Ok(val) = std::env::var(env_var)
     {
-        let val = val.trim().to_owned();
-        if !val.is_empty() {
-            return Some(val);
+        let trimmed = val.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_owned());
         }
     }
 
@@ -132,7 +133,7 @@ pub fn store_api_key(name: &str, value: &str) -> Result<(), String> {
 /// Return the env var name for a canonical key, if one exists.
 #[must_use]
 pub fn env_var_for_key(name: &str) -> Option<&'static str> {
-    KEY_ENV_MAP.iter().find(|(k, _)| *k == name).map(|(_, v)| *v)
+    KEY_ENV_MAP.iter().find(|entry| entry.0 == name).map(|entry| entry.1)
 }
 
 /// Whether a non-empty key is available for `name` (env var **or** stored),

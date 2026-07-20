@@ -26,10 +26,10 @@ impl Panel for GitResultPanel {
 
     fn build_cache_request(&self, ctx: &Entry, _state: &State) -> Option<CacheRequest> {
         let command = ctx.get_meta_str("result_command")?;
-        Some(CacheRequest {
-            context_type: Kind::new(Kind::GIT_RESULT),
-            data: Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.to_string() }),
-        })
+        Some(CacheRequest::new(
+            Kind::new(Kind::GIT_RESULT),
+            Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.to_owned() }),
+        ))
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {
@@ -52,7 +52,7 @@ impl Panel for GitResultPanel {
                 }
                 ctx.cache_deprecated = false;
                 let content_ref = ctx.cached_content.clone().unwrap_or_default();
-                let _ = update_if_changed(ctx, &content_ref);
+                let _changed = update_if_changed(ctx, &content_ref);
                 true
             }
             CacheUpdate::Unchanged { .. } | CacheUpdate::ModuleSpecific { .. } => false,
@@ -67,21 +67,21 @@ impl Panel for GitResultPanel {
         let args = super::classify::validate_git_command(&command).ok()?;
 
         let mut cmd = std::process::Command::new("git");
-        let _ = cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
+        let _c = cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
         let output = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
 
         match output {
             Ok(out) => {
                 let stdout = String::from_utf8_lossy(&out.stdout);
                 let stderr = String::from_utf8_lossy(&out.stderr);
-                let content = if stderr.trim().is_empty() {
+                let raw = if stderr.trim().is_empty() {
                     stdout.to_string()
                 } else if stdout.trim().is_empty() {
                     stderr.to_string()
                 } else {
                     format!("{stdout}\n{stderr}")
                 };
-                let content = truncate_output(&content, constants::MAX_RESULT_CONTENT_BYTES);
+                let content = truncate_output(&raw, constants::MAX_RESULT_CONTENT_BYTES);
                 let token_count = estimate_tokens(&content);
                 Some(CacheUpdate::Content { context_id, content, token_count })
             }
@@ -100,13 +100,13 @@ impl Panel for GitResultPanel {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
 
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GIT_RESULT);
+        let ctx_opt = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GIT_RESULT);
 
-        let Some(ctx) = ctx else {
+        let Some(ctx) = ctx_opt else {
             return vec![Block::styled_text(" No git result panel".into(), Semantic::Muted)];
         };
 
-        let Some(content) = &ctx.cached_content else {
+        let Some(content) = ctx.cached_content.as_ref() else {
             return vec![Block::Line(vec![S::muted(" Loading...".into()).italic()])];
         };
 
@@ -137,13 +137,13 @@ impl Panel for GitResultPanel {
             && let Some(cmd) = ctx.get_meta_str("result_command")
         {
             let short = if cmd.len() > 40 {
-                format!("{}...", &cmd.get(..cmd.floor_char_boundary(37)).unwrap_or(""))
+                format!("{}...", cmd.get(..cmd.floor_char_boundary(37)).unwrap_or(""))
             } else {
-                cmd.to_string()
+                cmd.to_owned()
             };
             return short;
         }
-        "Git Result".to_string()
+        "Git Result".to_owned()
     }
 
     fn max_freezes(&self) -> u8 {

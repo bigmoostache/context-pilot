@@ -8,13 +8,17 @@ use cp_render::{Block, Semantic, Span};
 use crate::infra::constants::icons;
 use crate::ui::helpers::wrap_text;
 
+/// Paste-sentinel expansion (split out for the 500-line structure limit).
+mod sentinels;
+use sentinels::expand_paste_sentinels;
+
 /// Sentinel marker used to represent paste placeholders in the input string.
-const SENTINEL_CHAR: char = '\x00';
+pub(super) const SENTINEL_CHAR: char = '\x00';
 
 /// Placeholder prefix used in display text for paste placeholders.
-const PASTE_PLACEHOLDER_START: char = '\u{E000}';
+pub(super) const PASTE_PLACEHOLDER_START: char = '\u{E000}';
 /// Placeholder suffix used in display text for paste placeholders.
-const PASTE_PLACEHOLDER_END: char = '\u{E001}';
+pub(super) const PASTE_PLACEHOLDER_END: char = '\u{E001}';
 
 /// Contextual data needed to render the input area.
 pub(crate) struct InputBlockCtx<'ctx> {
@@ -28,8 +32,130 @@ pub(crate) struct InputBlockCtx<'ctx> {
     pub viewport_width: u16,
 }
 
+/// Build the content spans for one wrapped input line, honoring an active
+/// paste-block (rendered as a single accent run with cursor split) or normal
+/// command/cursor highlighting.
+fn build_line_content_spans(
+    line_text: &str,
+    in_paste_block: bool,
+    cursor_char: &str,
+    command_ids: &[String],
+) -> Vec<Span> {
+    if !in_paste_block {
+        return build_input_spans_ir(line_text, cursor_char, command_ids);
+    }
+    let clean = line_text.replace([PASTE_PLACEHOLDER_START, PASTE_PLACEHOLDER_END], "");
+    if clean.contains(cursor_char) {
+        let parts: Vec<&str> = clean.splitn(2, cursor_char).collect();
+        let first_part = parts.first().copied().unwrap_or("");
+        vec![
+            Span::styled(first_part.to_owned(), Semantic::Accent),
+            Span::styled(cursor_char.to_owned(), Semantic::Accent).bold(),
+            Span::styled(parts.get(1).unwrap_or(&"").to_string(), Semantic::Accent),
+        ]
+    } else {
+        vec![Span::styled(clean, Semantic::Accent)]
+    }
+}
+
+/// Push one input line: role-icon lead on the first line, blank indent after.
+/// Flips `*is_first_line` false after the first call.
+fn emit_input_line(
+    blocks: &mut Vec<Block>,
+    ctx: &LineRenderCtx<'_>,
+    is_first_line: &mut bool,
+    content_spans: Vec<Span>,
+) {
+    let mut line_spans = if *is_first_line {
+        *is_first_line = false;
+        vec![
+            Span::styled(ctx.role_icon.to_owned(), Semantic::Accent),
+            Span::styled("... ".to_owned(), Semantic::Accent).dim(),
+            Span::new(" ".to_owned()),
+        ]
+    } else {
+        vec![Span::new(" ".repeat(ctx.prefix_width))]
+    };
+    line_spans.extend(content_spans);
+    blocks.push(Block::line(line_spans));
+}
+
+/// Mutable cursor state threaded across the wrapped-line emit loop.
+struct LineEmitState {
+    /// Whether we are currently inside a paste-placeholder block.
+    in_paste_block: bool,
+    /// Byte position within `input_with_cursor` (for selection mapping).
+    byte_pos: usize,
+    /// Whether the next emitted line is the first (gets the role-icon lead).
+    is_first_line: bool,
+}
+
+/// Read-only rendering context for the wrapped-line emit loop.
+struct LineRenderCtx<'ctx> {
+    /// Cursor glyph inserted at the caret position.
+    cursor_char: &'ctx str,
+    /// Known command IDs for `/command` highlighting.
+    command_ids: &'ctx [String],
+    /// Role icon (user glyph) for the first line's lead.
+    role_icon: &'ctx str,
+    /// Blank-indent width for continuation lines.
+    prefix_width: usize,
+    /// Selection start byte (post-cursor-insertion coords).
+    sel_start: usize,
+    /// Selection end byte (post-cursor-insertion coords).
+    sel_end: usize,
+}
+
+/// Process one wrapped line: toggle paste-block state, build content spans,
+/// apply selection highlighting + command hints, and emit the prefixed line.
+fn process_wrapped_line(blocks: &mut Vec<Block>, st: &mut LineEmitState, ctx: &LineRenderCtx<'_>, line_text: &str) {
+    let has_start = line_text.contains(PASTE_PLACEHOLDER_START);
+    let has_end = line_text.contains(PASTE_PLACEHOLDER_END);
+    if has_start {
+        st.in_paste_block = true;
+    }
+
+    let line_byte_start = st.byte_pos;
+    let mut spans = build_line_content_spans(line_text, st.in_paste_block, ctx.cursor_char, ctx.command_ids);
+
+    if has_end {
+        st.in_paste_block = false;
+    }
+
+    if ctx.sel_start < ctx.sel_end {
+        spans = apply_selection_to_spans(spans, line_byte_start, ctx.sel_start, ctx.sel_end);
+    }
+
+    if line_text.contains(ctx.cursor_char) && !st.in_paste_block {
+        let clean_line = line_text.replace(ctx.cursor_char, "");
+        spans.extend(build_command_hints_ir(&clean_line, ctx.command_ids));
+    }
+
+    emit_input_line(blocks, ctx, &mut st.is_first_line, spans);
+    st.byte_pos = st.byte_pos.saturating_add(line_text.len());
+}
+
+/// Emit the non-empty input body: iterate source lines, wrap each, and emit
+/// every wrapped line (blank-indent for empty lines, trailing blank on `\n`).
+fn emit_input_body(blocks: &mut Vec<Block>, input_with_cursor: &str, wrap_width: usize, ctx: &LineRenderCtx<'_>) {
+    let mut st = LineEmitState { in_paste_block: false, byte_pos: 0, is_first_line: true };
+    for line in input_with_cursor.lines() {
+        if line.is_empty() {
+            blocks.push(Block::line(vec![Span::new(" ".repeat(ctx.prefix_width))]));
+            st.byte_pos = st.byte_pos.saturating_add(1); // skip \n
+            continue;
+        }
+        for line_text in &wrap_text(line, wrap_width) {
+            process_wrapped_line(blocks, &mut st, ctx, line_text);
+        }
+        st.byte_pos = st.byte_pos.saturating_add(1); // account for \n between lines
+    }
+    if input_with_cursor.ends_with('\n') {
+        blocks.push(Block::line(vec![Span::new(" ".repeat(ctx.prefix_width))]));
+    }
+}
+
 /// Render input area to IR blocks.
-#[expect(clippy::too_many_lines, reason = "rendering pipeline with selection logic")]
 pub(crate) fn render_input_blocks(
     raw_input: &str,
     raw_cursor: usize,
@@ -39,7 +165,7 @@ pub(crate) fn render_input_blocks(
     let mut blocks: Vec<Block> = Vec::new();
     let role_icon = icons::msg_user();
     let prefix_width: usize = 8;
-    let wrap_width = (ctx.viewport_width as usize).saturating_sub(prefix_width.saturating_add(2)).max(20);
+    let wrap_width = usize::from(ctx.viewport_width).saturating_sub(prefix_width.saturating_add(2)).max(20);
     let cursor_char = "\u{258e}";
     let cursor_char_len = cursor_char.len();
 
@@ -71,82 +197,15 @@ pub(crate) fn render_input_blocks(
             Span::styled(cursor_char.to_owned(), Semantic::Accent),
         ]));
     } else {
-        let mut is_first_line = true;
-        let mut in_paste_block = false;
-        let mut byte_pos: usize = 0; // tracks position in input_with_cursor
-
-        for line in input_with_cursor.lines() {
-            if line.is_empty() {
-                blocks.push(Block::line(vec![Span::new(" ".repeat(prefix_width))]));
-                byte_pos = byte_pos.saturating_add(1); // skip \n
-                continue;
-            }
-
-            let wrapped = wrap_text(line, wrap_width);
-            for line_text in &wrapped {
-                let has_start = line_text.contains(PASTE_PLACEHOLDER_START);
-                let has_end = line_text.contains(PASTE_PLACEHOLDER_END);
-                if has_start {
-                    in_paste_block = true;
-                }
-
-                let line_byte_start = byte_pos;
-
-                let mut spans = if in_paste_block {
-                    let clean = line_text.replace([PASTE_PLACEHOLDER_START, PASTE_PLACEHOLDER_END], "");
-                    if clean.contains(cursor_char) {
-                        let parts: Vec<&str> = clean.splitn(2, cursor_char).collect();
-                        let first_part = parts.first().copied().unwrap_or("");
-                        vec![
-                            Span::styled(first_part.to_owned(), Semantic::Accent),
-                            Span::styled(cursor_char.to_owned(), Semantic::Accent).bold(),
-                            Span::styled(parts.get(1).unwrap_or(&"").to_string(), Semantic::Accent),
-                        ]
-                    } else {
-                        vec![Span::styled(clean, Semantic::Accent)]
-                    }
-                } else {
-                    build_input_spans_ir(line_text, cursor_char, ctx.command_ids)
-                };
-
-                if has_end {
-                    in_paste_block = false;
-                }
-
-                // Apply selection highlighting to content spans
-                if sel_start < sel_end {
-                    spans = apply_selection_to_spans(spans, line_byte_start, sel_start, sel_end);
-                }
-
-                // Add command hints if this line contains the cursor and starts with /
-                if line_text.contains(cursor_char) && !in_paste_block {
-                    let clean_line = line_text.replace(cursor_char, "");
-                    let hints = build_command_hints_ir(&clean_line, ctx.command_ids);
-                    spans.extend(hints);
-                }
-
-                if is_first_line {
-                    let mut line_spans = vec![
-                        Span::styled(role_icon.clone(), Semantic::Accent),
-                        Span::styled("... ".to_owned(), Semantic::Accent).dim(),
-                        Span::new(" ".to_owned()),
-                    ];
-                    line_spans.extend(spans);
-                    blocks.push(Block::line(line_spans));
-                    is_first_line = false;
-                } else {
-                    let mut line_spans = vec![Span::new(" ".repeat(prefix_width))];
-                    line_spans.extend(spans);
-                    blocks.push(Block::line(line_spans));
-                }
-
-                byte_pos = byte_pos.saturating_add(line_text.len());
-            }
-            byte_pos = byte_pos.saturating_add(1); // account for \n between lines
-        }
-        if input_with_cursor.ends_with('\n') {
-            blocks.push(Block::line(vec![Span::new(" ".repeat(prefix_width))]));
-        }
+        let render_ctx = LineRenderCtx {
+            cursor_char,
+            command_ids: ctx.command_ids,
+            role_icon: &role_icon,
+            prefix_width,
+            sel_start,
+            sel_end,
+        };
+        emit_input_body(&mut blocks, &input_with_cursor, wrap_width, &render_ctx);
     }
 
     // Show hint when next Enter will send
@@ -154,7 +213,7 @@ pub(crate) fn render_input_blocks(
     let ends_with_empty_line =
         original_input.ends_with('\n') || original_input.lines().last().is_some_and(|l| l.trim().is_empty());
     if !original_input.is_empty() && at_end && ends_with_empty_line {
-        blocks.push(Block::line(vec![Span::styled("  ↵ Enter to send".to_owned(), Semantic::Muted)]));
+        blocks.push(Block::line(vec![Span::styled("  \u{21b5} Enter to send".to_owned(), Semantic::Muted)]));
     }
 
     blocks.push(Block::line(vec![Span::new(String::new())]));
@@ -183,6 +242,30 @@ const fn compute_post_insertion_selection(
     }
 }
 
+/// Split a span straddling a selection boundary into up-to-three pieces
+/// (before / selected-reversed / after), pushing each non-empty piece.
+fn split_span_at_selection(result: &mut Vec<Span>, span: &Span, clip_start: usize, clip_end: usize) {
+    // Before selection
+    if clip_start > 0
+        && let Some(before_text) = span.text.get(..clip_start)
+        && !before_text.is_empty()
+    {
+        result.push(Span { text: before_text.to_owned(), ..span.clone() });
+    }
+    // Selected part
+    if let Some(sel_text) = span.text.get(clip_start..clip_end)
+        && !sel_text.is_empty()
+    {
+        result.push(Span { text: sel_text.to_owned(), reversed: true, ..span.clone() });
+    }
+    // After selection
+    if let Some(after_text) = span.text.get(clip_end..)
+        && !after_text.is_empty()
+    {
+        result.push(Span { text: after_text.to_owned(), ..span.clone() });
+    }
+}
+
 /// Apply selection highlighting (reversed style) to spans within a selection range.
 /// `line_offset` is the byte position of this line's text within the full `input_with_cursor`.
 fn apply_selection_to_spans(spans: Vec<Span>, line_offset: usize, sel_start: usize, sel_end: usize) -> Vec<Span> {
@@ -204,132 +287,13 @@ fn apply_selection_to_spans(spans: Vec<Span>, line_offset: usize, sel_start: usi
             // Partially overlapping — split at selection boundaries
             let clip_start = sel_start.saturating_sub(span_start).min(span_len);
             let clip_end = sel_end.saturating_sub(span_start).min(span_len);
-
-            // Before selection
-            if clip_start > 0
-                && let Some(before_text) = span.text.get(..clip_start)
-                && !before_text.is_empty()
-            {
-                result.push(Span { text: before_text.to_owned(), ..span.clone() });
-            }
-            // Selected part
-            if let Some(sel_text) = span.text.get(clip_start..clip_end)
-                && !sel_text.is_empty()
-            {
-                result.push(Span { text: sel_text.to_owned(), reversed: true, ..span.clone() });
-            }
-            // After selection
-            if let Some(after_text) = span.text.get(clip_end..)
-                && !after_text.is_empty()
-            {
-                result.push(Span { text: after_text.to_owned(), ..span.clone() });
-            }
+            split_span_at_selection(&mut result, &span, clip_start, clip_end);
         }
 
         offset = span_end;
     }
 
     result
-}
-
-// ── Paste sentinel expansion ─────────────────────────────────────────
-
-/// Pre-process input string: replace sentinel markers with display placeholders.
-/// Maps cursor and optional anchor positions through the expansion.
-fn expand_paste_sentinels(
-    raw_input: &str,
-    raw_cursor: usize,
-    raw_anchor: Option<usize>,
-    ctx: &InputBlockCtx<'_>,
-) -> (String, usize, Option<usize>) {
-    if !raw_input.contains(SENTINEL_CHAR) {
-        return (raw_input.to_string(), raw_cursor, raw_anchor);
-    }
-
-    let paste_buffers = ctx.paste_buffers;
-    let paste_buffer_labels = ctx.paste_buffer_labels;
-
-    let mut result = String::new();
-    let mut new_cursor = raw_cursor;
-    let mut new_anchor = raw_anchor;
-    let mut i = 0;
-    let bytes = raw_input.as_bytes();
-
-    while i < bytes.len() {
-        let Some(&byte_val) = bytes.get(i) else { break };
-        if byte_val == 0 {
-            let start = i;
-            i = i.saturating_add(1);
-            let idx_start = i;
-            while i < bytes.len() {
-                let Some(&inner_byte) = bytes.get(i) else { break };
-                if inner_byte == 0 {
-                    break;
-                }
-                i = i.saturating_add(1);
-            }
-            if i < bytes.len() {
-                let idx_str = raw_input.get(idx_start..i).unwrap_or("");
-                i = i.saturating_add(1);
-                let sentinel_len = i.saturating_sub(start);
-
-                if let Ok(idx) = idx_str.parse::<usize>() {
-                    let label = paste_buffer_labels.get(idx).and_then(|l| l.as_ref());
-                    let display_text = label.map_or_else(
-                        || {
-                            let (token_count, line_count) = paste_buffers
-                                .get(idx)
-                                .map_or((0, 0), |s| (crate::state::estimate_tokens(s), s.lines().count().max(1)));
-                            format!(
-                                "{}📋 Paste #{} ({} lines, {} tok){}",
-                                PASTE_PLACEHOLDER_START,
-                                idx.saturating_add(1),
-                                line_count,
-                                token_count,
-                                PASTE_PLACEHOLDER_END
-                            )
-                        },
-                        |cmd_name| {
-                            let content = paste_buffers.get(idx).map_or("", |s| s.as_str());
-                            format!("{PASTE_PLACEHOLDER_START}⚡/{cmd_name}\n{content}{PASTE_PLACEHOLDER_END}")
-                        },
-                    );
-                    let placeholder_len = display_text.len();
-
-                    // Remap cursor
-                    if raw_cursor > start {
-                        if raw_cursor >= start.saturating_add(sentinel_len) {
-                            new_cursor = new_cursor.saturating_add(placeholder_len).saturating_sub(sentinel_len);
-                        } else {
-                            new_cursor = result.len().saturating_add(placeholder_len);
-                        }
-                    }
-                    // Remap anchor
-                    if let Some(ra) = raw_anchor
-                        && ra > start
-                    {
-                        new_anchor = Some(if ra >= start.saturating_add(sentinel_len) {
-                            new_anchor.unwrap_or(0).saturating_add(placeholder_len).saturating_sub(sentinel_len)
-                        } else {
-                            result.len().saturating_add(placeholder_len)
-                        });
-                    }
-
-                    result.push_str(&display_text);
-                } else {
-                    result.push_str(raw_input.get(start..i).unwrap_or(""));
-                }
-            } else {
-                result.push_str(raw_input.get(start..).unwrap_or(""));
-            }
-        } else {
-            let remainder_ch = raw_input.get(i..).unwrap_or("").chars().next().unwrap_or('\0');
-            result.push(remainder_ch);
-            i = i.saturating_add(remainder_ch.len_utf8());
-        }
-    }
-
-    (result, new_cursor, new_anchor)
 }
 
 // ── Input span building ──────────────────────────────────────────────
@@ -396,6 +360,37 @@ fn split_paste_placeholders(line: &str) -> Vec<InputSegment> {
     segments
 }
 
+/// Split a command line into its command part (first `matched_cmd_len` visible
+/// chars) and the rest, keeping the cursor char attached to whichever side it
+/// falls on.
+fn split_cmd_rest(text: &str, matched_cmd_len: usize, cursor_char: &str) -> (String, String) {
+    let mut cmd_part = String::new();
+    let mut rest_part = String::new();
+    let mut chars_consumed: usize = 0;
+    let mut in_cmd = true;
+
+    for text_ch in text.chars() {
+        if text_ch.to_string() == cursor_char {
+            if in_cmd {
+                cmd_part.push(text_ch);
+            } else {
+                rest_part.push(text_ch);
+            }
+            continue;
+        }
+        if in_cmd && chars_consumed >= matched_cmd_len {
+            in_cmd = false;
+        }
+        if in_cmd {
+            cmd_part.push(text_ch);
+        } else {
+            rest_part.push(text_ch);
+        }
+        chars_consumed = chars_consumed.saturating_add(1);
+    }
+    (cmd_part, rest_part)
+}
+
 /// Build IR spans for a plain text segment (no paste placeholders).
 fn build_text_spans_ir(text: &str, cursor_char: &str, command_ids: &[String]) -> Vec<Span> {
     let mut spans: Vec<Span> = Vec::new();
@@ -419,31 +414,7 @@ fn build_text_spans_ir(text: &str, cursor_char: &str, command_ids: &[String]) ->
     };
 
     if is_command {
-        let mut cmd_part = String::new();
-        let mut rest_part = String::new();
-        let mut chars_consumed: usize = 0;
-        let mut in_cmd = true;
-
-        for text_ch in text.chars() {
-            if text_ch.to_string() == cursor_char {
-                if in_cmd {
-                    cmd_part.push(text_ch);
-                } else {
-                    rest_part.push(text_ch);
-                }
-                continue;
-            }
-            if in_cmd && chars_consumed >= matched_cmd_len {
-                in_cmd = false;
-            }
-            if in_cmd {
-                cmd_part.push(text_ch);
-            } else {
-                rest_part.push(text_ch);
-            }
-            chars_consumed = chars_consumed.saturating_add(1);
-        }
-
+        let (cmd_part, rest_part) = split_cmd_rest(text, matched_cmd_len, cursor_char);
         push_with_cursor_ir(&mut spans, &cmd_part, cursor_char, Semantic::Accent);
         push_with_cursor_ir(&mut spans, &rest_part, cursor_char, Semantic::Default);
     } else {
@@ -468,6 +439,8 @@ fn push_with_cursor_ir(spans: &mut Vec<Span>, text: &str, cursor_char: &str, sem
         }
     } else if !text.is_empty() {
         spans.push(Span::styled(text.to_owned(), semantic));
+    } else {
+        // Empty text with no cursor — nothing to push.
     }
 }
 

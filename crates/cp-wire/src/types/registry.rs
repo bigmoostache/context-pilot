@@ -10,6 +10,10 @@ use serde::{Deserialize, Serialize};
 /// One agent's registration record, written atomically (tmp + rename) on
 /// boot and updated only on status changes — **not** per heartbeat.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[expect(
+    clippy::exhaustive_structs,
+    reason = "registry-record contract: Entry is a 14-field agent discovery record written cross-crate by the bridge boot path and read field-by-field by the backend; a constructor would take 13 positional arguments (tripping too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible and the exhaustive literal is the honest shape"
+)]
 pub struct Entry {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,
@@ -60,6 +64,10 @@ pub struct Entry {
 /// derive a richer verdict (design doc §10).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "wire-protocol contract: AgentStatus is a closed lifecycle set written cross-crate into the registry entry and matched exhaustively by the backend; #[non_exhaustive] would forbid that construction"
+)]
 pub enum AgentStatus {
     /// Agent is booting (bridge init in progress).
     Starting,

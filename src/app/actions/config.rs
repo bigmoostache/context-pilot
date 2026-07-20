@@ -44,7 +44,7 @@ pub(crate) fn handle_config_increase_bar(state: &mut State) -> ActionResult {
         }
         1 => {
             // Cleaning threshold
-            state.cleaning_threshold = (state.cleaning_threshold + 0.05).min(0.95);
+            state.cleaning_threshold = cp_base::cast::float_math::add_f32(state.cleaning_threshold, 0.05).min(0.95);
         }
         _ => {}
     }
@@ -65,7 +65,7 @@ pub(crate) fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
         }
         1 => {
             // Cleaning threshold
-            state.cleaning_threshold = (state.cleaning_threshold - 0.05).max(0.30);
+            state.cleaning_threshold = cp_base::cast::float_math::sub_f32(state.cleaning_threshold, 0.05).max(0.30);
         }
         _ => {}
     }
@@ -79,7 +79,7 @@ pub(crate) fn handle_config_next_theme(state: &mut State) -> ActionResult {
     let current_idx = THEME_ORDER.iter().position(|&t| t == state.active_theme).unwrap_or(0);
     let next_idx = wrap_next(current_idx, THEME_ORDER.len());
     let Some(theme) = THEME_ORDER.get(next_idx) else { return ActionResult::Nothing };
-    state.active_theme = (*theme).to_string();
+    (*theme).clone_into(&mut state.active_theme);
     crate::infra::config::set_active_theme(&state.active_theme);
     state.flags.ui.dirty = true;
     ActionResult::Save
@@ -91,7 +91,7 @@ pub(crate) fn handle_config_prev_theme(state: &mut State) -> ActionResult {
     let current_idx = THEME_ORDER.iter().position(|&t| t == state.active_theme).unwrap_or(0);
     let prev_idx = if current_idx == 0 { THEME_ORDER.len().saturating_sub(1) } else { current_idx.saturating_sub(1) };
     let Some(theme) = THEME_ORDER.get(prev_idx) else { return ActionResult::Nothing };
-    state.active_theme = (*theme).to_string();
+    (*theme).clone_into(&mut state.active_theme);
     crate::infra::config::set_active_theme(&state.active_theme);
     state.flags.ui.dirty = true;
     ActionResult::Save

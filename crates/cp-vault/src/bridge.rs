@@ -29,7 +29,7 @@ use crate::types::{KeyStatus, SecretString, Vault, VaultError};
 const DEFAULT_ORCH_URL: &str = "http://127.0.0.1:7878";
 
 /// Interval between background cache refreshes.
-const REFRESH_INTERVAL: Duration = Duration::from_secs(300);
+const REFRESH_INTERVAL: Duration = Duration::from_mins(5);
 
 /// HTTP connect timeout for orchestrator requests.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -95,31 +95,8 @@ impl Backend {
     ///
     /// Returns `true` on success, `false` on any failure (network, parse).
     fn refresh_from_orchestrator(&self) -> bool {
-        let url = format!("{}/api/vault/snapshot", self.orch_url);
-        let Ok(client) =
-            reqwest::blocking::Client::builder().connect_timeout(CONNECT_TIMEOUT).timeout(REQUEST_TIMEOUT).build()
-        else {
+        let Some(snapshot) = fetch_snapshot(&self.orch_url) else {
             return false;
-        };
-
-        let response = match client.get(&url).send() {
-            Ok(r) if r.status().is_success() => r,
-            Ok(r) => {
-                log::warn!("vault snapshot: HTTP {}", r.status());
-                return false;
-            }
-            Err(e) => {
-                log::warn!("vault snapshot unreachable: {e}");
-                return false;
-            }
-        };
-
-        let snapshot: BTreeMap<String, String> = match response.json() {
-            Ok(m) => m,
-            Err(e) => {
-                log::warn!("vault snapshot: bad JSON: {e}");
-                return false;
-            }
         };
 
         // Update in-memory cache.
@@ -168,21 +145,8 @@ impl Backend {
             loop {
                 thread::sleep(REFRESH_INTERVAL);
 
-                let url = format!("{orch_url}/api/vault/snapshot");
-                let Ok(client) = reqwest::blocking::Client::builder()
-                    .connect_timeout(CONNECT_TIMEOUT)
-                    .timeout(REQUEST_TIMEOUT)
-                    .build()
-                else {
+                let Some(snapshot) = fetch_snapshot(&orch_url) else {
                     continue;
-                };
-                let response = match client.get(&url).send() {
-                    Ok(r) if r.status().is_success() => r,
-                    _ => continue,
-                };
-                let snapshot: BTreeMap<String, String> = match response.json() {
-                    Ok(m) => m,
-                    Err(_) => continue,
                 };
                 if let Ok(mut guard) = cache.write() {
                     guard.clear();
@@ -274,6 +238,38 @@ impl Vault for Backend {
                     && self.get(def.canonical).is_none()
             })
             .collect()
+    }
+}
+
+/// Fetch the credential snapshot from the orchestrator over HTTP.
+///
+/// Returns `None` (with a granular `warn!`) on any failure — unreachable
+/// orchestrator, non-2xx status, or malformed JSON — so callers can fall back
+/// to the disk cache. Factored out of [`Backend::refresh_from_orchestrator`]
+/// and the background refresh thread, which share this exact fetch.
+fn fetch_snapshot(orch_url: &str) -> Option<BTreeMap<String, String>> {
+    let url = format!("{orch_url}/api/vault/snapshot");
+    let client =
+        reqwest::blocking::Client::builder().connect_timeout(CONNECT_TIMEOUT).timeout(REQUEST_TIMEOUT).build().ok()?;
+
+    let response = match client.get(&url).send() {
+        Ok(r) if r.status().is_success() => r,
+        Ok(r) => {
+            log::warn!("vault snapshot: HTTP {}", r.status());
+            return None;
+        }
+        Err(e) => {
+            log::warn!("vault snapshot unreachable: {e}");
+            return None;
+        }
+    };
+
+    match response.json() {
+        Ok(m) => Some(m),
+        Err(e) => {
+            log::warn!("vault snapshot: bad JSON: {e}");
+            None
+        }
     }
 }
 

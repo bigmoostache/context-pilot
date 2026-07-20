@@ -3,7 +3,7 @@ use super::*;
 
 /// Helper: create a simple text content block.
 fn make_text_block(text: &str) -> ContentBlock {
-    ContentBlock::Text { text: text.to_string() }
+    ContentBlock::Text { text: text.to_owned() }
 }
 
 /// Helper: create N alternating user/assistant messages, one text block each.
@@ -11,7 +11,7 @@ fn make_messages(block_count: usize) -> Vec<ApiMessage> {
     let mut msgs: Vec<ApiMessage> = Vec::new();
     for idx in 0..block_count {
         let role = if idx & 1 == 0 { "user" } else { "assistant" };
-        msgs.push(ApiMessage { role: role.to_string(), content: vec![make_text_block(&format!("block_{idx}"))] });
+        msgs.push(ApiMessage { role: role.to_owned(), content: vec![make_text_block(&format!("block_{idx}"))] });
     }
     msgs
 }
@@ -49,18 +49,18 @@ fn same_content_produces_same_hash() {
 #[test]
 fn tool_use_different_inputs_produce_different_hashes() {
     let msg_a = vec![ApiMessage {
-        role: "assistant".to_string(),
+        role: "assistant".to_owned(),
         content: vec![ContentBlock::ToolUse {
-            id: "call_1".to_string(),
-            name: "Edit".to_string(),
+            id: "call_1".to_owned(),
+            name: "Edit".to_owned(),
             input: serde_json::json!({"file_path": "/foo.rs", "old_string": "aaa", "new_string": "bbb"}),
         }],
     }];
     let msg_b = vec![ApiMessage {
-        role: "assistant".to_string(),
+        role: "assistant".to_owned(),
         content: vec![ContentBlock::ToolUse {
-            id: "call_1".to_string(),
-            name: "Edit".to_string(),
+            id: "call_1".to_owned(),
+            name: "Edit".to_owned(),
             input: serde_json::json!({"file_path": "/bar.rs", "old_string": "xxx", "new_string": "yyy"}),
         }],
     }];
@@ -79,16 +79,16 @@ fn tool_use_different_inputs_produce_different_hashes() {
 fn tool_use_different_ids_produce_different_hashes() {
     let input = serde_json::json!({"query": "hello"});
     let msg_a = vec![ApiMessage {
-        role: "assistant".to_string(),
+        role: "assistant".to_owned(),
         content: vec![ContentBlock::ToolUse {
-            id: "call_aaa".to_string(),
-            name: "brave_search".to_string(),
+            id: "call_aaa".to_owned(),
+            name: "brave_search".to_owned(),
             input: input.clone(),
         }],
     }];
     let msg_b = vec![ApiMessage {
-        role: "assistant".to_string(),
-        content: vec![ContentBlock::ToolUse { id: "call_bbb".to_string(), name: "brave_search".to_string(), input }],
+        role: "assistant".to_owned(),
+        content: vec![ContentBlock::ToolUse { id: "call_bbb".to_owned(), name: "brave_search".to_owned(), input }],
     }];
 
     let infos_a = compute_accumulated_hashes(&msg_a);
@@ -102,12 +102,12 @@ fn tool_use_different_ids_produce_different_hashes() {
 #[test]
 fn prune_removes_old_entries() {
     let mut engine = CacheEngine::default();
-    let now = 1_000_000_u64;
+    let now = 1_000_000u64;
     engine.breakpoints.push(BreakpointEntry {
-        acc_hash: "old".to_string(),
+        acc_hash: "old".to_owned(),
         timestamp_ms: now.saturating_sub(CACHE_TTL_MS).saturating_sub(1),
     });
-    engine.breakpoints.push(BreakpointEntry { acc_hash: "fresh".to_string(), timestamp_ms: now });
+    engine.breakpoints.push(BreakpointEntry { acc_hash: "fresh".to_owned(), timestamp_ms: now });
     engine.prune(now);
     assert_eq!(engine.breakpoints.len(), 1);
     assert_eq!(engine.breakpoints.first().map(|bp| bp.acc_hash.as_str()), Some("fresh"));
@@ -138,7 +138,7 @@ fn beacon_placed_after_frontier() {
 
     let plan = engine.compute_breakpoints(&msgs);
     // Beacon at 0-indexed position 30 → msg_idx 30
-    let has_beacon_near_30 = plan.positions.iter().any(|(msg_idx, _)| *msg_idx >= 28 && *msg_idx <= 32);
+    let has_beacon_near_30 = plan.positions.iter().any(|entry| entry.0 >= 28 && entry.0 <= 32);
     assert!(has_beacon_near_30, "expected beacon near position 30, got {:?}", plan.positions);
 }
 
@@ -149,19 +149,19 @@ fn no_frontier_beacon_at_tail() {
 
     let plan = engine.compute_breakpoints(&msgs);
     // With no frontier, beacon goes to last block (idx 9)
-    let has_tail = plan.positions.iter().any(|(msg_idx, _)| *msg_idx >= 7);
+    let has_tail = plan.positions.iter().any(|entry| entry.0 >= 7);
     assert!(has_tail, "expected beacon near tail, got {:?}", plan.positions);
 }
 
 #[test]
 fn record_and_retrieve() {
     let mut engine = CacheEngine::default();
-    let hashes = vec!["hash_a".to_string(), "hash_b".to_string()];
+    let hashes = vec!["hash_a".to_owned(), "hash_b".to_owned()];
     engine.record_breakpoints(&hashes, 1_000_000);
     assert_eq!(engine.breakpoints.len(), 2);
 
     // Recording same hash again should refresh, not duplicate
-    engine.record_breakpoints(&["hash_a".to_string()], 2_000_000);
+    engine.record_breakpoints(&["hash_a".to_owned()], 2_000_000);
     assert_eq!(engine.breakpoints.len(), 2);
     let ts = engine.breakpoints.iter().find(|bp| bp.acc_hash == "hash_a").map(|bp| bp.timestamp_ms);
     assert_eq!(ts, Some(2_000_000));
@@ -170,7 +170,7 @@ fn record_and_retrieve() {
 #[test]
 fn serialization_roundtrip() {
     let mut engine = CacheEngine::default();
-    engine.breakpoints.push(BreakpointEntry { acc_hash: "test_hash".to_string(), timestamp_ms: 12345 });
+    engine.breakpoints.push(BreakpointEntry { acc_hash: "test_hash".to_owned(), timestamp_ms: 12345 });
 
     let json = engine.to_json();
     let restored = CacheEngine::from_json(&json);
@@ -206,7 +206,7 @@ fn optimizer_spreads_bps() {
 
     // BPs should not all be clustered in the same region
     if plan.positions.len() >= 3 {
-        let mut msg_indices: Vec<usize> = plan.positions.iter().map(|(m, _)| *m).collect();
+        let mut msg_indices: Vec<usize> = plan.positions.iter().map(|entry| entry.0).collect();
         msg_indices.sort_unstable();
         let last = msg_indices.last().copied().unwrap_or(0);
         let first = msg_indices.first().copied().unwrap_or(0);
@@ -249,7 +249,7 @@ fn full_pipeline_with_frontier() {
     assert_eq!(plan.alive_count, 1);
 
     // Beacon should be around block 40 (20 + LOOKBACK_WINDOW)
-    let has_near_40 = plan.positions.iter().any(|(msg_idx, _)| *msg_idx >= 35 && *msg_idx <= 45);
+    let has_near_40 = plan.positions.iter().any(|entry| entry.0 >= 35 && entry.0 <= 45);
     assert!(has_near_40, "expected a BP near block 40, got {:?}", plan.positions);
 }
 

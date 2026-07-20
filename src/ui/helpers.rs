@@ -1,17 +1,18 @@
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 use unicode_width::UnicodeWidthStr as _;
 
 /// Truncate a string to fit within `max_width` display columns, appending '…' if truncated.
 pub(crate) fn truncate_string(s: &str, max_width: usize) -> String {
     if s.width() <= max_width {
-        s.to_string()
+        s.to_owned()
     } else {
         let mut result = String::new();
         let mut width = 0usize;
         for c in s.chars() {
             let cw = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
             if width.saturating_add(cw).saturating_add(1) > max_width {
-                result.push('…');
+                result.push('\u{2026}');
                 break;
             }
             result.push(c);
@@ -24,11 +25,11 @@ pub(crate) fn truncate_string(s: &str, max_width: usize) -> String {
 /// Format a number with K/M suffix for compact display.
 pub(crate) fn format_number(n: usize) -> String {
     if n >= 1_000_000_000 {
-        format!("{:.1}B", n.to_f64() / 1_000_000_000.0)
+        format!("{:.1}B", float_math::div_u64(n.to_u64(), 1_000_000_000.0f64))
     } else if n >= 1_000_000 {
-        format!("{:.1}M", n.to_f64() / 1_000_000.0)
+        format!("{:.1}M", float_math::div_u64(n.to_u64(), 1_000_000.0f64))
     } else if n >= 1_000 {
-        format!("{:.1}K", n.to_f64() / 1_000.0)
+        format!("{:.1}K", float_math::div_u64(n.to_u64(), 1_000.0f64))
     } else {
         n.to_string()
     }
@@ -52,7 +53,7 @@ pub(crate) fn format_time_ago(delta_ms: u64) -> String {
 /// Word-wrap text to fit within a given width.
 pub(crate) fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     if max_width == 0 {
-        return vec![text.to_string()];
+        return vec![text.to_owned()];
     }
 
     let mut lines = Vec::new();
@@ -64,7 +65,7 @@ pub(crate) fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
 
         if current_width == 0 {
             // First word on line
-            current_line = word.to_string();
+            word.clone_into(&mut current_line);
             current_width = word_width;
         } else if current_width.saturating_add(1).saturating_add(word_width) <= max_width {
             // Word fits on current line
@@ -73,8 +74,8 @@ pub(crate) fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
             current_width = current_width.saturating_add(1).saturating_add(word_width);
         } else {
             // Word doesn't fit, start new line
-            lines.push(current_line);
-            current_line = word.to_string();
+            lines.push(std::mem::take(&mut current_line));
+            word.clone_into(&mut current_line);
             current_width = word_width;
         }
     }
@@ -134,14 +135,17 @@ pub(crate) fn count_wrapped_lines(line: &ratatui::prelude::Line<'_>, max_width: 
 // ─── Spinner ─────────────────────────────────────────────────────────────────
 
 /// Braille spinner frames (smooth 10-frame animation)
-const SPINNER_BRAILLE: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const SPINNER_BRAILLE: &[&str] = &[
+    "\u{280b}", "\u{2819}", "\u{2839}", "\u{2838}", "\u{283c}", "\u{2834}", "\u{2826}", "\u{2827}", "\u{2807}",
+    "\u{280f}",
+];
 
 /// Get a braille spinner frame derived from the current wall-clock time.
 /// Rotates at 10fps (100ms per frame), independent of any frame counter.
 pub(crate) fn spinner() -> &'static str {
     let frame = cp_base::panels::now_ms().checked_div(100).unwrap_or(0);
     let idx = frame.to_usize().checked_rem(SPINNER_BRAILLE.len()).unwrap_or(0);
-    SPINNER_BRAILLE.get(idx).copied().unwrap_or("⠋")
+    SPINNER_BRAILLE.get(idx).copied().unwrap_or("\u{280b}")
 }
 
 // ─── Syntax Highlighting ─────────────────────────────────────────────────────
@@ -223,8 +227,8 @@ fn do_highlight_ir(path: &str, content: &str) -> IrHighlightResult {
         let spans: Vec<cp_render::Span> = ranges
             .into_iter()
             .map(|(style, text)| {
-                let text = text.trim_end_matches('\n').to_string();
-                cp_render::Span::rgb(text, style.foreground.r, style.foreground.g, style.foreground.b)
+                let trimmed = text.trim_end_matches('\n').to_owned();
+                cp_render::Span::rgb(trimmed, style.foreground.r, style.foreground.g, style.foreground.b)
             })
             .collect();
 
@@ -271,7 +275,7 @@ impl TypewriterBuffer {
             chunk_sizes: VecDeque::new(),
             last_chunk_time: None,
             last_char_time: Instant::now(),
-            chars_per_ms: 1.0 / TYPEWRITER_DEFAULT_DELAY_MS,
+            chars_per_ms: float_math::div(1.0, TYPEWRITER_DEFAULT_DELAY_MS),
             stream_done: false,
         }
     }
@@ -283,7 +287,7 @@ impl TypewriterBuffer {
         self.chunk_sizes.clear();
         self.last_chunk_time = None;
         self.last_char_time = Instant::now();
-        self.chars_per_ms = 1.0 / TYPEWRITER_DEFAULT_DELAY_MS;
+        self.chars_per_ms = float_math::div(1.0, TYPEWRITER_DEFAULT_DELAY_MS);
         self.stream_done = false;
     }
 
@@ -319,16 +323,17 @@ impl TypewriterBuffer {
             return;
         }
 
-        let total_interval_ms: f64 = self.chunk_intervals.iter().map(|d| d.as_secs_f64() * 1000.0).sum();
-        let avg_interval_ms = total_interval_ms / self.chunk_intervals.len().to_f64();
+        let total_interval_ms: f64 =
+            self.chunk_intervals.iter().map(|d| float_math::mul(d.as_secs_f64(), 1_000.0f64)).sum();
+        let avg_interval_ms = float_math::div(total_interval_ms, self.chunk_intervals.len().to_f64());
 
         let total_chars: usize = self.chunk_sizes.iter().sum();
-        let avg_chunk_size = total_chars.to_f64() / self.chunk_sizes.len().to_f64();
+        let avg_chunk_size = float_math::div(total_chars.to_f64(), self.chunk_sizes.len().to_f64());
 
-        if avg_interval_ms > 0.0 && avg_chunk_size > 0.0 {
-            let calculated_delay = avg_interval_ms / avg_chunk_size;
+        if avg_interval_ms > 0.0f64 && avg_chunk_size > 0.0f64 {
+            let calculated_delay = float_math::div(avg_interval_ms, avg_chunk_size);
             let clamped_delay = calculated_delay.clamp(TYPEWRITER_MIN_DELAY_MS, TYPEWRITER_MAX_DELAY_MS);
-            self.chars_per_ms = 1.0 / clamped_delay;
+            self.chars_per_ms = float_math::div(1.0, clamped_delay);
         }
     }
 
@@ -345,8 +350,8 @@ impl TypewriterBuffer {
         }
 
         let now = Instant::now();
-        let elapsed_ms = now.duration_since(self.last_char_time).as_secs_f64() * 1000.0;
-        let chars_to_release = (elapsed_ms * self.chars_per_ms).floor().to_usize();
+        let elapsed_ms = float_math::mul(now.duration_since(self.last_char_time).as_secs_f64(), 1_000.0f64);
+        let chars_to_release = float_math::mul(elapsed_ms, self.chars_per_ms).floor().to_usize();
 
         if chars_to_release == 0 {
             return None;

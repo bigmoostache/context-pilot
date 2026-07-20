@@ -31,9 +31,6 @@ use cp_wire::types::registry::Entry;
 /// unchanged by the split).
 pub use crate::registry::tailer::Tailer;
 
-/// Schema version stamped onto command frames this channel sends.
-const FRAME_SCHEMA_VERSION: u32 = 1;
-
 /// Subdirectory of the oplog directory holding spilled body files.
 const BODIES_DIR: &str = "bodies";
 
@@ -121,7 +118,7 @@ impl AgentChannel {
     /// the socket write fails, the ack is not received within
     /// [`ACK_READ_TIMEOUT`], or the response cannot be decoded.
     pub fn send(&self, command: Command) -> io::Result<Ack> {
-        let frame = CommandFrame { schema_version: FRAME_SCHEMA_VERSION, auth: self.cap_token.clone(), command };
+        let frame = CommandFrame::new(self.cap_token.clone(), command);
         let payload =
             serde_json::to_vec(&frame).map_err(|e| io::Error::other(format!("serialize command frame: {e}")))?;
         let frame_bytes = framing::encode_raw(&payload).map_err(|e| io::Error::other(format!("frame command: {e}")))?;
@@ -245,13 +242,7 @@ mod tests {
 
     /// Build a minimal Command for testing.
     fn test_command(dedup: &str) -> Command {
-        Command {
-            schema_version: 1,
-            id: format!("cmd-{dedup}"),
-            seq: 1,
-            dedup_token: dedup.to_owned(),
-            kind: cp_wire::types::command::Kind::Stop,
-        }
+        Command::new(format!("cmd-{dedup}"), 1, dedup.to_owned(), cp_wire::types::command::Kind::Stop)
     }
 
     /// A minimal echo-ack server: reads one framed CommandFrame, writes back
@@ -270,7 +261,7 @@ mod tests {
             }
         }
         // We don't need to parse the command — just ack it.
-        let ack = Ack { schema_version: 1, cmd_id: "cmd-echo".to_owned(), status: Status::Accepted, rev: Some(42) };
+        let ack = Ack::new("cmd-echo".to_owned(), Status::Accepted, Some(42));
         let payload = serde_json::to_vec(&ack).expect("ser");
         let frame = framing::encode_raw(&payload).expect("frame");
         conn.write_all(&frame).expect("write");

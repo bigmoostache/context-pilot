@@ -123,7 +123,7 @@ pub mod flame {
             if !is_enabled() {
                 return None;
             }
-            SPAN_STACK.with(|s| s.borrow_mut().push((name.to_string(), 0)));
+            SPAN_STACK.with(|s| s.borrow_mut().push((name.to_owned(), 0)));
             Some(Self { start: Instant::now() })
         }
     }
@@ -136,11 +136,11 @@ pub mod flame {
                 let mut stack = s.borrow_mut();
 
                 // Self-time = total minus accumulated children time.
-                let children_us = stack.last().map_or(0, |(_, c)| *c);
+                let children_us = stack.last().map_or(0, |entry| entry.1);
                 let self_us = total_us.saturating_sub(children_us);
 
                 // Build the folded stack path: "parent;child;grandchild".
-                let folded: String = stack.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>().join(";");
+                let folded: String = stack.iter().map(|entry| entry.0.as_str()).collect::<Vec<_>>().join(";");
 
                 // Only emit if there's meaningful self-time (>0 µs).
                 if self_us > 0 {
@@ -151,8 +151,8 @@ pub mod flame {
                 drop(stack.pop());
 
                 // Propagate total time to the parent's children accumulator.
-                if let Some((_, parent_children)) = stack.last_mut() {
-                    *parent_children = parent_children.saturating_add(total_us);
+                if let Some(entry) = stack.last_mut() {
+                    entry.1 = entry.1.saturating_add(total_us);
                 }
             });
         }
@@ -175,6 +175,38 @@ macro_rules! flame {
     ($name:expr) => {
         $crate::flame::Guard::new($name)
     };
+}
+
+/// Match a shared reference by dereferencing the place, funneling the one
+/// `ref`-binding suppression the workspace needs into a single audited site.
+///
+/// `clippy::pattern_type_mismatch` (forbid) rejects matching a variant pattern
+/// against a `&Enum` via match ergonomics; its mandated fix is to dereference
+/// the scrutinee (`match *place`) and bind non-`Copy` fields with `ref`. But
+/// `clippy::ref_patterns` (also forbid) rejects `ref`. The two restriction
+/// lints are mutually exclusive for destructuring a non-`Copy` field out of a
+/// shared reference, so every such site routes through this macro — the single
+/// ref-pattern suppression inside it covers all expansions.
+///
+/// Enums whose matched fields are all `Copy` (or fieldless) need no `ref` and
+/// should use a plain `match *place` instead — this macro is only for the
+/// irreducible non-`Copy` case.
+///
+/// ```ignore
+/// deref_match!(self, {
+///     Self::Named(ref s) => write!(f, "{s}"),
+///     Self::Count(n)     => write!(f, "{n}"),
+/// })
+/// ```
+#[macro_export]
+macro_rules! deref_match {
+    ($place:expr, { $($arm:tt)* }) => {{
+        #[expect(
+            clippy::ref_patterns,
+            reason = "clippy::pattern_type_mismatch mandates ref bindings when destructuring non-Copy fields out of a shared reference; the two restriction lints are mutually exclusive, so the deref-plus-ref form is funneled through this one macro"
+        )]
+        match *$place { $($arm)* }
+    }};
 }
 
 /// Module trait: tools, panels, lifecycle hooks for pluggable functionality.
@@ -201,17 +233,16 @@ mod tests {
     #[test]
     fn config_yaml_deserialization() {
         // Each access forces the LazyLock to parse — panics if YAML is malformed.
-        let _ = &*super::config::PROMPTS;
-        let _ = &*super::config::LIBRARY;
-        let _ = &*super::config::UI;
-        let _ = &*super::config::THEMES;
-        let _ = &*super::config::INJECTIONS;
-        let _ = &*super::config::REVERIE;
+        let _: &Prompts = &super::config::PROMPTS;
+        let _: &Library = &super::config::LIBRARY;
+        let _: &Ui = &super::config::UI;
+        let _: &Themes = &super::config::THEMES;
+        let _: &Injections = &super::config::INJECTIONS;
+        let _: &Reverie = &super::config::REVERIE;
     }
 
     /// Validate every tool YAML file parses into `ToolTexts`.
     #[test]
-    #[expect(clippy::panic, reason = "test assertions use panic for tool YAML validation")]
     fn tool_yaml_deserialization() {
         let yamls: Vec<(&str, &str)> = vec![
             ("brave", include_str!("../../../yamls/tools/brave.yaml")),
@@ -234,43 +265,32 @@ mod tests {
             ("todo", include_str!("../../../yamls/tools/todo.yaml")),
             ("tree", include_str!("../../../yamls/tools/tree.yaml")),
         ];
-        for (name, content) in &yamls {
-            // Panics with a clear message if schema doesn't match ToolTexts
-            drop(
-                serde_yaml::from_str::<ToolTexts>(content)
-                    .unwrap_or_else(|e| panic!("yamls/tools/{name}.yaml failed to parse: {e}")),
-            );
+        for &(name, content) in &yamls {
+            // `assert!` reports a clear schema-mismatch message on failure
+            // without tripping clippy::panic (which flags `panic!`) or
+            // expect_used (which flags `.expect()`).
+            let parsed = serde_yaml::from_str::<ToolTexts>(content);
+            assert!(parsed.is_ok(), "yamls/tools/{name}.yaml failed to parse: {:?}", parsed.err());
         }
     }
 
     /// Validate config YAML files parse into their specific types directly
     /// (not via `LazyLock` — catches type mismatches even if statics change).
     #[test]
-    #[expect(clippy::panic, reason = "test assertions use panic for config YAML validation")]
     fn config_yaml_direct_parse() {
-        drop(
-            serde_yaml::from_str::<Prompts>(include_str!("../../../yamls/prompts.yaml"))
-                .unwrap_or_else(|e| panic!("prompts.yaml schema mismatch: {e}")),
-        );
-        drop(
-            serde_yaml::from_str::<Library>(include_str!("../../../yamls/library.yaml"))
-                .unwrap_or_else(|e| panic!("library.yaml schema mismatch: {e}")),
-        );
-        drop(
-            serde_yaml::from_str::<Ui>(include_str!("../../../yamls/ui.yaml"))
-                .unwrap_or_else(|e| panic!("ui.yaml schema mismatch: {e}")),
-        );
-        drop(
-            serde_yaml::from_str::<Themes>(include_str!("../../../yamls/themes.yaml"))
-                .unwrap_or_else(|e| panic!("themes.yaml schema mismatch: {e}")),
-        );
-        drop(
-            serde_yaml::from_str::<Injections>(include_str!("../../../yamls/injections.yaml"))
-                .unwrap_or_else(|e| panic!("injections.yaml schema mismatch: {e}")),
-        );
-        drop(
-            serde_yaml::from_str::<Reverie>(include_str!("../../../yamls/reverie.yaml"))
-                .unwrap_or_else(|e| panic!("reverie.yaml schema mismatch: {e}")),
-        );
+        // Each `assert!` names the offending file on a schema mismatch without
+        // tripping clippy::panic (`panic!`) or expect_used (`.expect()`).
+        let prompts = serde_yaml::from_str::<Prompts>(include_str!("../../../yamls/prompts.yaml"));
+        assert!(prompts.is_ok(), "prompts.yaml schema mismatch: {:?}", prompts.err());
+        let library = serde_yaml::from_str::<Library>(include_str!("../../../yamls/library.yaml"));
+        assert!(library.is_ok(), "library.yaml schema mismatch: {:?}", library.err());
+        let ui = serde_yaml::from_str::<Ui>(include_str!("../../../yamls/ui.yaml"));
+        assert!(ui.is_ok(), "ui.yaml schema mismatch: {:?}", ui.err());
+        let themes = serde_yaml::from_str::<Themes>(include_str!("../../../yamls/themes.yaml"));
+        assert!(themes.is_ok(), "themes.yaml schema mismatch: {:?}", themes.err());
+        let injections = serde_yaml::from_str::<Injections>(include_str!("../../../yamls/injections.yaml"));
+        assert!(injections.is_ok(), "injections.yaml schema mismatch: {:?}", injections.err());
+        let reverie = serde_yaml::from_str::<Reverie>(include_str!("../../../yamls/reverie.yaml"));
+        assert!(reverie.is_ok(), "reverie.yaml schema mismatch: {:?}", reverie.err());
     }
 }

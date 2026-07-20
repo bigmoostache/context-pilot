@@ -33,7 +33,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Scratchpad module: temporary note cells for working data during a session.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct ScratchpadModule;
+
+impl Default for ScratchpadModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ScratchpadModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for ScratchpadModule {
     fn id(&self) -> &'static str {
@@ -240,10 +256,30 @@ impl Module for ScratchpadModule {
     }
 }
 
+/// Classify a scratchpad output line into a display semantic.
+fn scratchpad_line_semantic(line: &str) -> cp_render::Semantic {
+    use cp_render::Semantic;
+    if line.starts_with("Error:") {
+        Semantic::Error
+    } else if line.starts_with("Created cell") {
+        Semantic::Success
+    } else if line.starts_with("Updated") {
+        Semantic::Info
+    } else if line.starts_with("Deleted") {
+        Semantic::Error
+    } else if line.starts_with('C') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
+        Semantic::Info
+    } else if line.contains(':') {
+        Semantic::Muted
+    } else {
+        Semantic::Default
+    }
+}
+
 /// Visualizer for scratchpad tool results.
 /// Highlights cell titles and shows creation vs edit vs deletion actions.
 fn visualize_scratchpad_output(content: &str, width: usize) -> Vec<cp_render::Block> {
-    use cp_render::{Block, Semantic, Span};
+    use cp_render::{Block, Span};
 
     content
         .lines()
@@ -251,25 +287,11 @@ fn visualize_scratchpad_output(content: &str, width: usize) -> Vec<cp_render::Bl
             if line.is_empty() {
                 return Block::empty();
             }
-            let semantic = if line.starts_with("Error:") {
-                Semantic::Error
-            } else if line.starts_with("Created cell") {
-                Semantic::Success
-            } else if line.starts_with("Updated") {
-                Semantic::Info
-            } else if line.starts_with("Deleted") {
-                Semantic::Error
-            } else if line.starts_with('C') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
-                Semantic::Info
-            } else if line.contains(':') {
-                Semantic::Muted
-            } else {
-                Semantic::Default
-            };
+            let semantic = scratchpad_line_semantic(line);
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
             Block::Line(vec![Span::styled(display, semantic)])
         })

@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 /// Authn is handled at the transport layer (v1: bearer `cap_token` checked
 /// before deserialisation reaches this struct — design doc I9).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Command {
     /// Wire-schema revision for this struct (always `1` today).
     pub schema_version: u32,
@@ -30,6 +31,18 @@ pub struct Command {
     pub kind: Kind,
 }
 
+impl Command {
+    /// Build a command, stamping the current `schema_version`.
+    ///
+    /// A constructor keeps [`Command`] `#[non_exhaustive]` across the
+    /// orchestrator (which builds commands cross-crate); the wire-schema
+    /// revision is filled in here rather than at every call site.
+    #[must_use]
+    pub const fn new(id: String, seq: u64, dedup_token: String, kind: Kind) -> Self {
+        Self { schema_version: 1, id, seq, dedup_token, kind }
+    }
+}
+
 /// The action a [`Command`] requests.
 ///
 /// Uses an internally-tagged representation (`"kind"` field) so that an
@@ -38,6 +51,10 @@ pub struct Command {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "wire-protocol contract: Kind carries an Unknown catch-all for N-1 tolerance; its variant set is otherwise closed and constructed cross-crate (orchestrator builds commands, agent matches them exhaustively), so #[non_exhaustive] would forbid that construction"
+)]
 pub enum Kind {
     /// Send a message to a thread (the primary user action).
     #[serde(rename = "send_message")]
@@ -133,6 +150,7 @@ pub enum Kind {
 /// remote-transport seam (G7) later wraps this same envelope in an HMAC/nonce
 /// without changing the shape.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Frame {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,
@@ -143,6 +161,17 @@ pub struct Frame {
 
     /// The command to apply once the bearer is verified.
     pub command: Command,
+}
+
+impl Frame {
+    /// Wrap a [`Command`] with its bearer credential.
+    ///
+    /// A constructor keeps [`Frame`] `#[non_exhaustive]` across the orchestrator
+    /// (which builds command frames); `schema_version` is stamped here.
+    #[must_use]
+    pub const fn new(auth: String, command: Command) -> Self {
+        Self { schema_version: 1, auth, command }
+    }
 }
 
 #[cfg(test)]

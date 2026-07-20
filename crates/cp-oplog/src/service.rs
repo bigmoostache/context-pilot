@@ -74,6 +74,10 @@ pub const MAX_BATCH: usize = 1024;
 
 /// How a record must be treated under queue pressure (design doc GAP 2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "durability policy is a closed binary set (Durable/BestEffort) constructed by Durability::of and matched exhaustively by the commit routing; #[non_exhaustive] would forbid that construction and adds nothing to a binary outcome"
+)]
 pub enum Durability {
     /// Must never be lost — the submitter blocks rather than drop it.
     Durable,
@@ -120,6 +124,10 @@ impl Durability {
 
 /// The fate of an [`append_best_effort`](OplogService::append_best_effort) call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "best-effort outcome is a closed binary set (Submitted/Dropped) returned cross-crate and matched exhaustively by callers; #[non_exhaustive] would forbid that construction and adds nothing to a binary outcome"
+)]
 pub enum BestEffortOutcome {
     /// Accepted into the queue (it will be written on the next group commit).
     /// Acceptance is *not* durability — a best-effort record is never awaited.
@@ -173,7 +181,10 @@ impl Service {
     /// # Errors
     ///
     /// Returns [`Error::Io`] if the oplog cannot be opened.
-    pub fn spawn<P: AsRef<Path>>(dir: P) -> OplogResult<Self> {
+    pub fn spawn<P>(dir: P) -> OplogResult<Self>
+    where
+        P: AsRef<Path>,
+    {
         Self::spawn_inner(dir.as_ref(), DEFAULT_SEGMENT_LIMIT, DEFAULT_QUEUE_CAPACITY)
     }
 
@@ -183,7 +194,10 @@ impl Service {
     /// # Errors
     ///
     /// Returns [`Error::Io`] if the oplog cannot be opened.
-    pub fn spawn_with_segment_limit<P: AsRef<Path>>(dir: P, segment_limit: u64) -> OplogResult<Self> {
+    pub fn spawn_with_segment_limit<P>(dir: P, segment_limit: u64) -> OplogResult<Self>
+    where
+        P: AsRef<Path>,
+    {
         Self::spawn_inner(dir.as_ref(), segment_limit, DEFAULT_QUEUE_CAPACITY)
     }
 
@@ -284,7 +298,10 @@ impl Drop for Service {
 
 /// Build an [`Error::Io`] from a message (the channel carries error text
 /// because [`Error`] is not `Clone`).
-fn stopped<M: Into<String>>(message: M) -> Error {
+fn stopped<M>(message: M) -> Error
+where
+    M: Into<String>,
+{
     Error::Io(io::Error::other(message.into()))
 }
 
@@ -330,10 +347,7 @@ fn commit_batch(writer: &mut OplogWriter, batch: Vec<Job>) -> bool {
     for (ack, buffered) in acks {
         // The rev is durable only if the group sync succeeded; a sync failure
         // overrides any per-record success.
-        let final_result = match &sync_result {
-            Ok(()) => buffered,
-            Err(e) => Err(e.to_string()),
-        };
+        let final_result = if let Err(e) = sync_result.as_ref() { Err(e.to_string()) } else { buffered };
         let _ignored = ack.send(final_result);
     }
     shutdown

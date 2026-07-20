@@ -36,7 +36,7 @@ pub fn run_with_timeout(mut cmd: Command, timeout_secs: u64) -> std::io::Result<
 #[must_use]
 pub fn truncate_output(output: &str, max_bytes: usize) -> String {
     if output.len() <= max_bytes {
-        output.to_string()
+        output.to_owned()
     } else {
         let truncated = &output.get(..output.floor_char_boundary(max_bytes)).unwrap_or("");
         format!("{truncated}\n\n[Output truncated at 1MB]")

@@ -19,6 +19,51 @@ fn format_timestamp(ms: u64) -> String {
     format!("{hours:02}:{minutes:02}:{seconds:02}")
 }
 
+/// Append a labeled `[id] time type — content` list for one notification group.
+fn push_notif_list(output: &mut String, header: Option<&str>, notifs: &[&crate::types::Notification]) {
+    if let Some(h) = header {
+        output.push_str(h);
+    }
+    for n in notifs {
+        let ts = format_timestamp(n.timestamp_ms);
+        let _r = writeln!(output, "[{}] {} {} — {}", n.id, ts, n.kind.label(), n.content);
+    }
+}
+
+/// Append the spine config summary (continuation flags + counters + retry cap).
+fn push_config_summary(output: &mut String, state: &State) {
+    output.push_str("\n=== Spine Config ===\n");
+    let cfg = &SpineState::get(state).config;
+    let _r1 = writeln!(output, "continue_until_todos_done: {}", cfg.continue_until_todos_done);
+    let _r2 = writeln!(output, "auto_continuation_count: {}", cfg.auto_continuation_count);
+    if let Some(v) = cfg.max_auto_retries {
+        let _r3 = writeln!(output, "max_auto_retries: {v}");
+    }
+}
+
+/// Append the active-watchers list (mode, recurrence, age), if any.
+fn push_watchers_summary(output: &mut String, state: &State) {
+    let Some(registry) = state.get_ext::<WatcherRegistry>() else {
+        return;
+    };
+    let watchers = registry.active_watchers();
+    if watchers.is_empty() {
+        return;
+    }
+    output.push_str("\n=== Active Watchers ===\n");
+    let now = now_ms();
+    for w in watchers {
+        let age_s = cp_base::panels::time_arith::ms_to_secs(now.saturating_sub(w.registered_ms()));
+        let mode = if w.is_blocking() { "blocking" } else { "async" };
+        let recurrence = if w.interval_ms() > 0 {
+            w.recurrence_label().map_or_else(|| " recurrent".to_owned(), |l| format!(" {l}"))
+        } else {
+            String::new()
+        };
+        let _r4 = writeln!(output, "[{}] {} ({}{}, {}s ago)", w.id(), w.description(), mode, recurrence, age_s);
+    }
+}
+
 impl SpinePanel {
     /// Format notifications for LLM context
     fn format_notifications_for_context(state: &State) -> String {
@@ -36,59 +81,18 @@ impl SpinePanel {
         if unprocessed.is_empty() {
             output.push_str("No unprocessed notifications.\n");
         } else {
-            for n in &unprocessed {
-                let ts = format_timestamp(n.timestamp_ms);
-                let _r = writeln!(output, "[{}] {} {} — {}", n.id, ts, n.kind.label(), n.content);
-            }
+            push_notif_list(&mut output, None, &unprocessed);
         }
-
         if !blocked.is_empty() {
-            output.push_str("\n=== Blocked (awaiting guard rail clearance) ===\n");
-            for n in &blocked {
-                let ts = format_timestamp(n.timestamp_ms);
-                let _r = writeln!(output, "[{}] {} {} — {}", n.id, ts, n.kind.label(), n.content);
-            }
+            push_notif_list(&mut output, Some("\n=== Blocked (awaiting guard rail clearance) ===\n"), &blocked);
         }
-
         if !recent_processed.is_empty() {
-            output.push_str("\n=== Recent Processed ===\n");
-            for n in &recent_processed {
-                let ts = format_timestamp(n.timestamp_ms);
-                let _r = writeln!(output, "[{}] {} {} — {}", n.id, ts, n.kind.label(), n.content);
-            }
+            push_notif_list(&mut output, Some("\n=== Recent Processed ===\n"), &recent_processed);
         }
+        push_config_summary(&mut output, state);
+        push_watchers_summary(&mut output, state);
 
-        // Show spine config summary
-        output.push_str("\n=== Spine Config ===\n");
-        let _r1 =
-            writeln!(output, "continue_until_todos_done: {}", SpineState::get(state).config.continue_until_todos_done);
-        let _r2 =
-            writeln!(output, "auto_continuation_count: {}", SpineState::get(state).config.auto_continuation_count);
-        if let Some(v) = SpineState::get(state).config.max_auto_retries {
-            let _r3 = writeln!(output, "max_auto_retries: {v}");
-        }
-
-        // Show active watchers
-        if let Some(registry) = state.get_ext::<WatcherRegistry>() {
-            let watchers = registry.active_watchers();
-            if !watchers.is_empty() {
-                output.push_str("\n=== Active Watchers ===\n");
-                let now = now_ms();
-                for w in watchers {
-                    let age_s = cp_base::panels::time_arith::ms_to_secs(now.saturating_sub(w.registered_ms()));
-                    let mode = if w.is_blocking() { "blocking" } else { "async" };
-                    let recurrence = if w.interval_ms() > 0 {
-                        w.recurrence_label().map_or_else(|| " recurrent".to_string(), |l| format!(" {l}"))
-                    } else {
-                        String::new()
-                    };
-                    let _r4 =
-                        writeln!(output, "[{}] {} ({}{}, {}s ago)", w.id(), w.description(), mode, recurrence, age_s);
-                }
-            }
-        }
-
-        output.trim_end().to_string()
+        output.trim_end().to_owned()
     }
 }
 
@@ -131,30 +135,16 @@ impl Panel for SpinePanel {
     }
 
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
-        use cp_render::{Align, Block, Cell, Column, Semantic, Span as S};
+        use cp_render::{Block, Span as S};
 
         let mut blocks = Vec::new();
 
-        let notif_columns = vec![
-            Column { header: "ID".to_owned(), align: Align::Left },
-            Column { header: "Time".to_owned(), align: Align::Left },
-            Column { header: "Type".to_owned(), align: Align::Left },
-            Column { header: "Content".to_owned(), align: Align::Left },
-        ];
-
         // === Unprocessed Notifications ===
         let unprocessed: Vec<_> = SpineState::get(state).notifications.iter().filter(|n| n.is_unprocessed()).collect();
-
         if unprocessed.is_empty() {
             blocks.push(Block::Line(vec![S::muted("No unprocessed notifications.".into()).italic()]));
         } else {
-            blocks.push(Block::Header(vec![
-                S::styled("Unprocessed".to_owned(), Semantic::Accent),
-                S::muted(format!("  ({})", unprocessed.len())),
-            ]));
-            let rows: Vec<Vec<Cell>> =
-                unprocessed.iter().map(|n| notification_row(n, notification_type_semantic(n.kind))).collect();
-            blocks.push(Block::Table { columns: notif_columns.clone(), rows });
+            push_notif_table(&mut blocks, "Unprocessed", cp_render::Semantic::Accent, &unprocessed);
         }
 
         // === Blocked Notifications ===
@@ -163,77 +153,27 @@ impl Panel for SpinePanel {
             .iter()
             .filter(|n| n.status == crate::types::NotificationStatus::Blocked)
             .collect();
-
         if !blocked.is_empty() {
             blocks.push(Block::Empty);
-            blocks.push(Block::Header(vec![
-                S::styled("Blocked".to_owned(), Semantic::Warning),
-                S::muted(format!("  ({})", blocked.len())),
-            ]));
-            let rows: Vec<Vec<Cell>> = blocked.iter().map(|n| notification_row(n, Semantic::Warning)).collect();
-            blocks.push(Block::Table { columns: notif_columns.clone(), rows });
+            push_notif_table(&mut blocks, "Blocked", cp_render::Semantic::Warning, &blocked);
         }
 
         // === Recent Processed ===
         let recent_processed: Vec<_> =
             SpineState::get(state).notifications.iter().filter(|n| n.is_processed()).rev().take(10).collect();
-
         if !recent_processed.is_empty() {
             blocks.push(Block::Empty);
-            blocks.push(Block::Header(vec![
-                S::styled("Recent Processed".to_owned(), Semantic::Muted),
-                S::muted(format!("  ({})", recent_processed.len())),
-            ]));
-            let rows: Vec<Vec<Cell>> = recent_processed.iter().map(|n| notification_row(n, Semantic::Muted)).collect();
-            blocks.push(Block::Table { columns: notif_columns, rows });
+            push_notif_table(&mut blocks, "Recent Processed", cp_render::Semantic::Muted, &recent_processed);
         }
 
         blocks.push(Block::Empty);
-
-        // === Config Summary ===
-        blocks.push(Block::Line(vec![S::styled("Config".into(), Semantic::Code)]));
-        blocks.push(Block::KeyValue(vec![
-            (
-                vec![S::muted("  continue_until_todos_done".into())],
-                vec![S::new(format!("{}", SpineState::get(state).config.continue_until_todos_done))],
-            ),
-            (
-                vec![S::muted("  auto_continuations".into())],
-                vec![S::new(format!("{}", SpineState::get(state).config.auto_continuation_count))],
-            ),
-        ]));
-
-        // === Active Watchers ===
-        if let Some(registry) = state.get_ext::<WatcherRegistry>() {
-            let watchers = registry.active_watchers();
-            if !watchers.is_empty() {
-                blocks.push(Block::Empty);
-                blocks.push(Block::Header(vec![S::accent(format!("Active Watchers ({})", watchers.len()))]));
-                let now = now_ms();
-                for w in watchers {
-                    let age_s = cp_base::panels::time_arith::ms_to_secs(now.saturating_sub(w.registered_ms()));
-                    let (mode_icon, mode_sem) =
-                        if w.is_blocking() { ("⏳", Semantic::Warning) } else { ("👁", Semantic::Code) };
-                    let recurrence_span = if w.interval_ms() > 0 {
-                        let label = w.recurrence_label().unwrap_or("recurrent");
-                        format!(" [{label}]")
-                    } else {
-                        String::new()
-                    };
-                    blocks.push(Block::Line(vec![
-                        S::styled(format!("  {mode_icon} "), mode_sem),
-                        S::new(w.description().to_string()),
-                        S::styled(recurrence_span, Semantic::Accent),
-                        S::muted(format!(" ({age_s}s)")),
-                    ]));
-                }
-            }
-        }
+        push_config_blocks(&mut blocks, state);
+        push_watcher_blocks(&mut blocks, state);
 
         blocks
     }
     fn title(&self, _state: &State) -> String {
-        "Spine".to_string()
+        "Spine".to_owned()
     }
 
     fn refresh(&self, state: &mut State) {
@@ -243,7 +183,7 @@ impl Panel for SpinePanel {
         for ctx in &mut state.context {
             if ctx.context_type.as_str() == Kind::SPINE {
                 ctx.token_count = token_count;
-                let _ = cp_base::panels::update_if_changed(ctx, &content);
+                let _changed = cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }
@@ -261,6 +201,80 @@ impl Panel for SpinePanel {
             .find(|c| c.context_type.as_str() == Kind::SPINE)
             .map_or(("P9", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Spine", content, last_refresh_ms)]
+    }
+}
+
+/// The 4-column layout (ID/Time/Type/Content) shared by every notification table.
+fn notif_columns() -> Vec<cp_render::Column> {
+    use cp_render::{Align, Column};
+    vec![
+        Column { header: "ID".to_owned(), align: Align::Left },
+        Column { header: "Time".to_owned(), align: Align::Left },
+        Column { header: "Type".to_owned(), align: Align::Left },
+        Column { header: "Content".to_owned(), align: Align::Left },
+    ]
+}
+
+/// Push a titled notification table (header with count + rows) into `blocks`.
+fn push_notif_table(
+    blocks: &mut Vec<cp_render::Block>,
+    title: &str,
+    header_sem: cp_render::Semantic,
+    notifs: &[&crate::types::Notification],
+) {
+    use cp_render::{Block, Cell, Span as S};
+    blocks
+        .push(Block::Header(vec![S::styled(title.to_owned(), header_sem), S::muted(format!("  ({})", notifs.len()))]));
+    let row_sem = if title == "Unprocessed" { None } else { Some(header_sem) };
+    let rows: Vec<Vec<Cell>> = notifs
+        .iter()
+        .map(|n| notification_row(n, row_sem.unwrap_or_else(|| notification_type_semantic(n.kind))))
+        .collect();
+    blocks.push(Block::Table { columns: notif_columns(), rows });
+}
+
+/// Push the config summary (continuation flag + counter) into `blocks`.
+fn push_config_blocks(blocks: &mut Vec<cp_render::Block>, state: &State) {
+    use cp_render::{Block, Semantic, Span as S};
+    let cfg = &SpineState::get(state).config;
+    blocks.push(Block::Line(vec![S::styled("Config".into(), Semantic::Code)]));
+    blocks.push(Block::KeyValue(vec![
+        (
+            vec![S::muted("  continue_until_todos_done".into())],
+            vec![S::new(format!("{}", cfg.continue_until_todos_done))],
+        ),
+        (vec![S::muted("  auto_continuations".into())], vec![S::new(format!("{}", cfg.auto_continuation_count))]),
+    ]));
+}
+
+/// Push the active-watchers list (mode icon, recurrence, age) into `blocks`, if any.
+fn push_watcher_blocks(blocks: &mut Vec<cp_render::Block>, state: &State) {
+    use cp_render::{Block, Semantic, Span as S};
+    let Some(registry) = state.get_ext::<WatcherRegistry>() else {
+        return;
+    };
+    let watchers = registry.active_watchers();
+    if watchers.is_empty() {
+        return;
+    }
+    blocks.push(Block::Empty);
+    blocks.push(Block::Header(vec![S::accent(format!("Active Watchers ({})", watchers.len()))]));
+    let now = now_ms();
+    for w in watchers {
+        let age_s = cp_base::panels::time_arith::ms_to_secs(now.saturating_sub(w.registered_ms()));
+        let (mode_icon, mode_sem) =
+            if w.is_blocking() { ("\u{23f3}", Semantic::Warning) } else { ("\u{1f441}", Semantic::Code) };
+        let recurrence_span = if w.interval_ms() > 0 {
+            format!(" [{}]", w.recurrence_label().unwrap_or("recurrent"))
+        } else {
+            String::new()
+        };
+        blocks.push(Block::Line(vec![
+            S::styled(format!("  {mode_icon} "), mode_sem),
+            S::new(w.description().to_owned()),
+            S::styled(recurrence_span, Semantic::Accent),
+            S::muted(format!(" ({age_s}s)")),
+        ]));
     }
 }
 
@@ -295,7 +309,7 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         trimmed
     } else {
         let mut result: String = trimmed.chars().take(max_len.saturating_sub(1)).collect();
-        result.push('…');
+        result.push('\u{2026}');
         result
     }
 }

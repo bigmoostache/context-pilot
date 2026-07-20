@@ -25,7 +25,7 @@ impl Panel for ThreadsPanel {
         let ts = ThreadsState::get(state);
 
         if ts.panel_content.is_empty() {
-            return vec![Block::Line(vec![S::muted("  (empty — AI must call Read to populate)".into())])];
+            return vec![Block::Line(vec![S::muted("  (empty \u{2014} AI must call Read to populate)".into())])];
         }
 
         // Render the same panel_content the LLM sees, line by line
@@ -36,7 +36,7 @@ impl Panel for ThreadsPanel {
     }
 
     fn title(&self, _state: &State) -> String {
-        "Threads".to_string()
+        "Threads".to_owned()
     }
 
     fn refresh(&self, state: &mut State) {
@@ -47,7 +47,7 @@ impl Panel for ThreadsPanel {
         for ctx in &mut state.context {
             if ctx.context_type.as_str() == Kind::THREADS {
                 ctx.token_count = token_count;
-                let _ = cp_base::panels::update_if_changed(ctx, &content);
+                let _changed = cp_base::panels::update_if_changed(ctx, &content);
                 break;
             }
         }

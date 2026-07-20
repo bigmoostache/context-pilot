@@ -24,7 +24,21 @@ export interface Actions {
   restartBusy: boolean
   avatarBust: number
   onAvatarChange: (file: File) => void
+  onRandomizeAvatar: () => void
 }
+
+/** DiceBear avatar styles suitable for agents (robots, shapes, playful glyphs —
+ *  no realistic human faces). One is picked at random on each randomize click. */
+const DICEBEAR_STYLES = [
+  "bottts",
+  "bottts-neutral",
+  "fun-emoji",
+  "icons",
+  "shapes",
+  "thumbs",
+  "identicon",
+  "pixel-art",
+]
 
 /** Inputs to {@link useAgentModalActions} — bundled into one object so the hook
  *  stays within the max-params budget. */
@@ -73,6 +87,33 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
           setLocalError(err instanceof Error ? err.message : "Avatar upload failed"),
       },
     )
+  }
+
+  /** Randomize the avatar: pick a random DiceBear style + seed, fetch the SVG,
+   *  and push it through the SAME upload mutation as a manual file pick (so the
+   *  bytes land on the agent identically — no new backend surface). */
+  const onRandomizeAvatar = () => {
+    if (!agent) return
+    const style = DICEBEAR_STYLES[Math.floor(Math.random() * DICEBEAR_STYLES.length)] ?? "bottts"
+    const seed = crypto.randomUUID()
+    const url = `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`
+    setLocalError(null)
+    fetch(url)
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(`DiceBear ${r.status}`))))
+      .then((blob) => {
+        const file = new File([blob], `${style}-${seed}.svg`, { type: "image/svg+xml" })
+        uploadAvatar.mutate(
+          { agentId: agent.id, file },
+          {
+            onSuccess: () => setAvatarBust(Date.now()),
+            onError: (err) =>
+              setLocalError(err instanceof Error ? err.message : "Avatar upload failed"),
+          },
+        )
+      })
+      .catch((e: unknown) =>
+        setLocalError(e instanceof Error ? e.message : "Could not fetch a random avatar"),
+      )
   }
 
   /** Restart a (possibly stale-binary) agent so a fresh process can accept
@@ -176,5 +217,6 @@ export function useAgentModalActions(args: ActionsArgs): Actions {
     restartBusy,
     avatarBust,
     onAvatarChange,
+    onRandomizeAvatar,
   }
 }

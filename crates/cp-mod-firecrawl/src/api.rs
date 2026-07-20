@@ -10,6 +10,7 @@ const TIMEOUT_SECS: u64 = 30;
 
 /// Parameters for `firecrawl_scrape`.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct ScrapeParams<'req> {
     /// Target URL to scrape.
     pub url: &'req str,
@@ -23,6 +24,7 @@ pub struct ScrapeParams<'req> {
 
 /// Parameters for `firecrawl_search`.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct SearchParams<'req> {
     /// Search query string.
     pub query: &'req str,
@@ -40,6 +42,7 @@ pub struct SearchParams<'req> {
 
 /// Parameters for `firecrawl_map`.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct MapParams<'req> {
     /// Root domain or subdomain to map.
     pub url: &'req str,
@@ -57,6 +60,7 @@ pub struct MapParams<'req> {
 
 /// Parameters for `firecrawl_crawl`.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct CrawlParams<'req> {
     /// Starting URL to crawl from.
     pub url: &'req str,
@@ -74,6 +78,7 @@ pub struct CrawlParams<'req> {
 
 /// HTTP client for the Firecrawl API (v2).
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct FirecrawlClient {
     /// Reusable reqwest HTTP client with 30s timeout.
     client: Client,
@@ -106,7 +111,7 @@ impl FirecrawlClient {
             "formats": p.formats,
         });
 
-        if let (Some(country), Some(langs)) = (&p.country, &p.languages)
+        if let (Some(country), Some(langs)) = (p.country.as_ref(), p.languages.as_ref())
             && let Some(obj) = body.as_object_mut()
         {
             drop(obj.insert(
@@ -139,7 +144,7 @@ impl FirecrawlClient {
             if !p.sources.is_empty() {
                 drop(obj.insert("sources".into(), serde_json::json!(p.sources)));
             }
-            if let Some(ref cats) = p.categories {
+            if let Some(cats) = p.categories.as_ref() {
                 drop(obj.insert("categories".into(), serde_json::json!(cats)));
             }
             if let Some(tbs) = p.tbs {
@@ -169,7 +174,7 @@ impl FirecrawlClient {
             if let Some(search) = p.search {
                 drop(obj.insert("search".into(), serde_json::json!(search)));
             }
-            if let (Some(country), Some(langs)) = (&p.country, &p.languages) {
+            if let (Some(country), Some(langs)) = (p.country.as_ref(), p.languages.as_ref()) {
                 drop(obj.insert(
                     "location".into(),
                     serde_json::json!({
@@ -202,10 +207,10 @@ impl FirecrawlClient {
             if let Some(depth) = p.max_depth {
                 drop(obj.insert("maxDepth".into(), serde_json::json!(depth)));
             }
-            if let Some(ref paths) = p.include_paths {
+            if let Some(paths) = p.include_paths.as_ref() {
                 drop(obj.insert("includePaths".into(), serde_json::json!(paths)));
             }
-            if let Some(ref paths) = p.exclude_paths {
+            if let Some(paths) = p.exclude_paths.as_ref() {
                 drop(obj.insert("excludePaths".into(), serde_json::json!(paths)));
             }
         }
@@ -223,10 +228,13 @@ impl FirecrawlClient {
     }
 
     /// GET JSON with 5xx retry (2 attempts, 1s delay).
-    fn get_json<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, String> {
+    fn get_json<T>(&self, path: &str) -> Result<T, String>
+    where
+        T: serde::de::DeserializeOwned,
+    {
         let url = format!("{FIRECRAWL_BASE_URL}{path}");
 
-        for attempt in 0..3 {
+        for attempt in 0i32..3i32 {
             let resp = self
                 .client
                 .get(&url)
@@ -244,7 +252,7 @@ impl FirecrawlClient {
                 429 => {
                     return Err(format!("Rate limited (429). Response: {}", truncate(&resp_body, 200)));
                 }
-                500..=599 if attempt < 2 => {
+                500..=599 if attempt < 2i32 => {
                     std::thread::sleep(Duration::from_secs(1));
                 }
                 _ => {
@@ -252,14 +260,17 @@ impl FirecrawlClient {
                 }
             }
         }
-        Err("Max retries exceeded".to_string())
+        Err("Max retries exceeded".to_owned())
     }
 
     /// POST JSON with 5xx retry (2 attempts, 1s delay).
-    fn post_json<T: serde::de::DeserializeOwned>(&self, path: &str, body: &serde_json::Value) -> Result<T, String> {
+    fn post_json<T>(&self, path: &str, body: &serde_json::Value) -> Result<T, String>
+    where
+        T: serde::de::DeserializeOwned,
+    {
         let url = format!("{FIRECRAWL_BASE_URL}{path}");
 
-        for attempt in 0..3 {
+        for attempt in 0i32..3i32 {
             let resp = self
                 .client
                 .post(&url)
@@ -285,7 +296,7 @@ impl FirecrawlClient {
                         truncate(&resp_body, 200)
                     ));
                 }
-                500..=599 if attempt < 2 => {
+                500..=599 if attempt < 2i32 => {
                     std::thread::sleep(Duration::from_secs(1));
                 }
                 _ => {
@@ -293,7 +304,7 @@ impl FirecrawlClient {
                 }
             }
         }
-        Err("Max retries exceeded".to_string())
+        Err("Max retries exceeded".to_owned())
     }
 }
 

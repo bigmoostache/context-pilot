@@ -68,20 +68,20 @@ fn create_panel_inner(state: &mut State, title: &str, content: &str, live: Optio
 
     let mut elem = make_default_entry(&panel_id, Kind::new(ENTITY_RESULT_TYPE), title, false);
     elem.uid = Some(uid);
-    elem.cached_content = Some(content.to_string());
+    elem.cached_content = Some(content.to_owned());
     elem.token_count = estimate_tokens(content);
     elem.full_token_count = elem.token_count;
     elem.total_pages = compute_total_pages(elem.token_count);
     elem.source_hash = Some(hash_content(content));
 
     // Persist content for fallback restore on reload
-    drop(elem.metadata.insert(META_CONTENT.to_string(), serde_json::Value::String(content.to_string())));
+    drop(elem.metadata.insert(META_CONTENT.to_owned(), serde_json::Value::String(content.to_owned())));
 
     // Live refresh metadata (only for live panels)
     if let Some(meta) = live {
-        drop(elem.metadata.insert(META_SQL.to_string(), serde_json::Value::String(meta.sql.to_string())));
-        drop(elem.metadata.insert(META_DB_PATH.to_string(), serde_json::Value::String(meta.db_path.to_string())));
-        drop(elem.metadata.insert(META_IS_LIVE.to_string(), serde_json::Value::Bool(true)));
+        drop(elem.metadata.insert(META_SQL.to_owned(), serde_json::Value::String(meta.sql.to_owned())));
+        drop(elem.metadata.insert(META_DB_PATH.to_owned(), serde_json::Value::String(meta.db_path.to_owned())));
+        drop(elem.metadata.insert(META_IS_LIVE.to_owned(), serde_json::Value::Bool(true)));
     }
 
     state.context.push(elem);
@@ -150,25 +150,25 @@ impl Panel for EntityResultPanel {
             // Live panel — re-execute SQL on every cache cycle
             let sql = ctx.metadata.get(META_SQL)?.as_str()?;
             let db_path = ctx.metadata.get(META_DB_PATH)?.as_str()?;
-            Some(CacheRequest {
-                context_type: Kind::new(ENTITY_RESULT_TYPE),
-                data: Box::new(LiveQueryRequest {
+            Some(CacheRequest::new(
+                Kind::new(ENTITY_RESULT_TYPE),
+                Box::new(LiveQueryRequest {
                     context_id: ctx.id.clone(),
-                    sql: sql.to_string(),
-                    db_path: db_path.to_string(),
+                    sql: sql.to_owned(),
+                    db_path: db_path.to_owned(),
                     current_source_hash: ctx.source_hash.clone(),
                 }),
-            })
+            ))
         } else {
             // Static panel — only restore if content missing (post-reload)
             if ctx.cached_content.is_some() {
                 return None;
             }
             let content = ctx.metadata.get(META_CONTENT)?.as_str()?;
-            Some(CacheRequest {
-                context_type: Kind::new(ENTITY_RESULT_TYPE),
-                data: Box::new(EntityRestoreRequest { context_id: ctx.id.clone(), content: content.to_string() }),
-            })
+            Some(CacheRequest::new(
+                Kind::new(ENTITY_RESULT_TYPE),
+                Box::new(EntityRestoreRequest { context_id: ctx.id.clone(), content: content.to_owned() }),
+            ))
         }
     }
 
@@ -191,7 +191,7 @@ impl Panel for EntityResultPanel {
                 ctx.token_count = token_count;
             }
             ctx.cache_deprecated = false;
-            let _ = update_if_changed(ctx, &content);
+            let _changed = update_if_changed(ctx, &content);
             true
         } else {
             false
@@ -215,13 +215,14 @@ impl Panel for EntityResultPanel {
     }
 
     fn blocks(&self, state: &State) -> Vec<Block> {
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(ENTITY_RESULT_TYPE));
+        let ctx_opt =
+            state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(ENTITY_RESULT_TYPE));
 
-        let Some(ctx) = ctx else {
+        let Some(ctx) = ctx_opt else {
             return vec![Block::styled_text("No entity result panel".into(), Semantic::Muted)];
         };
 
-        let Some(content) = &ctx.cached_content else {
+        let Some(content) = ctx.cached_content.as_ref() else {
             return vec![Block::Line(vec![Span::muted("Loading...".into()).italic()])];
         };
 
@@ -229,7 +230,7 @@ impl Panel for EntityResultPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        state.context.get(state.selected_context).map_or_else(|| "Entity Result".to_string(), |ctx| ctx.name.clone())
+        state.context.get(state.selected_context).map_or_else(|| "Entity Result".to_owned(), |ctx| ctx.name.clone())
     }
 
     fn max_freezes(&self) -> u8 {

@@ -389,7 +389,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn phase_entry(rev: u64, phase: Phase) -> OpEntry {
-        OpEntry { schema_version: 1, rev, timestamp_ms: 0, kind: OpEntryKind::PhaseTransition { phase } }
+        OpEntry::new(1, rev, 0, OpEntryKind::PhaseTransition { phase })
     }
 
     fn backend_with_agent() -> Mutex<Backend> {

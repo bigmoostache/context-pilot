@@ -10,67 +10,74 @@ use cp_base::state::data::message::MsgKind;
 /// Content is set once at creation (via `detach_conversation_chunks`) and never refreshed.
 pub(super) struct ConversationHistoryPanel;
 
-/// Render a single message into IR blocks (simplified history view).
-fn render_message_blocks(msg: &cp_base::state::data::message::Message) -> Vec<cp_render::Block> {
+/// Render a `TextMessage` history entry: role header + content lines.
+fn render_text_hist(msg: &cp_base::state::data::message::Message) -> Vec<cp_render::Block> {
     let mut blocks = Vec::new();
-
-    match msg.msg_type {
-        MsgKind::TextMessage => {
-            // Role header line
-            let (icon, semantic) = if msg.role == "user" {
-                ("👤", cp_render::Semantic::Accent)
-            } else {
-                ("🤖", cp_render::Semantic::AccentDim)
-            };
-            blocks.push(cp_render::Block::Line(vec![
-                cp_render::Span::styled(format!("{icon} "), semantic),
-                cp_render::Span::styled(format!("[{}]", msg.id), semantic).bold(),
-            ]));
-
-            // Content lines
-            if !msg.content.is_empty() {
-                for line in msg.content.lines() {
-                    blocks.push(cp_render::Block::Line(vec![cp_render::Span::new(line.to_string())]));
-                }
-            }
-            blocks.push(cp_render::Block::Empty);
-        }
-        MsgKind::ToolCall => {
-            blocks.push(cp_render::Block::Line(vec![
-                cp_render::Span::styled("🔧 ".to_string(), cp_render::Semantic::Info),
-                cp_render::Span::styled(format!("[{}] tool_call", msg.id), cp_render::Semantic::Info).bold(),
-            ]));
-            for tu in &msg.tool_uses {
-                blocks.push(cp_render::Block::Line(vec![
-                    cp_render::Span::muted("  → ".to_string()),
-                    cp_render::Span::styled(tu.name.clone(), cp_render::Semantic::Accent),
-                ]));
-            }
-            blocks.push(cp_render::Block::Empty);
-        }
-        MsgKind::ToolResult => {
-            blocks.push(cp_render::Block::Line(vec![
-                cp_render::Span::styled("📋 ".to_string(), cp_render::Semantic::Muted),
-                cp_render::Span::styled(format!("[{}] tool_result", msg.id), cp_render::Semantic::Muted),
-            ]));
-            for tr in &msg.tool_results {
-                // Show first line of result content
-                let preview = tr.content.lines().next().unwrap_or("");
-                let truncated = if preview.len() > 80 {
-                    format!("{}…", preview.get(..80).unwrap_or(preview))
-                } else {
-                    preview.to_string()
-                };
-                blocks.push(cp_render::Block::Line(vec![
-                    cp_render::Span::muted("  ".to_string()),
-                    cp_render::Span::muted(truncated),
-                ]));
-            }
-            blocks.push(cp_render::Block::Empty);
+    let (icon, semantic) = if msg.role == "user" {
+        ("\u{1f464}", cp_render::Semantic::Accent)
+    } else {
+        ("\u{1f916}", cp_render::Semantic::AccentDim)
+    };
+    blocks.push(cp_render::Block::Line(vec![
+        cp_render::Span::styled(format!("{icon} "), semantic),
+        cp_render::Span::styled(format!("[{}]", msg.id), semantic).bold(),
+    ]));
+    if !msg.content.is_empty() {
+        for line in msg.content.lines() {
+            blocks.push(cp_render::Block::Line(vec![cp_render::Span::new(line.to_owned())]));
         }
     }
-
+    blocks.push(cp_render::Block::Empty);
     blocks
+}
+
+/// Render a `ToolCall` history entry: header + one line per tool name.
+fn render_toolcall_hist(msg: &cp_base::state::data::message::Message) -> Vec<cp_render::Block> {
+    let mut blocks = Vec::new();
+    blocks.push(cp_render::Block::Line(vec![
+        cp_render::Span::styled("\u{1f527} ".to_owned(), cp_render::Semantic::Info),
+        cp_render::Span::styled(format!("[{}] tool_call", msg.id), cp_render::Semantic::Info).bold(),
+    ]));
+    for tu in &msg.tool_uses {
+        blocks.push(cp_render::Block::Line(vec![
+            cp_render::Span::muted("  \u{2192} ".to_owned()),
+            cp_render::Span::styled(tu.name.clone(), cp_render::Semantic::Accent),
+        ]));
+    }
+    blocks.push(cp_render::Block::Empty);
+    blocks
+}
+
+/// Render a `ToolResult` history entry: header + first-line preview per result.
+fn render_toolresult_hist(msg: &cp_base::state::data::message::Message) -> Vec<cp_render::Block> {
+    let mut blocks = Vec::new();
+    blocks.push(cp_render::Block::Line(vec![
+        cp_render::Span::styled("\u{1f4cb} ".to_owned(), cp_render::Semantic::Muted),
+        cp_render::Span::styled(format!("[{}] tool_result", msg.id), cp_render::Semantic::Muted),
+    ]));
+    for tr in &msg.tool_results {
+        let preview = tr.content.lines().next().unwrap_or("");
+        let truncated = if preview.len() > 80 {
+            format!("{}…", preview.get(..80).unwrap_or(preview))
+        } else {
+            preview.to_owned()
+        };
+        blocks.push(cp_render::Block::Line(vec![
+            cp_render::Span::muted("  ".to_owned()),
+            cp_render::Span::muted(truncated),
+        ]));
+    }
+    blocks.push(cp_render::Block::Empty);
+    blocks
+}
+
+/// Render a single message into IR blocks (simplified history view).
+fn render_message_blocks(msg: &cp_base::state::data::message::Message) -> Vec<cp_render::Block> {
+    match msg.msg_type {
+        MsgKind::TextMessage => render_text_hist(msg),
+        MsgKind::ToolCall => render_toolcall_hist(msg),
+        MsgKind::ToolResult => render_toolresult_hist(msg),
+    }
 }
 
 impl Panel for ConversationHistoryPanel {
@@ -83,35 +90,35 @@ impl Panel for ConversationHistoryPanel {
             Some(c) if c.context_type.as_str() == Kind::CONVERSATION_HISTORY => c,
             _ => {
                 return vec![cp_render::Block::Line(vec![
-                    cp_render::Span::muted("No conversation history.".to_string()).italic(),
+                    cp_render::Span::muted("No conversation history.".to_owned()).italic(),
                 ])];
             }
         };
 
         // Prefer rendering from history_messages (structured message data)
-        if let Some(ref msgs) = ctx.history_messages {
+        if let Some(msgs) = ctx.history_messages.as_ref() {
             let mut blocks = Vec::new();
             for msg in msgs {
                 blocks.extend(render_message_blocks(msg));
             }
             if blocks.is_empty() {
                 blocks.push(cp_render::Block::Line(vec![
-                    cp_render::Span::muted("No messages in this history block.".to_string()).italic(),
+                    cp_render::Span::muted("No messages in this history block.".to_owned()).italic(),
                 ]));
             }
             return blocks;
         }
 
         // Fallback: plain-text rendering from cached_content
-        if let Some(content) = &ctx.cached_content {
+        if let Some(content) = ctx.cached_content.as_ref() {
             return content
                 .lines()
-                .map(|line| cp_render::Block::Line(vec![cp_render::Span::muted(line.to_string())]))
+                .map(|line| cp_render::Block::Line(vec![cp_render::Span::muted(line.to_owned())]))
                 .collect();
         }
 
         vec![cp_render::Block::Line(vec![
-            cp_render::Span::muted("No messages in this history block.".to_string()).italic(),
+            cp_render::Span::muted("No messages in this history block.".to_owned()).italic(),
         ])]
     }
     fn title(&self, state: &State) -> String {
@@ -119,7 +126,7 @@ impl Panel for ConversationHistoryPanel {
             .context
             .get(state.selected_context)
             .filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY)
-            .map_or_else(|| "Chat History".to_string(), |c| c.name.clone())
+            .map_or_else(|| "Chat History".to_owned(), |c| c.name.clone())
     }
 
     fn max_freezes(&self) -> u8 {

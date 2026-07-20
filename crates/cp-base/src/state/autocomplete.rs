@@ -13,6 +13,7 @@ const MAX_VISIBLE: usize = 10;
 
 /// A single entry in the autocomplete list.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Completion {
     /// Display name (just the file/folder name, not the full path).
     pub name: String,
@@ -20,8 +21,20 @@ pub struct Completion {
     pub is_dir: bool,
 }
 
+impl Completion {
+    /// Build a completion entry from a display name and directory flag.
+    #[must_use]
+    pub fn new<S>(name: S, is_dir: bool) -> Self
+    where
+        S: Into<String>,
+    {
+        Self { name: name.into(), is_dir }
+    }
+}
+
 /// State for the @-triggered file path autocomplete popup.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Suggestions {
     /// Whether the autocomplete popup is currently visible.
     pub active: bool,
@@ -185,8 +198,8 @@ impl Suggestions {
     /// Split query into `dir_prefix` and `name_prefix` at the last '/'.
     fn split_query(&mut self) {
         if let Some(last_slash) = self.query.rfind('/') {
-            self.dir_prefix = self.query.get(..last_slash).unwrap_or("").to_string();
-            self.name_prefix = self.query.get(last_slash.saturating_add(1)..).unwrap_or("").to_string();
+            self.dir_prefix = self.query.get(..last_slash).unwrap_or("").to_owned();
+            self.name_prefix = self.query.get(last_slash.saturating_add(1)..).unwrap_or("").to_owned();
         } else {
             self.dir_prefix.clear();
             self.name_prefix = self.query.clone();

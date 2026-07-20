@@ -19,7 +19,7 @@ pub(crate) fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResul
     // Set flag - actual reload happens in app.rs after tool result is saved
     state.flags.lifecycle.reload_pending = true;
 
-    ToolResult::new(tool.id.clone(), "Reload initiated. Restarting TUI...".to_string(), false)
+    ToolResult::new(tool.id.clone(), "Reload initiated. Restarting TUI...".to_owned(), false)
 }
 
 /// Write `reload_requested: true` into config.json so `run.sh` restarts the TUI.
@@ -36,7 +36,7 @@ pub(crate) fn write_reload_flag() {
             json.replace("\"reload_requested\": false", "\"reload_requested\": true")
                 .replace("\"reload_requested\":false", "\"reload_requested\":true")
         } else {
-            let mut s = json.trim_end().trim_end_matches('}').to_string();
+            let mut s = json.trim_end().trim_end_matches('}').to_owned();
             s.push_str(",\n  \"reload_requested\": true\n}");
             s
         };

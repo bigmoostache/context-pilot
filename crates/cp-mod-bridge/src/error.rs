@@ -17,6 +17,10 @@ use std::io;
 
 /// An error raised while booting the agent-side bridge.
 #[derive(Debug)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "bridge boot error taxonomy is a closed AlreadyRunning/Io set constructed within cp-mod-bridge and matched exhaustively by callers; #[non_exhaustive] would force cross-crate wildcard arms that the forbidden wildcard_enum_match_arm lint rejects"
+)]
 pub enum Error {
     /// Another live agent already holds the exclusive lock on this folder, so
     /// this instance must not run (single-process exclusion, design doc I1/D2).
@@ -45,12 +49,12 @@ impl Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::AlreadyRunning { folder } => {
+        cp_base::deref_match!(self, {
+            Self::AlreadyRunning { ref folder } => {
                 write!(f, "another agent already owns the folder {folder}")
             }
-            Self::Io { context, source } => write!(f, "bridge boot failed ({context}): {source}"),
-        }
+            Self::Io { ref context, ref source } => write!(f, "bridge boot failed ({context}): {source}"),
+        })
     }
 }
 

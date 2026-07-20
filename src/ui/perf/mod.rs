@@ -9,6 +9,7 @@ pub(crate) use overlay::render_perf_overlay_from_ir;
 
 use crate::infra::constants::PERF_STATS_REFRESH_MS;
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
@@ -53,10 +54,10 @@ impl<T: Copy + Default + Ord> RingBuffer<T> {
         if self.len == 0 {
             return Vec::new();
         }
-        let count = count.min(self.len);
-        let mut result = Vec::with_capacity(count);
+        let take = count.min(self.len);
+        let mut result = Vec::with_capacity(take);
         let start = if self.len < SAMPLE_RING_SIZE { 0 } else { self.write_pos };
-        for i in 0..count {
+        for i in 0..take {
             let idx = start.saturating_add(self.len).saturating_sub(count).saturating_add(i) & RING_MASK;
             if let Some(&val) = self.data.get(idx) {
                 result.push(val);
@@ -175,8 +176,8 @@ fn read_proc_stat() -> Option<(u64, u64)> {
         return None;
     }
     let text = String::from_utf8(output.stdout).ok()?;
-    let text = text.trim();
-    let mut parts = text.split_whitespace();
+    let trimmed = text.trim();
+    let mut parts = trimmed.split_whitespace();
     let rss_kb: u64 = parts.next()?.parse().ok()?;
     let mem_bytes = rss_kb.saturating_mul(1024);
     let cpu_centisecs = parse_ps_cputime(parts.next()?)?;
@@ -188,23 +189,37 @@ fn read_proc_stat() -> Option<(u64, u64)> {
 fn parse_ps_cputime(raw: &str) -> Option<u64> {
     let (main_part, centis_str) = raw.rsplit_once('.')?;
     let centis: u64 = centis_str.parse().ok()?;
-    let segments: Vec<&str> = main_part.split(':').collect();
-    let total_secs: u64 = match segments.len() {
-        1 => segments.first()?.parse().ok()?,
-        2 => {
-            let mins: u64 = segments.first()?.parse().ok()?;
-            let secs: u64 = segments.get(1)?.parse().ok()?;
-            mins.saturating_mul(60).saturating_add(secs)
-        }
-        3 => {
-            let hours: u64 = segments.first()?.parse().ok()?;
-            let mins: u64 = segments.get(1)?.parse().ok()?;
-            let secs: u64 = segments.get(2)?.parse().ok()?;
-            hours.saturating_mul(3600).saturating_add(mins.saturating_mul(60)).saturating_add(secs)
-        }
-        _ => return None,
-    };
+    let total_secs = parse_hms_secs(main_part)?;
     Some(total_secs.saturating_mul(100).saturating_add(centis))
+}
+
+/// Parse a `SS` / `MM:SS` / `H:MM:SS` colon-separated duration into seconds.
+#[cfg(target_os = "macos")]
+fn parse_hms_secs(main_part: &str) -> Option<u64> {
+    let segments: Vec<&str> = main_part.split(':').collect();
+    match segments.len() {
+        1 => segments.first()?.parse().ok(),
+        2 => parse_ms_secs(&segments),
+        3 => parse_hms_triple(&segments),
+        _ => None,
+    }
+}
+
+/// Parse `[MM, SS]` colon segments into total seconds.
+#[cfg(target_os = "macos")]
+fn parse_ms_secs(segments: &[&str]) -> Option<u64> {
+    let mins: u64 = segments.first()?.parse().ok()?;
+    let secs: u64 = segments.get(1)?.parse().ok()?;
+    Some(mins.saturating_mul(60).saturating_add(secs))
+}
+
+/// Parse `[H, MM, SS]` colon segments into total seconds.
+#[cfg(target_os = "macos")]
+fn parse_hms_triple(segments: &[&str]) -> Option<u64> {
+    let hours: u64 = segments.first()?.parse().ok()?;
+    let mins: u64 = segments.get(1)?.parse().ok()?;
+    let secs: u64 = segments.get(2)?.parse().ok()?;
+    Some(hours.saturating_mul(3600).saturating_add(mins.saturating_mul(60)).saturating_add(secs))
 }
 
 /// Fallback for unsupported platforms — no CPU/memory data available.
@@ -281,9 +296,9 @@ impl PerfMetrics {
                 let pct = if elapsed > 0.0 {
                     let tick_delta = cpu_ticks.saturating_sub(frame_st.last_cpu_measure.1);
                     // Convert ticks to seconds (usually 100 ticks/sec on Linux)
-                    let cpu_seconds = tick_delta.to_f32() / 100.0;
+                    let cpu_seconds = float_math::div_u64(tick_delta, 100.0).to_f32();
                     // CPU percentage = (cpu_time / wall_time) * 100
-                    (cpu_seconds / elapsed) * 100.0
+                    float_math::percent(cpu_seconds.to_f64(), elapsed.to_f64()).to_f32()
                 } else {
                     0.0
                 };
@@ -309,7 +324,7 @@ impl PerfMetrics {
         // Extract frame data and release lock before processing ops
         let frame_samples: Vec<f64> = {
             let frame_times = self.frame_times.read().unwrap_or_else(std::sync::PoisonError::into_inner);
-            frame_times.recent(40).iter().map(|&us| us.to_f64() / 1000.0).collect()
+            frame_times.recent(40).iter().map(|&us| float_math::div_u64(us, 1_000.0f64)).collect()
         };
 
         // Extract op data under lock, then process without holding it
@@ -327,47 +342,14 @@ impl PerfMetrics {
                 .collect()
         };
 
-        let mut op_snapshots: Vec<OpSnapshot> = raw_ops
-            .iter()
-            .map(|(name, total_us, recent)| {
-                let count = recent.len();
-
-                // Calculate mean
-                let mean_us = if count > 0 { recent.iter().sum::<u64>().to_f64() / count.to_f64() } else { 0.0 };
-
-                // Calculate standard deviation
-                let std_us = if count > 1 {
-                    let variance = recent
-                        .iter()
-                        .map(|&x| {
-                            let diff = x.to_f64() - mean_us;
-                            diff * diff
-                        })
-                        .sum::<f64>()
-                        / count.saturating_sub(1).to_f64();
-                    variance.sqrt()
-                } else {
-                    0.0
-                };
-
-                OpSnapshot {
-                    name,
-                    total_ms: total_us.to_f64() / 1000.0,
-                    mean_ms: mean_us / 1000.0,
-                    std_ms: std_us / 1000.0,
-                }
-            })
-            .collect();
+        let mut op_snapshots: Vec<OpSnapshot> =
+            raw_ops.iter().map(|entry| compute_op_snapshot(entry.0, entry.1, &entry.2)).collect();
 
         // Sort by total time descending (hotspots first)
         op_snapshots.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
 
-        let frame_avg_ms = if frame_samples.is_empty() {
-            0.0
-        } else {
-            frame_samples.iter().sum::<f64>() / frame_samples.len().to_f64()
-        };
-        let frame_max_ms = frame_samples.iter().copied().fold(0.0, f64::max);
+        let frame_avg_ms = if frame_samples.is_empty() { 0.0f64 } else { float_math::mean(&frame_samples) };
+        let frame_max_ms = frame_samples.iter().copied().fold(0.0f64, f64::max);
 
         PerfSnapshot {
             ops: op_snapshots,
@@ -375,7 +357,7 @@ impl PerfMetrics {
             frame_avg_ms,
             frame_max_ms,
             cpu_usage: f32::from_bits(self.cpu_usage.load(Ordering::Relaxed)),
-            memory_mb: self.memory_bytes.load(Ordering::Relaxed).to_f64() / (1024.0 * 1024.0),
+            memory_mb: float_math::div_u64(self.memory_bytes.load(Ordering::Relaxed), 1_048_576.0f64),
             open_fds: self.open_fds.load(Ordering::Relaxed),
             fd_limit_soft: self.fd_limit_soft.load(Ordering::Relaxed),
         }
@@ -398,6 +380,35 @@ impl PerfMetrics {
             self.refresh_system_stats();
         }
         new_state
+    }
+}
+
+/// Compute one operation's display snapshot (total/mean/std in ms) from its
+/// accumulated total and recent-sample ring. `recent` drives mean + std;
+/// std needs ≥2 samples (sample variance, `n-1` divisor).
+fn compute_op_snapshot(name: &'static str, total_us: u64, recent: &[u64]) -> OpSnapshot {
+    let count = recent.len();
+
+    let mean_us = if count > 0 { float_math::div(recent.iter().sum::<u64>().to_f64(), count.to_f64()) } else { 0.0f64 };
+
+    let std_us = if count > 1 {
+        let variance = float_math::div(
+            float_math::sum_iter(recent.iter().map(|&x| {
+                let diff = float_math::sub(x.to_f64(), mean_us);
+                float_math::mul(diff, diff)
+            })),
+            count.saturating_sub(1).to_f64(),
+        );
+        variance.sqrt()
+    } else {
+        0.0f64
+    };
+
+    OpSnapshot {
+        name,
+        total_ms: float_math::div_u64(total_us, 1000.0f64),
+        mean_ms: float_math::div(mean_us, 1000.0f64),
+        std_ms: float_math::div(std_us, 1000.0f64),
     }
 }
 

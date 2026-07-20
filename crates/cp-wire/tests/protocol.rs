@@ -67,7 +67,7 @@ fn every_opentry_kind_round_trips() {
 
     for (i, kind) in kinds.into_iter().enumerate() {
         let rev = u64::try_from(i).unwrap_or(0);
-        round_trips(&OpEntry { schema_version: 1, rev, timestamp_ms: 1_000_u64.wrapping_add(rev), kind });
+        round_trips(&OpEntry::new(1, rev, 1_000_u64.wrapping_add(rev), kind));
     }
 }
 
@@ -82,12 +82,7 @@ fn checkpoint_carries_a_faithful_snapshot() {
     snapshot.seen.mark("tok-a", 1);
     snapshot.seen.mark("tok-b", 9);
 
-    let entry = OpEntry {
-        schema_version: 1,
-        rev: 100,
-        timestamp_ms: 5,
-        kind: OpEntryKind::Checkpoint { snapshot: snapshot.clone() },
-    };
+    let entry = OpEntry::new(1, 100, 5, OpEntryKind::Checkpoint { snapshot: snapshot.clone() });
     let json = serde_json::to_string(&entry).expect("serialize");
     let back: OpEntry = serde_json::from_str(&json).expect("deserialize");
 

@@ -89,10 +89,32 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
         {
             context.push(panel_to_context(&panel_data, &id));
             panel_count = panel_count.saturating_add(1);
+        } else {
+            // No persisted panel for this fixed slot — skip (created lazily later).
         }
     }
 
     // Dynamic panels (P8+)
+    let dynamic_panels = load_dynamic_panels(cfg);
+    panel_count = panel_count.saturating_add(dynamic_panels.len());
+    for (_, elem) in dynamic_panels {
+        context.push(elem);
+    }
+
+    // Extract message UIDs for Phase 3
+    let message_uids: Vec<String> = important
+        .get(&Kind::new(Kind::CONVERSATION))
+        .and_then(|uid| panel::load_panel(uid))
+        .map(|p| p.message_uids)
+        .unwrap_or_default();
+
+    BootPanels { context, message_uids, panel_count }
+}
+
+/// Load the dynamic panels (P8+) from disk, sorted by their numeric local id.
+/// Conversation-history panels also get their message bodies hydrated + a page
+/// count computed so the boot render matches steady state.
+fn load_dynamic_panels(cfg: &BootConfig) -> Vec<(String, Entry)> {
     let mut dynamic_panels: Vec<(String, Entry)> = cfg
         .worker
         .panel_uid_to_local_id
@@ -126,19 +148,7 @@ pub(crate) fn boot_load_panels(cfg: &BootConfig) -> BootPanels {
         let b_num: usize = b.0.trim_start_matches('P').parse().unwrap_or(999);
         a_num.cmp(&b_num)
     });
-    panel_count = panel_count.saturating_add(dynamic_panels.len());
-    for (_, elem) in dynamic_panels {
-        context.push(elem);
-    }
-
-    // Extract message UIDs for Phase 3
-    let message_uids: Vec<String> = important
-        .get(&Kind::new(Kind::CONVERSATION))
-        .and_then(|uid| panel::load_panel(uid))
-        .map(|p| p.message_uids)
-        .unwrap_or_default();
-
-    BootPanels { context, message_uids, panel_count }
+    dynamic_panels
 }
 
 /// Phase 3: Load conversation messages from individual YAML files.
@@ -168,21 +178,15 @@ pub(crate) fn boot_assemble_state(cfg: BootConfig, panels: BootPanels, messages:
     // Restore cache engine state from worker modules
     let cache_engine_json = cfg.worker.modules.get("cache_engine").and_then(|v| serde_json::to_string(v).ok());
 
-    State {
-        context: panels.context,
-        messages,
-        selected_context: cfg.shared.selected_context,
-        next_user_id,
-        next_assistant_id,
-        next_tool_id: cfg.worker.next_tool_id,
-        next_result_id: cfg.worker.next_result_id,
-        input: cfg.shared.draft_input,
-        input_cursor: cfg.shared.draft_cursor,
-        view_mode: cfg.shared.view_mode,
-        active_theme: cfg.shared.active_theme,
-        cache_engine_json,
-        ..State::default()
-    }
+    State::default()
+        .with_context(panels.context)
+        .with_messages(messages)
+        .with_selected_context(cfg.shared.selected_context)
+        .with_id_counters((next_user_id, next_assistant_id, cfg.worker.next_tool_id, cfg.worker.next_result_id))
+        .with_draft(cfg.shared.draft_input, cfg.shared.draft_cursor)
+        .with_view_mode(cfg.shared.view_mode)
+        .with_active_theme(cfg.shared.active_theme)
+        .with_cache_engine_json(cache_engine_json)
 }
 
 // ─── Legacy Entry Point ─────────────────────────────────────────────────────
@@ -214,31 +218,12 @@ pub(crate) fn load_state() -> State {
 
 /// Convert `PanelData` to `Entry`
 fn panel_to_context(panel: &PanelData, local_id: &str) -> Entry {
-    Entry {
-        id: local_id.to_string(),
-        uid: Some(panel.uid.clone()),
-        context_type: panel.panel_type.clone(),
-        name: panel.name.clone(),
-        token_count: panel.token_count,
-        metadata: panel.metadata.clone(),
-        cached_content: None,
-        history_messages: None,
-        cache_deprecated: true, // Will be refreshed on load
-        cache_in_flight: false,
-        // Use saved timestamp if available, otherwise current time for new panels
-        last_refresh_ms: if panel.last_refresh_ms > 0 { panel.last_refresh_ms } else { crate::app::panels::now_ms() },
-        content_hash: panel.content_hash.clone(),
-        source_hash: None,
-        current_page: 0,
-        total_pages: 1,
-        page_descriptions: std::collections::BTreeMap::new(),
-        full_token_count: 0,
-        scroll_state: cp_base::state::context::ScrollState::default(),
-        panel_cache_hit: false,
-        panel_total_cost: panel.panel_total_cost.unwrap_or(0.0),
-        freeze_count: 0,
-        total_freezes: 0,
-        total_cache_misses: 0,
-        emitted: cp_base::state::context::EmittedState::default(),
-    }
+    let last_refresh_ms = if panel.last_refresh_ms > 0 { panel.last_refresh_ms } else { crate::app::panels::now_ms() };
+    cp_base::state::context::make_default_entry(local_id, panel.panel_type.clone(), &panel.name, true)
+        .with_uid(panel.uid.clone())
+        .with_token_count(panel.token_count)
+        .with_metadata(panel.metadata.clone())
+        .with_content_hash(panel.content_hash.clone())
+        .with_last_refresh_ms(last_refresh_ms)
+        .with_panel_total_cost(panel.panel_total_cost.unwrap_or(0.0))
 }

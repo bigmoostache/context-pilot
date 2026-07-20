@@ -17,7 +17,7 @@ fn push_log(state: &mut State, content: String, importance: &str) {
     ls.next_log_id = ls.next_log_id.saturating_add(1);
 
     let mut entry = LogEntry::new(id, content);
-    entry.importance = importance.to_string();
+    importance.clone_into(&mut entry.importance);
     ls.logs.push(entry);
 }
 
@@ -25,11 +25,11 @@ fn push_log(state: &mut State, content: String, importance: &str) {
 pub(crate) fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("log_create");
     let Some(entries) = tool.input.get("entries").and_then(|v| v.as_array()) else {
-        return ToolResult::new(tool.id.clone(), "Missing required 'entries' array".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required 'entries' array".to_owned(), true);
     };
 
     if entries.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Empty 'entries' array".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Empty 'entries' array".to_owned(), true);
     }
 
     let mut count: usize = 0;
@@ -39,7 +39,7 @@ pub(crate) fn execute_log_create(tool: &ToolUse, state: &mut State) -> ToolResul
         {
             let importance = entry_obj.get("importance").and_then(|v| v.as_str()).unwrap_or("medium");
 
-            push_log(state, content.to_string(), importance);
+            push_log(state, content.to_owned(), importance);
             count = count.saturating_add(1);
         }
     }
@@ -58,18 +58,18 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
     let _fg = cp_base::flame!("close_history");
     // 1. Validate the panels array
     let Some(panels) = tool.input.get("panels").and_then(|v| v.as_array()) else {
-        return ToolResult::new(tool.id.clone(), "Missing required 'panels' array".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required 'panels' array".to_owned(), true);
     };
 
     if panels.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Empty 'panels' array".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Empty 'panels' array".to_owned(), true);
     }
 
     let mut output_parts = Vec::new();
 
     for panel_obj in panels {
         let Some(panel_id) = panel_obj.get("panel_id").and_then(|v| v.as_str()) else {
-            output_parts.push("Skipped entry: missing 'panel_id'".to_string());
+            output_parts.push("Skipped entry: missing 'panel_id'".to_owned());
             continue;
         };
 
@@ -105,10 +105,10 @@ pub(crate) fn execute_close_conversation_history(tool: &ToolUse, state: &mut Sta
                         let ls = LogsState::get_mut(state);
                         let id = format!("L{}", ls.next_log_id);
                         ls.next_log_id = ls.next_log_id.saturating_add(1);
-                        let entry = LogEntry::with_timestamp(id, content.to_string(), last_msg_timestamp);
+                        let entry = LogEntry::with_timestamp(id, content.to_owned(), last_msg_timestamp);
                         ls.logs.push(entry);
                     } else {
-                        push_log(state, content.to_string(), "medium");
+                        push_log(state, content.to_owned(), "medium");
                     }
                     log_count = log_count.saturating_add(1);
                 }

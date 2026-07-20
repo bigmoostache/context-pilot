@@ -15,9 +15,83 @@
 # annotation from the source code.
 
 exceptions:
+  # ── deref_match! macro: sole ref-pattern chokepoint ─────────────────
+
+  - path: "crates/cp-base/src/lib.rs"
+    match: "clippy::pattern_type_mismatch mandates ref bindings when destructuring non-Copy fields out of a shared reference; the two restriction lints are mutually exclusive, so the deref-plus-ref form is funneled through this one macro"
+    reason: >
+      The deref_match! macro is the single audited site allowed to use `ref`
+      bindings. clippy::pattern_type_mismatch (forbid) rejects matching a variant
+      pattern against a &Enum via match ergonomics; its mandated fix is to
+      dereference the scrutinee (match *place) and bind non-Copy fields with ref.
+      But clippy::ref_patterns rejects ref. The two restriction lints are mutually
+      exclusive for destructuring a non-Copy field out of a shared reference, so
+      every such site (Display/Debug/Error impls with String/Box/Vec fields)
+      routes through this macro — the single #[expect(clippy::ref_patterns)]
+      covers all expansions workspace-wide.
+    strategy: >
+      Irreducible — the two forbid-level restriction lints are mutually exclusive
+      by design; a single chokepoint macro is the minimal honest resolution.
+
+  - path: "crates/cp-vault/src/types.rs"
+    match: "cp-vault is foundational (cannot depend on cp-base's deref_match! macro)"
+    reason: >
+      VaultError's Display impl matches *self and binds the non-Copy String
+      payloads (MissingKey/Io/Network) with ref. clippy::pattern_type_mismatch
+      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
+      exclusive with it. cp-vault sits below cp-base in the crate graph and cannot
+      use the deref_match! macro, so the fmt fn carries its own #[expect].
+    strategy: >
+      Irreducible — the two restriction lints are mutually exclusive and this
+      foundational crate cannot reach the shared macro chokepoint.
+
+  - path: "crates/cp-wire/src/framing.rs"
+    match: "cp-wire is foundational (cannot depend on cp-base's deref_match! macro)"
+    reason: >
+      FrameError's Display impl matches *self and binds the non-Copy String
+      payloads (DeserializeError/SerializeError) with ref. clippy::pattern_type_mismatch
+      (forbid) mandates the deref-plus-ref form; clippy::ref_patterns is mutually
+      exclusive with it. cp-wire sits below cp-base in the crate graph and cannot
+      use the deref_match! macro, so the fmt fn carries its own #[expect].
+    strategy: >
+      Irreducible — the two restriction lints are mutually exclusive and this
+      foundational crate cannot reach the shared macro chokepoint.
+
+  - path: "crates/cp-oplog/src/lib.rs"
+    match: "cp-oplog is foundational (only cp_wire + std); clippy::pattern_type_mismatch mandates explicit &-patterns with ref bindings for a read-only match over a borrowed enum and the two restriction lints are mutually exclusive, so every such site funnels through this one local macro"
+    reason: >
+      The ref_match! macro is cp-oplog's local ref-pattern chokepoint. Its sites
+      (Error Display, replay fold_entry, replay_fast Checkpoint) all read non-Copy
+      fields (io::Error/FrameError/Snapshot/thread_id) out of a borrowed enum;
+      clippy::pattern_type_mismatch (forbid) mandates explicit &-patterns with ref
+      bindings, and clippy::ref_patterns is mutually exclusive with it. cp-oplog
+      depends only on cp_wire + std and cannot reach cp-base's deref_match!, so
+      every such site routes through this one macro — the single
+      #[expect(clippy::ref_patterns)] covers all expansions.
+    strategy: >
+      Irreducible — the two restriction lints are mutually exclusive and this
+      foundational crate cannot reach the shared macro chokepoint.
+
+  # ── too_many_lines: flat aggregate root-state initializer ────────────
+
+  - path: "crates/cp-base/src/state/runtime/default.rs"
+    match: "flat aggregate root-state initializer; sub-grouping fields would churn 136 access sites for no gain"
+    reason: >
+      State is the flat aggregate root of the whole application (~80 leaf fields:
+      UI cursors, id counters, model selections, cache/stream/tick token + USD
+      telemetry, panel-diff snapshots, per-frame caches). Its Default impl is a
+      single linear struct literal — one `field: value` line each — at 82 lines
+      over the 60-line threshold. Grouping the telemetry counters into sub-structs
+      to shave lines would ripple across 136 field-access sites for zero
+      behavioural gain, so the initializer stays flat and carries the length
+      expect. Threshold is unchanged (still 60).
+    strategy: >
+      Irreducible without a 136-site sub-struct refactor that trades a linear
+      initializer for cross-cutting churn; the flat literal is the honest shape.
+
   # ── cast.rs: Safe numeric casting infrastructure ─────────────────
 
-  - path: "crates/cp-base/src/cast.rs"
+  - path: "crates/cp-base/src/cast/mod.rs"
     match: "lossy int→float: mantissa too narrow — inherent floating-point limitation"
     reason: >
       Module-level #[expect] on mod lossy_float covers all 12 lossy
@@ -27,7 +101,7 @@ exceptions:
     strategy: >
       Irreducible — fundamental floating-point limitation.
 
-  - path: "crates/cp-base/src/cast.rs"
+  - path: "crates/cp-base/src/cast/mod.rs"
     match: "saturating float→int: no TryFrom<float> for integers in std"
     reason: >
       Module-level #[expect] on mod float_to_int covers f64 and f32
@@ -35,6 +109,35 @@ exceptions:
       so raw `as` with manual bounds checking is the only path.
     strategy: >
       Irreducible until std provides TryFrom<f64> for integers.
+
+  - path: "crates/cp-base/src/cast/float_math.rs"
+    match: "sole chokepoint for irreducible f32/f64 arithmetic — token/char/page conversion, USD cost, bar fills, easing, and telemetry statistics"
+    reason: >
+      Module-level #![expect] on mod float_math: the sole audited site for
+      float arithmetic once clippy::float_arithmetic is deny workspace-wide.
+      Domain-named helpers (token/char/page conversion, USD cost, bar fills,
+      easing curves, telemetry statistics) carry no domain constants —
+      divisors/factors are parameters. The arithmetic is irreducible —
+      floating-point IS the domain (ratios, prices, decay).
+    strategy: >
+      Fundamentally irreducible — float ratio/price/decay math has no integer
+      equivalent. Chokepoint mirrors the time_arith integer-division module.
+
+  - path: "src/app/actions/mod.rs"
+    match: "exhaustive dispatch over ~70 Action variants; splitting requires either a forbidden wildcard catch-all (wildcard_enum_match_arm) or a duplicated giant or-pattern, both worse than one flat variant→handler table — the dispatch twin of the flat State::default initializer"
+    reason: >
+      apply_action is a single flat match over the closed ~70-variant Action enum
+      (the Elm/Redux update loop). Every arm is a one-line delegation to a handler.
+      Splitting the match across sub-dispatchers is impossible under the 60-line cap:
+      Rust requires each match to be exhaustive, and a _/bare-binding catch-all trips
+      clippy::wildcard_enum_match_arm (forbid); a pass-back Result chain needs the same
+      catch-all; borrowing the scrutinee (match &action) to split by payload trips
+      clippy::pattern_type_mismatch. The only residual is length, intrinsic to a
+      70-action enum, so the fn carries one #[expect(clippy::too_many_lines)] — the
+      dispatch twin of the State::default flat-initializer expect. Threshold unchanged (60).
+    strategy: >
+      Irreducible — a closed 70-variant dispatch cannot be split under the line cap
+      without a forbidden wildcard catch-all; the flat delegating match is the honest shape.
 
   # ── config/mod.rs: invariant_panic ──────────────────────────────────
 
@@ -97,7 +200,7 @@ exceptions:
 
   # ── cp-mod-search/radar.rs: numeric casts ────────────────────────────
 
-  - path: "crates/cp-mod-search/src/radar.rs"
+  - path: "crates/cp-mod-search/src/radar/mod.rs"
     match: "timestamp ms as f64 — decay math requires floating point"
     reason: >
       refresh_inner() casts u64 timestamps and log counts to f64 for
@@ -106,41 +209,604 @@ exceptions:
     strategy: >
       Irreducible — f64 arithmetic is required for exponential decay.
 
-  # ── render_input_blocks.rs: too_many_lines on render_input_blocks ────
-
-  - path: "src/modules/conversation/render_input_blocks.rs"
-    match: "rendering pipeline with selection logic"
+  - path: "crates/cp-mod-search/src/radar/mod.rs"
+    match: "log number as f64 — decay math requires floating point"
     reason: >
-      render_input_blocks() is a single rendering pipeline that handles
-      cursor insertion, paste sentinel expansion, selection highlighting,
-      command hints, and line wrapping. Splitting it would scatter tightly
-      coupled rendering logic across functions with no reuse benefit.
+      query_signal_results() casts the parsed log number and the current
+      log count to f64 for the per-hit exponential decay factor. Extracted
+      from refresh_inner during the cognitive_complexity split; the cast is
+      the same irreducible decay math.
     strategy: >
-      Could extract sub-phases into helper functions, but each phase
-      depends on state from previous phases (byte offsets, selection range).
-      The linear flow is clearer than scattered helpers.
+      Irreducible — f64 arithmetic is required for exponential decay.
 
   # ── cp-base test functions: panic for clear assertion messages ────
 
-  - path: "crates/cp-base/src/lib.rs"
-    match: 'test assertions use panic for tool YAML validation'
-    reason: >
-      tool_yaml_deserialization() uses unwrap_or_else(|e| panic!(...)) to
-      give clear schema-mismatch messages. The forbid-level expect_used
-      lint prevents .expect(), so panic! via unwrap_or_else is the only
-      way to get descriptive test failures.
-    strategy: >
-      Irreducible — expect_used is forbid-level so .expect() cannot be used.
+  # ── as_conversions: const-fn casts (try_from/From not const-callable) ──
 
-  - path: "crates/cp-base/src/lib.rs"
-    match: 'test assertions use panic for config YAML validation'
+  - path: "crates/cp-wire/src/framing.rs"
+    match: "const-fn narrowing after `& BYTE_MASK` is provably exact"
     reason: >
-      config_yaml_direct_parse() uses unwrap_or_else(|e| panic!(...)) to
-      give clear schema-mismatch messages. The forbid-level expect_used
-      lint prevents .expect(), so panic! via unwrap_or_else is the only
-      way to get descriptive test failures.
+      u32_to_le() masks the low 8 bits with `& BYTE_MASK` before each
+      `as u8`, so the narrowing is provably exact. try_from/From are not
+      const-callable, and clippy::little_endian_bytes (forbid) rejects the
+      to_le_bytes shortcut — the two restriction lints leave the masked `as`
+      form as the only path.
     strategy: >
-      Irreducible — expect_used is forbid-level so .expect() cannot be used.
+      Irreducible — clippy::little_endian_bytes forbids to_le_bytes and From
+      is not const-stable, so the masked const-fn narrowing is the only option.
+
+  - path: "crates/cp-wire/src/heartbeat.rs"
+    match: "const-fn narrowing after `& BYTE_MASK_U32` is provably exact"
+    reason: >
+      u32_to_le() masks the low 8 bits with `& BYTE_MASK_U32` before each
+      `as u8`, so the narrowing is provably exact. try_from/From are not
+      const-callable, and clippy::little_endian_bytes (forbid) rejects the
+      to_le_bytes shortcut — the masked `as` form is the only path.
+    strategy: >
+      Irreducible — clippy::little_endian_bytes forbids to_le_bytes and From
+      is not const-stable, so the masked const-fn narrowing is the only option.
+
+  - path: "crates/cp-wire/src/heartbeat.rs"
+    match: "const-fn narrowing after `& BYTE_MASK_U64` is provably exact"
+    reason: >
+      u64_to_le() masks the low 8 bits with `& BYTE_MASK_U64` before each
+      `as u8`, so the narrowing is provably exact. try_from/From are not
+      const-callable, and clippy::little_endian_bytes (forbid) rejects the
+      to_le_bytes shortcut — the masked `as` form is the only path.
+    strategy: >
+      Irreducible — clippy::little_endian_bytes forbids to_le_bytes and From
+      is not const-stable, so the masked const-fn narrowing is the only option.
+
+  - path: "crates/cp-mod-utilities/src/time.rs"
+    match: "const-fn widening (u8/i32 -> i64) is always exact"
+    reason: >
+      compose_epoch_secs() is a const fn that widens u8/i32 date-time
+      components to i64 (always exact). From/i64::from are not callable in
+      a const fn, so `as` is the only const-compatible widening.
+    strategy: >
+      Irreducible until From is const-callable in stable const fn.
+
+  - path: "src/ui/ir/render_sidebar.rs"
+    match: "const-fn widening (u16 -> usize) is always exact"
+    reason: >
+      content_width() is a const fn that widens the u16 area width to usize
+      (always exact). usize::from is not const-callable on stable, so `as`
+      is the only const-compatible widening.
+    strategy: >
+      Irreducible until From is const-callable in stable const fn.
+
+  # ── exhaustive_enums: closed wire / IR / registry contracts ──────────
+  # These public enums are LEGITIMATELY exhaustive. They are either wire /
+  # IR protocol contracts (a new variant IS a deliberate breaking change
+  # every peer must handle) or closed error/registry taxonomies matched
+  # exhaustively. #[non_exhaustive] is the wrong tool here: it would forbid
+  # the cross-crate CONSTRUCTION these enums require (E0639) and/or force
+  # cross-crate wildcard match arms that the forbidden wildcard_enum_match_arm
+  # lint rejects. The serde-tagged wire enums additionally carry an `Unknown`
+  # catch-all for N-1 forward compatibility, covering the only real use case
+  # #[non_exhaustive] would serve.
+
+  - path: "crates/cp-wire/src/types/mod.rs"
+    match: "the Phase variant set is closed"
+    reason: >
+      Phase is a wire-protocol contract constructed cross-crate; a new phase
+      is a deliberate breaking change every peer must handle exhaustively.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-wire/src/types/mod.rs"
+    match: "the LifecycleState variant set is closed"
+    reason: >
+      LifecycleState is a wire-protocol contract constructed cross-crate; a new
+      state is a deliberate breaking change every peer handles exhaustively.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-wire/src/types/mod.rs"
+    match: "ThreadTurn already carries an Unknown catch-all"
+    reason: >
+      ThreadTurn already has an Unknown catch-all for N-1 forward-compat and is
+      constructed cross-crate; non_exhaustive adds nothing and forbids that construction.
+    strategy: >
+      Irreducible — the Unknown variant already provides forward-compat.
+
+  - path: "crates/cp-wire/src/types/command.rs"
+    match: "Kind carries an Unknown catch-all for N-1 tolerance"
+    reason: >
+      Command Kind has an Unknown catch-all and is constructed by the orchestrator,
+      matched exhaustively by the agent; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — the Unknown variant already provides forward-compat.
+
+  - path: "crates/cp-wire/src/types/oplog.rs"
+    match: "OpEntryKind carries an Unknown catch-all for N-1 tolerance"
+    reason: >
+      OpEntryKind has an Unknown catch-all and is constructed cross-crate (the agent
+      emits every kind); non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — the Unknown variant already provides forward-compat.
+
+  - path: "crates/cp-wire/src/types/stream.rs"
+    match: "the stream-frame Kind carries an Unknown catch-all"
+    reason: >
+      The stream-frame Kind has an Unknown catch-all and is constructed cross-crate
+      (the agent emits frames); non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — the Unknown variant already provides forward-compat.
+
+  - path: "crates/cp-wire/src/types/ack.rs"
+    match: "the ack Status is a closed two-outcome set"
+    reason: >
+      Ack Status is a closed accepted/rejected set constructed by the orchestrator
+      and matched exhaustively by the agent; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — a binary outcome gains nothing from non_exhaustive.
+
+  - path: "crates/cp-wire/src/types/registry.rs"
+    match: "AgentStatus is a closed lifecycle set written cross-crate"
+    reason: >
+      AgentStatus is a closed lifecycle set written cross-crate into the registry
+      entry and matched exhaustively by the backend; non_exhaustive would forbid it.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-wire/src/framing.rs"
+    match: "framing error taxonomy is a closed wire contract"
+    reason: >
+      FrameError enumerates every decode failure mode; callers match exhaustively.
+      non_exhaustive would force cross-crate wildcard arms the forbidden
+      wildcard_enum_match_arm lint rejects.
+    strategy: >
+      Irreducible — closed error taxonomy, wildcard arms are forbidden.
+
+  - path: "crates/cp-wire/src/heartbeat.rs"
+    match: "heartbeat error taxonomy is a closed wire contract"
+    reason: >
+      Heartbeat Error enumerates every encode/decode failure mode; callers match
+      exhaustively. non_exhaustive would force forbidden wildcard arms.
+    strategy: >
+      Irreducible — closed error taxonomy, wildcard arms are forbidden.
+
+  - path: "crates/cp-render/src/frame.rs"
+    match: "IR rendering contract: SidebarMode is a closed set"
+    reason: >
+      SidebarMode is a closed IR set constructed by the frame builder and matched
+      exhaustively by the adapter; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-render/src/lib.rs"
+    match: "IR rendering contract: Align is a closed three-way set"
+    reason: >
+      Align is a closed Left/Center/Right IR set constructed exhaustively across the
+      tui adapter; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-vault/src/registry.rs"
+    match: "credential-registry taxonomy: KeyCategory is a closed set"
+    reason: >
+      KeyCategory is a closed set constructed in the ALL_KEYS table and matched
+      exhaustively by health/UI code; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-vault/src/registry.rs"
+    match: "credential-registry taxonomy: AuthMechanism is a closed set"
+    reason: >
+      AuthMechanism is a closed set constructed in the ALL_KEYS table and matched
+      exhaustively by the resolution cascade; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-vault/src/types.rs"
+    match: "vault error taxonomy is a closed set"
+    reason: >
+      VaultError is a closed MissingKey/Io/Network set constructed within cp-vault and
+      matched exhaustively by callers; non_exhaustive would force forbidden wildcard arms.
+    strategy: >
+      Irreducible — closed error taxonomy, wildcard arms are forbidden.
+
+  # ── exhaustive_enums: cp-base foundation contracts ───────────────────
+  # cp-base is the foundation crate every other crate depends on. Its public
+  # enums are constructed by variant literal cross-crate AND matched
+  # exhaustively cross-crate, so #[non_exhaustive] is impossible (E0639 on
+  # construction, wildcard_enum_match_arm on the matches). They are closed
+  # contracts by design.
+
+  - path: "crates/cp-base/src/config/llm_types.rs"
+    match: "stream-event contract"
+    reason: >
+      StreamEvent is constructed by every LLM provider and matched exhaustively by the
+      streaming pipeline; non_exhaustive would forbid that cross-crate construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/config/llm_types.rs"
+    match: "provider-roster contract"
+    reason: >
+      LlmProvider is a closed set constructed cross-crate by config/dispatch and matched
+      exhaustively across the client factory and config UI; non_exhaustive would forbid it.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/config/models.rs"
+    match: "AnthropicModel is a closed pricing/capability table"
+    reason: >
+      AnthropicModel is constructed cross-crate by model dispatch and matched exhaustively
+      by its ModelInfo impl; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/config/models.rs"
+    match: "GrokModel is a closed pricing/capability table"
+    reason: >
+      GrokModel is constructed cross-crate by model dispatch and matched exhaustively
+      by its ModelInfo impl; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/config/models.rs"
+    match: "GroqModel is a closed pricing/capability table"
+    reason: >
+      GroqModel is constructed cross-crate by model dispatch and matched exhaustively
+      by its ModelInfo impl; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/config/models.rs"
+    match: "DeepSeekModel is a closed pricing/capability table"
+    reason: >
+      DeepSeekModel is constructed cross-crate by model dispatch and matched exhaustively
+      by its ModelInfo impl; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/config/models.rs"
+    match: "MiniMaxModel is a closed pricing/capability table"
+    reason: >
+      MiniMaxModel is constructed cross-crate by model dispatch and matched exhaustively
+      by its ModelInfo impl; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/config/models.rs"
+    match: "ClaudeCodeV2Model is a closed pricing/capability table"
+    reason: >
+      ClaudeCodeV2Model is constructed cross-crate by model dispatch and matched exhaustively
+      by its ModelInfo impl; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/panels.rs"
+    match: "cache-update protocol"
+    reason: >
+      CacheUpdate is constructed by every module's refresh_cache and matched exhaustively
+      by the apply loop; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/panels.rs"
+    match: "watch-spec contract"
+    reason: >
+      WatchSpec is constructed by every module's watch_paths and matched exhaustively by
+      the watcher sync; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/state/actions.rs"
+    match: "central Elm action enum"
+    reason: >
+      Action is constructed by every event handler and matched exhaustively by apply_action;
+      the set is closed by design and non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/state/actions.rs"
+    match: "action-result contract"
+    reason: >
+      ActionResult is constructed by action handlers and matched exhaustively by the event
+      loop; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/state/data/config.rs"
+    match: "view-mode contract"
+    reason: >
+      ViewMode already carries #[serde(other)] on Normal for forward-compat and is constructed
+      cross-crate; non_exhaustive adds nothing and forbids that construction.
+    strategy: >
+      Irreducible — the serde(other) variant already provides forward-compat.
+
+  - path: "crates/cp-base/src/state/data/message.rs"
+    match: "message-shape discriminator"
+    reason: >
+      MsgKind is constructed cross-crate on every Message and matched exhaustively by the
+      formatter; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/state/data/message.rs"
+    match: "message-status contract"
+    reason: >
+      MsgStatus is constructed cross-crate and matched exhaustively by context management;
+      non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/state/data/mod.rs"
+    match: "cache-break telemetry taxonomy"
+    reason: >
+      CacheBreakKind is a closed partition matched exhaustively by as_tsv and constructed
+      cross-crate by the freeze pass; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/state/flags.rs"
+    match: "stream-phase state machine"
+    reason: >
+      StreamPhase is a closed 3-state set constructed cross-crate via transition() and matched
+      exhaustively by is_streaming/is_tooling; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/state/runtime/reverie.rs"
+    match: "reverie-kind contract"
+    reason: >
+      Reverie Kind is a closed set constructed cross-crate by the optimizer trigger and matched
+      exhaustively by its Display impl; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/tools/mod.rs"
+    match: "JSON-schema param type"
+    reason: >
+      ParamType is constructed by every tool definition cross-crate and matched exhaustively by
+      to_json_schema; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-base/src/ui/mod.rs"
+    match: "text-table alignment"
+    reason: >
+      This Align is a closed Left/Right set constructed cross-crate on TextCell and matched
+      exhaustively by pad_cell; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  # ── exhaustive_enums: cp-oplog service/error contracts ───────────────
+
+  - path: "crates/cp-oplog/src/error.rs"
+    match: "oplog error taxonomy is a closed two-variant set"
+    reason: >
+      Oplog Error is a closed Io/Frame set constructed within cp-oplog and matched
+      exhaustively by callers; non_exhaustive would force forbidden wildcard arms.
+    strategy: >
+      Irreducible — closed error taxonomy, wildcard arms are forbidden.
+
+  - path: "crates/cp-oplog/src/service.rs"
+    match: "durability policy is a closed binary set"
+    reason: >
+      Durability is a closed Durable/BestEffort set constructed by Durability::of and matched
+      exhaustively by commit routing; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — a binary outcome gains nothing from non_exhaustive.
+
+  - path: "crates/cp-oplog/src/service.rs"
+    match: "best-effort outcome is a closed binary set"
+    reason: >
+      BestEffortOutcome is a closed Submitted/Dropped set returned cross-crate and matched
+      exhaustively by callers; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — a binary outcome gains nothing from non_exhaustive.
+
+  # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
+
+  - path: "crates/cp-mod-github/src/classify/mod.rs"
+    match: "command-class contract"
+    reason: >
+      CommandClass is a closed ReadOnly/Mutating set returned by classify() and matched
+      exhaustively by the executor; non_exhaustive adds nothing to a binary outcome.
+    strategy: >
+      Irreducible — a binary outcome gains nothing from non_exhaustive.
+
+  - path: "crates/cp-mod-git/src/types.rs"
+    match: "git-change taxonomy"
+    reason: >
+      GitChangeType is a closed set constructed cross-crate by the status parser and matched
+      exhaustively by the diff renderer; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-mod-todo/src/types.rs"
+    match: "todo-status contract"
+    reason: >
+      TodoStatus is a closed Pending/InProgress/Done set serde-persisted and constructed
+      cross-crate, matched exhaustively by icon()/FromStr; non_exhaustive would forbid it.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-mod-console/src/types.rs"
+    match: "process-status contract"
+    reason: >
+      ProcessStatus is a closed lifecycle set constructed cross-crate by the session manager
+      and matched exhaustively by label()/exit_code(); non_exhaustive would forbid it.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-mod-bridge/src/body.rs"
+    match: "body-disposition contract"
+    reason: >
+      Stored is a closed Inline/Spilled set returned by Store::put and matched exhaustively
+      by callers routing the durability barrier; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-mod-bridge/src/error.rs"
+    match: "bridge boot error taxonomy is a closed AlreadyRunning/Io set"
+    reason: >
+      Bridge boot Error is a closed AlreadyRunning/Io set constructed within cp-mod-bridge and
+      matched exhaustively by callers; non_exhaustive would force forbidden wildcard arms.
+    strategy: >
+      Irreducible — closed error taxonomy, wildcard arms are forbidden.
+
+  - path: "crates/cp-mod-bridge/src/tee.rs"
+    match: "tee-outcome contract"
+    reason: >
+      Outcome is a closed Published/Dropped binary set returned by Tee::publish and matched
+      exhaustively by callers; non_exhaustive adds nothing to a binary outcome.
+    strategy: >
+      Irreducible — a binary outcome gains nothing from non_exhaustive.
+
+  - path: "crates/cp-mod-prompt/src/types.rs"
+    match: "prompt-kind contract"
+    reason: >
+      PromptType is a closed Agent/Skill/Command set serde-persisted and constructed cross-crate,
+      matched exhaustively by Display/dir_for; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-mod-memory/src/types.rs"
+    match: "importance contract"
+    reason: >
+      MemoryImportance is a closed Low/Medium/High/Critical set serde-persisted and constructed
+      cross-crate, matched exhaustively by as_str()/FromStr; non_exhaustive would forbid it.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-mod-spine/src/engine.rs"
+    match: "spine-decision contract"
+    reason: >
+      SpineDecision is a closed Idle/Blocked/Continue set returned by check_spine and matched
+      exhaustively by the app event loop; non_exhaustive would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-mod-spine/src/types.rs"
+    match: "notification-kind contract"
+    reason: >
+      NotificationType is a closed set serde-persisted and constructed cross-crate, matched
+      exhaustively by label() and the continuation builder; non_exhaustive would forbid it.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-mod-spine/src/types.rs"
+    match: "notification-status contract"
+    reason: >
+      NotificationStatus is a closed Unprocessed/Blocked/Processed set serde-persisted and
+      constructed cross-crate, matched exhaustively by the spine state machine; non_exhaustive
+      would forbid that construction.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-mod-spine/src/types.rs"
+    match: "continuation-action contract"
+    reason: >
+      ContinuationAction is a closed SyntheticMessage/Relaunch set constructed by the continuation
+      builder and matched exhaustively by apply_continuation; non_exhaustive would forbid it.
+    strategy: >
+      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+
+  - path: "crates/cp-mod-threads/src/types.rs"
+    match: "thread-turn contract: ThreadStatus is a closed MyTurn/TheirTurn set"
+    reason: >
+      ThreadStatus is a closed MyTurn/TheirTurn set constructed cross-crate and matched exhaustively
+      by the bridge and threads view; non_exhaustive would force cross-crate wildcard arms the
+      forbidden wildcard_enum_match_arm lint rejects.
+    strategy: >
+      Irreducible — closed two-outcome set, wildcard arms are forbidden.
+
+  - path: "crates/cp-mod-threads/src/types.rs"
+    match: "thread-author contract: ThreadAuthor is a closed User/Assistant set"
+    reason: >
+      ThreadAuthor is a closed User/Assistant set constructed cross-crate and matched exhaustively
+      by the message renderer; non_exhaustive would force cross-crate wildcard arms the forbidden
+      wildcard_enum_match_arm lint rejects.
+    strategy: >
+      Irreducible — closed two-outcome set, wildcard arms are forbidden.
+
+  # ── exhaustive_structs: wide wire records where a constructor is worse ──
+  # These public structs are legitimately exhaustive: each is a fixed-layout
+  # wire record built cross-crate at a single site, and a constructor would take
+  # so many positional arguments it trips the forbidden too_many_arguments lint
+  # (max 4) with no natural field grouping. #[non_exhaustive] is impossible
+  # (E0639 on the cross-crate construction), so the exhaustive literal + a
+  # registered #[expect] is the honest shape. Every OTHER exhaustive struct in
+  # the wire/IR layers took #[non_exhaustive] + an in-crate constructor instead;
+  # these two are the irreducible remainder.
+
+  - path: "crates/cp-wire/src/types/registry.rs"
+    match: "registry-record contract: Entry is a 14-field agent discovery record"
+    reason: >
+      Entry is a 14-field agent discovery record written cross-crate by the bridge boot path and
+      read field-by-field by the backend; a constructor would take 13 positional arguments
+      (tripping too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible.
+    strategy: >
+      Irreducible — a 13-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+
+  - path: "crates/cp-wire/src/types/stream.rs"
+    match: "stream-frame contract: Frame is a 7-field ephemeral routing record"
+    reason: >
+      Frame is a 7-field ephemeral routing record built cross-crate by the agent's tee path; a
+      constructor would take 6 positional arguments (tripping too_many_arguments) with no natural
+      grouping, so #[non_exhaustive] is impossible.
+    strategy: >
+      Irreducible — a 6-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+
+  - path: "crates/cp-wire/src/types/snapshot/mod.rs"
+    match: "roster-entry init bundle: a flat 7-field carrier built by literal cross-crate"
+    reason: >
+      RosterEntryInit is a flat 7-field parameter carrier fed to RosterThread::new. Cross-crate
+      builders (backend test fixtures) construct it by literal, so it must stay exhaustive —
+      #[non_exhaustive] would forbid that literal (the exact E0639 the bundle exists to route
+      around), and a 7-arg RosterThread::new trips too_many_arguments (threshold 4).
+    strategy: >
+      Irreducible — the bundle must be literal-constructible cross-crate; a 7-arg constructor
+      trips too_many_arguments. The exhaustive carrier is the honest shape.
+  # One crate-level #![expect] covers every IR type in cp-render. They are
+  # all built by struct literal cross-crate by the tui adapter (src/ui/ir,
+  # src/ui/search_overlay) and read field-by-field by the renderer, so
+  # #[non_exhaustive] forbids the construction (E0639); the wide records
+  # (Message, SearchIndex, SearchEmbeddings, StatusBar, …) would trip the
+  # forbidden too_many_arguments under any flat constructor. The IR is a
+  # single closed builder↔adapter contract — one reviewed decision, not 56.
+
+  - path: "crates/cp-render/src/lib.rs"
+    match: "IR data-carrier layer: every type is built by struct literal cross-crate"
+    reason: >
+      Crate-level #![expect] for all cp-render IR structs: each is adapter-built by struct literal
+      cross-crate and read field-by-field by the renderer; #[non_exhaustive] forbids that (E0639)
+      and wide records trip too_many_arguments under a flat constructor.
+    strategy: >
+      Irreducible — closed builder↔adapter IR contract; non_exhaustive+constructor is impossible
+      for the wide records.
+
+  # ── exhaustive_structs: cp-base wide cross-crate records ─────────────
+  # Two cp-base structs are built by struct literal at many sites across every
+  # module crate. Both are flat, wide records where a constructor would take so
+  # many positional arguments it trips the forbidden too_many_arguments lint
+  # (max 4). #[non_exhaustive] is impossible (E0639 on the cross-crate
+  # construction). Every OTHER cross-crate cp-base struct took a constructor or
+  # builder (ToolOutput::ok/error, CacheRequest::new, WatcherResult::new+setters)
+  # instead; these two are the irreducible remainder.
+
+  - path: "crates/cp-base/src/tools/mod.rs"
+    match: "tool-return contract: ToolResult is the closed struct every tool fills"
+    reason: >
+      ToolResult is the closed tool-return contract built by struct literal at 116 sites across
+      every module crate; the new/with_name constructors can't cover the display/tldr/preserves_tempo
+      field combinations each site sets, and a 7-arg constructor would trip too_many_arguments.
+    strategy: >
+      Irreducible — a 7-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+
+  - path: "crates/cp-base/src/state/context.rs"
+    match: "module-metadata registry record: TypeMeta is a flat 9-field descriptor"
+    reason: >
+      TypeMeta is a flat 9-field module-metadata descriptor built by struct literal at 25 sites —
+      one per module's context_type_metadata() — cross-crate; a 9-arg constructor would trip
+      too_many_arguments and every module fills all fields.
+    strategy: >
+      Irreducible — a 9-arg constructor trips too_many_arguments; the exhaustive literal is honest.
 
 
 

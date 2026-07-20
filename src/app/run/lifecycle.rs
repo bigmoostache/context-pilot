@@ -31,6 +31,16 @@ pub(crate) struct EventChannels<'ch> {
     pub cache_rx: &'ch Receiver<CacheUpdate>,
 }
 
+/// Outcome of the input phase, telling the main loop how to proceed this tick.
+enum InputOutcome {
+    /// Input fully handled + rendered — restart the loop (skip background work).
+    Restart,
+    /// User quit — break the loop.
+    Quit,
+    /// No short-circuit — fall through to background processing.
+    Continue,
+}
+
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
     /// Main event loop: processes input, stream events, tools, spine, and rendering.
@@ -51,17 +61,7 @@ impl App {
         // wedges, never terminates/signals the process). Idempotent.
         super::tools::watchdog::spawn();
 
-        // Auto-resume streaming if flag was set (e.g., after reload_tui)
-        if self.resume_stream {
-            self.resume_stream = false;
-            let _r = SpineState::create_notification(
-                &mut self.state,
-                NotificationType::ReloadResume,
-                "reload_resume".to_string(),
-                "Resuming after TUI reload".to_string(),
-            );
-            save_state(&self.state);
-        }
+        self.auto_resume_stream_if_flagged();
 
         loop {
             let current_ms = now_ms();
@@ -73,136 +73,13 @@ impl App {
             super::tools::watchdog::beat();
             super::tools::watchdog::mark(super::tools::watchdog::Step::Input);
 
-            // === INPUT FIRST: Process user input with minimal latency ===
-            // Non-blocking check for input - handle immediately for responsive feel
-            if event::poll(Duration::ZERO)? {
-                let evt = event::read()?;
-
-                // Handle command palette events first if it's open
-                if self.command_palette.is_open {
-                    if let Some(action) = self.handle_palette_event(&evt) {
-                        self.handle_action(action, ch.tx);
-                    }
-                    self.state.flags.ui.dirty = true;
-
-                    // Render immediately after input for instant feedback
-                    if self.state.flags.ui.dirty {
-                        let _r = terminal.draw(|frame| {
-                            ui::render(frame, &mut self.state);
-                            self.command_palette.render(frame, &self.state);
-                        })?;
-                        self.state.flags.ui.dirty = false;
-                        self.last_render_ms = current_ms;
-                    }
-                    continue;
-                }
-
-                // Handle autocomplete events if popup is active
-                if let Some(ac) = self.state.get_ext::<cp_base::state::autocomplete::Suggestions>()
-                    && ac.active
-                {
-                    self.handle_autocomplete_event(&evt);
-                    self.state.flags.ui.dirty = true;
-
-                    // Render immediately
-                    if self.state.flags.ui.dirty {
-                        let _r = terminal.draw(|frame| {
-                            ui::render(frame, &mut self.state);
-                            self.command_palette.render(frame, &self.state);
-                        })?;
-                        self.state.flags.ui.dirty = false;
-                        self.last_render_ms = current_ms;
-                    }
-                    continue;
-                }
-
-                let Some(action) = handle_event(&evt, &self.state) else {
-                    // User quit — flush all pending writes and save final state synchronously
-                    self.writer.flush();
-                    save_state(&self.state);
-                    break;
-                };
-
-                // Check for Ctrl+P to open palette
-                if matches!(action, Action::OpenCommandPalette) {
-                    self.command_palette.open(&self.state);
-                    self.state.flags.ui.dirty = true;
-                } else {
-                    self.handle_action(action, ch.tx);
-                }
-
-                // Render immediately after input for instant feedback
-                if self.state.flags.ui.dirty {
-                    let _r = terminal.draw(|frame| {
-                        ui::render(frame, &mut self.state);
-                        self.command_palette.render(frame, &self.state);
-                    })?;
-                    self.state.flags.ui.dirty = false;
-                    self.last_render_ms = current_ms;
-                }
+            match self.handle_input_phase(terminal, ch, current_ms)? {
+                InputOutcome::Restart => continue,
+                InputOutcome::Quit => break,
+                InputOutcome::Continue => {}
             }
 
-            // === BACKGROUND PROCESSING ===
-            super::tools::watchdog::mark(super::tools::watchdog::Step::Bridge);
-            super::threads::poll_bridge_commands(self);
-            super::tools::watchdog::mark(super::tools::watchdog::Step::ThreadsEmit);
-            super::threads::emit_vitals(self);
-            super::threads::emit_messages(self);
-            super::threads::emit_thread_status(self);
-            super::threads::emit_thread_focus(self);
-            super::threads::emit_thread_archived(self);
-            super::threads::emit_thread_paused(self);
-            super::tools::watchdog::mark(super::tools::watchdog::Step::Stream);
-            super::streaming::process_stream_events(self, ch.rx);
-            super::streaming::handle_retry(self, ch.tx);
-            super::streaming::process_typewriter(self);
-            super::tools::watchdog::mark(super::tools::watchdog::Step::Cache);
-            super::watchers::process_cache_updates(self, ch.cache_rx);
-            super::tools::watchdog::mark(super::tools::watchdog::Step::Watchers);
-            super::watchers::process_watcher_events(self);
-            // Check if we're waiting for panels and they're ready (non-blocking)
-            super::tools::checks::check_waiting_for_panels(self, ch.tx);
-            // Check if deferred sleep timer has expired (non-blocking)
-            super::tools::checks::check_deferred_sleep(self, ch.tx);
-            // Check watchers (blocking sentinel replacement + async → spine notifications)
-            super::tools::cleanup::check_watchers(self, ch.tx);
-            // Bridge self-heal: if CP_BRIDGE=1 but boot lost the flock race on a
-            // fast relaunch, the bridge sits PENDING and the agent is silently
-            // unreachable to web sends. Retry boot every ~2s — a fail-fast,
-            // non-blocking attempt that becomes a no-op the instant the bridge
-            // is live (or was never pending). Self-heals the moment the dying
-            // predecessor frees the lock, with no manual relaunch.
-            if current_ms.saturating_sub(self.last_bridge_recover_ms) >= 2_000 {
-                self.last_bridge_recover_ms = current_ms;
-                cp_mod_bridge::try_recover(&mut self.state);
-            }
-            // Drain Matrix sync events periodically (every 2s) so chat notifications
-            // fire even while idle — without this, drain_sync_events() only runs
-            // inside prepare_stream_context() which never happens when idle.
-            if current_ms.saturating_sub(self.last_chat_drain_ms) >= 2_000 {
-                self.last_chat_drain_ms = current_ms;
-                super::tools::watchdog::mark(super::tools::watchdog::Step::PanelRefresh);
-                crate::app::panels::refresh_all_panels(&mut self.state);
-            }
-            super::watchers::check_timer_based_deprecation(self);
-            super::tools::watchdog::mark(super::tools::watchdog::Step::Tools);
-            super::tools::pipeline::handle_tool_execution(self, ch.tx);
-            super::streaming::finalize_stream(self);
-            super::tools::watchdog::mark(super::tools::watchdog::Step::Spine);
-            self.check_spine(ch.tx);
-            super::threads::check_my_turn_threads(self);
-            super::streaming::process_api_check_results(self);
-
-            // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
-            super::tools::watchdog::mark(super::tools::watchdog::Step::Reverie);
-            // Check if a reverie needs to start streaming (state.reverie exists but no stream yet)
-            super::reverie::maybe_start_reverie_stream(self);
-            // Poll reverie stream events (text chunks, tool calls, done/error)
-            super::reverie::process_reverie_events(self);
-            // Execute pending reverie tool calls (after main tools — main AI has priority)
-            super::reverie::handle_reverie_tools(self);
-            // Check if reverie ended without calling Report (auto-relaunch guard rail)
-            super::reverie::check_reverie_end_turn(self);
+            self.run_background_phase(ch, current_ms);
 
             // Check if TUI reload was requested (by system_reload tool)
             if self.state.flags.lifecycle.reload_pending {
@@ -230,31 +107,183 @@ impl App {
             // Render if dirty and enough time has passed (capped at ~28fps)
             if self.state.flags.ui.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
                 super::tools::watchdog::mark(super::tools::watchdog::Step::Render);
-                let _r = terminal.draw(|frame| {
-                    ui::render(frame, &mut self.state);
-                    self.command_palette.render(frame, &self.state);
-                })?;
-                self.state.flags.ui.dirty = false;
-                self.last_render_ms = current_ms;
+                self.render_frame(terminal, current_ms)?;
             }
 
-            // Adaptive poll: sleep longer when idle, shorter when actively
-            // streaming or when the orchestration bridge is connected (a web
-            // UI is driving commands and expects sub-10ms apply latency, so we
-            // service the bridge socket every couple of ms instead of every
-            // 50ms — only while bridge-active, to keep idle CPU low otherwise).
-            let poll_ms = if self.state.flags.stream.phase.is_streaming() || self.state.flags.ui.dirty {
-                EVENT_POLL_MS // 8ms — responsive during streaming/active updates
-            } else if super::threads::bridge_active(&self.state) {
-                2 // bridge-active idle — keep web command→apply latency ≤ a few ms
-            } else {
-                50 // 50ms when idle — still responsive for typing, much less CPU
-            };
             super::tools::watchdog::mark(super::tools::watchdog::Step::Idle);
-            let _r = event::poll(Duration::from_millis(poll_ms))?;
+            let _r = event::poll(Duration::from_millis(self.compute_poll_ms()))?;
         }
 
         Ok(())
+    }
+
+    /// Auto-resume streaming if the reload flag was set (e.g., after `reload_tui`).
+    fn auto_resume_stream_if_flagged(&mut self) {
+        if !self.resume_stream {
+            return;
+        }
+        self.resume_stream = false;
+        let _r = SpineState::create_notification(
+            &mut self.state,
+            NotificationType::ReloadResume,
+            "reload_resume".to_owned(),
+            "Resuming after TUI reload".to_owned(),
+        );
+        save_state(&self.state);
+    }
+
+    /// Draw one frame: render the UI + command palette, clear dirty, stamp render time.
+    fn render_frame(
+        &mut self,
+        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+        current_ms: u64,
+    ) -> io::Result<()> {
+        let _r = terminal.draw(|frame| {
+            ui::render(frame, &mut self.state);
+            self.command_palette.render(frame, &self.state);
+        })?;
+        self.state.flags.ui.dirty = false;
+        self.last_render_ms = current_ms;
+        Ok(())
+    }
+
+    /// Adaptive poll interval: short while streaming/active or bridge-driven,
+    /// long when idle — keeps latency low without pinning a core at rest.
+    fn compute_poll_ms(&self) -> u64 {
+        if self.state.flags.stream.phase.is_streaming() || self.state.flags.ui.dirty {
+            EVENT_POLL_MS // 8ms — responsive during streaming/active updates
+        } else if super::threads::bridge_active(&self.state) {
+            2 // bridge-active idle — keep web command→apply latency ≤ a few ms
+        } else {
+            50 // 50ms when idle — still responsive for typing, much less CPU
+        }
+    }
+
+    /// Non-blocking input phase: poll one event and route it (palette,
+    /// autocomplete, quit, or normal action), rendering immediately for
+    /// responsiveness. Returns how the main loop should proceed this tick.
+    fn handle_input_phase(
+        &mut self,
+        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+        ch: &EventChannels<'_>,
+        current_ms: u64,
+    ) -> io::Result<InputOutcome> {
+        if !event::poll(Duration::ZERO)? {
+            return Ok(InputOutcome::Continue);
+        }
+        let evt = event::read()?;
+
+        // Command palette takes precedence when open.
+        if self.command_palette.is_open {
+            if let Some(action) = self.handle_palette_event(&evt) {
+                self.handle_action(action, ch.tx);
+            }
+            self.state.flags.ui.dirty = true;
+            self.render_frame(terminal, current_ms)?;
+            return Ok(InputOutcome::Restart);
+        }
+
+        // Autocomplete popup handling.
+        if let Some(ac) = self.state.get_ext::<cp_base::state::autocomplete::Suggestions>()
+            && ac.active
+        {
+            self.handle_autocomplete_event(&evt);
+            self.state.flags.ui.dirty = true;
+            self.render_frame(terminal, current_ms)?;
+            return Ok(InputOutcome::Restart);
+        }
+
+        let Some(action) = handle_event(&evt, &self.state) else {
+            // User quit — flush all pending writes and save final state synchronously
+            self.writer.flush();
+            save_state(&self.state);
+            return Ok(InputOutcome::Quit);
+        };
+
+        // Ctrl+P opens the palette; everything else dispatches normally.
+        if matches!(action, Action::OpenCommandPalette) {
+            self.command_palette.open(&self.state);
+            self.state.flags.ui.dirty = true;
+        } else {
+            self.handle_action(action, ch.tx);
+        }
+
+        // Render immediately after input for instant feedback.
+        if self.state.flags.ui.dirty {
+            self.render_frame(terminal, current_ms)?;
+        }
+        Ok(InputOutcome::Continue)
+    }
+
+    /// Run all background processing for one tick: bridge, threads, stream,
+    /// cache, watchers, tools, spine, reverie. Linear pipeline, no branching.
+    fn run_background_phase(&mut self, ch: &EventChannels<'_>, current_ms: u64) {
+        super::tools::watchdog::mark(super::tools::watchdog::Step::Bridge);
+        super::threads::poll_bridge_commands(self);
+        super::tools::watchdog::mark(super::tools::watchdog::Step::ThreadsEmit);
+        super::threads::emit_vitals(self);
+        super::threads::emit_messages(self);
+        super::threads::emit_thread_status(self);
+        super::threads::emit_thread_focus(self);
+        super::threads::emit_thread_archived(self);
+        super::threads::emit_thread_paused(self);
+        super::tools::watchdog::mark(super::tools::watchdog::Step::Stream);
+        super::streaming::process_stream_events(self, ch.rx);
+        super::streaming::handle_retry(self, ch.tx);
+        super::streaming::process_typewriter(self);
+        super::tools::watchdog::mark(super::tools::watchdog::Step::Cache);
+        super::watchers::process_cache_updates(self, ch.cache_rx);
+        super::tools::watchdog::mark(super::tools::watchdog::Step::Watchers);
+        super::watchers::process_watcher_events(self);
+        // Check if we're waiting for panels and they're ready (non-blocking)
+        super::tools::checks::check_waiting_for_panels(self, ch.tx);
+        // Check if deferred sleep timer has expired (non-blocking)
+        super::tools::checks::check_deferred_sleep(self, ch.tx);
+        // Check watchers (blocking sentinel replacement + async → spine notifications)
+        super::tools::cleanup::check_watchers(self, ch.tx);
+        self.recover_bridge_if_pending(current_ms);
+        self.drain_chat_sync_if_due(current_ms);
+        super::watchers::check_timer_based_deprecation(self);
+        super::tools::watchdog::mark(super::tools::watchdog::Step::Tools);
+        super::tools::pipeline::handle_tool_execution(self, ch.tx);
+        super::streaming::finalize_stream(self);
+        super::tools::watchdog::mark(super::tools::watchdog::Step::Spine);
+        self.check_spine(ch.tx);
+        super::threads::check_my_turn_threads(self);
+        super::streaming::process_api_check_results(self);
+
+        // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
+        super::tools::watchdog::mark(super::tools::watchdog::Step::Reverie);
+        // Check if a reverie needs to start streaming (state.reverie exists but no stream yet)
+        super::reverie::maybe_start_reverie_stream(self);
+        // Poll reverie stream events (text chunks, tool calls, done/error)
+        super::reverie::process_reverie_events(self);
+        // Execute pending reverie tool calls (after main tools — main AI has priority)
+        super::reverie::handle_reverie_tools(self);
+        // Check if reverie ended without calling Report (auto-relaunch guard rail)
+        super::reverie::check_reverie_end_turn(self);
+    }
+
+    /// Bridge self-heal: if `CP_BRIDGE=1` but boot lost the flock race on a fast
+    /// relaunch, the bridge sits PENDING and the agent is silently unreachable to
+    /// web sends. Retry boot every ~2s — a fail-fast, non-blocking attempt that
+    /// becomes a no-op the instant the bridge is live (or was never pending).
+    fn recover_bridge_if_pending(&mut self, current_ms: u64) {
+        if current_ms.saturating_sub(self.last_bridge_recover_ms) >= 2_000 {
+            self.last_bridge_recover_ms = current_ms;
+            cp_mod_bridge::try_recover(&mut self.state);
+        }
+    }
+
+    /// Drain Matrix sync events periodically (every 2s) so chat notifications
+    /// fire even while idle — without this, `drain_sync_events()` only runs
+    /// inside `prepare_stream_context()`, which never happens when idle.
+    fn drain_chat_sync_if_due(&mut self, current_ms: u64) {
+        if current_ms.saturating_sub(self.last_chat_drain_ms) >= 2_000 {
+            self.last_chat_drain_ms = current_ms;
+            super::tools::watchdog::mark(super::tools::watchdog::Step::PanelRefresh);
+            crate::app::panels::refresh_all_panels(&mut self.state);
+        }
     }
 
     /// Dispatch an `Action` through `apply_action` and handle the resulting side-effects.
@@ -391,7 +420,7 @@ impl App {
         let _r = SpineState::create_notification(
             &mut self.state,
             NotificationType::Custom,
-            "todo_continuation".to_string(),
+            "todo_continuation".to_owned(),
             format!("Non-completed todo items ({}). First: {first}", summary.len()),
         );
     }

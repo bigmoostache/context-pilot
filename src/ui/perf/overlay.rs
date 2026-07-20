@@ -13,6 +13,7 @@ use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
 use crate::ui::ir::semantic_to_style;
 use crate::ui::{chars, theme};
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 
 /// Render the performance overlay from its IR snapshot.
 pub(crate) fn render_perf_overlay_from_ir(frame: &mut Frame<'_>, area: Rect, perf: &PerfOverlay) {
@@ -49,7 +50,7 @@ pub(crate) fn render_perf_overlay_from_ir(frame: &mut Frame<'_>, area: Rect, per
     ]));
 
     // Meilisearch process stats
-    if let Some(ref meili) = perf.meili {
+    if let Some(meili) = perf.meili.as_ref() {
         lines.push(Line::from(vec![
             Span::styled(format!(" Meili CPU: {:.1}%", meili.cpu_pct), semantic_to_style(meili.cpu_semantic)),
             Span::styled(format!("  RAM: {:.1} MB", meili.memory_mb), semantic_to_style(Semantic::Muted)),
@@ -96,7 +97,7 @@ pub(crate) fn render_perf_overlay_from_ir(frame: &mut Frame<'_>, area: Rect, per
 /// Render a budget bar from IR data.
 fn render_budget_bar(budget_bar: &cp_render::conversation::PerfBudgetBar) -> Line<'static> {
     let bar_width = 30usize;
-    let filled = ((budget_bar.percent / 100.0) * bar_width.to_f64()).to_usize();
+    let filled = float_math::mul(float_math::div(budget_bar.percent, 100.0f64), bar_width.to_f64()).to_usize();
 
     Line::from(vec![
         Span::styled(format!(" {:<6}", budget_bar.label), semantic_to_style(Semantic::Muted)),
@@ -111,7 +112,8 @@ fn render_budget_bar(budget_bar: &cp_render::conversation::PerfBudgetBar) -> Lin
 
 /// Render a sparkline from frame time samples.
 fn render_sparkline(values: &[f64]) -> Line<'static> {
-    const SPARK_CHARS: &[char] = &['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    const SPARK_CHARS: &[char] =
+        &['\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}', '\u{2585}', '\u{2586}', '\u{2587}', '\u{2588}'];
 
     if values.is_empty() {
         return Line::from(vec![
@@ -120,13 +122,14 @@ fn render_sparkline(values: &[f64]) -> Line<'static> {
         ]);
     }
 
-    let max_val = values.iter().copied().fold(1.0_f64, f64::max);
+    let max_val = values.iter().copied().fold(1.0f64, f64::max);
     let sparkline: String = values
         .iter()
         .map(|&v| {
-            let idx = ((v / max_val) * SPARK_CHARS.len().saturating_sub(1).to_f64()).to_usize();
+            let idx =
+                float_math::mul(float_math::div(v, max_val), SPARK_CHARS.len().saturating_sub(1).to_f64()).to_usize();
             let clamped = idx.min(SPARK_CHARS.len().saturating_sub(1));
-            SPARK_CHARS.get(clamped).copied().unwrap_or('▁')
+            SPARK_CHARS.get(clamped).copied().unwrap_or('\u{2581}')
         })
         .collect();
 
@@ -138,13 +141,37 @@ fn render_sparkline(values: &[f64]) -> Line<'static> {
 
 /// Render the operation table using IR semantic styles.
 fn render_op_table(ops: &[cp_render::conversation::PerfOp], lines: &mut Vec<Line<'static>>) {
-    use unicode_width::UnicodeWidthStr as _;
-
     // Column definitions: name, mean, std, cumul
     let headers = ["Operation", "Mean", "Std", "Cumul"];
     let aligns = [false, true, true, true]; // false = left, true = right
+    let widths = op_table_widths(ops, &headers);
 
-    // Compute column widths
+    let border_style = semantic_to_style(Semantic::Border);
+    let header_style = semantic_to_style(Semantic::Accent).bold();
+
+    lines.push(op_table_header_row(&HeaderRowCtx {
+        headers: &headers,
+        widths: &widths,
+        aligns,
+        header_style,
+        border_style,
+    }));
+    lines.push(op_table_separator_row(&widths, border_style));
+    for op in ops {
+        lines.push(op_table_data_row(op, &widths, border_style));
+    }
+}
+
+/// Pad and align `text` to `width` (right-align when `right_align`).
+fn pad_cell(text: &str, width: usize, right_align: bool) -> String {
+    use unicode_width::UnicodeWidthStr as _;
+    let deficit = width.saturating_sub(text.width());
+    if right_align { format!("{}{text}", " ".repeat(deficit)) } else { format!("{text}{}", " ".repeat(deficit)) }
+}
+
+/// Compute per-column widths: max of header width and every op's cell width.
+fn op_table_widths(ops: &[cp_render::conversation::PerfOp], headers: &[&str; 4]) -> Vec<usize> {
+    use unicode_width::UnicodeWidthStr as _;
     let mut widths: Vec<usize> = headers.iter().map(|h| h.width()).collect();
     for op in ops {
         let name_w = op.name.len().saturating_add(2); // "! " or "  " prefix
@@ -161,72 +188,73 @@ fn render_op_table(ops: &[cp_render::conversation::PerfOp], lines: &mut Vec<Line
             *w = (*w).max(op.total_display.len());
         }
     }
+    widths
+}
 
-    let border_style = semantic_to_style(Semantic::Border);
-    let header_style = semantic_to_style(Semantic::Accent).bold();
+/// Column layout + styling for the perf-table header row.
+struct HeaderRowCtx<'ctx> {
+    /// Column header labels.
+    headers: &'ctx [&'ctx str; 4],
+    /// Per-column display widths.
+    widths: &'ctx [usize],
+    /// Per-column right-align flags (false = left).
+    aligns: [bool; 4],
+    /// Style for header text.
+    header_style: Style,
+    /// Style for the `│` separators.
+    border_style: Style,
+}
 
-    // Helper to pad and align
-    let pad = |text: &str, width: usize, right_align: bool| -> String {
-        let deficit = width.saturating_sub(text.width());
-        if right_align { format!("{}{text}", " ".repeat(deficit)) } else { format!("{text}{}", " ".repeat(deficit)) }
-    };
-
-    // Header row
+/// Build the header row: ` Operation │ Mean │ Std │ Cumul`.
+fn op_table_header_row(ctx: &HeaderRowCtx<'_>) -> Line<'static> {
     let mut spans = vec![Span::raw(" ")];
-    for (i, hdr) in headers.iter().enumerate() {
+    for (i, hdr) in ctx.headers.iter().enumerate() {
         if i > 0 {
-            spans.push(Span::styled(" │ ", border_style));
+            spans.push(Span::styled(" \u{2502} ", ctx.border_style));
         }
-        let w = widths.get(i).copied().unwrap_or(0);
-        spans.push(Span::styled(pad(hdr, w, *aligns.get(i).unwrap_or(&false)), header_style));
+        let w = ctx.widths.get(i).copied().unwrap_or(0);
+        spans.push(Span::styled(pad_cell(hdr, w, *ctx.aligns.get(i).unwrap_or(&false)), ctx.header_style));
     }
-    lines.push(Line::from(spans));
+    Line::from(spans)
+}
 
-    // Separator
+/// Build the header/data separator row: `───┼───┼───┼───`.
+fn op_table_separator_row(widths: &[usize], border_style: Style) -> Line<'static> {
     let mut sep_spans = vec![Span::raw(" ")];
     for (i, width) in widths.iter().enumerate() {
         if i > 0 {
-            sep_spans.push(Span::styled("─┼─", border_style));
+            sep_spans.push(Span::styled("\u{2500}\u{253c}\u{2500}", border_style));
         }
-        sep_spans.push(Span::styled("─".repeat(*width), border_style));
+        sep_spans.push(Span::styled("\u{2500}".repeat(*width), border_style));
     }
-    lines.push(Line::from(sep_spans));
+    Line::from(sep_spans)
+}
 
-    // Data rows
-    for op in ops {
-        let name_prefix = if op.is_hotspot { "! " } else { "  " };
-        let name_str = format!("{name_prefix}{}", op.name);
-        let name_style = if op.is_hotspot {
-            semantic_to_style(Semantic::Warning).bold()
-        } else {
-            semantic_to_style(Semantic::Default)
-        };
+/// Build one operation data row (hotspot-marked name + mean/std/cumul cells).
+fn op_table_data_row(op: &cp_render::conversation::PerfOp, widths: &[usize], border_style: Style) -> Line<'static> {
+    let name_prefix = if op.is_hotspot { "! " } else { "  " };
+    let name_str = format!("{name_prefix}{}", op.name);
+    let name_style =
+        if op.is_hotspot { semantic_to_style(Semantic::Warning).bold() } else { semantic_to_style(Semantic::Default) };
+    let mean_str = format!("{:.2}ms", op.mean_ms);
+    let std_str = format!("{:.2}ms", op.std_ms);
 
-        let mean_str = format!("{:.2}ms", op.mean_ms);
-        let std_str = format!("{:.2}ms", op.std_ms);
-
-        let mut row_spans = vec![Span::raw(" ")];
-        // Name
-        row_spans.push(Span::styled(pad(&name_str, widths.first().copied().unwrap_or(0), false), name_style));
-        // Mean
-        row_spans.push(Span::styled(" │ ", border_style));
-        row_spans.push(Span::styled(
-            pad(&mean_str, widths.get(1).copied().unwrap_or(0), true),
-            semantic_to_style(op.mean_semantic),
-        ));
-        // Std
-        row_spans.push(Span::styled(" │ ", border_style));
-        row_spans.push(Span::styled(
-            pad(&std_str, widths.get(2).copied().unwrap_or(0), true),
-            semantic_to_style(op.std_semantic),
-        ));
-        // Cumul
-        row_spans.push(Span::styled(" │ ", border_style));
-        row_spans.push(Span::styled(
-            pad(&op.total_display, widths.get(3).copied().unwrap_or(0), true),
-            semantic_to_style(Semantic::Muted),
-        ));
-
-        lines.push(Line::from(row_spans));
-    }
+    let mut row_spans = vec![Span::raw(" ")];
+    row_spans.push(Span::styled(pad_cell(&name_str, widths.first().copied().unwrap_or(0), false), name_style));
+    row_spans.push(Span::styled(" \u{2502} ", border_style));
+    row_spans.push(Span::styled(
+        pad_cell(&mean_str, widths.get(1).copied().unwrap_or(0), true),
+        semantic_to_style(op.mean_semantic),
+    ));
+    row_spans.push(Span::styled(" \u{2502} ", border_style));
+    row_spans.push(Span::styled(
+        pad_cell(&std_str, widths.get(2).copied().unwrap_or(0), true),
+        semantic_to_style(op.std_semantic),
+    ));
+    row_spans.push(Span::styled(" \u{2502} ", border_style));
+    row_spans.push(Span::styled(
+        pad_cell(&op.total_display, widths.get(3).copied().unwrap_or(0), true),
+        semantic_to_style(Semantic::Muted),
+    ));
+    Line::from(row_spans)
 }

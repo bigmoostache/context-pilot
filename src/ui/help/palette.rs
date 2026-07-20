@@ -219,7 +219,7 @@ fn render_command_palette_from_ir(frame: &mut Frame<'_>, palette: &PaletteOverla
 
     // Bottom border
     let Some(&border_chunk) = chunks.get(2) else { return };
-    let border_line = "─".repeat(width.to_usize());
+    let border_line = "\u{2500}".repeat(width.to_usize());
     let border = Paragraph::new(Line::from(Span::styled(border_line, Style::default().fg(theme::border()))))
         .style(Style::default().bg(theme::bg_surface()));
     frame.render_widget(border, border_chunk);
@@ -243,9 +243,9 @@ fn render_input_line(frame: &mut Frame<'_>, palette: &PaletteOverlay, width: u16
         let padding = available_width.saturating_sub(query_len);
         vec![
             Span::styled(" > ", Style::default().fg(theme::accent())),
-            Span::styled(before.to_string(), Style::default().fg(theme::text())),
-            Span::styled("│", Style::default().fg(theme::accent())),
-            Span::styled(after.to_string(), Style::default().fg(theme::text())),
+            Span::styled(before.to_owned(), Style::default().fg(theme::text())),
+            Span::styled("\u{2502}", Style::default().fg(theme::accent())),
+            Span::styled(after.to_owned(), Style::default().fg(theme::text())),
             Span::styled(
                 format!("{:>width$}", esc_hint, width = padding.saturating_add(esc_hint.len())),
                 Style::default().fg(theme::text_muted()),

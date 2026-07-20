@@ -10,13 +10,11 @@ use std::sync::mpsc::Sender;
 
 use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
-use serde_json::Value;
 
 use super::error::LlmError;
 use super::{ApiCheckResult, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::constants::library;
 use crate::infra::tools::build_api;
-use cp_base::config::INJECTIONS;
 
 use helpers::{
     BILLING_HEADER, CLAUDE_CODE_ENDPOINT, SYSTEM_REMINDER, apply_claude_code_headers, dump_last_request,
@@ -47,12 +45,7 @@ impl ClaudeCodeApiKeyClient {
         let api_key = match self.api_key.as_ref() {
             Some(t) => t.expose_secret(),
             None => {
-                return ApiCheckResult {
-                    auth_ok: false,
-                    streaming_ok: false,
-                    tools_ok: false,
-                    error: Some("ANTHROPIC_API_KEY not found in environment".to_string()),
-                };
+                return ApiCheckResult::failure(Some("ANTHROPIC_API_KEY not found in environment".to_owned()));
             }
         };
 
@@ -64,80 +57,61 @@ impl ClaudeCodeApiKeyClient {
             {"type": "text", "text": "You are a helpful assistant."}
         ]);
 
-        let user_msg = serde_json::json!({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": SYSTEM_REMINDER},
-                {"type": "text", "text": "Hi"}
-            ]
-        });
+        // Build a user message with the system-reminder marker prepended.
+        let user_msg = |text: &str| {
+            serde_json::json!({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": SYSTEM_REMINDER},
+                    {"type": "text", "text": text}
+                ]
+            })
+        };
+
+        // POST one probe body with CC headers; report whether it succeeded.
+        let probe = |accept: &str, body: &serde_json::Value| {
+            apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), api_key, accept).json(body).send()
+        };
 
         // Test 1: Basic auth
-        let auth_result = apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), api_key, "application/json")
-            .json(&serde_json::json!({
-                "model": mapped_model,
-                "max_tokens": 10,
-                "system": system,
-                "messages": [user_msg]
-            }))
-            .send();
-
+        let auth_result = probe(
+            "application/json",
+            &serde_json::json!({
+                "model": mapped_model, "max_tokens": 10i32,
+                "system": system, "messages": [user_msg("Hi")]
+            }),
+        );
         let auth_ok = auth_result.as_ref().is_ok_and(|resp| resp.status().is_success());
-
         if !auth_ok {
-            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
-            return ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
+            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_owned()));
+            return ApiCheckResult::failure(error);
         }
 
         // Test 2: Streaming
-        let stream_msg = serde_json::json!({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": SYSTEM_REMINDER},
-                {"type": "text", "text": "Say ok"}
-            ]
-        });
-        let stream_result = apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), api_key, "text/event-stream")
-            .json(&serde_json::json!({
-                "model": mapped_model,
-                "max_tokens": 10,
-                "stream": true,
-                "system": system,
-                "messages": [stream_msg]
-            }))
-            .send();
-
-        let streaming_ok = stream_result.as_ref().is_ok_and(|r| r.status().is_success());
+        let streaming_ok = probe(
+            "text/event-stream",
+            &serde_json::json!({
+                "model": mapped_model, "max_tokens": 10i32, "stream": true,
+                "system": system, "messages": [user_msg("Say ok")]
+            }),
+        )
+        .is_ok_and(|r| r.status().is_success());
 
         // Test 3: Tool calling
-        let tools_msg = serde_json::json!({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": SYSTEM_REMINDER},
-                {"type": "text", "text": "Hi"}
-            ]
-        });
-        let tools_result = apply_claude_code_headers(client.post(CLAUDE_CODE_ENDPOINT), api_key, "application/json")
-            .json(&serde_json::json!({
-                "model": mapped_model,
-                "max_tokens": 50,
-                "system": system,
+        let tools_ok = probe(
+            "application/json",
+            &serde_json::json!({
+                "model": mapped_model, "max_tokens": 50i32, "system": system,
                 "tools": [{
-                    "name": "test_tool",
-                    "description": "A test tool",
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {},
-                        "required": []
-                    }
+                    "name": "test_tool", "description": "A test tool",
+                    "input_schema": {"type": "object", "properties": {}, "required": []}
                 }],
-                "messages": [tools_msg]
-            }))
-            .send();
+                "messages": [user_msg("Hi")]
+            }),
+        )
+        .is_ok_and(|r| r.status().is_success());
 
-        let tools_ok = tools_result.as_ref().is_ok_and(|r| r.status().is_success());
-
-        ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
+        ApiCheckResult::checks([auth_ok, streaming_ok, tools_ok])
     }
 }
 
@@ -156,48 +130,11 @@ impl LlmClient for ClaudeCodeApiKeyClient {
 
         // Handle cleaner mode or custom system prompt
         let system_text =
-            request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_string(), Clone::clone);
+            request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_owned(), Clone::clone);
 
-        // Build messages from pre-assembled API messages or raw data
+        // Build messages (api-message conversion + cleaner context + tool results)
         let super::CcJsonResult { mut json_messages, bp_hashes, bp_panel_ids, alive_count, alive_positions_permille } =
-            if request.api_messages.is_empty() {
-                super::CcJsonResult {
-                    json_messages: Vec::new(),
-                    bp_hashes: Vec::new(),
-                    bp_panel_ids: Vec::new(),
-                    alive_count: 0,
-                    alive_positions_permille: Vec::new(),
-                }
-            } else {
-                super::api_messages_to_cc_json(&request.api_messages, request.cache_engine_json.as_deref())
-            };
-
-        // Handle cleaner mode extra context
-        if let Some(ref context) = request.extra_context {
-            let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
-            json_messages.push(serde_json::json!({
-                "role": "user",
-                "content": msg
-            }));
-        }
-
-        // Add pending tool results
-        if let Some(results) = &request.tool_results {
-            let tool_results: Vec<Value> = results
-                .iter()
-                .map(|r: &crate::infra::tools::ToolResult| {
-                    serde_json::json!({
-                        "type": "tool_result",
-                        "tool_use_id": r.tool_use_id,
-                        "content": r.content
-                    })
-                })
-                .collect();
-            json_messages.push(serde_json::json!({
-                "role": "user",
-                "content": tool_results
-            }));
-        }
+            helpers::build_cc_json_messages(&request);
 
         inject_system_reminder(&mut json_messages);
 

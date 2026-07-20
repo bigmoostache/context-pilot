@@ -9,6 +9,7 @@ use cp_render::{ProgressSegment, Semantic};
 use crate::state::{Kind, State};
 use crate::ui::helpers::spinner;
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 
 /// Returns a count badge for fixed panels, replacing the panel ID (P1, P2, etc.)
 /// with a meaningful number that reflects the panel's content.
@@ -111,50 +112,54 @@ fn build_entries(state: &State) -> Vec<SidebarEntry> {
         if ctx.context_type == Kind::new(Kind::CONVERSATION) {
             continue;
         }
-
-        let is_loading = ctx.cached_content.is_none() && ctx.context_type.needs_cache();
-
-        let is_fixed = ctx.context_type.is_fixed();
-        let is_console = ctx.context_type.as_str() == "console";
-        let is_running_console =
-            is_console && ctx.get_meta_str("console_status").is_some_and(|s| s.starts_with("running"));
-
-        let badge = if is_fixed {
-            fixed_panel_badge(ctx.context_type.as_str(), state)
-        } else if ctx.total_pages > 1 {
-            Some(format!("{}/{}", ctx.current_page.saturating_add(1), ctx.total_pages))
-        } else {
-            None
-        };
-
-        let shortcut = if is_fixed {
-            // Don't show "0" — empty string hides the badge
-            fixed_panel_badge(ctx.context_type.as_str(), state).filter(|s| s != "0").unwrap_or_default()
-        } else if is_running_console {
-            spinner().to_owned()
-        } else {
-            ctx.id.clone()
-        };
-
-        let label = {
-            let name = crate::ui::helpers::truncate_string(&ctx.name, 18);
-            if is_loading { format!("{name} {spin}", spin = spinner()) } else { name }
-        };
-
-        entries.push(SidebarEntry {
-            id: ctx.id.clone(),
-            icon: ctx.context_type.icon(),
-            shortcut,
-            label,
-            tokens: ctx.token_count.to_u32(),
-            active: i == state.selected_context,
-            frozen: ctx.freeze_count > 0 && ctx.freeze_count < u8::MAX,
-            badge,
-            fixed: is_fixed,
-        });
+        entries.push(context_to_entry(ctx, state, i == state.selected_context));
     }
 
     entries
+}
+
+/// Build one sidebar entry from a context element (non-conversation).
+/// Resolves fixed-panel badges/shortcuts, running-console spinner, and the
+/// loading-spinner label suffix.
+fn context_to_entry(ctx: &crate::state::Entry, state: &State, active: bool) -> SidebarEntry {
+    let is_loading = ctx.cached_content.is_none() && ctx.context_type.needs_cache();
+    let is_fixed = ctx.context_type.is_fixed();
+    let is_console = ctx.context_type.as_str() == "console";
+    let is_running_console = is_console && ctx.get_meta_str("console_status").is_some_and(|s| s.starts_with("running"));
+
+    let badge = if is_fixed {
+        fixed_panel_badge(ctx.context_type.as_str(), state)
+    } else if ctx.total_pages > 1 {
+        Some(format!("{}/{}", ctx.current_page.saturating_add(1), ctx.total_pages))
+    } else {
+        None
+    };
+
+    let shortcut = if is_fixed {
+        // Don't show "0" — empty string hides the badge
+        fixed_panel_badge(ctx.context_type.as_str(), state).filter(|s| s != "0").unwrap_or_default()
+    } else if is_running_console {
+        spinner().to_owned()
+    } else {
+        ctx.id.clone()
+    };
+
+    let label = {
+        let name = crate::ui::helpers::truncate_string(&ctx.name, 18);
+        if is_loading { format!("{name} {spin}", spin = spinner()) } else { name }
+    };
+
+    SidebarEntry {
+        id: ctx.id.clone(),
+        icon: ctx.context_type.icon(),
+        shortcut,
+        label,
+        tokens: ctx.token_count.to_u32(),
+        active,
+        frozen: ctx.freeze_count > 0 && ctx.freeze_count < u8::MAX,
+        badge,
+        fixed: is_fixed,
+    }
 }
 
 // ── Token bar ────────────────────────────────────────────────────────
@@ -172,8 +177,8 @@ fn build_token_bar(state: &State) -> TokenBar {
     // re-derivation that could drift).
     let (hit, miss) = crate::modules::overview::context::context_hit_miss(state);
 
-    let hit_pct = if budget > 0 { (hit.to_f64() / budget.to_f64() * 100.0).to_u8() } else { 0 };
-    let miss_pct = if budget > 0 { (miss.to_f64() / budget.to_f64() * 100.0).to_u8() } else { 0 };
+    let hit_pct = if budget > 0 { float_math::percent(hit.to_f64(), budget.to_f64()).to_u8() } else { 0 };
+    let miss_pct = if budget > 0 { float_math::percent(miss.to_f64(), budget.to_f64()).to_u8() } else { 0 };
 
     TokenBar {
         segments: vec![
@@ -240,8 +245,8 @@ fn build_token_stats(state: &State) -> Option<TokenStats> {
     }
 
     // Total cost (sum of frozen legs)
-    let total_cost = state.cost_hit_usd + state.cost_miss_usd + state.cost_output_usd;
-    let total_cost_opt = (total_cost >= 0.001).then_some(total_cost);
+    let total_cost = float_math::sum3(state.cost_hit_usd, state.cost_miss_usd, state.cost_output_usd);
+    let total_cost_opt = (total_cost >= 0.001f64).then_some(total_cost);
 
     Some(TokenStats {
         rows,
@@ -279,9 +284,9 @@ fn build_help_hints(state: &State) -> Vec<HelpHint> {
 
     [
         ("Tab", "next panel"),
-        ("↑↓", "scroll"),
+        ("\u{2191}\u{2193}", "scroll"),
         ("Ctrl+U/D", "history"),
-        ("Ctrl+C", if copy_flash { "copied ✓" } else { "copy panel" }),
+        ("Ctrl+C", if copy_flash { "copied \u{2713}" } else { "copy panel" }),
         ("Ctrl+I", "search index"),
         ("Ctrl+P", "commands"),
         ("Ctrl+H", "config"),

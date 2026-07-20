@@ -7,7 +7,8 @@ use cp_base::config::constants;
 use cp_base::panels::now_ms;
 use cp_base::panels::time_arith::ms_to_secs;
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{DeferredPanel, Watcher, WatcherRegistry, WatcherResult};
+use cp_base::state::watchers::carriers::{DeferredPanel, WatcherResult};
+use cp_base::state::watchers::{Watcher, WatcherRegistry};
 
 use cp_mod_console::manager::SessionHandle;
 use cp_mod_console::types::ConsoleState;
@@ -17,6 +18,7 @@ use crate::types::CallbackState;
 
 /// Result of firing a callback, including dedup info.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct FireResult {
     /// Console session key for the spawned script.
     pub session_key: String,
@@ -53,6 +55,51 @@ fn kill_existing_callback(state: &mut State, callback_id: &str) -> bool {
     true
 }
 
+/// Build the shell command for a callback: either its inline `built_in_command`
+/// or a `bash <script>` invocation, with the changed-files env, project root,
+/// and callback name baked in as leading `KEY=VAL` assignments.
+///
+/// # Errors
+///
+/// Returns `Err` when a non-built-in callback's script file is missing.
+fn build_callback_command(
+    def: &crate::types::CallbackDefinition,
+    env_key: &str,
+    env_val: &str,
+    project_root: &str,
+) -> Result<String, String> {
+    if def.built_in {
+        let base_cmd = def.built_in_command.as_deref().unwrap_or("echo 'no built_in_command set'");
+        return Ok(format!(
+            "{env_key}={changed} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} {cmd}",
+            changed = shell_escape(env_val),
+            root = shell_escape(project_root),
+            name = shell_escape(&def.name),
+            cmd = base_cmd,
+        ));
+    }
+
+    let scripts_dir = std::path::PathBuf::from(constants::STORE_DIR).join("scripts");
+    let script_path = scripts_dir.join(format!("{}.sh", def.name));
+    let script_path_str = if script_path.is_absolute() {
+        script_path.to_string_lossy().to_string()
+    } else {
+        format!("{}/{}", project_root, script_path.to_string_lossy())
+    };
+
+    if !script_path.exists() {
+        return Err(format!("Callback '{}' script not found: {}", def.name, script_path.display()));
+    }
+
+    Ok(format!(
+        "{env_key}={changed} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} bash {script}",
+        changed = shell_escape(env_val),
+        root = shell_escape(project_root),
+        name = shell_escape(&def.name),
+        script = shell_escape(&script_path_str),
+    ))
+}
+
 /// Fire a single callback by spawning its script via the console server.
 /// Creates a console session + watcher (no panel — deferred until failure).
 ///
@@ -76,46 +123,14 @@ pub fn fire_callback(
     // Local:  CP_CHANGED_FILE  (singular, one file per invocation)
     let (env_key, env_val) = single_file.map_or_else(
         || ("CP_CHANGED_FILES", build_changed_files_env(&matched.matched_files)),
-        |file| ("CP_CHANGED_FILE", file.to_string()),
+        |file| ("CP_CHANGED_FILE", file.to_owned()),
     );
     let project_root = std::env::current_dir().unwrap_or_default().to_string_lossy().to_string();
 
     // Use the callback's cwd if set, otherwise project root
     let cwd = def.cwd.clone().or_else(|| Some(project_root.clone()));
 
-    // Build the script path — uses constants::STORE_DIR for scripts dir
-    // For built-in callbacks, use the built_in_command directly instead of a script file.
-    let command = if def.built_in {
-        let base_cmd = def.built_in_command.as_deref().unwrap_or("echo 'no built_in_command set'");
-        format!(
-            "{env_key}={changed} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} {cmd}",
-            changed = shell_escape(&env_val),
-            root = shell_escape(&project_root),
-            name = shell_escape(&def.name),
-            cmd = base_cmd,
-        )
-    } else {
-        let scripts_dir = std::path::PathBuf::from(constants::STORE_DIR).join("scripts");
-        let script_path = scripts_dir.join(format!("{}.sh", def.name));
-        let script_path_str = if script_path.is_absolute() {
-            script_path.to_string_lossy().to_string()
-        } else {
-            format!("{}/{}", project_root, script_path.to_string_lossy())
-        };
-
-        // Check script exists and is readable before spawning
-        if !script_path.exists() {
-            return Err(format!("Callback '{}' script not found: {}", def.name, script_path.display(),));
-        }
-
-        format!(
-            "{env_key}={changed} CP_PROJECT_ROOT={root} CP_CALLBACK_NAME={name} bash {script}",
-            changed = shell_escape(&env_val),
-            root = shell_escape(&project_root),
-            name = shell_escape(&def.name),
-            script = shell_escape(&script_path_str),
-        )
-    };
+    let command = build_callback_command(def, env_key, &env_val, &project_root)?;
 
     // Dedup: kill any existing session for the same callback definition
     let replaced = kill_existing_callback(state, &def.id);
@@ -153,20 +168,19 @@ pub fn fire_callback(
         callback_tag: Box::leak(format!("callback_{}", def.id).into_boxed_str()),
         success_message: def.success_message.clone(),
         blocking: is_blocking,
-        tool_use_id: blocking_tool_use_id.map(ToString::to_string),
+        tool_use_id: blocking_tool_use_id.map(str::to_owned),
         registered_at_ms: now,
         deadline_ms,
         desc: watcher_desc,
         matched_files: matched.matched_files.clone(),
-        deferred_panel: DeferredPanel {
-            session_key: session_key.clone(),
-            display_name: format!("CB: {}", def.name),
+        deferred_panel: DeferredPanel::new(
+            session_key.clone(),
+            format!("CB: {}", def.name),
             command,
-            description: format!("Callback: {}", def.name),
-            cwd: def.cwd.clone(),
-            callback_id: def.id.clone(),
-            callback_name: def.name.clone(),
-        },
+            format!("Callback: {}", def.name),
+        )
+        .cwd(def.cwd.clone())
+        .callback(def.id.clone(), def.name.clone()),
     };
 
     let registry = WatcherRegistry::get_mut(state);
@@ -178,32 +192,45 @@ pub fn fire_callback(
     Ok(FireResult { session_key, replaced })
 }
 
+/// Dispatch parameters distinguishing async vs blocking callback fan-out.
+struct FanOut<'fan> {
+    /// Sentinel tool-use id for blocking callbacks (`None` for async).
+    blocking_id: Option<&'fan str>,
+    /// Verb shown on success ("dispatched" vs "running (blocking)").
+    running_word: &'fan str,
+    /// Suffix labeling a dedup replacement (async vs blocking wording).
+    replaced_suffix: &'fan str,
+}
+
+/// Fire one matched callback, fanning out to one invocation per file for
+/// local callbacks (or a single all-files invocation for global ones), and
+/// push a compact summary line per invocation into `summaries`.
+fn fire_one(state: &mut State, cb: &MatchedCallback, fan: &FanOut<'_>, summaries: &mut Vec<String>) {
+    let name = &cb.definition.name;
+    let files: Vec<Option<String>> =
+        if cb.definition.is_global { vec![None] } else { cb.matched_files.iter().map(|f| Some(f.clone())).collect() };
+
+    for file in files {
+        let scope = file.as_ref().map(|f| format!(" ({f})")).unwrap_or_default();
+        match fire_callback(state, cb, fan.blocking_id, file.as_deref()) {
+            Ok(r) => {
+                let suffix = if r.replaced { fan.replaced_suffix } else { "" };
+                summaries.push(format!("· {name} {}{scope}{suffix}", fan.running_word));
+            }
+            Err(e) => summaries.push(format!("· {name} FAILED to spawn{scope}: {e}")),
+        }
+    }
+}
+
 /// Fire all matched non-blocking callbacks.
 /// Global: fires once with all files. Local: fires once per matched file.
 /// Returns one summary line per invocation in compact format.
 pub fn fire_async_callbacks(state: &mut State, callbacks: &[MatchedCallback]) -> Vec<String> {
     let _fg = cp_base::flame!("cb_fire_async");
+    let fan = FanOut { blocking_id: None, running_word: "dispatched", replaced_suffix: " (replaced previous run)" };
     let mut summaries = Vec::new();
     for cb in callbacks {
-        if cb.definition.is_global {
-            match fire_callback(state, cb, None, None) {
-                Ok(r) => {
-                    let suffix = if r.replaced { " (replaced previous run)" } else { "" };
-                    summaries.push(format!("· {} dispatched{suffix}", cb.definition.name));
-                }
-                Err(e) => summaries.push(format!("· {} FAILED to spawn: {}", cb.definition.name, e)),
-            }
-        } else {
-            for file in &cb.matched_files {
-                match fire_callback(state, cb, None, Some(file)) {
-                    Ok(r) => {
-                        let suffix = if r.replaced { " (replaced previous run)" } else { "" };
-                        summaries.push(format!("· {} dispatched ({}){suffix}", cb.definition.name, file));
-                    }
-                    Err(e) => summaries.push(format!("· {} FAILED to spawn for {}: {}", cb.definition.name, file, e)),
-                }
-            }
-        }
+        fire_one(state, cb, &fan, &mut summaries);
     }
     summaries
 }
@@ -213,27 +240,14 @@ pub fn fire_async_callbacks(state: &mut State, callbacks: &[MatchedCallback]) ->
 /// Each gets a sentinel `tool_use_id` so `tool_pipeline` can track them.
 pub fn fire_blocking_callbacks(state: &mut State, callbacks: &[MatchedCallback], tool_use_id: &str) -> Vec<String> {
     let _fg = cp_base::flame!("cb_fire_blocking");
+    let fan = FanOut {
+        blocking_id: Some(tool_use_id),
+        running_word: "running (blocking)",
+        replaced_suffix: " \u{2014} replaced timed-out run",
+    };
     let mut summaries = Vec::new();
     for cb in callbacks {
-        if cb.definition.is_global {
-            match fire_callback(state, cb, Some(tool_use_id), None) {
-                Ok(r) => {
-                    let suffix = if r.replaced { " — replaced timed-out run" } else { "" };
-                    summaries.push(format!("· {} running (blocking){suffix}", cb.definition.name));
-                }
-                Err(e) => summaries.push(format!("· {} FAILED to spawn: {}", cb.definition.name, e)),
-            }
-        } else {
-            for file in &cb.matched_files {
-                match fire_callback(state, cb, Some(tool_use_id), Some(file)) {
-                    Ok(r) => {
-                        let suffix = if r.replaced { " — replaced timed-out run" } else { "" };
-                        summaries.push(format!("· {} running (blocking, {}){suffix}", cb.definition.name, file));
-                    }
-                    Err(e) => summaries.push(format!("· {} FAILED to spawn for {}: {}", cb.definition.name, file, e)),
-                }
-            }
-        }
+        fire_one(state, cb, &fan, &mut summaries);
     }
     summaries
 }
@@ -253,6 +267,7 @@ fn shell_escape(s: &str) -> String {
 /// On exit 0: returns `success_message` + log file path, kills session.
 /// On exit != 0: returns error output + deferred panel info for `tool_cleanup` to create.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct CallbackWatcher {
     /// Unique watcher ID (e.g., "`callback_CB3_cb_42`").
     pub watcher_id: String,
@@ -305,23 +320,18 @@ impl Watcher for CallbackWatcher {
             return None;
         }
 
-        let exit_code = handle.get_status().exit_code().unwrap_or(-1);
+        let exit_code = handle.get_status().exit_code().unwrap_or(-1i32);
 
         // Exit code 7 = "nothing to do" — silent success, suppress entirely.
         // Used by callbacks that fire broadly (e.g., pattern "*") but often have nothing to do.
         // Returning None consumes the watcher without producing any visible result.
-        if exit_code == 7 {
-            return Some(WatcherResult {
-                description: String::new(),
-                panel_id: None,
-                tool_use_id: self.tool_use_id.clone(),
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: true,
-                kill_session: Some(self.session_name.clone()),
-                preserves_tempo: false,
-            });
+        if exit_code == 7i32 {
+            return Some(
+                WatcherResult::new(String::new())
+                    .tool_use_id_opt(self.tool_use_id.clone())
+                    .processed_already()
+                    .kill_session(self.session_name.clone()),
+            );
         }
 
         if exit_code == 0 {
@@ -329,39 +339,27 @@ impl Watcher for CallbackWatcher {
                 || format!("· {} passed", self.callback_name),
                 |sm| format!("· {} passed ({})", self.callback_name, sm),
             );
-            Some(WatcherResult {
-                description: msg,
-                panel_id: None,
-                tool_use_id: self.tool_use_id.clone(),
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: true,
-                kill_session: Some(self.session_name.clone()),
-                preserves_tempo: false,
-            })
+            Some(
+                WatcherResult::new(msg)
+                    .tool_use_id_opt(self.tool_use_id.clone())
+                    .processed_already()
+                    .kill_session(self.session_name.clone()),
+            )
         } else {
             // Panel content is already final — the pipeline waited for process exit before resuming
             let msg = format!("· {} FAILED (exit {})", self.callback_name, exit_code);
-            Some(WatcherResult {
-                description: msg,
-                panel_id: None,
-                tool_use_id: self.tool_use_id.clone(),
-                close_panel: false,
-                create_panel: Some(DeferredPanel {
-                    session_key: self.deferred_panel.session_key.clone(),
-                    display_name: self.deferred_panel.display_name.clone(),
-                    command: self.deferred_panel.command.clone(),
-                    description: self.deferred_panel.description.clone(),
-                    cwd: self.deferred_panel.cwd.clone(),
-                    callback_id: self.deferred_panel.callback_id.clone(),
-                    callback_name: self.deferred_panel.callback_name.clone(),
-                }),
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            })
+            Some(
+                WatcherResult::new(msg).tool_use_id_opt(self.tool_use_id.clone()).create_panel(
+                    DeferredPanel::new(
+                        self.deferred_panel.session_key.clone(),
+                        self.deferred_panel.display_name.clone(),
+                        self.deferred_panel.command.clone(),
+                        self.deferred_panel.description.clone(),
+                    )
+                    .cwd(self.deferred_panel.cwd.clone())
+                    .callback(self.deferred_panel.callback_id.clone(), self.deferred_panel.callback_name.clone()),
+                ),
+            )
         }
     }
 
@@ -372,25 +370,20 @@ impl Watcher for CallbackWatcher {
             return None;
         }
         let elapsed_s = ms_to_secs(now.saturating_sub(self.registered_at_ms));
-        Some(WatcherResult {
-            description: format!("· {} TIMED OUT ({}s)", self.callback_name, elapsed_s,),
-            panel_id: None,
-            tool_use_id: self.tool_use_id.clone(),
-            close_panel: false,
-            create_panel: Some(DeferredPanel {
-                session_key: self.deferred_panel.session_key.clone(),
-                display_name: self.deferred_panel.display_name.clone(),
-                command: self.deferred_panel.command.clone(),
-                description: self.deferred_panel.description.clone(),
-                cwd: self.deferred_panel.cwd.clone(),
-                callback_id: self.deferred_panel.callback_id.clone(),
-                callback_name: self.deferred_panel.callback_name.clone(),
-            }),
-            create_dyn_panel: None,
-            processed_already: false,
-            kill_session: None,
-            preserves_tempo: false,
-        })
+        Some(
+            WatcherResult::new(format!("· {} TIMED OUT ({}s)", self.callback_name, elapsed_s))
+                .tool_use_id_opt(self.tool_use_id.clone())
+                .create_panel(
+                    DeferredPanel::new(
+                        self.deferred_panel.session_key.clone(),
+                        self.deferred_panel.display_name.clone(),
+                        self.deferred_panel.command.clone(),
+                        self.deferred_panel.description.clone(),
+                    )
+                    .cwd(self.deferred_panel.cwd.clone())
+                    .callback(self.deferred_panel.callback_id.clone(), self.deferred_panel.callback_name.clone()),
+                ),
+        )
     }
 
     fn registered_ms(&self) -> u64 {

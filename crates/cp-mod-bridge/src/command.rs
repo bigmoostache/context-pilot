@@ -58,9 +58,6 @@ use cp_wire::types::snapshot::SeenSet;
 
 use crate::error::{BootResult, Error};
 
-/// Schema version stamped onto the [`Ack`]s this intake emits.
-const ACK_SCHEMA_VERSION: u32 = 1;
-
 /// Largest accumulated read (per connection) before a frame is abandoned as
 /// junk — bounds memory against a peer that sends an endless un-decodable
 /// stream. 32 MiB comfortably fits any realistic command frame (a `SendMessage`
@@ -214,17 +211,12 @@ fn take_frame(buf: &[u8]) -> Option<(usize, CommandFrame)> {
 
 /// Build an `Accepted` ack for `cmd_id` at `rev`.
 fn accept(cmd_id: &str, rev: Option<u64>) -> Ack {
-    Ack { schema_version: ACK_SCHEMA_VERSION, cmd_id: cmd_id.to_owned(), status: Status::Accepted, rev }
+    Ack::new(cmd_id.to_owned(), Status::Accepted, rev)
 }
 
 /// Build a `Rejected` ack for `cmd_id` with `reason`.
 fn reject(cmd_id: &str, reason: &str) -> Ack {
-    Ack {
-        schema_version: ACK_SCHEMA_VERSION,
-        cmd_id: cmd_id.to_owned(),
-        status: Status::Rejected { reason: reason.to_owned() },
-        rev: None,
-    }
+    Ack::new(cmd_id.to_owned(), Status::Rejected { reason: reason.to_owned() }, None)
 }
 
 /// Serialise an [`Ack`] and wrap it in the shared length+CRC framing.
@@ -251,17 +243,15 @@ mod tests {
     const TOKEN: &str = "cap-token-256bit";
 
     fn frame(auth: &str, dedup: &str) -> Vec<u8> {
-        let cf = CommandFrame {
-            schema_version: 1,
-            auth: auth.to_owned(),
-            command: Command {
-                schema_version: 1,
-                id: format!("cmd-{dedup}"),
-                seq: 1,
-                dedup_token: dedup.to_owned(),
-                kind: Kind::SendMessage { thread_id: "T1".to_owned(), content: "hi".to_owned() },
-            },
-        };
+        let cf = CommandFrame::new(
+            auth.to_owned(),
+            Command::new(
+                format!("cmd-{dedup}"),
+                1,
+                dedup.to_owned(),
+                Kind::SendMessage { thread_id: "T1".to_owned(), content: "hi".to_owned() },
+            ),
+        );
         framing::encode_raw(&serde_json::to_vec(&cf).expect("ser")).expect("frame")
     }
 

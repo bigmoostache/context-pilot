@@ -31,12 +31,12 @@ pub(crate) fn build_search_index_overlay(state: &State) -> SearchIndexOverlay {
     let now_u64 = u64::try_from(now_ms).unwrap_or(u64::MAX);
     let flash_active =
         state.flags.overlays.copied_flash_ms > 0 && now_u64.saturating_sub(state.flags.overlays.copied_flash_ms) < 1500;
-    let title = if flash_active { " ✓ Copied! ".into() } else { " Indexing Status ".into() };
+    let title = if flash_active { " \u{2713} Copied! ".into() } else { " Indexing Status ".into() };
 
     let Some(info) = cp_mod_search::overlay_info(state) else {
         return SearchIndexOverlay {
             title,
-            footer: " Ctrl+C copy · Ctrl+I or Esc to dismiss ".into(),
+            footer: " Ctrl+C copy \u{b7} Ctrl+I or Esc to dismiss ".into(),
             server: SearchServer {
                 url: String::new(),
                 online: false,
@@ -77,7 +77,7 @@ pub(crate) fn build_search_index_overlay(state: &State) -> SearchIndexOverlay {
 
     SearchIndexOverlay {
         title,
-        footer: " Ctrl+C copy · Ctrl+I or Esc to dismiss ".into(),
+        footer: " Ctrl+C copy \u{b7} Ctrl+I or Esc to dismiss ".into(),
         server,
         index,
         extensions,
@@ -112,7 +112,7 @@ fn build_server(info: &cp_mod_search::types::SearchOverlayInfo) -> SearchServer 
 
 /// Build core index statistics from overlay info.
 fn build_index(info: &cp_mod_search::types::SearchOverlayInfo) -> SearchIndex {
-    let last = if info.last_activity_ms > 0 { format_ago(info.last_activity_ms) } else { "never".to_string() };
+    let last = if info.last_activity_ms > 0 { format_ago(info.last_activity_ms) } else { "never".to_owned() };
     SearchIndex {
         files_indexed: info.files_indexed,
         chunks_indexed: info.chunks_indexed,
@@ -137,11 +137,12 @@ fn build_extensions(info: &cp_mod_search::types::SearchOverlayInfo) -> Vec<Searc
     let bar_max_width: u64 = 28;
     info.top_extensions
         .iter()
-        .map(|(ext, count)| {
+        .map(|entry| {
+            let (ext, count) = (&entry.0, entry.1);
             let bar_len = count.saturating_mul(bar_max_width).checked_div(max_count).unwrap_or(0);
             let bar_usize = usize::try_from(bar_len).unwrap_or(0).max(1);
             let pct = if total_files > 0 { count.saturating_mul(100).checked_div(total_files).unwrap_or(0) } else { 0 };
-            SearchExtension { name: ext.clone(), count: *count, bar_width: bar_usize, pct }
+            SearchExtension { name: ext.clone(), count, bar_width: bar_usize, pct }
         })
         .collect()
 }
@@ -157,7 +158,7 @@ fn build_splitter(info: &cp_mod_search::types::SearchOverlayInfo) -> Option<Sear
         tree_sitter_chunks: info.tree_sitter_chunks,
         tree_sitter_pct: ts_pct,
         fallback_chunks: info.fallback_chunks,
-        fallback_pct: 100_u64.saturating_sub(ts_pct),
+        fallback_pct: 100u64.saturating_sub(ts_pct),
     })
 }
 
@@ -205,15 +206,19 @@ fn build_tasks(info: &cp_mod_search::types::SearchOverlayInfo) -> Vec<SearchTask
 
 /// Build top-recomputed file entries from overlay info.
 fn build_recomputed(info: &cp_mod_search::types::SearchOverlayInfo) -> Vec<SearchRecomputed> {
-    info.top_recomputed.iter().map(|(p, c)| SearchRecomputed { path: truncate_path(p, 46), count: *c }).collect()
+    info.top_recomputed
+        .iter()
+        .map(|entry| SearchRecomputed { path: truncate_path(&entry.0, 46), count: entry.1 })
+        .collect()
 }
 
 /// Build recently-sent file entries from overlay info.
 fn build_recently_sent(info: &cp_mod_search::types::SearchOverlayInfo) -> Vec<SearchRecentFile> {
     info.recently_sent
         .iter()
-        .map(|(p, ts_ms)| {
-            let ago = if *ts_ms > 0 { format_ago(*ts_ms) } else { "?".to_string() };
+        .map(|entry| {
+            let (p, ts_ms) = (&entry.0, entry.1);
+            let ago = if ts_ms > 0 { format_ago(ts_ms) } else { "?".to_owned() };
             SearchRecentFile { path: truncate_path(p, 42), ago }
         })
         .collect()
@@ -250,7 +255,7 @@ pub(crate) fn render_search_index_overlay(frame: &mut Frame<'_>, overlay: &Searc
 
     let sep_height = usize::from(inner.height);
     let sep_lines: Vec<Line<'_>> =
-        std::iter::repeat_with(|| Line::from(Span::styled("│", Style::default().fg(theme::text_muted()))))
+        std::iter::repeat_with(|| Line::from(Span::styled("\u{2502}", Style::default().fg(theme::text_muted()))))
             .take(sep_height)
             .collect();
     let sep_para = Paragraph::new(sep_lines);
@@ -292,7 +297,7 @@ pub(crate) fn format_ago(ms_then: u64) -> String {
 /// Truncate a file path to fit within `max_len` characters.
 fn truncate_path(path: &str, max_len: usize) -> String {
     if path.len() <= max_len {
-        return path.to_string();
+        return path.to_owned();
     }
     let start = path.len().saturating_sub(max_len.saturating_sub(1));
     format!("…{}", path.get(start..).unwrap_or(path))

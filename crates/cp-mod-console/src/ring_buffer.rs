@@ -59,7 +59,7 @@ impl RingBuffer {
             }
         }
         inner.write_pos = pos;
-        inner.total_written = inner.total_written.saturating_add(data.len() as u64);
+        inner.total_written = inner.total_written.saturating_add(u64::try_from(data.len()).unwrap_or(u64::MAX));
     }
 
     /// Read the entire buffer contents as a string.

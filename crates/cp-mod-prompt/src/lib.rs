@@ -39,7 +39,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Prompt library module: agents, skills, commands — the ship's charter.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct PromptModule;
+
+impl Default for PromptModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PromptModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for PromptModule {
     fn id(&self) -> &'static str {
@@ -49,7 +65,7 @@ impl Module for PromptModule {
         "System"
     }
     fn description(&self) -> &'static str {
-        "Prompt library — agents, skills, commands"
+        "Prompt library \u{2014} agents, skills, commands"
     }
     fn is_core(&self) -> bool {
         true
@@ -137,55 +153,9 @@ impl Module for PromptModule {
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
-            "Behaviour_create" => {
-                let mut pf = Verdict::new();
-                let type_str = tool.input.get("type").and_then(|v| v.as_str()).unwrap_or("");
-                let pt = match type_str {
-                    "agent" => Some(PromptType::Agent),
-                    "skill" => Some(PromptType::Skill),
-                    "command" => Some(PromptType::Command),
-                    _ => {
-                        pf.errors.push(format!("Invalid type '{type_str}' — must be 'agent', 'skill', or 'command'"));
-                        None
-                    }
-                };
-                if let Some(name) = tool.input.get("name").and_then(|v| v.as_str())
-                    && let Some(pt) = pt
-                {
-                    let id = storage::slugify(name);
-                    if !id.is_empty() {
-                        let path = storage::dir_for(pt).join(format!("{id}.md"));
-                        if path.exists() {
-                            pf.errors.push(format!("A {type_str} with ID '{id}' already exists at {}", path.display()));
-                        }
-                    }
-                }
-                Some(pf)
-            }
-            "agent_load" => {
-                let mut pf = Verdict::new();
-                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str())
-                    && !id.is_empty()
-                {
-                    let agents = storage::load_prompts_for(PromptType::Agent);
-                    if !agents.iter().any(|a| a.id == id) {
-                        pf.errors.push(format!("Agent '{id}' not found"));
-                    }
-                }
-                Some(pf)
-            }
-            "skill_load" => {
-                let mut pf = Verdict::new();
-                if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
-                    let skills = storage::load_prompts_for(PromptType::Skill);
-                    if !skills.iter().any(|s| s.id == id) {
-                        pf.errors.push(format!("Skill '{id}' not found"));
-                    } else if PromptState::get(state).loaded_skill_ids.contains(&id.to_string()) {
-                        pf.warnings.push(format!("Skill '{id}' is already loaded"));
-                    }
-                }
-                Some(pf)
-            }
+            "Behaviour_create" => Some(preflight_behaviour_create(tool)),
+            "agent_load" => Some(preflight_agent_load(tool)),
+            "skill_load" => Some(preflight_skill_load(tool, state)),
             "Edit" => preflight_edit_prompt_file(tool),
             _ => None,
         }
@@ -237,7 +207,7 @@ impl Module for PromptModule {
             return None;
         }
         let name = ctx.name.clone();
-        if let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(ToString::to_string) {
+        if let Some(skill_id) = ctx.get_meta_str("skill_prompt_id").map(str::to_owned) {
             PromptState::get_mut(state).loaded_skill_ids.retain(|s| s != &skill_id);
         }
         Some(Ok(format!("skill: {name}")))
@@ -305,18 +275,75 @@ impl Module for PromptModule {
     }
 }
 
+/// Pre-flight for `Behaviour_create`: validate type and reject duplicate IDs.
+fn preflight_behaviour_create(tool: &ToolUse) -> Verdict {
+    let mut pf = Verdict::new();
+    let type_str = tool.input.get("type").and_then(|v| v.as_str()).unwrap_or("");
+    let pt_opt = match type_str {
+        "agent" => Some(PromptType::Agent),
+        "skill" => Some(PromptType::Skill),
+        "command" => Some(PromptType::Command),
+        _ => {
+            pf.errors.push(format!("Invalid type '{type_str}' — must be 'agent', 'skill', or 'command'"));
+            None
+        }
+    };
+    if let Some(name) = tool.input.get("name").and_then(|v| v.as_str())
+        && let Some(pt) = pt_opt
+    {
+        let id = storage::slugify(name);
+        if !id.is_empty() {
+            let path = storage::dir_for(pt).join(format!("{id}.md"));
+            if path.exists() {
+                pf.errors.push(format!("A {type_str} with ID '{id}' already exists at {}", path.display()));
+            }
+        }
+    }
+    pf
+}
+
+/// Pre-flight for `agent_load`: verify the agent ID exists (empty = default).
+fn preflight_agent_load(tool: &ToolUse) -> Verdict {
+    let mut pf = Verdict::new();
+    if let Some(id) = tool.input.get("id").and_then(|v| v.as_str())
+        && !id.is_empty()
+    {
+        let agents = storage::load_prompts_for(PromptType::Agent);
+        if !agents.iter().any(|a| a.id == id) {
+            pf.errors.push(format!("Agent '{id}' not found"));
+        }
+    }
+    pf
+}
+
+/// Pre-flight for `skill_load`: verify the skill exists and warn if already loaded.
+fn preflight_skill_load(tool: &ToolUse, state: &State) -> Verdict {
+    let mut pf = Verdict::new();
+    if let Some(id) = tool.input.get("id").and_then(|v| v.as_str()) {
+        let skills = storage::load_prompts_for(PromptType::Skill);
+        if !skills.iter().any(|s| s.id == id) {
+            pf.errors.push(format!("Skill '{id}' not found"));
+        } else if PromptState::get(state).loaded_skill_ids.contains(&id.to_owned()) {
+            pf.warnings.push(format!("Skill '{id}' is already loaded"));
+        } else {
+            // Skill exists and is not yet loaded — no warning.
+        }
+    }
+    pf
+}
+
 /// Check if a file path is inside one of the three prompt directories.
 /// Handles both absolute and relative paths by canonicalizing comparison.
 fn is_prompt_file(path: &str) -> bool {
-    let path = std::path::Path::new(path);
+    let p = std::path::Path::new(path);
     [PromptType::Agent, PromptType::Skill, PromptType::Command].iter().any(|pt| {
         let dir = storage::dir_for(*pt);
         // Try canonical comparison first (handles absolute vs relative)
-        if let (Ok(canon_path), Ok(canon_dir)) = (path.canonicalize(), dir.canonicalize()) {
+        if let (Ok(canon_path), Ok(canon_dir)) = (p.canonicalize(), dir.canonicalize()) {
             canon_path.starts_with(canon_dir)
         } else {
             // Fallback: check if path contains the relative dir segment
-            path.starts_with(&dir)
+            p.starts_with(&dir)
         }
     })
 }
@@ -350,10 +377,28 @@ fn preflight_edit_prompt_file(tool: &ToolUse) -> Option<Verdict> {
     Some(pf)
 }
 
+/// Pick the semantic color for one line of prompt-tool output.
+fn prompt_line_semantic(line: &str) -> cp_render::Semantic {
+    use cp_render::Semantic;
+    if line.starts_with("Error:") {
+        Semantic::Error
+    } else if line.starts_with("Created") || line.starts_with("Loaded") {
+        Semantic::Success
+    } else if line.starts_with("Updated") || line.starts_with("Edited") {
+        Semantic::Info
+    } else if line.starts_with("Deleted") || line.starts_with("Unloaded") {
+        Semantic::Warning
+    } else if line.contains("agent") || line.contains("skill") || line.contains("command") || line.contains('\'') {
+        Semantic::Info
+    } else {
+        Semantic::Default
+    }
+}
+
 /// Visualizer for prompt/agent/skill/command tool results.
 /// Highlights entity names, shows active status, and differentiates CRUD operations visually.
 fn visualize_prompt_output(content: &str, width: usize) -> Vec<cp_render::Block> {
-    use cp_render::{Block, Semantic, Span};
+    use cp_render::{Block, Span};
 
     content
         .lines()
@@ -361,27 +406,11 @@ fn visualize_prompt_output(content: &str, width: usize) -> Vec<cp_render::Block>
             if line.is_empty() {
                 return Block::empty();
             }
-            let semantic = if line.starts_with("Error:") {
-                Semantic::Error
-            } else if line.starts_with("Created") || line.starts_with("Loaded") {
-                Semantic::Success
-            } else if line.starts_with("Updated") || line.starts_with("Edited") {
-                Semantic::Info
-            } else if line.starts_with("Deleted") || line.starts_with("Unloaded") {
-                Semantic::Warning
-            } else if line.contains("agent")
-                || line.contains("skill")
-                || line.contains("command")
-                || line.contains('\'')
-            {
-                Semantic::Info
-            } else {
-                Semantic::Default
-            };
+            let semantic = prompt_line_semantic(line);
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
             Block::Line(vec![Span::styled(display, semantic)])
         })

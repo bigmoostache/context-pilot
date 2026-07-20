@@ -33,6 +33,7 @@ const SUFFIX: &str = ".log";
 
 /// The decoded contents of a segment up to its last valid record boundary.
 #[derive(Debug, Default)]
+#[non_exhaustive]
 pub struct Scan {
     /// Every entry that decoded cleanly, in file order.
     pub entries: Vec<OpEntry>,
@@ -75,8 +76,8 @@ pub fn indices(dir: &Path) -> io::Result<Vec<u64>> {
     };
 
     let mut found = Vec::new();
-    for entry in read_dir {
-        let entry = entry?;
+    for dirent in read_dir {
+        let entry = dirent?;
         if let Some(name) = entry.file_name().to_str()
             && let Some(index) = parse_index(name)
         {
@@ -143,7 +144,7 @@ pub fn scan_bytes(data: &[u8]) -> Scan {
         }
     }
 
-    scan.valid_len = offset as u64;
+    scan.valid_len = u64::try_from(offset).unwrap_or(u64::MAX);
     scan
 }
 
@@ -155,7 +156,7 @@ mod tests {
     use cp_wire::types::oplog::OpEntryKind;
 
     fn entry(rev: u64) -> OpEntry {
-        OpEntry { schema_version: 1, rev, timestamp_ms: 0, kind: OpEntryKind::PhaseTransition { phase: Phase::Idle } }
+        OpEntry::new(1, rev, 0, OpEntryKind::PhaseTransition { phase: Phase::Idle })
     }
 
     #[test]

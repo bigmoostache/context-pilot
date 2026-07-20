@@ -300,7 +300,6 @@ fn now_ms() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cp_wire::heartbeat::HEARTBEAT_SCHEMA_VERSION;
     use tempfile::tempdir;
 
     /// A boot id of the exact 32-hex-char width the heartbeat record requires.
@@ -329,13 +328,7 @@ mod tests {
     }
 
     fn heartbeat(pid: u32, timestamp_ms: u64) -> Heartbeat {
-        Heartbeat {
-            schema_version: HEARTBEAT_SCHEMA_VERSION,
-            timestamp_ms,
-            sequence: 0,
-            pid,
-            boot_id: BOOT_A.to_owned(),
-        }
+        Heartbeat::new(timestamp_ms, 0, pid, BOOT_A.to_owned())
     }
 
     /// Write `record` as `<id>.json` into `dir`.

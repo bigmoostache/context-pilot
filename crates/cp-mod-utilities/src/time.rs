@@ -50,7 +50,7 @@ pub fn now_utc_rfc3339_secs() -> String {
 pub fn now_utc_compact() -> String {
     let epoch_secs = now_epoch_ms().wrapping_div(1000);
     let Some(dt) = decompose_utc(epoch_secs) else {
-        return "19700101T000000".to_string();
+        return "19700101T000000".to_owned();
     };
     format!("{:04}{:02}{:02}T{:02}{:02}{:02}", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
 }
@@ -119,7 +119,11 @@ pub fn decompose_epoch_secs(epoch_secs: i64) -> Option<Local> {
 // ── Local time formatting ────────────────────────────────────────────────
 
 /// Decomposed local date/time with UTC offset.
+///
+/// `#[non_exhaustive]`: built only in-crate (`now_local`, `decompose_epoch_secs`);
+/// callers read fields, never construct — so a new field is not a breaking change.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct Local {
     /// Full year (e.g. 2026).
     pub year: i32,
@@ -211,6 +215,22 @@ pub fn parse_rfc3339_to_epoch_ms(s: &str) -> Option<i64> {
     Some(adjusted.saturating_mul(1000))
 }
 
+/// Parse the fixed `YYYY-MM-DDTHH:MM:SS` prefix into [`Parts`].
+///
+/// Shared by the RFC 3339 and local-datetime parsers: both read the six
+/// components from the same byte offsets, so factoring the `?`-chain out keeps
+/// each caller's control-flow simple.
+fn parse_datetime_fields(s: &str) -> Option<Parts> {
+    Some(Parts {
+        year: s.get(..4)?.parse().ok()?,
+        month: s.get(5..7)?.parse().ok()?,
+        day: s.get(8..10)?.parse().ok()?,
+        hour: s.get(11..13)?.parse().ok()?,
+        minute: s.get(14..16)?.parse().ok()?,
+        second: s.get(17..19)?.parse().ok()?,
+    })
+}
+
 /// Parse a local datetime string `YYYY-MM-DDTHH:MM:SS` to epoch
 /// milliseconds, assuming local timezone.
 ///
@@ -220,14 +240,7 @@ pub fn parse_local_datetime_to_epoch_ms(s: &str) -> Option<i64> {
     if s.len() < 19 {
         return None;
     }
-    let parts = Parts {
-        year: s.get(..4)?.parse::<i32>().ok()?,
-        month: s.get(5..7)?.parse::<u8>().ok()?,
-        day: s.get(8..10)?.parse::<u8>().ok()?,
-        hour: s.get(11..13)?.parse::<u8>().ok()?,
-        minute: s.get(14..16)?.parse::<u8>().ok()?,
-        second: s.get(17..19)?.parse::<u8>().ok()?,
-    };
+    let parts = parse_datetime_fields(s)?;
     let epoch = compose_epoch_secs(&parts)?;
     let offset = local_utc_offset_secs();
     let adjusted = epoch.checked_sub(i64::from(offset))?;
@@ -278,11 +291,11 @@ fn civil_from_days(days: i64) -> (i32, u8, u8) {
         .wrapping_div(365);
     let year_long = yoe.saturating_add(era.saturating_mul(400));
     let doy = doe
-        .saturating_sub(365_i64.saturating_mul(yoe))
+        .saturating_sub(365i64.saturating_mul(yoe))
         .saturating_sub(yoe.wrapping_div(4))
         .saturating_add(yoe.wrapping_div(100));
-    let mp = 5_i64.saturating_mul(doy).saturating_add(2).wrapping_div(153);
-    let raw_day = doy.saturating_sub(153_i64.saturating_mul(mp).saturating_add(2).wrapping_div(5)).saturating_add(1);
+    let mp = 5i64.saturating_mul(doy).saturating_add(2).wrapping_div(153);
+    let raw_day = doy.saturating_sub(153i64.saturating_mul(mp).saturating_add(2).wrapping_div(5)).saturating_add(1);
     let month = if mp < 10 { mp.saturating_add(3) } else { mp.saturating_sub(9) };
     let year = if month <= 2 { year_long.saturating_add(1) } else { year_long };
 
@@ -292,6 +305,10 @@ fn civil_from_days(days: i64) -> (i32, u8, u8) {
 /// Compose date-time parts into epoch seconds.
 ///
 /// Inverse of [`decompose_utc`]. Returns `None` for invalid dates.
+#[expect(
+    clippy::as_conversions,
+    reason = "const-fn widening (u8/i32 -> i64) is always exact; From/i64::from are not callable in a const fn"
+)]
 const fn compose_epoch_secs(dt: &Parts) -> Option<i64> {
     if dt.month < 1 || dt.month > 12 || dt.day < 1 || dt.day > 31 || dt.hour > 23 || dt.minute > 59 || dt.second > 60 {
         return None;
@@ -322,8 +339,8 @@ const fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let era = (if yr >= 0 { yr } else { yr.saturating_sub(399) }).wrapping_div(400);
     let yoe = yr.saturating_sub(era.saturating_mul(400));
     let mp = if month > 2 { month.saturating_sub(3) } else { month.saturating_add(9) };
-    let doy = 153_i64.saturating_mul(mp).saturating_add(2).wrapping_div(5).saturating_add(day).saturating_sub(1);
-    let doe = 365_i64
+    let doy = 153i64.saturating_mul(mp).saturating_add(2).wrapping_div(5).saturating_add(day).saturating_sub(1);
+    let doe = 365i64
         .saturating_mul(yoe)
         .saturating_add(yoe.wrapping_div(4))
         .saturating_sub(yoe.wrapping_div(100))
@@ -335,14 +352,7 @@ const fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
 
 /// Parse RFC 3339 into components + UTC offset in seconds.
 fn parse_rfc3339_parts(s: &str) -> Option<(Parts, i32)> {
-    let parts = Parts {
-        year: s.get(..4)?.parse::<i32>().ok()?,
-        month: s.get(5..7)?.parse::<u8>().ok()?,
-        day: s.get(8..10)?.parse::<u8>().ok()?,
-        hour: s.get(11..13)?.parse::<u8>().ok()?,
-        minute: s.get(14..16)?.parse::<u8>().ok()?,
-        second: s.get(17..19)?.parse::<u8>().ok()?,
-    };
+    let parts = parse_datetime_fields(s)?;
 
     let tz_part = s.get(19..)?.trim();
     let offset_secs = parse_tz_suffix(tz_part)?;
@@ -369,7 +379,7 @@ fn parse_tz_suffix(tz_part: &str) -> Option<i32> {
         return Some(0);
     }
 
-    let sign: i32 = match tz.as_bytes().first()? {
+    let sign: i32 = match tz.as_bytes().first().copied()? {
         b'+' => 1,
         b'-' => -1,
         _ => return None,
@@ -396,7 +406,7 @@ fn local_utc_offset_secs() -> i32 {
             .ok()
             .and_then(|o| String::from_utf8(o.stdout).ok())
             .and_then(|s| parse_tz_offset(s.trim()))
-            .unwrap_or(0)
+            .unwrap_or(0i32)
     })
 }
 
@@ -405,7 +415,7 @@ fn parse_tz_offset(s: &str) -> Option<i32> {
     if s.len() < 5 {
         return None;
     }
-    let sign: i32 = match s.as_bytes().first()? {
+    let sign: i32 = match s.as_bytes().first().copied()? {
         b'+' => 1,
         b'-' => -1,
         _ => return None,
@@ -448,7 +458,7 @@ mod tests {
 
     #[test]
     fn civil_roundtrip() {
-        for days in [0_i64, 1, 365, 730, 18628, 20000] {
+        for days in [0i64, 1, 365, 730, 18628, 20000] {
             let (year, month, day) = civil_from_days(days);
             let rt = days_from_civil(i64::from(year), i64::from(month), i64::from(day));
             assert_eq!(days, rt, "roundtrip failed for day {days}");

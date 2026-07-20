@@ -27,96 +27,81 @@ impl TreeSitterSplitter {
     }
 }
 
+/// Rust top-level semantic node kinds.
+const RUST_KINDS: &[&str] = &[
+    "function_item",
+    "struct_item",
+    "enum_item",
+    "impl_item",
+    "trait_item",
+    "mod_item",
+    "const_item",
+    "static_item",
+    "type_item",
+    "macro_definition",
+];
+
+/// Python top-level semantic node kinds.
+const PYTHON_KINDS: &[&str] = &["function_definition", "class_definition", "decorated_definition"];
+
+/// JavaScript/JSX top-level semantic node kinds.
+const JS_KINDS: &[&str] =
+    &["function_declaration", "class_declaration", "export_statement", "lexical_declaration", "variable_declaration"];
+
+/// TypeScript/TSX top-level semantic node kinds.
+const TS_KINDS: &[&str] = &[
+    "function_declaration",
+    "class_declaration",
+    "interface_declaration",
+    "type_alias_declaration",
+    "enum_declaration",
+    "export_statement",
+    "lexical_declaration",
+    "variable_declaration",
+];
+
+/// Go top-level semantic node kinds.
+const GO_KINDS: &[&str] =
+    &["function_declaration", "method_declaration", "type_declaration", "const_declaration", "var_declaration"];
+
+/// Java top-level semantic node kinds.
+const JAVA_KINDS: &[&str] = &[
+    "class_declaration",
+    "interface_declaration",
+    "enum_declaration",
+    "annotation_type_declaration",
+    "record_declaration",
+];
+
+/// C top-level semantic node kinds.
+const C_KINDS: &[&str] =
+    &["function_definition", "struct_specifier", "enum_specifier", "type_definition", "declaration"];
+
+/// C++ top-level semantic node kinds.
+const CPP_KINDS: &[&str] = &[
+    "function_definition",
+    "class_specifier",
+    "struct_specifier",
+    "namespace_definition",
+    "template_declaration",
+    "enum_specifier",
+    "type_definition",
+    "declaration",
+];
+
 /// Map a file extension to a tree-sitter [`Language`] and its
 /// set of top-level node kinds that constitute "semantic items".
 fn language_for_ext(ext: &str) -> Option<(Language, &'static [&'static str])> {
     match ext {
-        "rs" => Some((
-            tree_sitter_rust::LANGUAGE.into(),
-            &[
-                "function_item",
-                "struct_item",
-                "enum_item",
-                "impl_item",
-                "trait_item",
-                "mod_item",
-                "const_item",
-                "static_item",
-                "type_item",
-                "macro_definition",
-            ],
-        )),
-        "py" => Some((
-            tree_sitter_python::LANGUAGE.into(),
-            &["function_definition", "class_definition", "decorated_definition"],
-        )),
-        "js" | "jsx" => Some((
-            tree_sitter_javascript::LANGUAGE.into(),
-            &[
-                "function_declaration",
-                "class_declaration",
-                "export_statement",
-                "lexical_declaration",
-                "variable_declaration",
-            ],
-        )),
-        "ts" => Some((
-            tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
-            &[
-                "function_declaration",
-                "class_declaration",
-                "interface_declaration",
-                "type_alias_declaration",
-                "enum_declaration",
-                "export_statement",
-                "lexical_declaration",
-                "variable_declaration",
-            ],
-        )),
-        "tsx" => Some((
-            tree_sitter_typescript::LANGUAGE_TSX.into(),
-            &[
-                "function_declaration",
-                "class_declaration",
-                "interface_declaration",
-                "type_alias_declaration",
-                "enum_declaration",
-                "export_statement",
-                "lexical_declaration",
-                "variable_declaration",
-            ],
-        )),
-        "go" => Some((
-            tree_sitter_go::LANGUAGE.into(),
-            &["function_declaration", "method_declaration", "type_declaration", "const_declaration", "var_declaration"],
-        )),
-        "java" => Some((
-            tree_sitter_java::LANGUAGE.into(),
-            &[
-                "class_declaration",
-                "interface_declaration",
-                "enum_declaration",
-                "annotation_type_declaration",
-                "record_declaration",
-            ],
-        )),
-        "c" | "h" => Some((
-            tree_sitter_c::LANGUAGE.into(),
-            &["function_definition", "struct_specifier", "enum_specifier", "type_definition", "declaration"],
-        )),
-        "cpp" | "hpp" | "cc" => Some((
-            tree_sitter_cpp::LANGUAGE.into(),
-            &[
-                "function_definition",
-                "class_specifier",
-                "struct_specifier",
-                "namespace_definition",
-                "template_declaration",
-                "enum_specifier",
-                "type_definition",
-                "declaration",
-            ],
-        )),
+        "rs" => Some((tree_sitter_rust::LANGUAGE.into(), RUST_KINDS)),
+        "py" => Some((tree_sitter_python::LANGUAGE.into(), PYTHON_KINDS)),
+        "js" | "jsx" => Some((tree_sitter_javascript::LANGUAGE.into(), JS_KINDS)),
+        "ts" => Some((tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(), TS_KINDS)),
+        "tsx" => Some((tree_sitter_typescript::LANGUAGE_TSX.into(), TS_KINDS)),
+        "go" => Some((tree_sitter_go::LANGUAGE.into(), GO_KINDS)),
+        "java" => Some((tree_sitter_java::LANGUAGE.into(), JAVA_KINDS)),
+        "c" | "h" => Some((tree_sitter_c::LANGUAGE.into(), C_KINDS)),
+        "cpp" | "hpp" | "cc" => Some((tree_sitter_cpp::LANGUAGE.into(), CPP_KINDS)),
         _ => None,
     }
 }
@@ -190,6 +175,80 @@ fn chunk_type_label(kind: &str) -> &'static str {
     }
 }
 
+/// Accumulator for the tree-sitter split walk: emitted chunks plus the
+/// pending non-semantic preamble span (comments/imports before the next item).
+struct SplitAccum {
+    /// Chunks emitted so far (semantic items + flushed preambles).
+    chunks: Vec<Chunk>,
+    /// Byte offset where the current preamble run started, if any.
+    preamble_start: Option<usize>,
+    /// 1-based line of the current preamble run's start.
+    preamble_start_line: u32,
+    /// Char offset of the current preamble run's start.
+    preamble_start_char: u32,
+}
+
+impl SplitAccum {
+    /// Fresh accumulator with no chunks and no open preamble.
+    const fn new() -> Self {
+        Self { chunks: Vec::new(), preamble_start: None, preamble_start_line: 1, preamble_start_char: 0 }
+    }
+
+    /// Flush any accumulated preamble as a `preamble` chunk ending at `end_byte`
+    /// (line `end_line`). No-op when there's no open preamble or it's blank.
+    fn flush_preamble(&mut self, content: &str, end_byte: usize, end_line: usize) {
+        let Some(pre_start) = self.preamble_start.take() else {
+            return;
+        };
+        if end_byte <= pre_start {
+            return;
+        }
+        let pre_content = content.get(pre_start..end_byte).unwrap_or("");
+        if pre_content.trim().is_empty() {
+            return;
+        }
+        self.chunks.push(Chunk {
+            content: pre_content.to_owned(),
+            kind: "preamble".to_owned(),
+            name: String::new(),
+            line_start: self.preamble_start_line,
+            line_end: u32::try_from(end_line).unwrap_or(u32::MAX),
+            char_start: self.preamble_start_char,
+            char_end: u32::try_from(end_byte).unwrap_or(u32::MAX),
+        });
+    }
+
+    /// Open a preamble run at `node` if one isn't already open.
+    fn start_preamble(&mut self, node: &tree_sitter::Node<'_>) {
+        if self.preamble_start.is_none() {
+            self.preamble_start = Some(node.start_byte());
+            self.preamble_start_line = u32::try_from(node.start_position().row.saturating_add(1)).unwrap_or(1);
+            self.preamble_start_char = u32::try_from(node.start_byte()).unwrap_or(0);
+        }
+    }
+
+    /// Emit one semantic node as a labelled chunk.
+    fn push_semantic(&mut self, node: &tree_sitter::Node<'_>, content: &str, source: &[u8]) {
+        let start_byte = node.start_byte();
+        let end_byte = node.end_byte();
+        let node_content = content.get(start_byte..end_byte).unwrap_or("");
+        let name = extract_name(node, source);
+        let label = chunk_type_label(node.kind());
+        let start_line = node.start_position().row.saturating_add(1);
+        let end_line = node.end_position().row.saturating_add(1);
+
+        self.chunks.push(Chunk {
+            content: node_content.to_owned(),
+            kind: label.to_owned(),
+            name,
+            line_start: u32::try_from(start_line).unwrap_or(u32::MAX),
+            line_end: u32::try_from(end_line).unwrap_or(u32::MAX),
+            char_start: u32::try_from(start_byte).unwrap_or(u32::MAX),
+            char_end: u32::try_from(end_byte).unwrap_or(u32::MAX),
+        });
+    }
+}
+
 impl Splitter for TreeSitterSplitter {
     fn supports(&self, extension: &str) -> bool {
         language_for_ext(extension).is_some()
@@ -215,12 +274,7 @@ impl Splitter for TreeSitterSplitter {
 
         let source = content.as_bytes();
         let root = tree.root_node();
-        let mut chunks = Vec::new();
-
-        // Accumulate non-semantic preamble text (comments, use statements, etc.)
-        let mut preamble_start: Option<usize> = None;
-        let mut preamble_start_line: u32 = 1;
-        let mut preamble_start_char: u32 = 0;
+        let mut acc = SplitAccum::new();
 
         let cursor_count = u32::try_from(root.child_count()).unwrap_or(u32::MAX);
         for i in 0..cursor_count {
@@ -228,79 +282,19 @@ impl Splitter for TreeSitterSplitter {
                 continue;
             };
 
-            let kind = node.kind();
-            let is_semantic = semantic_kinds.contains(&kind);
-
-            if is_semantic {
-                // Flush any accumulated preamble as a "preamble" chunk
-                if let Some(pre_start) = preamble_start.take() {
-                    let pre_end = node.start_byte();
-                    if pre_end > pre_start {
-                        let pre_content = content.get(pre_start..pre_end).unwrap_or("");
-                        let trimmed = pre_content.trim();
-                        if !trimmed.is_empty() {
-                            let pre_end_line = node.start_position().row.saturating_add(1);
-                            chunks.push(Chunk {
-                                content: pre_content.to_string(),
-                                kind: "preamble".to_string(),
-                                name: String::new(),
-                                line_start: preamble_start_line,
-                                line_end: u32::try_from(pre_end_line).unwrap_or(u32::MAX),
-                                char_start: preamble_start_char,
-                                char_end: u32::try_from(pre_end).unwrap_or(u32::MAX),
-                            });
-                        }
-                    }
-                }
-
-                // Extract the semantic chunk
-                let start_byte = node.start_byte();
-                let end_byte = node.end_byte();
-                let node_content = content.get(start_byte..end_byte).unwrap_or("");
-                let name = extract_name(&node, source);
-                let label = chunk_type_label(kind);
-                let start_line = node.start_position().row.saturating_add(1);
-                let end_line = node.end_position().row.saturating_add(1);
-
-                chunks.push(Chunk {
-                    content: node_content.to_string(),
-                    kind: label.to_string(),
-                    name,
-                    line_start: u32::try_from(start_line).unwrap_or(u32::MAX),
-                    line_end: u32::try_from(end_line).unwrap_or(u32::MAX),
-                    char_start: u32::try_from(start_byte).unwrap_or(u32::MAX),
-                    char_end: u32::try_from(end_byte).unwrap_or(u32::MAX),
-                });
+            if semantic_kinds.contains(&node.kind()) {
+                // Flush preamble up to this node, then emit the semantic chunk.
+                acc.flush_preamble(content, node.start_byte(), node.start_position().row.saturating_add(1));
+                acc.push_semantic(&node, content, source);
             } else {
-                // Non-semantic node — start or extend preamble
-                if preamble_start.is_none() {
-                    preamble_start = Some(node.start_byte());
-                    preamble_start_line = u32::try_from(node.start_position().row.saturating_add(1)).unwrap_or(1);
-                    preamble_start_char = u32::try_from(node.start_byte()).unwrap_or(0);
-                }
-                // The preamble extends to wherever the next semantic node starts
-                // (or end of file if none)
+                // Non-semantic node — start (or extend) the preamble run.
+                acc.start_preamble(&node);
             }
         }
 
-        // Flush trailing preamble
-        if let Some(pre_start) = preamble_start {
-            let pre_content = content.get(pre_start..).unwrap_or("");
-            let trimmed = pre_content.trim();
-            if !trimmed.is_empty() {
-                let total_lines = content.lines().count();
-                chunks.push(Chunk {
-                    content: pre_content.to_string(),
-                    kind: "preamble".to_string(),
-                    name: String::new(),
-                    line_start: preamble_start_line,
-                    line_end: u32::try_from(total_lines).unwrap_or(u32::MAX),
-                    char_start: preamble_start_char,
-                    char_end: u32::try_from(content.len()).unwrap_or(u32::MAX),
-                });
-            }
-        }
+        // Flush trailing preamble (to end of file).
+        acc.flush_preamble(content, content.len(), content.lines().count());
 
-        chunks
+        acc.chunks
     }
 }

@@ -18,29 +18,21 @@ use crate::llms::{ApiMessage, ContentBlock};
 /// Placeholder content for a `tool_result` synthesized to pair an orphaned
 /// `tool_use` (call recorded but its result was lost to an interrupt, reload,
 /// truncation, or partial queue flush).
-const MISSING_TOOL_RESULT: &str = "(no result recorded — tool call was interrupted or its result was lost)";
+const MISSING_TOOL_RESULT: &str = "(no result recorded \u{2014} tool call was interrupted or its result was lost)";
 
 /// Collect the `tool_use` ids carried by a message, in order.
 fn tool_use_ids_of(msg: &ApiMessage) -> Vec<String> {
-    msg.content
-        .iter()
-        .filter_map(|b| if let ContentBlock::ToolUse { id, .. } = b { Some(id.clone()) } else { None })
-        .collect()
+    msg.content.iter().filter_map(|b| b.tool_use().map(|t| t.0.to_owned())).collect()
 }
 
 /// Collect the `tool_result` ids carried by a message, in order.
 fn tool_result_ids_of(msg: &ApiMessage) -> Vec<String> {
-    msg.content
-        .iter()
-        .filter_map(
-            |b| if let ContentBlock::ToolResult { tool_use_id, .. } = b { Some(tool_use_id.clone()) } else { None },
-        )
-        .collect()
+    msg.content.iter().filter_map(|b| b.tool_result().map(|r| r.0.to_owned())).collect()
 }
 
 /// Build a single synthetic placeholder `tool_result` for an orphaned `tool_use` id.
 fn placeholder_result(id: &str) -> ContentBlock {
-    ContentBlock::ToolResult { tool_use_id: id.to_string(), content: MISSING_TOOL_RESULT.to_string() }
+    ContentBlock::ToolResult { tool_use_id: id.to_owned(), content: MISSING_TOOL_RESULT.to_owned() }
 }
 
 /// Build synthetic placeholder `tool_result` blocks for a set of `tool_use` ids.
@@ -58,7 +50,16 @@ fn placeholder_results(ids: &[String]) -> Vec<ContentBlock> {
 /// - stray `tool_result` blocks whose id has no matching `tool_use` in the
 ///   immediately-preceding assistant message are dropped (the symmetric invariant).
 pub(super) fn repair_tool_pairing(messages: &mut Vec<ApiMessage>) {
-    // Forward pass: every assistant tool_use gets an adjacent result.
+    ensure_adjacent_results(messages);
+    drop_stray_results(messages);
+    // Prune any user message left empty by stray-result removal.
+    messages.retain(|m| !(m.role == "user" && m.content.is_empty()));
+}
+
+/// Forward pass: every assistant `tool_use` gets an adjacent user `tool_result`
+/// (missing ids prepended as placeholders; a user message inserted/appended when
+/// none suitably follows).
+fn ensure_adjacent_results(messages: &mut Vec<ApiMessage>) {
     let mut idx = 0;
     while idx < messages.len() {
         let tool_use_ids = messages.get(idx).map(tool_use_ids_of).unwrap_or_default();
@@ -70,14 +71,14 @@ pub(super) fn repair_tool_pairing(messages: &mut Vec<ApiMessage>) {
         let next = idx.saturating_add(1);
         let Some(next_msg) = messages.get(next) else {
             // No message follows — append one carrying placeholders for all ids.
-            messages.push(ApiMessage { role: "user".to_string(), content: placeholder_results(&tool_use_ids) });
+            messages.push(ApiMessage { role: "user".to_owned(), content: placeholder_results(&tool_use_ids) });
             idx = idx.saturating_add(2);
             continue;
         };
 
         if next_msg.role != "user" {
             // A non-user message follows — insert a user result message between them.
-            messages.insert(next, ApiMessage { role: "user".to_string(), content: placeholder_results(&tool_use_ids) });
+            messages.insert(next, ApiMessage { role: "user".to_owned(), content: placeholder_results(&tool_use_ids) });
             idx = idx.saturating_add(2);
             continue;
         }
@@ -94,8 +95,11 @@ pub(super) fn repair_tool_pairing(messages: &mut Vec<ApiMessage>) {
         }
         idx = idx.saturating_add(2);
     }
+}
 
-    // Symmetric pass: drop stray tool_results whose call isn't in the message before.
+/// Symmetric pass: drop stray `tool_result` blocks whose matching `tool_use`
+/// isn't in the immediately-preceding message.
+fn drop_stray_results(messages: &mut [ApiMessage]) {
     for pos in 1..messages.len() {
         let prior_ids: std::collections::HashSet<String> =
             messages.get(pos.saturating_sub(1)).map(tool_use_ids_of).unwrap_or_default().into_iter().collect();
@@ -103,19 +107,11 @@ pub(super) fn repair_tool_pairing(messages: &mut Vec<ApiMessage>) {
         if msg.role != "user" {
             continue;
         }
-        let has_stray = msg
-            .content
-            .iter()
-            .any(|b| matches!(b, ContentBlock::ToolResult { tool_use_id, .. } if !prior_ids.contains(tool_use_id)));
+        let has_stray = msg.content.iter().any(|b| b.tool_result().is_some_and(|r| !prior_ids.contains(r.0)));
         if has_stray {
-            msg.content.retain(|b| match b {
-                ContentBlock::ToolResult { tool_use_id, .. } => prior_ids.contains(tool_use_id),
-                ContentBlock::Text { .. } | ContentBlock::ToolUse { .. } => true,
-            });
+            msg.content.retain(|b| b.tool_result().is_none_or(|r| prior_ids.contains(r.0)));
         }
     }
-    // Prune any user message left empty by stray-result removal.
-    messages.retain(|m| !(m.role == "user" && m.content.is_empty()));
 }
 
 #[cfg(test)]
@@ -123,19 +119,19 @@ mod tests {
     use super::*;
 
     fn tu(id: &str) -> ContentBlock {
-        ContentBlock::ToolUse { id: id.to_string(), name: "t".to_string(), input: serde_json::Value::Null }
+        ContentBlock::ToolUse { id: id.to_owned(), name: "t".to_owned(), input: serde_json::Value::Null }
     }
     fn tr(id: &str) -> ContentBlock {
-        ContentBlock::ToolResult { tool_use_id: id.to_string(), content: "ok".to_string() }
+        ContentBlock::ToolResult { tool_use_id: id.to_owned(), content: "ok".to_owned() }
     }
     fn text(t: &str) -> ContentBlock {
-        ContentBlock::Text { text: t.to_string() }
+        ContentBlock::Text { text: t.to_owned() }
     }
     fn asst(content: Vec<ContentBlock>) -> ApiMessage {
-        ApiMessage { role: "assistant".to_string(), content }
+        ApiMessage { role: "assistant".to_owned(), content }
     }
     fn user(content: Vec<ContentBlock>) -> ApiMessage {
-        ApiMessage { role: "user".to_string(), content }
+        ApiMessage { role: "user".to_owned(), content }
     }
 
     /// Ids of `tool_result` blocks in a message, in order.
@@ -145,7 +141,7 @@ mod tests {
 
     /// True if the message carries a text block equal to `needle`.
     fn has_text(msg: &ApiMessage, needle: &str) -> bool {
-        msg.content.iter().any(|b| matches!(b, ContentBlock::Text { text } if text == needle))
+        msg.content.iter().any(|b| b.text() == Some(needle))
     }
 
     #[test]
@@ -154,7 +150,7 @@ mod tests {
         let mut msgs = vec![asst(vec![tu("A")]), user(vec![text("hi")])];
         repair_tool_pairing(&mut msgs);
         // The following user message now leads with a synthetic result for A.
-        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_string()]));
+        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_owned()]));
         // Original text is preserved after the injected result.
         assert_eq!(msgs.get(1).map(|m| has_text(m, "hi")), Some(true));
     }
@@ -173,9 +169,9 @@ mod tests {
         // flush_1's assistant message (idx 0) must now be immediately followed by a
         // user message carrying flush_1's result.
         assert_eq!(msgs.first().map(|m| m.role.as_str()), Some("assistant"));
-        assert_eq!(msgs.first().map(tool_use_ids_of), Some(vec!["flush_1".to_string()]));
+        assert_eq!(msgs.first().map(tool_use_ids_of), Some(vec!["flush_1".to_owned()]));
         assert_eq!(msgs.get(1).map(|m| m.role.as_str()), Some("user"));
-        assert_eq!(msgs.get(1).map(|m| result_ids(m).contains(&"flush_1".to_string())), Some(true));
+        assert_eq!(msgs.get(1).map(|m| result_ids(m).contains(&"flush_1".to_owned())), Some(true));
     }
 
     #[test]
@@ -185,7 +181,7 @@ mod tests {
         repair_tool_pairing(&mut msgs);
         assert_eq!(msgs.len(), 2);
         assert_eq!(msgs.get(1).map(|m| m.role.as_str()), Some("user"));
-        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_string()]));
+        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_owned()]));
     }
 
     #[test]
@@ -194,13 +190,10 @@ mod tests {
         let before = msgs.clone();
         repair_tool_pairing(&mut msgs);
         assert_eq!(msgs.len(), before.len());
-        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_string(), "B".to_string()]));
+        assert_eq!(msgs.get(1).map(result_ids), Some(vec!["A".to_owned(), "B".to_owned()]));
         // No placeholder content injected.
-        let has_placeholder = msgs.get(1).map(|m| {
-            m.content
-                .iter()
-                .any(|b| matches!(b, ContentBlock::ToolResult { content, .. } if content == MISSING_TOOL_RESULT))
-        });
+        let has_placeholder =
+            msgs.get(1).map(|m| m.content.iter().any(|b| b.tool_result().is_some_and(|r| r.1 == MISSING_TOOL_RESULT)));
         assert_eq!(has_placeholder, Some(false));
     }
 
@@ -218,11 +211,7 @@ mod tests {
     fn placeholder_uses_missing_result_content() {
         let mut msgs = vec![asst(vec![tu("A")]), user(vec![text("x")])];
         repair_tool_pairing(&mut msgs);
-        let injected = msgs.get(1).and_then(|m| {
-            m.content.iter().find_map(|b| {
-                if let ContentBlock::ToolResult { content, .. } = b { Some(content.clone()) } else { None }
-            })
-        });
+        let injected = msgs.get(1).and_then(|m| m.content.iter().find_map(|b| b.tool_result().map(|r| r.1.to_owned())));
         assert_eq!(injected.as_deref(), Some(MISSING_TOOL_RESULT));
     }
 }

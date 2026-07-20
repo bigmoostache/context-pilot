@@ -59,39 +59,15 @@ pub(in crate::app::run) fn emit_thread_archived(app: &mut App) {
         return;
     }
 
-    // Emit the changed count only once (when the diff fires on the first tick).
-    // Normal ticks have zero changes — no log noise.
+    seed_archived_memo_if_needed(app);
 
-    // First pass after (re)boot: seed from the oplog, then FALL THROUGH.
-    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.archived());
-    if !seeded {
-        let oplog_archived = oplog_roster_archived(&app.state);
-        log::info!("bridge: emit_thread_archived seeding from oplog roster ({} entries)", oplog_archived.len(),);
-        let bs = app.state.ext_mut::<BridgeState>();
-        bs.thread_archived_memo.extend(oplog_archived);
-        bs.seeded.seed_archived();
-        // Fall through — diff below emits any flip the oplog missed.
-    }
-
-    // Diff live archived flags against the memo; collect changes (owned).
-    let changed: Vec<(String, bool)> = {
-        let ts = ThreadsState::get(&app.state);
-        let memo = &app.state.ext::<BridgeState>().thread_archived_memo;
-        ts.threads
-            .iter()
-            .filter_map(|t| {
-                let live = t.archived;
-                (memo.get(&t.id).copied() != Some(live)).then(|| (t.id.clone(), live))
-            })
-            .collect()
-    };
-
+    let changed = collect_archived_changes(app);
     if !changed.is_empty() {
-        log::info!("bridge: emit_thread_archived found {} divergence(s)", changed.len(),);
+        log::info!("bridge: emit_thread_archived found {} divergence(s)", changed.len());
     }
 
     for (thread_id, archived) in changed {
-        log::info!("bridge: emit_thread_archived divergence: {thread_id} → archived={archived}",);
+        log::info!("bridge: emit_thread_archived divergence: {thread_id} → archived={archived}");
         let kind = if archived {
             OpEntryKind::ThreadArchived { thread_id: thread_id.clone() }
         } else {
@@ -100,4 +76,33 @@ pub(in crate::app::run) fn emit_thread_archived(app: &mut App) {
         emit_roster_delta(&app.state, kind);
         let _prev = app.state.ext_mut::<BridgeState>().thread_archived_memo.insert(thread_id, archived);
     }
+}
+
+/// First pass after (re)boot: seed the archived memo from the oplog roster (what
+/// the backend view has folded), then let the diff catch any flip the oplog
+/// missed. No-op once already seeded.
+fn seed_archived_memo_if_needed(app: &mut App) {
+    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.archived());
+    if seeded {
+        return;
+    }
+    let oplog_archived = oplog_roster_archived(&app.state);
+    log::info!("bridge: emit_thread_archived seeding from oplog roster ({} entries)", oplog_archived.len());
+    let bs = app.state.ext_mut::<BridgeState>();
+    bs.thread_archived_memo.extend(oplog_archived);
+    bs.seeded.seed_archived();
+}
+
+/// Diff live archived flags against the memo; collect (`thread_id`, archived) for
+/// each thread whose flag changed.
+fn collect_archived_changes(app: &App) -> Vec<(String, bool)> {
+    let ts = ThreadsState::get(&app.state);
+    let memo = &app.state.ext::<BridgeState>().thread_archived_memo;
+    ts.threads
+        .iter()
+        .filter_map(|t| {
+            let live = t.archived;
+            (memo.get(&t.id).copied() != Some(live)).then(|| (t.id.clone(), live))
+        })
+        .collect()
 }

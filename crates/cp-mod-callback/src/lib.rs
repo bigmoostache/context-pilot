@@ -14,12 +14,12 @@ mod panel;
 mod storage;
 /// Tool dispatch: upsert, toggle, open/close editor.
 pub mod tools;
-/// Upsert tool internals: create, update, delete callback definitions.
-mod tools_upsert;
 /// Glob matching and callback trigger on file edits.
 pub mod trigger;
 /// Callback state types: `CallbackDefinition`, `CallbackState`.
 pub mod types;
+/// Upsert tool internals: create, update, delete callback definitions.
+mod upsert;
 
 use serde_json::json;
 
@@ -40,7 +40,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Callback module: auto-fire bash scripts on file edits matching glob patterns.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct CallbackModule;
+
+impl Default for CallbackModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CallbackModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for CallbackModule {
     fn id(&self) -> &'static str {
@@ -98,7 +114,7 @@ impl Module for CallbackModule {
 
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(v) = data.get("editor_open") {
-            CallbackState::get_mut(state).editor_open = v.as_str().map(ToString::to_string);
+            CallbackState::get_mut(state).editor_open = v.as_str().map(str::to_owned);
         }
         // Populate missing callbacks from YAML backing store.
         storage::populate_from_yaml(CallbackState::get_mut(state));
@@ -196,7 +212,7 @@ impl Module for CallbackModule {
                 let mut pf = Verdict::new();
                 let cs = CallbackState::get(state);
                 if cs.editor_open.is_none() {
-                    pf.warnings.push("No callback editor is currently open".to_string());
+                    pf.warnings.push("No callback editor is currently open".to_owned());
                 }
                 Some(pf)
             }
@@ -214,7 +230,7 @@ impl Module for CallbackModule {
     }
 
     fn context_detail(&self, ctx: &cp_base::state::context::Entry) -> Option<String> {
-        (ctx.context_type.as_str() == Kind::CALLBACK).then_some("callbacks".to_string())
+        (ctx.context_type.as_str() == Kind::CALLBACK).then_some("callbacks".to_owned())
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {

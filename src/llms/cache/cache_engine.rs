@@ -134,23 +134,7 @@ impl CacheEngine {
             .collect();
 
         let alive_count = alive_block_positions.len();
-        let mut alive_positions_permille: Vec<u16> = if total_tokens > 0 {
-            alive_block_positions
-                .iter()
-                .map(|&pos| {
-                    let permille = block_infos
-                        .get(pos)
-                        .map_or(0, |bi| bi.cumulative_tokens)
-                        .saturating_mul(1000)
-                        .checked_div(total_tokens)
-                        .unwrap_or(0);
-                    permille.to_u16()
-                })
-                .collect()
-        } else {
-            vec![]
-        };
-        alive_positions_permille.sort_unstable();
+        let alive_positions_permille = alive_permille(&block_infos, &alive_block_positions, total_tokens);
 
         // ── Beacon: extend cached prefix past the frontier ──────────────
         let frontier = self.find_cache_frontier(&block_infos);
@@ -215,6 +199,28 @@ impl CacheEngine {
 
 // ─── Hash Chain ─────────────────────────────────────────────────────────────
 
+/// Sorted per-mille positions (0–1000) of alive BPs within the prompt, keyed on
+/// each block's cumulative token share. Empty when the prompt has no tokens.
+fn alive_permille(block_infos: &[BlockInfo], alive_positions: &[usize], total_tokens: usize) -> Vec<u16> {
+    if total_tokens == 0 {
+        return vec![];
+    }
+    let mut permille: Vec<u16> = alive_positions
+        .iter()
+        .map(|&pos| {
+            let share = block_infos
+                .get(pos)
+                .map_or(0, |bi| bi.cumulative_tokens)
+                .saturating_mul(1000)
+                .checked_div(total_tokens)
+                .unwrap_or(0);
+            share.to_u16()
+        })
+        .collect();
+    permille.sort_unstable();
+    permille
+}
+
 /// Compute accumulated hashes for every content block in the prompt.
 /// `acc_hash[i] = sha256(block_content + acc_hash[i-1])`
 fn compute_accumulated_hashes(api_messages: &[ApiMessage]) -> Vec<BlockInfo> {
@@ -224,15 +230,15 @@ fn compute_accumulated_hashes(api_messages: &[ApiMessage]) -> Vec<BlockInfo> {
 
     for (msg_idx, msg) in api_messages.iter().enumerate() {
         for (blk_idx, block) in msg.content.iter().enumerate() {
-            let hash_repr = match block {
-                super::super::ContentBlock::Text { text } => text.clone(),
-                super::super::ContentBlock::ToolUse { id, name, input } => {
+            let hash_repr = cp_base::deref_match!(block, {
+                super::super::ContentBlock::Text { ref text } => text.clone(),
+                super::super::ContentBlock::ToolUse { ref id, ref name, ref input } => {
                     format!("tool_use:{id}:{name}:{}", serde_json::to_string(input).unwrap_or_default())
                 }
-                super::super::ContentBlock::ToolResult { tool_use_id, content } => {
+                super::super::ContentBlock::ToolResult { ref tool_use_id, ref content } => {
                     format!("tool_result:{tool_use_id}:{content}")
                 }
-            };
+            });
 
             let token_count = cp_base::state::context::estimate_tokens(&hash_repr);
             cumulative_tokens = cumulative_tokens.saturating_add(token_count);

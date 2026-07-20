@@ -78,6 +78,10 @@ const MAX_WRITE_ATTEMPTS: u32 = 50;
 
 /// The fate of a [`Tee::publish`] call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "tee-outcome contract: Outcome is a closed Published/Dropped binary set returned by Tee::publish and matched exhaustively by callers; #[non_exhaustive] adds nothing to a binary outcome"
+)]
 pub enum Outcome {
     /// The frame was enqueued for the publisher (not a delivery guarantee —
     /// tier-③ traffic is best-effort all the way down).
@@ -287,7 +291,7 @@ fn write_all_bounded(stream: &mut UnixStream, bytes: &[u8]) -> bool {
                 written = written.wrapping_add(n);
                 attempts = 0;
             }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                 attempts = attempts.wrapping_add(1);
                 if attempts >= MAX_WRITE_ATTEMPTS {
                     return false;

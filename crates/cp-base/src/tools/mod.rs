@@ -19,6 +19,7 @@ pub mod api_schema;
 
 /// Root structure of a tool YAML file.
 #[derive(Debug, Clone, Deserialize)]
+#[non_exhaustive]
 pub struct ToolTexts {
     /// Map of tool ID → tool text (description + parameter descriptions).
     pub tools: HashMap<String, ToolText>,
@@ -37,6 +38,7 @@ impl ToolTexts {
 
 /// LLM-facing text for a single tool: description + parameter descriptions.
 #[derive(Debug, Clone, Deserialize)]
+#[non_exhaustive]
 pub struct ToolText {
     /// Full tool description shown to the LLM.
     pub description: String,
@@ -47,6 +49,7 @@ pub struct ToolText {
 
 /// A tool invocation requested by the LLM during streaming.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ToolUse {
     /// Unique ID assigned by the LLM (used to correlate with [`ToolResult`]).
     pub id: String,
@@ -56,8 +59,20 @@ pub struct ToolUse {
     pub input: Value,
 }
 
+impl ToolUse {
+    /// Build a tool invocation from its LLM-assigned ID, tool name, and input.
+    #[must_use]
+    pub const fn new(id: String, name: String, input: Value) -> Self {
+        Self { id, name, input }
+    }
+}
+
 /// Result returned after executing a tool, sent back to the LLM.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[expect(
+    clippy::exhaustive_structs,
+    reason = "tool-return contract: ToolResult is the closed struct every tool fills and is built by struct literal at 116 sites cross-crate; the constructors (new/with_name) can't cover the display/tldr/preserves_tempo field combinations each site sets, and a 7-arg constructor would trip too_many_arguments, so the exhaustive literal is the honest shape"
+)]
 pub struct ToolResult {
     /// Correlates with [`ToolUse::id`].
     pub tool_use_id: String,
@@ -116,6 +131,10 @@ impl ToolResult {
 /// JSON Schema type for a tool parameter. Recursive via [`Array`] and [`Object`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "JSON-schema param type: ParamType is constructed by every tool definition cross-crate and matched exhaustively by to_json_schema; the set is closed and #[non_exhaustive] would forbid that construction"
+)]
 pub enum ParamType {
     /// Free-form string.
     String,
@@ -134,29 +153,29 @@ pub enum ParamType {
 impl ParamType {
     /// Emit the JSON Schema representation (recursive for nested types).
     fn to_json_schema(&self) -> Value {
-        match self {
+        crate::deref_match!(self, {
             Self::String => json!({"type": "string"}),
             Self::Integer => json!({"type": "integer"}),
             Self::Number => json!({"type": "number"}),
             Self::Boolean => json!({"type": "boolean"}),
-            Self::Array(inner) => json!({
+            Self::Array(ref inner) => json!({
                 "type": "array",
                 "items": inner.to_json_schema()
             }),
-            Self::Object(params) => {
+            Self::Object(ref params) => {
                 let mut properties = serde_json::Map::new();
                 let mut required = Vec::new();
                 for param in params {
                     let mut schema = param.param_type.to_json_schema();
-                    if let Some(desc) = &param.description
+                    if let Some(desc) = param.description.as_ref()
                         && let Some(obj) = schema.as_object_mut()
                     {
-                        drop(obj.insert("description".to_string(), json!(desc)));
+                        drop(obj.insert("description".to_owned(), json!(desc)));
                     }
-                    if let Some(enum_vals) = &param.enum_values
+                    if let Some(enum_vals) = param.enum_values.as_ref()
                         && let Some(obj) = schema.as_object_mut()
                     {
-                        drop(obj.insert("enum".to_string(), json!(enum_vals)));
+                        drop(obj.insert("enum".to_owned(), json!(enum_vals)));
                     }
                     drop(properties.insert(param.name.clone(), schema));
                     if param.required {
@@ -169,12 +188,13 @@ impl ParamType {
                     "required": required
                 })
             }
-        }
+        })
     }
 }
 
 /// A single tool parameter in a [`ToolDefinition`] schema.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ToolParam {
     /// Parameter name (JSON key).
     pub name: String,
@@ -194,20 +214,13 @@ impl ToolParam {
     /// Create a parameter with name and type. Defaults to optional, no description.
     #[must_use]
     pub fn new(name: &str, param_type: ParamType) -> Self {
-        Self {
-            name: name.to_string(),
-            param_type,
-            description: None,
-            required: false,
-            enum_values: None,
-            default: None,
-        }
+        Self { name: name.to_owned(), param_type, description: None, required: false, enum_values: None, default: None }
     }
 
     /// Set a description (builder pattern).
     #[must_use]
     pub fn desc(mut self, d: &str) -> Self {
-        self.description = Some(d.to_string());
+        self.description = Some(d.to_owned());
         self
     }
 
@@ -228,7 +241,7 @@ impl ToolParam {
     /// Set a default value hint (builder pattern).
     #[must_use]
     pub fn default_val(mut self, val: &str) -> Self {
-        self.default = Some(val.to_string());
+        self.default = Some(val.to_owned());
         self
     }
 }
@@ -236,6 +249,7 @@ impl ToolParam {
 /// A complete tool definition: identity, schema, and runtime flags.
 /// Serialized to JSON Schema for the LLM API.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ToolDefinition {
     /// Tool identifier (e.g., `"Open"`, `"git_execute"`).
     pub id: String,
@@ -273,8 +287,8 @@ impl ToolDefinition {
             .get(id)
             .unwrap_or_else(|| crate::config::invariant_panic(&format!("Tool '{id}' not found in YAML")));
         ToolDefBuilder {
-            id: id.to_string(),
-            description: text.description.trim().to_string(),
+            id: id.to_owned(),
+            description: text.description.trim().to_owned(),
             param_descs: &text.parameters,
             params: Vec::new(),
             short_desc: String::new(),
@@ -292,15 +306,15 @@ impl ToolDefinition {
 
         for param in &self.params {
             let mut schema = param.param_type.to_json_schema();
-            if let Some(desc) = &param.description
+            if let Some(desc) = param.description.as_ref()
                 && let Some(obj) = schema.as_object_mut()
             {
-                drop(obj.insert("description".to_string(), json!(desc)));
+                drop(obj.insert("description".to_owned(), json!(desc)));
             }
-            if let Some(enum_vals) = &param.enum_values
+            if let Some(enum_vals) = param.enum_values.as_ref()
                 && let Some(obj) = schema.as_object_mut()
             {
-                drop(obj.insert("enum".to_string(), json!(enum_vals)));
+                drop(obj.insert("enum".to_owned(), json!(enum_vals)));
             }
             drop(properties.insert(param.name.clone(), schema));
             if param.required {
@@ -343,14 +357,14 @@ impl ToolDefBuilder<'_> {
     /// Set sidebar short description.
     #[must_use]
     pub fn short_desc(mut self, s: &str) -> Self {
-        self.short_desc = s.to_string();
+        self.short_desc = String::from(s);
         self
     }
 
     /// Set tool category for grouping.
     #[must_use]
     pub fn category(mut self, c: &str) -> Self {
-        self.category = c.to_string();
+        self.category = String::from(c);
         self
     }
 
@@ -401,7 +415,7 @@ impl ToolDefBuilder<'_> {
         let desc = self.param_descs.get(name).cloned();
         let mut p = ToolParam::new(name, param_type);
         p.description = desc;
-        p.default = Some(default.to_string());
+        p.default = Some(default.to_owned());
         self.params.push(p);
         self
     }

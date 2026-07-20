@@ -5,6 +5,10 @@
 
 /// Category of a credential.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "credential-registry taxonomy: KeyCategory is a closed set constructed in the ALL_KEYS table and matched exhaustively by health/UI code; #[non_exhaustive] would forbid that cross-crate construction"
+)]
 pub enum KeyCategory {
     /// LLM provider API key (Anthropic, xAI, DeepSeek, etc.)
     LlmProvider,
@@ -20,6 +24,10 @@ pub enum KeyCategory {
 
 /// How a credential is resolved.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "credential-registry taxonomy: AuthMechanism is a closed set constructed in the ALL_KEYS table and matched exhaustively by the resolution cascade; #[non_exhaustive] would forbid that cross-crate construction"
+)]
 pub enum AuthMechanism {
     /// Standard environment variable lookup.
     EnvVar,
@@ -28,7 +36,12 @@ pub enum AuthMechanism {
 }
 
 /// Definition of a well-known credential.
+///
+/// `#[non_exhaustive]`: constructed only in-crate (the `ALL_KEYS` table);
+/// external code reads fields via `resolve_definition`, so adding a field
+/// is not a breaking change.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct KeyDefinition {
     /// Short canonical name used in vault API calls (e.g. `"anthropic"`).
     pub canonical: &'static str,

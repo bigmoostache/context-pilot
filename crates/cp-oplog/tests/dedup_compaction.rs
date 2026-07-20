@@ -193,7 +193,7 @@ fn compaction_is_a_noop_before_the_first_roll() {
         }
     }
     let report = compact(dir.path()).expect("compact");
-    assert_eq!(report, Report { segments_removed: 0, oldest_index: Some(0) });
+    assert_eq!(report, Report::new(0, Some(0)));
 }
 
 // ── size trigger + GC grace composition ─────────────────────────────────────

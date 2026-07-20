@@ -29,7 +29,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Firecrawl module: web scraping and content extraction via Firecrawl API.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct FirecrawlModule;
+
+impl Default for FirecrawlModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FirecrawlModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for FirecrawlModule {
     fn id(&self) -> &'static str {

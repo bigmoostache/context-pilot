@@ -5,15 +5,19 @@ use super::context::{Entry, Kind};
 use super::data::TickTelemetry;
 use super::data::config::ViewMode;
 use super::data::message::Message;
-use super::flags::{ConfigOverlay, HighlightIrFn, StatusBools, StreamPhase, StreamingTool, UiState};
+use super::flags::{HighlightIrFn, StatusBools, StreamPhase, StreamingTool};
 use crate::config::llm_types::LlmProvider;
 use crate::panels::ContextItem;
 use crate::tools::ToolDefinition;
 use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
+/// Ephemeral reverie sub-agent state (context optimizer, cartographer).
+pub mod reverie;
+
 // Runtime State
 
 /// Runtime state (messages loaded in memory)
+#[non_exhaustive]
 pub struct State {
     /// Active context panels (dynamic + fixed), ordered by recency for LLM injection.
     pub context: Vec<Entry>,
@@ -81,7 +85,7 @@ pub struct State {
     pub view_mode: ViewMode,
     /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
     /// Ephemeral — not persisted, discarded after each run.
-    pub reveries: HashMap<String, super::reverie::Session>,
+    pub reveries: HashMap<String, reverie::Session>,
     /// Accumulated `prompt_cache_hit_tokens` across all API calls (persisted)
     pub cache_hit_tokens: usize,
     /// Accumulated `prompt_cache_miss_tokens` across all API calls (persisted)
@@ -205,106 +209,89 @@ pub struct State {
     pub module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            // NOTE: context and tools are initialized empty here.
-            // The binary populates them via the module registry during init.
-            context: vec![],
-            messages: vec![],
-            input: String::new(),
-            input_cursor: 0,
-            input_selection_anchor: None,
-            paste_buffers: vec![],
-            paste_buffer_labels: vec![],
-            selected_context: 0,
-            flags: StatusBools {
-                ui: UiState { dirty: true, ..UiState::default() },
-                config: ConfigOverlay { reverie_enabled: true, ..ConfigOverlay::default() },
-                ..StatusBools::default()
-            },
-            streaming_tool: None,
-            last_stop_reason: None,
-            scroll_offset: 0.0,
-            scroll_accel: 1.0,
-            max_scroll: 0.0,
-            streaming_estimated_tokens: 0,
-            next_user_id: 1,
-            next_assistant_id: 1,
-            next_tool_id: 1,
-            next_result_id: 1,
-            global_next_uid: 1,
-            tools: vec![],
-            active_modules: std::collections::HashSet::new(),
-            config_selected_bar: 0,
-            active_theme: crate::config::DEFAULT_THEME.to_string(),
-            llm_provider: LlmProvider::default(),
-            anthropic_model: crate::config::models::AnthropicModel::default(),
-            grok_model: crate::config::models::GrokModel::default(),
-            groq_model: crate::config::models::GroqModel::default(),
-            deepseek_model: crate::config::models::DeepSeekModel::default(),
-            minimax_model: crate::config::models::MiniMaxModel::default(),
-            claude_code_v2_model: crate::config::models::ClaudeCodeV2Model::default(),
-            view_mode: ViewMode::Normal,
-            reveries: HashMap::new(),
-            cache_hit_tokens: 0,
-            cache_miss_tokens: 0,
-            total_output_tokens: 0,
-            uncached_input_tokens: 0,
-            stream_cache_hit_tokens: 0,
-            stream_cache_miss_tokens: 0,
-            stream_output_tokens: 0,
-            stream_uncached_input_tokens: 0,
-            tick_cache_hit_tokens: 0,
-            tick_cache_miss_tokens: 0,
-            tick_output_tokens: 0,
-            tick_uncached_input_tokens: 0,
-            cleaning_threshold: 0.70,
-            context_budget: None,
-            cost_hit_usd: 0.0,
-            cost_miss_usd: 0.0,
-            cost_output_usd: 0.0,
-            stream_cost_hit_usd: 0.0,
-            stream_cost_miss_usd: 0.0,
-            stream_cost_output_usd: 0.0,
-            tick_cost_hit_usd: 0.0,
-            tick_cost_miss_usd: 0.0,
-            tick_cost_output_usd: 0.0,
-            api_check_result: None,
-            api_retry_count: 0,
-            guard_rail_blocked: None,
-            previous_panel_hash_list: vec![],
-            previous_panel_order: vec![],
-            previous_panel_id_types: vec![],
-            previous_breakpoint_panel_ids: vec![],
-            frozen_context_snapshot: None,
-            tool_sleep_until_ms: 0,
-            cache_engine_json: None,
-            tempo: true,
-            tick_telemetry: None,
-            tick_alive_breakpoints: 0,
-            tick_alive_bp_positions: vec![],
-            last_viewport_width: 0,
-            message_cache: HashMap::new(),
-            input_cache: None,
-            full_content_cache: None,
-            highlight_ir_fn: None,
-            module_data: HashMap::new(),
-        }
-    }
-}
+/// `Default` for `State` (extracted for the 500-line cap).
+mod default;
 
 impl State {
+    // === Boot builder (cross-crate reconstruction from persisted state) ===
+
+    /// Set the loaded context panels (builder).
+    #[must_use]
+    pub fn with_context(mut self, context: Vec<Entry>) -> Self {
+        self.context = context;
+        self
+    }
+
+    /// Set the loaded conversation messages (builder).
+    #[must_use]
+    pub fn with_messages(mut self, messages: Vec<Message>) -> Self {
+        self.messages = messages;
+        self
+    }
+
+    /// Set the selected-panel index (builder).
+    #[must_use]
+    pub const fn with_selected_context(mut self, idx: usize) -> Self {
+        self.selected_context = idx;
+        self
+    }
+
+    /// Set the four message-ID counters as `(user, assistant, tool, result)` (builder).
+    #[must_use]
+    pub const fn with_id_counters(mut self, counters: (usize, usize, usize, usize)) -> Self {
+        let (user, assistant, tool, result) = counters;
+        self.next_user_id = user;
+        self.next_assistant_id = assistant;
+        self.next_tool_id = tool;
+        self.next_result_id = result;
+        self
+    }
+
+    /// Set the draft input text and cursor byte-offset (builder).
+    #[must_use]
+    pub fn with_draft(mut self, input: String, cursor: usize) -> Self {
+        self.input = input;
+        self.input_cursor = cursor;
+        self
+    }
+
+    /// Set the view mode (builder).
+    #[must_use]
+    pub const fn with_view_mode(mut self, view_mode: ViewMode) -> Self {
+        self.view_mode = view_mode;
+        self
+    }
+
+    /// Set the active theme ID (builder).
+    #[must_use]
+    pub fn with_active_theme(mut self, theme: String) -> Self {
+        self.active_theme = theme;
+        self
+    }
+
+    /// Set the persisted cache-engine JSON blob (builder).
+    #[must_use]
+    pub fn with_cache_engine_json(mut self, json: Option<String>) -> Self {
+        self.cache_engine_json = json;
+        self
+    }
+
     // === Module extension data (TypeMap) ===
 
     /// Get a reference to module-owned state by type.
     #[must_use]
-    pub fn get_ext<T: 'static + Send + Sync>(&self) -> Option<&T> {
+    pub fn get_ext<T>(&self) -> Option<&T>
+    where
+        T: 'static + Send + Sync,
+    {
         self.module_data.get(&TypeId::of::<T>()).and_then(|v| v.downcast_ref())
     }
 
     /// Get a mutable reference to module-owned state by type.
-    pub fn get_ext_mut<T: 'static + Send + Sync>(&mut self) -> Option<&mut T> {
+    pub fn get_ext_mut<T>(&mut self) -> Option<&mut T>
+    where
+        T: 'static + Send + Sync,
+    {
         self.module_data.get_mut(&TypeId::of::<T>()).and_then(|v| v.downcast_mut())
     }
 
@@ -318,9 +305,12 @@ impl State {
     ///
     /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
     #[must_use]
-    pub fn ext<T: 'static + Send + Sync>(&self) -> &T {
+    pub fn ext<T>(&self) -> &T
+    where
+        T: 'static + Send + Sync,
+    {
         self.get_ext::<T>().unwrap_or_else(|| {
-            crate::config::invariant_panic("module state not initialized — was init_state() called?")
+            crate::config::invariant_panic("module state not initialized \u{2014} was init_state() called?")
         })
     }
 
@@ -329,14 +319,20 @@ impl State {
     /// # Panics
     ///
     /// Panics if module state `T` was never registered via [`set_ext`](Self::set_ext).
-    pub fn ext_mut<T: 'static + Send + Sync>(&mut self) -> &mut T {
+    pub fn ext_mut<T>(&mut self) -> &mut T
+    where
+        T: 'static + Send + Sync,
+    {
         self.get_ext_mut::<T>().unwrap_or_else(|| {
-            crate::config::invariant_panic("module state not initialized — was init_state() called?")
+            crate::config::invariant_panic("module state not initialized \u{2014} was init_state() called?")
         })
     }
 
     /// Set module-owned state by type. Replaces any existing value of this type.
-    pub fn set_ext<T: 'static + Send + Sync>(&mut self, val: T) {
+    pub fn set_ext<T>(&mut self, val: T)
+    where
+        T: 'static + Send + Sync,
+    {
         drop(self.module_data.insert(TypeId::of::<T>(), Box::new(val)));
     }
 
@@ -419,9 +415,9 @@ impl State {
         self.tick_cache_miss_tokens = 0;
         self.tick_output_tokens = 0;
         self.tick_uncached_input_tokens = 0;
-        self.tick_cost_hit_usd = 0.0;
-        self.tick_cost_miss_usd = 0.0;
-        self.tick_cost_output_usd = 0.0;
+        self.tick_cost_hit_usd = 0.0f64;
+        self.tick_cost_miss_usd = 0.0f64;
+        self.tick_cost_output_usd = 0.0f64;
     }
 }
 

@@ -5,6 +5,48 @@
 
 use crate::llms::{ApiMessage, ContentBlock};
 
+/// Rolling cleanup: keep only the 20 most recent CSVs in `dir`.
+fn rolling_cleanup_csvs(dir: &std::path::Path) {
+    let Ok(mut entries) = std::fs::read_dir(dir) else { return };
+    let mut files: Vec<std::path::PathBuf> = entries
+        .by_ref()
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("csv"))
+        .collect();
+    if files.len() < 20 {
+        return;
+    }
+    files.sort();
+    for old in files.iter().take(files.len().saturating_sub(19)) {
+        let _del = std::fs::remove_file(old);
+    }
+}
+
+/// Classify one content block into `(block_type, context, raw_text)` for the CSV.
+fn block_to_row<'blk>(block: &'blk ContentBlock, role: &str) -> (&'static str, String, &'blk str) {
+    cp_base::deref_match!(block, {
+        ContentBlock::Text { ref text } => ("text", classify_text_context(text, role), text.as_str()),
+        ContentBlock::ToolUse { ref id, ref name, .. } => {
+            let ctx = if name == "dynamic_panel" { format!("panel_call:{id}") } else { format!("tool_use:{name}") };
+            ("tool_use", ctx, name.as_str())
+        }
+        ContentBlock::ToolResult { ref tool_use_id, ref content } => {
+            ("tool_result", tool_result_context(tool_use_id, content), content.as_str())
+        }
+    })
+}
+
+/// Build the context label for a `ToolResult` block (panel-aware).
+fn tool_result_context(tool_use_id: &str, content: &str) -> String {
+    if !tool_use_id.starts_with("panel_") {
+        return format!("tool_result:{tool_use_id}");
+    }
+    let panel_info =
+        content.lines().next().unwrap_or("").trim_start_matches("======= [").split(']').next().unwrap_or(tool_use_id);
+    format!("panel_result:{panel_info}")
+}
+
 /// Dump every message in the assembled prompt to a CSV file for debugging.
 ///
 /// Each tick writes a new file to `.context-pilot/prompt_ticks/` named by
@@ -24,21 +66,7 @@ pub(crate) fn dump_prompt_tick_csv(api_messages: &[ApiMessage]) {
     let dir = std::path::Path::new(".context-pilot").join("prompt_ticks");
     let _mkdir = std::fs::create_dir_all(&dir);
 
-    // Rolling cleanup: keep only 20 most recent CSVs
-    if let Ok(mut entries) = std::fs::read_dir(&dir) {
-        let mut files: Vec<std::path::PathBuf> = entries
-            .by_ref()
-            .filter_map(Result::ok)
-            .map(|e| e.path())
-            .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("csv"))
-            .collect();
-        if files.len() >= 20 {
-            files.sort();
-            for old in files.iter().take(files.len().saturating_sub(19)) {
-                let _del = std::fs::remove_file(old);
-            }
-        }
-    }
+    rolling_cleanup_csvs(&dir);
 
     // Filename: datetime with second precision
     let ts = cp_mod_utilities::time::now_local_ymd_hms_file();
@@ -46,36 +74,10 @@ pub(crate) fn dump_prompt_tick_csv(api_messages: &[ApiMessage]) {
 
     for msg in api_messages {
         for block in &msg.content {
-            let (block_type, context, raw_text) = match block {
-                ContentBlock::Text { text } => {
-                    let ctx = classify_text_context(text, &msg.role);
-                    ("text", ctx, text.as_str())
-                }
-                ContentBlock::ToolUse { id, name, .. } => {
-                    let ctx =
-                        if name == "dynamic_panel" { format!("panel_call:{id}") } else { format!("tool_use:{name}") };
-                    ("tool_use", ctx, name.as_str())
-                }
-                ContentBlock::ToolResult { tool_use_id, content } => {
-                    let ctx = if tool_use_id.starts_with("panel_") {
-                        let panel_info = content
-                            .lines()
-                            .next()
-                            .unwrap_or("")
-                            .trim_start_matches("======= [")
-                            .split(']')
-                            .next()
-                            .unwrap_or(tool_use_id);
-                        format!("panel_result:{panel_info}")
-                    } else {
-                        format!("tool_result:{tool_use_id}")
-                    };
-                    ("tool_result", ctx, content.as_str())
-                }
-            };
+            let (block_type, context, raw_text) = block_to_row(block, &msg.role);
 
             let full_hash = crate::state::cache::hash_content(raw_text);
-            let short_hash = full_hash.get(..16).unwrap_or(&full_hash).to_string();
+            let short_hash = full_hash.get(..16).unwrap_or(&full_hash).to_owned();
             let tokens = cp_base::state::context::estimate_tokens(raw_text);
 
             let preview: String = raw_text
@@ -91,7 +93,7 @@ pub(crate) fn dump_prompt_tick_csv(api_messages: &[ApiMessage]) {
     // Second pass: compute accumulated and reverse-accumulated token counts
     let total_tokens: usize = row_data.iter().map(|r| r.tokens).sum();
     let mut acc: usize = 0;
-    let mut rows: Vec<String> = vec!["hash,role,type,context,tokens,acc_tokens,rev_acc_tokens,preview".to_string()];
+    let mut rows: Vec<String> = vec!["hash,role,type,context,tokens,acc_tokens,rev_acc_tokens,preview".to_owned()];
 
     for row in &row_data {
         acc = acc.saturating_add(row.tokens);
@@ -110,28 +112,28 @@ pub(crate) fn dump_prompt_tick_csv(api_messages: &[ApiMessage]) {
 fn classify_text_context(text: &str, role: &str) -> String {
     // Panel header (first text in the panel injection sequence)
     if text.contains("Beginning of dynamic panel display") {
-        return "panel_header".to_string();
+        return "panel_header".to_owned();
     }
     // Panel timestamp lines
     if text.starts_with("Panel automatically generated at") {
-        return "panel_timestamp".to_string();
+        return "panel_timestamp".to_owned();
     }
     // Panel footer
     if text.contains("End of dynamic panel display") {
-        return "panel_footer".to_string();
+        return "panel_footer".to_owned();
     }
     // Seed re-injection header
     if text.contains("System instructions") {
-        return "seed_reinjection".to_string();
+        return "seed_reinjection".to_owned();
     }
     // Seed re-injection ack
     if role == "assistant" && text.contains("Understood") && text.len() < 100 {
-        return "seed_ack".to_string();
+        return "seed_ack".to_owned();
     }
     // Footer ack
     if role == "user" && text.contains("Proceeding with conversation") {
-        return "footer_ack".to_string();
+        return "footer_ack".to_owned();
     }
     // Conversation messages
-    if role == "user" { "conversation:user".to_string() } else { "conversation:assistant".to_string() }
+    if role == "user" { "conversation:user".to_owned() } else { "conversation:assistant".to_owned() }
 }

@@ -5,7 +5,6 @@
 //! `clippy::multiple_inherent_impl`.
 
 use super::super::runtime::State;
-use crate::cast::Safe as _;
 use crate::config::llm_types::{LlmProvider, ModelInfo as _};
 
 /// Model-selection, pricing, and context-budget helpers for [`State`].
@@ -34,13 +33,13 @@ impl ModelPricing for State {
     fn current_model(&self) -> String {
         match self.llm_provider {
             LlmProvider::Anthropic | LlmProvider::ClaudeCode | LlmProvider::ClaudeCodeApiKey => {
-                self.anthropic_model.api_name().to_string()
+                self.anthropic_model.api_name().to_owned()
             }
-            LlmProvider::Grok => self.grok_model.api_name().to_string(),
-            LlmProvider::Groq => self.groq_model.api_name().to_string(),
-            LlmProvider::DeepSeek => self.deepseek_model.api_name().to_string(),
-            LlmProvider::MiniMax => self.minimax_model.api_name().to_string(),
-            LlmProvider::ClaudeCodeV2 => self.claude_code_v2_model.api_name().to_string(),
+            LlmProvider::Grok => self.grok_model.api_name().to_owned(),
+            LlmProvider::Groq => self.groq_model.api_name().to_owned(),
+            LlmProvider::DeepSeek => self.deepseek_model.api_name().to_owned(),
+            LlmProvider::MiniMax => self.minimax_model.api_name().to_owned(),
+            LlmProvider::ClaudeCodeV2 => self.claude_code_v2_model.api_name().to_owned(),
         }
     }
 
@@ -127,12 +126,12 @@ impl ModelPricing for State {
     }
 
     fn cleaning_threshold_tokens(&self) -> usize {
-        (self.effective_context_budget().to_f32() * self.cleaning_threshold).to_usize()
+        crate::cast::float_math::scale_to_usize(self.effective_context_budget(), self.cleaning_threshold)
     }
 }
 
 /// Cost in USD for a given token count and price per million tokens.
 #[must_use]
 pub fn token_cost(tokens: usize, price_per_mtok: f32) -> f64 {
-    tokens.to_f64() * price_per_mtok.to_f64() / 1_000_000.0
+    crate::cast::float_math::cost_usd(tokens, price_per_mtok)
 }

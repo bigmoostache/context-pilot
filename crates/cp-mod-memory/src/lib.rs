@@ -39,7 +39,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Memory module: persistent knowledge items across conversations.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct MemoryModule;
+
+impl Default for MemoryModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MemoryModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for MemoryModule {
     fn id(&self) -> &'static str {
@@ -316,6 +332,6 @@ fn truncate_mem_line(line: &str, width: usize) -> String {
     if line.len() > width {
         format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
     } else {
-        line.to_string()
+        line.to_owned()
     }
 }

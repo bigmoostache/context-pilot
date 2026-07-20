@@ -2,21 +2,20 @@
 
 use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
-use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
 use super::error::LlmError;
 use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::constants::{API_ENDPOINT, API_VERSION, library};
-use crate::infra::tools::ToolUse;
 use crate::infra::tools::build_api;
 use cp_base::config::INJECTIONS;
 
 pub(in crate::llms) mod messages;
+pub(in crate::llms) mod streaming;
 
-use messages::{log_sse_error, messages_to_api};
+use messages::messages_to_api;
 
 /// Anthropic Claude client
 pub(crate) struct AnthropicClient {
@@ -53,56 +52,42 @@ struct AnthropicRequest {
     stream: bool,
 }
 
-/// Content block metadata from SSE stream events.
-#[derive(Debug, Deserialize)]
-struct StreamContentBlock {
-    /// Block type (e.g. "text", "`tool_use`")
-    #[serde(rename = "type")]
-    block_type: Option<String>,
-    /// Block ID (for `tool_use` blocks)
-    id: Option<String>,
-    /// Tool name (for `tool_use` blocks)
-    name: Option<String>,
-}
+/// Assemble the Anthropic `messages` array and resolved system prompt from a
+/// request: prefer pre-built `api_messages` (fallback to raw assembly), append
+/// any tool-result blocks, then pick the custom system prompt (injecting the
+/// cleaner-mode context block) or the default agent prompt.
+pub(in crate::llms) fn build_messages_and_system(request: &LlmRequest) -> (Vec<ApiMessage>, String) {
+    let include_tool_uses = request.tool_results.is_some();
+    let mut api_messages = if request.api_messages.is_empty() {
+        messages_to_api(&request.messages, &request.context_items, include_tool_uses, request.seed_content.as_deref())
+    } else {
+        request.api_messages.clone()
+    };
 
-/// Delta payload from SSE stream events.
-#[derive(Debug, Deserialize)]
-struct StreamDelta {
-    /// Delta type (e.g. "`text_delta`", "`input_json_delta`")
-    #[serde(rename = "type")]
-    delta_type: Option<String>,
-    /// Text content delta
-    text: Option<String>,
-    /// Partial JSON for tool input
-    partial_json: Option<String>,
-    /// Stop reason (e.g. "`end_turn`", "`tool_use`")
-    stop_reason: Option<String>,
-}
+    if let Some(results) = request.tool_results.as_ref() {
+        let tool_result_blocks: Vec<ContentBlock> = results
+            .iter()
+            .map(|r: &crate::infra::tools::ToolResult| ContentBlock::ToolResult {
+                tool_use_id: r.tool_use_id.clone(),
+                content: r.content.clone(),
+            })
+            .collect();
+        api_messages.push(ApiMessage { role: "user".to_owned(), content: tool_result_blocks });
+    }
 
-/// Top-level SSE stream event from the Anthropic API.
-#[derive(Debug, Deserialize)]
-struct StreamMessage {
-    /// Event type (e.g. "`content_block_start`", "`message_delta`")
-    #[serde(rename = "type")]
-    event_type: String,
-    /// Content block index (unused but present in API)
-    #[serde(default)]
-    _index: Option<usize>,
-    /// Content block metadata (for `block_start` events)
-    content_block: Option<StreamContentBlock>,
-    /// Delta payload (for delta events)
-    delta: Option<StreamDelta>,
-    /// Token usage statistics
-    usage: Option<StreamUsage>,
-}
+    let system_prompt = request.system_prompt.as_ref().map_or_else(
+        || library::default_agent_content().to_owned(),
+        |prompt| {
+            if let Some(context) = request.extra_context.as_ref() {
+                let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
+                api_messages
+                    .push(ApiMessage { role: "user".to_owned(), content: vec![ContentBlock::Text { text: msg }] });
+            }
+            prompt.clone()
+        },
+    );
 
-/// Token usage statistics from the Anthropic API.
-#[derive(Debug, Deserialize)]
-struct StreamUsage {
-    /// Number of input tokens consumed
-    input_tokens: Option<usize>,
-    /// Number of output tokens generated
-    output_tokens: Option<usize>,
+    (api_messages, system_prompt)
 }
 
 impl LlmClient for AnthropicClient {
@@ -114,45 +99,7 @@ impl LlmClient for AnthropicClient {
         // silent stream drops mid-response (same fix applied to Claude Code providers).
         let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 
-        // Build API messages
-        let include_tool_uses = request.tool_results.is_some();
-        // Use pre-assembled API messages from prompt_builder (centralized assembly)
-        let mut api_messages = if request.api_messages.is_empty() {
-            // Fallback: build from raw data (should only happen for api_check etc.)
-            messages_to_api(
-                &request.messages,
-                &request.context_items,
-                include_tool_uses,
-                request.seed_content.as_deref(),
-            )
-        } else {
-            request.api_messages.clone()
-        };
-
-        // Add tool results if present
-        if let Some(results) = &request.tool_results {
-            let tool_result_blocks: Vec<ContentBlock> = results
-                .iter()
-                .map(|r: &crate::infra::tools::ToolResult| ContentBlock::ToolResult {
-                    tool_use_id: r.tool_use_id.clone(),
-                    content: r.content.clone(),
-                })
-                .collect();
-
-            api_messages.push(ApiMessage { role: "user".to_string(), content: tool_result_blocks });
-        }
-
-        // Handle cleaner mode or custom system prompt
-        let system_prompt = if let Some(ref prompt) = request.system_prompt {
-            if let Some(ref context) = request.extra_context {
-                let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
-                api_messages
-                    .push(ApiMessage { role: "user".to_string(), content: vec![ContentBlock::Text { text: msg }] });
-            }
-            prompt.clone()
-        } else {
-            library::default_agent_content().to_string()
-        };
+        let (api_messages, system_prompt) = build_messages_and_system(&request);
 
         let api_request = AnthropicRequest {
             model: request.model.clone(),
@@ -185,126 +132,14 @@ impl LlmClient for AnthropicClient {
             return Err(LlmError::Api { status, body });
         }
 
-        let mut reader = BufReader::new(response);
-        let mut input_tokens = 0;
-        let mut output_tokens = 0;
-        let mut current_tool: Option<(String, String, String)> = None;
-        let mut stop_reason: Option<String> = None;
-        let mut total_bytes: usize = 0;
-        let mut line_count: usize = 0;
-        let mut last_lines: Vec<String> = Vec::new();
-
-        loop {
-            let mut line = String::new();
-            match reader.read_line(&mut line) {
-                Ok(0) => break, // EOF
-                Ok(n) => {
-                    total_bytes = total_bytes.saturating_add(n);
-                    line_count = line_count.saturating_add(1);
-                }
-                Err(e) => {
-                    let tool_ctx = current_tool.as_ref().map_or_else(
-                        || "No tool in progress".to_string(),
-                        |(id, name, partial)| {
-                            format!("In-flight tool: {} (id={}), partial: {} bytes", name, id, partial.len())
-                        },
-                    );
-                    let recent =
-                        if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
-                    return Err(LlmError::StreamRead(format!(
-                        "{e}\nStream position: {total_bytes} bytes, {line_count} lines read\n{tool_ctx}\nLast SSE lines:\n{recent}"
-                    )));
-                }
-            }
-            let line = line.trim_end_matches('\n').trim_end_matches('\r');
-
-            if !line.starts_with("data: ") {
-                continue;
-            }
-
-            if last_lines.len() >= 5 {
-                let _r = last_lines.remove(0);
-            }
-            last_lines.push(line.to_string());
-
-            let json_str = line.get(6..).unwrap_or("");
-            if json_str == "[DONE]" {
-                break;
-            }
-
-            if let Ok(event) = serde_json::from_str::<StreamMessage>(json_str) {
-                match event.event_type.as_str() {
-                    "content_block_start" => {
-                        if let Some(block) = event.content_block
-                            && block.block_type.as_deref() == Some("tool_use")
-                        {
-                            let name = block.name.unwrap_or_default();
-                            let _r =
-                                tx.send(StreamEvent::ToolProgress { name: name.clone(), input_so_far: String::new() });
-                            current_tool = Some((block.id.unwrap_or_default(), name, String::new()));
-                        }
-                    }
-                    "content_block_delta" => {
-                        if let Some(delta) = event.delta {
-                            match delta.delta_type.as_deref() {
-                                Some("text_delta") => {
-                                    if let Some(text) = delta.text {
-                                        let _r = tx.send(StreamEvent::Chunk(text));
-                                    }
-                                }
-                                Some("input_json_delta") => {
-                                    if let Some(json) = delta.partial_json
-                                        && let Some((_, ref name, ref mut input)) = current_tool
-                                    {
-                                        input.push_str(&json);
-                                        let _r = tx.send(StreamEvent::ToolProgress {
-                                            name: name.clone(),
-                                            input_so_far: input.clone(),
-                                        });
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                    "content_block_stop" => {
-                        if let Some((id, name, input_json)) = current_tool.take() {
-                            let input: Value = serde_json::from_str(&input_json)
-                                .unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
-                            let _r = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
-                        }
-                    }
-                    "message_delta" => {
-                        if let Some(ref delta) = event.delta
-                            && let Some(ref reason) = delta.stop_reason
-                        {
-                            stop_reason = Some(reason.clone());
-                        }
-                        if let Some(usage) = event.usage {
-                            if let Some(inp) = usage.input_tokens {
-                                input_tokens = inp;
-                            }
-                            if let Some(out) = usage.output_tokens {
-                                output_tokens = out;
-                            }
-                        }
-                    }
-                    "message_stop" => break,
-                    "error" => {
-                        log_sse_error(json_str, total_bytes, line_count, &last_lines);
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-        }
+        let totals = streaming::consume_anthropic_stream(response, &tx, "anthropic")?;
 
         let _r = tx.send(StreamEvent::Done {
-            input_tokens,
-            output_tokens,
+            input_tokens: totals.input_tokens,
+            output_tokens: totals.output_tokens,
             cache_hit_tokens: 0,
             cache_miss_tokens: 0,
-            stop_reason,
+            stop_reason: totals.stop_reason,
             bp_hashes: vec![],
             bp_panel_ids: vec![],
             alive_count: 0,
@@ -315,12 +150,7 @@ impl LlmClient for AnthropicClient {
 
     fn check_api(&self, model: &str) -> super::ApiCheckResult {
         let Some(api_key) = self.api_key.as_ref() else {
-            return super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error: Some("ANTHROPIC_API_KEY not set".to_string()),
-            };
+            return super::ApiCheckResult::failure(Some("ANTHROPIC_API_KEY not set".to_owned()));
         };
 
         let client = Client::new();
@@ -335,25 +165,20 @@ impl LlmClient for AnthropicClient {
         // Test 1: Basic auth
         let auth_ok = base()
             .json(&serde_json::json!({
-                "model": model, "max_tokens": 10,
+                "model": model, "max_tokens": 10i32,
                 "messages": [{"role": "user", "content": "Hi"}]
             }))
             .send()
             .is_ok_and(|r| r.status().is_success());
 
         if !auth_ok {
-            return super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error: Some("Auth failed".to_string()),
-            };
+            return super::ApiCheckResult::failure(Some("Auth failed".to_owned()));
         }
 
         // Test 2: Streaming
         let streaming_ok = base()
             .json(&serde_json::json!({
-                "model": model, "max_tokens": 10, "stream": true,
+                "model": model, "max_tokens": 10i32, "stream": true,
                 "messages": [{"role": "user", "content": "Say ok"}]
             }))
             .send()
@@ -362,7 +187,7 @@ impl LlmClient for AnthropicClient {
         // Test 3: Tools
         let tools_ok = base()
             .json(&serde_json::json!({
-                "model": model, "max_tokens": 50,
+                "model": model, "max_tokens": 50i32,
                 "tools": [{"name": "test_tool", "description": "A test tool",
                     "input_schema": {"type": "object", "properties": {}, "required": []}}],
                 "messages": [{"role": "user", "content": "Hi"}]
@@ -370,6 +195,6 @@ impl LlmClient for AnthropicClient {
             .send()
             .is_ok_and(|r| r.status().is_success());
 
-        super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
+        super::ApiCheckResult::checks([auth_ok, streaming_ok, tools_ok])
     }
 }

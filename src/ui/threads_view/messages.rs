@@ -11,7 +11,7 @@ use cp_render::{Block as IrBlock, Semantic, Span as S};
 
 use crate::modules::conversation::render_blocks::{MessageBlockOpts, render_message_blocks};
 use crate::modules::conversation::render_input_blocks::{InputBlockCtx, render_input_blocks};
-use crate::state::{Message, MsgKind, MsgStatus, State};
+use crate::state::{Message, State};
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
 use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
@@ -145,7 +145,7 @@ fn render_thread_messages(frame: &mut Frame<'_>, state: &State, thread: &cp_mod_
 fn render_thread_input(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // Separator line via IR (border-colored, dimmed)
     let sep_area = Rect { height: 1, ..area };
-    let sep_blocks = vec![IrBlock::Line(vec![S::styled("─".repeat(area.width.into()), Semantic::Border).dim()])];
+    let sep_blocks = vec![IrBlock::Line(vec![S::styled("\u{2500}".repeat(area.width.into()), Semantic::Border).dim()])];
     let sep_lines = ir::blocks_to_lines(&sep_blocks);
     let sep = Paragraph::new(sep_lines);
     frame.render_widget(sep, sep_area);
@@ -189,19 +189,7 @@ fn thread_message_to_message(msg: &cp_mod_threads::types::ThreadMessage) -> Mess
     };
     let content = msg.content.clone().unwrap_or_default();
 
-    Message {
-        id: String::new(),
-        uid: None,
-        role: role.to_owned(),
-        content,
-        msg_type: MsgKind::TextMessage,
-        status: MsgStatus::Full,
-        tool_uses: vec![],
-        tool_results: vec![],
-        input_tokens: 0,
-        content_token_count: 0,
-        timestamp_ms: msg.timestamp,
-    }
+    Message::new_text(String::new(), role, content).at(msg.timestamp)
 }
 
 /// Calculate input area height based on current input content.
@@ -215,7 +203,7 @@ fn calculate_input_height(state: &State, width: u16, available_height: u16) -> u
     }
     let line_count = state.input.lines().count().max(1);
     // Account for wrapping
-    let wrap_width = (width as usize).saturating_sub(10).max(20);
+    let wrap_width = usize::from(width).saturating_sub(10).max(20);
     let wrapped_lines: usize =
         state.input.lines().map(|l| if l.is_empty() { 1 } else { l.len().div_ceil(wrap_width).max(1) }).sum();
     let total = wrapped_lines.max(line_count);

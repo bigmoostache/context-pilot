@@ -85,6 +85,10 @@ const OFF_CRC: usize = OFF_BOOT_ID + BOOT_ID_LEN;
 
 /// Why a heartbeat record could not be encoded or decoded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "heartbeat error taxonomy is a closed wire contract: every encode/decode failure mode is enumerated and callers match them exhaustively; #[non_exhaustive] would force cross-crate wildcard arms that the forbidden wildcard_enum_match_arm lint rejects"
+)]
 pub enum Error {
     /// The `boot_id` was not exactly [`BOOT_ID_LEN`] ASCII bytes (encode only).
     BadBootId,
@@ -110,7 +114,7 @@ pub enum Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
+        match *self {
             Self::BadBootId => write!(f, "boot_id must be exactly {BOOT_ID_LEN} ASCII bytes"),
             Self::BadLength(n) => {
                 write!(f, "heartbeat must be exactly {HEARTBEAT_LEN} bytes, got {n}")
@@ -128,6 +132,7 @@ impl fmt::Display for Error {
 
 /// One decoded heartbeat beat.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Heartbeat {
     /// Schema revision of this record.
     pub schema_version: u32,
@@ -146,6 +151,15 @@ pub struct Heartbeat {
 }
 
 impl Heartbeat {
+    /// Build a heartbeat beat from its live fields.
+    ///
+    /// A constructor keeps [`Heartbeat`] `#[non_exhaustive]` across the
+    /// agent-side writer thread; `schema_version` is stamped here.
+    #[must_use]
+    pub const fn new(timestamp_ms: u64, sequence: u64, pid: u32, boot_id: String) -> Self {
+        Self { schema_version: HEARTBEAT_SCHEMA_VERSION, timestamp_ms, sequence, pid, boot_id }
+    }
+
     /// Encode into a fixed [`HEARTBEAT_LEN`]-byte array.
     ///
     /// # Errors
@@ -233,9 +247,8 @@ impl Heartbeat {
 // ── fixed little-endian field codec (explicit, host-independent) ─────────
 //
 // The byte order is a wire contract, so it is spelled out by hand rather than
-// delegated to `to_le_bytes`/`from_le_bytes` (which read as host-dependent to a
-// reviewer, and which the workspace forbids for exactly that reason — see
-// `framing.rs`).
+// delegated to `to_le_bytes`/`from_le_bytes` (which the workspace forbids via
+// clippy::little_endian_bytes — see `framing.rs`).
 
 /// Byte mask isolating the low 8 bits of a `u32`.
 const BYTE_MASK_U32: u32 = 0xFF;
@@ -245,6 +258,10 @@ const BYTE_MASK_U64: u64 = 0xFF;
 
 /// Encode a `u32` as four little-endian bytes. Each `& BYTE_MASK_U32` proves
 /// the value fits in a `u8`, so the cast is exact.
+#[expect(
+    clippy::as_conversions,
+    reason = "const-fn narrowing after `& BYTE_MASK_U32` is provably exact; try_from/From are not const-callable and clippy::little_endian_bytes forbids the to_le_bytes shortcut"
+)]
 const fn u32_to_le(value: u32) -> [u8; 4] {
     [
         (value & BYTE_MASK_U32) as u8,
@@ -261,6 +278,10 @@ fn u32_from_le(bytes: [u8; 4]) -> u32 {
 }
 
 /// Encode a `u64` as eight little-endian bytes.
+#[expect(
+    clippy::as_conversions,
+    reason = "const-fn narrowing after `& BYTE_MASK_U64` is provably exact; try_from/From are not const-callable and clippy::little_endian_bytes forbids the to_le_bytes shortcut"
+)]
 const fn u64_to_le(value: u64) -> [u8; 8] {
     [
         (value & BYTE_MASK_U64) as u8,

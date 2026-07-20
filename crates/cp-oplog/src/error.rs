@@ -19,6 +19,10 @@ use cp_wire::framing::FrameError;
 
 /// An error from oplog operations.
 #[derive(Debug)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "oplog error taxonomy is a closed two-variant set (Io/Frame) constructed within cp-oplog and matched exhaustively by callers; #[non_exhaustive] would force cross-crate wildcard arms that the forbidden wildcard_enum_match_arm lint rejects"
+)]
 pub enum Error {
     /// An underlying filesystem operation failed (open, write, sync, …).
     Io(io::Error),
@@ -30,10 +34,10 @@ pub enum Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Io(e) => write!(f, "oplog I/O error: {e}"),
-            Self::Frame(e) => write!(f, "oplog framing error: {e}"),
-        }
+        crate::ref_match!(self, {
+            &Self::Io(ref e) => write!(f, "oplog I/O error: {e}"),
+            &Self::Frame(ref e) => write!(f, "oplog framing error: {e}"),
+        })
     }
 }
 

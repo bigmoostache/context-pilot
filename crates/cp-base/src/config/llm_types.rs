@@ -7,6 +7,10 @@ use crate::tools::ToolUse;
 
 /// Events emitted by the LLM during streaming.
 #[derive(Debug)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "stream-event contract: StreamEvent is constructed by every LLM provider and matched exhaustively by the streaming pipeline; the variant set is closed and #[non_exhaustive] would forbid that cross-crate construction"
+)]
 pub enum StreamEvent {
     /// Text chunk from the response.
     Chunk(String),
@@ -53,7 +57,8 @@ pub enum StreamEvent {
 }
 
 /// Result of an LLM provider API connectivity check.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct ApiCheckResult {
     /// Whether authentication (API key / OAuth) succeeded.
     pub auth_ok: bool,
@@ -66,6 +71,21 @@ pub struct ApiCheckResult {
 }
 
 impl ApiCheckResult {
+    /// Total failure: no check passed, carrying the given error message.
+    #[must_use]
+    pub const fn failure(error: Option<String>) -> Self {
+        Self { auth_ok: false, streaming_ok: false, tools_ok: false, error }
+    }
+
+    /// Build a result from the three probe outcomes (`[auth, streaming, tools]`),
+    /// no error message. The shared tail of every provider's `check_api`. Takes
+    /// the outcomes as an array — three separate `bool` params trip
+    /// `fn_params_excessive_bools`.
+    #[must_use]
+    pub const fn checks([auth_ok, streaming_ok, tools_ok]: [bool; 3]) -> Self {
+        Self { auth_ok, streaming_ok, tools_ok, error: None }
+    }
+
     /// `true` only when auth, streaming, and tool-use all passed.
     #[must_use]
     pub const fn all_ok(&self) -> bool {
@@ -87,11 +107,11 @@ pub trait ModelInfo {
     fn output_price_per_mtok(&self) -> f32;
     /// Cache hit price per million tokens in USD (default: same as input)
     fn cache_hit_price_per_mtok(&self) -> f32 {
-        self.input_price_per_mtok() * 0.1
+        crate::cast::float_math::mul_f32(self.input_price_per_mtok(), 0.1)
     }
     /// Cache write/miss price per million tokens in USD (default: 1.25x input)
     fn cache_miss_price_per_mtok(&self) -> f32 {
-        self.input_price_per_mtok() * 1.25
+        crate::cast::float_math::mul_f32(self.input_price_per_mtok(), 1.25)
     }
     /// Maximum output tokens the model can produce in a single response
     fn max_output_tokens(&self) -> u32;
@@ -101,6 +121,10 @@ pub trait ModelInfo {
 /// API client, auth flow, and model roster.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "provider-roster contract: LlmProvider is a closed set constructed cross-crate by config/dispatch and matched exhaustively across the client factory and config UI; #[non_exhaustive] would forbid that construction"
+)]
 pub enum LlmProvider {
     /// Direct Anthropic Messages API (API-key auth).
     #[default]

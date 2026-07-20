@@ -52,6 +52,19 @@ fn schema_marker_path() -> PathBuf {
     logs_dir().join(".schema_v2")
 }
 
+/// Delete all `chunk_*.json` and `next_id.json` files in the logs directory.
+fn purge_chunk_files(dir: &std::path::Path) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.filter_map(Result::ok) {
+        let path = entry.path();
+        if path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("chunk_") || n == "next_id.json") {
+            let _r = fs::remove_file(&path);
+        }
+    }
+}
+
 /// Perform clean-slate migration to the v2 schema (tags + importance, no summaries).
 ///
 /// If the marker file `.schema_v2` does not exist in the logs directory,
@@ -64,24 +77,13 @@ fn migrate_if_needed() {
 
     let dir = logs_dir();
     if dir.is_dir() {
-        if let Ok(entries) = fs::read_dir(&dir) {
-            for entry in entries.filter_map(Result::ok) {
-                let path = entry.path();
-                if path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.starts_with("chunk_") || n == "next_id.json")
-                {
-                    let _r = fs::remove_file(&path);
-                }
-            }
-        }
+        purge_chunk_files(&dir);
     } else {
         let _r = fs::create_dir_all(&dir);
     }
 
     // Write reset next_id.json
-    let next_id_json = serde_json::json!({ "next_log_id": 1 });
+    let next_id_json = serde_json::json!({ "next_log_id": 1i32 });
     if let Ok(s) = serde_json::to_string_pretty(&next_id_json) {
         let _r = fs::write(dir.join("next_id.json"), s);
     }
@@ -156,7 +158,7 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
                 Some((idx, path))
             })
             .collect();
-        chunk_files.sort_by_key(|(idx, _)| *idx);
+        chunk_files.sort_by_key(|entry| entry.0);
 
         for (_, path) in chunk_files {
             if let Ok(content) = fs::read_to_string(&path)
@@ -175,7 +177,23 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
 
 /// Logs module: timestamped entries and conversation history management.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct LogsModule;
+
+impl Default for LogsModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LogsModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for LogsModule {
     fn id(&self) -> &'static str {
@@ -259,7 +277,7 @@ impl Module for LogsModule {
                             .desc("ID of the conversation history panel to close (e.g., 'P12')")
                             .required(),
                         ToolParam::new("logs", ParamType::Array(Box::new(ParamType::String)))
-                            .desc("Log entries to create — simple strings, one per entry"),
+                            .desc("Log entries to create \u{2014} simple strings, one per entry"),
                     ]),
                     true,
                 )
@@ -276,11 +294,11 @@ impl Module for LogsModule {
 
                 // Panels array: must exist and be non-empty
                 let Some(panels) = tool.input.get("panels").and_then(|v| v.as_array()) else {
-                    pf.errors.push("Missing required 'panels' array".to_string());
+                    pf.errors.push("Missing required 'panels' array".to_owned());
                     return Some(pf);
                 };
                 if panels.is_empty() {
-                    pf.errors.push("Empty 'panels' array — provide at least one panel to close".to_string());
+                    pf.errors.push("Empty 'panels' array \u{2014} provide at least one panel to close".to_owned());
                     return Some(pf);
                 }
 
@@ -433,7 +451,7 @@ fn visualize_logs_output(content: &str, width: usize) -> Vec<cp_render::Block> {
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
             Block::Line(vec![Span::styled(display, semantic)])
         })

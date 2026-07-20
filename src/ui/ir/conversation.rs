@@ -11,7 +11,7 @@ use cp_render::conversation::{
 use cp_render::{Block, Semantic};
 
 use crate::state::{Kind, MsgKind, MsgStatus, State, ToolResultRecord, ToolUseRecord};
-use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 
 /// Build the conversation region from application state.
 #[must_use]
@@ -122,7 +122,7 @@ fn tool_result_to_ir(tr: &ToolResultRecord) -> ToolResultPreview {
         let boundary = source.floor_char_boundary(77);
         format!("{}...", source.get(..boundary).unwrap_or(""))
     } else {
-        source.to_string()
+        source.to_owned()
     };
 
     ToolResultPreview { tool_name: tr.tool_name.clone(), summary, success: !tr.is_error }
@@ -146,7 +146,7 @@ fn build_input(state: &State) -> InputArea {
     InputArea {
         text: state.input.clone(),
         cursor: state.input_cursor,
-        placeholder: "Type a message…".into(),
+        placeholder: "Type a message\u{2026}".into(),
         focused: !state.flags.stream.phase.is_streaming(),
     }
 }
@@ -192,7 +192,7 @@ fn build_autocomplete(ac: &cp_base::state::autocomplete::Suggestions) -> Autocom
         .map(|e| AutocompleteEntry {
             label: e.name.clone(),
             is_dir: e.is_dir,
-            icon: if e.is_dir { "📁".into() } else { "📄".into() },
+            icon: if e.is_dir { "\u{1f4c1}".into() } else { "\u{1f4c4}".into() },
         })
         .collect();
 
@@ -240,7 +240,7 @@ fn fd_semantic(open: u32, limit: u64) -> Semantic {
     if limit == 0 {
         return Semantic::Muted;
     }
-    let pct = f64::from(open) / f64::from(u32::try_from(limit).unwrap_or(u32::MAX)) * 100.0;
+    let pct = float_math::percent(f64::from(open), f64::from(u32::try_from(limit).unwrap_or(u32::MAX)));
     if pct < 50.0 {
         Semantic::Success
     } else if pct < 80.0 {
@@ -250,69 +250,34 @@ fn fd_semantic(open: u32, limit: u64) -> Semantic {
     }
 }
 
-/// Build the perf overlay IR data from the perf metrics snapshot.
-fn build_perf_overlay(state: &State) -> PerfOverlay {
-    use crate::ui::perf::PERF;
-
-    let snapshot = PERF.snapshot();
-
-    let fps = if snapshot.frame_avg_ms > 0.0 { 1000.0 / snapshot.frame_avg_ms } else { 0.0 };
-
-    // Meilisearch stats
-    let meili = cp_mod_search::overlay_info(state).and_then(|info| {
-        if info.meili_memory_bytes == 0 && info.meili_cpu_pct <= 0.0 {
-            return None;
-        }
-        let mb = info.meili_memory_bytes.to_f64() / (1024.0 * 1024.0);
-        Some(PerfMeiliStats {
-            cpu_pct: f64::from(info.meili_cpu_pct),
-            cpu_semantic: cpu_semantic(f64::from(info.meili_cpu_pct)),
-            memory_mb: mb,
-        })
-    });
-
-    // Budget bars
-    let build_bar = |label: &str, budget_ms: f64| -> PerfBudgetBar {
-        let pct = (snapshot.frame_avg_ms / budget_ms * 100.0).min(150.0);
-        let semantic = if pct <= 80.0 {
-            Semantic::Success
-        } else if pct <= 100.0 {
-            Semantic::Warning
-        } else {
-            Semantic::Error
-        };
-        PerfBudgetBar { label: label.into(), percent: pct, semantic }
-    };
-
-    let budget_bars = vec![build_bar("60fps", FRAME_BUDGET_60FPS), build_bar("30fps", FRAME_BUDGET_30FPS)];
-
-    // Operations
+/// Build the per-operation perf rows (top 10 by total time) from a snapshot.
+fn build_perf_ops(snapshot: &crate::ui::perf::PerfSnapshot) -> Vec<PerfOp> {
     let total_time: f64 = snapshot.ops.iter().map(|o| o.total_ms).sum();
 
-    let operations = snapshot
+    snapshot
         .ops
         .iter()
         .take(10)
         .map(|op| {
-            let pct = if total_time > 0.0 { op.total_ms / total_time * 100.0 } else { 0.0 };
-            let is_hotspot = pct > 30.0;
+            let pct = if total_time > 0.0f64 { float_math::percent(op.total_ms, total_time) } else { 0.0f64 };
+            let is_hotspot = pct > 30.0f64;
 
             let name = if op.name.len() <= 24 {
-                op.name.to_string()
+                op.name.to_owned()
             } else {
                 let tail_start = op.name.len().saturating_sub(22);
                 format!("..{}", op.name.get(tail_start..).unwrap_or(""))
             };
 
-            let total_display = if op.total_ms >= 1000.0 {
-                format!("{:.1}s", op.total_ms / 1000.0)
+            let total_display = if op.total_ms >= 1_000.0f64 {
+                format!("{:.1}s", float_math::div(op.total_ms, 1_000.0f64))
             } else {
                 format!("{:.0}ms", op.total_ms)
             };
 
-            let std_semantic = if op.std_ms < 1.0 {
+            let std_semantic = if op.std_ms < 1.0f64 {
                 Semantic::Success
-            } else if op.std_ms < 5.0 {
+            } else if op.std_ms < 5.0f64 {
                 Semantic::Warning
             } else {
                 Semantic::Error
@@ -328,7 +293,49 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
                 is_hotspot,
             }
         })
-        .collect();
+        .collect()
+}
+
+/// Build the optional Meilisearch stats row for the perf overlay (None when no
+/// meili process is running or it reports no CPU/memory).
+fn build_perf_meili(state: &State) -> Option<PerfMeiliStats> {
+    let info = cp_mod_search::overlay_info(state)?;
+    if info.meili_memory_bytes == 0 && info.meili_cpu_pct <= 0.0 {
+        return None;
+    }
+    let mb = float_math::div_u64(info.meili_memory_bytes, 1_048_576.0f64);
+    Some(PerfMeiliStats {
+        cpu_pct: f64::from(info.meili_cpu_pct),
+        cpu_semantic: cpu_semantic(f64::from(info.meili_cpu_pct)),
+        memory_mb: mb,
+    })
+}
+
+/// Build the two frame-budget bars (60fps / 30fps) from the average frame time.
+fn build_perf_budget_bars(frame_avg_ms: f64) -> Vec<PerfBudgetBar> {
+    let build_bar = |label: &str, budget_ms: f64| -> PerfBudgetBar {
+        let pct = float_math::percent(frame_avg_ms, budget_ms).min(150.0);
+        let semantic = if pct <= 80.0f64 {
+            Semantic::Success
+        } else if pct <= 100.0f64 {
+            Semantic::Warning
+        } else {
+            Semantic::Error
+        };
+        PerfBudgetBar { label: label.into(), percent: pct, semantic }
+    };
+    vec![build_bar("60fps", FRAME_BUDGET_60FPS), build_bar("30fps", FRAME_BUDGET_30FPS)]
+}
+
+/// Build the perf overlay IR data from the perf metrics snapshot.
+fn build_perf_overlay(state: &State) -> PerfOverlay {
+    use crate::ui::perf::PERF;
+
+    let snapshot = PERF.snapshot();
+
+    let fps = if snapshot.frame_avg_ms > 0.0f64 { float_math::div(1_000.0f64, snapshot.frame_avg_ms) } else { 0.0f64 };
+
+    let operations = build_perf_ops(&snapshot);
 
     PerfOverlay {
         fps,
@@ -341,8 +348,8 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
         open_fds: snapshot.open_fds,
         fd_limit_soft: snapshot.fd_limit_soft,
         fd_semantic: fd_semantic(snapshot.open_fds, snapshot.fd_limit_soft),
-        meili,
-        budget_bars,
+        meili: build_perf_meili(state),
+        budget_bars: build_perf_budget_bars(snapshot.frame_avg_ms),
         sparkline: snapshot.frame_times_ms,
         operations,
     }

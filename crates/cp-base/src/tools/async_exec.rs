@@ -7,7 +7,8 @@
 
 use std::sync::mpsc;
 
-use crate::state::watchers::{ASYNC_ERROR_PREFIX, ChannelWatcher, DynPanel, WatcherRegistry, WatcherResult};
+use crate::state::watchers::carriers::{DynPanel, WatcherResult};
+use crate::state::watchers::{ASYNC_ERROR_PREFIX, ChannelWatcher, WatcherRegistry};
 use crate::tools::{ToolResult, ToolUse};
 
 /// Sentinel value returned by tools that execute asynchronously on a worker thread.
@@ -23,6 +24,7 @@ pub const BLOCKING_TOOL_SENTINEL: &str = "__CONSOLE_WAIT_BLOCKING__";
 /// Sent through the channel to [`ChannelWatcher`],
 /// which converts it into a [`WatcherResult`] for sentinel replacement.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct ToolOutput {
     /// Content string that replaces the sentinel in the tool result.
     /// This is what the LLM sees in the conversation.
@@ -35,6 +37,39 @@ pub struct ToolOutput {
     pub create_panel: Option<DynPanel>,
     /// When `true`, this result does NOT break tempo.
     pub preserves_tempo: bool,
+}
+
+impl ToolOutput {
+    /// Successful output: `content` shown to the LLM, no panel, breaks tempo.
+    #[must_use]
+    pub fn ok<S>(content: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self { content: content.into(), is_error: false, create_panel: None, preserves_tempo: false }
+    }
+
+    /// Error output: `content` is the error message shown to the LLM.
+    #[must_use]
+    pub fn error<S>(content: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self { content: content.into(), is_error: true, create_panel: None, preserves_tempo: false }
+    }
+
+    /// Full control over every field (panel creation, tempo preservation).
+    #[must_use]
+    pub const fn new(content: String, is_error: bool, create_panel: Option<DynPanel>, preserves_tempo: bool) -> Self {
+        Self { content, is_error, create_panel, preserves_tempo }
+    }
+
+    /// Attach a dynamic panel to create when the watcher fires (builder).
+    #[must_use]
+    pub fn with_panel(mut self, panel: DynPanel) -> Self {
+        self.create_panel = Some(panel);
+        self
+    }
 }
 
 /// Spawn a tool's I/O work on a background thread, returning a sentinel
@@ -80,22 +115,18 @@ where
         // cannot carry an is_error bool (struct_excessive_bools is forbid-level).
         let description =
             if output.is_error { format!("{ASYNC_ERROR_PREFIX}{}", output.content) } else { output.content };
-        let result = WatcherResult {
-            description,
-            panel_id: None,
-            tool_use_id: Some(tool_use_id),
-            close_panel: false,
-            create_panel: None,
-            create_dyn_panel: output.create_panel,
-            processed_already: false,
-            kill_session: None,
-            preserves_tempo: output.preserves_tempo,
-        };
+        let mut result = WatcherResult::new(description).tool_use_id(tool_use_id);
+        if let Some(panel) = output.create_panel {
+            result = result.create_dyn_panel(panel);
+        }
+        if output.preserves_tempo {
+            result = result.preserves_tempo();
+        }
         // If send fails, the watcher will detect Disconnected and return an error.
         let _r = tx.send(result);
     });
 
-    if let Err(ref e) = handle {
+    if let Err(e) = handle.as_ref() {
         // Thread spawn failed — return error synchronously
         return ToolResult {
             tool_use_id: tool.id.clone(),
@@ -114,7 +145,7 @@ where
 
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: BLOCKING_TOOL_SENTINEL.to_string(),
+        content: BLOCKING_TOOL_SENTINEL.to_owned(),
         display: None,
         tldr: None,
         is_error: false,

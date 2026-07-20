@@ -43,7 +43,7 @@ impl Panel for TreePanel {
             .find(|c| c.context_type.as_str() == Kind::TREE)
             .and_then(|ctx| ctx.cached_content.as_ref())
             .cloned()
-            .unwrap_or_else(|| "Loading...".to_string());
+            .unwrap_or_else(|| "Loading...".to_owned());
 
         let mut blocks = Vec::new();
         for line in tree_content.lines() {
@@ -56,23 +56,23 @@ impl Panel for TreePanel {
 
             if let Some(size_start) = find_size_pattern(main_line) {
                 let (before, size_part) = main_line.split_at(size_start);
-                spans.push(S::new(before.to_string()));
-                spans.push(S::styled(size_part.to_string(), Semantic::AccentDim));
+                spans.push(S::new(before.to_owned()));
+                spans.push(S::styled(size_part.to_owned(), Semantic::AccentDim));
             } else if let Some((start, end)) = find_children_pattern(main_line) {
                 let before = main_line.get(..start).unwrap_or("");
                 let children = main_line.get(start..end).unwrap_or("");
                 let after = main_line.get(end..).unwrap_or("");
-                spans.push(S::new(before.to_string()));
-                spans.push(S::accent(children.to_string()));
+                spans.push(S::new(before.to_owned()));
+                spans.push(S::accent(children.to_owned()));
                 if !after.is_empty() {
-                    spans.push(S::new(after.to_string()));
+                    spans.push(S::new(after.to_owned()));
                 }
             } else {
-                spans.push(S::new(main_line.to_string()));
+                spans.push(S::new(main_line.to_owned()));
             }
 
             if let Some(desc) = description {
-                spans.push(S::muted(desc.to_string()));
+                spans.push(S::muted(desc.to_owned()));
             }
 
             blocks.push(Block::Line(spans));
@@ -80,20 +80,20 @@ impl Panel for TreePanel {
         blocks
     }
     fn title(&self, _state: &State) -> String {
-        "Directory Tree".to_string()
+        "Directory Tree".to_owned()
     }
 
     fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
         let ts = TreeState::get(state);
-        Some(CacheRequest {
-            context_type: Kind::new(Kind::TREE),
-            data: Box::new(TreeCacheRequest {
+        Some(CacheRequest::new(
+            Kind::new(Kind::TREE),
+            Box::new(TreeCacheRequest {
                 context_id: ctx.id.clone(),
                 tree_filter: ts.filter.clone(),
                 tree_open_folders: ts.open_folders.clone(),
                 tree_descriptions: ts.descriptions.clone(),
             }),
-        })
+        ))
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, state: &mut State) -> bool {
@@ -130,7 +130,7 @@ impl Panel for TreePanel {
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
         let req = request.data.downcast::<TreeCacheRequest>().ok()?;
         let TreeCacheRequest { context_id, tree_filter, tree_open_folders, tree_descriptions } = *req;
-        let content = crate::tools::generate_tree_string(&tree_filter, &tree_open_folders, &tree_descriptions);
+        let content = crate::render::generate_tree_string(&tree_filter, &tree_open_folders, &tree_descriptions);
         let token_count = estimate_tokens(&content);
         Some(CacheUpdate::Content { context_id, content, token_count })
     }
@@ -143,7 +143,7 @@ impl Panel for TreePanel {
         // Find tree context and use cached content
         for ctx in &state.context {
             if ctx.context_type.as_str() == Kind::TREE {
-                if let Some(content) = &ctx.cached_content
+                if let Some(content) = ctx.cached_content.as_ref()
                     && !content.is_empty()
                 {
                     let output = paginate_content(content, ctx.current_page, ctx.total_pages, &ctx.page_descriptions);

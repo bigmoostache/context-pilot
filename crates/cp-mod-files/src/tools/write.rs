@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use cp_base::state::context::{Entry, Kind, estimate_tokens};
+use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 use std::fmt::Write as _;
@@ -10,12 +10,12 @@ use std::fmt::Write as _;
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("file_write");
     let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_owned(), true);
     };
 
     let Some(contents) = tool.input.get("contents").or_else(|| tool.input.get("content")).and_then(|v| v.as_str())
     else {
-        return ToolResult::new(tool.id.clone(), "Missing required parameter: contents".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: contents".to_owned(), true);
     };
 
     let path = Path::new(path_str);
@@ -58,35 +58,14 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
         let uid = format!("UID_{}_P", state.global_next_uid);
         state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-        let file_name = path.file_name().map_or_else(|| path_str.to_string(), |n| n.to_string_lossy().to_string());
+        let file_name = path.file_name().map_or_else(|| path_str.to_owned(), |n| n.to_string_lossy().to_string());
 
-        let mut elem = Entry {
-            id: context_id,
-            uid: Some(uid),
-            context_type: Kind::new(Kind::FILE),
-            name: file_name,
-            token_count,
-            metadata: std::collections::HashMap::new(),
-            cached_content: Some(contents.to_string()),
-            history_messages: None,
-            cache_deprecated: true,
-            cache_in_flight: false,
-            last_refresh_ms: cp_base::panels::now_ms(),
-            content_hash: None,
-            source_hash: None,
-            current_page: 0,
-            total_pages: 1,
-            page_descriptions: std::collections::BTreeMap::new(),
-            full_token_count: 0,
-            scroll_state: cp_base::state::context::ScrollState::default(),
-            panel_cache_hit: false,
-            panel_total_cost: 0.0,
-            freeze_count: 0,
-            total_freezes: 0,
-            total_cache_misses: 0,
-            emitted: cp_base::state::context::EmittedState::default(),
-        };
-        elem.set_meta("file_path", &path_str.to_string());
+        let mut elem =
+            cp_base::state::context::make_default_entry(&context_id, Kind::new(Kind::FILE), &file_name, true);
+        elem.uid = Some(uid);
+        elem.token_count = token_count;
+        elem.cached_content = Some(contents.to_owned());
+        elem.set_meta("file_path", &path_str.to_owned());
         state.context.push(elem);
 
         // Invalidate tree cache

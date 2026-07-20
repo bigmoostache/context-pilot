@@ -67,6 +67,10 @@ const BODIES_DIR: &str = "bodies";
 /// tells the caller *how* to make the reference durable (embed the bytes vs.
 /// reference the already-durable file).
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "body-disposition contract: Stored is a closed Inline/Spilled set returned by Store::put and matched exhaustively by callers routing the durability barrier; #[non_exhaustive] would forbid that construction"
+)]
 pub enum Stored {
     /// A small body: embed `bytes` in the same oplog entry that references it,
     /// so the body shares that entry's `fdatasync` (the barrier is trivial).
@@ -219,10 +223,10 @@ impl Store {
             Err(e) => return Err(Error::io(format!("list bodies {}", self.dir.display()), e)),
         };
 
-        for entry in read_dir {
-            let entry = entry.map_err(|e| Error::io("read body dir entry", e))?;
-            let name = entry.file_name();
-            let Some(name) = name.to_str() else { continue };
+        for dirent in read_dir {
+            let entry = dirent.map_err(|e| Error::io("read body dir entry", e))?;
+            let name_os = entry.file_name();
+            let Some(name) = name_os.to_str() else { continue };
             // Only 64-char lowercase-hex names are bodies; skip tmp files and
             // anything else.
             if name.len() != 64 || !name.bytes().all(|b| b.is_ascii_hexdigit()) {

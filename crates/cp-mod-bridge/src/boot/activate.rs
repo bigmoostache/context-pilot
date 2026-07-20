@@ -49,18 +49,31 @@ fn setup_tee(entry: &cp_wire::types::registry::Entry) -> std::io::Result<Tee> {
 /// identically to a clean boot. The fresh `BridgeState` resets the
 /// observe-on-change memos (`*_memo_seeded = false`), so a recovered bridge
 /// re-seeds without replaying its entire message/status backlog onto the oplog.
+/// Unwrap a fallible resource setup into `Option`, logging the error and
+/// degrading to `None` on failure. Keeps each live surface independent —
+/// a missing tee/intake/store only disables that surface, the durable disk
+/// path still carries the data.
+fn or_log<T, E>(what: &str, result: Result<T, E>) -> Option<T>
+where
+    E: std::fmt::Debug,
+{
+    match result {
+        Ok(v) => Some(v),
+        Err(e) => {
+            log::error!("bridge: {what} setup failed: {e:?}");
+            None
+        }
+    }
+}
+
+/// Wire the live bridge surfaces around a booted [`Boot`] and install the
+/// assembled [`BridgeState`] on `state` (see the module-level docs).
 pub(crate) fn activate(boot: Boot, state: &mut State) {
     log::info!("bridge: activated for {} ({})", boot.id(), boot.entry().folder);
 
     // Bind a dedicated tee socket for live token streaming (separate from the
     // command socket in Boot).
-    let tee = match setup_tee(boot.entry()) {
-        Ok(t) => Some(t),
-        Err(e) => {
-            log::error!("bridge: tee setup failed: {e}");
-            None
-        }
-    };
+    let tee = or_log("tee", setup_tee(boot.entry()));
 
     // Set the command listener to non-blocking so the main-loop poll never
     // stalls when no commander is connected.
@@ -68,23 +81,12 @@ pub(crate) fn activate(boot: Boot, state: &mut State) {
 
     // Seed the command intake from the oplog replay (populates the SeenSet for
     // dedup across deadman re-exec).
-    let intake = match Intake::new(std::path::Path::new(&boot.entry().oplog_path), boot.cap_token().to_owned()) {
-        Ok(i) => Some(i),
-        Err(e) => {
-            log::error!("bridge: intake setup failed: {e:?}");
-            None
-        }
-    };
+    let intake =
+        or_log("intake", Intake::new(std::path::Path::new(&boot.entry().oplog_path), boot.cap_token().to_owned()));
 
     // Open the content-addressed body store under the oplog dir, so the message
     // chokepoint can durably stage bodies before referencing them (I13).
-    let store = match Store::open(std::path::Path::new(&boot.entry().oplog_path)) {
-        Ok(s) => Some(s),
-        Err(e) => {
-            log::error!("bridge: body store open failed: {e:?}");
-            None
-        }
-    };
+    let store = or_log("body store", Store::open(std::path::Path::new(&boot.entry().oplog_path)));
 
     state.set_ext(BridgeState { boot: Some(boot), tee, intake, store, ..Default::default() });
 }
@@ -120,7 +122,7 @@ pub fn try_recover(state: &mut State) {
 
     match Boot::try_start(&folder, &model) {
         Ok(boot) => {
-            log::error!("bridge: RECOVERED — orchestration plane is live again ({})", folder.display(),);
+            log::error!("bridge: RECOVERED — orchestration plane is live again ({})", folder.display());
             activate(boot, state);
         }
         // Still contended (predecessor not yet dead) — remain pending, the next
@@ -169,7 +171,7 @@ pub(crate) fn publish_frame(state: &mut State, kind: StreamKind) {
         kind,
     };
 
-    if let Some(tee) = &bs.tee {
+    if let Some(tee) = bs.tee.as_ref() {
         let _outcome = tee.publish(frame);
     }
 }

@@ -1,5 +1,6 @@
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{DYN_PANEL_ID_PLACEHOLDER, DynPanel};
+use cp_base::state::watchers::DYN_PANEL_ID_PLACEHOLDER;
+use cp_base::state::watchers::carriers::DynPanel;
 use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -44,7 +45,7 @@ pub(crate) fn err_result(tool: &ToolUse, content: String) -> ToolResult {
 /// Closing a panel causes instant, irreversible context loss.
 const PANEL_WARNING: &str = "\n\nIMPORTANT: Results live in this panel. Act on the information FIRST (write \
     files, answer questions, store in scratchpad, etc.), THEN close the panel. Closing it IMMEDIATELY and \
-    IRREVERSIBLY erases all content from your context — you cannot recall it from memory afterward. \
+    IRREVERSIBLY erases all content from your context \u{2014} you cannot recall it from memory afterward. \
     Never close-then-act; always act-then-close.";
 
 /// Async timeout for Firecrawl scrape/search calls (seconds).
@@ -65,6 +66,44 @@ pub(crate) const CRAWL_POLL_INTERVAL: Duration = Duration::from_secs(5);
 /// Maximum number of poll iterations before giving up internally.
 pub(crate) const CRAWL_MAX_POLLS: u32 = 60;
 
+/// Append the `## Metadata` section (title / description / URL) when present.
+fn push_scrape_metadata(content: &mut String, data: &crate::types::ScrapeData) {
+    let Some(meta) = data.metadata.as_ref() else {
+        return;
+    };
+    content.push_str("## Metadata\n\n");
+    if let Some(t) = meta.title.as_ref() {
+        let _r = writeln!(content, "**Title:** {t}");
+    }
+    if let Some(d) = meta.description.as_ref() {
+        let _r = writeln!(content, "**Description:** {d}");
+    }
+    if let Some(u) = meta.source_url.as_ref() {
+        let _r = writeln!(content, "**URL:** {u}");
+    }
+    content.push('\n');
+}
+
+/// Build the markdown panel body for a scrape result (metadata + content + links).
+fn build_scrape_panel_content(data: &crate::types::ScrapeData) -> String {
+    let mut content = String::new();
+    push_scrape_metadata(&mut content, data);
+    if let Some(md) = data.markdown.as_ref() {
+        content.push_str("## Content\n\n");
+        content.push_str(md);
+        content.push_str("\n\n");
+    }
+    if let Some(links) = data.links.as_ref()
+        && !links.is_empty()
+    {
+        content.push_str("## Links\n\n");
+        for link in links {
+            let _r = writeln!(content, "- {link}");
+        }
+    }
+    content
+}
+
 /// Execute the `firecrawl_scrape` tool: scrape a single URL for content.
 ///
 /// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
@@ -75,14 +114,14 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return err_result(tool, e),
     };
 
-    let Some(url) = tool.input.get("url").and_then(|v| v.as_str()) else {
-        return err_result(tool, "Missing required parameter 'url'".to_string());
+    let Some(url_ref) = tool.input.get("url").and_then(|v| v.as_str()) else {
+        return err_result(tool, "Missing required parameter 'url'".to_owned());
     };
 
     // Extract all params to owned types for the closure
-    let url = url.to_string();
+    let url = url_ref.to_owned();
     let formats_val: Vec<String> = tool.input.get("formats").and_then(|v| v.as_array()).map_or_else(
-        || vec!["markdown".to_string(), "links".to_string()],
+        || vec!["markdown".to_owned(), "links".to_owned()],
         |arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
     );
     let country_val = tool
@@ -109,75 +148,150 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
         match client.scrape(&params) {
             Ok(resp) => {
                 if !resp.success {
-                    let msg = resp.error.unwrap_or_else(|| "Unknown error".to_string());
-                    return ToolOutput {
-                        content: format!("Firecrawl scrape failed: {msg}"),
-                        is_error: true,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    let msg = resp.error.unwrap_or_else(|| "Unknown error".to_owned());
+                    return ToolOutput::error(format!("Firecrawl scrape failed: {msg}"));
                 }
 
                 let Some(data) = resp.data else {
-                    return ToolOutput {
-                        content: "Scrape returned no data".to_string(),
-                        is_error: true,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::error("Scrape returned no data".to_owned());
                 };
 
-                let title = data.metadata.as_ref().and_then(|m| m.title.as_deref()).unwrap_or("untitled");
+                let title = data.metadata.as_ref().and_then(|m| m.title.as_deref()).unwrap_or("untitled").to_owned();
+                let content = build_scrape_panel_content(&data);
 
-                // Build panel content
-                let mut content = String::new();
-                if let Some(ref meta) = data.metadata {
-                    content.push_str("## Metadata\n\n");
-                    if let Some(ref t) = meta.title {
-                        let _r = writeln!(content, "**Title:** {t}");
-                    }
-                    if let Some(ref d) = meta.description {
-                        let _r = writeln!(content, "**Description:** {d}");
-                    }
-                    if let Some(ref u) = meta.source_url {
-                        let _r = writeln!(content, "**URL:** {u}");
-                    }
-                    content.push('\n');
-                }
-                if let Some(ref md) = data.markdown {
-                    content.push_str("## Content\n\n");
-                    content.push_str(md);
-                    content.push_str("\n\n");
-                }
-                if let Some(ref links) = data.links
-                    && !links.is_empty()
-                {
-                    content.push_str("## Links\n\n");
-                    for link in links {
-                        let _r = writeln!(content, "- {link}");
-                    }
-                }
+                let dyn_panel =
+                    DynPanel::new(crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(), format!("firecrawl_scrape: {url}"))
+                        .metadata(vec![("result_content".to_owned(), content.clone())])
+                        .content(content);
 
-                let dyn_panel = DynPanel {
-                    context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_string(),
-                    display_name: format!("firecrawl_scrape: {url}"),
-                    metadata: vec![("result_content".to_string(), content.clone())],
-                    content: Some(content),
-                };
-
-                ToolOutput {
-                    content: format!(
-                        "Created panel {DYN_PANEL_ID_PLACEHOLDER}: scraped {url} ({title}){PANEL_WARNING}",
-                    ),
-                    is_error: false,
-                    create_panel: Some(dyn_panel),
-                    preserves_tempo: false,
-                }
+                ToolOutput::ok(format!(
+                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: scraped {url} ({title}){PANEL_WARNING}",
+                ))
+                .with_panel(dyn_panel)
             }
-            Err(e) => ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
+            Err(e) => ToolOutput::error(e),
         }
     })
 }
+/// Build the markdown panel body from scraped search results (one section each).
+fn build_search_results_content(results: &[crate::types::SearchResult]) -> String {
+    let mut content = String::new();
+    for (i, result) in results.iter().enumerate() {
+        let page_title = result.title.as_deref().unwrap_or("untitled");
+        let page_url = result.url.as_deref().unwrap_or("unknown");
+        let _r1 = write!(content, "## Result {} — {} ({})\n\n", i.saturating_add(1), page_title, page_url);
+        if let Some(md) = result.markdown.as_ref() {
+            content.push_str(md);
+            content.push_str("\n\n");
+        } else if let Some(desc) = result.description.as_ref() {
+            content.push_str(desc);
+            content.push_str("\n\n");
+        } else {
+            // Neither markdown nor description present — nothing to append.
+        }
+        if let Some(links) = result.links.as_ref()
+            && !links.is_empty()
+        {
+            content.push_str("**Links:**\n");
+            for link in links.iter().take(10) {
+                let _r2 = writeln!(content, "- {link}");
+            }
+            content.push('\n');
+        }
+        content.push_str("---\n\n");
+    }
+    content
+}
+
+/// Owned search parameters handed to the worker thread by [`exec_search`].
+struct SearchJob {
+    /// Search query text.
+    query: String,
+    /// Max results to scrape.
+    limit: u32,
+    /// Source kinds ("web"/"news"/"images").
+    sources_val: Vec<String>,
+    /// Optional category filter.
+    cats_val: Option<Vec<String>>,
+    /// Optional time-based search filter.
+    tbs_val: Option<String>,
+    /// Optional geo location.
+    loc_val: Option<String>,
+}
+
+/// Run one Firecrawl search off the main loop: issue the request, parse the
+/// polymorphic `data` field (array vs web/news/images dict), and fold it into a
+/// panel-bearing [`ToolOutput`].
+fn run_search(client: &FirecrawlClient, job: &SearchJob) -> ToolOutput {
+    let query = &job.query;
+    let limit = &job.limit;
+    let sources_val = &job.sources_val;
+    let cats_val = &job.cats_val;
+    let tbs_val = &job.tbs_val;
+    let loc_val = &job.loc_val;
+    let sources: Vec<&str> = sources_val.iter().map(String::as_str).collect();
+    let cats_refs: Option<Vec<&str>> = cats_val.as_ref().map(|v| v.iter().map(String::as_str).collect());
+
+    let params = SearchParams {
+        query,
+        limit: *limit,
+        sources,
+        categories: cats_refs,
+        tbs: tbs_val.as_deref(),
+        location: loc_val.as_deref(),
+    };
+
+    match client.search(&params) {
+        Ok(resp) => {
+            if !resp.success {
+                let msg = resp.error.unwrap_or_else(|| "Unknown error".to_owned());
+                return ToolOutput::error(format!("Firecrawl search failed: {msg}"));
+            }
+
+            let Some(data) = resp.data else {
+                return ToolOutput::ok(format!("No results found for '{query}'"));
+            };
+
+            // Parse data — can be array (scraped results) or object (web/news/images dict)
+            let results: Vec<crate::types::SearchResult> = if data.is_array() {
+                serde_json::from_value(data).unwrap_or_default()
+            } else if let Some(web_arr) = data.get("web").and_then(|v| v.as_array()) {
+                web_arr.iter().filter_map(|v| serde_json::from_value(v.clone()).ok()).collect()
+            } else {
+                // Fallback: dump as YAML
+                let panel_content = serde_yaml::to_string(&data).unwrap_or_else(|_| format!("{data:#}"));
+                let dyn_panel =
+                    DynPanel::new(crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(), format!("firecrawl_search: {query}"))
+                        .metadata(vec![("result_content".to_owned(), panel_content.clone())])
+                        .content(panel_content);
+                return ToolOutput::ok(format!(
+                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: results for '{query}'{PANEL_WARNING}",
+                ))
+                .with_panel(dyn_panel);
+            };
+
+            let count = results.len();
+            if count == 0 {
+                return ToolOutput::ok(format!("No results found for '{query}'"));
+            }
+
+            // Build panel: concatenated markdown per page
+            let content = build_search_results_content(&results);
+
+            let dyn_panel =
+                DynPanel::new(crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(), format!("firecrawl_search: {query}"))
+                    .metadata(vec![("result_content".to_owned(), content.clone())])
+                    .content(content);
+
+            ToolOutput::ok(format!(
+                "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {count} results for '{query}'{PANEL_WARNING}",
+            ))
+            .with_panel(dyn_panel)
+        }
+        Err(e) => ToolOutput::error(e),
+    }
+}
+
 /// Execute the `firecrawl_search` tool: search and scrape in one call.
 ///
 /// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
@@ -188,15 +302,15 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return err_result(tool, e),
     };
 
-    let Some(query) = tool.input.get("query").and_then(|v| v.as_str()) else {
-        return err_result(tool, "Missing required parameter 'query'".to_string());
+    let Some(query_ref) = tool.input.get("query").and_then(|v| v.as_str()) else {
+        return err_result(tool, "Missing required parameter 'query'".to_owned());
     };
 
     // Extract all params to owned types for the closure
-    let query = query.to_string();
+    let query = query_ref.to_owned();
     let limit = tool.input.get("limit").and_then(serde_json::Value::as_u64).unwrap_or(3).to_u32();
     let sources_val: Vec<String> = tool.input.get("sources").and_then(|v| v.as_array()).map_or_else(
-        || vec!["web".to_string()],
+        || vec!["web".to_owned()],
         |arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
     );
     let cats_val: Option<Vec<String>> = tool
@@ -207,119 +321,83 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     let tbs_val = tool.input.get("tbs").and_then(|v| v.as_str()).map(String::from);
     let loc_val = tool.input.get("location").and_then(|v| v.as_str()).map(String::from);
 
-    spawn_async_tool(state, tool, ASYNC_TIMEOUT_SCRAPE_SECS, move || {
-        let sources: Vec<&str> = sources_val.iter().map(String::as_str).collect();
-        let cats_refs: Option<Vec<&str>> = cats_val.as_ref().map(|v| v.iter().map(String::as_str).collect());
-
-        let params = SearchParams {
-            query: &query,
-            limit,
-            sources,
-            categories: cats_refs,
-            tbs: tbs_val.as_deref(),
-            location: loc_val.as_deref(),
-        };
-
-        match client.search(&params) {
-            Ok(resp) => {
-                if !resp.success {
-                    let msg = resp.error.unwrap_or_else(|| "Unknown error".to_string());
-                    return ToolOutput {
-                        content: format!("Firecrawl search failed: {msg}"),
-                        is_error: true,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
-                }
-
-                let Some(data) = resp.data else {
-                    return ToolOutput {
-                        content: format!("No results found for '{query}'"),
-                        is_error: false,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
-                };
-
-                // Parse data — can be array (scraped results) or object (web/news/images dict)
-                let results: Vec<crate::types::SearchResult> = if data.is_array() {
-                    serde_json::from_value(data).unwrap_or_default()
-                } else if let Some(web_arr) = data.get("web").and_then(|v| v.as_array()) {
-                    web_arr.iter().filter_map(|v| serde_json::from_value(v.clone()).ok()).collect()
-                } else {
-                    // Fallback: dump as YAML
-                    let panel_content = serde_yaml::to_string(&data).unwrap_or_else(|_| format!("{data:#}"));
-                    let dyn_panel = DynPanel {
-                        context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_string(),
-                        display_name: format!("firecrawl_search: {query}"),
-                        metadata: vec![("result_content".to_string(), panel_content.clone())],
-                        content: Some(panel_content),
-                    };
-                    return ToolOutput {
-                        content: format!(
-                            "Created panel {DYN_PANEL_ID_PLACEHOLDER}: results for '{query}'{PANEL_WARNING}",
-                        ),
-                        is_error: false,
-                        create_panel: Some(dyn_panel),
-                        preserves_tempo: false,
-                    };
-                };
-
-                let count = results.len();
-                if count == 0 {
-                    return ToolOutput {
-                        content: format!("No results found for '{query}'"),
-                        is_error: false,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
-                }
-
-                // Build panel: concatenated markdown per page
-                let mut content = String::new();
-                for (i, result) in results.iter().enumerate() {
-                    let page_title = result.title.as_deref().unwrap_or("untitled");
-                    let page_url = result.url.as_deref().unwrap_or("unknown");
-                    let _r1 = write!(content, "## Result {} — {} ({})\n\n", i.saturating_add(1), page_title, page_url);
-                    if let Some(ref md) = result.markdown {
-                        content.push_str(md);
-                        content.push_str("\n\n");
-                    } else if let Some(ref desc) = result.description {
-                        content.push_str(desc);
-                        content.push_str("\n\n");
-                    }
-                    if let Some(ref links) = result.links
-                        && !links.is_empty()
-                    {
-                        content.push_str("**Links:**\n");
-                        for link in links.iter().take(10) {
-                            let _r2 = writeln!(content, "- {link}");
-                        }
-                        content.push('\n');
-                    }
-                    content.push_str("---\n\n");
-                }
-
-                let dyn_panel = DynPanel {
-                    context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_string(),
-                    display_name: format!("firecrawl_search: {query}"),
-                    metadata: vec![("result_content".to_string(), content.clone())],
-                    content: Some(content),
-                };
-
-                ToolOutput {
-                    content: format!(
-                        "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {count} results for '{query}'{PANEL_WARNING}",
-                    ),
-                    is_error: false,
-                    create_panel: Some(dyn_panel),
-                    preserves_tempo: false,
-                }
-            }
-            Err(e) => ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
-        }
-    })
+    let job = SearchJob { query, limit, sources_val, cats_val, tbs_val, loc_val };
+    spawn_async_tool(state, tool, ASYNC_TIMEOUT_SCRAPE_SECS, move || run_search(&client, &job))
 }
+/// Owned map parameters handed to the worker thread by [`exec_map`].
+struct MapJob {
+    /// Root URL to map.
+    url: String,
+    /// Max URLs to return.
+    limit: u32,
+    /// Optional keyword filter on discovered URLs.
+    search_val: Option<String>,
+    /// Whether to include subdomains.
+    include_subdomains: bool,
+    /// Optional geo country.
+    country_val: Option<String>,
+    /// Optional language list.
+    languages_val: Option<Vec<String>>,
+}
+
+/// Run one Firecrawl map off the main loop: discover URLs on the domain and
+/// fold the YAML-serialized link list into a panel-bearing [`ToolOutput`].
+fn run_map(client: &FirecrawlClient, job: &MapJob) -> ToolOutput {
+    let url = &job.url;
+    let limit = &job.limit;
+    let search_val = &job.search_val;
+    let include_subdomains = &job.include_subdomains;
+    let country_val = &job.country_val;
+    let languages_val = &job.languages_val;
+    let langs_refs: Option<Vec<&str>> = languages_val.as_ref().map(|v| v.iter().map(String::as_str).collect());
+
+    let params = MapParams {
+        url,
+        limit: *limit,
+        search: search_val.as_deref(),
+        include_subdomains: *include_subdomains,
+        country: country_val.as_deref(),
+        languages: langs_refs,
+    };
+
+    match client.map(&params) {
+        Ok(resp) => {
+            if !resp.success {
+                let msg = resp.error.unwrap_or_else(|| "Unknown error".to_owned());
+                return ToolOutput::error(format!("Firecrawl map failed: {msg}"));
+            }
+
+            let links = resp.links.unwrap_or_default();
+            let count = links.len();
+
+            if count == 0 {
+                return ToolOutput::ok(format!("No URLs discovered on '{url}'"));
+            }
+
+            let panel_content = match serde_yaml::to_string(&links) {
+                Ok(yaml) => yaml,
+                Err(e) => {
+                    return ToolOutput::error(format!("Failed to serialize response: {e}"));
+                }
+            };
+
+            let domain =
+                url.trim_start_matches("https://").trim_start_matches("http://").split('/').next().unwrap_or(url);
+
+            let dyn_panel =
+                DynPanel::new(crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(), format!("firecrawl_map: {domain}"))
+                    .metadata(vec![("result_content".to_owned(), panel_content.clone())])
+                    .content(panel_content);
+
+            ToolOutput::ok(format!(
+                "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {count} URLs discovered on '{domain}'{PANEL_WARNING}",
+            ))
+            .with_panel(dyn_panel)
+        }
+        Err(e) => ToolOutput::error(e),
+    }
+}
+
 /// Execute the `firecrawl_map` tool: discover all URLs on a domain.
 ///
 /// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
@@ -330,12 +408,12 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return err_result(tool, e),
     };
 
-    let Some(url) = tool.input.get("url").and_then(|v| v.as_str()) else {
-        return err_result(tool, "Missing required parameter 'url'".to_string());
+    let Some(url_ref) = tool.input.get("url").and_then(|v| v.as_str()) else {
+        return err_result(tool, "Missing required parameter 'url'".to_owned());
     };
 
     // Extract all params to owned types for the closure
-    let url = url.to_string();
+    let url = url_ref.to_owned();
     let limit = tool.input.get("limit").and_then(serde_json::Value::as_u64).unwrap_or(50).to_u32();
     let search_val = tool.input.get("search").and_then(|v| v.as_str()).map(String::from);
     let include_subdomains = tool.input.get("include_subdomains").and_then(serde_json::Value::as_bool).unwrap_or(false);
@@ -354,74 +432,6 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
         .and_then(|v| v.as_array())
         .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect());
 
-    spawn_async_tool(state, tool, ASYNC_TIMEOUT_MAP_SECS, move || {
-        let langs_refs: Option<Vec<&str>> = languages_val.as_ref().map(|v| v.iter().map(String::as_str).collect());
-
-        let params = MapParams {
-            url: &url,
-            limit,
-            search: search_val.as_deref(),
-            include_subdomains,
-            country: country_val.as_deref(),
-            languages: langs_refs,
-        };
-
-        match client.map(&params) {
-            Ok(resp) => {
-                if !resp.success {
-                    let msg = resp.error.unwrap_or_else(|| "Unknown error".to_string());
-                    return ToolOutput {
-                        content: format!("Firecrawl map failed: {msg}"),
-                        is_error: true,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
-                }
-
-                let links = resp.links.unwrap_or_default();
-                let count = links.len();
-
-                if count == 0 {
-                    return ToolOutput {
-                        content: format!("No URLs discovered on '{url}'"),
-                        is_error: false,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
-                }
-
-                let panel_content = match serde_yaml::to_string(&links) {
-                    Ok(yaml) => yaml,
-                    Err(e) => {
-                        return ToolOutput {
-                            content: format!("Failed to serialize response: {e}"),
-                            is_error: true,
-                            create_panel: None,
-                            preserves_tempo: false,
-                        };
-                    }
-                };
-
-                let domain =
-                    url.trim_start_matches("https://").trim_start_matches("http://").split('/').next().unwrap_or(&url);
-
-                let dyn_panel = DynPanel {
-                    context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_string(),
-                    display_name: format!("firecrawl_map: {domain}"),
-                    metadata: vec![("result_content".to_string(), panel_content.clone())],
-                    content: Some(panel_content),
-                };
-
-                ToolOutput {
-                    content: format!(
-                        "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {count} URLs discovered on '{domain}'{PANEL_WARNING}",
-                    ),
-                    is_error: false,
-                    create_panel: Some(dyn_panel),
-                    preserves_tempo: false,
-                }
-            }
-            Err(e) => ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
-        }
-    })
+    let job = MapJob { url, limit, search_val, include_subdomains, country_val, languages_val };
+    spawn_async_tool(state, tool, ASYNC_TIMEOUT_MAP_SECS, move || run_map(&client, &job))
 }

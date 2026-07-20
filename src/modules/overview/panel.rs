@@ -34,7 +34,7 @@ impl Panel for OverviewPanel {
         blocks
     }
     fn title(&self, _state: &State) -> String {
-        "Statistics".to_string()
+        "Statistics".to_owned()
     }
 
     fn max_freezes(&self) -> u8 {
@@ -44,7 +44,7 @@ impl Panel for OverviewPanel {
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Use cached content if available (set by refresh)
         if let Some(ctx) = state.context.iter().find(|c| c.context_type.as_str() == Kind::OVERVIEW)
-            && let Some(content) = &ctx.cached_content
+            && let Some(content) = ctx.cached_content.as_ref()
         {
             return vec![ContextItem::new(&ctx.id, "Statistics", content.clone(), ctx.last_refresh_ms)];
         }

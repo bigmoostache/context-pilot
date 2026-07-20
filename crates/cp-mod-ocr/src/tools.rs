@@ -11,7 +11,8 @@ use std::sync::mpsc::{self, Receiver, TryRecvError};
 
 use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{Watcher, WatcherRegistry, WatcherResult};
+use cp_base::state::watchers::carriers::WatcherResult;
+use cp_base::state::watchers::{Watcher, WatcherRegistry};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::client::{DatalabClient, OcrMode, api_key_from_env, is_ocr_extension};
@@ -30,47 +31,59 @@ pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> 
     (tool.name == "ocr").then(|| execute_ocr(tool, state))
 }
 
-/// Execute the `ocr` tool.
-///
-/// Validates parameters synchronously, spawns a background thread for the
-/// Datalab API call, and returns immediately. A spine notification fires
-/// when the conversion completes (or fails), waking the AI if idle.
-fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let _fg = cp_base::flame!("ocr_exec");
-    // --- Validate DATALAB_API_KEY ---
+/// Validated inputs for one OCR job, produced by [`validate_ocr_inputs`].
+struct OcrJob {
+    /// Datalab API key from the environment.
+    api_key: String,
+    /// Absolute path of the source document.
+    path: PathBuf,
+    /// Output format (markdown or text-boxes).
+    mode: OcrMode,
+    /// Destination path for the converted text.
+    output_path: PathBuf,
+    /// Source path as given (for messages).
+    path_display: String,
+    /// Output path as given (for messages).
+    output_display: String,
+}
+
+/// Validate every `ocr` parameter synchronously (API key, path existence +
+/// extension, mode, output + parent dir). Returns the ready-to-run [`OcrJob`]
+/// or the error `ToolResult` to bubble straight back.
+fn validate_ocr_inputs(tool: &ToolUse) -> Result<OcrJob, Box<ToolResult>> {
     let Some(api_key) = api_key_from_env() else {
-        return err(tool, "DATALAB_API_KEY not set in environment.".to_string());
+        return Err(Box::new(err(tool, "DATALAB_API_KEY not set in environment.".to_owned())));
     };
 
-    // --- Validate path ---
     let Some(path_str) = tool.input.get("path").and_then(|v| v.as_str()) else {
-        return err(tool, "Missing required parameter 'path'.".to_string());
+        return Err(Box::new(err(tool, "Missing required parameter 'path'.".to_owned())));
     };
     let path = PathBuf::from(path_str);
     if !path.exists() {
-        return err(tool, format!("File not found: '{path_str}'"));
+        return Err(Box::new(err(tool, format!("File not found: '{path_str}'"))));
     }
 
     let ext = path.extension().and_then(std::ffi::OsStr::to_str).unwrap_or("");
     if !is_ocr_extension(ext) {
-        return err(
+        return Err(Box::new(err(
             tool,
             format!("Unsupported file type '.{ext}'. Supported: pdf, png, jpg, jpeg, tiff, webp, bmp, heic, gif."),
-        );
+        )));
     }
 
-    // --- Validate mode ---
     let Some(mode_str) = tool.input.get("mode").and_then(|v| v.as_str()) else {
-        return err(tool, "Missing required parameter 'mode'. Use 'markdown' or 'text_boxes'.".to_string());
+        return Err(Box::new(err(
+            tool,
+            "Missing required parameter 'mode'. Use 'markdown' or 'text_boxes'.".to_owned(),
+        )));
     };
     let mode = match OcrMode::from_str(mode_str) {
         Ok(m) => m,
-        Err(e) => return err(tool, e),
+        Err(e) => return Err(Box::new(err(tool, e))),
     };
 
-    // --- Validate output ---
     let Some(output_str) = tool.input.get("output").and_then(|v| v.as_str()) else {
-        return err(tool, "Missing required parameter 'output'.".to_string());
+        return Err(Box::new(err(tool, "Missing required parameter 'output'.".to_owned())));
     };
     let output_path = PathBuf::from(output_str);
 
@@ -80,12 +93,33 @@ fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
         && !parent.exists()
         && let Err(e) = std::fs::create_dir_all(parent)
     {
-        return err(tool, format!("Cannot create output directory '{}': {e}", parent.display()));
+        return Err(Box::new(err(tool, format!("Cannot create output directory '{}': {e}", parent.display()))));
     }
 
+    Ok(OcrJob {
+        api_key,
+        path,
+        mode,
+        output_path,
+        path_display: path_str.to_owned(),
+        output_display: output_str.to_owned(),
+    })
+}
+
+/// Execute the `ocr` tool.
+///
+/// Validates parameters synchronously, spawns a background thread for the
+/// Datalab API call, and returns immediately. A spine notification fires
+/// when the conversion completes (or fails), waking the AI if idle.
+fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("ocr_exec");
+    let job = match validate_ocr_inputs(tool) {
+        Ok(j) => j,
+        Err(e) => return *e,
+    };
+    let OcrJob { api_key, path, mode, output_path, path_display, output_display } = job;
+
     // --- Spawn background thread + non-blocking watcher ---
-    let path_display = path_str.to_string();
-    let output_display = output_str.to_string();
     let (tx, rx) = mpsc::channel();
 
     // Clone for the closure — originals are used in the tool result after spawn.
@@ -105,7 +139,7 @@ fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
             Ok(result) => {
                 if let Err(e) = std::fs::write(&output_path, &result.text) {
                     let _r =
-                        tx.send(format!("❌ OCR succeeded but failed to write output to '{output_for_closure}': {e}",));
+                        tx.send(format!("❌ OCR succeeded but failed to write output to '{output_for_closure}': {e}"));
                     return;
                 }
                 let cached_note = if result.cached { " (from cache)" } else { "" };
@@ -120,7 +154,7 @@ fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     });
 
-    if let Err(ref e) = handle {
+    if let Err(e) = handle.as_ref() {
         return err(tool, format!("Failed to spawn OCR worker thread: {e}"));
     }
 
@@ -224,41 +258,11 @@ impl Watcher for OcrWatcher {
 
     fn check(&self, _state: &State) -> Option<WatcherResult> {
         let Ok(rx) = self.rx.lock() else {
-            return Some(WatcherResult {
-                description: "❌ OCR watcher failed (lock poisoned)".to_string(),
-                panel_id: None,
-                tool_use_id: None,
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            });
+            return Some(WatcherResult::new("\u{274c} OCR watcher failed (lock poisoned)"));
         };
         match rx.try_recv() {
-            Ok(message) => Some(WatcherResult {
-                description: message,
-                panel_id: None,
-                tool_use_id: None,
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            }),
-            Err(TryRecvError::Disconnected) => Some(WatcherResult {
-                description: "❌ OCR worker thread died unexpectedly".to_string(),
-                panel_id: None,
-                tool_use_id: None,
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            }),
+            Ok(message) => Some(WatcherResult::new(message)),
+            Err(TryRecvError::Disconnected) => Some(WatcherResult::new("\u{274c} OCR worker thread died unexpectedly")),
             Err(TryRecvError::Empty) => None,
         }
     }
@@ -267,17 +271,7 @@ impl Watcher for OcrWatcher {
         (now_ms() >= self.deadline_ms).then(|| {
             let elapsed_secs =
                 cp_base::panels::time_arith::ms_to_secs(self.deadline_ms.saturating_sub(self.registered_at_ms));
-            WatcherResult {
-                description: format!("❌ OCR timed out after {elapsed_secs}s"),
-                panel_id: None,
-                tool_use_id: None,
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            }
+            WatcherResult::new(format!("❌ OCR timed out after {elapsed_secs}s"))
         })
     }
 

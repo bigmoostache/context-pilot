@@ -48,9 +48,13 @@ const BYTE_MASK: u32 = 0xFF;
 /// Encode a `u32` as four little-endian bytes.
 ///
 /// The byte order is part of the on-disk contract, so it is spelled out
-/// rather than delegated to `to_le_bytes` (which would read as
-/// host-dependent to a reviewer). Each `& BYTE_MASK` guarantees the value
+/// rather than delegated to `to_le_bytes` (which the workspace forbids via
+/// `clippy::little_endian_bytes`). Each `& BYTE_MASK` guarantees the value
 /// fits in a `u8`, so the cast is exact.
+#[expect(
+    clippy::as_conversions,
+    reason = "const-fn narrowing after `& BYTE_MASK` is provably exact; try_from/From are not const-callable and clippy::little_endian_bytes forbids the to_le_bytes shortcut"
+)]
 const fn u32_to_le(value: u32) -> [u8; 4] {
     [
         (value & BYTE_MASK) as u8,
@@ -70,6 +74,10 @@ fn u32_from_le(bytes: [u8; 4]) -> u32 {
 
 /// Framing-level decode/encode error.
 #[derive(Debug, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "framing error taxonomy is a closed wire contract: every decode failure mode is enumerated and callers match them exhaustively; a new variant is a deliberate breaking change, and #[non_exhaustive] would force cross-crate wildcard arms that the forbidden wildcard_enum_match_arm lint rejects"
+)]
 pub enum FrameError {
     /// Not enough bytes to read the header or the full payload.
     Incomplete,
@@ -95,8 +103,12 @@ pub enum FrameError {
 }
 
 impl fmt::Display for FrameError {
+    #[expect(
+        clippy::ref_patterns,
+        reason = "clippy::pattern_type_mismatch mandates dereferencing the &self scrutinee and binding the non-Copy String payloads (DeserializeError/SerializeError) with ref; the two restriction lints are mutually exclusive and cp-wire is foundational (cannot depend on cp-base's deref_match! macro)"
+    )]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
+        match *self {
             Self::Incomplete => f.write_str("incomplete frame (truncated)"),
             Self::PayloadTooLarge(n) => {
                 write!(f, "payload length {n} exceeds {MAX_PAYLOAD_SIZE}-byte limit")
@@ -104,8 +116,8 @@ impl fmt::Display for FrameError {
             Self::CrcMismatch { expected, actual } => {
                 write!(f, "CRC mismatch: header {expected:#010x}, computed {actual:#010x}")
             }
-            Self::DeserializeError(msg) => write!(f, "deserialize: {msg}"),
-            Self::SerializeError(msg) => write!(f, "serialize: {msg}"),
+            Self::DeserializeError(ref msg) => write!(f, "deserialize: {msg}"),
+            Self::SerializeError(ref msg) => write!(f, "serialize: {msg}"),
         }
     }
 }

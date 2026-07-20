@@ -15,6 +15,10 @@ use super::Phase;
 /// I10).  The backend fans these out to N frontend WebSocket subscribers
 /// without touching the agent.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[expect(
+    clippy::exhaustive_structs,
+    reason = "stream-frame contract: Frame is a 7-field ephemeral routing record built cross-crate by the agent's tee path; a constructor would take 6 positional arguments (tripping too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible and the exhaustive literal is the honest shape"
+)]
 pub struct Frame {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,
@@ -44,6 +48,10 @@ pub struct Frame {
 /// forward compatibility.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "wire-protocol contract: the stream-frame Kind carries an Unknown catch-all for forward-compat; its variant set is otherwise closed and constructed cross-crate (the agent emits frames, the backend fans them out), so #[non_exhaustive] would forbid that construction"
+)]
 pub enum Kind {
     /// Latency hint that a new message is starting (self-describing so the
     /// frontend can paint before the oplog entry lands).

@@ -38,7 +38,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Spine module: auto-continuation, notifications, guard rails, coucou timers.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct SpineModule;
+
+impl Default for SpineModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SpineModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for SpineModule {
     fn dependencies(&self) -> &[&'static str] {
@@ -317,7 +333,11 @@ fn visualize_spine_output(content: &str, width: usize) -> Vec<cp_render::Block> 
                 Semantic::Error
             } else if line.starts_with("Marked") {
                 Semantic::Success
-            } else if line.starts_with("Updated") || line.contains("→") || line.contains('=') || line.contains(':') {
+            } else if line.starts_with("Updated")
+                || line.contains("\u{2192}")
+                || line.contains('=')
+                || line.contains(':')
+            {
                 Semantic::Info
             } else if line.starts_with('N') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
                 Semantic::Warning
@@ -327,7 +347,7 @@ fn visualize_spine_output(content: &str, width: usize) -> Vec<cp_render::Block> 
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
             Block::Line(vec![Span::styled(display, semantic)])
         })
@@ -340,7 +360,7 @@ fn prune_notifications(notifications: &mut Vec<Notification>) {
     if processed_count <= 10 {
         return;
     }
-    let mut processed_seen = 0_usize;
+    let mut processed_seen = 0usize;
     let drop_count = processed_count.saturating_sub(10);
     notifications.retain(|n| {
         if n.is_processed() {

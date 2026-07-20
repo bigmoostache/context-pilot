@@ -68,10 +68,11 @@ pub const DEFAULT_COMPACT_THRESHOLD: u64 = 256 * 1024 * 1024;
 /// which is a handful of `fdatasync`s on a single writer thread. 60 s is vastly
 /// larger, so an in-flight spilled body is always referenced before it becomes
 /// GC-eligible; only crash-orphans are ever collected.
-pub const DEFAULT_GC_GRACE: Duration = Duration::from_secs(60);
+pub const DEFAULT_GC_GRACE: Duration = Duration::from_mins(1);
 
 /// The outcome of a [`compact`] pass.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Report {
     /// How many whole segments were deleted.
     pub segments_removed: u64,
@@ -79,6 +80,16 @@ pub struct Report {
     /// The index of the oldest segment remaining after compaction, or `None`
     /// if the oplog directory holds no segments.
     pub oldest_index: Option<u64>,
+}
+
+impl Report {
+    /// Bundle a compaction outcome. A constructor keeps [`Report`]
+    /// `#[non_exhaustive]` across cross-crate builders (integration tests
+    /// assert against a constructed expected value).
+    #[must_use]
+    pub const fn new(segments_removed: u64, oldest_index: Option<u64>) -> Self {
+        Self { segments_removed, oldest_index }
+    }
 }
 
 /// Compact the oplog in `dir`: delete every segment older than the newest
@@ -95,8 +106,11 @@ pub struct Report {
 ///
 /// Returns [`Error::Io`](crate::error::Error::Io) if a segment
 /// cannot be listed, read, removed, or if the directory cannot be `fsync`'d.
-pub fn compact<P: AsRef<Path>>(dir: P) -> OplogResult<Report> {
-    let dir = dir.as_ref();
+pub fn compact<P>(path: P) -> OplogResult<Report>
+where
+    P: AsRef<Path>,
+{
+    let dir = path.as_ref();
     let indices = segment::indices(dir)?;
 
     let Some(cut) = newest_checkpoint_index(dir, &indices)? else {
@@ -146,8 +160,11 @@ fn sync_dir(dir: &Path) -> OplogResult<()> {
 ///
 /// Returns [`Error::Io`](crate::error::Error::Io) if the directory
 /// cannot be listed or a segment's metadata cannot be read.
-pub fn total_bytes<P: AsRef<Path>>(dir: P) -> OplogResult<u64> {
-    let dir = dir.as_ref();
+pub fn total_bytes<P>(path: P) -> OplogResult<u64>
+where
+    P: AsRef<Path>,
+{
+    let dir = path.as_ref();
     let mut total: u64 = 0;
     for index in segment::indices(dir)? {
         let meta = fs::metadata(segment::path(dir, index))?;

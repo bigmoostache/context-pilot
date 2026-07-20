@@ -3,7 +3,6 @@
 //! Groq uses an OpenAI-compatible API format.
 //! Message building is delegated to the shared `openai_compat` module.
 
-use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
 use cp_mod_utilities::secret::Redacted;
@@ -14,7 +13,6 @@ use serde_json::Value;
 use super::super::error::LlmError;
 use super::super::{LlmClient, LlmRequest, StreamEvent};
 use super::openai_compat::{self, BuildOptions, OaiMessage};
-use super::openai_streaming::ToolCallAccumulator;
 use crate::infra::tools::ToolDefinition;
 use cp_base::config::INJECTIONS;
 
@@ -79,7 +77,7 @@ impl LlmClient for GroqClient {
         let system_suffix = request
             .model
             .starts_with("openai/gpt-oss")
-            .then(|| INJECTIONS.providers.gpt_oss_suffix.trim_end().to_string());
+            .then(|| INJECTIONS.providers.gpt_oss_suffix.trim_end().to_owned());
 
         // Build messages using shared builder
         let mut messages = openai_compat::build_messages(
@@ -95,10 +93,10 @@ impl LlmClient for GroqClient {
         );
 
         // Add tool results if present
-        if let Some(results) = &request.tool_results {
+        if let Some(results) = request.tool_results.as_ref() {
             for result in results {
                 messages.push(OaiMessage {
-                    role: "tool".to_string(),
+                    role: "tool".to_owned(),
                     content: Some(result.content.clone()),
                     tool_calls: None,
                     tool_call_id: Some(result.tool_use_id.clone()),
@@ -107,7 +105,7 @@ impl LlmClient for GroqClient {
         }
 
         let tools = tools_to_groq(&request.tools, &request.model);
-        let tool_choice = if tools.is_empty() { None } else { Some("auto".to_string()) };
+        let tool_choice = if tools.is_empty() { None } else { Some("auto".to_owned()) };
 
         let api_request = GroqRequest {
             model: request.model.clone(),
@@ -120,151 +118,27 @@ impl LlmClient for GroqClient {
 
         super::openai_streaming::dump_request(&request.worker_id, "groq", &api_request);
 
-        let response = client
-            .post(GROQ_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
-            .header("Content-Type", "application/json")
-            .json(&api_request)
-            .send()?;
-
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let body = response.text().unwrap_or_default();
-            return Err(LlmError::Api { status, body });
-        }
-
-        // Stream SSE using shared helpers
-        let reader = BufReader::new(response);
-        let mut input_tokens = 0;
-        let mut output_tokens = 0;
-        let mut stop_reason: Option<String> = None;
-        let mut tool_acc = ToolCallAccumulator::new();
-
-        for line in reader.lines() {
-            let line = line.map_err(|e| LlmError::StreamRead(e.to_string()))?;
-
-            if let Some(resp) = super::openai_streaming::parse_sse_line(&line) {
-                if let Some(usage) = resp.usage {
-                    if let Some(inp) = usage.prompt {
-                        input_tokens = inp;
-                    }
-                    if let Some(out) = usage.completion {
-                        output_tokens = out;
-                    }
-                }
-
-                for choice in resp.choices {
-                    if let Some(delta) = choice.delta {
-                        if let Some(content) = delta.content
-                            && !content.is_empty()
-                        {
-                            let _r = tx.send(StreamEvent::Chunk(content));
-                        }
-                        if let Some(calls) = delta.tool_calls {
-                            for call in &calls {
-                                if let Some((name, input_so_far)) = tool_acc.feed(call) {
-                                    let _r = tx.send(StreamEvent::ToolProgress { name, input_so_far });
-                                }
-                            }
-                        }
-                    }
-                    if let Some(ref reason) = choice.finish_reason {
-                        stop_reason = Some(super::openai_streaming::normalize_stop_reason(reason));
-                        for tool_use in tool_acc.drain() {
-                            let _r = tx.send(StreamEvent::ToolUse(tool_use));
-                        }
-                    }
-                }
-            }
-        }
-
-        let _r = tx.send(StreamEvent::Done {
-            input_tokens,
-            output_tokens,
-            cache_hit_tokens: 0,
-            cache_miss_tokens: 0,
-            stop_reason,
-            bp_hashes: vec![],
-            bp_panel_ids: vec![],
-            alive_count: 0,
-            alive_positions_permille: vec![],
-        });
+        let ep = super::openai_streaming::OaiEndpoint {
+            client: &client,
+            url: GROQ_API_ENDPOINT,
+            key: api_key.expose_secret(),
+        };
+        let acc = super::openai_streaming::run_oai_stream(&ep, &api_request, &tx)?;
+        super::openai_streaming::send_stream_done(&tx, acc);
         Ok(())
     }
 
     fn check_api(&self, model: &str) -> super::super::ApiCheckResult {
         let Some(api_key) = self.api_key.as_ref() else {
-            return super::super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error: Some("GROQ_API_KEY not set".to_string()),
-            };
+            return super::super::ApiCheckResult::failure(Some("GROQ_API_KEY not set".to_owned()));
         };
-
         let client = Client::new();
-
-        // Test 1: Basic auth
-        let auth_result = client
-            .post(GROQ_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "model": model,
-                "max_completion_tokens": 10,
-                "messages": [{"role": "user", "content": "Hi"}]
-            }))
-            .send();
-
-        let auth_ok = auth_result.as_ref().is_ok_and(|r| r.status().is_success());
-
-        if !auth_ok {
-            let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_string()));
-            return super::super::ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
-        }
-
-        // Test 2: Streaming
-        let stream_result = client
-            .post(GROQ_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "model": model,
-                "max_completion_tokens": 10,
-                "stream": true,
-                "messages": [{"role": "user", "content": "Say ok"}]
-            }))
-            .send();
-
-        let streaming_ok = stream_result.as_ref().is_ok_and(|r| r.status().is_success());
-
-        // Test 3: Tools
-        let tools_result = client
-            .post(GROQ_API_ENDPOINT)
-            .header("Authorization", format!("Bearer {}", api_key.expose_secret()))
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "model": model,
-                "max_completion_tokens": 50,
-                "tools": [{
-                    "type": "function",
-                    "function": {
-                        "name": "test_tool",
-                        "description": "A test tool",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {},
-                            "required": []
-                        }
-                    }
-                }],
-                "messages": [{"role": "user", "content": "Hi"}]
-            }))
-            .send();
-
-        let tools_ok = tools_result.as_ref().is_ok_and(|r| r.status().is_success());
-
-        super::super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
+        let ep = super::openai_streaming::OaiEndpoint {
+            client: &client,
+            url: GROQ_API_ENDPOINT,
+            key: api_key.expose_secret(),
+        };
+        super::openai_streaming::oai_check_api(&ep, model, "max_completion_tokens")
     }
 }
 

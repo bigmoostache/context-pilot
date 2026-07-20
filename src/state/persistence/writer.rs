@@ -181,8 +181,8 @@ fn execute_pending_messages(messages: &mut Vec<WriteOp>) {
 }
 
 /// Execute a batch of write/delete operations
-fn execute_batch(batch: Option<WriteBatch>) {
-    let Some(batch) = batch else { return };
+fn execute_batch(maybe_batch: Option<WriteBatch>) {
+    let Some(batch) = maybe_batch else { return };
 
     // Ensure directories exist
     for dir in &batch.ensure_dirs {

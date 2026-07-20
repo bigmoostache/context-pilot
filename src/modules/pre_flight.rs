@@ -22,41 +22,11 @@ pub(crate) fn pre_flight_tool(tool: &ToolUse, state: &State, active_modules: &Ha
     // If another queued item already targets the same panel, reject early.
     // Skip when trap is active — queued items are frozen (queue flush blocked),
     // and Close_conversation_history executes directly during trap.
-    if tool.name == "Close_conversation_history" {
-        let qs = cp_mod_queue::types::QueueState::get(state);
-        if !qs.trap_active {
-            // Extract panel_ids from this call
-            let new_ids: Vec<&str> = tool
-                .input
-                .get("panels")
-                .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|p| p.get("panel_id").and_then(serde_json::Value::as_str)).collect())
-                .unwrap_or_default();
-
-            // Extract panel_ids from all queued Close_conversation_history calls
-            let queued_ids: Vec<&str> = qs
-                .queued_calls
-                .iter()
-                .filter(|q| q.tool_name == "Close_conversation_history")
-                .flat_map(|q| {
-                    q.input
-                        .get("panels")
-                        .and_then(|v| v.as_array())
-                        .into_iter()
-                        .flatten()
-                        .filter_map(|p| p.get("panel_id").and_then(serde_json::Value::as_str))
-                })
-                .collect();
-
-            for id in &new_ids {
-                if queued_ids.contains(id) {
-                    result.errors.push(format!(
-                        "Panel '{id}' is already queued for closing by another Close_conversation_history call",
-                    ));
-                    return result;
-                }
-            }
-        }
+    if tool.name == "Close_conversation_history"
+        && let Some(dup_err) = check_duplicate_close(tool, state)
+    {
+        result.errors.push(dup_err);
+        return result;
     }
 
     // Phase 1: Global schema validation against ToolDefinition
@@ -90,11 +60,48 @@ pub(crate) fn pre_flight_tool(tool: &ToolUse, state: &State, active_modules: &Ha
     result
 }
 
+/// Reject a `Close_conversation_history` call whose target panel is already
+/// queued for closing by another such call. Returns `None` when the trap is
+/// active (queued items frozen, closes execute directly) or no clash exists.
+fn check_duplicate_close(tool: &ToolUse, state: &State) -> Option<String> {
+    let qs = cp_mod_queue::types::QueueState::get(state);
+    if qs.trap_active {
+        return None;
+    }
+    // Extract panel_ids from this call
+    let new_ids: Vec<&str> = tool
+        .input
+        .get("panels")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(|p| p.get("panel_id").and_then(serde_json::Value::as_str)).collect())
+        .unwrap_or_default();
+
+    // Extract panel_ids from all queued Close_conversation_history calls
+    let queued_ids: Vec<&str> = qs
+        .queued_calls
+        .iter()
+        .filter(|q| q.tool_name == "Close_conversation_history")
+        .flat_map(|q| {
+            q.input
+                .get("panels")
+                .and_then(|v| v.as_array())
+                .into_iter()
+                .flatten()
+                .filter_map(|p| p.get("panel_id").and_then(serde_json::Value::as_str))
+        })
+        .collect();
+
+    new_ids
+        .iter()
+        .find(|id| queued_ids.contains(id))
+        .map(|id| format!("Panel '{id}' is already queued for closing by another Close_conversation_history call"))
+}
+
 /// Validate tool input JSON against the parameter schema.
 /// Checks: required params present, basic type matching.
 fn validate_schema(input: &serde_json::Value, params: &[ToolParam], result: &mut Verdict) {
     let Some(obj) = input.as_object() else {
-        result.errors.push("Tool input must be a JSON object".to_string());
+        result.errors.push("Tool input must be a JSON object".to_owned());
         return;
     };
 
@@ -119,7 +126,7 @@ fn validate_schema(input: &serde_json::Value, params: &[ToolParam], result: &mut
             }
 
             // Enum check
-            if let Some(ref enum_vals) = param.enum_values
+            if let Some(enum_vals) = param.enum_values.as_ref()
                 && let Some(s) = val.as_str()
                 && !enum_vals.iter().any(|e: &String| e == s)
             {
@@ -140,19 +147,19 @@ fn validate_schema(input: &serde_json::Value, params: &[ToolParam], result: &mut
 /// Lenient for arrays: a single value matching the inner type is accepted
 /// (common LLM mistake — sending `"path": "foo.rs"` instead of `"path": ["foo.rs"]`).
 fn check_type(value: &serde_json::Value, expected: &ParamType) -> bool {
-    match expected {
+    cp_base::deref_match!(expected, {
         ParamType::String => value.is_string(),
         ParamType::Integer => value.is_i64() || value.is_u64(),
         ParamType::Number => value.is_number(),
         ParamType::Boolean => value.is_boolean(),
-        ParamType::Array(inner) => value.is_array() || check_type(value, inner),
+        ParamType::Array(ref inner) => value.is_array() || check_type(value, inner),
         ParamType::Object(_) => value.is_object(),
-    }
+    })
 }
 
 /// Human-readable name for a `ParamType`.
 const fn type_name(pt: &ParamType) -> &'static str {
-    match pt {
+    match *pt {
         ParamType::String => "string",
         ParamType::Integer => "integer",
         ParamType::Number => "number",
@@ -164,7 +171,7 @@ const fn type_name(pt: &ParamType) -> &'static str {
 
 /// Human-readable name for a JSON value type.
 const fn json_type_name(val: &serde_json::Value) -> &'static str {
-    match val {
+    match *val {
         serde_json::Value::Null => "null",
         serde_json::Value::Bool(_) => "boolean",
         serde_json::Value::Number(_) => "number",
@@ -184,10 +191,10 @@ fn validate_tool_metadata(tool: &ToolUse, result: &mut Verdict) {
     match intent {
         None => result
             .warnings
-            .push(format!("Missing parameter: 'intent'. Provide a 1-10 word reason for calling {}.", tool.name,)),
-        Some(s) if s.trim().is_empty() => result.warnings.push("Parameter 'intent' is empty.".to_string()),
+            .push(format!("Missing parameter: 'intent'. Provide a 1-10 word reason for calling {}.", tool.name)),
+        Some(s) if s.trim().is_empty() => result.warnings.push("Parameter 'intent' is empty.".to_owned()),
         Some(s) if s.split_whitespace().count() > 10 => {
-            result.warnings.push("Parameter 'intent' exceeds 10 words — keep it concise.".to_string());
+            result.warnings.push("Parameter 'intent' exceeds 10 words \u{2014} keep it concise.".to_owned());
         }
         Some(_) => {}
     }
@@ -195,10 +202,10 @@ fn validate_tool_metadata(tool: &ToolUse, result: &mut Verdict) {
     match verb {
         None => result
             .warnings
-            .push(format!("Missing parameter: 'verb'. Provide a single -ING action word for {}.", tool.name,)),
-        Some(s) if s.trim().is_empty() => result.warnings.push("Parameter 'verb' is empty.".to_string()),
+            .push(format!("Missing parameter: 'verb'. Provide a single -ING action word for {}.", tool.name)),
+        Some(s) if s.trim().is_empty() => result.warnings.push("Parameter 'verb' is empty.".to_owned()),
         Some(s) if s.split_whitespace().count() != 1 => {
-            result.warnings.push("Parameter 'verb' must be exactly 1 word.".to_string());
+            result.warnings.push("Parameter 'verb' must be exactly 1 word.".to_owned());
         }
         Some(_) => {}
     }

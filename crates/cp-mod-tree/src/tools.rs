@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -11,53 +10,14 @@ use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::storage;
 use crate::types::{TreeFileDescription, TreeState};
-use std::fmt::Write as _;
 
 /// Whether to show `.context-pilot/` in the tree (opt-in via env var).
-static SHOW_CONTEXT_PILOT: LazyLock<bool> =
+pub(crate) static SHOW_CONTEXT_PILOT: LazyLock<bool> =
     LazyLock::new(|| std::env::var("SHOW_CONTEXT_PILOT_IN_TREE").is_ok_and(|v| v == "1" || v == "true"));
 
 /// Mark tree context cache as deprecated (needs refresh)
 fn invalidate_tree_cache(state: &mut State) {
     cp_base::panels::mark_panels_dirty(state, Kind::TREE);
-}
-
-/// Generate tree string without mutating state (for read-only rendering)
-pub(crate) fn generate_tree_string(
-    tree_filter: &str,
-    tree_open_folders: &[String],
-    tree_descriptions: &[TreeFileDescription],
-) -> String {
-    let root = PathBuf::from(".");
-
-    // Build gitignore matcher from filter
-    let mut builder = GitignoreBuilder::new(&root);
-    for line in tree_filter.lines() {
-        let line = line.trim();
-        if !line.is_empty() && !line.starts_with('#') {
-            let _: Option<&mut GitignoreBuilder> = builder.add_line(None, line).ok();
-        }
-    }
-    let gitignore = builder.build().ok();
-
-    // Build set of open folders for quick lookup
-    let open_set: HashSet<_> = tree_open_folders.iter().cloned().collect();
-
-    // Build map of descriptions for quick lookup
-    let desc_map: std::collections::HashMap<_, _> = tree_descriptions.iter().map(|d| (d.path.clone(), d)).collect();
-
-    let mut output = String::new();
-
-    // Show pwd at the top
-    if let Ok(cwd) = std::env::current_dir() {
-        let _r = writeln!(output, "pwd: {}", cwd.display());
-    }
-
-    // Build tree recursively - directly show contents without root folder line
-    let ctx = TreeContext { gitignore: gitignore.as_ref(), open_set: &open_set, desc_map: &desc_map };
-    build_tree_new(&TreeNode { dir: &root, path_str: ".", prefix: "" }, &ctx, &mut output);
-
-    output
 }
 
 /// Compute a short hash (8-char truncated FNV-1a) for a file's contents.
@@ -67,7 +27,98 @@ pub(crate) fn generate_tree_string(
 pub fn compute_file_hash(path: &Path) -> Option<String> {
     let content = fs::read(path).ok()?;
     let hex = cp_mod_utilities::hash::compute(&content);
-    Some(hex.get(..8).unwrap_or(&hex).to_string())
+    Some(hex.get(..8).unwrap_or(&hex).to_owned())
+}
+
+/// Outcome of toggling one folder path.
+enum ToggleChange {
+    /// Folder was expanded.
+    Opened,
+    /// Folder (and its children) was collapsed.
+    Closed,
+}
+
+/// Expand a folder: record it as open.
+fn open_folder(state: &mut State, normalized: &str) {
+    TreeState::get_mut(state).open_folders.push(normalized.to_owned());
+}
+
+/// Collapse a folder and every descendant folder.
+fn close_folder(state: &mut State, normalized: &str) {
+    let ts = TreeState::get_mut(state);
+    ts.open_folders.retain(|p| p != normalized);
+    let prefix = format!("{normalized}/");
+    ts.open_folders.retain(|p| !p.starts_with(&prefix));
+}
+
+/// Collapse `normalized`, rejecting the root and no-op'ing when already closed.
+fn do_close(state: &mut State, normalized: &str) -> Result<Option<ToggleChange>, String> {
+    if normalized == "." {
+        return Err("Cannot close root folder".to_owned());
+    }
+    if !TreeState::get(state).open_folders.contains(&normalized.to_owned()) {
+        return Ok(None);
+    }
+    close_folder(state, normalized);
+    Ok(Some(ToggleChange::Closed))
+}
+
+/// Expand `normalized`, no-op'ing when already open.
+fn do_open(state: &mut State, normalized: &str) -> Option<ToggleChange> {
+    if TreeState::get(state).open_folders.contains(&normalized.to_owned()) {
+        return None;
+    }
+    open_folder(state, normalized);
+    Some(ToggleChange::Opened)
+}
+
+/// Apply one folder toggle. `action` is `"open"`, `"close"`, or anything else
+/// (treated as a toggle: close when open, open when closed).
+fn toggle_path(state: &mut State, path: &Path, normalized: &str, action: &str) -> Result<Option<ToggleChange>, String> {
+    if !path.is_dir() && normalized != "." {
+        return Err(format!("{normalized}: not a directory"));
+    }
+    let is_open = TreeState::get(state).open_folders.contains(&normalized.to_owned());
+    let want_close = match action {
+        "open" => false,
+        "close" => true,
+        _ => is_open,
+    };
+    if want_close { do_close(state, normalized) } else { Ok(do_open(state, normalized)) }
+}
+
+/// Append `"{label}: a, b, c"` to `result` when `items` is non-empty.
+fn push_label(result: &mut Vec<String>, label: &str, items: &[String], sep: &str) {
+    if !items.is_empty() {
+        result.push(format!("{label}: {}", items.join(sep)));
+    }
+}
+
+/// Tallies produced by a `tree_toggle_folders` invocation.
+#[derive(Default)]
+struct ToggleTally {
+    /// Folders newly expanded.
+    opened: Vec<String>,
+    /// Folders collapsed.
+    closed: Vec<String>,
+    /// Per-path error messages.
+    errors: Vec<String>,
+}
+
+/// Apply `action` to every path, returning open/close/error tallies.
+fn run_toggles(state: &mut State, paths: &[&str], action: &str) -> ToggleTally {
+    let mut tally = ToggleTally::default();
+    for path_str in paths {
+        let path = PathBuf::from(path_str);
+        let normalized = crate::render::normalize_path(&path);
+        match toggle_path(state, &path, &normalized, action) {
+            Ok(Some(ToggleChange::Opened)) => tally.opened.push(normalized),
+            Ok(Some(ToggleChange::Closed)) => tally.closed.push(normalized),
+            Ok(None) => {}
+            Err(e) => tally.errors.push(e),
+        }
+    }
+    tally
 }
 
 /// Execute `tree_toggle_folders` tool - open or close folders
@@ -83,75 +134,15 @@ pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolR
     let action = tool.input.get("action").and_then(|v| v.as_str()).unwrap_or("toggle");
 
     if paths.is_empty() {
-        return ToolResult::new(tool.id.clone(), "Missing 'paths' parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing 'paths' parameter".to_owned(), true);
     }
 
-    let mut opened = Vec::new();
-    let mut closed = Vec::new();
-    let mut errors = Vec::new();
-
-    for path_str in paths {
-        // Normalize path
-        let path = PathBuf::from(path_str);
-        let normalized = normalize_path(&path);
-
-        // Verify it's a directory
-        if !path.is_dir() && normalized != "." {
-            errors.push(format!("{path_str}: not a directory"));
-            continue;
-        }
-
-        let ts = TreeState::get(state);
-        let is_open = ts.open_folders.contains(&normalized);
-
-        match action {
-            "open" => {
-                if !is_open {
-                    TreeState::get_mut(state).open_folders.push(normalized.clone());
-                    opened.push(normalized);
-                }
-            }
-            "close" => {
-                // Don't allow closing root
-                if normalized == "." {
-                    errors.push("Cannot close root folder".to_string());
-                    continue;
-                }
-                if is_open {
-                    let ts_mut = TreeState::get_mut(state);
-                    ts_mut.open_folders.retain(|p| p != &normalized);
-                    // Also close all children
-                    let prefix = format!("{normalized}/");
-                    ts_mut.open_folders.retain(|p| !p.starts_with(&prefix));
-                    closed.push(normalized);
-                }
-            }
-            _ => {
-                // toggle
-                if is_open && normalized != "." {
-                    let ts_toggle = TreeState::get_mut(state);
-                    ts_toggle.open_folders.retain(|p| p != &normalized);
-                    let prefix = format!("{normalized}/");
-                    ts_toggle.open_folders.retain(|p| !p.starts_with(&prefix));
-                    closed.push(normalized);
-                } else if !is_open {
-                    TreeState::get_mut(state).open_folders.push(normalized.clone());
-                    opened.push(normalized);
-                }
-            }
-        }
-    }
+    let ToggleTally { opened, closed, errors } = run_toggles(state, &paths, action);
 
     let mut result = Vec::new();
-    if !opened.is_empty() {
-        result.push(format!("Opened: {}", opened.join(", ")));
-    }
-    if !closed.is_empty() {
-        result.push(format!("Closed: {}", closed.join(", ")));
-    }
-    if !errors.is_empty() {
-        result.push(format!("Errors: {}", errors.join(", ")));
-    }
+    push_label(&mut result, "Opened", &opened, ", ");
+    push_label(&mut result, "Closed", &closed, ", ");
+    push_label(&mut result, "Errors", &errors, ", ");
 
     // Invalidate tree cache to trigger refresh
     if !opened.is_empty() || !closed.is_empty() {
@@ -160,7 +151,7 @@ pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolR
 
     let mut tool_result = ToolResult::new(
         tool.id.clone(),
-        if result.is_empty() { "No changes".to_string() } else { result.join("\n") },
+        if result.is_empty() { "No changes".to_owned() } else { result.join("\n") },
         false,
     );
     // Closing folders reduces context content — safe to preserve tempo.
@@ -171,121 +162,160 @@ pub(crate) fn execute_toggle_folders(tool: &ToolUse, state: &mut State) -> ToolR
     tool_result
 }
 
-/// Execute `tree_describe_files` tool - add/update/remove file descriptions
-pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let _fg = cp_base::flame!("tree_describe");
-    let descriptions = tool.input.get("descriptions").and_then(|v| v.as_array());
+/// Running tallies for a `tree_describe_files` invocation.
+#[derive(Default)]
+struct DescribeTally {
+    /// Paths whose descriptions were newly added.
+    added: Vec<String>,
+    /// Paths whose descriptions were updated.
+    updated: Vec<String>,
+    /// Paths whose descriptions were removed.
+    removed: Vec<String>,
+    /// Auto-closed file panels (`"{panel_id} ({path})"`).
+    auto_closed: Vec<String>,
+    /// Per-entry error messages.
+    errors: Vec<String>,
+}
 
-    let Some(descriptions) = descriptions else {
-        return ToolResult::new(tool.id.clone(), "Missing 'descriptions' parameter".to_string(), true);
+/// Whether an upsert added a new description or updated an existing one.
+enum UpsertKind {
+    /// A new description was inserted.
+    Added,
+    /// An existing description was overwritten.
+    Updated,
+}
+
+/// Insert or update a description in state, reporting which happened.
+fn upsert_description(state: &mut State, normalized: &str, description: String, file_hash: String) -> UpsertKind {
+    let ts = TreeState::get_mut(state);
+    if let Some(existing) = ts.descriptions.iter_mut().find(|d| d.path == normalized) {
+        existing.description = description;
+        existing.file_hash = file_hash;
+        UpsertKind::Updated
+    } else {
+        ts.descriptions.push(TreeFileDescription { path: normalized.to_owned(), description, file_hash });
+        UpsertKind::Added
+    }
+}
+
+/// Handle a `delete: true` request. Returns `true` when the object was a delete
+/// request (handled here, caller should stop), `false` otherwise.
+fn try_delete_description(
+    state: &mut State,
+    desc_obj: &serde_json::Value,
+    normalized: &str,
+    tally: &mut DescribeTally,
+) -> bool {
+    if !desc_obj.get("delete").and_then(serde_json::Value::as_bool).unwrap_or(false) {
+        return false;
+    }
+    if TreeState::get(state).descriptions.iter().any(|d| d.path == normalized) {
+        TreeState::get_mut(state).descriptions.retain(|d| d.path != normalized);
+        tally.removed.push(normalized.to_owned());
+    }
+    true
+}
+
+/// Close the open FILE panel for `normalized`, if any; returns its `"id (path)"` tag.
+fn auto_close_file_panel(state: &mut State, normalized: &str, cwd: Option<&PathBuf>) -> Option<String> {
+    let cwd_path = cwd?;
+    let abs_path = cwd_path.join(normalized).to_string_lossy().to_string();
+    let pos = state
+        .context
+        .iter()
+        .position(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&abs_path))?;
+    let panel_id = state.context.get(pos).map(|c| c.id.clone()).unwrap_or_default();
+    let _removed = state.context.remove(pos);
+    Some(format!("{panel_id} ({normalized})"))
+}
+
+/// Process one description object (add / update / delete + optional panel close).
+fn describe_one(state: &mut State, desc_obj: &serde_json::Value, cwd: Option<&PathBuf>, tally: &mut DescribeTally) {
+    let Some(path_str) = desc_obj.get("path").and_then(|v| v.as_str()) else {
+        tally.errors.push("Missing 'path' in description".to_owned());
+        return;
+    };
+    let path = PathBuf::from(path_str);
+    let normalized = crate::render::normalize_path(&path);
+
+    if try_delete_description(state, desc_obj, &normalized, tally) {
+        return;
+    }
+
+    let Some(description) = desc_obj.get("description").and_then(|v| v.as_str()) else {
+        tally.errors.push(format!("{path_str}: missing 'description'"));
+        return;
     };
 
-    let mut added = Vec::new();
-    let mut updated = Vec::new();
-    let mut removed = Vec::new();
-    let mut auto_closed = Vec::new();
-    let mut errors = Vec::new();
-
-    // Resolve CWD once for absolute path matching when auto-closing panels.
-    let cwd = std::env::current_dir().ok();
-
-    for desc_obj in descriptions {
-        let Some(path_str) = desc_obj.get("path").and_then(|v| v.as_str()) else {
-            errors.push("Missing 'path' in description".to_string());
-            continue;
-        };
-
-        let path = PathBuf::from(path_str);
-        let normalized = normalize_path(&path);
-
-        // Check if delete is requested
-        if desc_obj.get("delete").and_then(serde_json::Value::as_bool).unwrap_or(false) {
-            if TreeState::get(state).descriptions.iter().any(|d| d.path == normalized) {
-                TreeState::get_mut(state).descriptions.retain(|d| d.path != normalized);
-                removed.push(normalized);
-            }
-            continue;
-        }
-
-        let description = if let Some(d) = desc_obj.get("description").and_then(|v| v.as_str()) {
-            d.to_string()
-        } else {
-            errors.push(format!("{path_str}: missing 'description'"));
-            continue;
-        };
-
-        // Verify path exists (file or folder)
-        if !path.exists() {
-            errors.push(format!("{path_str}: path not found"));
-            continue;
-        }
-
-        // Compute file hash
-        let file_hash = compute_file_hash(&path).unwrap_or_default();
-
-        // Update or add
-        let ts = TreeState::get_mut(state);
-        if let Some(existing) = ts.descriptions.iter_mut().find(|d| d.path == normalized) {
-            existing.description = description;
-            existing.file_hash = file_hash;
-            updated.push(normalized.clone());
-        } else {
-            ts.descriptions.push(TreeFileDescription { path: normalized.clone(), description, file_hash });
-            added.push(normalized.clone());
-        }
-
-        // Auto-close the file's open panel unless close_panel=false
-        let should_close = desc_obj.get("close_panel").and_then(serde_json::Value::as_bool).unwrap_or(true);
-        if should_close && let Some(ref cwd) = cwd {
-            let abs_path = cwd.join(&normalized).to_string_lossy().to_string();
-            if let Some(pos) = state
-                .context
-                .iter()
-                .position(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&abs_path))
-            {
-                let panel_id = state.context.get(pos).map(|c| c.id.clone()).unwrap_or_default();
-                let _removed = state.context.remove(pos);
-                auto_closed.push(format!("{panel_id} ({normalized})"));
-            }
-        }
+    if !path.exists() {
+        tally.errors.push(format!("{path_str}: path not found"));
+        return;
     }
 
-    let mut result = Vec::new();
-    if !added.is_empty() {
-        result.push(format!("Added: {}", added.join(", ")));
-    }
-    if !updated.is_empty() {
-        result.push(format!("Updated: {}", updated.join(", ")));
-    }
-    if !removed.is_empty() {
-        result.push(format!("Removed: {}", removed.join(", ")));
-    }
-    if !auto_closed.is_empty() {
-        result.push(format!("Auto-closed panels: {}", auto_closed.join(", ")));
-    }
-    if !errors.is_empty() {
-        result.push(format!("Errors: {}", errors.join("; ")));
+    let file_hash = compute_file_hash(&path).unwrap_or_default();
+    match upsert_description(state, &normalized, description.to_owned(), file_hash) {
+        UpsertKind::Added => tally.added.push(normalized.clone()),
+        UpsertKind::Updated => tally.updated.push(normalized.clone()),
     }
 
-    // Sync changes to YAML backing store
+    // Auto-close the file's open panel unless close_panel=false.
+    let should_close = desc_obj.get("close_panel").and_then(serde_json::Value::as_bool).unwrap_or(true);
+    if should_close && let Some(tag) = auto_close_file_panel(state, &normalized, cwd) {
+        tally.auto_closed.push(tag);
+    }
+}
+
+/// Persist added/updated descriptions and drop removed ones from the YAML store.
+fn sync_descriptions_to_yaml(state: &State, added: &[String], updated: &[String], removed: &[String]) {
     for path in added.iter().chain(updated.iter()) {
         if let Some(desc) = TreeState::get(state).descriptions.iter().find(|d| d.path == *path) {
             storage::upsert_yaml_entry(&desc.path, &desc.description);
         }
     }
-    for path in &removed {
+    for path in removed {
         storage::remove_yaml_entry(path);
     }
+}
+
+/// Execute `tree_describe_files` tool - add/update/remove file descriptions
+pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
+    let _fg = cp_base::flame!("tree_describe");
+    let descriptions_arr = tool.input.get("descriptions").and_then(|v| v.as_array());
+
+    let Some(descriptions) = descriptions_arr else {
+        return ToolResult::new(tool.id.clone(), "Missing 'descriptions' parameter".to_owned(), true);
+    };
+
+    let mut tally = DescribeTally::default();
+
+    // Resolve CWD once for absolute path matching when auto-closing panels.
+    let cwd = std::env::current_dir().ok();
+
+    for desc_obj in descriptions {
+        describe_one(state, desc_obj, cwd.as_ref(), &mut tally);
+    }
+
+    let DescribeTally { added, updated, removed, auto_closed, errors } = tally;
+
+    let mut result = Vec::new();
+    push_label(&mut result, "Added", &added, ", ");
+    push_label(&mut result, "Updated", &updated, ", ");
+    push_label(&mut result, "Removed", &removed, ", ");
+    push_label(&mut result, "Auto-closed panels", &auto_closed, ", ");
+    push_label(&mut result, "Errors", &errors, "; ");
+
+    sync_descriptions_to_yaml(state, &added, &updated, &removed);
 
     // Invalidate tree cache to trigger refresh
     if !added.is_empty() || !updated.is_empty() || !removed.is_empty() {
         invalidate_tree_cache(state);
     }
 
+    let is_error = !errors.is_empty() && added.is_empty() && updated.is_empty() && removed.is_empty();
     ToolResult::new(
         tool.id.clone(),
-        if result.is_empty() { "No changes".to_string() } else { result.join("\n") },
-        !errors.is_empty() && added.is_empty() && updated.is_empty() && removed.is_empty(),
+        if result.is_empty() { "No changes".to_owned() } else { result.join("\n") },
+        is_error,
     )
 }
 
@@ -293,23 +323,15 @@ pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolR
 pub(crate) fn execute_edit_filter(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("tree_filter");
     let Some(filter) = tool.input.get("filter").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'filter' parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing 'filter' parameter".to_owned(), true);
     };
 
-    TreeState::get_mut(state).filter = filter.to_string();
+    filter.clone_into(&mut TreeState::get_mut(state).filter);
 
     // Invalidate tree cache to trigger refresh
     invalidate_tree_cache(state);
 
     ToolResult::new(tool.id.clone(), format!("Updated tree filter:\n{filter}"), false)
-}
-
-/// Normalize a path to a consistent format
-fn normalize_path(path: &Path) -> String {
-    let path_str = path.to_string_lossy();
-    let normalized = path_str.trim_start_matches("./").trim_end_matches('/');
-
-    if normalized.is_empty() || normalized == "." { ".".to_string() } else { normalized.to_string() }
 }
 
 /// List directory entries (files + folders) matching a prefix, respecting the gitignore filter.
@@ -327,9 +349,9 @@ pub fn list_dir_entries(
     // Build gitignore matcher from filter
     let mut builder = GitignoreBuilder::new(&root);
     for line in tree_filter.lines() {
-        let line = line.trim();
-        if !line.is_empty() && !line.starts_with('#') {
-            let _: Option<&mut GitignoreBuilder> = builder.add_line(None, line).ok();
+        let trimmed = line.trim();
+        if !trimmed.is_empty() && !trimmed.starts_with('#') {
+            let _: Option<&mut GitignoreBuilder> = builder.add_line(None, trimmed).ok();
         }
     }
     let gitignore = builder.build().ok();
@@ -356,7 +378,7 @@ pub fn list_dir_entries(
             }
 
             // Apply gitignore filter
-            if let Some(ref gi) = gitignore
+            if let Some(gi) = gitignore.as_ref()
                 && gi.matched(&path, is_dir).is_ignore()
             {
                 return None;
@@ -367,7 +389,7 @@ pub fn list_dir_entries(
                 return None;
             }
 
-            Some(cp_base::state::autocomplete::Completion { name, is_dir })
+            Some(cp_base::state::autocomplete::Completion::new(name, is_dir))
         })
         .collect();
 
@@ -379,104 +401,4 @@ pub fn list_dir_entries(
     });
 
     entries
-}
-
-/// Context passed through tree recursion to avoid excessive parameters.
-struct TreeContext<'tree> {
-    /// Optional gitignore matcher for filtering entries.
-    gitignore: Option<&'tree ignore::gitignore::Gitignore>,
-    /// Set of folder paths currently expanded in the tree.
-    open_set: &'tree HashSet<String>,
-    /// Map from path to file/folder description annotation.
-    desc_map: &'tree std::collections::HashMap<String, &'tree TreeFileDescription>,
-}
-
-/// Recursive traversal state for a single tree node.
-struct TreeNode<'tree> {
-    /// Filesystem directory path for this node.
-    dir: &'tree Path,
-    /// Normalized string representation of the path.
-    path_str: &'tree str,
-    /// Indentation prefix for tree drawing characters.
-    prefix: &'tree str,
-}
-
-/// Recursively build the tree output string for a single directory node.
-fn build_tree_new(node: &TreeNode<'_>, ctx: &TreeContext<'_>, output: &mut String) {
-    let Ok(entries) = fs::read_dir(node.dir) else { return };
-
-    let mut items: Vec<_> = entries
-        .filter_map(Result::ok)
-        .filter(|e| {
-            let path = e.path();
-            let is_dir = path.is_dir();
-            // .context-pilot/ is internal rigging — hide unless explicitly opted in
-            if is_dir && e.file_name() == ".context-pilot" && !*SHOW_CONTEXT_PILOT {
-                return false;
-            }
-            ctx.gitignore.as_ref().is_none_or(|gi| !gi.matched(&path, is_dir).is_ignore())
-        })
-        .collect();
-
-    // Sort: directories first, then alphabetically
-    items.sort_by(|a, b| {
-        let a_dir = a.path().is_dir();
-        let b_dir = b.path().is_dir();
-        match (a_dir, b_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.file_name().cmp(&b.file_name()),
-        }
-    });
-
-    let total = items.len();
-    for (i, entry) in items.iter().enumerate() {
-        let is_last = i == total.saturating_sub(1);
-        let connector = if is_last { "└── " } else { "├── " };
-        let child_prefix = if is_last { "    " } else { "│   " };
-
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
-        let is_dir = entry.path().is_dir();
-
-        // Build path string for this entry
-        let entry_path =
-            if node.path_str == "." { name_str.to_string() } else { format!("{}/{name_str}", node.path_str) };
-
-        if is_dir {
-            let is_open = ctx.open_set.contains(&entry_path);
-
-            // Check for folder description
-            let folder_desc = ctx.desc_map.get(&entry_path).map(|d| &d.description);
-
-            let triangle = if is_open { "▼ " } else { "▶ " };
-            if is_open {
-                if let Some(desc) = folder_desc {
-                    let _r = writeln!(output, "{}{connector}{triangle}{name_str}/  - {desc}", node.prefix);
-                } else {
-                    let _r = writeln!(output, "{}{connector}{triangle}{name_str}/", node.prefix);
-                }
-                let child_node = TreeNode {
-                    dir: &entry.path(),
-                    path_str: &entry_path,
-                    prefix: &format!("{}{child_prefix}", node.prefix),
-                };
-                build_tree_new(&child_node, ctx, output);
-            } else if let Some(desc) = folder_desc {
-                let _r = writeln!(output, "{}{connector}{triangle}{name_str}/ - {desc}", node.prefix);
-            } else {
-                let _r = writeln!(output, "{}{connector}{triangle}{name_str}/ ", node.prefix);
-            }
-        } else if let Some(desc) = ctx.desc_map.get(&entry_path) {
-            // Check if description is stale
-            let current_hash = compute_file_hash(&entry.path()).unwrap_or_default();
-            let is_stale = !desc.file_hash.is_empty() && desc.file_hash != current_hash;
-
-            let stale_marker = if is_stale { " [!]" } else { "" };
-            let _r =
-                writeln!(output, "{}{}{}{} - {}", node.prefix, connector, name_str, stale_marker, desc.description);
-        } else {
-            let _r = writeln!(output, "{}{connector}{name_str}", node.prefix);
-        }
-    }
 }

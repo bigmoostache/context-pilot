@@ -75,14 +75,7 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
         return;
     };
 
-    thread.messages.push(ThreadMessage {
-        author: ThreadAuthor::User,
-        content: Some(content.to_owned()),
-        file_path: None,
-        timestamp: now_ms(),
-        acknowledged: false,
-        auto: false,
-    });
+    thread.messages.push(ThreadMessage::user(content.to_owned()));
     thread.status = ThreadStatus::MyTurn;
     let thread_name = thread.name.clone();
 
@@ -103,7 +96,7 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
              2. Send a short acknowledgement (still_my_turn=true)",
         );
         let _r =
-            SpineState::create_notification(state, NotificationType::Custom, "focused_thread_input".to_string(), notif);
+            SpineState::create_notification(state, NotificationType::Custom, "focused_thread_input".to_owned(), notif);
     }
 
     for module in crate::modules::all_modules() {
@@ -122,15 +115,7 @@ fn apply_create_thread(state: &mut State, name: &str) {
     let id = format!("T{}", ts.next_id);
     ts.next_id = ts.next_id.saturating_add(1);
 
-    ts.threads.push(cp_mod_threads::types::Thread {
-        id: id.clone(),
-        name: name.to_owned(),
-        status: ThreadStatus::TheirTurn,
-        messages: vec![],
-        created_at: now_ms(),
-        archived: false,
-        paused: false,
-    });
+    ts.threads.push(cp_mod_threads::types::Thread::new(id.clone(), name.to_owned()));
 
     // Emit the durable roster delta so the backend view reflects the new
     // thread in ms (Leg 0 keystone) — a fresh, empty thread is the user's turn
@@ -171,7 +156,7 @@ fn apply_archive_thread(state: &mut State, thread_id: &str) {
     let focus = FocusState::get_mut(state);
     if focus.focused_thread_id.as_deref() == Some(thread_id) {
         focus.focused_thread_id = None;
-        focus.dangling_remaining = 0;
+        focus.dangling_remaining = 0i32;
         focus.escalation_level = 0;
     }
     let _prev = focus.last_read_count.remove(thread_id);
@@ -258,7 +243,7 @@ fn apply_delete_thread(state: &mut State, thread_id: &str) {
     let focus = FocusState::get_mut(state);
     if focus.focused_thread_id.as_deref() == Some(thread_id) {
         focus.focused_thread_id = None;
-        focus.dangling_remaining = 0;
+        focus.dangling_remaining = 0i32;
         focus.escalation_level = 0;
     }
     let _prev = focus.last_read_count.remove(thread_id);
@@ -304,24 +289,7 @@ fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
         return;
     };
 
-    let is_assistant = thread.messages.get(idx).is_some_and(|m| m.author == ThreadAuthor::Assistant);
-
-    // Collect timestamps to delete: the target + any trailing auto messages.
-    let mut to_delete: Vec<u64> = vec![message_ts];
-
-    if is_assistant {
-        // Walk backward from idx-1 collecting consecutive auto messages
-        // (tool-call traces that produced this response).
-        if let Some(preceding) = thread.messages.get(..idx) {
-            for msg in preceding.iter().rev() {
-                if msg.auto {
-                    to_delete.push(msg.timestamp);
-                } else {
-                    break;
-                }
-            }
-        }
-    }
+    let to_delete = collect_delete_timestamps(thread, idx, message_ts);
 
     // Remove all collected messages.
     let delete_set: std::collections::HashSet<u64> = to_delete.iter().copied().collect();
@@ -342,7 +310,28 @@ fn apply_delete_message(state: &mut State, thread_id: &str, message_ts: u64) {
     }
 
     state.flags.ui.dirty = true;
-    log::info!("bridge: deleted {} message(s) from thread {thread_id} (target ts={message_ts})", to_delete.len(),);
+    log::info!("bridge: deleted {} message(s) from thread {thread_id} (target ts={message_ts})", to_delete.len());
+}
+
+/// Timestamps to delete for a `DeleteMessage`: the target plus, when the target
+/// is an assistant message, all *consecutive* `auto:true` messages immediately
+/// *preceding* it (tool-trace cleanup — stops at the first non-auto message).
+fn collect_delete_timestamps(thread: &cp_mod_threads::types::Thread, idx: usize, message_ts: u64) -> Vec<u64> {
+    let mut to_delete: Vec<u64> = vec![message_ts];
+    let is_assistant = thread.messages.get(idx).is_some_and(|m| m.author == ThreadAuthor::Assistant);
+    if !is_assistant {
+        return to_delete;
+    }
+    if let Some(preceding) = thread.messages.get(..idx) {
+        for msg in preceding.iter().rev() {
+            if msg.auto {
+                to_delete.push(msg.timestamp);
+            } else {
+                break;
+            }
+        }
+    }
+    to_delete
 }
 
 // ── Stop / Interrupt ────────────────────────────────────────────────────

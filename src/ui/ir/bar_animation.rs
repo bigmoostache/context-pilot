@@ -14,12 +14,13 @@ use cp_render::frame::TokenBar;
 use ratatui::style::Color;
 
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 
 /// Default transition duration (ease-out cubic).
-const TRANSITION_DURATION: Duration = Duration::from_millis(1000);
+const TRANSITION_DURATION: Duration = Duration::from_secs(1);
 
 /// Pulse period during streaming (one full sine cycle).
-const PULSE_PERIOD: Duration = Duration::from_millis(2000);
+const PULSE_PERIOD: Duration = Duration::from_secs(2);
 
 /// Pulse amplitude: ±12% brightness swing.
 const PULSE_AMPLITUDE: f64 = 0.12;
@@ -50,7 +51,7 @@ impl BarTransition {
     /// Update the target. If it changed, start a new transition from the
     /// current interpolated position.
     fn update(&mut self, target: f64) {
-        if (self.to - target).abs() < 0.01 {
+        if float_math::abs_diff(self.to, target) < 0.01f64 {
             return; // no meaningful change
         }
         self.from = self.current();
@@ -63,13 +64,13 @@ impl BarTransition {
     fn current(&self) -> f64 {
         let elapsed = self.start.elapsed().as_secs_f64();
         let total = self.duration.as_secs_f64();
-        if total <= 0.0 {
+        if total <= 0.0f64 {
             return self.to;
         }
-        let t = (elapsed / total).clamp(0.0, 1.0);
+        let t = float_math::div(elapsed, total).clamp(0.0, 1.0);
         // Ease-out cubic: fast start, smooth deceleration
-        let eased = 1.0 - (1.0 - t).powi(3);
-        (self.to - self.from).mul_add(eased, self.from)
+        let eased = float_math::ease_out_cubic(t);
+        float_math::lerp(self.from, self.to, eased)
     }
 }
 
@@ -125,9 +126,9 @@ impl TokenBarAnimator {
         }
         let elapsed = self.stream_start.elapsed().as_secs_f64();
         let period = PULSE_PERIOD.as_secs_f64();
-        let phase = (elapsed / period).fract();
+        let phase = float_math::fract_phase(elapsed, period);
         // Sine wave: 1.0 ± PULSE_AMPLITUDE
-        Some(PULSE_AMPLITUDE.mul_add((phase * std::f64::consts::TAU).sin(), 1.0))
+        Some(float_math::pulse(PULSE_AMPLITUDE, phase))
     }
 }
 
@@ -166,9 +167,9 @@ pub(crate) fn tick(token_bar: &TokenBar) -> AnimatedBar {
 /// `t` = 0.0 → returns `a`, `t` = 1.0 → returns `b`.
 /// Falls back to `a` or `b` if either is not `Color::Rgb`.
 pub(crate) fn lerp_color(from: Color, to: Color, progress: f64) -> Color {
-    let progress = progress.clamp(0.0, 1.0);
+    let clamped = progress.clamp(0.0, 1.0);
     if let (Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2)) = (from, to) {
-        Color::Rgb(lerp_u8(r1, r2, progress), lerp_u8(g1, g2, progress), lerp_u8(b1, b2, progress))
+        Color::Rgb(lerp_u8(r1, r2, clamped), lerp_u8(g1, g2, clamped), lerp_u8(b1, b2, clamped))
     } else if progress < 0.5 {
         from
     } else {
@@ -190,11 +191,11 @@ pub(crate) fn pulse_color(color: Color, brightness: f64) -> Color {
 
 /// Interpolate a `u8` channel between two values.
 fn lerp_u8(from: u8, to: u8, progress: f64) -> u8 {
-    let result = (f64::from(to) - f64::from(from)).mul_add(progress, f64::from(from));
+    let result = float_math::lerp(f64::from(from), f64::from(to), progress);
     result.round().clamp(0.0, 255.0).to_u8()
 }
 
 /// Scale a `u8` channel by a brightness factor.
 fn scale_u8(value: u8, factor: f64) -> u8 {
-    (f64::from(value) * factor).round().clamp(0.0, 255.0).to_u8()
+    float_math::mul(f64::from(value), factor).round().clamp(0.0, 255.0).to_u8()
 }

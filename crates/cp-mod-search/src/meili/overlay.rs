@@ -97,6 +97,28 @@ fn current_ms() -> u64 {
         .unwrap_or(u64::MAX)
 }
 
+/// Compute Meilisearch CPU% from the tick delta vs the previous refresh.
+///
+/// `prev` is `(previous cpu ticks, previous fetched-at ms)`. Ticks are
+/// centiseconds (100/sec). Returns 0.0 on the first sample or a zero interval.
+///
+/// Float math routes through the `float_math` chokepoint (CPU% is a ratio of
+/// two time deltas — inherently fractional).
+fn compute_cpu_pct(prev: Option<(u64, u64)>, cur_ticks: u64) -> f32 {
+    use cp_base::cast::float_math;
+    let Some((prev_t, prev_ms)) = prev else {
+        return 0.0;
+    };
+    let tick_delta = cur_ticks.saturating_sub(prev_t);
+    let ms_delta = current_ms().saturating_sub(prev_ms);
+    if ms_delta == 0 || prev_t == 0 {
+        return 0.0;
+    }
+    let cpu_secs = float_math::div_u64(tick_delta, 100.0);
+    let wall_secs = float_math::div_u64(ms_delta, 1000.0);
+    float_math::percent(cpu_secs, wall_secs).to_f32()
+}
+
 /// Refresh cached live stats from Meilisearch if stale (>2s old).
 ///
 /// Makes HTTP calls (`/stats` + `/settings/embedders`) outside any lock.
@@ -143,48 +165,8 @@ fn refresh_live_stats(ss: &SearchState) {
     let tasks_json =
         meili.recent_tasks(5, &[&files_uid, &logs_uid]).unwrap_or_else(|_| serde_json::Value::Array(Vec::new()));
 
-    // -- Parse stats into MeiliLiveStats (inlined to avoid too_many_arguments) --
-
-    let db_size = stats.get("databaseSize").and_then(serde_json::Value::as_u64).unwrap_or(0);
-    let db_used = stats.get("usedDatabaseSize").and_then(serde_json::Value::as_u64).unwrap_or(0);
-    let last_update = stats.get("lastUpdate").and_then(serde_json::Value::as_str).unwrap_or("").to_string();
-
-    let indexes = stats.get("indexes");
-
-    let files_stats = indexes.and_then(|i| i.get(&files_uid));
-    let emb_count =
-        files_stats.and_then(|f| f.get("numberOfEmbeddings")).and_then(serde_json::Value::as_u64).unwrap_or(0);
-    let is_indexing =
-        files_stats.and_then(|f| f.get("isIndexing")).and_then(serde_json::Value::as_bool).unwrap_or(false);
-    let avg_doc_size =
-        files_stats.and_then(|f| f.get("avgDocumentSize")).and_then(serde_json::Value::as_u64).unwrap_or(0);
-    let raw_doc_db =
-        files_stats.and_then(|f| f.get("rawDocumentDbSize")).and_then(serde_json::Value::as_u64).unwrap_or(0);
-    let embedded_count =
-        files_stats.and_then(|f| f.get("numberOfEmbeddedDocuments")).and_then(serde_json::Value::as_u64).unwrap_or(0);
-    let total_count =
-        files_stats.and_then(|f| f.get("numberOfDocuments")).and_then(serde_json::Value::as_u64).unwrap_or(0);
-
-    let logs_stats = indexes.and_then(|i| i.get(&logs_uid));
-    let logs_count =
-        logs_stats.and_then(|l| l.get("numberOfDocuments")).and_then(serde_json::Value::as_u64).unwrap_or(0);
-
-    // Parse recent tasks
-    let recent_tasks = tasks_json
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|t| {
-                    Some(crate::types::MeiliTask {
-                        uid: t.get("uid")?.as_u64()?,
-                        task_type: t.get("type")?.as_str()?.to_string(),
-                        status: t.get("status")?.as_str()?.to_string(),
-                        duration: t.get("duration").and_then(serde_json::Value::as_str).unwrap_or("").to_string(),
-                    })
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+    let parsed = parse_stats_json(&stats, &files_uid, &logs_uid);
+    let recent_tasks = parse_recent_tasks(&tasks_json);
 
     // -- Read Meilisearch process stats (CPU ticks + RSS) --
     let meili_pid = super::server::read_pid();
@@ -193,35 +175,22 @@ fn refresh_live_stats(ss: &SearchState) {
     // Compute CPU% from tick delta vs previous refresh
     let prev_ticks =
         ss.metrics.lock().ok().and_then(|m| m.live_stats.as_ref().map(|s| (s.meili_cpu_ticks, s.fetched_at_ms)));
-    let meili_cpu_pct = if let Some((prev_t, prev_ms)) = prev_ticks {
-        let tick_delta = meili_cpu_ticks.saturating_sub(prev_t);
-        let ms_delta = current_ms().saturating_sub(prev_ms);
-        if ms_delta > 0 && prev_t > 0 {
-            // ticks are centiseconds (100 ticks/sec)
-            let cpu_secs = tick_delta.to_f32() / 100.0;
-            let wall_secs = ms_delta.to_f32() / 1000.0;
-            (cpu_secs / wall_secs) * 100.0
-        } else {
-            0.0
-        }
-    } else {
-        0.0
-    };
+    let meili_cpu_pct = compute_cpu_pct(prev_ticks, meili_cpu_ticks);
 
     let live = MeiliLiveStats {
-        database_size_bytes: db_size,
-        used_database_size_bytes: db_used,
-        files_embedding_count: emb_count,
-        files_is_indexing: is_indexing,
-        logs_doc_count: logs_count,
+        database_size_bytes: parsed.db_size,
+        used_database_size_bytes: parsed.db_used,
+        files_embedding_count: parsed.emb_count,
+        files_is_indexing: parsed.is_indexing,
+        logs_doc_count: parsed.logs_count,
         embedding_model: model,
         fetched_at_ms: current_ms(),
         version,
-        avg_document_size: avg_doc_size,
-        raw_document_db_size: raw_doc_db,
-        files_embedded_doc_count: embedded_count,
-        files_total_doc_count: total_count,
-        last_update,
+        avg_document_size: parsed.avg_doc_size,
+        raw_document_db_size: parsed.raw_doc_db,
+        files_embedded_doc_count: parsed.embedded_count,
+        files_total_doc_count: parsed.total_count,
+        last_update: parsed.last_update,
         recent_tasks,
         meili_cpu_ticks,
         meili_cpu_pct,
@@ -232,6 +201,76 @@ fn refresh_live_stats(ss: &SearchState) {
     if let Ok(mut m) = ss.metrics.lock() {
         m.live_stats = Some(live);
     }
+}
+
+/// Numeric + string fields parsed out of the Meilisearch `/stats` payload.
+struct ParsedStats {
+    /// Total on-disk database size in bytes.
+    db_size: u64,
+    /// Used (non-free) database size in bytes.
+    db_used: u64,
+    /// Number of embeddings on the files index.
+    emb_count: u64,
+    /// Whether the files index is currently indexing.
+    is_indexing: bool,
+    /// Average document size on the files index (bytes).
+    avg_doc_size: u64,
+    /// Raw (pre-index) document store size on the files index (bytes).
+    raw_doc_db: u64,
+    /// Count of files-index documents that carry an embedding.
+    embedded_count: u64,
+    /// Total files-index document count.
+    total_count: u64,
+    /// Logs-index document count.
+    logs_count: u64,
+    /// ISO 8601 timestamp of the last index update.
+    last_update: String,
+}
+
+/// Parse the `/stats` JSON into a flat [`ParsedStats`] (per-index lookups by uid).
+fn parse_stats_json(stats: &serde_json::Value, files_uid: &str, logs_uid: &str) -> ParsedStats {
+    let u64_at = |v: Option<&serde_json::Value>, key: &str| -> u64 {
+        v.and_then(|x| x.get(key)).and_then(serde_json::Value::as_u64).unwrap_or(0)
+    };
+
+    let indexes = stats.get("indexes");
+    let files_stats = indexes.and_then(|i| i.get(files_uid));
+    let logs_stats = indexes.and_then(|i| i.get(logs_uid));
+
+    ParsedStats {
+        db_size: stats.get("databaseSize").and_then(serde_json::Value::as_u64).unwrap_or(0),
+        db_used: stats.get("usedDatabaseSize").and_then(serde_json::Value::as_u64).unwrap_or(0),
+        last_update: stats.get("lastUpdate").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
+        emb_count: u64_at(files_stats, "numberOfEmbeddings"),
+        is_indexing: files_stats
+            .and_then(|f| f.get("isIndexing"))
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        avg_doc_size: u64_at(files_stats, "avgDocumentSize"),
+        raw_doc_db: u64_at(files_stats, "rawDocumentDbSize"),
+        embedded_count: u64_at(files_stats, "numberOfEmbeddedDocuments"),
+        total_count: u64_at(files_stats, "numberOfDocuments"),
+        logs_count: u64_at(logs_stats, "numberOfDocuments"),
+    }
+}
+
+/// Parse the recent-tasks JSON array into [`MeiliTask`] records.
+fn parse_recent_tasks(tasks_json: &serde_json::Value) -> Vec<crate::types::MeiliTask> {
+    tasks_json
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|t| {
+                    Some(crate::types::MeiliTask {
+                        uid: t.get("uid")?.as_u64()?,
+                        task_type: t.get("type")?.as_str()?.to_owned(),
+                        status: t.get("status")?.as_str()?.to_owned(),
+                        duration: t.get("duration").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Read CPU ticks (centiseconds) and RSS (bytes) for a process by PID.
@@ -258,8 +297,8 @@ fn read_process_stats(pid: u32) -> Option<(u64, u64)> {
     if !output.status.success() {
         return None;
     }
-    let text = String::from_utf8(output.stdout).ok()?;
-    let text = text.trim();
+    let raw = String::from_utf8(output.stdout).ok()?;
+    let text = raw.trim();
     let mut parts = text.split_whitespace();
     let rss_kb: u64 = parts.next()?.parse().ok()?;
     let cputime_str = parts.next()?;
@@ -267,27 +306,25 @@ fn read_process_stats(pid: u32) -> Option<(u64, u64)> {
     Some((cpu_ticks, rss_kb.saturating_mul(1024)))
 }
 
+/// Parse the `H:MM:SS` / `MM:SS` / `SS` seconds portion of a `ps` cputime.
+#[cfg(target_os = "macos")]
+fn parse_ps_seconds(main_part: &str) -> Option<u64> {
+    let segments: Vec<&str> = main_part.split(':').collect();
+    let n = |i: usize| -> Option<u64> { segments.get(i)?.parse().ok() };
+    match segments.len() {
+        1 => n(0),
+        2 => Some(n(0)?.saturating_mul(60).saturating_add(n(1)?)),
+        3 => Some(n(0)?.saturating_mul(3600).saturating_add(n(1)?.saturating_mul(60)).saturating_add(n(2)?)),
+        _ => None,
+    }
+}
+
 /// Parse `ps` cputime format (`H:MM:SS.cc` / `MM:SS.cc`) into centiseconds.
 #[cfg(target_os = "macos")]
 fn parse_ps_cputime(raw: &str) -> Option<u64> {
     let (main_part, centis_str) = raw.rsplit_once('.')?;
     let centis: u64 = centis_str.parse().ok()?;
-    let segments: Vec<&str> = main_part.split(':').collect();
-    let total_secs: u64 = match segments.len() {
-        1 => segments.first()?.parse().ok()?,
-        2 => {
-            let mins: u64 = segments.first()?.parse().ok()?;
-            let secs: u64 = segments.get(1)?.parse().ok()?;
-            mins.saturating_mul(60).saturating_add(secs)
-        }
-        3 => {
-            let hours: u64 = segments.first()?.parse().ok()?;
-            let mins: u64 = segments.get(1)?.parse().ok()?;
-            let secs: u64 = segments.get(2)?.parse().ok()?;
-            hours.saturating_mul(3600).saturating_add(mins.saturating_mul(60)).saturating_add(secs)
-        }
-        _ => return None,
-    };
+    let total_secs = parse_ps_seconds(main_part)?;
     Some(total_secs.saturating_mul(100).saturating_add(centis))
 }
 
@@ -300,18 +337,18 @@ fn read_process_stats(_pid: u32) -> Option<(u64, u64)> {
 /// Shorten Meilisearch task type names for compact display.
 fn shorten_task_type(task_type: &str) -> String {
     match task_type {
-        "documentAdditionOrUpdate" => "docAdd".to_string(),
-        "documentDeletion" => "docDel".to_string(),
-        "settingsUpdate" => "settings".to_string(),
-        "indexCreation" => "create".to_string(),
-        "indexUpdate" => "update".to_string(),
-        "indexDeletion" => "delete".to_string(),
-        "indexSwap" => "swap".to_string(),
-        "taskCancelation" => "cancel".to_string(),
-        "taskDeletion" => "taskDel".to_string(),
-        "dumpCreation" => "dump".to_string(),
-        "snapshotCreation" => "snapshot".to_string(),
-        other => other.to_string(),
+        "documentAdditionOrUpdate" => "docAdd".to_owned(),
+        "documentDeletion" => "docDel".to_owned(),
+        "settingsUpdate" => "settings".to_owned(),
+        "indexCreation" => "create".to_owned(),
+        "indexUpdate" => "update".to_owned(),
+        "indexDeletion" => "delete".to_owned(),
+        "indexSwap" => "swap".to_owned(),
+        "taskCancelation" => "cancel".to_owned(),
+        "taskDeletion" => "taskDel".to_owned(),
+        "dumpCreation" => "dump".to_owned(),
+        "snapshotCreation" => "snapshot".to_owned(),
+        other => other.to_owned(),
     }
 }
 
@@ -319,12 +356,12 @@ fn shorten_task_type(task_type: &str) -> String {
 /// human-readable form (e.g. "0.25s"). Returns "—" for empty strings.
 fn humanize_duration(iso: &str) -> String {
     if iso.is_empty() {
-        return "\u{2014}".to_string(); // em-dash
+        return "\u{2014}".to_owned(); // em-dash
     }
 
     // Strip "PT" prefix and "S" suffix: "PT0.254092S" → "0.254092"
-    let stripped = iso.strip_prefix("PT").unwrap_or(iso);
-    let stripped = stripped.strip_suffix('S').unwrap_or(stripped);
+    let no_prefix = iso.strip_prefix("PT").unwrap_or(iso);
+    let stripped = no_prefix.strip_suffix('S').unwrap_or(no_prefix);
 
     // Truncate to 2 decimal places for display
     if let Some((whole, frac)) = stripped.split_once('.') {

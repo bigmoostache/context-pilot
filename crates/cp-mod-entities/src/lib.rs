@@ -37,7 +37,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Entities module: persistent relational entity database.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct EntitiesModule;
+
+impl Default for EntitiesModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl EntitiesModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for EntitiesModule {
     fn id(&self) -> &'static str {
@@ -290,7 +306,7 @@ fn visualize_entity_output(content: &str, width: usize) -> Vec<cp_render::Block>
             let display = if line.len() > width {
                 format!("{}…", line.get(..line.floor_char_boundary(width.saturating_sub(1))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
 
             // Error lines
@@ -334,7 +350,7 @@ fn visualize_entity_output(content: &str, width: usize) -> Vec<cp_render::Block>
                             spans.push(Span::muted("NULL".into()).dim());
                         }
                         if !part.is_empty() {
-                            spans.push(Span::new(part.to_string()));
+                            spans.push(Span::new(part.to_owned()));
                         }
                         spans
                     })
@@ -351,6 +367,54 @@ fn visualize_entity_output(content: &str, width: usize) -> Vec<cp_render::Block>
 // Database recovery
 // =============================================================================
 
+/// Rebuild a fresh database from scratch: delete the file, recreate, restore the
+/// dump (if present), then apply pending migrations. Used by both open-failure
+/// and integrity-failure recovery paths.
+fn recover_from_scratch(db_path: &std::path::Path, dump_path: &std::path::Path, migrations_dir: &std::path::Path) {
+    let _rm = std::fs::remove_file(db_path);
+    let Ok(fresh) = db::open(db_path) else {
+        log::warn!("Recovery failed: cannot create fresh database");
+        return;
+    };
+    if dump_path.exists()
+        && let Err(re) = db::restore_from_file(&fresh, dump_path)
+    {
+        log::warn!("Failed to restore dump during recovery: {re}");
+    }
+    let _apply = migrations::apply_pending(&fresh, migrations_dir);
+}
+
+/// Restore the dump into a database and log the resulting table/row counts.
+/// No-op when the dump file is absent.
+fn apply_dump(conn: &rusqlite::Connection, db_path: &std::path::Path, dump_path: &std::path::Path) {
+    if !dump_path.exists() {
+        return;
+    }
+    log::info!("Entity DB empty, restoring from dump ({} bytes)", std::fs::metadata(dump_path).map_or(0, |m| m.len()));
+    match db::restore_from_file(conn, dump_path) {
+        Ok(()) => {
+            let post_check = db::introspect(conn, db_path);
+            let total_rows: u64 = post_check.tables.iter().map(|t| t.row_count).sum();
+            log::info!("Dump restore OK: {} tables, {} rows", post_check.tables.len(), total_rows);
+        }
+        Err(e) => log::warn!("Failed to restore dump: {e}"),
+    }
+}
+
+/// Restore an empty (but healthy) database from the dump, then apply any
+/// migrations the dump didn't cover.
+fn restore_empty_db(
+    conn: &rusqlite::Connection,
+    db_path: &std::path::Path,
+    dump_path: &std::path::Path,
+    migrations_dir: &std::path::Path,
+) {
+    apply_dump(conn, db_path, dump_path);
+    if let Err(e) = migrations::apply_pending(conn, migrations_dir) {
+        log::warn!("Failed to apply pending migrations: {e}");
+    }
+}
+
 /// Recover the entity database using the priority table from the design doc.
 ///
 /// Priority: DB (if healthy) → dump → migrations → fresh start.
@@ -359,19 +423,8 @@ fn recover_database(db_path: &std::path::Path, dump_path: &std::path::Path, migr
         Ok(c) => c,
         Err(e) => {
             // db::open() failed (e.g. corrupt file where PRAGMAs fail).
-            // Delete the corrupt file and attempt a full recovery.
             log::warn!("Failed to open entity database: {e} — attempting recovery");
-            let _rm = std::fs::remove_file(db_path);
-            let Ok(fresh) = db::open(db_path) else {
-                log::warn!("Recovery failed: cannot create fresh database");
-                return;
-            };
-            if dump_path.exists()
-                && let Err(re) = db::restore_from_file(&fresh, dump_path)
-            {
-                log::warn!("Failed to restore dump during open-failure recovery: {re}");
-            }
-            let _apply = migrations::apply_pending(&fresh, migrations_dir);
+            recover_from_scratch(db_path, dump_path, migrations_dir);
             return;
         }
     };
@@ -380,16 +433,7 @@ fn recover_database(db_path: &std::path::Path, dump_path: &std::path::Path, migr
     if !db::integrity_check(&conn) {
         log::warn!("Entity database corrupt, attempting recovery");
         drop(conn);
-        let _rm = std::fs::remove_file(db_path);
-        let Ok(fresh) = db::open(db_path) else {
-            return;
-        };
-        if dump_path.exists()
-            && let Err(e) = db::restore_from_file(&fresh, dump_path)
-        {
-            log::warn!("Failed to restore dump: {e}");
-        }
-        let _apply = migrations::apply_pending(&fresh, migrations_dir);
+        recover_from_scratch(db_path, dump_path, migrations_dir);
         return;
     }
 
@@ -403,26 +447,5 @@ fn recover_database(db_path: &std::path::Path, dump_path: &std::path::Path, migr
     }
 
     // DB is empty — try recovery from files
-    if dump_path.exists() {
-        log::info!(
-            "Entity DB empty, restoring from dump ({} bytes)",
-            std::fs::metadata(dump_path).map_or(0, |m| m.len())
-        );
-        match db::restore_from_file(&conn, dump_path) {
-            Ok(()) => {
-                // Verify restoration succeeded
-                let post_check = db::introspect(&conn, db_path);
-                let total_rows: u64 = post_check.tables.iter().map(|t| t.row_count).sum();
-                log::info!("Dump restore OK: {} tables, {} rows", post_check.tables.len(), total_rows);
-            }
-            Err(e) => {
-                log::warn!("Failed to restore dump: {e}");
-            }
-        }
-    }
-
-    // Apply any pending migrations beyond what the dump contained
-    if let Err(e) = migrations::apply_pending(&conn, migrations_dir) {
-        log::warn!("Failed to apply pending migrations: {e}");
-    }
+    restore_empty_db(&conn, db_path, dump_path, migrations_dir);
 }

@@ -16,7 +16,7 @@ pub(crate) struct EntitiesPanel;
 
 impl Panel for EntitiesPanel {
     fn title(&self, _state: &State) -> String {
-        "Entities".to_string()
+        "Entities".to_owned()
     }
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
@@ -113,18 +113,18 @@ impl Panel for EntitiesPanel {
 
 /// Build the text sent to the LLM as context for the Entities panel.
 fn build_context_text(es: &EntitiesState) -> String {
-    let Some(cache) = &es.schema_cache else {
-        return "Entity Database (empty)\n\nNo entity tables yet. Use entity_sql to create your schema.".to_string();
+    let Some(cache) = es.schema_cache.as_ref() else {
+        return "Entity Database (empty)\n\nNo entity tables yet. Use entity_sql to create your schema.".to_owned();
     };
 
     if cache.tables.is_empty() {
-        return "Entity Database (empty)\n\nNo entity tables yet. Use entity_sql to create your schema.".to_string();
+        return "Entity Database (empty)\n\nNo entity tables yet. Use entity_sql to create your schema.".to_owned();
     }
 
     let total_rows: u64 = cache.tables.iter().map(|t| t.row_count).sum();
     let kb = cache.db_size_bytes.wrapping_div(1024);
 
-    let mut out = format!("Entity Database ({} tables, {} rows, {} KB):\n\n", cache.tables.len(), total_rows, kb,);
+    let mut out = format!("Entity Database ({} tables, {} rows, {} KB):\n\n", cache.tables.len(), total_rows, kb);
 
     // Open connection for sample data
     let conn = db::open(&es.db_path).ok();
@@ -153,7 +153,7 @@ fn build_context_text(es: &EntitiesState) -> String {
         }
 
         // Sample data (3 rows, 50 char truncation, skip >10 columns)
-        if let Some(ref c) = conn {
+        if let Some(c) = conn.as_ref() {
             let samples = db::sample_rows(c, &table.name, 3);
             if !samples.is_empty() {
                 for row in &samples {
@@ -176,10 +176,37 @@ fn build_context_text(es: &EntitiesState) -> String {
 // Populated blocks (IR rendering)
 // =============================================================================
 
+/// Build the display blocks for a single table (name + columns + foreign keys).
+fn table_blocks(table: &crate::types::TableInfo) -> Vec<Block> {
+    let mut blocks = vec![Block::Line(vec![
+        Span::styled(table.name.clone(), Semantic::Accent).bold(),
+        Span::new(format!(" ({} rows)", table.row_count)),
+    ])];
+
+    for col in &table.columns {
+        let pk_marker = if col.is_pk { " PK" } else { "" };
+        let nn_marker = if col.is_not_null { " NOT NULL" } else { "" };
+        blocks.push(Block::Line(vec![
+            Span::new(format!("  {} ", col.name)),
+            Span::styled(format!("{}{pk_marker}{nn_marker}", col.col_type), Semantic::Code),
+        ]));
+    }
+
+    for fk in &table.foreign_keys {
+        blocks.push(Block::Line(vec![Span::styled(
+            format!("  FK: {} → {}({})", fk.from_col, fk.to_table, fk.to_col),
+            Semantic::Muted,
+        )]));
+    }
+
+    blocks.push(Block::empty());
+    blocks
+}
+
 /// Blocks for a populated database.
 fn populated_blocks(es: &EntitiesState) -> Vec<Block> {
-    let Some(cache) = &es.schema_cache else {
-        return vec![Block::text("Entity Database (loading...)".to_string())];
+    let Some(cache) = es.schema_cache.as_ref() else {
+        return vec![Block::text("Entity Database (loading...)".to_owned())];
     };
 
     let total_rows: u64 = cache.tables.iter().map(|t| t.row_count).sum();
@@ -206,31 +233,7 @@ fn populated_blocks(es: &EntitiesState) -> Vec<Block> {
     }
 
     for table in &cache.tables {
-        // Table name + row count
-        blocks.push(Block::Line(vec![
-            Span::styled(table.name.clone(), Semantic::Accent).bold(),
-            Span::new(format!(" ({} rows)", table.row_count)),
-        ]));
-
-        // Columns
-        for col in &table.columns {
-            let pk_marker = if col.is_pk { " PK" } else { "" };
-            let nn_marker = if col.is_not_null { " NOT NULL" } else { "" };
-            blocks.push(Block::Line(vec![
-                Span::new(format!("  {} ", col.name)),
-                Span::styled(format!("{}{pk_marker}{nn_marker}", col.col_type), Semantic::Code),
-            ]));
-        }
-
-        // Foreign keys
-        for fk in &table.foreign_keys {
-            blocks.push(Block::Line(vec![Span::styled(
-                format!("  FK: {} → {}({})", fk.from_col, fk.to_table, fk.to_col),
-                Semantic::Muted,
-            )]));
-        }
-
-        blocks.push(Block::empty());
+        blocks.extend(table_blocks(table));
     }
 
     blocks
@@ -243,33 +246,30 @@ fn populated_blocks(es: &EntitiesState) -> Vec<Block> {
 /// Blocks for the empty-state panel (onboarding guide).
 fn empty_state_blocks() -> Vec<Block> {
     vec![
-        Block::text("Entity Database (empty)".to_string()),
+        Block::text("Entity Database (empty)".to_owned()),
         Block::empty(),
-        Block::text("No entity tables yet. Use entity_sql to create your schema.".to_string()),
+        Block::text("No entity tables yet. Use entity_sql to create your schema.".to_owned()),
         Block::empty(),
-        Block::Line(vec![Span::new("Quick start:".to_string()).bold()]),
+        Block::Line(vec![Span::new("Quick start:".to_owned()).bold()]),
         Block::Line(vec![Span::styled(
-            "  CREATE TABLE companies (id INTEGER PRIMARY KEY, name TEXT NOT NULL, country TEXT);".to_string(),
+            "  CREATE TABLE companies (id INTEGER PRIMARY KEY, name TEXT NOT NULL, country TEXT);".to_owned(),
             Semantic::Code,
         )]),
         Block::Line(vec![Span::styled(
-            "  CREATE TABLE people (id INTEGER PRIMARY KEY, name TEXT, role TEXT,".to_string(),
+            "  CREATE TABLE people (id INTEGER PRIMARY KEY, name TEXT, role TEXT,".to_owned(),
             Semantic::Code,
         )]),
+        Block::Line(vec![Span::styled("    company_id INTEGER REFERENCES companies(id));".to_owned(), Semantic::Code)]),
         Block::Line(vec![Span::styled(
-            "    company_id INTEGER REFERENCES companies(id));".to_string(),
-            Semantic::Code,
-        )]),
-        Block::Line(vec![Span::styled(
-            "  INSERT INTO companies (name, country) VALUES ('Acme', 'France') RETURNING *;".to_string(),
+            "  INSERT INTO companies (name, country) VALUES ('Acme', 'France') RETURNING *;".to_owned(),
             Semantic::Code,
         )]),
         Block::empty(),
-        Block::Line(vec![Span::new("Tips:".to_string()).bold()]),
-        Block::text("  - INTEGER PRIMARY KEY = auto-increment (don't use AUTOINCREMENT)".to_string()),
-        Block::text("  - FOREIGN KEY constraints model relationships".to_string()),
-        Block::text("  - SQLite types: TEXT, INTEGER, REAL, BLOB (VARCHAR(N) length is ignored)".to_string()),
-        Block::text("  - Use RETURNING * on INSERT/UPDATE to see results immediately".to_string()),
-        Block::text("  - For graph patterns: edges(source_id, target_id, rel_type)".to_string()),
+        Block::Line(vec![Span::new("Tips:".to_owned()).bold()]),
+        Block::text("  - INTEGER PRIMARY KEY = auto-increment (don't use AUTOINCREMENT)".to_owned()),
+        Block::text("  - FOREIGN KEY constraints model relationships".to_owned()),
+        Block::text("  - SQLite types: TEXT, INTEGER, REAL, BLOB (VARCHAR(N) length is ignored)".to_owned()),
+        Block::text("  - Use RETURNING * on INSERT/UPDATE to see results immediately".to_owned()),
+        Block::text("  - For graph patterns: edges(source_id, target_id, rel_type)".to_owned()),
     ]
 }

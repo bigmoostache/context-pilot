@@ -18,10 +18,9 @@ pub(super) use paused::emit_thread_paused;
 
 use crate::app::App;
 use crate::app::PendingDone;
-use crate::app::panels::now_ms;
 use cp_base::tools::ToolUse;
 use cp_mod_spine::types::{NotificationType, SpineState};
-use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
+use cp_mod_threads::types::{FocusState, ThreadMessage, ThreadStatus, ThreadsState};
 
 /// Inject a synthetic `Read` tool call when auto-continuation fires for a
 /// thread notification while the AI is unfocused.
@@ -95,15 +94,15 @@ pub(super) fn maybe_inject_auto_read(app: &mut App) -> bool {
     // Build the Read ToolUse exactly as the LLM would, then hand it to the
     // normal pipeline. The pipeline does ALL the rest (focus, panel refresh,
     // tempo break, message pairing, follow-up stream) — see `inject_tool_call`.
-    let tool_use = ToolUse {
-        id: format!("auto_read_{tid}"),
-        name: "Read".into(),
-        input: serde_json::json!({
+    let tool_use = ToolUse::new(
+        format!("auto_read_{tid}"),
+        "Read".into(),
+        serde_json::json!({
             "thread_id": tid,
             "intent": "Focus on thread",
             "verb": "Reading",
         }),
-    };
+    );
 
     inject_tool_call(app, tool_use);
     true
@@ -147,7 +146,7 @@ pub(super) fn inject_tool_call(app: &mut App, tool: ToolUse) {
     app.pending_tools.push(tool);
     // Synthetic "stream finished with a tool_use" receipt: zero tokens/cost,
     // no breakpoint hashes — see the doc comment for why each field is zero.
-    let synthetic_done: PendingDone = (0, 0, 0, 0, Some("tool_use".to_string()), Vec::new(), Vec::new(), 0, Vec::new());
+    let synthetic_done: PendingDone = (0, 0, 0, 0, Some("tool_use".to_owned()), Vec::new(), Vec::new(), 0, Vec::new());
     app.pending_done = Some(synthetic_done);
 }
 
@@ -194,12 +193,8 @@ pub(super) fn check_my_turn_threads(app: &mut App) {
         "Thread \"{tname}\" ({tid}) is MY_TURN — it has user input awaiting your response.\n\
          Use Read(thread_id=\"{tid}\") to see the conversation and respond.",
     );
-    let _r = SpineState::create_notification(
-        &mut app.state,
-        NotificationType::Custom,
-        "my_turn_thread".to_string(),
-        content,
-    );
+    let _r =
+        SpineState::create_notification(&mut app.state, NotificationType::Custom, "my_turn_thread".to_owned(), content);
 }
 
 /// Extract thread IDs from notification content embedded in a synthetic message.
@@ -217,7 +212,7 @@ fn extract_thread_ids(content: &str) -> Vec<String> {
         };
         if let Some(end_offset) = content.get(start..).and_then(|s| s.find('"')) {
             if let Some(id_str) = start.checked_add(end_offset).and_then(|end| content.get(start..end)) {
-                ids.push(id_str.to_string());
+                ids.push(id_str.to_owned());
             }
             search_from = start.saturating_add(end_offset).saturating_add(1);
         } else {
@@ -266,13 +261,6 @@ pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut cp_base::state
 
     let ts = ThreadsState::get_mut(state);
     if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == tid) {
-        thread.messages.push(ThreadMessage {
-            author: ThreadAuthor::Assistant,
-            content: Some(line),
-            file_path: None,
-            timestamp: now_ms(),
-            acknowledged: true,
-            auto: true,
-        });
+        thread.messages.push(ThreadMessage::auto_trace(line));
     }
 }

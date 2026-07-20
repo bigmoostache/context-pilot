@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 /// oplog before this ack is sent (I11).  A deadman re-exec replays it
 /// exactly once (I4/K2).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Ack {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,
@@ -26,9 +27,24 @@ pub struct Ack {
     pub rev: Option<u64>,
 }
 
+impl Ack {
+    /// Build an acknowledgment for `cmd_id` with the given outcome.
+    ///
+    /// A constructor keeps [`Ack`] `#[non_exhaustive]` across the orchestrator
+    /// and agent, which both build acks; `schema_version` is stamped here.
+    #[must_use]
+    pub const fn new(cmd_id: String, status: Status, rev: Option<u64>) -> Self {
+        Self { schema_version: 1, cmd_id, status, rev }
+    }
+}
+
 /// Outcome of command processing.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "status")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "wire-protocol contract: the ack Status is a closed two-outcome set (accepted/rejected) constructed by the orchestrator and matched exhaustively by the agent; #[non_exhaustive] would forbid that construction and adds nothing to a binary outcome"
+)]
 pub enum Status {
     /// Command durably accepted — effect is in the oplog.
     #[serde(rename = "accepted")]

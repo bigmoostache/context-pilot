@@ -11,6 +11,7 @@ const TIMEOUT_SECS: u64 = 10;
 
 /// Parameters for a Brave web search request.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct SearchParams<'req> {
     /// Search query string.
     pub query: &'req str,
@@ -30,6 +31,7 @@ pub struct SearchParams<'req> {
 
 /// Parameters for a Brave LLM context request.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct LLMContextParams<'req> {
     /// Search query string.
     pub query: &'req str,
@@ -144,7 +146,7 @@ impl BraveClient {
 
     /// GET with 5xx retry (2 attempts, 1s delay).
     fn get_with_retry(&self, url: &str) -> Result<String, String> {
-        for attempt in 0..3 {
+        for attempt in 0i32..3i32 {
             let resp = self
                 .client
                 .get(url)
@@ -164,7 +166,7 @@ impl BraveClient {
                 403 => {
                     return Err(format!("Forbidden (403). Check API key. Response: {}", truncate(&body, 200)));
                 }
-                500..=599 if attempt < 2 => {
+                500..=599 if attempt < 2i32 => {
                     std::thread::sleep(Duration::from_secs(1));
                 }
                 _ => {
@@ -172,7 +174,7 @@ impl BraveClient {
                 }
             }
         }
-        Err("Max retries exceeded".to_string())
+        Err("Max retries exceeded".to_owned())
     }
 }
 
@@ -182,7 +184,7 @@ fn urlenc(s: &str) -> String {
     for b in s.bytes() {
         match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                result.push(b as char);
+                result.push(char::from(b));
             }
             _ => {
                 let _r = write!(result, "%{b:02X}");

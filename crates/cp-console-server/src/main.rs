@@ -167,12 +167,12 @@ fn handle_create(sessions: &Sessions, params: &CreateParams<'_>) -> Response {
 
     // Spawn a thread to wait for the child so we get proper exit status
     {
-        let sessions = Arc::clone(sessions);
-        let key = key.to_string();
+        let task_sessions = Arc::clone(sessions);
+        let task_key = key.to_string();
         drop(std::thread::spawn(move || {
             let code = child.wait().map_or(-1, |status| status.code().unwrap_or(-1));
-            if let Ok(mut map) = sessions.lock()
-                && let Some(session) = map.get_mut(&key)
+            if let Ok(mut map) = task_sessions.lock()
+                && let Some(session) = map.get_mut(&task_key)
             {
                 session.status = SessionStatus::Exited(code);
             }
@@ -325,6 +325,46 @@ struct ConnectionHandler {
     sessions: Sessions,
 }
 
+/// Route a parsed request to its handler, returning the response to send back.
+///
+/// Covers every command except `"shutdown"` (which needs to break the connection
+/// loop and is handled inline by [`ConnectionHandler::run`]).
+fn dispatch_command(req: &Request, sessions: &Sessions) -> Response {
+    match req.cmd.as_str() {
+        "create" => {
+            let key = req.key.as_deref().unwrap_or("");
+            let command = req.command.as_deref().unwrap_or("");
+            let log_path = req.log_path.as_deref().unwrap_or("");
+            if key.is_empty() || command.is_empty() || log_path.is_empty() {
+                Response::err("Missing key, command, or log_path")
+            } else {
+                handle_create(sessions, &CreateParams { key, command, cwd: req.cwd.as_deref(), log_path })
+            }
+        }
+        "send" => {
+            let key = req.key.as_deref().unwrap_or("");
+            let input = req.input.as_deref().unwrap_or("");
+            if key.is_empty() { Response::err("Missing key") } else { handle_send(sessions, key, input) }
+        }
+        "kill" => {
+            let key = req.key.as_deref().unwrap_or("");
+            if key.is_empty() { Response::err("Missing key") } else { handle_kill(sessions, key) }
+        }
+        "remove" => {
+            let key = req.key.as_deref().unwrap_or("");
+            if key.is_empty() { Response::err("Missing key") } else { handle_remove(sessions, key) }
+        }
+        "status" => {
+            let key = req.key.as_deref().unwrap_or("");
+            if key.is_empty() { Response::err("Missing key") } else { handle_status(sessions, key) }
+        }
+        "list" => handle_list(sessions),
+        "stats" => handle_stats(sessions),
+        "ping" => Response::ok(),
+        other => Response::err(format!("Unknown command: {other}")),
+    }
+}
+
 impl ConnectionHandler {
     /// Consume self and process JSON-line commands until the connection closes.
     fn run(self) {
@@ -335,8 +375,8 @@ impl ConnectionHandler {
         let reader = BufReader::new(cloned);
         let mut writer = stream;
 
-        for line in reader.lines() {
-            let Ok(line) = line else {
+        for line_result in reader.lines() {
+            let Ok(line) = line_result else {
                 break; // Connection closed
             };
             if line.is_empty() {
@@ -352,46 +392,16 @@ impl ConnectionHandler {
                 }
             };
 
-            let resp = match req.cmd.as_str() {
-                "create" => {
-                    let key = req.key.as_deref().unwrap_or("");
-                    let command = req.command.as_deref().unwrap_or("");
-                    let log_path = req.log_path.as_deref().unwrap_or("");
-                    if key.is_empty() || command.is_empty() || log_path.is_empty() {
-                        Response::err("Missing key, command, or log_path")
-                    } else {
-                        handle_create(&sessions, &CreateParams { key, command, cwd: req.cwd.as_deref(), log_path })
-                    }
-                }
-                "send" => {
-                    let key = req.key.as_deref().unwrap_or("");
-                    let input = req.input.as_deref().unwrap_or("");
-                    if key.is_empty() { Response::err("Missing key") } else { handle_send(&sessions, key, input) }
-                }
-                "kill" => {
-                    let key = req.key.as_deref().unwrap_or("");
-                    if key.is_empty() { Response::err("Missing key") } else { handle_kill(&sessions, key) }
-                }
-                "remove" => {
-                    let key = req.key.as_deref().unwrap_or("");
-                    if key.is_empty() { Response::err("Missing key") } else { handle_remove(&sessions, key) }
-                }
-                "status" => {
-                    let key = req.key.as_deref().unwrap_or("");
-                    if key.is_empty() { Response::err("Missing key") } else { handle_status(&sessions, key) }
-                }
-                "list" => handle_list(&sessions),
-                "stats" => handle_stats(&sessions),
-                "ping" => Response::ok(),
-                "shutdown" => {
-                    SHUTDOWN_REQUESTED.store(true, Ordering::Relaxed);
-                    let resp = Response::ok();
-                    drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()));
-                    break;
-                }
-                other => Response::err(format!("Unknown command: {other}")),
-            };
+            // `shutdown` acks then breaks the loop; every other command routes
+            // through dispatch_command.
+            if req.cmd == "shutdown" {
+                SHUTDOWN_REQUESTED.store(true, Ordering::Relaxed);
+                let resp = Response::ok();
+                drop(writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()));
+                break;
+            }
 
+            let resp = dispatch_command(&req, &sessions);
             if writeln!(writer, "{}", serde_json::to_string(&resp).unwrap_or_default()).is_err() {
                 break;
             }
@@ -442,17 +452,17 @@ fn main() {
     // Without this, sessions that exit but are never explicitly killed accumulate
     // forever — each holding a stdin pipe FD — until FD exhaustion.
     {
-        let sessions = Arc::clone(&sessions);
-        drop(std::thread::spawn(move || cleanup::reaper_loop(&sessions)));
+        let reaper_sessions = Arc::clone(&sessions);
+        drop(std::thread::spawn(move || cleanup::reaper_loop(&reaper_sessions)));
     }
 
     // Accept connections (one thread per connection)
     loop {
         match listener.accept() {
             Ok((stream, _)) => {
-                let sessions = Arc::clone(&sessions);
+                let conn_sessions = Arc::clone(&sessions);
                 drop(std::thread::spawn(move || {
-                    ConnectionHandler { stream, sessions }.run();
+                    ConnectionHandler { stream, sessions: conn_sessions }.run();
                 }));
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {

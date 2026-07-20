@@ -119,6 +119,26 @@ impl Step {
         }
     }
 
+    /// Encode to the stored discriminant. Explicit per-variant literals avoid
+    /// an `as` cast on the `#[repr(u8)]` enum; kept in lockstep with [`from_u8`].
+    const fn as_u8(self) -> u8 {
+        match self {
+            Self::Idle => 0,
+            Self::Input => 1,
+            Self::Bridge => 2,
+            Self::ThreadsEmit => 3,
+            Self::Stream => 4,
+            Self::Cache => 5,
+            Self::Watchers => 6,
+            Self::Tools => 7,
+            Self::Spine => 8,
+            Self::Reverie => 9,
+            Self::PanelRefresh => 10,
+            Self::Render => 11,
+            Self::Save => 12,
+        }
+    }
+
     /// Decode a stored discriminant, falling back to [`Step::Idle`] for any
     /// unknown byte (forward-compatible, never panics).
     const fn from_u8(v: u8) -> Self {
@@ -148,7 +168,7 @@ pub(crate) fn beat() {
 
 /// Record the step the loop is about to execute, so a wedge dump can name it.
 pub(crate) fn mark(step: Step) {
-    CURRENT_STEP.store(step as u8, Ordering::Relaxed);
+    CURRENT_STEP.store(step.as_u8(), Ordering::Relaxed);
     STEP_SINCE_MS.store(now_ms(), Ordering::Relaxed);
 }
 
@@ -218,14 +238,14 @@ fn dump_diagnostic(w: &Wedge) {
     let cpu = cpu_busy_pct();
     let cpu_line = cpu.map_or_else(|| "CPU usage: (unavailable)".to_owned(), |pct| format!("CPU usage: {pct:.0}%"));
     let interpretation = match cpu {
-        Some(p) if p >= 70.0 => {
+        Some(p) if p >= 70.0f64 => {
             format!(
                 "→ CPU is HIGH: a busy-loop / runaway computation in step '{}' \
                      (e.g. tree rehash, infinite loop).",
                 step.name()
             )
         }
-        Some(p) if p <= 15.0 => {
+        Some(p) if p <= 15.0f64 => {
             format!(
                 "→ CPU is LOW: a blocked syscall or lock (network/socket/disk/mutex) \
                      in step '{}'.",
@@ -283,8 +303,11 @@ fn cpu_busy_pct() -> Option<f64> {
     let t1 = ticks()?;
     let delta = u32::try_from(t1.saturating_sub(t0)).unwrap_or(u32::MAX);
     let dticks = f64::from(delta);
-    let secs = f64::from(CPU_SAMPLE_MS) / 1000.0;
-    Some((dticks / CLK_TCK / secs) * 100.0)
+    let secs = cp_base::cast::float_math::div(f64::from(CPU_SAMPLE_MS), 1000.0f64);
+    Some(cp_base::cast::float_math::mul(
+        cp_base::cast::float_math::div(cp_base::cast::float_math::div(dticks, CLK_TCK), secs),
+        100.0f64,
+    ))
 }
 
 /// macOS CPU sample via `ps %cpu` (a recent decaying average — ample to

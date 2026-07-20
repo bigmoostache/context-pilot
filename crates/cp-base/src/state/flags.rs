@@ -16,6 +16,10 @@ pub type HighlightIrFn = fn(&str, &str) -> std::sync::Arc<Vec<Vec<cp_render::Spa
 /// Transitions are tracked via [`StreamPhase::transition`] using `#[track_caller]`
 /// so every state change logs its source location automatically.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "stream-phase state machine: StreamPhase is a closed 3-state set constructed cross-crate via transition() and matched exhaustively by is_streaming/is_tooling; #[non_exhaustive] would forbid that construction"
+)]
 pub enum StreamPhase {
     /// Not streaming — between conversation turns.
     #[default]
@@ -38,7 +42,7 @@ impl StreamPhase {
         if from != to {
             let loc = std::panic::Location::caller();
             // No-op until a log backend (env_logger, tracing, etc.) is registered in the binary.
-            log::trace!("[StreamPhase] {from:?} → {to:?} ({}:{})", loc.file(), loc.line(),);
+            log::trace!("[StreamPhase] {from:?} → {to:?} ({}:{})", loc.file(), loc.line());
         }
         *self = to;
     }
@@ -58,6 +62,7 @@ impl StreamPhase {
 
 /// Stream-related state: the current [`StreamPhase`] plus independent scroll tracking.
 #[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
 pub struct StreamState {
     /// Current phase of the LLM stream lifecycle.
     pub phase: StreamPhase,
@@ -68,6 +73,7 @@ pub struct StreamState {
 /// UI and lifecycle status flags — separated from [`StreamState`] to stay under
 /// clippy's 3-bool threshold per struct.
 #[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
 pub struct UiState {
     /// Whether the UI needs to be redrawn.
     pub dirty: bool,
@@ -79,6 +85,7 @@ pub struct UiState {
 
 /// Configuration overlay flags.
 #[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
 pub struct ConfigOverlay {
     /// Configuration view is open (Ctrl+H to toggle).
     pub config_view: bool,
@@ -88,6 +95,7 @@ pub struct ConfigOverlay {
 
 /// Lifecycle flags for async operations and reload state.
 #[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
 pub struct Lifecycle {
     /// Whether an API check is in progress.
     pub api_check_in_progress: bool,
@@ -100,6 +108,7 @@ pub struct Lifecycle {
 /// Module-specific overlay flags — kept separate from core UI flags
 /// to avoid the 3-bool struct limit.
 #[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
 pub struct ModuleOverlays {
     /// Meilisearch indexing status overlay (Ctrl+I to toggle).
     pub index_status: bool,
@@ -113,6 +122,7 @@ pub struct ModuleOverlays {
 /// Access individual flags via domain sub-structs: `flags.stream.is_streaming`,
 /// `flags.ui.dirty`, `flags.config.reverie_enabled`, `flags.lifecycle.reload_pending`.
 #[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
 pub struct StatusBools {
     /// Streaming and scrolling state.
     pub stream: StreamState,
@@ -132,9 +142,18 @@ pub struct StatusBools {
 /// [`StreamEvent::ToolUse`] or [`StreamEvent::Done`]. Pure UI — has
 /// no effect on tool execution.
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct StreamingTool {
     /// Tool name (e.g., `"Edit"`, `"Open"`). Known from `content_block_start`.
     pub name: String,
     /// Accumulated partial JSON input (grows with each `input_json_delta`).
     pub input_so_far: String,
+}
+
+impl StreamingTool {
+    /// A streaming-tool advisory from its name and partial JSON input.
+    #[must_use]
+    pub const fn new(name: String, input_so_far: String) -> Self {
+        Self { name, input_so_far }
+    }
 }

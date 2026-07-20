@@ -100,7 +100,7 @@ fn pid_alive(pid: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cp_wire::heartbeat::{DEFAULT_MAX_AGE, HEARTBEAT_SCHEMA_VERSION};
+    use cp_wire::heartbeat::DEFAULT_MAX_AGE;
     use cp_wire::types::registry::AgentStatus;
     use std::path::Path;
 
@@ -131,13 +131,7 @@ mod tests {
     }
 
     fn heartbeat(pid: u32, boot_id: &str, timestamp_ms: u64) -> Heartbeat {
-        Heartbeat {
-            schema_version: HEARTBEAT_SCHEMA_VERSION,
-            timestamp_ms,
-            sequence: 0,
-            pid,
-            boot_id: boot_id.to_owned(),
-        }
+        Heartbeat::new(timestamp_ms, 0, pid, boot_id.to_owned())
     }
 
     #[test]

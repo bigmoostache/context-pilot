@@ -14,6 +14,10 @@ use crate::state::context::Kind;
 /// `Threads` replaces the entire layout with a dedicated threads view.
 /// Ctrl+V toggles between them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "view-mode contract: ViewMode already carries #[serde(other)] on Normal for forward-compat; the set is otherwise closed and constructed cross-crate, so #[non_exhaustive] would forbid that construction while adding nothing"
+)]
 pub enum ViewMode {
     /// Threads view: dedicated layout for thread management (no panels).
     Threads,
@@ -61,6 +65,7 @@ pub const SCHEMA_VERSION: u32 = 1;
 /// Shared configuration (`config.json`)
 /// Infrastructure fields + module data under "modules" key
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Shared {
     // === Infrastructure ===
     /// Schema version for forward/backward compatibility
@@ -99,7 +104,7 @@ impl Default for Shared {
         Self {
             schema_version: SCHEMA_VERSION,
             reload_requested: false,
-            active_theme: crate::config::DEFAULT_THEME.to_string(),
+            active_theme: crate::config::DEFAULT_THEME.to_owned(),
             owner_pid: None,
             selected_context: 0,
             draft_input: String::new(),
@@ -110,9 +115,49 @@ impl Default for Shared {
     }
 }
 
+impl Shared {
+    /// Set the selected-panel index and draft input state (builder over `default`).
+    #[must_use]
+    pub fn with_ui(mut self, selected_context: usize, draft_input: String, draft_cursor: usize) -> Self {
+        self.selected_context = selected_context;
+        self.draft_input = draft_input;
+        self.draft_cursor = draft_cursor;
+        self
+    }
+
+    /// Set the active theme ID (builder).
+    #[must_use]
+    pub fn with_active_theme(mut self, theme: String) -> Self {
+        self.active_theme = theme;
+        self
+    }
+
+    /// Set the owning process PID (builder).
+    #[must_use]
+    pub const fn with_owner_pid(mut self, pid: Option<u32>) -> Self {
+        self.owner_pid = pid;
+        self
+    }
+
+    /// Set the view mode (builder).
+    #[must_use]
+    pub const fn with_view_mode(mut self, view_mode: ViewMode) -> Self {
+        self.view_mode = view_mode;
+        self
+    }
+
+    /// Set the per-module persistent data map (builder).
+    #[must_use]
+    pub fn with_modules(mut self, modules: HashMap<String, serde_json::Value>) -> Self {
+        self.modules = modules;
+        self
+    }
+}
+
 /// Worker-specific state (states/{worker}.json)
 /// Infrastructure fields + module data under "modules" key
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct WorkerState {
     /// Schema version for forward/backward compatibility
     #[serde(default = "default_schema_version")]
@@ -146,7 +191,7 @@ impl Default for WorkerState {
     fn default() -> Self {
         Self {
             schema_version: SCHEMA_VERSION,
-            worker_id: crate::config::constants::DEFAULT_WORKER_ID.to_string(),
+            worker_id: crate::config::constants::DEFAULT_WORKER_ID.to_owned(),
             important_panel_uids: HashMap::new(),
             panel_uid_to_local_id: HashMap::new(),
             next_tool_id: 1,
@@ -156,9 +201,46 @@ impl Default for WorkerState {
     }
 }
 
+impl WorkerState {
+    /// Set the worker identifier (builder over `default`).
+    #[must_use]
+    pub fn with_worker_id(mut self, worker_id: String) -> Self {
+        self.worker_id = worker_id;
+        self
+    }
+
+    /// Set the important + local-id panel UID maps (builder).
+    #[must_use]
+    pub fn with_panel_uids(
+        mut self,
+        important: ImportantPanelUids,
+        panel_uid_to_local_id: HashMap<String, String>,
+    ) -> Self {
+        self.important_panel_uids = important;
+        self.panel_uid_to_local_id = panel_uid_to_local_id;
+        self
+    }
+
+    /// Set the next tool + result message-ID counters (builder).
+    #[must_use]
+    pub const fn with_id_counters(mut self, next_tool_id: usize, next_result_id: usize) -> Self {
+        self.next_tool_id = next_tool_id;
+        self.next_result_id = next_result_id;
+        self
+    }
+
+    /// Set the per-module persistent worker-data map (builder).
+    #[must_use]
+    pub fn with_modules(mut self, modules: HashMap<String, serde_json::Value>) -> Self {
+        self.modules = modules;
+        self
+    }
+}
+
 /// Panel data stored in panels/{uid}.json
 /// All panels are stored here - fixed (System, Conversation, Tree, etc.) and dynamic (File, Glob, Grep, Tmux)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct PanelData {
     /// UID of this panel
     pub uid: String,
@@ -202,6 +284,52 @@ pub struct PanelData {
 /// Maps `Kind` to panel UID string.
 pub type ImportantPanelUids = HashMap<Kind, String>;
 
+impl PanelData {
+    /// A panel-data record from its identity triple; all other fields default —
+    /// fill them via the builder setters.
+    #[must_use]
+    pub fn new(uid: String, panel_type: Kind, name: String) -> Self {
+        Self { uid, panel_type, name, ..Self::default() }
+    }
+
+    /// Set the token count and last-refresh timestamp (builder).
+    #[must_use]
+    pub const fn with_metrics(mut self, token_count: usize, last_refresh_ms: u64) -> Self {
+        self.token_count = token_count;
+        self.last_refresh_ms = last_refresh_ms;
+        self
+    }
+
+    /// Set the conversation/history message UIDs (builder).
+    #[must_use]
+    pub fn with_message_uids(mut self, message_uids: Vec<String>) -> Self {
+        self.message_uids = message_uids;
+        self
+    }
+
+    /// Set the metadata bag and content hash (builder).
+    #[must_use]
+    pub fn with_metadata(mut self, metadata: HashMap<String, serde_json::Value>, content_hash: Option<String>) -> Self {
+        self.metadata = metadata;
+        self.content_hash = content_hash;
+        self
+    }
+
+    /// Set the accumulated cost + lifetime freeze/cache-miss counters (builder).
+    #[must_use]
+    pub const fn with_stats(
+        mut self,
+        panel_total_cost: Option<f64>,
+        total_freezes: u64,
+        total_cache_misses: u64,
+    ) -> Self {
+        self.panel_total_cost = panel_total_cost;
+        self.total_freezes = total_freezes;
+        self.total_cache_misses = total_cache_misses;
+        self
+    }
+}
+
 /// Returns the default schema version (1) for serde `default` attributes.
 const fn default_schema_version() -> u32 {
     1
@@ -209,7 +337,7 @@ const fn default_schema_version() -> u32 {
 
 /// Returns the default theme ID string for serde `default` attributes.
 fn default_theme() -> String {
-    crate::config::DEFAULT_THEME.to_string()
+    crate::config::DEFAULT_THEME.to_owned()
 }
 
 /// Returns 1, used as serde `default` for ID counters that start at 1.

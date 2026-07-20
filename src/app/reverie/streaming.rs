@@ -30,15 +30,15 @@ pub(crate) fn start_reverie_stream(state: &mut State, agent_id: &str, tx: Sender
     let mut reverie_messages = state.reveries.get(agent_id).map(|r| r.messages.clone()).unwrap_or_default();
     if reverie_messages.is_empty() {
         reverie_messages.push(cp_base::state::data::message::Message::new_user(
-            "reverie-kickoff".to_string(),
-            "reverie-kickoff".to_string(),
-            REVERIE.kickoff_message.trim_end().to_string(),
+            "reverie-kickoff".to_owned(),
+            "reverie-kickoff".to_owned(),
+            REVERIE.kickoff_message.trim_end().to_owned(),
             0,
         ));
     }
     for msg in &mut reverie_messages {
         if msg.role == "assistant" {
-            msg.content = msg.content.trim_end().to_string();
+            msg.content = msg.content.trim_end().to_owned();
         }
     }
 
@@ -57,7 +57,7 @@ pub(crate) fn start_reverie_stream(state: &mut State, agent_id: &str, tx: Sender
     let ctx = prepare_stream_context(
         state,
         true,
-        Some(ReverieContext { agent_id: agent_id.to_string(), messages: reverie_messages, tool_restrictions }),
+        Some(ReverieContext { agent_id: agent_id.to_owned(), messages: reverie_messages, tool_restrictions }),
     );
 
     // Fire the stream using the SAME provider/model/system prompt as the main worker.
@@ -87,7 +87,7 @@ fn build_reverie_seed(state: &State, agent_id: &str, tool_restrictions: &str) ->
 
     // Additional context (directive from optimize_context tool)
     if let Some(rev_state) = state.reveries.get(agent_id)
-        && let Some(ctx) = &rev_state.context
+        && let Some(ctx) = rev_state.context.as_ref()
     {
         seed.push_str("\n## Directive\n");
         seed.push_str(ctx);

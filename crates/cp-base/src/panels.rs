@@ -75,6 +75,10 @@ pub const fn scroll_key_action(key: &KeyEvent) -> Option<Action> {
 // =============================================================================
 
 /// Result of a background cache operation
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "cache-update protocol: CacheUpdate is constructed by every module's refresh_cache and matched exhaustively by the apply loop; the variant set is closed and #[non_exhaustive] would forbid that cross-crate construction"
+)]
 pub enum CacheUpdate {
     /// Generic content update (used by File, Tree, Glob, Grep, Tmux, `GitResult`, `GithubResult`)
     Content {
@@ -99,27 +103,68 @@ pub enum CacheUpdate {
     },
 }
 
+impl CacheUpdate {
+    /// Context id of an [`Unchanged`](Self::Unchanged) update, else `None`.
+    #[must_use]
+    pub const fn unchanged_context_id(&self) -> Option<&str> {
+        crate::deref_match!(self, {
+            Self::Unchanged { ref context_id } => Some(context_id.as_str()),
+            Self::Content { .. } => None,
+            Self::ModuleSpecific { .. } => None,
+        })
+    }
+
+    /// Context id of a [`Content`](Self::Content) update, else `None`.
+    #[must_use]
+    pub const fn content_context_id(&self) -> Option<&str> {
+        crate::deref_match!(self, {
+            Self::Content { ref context_id, .. } => Some(context_id.as_str()),
+            Self::Unchanged { .. } => None,
+            Self::ModuleSpecific { .. } => None,
+        })
+    }
+
+    /// Context type of a [`ModuleSpecific`](Self::ModuleSpecific) update, else `None`.
+    #[must_use]
+    pub const fn module_specific_type(&self) -> Option<&Kind> {
+        crate::deref_match!(self, {
+            Self::ModuleSpecific { ref context_type, .. } => Some(context_type),
+            Self::Content { .. } => None,
+            Self::Unchanged { .. } => None,
+        })
+    }
+}
+
 impl fmt::Debug for CacheUpdate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Content { context_id, token_count, .. } => {
-                f.debug_struct("Content").field("context_id", context_id).field("token_count", token_count).finish()
+        crate::deref_match!(self, {
+            Self::Content { ref context_id, token_count, .. } => {
+                f.debug_struct("Content").field("context_id", context_id).field("token_count", &token_count).finish()
             }
-            Self::Unchanged { context_id } => f.debug_struct("Unchanged").field("context_id", context_id).finish(),
-            Self::ModuleSpecific { context_type, .. } => {
+            Self::Unchanged { ref context_id } => f.debug_struct("Unchanged").field("context_id", context_id).finish(),
+            Self::ModuleSpecific { ref context_type, .. } => {
                 f.debug_struct("ModuleSpecific").field("context_type", context_type).finish()
             }
-        }
+        })
     }
 }
 
 /// Generic request for background cache operations.
 /// Each module defines its own request data struct and wraps it in `data`.
+#[non_exhaustive]
 pub struct CacheRequest {
     /// Panel type that originated this request.
     pub context_type: Kind,
     /// Type-erased request payload (downcast by the module's `refresh_cache`).
     pub data: Box<dyn Any + Send>,
+}
+
+impl CacheRequest {
+    /// Build a cache request for a panel type, boxing the module-specific payload.
+    #[must_use]
+    pub fn new(context_type: Kind, data: Box<dyn Any + Send>) -> Self {
+        Self { context_type, data }
+    }
 }
 
 impl fmt::Debug for CacheRequest {
@@ -140,6 +185,10 @@ pub fn hash_content(content: &str) -> String {
 
 /// Specification for a filesystem path to watch.
 #[derive(Debug)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "watch-spec contract: WatchSpec is constructed by every module's watch_paths and matched exhaustively by the watcher sync; the variant set is closed and #[non_exhaustive] would forbid that cross-crate construction"
+)]
 pub enum WatchSpec {
     /// Watch a single file (non-recursive)
     File(String),
@@ -162,6 +211,7 @@ pub fn now_ms() -> u64 {
 /// `clippy::integer_division_remainder_used`.
 #[expect(
     clippy::integer_division_remainder_used,
+    clippy::integer_division,
     clippy::arithmetic_side_effects,
     reason = "sole choke-point for truncating time/division arithmetic"
 )]
@@ -261,11 +311,11 @@ pub fn paginate_content(
     use crate::config::constants::{CHARS_PER_TOKEN, PANEL_PAGE_TOKENS};
 
     if total_pages <= 1 {
-        return full_content.to_string();
+        return full_content.to_owned();
     }
 
-    let chars_per_page = PANEL_PAGE_TOKENS.to_f32() * CHARS_PER_TOKEN;
-    let start_char = (current_page.to_f32() * chars_per_page).to_usize();
+    let chars_per_page = crate::cast::float_math::scale(PANEL_PAGE_TOKENS, CHARS_PER_TOKEN);
+    let start_char = crate::cast::float_math::scale_to_usize(current_page, chars_per_page);
 
     // Snap start to next line boundary
     let start = if start_char == 0 {
@@ -302,15 +352,16 @@ pub fn paginate_content(
     let mut scratchpad = String::new();
     if !page_descriptions.is_empty() {
         use std::fmt::Write as _;
-        scratchpad.push_str("[Page notes — scratchpad you wrote while navigating (cleared when this panel closes):\n");
+        scratchpad
+            .push_str("[Page notes \u{2014} scratchpad you wrote while navigating (cleared when this panel closes):\n");
         for (page_idx, note) in page_descriptions {
-            let _r = writeln!(scratchpad, "  · page {}: {}", page_idx.saturating_add(1), note.trim());
+            let _r = writeln!(scratchpad, "  \u{b7} page {}: {}", page_idx.saturating_add(1), note.trim());
         }
         scratchpad.push_str("]\n");
     }
 
     format!(
-        "{scratchpad}[Page {}/{} · DESTRUCTIVE PAGINATION: only THIS page is in context. \
+        "{scratchpad}[Page {}/{} \u{b7} DESTRUCTIVE PAGINATION: only THIS page is in context. \
 Navigating away with panel_goto_page permanently discards this page's content — you will \
 retain NOTHING from it except the note you write in `current_page_description`. Extract what \
 you need NOW; prefer searching/opening a specific range over walking pages.]\n{page_content}",
@@ -321,6 +372,7 @@ you need NOW; prefer searching/opening a specific range over walking pages.]\n{p
 
 /// A single context item to be sent to the LLM
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ContextItem {
     /// Context element ID (e.g., "P7", "P8") for LLM reference
     pub id: String,
@@ -334,12 +386,12 @@ pub struct ContextItem {
 
 impl ContextItem {
     /// Create a context item from its components.
-    pub fn new<I: Into<String>, H: Into<String>, C: Into<String>>(
-        id: I,
-        header: H,
-        content: C,
-        last_refresh_ms: u64,
-    ) -> Self {
+    pub fn new<I, H, C>(id: I, header: H, content: C, last_refresh_ms: u64) -> Self
+    where
+        I: Into<String>,
+        H: Into<String>,
+        C: Into<String>,
+    {
         Self { id: id.into(), header: header.into(), content: content.into(), last_refresh_ms }
     }
 }

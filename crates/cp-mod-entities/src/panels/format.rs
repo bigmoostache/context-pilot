@@ -17,7 +17,7 @@ pub(crate) fn query_to_markdown(
     enrichment: Option<(&str, u64)>,
 ) -> Result<String, String> {
     let mut stmt = conn.prepare(sql).map_err(|e| format!("{e}"))?;
-    let col_names: Vec<String> = stmt.column_names().iter().map(|s| (*s).to_string()).collect();
+    let col_names: Vec<String> = stmt.column_names().iter().map(|s| (*s).to_owned()).collect();
     let mut rows_data: Vec<Vec<String>> = Vec::new();
 
     let mut rows = stmt.query([]).map_err(|e| format!("{e}"))?;
@@ -35,7 +35,7 @@ pub(crate) fn query_to_markdown(
         if let Some((name, total)) = enrichment {
             return Ok(format!("0 rows returned. (Table '{name}' has {total} total rows.)"));
         }
-        return Ok("0 rows returned.".to_string());
+        return Ok("0 rows returned.".to_owned());
     }
 
     // Cap results at MAX_RESULT_ROWS
@@ -54,11 +54,11 @@ pub(crate) fn format_cell(row: &rusqlite::Row<'_>, idx: usize) -> String {
     use rusqlite::types::ValueRef;
 
     let Ok(val) = row.get_ref(idx) else {
-        return "NULL".to_string();
+        return "NULL".to_owned();
     };
 
     match val {
-        ValueRef::Null => "NULL".to_string(),
+        ValueRef::Null => "NULL".to_owned(),
         ValueRef::Integer(n) => n.to_string(),
         ValueRef::Real(f) => f.to_string(),
         ValueRef::Text(bytes) => String::from_utf8_lossy(bytes).into_owned(),

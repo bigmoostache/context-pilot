@@ -42,6 +42,10 @@ impl fmt::Debug for SecretString {
 
 /// Errors that can occur during vault operations.
 #[derive(Debug)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "vault error taxonomy is a closed set (MissingKey/Io/Network) constructed within cp-vault and matched exhaustively by callers; #[non_exhaustive] would force cross-crate wildcard arms that the forbidden wildcard_enum_match_arm lint rejects"
+)]
 pub enum VaultError {
     /// Requested key is not configured anywhere in the resolution cascade.
     MissingKey(String),
@@ -52,11 +56,15 @@ pub enum VaultError {
 }
 
 impl fmt::Display for VaultError {
+    #[expect(
+        clippy::ref_patterns,
+        reason = "clippy::pattern_type_mismatch mandates dereferencing the &self scrutinee and binding the non-Copy String payloads with ref; the two restriction lints are mutually exclusive and cp-vault is foundational (cannot depend on cp-base's deref_match! macro)"
+    )]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::MissingKey(key) => write!(f, "credential not configured: {key}"),
-            Self::Io(msg) => write!(f, "vault I/O error: {msg}"),
-            Self::Network(msg) => write!(f, "vault network error: {msg}"),
+        match *self {
+            Self::MissingKey(ref key) => write!(f, "credential not configured: {key}"),
+            Self::Io(ref msg) => write!(f, "vault I/O error: {msg}"),
+            Self::Network(ref msg) => write!(f, "vault network error: {msg}"),
         }
     }
 }
@@ -64,7 +72,11 @@ impl fmt::Display for VaultError {
 // ─── KeyStatus ──────────────────────────────────────────────────────────────
 
 /// Status of a single key as reported by [`Vault::list()`].
+///
+/// `#[non_exhaustive]`: constructed only in-crate by vault backends;
+/// callers read `definition`/`available`, so a new field is not breaking.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct KeyStatus {
     /// The key's static definition from the registry.
     pub definition: &'static KeyDefinition,

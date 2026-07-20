@@ -9,16 +9,16 @@ use std::fmt::Write as _;
 pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("scratch_create");
     let title = match tool.input.get("cell_title").and_then(|v| v.as_str()) {
-        Some(t) => t.to_string(),
+        Some(t) => t.to_owned(),
         None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'cell_title' parameter".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing 'cell_title' parameter".to_owned(), true);
         }
     };
 
     let contents = match tool.input.get("cell_contents").and_then(|v| v.as_str()) {
-        Some(c) => c.to_string(),
+        Some(c) => c.to_owned(),
         None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'cell_contents' parameter".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing 'cell_contents' parameter".to_owned(), true);
         }
     };
 
@@ -31,7 +31,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     state.touch_panel(Kind::SCRATCHPAD);
 
     let preview = if contents.len() > 50 {
-        format!("{}...", &contents.get(..contents.floor_char_boundary(47)).unwrap_or(""))
+        format!("{}...", contents.get(..contents.floor_char_boundary(47)).unwrap_or(""))
     } else {
         contents
     };
@@ -43,7 +43,7 @@ pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("scratch_edit");
     let Some(cell_id) = tool.input.get("cell_id").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'cell_id' parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing 'cell_id' parameter".to_owned(), true);
     };
 
     let ss = ScratchpadState::get_mut(state);
@@ -54,12 +54,12 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
             let mut changes = Vec::new();
 
             if let Some(title) = tool.input.get("cell_title").and_then(|v| v.as_str()) {
-                c.title = title.to_string();
+                title.clone_into(&mut c.title);
                 changes.push("title");
             }
 
             if let Some(contents) = tool.input.get("cell_contents").and_then(|v| v.as_str()) {
-                c.content = contents.to_string();
+                contents.clone_into(&mut c.content);
                 changes.push("contents");
             }
 
@@ -79,7 +79,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("scratch_wipe");
     let Some(cell_ids) = tool.input.get("cell_ids").and_then(|v| v.as_array()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'cell_ids' array parameter".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing 'cell_ids' array parameter".to_owned(), true);
     };
 
     // If empty array, wipe all cells
@@ -93,7 +93,7 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Otherwise, delete specific cells
-    let ids_to_delete: Vec<String> = cell_ids.iter().filter_map(|v| v.as_str().map(ToString::to_string)).collect();
+    let ids_to_delete: Vec<String> = cell_ids.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect();
 
     let ss = ScratchpadState::get_mut(state);
     let initial_count = ss.scratchpad_cells.len();

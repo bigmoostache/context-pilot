@@ -5,6 +5,12 @@
 //! values that don't fit clamp to the target type's MIN/MAX.
 //!
 //! Usage: `use cp_base::cast::Safe;` then `value.to_u16()`, etc.
+//!
+//! Float arithmetic lives in the [`float_math`] sibling module — the sole
+//! audited chokepoint for `clippy::float_arithmetic` (deny workspace-wide).
+
+/// Float arithmetic chokepoint (ratios, cost, bar fills, easing, statistics).
+pub mod float_math;
 
 /// Trait for safe saturating casts between numeric types.
 pub trait Safe {
@@ -75,6 +81,7 @@ impl Safe for u16 {
 /// values of wider integer types. This is fundamental, not fixable.
 #[expect(
     clippy::cast_precision_loss,
+    clippy::as_conversions,
     reason = "lossy int→float: mantissa too narrow — inherent floating-point limitation"
 )]
 mod lossy_float {
@@ -252,6 +259,7 @@ mod lossy_float {
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
+    clippy::as_conversions,
     reason = "saturating float→int: no TryFrom<float> for integers in std"
 )]
 mod float_to_int {

@@ -64,7 +64,8 @@ fn agents_table(agents: &[crate::types::PromptItem], ps: &PromptState, blocks: &
         .iter()
         .map(|agent| {
             let is_active = ps.active_agent_id.as_deref() == Some(&agent.id);
-            let (active_str, active_sem) = if is_active { ("✓", Semantic::Success) } else { ("", Semantic::Muted) };
+            let (active_str, active_sem) =
+                if is_active { ("\u{2713}", Semantic::Success) } else { ("", Semantic::Muted) };
             let (type_str, type_sem) =
                 if agent.is_builtin { ("built-in", Semantic::AccentDim) } else { ("custom", Semantic::Success) };
             vec![
@@ -104,7 +105,8 @@ fn skills_table(skills: &[crate::types::PromptItem], ps: &PromptState, blocks: &
         .iter()
         .map(|skill| {
             let is_loaded = ps.loaded_skill_ids.contains(&skill.id);
-            let (loaded_str, loaded_sem) = if is_loaded { ("✓", Semantic::Success) } else { ("", Semantic::Muted) };
+            let (loaded_str, loaded_sem) =
+                if is_loaded { ("\u{2713}", Semantic::Success) } else { ("", Semantic::Muted) };
             let (type_str, type_sem) =
                 if skill.is_builtin { ("built-in", Semantic::AccentDim) } else { ("custom", Semantic::Success) };
             vec![

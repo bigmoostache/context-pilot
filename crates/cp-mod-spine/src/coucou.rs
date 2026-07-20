@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{Watcher, WatcherRegistry, WatcherResult};
+use cp_base::state::watchers::carriers::WatcherResult;
+use cp_base::state::watchers::{Watcher, WatcherRegistry};
 use cp_base::tools::{ToolResult, ToolUse};
 
 // ============================================================
@@ -42,7 +43,7 @@ impl CoucouData {
     /// Convert into a live `CoucouWatcher` and register in `WatcherRegistry`.
     pub(crate) fn into_watcher(self) -> CoucouWatcher {
         let recurrence_suffix = self.recurrence_label.as_deref().map_or(String::new(), |r| format!(" [{r}]"));
-        let desc = if let Some(tid) = &self.thread_id {
+        let desc = if let Some(tid) = self.thread_id.as_ref() {
             format!("🔔 Coucou (thread {tid}): \"{}\"{recurrence_suffix}", self.message)
         } else {
             format!("🔔 Coucou: \"{}\"{recurrence_suffix}", self.message)
@@ -70,13 +71,13 @@ pub(crate) fn collect_pending_coucous(state: &State) -> Vec<CoucouData> {
         .filter(|w| w.source_tag() == "coucou")
         .filter_map(|w| {
             Some(CoucouData {
-                watcher_id: w.id().to_string(),
-                message: w.message()?.to_string(),
+                watcher_id: w.id().to_owned(),
+                message: w.message()?.to_owned(),
                 registered_at_ms: w.registered_ms(),
                 fire_at_ms: w.fire_at_ms()?,
-                thread_id: w.thread_id().map(str::to_string),
+                thread_id: w.thread_id().map(str::to_owned),
                 interval_ms: w.interval_ms(),
-                recurrence_label: w.recurrence_label().map(str::to_string),
+                recurrence_label: w.recurrence_label().map(str::to_owned),
             })
         })
         .collect()
@@ -85,12 +86,12 @@ pub(crate) fn collect_pending_coucous(state: &State) -> Vec<CoucouData> {
 /// Parse a human-friendly duration string into milliseconds.
 /// Supports: "30s", "5m", "1h", "1h30m", "2h15m30s", "90s", "120"
 fn parse_duration_ms(s: &str) -> Result<u64, String> {
-    let s = s.trim();
+    let trimmed = s.trim();
 
     // Pure numeric → treat as seconds
-    if let Ok(secs) = s.parse::<u64>() {
+    if let Ok(secs) = trimmed.parse::<u64>() {
         if secs == 0 {
-            return Err("Duration must be greater than 0".to_string());
+            return Err("Duration must be greater than 0".to_owned());
         }
         return Ok(secs.saturating_mul(1000));
     }
@@ -98,11 +99,11 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
     let mut total_ms: u64 = 0;
     let mut current_num = String::new();
 
-    for ch in s.chars() {
+    for ch in trimmed.chars() {
         if ch.is_ascii_digit() {
             current_num.push(ch);
         } else {
-            let val: u64 = current_num.parse().map_err(|_e| format!("Invalid number in duration: '{s}'"))?;
+            let val: u64 = current_num.parse().map_err(|_e| format!("Invalid number in duration: '{trimmed}'"))?;
             current_num.clear();
             match ch {
                 'h' | 'H' => total_ms = total_ms.saturating_add(val.saturating_mul(3_600_000)),
@@ -115,12 +116,12 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
 
     // Trailing number without unit → seconds
     if !current_num.is_empty() {
-        let val: u64 = current_num.parse().map_err(|_e| format!("Invalid number in duration: '{s}'"))?;
+        let val: u64 = current_num.parse().map_err(|_e| format!("Invalid number in duration: '{trimmed}'"))?;
         total_ms = total_ms.saturating_add(val.saturating_mul(1_000));
     }
 
     if total_ms == 0 {
-        return Err("Duration must be greater than 0".to_string());
+        return Err("Duration must be greater than 0".to_owned());
     }
 
     Ok(total_ms)
@@ -129,19 +130,19 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
 /// Parse an ISO 8601 datetime string into milliseconds since epoch.
 /// Supports: "2026-02-20T08:00:00", "2026-02-20 08:00:00", "2026-02-20T08:00"
 fn parse_datetime_ms(s: &str) -> Result<u64, String> {
-    let s = s.trim().replace(' ', "T");
+    let joined = s.trim().replace(' ', "T");
 
     // Pad missing seconds: "2026-02-20T08:00" → "2026-02-20T08:00:00"
-    let normalized = if s.matches(':').count() == 1 { format!("{s}:00") } else { s };
+    let padded = if joined.matches(':').count() == 1 { format!("{joined}:00") } else { joined };
     // Strip trailing Z if present
-    let normalized = normalized.trim_end_matches('Z');
+    let normalized = padded.trim_end_matches('Z');
 
     // Treat as UTC by appending 'Z', matching the original behavior
     let rfc3339 = format!("{normalized}Z");
     let ms = cp_mod_utilities::time::parse_rfc3339_to_epoch_ms(&rfc3339)
         .ok_or_else(|| format!("Invalid datetime: '{normalized}'. Expected format: YYYY-MM-DDTHH:MM:SS"))?;
 
-    u64::try_from(ms).map_err(|_e| "DateTime is before epoch".to_string())
+    u64::try_from(ms).map_err(|_e| "DateTime is before epoch".to_owned())
 }
 
 /// Format milliseconds as a human-friendly duration string.
@@ -233,17 +234,7 @@ impl Watcher for CoucouWatcher {
                 || format!("⏰ Coucou! {}", self.message),
                 |tid| format!("⏰ Coucou (thread {tid})! {}", self.message),
             );
-            WatcherResult {
-                description: desc,
-                panel_id: None,
-                tool_use_id: None,
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            }
+            WatcherResult::new(desc)
         })
     }
 
@@ -288,6 +279,112 @@ impl Watcher for CoucouWatcher {
 /// Monotonic counter for generating unique coucou watcher IDs.
 static COUCOU_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
+/// Minimum recurrence interval to prevent notification spam (60 seconds).
+const MIN_RECURRENCE_MS: u64 = 60_000;
+
+/// Parsed recurrence: interval in ms (0 = one-shot) + human-readable label.
+type Recurrence = (u64, Option<String>);
+
+/// Resolved schedule: absolute fire time (ms since epoch) + delay description.
+type FireTime = (u64, String);
+
+/// Boxed error result — keeps the fallible parse signatures under the
+/// `type_complexity` threshold.
+type CoucouErr = Box<ToolResult>;
+
+/// Parse the `recurrence` (+ `interval` for custom) params into an interval in
+/// ms (0 = one-shot) and a human-readable label. Returns the error `ToolResult`
+/// on an unknown recurrence or an invalid/too-short custom interval.
+fn parse_recurrence(tool: &ToolUse) -> Result<Recurrence, CoucouErr> {
+    let recurrence_str = tool.input.get("recurrence").and_then(|v| v.as_str()).unwrap_or("once");
+    match recurrence_str {
+        "once" => Ok((0, None)),
+        "hourly" => Ok((3_600_000, Some("hourly".to_owned()))),
+        "daily" => Ok((86_400_000, Some("daily".to_owned()))),
+        "weekly" => Ok((604_800_000, Some("weekly".to_owned()))),
+        "custom" => {
+            let Some(interval_str) = tool.input.get("interval").and_then(|v| v.as_str()) else {
+                return Err(Box::new(ToolResult::new(
+                    tool.id.clone(),
+                    "Missing 'interval' parameter for custom recurrence. Examples: '30m', '2h', '1d'".to_owned(),
+                    true,
+                )));
+            };
+            match parse_duration_ms(interval_str) {
+                Ok(ms) if ms < MIN_RECURRENCE_MS => Err(Box::new(ToolResult::new(
+                    tool.id.clone(),
+                    format!(
+                        "Recurrence interval '{interval_str}' is too short. Minimum is 60s to prevent notification spam."
+                    ),
+                    true,
+                ))),
+                Ok(ms) => Ok((ms, Some(format!("every {}", format_duration(ms))))),
+                Err(e) => Err(Box::new(ToolResult::new(
+                    tool.id.clone(),
+                    format!("Invalid interval '{interval_str}': {e}"),
+                    true,
+                ))),
+            }
+        }
+        _ => Err(Box::new(ToolResult::new(
+            tool.id.clone(),
+            format!("Unknown recurrence '{recurrence_str}'. Use 'once', 'hourly', 'daily', 'weekly', or 'custom'."),
+            true,
+        ))),
+    }
+}
+
+/// Resolve the absolute fire time (ms since epoch) and a human-readable delay
+/// description for the given `mode` ("timer" or "datetime"). Returns the error
+/// `ToolResult` on a missing/invalid delay or datetime, or a past datetime.
+fn resolve_fire_time(tool: &ToolUse, mode: &str, now: u64) -> Result<FireTime, CoucouErr> {
+    match mode {
+        "timer" => {
+            let Some(delay_str) = tool.input.get("delay").and_then(|v| v.as_str()) else {
+                return Err(Box::new(ToolResult::new(
+                    tool.id.clone(),
+                    "Missing 'delay' parameter for timer mode. Examples: '30s', '5m', '1h30m'".to_owned(),
+                    true,
+                )));
+            };
+            match parse_duration_ms(delay_str) {
+                Ok(delay_ms) => Ok((now.saturating_add(delay_ms), format!("in {}", format_duration(delay_ms)))),
+                Err(e) => {
+                    Err(Box::new(ToolResult::new(tool.id.clone(), format!("Invalid delay '{delay_str}': {e}"), true)))
+                }
+            }
+        }
+        "datetime" => {
+            let Some(dt_str) = tool.input.get("datetime").and_then(|v| v.as_str()) else {
+                return Err(Box::new(ToolResult::new(
+                    tool.id.clone(),
+                    "Missing 'datetime' parameter. Format: YYYY-MM-DDTHH:MM:SS".to_owned(),
+                    true,
+                )));
+            };
+            match parse_datetime_ms(dt_str) {
+                Ok(target_ms) if target_ms <= now => Err(Box::new(ToolResult::new(
+                    tool.id.clone(),
+                    format!("DateTime '{dt_str}' is in the past!"),
+                    true,
+                ))),
+                Ok(target_ms) => {
+                    let remaining = format_duration(target_ms.saturating_sub(now));
+                    Ok((target_ms, format!("at {dt_str} ({remaining})")))
+                }
+                Err(e) => {
+                    Err(Box::new(ToolResult::new(tool.id.clone(), format!("Invalid datetime '{dt_str}': {e}"), true)))
+                }
+            }
+        }
+        _ => Err(Box::new(ToolResult::new(
+            tool.id.clone(),
+            format!("Unknown mode '{mode}'. Use 'timer' or 'datetime'."),
+            true,
+        ))),
+    }
+}
+
 /// Execute the coucou tool — schedule a notification or cancel an existing one.
 pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
     // === Cancel path ===
@@ -304,117 +401,30 @@ pub(crate) fn execute_coucou(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(mode) = tool.input.get("mode").and_then(|v| v.as_str()) else {
         return ToolResult::new(
             tool.id.clone(),
-            "Missing required 'mode' parameter. Use 'timer' or 'datetime'.".to_string(),
+            "Missing required 'mode' parameter. Use 'timer' or 'datetime'.".to_owned(),
             true,
         );
     };
 
     let message = match tool.input.get("message").and_then(|v| v.as_str()) {
-        Some(m) => m.to_string(),
+        Some(m) => m.to_owned(),
         None => {
-            return ToolResult::new(tool.id.clone(), "Missing required 'message' parameter.".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing required 'message' parameter.".to_owned(), true);
         }
     };
 
     let thread_id = tool.input.get("thread_id").and_then(|v| v.as_str()).map(String::from);
 
-    // Parse recurrence
-    let recurrence_str = tool.input.get("recurrence").and_then(|v| v.as_str()).unwrap_or("once");
-    let (interval_ms, recurrence_label): (u64, Option<String>) = match recurrence_str {
-        "once" => (0, None),
-        "hourly" => (3_600_000, Some("hourly".to_string())),
-        "daily" => (86_400_000, Some("daily".to_string())),
-        "weekly" => (604_800_000, Some("weekly".to_string())),
-        "custom" => {
-            /// Minimum recurrence interval to prevent notification spam (60 seconds).
-            const MIN_RECURRENCE_MS: u64 = 60_000;
-            let Some(interval_str) = tool.input.get("interval").and_then(|v| v.as_str()) else {
-                return ToolResult::new(
-                    tool.id.clone(),
-                    "Missing 'interval' parameter for custom recurrence. Examples: '30m', '2h', '1d'".to_string(),
-                    true,
-                );
-            };
-            match parse_duration_ms(interval_str) {
-                Ok(ms) if ms < MIN_RECURRENCE_MS => {
-                    return ToolResult::new(
-                        tool.id.clone(),
-                        format!(
-                            "Recurrence interval '{interval_str}' is too short. Minimum is 60s to prevent notification spam."
-                        ),
-                        true,
-                    );
-                }
-                Ok(ms) => (ms, Some(format!("every {}", format_duration(ms)))),
-                Err(e) => {
-                    return ToolResult::new(tool.id.clone(), format!("Invalid interval '{interval_str}': {e}"), true);
-                }
-            }
-        }
-        _ => {
-            return ToolResult::new(
-                tool.id.clone(),
-                format!("Unknown recurrence '{recurrence_str}'. Use 'once', 'hourly', 'daily', 'weekly', or 'custom'."),
-                true,
-            );
-        }
+    let (interval_ms, recurrence_label) = match parse_recurrence(tool) {
+        Ok(r) => r,
+        Err(e) => return *e,
     };
 
     let now = now_ms();
-    let fire_at_ms: u64;
-    let delay_desc: String;
-
-    match mode {
-        "timer" => {
-            let Some(delay_str) = tool.input.get("delay").and_then(|v| v.as_str()) else {
-                return ToolResult::new(
-                    tool.id.clone(),
-                    "Missing 'delay' parameter for timer mode. Examples: '30s', '5m', '1h30m'".to_string(),
-                    true,
-                );
-            };
-
-            match parse_duration_ms(delay_str) {
-                Ok(delay_ms) => {
-                    fire_at_ms = now.saturating_add(delay_ms);
-                    delay_desc = format!("in {}", format_duration(delay_ms));
-                }
-                Err(e) => {
-                    return ToolResult::new(tool.id.clone(), format!("Invalid delay '{delay_str}': {e}"), true);
-                }
-            }
-        }
-        "datetime" => {
-            let Some(dt_str) = tool.input.get("datetime").and_then(|v| v.as_str()) else {
-                return ToolResult::new(
-                    tool.id.clone(),
-                    "Missing 'datetime' parameter. Format: YYYY-MM-DDTHH:MM:SS".to_string(),
-                    true,
-                );
-            };
-
-            match parse_datetime_ms(dt_str) {
-                Ok(target_ms) => {
-                    if target_ms <= now {
-                        return ToolResult::new(tool.id.clone(), format!("DateTime '{dt_str}' is in the past!"), true);
-                    }
-                    fire_at_ms = target_ms;
-                    let remaining = format_duration(target_ms.saturating_sub(now));
-                    delay_desc = format!("at {dt_str} ({remaining})");
-                }
-                Err(e) => {
-                    return ToolResult::new(tool.id.clone(), format!("Invalid datetime '{dt_str}': {e}"), true);
-                }
-            }
-        }
-        _ => {
-            return ToolResult::new(
-                tool.id.clone(),
-                format!("Unknown mode '{mode}'. Use 'timer' or 'datetime'."),
-                true,
-            );
-        }
-    }
+    let (fire_at_ms, delay_desc) = match resolve_fire_time(tool, mode, now) {
+        Ok(r) => r,
+        Err(e) => return *e,
+    };
 
     let counter = COUCOU_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let watcher_id = format!("coucou_{counter}");

@@ -8,7 +8,7 @@ use crate::infra::constants::{
 };
 use crate::modules::conversation::refresh::estimate_message_tokens;
 use crate::state::cache::hash_content;
-use crate::state::{Entry, Kind, Message, MsgKind, MsgStatus, compute_total_pages, estimate_tokens};
+use crate::state::{Kind, Message, MsgKind, MsgStatus, compute_total_pages, estimate_tokens};
 use cp_base::panels::time_arith;
 
 /// Check if `idx` is a turn boundary — a safe place to split the conversation.
@@ -46,6 +46,121 @@ fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> Strin
     crate::state::format_messages_to_chunk(slice)
 }
 
+/// Count active (non-Deleted, non-Detached) messages in `msgs`.
+fn active_count(msgs: &[Message]) -> usize {
+    msgs.iter().filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached).count()
+}
+
+/// Sum estimated tokens over active messages in `msgs`.
+fn active_tokens(msgs: &[Message]) -> usize {
+    msgs.iter()
+        .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
+        .map(estimate_message_tokens)
+        .sum()
+}
+
+/// Walk from oldest, returning the exclusive-end index of the first detachable
+/// chunk: a turn boundary reached once BOTH chunk minimums (messages + tokens)
+/// are satisfied. `None` when no such boundary exists.
+fn find_detach_boundary(messages: &[Message]) -> Option<usize> {
+    let mut active_seen = 0usize;
+    let mut tokens_seen = 0usize;
+    for (idx, msg) in messages.iter().enumerate() {
+        if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
+            continue;
+        }
+        active_seen = active_seen.saturating_add(1);
+        tokens_seen = tokens_seen.saturating_add(estimate_message_tokens(msg));
+
+        if active_seen >= DETACH_CHUNK_MIN_MESSAGES
+            && tokens_seen >= DETACH_CHUNK_MIN_TOKENS
+            && is_turn_boundary(messages, idx)
+        {
+            return (idx.saturating_add(1) > 0).then(|| idx.saturating_add(1));
+        }
+    }
+    None
+}
+
+/// Whether the tip remaining after `boundary` still satisfies both keep minimums.
+fn tip_keeps_enough(messages: &[Message], boundary: usize) -> bool {
+    let remaining = messages.get(boundary..).unwrap_or_default();
+    active_count(remaining) >= DETACH_KEEP_MIN_MESSAGES && active_tokens(remaining) >= DETACH_KEEP_MIN_TOKENS
+}
+
+/// Build the `Chat HH:MM–HH:MM` (or `Chat (N)`) name for a detached chunk.
+fn chunk_name(first_ts: u64, last_ts: u64, active_seen: usize) -> String {
+    fn ms_to_short_time(ms: u64) -> String {
+        let secs = time_arith::ms_to_secs(ms);
+        let (hours, minutes, _seconds) = time_arith::secs_to_hms(secs);
+        format!("{hours:02}:{minutes:02}")
+    }
+    if first_ts > 0 && last_ts > 0 {
+        format!("Chat {}–{}", ms_to_short_time(first_ts), ms_to_short_time(last_ts))
+    } else {
+        format!("Chat ({active_seen})")
+    }
+}
+
+/// Create the `ConversationHistory` panel for `messages[..boundary]` and push it
+/// onto `state.context`. Returns `false` when the chunk content is empty (bail).
+fn push_history_chunk(state: &mut crate::state::State, boundary: usize) -> bool {
+    let chunk_msgs = state.messages.get(..boundary).unwrap_or_default();
+    let first_timestamp = chunk_msgs
+        .iter()
+        .find(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
+        .map_or(0, |m| m.timestamp_ms);
+    let last_timestamp = chunk_msgs
+        .iter()
+        .rev()
+        .find(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
+        .map_or(0, |m| m.timestamp_ms);
+    let seen = active_count(chunk_msgs);
+
+    let history_msgs: Vec<Message> = chunk_msgs
+        .iter()
+        .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
+        .cloned()
+        .collect();
+
+    let content = format_chunk_content(&state.messages, 0, boundary);
+    if content.is_empty() {
+        return false;
+    }
+
+    // Use current time as last_refresh_ms so the history panel sorts to the end
+    // of the context, preserving prompt cache hits for all panels before it —
+    // history panels stack progressively like icebergs calving off.
+    let chunk_timestamp = now_ms();
+    let panel_id = state.next_available_context_id();
+    let token_count = estimate_tokens(&content);
+    let total_pages = compute_total_pages(token_count);
+    let name = chunk_name(first_timestamp, last_timestamp, seen);
+
+    let panel_global_uid = format!("UID_{}_P", state.global_next_uid);
+    state.global_next_uid = state.global_next_uid.saturating_add(1);
+
+    state.context.push(
+        cp_base::state::context::make_default_entry(&panel_id, Kind::new(Kind::CONVERSATION_HISTORY), &name, false)
+            .with_uid(panel_global_uid)
+            .with_token_count(token_count)
+            .with_cached_content(Some(content.clone()))
+            .with_history_messages(Some(history_msgs))
+            .with_last_refresh_ms(chunk_timestamp)
+            .with_pages(total_pages, token_count)
+            .with_emitted(cp_base::state::context::EmittedState::new(None, Some(hash_content(&content)))),
+    );
+
+    // Remove detached messages from state and disk.
+    let removed: Vec<Message> = state.messages.drain(..boundary).collect();
+    for msg in &removed {
+        if let Some(uid) = msg.uid.as_ref() {
+            crate::state::persistence::delete_message(uid);
+        }
+    }
+    true
+}
+
 /// Detach oldest conversation messages into frozen `ConversationHistory` panels
 /// when the active conversation exceeds thresholds.
 ///
@@ -63,152 +178,22 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
     }
 
     loop {
-        // 1. Count active (non-Deleted, non-Detached) messages and total tokens
-        let active_count =
-            state.messages.iter().filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached).count();
-        let total_tokens: usize = state
-            .messages
-            .iter()
-            .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
-            .map(estimate_message_tokens)
-            .sum();
-
-        // 2. Quick check: if we can't possibly satisfy both chunk minimums
-        //    while leaving enough in the tip, bail early.
-        if active_count < DETACH_CHUNK_MIN_MESSAGES.saturating_add(DETACH_KEEP_MIN_MESSAGES) {
+        // Quick check: bail if we can't satisfy both chunk minimums while
+        // leaving enough in the tip.
+        if active_count(&state.messages) < DETACH_CHUNK_MIN_MESSAGES.saturating_add(DETACH_KEEP_MIN_MESSAGES) {
             break;
         }
-        if total_tokens < DETACH_CHUNK_MIN_TOKENS.saturating_add(DETACH_KEEP_MIN_TOKENS) {
+        if active_tokens(&state.messages) < DETACH_CHUNK_MIN_TOKENS.saturating_add(DETACH_KEEP_MIN_TOKENS) {
             break;
         }
 
-        // 3. Walk from oldest, tracking both message count and token count.
-        //    Only consider a boundary once BOTH chunk minimums are reached.
-        let mut active_seen = 0usize;
-        let mut tokens_seen = 0usize;
-        let mut boundary = None;
-
-        for (idx, msg) in state.messages.iter().enumerate() {
-            if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
-                continue;
-            }
-            active_seen = active_seen.saturating_add(1);
-            tokens_seen = tokens_seen.saturating_add(estimate_message_tokens(msg));
-
-            if active_seen >= DETACH_CHUNK_MIN_MESSAGES
-                && tokens_seen >= DETACH_CHUNK_MIN_TOKENS
-                && is_turn_boundary(&state.messages, idx)
-            {
-                boundary = Some(idx.saturating_add(1)); // exclusive end
-                break;
-            }
-        }
-
-        let boundary = match boundary {
-            Some(b) if b > 0 => b,
-            _ => break, // No valid boundary found, bail
-        };
-
-        // 4. Verify the remaining tip satisfies both keep minimums
-        let remaining_msgs = state.messages.get(boundary..).unwrap_or_default();
-        let remaining_active =
-            remaining_msgs.iter().filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached).count();
-        let remaining_tokens: usize = remaining_msgs
-            .iter()
-            .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
-            .map(estimate_message_tokens)
-            .sum();
-
-        if remaining_active < DETACH_KEEP_MIN_MESSAGES || remaining_tokens < DETACH_KEEP_MIN_TOKENS {
+        let Some(boundary) = find_detach_boundary(&state.messages) else { break };
+        if !tip_keeps_enough(&state.messages, boundary) {
             break;
         }
-
-        // 4. Collect message IDs for the chunk name
-        let chunk_msgs = state.messages.get(..boundary).unwrap_or_default();
-        let first_timestamp = chunk_msgs
-            .iter()
-            .find(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
-            .map_or(0, |m| m.timestamp_ms);
-        let last_timestamp = chunk_msgs
-            .iter()
-            .rev()
-            .find(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
-            .map_or(0, |m| m.timestamp_ms);
-
-        // 5. Collect Message objects for UI rendering + format chunk content for LLM
-        let history_msgs: Vec<Message> = chunk_msgs
-            .iter()
-            .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
-            .cloned()
-            .collect();
-
-        let content = format_chunk_content(&state.messages, 0, boundary);
-        if content.is_empty() {
-            break; // Nothing useful to detach
+        if !push_history_chunk(state, boundary) {
+            break;
         }
-
-        // 6. Use current time as last_refresh_ms so the history panel sorts
-        //    to the end of the context. This preserves prompt cache hits for
-        //    all panels before it — history panels stack progressively like
-        //    icebergs calving off, instead of sinking deep and invalidating cache.
-        let chunk_timestamp = now_ms();
-
-        // 7. Create the ConversationHistory panel
-        let panel_id = state.next_available_context_id();
-        let token_count = estimate_tokens(&content);
-        let total_pages = compute_total_pages(token_count);
-        let chunk_name = {
-            // Format timestamps as short time strings (HH:MM)
-            fn ms_to_short_time(ms: u64) -> String {
-                let secs = time_arith::ms_to_secs(ms);
-                let (hours, minutes, _seconds) = time_arith::secs_to_hms(secs);
-                format!("{hours:02}:{minutes:02}")
-            }
-            if first_timestamp > 0 && last_timestamp > 0 {
-                format!("Chat {}–{}", ms_to_short_time(first_timestamp), ms_to_short_time(last_timestamp))
-            } else {
-                format!("Chat ({active_seen})")
-            }
-        };
-
-        let panel_global_uid = format!("UID_{}_P", state.global_next_uid);
-        state.global_next_uid = state.global_next_uid.saturating_add(1);
-
-        state.context.push(Entry {
-            id: panel_id,
-            uid: Some(panel_global_uid),
-            context_type: Kind::new(Kind::CONVERSATION_HISTORY),
-            name: chunk_name,
-            token_count,
-            metadata: std::collections::HashMap::new(),
-            cached_content: Some(content.clone()),
-            history_messages: Some(history_msgs),
-            cache_deprecated: false,
-            cache_in_flight: false,
-            last_refresh_ms: chunk_timestamp,
-            content_hash: None,
-            source_hash: None,
-            current_page: 0,
-            total_pages,
-            page_descriptions: std::collections::BTreeMap::new(),
-            full_token_count: token_count,
-            scroll_state: cp_base::state::context::ScrollState::default(),
-            panel_cache_hit: false,
-            panel_total_cost: 0.0,
-            freeze_count: 0,
-            total_freezes: 0,
-            total_cache_misses: 0,
-            emitted: cp_base::state::context::EmittedState { hash: Some(hash_content(&content)), context: None },
-        });
-
-        // 8. Remove detached messages from state and disk
-        let removed: Vec<Message> = state.messages.drain(..boundary).collect();
-        for msg in &removed {
-            if let Some(uid) = &msg.uid {
-                crate::state::persistence::delete_message(uid);
-            }
-        }
-
-        // Loop to check if remaining messages still exceed threshold
+        // Loop to check if remaining messages still exceed threshold.
     }
 }

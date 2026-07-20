@@ -14,6 +14,7 @@ use crate::types::{CallbackDefinition, CallbackState};
 /// A callback that matched one or more changed files and is ready to fire.
 // Queue ID test marker — delete me later
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct MatchedCallback {
     /// The callback definition
     pub definition: CallbackDefinition,
@@ -23,11 +24,36 @@ pub struct MatchedCallback {
 
 /// A changed file with optional `skip_callbacks` names from the tool that changed it.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ChangedFile {
     /// Relative path to the changed file
     pub path: String,
     /// Callback names the LLM wants to skip for this file
     pub skip_callbacks: Vec<String>,
+}
+
+/// Normalize a raw tool `file_path` to a project-relative path (strip `./` and
+/// an absolute project-root prefix).
+fn normalize_changed_path(path: &str, project_root: &str) -> String {
+    let mut anchor = path.strip_prefix("./").unwrap_or(path);
+    if let Some(relative) = anchor.strip_prefix(project_root) {
+        anchor = relative.strip_prefix('/').unwrap_or(relative);
+    }
+    anchor.to_owned()
+}
+
+/// Merge one changed file into `hull`, unioning skip-lists when the path
+/// already appears (two tools touched the same file in one batch).
+fn merge_changed_file(hull: &mut Vec<ChangedFile>, path: String, skip_names: Vec<String>) {
+    if let Some(existing) = hull.iter_mut().find(|f| f.path == path) {
+        for name in skip_names {
+            if !existing.skip_callbacks.contains(&name) {
+                existing.skip_callbacks.push(name);
+            }
+        }
+    } else {
+        hull.push(ChangedFile { path, skip_callbacks: skip_names });
+    }
 }
 
 /// Collect changed file paths from a batch of tool uses.
@@ -38,33 +64,15 @@ pub fn collect_changed_files(tools: &[cp_base::tools::ToolUse]) -> Vec<ChangedFi
     let mut hull: Vec<ChangedFile> = Vec::new();
     let project_root = std::env::current_dir().unwrap_or_default().to_string_lossy().to_string();
     for tool in tools {
-        match tool.name.as_str() {
-            "Edit" | "Write" => {
-                if let Some(path) = tool.input.get("file_path").and_then(|v| v.as_str()) {
-                    // Normalize: strip leading ./ if present, strip absolute project root prefix
-                    let mut anchor_path = path.strip_prefix("./").unwrap_or(path);
-                    if let Some(relative) = anchor_path.strip_prefix(&project_root) {
-                        anchor_path = relative.strip_prefix('/').unwrap_or(relative);
-                    }
-                    let anchor_str = anchor_path.to_string();
-
-                    // Parse skip_callbacks: string array of callback names
-                    let skip_names = parse_skip_callbacks(&tool.input);
-
-                    // Merge: if file already in hull, union the skip lists
-                    if let Some(existing) = hull.iter_mut().find(|f| f.path == anchor_str) {
-                        for name in &skip_names {
-                            if !existing.skip_callbacks.contains(name) {
-                                existing.skip_callbacks.push(name.clone());
-                            }
-                        }
-                    } else {
-                        hull.push(ChangedFile { path: anchor_str, skip_callbacks: skip_names });
-                    }
-                }
-            }
-            _ => {}
+        if !matches!(tool.name.as_str(), "Edit" | "Write") {
+            continue;
         }
+        let Some(path) = tool.input.get("file_path").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let anchor = normalize_changed_path(path, &project_root);
+        let skip_names = parse_skip_callbacks(&tool.input);
+        merge_changed_file(&mut hull, anchor, skip_names);
     }
     hull
 }
@@ -75,8 +83,43 @@ fn parse_skip_callbacks(input: &serde_json::Value) -> Vec<String> {
     input
         .get("skip_callbacks")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|item| item.as_str().map(ToString::to_string)).collect())
+        .map(|arr| arr.iter().filter_map(|item| item.as_str().map(str::to_owned)).collect())
         .unwrap_or_default()
+}
+
+/// True if `def`'s glob matches `file` (full path or basename).
+fn def_matches_file(matcher: &globset::GlobMatcher, file: &str) -> bool {
+    let path = Path::new(file);
+    matcher.is_match(path) || matcher.is_match(path.file_name().unwrap_or_default())
+}
+
+/// Match one callback definition against all changed files, honoring
+/// `skip_callbacks`. Returns the matched file paths and pushes a warning for
+/// any skip that named this callback but wouldn't have triggered it anyway.
+fn match_one_def(def: &CallbackDefinition, changed_files: &[ChangedFile], warnings: &mut Vec<String>) -> Vec<String> {
+    let Ok(glob) = Glob::new(&def.pattern) else {
+        return Vec::new();
+    };
+    let matcher = glob.compile_matcher();
+    let mut crew = Vec::new();
+
+    for changed_file in changed_files {
+        let skipped = changed_file.skip_callbacks.iter().any(|name| name == &def.name);
+        let would_match = def_matches_file(&matcher, &changed_file.path);
+        if skipped {
+            if !would_match {
+                warnings.push(format!(
+                    "skip_callbacks: '{}' would not have triggered for '{}' (pattern '{}' doesn't match)",
+                    def.name, changed_file.path, def.pattern,
+                ));
+            }
+            continue;
+        }
+        if would_match {
+            crew.push(changed_file.path.clone());
+        }
+    }
+    crew
 }
 
 /// Match changed files against active callback patterns.
@@ -100,40 +143,7 @@ pub fn match_callbacks(state: &State, changed_files: &[ChangedFile]) -> (Vec<Mat
     validate_skip_names(cs, &all_skip_names, &mut warnings);
 
     for def in &cs.definitions {
-        // Compile the glob pattern
-        let compass = match Glob::new(&def.pattern) {
-            Ok(g) => g.compile_matcher(),
-            Err(_) => continue,
-        };
-
-        // Match each changed file against the pattern, respecting skip_callbacks
-        let mut crew: Vec<String> = Vec::new();
-        for changed_file in changed_files {
-            // Check if this callback is skipped for this file
-            if changed_file.skip_callbacks.iter().any(|name| name == &def.name) {
-                continue;
-            }
-
-            let path = Path::new(&changed_file.path);
-            if compass.is_match(path) || compass.is_match(path.file_name().unwrap_or_default()) {
-                crew.push(changed_file.path.clone());
-            }
-        }
-
-        // Warn if a skip_callbacks name matched this callback but the file wouldn't have triggered it
-        for changed_file in changed_files {
-            if changed_file.skip_callbacks.iter().any(|name| name == &def.name) {
-                let path = Path::new(&changed_file.path);
-                let would_match = compass.is_match(path) || compass.is_match(path.file_name().unwrap_or_default());
-                if !would_match {
-                    warnings.push(format!(
-                        "skip_callbacks: '{}' would not have triggered for '{}' (pattern '{}' doesn't match)",
-                        def.name, changed_file.path, def.pattern,
-                    ));
-                }
-            }
-        }
-
+        let crew = match_one_def(def, changed_files, &mut warnings);
         if !crew.is_empty() {
             treasure_map.push(MatchedCallback { definition: def.clone(), matched_files: crew });
         }
@@ -150,9 +160,9 @@ fn validate_skip_names(cs: &CallbackState, names: &[&str], warnings: &mut Vec<St
         if seen.contains(name) {
             continue;
         }
-        let _ = seen.insert(*name);
+        let _inserted = seen.insert(*name);
         if !cs.definitions.iter().any(|d| d.name == *name) {
-            warnings.push(format!("skip_callbacks: '{name}' does not match any defined callback",));
+            warnings.push(format!("skip_callbacks: '{name}' does not match any defined callback"));
         }
     }
 }

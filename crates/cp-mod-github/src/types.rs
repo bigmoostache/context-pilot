@@ -2,6 +2,7 @@ use cp_base::state::runtime::State;
 
 /// Info about a PR associated with the current branch
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct BranchPrInfo {
     /// PR number (e.g., 42).
     pub number: u64,
@@ -23,6 +24,7 @@ pub struct BranchPrInfo {
 
 /// Runtime state for the GitHub module.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct GithubState {
     /// GitHub personal access token (from `GITHUB_TOKEN` env).
     pub github_token: Option<String>,
@@ -63,6 +65,7 @@ impl GithubState {
 
 /// Payload for a GitHub result panel cache refresh request.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct GithubResultRequest {
     /// Context element ID (e.g., "P15").
     pub context_id: String,

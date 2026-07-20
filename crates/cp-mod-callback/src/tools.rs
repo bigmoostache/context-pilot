@@ -4,23 +4,23 @@ use cp_base::config::constants;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
-use crate::tools_upsert;
 use crate::types::CallbackState;
+use crate::upsert;
 
 /// Execute the `Callback_upsert` tool (create/update/delete callbacks).
 pub fn execute_upsert(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(action) = tool.input.get("action").and_then(|v| v.as_str()) else {
         return ToolResult::new(
             tool.id.clone(),
-            "Missing required parameter 'action' (create/update/delete)".to_string(),
+            "Missing required parameter 'action' (create/update/delete)".to_owned(),
             true,
         );
     };
 
     match action {
-        "create" => tools_upsert::execute_create(tool, state),
-        "update" => tools_upsert::execute_update(tool, state),
-        "delete" => tools_upsert::execute_delete(tool, state),
+        "create" => upsert::execute_create(tool, state),
+        "update" => upsert::execute_update(tool, state),
+        "delete" => upsert::execute_delete(tool, state),
         _ => ToolResult::new(
             tool.id.clone(),
             format!("Invalid action '{action}'. Use 'create', 'update', or 'delete'."),
@@ -32,9 +32,9 @@ pub fn execute_upsert(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// Open a callback's script in the panel editor for viewing/editing.
 pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     let key = match tool.input.get("id").and_then(|v| v.as_str()) {
-        Some(id) => id.to_string(),
+        Some(id) => id.to_owned(),
         None => {
-            return ToolResult::new(tool.id.clone(), "Missing required parameter 'id'".to_string(), true);
+            return ToolResult::new(tool.id.clone(), "Missing required parameter 'id'".to_owned(), true);
         }
     };
 
@@ -79,7 +79,7 @@ pub fn execute_open_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// Close the callback editor, restoring the normal table view.
 pub fn execute_close_editor(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(previous) = CallbackState::get(state).editor_open.clone() else {
-        return ToolResult::new(tool.id.clone(), "No callback editor is currently open.".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "No callback editor is currently open.".to_owned(), true);
     };
 
     CallbackState::get_mut(state).editor_open = None;

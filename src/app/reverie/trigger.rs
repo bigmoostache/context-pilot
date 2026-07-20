@@ -6,7 +6,7 @@
 
 use crate::state::State;
 use cp_base::state::data::model_helpers::ModelPricing as _;
-use cp_base::state::reverie::{Kind, Session};
+use cp_base::state::runtime::reverie::{Kind, Session};
 
 /// Check whether the context has breached the cleaning threshold and a reverie
 /// should be auto-triggered.
@@ -37,9 +37,9 @@ pub(crate) fn check_threshold_trigger(state: &mut State) -> bool {
 
     // Threshold breached — fire the reverie
     // Start the reverie session with the default cleaner agent
-    let mut rev = Session::new(Kind::ContextOptimizer, "cleaner".to_string(), None);
+    let mut rev = Session::new(Kind::ContextOptimizer, "cleaner".to_owned(), None);
     rev.queue_active = true;
-    let _r = state.reveries.insert("cleaner".to_string(), rev);
+    let _r = state.reveries.insert("cleaner".to_owned(), rev);
 
     true
 }

@@ -6,6 +6,25 @@
 
 use crate::{Align, Block, Cell, Column, Semantic, Span};
 
+/// Bullet-point prefix glyph: U+2022 "• " (escaped to keep the source ASCII-only).
+const BULLET_PREFIX: &str = "\u{2022} ";
+
+/// Index one past the last consecutive `|`-prefixed line starting at `start`.
+///
+/// A markdown table is a run of pipe-prefixed lines; this finds its end so
+/// [`to_blocks`] can slice it out without an inline accumulation loop.
+fn table_end(lines: &[&str], start: usize) -> usize {
+    let mut i = start.saturating_add(1);
+    while i < lines.len() {
+        if lines.get(i).copied().unwrap_or("").trim_start().starts_with('|') {
+            i = i.saturating_add(1);
+        } else {
+            break;
+        }
+    }
+    i
+}
+
 /// Parse a full markdown document into IR blocks.
 ///
 /// Handles fenced code blocks (`` ``` ``), headers, bullets, and inline
@@ -41,20 +60,11 @@ pub fn to_blocks(content: &str) -> Vec<Block> {
             continue;
         }
 
-        // Markdown table: accumulate consecutive lines starting with |
+        // Markdown table: slice out the run of consecutive `|`-prefixed lines.
         if line.trim_start().starts_with('|') {
-            let mut table_lines = vec![line];
-            i = i.saturating_add(1);
-            while i < lines.len() {
-                let next = lines.get(i).copied().unwrap_or("");
-                if next.trim_start().starts_with('|') {
-                    table_lines.push(next);
-                    i = i.saturating_add(1);
-                } else {
-                    break;
-                }
-            }
-            blocks.push(parse_table(&table_lines));
+            let end = table_end(&lines, i);
+            blocks.push(parse_table(lines.get(i..end).unwrap_or(&[])));
+            i = end;
             continue;
         }
 
@@ -93,7 +103,8 @@ pub fn parse_line(line: &str) -> Vec<Span> {
     // Bullet points: - or *
     if let Some(stripped) = trimmed.strip_prefix("- ") {
         let indent = line.len().saturating_sub(trimmed.len());
-        let mut spans = vec![Span::new(" ".repeat(indent)), Span::styled("• ".to_owned(), Semantic::AccentDim)];
+        let mut spans =
+            vec![Span::new(" ".repeat(indent)), Span::styled(BULLET_PREFIX.to_owned(), Semantic::AccentDim)];
         spans.extend(parse_inline(stripped));
         return spans;
     }
@@ -101,13 +112,129 @@ pub fn parse_line(line: &str) -> Vec<Span> {
     if trimmed.starts_with("* ") && !trimmed.starts_with("**") {
         let content = trimmed.get(2..).unwrap_or("");
         let indent = line.len().saturating_sub(trimmed.len());
-        let mut spans = vec![Span::new(" ".repeat(indent)), Span::styled("• ".to_owned(), Semantic::AccentDim)];
+        let mut spans =
+            vec![Span::new(" ".repeat(indent)), Span::styled(BULLET_PREFIX.to_owned(), Semantic::AccentDim)];
         spans.extend(parse_inline(content));
         return spans;
     }
 
     // Regular line — parse inline markdown
     parse_inline(line)
+}
+
+/// Flush any pending plain-text buffer into `spans` as a single span.
+fn flush_text(spans: &mut Vec<Span>, current: &mut String) {
+    if !current.is_empty() {
+        spans.push(Span::new(std::mem::take(current)));
+    }
+}
+
+/// Read an inline-code body: characters up to (and consuming) the closing `` ` ``.
+fn take_code(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> String {
+    let mut code = String::new();
+    while let Some(&next) = chars.peek() {
+        if next == '`' {
+            let _r = chars.next();
+            break;
+        }
+        if let Some(ch) = chars.next() {
+            code.push(ch);
+        }
+    }
+    code
+}
+
+/// Read a bold body after a `**`/`__` open marker (`marker` is the marker char),
+/// up to (and consuming) the matching double marker.
+fn take_bold(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, marker: char) -> String {
+    let mut text = String::new();
+    while let Some(next) = chars.next() {
+        if next == marker && chars.peek() == Some(&marker) {
+            let _r = chars.next();
+            break;
+        }
+        text.push(next);
+    }
+    text
+}
+
+/// Outcome of parsing a `[...]` sequence: either a valid link's display text,
+/// or the literal characters to keep when it is not a well-formed link.
+enum LinkParse {
+    /// `[text](url)` — carries the display text (url discarded).
+    Link(String),
+    /// Malformed — carries the literal text to append verbatim.
+    Literal(String),
+}
+
+/// Parse `[text](url)` after the opening `[` has been consumed.
+fn take_link(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> LinkParse {
+    let mut link_text = String::new();
+    let mut found_bracket = false;
+    for next in chars.by_ref() {
+        if next == ']' {
+            found_bracket = true;
+            break;
+        }
+        link_text.push(next);
+    }
+
+    if found_bracket && chars.peek() == Some(&'(') {
+        let _r = chars.next(); // consume (
+        for next in chars.by_ref() {
+            if next == ')' {
+                break;
+            }
+        }
+        LinkParse::Link(link_text)
+    } else {
+        let mut literal = String::from('[');
+        literal.push_str(&link_text);
+        if found_bracket {
+            literal.push(']');
+        }
+        LinkParse::Literal(literal)
+    }
+}
+
+/// Handle a `` ` `` inline-code marker: flush pending text, then push the code span.
+fn handle_code(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, spans: &mut Vec<Span>, current: &mut String) {
+    flush_text(spans, current);
+    let code = take_code(chars);
+    if !code.is_empty() {
+        spans.push(Span::styled(code, Semantic::Warning));
+    }
+}
+
+/// Handle a `*`/`_` marker: a doubled marker opens bold, a lone one is literal.
+fn handle_marker(
+    marker: char,
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    spans: &mut Vec<Span>,
+    current: &mut String,
+) {
+    if chars.peek() != Some(&marker) {
+        current.push(marker);
+        return;
+    }
+    let _r = chars.next(); // consume the second marker
+    flush_text(spans, current);
+    let bold = take_bold(chars, marker);
+    if !bold.is_empty() {
+        spans.push(Span::new(bold).bold());
+    }
+}
+
+/// Handle a `[` link opener: push an accent span for a valid `[text](url)`,
+/// otherwise append the literal characters verbatim.
+fn handle_link(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, spans: &mut Vec<Span>, current: &mut String) {
+    match take_link(chars) {
+        LinkParse::Link(link_text) => {
+            flush_text(spans, current);
+            spans.push(Span::styled(link_text, Semantic::Accent));
+        }
+        LinkParse::Literal(literal) => current.push_str(&literal),
+    }
 }
 
 /// Parse inline markdown (bold, code, links) and return IR spans.
@@ -119,99 +246,14 @@ pub fn parse_inline(text: &str) -> Vec<Span> {
 
     while let Some(c) = chars.next() {
         match c {
-            '`' => {
-                // Inline code
-                if !current.is_empty() {
-                    spans.push(Span::new(std::mem::take(&mut current)));
-                }
-
-                let mut code = String::new();
-                while let Some(&next) = chars.peek() {
-                    if next == '`' {
-                        let _r = chars.next();
-                        break;
-                    }
-                    if let Some(ch) = chars.next() {
-                        code.push(ch);
-                    }
-                }
-
-                if !code.is_empty() {
-                    spans.push(Span::styled(code, Semantic::Warning));
-                }
-            }
-            '*' | '_' => {
-                // Check for bold (**/__) — single markers are plain text
-                let is_double = chars.peek() == Some(&c);
-
-                if is_double {
-                    let _r = chars.next(); // consume second marker
-
-                    if !current.is_empty() {
-                        spans.push(Span::new(std::mem::take(&mut current)));
-                    }
-
-                    // Bold text
-                    let mut bold_text = String::new();
-                    while let Some(next) = chars.next() {
-                        if next == c && chars.peek() == Some(&c) {
-                            let _r2 = chars.next();
-                            break;
-                        }
-                        bold_text.push(next);
-                    }
-
-                    if !bold_text.is_empty() {
-                        spans.push(Span::new(bold_text).bold());
-                    }
-                } else {
-                    current.push(c);
-                }
-            }
-            '[' => {
-                // Possible link [text](url)
-                let mut link_text = String::new();
-                let mut found_bracket = false;
-
-                for next in chars.by_ref() {
-                    if next == ']' {
-                        found_bracket = true;
-                        break;
-                    }
-                    link_text.push(next);
-                }
-
-                if found_bracket && chars.peek() == Some(&'(') {
-                    let _r = chars.next(); // consume (
-                    for next in chars.by_ref() {
-                        if next == ')' {
-                            break;
-                        }
-                    }
-
-                    // Display link text in accent color
-                    if !current.is_empty() {
-                        spans.push(Span::new(std::mem::take(&mut current)));
-                    }
-                    spans.push(Span::styled(link_text, Semantic::Accent));
-                } else {
-                    // Not a valid link, restore
-                    current.push('[');
-                    current.push_str(&link_text);
-                    if found_bracket {
-                        current.push(']');
-                    }
-                }
-            }
-            _ => {
-                current.push(c);
-            }
+            '`' => handle_code(&mut chars, &mut spans, &mut current),
+            '*' | '_' => handle_marker(c, &mut chars, &mut spans, &mut current),
+            '[' => handle_link(&mut chars, &mut spans, &mut current),
+            _ => current.push(c),
         }
     }
 
-    if !current.is_empty() {
-        spans.push(Span::new(current));
-    }
+    flush_text(&mut spans, &mut current);
 
     if spans.is_empty() {
         spans.push(Span::new(String::new()));
@@ -228,8 +270,8 @@ pub fn parse_inline(text: &str) -> Vec<Span> {
 fn split_table_row(line: &str) -> Vec<&str> {
     let trimmed = line.trim();
     // Strip leading/trailing pipes, then split by |
-    let inner = trimmed.strip_prefix('|').unwrap_or(trimmed);
-    let inner = inner.strip_suffix('|').unwrap_or(inner);
+    let no_lead = trimmed.strip_prefix('|').unwrap_or(trimmed);
+    let inner = no_lead.strip_suffix('|').unwrap_or(no_lead);
     inner.split('|').map(str::trim).collect()
 }
 
@@ -237,13 +279,13 @@ fn split_table_row(line: &str) -> Vec<&str> {
 fn is_separator_row(cells: &[&str]) -> bool {
     !cells.is_empty()
         && cells.iter().all(|c| {
-            let s = c.trim();
-            if s.is_empty() {
+            let trimmed = c.trim();
+            if trimmed.is_empty() {
                 return false;
             }
-            let s = s.strip_prefix(':').unwrap_or(s);
-            let s = s.strip_suffix(':').unwrap_or(s);
-            !s.is_empty() && s.chars().all(|ch| ch == '-')
+            let no_lead = trimmed.strip_prefix(':').unwrap_or(trimmed);
+            let core = no_lead.strip_suffix(':').unwrap_or(no_lead);
+            !core.is_empty() && core.chars().all(|ch| ch == '-')
         })
 }
 

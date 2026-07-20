@@ -31,6 +31,10 @@ pub struct Frame {
 
 /// Sidebar display mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "IR rendering contract: SidebarMode is a closed set constructed by the frame builder and matched exhaustively by the adapter; #[non_exhaustive] would forbid that cross-crate construction"
+)]
 pub enum SidebarMode {
     /// Full sidebar with entries, token bar, help hints.
     Normal,

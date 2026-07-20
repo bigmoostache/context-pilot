@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Stored as chunked JSON in `.context-pilot/logs/`.  Indexed into
 /// Meilisearch by the search module's file watcher for full-text search.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct LogEntry {
     /// Log ID (L1, L2, ...).
     pub id: String,
@@ -25,7 +26,7 @@ pub struct LogEntry {
 
 /// Default importance level for deserialization of legacy logs.
 fn default_importance() -> String {
-    "medium".to_string()
+    "medium".to_owned()
 }
 
 /// Format a millisecond timestamp as an ISO 8601 UTC datetime string.
@@ -39,19 +40,20 @@ impl LogEntry {
     pub fn new(id: String, content: String) -> Self {
         let timestamp_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis().to_u64());
         let datetime = ms_to_iso(timestamp_ms);
-        Self { id, timestamp_ms, datetime, content, importance: "medium".to_string() }
+        Self { id, timestamp_ms, datetime, content, importance: "medium".to_owned() }
     }
 
     /// Create a log entry with an explicit timestamp (ms since UNIX epoch).
     #[must_use]
     pub fn with_timestamp(id: String, content: String, timestamp_ms: u64) -> Self {
         let datetime = ms_to_iso(timestamp_ms);
-        Self { id, timestamp_ms, datetime, content, importance: "medium".to_string() }
+        Self { id, timestamp_ms, datetime, content, importance: "medium".to_owned() }
     }
 }
 
 /// Module-owned state for the Logs module
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct LogsState {
     /// All log entries, ordered by creation.
     pub logs: Vec<LogEntry>,

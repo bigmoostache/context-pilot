@@ -62,7 +62,7 @@ use cp_orchestrator::channel::{AgentChannel, Tailer};
 use cp_orchestrator::liveness::Liveness;
 use cp_orchestrator::registry::{AgentRegistry, Event};
 
-use cp_wire::heartbeat::{HEARTBEAT_SCHEMA_VERSION, Heartbeat};
+use cp_wire::heartbeat::Heartbeat;
 use cp_wire::types::ack::Status;
 use cp_wire::types::command::{Command, Kind as CommandKind};
 use cp_wire::types::oplog::OpEntryKind;
@@ -106,13 +106,7 @@ fn entry(id: &str, hb_path: &Path, oplog_path: &Path, socket_path: &Path) -> Ent
 
 /// A heartbeat for this process at `timestamp_ms`, bound to [`BOOT_A`].
 fn heartbeat(timestamp_ms: u64) -> Heartbeat {
-    Heartbeat {
-        schema_version: HEARTBEAT_SCHEMA_VERSION,
-        timestamp_ms,
-        sequence: 0,
-        pid: std::process::id(),
-        boot_id: BOOT_A.to_owned(),
-    }
+    Heartbeat::new(timestamp_ms, 0, std::process::id(), BOOT_A.to_owned())
 }
 
 /// Write `record` as `<id>.json` into `dir`.
@@ -128,13 +122,12 @@ fn write_heartbeat(path: &Path, hb: &Heartbeat) {
 
 /// A [`SendMessage`](CommandKind::SendMessage) command keyed by `dedup`.
 fn send_command(dedup: &str) -> Command {
-    Command {
-        schema_version: 1,
-        id: format!("cmd-{dedup}"),
-        seq: 1,
-        dedup_token: dedup.to_owned(),
-        kind: CommandKind::SendMessage { thread_id: "T1".to_owned(), content: "hi".to_owned() },
-    }
+    Command::new(
+        format!("cmd-{dedup}"),
+        1,
+        dedup.to_owned(),
+        CommandKind::SendMessage { thread_id: "T1".to_owned(), content: "hi".to_owned() },
+    )
 }
 
 // ── 1. a real booted agent is discovered live, then survives drop ───────────

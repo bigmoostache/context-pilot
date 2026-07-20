@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{DeferredPanel, Watcher, WatcherResult};
+use cp_base::state::watchers::Watcher;
+use cp_base::state::watchers::carriers::{DeferredPanel, WatcherResult};
 use serde::{Deserialize, Serialize};
 
 use crate::manager::SessionHandle;
@@ -10,6 +11,7 @@ use crate::tools::truncate_str;
 
 /// Serializable metadata for a console session (used for persistence across reloads).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SessionMeta {
     /// OS process ID.
     pub pid: u32,
@@ -25,6 +27,10 @@ pub struct SessionMeta {
 
 /// Process lifecycle status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "process-status contract: ProcessStatus is a closed lifecycle set constructed cross-crate by the session manager and matched exhaustively by label()/exit_code(); #[non_exhaustive] would forbid that construction"
+)]
 pub enum ProcessStatus {
     /// Process is actively running.
     Running,
@@ -41,10 +47,10 @@ impl ProcessStatus {
     #[must_use]
     pub fn label(self) -> String {
         match self {
-            Self::Running => "running".to_string(),
+            Self::Running => "running".to_owned(),
             Self::Finished(code) => format!("exited({code})"),
             Self::Failed(code) => format!("failed({code})"),
-            Self::Killed => "killed".to_string(),
+            Self::Killed => "killed".to_owned(),
         }
     }
 
@@ -68,6 +74,7 @@ impl ProcessStatus {
 /// Module-owned state for the Console module.
 /// Stored in `State.module_data` via `TypeMap`.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct ConsoleState {
     /// Active session handles, keyed by session name (e.g., "`c_42`").
     pub sessions: HashMap<String, SessionHandle>,
@@ -131,7 +138,7 @@ impl ConsoleState {
 /// Format a wait result message for the LLM.
 #[must_use]
 pub fn format_wait_result(name: &str, exit_code: Option<i32>, panel_id: &str, last_lines: &str) -> String {
-    let code_str = exit_code.map_or_else(|| "?".to_string(), |c| c.to_string());
+    let code_str = exit_code.map_or_else(|| "?".to_owned(), |c| c.to_string());
     let now = now_ms();
     format!(
         "Console '{name}' condition met (exit_code={code_str}, panel={panel_id}, time={now}ms)\nLast output:\n{last_lines}"
@@ -151,6 +158,7 @@ const EASY_BASH_INLINE_MAX_BYTES: usize = 8_000;
 
 /// A watcher that monitors a console session for a condition.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct ConsoleWatcher {
     /// Unique ID for this watcher (e.g., "`console_c_42_exit`").
     pub watcher_id: String,
@@ -224,53 +232,36 @@ impl Watcher for ConsoleWatcher {
                 } else {
                     format!("{}\n\n(exit_code={exit_code})", output.trim_end())
                 };
-                return Some(WatcherResult {
-                    description,
-                    panel_id: None,
-                    tool_use_id: self.tool_use_id.clone(),
-                    close_panel: false,
-                    create_panel: None,
-                    processed_already: false,
-                    kill_session: Some(self.session_name.clone()),
-                    preserves_tempo: true,
-                    create_dyn_panel: None,
-                });
+                return Some(
+                    WatcherResult::new(description)
+                        .tool_use_id_opt(self.tool_use_id.clone())
+                        .kill_session(self.session_name.clone())
+                        .preserves_tempo(),
+                );
             }
 
             // Long output (too many lines or too large) → create panel via deferred, keep session alive
-            Some(WatcherResult {
-                description: format!("Output too long for inline ({line_count} lines, exit_code={exit_code})"),
-                panel_id: None,
-                tool_use_id: self.tool_use_id.clone(),
-                close_panel: false,
-                create_panel: Some(DeferredPanel {
-                    session_key: self.session_name.clone(),
-                    display_name: truncate_str(&self.command, 30).to_string(),
-                    command: self.command.clone(),
-                    description: truncate_str(&self.command, 60).to_string(),
-                    cwd: self.cwd.clone(),
-                    callback_id: String::new(),
-                    callback_name: String::new(),
-                }),
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            })
+            Some(
+                WatcherResult::new(format!("Output too long for inline ({line_count} lines, exit_code={exit_code})"))
+                    .tool_use_id_opt(self.tool_use_id.clone())
+                    .create_panel(
+                        DeferredPanel::new(
+                            self.session_name.clone(),
+                            truncate_str(&self.command, 30).to_owned(),
+                            self.command.clone(),
+                            truncate_str(&self.command, 60).to_owned(),
+                        )
+                        .cwd(self.cwd.clone()),
+                    ),
+            )
         } else {
             let exit_code = handle.get_status().exit_code();
             let last_lines = handle.buffer.last_n_lines(5);
-            Some(WatcherResult {
-                description: format_wait_result(&self.session_name, exit_code, &self.panel_id, &last_lines),
-                panel_id: Some(self.panel_id.clone()),
-                tool_use_id: self.tool_use_id.clone(),
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            })
+            Some(
+                WatcherResult::new(format_wait_result(&self.session_name, exit_code, &self.panel_id, &last_lines))
+                    .panel_id(self.panel_id.clone())
+                    .tool_use_id_opt(self.tool_use_id.clone()),
+            )
         }
     }
 
@@ -285,40 +276,28 @@ impl Watcher for ConsoleWatcher {
 
         if self.easy_bash {
             // Timeout → create panel so user can inspect partial output
-            Some(WatcherResult {
-                description: format!("TIMED OUT after {elapsed_s}s, process may still be running"),
-                panel_id: None,
-                tool_use_id: self.tool_use_id.clone(),
-                close_panel: false,
-                create_panel: Some(DeferredPanel {
-                    session_key: self.session_name.clone(),
-                    display_name: truncate_str(&self.command, 30).to_string(),
-                    command: self.command.clone(),
-                    description: truncate_str(&self.command, 60).to_string(),
-                    cwd: self.cwd.clone(),
-                    callback_id: String::new(),
-                    callback_name: String::new(),
-                }),
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            })
+            Some(
+                WatcherResult::new(format!("TIMED OUT after {elapsed_s}s, process may still be running"))
+                    .tool_use_id_opt(self.tool_use_id.clone())
+                    .create_panel(
+                        DeferredPanel::new(
+                            self.session_name.clone(),
+                            truncate_str(&self.command, 30).to_owned(),
+                            self.command.clone(),
+                            truncate_str(&self.command, 60).to_owned(),
+                        )
+                        .cwd(self.cwd.clone()),
+                    ),
+            )
         } else {
-            Some(WatcherResult {
-                description: format!(
+            Some(
+                WatcherResult::new(format!(
                     "Console '{}' wait TIMED OUT after {}s (panel={})",
                     self.session_name, elapsed_s, self.panel_id
-                ),
-                panel_id: Some(self.panel_id.clone()),
-                tool_use_id: self.tool_use_id.clone(),
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            })
+                ))
+                .panel_id(self.panel_id.clone())
+                .tool_use_id_opt(self.tool_use_id.clone()),
+            )
         }
     }
 

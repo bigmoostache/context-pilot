@@ -37,7 +37,7 @@ pub(crate) fn ensure_index(port: u16, key: &str, index_uid: &str) -> Result<(), 
         "sortableAttributes": [],
         "typoTolerance": {
             "enabled": true,
-            "minWordSizeForTypos": { "oneTypo": 4, "twoTypos": 8 }
+            "minWordSizeForTypos": { "oneTypo": 4i32, "twoTypos": 8i32 }
         }
     });
     let _task = client.update_settings(index_uid, &settings)?;
@@ -145,6 +145,28 @@ pub(crate) fn flush_sync(state: &mut State) {
     }
 }
 
+/// Sync every current table to Meilisearch (upsert — never leaves index empty).
+fn sync_current_tables(client: &MeiliClient, db_path: &std::path::Path, index_uid: &str, current_tables: &[String]) {
+    for table in current_tables {
+        if let Err(e) = sync_table(client, db_path, index_uid, table) {
+            log::warn!("Failed to sync table '{table}' to Meilisearch: {e}");
+        }
+    }
+}
+
+/// Delete Meilisearch docs for any indexed table no longer present in the DB.
+fn cleanup_orphan_tables(client: &MeiliClient, index_uid: &str, current_tables: &[String]) {
+    if let Ok(facets) = client.facet_distribution(index_uid, &["entity_table"])
+        && let Some(tables_map) = facets.get("entity_table").and_then(serde_json::Value::as_object)
+    {
+        for indexed_table in tables_map.keys() {
+            if !current_tables.contains(indexed_table) {
+                let _r = delete_table_docs(client, index_uid, indexed_table);
+            }
+        }
+    }
+}
+
 /// Full reindex: sync all current tables + clean up orphans.
 ///
 /// Called on init/reload for cold-start catch-up.
@@ -174,101 +196,78 @@ pub(crate) fn full_reindex(state: &State) {
         return;
     };
 
-    // Sync all current tables (upsert — never leaves index empty)
     let Ok(conn) = db::open(&db_path) else { return };
     let cache = db::introspect(&conn, &db_path);
     let current_tables: Vec<String> = cache.tables.iter().map(|t| t.name.clone()).collect();
     drop(conn);
 
-    for table in &current_tables {
-        if let Err(e) = sync_table(&client, &db_path, &index_uid, table) {
-            log::warn!("Failed to sync table '{table}' to Meilisearch: {e}");
-        }
-    }
-
-    // Clean up orphan tables via facet_distribution
-    if let Ok(facets) = client.facet_distribution(&index_uid, &["entity_table"])
-        && let Some(tables_map) = facets.get("entity_table").and_then(serde_json::Value::as_object)
-    {
-        for indexed_table in tables_map.keys() {
-            if !current_tables.contains(indexed_table) {
-                let _r = delete_table_docs(&client, &index_uid, indexed_table);
-            }
-        }
-    }
+    sync_current_tables(&client, &db_path, &index_uid, &current_tables);
+    cleanup_orphan_tables(&client, &index_uid, &current_tables);
 }
 
 // =============================================================================
 // SQL table name extraction
 // =============================================================================
 
+/// Table touched by a DML statement (`INSERT INTO` / `UPDATE` / `DELETE FROM`).
+fn dml_table(words: &[&str]) -> Option<String> {
+    // INSERT INTO table / INSERT OR ... INTO table
+    if let Some(pos) = words.iter().position(|w| *w == "INTO") {
+        return words.get(pos.saturating_add(1)).map(|n| clean_identifier(n));
+    }
+    // UPDATE table / UPDATE OR ... table
+    if words.first() == Some(&"UPDATE") {
+        let skip = if words.get(1) == Some(&"OR") { 3 } else { 1 };
+        return words.get(skip).map(|n| clean_identifier(n));
+    }
+    // DELETE FROM table
+    if words.first() == Some(&"DELETE")
+        && let Some(pos) = words.iter().position(|w| *w == "FROM")
+    {
+        return words.get(pos.saturating_add(1)).map(|n| clean_identifier(n));
+    }
+    None
+}
+
+/// Table touched by a DDL statement (`CREATE/ALTER/DROP TABLE`, `CREATE INDEX … ON`).
+fn ddl_table(words: &[&str]) -> Option<String> {
+    // CREATE TABLE / ALTER TABLE / DROP TABLE
+    if let Some(pos) = words.iter().position(|w| *w == "TABLE") {
+        let next = pos.saturating_add(1);
+        // Skip optional IF NOT EXISTS / IF EXISTS
+        let name_pos = if words.get(next) == Some(&"IF") {
+            if words.get(next.saturating_add(1)) == Some(&"NOT") {
+                next.saturating_add(3)
+            } else {
+                next.saturating_add(2)
+            }
+        } else {
+            next
+        };
+        return words.get(name_pos).map(|n| clean_identifier(n));
+    }
+    // CREATE INDEX ... ON table
+    if let Some(pos) = words.iter().position(|w| *w == "ON")
+        && words.first() == Some(&"CREATE")
+    {
+        return words.get(pos.saturating_add(1)).map(|n| clean_identifier(n));
+    }
+    None
+}
+
+/// Table name affected by one SQL statement, if any (DML first, then DDL).
+fn table_from_statement(stmt: &str) -> Option<String> {
+    let upper = stmt.trim().to_uppercase();
+    let words: Vec<&str> = upper.split_whitespace().collect();
+    dml_table(&words).or_else(|| ddl_table(&words))
+}
+
 /// Extract affected table names from SQL statements.
 ///
 /// Parses `INSERT INTO`, `UPDATE`, `DELETE FROM`, `CREATE TABLE`,
 /// `ALTER TABLE`, `DROP TABLE`, and `CREATE INDEX ON`.
 pub(crate) fn extract_affected_tables(statements: &[&str]) -> Vec<String> {
-    let mut tables = Vec::new();
-
-    for stmt in statements {
-        let upper = stmt.trim().to_uppercase();
-        let words: Vec<&str> = upper.split_whitespace().collect();
-
-        // INSERT INTO table / INSERT OR ... INTO table
-        if let Some(pos) = words.iter().position(|w| *w == "INTO") {
-            if let Some(name) = words.get(pos.saturating_add(1)) {
-                tables.push(clean_identifier(name));
-            }
-            continue;
-        }
-
-        // UPDATE table / UPDATE OR ... table
-        if words.first() == Some(&"UPDATE") {
-            let skip = if words.get(1) == Some(&"OR") { 3 } else { 1 };
-            if let Some(name) = words.get(skip) {
-                tables.push(clean_identifier(name));
-            }
-            continue;
-        }
-
-        // DELETE FROM table
-        if words.first() == Some(&"DELETE") {
-            if let Some(pos) = words.iter().position(|w| *w == "FROM")
-                && let Some(name) = words.get(pos.saturating_add(1))
-            {
-                tables.push(clean_identifier(name));
-            }
-            continue;
-        }
-
-        // CREATE TABLE / ALTER TABLE / DROP TABLE
-        if let Some(pos) = words.iter().position(|w| *w == "TABLE") {
-            let next = pos.saturating_add(1);
-            // Skip optional IF NOT EXISTS / IF EXISTS
-            let name_pos = if words.get(next) == Some(&"IF") {
-                // IF NOT EXISTS → skip 3, IF EXISTS → skip 2
-                if words.get(next.saturating_add(1)) == Some(&"NOT") {
-                    next.saturating_add(3)
-                } else {
-                    next.saturating_add(2)
-                }
-            } else {
-                next
-            };
-            if let Some(name) = words.get(name_pos) {
-                tables.push(clean_identifier(name));
-            }
-            continue;
-        }
-
-        // CREATE INDEX ... ON table
-        if let Some(pos) = words.iter().position(|w| *w == "ON")
-            && words.first() == Some(&"CREATE")
-            && let Some(name) = words.get(pos.saturating_add(1))
-        {
-            tables.push(clean_identifier(name));
-        }
-    }
-
+    let mut tables: Vec<String> = statements.iter().filter_map(|stmt| table_from_statement(stmt)).collect();
     tables.sort();
     tables.dedup();
     tables
@@ -376,11 +375,11 @@ fn format_cell_value(row: &rusqlite::Row<'_>, idx: usize) -> String {
     use rusqlite::types::ValueRef;
 
     let Ok(val) = row.get_ref(idx) else {
-        return "NULL".to_string();
+        return "NULL".to_owned();
     };
 
     match val {
-        ValueRef::Null => "NULL".to_string(),
+        ValueRef::Null => "NULL".to_owned(),
         ValueRef::Integer(n) => n.to_string(),
         ValueRef::Real(f) => f.to_string(),
         ValueRef::Text(bytes) => {

@@ -45,7 +45,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Console module: spawns child processes, manages sessions, provides interactive I/O.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct ConsoleModule;
+
+impl Default for ConsoleModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ConsoleModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for ConsoleModule {
     fn id(&self) -> &'static str {
@@ -311,7 +327,7 @@ impl Module for ConsoleModule {
         if ctx.context_type.as_str() != Kind::CONSOLE {
             return None;
         }
-        let name = ctx.get_meta_str("console_name").unwrap_or_default().to_string();
+        let name = ctx.get_meta_str("console_name").unwrap_or_default().to_owned();
         // Grab file path before removing
         let log_path = {
             let cs = ConsoleState::get(state);
@@ -434,7 +450,7 @@ fn visualize_console_output(content: &str, width: usize) -> Vec<cp_render::Block
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
             Block::Line(vec![Span::styled(display, semantic)])
         })

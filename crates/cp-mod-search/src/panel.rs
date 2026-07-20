@@ -49,10 +49,10 @@ impl Panel for SearchResultPanel {
             return None;
         }
         let content = ctx.metadata.get(META_CONTENT)?.as_str()?;
-        Some(CacheRequest {
-            context_type: Kind::new(SEARCH_PANEL_TYPE),
-            data: Box::new(RestoreRequest { context_id: ctx.id.clone(), content: content.to_string() }),
-        })
+        Some(CacheRequest::new(
+            Kind::new(SEARCH_PANEL_TYPE),
+            Box::new(RestoreRequest { context_id: ctx.id.clone(), content: content.to_owned() }),
+        ))
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {
@@ -73,7 +73,7 @@ impl Panel for SearchResultPanel {
                 ctx.token_count = token_count;
             }
             ctx.cache_deprecated = false;
-            let _ = update_if_changed(ctx, &content);
+            let _changed = update_if_changed(ctx, &content);
             true
         } else {
             false
@@ -93,13 +93,14 @@ impl Panel for SearchResultPanel {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span};
 
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(SEARCH_PANEL_TYPE));
+        let ctx_opt =
+            state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(SEARCH_PANEL_TYPE));
 
-        let Some(ctx) = ctx else {
+        let Some(ctx) = ctx_opt else {
             return vec![Block::styled_text(" No search result panel".into(), Semantic::Muted)];
         };
 
-        let Some(content) = &ctx.cached_content else {
+        let Some(content) = ctx.cached_content.as_ref() else {
             return vec![Block::Line(vec![Span::muted(" Loading...".into()).italic()])];
         };
 
@@ -107,7 +108,7 @@ impl Panel for SearchResultPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        state.context.get(state.selected_context).map_or_else(|| "Search Results".to_string(), |ctx| ctx.name.clone())
+        state.context.get(state.selected_context).map_or_else(|| "Search Results".to_owned(), |ctx| ctx.name.clone())
     }
 
     fn max_freezes(&self) -> u8 {
@@ -138,12 +139,33 @@ impl Panel for SearchResultPanel {
     }
 }
 
+/// Classify a search-output line into a display semantic.
+fn search_line_semantic(line: &str) -> cp_render::Semantic {
+    use cp_render::Semantic;
+    if line.starts_with("Results for") || line.starts_with("No results") {
+        Semantic::Info
+    } else if line.starts_with("---") && line.ends_with("---") {
+        Semantic::Header
+    } else if line.starts_with("Error") || line.contains("[critical]") {
+        Semantic::Error
+    } else if line.contains("[high]") {
+        Semantic::Warning
+    } else if line.contains("[low]") {
+        Semantic::Muted
+    } else if line.starts_with(|c: char| c.is_ascii_digit()) && line.contains(":[") {
+        // File result line like "1. src/main.rs:15-42 [function: run]"
+        Semantic::Success
+    } else {
+        Semantic::Default
+    }
+}
+
 /// Visualizer for search tool results.
 ///
 /// Highlights file paths, section headers, importance levels, and tags
 /// in the conversation view.
 pub(crate) fn visualize_search_output(content: &str, width: usize) -> Vec<cp_render::Block> {
-    use cp_render::{Block, Semantic, Span};
+    use cp_render::{Block, Span};
 
     content
         .lines()
@@ -156,27 +178,10 @@ pub(crate) fn visualize_search_output(content: &str, width: usize) -> Vec<cp_ren
             let display = if line.len() > width {
                 format!("{}...", line.get(..line.floor_char_boundary(width.saturating_sub(3))).unwrap_or(""))
             } else {
-                line.to_string()
+                line.to_owned()
             };
 
-            let semantic = if line.starts_with("Results for") || line.starts_with("No results") {
-                Semantic::Info
-            } else if line.starts_with("---") && line.ends_with("---") {
-                Semantic::Header
-            } else if line.starts_with("Error") || line.contains("[critical]") {
-                Semantic::Error
-            } else if line.contains("[high]") {
-                Semantic::Warning
-            } else if line.contains("[low]") {
-                Semantic::Muted
-            } else if line.starts_with(|c: char| c.is_ascii_digit()) && line.contains(":[") {
-                // File result line like "1. src/main.rs:15-42 [function: run]"
-                Semantic::Success
-            } else {
-                Semantic::Default
-            };
-
-            Block::Line(vec![Span::styled(display, semantic)])
+            Block::Line(vec![Span::styled(display, search_line_semantic(line))])
         })
         .collect()
 }
@@ -213,7 +218,7 @@ pub(crate) fn format_results(query: &str, output: &SearchOutput<'_>, hide_conten
     let total = output.files.len().saturating_add(output.logs.len()).saturating_add(output.entities.len());
 
     let mut root = serde_json::Map::new();
-    drop(root.insert("query".into(), serde_json::Value::String(query.to_string())));
+    drop(root.insert("query".into(), serde_json::Value::String(query.to_owned())));
     drop(root.insert("total_results".into(), serde_json::json!(total)));
 
     // -- File results, grouped by path ---------------------------------------
@@ -221,7 +226,7 @@ pub(crate) fn format_results(query: &str, output: &SearchOutput<'_>, hide_conten
     if !output.files.is_empty() {
         let mut by_path: BTreeMap<String, Vec<&SearchResult>> = BTreeMap::new();
         for r in output.files {
-            let path = r.file_path.as_deref().unwrap_or("unknown").to_string();
+            let path = r.file_path.as_deref().unwrap_or("unknown").to_owned();
             by_path.entry(path).or_default().push(r);
         }
 
@@ -230,7 +235,7 @@ pub(crate) fn format_results(query: &str, output: &SearchOutput<'_>, hide_conten
             let ext = chunks.first().and_then(|c| c.extension.as_deref()).unwrap_or("");
             let mut file_obj = serde_json::Map::new();
             drop(file_obj.insert("path".into(), serde_json::Value::String(path.clone())));
-            drop(file_obj.insert("extension".into(), serde_json::Value::String(ext.to_string())));
+            drop(file_obj.insert("extension".into(), serde_json::Value::String(ext.to_owned())));
 
             let chunks_arr: Vec<serde_json::Value> =
                 chunks.iter().map(|chunk| build_chunk_value(chunk, hide_contents)).collect();
@@ -264,10 +269,8 @@ pub(crate) fn format_results(query: &str, output: &SearchOutput<'_>, hide_conten
 /// Build a JSON value for a single file chunk.
 fn build_chunk_value(chunk: &SearchResult, hide_contents: bool) -> serde_json::Value {
     let mut obj = serde_json::Map::new();
-    drop(
-        obj.insert("type".into(), serde_json::Value::String(chunk.chunk_type.as_deref().unwrap_or("raw").to_string())),
-    );
-    if let Some(ref name) = chunk.chunk_name
+    drop(obj.insert("type".into(), serde_json::Value::String(chunk.chunk_type.as_deref().unwrap_or("raw").to_owned())));
+    if let Some(name) = chunk.chunk_name.as_ref()
         && !name.is_empty()
     {
         drop(obj.insert("name".into(), serde_json::Value::String(name.clone())));
@@ -290,13 +293,13 @@ fn build_chunk_value(chunk: &SearchResult, hide_contents: bool) -> serde_json::V
 /// Build a JSON value for a single log result.
 fn build_log_value(r: &SearchResult, hide_contents: bool) -> serde_json::Value {
     let mut obj = serde_json::Map::new();
-    if let Some(ref id) = r.log_id {
+    if let Some(id) = r.log_id.as_ref() {
         drop(obj.insert("id".into(), serde_json::Value::String(id.clone())));
     }
-    if let Some(ref dt) = r.datetime {
+    if let Some(dt) = r.datetime.as_ref() {
         drop(obj.insert("datetime".into(), serde_json::Value::String(dt.clone())));
     }
-    if let Some(ref imp) = r.importance {
+    if let Some(imp) = r.importance.as_ref() {
         drop(obj.insert("importance".into(), serde_json::Value::String(imp.clone())));
     }
     if let Some(score) = r.ranking_score {

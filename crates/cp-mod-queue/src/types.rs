@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 /// A single queued tool call, waiting to be flushed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct QueuedToolCall {
     /// Index in the queue (1-based, for display and undo)
     pub index: usize,
@@ -15,8 +16,18 @@ pub struct QueuedToolCall {
     pub queued_at: u64,
 }
 
+impl QueuedToolCall {
+    /// A queued call from a tool invocation; `index` is assigned on `enqueue`,
+    /// `queued_at` stamped now.
+    #[must_use]
+    pub fn new(tool_name: String, tool_use_id: String, input: serde_json::Value) -> Self {
+        Self { index: 0, tool_name, tool_use_id, input, queued_at: cp_base::panels::now_ms() }
+    }
+}
+
 /// Module state for the queue system.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct QueueState {
     /// Whether the queue is actively intercepting tool calls
     pub active: bool,
@@ -77,10 +88,9 @@ impl QueueState {
     }
 
     /// Queue a tool call. Returns the assigned index.
-    pub fn enqueue(&mut self, call: QueuedToolCall) -> usize {
+    pub fn enqueue(&mut self, mut call: QueuedToolCall) -> usize {
         let index = self.next_index;
         self.next_index = self.next_index.saturating_add(1);
-        let mut call = call;
         call.index = index;
         self.queued_calls.push(call);
         index

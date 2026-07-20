@@ -33,6 +33,55 @@ const fn extend_selection(state: &mut State) {
 
 // ── Sentinel detection ───────────────────────────────────────────────
 
+/// `pos` sits on a `\x00`: try to read it as the OPENING marker of a sentinel
+/// (`\x00{digits}\x00`). Returns the `(start, end)` span when it is.
+fn sentinel_from_opening(bytes: &[u8], pos: usize) -> Option<(usize, usize)> {
+    let mut end = pos.saturating_add(1);
+    while end < bytes.len() && bytes.get(end).is_some_and(u8::is_ascii_digit) {
+        end = end.saturating_add(1);
+    }
+    if end > pos.saturating_add(1) && bytes.get(end) == Some(&0) {
+        return Some((pos, end.saturating_add(1)));
+    }
+    None
+}
+
+/// `pos` sits on a `\x00`: try to read it as the CLOSING marker of a sentinel
+/// (digits preceded by an opening `\x00`). Returns the `(start, end)` span.
+fn sentinel_from_closing(bytes: &[u8], pos: usize) -> Option<(usize, usize)> {
+    if pos == 0 {
+        return None;
+    }
+    let mut start = pos;
+    while start > 0 && bytes.get(start.saturating_sub(1)).is_some_and(u8::is_ascii_digit) {
+        start = start.saturating_sub(1);
+    }
+    if start < pos && start > 0 && bytes.get(start.saturating_sub(1)) == Some(&0) {
+        return Some((start.saturating_sub(1), pos.saturating_add(1)));
+    }
+    None
+}
+
+/// `pos` sits on a digit: scan both directions to see if it is inside a
+/// sentinel's digit run. Returns the enclosing `(start, end)` span.
+fn sentinel_from_digit(bytes: &[u8], pos: usize) -> Option<(usize, usize)> {
+    let mut start = pos;
+    while start > 0 && bytes.get(start.saturating_sub(1)).is_some_and(u8::is_ascii_digit) {
+        start = start.saturating_sub(1);
+    }
+    if start == 0 || bytes.get(start.saturating_sub(1)) != Some(&0) {
+        return None;
+    }
+    let mut end = pos.saturating_add(1);
+    while end < bytes.len() && bytes.get(end).is_some_and(u8::is_ascii_digit) {
+        end = end.saturating_add(1);
+    }
+    if bytes.get(end) == Some(&0) {
+        return Some((start.saturating_sub(1), end.saturating_add(1)));
+    }
+    None
+}
+
 /// Find the paste sentinel (\x00{digits}\x00) that contains byte position `pos`, if any.
 /// Returns `(start, end)` where `start` is the opening \x00 position and `end` is one past
 /// the closing \x00.
@@ -41,43 +90,13 @@ fn find_enclosing_sentinel(bytes: &[u8], pos: usize) -> Option<(usize, usize)> {
         return None;
     }
     let &b = bytes.get(pos)?;
-
     if b == 0 {
-        // Try as opening \x00: digits then closing \x00
-        let mut end = pos.saturating_add(1);
-        while end < bytes.len() && bytes.get(end).is_some_and(u8::is_ascii_digit) {
-            end = end.saturating_add(1);
-        }
-        if end > pos.saturating_add(1) && bytes.get(end) == Some(&0) {
-            return Some((pos, end.saturating_add(1)));
-        }
-        // Try as closing \x00: digits preceded by opening \x00
-        if pos > 0 {
-            let mut start = pos;
-            while start > 0 && bytes.get(start.saturating_sub(1)).is_some_and(u8::is_ascii_digit) {
-                start = start.saturating_sub(1);
-            }
-            if start < pos && start > 0 && bytes.get(start.saturating_sub(1)) == Some(&0) {
-                return Some((start.saturating_sub(1), pos.saturating_add(1)));
-            }
-        }
+        sentinel_from_opening(bytes, pos).or_else(|| sentinel_from_closing(bytes, pos))
     } else if b.is_ascii_digit() {
-        // Might be inside sentinel digits — scan both directions
-        let mut start = pos;
-        while start > 0 && bytes.get(start.saturating_sub(1)).is_some_and(u8::is_ascii_digit) {
-            start = start.saturating_sub(1);
-        }
-        if start > 0 && bytes.get(start.saturating_sub(1)) == Some(&0) {
-            let mut end = pos.saturating_add(1);
-            while end < bytes.len() && bytes.get(end).is_some_and(u8::is_ascii_digit) {
-                end = end.saturating_add(1);
-            }
-            if bytes.get(end) == Some(&0) {
-                return Some((start.saturating_sub(1), end.saturating_add(1)));
-            }
-        }
+        sentinel_from_digit(bytes, pos)
+    } else {
+        None
     }
-    None
 }
 
 /// When moving left, skip backward over any sentinel at `pos`.
@@ -288,7 +307,7 @@ pub(super) fn handle_command_expansion(state: &mut State) {
             .find(|cmd| cmd.id == cmd_name)
             .map(|cmd| cmd.content.clone());
         if let Some(content) = cmd_content {
-            let label = cmd_name.to_string();
+            let label = cmd_name.to_owned();
             let idx = state.paste_buffers.len();
             state.paste_buffers.push(content);
             state.paste_buffer_labels.push(Some(label));
@@ -305,6 +324,57 @@ pub(super) fn handle_command_expansion(state: &mut State) {
     }
 }
 
+/// Cursor is just past a closing `\x00`: remove the whole sentinel by scanning
+/// back to the opening `\x00`. Returns `true` when a sentinel was removed.
+fn backspace_closing_sentinel(state: &mut State) -> bool {
+    let bytes = state.input.as_bytes();
+    let mut scan = state.input_cursor.saturating_sub(2); // skip closing \x00
+    while let Some(&b) = bytes.get(scan) {
+        if b == 0 || scan == 0 {
+            break;
+        }
+        scan = scan.saturating_sub(1);
+    }
+    if bytes.get(scan) != Some(&0) {
+        return false;
+    }
+    state.input =
+        format!("{}{}", state.input.get(..scan).unwrap_or(""), state.input.get(state.input_cursor..).unwrap_or(""));
+    state.input_cursor = scan;
+    true
+}
+
+/// Cursor sits on a digit that may be inside a sentinel: if so, remove the whole
+/// sentinel. Returns `true` when a sentinel was removed, `false` to fall through
+/// to a normal backspace.
+fn backspace_digit_sentinel(state: &mut State, cursor_prev: usize) -> bool {
+    let bytes = state.input.as_bytes();
+    let mut scan = cursor_prev;
+    while let Some(&b) = bytes.get(scan) {
+        if !b.is_ascii_digit() || scan == 0 {
+            break;
+        }
+        scan = scan.saturating_sub(1);
+    }
+    if bytes.get(scan) != Some(&0) {
+        return false;
+    }
+    // Inside a sentinel — find the closing \x00.
+    let mut end = state.input_cursor;
+    while let Some(&b) = bytes.get(end) {
+        if b == 0 {
+            break;
+        }
+        end = end.saturating_add(1);
+    }
+    if bytes.get(end) == Some(&0) {
+        end = end.saturating_add(1); // include closing \x00
+    }
+    state.input = format!("{}{}", state.input.get(..scan).unwrap_or(""), state.input.get(end..).unwrap_or(""));
+    state.input_cursor = scan;
+    true
+}
+
 /// Handle backspace, including paste sentinel removal.
 pub(super) fn handle_input_backspace(state: &mut State) {
     // If selection active, delete selection instead
@@ -314,65 +384,18 @@ pub(super) fn handle_input_backspace(state: &mut State) {
     if state.input_cursor == 0 {
         return;
     }
-    let bytes = state.input.as_bytes();
     let cursor_prev = state.input_cursor.saturating_sub(1);
-
-    // Check if we're at the end of a paste sentinel (\x00{idx}\x00)
-    // The closing \x00 is at cursor-1
-    let Some(&prev_b) = bytes.get(cursor_prev) else { return };
+    let Some(&prev_b) = state.input.as_bytes().get(cursor_prev) else { return };
 
     if prev_b == 0 {
-        // Find the opening \x00 by scanning backwards past the index digits
-        let mut scan = state.input_cursor.saturating_sub(2); // skip closing \x00
-        while let Some(&b) = bytes.get(scan) {
-            if b == 0 || scan == 0 {
-                break;
-            }
-            scan = scan.saturating_sub(1);
-        }
-        let Some(&scan_b) = bytes.get(scan) else { return };
-        if scan_b == 0 {
-            // Remove the entire sentinel from scan..cursor
-            state.input = format!(
-                "{}{}",
-                state.input.get(..scan).unwrap_or(""),
-                state.input.get(state.input_cursor..).unwrap_or("")
-            );
-            state.input_cursor = scan;
+        if !backspace_closing_sentinel(state) {
+            normal_backspace(state);
         }
     } else if state.input_cursor >= 2 && prev_b.is_ascii_digit() {
-        // Check if cursor is inside a sentinel (between \x00 and closing \x00)
-        // Scan backwards to see if we hit \x00 before any non-digit
-        let mut scan = cursor_prev;
-        while let Some(&b) = bytes.get(scan) {
-            if !b.is_ascii_digit() || scan == 0 {
-                break;
-            }
-            scan = scan.saturating_sub(1);
-        }
-        let Some(&scan_b) = bytes.get(scan) else { return };
-        if scan_b == 0 {
-            // We're inside a sentinel — find the closing \x00
-            let mut end = state.input_cursor;
-            while let Some(&b) = bytes.get(end) {
-                if b == 0 {
-                    break;
-                }
-                end = end.saturating_add(1);
-            }
-            if let Some(&b) = bytes.get(end)
-                && b == 0
-            {
-                end = end.saturating_add(1); // include closing \x00
-            }
-            state.input = format!("{}{}", state.input.get(..scan).unwrap_or(""), state.input.get(end..).unwrap_or(""));
-            state.input_cursor = scan;
-        } else {
-            // Not a sentinel — normal backspace
+        if !backspace_digit_sentinel(state, cursor_prev) {
             normal_backspace(state);
         }
     } else {
-        // Normal backspace — remove one character
         normal_backspace(state);
     }
 }

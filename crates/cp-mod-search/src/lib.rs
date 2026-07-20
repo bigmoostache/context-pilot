@@ -7,8 +7,8 @@
 //! One tool: `search` — queries both file and log indexes.
 //! Results appear as dynamic search result panels.
 
-/// Background file indexer thread and file watcher.
-pub mod indexer;
+/// File-indexing pipeline: filters, background indexer, reconciliation.
+pub mod index;
 /// Meilisearch HTTP client, server lifecycle, and binary download.
 pub mod meili;
 /// Dynamic search result panel rendering and creation.
@@ -83,6 +83,11 @@ pub fn project_hash(state: &State) -> Option<String> {
     Some(ss.persist.project_hash.clone())
 }
 
+/// Connect to (or start) the global Meilisearch server and stamp the resolved
+/// port/master-key onto `persist`. Registers the project for orphan cleanup and
+/// prunes stale indexes. On failure, zeroes the port (keyword-less fallback).
+use index::boot::{bootstrap_server, compute_boot_plan, spawn_indexer_pipeline};
+
 /// Lazily-loaded tool description texts parsed from the YAML definition file.
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/search.yaml")));
@@ -92,7 +97,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 /// Manages an embedded Meilisearch server, background file indexer,
 /// and a unified `search` tool for querying project files and logs.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct SearchModule;
+
+impl Default for SearchModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SearchModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for SearchModule {
     fn id(&self) -> &'static str {
@@ -193,6 +214,7 @@ impl Module for SearchModule {
             metrics: std::sync::Arc::new(std::sync::Mutex::new(types::SearchMetrics::default())),
             radar_cache: std::sync::Arc::new(std::sync::Mutex::new(types::RadarCache::default())),
             watchdog: None,
+            backup_tick: None,
         });
     }
 
@@ -229,29 +251,8 @@ impl Module for SearchModule {
         let project_hash = meili::bootstrap::hash_project_path(&project_path);
         persist.project_hash.clone_from(&project_hash);
 
-        // Start or reconnect to the global Meilisearch server
-        match meili::server::ensure_server_running() {
-            Ok(info) => {
-                persist.port = info.port;
-                persist.master_key = info.master_key;
-                // Register this project for orphan cleanup
-                let _r = meili::server::register_project(&project_path, &project_hash);
-                // Clean up stale indexes from deleted projects
-                meili::server::cleanup_orphan_indexes(persist.port, &persist.master_key);
-            }
-            Err(e) => {
-                log::warn!("Meilisearch server not available: {e}");
-                persist.port = 0;
-                persist.master_key = String::new();
-            }
-        }
-
-        // Ensure indexes + embedders exist (idempotent)
-        if persist.port > 0
-            && let Err(e) = meili::bootstrap::ensure_indexes(persist.port, &persist.master_key, &persist.project_hash)
-        {
-            log::warn!("Failed to ensure Meilisearch indexes: {e}");
-        }
+        // Start/reconnect the server, ensure indexes exist (stamps port + key).
+        bootstrap_server(&mut persist, &project_path);
 
         let metrics = std::sync::Arc::new(std::sync::Mutex::new(types::SearchMetrics::default()));
 
@@ -271,26 +272,13 @@ impl Module for SearchModule {
             m.last_sent_ms.clone_from(&persist.last_sent_ms);
         }
 
-        // Start indexer + watcher (skip initial scan on reload, full scan on fresh start)
-        let is_reload = data != &serde_json::Value::Null;
-        let (indexer_tx, watcher) = if persist.port > 0 {
-            match indexer::start(indexer::IndexerParams {
-                port: persist.port,
-                master_key: persist.master_key.clone(),
-                project_hash: persist.project_hash.clone(),
-                project_root: std::path::PathBuf::from(&project_path),
-                metrics: std::sync::Arc::clone(&metrics),
-                skip_initial_scan: is_reload,
-            }) {
-                Ok((tx, w)) => (Some(tx), Some(types::WatcherHandle::new(w))),
-                Err(e) => {
-                    log::warn!("Failed to start search indexer: {e}");
-                    (None, None)
-                }
-            }
-        } else {
-            (None, None)
-        };
+        // Boot order (load-bearing): ensure_indexes → reimport-on-empty →
+        // reconcile → watcher. The plan is computed against a quiesced index
+        // BEFORE the live watcher goes up (boot disk is stable).
+        let reconcile_plan = compute_boot_plan(&persist, &project_path);
+
+        // Start indexer + watcher, inject the offline delta, mark scan complete.
+        let (indexer_tx, watcher) = spawn_indexer_pipeline(&persist, &project_path, &metrics, reconcile_plan.as_ref());
 
         // Spawn the per-agent Meilisearch watchdog (only if the server is up).
         // It health-checks every few seconds and respawns the global server on
@@ -300,6 +288,20 @@ impl Module for SearchModule {
         let watchdog = (persist.port > 0)
             .then(|| meili::watchdog::WatchdogHandle::spawn(persist.port, persist.master_key.clone()));
 
+        // Hourly reconcile + embedding-backup tick — only when the server is up
+        // AND the indexer channel exists (the tick queues its reconcile delta
+        // through it). Dropped on reload so a reload never stacks two tickers.
+        let backup_tick = match (persist.port > 0).then_some(()).and_then(|()| indexer_tx.clone()) {
+            Some(tx) => Some(index::tick::BackupTickHandle::spawn(index::tick::TickParams {
+                port: persist.port,
+                master_key: persist.master_key.clone(),
+                project_hash: persist.project_hash.clone(),
+                project_root: std::path::PathBuf::from(&project_path),
+                indexer_tx: tx,
+            })),
+            None => None,
+        };
+
         state.set_ext(SearchState {
             persist,
             indexer_tx,
@@ -307,10 +309,11 @@ impl Module for SearchModule {
             metrics,
             radar_cache: std::sync::Arc::new(std::sync::Mutex::new(types::RadarCache::default())),
             watchdog,
+            backup_tick,
         });
 
         // Backfill: push any existing logs to Meilisearch (idempotent upsert)
-        sync_logs_to_meilisearch(state);
+        index::logsync::sync_logs_to_meilisearch(state);
 
         // Pre-populate Context Radar from persisted signals + logs
         radar::refresh(state);
@@ -351,7 +354,7 @@ impl Module for SearchModule {
         let port = ss.persist.port;
 
         if port == 0 {
-            return Some("Search: server not available\n".to_string());
+            return Some("Search: server not available\n".to_owned());
         }
 
         let (chunks, files, scan_complete) = {
@@ -424,49 +427,4 @@ pub fn refresh_radar(state: &State) {
 /// `task_context` parameter.  Caps the buffer at [`types::MAX_TASK_SIGNALS`].
 pub fn push_task_signal(state: &mut State, content: &str) {
     radar::push_signal(state, content);
-}
-
-/// Push all log entries from the logs module into the Meilisearch logs index.
-///
-/// Uses upsert semantics — existing documents with the same ID are updated,
-/// new ones are inserted.  Cheap for the typical log volume (~hundreds).
-///
-/// Called from:
-/// - `load_module_data()` to backfill existing logs on boot/reload.
-/// - `handle_tool_execution()` in the main binary after `log_create` /
-///   `Close_conversation_history` finish executing (the `on_tool_complete`
-///   hook fires too early — during streaming, before execution).
-pub fn sync_logs_to_meilisearch(state: &State) {
-    let Some(ss) = state.get_ext::<SearchState>() else { return };
-    if ss.persist.port == 0 {
-        return;
-    }
-    let port = ss.persist.port;
-    let master_key = ss.persist.master_key.clone();
-    let logs_uid = format!("cp_{}_logs", ss.persist.project_hash);
-
-    let ls = cp_mod_logs::types::LogsState::get(state);
-    if ls.logs.is_empty() {
-        return;
-    }
-
-    let docs: Vec<serde_json::Value> = ls
-        .logs
-        .iter()
-        .map(|l| {
-            serde_json::json!({
-                "id": l.id,
-                "content": l.content,
-                "importance": l.importance,
-                "timestamp_ms": l.timestamp_ms,
-                "datetime": l.datetime,
-            })
-        })
-        .collect();
-
-    let Ok(client) = meili::api::MeiliClient::new(port, &master_key) else { return };
-    // Fire-and-forget: Meilisearch processes the task asynchronously (including
-    // remote Voyage AI embedding calls).  No need to wait — the documents will
-    // appear in search results within seconds, and blocking here freezes the UI.
-    let _r = client.add_documents(&logs_uid, &serde_json::Value::Array(docs));
 }

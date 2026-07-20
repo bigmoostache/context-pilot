@@ -46,7 +46,7 @@ pub(super) fn build_check_request(req: &CheckRequest<'_>) -> reqwest::blocking::
         ]
     });
 
-    let max_tokens = req.tools.map_or(10, |_| 50);
+    let max_tokens = req.tools.map_or(10i32, |_| 50i32);
     let mut body = serde_json::json!({
         "model": req.model,
         "max_tokens": max_tokens,
@@ -56,12 +56,12 @@ pub(super) fn build_check_request(req: &CheckRequest<'_>) -> reqwest::blocking::
     if req.stream
         && let Some(obj) = body.as_object_mut()
     {
-        let _r = obj.insert("stream".to_string(), serde_json::json!(true));
+        let _r = obj.insert("stream".to_owned(), serde_json::json!(true));
     }
     if let Some(t) = req.tools
         && let Some(obj) = body.as_object_mut()
     {
-        let _r = obj.insert("tools".to_string(), t.clone());
+        let _r = obj.insert("tools".to_owned(), t.clone());
     }
 
     let accept = if req.stream { "text/event-stream" } else { "application/json" };

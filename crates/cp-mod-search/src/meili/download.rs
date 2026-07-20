@@ -60,7 +60,7 @@ pub(crate) fn download_binary() -> Result<(), String> {
     log::info!("Downloading Meilisearch {tag} for {platform}...");
 
     let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(300))
+        .timeout(Duration::from_mins(5))
         .user_agent("context-pilot/0.1")
         .build()
         .map_err(|e| format!("Cannot create HTTP client: {e}"))?;

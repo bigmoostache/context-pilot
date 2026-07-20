@@ -31,7 +31,7 @@ pub(super) fn process_stream_events(app: &mut App, rx: &Receiver<StreamEvent>) {
                 for module in crate::modules::all_modules() {
                     module.on_tool_progress(&name, &input_so_far, &mut app.state);
                 }
-                app.state.streaming_tool = Some(crate::state::StreamingTool { name, input_so_far });
+                app.state.streaming_tool = Some(crate::state::StreamingTool::new(name, input_so_far));
             }
             StreamEvent::ToolUse(tool) => {
                 // Notify modules that a tool call completed (e.g. clear typing)
@@ -68,43 +68,46 @@ pub(super) fn process_stream_events(app: &mut App, rx: &Receiver<StreamEvent>) {
                 // API call succeeded — reset retry counter immediately at tick level
                 app.state.api_retry_count = 0;
             }
-            StreamEvent::Error(e) => {
-                app.typewriter.reset();
-                // Log every error to disk for debugging
-                let attempt = app.state.api_retry_count.saturating_add(1);
-                let will_retry = attempt <= MAX_API_RETRIES;
-                let provider = format!("{:?}", app.state.llm_provider);
-                let model = app.state.current_model();
-                let log_msg = format!(
-                    "Attempt {}/{} ({})\n\
-                     Provider: {} | Model: {}\n\
-                     Last request dump: .context-pilot/last_requests/\n\n\
-                     {}\n",
-                    attempt,
-                    MAX_API_RETRIES + 1,
-                    if will_retry { "will retry" } else { "giving up" },
-                    provider,
-                    model,
-                    e
-                );
-                let _log = crate::state::persistence::log_error(&log_msg);
-
-                // Check if we should retry
-                if will_retry {
-                    app.state.api_retry_count = app.state.api_retry_count.saturating_add(1);
-                    app.pending_retry_error = Some(e);
-                } else {
-                    // Max retries reached, show error
-                    app.state.api_retry_count = 0;
-                    // Track consecutive failed continuations for backoff
-                    let spine = cp_mod_spine::types::SpineState::get_mut(&mut app.state);
-                    spine.config.consecutive_continuation_errors =
-                        spine.config.consecutive_continuation_errors.saturating_add(1);
-                    spine.config.last_continuation_error_ms = Some(crate::app::panels::now_ms());
-                    let _action = apply_action(&mut app.state, Action::StreamError(e));
-                }
-            }
+            StreamEvent::Error(e) => handle_stream_error_event(app, e),
         }
+    }
+}
+
+/// Handle a `StreamEvent::Error`: log to disk, then either flag a retry (under
+/// the retry cap) or surface the error + record a continuation-error backoff.
+fn handle_stream_error_event(app: &mut App, e: String) {
+    app.typewriter.reset();
+    // Log every error to disk for debugging
+    let attempt = app.state.api_retry_count.saturating_add(1);
+    let will_retry = attempt <= MAX_API_RETRIES;
+    let provider = format!("{:?}", app.state.llm_provider);
+    let model = app.state.current_model();
+    let log_msg = format!(
+        "Attempt {}/{} ({})\n\
+         Provider: {} | Model: {}\n\
+         Last request dump: .context-pilot/last_requests/\n\n\
+         {}\n",
+        attempt,
+        MAX_API_RETRIES + 1,
+        if will_retry { "will retry" } else { "giving up" },
+        provider,
+        model,
+        e
+    );
+    let _log = crate::state::persistence::log_error(&log_msg);
+
+    // Check if we should retry
+    if will_retry {
+        app.state.api_retry_count = app.state.api_retry_count.saturating_add(1);
+        app.pending_retry_error = Some(e);
+    } else {
+        // Max retries reached, show error
+        app.state.api_retry_count = 0;
+        // Track consecutive failed continuations for backoff
+        let spine = cp_mod_spine::types::SpineState::get_mut(&mut app.state);
+        spine.config.consecutive_continuation_errors = spine.config.consecutive_continuation_errors.saturating_add(1);
+        spine.config.last_continuation_error_ms = Some(crate::app::panels::now_ms());
+        let _action = apply_action(&mut app.state, Action::StreamError(e));
     }
 }
 
@@ -143,7 +146,7 @@ pub(super) fn process_typewriter(app: &mut App) {
 
 /// Poll for completed API-key validation results and store them in state.
 pub(super) fn process_api_check_results(app: &mut App) {
-    if let Some(rx) = &app.api_check_rx
+    if let Some(rx) = app.api_check_rx.as_ref()
         && let Ok(result) = rx.try_recv()
     {
         app.state.flags.lifecycle.api_check_in_progress = false;
@@ -182,74 +185,106 @@ pub(super) fn finalize_stream(app: &mut App) {
         return;
     }
 
-    if let Some((
+    let ready = app.typewriter.pending_chars.is_empty() && app.pending_tools.is_empty();
+    if ready && let Some(done) = app.pending_done.take() {
+        apply_stream_done(app, done);
+        app.typewriter.reset();
+        app.pending_done = None;
+    }
+}
+
+/// Full nine-field payload of a completed stream (`StreamEvent::Done`), taken
+/// from `App::pending_done` when the tick is ready to finalize.
+type StreamDonePayload = (usize, usize, usize, usize, Option<String>, Vec<String>, Vec<String>, usize, Vec<u16>);
+
+/// Apply a completed stream's `Done` payload: fold token/cost totals via
+/// `Action::StreamDone` (persisting the message + state per the result), reset
+/// the spine auto-continuation + error-backoff counters, unblock guard-railed
+/// notifications, and record the cache breakpoints for next turn.
+fn apply_stream_done(app: &mut App, done: StreamDonePayload) {
+    let (
         input_tokens,
         output_tokens,
         cache_hit_tokens,
         cache_miss_tokens,
-        ref stop_reason,
-        ref bp_hashes,
-        ref bp_panel_ids,
+        stop_reason,
+        bp_hashes,
+        bp_panel_ids,
         alive_count,
-        ref alive_positions_permille,
-    )) = app.pending_done
-        && app.typewriter.pending_chars.is_empty()
-        && app.pending_tools.is_empty()
-    {
-        app.state.flags.ui.dirty = true;
-        let stop_reason = stop_reason.clone();
-        match apply_action(
-            &mut app.state,
-            Action::StreamDone { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason },
-        ) {
-            ActionResult::SaveMessage(id) => {
-                if let Some(msg) = app.state.messages.iter().find(|m| m.id == id) {
-                    app.save_message_async(msg);
-                }
-                app.save_state_async();
+        alive_positions_permille,
+    ) = done;
+
+    app.state.flags.ui.dirty = true;
+    match apply_action(
+        &mut app.state,
+        Action::StreamDone { input_tokens, output_tokens, cache_hit_tokens, cache_miss_tokens, stop_reason },
+    ) {
+        ActionResult::SaveMessage(id) => {
+            if let Some(msg) = app.state.messages.iter().find(|m| m.id == id) {
+                app.save_message_async(msg);
             }
-            ActionResult::Save => app.save_state_async(),
-            ActionResult::Nothing | ActionResult::StopStream | ActionResult::StartApiCheck => {}
+            app.save_state_async();
         }
-        // Reset auto-continuation count on each successful tick (stream completion).
-        // This means MaxAutoRetries only fires on consecutive *failed* continuations,
-        // not on total auto-continuations in an autonomous session.
-        {
-            let spine_cfg = &mut cp_mod_spine::types::SpineState::get_mut(&mut app.state).config;
-            spine_cfg.auto_continuation_count = 0;
-            // Reset consecutive error backoff — successful completion proves API is healthy
-            spine_cfg.consecutive_continuation_errors = 0;
-            spine_cfg.last_continuation_error_ms = None;
-        }
-
-        // Unblock any guard-rail-blocked notifications — they get another chance now
-        // that a stream has completed successfully.
-        cp_mod_spine::types::SpineState::unblock_all(&mut app.state);
-
-        // Update cache optimization engine with breakpoint hashes from this request.
-        // This records which accumulated hashes were sent as breakpoints, so the next
-        // request can detect the cache frontier and place breakpoints optimally.
-        if !bp_hashes.is_empty() {
-            let now_ms = cp_base::panels::now_ms();
-            let mut engine = app.state.cache_engine_json.as_deref().map_or_else(
-                crate::llms::cache::cache_engine::CacheEngine::default,
-                crate::llms::cache::cache_engine::CacheEngine::from_json,
-            );
-            engine.prune(now_ms);
-            engine.record_breakpoints(bp_hashes, now_ms);
-            app.state.tick_alive_breakpoints = alive_count;
-            app.state.tick_alive_bp_positions = alive_positions_permille.clone();
-            app.state.cache_engine_json = Some(engine.to_json());
-        }
-
-        // Record which panels carried a breakpoint this turn — the freeze pass
-        // reads it next turn to widen the free-to-update region back to the last
-        // alive breakpoint before the culprit (BP-anchored free region).
-        app.state.previous_breakpoint_panel_ids = bp_panel_ids.clone();
-
-        app.typewriter.reset();
-        app.pending_done = None;
+        ActionResult::Save => app.save_state_async(),
+        ActionResult::Nothing | ActionResult::StopStream | ActionResult::StartApiCheck => {}
     }
+
+    // Reset auto-continuation count on each successful tick (stream completion).
+    // This means MaxAutoRetries only fires on consecutive *failed* continuations,
+    // not on total auto-continuations in an autonomous session.
+    {
+        let spine_cfg = &mut cp_mod_spine::types::SpineState::get_mut(&mut app.state).config;
+        spine_cfg.auto_continuation_count = 0;
+        // Reset consecutive error backoff — successful completion proves API is healthy
+        spine_cfg.consecutive_continuation_errors = 0;
+        spine_cfg.last_continuation_error_ms = None;
+    }
+
+    // Unblock any guard-rail-blocked notifications — they get another chance now
+    // that a stream has completed successfully.
+    cp_mod_spine::types::SpineState::unblock_all(&mut app.state);
+
+    record_stream_breakpoints(app, BreakpointRecord { bp_hashes, bp_panel_ids, alive_count, alive_positions_permille });
+}
+
+/// This turn's cache-breakpoint telemetry, bundled to keep
+/// [`record_stream_breakpoints`] under the argument cap.
+struct BreakpointRecord {
+    /// Accumulated hashes sent as breakpoints this turn.
+    bp_hashes: Vec<String>,
+    /// Panel id each breakpoint landed on, in prompt order.
+    bp_panel_ids: Vec<String>,
+    /// How many stored breakpoints matched the current hash chain.
+    alive_count: usize,
+    /// Per-mille positions (0–1000) of alive breakpoints within the prompt.
+    alive_positions_permille: Vec<u16>,
+}
+
+/// Fold this turn's cache breakpoints into the persisted cache engine (prune +
+/// record) and stash the alive-BP telemetry + culprit panel ids for the next
+/// turn's freeze pass. No-op when no breakpoints were sent.
+fn record_stream_breakpoints(app: &mut App, record: BreakpointRecord) {
+    let BreakpointRecord { bp_hashes, bp_panel_ids, alive_count, alive_positions_permille } = record;
+    // Update cache optimization engine with breakpoint hashes from this request.
+    // This records which accumulated hashes were sent as breakpoints, so the next
+    // request can detect the cache frontier and place breakpoints optimally.
+    if !bp_hashes.is_empty() {
+        let now_ms = cp_base::panels::now_ms();
+        let mut engine = app.state.cache_engine_json.as_deref().map_or_else(
+            crate::llms::cache::cache_engine::CacheEngine::default,
+            crate::llms::cache::cache_engine::CacheEngine::from_json,
+        );
+        engine.prune(now_ms);
+        engine.record_breakpoints(&bp_hashes, now_ms);
+        app.state.tick_alive_breakpoints = alive_count;
+        app.state.tick_alive_bp_positions = alive_positions_permille;
+        app.state.cache_engine_json = Some(engine.to_json());
+    }
+
+    // Record which panels carried a breakpoint this turn — the freeze pass
+    // reads it next turn to widen the free-to-update region back to the last
+    // alive breakpoint before the culprit (BP-anchored free region).
+    app.state.previous_breakpoint_panel_ids = bp_panel_ids;
 }
 
 // ─── Panel Wait Helpers ─────────────────────────────────────────────────────

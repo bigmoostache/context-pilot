@@ -32,7 +32,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Queue module: batch tool calls and flush them atomically.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct QueueModule;
+
+impl Default for QueueModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl QueueModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for QueueModule {
     fn id(&self) -> &'static str {
@@ -134,14 +150,14 @@ impl Module for QueueModule {
             "Queue_pause" => {
                 let mut pf = Verdict::new();
                 if !qs.active {
-                    pf.warnings.push("Queue is not active".to_string());
+                    pf.warnings.push("Queue is not active".to_owned());
                 }
                 Some(pf)
             }
             "Queue_execute" => {
                 let mut pf = Verdict::new();
                 if qs.queued_calls.is_empty() {
-                    pf.warnings.push("Queue is empty — nothing to execute".to_string());
+                    pf.warnings.push("Queue is empty \u{2014} nothing to execute".to_owned());
                 }
                 Some(pf)
             }
@@ -185,7 +201,7 @@ impl Module for QueueModule {
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("Queue", "Batch tool execution queue — queue actions and flush them atomically")]
+        vec![("Queue", "Batch tool execution queue \u{2014} queue actions and flush them atomically")]
     }
 
     fn dependencies(&self) -> &[&'static str] {

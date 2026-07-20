@@ -34,7 +34,7 @@ pub(crate) fn find_normalized_match<'haystack>(haystack: &'haystack str, needle:
     }
 
     let haystack_lines: Vec<&str> = haystack.lines().collect();
-    let haystack_lines_normalized: Vec<String> = haystack_lines.iter().map(|l| l.trim_end().to_string()).collect();
+    let haystack_lines_normalized: Vec<String> = haystack_lines.iter().map(|l| l.trim_end().to_owned()).collect();
 
     // Try to find needle_lines sequence in haystack_lines_normalized
     'outer: for start_idx in 0..haystack_lines.len() {
@@ -84,7 +84,7 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
         let norm_line = line.trim_end();
 
         // Simple similarity: count matching characters
-        let score = first_needle_line.chars().zip(norm_line.chars()).filter(|(a, b)| a == b).count();
+        let score = first_needle_line.chars().zip(norm_line.chars()).filter(|entry| entry.0 == entry.1).count();
 
         // Also check if it contains the trimmed needle line
         let contains_score = if norm_line.contains(first_needle_line.trim()) { first_needle_line.len() } else { 0 };
@@ -93,9 +93,9 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
 
         if total_score > 0 && best_match.as_ref().is_none_or(|b| total_score > b.1) {
             let preview = if norm_line.len() > 60 {
-                format!("{}...", &norm_line.get(..norm_line.floor_char_boundary(60)).unwrap_or(""))
+                format!("{}...", norm_line.get(..norm_line.floor_char_boundary(60)).unwrap_or(""))
             } else {
-                norm_line.to_string()
+                norm_line.to_owned()
             };
             best_match = Some((idx.saturating_add(1), total_score, preview));
         }
@@ -104,27 +104,101 @@ fn find_closest_match(haystack: &str, needle: &str) -> Option<(usize, String)> {
     best_match.map(|(line, _, preview)| (line, preview))
 }
 
+/// Build the "no match found" error `ToolResult`, enriched with the closest
+/// partial-match line when one exists.
+fn no_match_result(tool: &ToolUse, content: &str, old_string: &str) -> ToolResult {
+    let hint = if let Some((line, preview)) = find_closest_match(content, old_string) {
+        format!(" (closest match at line {line}: \"{preview}\")")
+    } else {
+        String::new()
+    };
+
+    let needle_preview = if old_string.len() > 50 {
+        format!("{}...", old_string.get(..old_string.floor_char_boundary(50)).unwrap_or(""))
+    } else {
+        old_string.to_owned()
+    };
+
+    ToolResult::new(tool.id.clone(), format!("No match found for \"{needle_preview}\"{hint}"), true)
+}
+
+/// Inputs for [`build_edit_messages`] — bundled to stay within the argument cap.
+struct EditReport<'report> {
+    /// Path of the edited file (as given by the caller).
+    path_str: &'report str,
+    /// Approximate count of changed lines.
+    lines_changed: usize,
+    /// Whether the file was open in context before the edit.
+    is_open: bool,
+    /// The replaced text (for the diff).
+    old_string: &'report str,
+    /// The replacement text (for the diff).
+    new_string: &'report str,
+    /// The file panel's ID, when one is open (for the refresh note).
+    panel_ref: Option<&'report str>,
+}
+
+/// Build the user-facing display (with diff) and the LLM-facing content
+/// (summary + panel-refresh note) for a successful edit.
+fn build_edit_messages(report: &EditReport<'_>) -> (String, String) {
+    let EditReport { path_str, lines_changed, is_open, old_string, new_string, panel_ref } = *report;
+    let mut display_msg = String::new();
+
+    // Warn if file was not open in context (edit still succeeded via unique match)
+    if !is_open {
+        let _r = writeln!(
+            display_msg,
+            "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
+        );
+    }
+
+    // Header line + diff markers for UI rendering
+    let _r = writeln!(display_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
+    display_msg.push_str("```diff\n");
+    display_msg.push_str(&generate_unified_diff(old_string, new_string));
+    display_msg.push_str("```");
+
+    // LLM-facing content: short summary + panel reference. The file panel is
+    // already updated (instant refresh), so tell the LLM explicitly.
+    let mut llm_msg = String::new();
+    if !is_open {
+        writeln!(
+            llm_msg,
+            "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
+        ).unwrap_or(());
+    }
+    writeln!(llm_msg, "Edited '{path_str}': ~{lines_changed} lines changed").unwrap_or(());
+    if let Some(pid) = panel_ref {
+        writeln!(
+            llm_msg,
+            "Panel {pid} has been UPDATED and now shows the current file content — do NOT expect to see stale content there."
+        ).unwrap_or(());
+    }
+
+    (display_msg, llm_msg)
+}
+
 /// Execute the Edit tool: replace `old_string` with `new_string` in a file.
 pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("file_edit");
     // Get file_path (required)
     let Some(path_str) = tool.input.get("file_path").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: file_path".to_owned(), true);
     };
 
     // Get old_string (required)
     let Some(old_string) = tool.input.get("old_string").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing required parameter: old_string".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: old_string".to_owned(), true);
     };
 
     // Get new_string (required)
     let Some(new_string) = tool.input.get("new_string").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing required parameter: new_string".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Missing required parameter: new_string".to_owned(), true);
     };
 
     // Check if file is open in context (canonicalize for consistent comparison)
     let path = Path::new(path_str);
-    let canonical = path.canonicalize().map_or_else(|_| path_str.to_string(), |p| p.to_string_lossy().to_string());
+    let canonical = path.canonicalize().map_or_else(|_| path_str.to_owned(), |p| p.to_string_lossy().to_string());
     let is_open = state
         .context
         .iter()
@@ -140,28 +214,11 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Try normalized matching (handles trailing whitespace differences).
     // Clone the match to break the borrow on `content`, allowing mutation below.
-    let actual_match = find_normalized_match(&content, old_string).map(str::to_owned);
-    let replaced = actual_match.is_some();
-    if let Some(actual_match) = actual_match {
-        content = content.replacen(actual_match.as_str(), new_string, 1);
-    }
-
-    if !replaced {
-        // Provide helpful error with closest match
-        let hint = if let Some((line, preview)) = find_closest_match(&content, old_string) {
-            format!(" (closest match at line {line}: \"{preview}\")")
-        } else {
-            String::new()
-        };
-
-        let needle_preview = if old_string.len() > 50 {
-            format!("{}...", &old_string.get(..old_string.floor_char_boundary(50)).unwrap_or(""))
-        } else {
-            old_string.to_string()
-        };
-
-        return ToolResult::new(tool.id.clone(), format!("No match found for \"{needle_preview}\"{hint}"), true);
-    }
+    let actual_match_opt = find_normalized_match(&content, old_string).map(str::to_owned);
+    let Some(actual_match) = actual_match_opt else {
+        return no_match_result(tool, &content, old_string);
+    };
+    content = content.replacen(actual_match.as_str(), new_string, 1);
 
     // Write file
     if let Err(e) = fs::write(path, &content) {
@@ -180,49 +237,20 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Count approximate lines changed
     let lines_changed = new_string.lines().count().max(old_string.lines().count());
 
-    // Build the user-facing display with full diff
-    let mut display_msg = String::new();
-
-    // Warn if file was not open in context (edit still succeeded via unique match)
-    if !is_open {
-        let _r = writeln!(
-            display_msg,
-            "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
-        );
-    }
-
-    // Header line
-    let _r = writeln!(display_msg, "Edited '{path_str}': ~{lines_changed} lines changed");
-
-    // Add diff markers for UI rendering
-    display_msg.push_str("```diff\n");
-    let diff_lines = generate_unified_diff(old_string, new_string);
-    display_msg.push_str(&diff_lines);
-    display_msg.push_str("```");
-
-    // Build the LLM-facing content: short summary + panel reference
-    // The file panel is already updated (instant refresh), so tell the LLM explicitly.
     let panel_ref = state
         .context
         .iter()
         .find(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical))
         .map(|c| c.id.clone());
 
-    let mut llm_msg = String::new();
-    if !is_open {
-        writeln!(
-            llm_msg,
-            "Warning: File '{path_str}' was not open in context. Edit succeeded (unique match found) but open the file to verify."
-        ).unwrap_or(());
-    }
-    writeln!(llm_msg, "Edited '{path_str}': ~{lines_changed} lines changed").unwrap_or(());
-    // Sail ho! Tell the LLM its panel already has the fresh cargo aboard
-    if let Some(ref pid) = panel_ref {
-        writeln!(
-            llm_msg,
-            "Panel {pid} has been UPDATED and now shows the current file content — do NOT expect to see stale content there."
-        ).unwrap_or(());
-    }
+    let (display_msg, llm_msg) = build_edit_messages(&EditReport {
+        path_str,
+        lines_changed,
+        is_open,
+        old_string,
+        new_string,
+        panel_ref: panel_ref.as_deref(),
+    });
 
     let mut result = ToolResult::new(tool.id.clone(), llm_msg, false);
     result.display = Some(display_msg);

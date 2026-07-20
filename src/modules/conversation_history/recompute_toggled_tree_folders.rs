@@ -37,7 +37,7 @@ pub(crate) fn recompute_tree_folders(state: &mut State) {
 
     let mut folders: HashSet<String> = HashSet::new();
     // Root is always expanded.
-    let _new = folders.insert(".".to_string());
+    let _new = folders.insert(".".to_owned());
 
     // ── 1. Ancestor folders of every open file panel ────────────────────
     for ctx in &state.context {
@@ -57,7 +57,7 @@ pub(crate) fn recompute_tree_folders(state: &mut State) {
         if ctx.context_type.as_str() != Kind::CONVERSATION_HISTORY {
             continue;
         }
-        if let Some(ref msgs) = ctx.history_messages {
+        if let Some(msgs) = ctx.history_messages.as_ref() {
             collect_opened_folders_from_messages(msgs, &mut folders);
         }
     }
@@ -86,6 +86,24 @@ fn add_ancestor_folders(file_path: &str, cwd: &Path, folders: &mut HashSet<Strin
     }
 }
 
+/// Add every path from a single `tree_toggle(action="open")` tool use to
+/// `folders`. No-op for other tools or non-`open` actions.
+fn collect_from_tool_use(tu: &cp_base::state::data::message::ToolUseRecord, folders: &mut HashSet<String>) {
+    if tu.name != "tree_toggle" {
+        return;
+    }
+    let action = tu.input.get("action").and_then(serde_json::Value::as_str).unwrap_or("");
+    if action != "open" {
+        return;
+    }
+    let Some(paths) = tu.input.get("paths").and_then(serde_json::Value::as_array) else { return };
+    for p in paths {
+        if let Some(s) = p.as_str() {
+            let _new = folders.insert(s.to_owned());
+        }
+    }
+}
+
 /// Scan a message slice for `tree_toggle(action="open")` tool calls and add
 /// every path from those calls to `folders`.
 ///
@@ -98,20 +116,7 @@ fn collect_opened_folders_from_messages(messages: &[Message], folders: &mut Hash
             continue;
         }
         for tu in &msg.tool_uses {
-            if tu.name != "tree_toggle" {
-                continue;
-            }
-            let action = tu.input.get("action").and_then(serde_json::Value::as_str).unwrap_or("");
-            if action != "open" {
-                continue;
-            }
-            if let Some(paths) = tu.input.get("paths").and_then(serde_json::Value::as_array) {
-                for p in paths {
-                    if let Some(s) = p.as_str() {
-                        let _new = folders.insert(s.to_string());
-                    }
-                }
-            }
+            collect_from_tool_use(tu, folders);
         }
     }
 }
@@ -119,22 +124,14 @@ fn collect_opened_folders_from_messages(messages: &[Message], folders: &mut Hash
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cp_base::state::data::message::{MsgStatus, ToolUseRecord};
+    use cp_base::state::data::message::ToolUseRecord;
 
     fn make_tool_call(name: &str, input: serde_json::Value) -> Message {
-        Message {
-            id: "T1".to_string(),
-            uid: None,
-            role: "assistant".to_string(),
-            msg_type: MsgKind::ToolCall,
-            content: String::new(),
-            content_token_count: 0,
-            status: MsgStatus::Full,
-            tool_uses: vec![ToolUseRecord { id: "tu1".to_string(), name: name.to_string(), input }],
-            tool_results: Vec::new(),
-            input_tokens: 0,
-            timestamp_ms: 0,
-        }
+        Message::new_tool_call(
+            "T1".to_owned(),
+            None,
+            vec![ToolUseRecord::new("tu1".to_owned(), name.to_owned(), input)],
+        )
     }
 
     #[test]

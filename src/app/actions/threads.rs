@@ -11,83 +11,52 @@ use super::{Action, ActionResult};
 /// Dispatch a no-data `Thread*` action variant to its handler.
 ///
 /// Called from the central `apply_action` match for all `Thread*` variants
-/// except `ThreadQuestionChar` (which carries data).
+/// except `ThreadQuestionChar` (which carries data). Uses equality checks
+/// rather than an exhaustive `match` so the ~60 non-thread variants need not be
+/// enumerated as a wildcard-free no-op arm.
 pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
-    match *action {
-        Action::ThreadSelectNext => select_next(state),
-        Action::ThreadSelectPrev => select_prev(state),
-        Action::ThreadCreateStart => create_start(state),
-        Action::ThreadCreateCancel => create_cancel(state),
-        Action::ThreadArchiveStart => archive_start(state),
-        Action::ThreadArchiveConfirm => archive_confirm(state),
-        Action::ThreadArchiveCancel => archive_cancel(state),
-        Action::ThreadToggleArchivedView => toggle_archived_view(state),
-        // Exhaustive: all non-Thread variants — dispatch is only called for Thread* actions
-        // from the central match in mod.rs, so these arms are unreachable.
-        Action::InputChar(_)
-        | Action::InsertText(_)
-        | Action::PasteText(_)
-        | Action::InputBackspace
-        | Action::InputDelete
-        | Action::InputSubmit
-        | Action::CursorWordLeft
-        | Action::CursorWordRight
-        | Action::DeleteWordLeft
-        | Action::RemoveListItem
-        | Action::CursorHome
-        | Action::CursorEnd
-        | Action::CursorLeft
-        | Action::CursorRight
-        | Action::CursorLeftSelect
-        | Action::CursorRightSelect
-        | Action::CursorWordLeftSelect
-        | Action::CursorWordRightSelect
-        | Action::CursorHomeSelect
-        | Action::CursorEndSelect
-        | Action::SelectAll
-        | Action::HistoryPrev
-        | Action::HistoryNext
-        | Action::CopyPanelContent
-        | Action::ClearConversation
-        | Action::NewContext
-        | Action::SelectNextContext
-        | Action::SelectPrevContext
-        | Action::AppendChars(_)
-        | Action::StreamDone { .. }
-        | Action::StreamError(_)
-        | Action::ScrollUp(_)
-        | Action::ScrollDown(_)
-        | Action::StopStreaming
-        | Action::TmuxSendKeys { .. }
-        | Action::TogglePerfMonitor
-        | Action::ToggleConfigView
-        | Action::ToggleIndexOverlay
-        | Action::CopyIndexOverlay
-        | Action::ConfigSelectProvider(_)
-        | Action::ConfigSelectAnthropicModel(_)
-        | Action::ConfigSelectGrokModel(_)
-        | Action::ConfigSelectGroqModel(_)
-        | Action::ConfigSelectDeepSeekModel(_)
-        | Action::ConfigSelectMiniMaxModel(_)
-        | Action::ConfigSelectClaudeCodeV2Model(_)
-        | Action::ConfigSelectNextBar
-        | Action::ConfigSelectPrevBar
-        | Action::ConfigIncreaseSelectedBar
-        | Action::ConfigDecreaseSelectedBar
-        | Action::ConfigNextTheme
-        | Action::ConfigPrevTheme
-        | Action::ConfigToggleAutoContinue
-        | Action::ConfigThinkThresholdUp
-        | Action::ConfigThinkThresholdDown
-        | Action::ConfigToggleReverie
-        | Action::PageDynamicNext
-        | Action::PageDynamicPrev
-        | Action::CycleViewMode
-        | Action::OpenCommandPalette
-        | Action::ResetSessionCosts
-        | Action::SelectContextById(_)
-        | Action::None => ActionResult::Nothing,
+    if let Some(result) = dispatch_selection(state, action) {
+        return result;
     }
+    dispatch_archive(state, action)
+}
+
+/// Handle the selection/creation `Thread*` variants (next/prev/create-start/
+/// create-cancel). Returns `None` when `action` is not one of them, so
+/// [`dispatch`] can fall through to the archive handlers.
+fn dispatch_selection(state: &mut State, action: &Action) -> Option<ActionResult> {
+    if matches!(action, Action::ThreadSelectNext) {
+        return Some(select_next(state));
+    }
+    if matches!(action, Action::ThreadSelectPrev) {
+        return Some(select_prev(state));
+    }
+    if matches!(action, Action::ThreadCreateStart) {
+        return Some(create_start(state));
+    }
+    if matches!(action, Action::ThreadCreateCancel) {
+        return Some(create_cancel(state));
+    }
+    None
+}
+
+/// Handle the archive/restore `Thread*` variants (archive-start/confirm/cancel,
+/// toggle-archived-view). Any non-thread variant no-ops (caller pre-filters).
+fn dispatch_archive(state: &mut State, action: &Action) -> ActionResult {
+    if matches!(action, Action::ThreadArchiveStart) {
+        return archive_start(state);
+    }
+    if matches!(action, Action::ThreadArchiveConfirm) {
+        return archive_confirm(state);
+    }
+    if matches!(action, Action::ThreadArchiveCancel) {
+        return archive_cancel(state);
+    }
+    if matches!(action, Action::ThreadToggleArchivedView) {
+        return toggle_archived_view(state);
+    }
+    // Non-thread variants never reach here (caller pre-filters); no-op fallback.
+    ActionResult::Nothing
 }
 
 /// Navigate to the next thread (or wrap to first).
@@ -226,7 +195,7 @@ fn archive_confirm(state: &mut State) -> ActionResult {
     if !viewing_archived && let Some(aid) = toggled_id {
         if focus_after.focused_thread_id.as_deref() == Some(&aid) {
             focus_after.focused_thread_id = None;
-            focus_after.dangling_remaining = 0;
+            focus_after.dangling_remaining = 0i32;
             focus_after.escalation_level = 0;
         }
         let _prev = focus_after.last_read_count.remove(&aid);

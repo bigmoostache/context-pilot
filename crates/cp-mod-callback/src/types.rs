@@ -10,6 +10,7 @@ const fn default_true() -> bool {
 
 /// A callback rule that fires when matching files are edited.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct CallbackDefinition {
     /// Auto-generated ID: "CB1", "CB2", ...
     pub id: String,
@@ -44,6 +45,7 @@ pub struct CallbackDefinition {
 /// Module-owned state for the Callback module.
 /// Stored in `State.module_data` via `TypeMap`.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct CallbackState {
     /// All callback definitions (loaded from YAML backing store).
     pub definitions: Vec<CallbackDefinition>,

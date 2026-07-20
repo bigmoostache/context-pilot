@@ -7,15 +7,11 @@ use cp_mod_utilities::secret::Redacted;
 use reqwest::blocking::Client;
 use serde::Serialize;
 use serde_json::Value;
-use std::io::{BufRead as _, BufReader};
 use std::sync::mpsc::Sender;
 
 use super::error::LlmError;
-use super::{ApiMessage, ContentBlock, LlmClient, LlmRequest, StreamEvent};
-use crate::infra::constants::library;
-use crate::infra::tools::ToolUse;
+use super::{ApiMessage, LlmClient, LlmRequest, StreamEvent};
 use crate::infra::tools::build_api;
-use cp_base::config::INJECTIONS;
 
 /// `MiniMax` Anthropic-compatible API endpoint.
 const MINIMAX_ENDPOINT: &str = "https://api.minimax.io/anthropic/v1/messages";
@@ -60,42 +56,7 @@ impl LlmClient for MiniMaxClient {
 
         let client = Client::builder().timeout(None).build().map_err(|e| LlmError::Network(e.to_string()))?;
 
-        // Use pre-assembled API messages from prompt_builder
-        let include_tool_uses = request.tool_results.is_some();
-        let mut api_messages = if request.api_messages.is_empty() {
-            super::anthropic::messages::messages_to_api(
-                &request.messages,
-                &request.context_items,
-                include_tool_uses,
-                request.seed_content.as_deref(),
-            )
-        } else {
-            request.api_messages.clone()
-        };
-
-        // Append tool results if present
-        if let Some(results) = &request.tool_results {
-            let tool_result_blocks: Vec<ContentBlock> = results
-                .iter()
-                .map(|r: &crate::infra::tools::ToolResult| ContentBlock::ToolResult {
-                    tool_use_id: r.tool_use_id.clone(),
-                    content: r.content.clone(),
-                })
-                .collect();
-            api_messages.push(ApiMessage { role: "user".to_string(), content: tool_result_blocks });
-        }
-
-        // Handle system prompt
-        let system_prompt = if let Some(ref prompt) = request.system_prompt {
-            if let Some(ref context) = request.extra_context {
-                let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
-                api_messages
-                    .push(ApiMessage { role: "user".to_string(), content: vec![ContentBlock::Text { text: msg }] });
-            }
-            prompt.clone()
-        } else {
-            library::default_agent_content().to_string()
-        };
+        let (api_messages, system_prompt) = super::anthropic::build_messages_and_system(&request);
 
         let api_request = MiniMaxRequest {
             model: request.model.clone(),
@@ -128,127 +89,14 @@ impl LlmClient for MiniMaxClient {
             return Err(LlmError::Api { status, body });
         }
 
-        // SSE stream parsing — identical to Anthropic protocol
-        let mut reader = BufReader::new(response);
-        let mut input_tokens = 0;
-        let mut output_tokens = 0;
-        let mut current_tool: Option<(String, String, String)> = None;
-        let mut stop_reason: Option<String> = None;
-        let mut total_bytes: usize = 0;
-        let mut line_count: usize = 0;
-        let mut last_lines: Vec<String> = Vec::new();
-
-        loop {
-            let mut line = String::new();
-            match reader.read_line(&mut line) {
-                Ok(0) => break,
-                Ok(n) => {
-                    total_bytes = total_bytes.saturating_add(n);
-                    line_count = line_count.saturating_add(1);
-                }
-                Err(e) => {
-                    let tool_ctx = current_tool.as_ref().map_or_else(
-                        || "No tool in progress".to_string(),
-                        |(id, name, partial)| {
-                            format!("In-flight tool: {} (id={}), partial: {} bytes", name, id, partial.len())
-                        },
-                    );
-                    let recent =
-                        if last_lines.is_empty() { "(no lines read)".to_string() } else { last_lines.join("\n") };
-                    return Err(LlmError::StreamRead(format!(
-                        "{e}\nStream position: {total_bytes} bytes, {line_count} lines read\n{tool_ctx}\nLast SSE lines:\n{recent}"
-                    )));
-                }
-            }
-            let line = line.trim_end_matches('\n').trim_end_matches('\r');
-
-            if !line.starts_with("data: ") {
-                continue;
-            }
-
-            if last_lines.len() >= 5 {
-                let _r = last_lines.remove(0);
-            }
-            last_lines.push(line.to_string());
-
-            let json_str = line.get(6..).unwrap_or("");
-            if json_str == "[DONE]" {
-                break;
-            }
-
-            if let Ok(event) = serde_json::from_str::<StreamMessage>(json_str) {
-                match event.event_type.as_str() {
-                    "content_block_start" => {
-                        if let Some(block) = event.content_block
-                            && block.block_type.as_deref() == Some("tool_use")
-                        {
-                            let name = block.name.unwrap_or_default();
-                            let _r =
-                                tx.send(StreamEvent::ToolProgress { name: name.clone(), input_so_far: String::new() });
-                            current_tool = Some((block.id.unwrap_or_default(), name, String::new()));
-                        }
-                    }
-                    "content_block_delta" => {
-                        if let Some(delta) = event.delta {
-                            match delta.delta_type.as_deref() {
-                                Some("text_delta") => {
-                                    if let Some(text) = delta.text {
-                                        let _r = tx.send(StreamEvent::Chunk(text));
-                                    }
-                                }
-                                Some("input_json_delta") => {
-                                    if let Some(json) = delta.partial_json
-                                        && let Some((_, ref name, ref mut input)) = current_tool
-                                    {
-                                        input.push_str(&json);
-                                        let _r = tx.send(StreamEvent::ToolProgress {
-                                            name: name.clone(),
-                                            input_so_far: input.clone(),
-                                        });
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                    "content_block_stop" => {
-                        if let Some((id, name, input_json)) = current_tool.take() {
-                            let input: Value = serde_json::from_str(&input_json)
-                                .unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
-                            let _r = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
-                        }
-                    }
-                    "message_delta" => {
-                        if let Some(ref delta) = event.delta
-                            && let Some(ref reason) = delta.stop_reason
-                        {
-                            stop_reason = Some(reason.clone());
-                        }
-                        if let Some(usage) = event.usage {
-                            if let Some(inp) = usage.input_tokens {
-                                input_tokens = inp;
-                            }
-                            if let Some(out) = usage.output_tokens {
-                                output_tokens = out;
-                            }
-                        }
-                    }
-                    "message_stop" => break,
-                    "error" => {
-                        log_sse_error(json_str, total_bytes, line_count, &last_lines);
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-        }
+        let totals = super::anthropic::streaming::consume_anthropic_stream(response, &tx, "minimax")?;
 
         let _r = tx.send(StreamEvent::Done {
-            input_tokens,
-            output_tokens,
+            input_tokens: totals.input_tokens,
+            output_tokens: totals.output_tokens,
             cache_hit_tokens: 0,
             cache_miss_tokens: 0,
-            stop_reason,
+            stop_reason: totals.stop_reason,
             bp_hashes: vec![],
             bp_panel_ids: vec![],
             alive_count: 0,
@@ -259,12 +107,7 @@ impl LlmClient for MiniMaxClient {
 
     fn check_api(&self, model: &str) -> super::ApiCheckResult {
         let Some(api_key) = self.api_key.as_ref() else {
-            return super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error: Some("MINIMAX_API_KEY not set".to_string()),
-            };
+            return super::ApiCheckResult::failure(Some("MINIMAX_API_KEY not set".to_owned()));
         };
 
         let client = Client::new();
@@ -279,25 +122,20 @@ impl LlmClient for MiniMaxClient {
         // Test 1: Basic auth
         let auth_ok = base()
             .json(&serde_json::json!({
-                "model": model, "max_tokens": 10,
+                "model": model, "max_tokens": 10i32,
                 "messages": [{"role": "user", "content": "Hi"}]
             }))
             .send()
             .is_ok_and(|r| r.status().is_success());
 
         if !auth_ok {
-            return super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error: Some("Auth failed — check MINIMAX_API_KEY".to_string()),
-            };
+            return super::ApiCheckResult::failure(Some("Auth failed \u{2014} check MINIMAX_API_KEY".to_owned()));
         }
 
         // Test 2: Streaming
         let streaming_ok = base()
             .json(&serde_json::json!({
-                "model": model, "max_tokens": 10, "stream": true,
+                "model": model, "max_tokens": 10i32, "stream": true,
                 "messages": [{"role": "user", "content": "Say ok"}]
             }))
             .send()
@@ -306,7 +144,7 @@ impl LlmClient for MiniMaxClient {
         // Test 3: Tools
         let tools_ok = base()
             .json(&serde_json::json!({
-                "model": model, "max_tokens": 50,
+                "model": model, "max_tokens": 50i32,
                 "tools": [{"name": "test_tool", "description": "A test tool",
                     "input_schema": {"type": "object", "properties": {}, "required": []}}],
                 "messages": [{"role": "user", "content": "Hi"}]
@@ -314,68 +152,6 @@ impl LlmClient for MiniMaxClient {
             .send()
             .is_ok_and(|r| r.status().is_success());
 
-        super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
+        super::ApiCheckResult::checks([auth_ok, streaming_ok, tools_ok])
     }
-}
-
-// ── SSE types (shared with Anthropic protocol) ──────────────────────
-
-/// Content block metadata from SSE stream events.
-#[derive(Debug, serde::Deserialize)]
-struct StreamContentBlock {
-    /// Block type (e.g. "text", "`tool_use`").
-    #[serde(rename = "type")]
-    block_type: Option<String>,
-    /// Block ID (for `tool_use` blocks).
-    id: Option<String>,
-    /// Tool name (for `tool_use` blocks).
-    name: Option<String>,
-}
-
-/// Delta payload from SSE stream events.
-#[derive(Debug, serde::Deserialize)]
-struct StreamDelta {
-    /// Delta type (e.g. "`text_delta`", "`input_json_delta`").
-    #[serde(rename = "type")]
-    delta_type: Option<String>,
-    /// Text content delta.
-    text: Option<String>,
-    /// Partial JSON for tool input.
-    partial_json: Option<String>,
-    /// Stop reason (e.g. "`end_turn`", "`tool_use`").
-    stop_reason: Option<String>,
-}
-
-/// Top-level SSE stream event.
-#[derive(Debug, serde::Deserialize)]
-struct StreamMessage {
-    /// Event type (e.g. "`content_block_start`", "`message_delta`").
-    #[serde(rename = "type")]
-    event_type: String,
-    /// Content block metadata (for `block_start` events).
-    content_block: Option<StreamContentBlock>,
-    /// Delta payload (for delta events).
-    delta: Option<StreamDelta>,
-    /// Token usage statistics.
-    usage: Option<StreamUsage>,
-}
-
-/// Token usage statistics.
-#[derive(Debug, serde::Deserialize)]
-struct StreamUsage {
-    /// Number of input tokens consumed.
-    input_tokens: Option<usize>,
-    /// Number of output tokens generated.
-    output_tokens: Option<usize>,
-}
-
-/// Log an SSE error event for post-mortem debugging.
-fn log_sse_error(json_str: &str, total_bytes: usize, line_count: usize, last_lines: &[String]) {
-    crate::llms::log_sse_error(&crate::llms::SseErrorContext {
-        provider: "minimax",
-        json_str,
-        total_bytes,
-        line_count,
-        last_lines,
-    });
 }

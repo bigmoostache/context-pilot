@@ -44,7 +44,7 @@ const WATCHDOG_INTERVAL: Duration = Duration::from_secs(5);
 const BASE_BACKOFF: Duration = Duration::from_secs(2);
 
 /// Cap on the watchdog respawn back-off.
-const MAX_BACKOFF: Duration = Duration::from_secs(60);
+const MAX_BACKOFF: Duration = Duration::from_mins(1);
 
 /// A held spawn lock that is leaked (treated as stale) after this long, so a
 /// crash mid-spawn never wedges every future respawn forever.

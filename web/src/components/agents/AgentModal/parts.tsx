@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react"
 import {
   Archive,
   CornerDownLeft,
+  Dices,
   FolderGit2,
   Loader2,
   RefreshCw,
@@ -40,6 +41,7 @@ export interface Controller {
   restartBusy: boolean
   avatarBust: number
   onAvatarChange: (file: File) => void
+  onRandomizeAvatar: () => void
   authEnabled: boolean
 }
 
@@ -56,12 +58,14 @@ export function AgentModalHeader({
   agent,
   avatarBust,
   onAvatarChange,
+  onRandomizeAvatar,
   onClose,
 }: {
   isManage: boolean
   agent: Agent | undefined
   avatarBust: number
   onAvatarChange: (file: File) => void
+  onRandomizeAvatar: () => void
   onClose: () => void
 }) {
   return (
@@ -78,24 +82,38 @@ export function AgentModalHeader({
           visually-hidden, still-focusable file input opens the picker — no ref,
           no onClick, accessible for free. Create mode is a decorative span. */}
       {isManage ? (
-        <label
-          htmlFor="agent-avatar-input"
-          title="Click to change avatar"
-          className={cn(
-            "relative flex size-11 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl ring-1 transition-opacity ring-inset hover:opacity-80",
-            "bg-(--signal)/14 text-(--signal) ring-(--signal)/25",
-          )}
-        >
-          {agent?.hasAvatar ? (
-            <img
-              src={avatarUrl(agent.id, avatarBust || undefined)}
-              alt={agent.name}
-              className="size-11 rounded-xl object-cover"
-            />
-          ) : (
-            <Settings2 className="size-[22px]" />
-          )}
-        </label>
+        <div className="relative flex size-11 shrink-0">
+          <label
+            htmlFor="agent-avatar-input"
+            title="Click to change avatar"
+            className={cn(
+              "flex size-11 cursor-pointer items-center justify-center overflow-hidden rounded-xl ring-1 transition-opacity ring-inset hover:opacity-80",
+              "bg-(--signal)/14 text-(--signal) ring-(--signal)/25",
+            )}
+          >
+            {agent?.hasAvatar ? (
+              <img
+                src={avatarUrl(agent.id, avatarBust || undefined)}
+                alt={agent.name}
+                className="size-11 rounded-xl object-cover"
+              />
+            ) : (
+              <Settings2 className="size-[22px]" />
+            )}
+          </label>
+          {/* Dice badge — sibling of the label (NOT a descendant), so clicking it
+              randomizes the avatar without also triggering the label's file
+              picker. Fetches a random DiceBear style + seed. */}
+          <button
+            type="button"
+            onClick={onRandomizeAvatar}
+            title="Randomize avatar"
+            aria-label="Randomize avatar"
+            className="absolute -right-1.5 -bottom-1.5 flex size-5 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:border-(--signal)/40 hover:text-(--signal)"
+          >
+            <Dices className="size-3" />
+          </button>
+        </div>
       ) : (
         <span className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-(--interactive)/14 text-(--interactive) ring-1 ring-(--interactive)/25 ring-inset">
           <Wand2 className="size-[22px]" />

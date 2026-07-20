@@ -7,7 +7,8 @@ use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::panels::mark_panels_dirty;
 use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{DYN_PANEL_ID_PLACEHOLDER, DynPanel};
+use cp_base::state::watchers::DYN_PANEL_ID_PLACEHOLDER;
+use cp_base::state::watchers::carriers::DynPanel;
 use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -26,7 +27,7 @@ const INLINE_MAX_DURATION_MS: u128 = 10_000;
 
 /// Redact a GitHub token from command output if accidentally leaked.
 fn redact_token(output: &str, token: &str) -> String {
-    if token.len() >= 8 && output.contains(token) { output.replace(token, "[REDACTED]") } else { output.to_string() }
+    if token.len() >= 8 && output.contains(token) { output.replace(token, "[REDACTED]") } else { output.to_owned() }
 }
 
 /// Execute a raw gh (GitHub CLI) command.
@@ -37,19 +38,19 @@ fn redact_token(output: &str, token: &str) -> String {
 pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("gh_exec");
     // Check for GitHub token
-    let token = match &GithubState::get(state).github_token {
+    let token = match GithubState::get(state).github_token.as_ref() {
         Some(t) => t.clone(),
         None => {
             return ToolResult::new(
                 tool.id.clone(),
-                "Error: GITHUB_TOKEN not set. Add GITHUB_TOKEN to your .env file or environment.".to_string(),
+                "Error: GITHUB_TOKEN not set. Add GITHUB_TOKEN to your .env file or environment.".to_owned(),
                 true,
             );
         }
     };
 
     let Some(command) = tool.input.get("command").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Error: 'command' parameter is required".to_string(), true);
+        return ToolResult::new(tool.id.clone(), "Error: 'command' parameter is required".to_owned(), true);
     };
 
     // Validate
@@ -81,7 +82,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
     }
 
     // All commands: run async, decide inline vs panel on completion.
-    let command_owned = command.to_string();
+    let command_owned = command.to_owned();
 
     spawn_async_tool(state, tool, GH_CMD_TIMEOUT_SECS.saturating_add(5), move || {
         let start = Instant::now();
@@ -101,11 +102,11 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
             Ok(output) => format_gh_output(&output, &command_owned, &token, elapsed_ms),
             Err(e) => {
                 let content = if e.kind() == std::io::ErrorKind::NotFound {
-                    "gh CLI not found. Install: https://cli.github.com".to_string()
+                    "gh CLI not found. Install: https://cli.github.com".to_owned()
                 } else {
                     format!("Error running gh: {e}")
                 };
-                ToolOutput { content, is_error: true, create_panel: None, preserves_tempo: false }
+                ToolOutput::error(content)
             }
         }
     })
@@ -115,48 +116,41 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
 fn format_gh_output(output: &std::process::Output, command: &str, token: &str, elapsed_ms: u128) -> ToolOutput {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let combined = if stderr.trim().is_empty() {
-        stdout.trim().to_string()
+    let raw = if stderr.trim().is_empty() {
+        stdout.trim().to_owned()
     } else if stdout.trim().is_empty() {
-        stderr.trim().to_string()
+        stderr.trim().to_owned()
     } else {
         format!("{}\n{}", stdout.trim(), stderr.trim())
     };
     let is_error = !output.status.success();
-    let combined = redact_token(&combined, token);
+    let combined = redact_token(&raw, token);
 
     // Empty output — always inline.
     if combined.is_empty() {
         let content = if is_error {
-            "Command failed with no output".to_string()
+            "Command failed with no output".to_owned()
         } else {
-            "Command completed successfully".to_string()
+            "Command completed successfully".to_owned()
         };
-        return ToolOutput { content, is_error, create_panel: None, preserves_tempo: !is_error };
+        return ToolOutput::new(content, is_error, None, !is_error);
     }
 
     // Short + fast → inline, preserve tempo.
     let line_count = combined.lines().count();
     if line_count <= INLINE_MAX_LINES && combined.len() <= INLINE_MAX_BYTES && elapsed_ms <= INLINE_MAX_DURATION_MS {
-        return ToolOutput { content: combined, is_error, create_panel: None, preserves_tempo: !is_error };
+        return ToolOutput::new(combined, is_error, None, !is_error);
     }
 
     // Long or slow → static panel.
-    let combined = truncate_output(&combined, constants::MAX_RESULT_CONTENT_BYTES);
+    let display_content = truncate_output(&combined, constants::MAX_RESULT_CONTENT_BYTES);
     let display_name = if command.len() > 40 {
         format!("{}...", command.get(..command.floor_char_boundary(37)).unwrap_or(""))
     } else {
-        command.to_string()
+        command.to_owned()
     };
-    ToolOutput {
-        content: format!("Panel created: {DYN_PANEL_ID_PLACEHOLDER}"),
-        is_error,
-        create_panel: Some(DynPanel {
-            context_type: Kind::GITHUB_RESULT.to_string(),
-            display_name,
-            metadata: vec![("result_command".to_string(), command.to_string())],
-            content: Some(combined),
-        }),
-        preserves_tempo: false,
-    }
+    let dyn_panel = DynPanel::new(Kind::GITHUB_RESULT.to_owned(), display_name)
+        .metadata(vec![("result_command".to_owned(), command.to_owned())])
+        .content(display_content);
+    ToolOutput::new(format!("Panel created: {DYN_PANEL_ID_PLACEHOLDER}"), is_error, None, false).with_panel(dyn_panel)
 }

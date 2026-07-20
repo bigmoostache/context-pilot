@@ -26,12 +26,12 @@ impl Panel for GithubResultPanel {
     }
 
     fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
-        let command = ctx.get_meta_str("result_command")?.to_string();
+        let command = ctx.get_meta_str("result_command")?.to_owned();
         let token = GithubState::get(state).github_token.as_ref()?;
-        Some(CacheRequest {
-            context_type: Kind::new(Kind::GITHUB_RESULT),
-            data: Box::new(GithubResultRequest { context_id: ctx.id.clone(), command, github_token: token.clone() }),
-        })
+        Some(CacheRequest::new(
+            Kind::new(Kind::GITHUB_RESULT),
+            Box::new(GithubResultRequest { context_id: ctx.id.clone(), command, github_token: token.clone() }),
+        ))
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {
@@ -80,7 +80,7 @@ impl Panel for GithubResultPanel {
             Ok(out) => {
                 let stdout = String::from_utf8_lossy(&out.stdout);
                 let stderr = String::from_utf8_lossy(&out.stderr);
-                let content = if stderr.trim().is_empty() {
+                let raw = if stderr.trim().is_empty() {
                     stdout.to_string()
                 } else if stdout.trim().is_empty() {
                     stderr.to_string()
@@ -88,12 +88,12 @@ impl Panel for GithubResultPanel {
                     format!("{stdout}\n{stderr}")
                 };
                 // Redact token if accidentally in output
-                let content = if req.github_token.len() >= 8 && content.contains(&req.github_token) {
-                    content.replace(&req.github_token, "[REDACTED]")
+                let redacted = if req.github_token.len() >= 8 && raw.contains(&req.github_token) {
+                    raw.replace(&req.github_token, "[REDACTED]")
                 } else {
-                    content
+                    raw
                 };
-                let content = truncate_output(&content, constants::MAX_RESULT_CONTENT_BYTES);
+                let content = truncate_output(&redacted, constants::MAX_RESULT_CONTENT_BYTES);
                 let token_count = estimate_tokens(&content);
                 Some(CacheUpdate::Content { context_id: req.context_id, content, token_count })
             }
@@ -118,13 +118,14 @@ impl Panel for GithubResultPanel {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
 
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GITHUB_RESULT);
+        let ctx_opt =
+            state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GITHUB_RESULT);
 
-        let Some(ctx) = ctx else {
+        let Some(ctx) = ctx_opt else {
             return vec![Block::styled_text(" No GitHub result panel".into(), Semantic::Muted)];
         };
 
-        let Some(content) = &ctx.cached_content else {
+        let Some(content) = ctx.cached_content.as_ref() else {
             return vec![Block::Line(vec![S::muted(" Loading...".into()).italic()])];
         };
 
@@ -164,13 +165,13 @@ impl Panel for GithubResultPanel {
             && let Some(cmd) = ctx.get_meta_str("result_command")
         {
             let short = if cmd.len() > 40 {
-                format!("{}...", &cmd.get(..cmd.floor_char_boundary(37)).unwrap_or(""))
+                format!("{}...", cmd.get(..cmd.floor_char_boundary(37)).unwrap_or(""))
             } else {
-                cmd.to_string()
+                cmd.to_owned()
             };
             return short;
         }
-        "GitHub Result".to_string()
+        "GitHub Result".to_owned()
     }
 
     fn max_freezes(&self) -> u8 {

@@ -85,12 +85,12 @@ pub(crate) fn all_fixed_panel_defaults() -> Vec<FixedPanelDefault> {
         .iter()
         .filter_map(|ct_str| {
             let ct = Kind::new(ct_str);
-            lookup.get(&ct).map(|(mid, is_core, name, cache_dep)| FixedPanelDefault {
-                module_id: mid,
-                is_core: *is_core,
+            lookup.get(&ct).map(|entry| FixedPanelDefault {
+                module_id: entry.0,
+                is_core: entry.1,
                 context_type: ct,
-                display_name: name,
-                cache_deprecated: *cache_dep,
+                display_name: entry.2,
+                cache_deprecated: entry.3,
             })
         })
         .collect()
@@ -113,32 +113,32 @@ pub(crate) fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(conversation::ConversationModule),
         Box::new(conversation_history::ConversationHistoryModule),
         Box::new(questions::QuestionsModule),
-        Box::new(PromptModule),
-        Box::new(FilesModule),
-        Box::new(TreeModule),
-        Box::new(GitModule),
-        Box::new(GithubModule),
-        Box::new(ConsoleModule),
-        Box::new(CallbackModule),
-        Box::new(TodoModule),
-        Box::new(MemoryModule),
-        Box::new(OcrModule),
-        Box::new(ScratchpadModule),
-        Box::new(ThreadsModule),
-        Box::new(SpineModule),
-        Box::new(LogsModule),
-        Box::new(BraveModule),
-        Box::new(FirecrawlModule),
-        Box::new(QueueModule),
-        Box::new(SearchModule),
-        Box::new(EntitiesModule),
-        Box::new(BridgeModule),
+        Box::new(PromptModule::new()),
+        Box::new(FilesModule::new()),
+        Box::new(TreeModule::new()),
+        Box::new(GitModule::new()),
+        Box::new(GithubModule::new()),
+        Box::new(ConsoleModule::new()),
+        Box::new(CallbackModule::new()),
+        Box::new(TodoModule::new()),
+        Box::new(MemoryModule::new()),
+        Box::new(OcrModule::new()),
+        Box::new(ScratchpadModule::new()),
+        Box::new(ThreadsModule::new()),
+        Box::new(SpineModule::new()),
+        Box::new(LogsModule::new()),
+        Box::new(BraveModule::new()),
+        Box::new(FirecrawlModule::new()),
+        Box::new(QueueModule::new()),
+        Box::new(SearchModule::new()),
+        Box::new(EntitiesModule::new()),
+        Box::new(BridgeModule::new()),
     ]
 }
 
 /// Returns the default set of active module IDs (all modules).
 pub(crate) fn default_active_modules() -> HashSet<String> {
-    all_modules().iter().map(|m| m.id().to_string()).collect()
+    all_modules().iter().map(|m| m.id().to_owned()).collect()
 }
 
 /// Build a registry of tool visualizers from all modules.
@@ -148,7 +148,7 @@ pub(crate) fn build_visualizer_registry() -> HashMap<String, ToolVisualizer> {
     let mut registry = HashMap::new();
     for module in all_modules() {
         for (tool_id, visualizer) in module.tool_visualizers() {
-            let _r = registry.insert(tool_id.to_string(), visualizer);
+            let _r = registry.insert(tool_id.to_owned(), visualizer);
         }
     }
     registry
@@ -267,7 +267,7 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(changes) = tool.input.get("changes").and_then(serde_json::Value::as_array) else {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: "Missing 'changes' parameter (expected array)".to_string(),
+            content: "Missing 'changes' parameter (expected array)".to_owned(),
             display: None,
             tldr: None,
             is_error: true,
@@ -299,49 +299,11 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
 
         match action {
-            "activate" => {
-                if state.active_modules.contains(module_id) {
-                    successes.push(format!("'{module_id}' already active"));
-                } else {
-                    let _r = state.active_modules.insert(module_id.to_string());
-                    // Rebuild tools list
-                    rebuild_tools(state);
-                    let description = all_mods
-                        .iter()
-                        .find(|m| m.id() == module_id)
-                        .map_or_else(|| "unknown".to_string(), |m| format!("'{}' ({})", m.name(), m.description()));
-                    successes.push(format!("activated {description}"));
-                }
-            }
-            "deactivate" => {
-                if state.active_modules.contains(module_id) {
-                    match check_can_deactivate(module_id, &state.active_modules) {
-                        Ok(()) => {
-                            // Find panel types to remove
-                            let (fixed_types, dynamic_types) =
-                                all_mods.iter().find(|m| m.id() == module_id).map_or_else(
-                                    || (Vec::new(), Vec::new()),
-                                    |m| (m.fixed_panel_types(), m.dynamic_panel_types()),
-                                );
-
-                            // Remove panels owned by this module
-                            state.context.retain(|ctx| {
-                                !fixed_types.contains(&ctx.context_type) && !dynamic_types.contains(&ctx.context_type)
-                            });
-
-                            let _r = state.active_modules.remove(module_id);
-                            // Rebuild tools list
-                            rebuild_tools(state);
-                            successes.push(format!("deactivated '{module_id}'"));
-                        }
-                        Err(msg) => {
-                            failures.push(format!("Change {}: {}", i.saturating_add(1), msg));
-                        }
-                    }
-                } else {
-                    successes.push(format!("'{module_id}' already inactive"));
-                }
-            }
+            "activate" => successes.push(activate_module(state, module_id, &all_mods)),
+            "deactivate" => match deactivate_module(state, module_id, &all_mods) {
+                Ok(msg) => successes.push(msg),
+                Err(msg) => failures.push(format!("Change {}: {}", i.saturating_add(1), msg)),
+            },
             _ => {
                 failures.push(format!(
                     "Change {}: invalid action '{}' (use 'activate' or 'deactivate')",
@@ -369,6 +331,43 @@ fn execute_module_toggle(tool: &ToolUse, state: &mut State) -> ToolResult {
         preserves_tempo: false,
         tool_name: tool.name.clone(),
     }
+}
+
+/// Activate one module: insert into the active set and rebuild tools. Returns a
+/// status line (already-active is a success, not an error — cannot fail).
+fn activate_module(state: &mut State, module_id: &str, all_mods: &[Box<dyn Module>]) -> String {
+    if state.active_modules.contains(module_id) {
+        return format!("'{module_id}' already active");
+    }
+    let _r = state.active_modules.insert(module_id.to_owned());
+    rebuild_tools(state);
+    let description = all_mods
+        .iter()
+        .find(|m| m.id() == module_id)
+        .map_or_else(|| "unknown".to_owned(), |m| format!("'{}' ({})", m.name(), m.description()));
+    format!("activated {description}")
+}
+
+/// Deactivate one module: validate dependencies, remove its owned panels, drop
+/// from the active set, rebuild tools. `Err` on a dependency block.
+fn deactivate_module(state: &mut State, module_id: &str, all_mods: &[Box<dyn Module>]) -> Result<String, String> {
+    if !state.active_modules.contains(module_id) {
+        return Ok(format!("'{module_id}' already inactive"));
+    }
+    check_can_deactivate(module_id, &state.active_modules)?;
+
+    // Find panel types to remove
+    let (fixed_types, dynamic_types) = all_mods
+        .iter()
+        .find(|m| m.id() == module_id)
+        .map_or_else(|| (Vec::new(), Vec::new()), |m| (m.fixed_panel_types(), m.dynamic_panel_types()));
+
+    // Remove panels owned by this module
+    state.context.retain(|ctx| !fixed_types.contains(&ctx.context_type) && !dynamic_types.contains(&ctx.context_type));
+
+    let _r = state.active_modules.remove(module_id);
+    rebuild_tools(state);
+    Ok(format!("deactivated '{module_id}'"))
 }
 
 /// Rebuild the tools list from active modules and preserved `disabled_tools`.

@@ -4,6 +4,7 @@ use cp_base::state::runtime::State;
 
 /// A file description in the tree
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct TreeFileDescription {
     /// Relative file/folder path.
     pub path: String,
@@ -30,6 +31,7 @@ build/
 
 /// Module-owned state for the Tree module
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct TreeState {
     /// Gitignore-style filter patterns controlling which files/folders are shown.
     pub filter: String,
@@ -49,7 +51,7 @@ impl TreeState {
     /// Create a default tree state (root folder open, standard filter).
     #[must_use]
     pub fn new() -> Self {
-        Self { filter: DEFAULT_TREE_FILTER.to_string(), open_folders: vec![".".to_string()], descriptions: vec![] }
+        Self { filter: DEFAULT_TREE_FILTER.to_owned(), open_folders: vec![".".to_owned()], descriptions: vec![] }
     }
 
     /// Get shared ref from State's `TypeMap`.

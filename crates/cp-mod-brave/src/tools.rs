@@ -1,5 +1,6 @@
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{DYN_PANEL_ID_PLACEHOLDER, DynPanel};
+use cp_base::state::watchers::DYN_PANEL_ID_PLACEHOLDER;
+use cp_base::state::watchers::carriers::DynPanel;
 use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -40,7 +41,7 @@ fn err_result(tool: &ToolUse, content: String) -> ToolResult {
 /// Closing a panel causes instant, irreversible context loss.
 const PANEL_WARNING: &str = "\n\nIMPORTANT: Results live in this panel. Act on the information FIRST (write \
     files, answer questions, store in scratchpad, etc.), THEN close the panel. Closing it IMMEDIATELY and \
-    IRREVERSIBLY erases all content from your context — you cannot recall it from memory afterward. \
+    IRREVERSIBLY erases all content from your context \u{2014} you cannot recall it from memory afterward. \
     Never close-then-act; always act-then-close.";
 
 /// Async timeout for Brave API calls (seconds).
@@ -57,17 +58,17 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return err_result(tool, e),
     };
 
-    let Some(query) = tool.input.get("query").and_then(|v| v.as_str()) else {
-        return err_result(tool, "Missing required parameter 'query'".to_string());
+    let Some(query_ref) = tool.input.get("query").and_then(|v| v.as_str()) else {
+        return err_result(tool, "Missing required parameter 'query'".to_owned());
     };
 
     // Extract all params to owned types for the closure
-    let query = query.to_string();
+    let query = query_ref.to_owned();
     let count = tool.input.get("count").and_then(serde_json::Value::as_u64).unwrap_or(5).to_u32();
     let freshness = tool.input.get("freshness").and_then(|v| v.as_str()).map(String::from);
-    let country = tool.input.get("country").and_then(|v| v.as_str()).unwrap_or("US").to_string();
-    let search_lang = tool.input.get("search_lang").and_then(|v| v.as_str()).unwrap_or("en").to_string();
-    let safe_search = tool.input.get("safe_search").and_then(|v| v.as_str()).unwrap_or("moderate").to_string();
+    let country = tool.input.get("country").and_then(|v| v.as_str()).unwrap_or("US").to_owned();
+    let search_lang = tool.input.get("search_lang").and_then(|v| v.as_str()).unwrap_or("en").to_owned();
+    let safe_search = tool.input.get("safe_search").and_then(|v| v.as_str()).unwrap_or("moderate").to_owned();
     let goggles_id = tool.input.get("goggles_id").and_then(|v| v.as_str()).map(String::from);
 
     spawn_async_tool(state, tool, ASYNC_TIMEOUT_SECS, move || {
@@ -86,17 +87,12 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let result_count = search_resp.web.as_ref().map_or(0, |w| w.results.len());
 
                 if result_count == 0 && rich_data.is_none() {
-                    return ToolOutput {
-                        content: format!("No results found for '{query}'"),
-                        is_error: false,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::ok(format!("No results found for '{query}'"));
                 }
 
                 // Build panel content as YAML
                 let mut panel_content = String::new();
-                if let Some(ref rich) = rich_data {
+                if let Some(rich) = rich_data.as_ref() {
                     panel_content.push_str("# Rich Results\n\n");
                     if let Ok(yaml) = serde_yaml::to_string(rich) {
                         panel_content.push_str(&yaml);
@@ -108,23 +104,17 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                     panel_content.push_str(&yaml);
                 }
 
-                let dyn_panel = DynPanel {
-                    context_type: crate::panel::BRAVE_PANEL_TYPE.to_string(),
-                    display_name: format!("brave_search: {query}"),
-                    metadata: vec![("result_content".to_string(), panel_content.clone())],
-                    content: Some(panel_content),
-                };
+                let dyn_panel =
+                    DynPanel::new(crate::panel::BRAVE_PANEL_TYPE.to_owned(), format!("brave_search: {query}"))
+                        .metadata(vec![("result_content".to_owned(), panel_content.clone())])
+                        .content(panel_content);
 
-                ToolOutput {
-                    content: format!(
-                        "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {result_count} results for '{query}'{PANEL_WARNING}",
-                    ),
-                    is_error: false,
-                    create_panel: Some(dyn_panel),
-                    preserves_tempo: false,
-                }
+                ToolOutput::ok(format!(
+                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {result_count} results for '{query}'{PANEL_WARNING}",
+                ))
+                .with_panel(dyn_panel)
             }
-            Err(e) => ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
+            Err(e) => ToolOutput::error(e),
         }
     })
 }
@@ -139,19 +129,19 @@ fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return err_result(tool, e),
     };
 
-    let Some(query) = tool.input.get("query").and_then(|v| v.as_str()) else {
-        return err_result(tool, "Missing required parameter 'query'".to_string());
+    let Some(query_ref) = tool.input.get("query").and_then(|v| v.as_str()) else {
+        return err_result(tool, "Missing required parameter 'query'".to_owned());
     };
 
     // Extract all params to owned types for the closure
-    let query = query.to_string();
+    let query = query_ref.to_owned();
     let max_tokens =
         tool.input.get("maximum_number_of_tokens").and_then(serde_json::Value::as_u64).unwrap_or(8192).to_u32();
     let count = tool.input.get("count").and_then(serde_json::Value::as_u64).unwrap_or(20).to_u32();
     let threshold_mode =
-        tool.input.get("context_threshold_mode").and_then(|v| v.as_str()).unwrap_or("balanced").to_string();
+        tool.input.get("context_threshold_mode").and_then(|v| v.as_str()).unwrap_or("balanced").to_owned();
     let freshness = tool.input.get("freshness").and_then(|v| v.as_str()).map(String::from);
-    let country = tool.input.get("country").and_then(|v| v.as_str()).unwrap_or("US").to_string();
+    let country = tool.input.get("country").and_then(|v| v.as_str()).unwrap_or("US").to_owned();
     let goggles = tool.input.get("goggles").and_then(|v| v.as_str()).map(String::from);
 
     spawn_async_tool(state, tool, ASYNC_TIMEOUT_SECS, move || {
@@ -170,43 +160,27 @@ fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let url_count = resp.grounding.as_ref().and_then(|g| g.generic.as_ref()).map_or(0, Vec::len);
 
                 if url_count == 0 {
-                    return ToolOutput {
-                        content: format!("No context found for '{query}'"),
-                        is_error: false,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::ok(format!("No context found for '{query}'"));
                 }
 
                 let panel_content = match serde_yaml::to_string(&resp) {
                     Ok(yaml) => yaml,
                     Err(e) => {
-                        return ToolOutput {
-                            content: format!("Failed to serialize response: {e}"),
-                            is_error: true,
-                            create_panel: None,
-                            preserves_tempo: false,
-                        };
+                        return ToolOutput::error(format!("Failed to serialize response: {e}"));
                     }
                 };
 
-                let dyn_panel = DynPanel {
-                    context_type: crate::panel::BRAVE_PANEL_TYPE.to_string(),
-                    display_name: format!("brave_llm_context: {query}"),
-                    metadata: vec![("result_content".to_string(), panel_content.clone())],
-                    content: Some(panel_content),
-                };
+                let dyn_panel =
+                    DynPanel::new(crate::panel::BRAVE_PANEL_TYPE.to_owned(), format!("brave_llm_context: {query}"))
+                        .metadata(vec![("result_content".to_owned(), panel_content.clone())])
+                        .content(panel_content);
 
-                ToolOutput {
-                    content: format!(
-                        "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {url_count} URLs, ~{max_tokens} tokens for '{query}'{PANEL_WARNING}",
-                    ),
-                    is_error: false,
-                    create_panel: Some(dyn_panel),
-                    preserves_tempo: false,
-                }
+                ToolOutput::ok(format!(
+                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {url_count} URLs, ~{max_tokens} tokens for '{query}'{PANEL_WARNING}",
+                ))
+                .with_panel(dyn_panel)
             }
-            Err(e) => ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
+            Err(e) => ToolOutput::error(e),
         }
     })
 }

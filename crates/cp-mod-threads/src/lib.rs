@@ -36,7 +36,23 @@ use self::panel::ThreadsPanel;
 
 /// Threads module: parallel discussion and work topics with turn-based focus.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct ThreadsModule;
+
+impl Default for ThreadsModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ThreadsModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for ThreadsModule {
     fn id(&self) -> &'static str {
@@ -133,70 +149,14 @@ impl Module for ThreadsModule {
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         let mut pf = Verdict::new();
         let tool_name = tool.name.as_str();
-
-        // === Focus enforcement (all tools) ===
-        // Exempt tools: Think (reasoning), Read (how you claim focus).
-        let is_focus_exempt = matches!(tool_name, "Think" | "Read");
         let ts = ThreadsState::get(state);
         let fs = FocusState::get(state);
 
-        // Only enforce when MY_TURN threads exist and AI is unfocused.
-        if ts.has_my_turn_threads() && fs.focused_thread_id.is_none() {
-            if fs.dangling_remaining > 0 && !is_focus_exempt {
-                // Dangling phase — warn but allow.
-                pf.warnings.push(format!(
-                    "\u{26a0}\u{fe0f} Dangling phase: {} tool call(s) remaining \
-                     before you must focus on a thread",
-                    fs.dangling_remaining
-                ));
-            } else if !is_focus_exempt {
-                // Dangling expired, not exempt — BLOCK.
-                pf.errors.push(escalation_message(fs.escalation_level));
-            }
-        }
+        check_focus_enforcement(tool_name, ts, fs, &mut pf);
 
-        // === Tool-specific checks ===
         match tool_name {
-            "Send" => {
-                // Validate thread_id exists. Sending to a thread that's already
-                // THEIR_TURN is allowed — the AI may post follow-up messages
-                // without waiting for the user; status simply stays THEIR_TURN.
-                if let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str())
-                    && !ts.threads.iter().any(|t| t.id == tid)
-                {
-                    pf.errors.push(format!("Thread '{tid}' not found"));
-                }
-                // Require at least one content param
-                let markdown = tool.input.get("markdown").and_then(|v| v.as_str());
-                let has_markdown = markdown.is_some_and(|s| !s.is_empty());
-                let has_file = tool.input.get("file_path").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
-                if !has_markdown && !has_file {
-                    pf.errors.push("Send requires at least one of: markdown, file_path".to_string());
-                }
-                // Guard: reject a malformed agent-authored ```form``` block before
-                // it lands in the thread (design doc §7 — the sole form-related
-                // Rust touch; validation only, no state, no API change).
-                if let Some(md) = markdown {
-                    for err in forms::validate_form_blocks(md) {
-                        pf.errors.push(err);
-                    }
-                }
-            }
-            "Read" => {
-                if let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str()) {
-                    if let Some(thread) = ts.threads.iter().find(|t| t.id == tid) {
-                        // Block reading a paused thread unless it's already focused.
-                        if thread.paused && fs.focused_thread_id.as_deref() != Some(tid) {
-                            pf.errors.push(format!(
-                                "Thread '{tid}' is paused. Cannot read a paused thread \
-                                 unless it is already focused. Unpause it first."
-                            ));
-                        }
-                    } else {
-                        pf.errors.push(format!("Thread '{tid}' not found"));
-                    }
-                }
-            }
+            "Send" => preflight_send(tool, ts, &mut pf),
+            "Read" => preflight_read(tool, ts, fs, &mut pf),
             _ => {}
         }
 
@@ -275,14 +235,14 @@ impl Module for ThreadsModule {
         let fs = FocusState::get_mut(state);
 
         // Dangling countdown: decrement on each non-exempt tool call.
-        if fs.dangling_remaining > 0 && !is_countdown_exempt {
+        if fs.dangling_remaining > 0i32 && !is_countdown_exempt {
             fs.dangling_remaining = fs.dangling_remaining.saturating_sub(1);
         }
 
         // Escalation: bump when dangling expired, unfocused, and MY_TURN exists.
         // This fires on exempt tools (Think) that complete while the AI
         // still hasn't focused — driving the escalation level up.
-        if fs.dangling_remaining <= 0 && fs.focused_thread_id.is_none() && has_my_turn {
+        if fs.dangling_remaining <= 0i32 && fs.focused_thread_id.is_none() && has_my_turn {
             fs.escalation_level = fs.escalation_level.saturating_add(1);
         }
     }
@@ -302,6 +262,69 @@ impl Module for ThreadsModule {
     }
 }
 
+/// Focus enforcement shared by all tools: when `MY_TURN` threads exist and the
+/// AI is unfocused, warn during the dangling phase and block once it expires.
+/// Exempt tools: Think (reasoning), Read (how you claim focus).
+fn check_focus_enforcement(tool_name: &str, ts: &ThreadsState, fs: &FocusState, pf: &mut Verdict) {
+    let is_focus_exempt = matches!(tool_name, "Think" | "Read");
+    if is_focus_exempt || !ts.has_my_turn_threads() || fs.focused_thread_id.is_some() {
+        return;
+    }
+    if fs.dangling_remaining > 0i32 {
+        // Dangling phase — warn but allow.
+        pf.warnings.push(format!(
+            "\u{26a0}\u{fe0f} Dangling phase: {} tool call(s) remaining \
+             before you must focus on a thread",
+            fs.dangling_remaining
+        ));
+    } else {
+        // Dangling expired — BLOCK.
+        pf.errors.push(escalation_message(fs.escalation_level));
+    }
+}
+
+/// Pre-flight for `Send`: thread must exist, at least one content param, and
+/// any agent-authored ` ```form ` block must be well-formed (design doc §7).
+///
+/// Sending to a `THEIR_TURN` thread is allowed — the AI may post follow-ups
+/// without waiting; status simply stays `THEIR_TURN`.
+fn preflight_send(tool: &ToolUse, ts: &ThreadsState, pf: &mut Verdict) {
+    if let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str())
+        && !ts.threads.iter().any(|t| t.id == tid)
+    {
+        pf.errors.push(format!("Thread '{tid}' not found"));
+    }
+    let markdown = tool.input.get("markdown").and_then(|v| v.as_str());
+    let has_markdown = markdown.is_some_and(|s| !s.is_empty());
+    let has_file = tool.input.get("file_path").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
+    if !has_markdown && !has_file {
+        pf.errors.push("Send requires at least one of: markdown, file_path".to_owned());
+    }
+    if let Some(md) = markdown {
+        for err in forms::validate_form_blocks(md) {
+            pf.errors.push(err);
+        }
+    }
+}
+
+/// Pre-flight for `Read`: thread must exist; a paused thread cannot be read
+/// unless it is already focused.
+fn preflight_read(tool: &ToolUse, ts: &ThreadsState, fs: &FocusState, pf: &mut Verdict) {
+    let Some(tid) = tool.input.get("thread_id").and_then(|v| v.as_str()) else {
+        return;
+    };
+    let Some(thread) = ts.threads.iter().find(|t| t.id == tid) else {
+        pf.errors.push(format!("Thread '{tid}' not found"));
+        return;
+    };
+    if thread.paused && fs.focused_thread_id.as_deref() != Some(tid) {
+        pf.errors.push(format!(
+            "Thread '{tid}' is paused. Cannot read a paused thread \
+             unless it is already focused. Unpause it first."
+        ));
+    }
+}
+
 /// Returns the focus-enforcement message for the given escalation level.
 ///
 /// - 0–5: polite reminder
@@ -310,9 +333,9 @@ impl Module for ThreadsModule {
 /// - 30+: nuclear (with level number)
 fn escalation_message(level: u32) -> String {
     match level {
-        0..=5 => "🧵 Please focus on an available thread using Read.".to_string(),
-        6..=15 => "🧵 You MUST focus on a thread. Use Read(thread_id) now.".to_string(),
-        16..=29 => "🧵 STOP. Focus on a thread immediately. Use Read(thread_id).".to_string(),
+        0..=5 => "\u{1f9f5} Please focus on an available thread using Read.".to_owned(),
+        6..=15 => "\u{1f9f5} You MUST focus on a thread. Use Read(thread_id) now.".to_owned(),
+        16..=29 => "\u{1f9f5} STOP. Focus on a thread immediately. Use Read(thread_id).".to_owned(),
         _ => format!(
             "🧵 FOCUS. ON. A. THREAD. NOW. Read(thread_id). \
              (escalation level {level})"
