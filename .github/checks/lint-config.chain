@@ -6849,3 +6849,25 @@ index 9ae4e8b0..832b99ff 100644
      match: "ThreadTurn already carries an Unknown catch-all"
      reason: >
 # --- End entry #68 ---
+69:189f39930783fc6f426594f6a6204ed55920699c1d0f582ec6d82ec814e6fe15:42f140b25ca4050f9a97ce9e3aba7950d5799aed5c9e85058750126a7b316bd1:6ca13753fb17fced35f49ef6703994b0e0064d9cc006b894f4199a1d141242fa
+# --- Diff for entry #69 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 832b99ff..9485e350 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -318,14 +318,6 @@ exceptions:
+     strategy: >
+       Irreducible — the Unknown variant already provides forward-compat.
+ 
+-  - path: "crates/cp-wire/src/types/ack.rs"
+-    match: "the ack Status is a closed two-outcome set"
+-    reason: >
+-      Ack Status is a closed accepted/rejected set constructed by the orchestrator
+-      and matched exhaustively by the agent; non_exhaustive would forbid that construction.
+-    strategy: >
+-      Irreducible — a binary outcome gains nothing from non_exhaustive.
+-
+   - path: "crates/cp-wire/src/framing.rs"
+     match: "framing error taxonomy is a closed wire contract"
+     reason: >
+# --- End entry #69 ---

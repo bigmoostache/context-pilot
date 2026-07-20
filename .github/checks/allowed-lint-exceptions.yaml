@@ -318,14 +318,6 @@ exceptions:
     strategy: >
       Irreducible — the Unknown variant already provides forward-compat.
 
-  - path: "crates/cp-wire/src/types/ack.rs"
-    match: "the ack Status is a closed two-outcome set"
-    reason: >
-      Ack Status is a closed accepted/rejected set constructed by the orchestrator
-      and matched exhaustively by the agent; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — a binary outcome gains nothing from non_exhaustive.
-
   - path: "crates/cp-wire/src/framing.rs"
     match: "framing error taxonomy is a closed wire contract"
     reason: >

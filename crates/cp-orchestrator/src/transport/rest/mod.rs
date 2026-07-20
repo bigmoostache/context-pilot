@@ -281,6 +281,9 @@ fn ack_status(status: &cp_wire::types::ack::Status) -> String {
     match status {
         cp_wire::types::ack::Status::Accepted => "accepted".to_owned(),
         cp_wire::types::ack::Status::Rejected { .. } => "rejected".to_owned(),
+        // `Status` is #[non_exhaustive]; a status from a newer protocol folds
+        // to a neutral label rather than failing the build.
+        _ => "unknown".to_owned(),
     }
 }
 

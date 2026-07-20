@@ -41,10 +41,7 @@ impl Ack {
 /// Outcome of command processing.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "status")]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "wire-protocol contract: the ack Status is a closed two-outcome set (accepted/rejected) constructed by the orchestrator and matched exhaustively by the agent; #[non_exhaustive] would forbid that construction and adds nothing to a binary outcome"
-)]
+#[non_exhaustive]
 pub enum Status {
     /// Command durably accepted — effect is in the oplog.
     #[serde(rename = "accepted")]

@@ -401,7 +401,7 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'BOSS-HUNT (T595-T603): 44 lint kills, registry 81->37. Latest r20=Phase (wire, twin of LifecycleState — 2 orchestrator match arms + meta.rs). Rounds r1-r20 + gotchas + remaining in body.'
+  tl_dr: 'BOSS-HUNT (T595-T603): 45 lint kills, registry 81->36. Latest r21=Ack Status (wire, 1 orchestrator rest/mod.rs `_` arm). Rounds r1-r21 + gotchas + remaining in body.'
   contents: |-
     T588 A5-A13 lints-as-beacons directive still governs. BOSS-HUNT rounds T595-T603:
 
@@ -433,7 +433,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784567810893
+  last_edited_ms: 1784567953697
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high
