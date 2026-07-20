@@ -177,7 +177,7 @@ fn panel_hit_cell(ctx: &crate::state::Entry) -> (String, Semantic) {
 /// for never-refreshed, `now` for future/equal timestamps).
 fn panel_refreshed_str(ctx: &crate::state::Entry, now_ms: u64) -> String {
     if ctx.last_refresh_ms < 1_577_836_800_000 {
-        "—".to_owned()
+        "\u{2014}".to_owned()
     } else if now_ms > ctx.last_refresh_ms {
         crate::ui::helpers::format_time_ago(now_ms.saturating_sub(ctx.last_refresh_ms))
     } else {
@@ -234,11 +234,11 @@ fn non_panel_row(label: String, tokens: usize, accumulated: usize) -> Vec<Cell> 
         Cell::styled(label, Semantic::Muted),
         Cell::right(Span::accent(fmt_num(tokens))),
         Cell::right(Span::muted(fmt_num(accumulated))),
-        Cell::styled("—".to_owned(), Semantic::Muted),
-        Cell::styled("—".to_owned(), Semantic::Muted),
-        Cell::right(Span::muted("—".to_owned())),
-        Cell::right(Span::muted("—".to_owned())),
-        Cell::styled("—".to_owned(), Semantic::Muted),
+        Cell::styled("\u{2014}".to_owned(), Semantic::Muted),
+        Cell::styled("\u{2014}".to_owned(), Semantic::Muted),
+        Cell::right(Span::muted("\u{2014}".to_owned())),
+        Cell::right(Span::muted("\u{2014}".to_owned())),
+        Cell::styled("\u{2014}".to_owned(), Semantic::Muted),
         Cell::empty(),
     ]
 }
@@ -257,7 +257,7 @@ pub(super) fn context_elements_blocks(state: &State) -> Vec<Block> {
         Column { header: "Acc".to_owned(), align: Align::Right },
         Column { header: "Cost".to_owned(), align: Align::Right },
         Column { header: "Hit".to_owned(), align: Align::Left },
-        Column { header: "❄".to_owned(), align: Align::Right },
+        Column { header: "\u{2744}".to_owned(), align: Align::Right },
         Column { header: "Miss".to_owned(), align: Align::Right },
         Column { header: "Refreshed".to_owned(), align: Align::Left },
         Column { header: "Details".to_owned(), align: Align::Left },
@@ -272,7 +272,7 @@ pub(super) fn context_elements_blocks(state: &State) -> Vec<Block> {
     let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
     let system_prompt_tokens = crate::state::estimate_tokens(&system_prompt).saturating_mul(2);
     accumulated = accumulated.saturating_add(system_prompt_tokens);
-    rows.push(non_panel_row("system-prompt (×2)".to_owned(), system_prompt_tokens, accumulated));
+    rows.push(non_panel_row("system-prompt (\u{d7}2)".to_owned(), system_prompt_tokens, accumulated));
 
     // Tool definitions entry
     let tool_def_tokens = super::context::estimate_tool_definitions_tokens(state);

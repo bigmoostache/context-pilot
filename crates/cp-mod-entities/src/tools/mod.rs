@@ -23,7 +23,7 @@ const INLINE_MAX_BYTES: usize = 8000;
 /// Warning appended to panel-creating tool results.
 const PANEL_WARNING: &str = "\n\nIMPORTANT: Results live in this panel. Act on the information FIRST \
     (write files, answer questions, store in scratchpad, etc.), THEN close the panel. Closing it \
-    IMMEDIATELY and IRREVERSIBLY erases all content from your context — you cannot recall it from \
+    IMMEDIATELY and IRREVERSIBLY erases all content from your context \u{2014} you cannot recall it from \
     memory afterward. Never close-then-act; always act-then-close.";
 
 // =============================================================================
@@ -144,7 +144,11 @@ fn route_inline(state: &mut State, ctx: &RouteCtx<'_>) -> (String, bool, bool) {
         let sql_preview: String = ctx.sql.chars().take(60).collect();
         let title = format!("entity_sql: {sql_preview}");
         let panel_id = result_panel::create_result_panel(state, &title, ctx.text);
-        return (format!("{line_count} lines returned — results in panel {panel_id}.{PANEL_WARNING}"), false, false);
+        return (
+            format!("{line_count} lines returned \u{2014} results in panel {panel_id}.{PANEL_WARNING}"),
+            false,
+            false,
+        );
     }
     let note = if ctx.kind == SqlKind::Select || ctx.dry_run {
         ""

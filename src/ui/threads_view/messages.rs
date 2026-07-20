@@ -145,7 +145,7 @@ fn render_thread_messages(frame: &mut Frame<'_>, state: &State, thread: &cp_mod_
 fn render_thread_input(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // Separator line via IR (border-colored, dimmed)
     let sep_area = Rect { height: 1, ..area };
-    let sep_blocks = vec![IrBlock::Line(vec![S::styled("─".repeat(area.width.into()), Semantic::Border).dim()])];
+    let sep_blocks = vec![IrBlock::Line(vec![S::styled("\u{2500}".repeat(area.width.into()), Semantic::Border).dim()])];
     let sep_lines = ir::blocks_to_lines(&sep_blocks);
     let sep = Paragraph::new(sep_lines);
     frame.render_widget(sep, sep_area);

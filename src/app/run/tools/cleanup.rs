@@ -35,7 +35,7 @@ fn create_console_panel_for(app: &mut App, result: &mut cp_base::state::watchers
     }
     app.state.context.push(ctx);
     // Panel is already populated and exited — no console_wait needed.
-    result.description.push_str(" → see ");
+    result.description.push_str(" \u{2192} see ");
     result.description.push_str(&panel_id);
     result.description.push_str(" (already loaded, read it directly)");
 }

@@ -62,7 +62,7 @@ fn apply_flag_fields(tool: &ToolUse, def: &mut CallbackDefinition, changes: &mut
     // Non-blocking callbacks must always be global (dedup requires one-session-per-def).
     if !def.blocking && !def.is_global {
         def.is_global = true;
-        changes.push("scope → global (forced: non-blocking callbacks must be global)".to_owned());
+        changes.push("scope \u{2192} global (forced: non-blocking callbacks must be global)".to_owned());
     }
 }
 

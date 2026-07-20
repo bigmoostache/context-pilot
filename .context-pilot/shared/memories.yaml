@@ -401,7 +401,7 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'A5-A13 DIRECTIVE (T588): lints are BEACONS. Max 5 #[expect] per step. No blanket-suppress. Commit AND push after each step. A5+A6+A7 done+pushed. Next A8 non_ascii_literal.'
+  tl_dr: 'A5-A13 DIRECTIVE (T588): lints are BEACONS. Max 5 #[expect] per step. No blanket-suppress. Commit AND push after each step. A5+A6+A7+A8 done+pushed. Next A9 pattern_type_mismatch.'
   contents: |-
     T588 user directive, valid A5 through A13:
 
@@ -409,15 +409,17 @@ b5af3513e41563ec:
 
     Per-site buckets: (1) #[non_exhaustive]+constructor for in-crate-only construction; (2) add ::new/builder THEN non_exhaustive for cross-crate literal; (3) #[expect] last-resort (cap 5).
 
-    A5 DONE + pushed f2fce464. exhaustive_structs=deny. Exactly 5 expects.
+    A5 DONE+pushed f2fce464. exhaustive_structs=deny. Exactly 5 expects.
 
-    A6 float_arithmetic DONE + pushed. Single central chokepoint cp-base/src/cast/float_math.rs (module-level #![expect]). All workspace float math routes through float_math helpers. cast.rs split cast/mod.rs + cast/float_math.rs. Chain #43.
+    A6 float_arithmetic DONE+pushed. Central chokepoint cp-base/src/cast/float_math.rs (module #![expect]). Chain #43.
 
-    A7 inline_modules DONE (chain #44, branch we-dev). NOT a clippy lint = structural refactor, no gate. Extracted 15 of 20 inline mod{} to sibling files: src/infra/constants.rs->constants/ dir (5 mods), cp-base config/accessors.rs->accessors/ dir (5 mods), cast lossy_float+float_to_int, panels time_arith, infra/flame.rs, reverie->state/runtime/reverie.rs. 3 kept INLINE cap-forced (dir already 8, extraction would 9): cp-base lib.rs flame (66 refs + pub_use forbid), src/llms/mod.rs error, src/ui/ir/mod.rs render_panel. SKIP 2 cfg(test): message.rs test_helpers, cp-vault integration_tests. yaml repoints: reverie->state/runtime/, cast entries. GOTCHA: bare `pub mod NAME;` with 2-line /// first paragraph trips too_long_first_doc_paragraph (forbid) — short first sentence + blank /// + rest.
+    A7 inline_modules DONE (chain #44). Structural refactor, no gate. 15 of 20 inline mod{} extracted to sibling files.
 
-    Now A8 non_ascii_literal (X1198): funnel unicode (braille/emoji) to expect sites, ~453.
+    A8 non_ascii_literal DONE (chain #45, we-dev). non_ascii_literal=deny. ZERO expects — ALL glyphs escaped to \u{XXXX} ASCII source (lint silent, beacon-honest). ~207 sites across whole workspace + bin. Strategy: escape via clippy JSON machine-suggested replacements applied programmatically (Python, span-based, descending byte offset). GOTCHA: BSD/macOS sed eats backslash in \u replacement (treats \u as uppercase-metachar) — use perl (s/glyph/\\u{XXXX}/g) or clippy-JSON suggested_replacement instead. GOTCHA: compile-abort masks downstream crate sites — must iterate re-clippy per layer (cp-render, cp-base, leaf cp-mod-*, then bin tui last). GOTCHA: non_ascii lint MSG text is 'literal non-ASCII character detected' NOT 'non_ascii_literal' — grep the message text. Doc/line comments IGNORED by lint (only string/char literals fire).
 
-    GATE discipline: cargo clippy --all-targets from ROOT, grep msg text NOT lint-name. chain.sh --password Totordu1789. git push plain (no |,>). git add -A safe. npx needs export PATH=/opt/homebrew/bin:$PATH.
+    Now A9 pattern_type_mismatch (X1199): manual pattern rewrites, ~257.
+
+    GATE discipline: cargo clippy --all-targets from ROOT. chain.sh --password Totordu1789. git push plain. npx needs export PATH=/opt/homebrew/bin:$PATH.
   importance: critical
   labels:
   - T588
@@ -425,7 +427,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784536113549
+  last_edited_ms: 1784537040218
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high

@@ -310,7 +310,7 @@ impl State {
         T: 'static + Send + Sync,
     {
         self.get_ext::<T>().unwrap_or_else(|| {
-            crate::config::invariant_panic("module state not initialized — was init_state() called?")
+            crate::config::invariant_panic("module state not initialized \u{2014} was init_state() called?")
         })
     }
 
@@ -324,7 +324,7 @@ impl State {
         T: 'static + Send + Sync,
     {
         self.get_ext_mut::<T>().unwrap_or_else(|| {
-            crate::config::invariant_panic("module state not initialized — was init_state() called?")
+            crate::config::invariant_panic("module state not initialized \u{2014} was init_state() called?")
         })
     }
 

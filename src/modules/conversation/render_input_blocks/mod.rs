@@ -213,7 +213,7 @@ pub(crate) fn render_input_blocks(
     let ends_with_empty_line =
         original_input.ends_with('\n') || original_input.lines().last().is_some_and(|l| l.trim().is_empty());
     if !original_input.is_empty() && at_end && ends_with_empty_line {
-        blocks.push(Block::line(vec![Span::styled("  ↵ Enter to send".to_owned(), Semantic::Muted)]));
+        blocks.push(Block::line(vec![Span::styled("  \u{21b5} Enter to send".to_owned(), Semantic::Muted)]));
     }
 
     blocks.push(Block::line(vec![Span::new(String::new())]));

@@ -65,7 +65,7 @@ impl Module for PromptModule {
         "System"
     }
     fn description(&self) -> &'static str {
-        "Prompt library — agents, skills, commands"
+        "Prompt library \u{2014} agents, skills, commands"
     }
     fn is_core(&self) -> bool {
         true

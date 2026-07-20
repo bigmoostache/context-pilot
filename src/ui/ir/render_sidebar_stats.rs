@@ -78,23 +78,23 @@ pub(super) fn render_token_stats(lines: &mut Vec<Line<'static>>, stats: &TokenSt
     // Header row
     content.push(Line::from(vec![
         Span::styled(format!("{:<col_label_w$}", ""), Style::default()),
-        Span::styled(" │ ", border_style),
+        Span::styled(" \u{2502} ", border_style),
         Span::styled(format!("{:>col_hit_w$}", format!("{hit_icon} hit")), Style::default().fg(theme::success())),
-        Span::styled(" │ ", border_style),
+        Span::styled(" \u{2502} ", border_style),
         Span::styled(format!("{:>col_miss_w$}", format!("{miss_icon} miss")), Style::default().fg(theme::warning())),
-        Span::styled(" │ ", border_style),
+        Span::styled(" \u{2502} ", border_style),
         Span::styled(format!("{:>col_out_w$}", format!("{out_icon} out")), Style::default().fg(theme::accent_dim())),
     ]));
 
     // Header separator
     content.push(Line::from(vec![
-        Span::styled("─".repeat(col_label_w), border_style),
-        Span::styled("─┼─", border_style),
-        Span::styled("─".repeat(col_hit_w), border_style),
-        Span::styled("─┼─", border_style),
-        Span::styled("─".repeat(col_miss_w), border_style),
-        Span::styled("─┼─", border_style),
-        Span::styled("─".repeat(col_out_w), border_style),
+        Span::styled("\u{2500}".repeat(col_label_w), border_style),
+        Span::styled("\u{2500}\u{253c}\u{2500}", border_style),
+        Span::styled("\u{2500}".repeat(col_hit_w), border_style),
+        Span::styled("\u{2500}\u{253c}\u{2500}", border_style),
+        Span::styled("\u{2500}".repeat(col_miss_w), border_style),
+        Span::styled("\u{2500}\u{253c}\u{2500}", border_style),
+        Span::styled("\u{2500}".repeat(col_out_w), border_style),
     ]));
 
     for row in &stats.rows {
@@ -124,9 +124,9 @@ pub(super) fn render_token_stats(lines: &mut Vec<Line<'static>>, stats: &TokenSt
 
     // Top border: ╭───...───╮
     lines.push(padded(vec![
-        Span::styled("╭", border_style),
-        Span::styled("─".repeat(inner_width), border_style),
-        Span::styled("╮", border_style),
+        Span::styled("\u{256d}", border_style),
+        Span::styled("\u{2500}".repeat(inner_width), border_style),
+        Span::styled("\u{256e}", border_style),
     ]));
 
     // Content lines: │ content ... │
@@ -135,18 +135,18 @@ pub(super) fn render_token_stats(lines: &mut Vec<Line<'static>>, stats: &TokenSt
         let pad = inner_width.saturating_sub(line_width);
         let mut spans = Vec::with_capacity(content_line.spans.len().saturating_add(4));
         spans.push(Span::raw(" ")); // structural 1-char indent
-        spans.push(Span::styled("│", border_style));
+        spans.push(Span::styled("\u{2502}", border_style));
         spans.extend(content_line.spans);
         spans.push(Span::raw(" ".repeat(pad)));
-        spans.push(Span::styled("│", border_style));
+        spans.push(Span::styled("\u{2502}", border_style));
         lines.push(Line::from(spans));
     }
 
     // Bottom border: ╰───...───╯
     lines.push(padded(vec![
-        Span::styled("╰", border_style),
-        Span::styled("─".repeat(inner_width), border_style),
-        Span::styled("╯", border_style),
+        Span::styled("\u{2570}", border_style),
+        Span::styled("\u{2500}".repeat(inner_width), border_style),
+        Span::styled("\u{256f}", border_style),
     ]));
 }
 
@@ -163,17 +163,17 @@ fn push_stat_row(
 
     content.push(Line::from(vec![
         Span::styled(format!("{:<col_label_w$}", row.label), Style::default().fg(theme::text_muted())),
-        Span::styled(" │ ", border_style),
+        Span::styled(" \u{2502} ", border_style),
         Span::styled(
             format!("{:>col_hit_w$}", format_number(row.hit.to_usize())),
             Style::default().fg(theme::success()),
         ),
-        Span::styled(" │ ", border_style),
+        Span::styled(" \u{2502} ", border_style),
         Span::styled(
             format!("{:>col_miss_w$}", format_number(row.miss.to_usize())),
             Style::default().fg(theme::warning()),
         ),
-        Span::styled(" │ ", border_style),
+        Span::styled(" \u{2502} ", border_style),
         Span::styled(
             format!("{:>col_out_w$}", format_number(row.output.to_usize())),
             Style::default().fg(theme::accent_dim()),
@@ -188,11 +188,11 @@ fn push_stat_row(
     }
     content.push(Line::from(vec![
         Span::styled(format!("{:<col_label_w$}", ""), Style::default()),
-        Span::styled(" │ ", border_style),
+        Span::styled(" \u{2502} ", border_style),
         Span::styled(format!("{hit_cost:>col_hit_w$}"), Style::default().fg(theme::text_muted())),
-        Span::styled(" │ ", border_style),
+        Span::styled(" \u{2502} ", border_style),
         Span::styled(format!("{miss_cost:>col_miss_w$}"), Style::default().fg(theme::text_muted())),
-        Span::styled(" │ ", border_style),
+        Span::styled(" \u{2502} ", border_style),
         Span::styled(format!("{out_cost:>col_out_w$}"), Style::default().fg(theme::text_muted())),
     ]));
 }

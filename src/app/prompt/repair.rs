@@ -18,7 +18,7 @@ use crate::llms::{ApiMessage, ContentBlock};
 /// Placeholder content for a `tool_result` synthesized to pair an orphaned
 /// `tool_use` (call recorded but its result was lost to an interrupt, reload,
 /// truncation, or partial queue flush).
-const MISSING_TOOL_RESULT: &str = "(no result recorded — tool call was interrupted or its result was lost)";
+const MISSING_TOOL_RESULT: &str = "(no result recorded \u{2014} tool call was interrupted or its result was lost)";
 
 /// Collect the `tool_use` ids carried by a message, in order.
 fn tool_use_ids_of(msg: &ApiMessage) -> Vec<String> {

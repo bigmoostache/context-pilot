@@ -45,7 +45,7 @@ fn format_undo_result(removed: &[String], not_found: &[String], remaining: usize
         let _r = write!(msg, "Not found: #{}", not_found.join(", #"));
     }
     if deactivated {
-        let _r = write!(msg, ". Queue empty — deactivated.");
+        let _r = write!(msg, ". Queue empty \u{2014} deactivated.");
     } else {
         let _r = write!(msg, ". {remaining} action(s) remaining.");
     }

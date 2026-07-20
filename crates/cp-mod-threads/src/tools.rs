@@ -103,7 +103,7 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     let suffix = if still_my_turn { " (still your turn)" } else { "" };
-    let unarchived_note = if unarchived { " [thread was archived — automatically unarchived]" } else { "" };
+    let unarchived_note = if unarchived { " [thread was archived \u{2014} automatically unarchived]" } else { "" };
     let mut result = ToolResult::new(
         tool.id.clone(),
         format!("Sent to {tid} \"{thread_name}\": {msg_preview}{suffix}{unarchived_note}"),
@@ -122,7 +122,7 @@ fn collect_thread_summaries(ts: &ThreadsState, focused_tid: &str) -> Vec<String>
         if unack == 0 {
             continue;
         }
-        let marker = if t.id == focused_tid { " ← focused" } else { "" };
+        let marker = if t.id == focused_tid { " \u{2190} focused" } else { "" };
         summaries.push(format!(
             "  {id} \"{name}\" [{status}]: {unack} new{marker}",
             id = t.id,

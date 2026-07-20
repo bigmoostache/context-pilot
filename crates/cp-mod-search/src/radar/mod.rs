@@ -78,11 +78,11 @@ fn decay(age_ms: f64, half_life_ms: f64) -> f64 {
 /// Read the cached radar YAML from state, with fallback messages.
 fn get_radar_yaml(state: &State) -> String {
     state.get_ext::<SearchState>().map_or_else(
-        || "# Context Radar — search module not initialized\n".to_owned(),
+        || "# Context Radar \u{2014} search module not initialized\n".to_owned(),
         |ss| {
             let cache = ss.radar_cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             if cache.yaml.is_empty() {
-                "# Context Radar — no task signals yet\n".to_owned()
+                "# Context Radar \u{2014} no task signals yet\n".to_owned()
             } else {
                 cache.yaml.clone()
             }
@@ -186,7 +186,7 @@ pub(crate) fn refresh(state: &State) {
     if ss.persist.port == 0 || ss.persist.task_signals.is_empty() {
         // No server or no signals — clear the cache via the shared Arc
         let mut cache = ss.radar_cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        cache.yaml = String::from("# Context Radar — no task signals yet\n");
+        cache.yaml = String::from("# Context Radar \u{2014} no task signals yet\n");
         cache.last_refresh_ms = now_ms;
         drop(cache);
         return;

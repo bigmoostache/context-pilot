@@ -194,7 +194,7 @@ fn validate_tool_metadata(tool: &ToolUse, result: &mut Verdict) {
             .push(format!("Missing parameter: 'intent'. Provide a 1-10 word reason for calling {}.", tool.name)),
         Some(s) if s.trim().is_empty() => result.warnings.push("Parameter 'intent' is empty.".to_owned()),
         Some(s) if s.split_whitespace().count() > 10 => {
-            result.warnings.push("Parameter 'intent' exceeds 10 words — keep it concise.".to_owned());
+            result.warnings.push("Parameter 'intent' exceeds 10 words \u{2014} keep it concise.".to_owned());
         }
         Some(_) => {}
     }

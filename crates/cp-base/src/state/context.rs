@@ -163,7 +163,7 @@ impl Kind {
     #[must_use]
     pub fn icon(&self) -> String {
         let icon_id = get_context_type_meta(self.0.as_str()).map_or("file", |m| m.icon_id);
-        let raw = active_theme().context.get(icon_id).unwrap_or("📄");
+        let raw = active_theme().context.get(icon_id).unwrap_or("\u{1f4c4}");
         normalize_icon(raw)
     }
 

@@ -31,12 +31,12 @@ pub(crate) fn build_search_index_overlay(state: &State) -> SearchIndexOverlay {
     let now_u64 = u64::try_from(now_ms).unwrap_or(u64::MAX);
     let flash_active =
         state.flags.overlays.copied_flash_ms > 0 && now_u64.saturating_sub(state.flags.overlays.copied_flash_ms) < 1500;
-    let title = if flash_active { " ✓ Copied! ".into() } else { " Indexing Status ".into() };
+    let title = if flash_active { " \u{2713} Copied! ".into() } else { " Indexing Status ".into() };
 
     let Some(info) = cp_mod_search::overlay_info(state) else {
         return SearchIndexOverlay {
             title,
-            footer: " Ctrl+C copy · Ctrl+I or Esc to dismiss ".into(),
+            footer: " Ctrl+C copy \u{b7} Ctrl+I or Esc to dismiss ".into(),
             server: SearchServer {
                 url: String::new(),
                 online: false,
@@ -77,7 +77,7 @@ pub(crate) fn build_search_index_overlay(state: &State) -> SearchIndexOverlay {
 
     SearchIndexOverlay {
         title,
-        footer: " Ctrl+C copy · Ctrl+I or Esc to dismiss ".into(),
+        footer: " Ctrl+C copy \u{b7} Ctrl+I or Esc to dismiss ".into(),
         server,
         index,
         extensions,
@@ -250,7 +250,7 @@ pub(crate) fn render_search_index_overlay(frame: &mut Frame<'_>, overlay: &Searc
 
     let sep_height = usize::from(inner.height);
     let sep_lines: Vec<Line<'_>> =
-        std::iter::repeat_with(|| Line::from(Span::styled("│", Style::default().fg(theme::text_muted()))))
+        std::iter::repeat_with(|| Line::from(Span::styled("\u{2502}", Style::default().fg(theme::text_muted()))))
             .take(sep_height)
             .collect();
     let sep_para = Paragraph::new(sep_lines);

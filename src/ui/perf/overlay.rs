@@ -112,7 +112,8 @@ fn render_budget_bar(budget_bar: &cp_render::conversation::PerfBudgetBar) -> Lin
 
 /// Render a sparkline from frame time samples.
 fn render_sparkline(values: &[f64]) -> Line<'static> {
-    const SPARK_CHARS: &[char] = &['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    const SPARK_CHARS: &[char] =
+        &['\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}', '\u{2585}', '\u{2586}', '\u{2587}', '\u{2588}'];
 
     if values.is_empty() {
         return Line::from(vec![
@@ -128,7 +129,7 @@ fn render_sparkline(values: &[f64]) -> Line<'static> {
             let idx =
                 float_math::mul(float_math::div(v, max_val), SPARK_CHARS.len().saturating_sub(1).to_f64()).to_usize();
             let clamped = idx.min(SPARK_CHARS.len().saturating_sub(1));
-            SPARK_CHARS.get(clamped).copied().unwrap_or('▁')
+            SPARK_CHARS.get(clamped).copied().unwrap_or('\u{2581}')
         })
         .collect();
 
@@ -209,7 +210,7 @@ fn op_table_header_row(ctx: &HeaderRowCtx<'_>) -> Line<'static> {
     let mut spans = vec![Span::raw(" ")];
     for (i, hdr) in ctx.headers.iter().enumerate() {
         if i > 0 {
-            spans.push(Span::styled(" │ ", ctx.border_style));
+            spans.push(Span::styled(" \u{2502} ", ctx.border_style));
         }
         let w = ctx.widths.get(i).copied().unwrap_or(0);
         spans.push(Span::styled(pad_cell(hdr, w, *ctx.aligns.get(i).unwrap_or(&false)), ctx.header_style));
@@ -222,9 +223,9 @@ fn op_table_separator_row(widths: &[usize], border_style: Style) -> Line<'static
     let mut sep_spans = vec![Span::raw(" ")];
     for (i, width) in widths.iter().enumerate() {
         if i > 0 {
-            sep_spans.push(Span::styled("─┼─", border_style));
+            sep_spans.push(Span::styled("\u{2500}\u{253c}\u{2500}", border_style));
         }
-        sep_spans.push(Span::styled("─".repeat(*width), border_style));
+        sep_spans.push(Span::styled("\u{2500}".repeat(*width), border_style));
     }
     Line::from(sep_spans)
 }
@@ -240,17 +241,17 @@ fn op_table_data_row(op: &cp_render::conversation::PerfOp, widths: &[usize], bor
 
     let mut row_spans = vec![Span::raw(" ")];
     row_spans.push(Span::styled(pad_cell(&name_str, widths.first().copied().unwrap_or(0), false), name_style));
-    row_spans.push(Span::styled(" │ ", border_style));
+    row_spans.push(Span::styled(" \u{2502} ", border_style));
     row_spans.push(Span::styled(
         pad_cell(&mean_str, widths.get(1).copied().unwrap_or(0), true),
         semantic_to_style(op.mean_semantic),
     ));
-    row_spans.push(Span::styled(" │ ", border_style));
+    row_spans.push(Span::styled(" \u{2502} ", border_style));
     row_spans.push(Span::styled(
         pad_cell(&std_str, widths.get(2).copied().unwrap_or(0), true),
         semantic_to_style(op.std_semantic),
     ));
-    row_spans.push(Span::styled(" │ ", border_style));
+    row_spans.push(Span::styled(" \u{2502} ", border_style));
     row_spans.push(Span::styled(
         pad_cell(&op.total_display, widths.get(3).copied().unwrap_or(0), true),
         semantic_to_style(Semantic::Muted),

@@ -146,7 +146,7 @@ fn build_input(state: &State) -> InputArea {
     InputArea {
         text: state.input.clone(),
         cursor: state.input_cursor,
-        placeholder: "Type a message…".into(),
+        placeholder: "Type a message\u{2026}".into(),
         focused: !state.flags.stream.phase.is_streaming(),
     }
 }
@@ -192,7 +192,7 @@ fn build_autocomplete(ac: &cp_base::state::autocomplete::Suggestions) -> Autocom
         .map(|e| AutocompleteEntry {
             label: e.name.clone(),
             is_dir: e.is_dir,
-            icon: if e.is_dir { "📁".into() } else { "📄".into() },
+            icon: if e.is_dir { "\u{1f4c1}".into() } else { "\u{1f4c4}".into() },
         })
         .collect();
 

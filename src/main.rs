@@ -100,7 +100,7 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
 
         // Title
         let title = Line::from(vec![
-            Span::styled("⚓ ", Style::default().fg(theme::accent())),
+            Span::styled("\u{2693} ", Style::default().fg(theme::accent())),
             Span::styled("Context Pilot", Style::default().fg(theme::text()).add_modifier(Modifier::BOLD)),
         ]);
         frame.render_widget(title, title_area);
@@ -111,9 +111,9 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
             .enumerate()
             .map(|(i, step)| {
                 let (icon, style) = if step.done {
-                    ("  ✓ ", Style::default().fg(theme::success()))
+                    ("  \u{2713} ", Style::default().fg(theme::success()))
                 } else if i == done_count {
-                    ("  ▸ ", Style::default().fg(theme::warning()))
+                    ("  \u{25b8} ", Style::default().fg(theme::warning()))
                 } else {
                     ("    ", Style::default().fg(theme::text_muted()))
                 };
@@ -134,8 +134,8 @@ fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, ste
         let gauge_width = gauge_area.width;
         let filled_usize = done_count.saturating_mul(usize::from(gauge_width)).checked_div(total).unwrap_or(0);
         let filled = u16::try_from(filled_usize).unwrap_or(gauge_width);
-        let mut gauge_bar = "█".repeat(filled_usize);
-        gauge_bar.push_str(&"░".repeat(usize::from(gauge_width.saturating_sub(filled))));
+        let mut gauge_bar = "\u{2588}".repeat(filled_usize);
+        gauge_bar.push_str(&"\u{2591}".repeat(usize::from(gauge_width.saturating_sub(filled))));
         let gauge_line = Line::from(vec![
             Span::styled(gauge_bar, Style::default().fg(theme::accent())),
             Span::raw(format!(" {pct}%")),

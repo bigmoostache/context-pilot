@@ -14,7 +14,7 @@ fn push_agents_table(content: &mut String, agents: &[crate::types::PromptItem], 
     content.push_str("| ID | Name | Active | Description |\n");
     content.push_str("|------|------|--------|-------------|\n");
     for agent in agents {
-        let active = if active_id == Some(&agent.id) { "✓" } else { "" };
+        let active = if active_id == Some(&agent.id) { "\u{2713}" } else { "" };
         let _wa = writeln!(content, "| {} | {} | {} | {} |", agent.id, agent.name, active, agent.description);
     }
 }
@@ -28,7 +28,7 @@ fn push_skills_table(content: &mut String, skills: &[crate::types::PromptItem], 
     content.push_str("| ID | Name | Loaded | Description |\n");
     content.push_str("|------|------|--------|-------------|\n");
     for skill in skills {
-        let mark = if loaded.contains(&skill.id) { "✓" } else { "" };
+        let mark = if loaded.contains(&skill.id) { "\u{2713}" } else { "" };
         let _wb = writeln!(content, "| {} | {} | {} | {} |", skill.id, skill.name, mark, skill.description);
     }
 }
@@ -49,7 +49,7 @@ fn push_commands_table(content: &mut String, commands: &[crate::types::PromptIte
 /// Append the "how to manage behaviours" cheat sheet for the LLM.
 fn push_crud_cheatsheet(content: &mut String) {
     content.push_str("\nHow to manage behaviours:\n");
-    content.push_str("- Create: Behaviour_create(name, type, content) — type: 'agent', 'skill', or 'command'\n");
+    content.push_str("- Create: Behaviour_create(name, type, content) \u{2014} type: 'agent', 'skill', or 'command'\n");
     let _wd = writeln!(
         content,
         "- Edit: use Edit tool on the .md file — agents: {}/  skills: {}/  commands: {}/",
@@ -58,8 +58,8 @@ fn push_crud_cheatsheet(content: &mut String) {
         crate::storage::dir_for(PromptType::Command).display()
     );
     content.push_str("- Delete: delete the .md file (the system detects removals automatically)\n");
-    content.push_str("- Activate agent: agent_load(id) — pass empty id to revert to default\n");
-    content.push_str("- Load skill: skill_load(id) — unload by closing its panel with Close_panel\n");
+    content.push_str("- Activate agent: agent_load(id) \u{2014} pass empty id to revert to default\n");
+    content.push_str("- Load skill: skill_load(id) \u{2014} unload by closing its panel with Close_panel\n");
 }
 
 /// Panel displaying the full prompt library (agents, skills, commands).

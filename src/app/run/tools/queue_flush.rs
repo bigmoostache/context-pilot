@@ -31,7 +31,7 @@ pub(crate) fn execute_queue_flush(
         return (
             crate::infra::tools::ToolResult::new(
                 tool.id.clone(),
-                "Queue is empty — nothing to execute.".to_owned(),
+                "Queue is empty \u{2014} nothing to execute.".to_owned(),
                 false,
             ),
             Vec::new(),

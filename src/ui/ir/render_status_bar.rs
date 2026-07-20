@@ -96,9 +96,9 @@ fn push_git(spans: &mut Vec<Span<'static>>, status: &StatusBar, base: Style) {
 fn push_activity_cards(spans: &mut Vec<Span<'static>>, status: &StatusBar, spin: &str, base: Style) {
     if let Some(ac) = &(status.auto_continue) {
         let (icon, bg_color) = if ac.max.is_some() {
-            (normalize_icon("🔁"), theme::warning())
+            (normalize_icon("\u{1f501}"), theme::warning())
         } else {
-            (normalize_icon("🔄"), theme::text_muted())
+            (normalize_icon("\u{1f504}"), theme::text_muted())
         };
         let label = if ac.max.is_some() { "Auto-continue" } else { "No Auto-continue" };
         push_card(spans, format!(" {icon}{label} "), Style::default().fg(theme::bg_base()).bg(bg_color).bold(), base);

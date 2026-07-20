@@ -157,7 +157,7 @@ impl Module for QueueModule {
             "Queue_execute" => {
                 let mut pf = Verdict::new();
                 if qs.queued_calls.is_empty() {
-                    pf.warnings.push("Queue is empty — nothing to execute".to_owned());
+                    pf.warnings.push("Queue is empty \u{2014} nothing to execute".to_owned());
                 }
                 Some(pf)
             }
@@ -201,7 +201,7 @@ impl Module for QueueModule {
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("Queue", "Batch tool execution queue — queue actions and flush them atomically")]
+        vec![("Queue", "Batch tool execution queue \u{2014} queue actions and flush them atomically")]
     }
 
     fn dependencies(&self) -> &[&'static str] {

@@ -333,7 +333,11 @@ fn visualize_spine_output(content: &str, width: usize) -> Vec<cp_render::Block> 
                 Semantic::Error
             } else if line.starts_with("Marked") {
                 Semantic::Success
-            } else if line.starts_with("Updated") || line.contains("→") || line.contains('=') || line.contains(':') {
+            } else if line.starts_with("Updated")
+                || line.contains("\u{2192}")
+                || line.contains('=')
+                || line.contains(':')
+            {
                 Semantic::Info
             } else if line.starts_with('N') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
                 Semantic::Warning

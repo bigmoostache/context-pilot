@@ -112,7 +112,7 @@ fn write_manifest_atomic(dir: &Path, manifest: &Manifest) -> Result<(), String> 
 /// fails.
 pub(crate) fn export_backup(client: &MeiliClient, files_uid: &str, logs_uid: &str) -> Result<(), String> {
     let Some(fp) = fingerprint(client, files_uid) else {
-        return Err("no embedder configured — nothing to back up".to_owned());
+        return Err("no embedder configured \u{2014} nothing to back up".to_owned());
     };
 
     let files_rows = tasks::fetch_all_with_vectors(client, files_uid)?;

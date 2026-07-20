@@ -132,7 +132,7 @@ impl QueuePanel {
         if !qs.active && qs.queued_calls.is_empty() {
             text.push_str("Queue inactive.\n");
         } else if qs.active && qs.queued_calls.is_empty() {
-            text.push_str("Queue active — 0 actions queued.\n");
+            text.push_str("Queue active \u{2014} 0 actions queued.\n");
         } else {
             let status = if qs.active { "Active" } else { "Paused" };
             let _r1 = write!(text, "Queue {} — {} action(s) queued:\n\n", status, qs.queued_calls.len());

@@ -25,7 +25,7 @@ impl Panel for ThreadsPanel {
         let ts = ThreadsState::get(state);
 
         if ts.panel_content.is_empty() {
-            return vec![Block::Line(vec![S::muted("  (empty — AI must call Read to populate)".into())])];
+            return vec![Block::Line(vec![S::muted("  (empty \u{2014} AI must call Read to populate)".into())])];
         }
 
         // Render the same panel_content the LLM sees, line by line

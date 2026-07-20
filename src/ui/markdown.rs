@@ -257,7 +257,7 @@ fn border_row(col_widths: &[usize], left: &str, mid: &str, right: &str) -> Vec<S
         if col > 0 {
             spans.push(Span::styled(mid.to_owned(), Semantic::Border));
         }
-        spans.push(Span::styled("─".repeat(*width), Semantic::Border));
+        spans.push(Span::styled("\u{2500}".repeat(*width), Semantic::Border));
     }
     spans.push(Span::styled(right.to_owned(), Semantic::Border));
     spans
@@ -291,15 +291,15 @@ fn render_data_row(row: &[String], col_widths: &[usize], is_header: bool, result
     }
 
     for line_idx in 0..max_lines {
-        let mut spans: Vec<Span> = vec![Span::styled("│ ".to_owned(), Semantic::Border)];
+        let mut spans: Vec<Span> = vec![Span::styled("\u{2502} ".to_owned(), Semantic::Border)];
         for (col, width) in col_widths.iter().enumerate() {
             if col > 0 {
-                spans.push(Span::styled(" │ ".to_owned(), Semantic::Border));
+                spans.push(Span::styled(" \u{2502} ".to_owned(), Semantic::Border));
             }
             let cell_text = wrapped_cells.get(col).and_then(|lines| lines.get(line_idx)).map_or("", |s| s.as_str());
             render_cell(&mut spans, cell_text, *width, is_header);
         }
-        spans.push(Span::styled(" │".to_owned(), Semantic::Border));
+        spans.push(Span::styled(" \u{2502}".to_owned(), Semantic::Border));
         result.push(spans);
     }
 }
@@ -315,11 +315,11 @@ pub(crate) fn render_markdown_table(table_lines: &[&str], max_width: usize) -> V
     let col_widths = fit_col_widths(compute_col_widths(&parsed, num_cols), num_cols, max_width);
 
     let mut result: Vec<Vec<Span>> = Vec::new();
-    result.push(border_row(&col_widths, "┌─", "─┬─", "─┐")); // top border
+    result.push(border_row(&col_widths, "\u{250c}\u{2500}", "\u{2500}\u{252c}\u{2500}", "\u{2500}\u{2510}")); // top border
 
     for (row_idx, row) in parsed.rows.iter().enumerate() {
         if parsed.is_separator_row.get(row_idx).copied().unwrap_or(false) {
-            result.push(border_row(&col_widths, "├─", "─┼─", "─┤"));
+            result.push(border_row(&col_widths, "\u{251c}\u{2500}", "\u{2500}\u{253c}\u{2500}", "\u{2500}\u{2524}"));
             continue;
         }
         render_data_row(row, &col_widths, row_idx == 0, &mut result);
@@ -327,11 +327,11 @@ pub(crate) fn render_markdown_table(table_lines: &[&str], max_width: usize) -> V
         // Thin separator between consecutive data rows.
         let next_row_idx = row_idx.saturating_add(1);
         if next_row_idx < parsed.rows.len() && !parsed.is_separator_row.get(next_row_idx).copied().unwrap_or(false) {
-            result.push(border_row(&col_widths, "├─", "─┼─", "─┤"));
+            result.push(border_row(&col_widths, "\u{251c}\u{2500}", "\u{2500}\u{253c}\u{2500}", "\u{2500}\u{2524}"));
         }
     }
 
-    result.push(border_row(&col_widths, "└─", "─┴─", "─┘")); // bottom border
+    result.push(border_row(&col_widths, "\u{2514}\u{2500}", "\u{2500}\u{2534}\u{2500}", "\u{2500}\u{2518}")); // bottom border
     result
 }
 

@@ -116,12 +116,12 @@ fn render_dynamic_entries(lines: &mut Vec<Line<'static>>, dynamic_entries: &[&Si
         let suffix_len = page_text.len().saturating_add(3); // space + text + space + trailing ─
         let fill = cw.saturating_sub(suffix_len);
         lines.push(padded(vec![
-            Span::styled("─".repeat(fill), Style::default().fg(theme::border_muted())),
+            Span::styled("\u{2500}".repeat(fill), Style::default().fg(theme::border_muted())),
             Span::styled(format!(" {page_text} "), Style::default().fg(theme::text_muted())),
-            Span::styled("─", Style::default().fg(theme::border_muted())),
+            Span::styled("\u{2500}", Style::default().fg(theme::border_muted())),
         ]));
     } else {
-        lines.push(padded(vec![Span::styled("─".repeat(cw), Style::default().fg(theme::border_muted()))]));
+        lines.push(padded(vec![Span::styled("\u{2500}".repeat(cw), Style::default().fg(theme::border_muted()))]));
     }
 
     let page_start = current_page.saturating_mul(MAX_DYNAMIC_PER_PAGE);
@@ -221,7 +221,7 @@ fn render_token_bar_box(lines: &mut Vec<Line<'static>>, token_bar: &TokenBar, cw
     let content: Vec<Line<'static>> = vec![
         // Line 1: ⚓ Context Pilot
         Line::from(vec![
-            Span::styled("⚓ ", Style::default().fg(theme::accent())),
+            Span::styled("\u{2693} ", Style::default().fg(theme::accent())),
             Span::styled("Context Pilot", Style::default().fg(theme::text()).bold()),
         ]),
         // Line 2: used / threshold / budget
@@ -239,9 +239,9 @@ fn render_token_bar_box(lines: &mut Vec<Line<'static>>, token_bar: &TokenBar, cw
     // Wrap in rounded border
     // Top: ╭───...───╮
     lines.push(padded(vec![
-        Span::styled("╭", border_style),
-        Span::styled("─".repeat(inner_width), border_style),
-        Span::styled("╮", border_style),
+        Span::styled("\u{256d}", border_style),
+        Span::styled("\u{2500}".repeat(inner_width), border_style),
+        Span::styled("\u{256e}", border_style),
     ]));
 
     // Content lines: │ content ... │
@@ -251,18 +251,18 @@ fn render_token_bar_box(lines: &mut Vec<Line<'static>>, token_bar: &TokenBar, cw
         let pad = inner_width.saturating_sub(line_width);
         let mut spans = Vec::with_capacity(content_line.spans.len().saturating_add(4));
         spans.push(Span::raw(" ")); // structural indent
-        spans.push(Span::styled("│", border_style));
+        spans.push(Span::styled("\u{2502}", border_style));
         spans.extend(content_line.spans);
         spans.push(Span::raw(" ".repeat(pad)));
-        spans.push(Span::styled("│", border_style));
+        spans.push(Span::styled("\u{2502}", border_style));
         lines.push(Line::from(spans));
     }
 
     // Bottom: ╰───...───╯
     lines.push(padded(vec![
-        Span::styled("╰", border_style),
-        Span::styled("─".repeat(inner_width), border_style),
-        Span::styled("╯", border_style),
+        Span::styled("\u{2570}", border_style),
+        Span::styled("\u{2500}".repeat(inner_width), border_style),
+        Span::styled("\u{256f}", border_style),
     ]));
 }
 
@@ -383,19 +383,19 @@ fn render_pr_card(lines: &mut Vec<Line<'static>>, pr: &cp_render::frame::PrCard,
     }
     if let Some(review) = &(pr.review_status) {
         let (icon, color) = match review.as_str() {
-            "APPROVED" => (" ✓", theme::success()),
-            "CHANGES_REQUESTED" => (" ✗", theme::error()),
-            "REVIEW_REQUIRED" => (" ●", theme::warning()),
+            "APPROVED" => (" \u{2713}", theme::success()),
+            "CHANGES_REQUESTED" => (" \u{2717}", theme::error()),
+            "REVIEW_REQUIRED" => (" \u{25cf}", theme::warning()),
             _ => (" ?", theme::text_muted()),
         };
         detail_spans.push(Span::styled(icon, Style::default().fg(color)));
     }
     if let Some(checks) = &(pr.checks_status) {
         let (icon, color) = match checks.as_str() {
-            "passing" => (" ●", theme::success()),
-            "failing" => (" ●", theme::error()),
-            "pending" => (" ●", theme::warning()),
-            _ => (" ●", theme::text_muted()),
+            "passing" => (" \u{25cf}", theme::success()),
+            "failing" => (" \u{25cf}", theme::error()),
+            "pending" => (" \u{25cf}", theme::warning()),
+            _ => (" \u{25cf}", theme::text_muted()),
         };
         detail_spans.push(Span::styled(icon, Style::default().fg(color)));
     }

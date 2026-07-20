@@ -12,7 +12,7 @@ pub(crate) fn truncate_string(s: &str, max_width: usize) -> String {
         for c in s.chars() {
             let cw = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
             if width.saturating_add(cw).saturating_add(1) > max_width {
-                result.push('…');
+                result.push('\u{2026}');
                 break;
             }
             result.push(c);
@@ -135,14 +135,17 @@ pub(crate) fn count_wrapped_lines(line: &ratatui::prelude::Line<'_>, max_width: 
 // ─── Spinner ─────────────────────────────────────────────────────────────────
 
 /// Braille spinner frames (smooth 10-frame animation)
-const SPINNER_BRAILLE: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const SPINNER_BRAILLE: &[&str] = &[
+    "\u{280b}", "\u{2819}", "\u{2839}", "\u{2838}", "\u{283c}", "\u{2834}", "\u{2826}", "\u{2827}", "\u{2807}",
+    "\u{280f}",
+];
 
 /// Get a braille spinner frame derived from the current wall-clock time.
 /// Rotates at 10fps (100ms per frame), independent of any frame counter.
 pub(crate) fn spinner() -> &'static str {
     let frame = cp_base::panels::now_ms().checked_div(100).unwrap_or(0);
     let idx = frame.to_usize().checked_rem(SPINNER_BRAILLE.len()).unwrap_or(0);
-    SPINNER_BRAILLE.get(idx).copied().unwrap_or("⠋")
+    SPINNER_BRAILLE.get(idx).copied().unwrap_or("\u{280b}")
 }
 
 // ─── Syntax Highlighting ─────────────────────────────────────────────────────

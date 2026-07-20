@@ -91,7 +91,7 @@ fn preflight_tool_manage(tool: &ToolUse, state: &State) -> Verdict {
         if !state.tools.iter().any(|t| t.id == tool_id) {
             pf.errors.push(format!("Tool '{tool_id}' not found"));
         } else if tool_id == "tool_manage" {
-            pf.errors.push("Cannot disable 'tool_manage' — it protects itself".to_owned());
+            pf.errors.push("Cannot disable 'tool_manage' \u{2014} it protects itself".to_owned());
         } else {
             // Known, non-self-protecting tool — valid change.
         }
@@ -110,7 +110,7 @@ fn preflight_panel_goto_page(tool: &ToolUse, state: &State) -> Verdict {
         .is_some_and(|s| !s.trim().is_empty());
     if !has_desc {
         pf.errors.push(
-            "Missing 'current_page_description' — summarize what you see on the CURRENT page \
+            "Missing 'current_page_description' \u{2014} summarize what you see on the CURRENT page \
 before leaving it; its raw content will be discarded and this note is all you keep."
                 .to_owned(),
         );

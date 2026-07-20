@@ -41,7 +41,7 @@ fn err_result(tool: &ToolUse, content: String) -> ToolResult {
 /// Closing a panel causes instant, irreversible context loss.
 const PANEL_WARNING: &str = "\n\nIMPORTANT: Results live in this panel. Act on the information FIRST (write \
     files, answer questions, store in scratchpad, etc.), THEN close the panel. Closing it IMMEDIATELY and \
-    IRREVERSIBLY erases all content from your context — you cannot recall it from memory afterward. \
+    IRREVERSIBLY erases all content from your context \u{2014} you cannot recall it from memory afterward. \
     Never close-then-act; always act-then-close.";
 
 /// Async timeout for Brave API calls (seconds).

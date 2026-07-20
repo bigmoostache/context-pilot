@@ -231,9 +231,9 @@ fn gh_notice_semantic(line: &str) -> Option<cp_render::Semantic> {
 /// PR/issue state badges (open/merged/closed/draft).
 fn gh_state_semantic(line: &str) -> Option<cp_render::Semantic> {
     use cp_render::Semantic;
-    if line.contains("OPEN") || line.contains("MERGED") || line.contains('✓') {
+    if line.contains("OPEN") || line.contains("MERGED") || line.contains('\u{2713}') {
         Some(Semantic::Success)
-    } else if line.contains("CLOSED") || line.contains('✗') {
+    } else if line.contains("CLOSED") || line.contains('\u{2717}') {
         Some(Semantic::Error)
     } else if line.contains("DRAFT") || line.contains("PENDING") {
         Some(Semantic::Warning)

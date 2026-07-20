@@ -171,7 +171,7 @@ fn render_block(block: &cp_render::Block, lines: &mut Vec<Line<'static>>) {
         }
         cp_render::Block::Separator => {
             lines.push(Line::from(Span::styled(
-                "────────────────────────────────────────",
+                "\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}",
                 semantic_to_style(Semantic::Border),
             )));
         }
@@ -206,13 +206,13 @@ fn render_table(columns: &[cp_render::Column], rows: &[Vec<cp_render::Cell>], li
     let widths = compute_table_widths(columns, rows);
 
     // Top border: ╭───┬───┬───╮
-    render_border_row(&widths, ("╭", "┬", "╮"), border_style, lines);
+    render_border_row(&widths, ("\u{256d}", "\u{252c}", "\u{256e}"), border_style, lines);
 
     // Render header row (if any column has a non-empty header).
     if columns.iter().any(|c| !c.header.is_empty()) {
         render_header_row(columns, &widths, border_style, lines);
         // Header/data separator row: ├─────┼───────┼─────┤
-        render_border_row(&widths, ("├", "┼", "┤"), border_style, lines);
+        render_border_row(&widths, ("\u{251c}", "\u{253c}", "\u{2524}"), border_style, lines);
     }
 
     // Render data rows with thin separators between them.
@@ -222,12 +222,12 @@ fn render_table(columns: &[cp_render::Column], rows: &[Vec<cp_render::Cell>], li
 
         // Thin separator between data rows (not after the last row).
         if row_idx < rows.len().saturating_sub(1) {
-            render_border_row(&widths, ("├", "┼", "┤"), border_style, lines);
+            render_border_row(&widths, ("\u{251c}", "\u{253c}", "\u{2524}"), border_style, lines);
         }
     }
 
     // Bottom border: ╰───┴───┴───╯
-    render_border_row(&widths, ("╰", "┴", "╯"), border_style, lines);
+    render_border_row(&widths, ("\u{2570}", "\u{2534}", "\u{256f}"), border_style, lines);
 }
 
 /// Compute per-column display widths: max of the header width and every data
@@ -254,16 +254,16 @@ fn render_header_row(
     border_style: Style,
     lines: &mut Vec<Line<'static>>,
 ) {
-    let mut spans = vec![Span::styled("│ ", border_style)];
+    let mut spans = vec![Span::styled("\u{2502} ", border_style)];
     for (i, col) in columns.iter().enumerate() {
         if i > 0 {
-            spans.push(Span::styled(" │ ", border_style));
+            spans.push(Span::styled(" \u{2502} ", border_style));
         }
         let w = widths.get(i).copied().unwrap_or(0);
         let padded = pad_str(&col.header, w, col.align);
         spans.push(Span::styled(padded, semantic_to_style(Semantic::Header)));
     }
-    spans.push(Span::styled(" │", border_style));
+    spans.push(Span::styled(" \u{2502}", border_style));
     lines.push(Line::from(spans));
 }
 
@@ -279,11 +279,11 @@ struct RowCtx<'ctx> {
 
 /// Render one data row: `│ cell │ cell │` with per-cell alignment.
 fn render_data_row(ctx: &RowCtx<'_>, row: &[cp_render::Cell], lines: &mut Vec<Line<'static>>) {
-    let mut spans = vec![Span::styled("│ ", ctx.border_style)];
+    let mut spans = vec![Span::styled("\u{2502} ", ctx.border_style)];
     for (i, cell) in row.iter().enumerate() {
         let Some(col) = ctx.columns.get(i) else { break };
         if i > 0 {
-            spans.push(Span::styled(" │ ", ctx.border_style));
+            spans.push(Span::styled(" \u{2502} ", ctx.border_style));
         }
         let w = ctx.widths.get(i).copied().unwrap_or(0);
         let align = if cell.align == Align::Left { col.align } else { cell.align };
@@ -291,7 +291,7 @@ fn render_data_row(ctx: &RowCtx<'_>, row: &[cp_render::Cell], lines: &mut Vec<Li
         let padding = w.saturating_sub(content.width());
         push_cell_spans(&mut spans, cell, align, padding);
     }
-    spans.push(Span::styled(" │", ctx.border_style));
+    spans.push(Span::styled(" \u{2502}", ctx.border_style));
     lines.push(Line::from(spans));
 }
 
@@ -328,7 +328,7 @@ fn render_border_row(
             spans.push(Span::styled(mid.to_owned(), border_style));
         }
         // +2 for the space padding on each side of cell content
-        spans.push(Span::styled("─".repeat(width.saturating_add(2)), border_style));
+        spans.push(Span::styled("\u{2500}".repeat(width.saturating_add(2)), border_style));
     }
     spans.push(Span::styled(right.to_owned(), border_style));
     lines.push(Line::from(spans));
@@ -372,12 +372,15 @@ fn render_progress_bar(segments: &[cp_render::ProgressSegment], label: Option<&s
             cp_base::panels::time_arith::div_const::<100>(usize::from(seg.percent).saturating_mul(BAR_WIDTH));
         let seg_chars = seg_chars.min(BAR_WIDTH.saturating_sub(filled));
         if seg_chars > 0 {
-            spans.push(Span::styled("█".repeat(seg_chars), semantic_to_style(seg.semantic)));
+            spans.push(Span::styled("\u{2588}".repeat(seg_chars), semantic_to_style(seg.semantic)));
             filled = filled.saturating_add(seg_chars);
         }
     }
     if filled < BAR_WIDTH {
-        spans.push(Span::styled("░".repeat(BAR_WIDTH.saturating_sub(filled)), semantic_to_style(Semantic::Muted)));
+        spans.push(Span::styled(
+            "\u{2591}".repeat(BAR_WIDTH.saturating_sub(filled)),
+            semantic_to_style(Semantic::Muted),
+        ));
     }
 
     spans.push(Span::styled("]", semantic_to_style(Semantic::Border)));

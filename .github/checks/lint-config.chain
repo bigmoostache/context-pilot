@@ -5733,3 +5733,18 @@ index 0b69f666..3489ba00 100644
      reason: >
        Reverie Kind is a closed set constructed cross-crate by the optimizer trigger and matched
 # --- End entry #44 ---
+45:492293e2f6ac187a28293b1af90f05ad128cf55f747aad2999e0d82ca51aa89c:b206f5ca416cb0f5493a8f19eabb60d4006bef2239a93380ec65544ca6980933:eb2768b731e52edac49d2507417a0a34e7fc5080e0de7974343402cc4927a821
+# --- Diff for entry #45 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 7ef31ff8..c978f487 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -744,6 +744,7 @@ no_effect = "forbid"
+ no_effect_replace = "forbid"
+ no_effect_underscore_binding = "forbid"
+ no_mangle_with_rust_abi = "forbid"
++non_ascii_literal = "deny"
+ non_canonical_clone_impl = "forbid"
+ non_canonical_partial_ord_impl = "forbid"
+ non_minimal_cfg = "forbid"
+# --- End entry #45 ---

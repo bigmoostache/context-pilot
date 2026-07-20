@@ -99,7 +99,7 @@ struct Row<'row> {
 fn render_dir(entry: &fs::DirEntry, row: &Row<'_>, ctx: &TreeContext<'_>, output: &mut String) {
     let is_open = ctx.open_set.contains(row.entry_path);
     let folder_desc = ctx.desc_map.get(row.entry_path).map(|d| &d.description);
-    let triangle = if is_open { "▼ " } else { "▶ " };
+    let triangle = if is_open { "\u{25bc} " } else { "\u{25b6} " };
 
     if is_open {
         if let Some(desc) = folder_desc {
@@ -164,8 +164,8 @@ fn build_tree_new(node: &TreeNode<'_>, ctx: &TreeContext<'_>, output: &mut Strin
     let total = items.len();
     for (i, entry) in items.iter().enumerate() {
         let is_last = i == total.saturating_sub(1);
-        let connector = if is_last { "└── " } else { "├── " };
-        let child_prefix = if is_last { "    " } else { "│   " };
+        let connector = if is_last { "\u{2514}\u{2500}\u{2500} " } else { "\u{251c}\u{2500}\u{2500} " };
+        let child_prefix = if is_last { "    " } else { "\u{2502}   " };
 
         let name = entry.file_name();
         let name_str = name.to_string_lossy();

@@ -262,7 +262,8 @@ fn push_watcher_blocks(blocks: &mut Vec<cp_render::Block>, state: &State) {
     let now = now_ms();
     for w in watchers {
         let age_s = cp_base::panels::time_arith::ms_to_secs(now.saturating_sub(w.registered_ms()));
-        let (mode_icon, mode_sem) = if w.is_blocking() { ("⏳", Semantic::Warning) } else { ("👁", Semantic::Code) };
+        let (mode_icon, mode_sem) =
+            if w.is_blocking() { ("\u{23f3}", Semantic::Warning) } else { ("\u{1f441}", Semantic::Code) };
         let recurrence_span = if w.interval_ms() > 0 {
             format!(" [{}]", w.recurrence_label().unwrap_or("recurrent"))
         } else {
@@ -308,7 +309,7 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         trimmed
     } else {
         let mut result: String = trimmed.chars().take(max_len.saturating_sub(1)).collect();
-        result.push('…');
+        result.push('\u{2026}');
         result
     }
 }

@@ -284,9 +284,9 @@ fn build_help_hints(state: &State) -> Vec<HelpHint> {
 
     [
         ("Tab", "next panel"),
-        ("↑↓", "scroll"),
+        ("\u{2191}\u{2193}", "scroll"),
         ("Ctrl+U/D", "history"),
-        ("Ctrl+C", if copy_flash { "copied ✓" } else { "copy panel" }),
+        ("Ctrl+C", if copy_flash { "copied \u{2713}" } else { "copy panel" }),
         ("Ctrl+I", "search index"),
         ("Ctrl+P", "commands"),
         ("Ctrl+H", "config"),

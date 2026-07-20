@@ -109,8 +109,10 @@ impl ConversationPanel {
                 blocks.extend(rendered);
             }
             // Separator footer
-            blocks
-                .push(Block::line(vec![cp_render::Span::styled("── ── ── ──".to_owned(), cp_render::Semantic::Muted)]));
+            blocks.push(Block::line(vec![cp_render::Span::styled(
+                "\u{2500}\u{2500} \u{2500}\u{2500} \u{2500}\u{2500} \u{2500}\u{2500}".to_owned(),
+                cp_render::Semantic::Muted,
+            )]));
             blocks.push(Block::empty());
         }
     }

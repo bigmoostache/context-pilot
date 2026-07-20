@@ -277,7 +277,7 @@ impl Module for LogsModule {
                             .desc("ID of the conversation history panel to close (e.g., 'P12')")
                             .required(),
                         ToolParam::new("logs", ParamType::Array(Box::new(ParamType::String)))
-                            .desc("Log entries to create — simple strings, one per entry"),
+                            .desc("Log entries to create \u{2014} simple strings, one per entry"),
                     ]),
                     true,
                 )
@@ -298,7 +298,7 @@ impl Module for LogsModule {
                     return Some(pf);
                 };
                 if panels.is_empty() {
-                    pf.errors.push("Empty 'panels' array — provide at least one panel to close".to_owned());
+                    pf.errors.push("Empty 'panels' array \u{2014} provide at least one panel to close".to_owned());
                     return Some(pf);
                 }
 

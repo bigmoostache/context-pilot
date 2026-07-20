@@ -333,9 +333,9 @@ fn preflight_read(tool: &ToolUse, ts: &ThreadsState, fs: &FocusState, pf: &mut V
 /// - 30+: nuclear (with level number)
 fn escalation_message(level: u32) -> String {
     match level {
-        0..=5 => "🧵 Please focus on an available thread using Read.".to_owned(),
-        6..=15 => "🧵 You MUST focus on a thread. Use Read(thread_id) now.".to_owned(),
-        16..=29 => "🧵 STOP. Focus on a thread immediately. Use Read(thread_id).".to_owned(),
+        0..=5 => "\u{1f9f5} Please focus on an available thread using Read.".to_owned(),
+        6..=15 => "\u{1f9f5} You MUST focus on a thread. Use Read(thread_id) now.".to_owned(),
+        16..=29 => "\u{1f9f5} STOP. Focus on a thread immediately. Use Read(thread_id).".to_owned(),
         _ => format!(
             "🧵 FOCUS. ON. A. THREAD. NOW. Read(thread_id). \
              (escalation level {level})"

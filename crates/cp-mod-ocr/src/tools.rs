@@ -225,11 +225,11 @@ impl Watcher for OcrWatcher {
 
     fn check(&self, _state: &State) -> Option<WatcherResult> {
         let Ok(rx) = self.rx.lock() else {
-            return Some(WatcherResult::new("❌ OCR watcher failed (lock poisoned)"));
+            return Some(WatcherResult::new("\u{274c} OCR watcher failed (lock poisoned)"));
         };
         match rx.try_recv() {
             Ok(message) => Some(WatcherResult::new(message)),
-            Err(TryRecvError::Disconnected) => Some(WatcherResult::new("❌ OCR worker thread died unexpectedly")),
+            Err(TryRecvError::Disconnected) => Some(WatcherResult::new("\u{274c} OCR worker thread died unexpectedly")),
             Err(TryRecvError::Empty) => None,
         }
     }

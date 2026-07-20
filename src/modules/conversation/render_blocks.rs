@@ -364,7 +364,7 @@ pub(crate) fn render_streaming_tool_blocks(name: &str, partial_json: &str, viewp
         Span::styled(icon, Semantic::Accent),
         Span::new(" ".to_owned()),
         Span::new(name.to_owned()).bold(),
-        Span::styled(" …".to_owned(), Semantic::Muted),
+        Span::styled(" \u{2026}".to_owned(), Semantic::Muted),
     ]));
 
     // Parse partial JSON into key-value pairs

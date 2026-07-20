@@ -230,7 +230,7 @@ pub fn fire_blocking_callbacks(state: &mut State, callbacks: &[MatchedCallback],
     let fan = FanOut {
         blocking_id: Some(tool_use_id),
         running_word: "running (blocking)",
-        replaced_suffix: " — replaced timed-out run",
+        replaced_suffix: " \u{2014} replaced timed-out run",
     };
     let mut summaries = Vec::new();
     for cb in callbacks {

@@ -14,9 +14,9 @@ pub(super) struct ConversationHistoryPanel;
 fn render_text_hist(msg: &cp_base::state::data::message::Message) -> Vec<cp_render::Block> {
     let mut blocks = Vec::new();
     let (icon, semantic) = if msg.role == "user" {
-        ("👤", cp_render::Semantic::Accent)
+        ("\u{1f464}", cp_render::Semantic::Accent)
     } else {
-        ("🤖", cp_render::Semantic::AccentDim)
+        ("\u{1f916}", cp_render::Semantic::AccentDim)
     };
     blocks.push(cp_render::Block::Line(vec![
         cp_render::Span::styled(format!("{icon} "), semantic),
@@ -35,12 +35,12 @@ fn render_text_hist(msg: &cp_base::state::data::message::Message) -> Vec<cp_rend
 fn render_toolcall_hist(msg: &cp_base::state::data::message::Message) -> Vec<cp_render::Block> {
     let mut blocks = Vec::new();
     blocks.push(cp_render::Block::Line(vec![
-        cp_render::Span::styled("🔧 ".to_owned(), cp_render::Semantic::Info),
+        cp_render::Span::styled("\u{1f527} ".to_owned(), cp_render::Semantic::Info),
         cp_render::Span::styled(format!("[{}] tool_call", msg.id), cp_render::Semantic::Info).bold(),
     ]));
     for tu in &msg.tool_uses {
         blocks.push(cp_render::Block::Line(vec![
-            cp_render::Span::muted("  → ".to_owned()),
+            cp_render::Span::muted("  \u{2192} ".to_owned()),
             cp_render::Span::styled(tu.name.clone(), cp_render::Semantic::Accent),
         ]));
     }
@@ -52,7 +52,7 @@ fn render_toolcall_hist(msg: &cp_base::state::data::message::Message) -> Vec<cp_
 fn render_toolresult_hist(msg: &cp_base::state::data::message::Message) -> Vec<cp_render::Block> {
     let mut blocks = Vec::new();
     blocks.push(cp_render::Block::Line(vec![
-        cp_render::Span::styled("📋 ".to_owned(), cp_render::Semantic::Muted),
+        cp_render::Span::styled("\u{1f4cb} ".to_owned(), cp_render::Semantic::Muted),
         cp_render::Span::styled(format!("[{}] tool_result", msg.id), cp_render::Semantic::Muted),
     ]));
     for tr in &msg.tool_results {

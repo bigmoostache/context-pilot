@@ -320,15 +320,16 @@ pub fn paginate_content(
     let mut scratchpad = String::new();
     if !page_descriptions.is_empty() {
         use std::fmt::Write as _;
-        scratchpad.push_str("[Page notes — scratchpad you wrote while navigating (cleared when this panel closes):\n");
+        scratchpad
+            .push_str("[Page notes \u{2014} scratchpad you wrote while navigating (cleared when this panel closes):\n");
         for (page_idx, note) in page_descriptions {
-            let _r = writeln!(scratchpad, "  · page {}: {}", page_idx.saturating_add(1), note.trim());
+            let _r = writeln!(scratchpad, "  \u{b7} page {}: {}", page_idx.saturating_add(1), note.trim());
         }
         scratchpad.push_str("]\n");
     }
 
     format!(
-        "{scratchpad}[Page {}/{} · DESTRUCTIVE PAGINATION: only THIS page is in context. \
+        "{scratchpad}[Page {}/{} \u{b7} DESTRUCTIVE PAGINATION: only THIS page is in context. \
 Navigating away with panel_goto_page permanently discards this page's content — you will \
 retain NOTHING from it except the note you write in `current_page_description`. Extract what \
 you need NOW; prefer searching/opening a specific range over walking pages.]\n{page_content}",

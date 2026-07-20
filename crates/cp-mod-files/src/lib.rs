@@ -443,8 +443,8 @@ fn style_callback_line_ir(line: &str, width: usize) -> Option<cp_render::Block> 
     }
 
     // "· name passed ..." or "· name FAILED ..." etc.
-    if let Some(rest) = trimmed.strip_prefix("· ") {
-        let mut spans = vec![Span::muted("· ".to_owned())];
+    if let Some(rest) = trimmed.strip_prefix("\u{b7} ") {
+        let mut spans = vec![Span::muted("\u{b7} ".to_owned())];
 
         let status_patterns: &[(&str, Semantic)] = &[
             (" passed", Semantic::Success),

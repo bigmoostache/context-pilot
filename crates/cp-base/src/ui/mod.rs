@@ -78,7 +78,7 @@ fn column_widths(header: &[&str], rows: &[Vec<TextCell>]) -> Vec<usize> {
 fn push_header(out: &mut String, header: &[&str], widths: &[usize]) {
     for (col, hdr) in header.iter().enumerate() {
         if col > 0 {
-            out.push_str(" │ ");
+            out.push_str(" \u{2502} ");
         }
         out.push_str(&pad_cell(hdr, widths.get(col).copied().unwrap_or(0), Align::Left));
     }
@@ -89,9 +89,9 @@ fn push_header(out: &mut String, header: &[&str], widths: &[usize]) {
 fn push_separator(out: &mut String, widths: &[usize]) {
     for (col, width) in widths.iter().enumerate() {
         if col > 0 {
-            out.push_str("─┼─");
+            out.push_str("\u{2500}\u{253c}\u{2500}");
         }
-        out.push_str(&"─".repeat(*width));
+        out.push_str(&"\u{2500}".repeat(*width));
     }
     out.push('\n');
 }
@@ -100,7 +100,7 @@ fn push_separator(out: &mut String, widths: &[usize]) {
 fn push_data_row(out: &mut String, row: &[TextCell], widths: &[usize]) {
     for (col, col_w) in widths.iter().enumerate() {
         if col > 0 {
-            out.push_str(" │ ");
+            out.push_str(" \u{2502} ");
         }
         match row.get(col) {
             Some(cell) => out.push_str(&pad_cell(&cell.text, *col_w, cell.align)),

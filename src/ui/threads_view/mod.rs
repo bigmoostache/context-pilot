@@ -78,7 +78,7 @@ fn push_archived_header(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
     if viewing_archived {
         blocks.push(IrBlock::Line(vec![
             S::styled("  ".to_owned(), Semantic::Muted),
-            S::styled("⌗ ARCHIVED".to_owned(), Semantic::AccentDim),
+            S::styled("\u{2317} ARCHIVED".to_owned(), Semantic::AccentDim),
         ]));
         blocks.push(IrBlock::Empty);
     }
@@ -109,7 +109,7 @@ fn push_new_thread_entry(lb: &mut ListBuild<'_>, state: &State, on_virtual: bool
     };
     lb.blocks.push(IrBlock::Line(vec![
         S::styled("  ".to_owned(), new_sem),
-        S::styled("● ".to_owned(), new_sem),
+        S::styled("\u{25cf} ".to_owned(), new_sem),
         S::styled(new_name, new_sem),
     ]));
     lb.blocks.push(IrBlock::Line(vec![S::new("  ".to_owned()), S::styled("[NEW THREAD]".to_owned(), new_sem)]));
@@ -141,7 +141,7 @@ fn push_thread_entry(
     let is_focused = focus.focused_thread_id.as_deref() == Some(thread.id.as_str());
     let (status_sem, badge) = thread_status_style(thread, is_focused);
 
-    let indicator = if has_unread && !is_selected { "● " } else { "  " };
+    let indicator = if has_unread && !is_selected { "\u{25cf} " } else { "  " };
     let indicator_sem = if has_unread { Semantic::Warning } else { Semantic::Default };
     let name = truncate_str(&thread.name, lb.inner_width.saturating_sub(6).into());
 
@@ -150,7 +150,7 @@ fn push_thread_entry(
     }
     lb.blocks.push(IrBlock::Line(vec![
         S::styled(indicator.to_owned(), indicator_sem),
-        S::styled("● ".to_owned(), status_sem),
+        S::styled("\u{25cf} ".to_owned(), status_sem),
         S::new(name),
     ]));
     lb.blocks.push(IrBlock::Line(vec![
@@ -290,14 +290,14 @@ fn render_new_thread_prompt(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let inner = border.inner(area);
     frame.render_widget(border, area);
 
-    let input_preview = if state.input.is_empty() { "…".to_owned() } else { state.input.clone() };
+    let input_preview = if state.input.is_empty() { "\u{2026}".to_owned() } else { state.input.clone() };
 
     let ir_blocks = vec![
         IrBlock::Empty,
         IrBlock::Line(vec![S::muted("Type a name for the new thread below,".to_owned())]),
         IrBlock::Line(vec![S::muted("then press Enter to create it.".to_owned())]),
         IrBlock::Empty,
-        IrBlock::Line(vec![S::accent("  ➜ ".to_owned()), S::new(input_preview)]),
+        IrBlock::Line(vec![S::accent("  \u{279c} ".to_owned()), S::new(input_preview)]),
     ];
 
     let lines = ir::blocks_to_lines(&ir_blocks);
@@ -311,7 +311,7 @@ pub(super) fn truncate_str(s: &str, max_len: usize) -> String {
         s.to_owned()
     } else {
         let mut result: String = s.chars().take(max_len.saturating_sub(1)).collect();
-        result.push('…');
+        result.push('\u{2026}');
         result
     }
 }

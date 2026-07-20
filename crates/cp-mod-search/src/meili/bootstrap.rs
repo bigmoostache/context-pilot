@@ -207,7 +207,7 @@ fn configure_one_embedder(meili: &api::MeiliClient, uid: &str, settings: &serde_
 /// in the background to generate embeddings for all documents.
 fn configure_embedders(meili: &api::MeiliClient, files_uid: &str, logs_uid: &str) {
     let Some(api_key) = read_voyage_api_key() else {
-        log::info!("Voyage API key not configured — skipping embedder setup (keyword-only search)");
+        log::info!("Voyage API key not configured \u{2014} skipping embedder setup (keyword-only search)");
         return;
     };
 

@@ -6,6 +6,9 @@
 
 use crate::{Align, Block, Cell, Column, Semantic, Span};
 
+/// Bullet-point prefix glyph: U+2022 "• " (escaped to keep the source ASCII-only).
+const BULLET_PREFIX: &str = "\u{2022} ";
+
 /// Index one past the last consecutive `|`-prefixed line starting at `start`.
 ///
 /// A markdown table is a run of pipe-prefixed lines; this finds its end so
@@ -100,7 +103,8 @@ pub fn parse_line(line: &str) -> Vec<Span> {
     // Bullet points: - or *
     if let Some(stripped) = trimmed.strip_prefix("- ") {
         let indent = line.len().saturating_sub(trimmed.len());
-        let mut spans = vec![Span::new(" ".repeat(indent)), Span::styled("• ".to_owned(), Semantic::AccentDim)];
+        let mut spans =
+            vec![Span::new(" ".repeat(indent)), Span::styled(BULLET_PREFIX.to_owned(), Semantic::AccentDim)];
         spans.extend(parse_inline(stripped));
         return spans;
     }
@@ -108,7 +112,8 @@ pub fn parse_line(line: &str) -> Vec<Span> {
     if trimmed.starts_with("* ") && !trimmed.starts_with("**") {
         let content = trimmed.get(2..).unwrap_or("");
         let indent = line.len().saturating_sub(trimmed.len());
-        let mut spans = vec![Span::new(" ".repeat(indent)), Span::styled("• ".to_owned(), Semantic::AccentDim)];
+        let mut spans =
+            vec![Span::new(" ".repeat(indent)), Span::styled(BULLET_PREFIX.to_owned(), Semantic::AccentDim)];
         spans.extend(parse_inline(content));
         return spans;
     }

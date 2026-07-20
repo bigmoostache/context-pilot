@@ -52,7 +52,7 @@ fn write_index_stats(out: &mut String, overlay: &SearchIndexOverlay) {
 fn write_extensions_splitter(out: &mut String, overlay: &SearchIndexOverlay) {
     use std::fmt::Write as _;
     if !overlay.extensions.is_empty() {
-        out.push_str("\n── Extensions ──\n");
+        out.push_str("\n\u{2500}\u{2500} Extensions \u{2500}\u{2500}\n");
         for ext in &overlay.extensions {
             writeln!(out, "  {:<6} {:>4}  {}%", ext.name, ext.count, ext.pct).unwrap_or(());
         }
@@ -74,7 +74,7 @@ fn write_embeddings(out: &mut String, overlay: &SearchIndexOverlay) {
     let Some(emb) = &(overlay.embeddings) else {
         return;
     };
-    out.push_str("\n── Embeddings ──\n");
+    out.push_str("\n\u{2500}\u{2500} Embeddings \u{2500}\u{2500}\n");
     if !emb.model.is_empty() {
         writeln!(out, "Model   {}", emb.model).unwrap_or(());
     }
@@ -92,7 +92,7 @@ fn write_embeddings(out: &mut String, overlay: &SearchIndexOverlay) {
 fn write_task_trailers(out: &mut String, overlay: &SearchIndexOverlay) {
     use std::fmt::Write as _;
     if !overlay.recent_tasks.is_empty() {
-        out.push_str("\n── Recent Tasks ──\n");
+        out.push_str("\n\u{2500}\u{2500} Recent Tasks \u{2500}\u{2500}\n");
         for task in &overlay.recent_tasks {
             writeln!(out, "  #{:<6} {:<10} {:<10} {}", task.uid, task.task_type, task.status, task.duration)
                 .unwrap_or(());
@@ -100,14 +100,14 @@ fn write_task_trailers(out: &mut String, overlay: &SearchIndexOverlay) {
     }
 
     if !overlay.top_recomputed.is_empty() {
-        out.push_str("\n── Top Recomputed ──\n");
+        out.push_str("\n\u{2500}\u{2500} Top Recomputed \u{2500}\u{2500}\n");
         for entry in &overlay.top_recomputed {
             writeln!(out, "  {:>4}×  {}", entry.count, entry.path).unwrap_or(());
         }
     }
 
     if !overlay.recently_sent.is_empty() {
-        out.push_str("\n── Recently Sent ──\n");
+        out.push_str("\n\u{2500}\u{2500} Recently Sent \u{2500}\u{2500}\n");
         for entry in &overlay.recently_sent {
             writeln!(out, "  {:>8}  {}", entry.ago, entry.path).unwrap_or(());
         }

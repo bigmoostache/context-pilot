@@ -76,7 +76,7 @@ fn autocomplete_entry_line(entry: &cp_render::conversation::AutocompleteEntry, i
     let path_style =
         if is_selected { Style::default().fg(theme::accent()).bold() } else { Style::default().fg(theme::text()) };
     let suffix = if entry.is_dir { "/" } else { "" };
-    let icon = if entry.is_dir { "📁 " } else { "   " };
+    let icon = if entry.is_dir { "\u{1f4c1} " } else { "   " };
     Line::from(vec![
         Span::styled(format!(" {cursor_marker} "), Style::default().fg(theme::accent())),
         Span::styled(icon.to_owned(), Style::default()),

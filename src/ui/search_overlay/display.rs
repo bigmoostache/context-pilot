@@ -28,7 +28,7 @@ fn build_left_display(o: &SearchIndexOverlay) -> Vec<Line<'static>> {
 
     // Server
     let (status_label, status_color) =
-        if o.server.online { ("● online", theme::success()) } else { ("○ offline", theme::error()) };
+        if o.server.online { ("\u{25cf} online", theme::success()) } else { ("\u{25cb} offline", theme::error()) };
     let version_label = if o.server.version.is_empty() { String::new() } else { format!("  {}", o.server.version) };
 
     lines.push(Line::from(""));
@@ -91,7 +91,7 @@ fn push_index_section(lines: &mut Vec<Line<'static>>, o: &SearchIndexOverlay) {
         format!("{} pending", o.index.queue_depth),
         o.index.error_count,
     )));
-    let ready = if o.index.index_ready { "Ready" } else { "Scanning…" };
+    let ready = if o.index.index_ready { "Ready" } else { "Scanning\u{2026}" };
     lines.push(Line::from(format!("  Status {ready:<10} Last    {}", o.index.last_activity)));
 }
 
@@ -103,7 +103,7 @@ fn push_extensions_section(lines: &mut Vec<Line<'static>>, o: &SearchIndexOverla
     lines.push(Line::from(""));
     lines.push(section_header("Extensions"));
     for ext in &o.extensions {
-        let fill = "█".repeat(ext.bar_width);
+        let fill = "\u{2588}".repeat(ext.bar_width);
         lines.push(Line::from(vec![
             Span::raw(format!("  {:<6} {:>4}  ", ext.name, ext.count)),
             Span::styled(fill, Style::default().fg(theme::accent())),
@@ -153,7 +153,7 @@ fn push_embeddings_section(lines: &mut Vec<Line<'static>>, o: &SearchIndexOverla
         ]));
     }
     let (emb_label, emb_color) =
-        if emb.is_indexing { ("● generating", theme::warning()) } else { ("✓ ready", theme::success()) };
+        if emb.is_indexing { ("\u{25cf} generating", theme::warning()) } else { ("\u{2713} ready", theme::success()) };
     lines.push(Line::from(vec![
         Span::raw(format!("  Vectors {:>4}  ", emb.vector_count)),
         Span::styled(emb_label, Style::default().fg(emb_color)),
@@ -220,7 +220,7 @@ fn push_recently_sent_section(lines: &mut Vec<Line<'static>>, o: &SearchIndexOve
 
 /// Render a section header line with dashes.
 fn section_header(title: &str) -> Line<'static> {
-    let dashes = "─".repeat(48usize.saturating_sub(title.len()).saturating_sub(4));
+    let dashes = "\u{2500}".repeat(48usize.saturating_sub(title.len()).saturating_sub(4));
     Line::from(vec![
         Span::styled(format!("  ── {title} "), Style::default().fg(theme::accent())),
         Span::styled(dashes, Style::default().fg(theme::text_muted())),

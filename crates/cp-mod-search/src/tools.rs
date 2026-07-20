@@ -103,7 +103,7 @@ fn iso_to_ms(s: &str) -> Option<u64> {
 /// Closing a panel causes instant, irreversible context loss.
 const PANEL_WARNING: &str = "\n\nIMPORTANT: Results live in this panel. Act on the information FIRST (write \
     files, answer questions, store in scratchpad, etc.), THEN close the panel. Closing it IMMEDIATELY and \
-    IRREVERSIBLY erases all content from your context — you cannot recall it from memory afterward. \
+    IRREVERSIBLY erases all content from your context \u{2014} you cannot recall it from memory afterward. \
     Never close-then-act; always act-then-close.";
 
 /// Build Meilisearch sort parameter from tool sort string.
@@ -320,7 +320,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         return err_result(
             tool,
             "Missing or empty 'semantic_query' parameter. You MUST provide a fabricated example of what the \
-             target content looks like — NOT a description of what you're looking for, but an uneducated guess \
+             target content looks like \u{2014} NOT a description of what you're looking for, but an uneducated guess \
              at the actual text/code. Semantic embeddings find near-neighbors, so a fake snippet that resembles \
              the real content yields dramatically better results than a high-level description."
                 .to_owned(),

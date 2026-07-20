@@ -166,7 +166,7 @@ impl LlmClient for MiniMaxClient {
             .is_ok_and(|r| r.status().is_success());
 
         if !auth_ok {
-            return super::ApiCheckResult::failure(Some("Auth failed — check MINIMAX_API_KEY".to_owned()));
+            return super::ApiCheckResult::failure(Some("Auth failed \u{2014} check MINIMAX_API_KEY".to_owned()));
         }
 
         // Test 2: Streaming

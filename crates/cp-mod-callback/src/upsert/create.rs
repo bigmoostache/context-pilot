@@ -141,7 +141,7 @@ fn create_success_message(final_id: &str, params: &CreateParams) -> String {
     }
     let scope = if params.is_global { "global" } else { "local (per-file)" };
     let _r = write!(msg, "\n  Scope: {scope}");
-    msg.push_str("\n  Status: active ✓");
+    msg.push_str("\n  Status: active \u{2713}");
     msg
 }
 
