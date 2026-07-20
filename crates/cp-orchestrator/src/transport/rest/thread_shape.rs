@@ -138,13 +138,14 @@ fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cp_wire::types::snapshot::RosterEntryInit;
 
     #[test]
     fn overlay_synthesises_view_only_thread() {
         // A thread present in the roster but absent on disk is appended with an
         // empty log — the instant-appearance path.
         let mut details: Vec<serde_json::Value> = Vec::new();
-        let roster = [RosterEntry {
+        let roster = [RosterEntry::new(RosterEntryInit {
             thread_id: "T9".into(),
             name: "fresh".into(),
             status: ThreadTurn::TheirTurn,
@@ -152,7 +153,7 @@ mod tests {
             paused: false,
             last_activity_ms: 4_242,
             msg_count: 0,
-        }];
+        })];
         overlay_roster(&mut details, &roster, "a1");
         assert_eq!(details.len(), 1);
         let d = &details[0];
@@ -177,7 +178,7 @@ mod tests {
             "archived": false,
             "log": [{"id": "msg_0", "role": "user", "content": "hi", "timestamp": 100u64}],
         })];
-        let roster = [RosterEntry {
+        let roster = [RosterEntry::new(RosterEntryInit {
             thread_id: "T1".into(),
             name: "old".into(),
             status: ThreadTurn::MyTurn,
@@ -185,7 +186,7 @@ mod tests {
             paused: false,
             last_activity_ms: 500,
             msg_count: 1,
-        }];
+        })];
         overlay_roster(&mut details, &roster, "a1");
         assert_eq!(details.len(), 1, "no duplicate appended for a matched thread");
         let d = &details[0];

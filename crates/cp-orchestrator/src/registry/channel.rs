@@ -242,13 +242,7 @@ mod tests {
 
     /// Build a minimal Command for testing.
     fn test_command(dedup: &str) -> Command {
-        Command {
-            schema_version: 1,
-            id: format!("cmd-{dedup}"),
-            seq: 1,
-            dedup_token: dedup.to_owned(),
-            kind: cp_wire::types::command::Kind::Stop,
-        }
+        Command::new(format!("cmd-{dedup}"), 1, dedup.to_owned(), cp_wire::types::command::Kind::Stop)
     }
 
     /// A minimal echo-ack server: reads one framed CommandFrame, writes back
@@ -267,7 +261,7 @@ mod tests {
             }
         }
         // We don't need to parse the command — just ack it.
-        let ack = Ack { schema_version: 1, cmd_id: "cmd-echo".to_owned(), status: Status::Accepted, rev: Some(42) };
+        let ack = Ack::new("cmd-echo".to_owned(), Status::Accepted, Some(42));
         let payload = serde_json::to_vec(&ack).expect("ser");
         let frame = framing::encode_raw(&payload).expect("frame");
         conn.write_all(&frame).expect("write");

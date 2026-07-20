@@ -6094,3 +6094,28 @@ index 1996939f..2334a7e6 100644
  
    - path: "crates/cp-base/src/config/mod.rs"
 # --- End entry #51 ---
+52:71f92ae3d2c8e5c41737b7bdb4b73189deae28d5c3c710334da89477f873455a:e9da4fb1e6572c2771ca0c5033e727c914870e0a02474d129eb44a4dcc3dc60e:a78bfd370d4e35e545e67fb9016dcfcabcf2e36d0449fec965c57856294fc7ba
+# --- Diff for entry #52 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 2334a7e6..3f19a105 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -769,7 +769,16 @@ exceptions:
+     strategy: >
+       Irreducible — a 6-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+ 
+-  # ── exhaustive_structs: cp-render IR data-carrier layer (crate-level) ──
++  - path: "crates/cp-wire/src/types/snapshot/mod.rs"
++    match: "roster-entry init bundle: a flat 7-field carrier built by literal cross-crate"
++    reason: >
++      RosterEntryInit is a flat 7-field parameter carrier fed to RosterThread::new. Cross-crate
++      builders (backend test fixtures) construct it by literal, so it must stay exhaustive —
++      #[non_exhaustive] would forbid that literal (the exact E0639 the bundle exists to route
++      around), and a 7-arg RosterThread::new trips too_many_arguments (threshold 4).
++    strategy: >
++      Irreducible — the bundle must be literal-constructible cross-crate; a 7-arg constructor
++      trips too_many_arguments. The exhaustive carrier is the honest shape.
+   # One crate-level #![expect] covers every IR type in cp-render. They are
+   # all built by struct literal cross-crate by the tui adapter (src/ui/ir,
+   # src/ui/search_overlay) and read field-by-field by the renderer, so
+# --- End entry #52 ---

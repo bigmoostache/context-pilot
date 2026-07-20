@@ -140,7 +140,48 @@ impl<'src> ThreadCreation<'src> {
     }
 }
 
+/// The seven owned fields of a [`RosterThread`], bundled so
+/// [`RosterThread::new`] takes one argument rather than seven.
+///
+/// A cross-crate builder (the backend's test fixtures) constructs this by
+/// literal and hands it to [`RosterThread::new`]; it is deliberately
+/// exhaustive so that literal construction is allowed, unlike the
+/// `#[non_exhaustive]` [`RosterThread`] it feeds.
+#[derive(Clone, Debug)]
+#[expect(
+    clippy::exhaustive_structs,
+    reason = "roster-entry init bundle: a flat 7-field carrier built by literal cross-crate (backend test fixtures) then consumed by RosterThread::new; #[non_exhaustive] would forbid that literal (the very E0639 this bundle exists to route around) and a 7-arg constructor trips too_many_arguments (threshold 4)"
+)]
+pub struct RosterEntryInit {
+    /// Thread identifier (e.g. `"T7"`).
+    pub thread_id: String,
+    /// User-chosen thread label.
+    pub name: String,
+    /// Current turn ownership.
+    pub status: ThreadTurn,
+    /// Whether the thread is archived (soft-deleted).
+    pub archived: bool,
+    /// Whether the thread is paused (no idle `MY_TURN` notifications).
+    pub paused: bool,
+    /// Epoch-ms of the latest activity.
+    pub last_activity_ms: u64,
+    /// Number of messages folded into this thread so far.
+    pub msg_count: u32,
+}
+
 impl RosterThread {
+    /// Build a roster entry from a [`RosterEntryInit`] bundle.
+    ///
+    /// A constructor keeps [`RosterThread`] `#[non_exhaustive]` across
+    /// cross-crate builders (backend test fixtures build entries with full
+    /// field control); the seven fields ride in the bundle so the signature
+    /// stays under the argument cap.
+    #[must_use]
+    pub fn new(init: RosterEntryInit) -> Self {
+        let RosterEntryInit { thread_id, name, status, archived, paused, last_activity_ms, msg_count } = init;
+        Self { thread_id, name, status, archived, paused, last_activity_ms, msg_count }
+    }
+
     /// Apply a `ThreadCreated` to a roster, **insert-or-update** so a duplicate
     /// delivery or a replay folds idempotently (a re-seen creation refreshes
     /// name/status and clears `archived`, never duplicates the entry).

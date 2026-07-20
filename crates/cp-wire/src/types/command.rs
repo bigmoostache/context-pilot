@@ -31,6 +31,18 @@ pub struct Command {
     pub kind: Kind,
 }
 
+impl Command {
+    /// Build a command, stamping the current `schema_version`.
+    ///
+    /// A constructor keeps [`Command`] `#[non_exhaustive]` across the
+    /// orchestrator (which builds commands cross-crate); the wire-schema
+    /// revision is filled in here rather than at every call site.
+    #[must_use]
+    pub const fn new(id: String, seq: u64, dedup_token: String, kind: Kind) -> Self {
+        Self { schema_version: 1, id, seq, dedup_token, kind }
+    }
+}
+
 /// The action a [`Command`] requests.
 ///
 /// Uses an internally-tagged representation (`"kind"` field) so that an
