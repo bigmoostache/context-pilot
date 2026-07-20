@@ -6,12 +6,14 @@
 //! - **Adapter** (`blocks_to_lines`) that converts IR blocks into ratatui
 //!   `Line` vectors for the existing panel renderer.
 
+/// Progress bar animation: smooth fill, color crossfade, streaming pulse.
+pub(super) mod bar_animation;
 /// Conversation region builder: messages, history, streaming tools, overlays.
 mod conversation;
 /// Conversation adapter: renders conversation → ratatui with scrollbar + caching.
 pub(crate) mod render_conversation;
 /// Panel IR adapter: renders [`PanelContent`] → bordered scrollable widget.
-/// (Merged from `render_panel.rs` — too small for its own file.)
+/// (Merged from `render_panel.rs` — kept inline to stay under the 8-entry dir cap.)
 pub(crate) mod render_panel {
     use cp_render::frame::PanelContent;
     use ratatui::prelude::{Frame, Line, Rect, Span, Style};
@@ -75,8 +77,6 @@ pub(crate) mod render_panel {
         }
     }
 }
-/// Progress bar animation: smooth fill, color crossfade, streaming pulse.
-pub(super) mod bar_animation;
 /// Sidebar adapter: renders [`cp_render::frame::Sidebar`] → ratatui.
 pub(crate) mod render_sidebar;
 /// Token statistics sub-module for sidebar (rounded-border table).

@@ -11,6 +11,9 @@ use crate::panels::ContextItem;
 use crate::tools::ToolDefinition;
 use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
+/// Ephemeral reverie sub-agent state (context optimizer, cartographer).
+pub mod reverie;
+
 // Runtime State
 
 /// Runtime state (messages loaded in memory)
@@ -82,7 +85,7 @@ pub struct State {
     pub view_mode: ViewMode,
     /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
     /// Ephemeral — not persisted, discarded after each run.
-    pub reveries: HashMap<String, super::reverie::Session>,
+    pub reveries: HashMap<String, reverie::Session>,
     /// Accumulated `prompt_cache_hit_tokens` across all API calls (persisted)
     pub cache_hit_tokens: usize,
     /// Accumulated `prompt_cache_miss_tokens` across all API calls (persisted)

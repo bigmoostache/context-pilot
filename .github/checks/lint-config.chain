@@ -5717,3 +5717,19 @@ index b80974fb..0b69f666 100644
  
    - path: "crates/cp-base/src/config/mod.rs"
 # --- End entry #43 ---
+44:f7a97e17f650a62781186b110056219274653eadb4567642357978d58d51f437:b56d96abdb08adb13190b6404e1918cfd23ee04aff620acf51fa5e3777383144:492293e2f6ac187a28293b1af90f05ad128cf55f747aad2999e0d82ca51aa89c
+# --- Diff for entry #44 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 0b69f666..3489ba00 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -476,7 +476,7 @@ exceptions:
+     strategy: >
+       Irreducible — non_exhaustive would forbid the required cross-crate construction.
+ 
+-  - path: "crates/cp-base/src/state/mod.rs"
++  - path: "crates/cp-base/src/state/runtime/reverie.rs"
+     match: "reverie-kind contract"
+     reason: >
+       Reverie Kind is a closed set constructed cross-crate by the optimizer trigger and matched
+# --- End entry #44 ---

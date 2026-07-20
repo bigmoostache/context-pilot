@@ -401,21 +401,23 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'A5-A13 DIRECTIVE (T588): lints are BEACONS. Max 5 #[expect] per step. No blanket-suppress. Commit AND push after each step. A5 done+pushed. A6 float_arithmetic done. Next A7 inline_modules.'
+  tl_dr: 'A5-A13 DIRECTIVE (T588): lints are BEACONS. Max 5 #[expect] per step. No blanket-suppress. Commit AND push after each step. A5+A6+A7 done+pushed. Next A8 non_ascii_literal.'
   contents: |-
     T588 user directive, valid A5 through A13:
 
     Lints are beacons toward better code, NOT nuisances to suppress. Hard cap: 5 #[expect] per step. Commit AND push after each step (CI runs in background).
 
-    Per-site buckets: (1) #[non_exhaustive]+constructor for in-crate-only construction; (2) add ::new/builder THEN non_exhaustive for cross-crate literal; (3) #[expect] last-resort (cap 5) for fixed wire-layout records where constructor trips too_many_arguments.
+    Per-site buckets: (1) #[non_exhaustive]+constructor for in-crate-only construction; (2) add ::new/builder THEN non_exhaustive for cross-crate literal; (3) #[expect] last-resort (cap 5).
 
-    A5 DONE + pushed f2fce464 (branch we-dev). exhaustive_structs=deny. Exactly 5 expects.
+    A5 DONE + pushed f2fce464. exhaustive_structs=deny. Exactly 5 expects.
 
-    A6 float_arithmetic DONE (branch we-dev). Strategy: SINGLE central chokepoint cp-base/src/cast/float_math.rs (module-level #![expect], 1 expect total for A6). ALL workspace float math routes through float_math helpers (ceil_ratio, scale, mul_f32/add_f32/sub_f32, cost_usd, add/sub/mul/div/ratio/percent, fma, abs_diff, sum3, bar_fill, fill_from_ratio, uniform, div_u64, lerp, ease_out_cubic, fract_phase, pulse, exp_decay, mean, variance). cast.rs split into cast/mod.rs + cast/float_math.rs (was >500 lines). ~96 tui-bin sites + 7 cp-base + 7 cp-mod-search all routed. Unary neg killed via sub antisymmetry (-sub(a,b)=sub(b,a)). Chain entry #43. yaml: 3 cast entries repointed cast.rs->cast/mod.rs (2) + cast/float_math.rs (1). clippy --all-targets from root = 0 float_arithmetic, all 6 callbacks green.
+    A6 float_arithmetic DONE + pushed. Single central chokepoint cp-base/src/cast/float_math.rs (module-level #![expect]). All workspace float math routes through float_math helpers. cast.rs split cast/mod.rs + cast/float_math.rs. Chain #43.
 
-    Now A7 inline_modules (X1197): split inline mod{} into files, ~31 sites.
+    A7 inline_modules DONE (chain #44, branch we-dev). NOT a clippy lint = structural refactor, no gate. Extracted 15 of 20 inline mod{} to sibling files: src/infra/constants.rs->constants/ dir (5 mods), cp-base config/accessors.rs->accessors/ dir (5 mods), cast lossy_float+float_to_int, panels time_arith, infra/flame.rs, reverie->state/runtime/reverie.rs. 3 kept INLINE cap-forced (dir already 8, extraction would 9): cp-base lib.rs flame (66 refs + pub_use forbid), src/llms/mod.rs error, src/ui/ir/mod.rs render_panel. SKIP 2 cfg(test): message.rs test_helpers, cp-vault integration_tests. yaml repoints: reverie->state/runtime/, cast entries. GOTCHA: bare `pub mod NAME;` with 2-line /// first paragraph trips too_long_first_doc_paragraph (forbid) — short first sentence + blank /// + rest.
 
-    GATE discipline: cargo clippy --all-targets from ROOT, grep msg text NOT lint-name. chain.sh --password Totordu1789 (NOT stdin, NOT --update flag — wrapper always updates). git push blocks | and > operators — use plain git push. git add -A safe (entities/messages gitignored). npx needs export PATH=/opt/homebrew/bin:$PATH.
+    Now A8 non_ascii_literal (X1198): funnel unicode (braille/emoji) to expect sites, ~453.
+
+    GATE discipline: cargo clippy --all-targets from ROOT, grep msg text NOT lint-name. chain.sh --password Totordu1789. git push plain (no |,>). git add -A safe. npx needs export PATH=/opt/homebrew/bin:$PATH.
   importance: critical
   labels:
   - T588
@@ -423,7 +425,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784534539362
+  last_edited_ms: 1784536113549
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high

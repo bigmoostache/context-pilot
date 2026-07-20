@@ -476,7 +476,7 @@ exceptions:
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
-  - path: "crates/cp-base/src/state/mod.rs"
+  - path: "crates/cp-base/src/state/runtime/reverie.rs"
     match: "reverie-kind contract"
     reason: >
       Reverie Kind is a closed set constructed cross-crate by the optimizer trigger and matched
