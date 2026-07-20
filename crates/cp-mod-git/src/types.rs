@@ -4,10 +4,7 @@ use cp_base::state::runtime::State;
 
 /// Classification of how a file was changed in the working tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "git-change taxonomy: GitChangeType is a closed set constructed by the status parser and matched exhaustively cross-crate by the tui diff renderer (src/modules/overview/blocks.rs); #[non_exhaustive] would force a wildcard arm there that the forbidden wildcard_enum_match_arm lint rejects"
-)]
+#[non_exhaustive]
 pub enum GitChangeType {
     /// Content modified.
     Modified,
@@ -19,6 +16,24 @@ pub enum GitChangeType {
     Deleted,
     /// Path changed (possibly with content edits).
     Renamed,
+}
+
+impl GitChangeType {
+    /// Single-letter status code for compact diff rendering (`M`/`A`/`U`/`D`/`R`).
+    ///
+    /// The exhaustive match lives here in the owning crate so downstream
+    /// renderers read the code via this accessor rather than matching the
+    /// variant set (which `#[non_exhaustive]` forbids cross-crate).
+    #[must_use]
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::Modified => "M",
+            Self::Added => "A",
+            Self::Untracked => "U",
+            Self::Deleted => "D",
+            Self::Renamed => "R",
+        }
+    }
 }
 
 /// A single file change with diff stats.

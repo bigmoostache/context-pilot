@@ -267,10 +267,7 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
 /// convention actually in use across both planes is identity-by-name, and this
 /// helper is the single place that conversion lives.)
 pub(super) const fn wire_turn(status: ThreadStatus) -> ThreadTurn {
-    match status {
-        ThreadStatus::MyTurn => ThreadTurn::MyTurn,
-        ThreadStatus::TheirTurn => ThreadTurn::TheirTurn,
-    }
+    if matches!(status, ThreadStatus::MyTurn) { ThreadTurn::MyTurn } else { ThreadTurn::TheirTurn }
 }
 
 /// Emit a [`ThreadStatusChanged`](OpEntryKind::ThreadStatusChanged) the instant

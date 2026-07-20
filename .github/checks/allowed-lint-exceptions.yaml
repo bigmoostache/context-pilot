@@ -578,22 +578,6 @@ exceptions:
 
   # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
 
-  - path: "crates/cp-mod-git/src/types.rs"
-    match: "git-change taxonomy"
-    reason: >
-      GitChangeType is a closed set constructed cross-crate by the status parser and matched
-      exhaustively by the diff renderer; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-mod-bridge/src/body.rs"
-    match: "body-disposition contract"
-    reason: >
-      Stored is a closed Inline/Spilled set returned by Store::put and matched exhaustively
-      by callers routing the durability barrier; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
   - path: "crates/cp-mod-bridge/src/error.rs"
     match: "bridge boot error taxonomy is a closed AlreadyRunning/Io set"
     reason: >
@@ -602,14 +586,6 @@ exceptions:
     strategy: >
       Irreducible — closed error taxonomy, wildcard arms are forbidden.
 
-  - path: "crates/cp-mod-spine/src/engine.rs"
-    match: "spine-decision contract"
-    reason: >
-      SpineDecision is a closed Idle/Blocked/Continue set returned by check_spine and matched
-      exhaustively by the app event loop; non_exhaustive would forbid that construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
   - path: "crates/cp-mod-spine/src/types.rs"
     match: "notification-kind contract"
     reason: >
@@ -617,24 +593,6 @@ exceptions:
       exhaustively by label() and the continuation builder; non_exhaustive would forbid it.
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-mod-threads/src/types.rs"
-    match: "thread-turn contract: ThreadStatus is a closed MyTurn/TheirTurn set"
-    reason: >
-      ThreadStatus is a closed MyTurn/TheirTurn set constructed cross-crate and matched exhaustively
-      by the bridge and threads view; non_exhaustive would force cross-crate wildcard arms the
-      forbidden wildcard_enum_match_arm lint rejects.
-    strategy: >
-      Irreducible — closed two-outcome set, wildcard arms are forbidden.
-
-  - path: "crates/cp-mod-threads/src/types.rs"
-    match: "thread-author contract: ThreadAuthor is a closed User/Assistant set"
-    reason: >
-      ThreadAuthor is a closed User/Assistant set constructed cross-crate and matched exhaustively
-      by the message renderer; non_exhaustive would force cross-crate wildcard arms the forbidden
-      wildcard_enum_match_arm lint rejects.
-    strategy: >
-      Irreducible — closed two-outcome set, wildcard arms are forbidden.
 
   # ── exhaustive_structs: wide wire records where a constructor is worse ──
   # These public structs are legitimately exhaustive: each is a fixed-layout

@@ -17,10 +17,7 @@ use crate::types::{ContinuationAction, Notification, NotificationType, SpineStat
 
 /// Result of a spine check — tells the caller what to do.
 #[derive(Debug)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "spine-decision contract: SpineDecision is a closed Idle/Blocked/Continue set returned by check_spine and matched exhaustively cross-crate by the tui app event loop (src/app/run/lifecycle.rs); #[non_exhaustive] would force a wildcard arm there that the forbidden wildcard_enum_match_arm lint rejects"
-)]
+#[non_exhaustive]
 pub enum SpineDecision {
     /// Nothing to do — no continuation needed
     Idle,
