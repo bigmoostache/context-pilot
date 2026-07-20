@@ -6997,3 +6997,25 @@ index 9485e350..74fe336e 100644
 -
 -
 # --- End entry #70 ---
+71:9ee0a90741ab26c2ec2a9e584795c8cd2ac9e779be2eaae2ca773cb8b7b91a7b:7b0e10d7e826d179483cd1f0ebf44a7ecf58223f9950cd4260c05cf6ba5540e6:556049103727608f0095ad57774a64ac4262d2dd4d1183764f3942f7fd099859
+# --- Diff for entry #71 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 74fe336e..c037044e 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -371,14 +371,3 @@ exceptions:
+       grouping, so #[non_exhaustive] is impossible.
+     strategy: >
+       Irreducible — a 6-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+-
+-  - path: "crates/cp-wire/src/types/snapshot/mod.rs"
+-    match: "roster-entry init bundle: a flat 7-field carrier built by literal cross-crate"
+-    reason: >
+-      RosterEntryInit is a flat 7-field parameter carrier fed to RosterThread::new. Cross-crate
+-      builders (backend test fixtures) construct it by literal, so it must stay exhaustive —
+-      #[non_exhaustive] would forbid that literal (the exact E0639 the bundle exists to route
+-      around), and a 7-arg RosterThread::new trips too_many_arguments (threshold 4).
+-    strategy: >
+-      Irreducible — the bundle must be literal-constructible cross-crate; a 7-arg constructor
+-      trips too_many_arguments. The exhaustive carrier is the honest shape.
+# --- End entry #71 ---

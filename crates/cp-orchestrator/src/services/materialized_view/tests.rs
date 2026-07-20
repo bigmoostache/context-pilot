@@ -4,7 +4,7 @@
 //! `#[path]`-included so `super` resolves to the `materialized_view` module.
 
 use super::*;
-use cp_wire::types::snapshot::{RosterEntryInit, Snapshot};
+use cp_wire::types::snapshot::Snapshot;
 use cp_wire::types::{ContentHash, ThreadTurn};
 
 /// Build an [`OpEntry`] with the given rev and kind.
@@ -71,15 +71,13 @@ fn checkpoint_restores_roster_wholesale() {
     // this is the cold-restart-after-compaction path (I5): the backend
     // rebuilds the thread list from the snapshot alone.
     let mut snapshot = Snapshot::default();
-    snapshot.roster.push(RosterEntry::new(RosterEntryInit {
-        thread_id: "T7".into(),
-        name: "carried".into(),
-        status: ThreadTurn::MyTurn,
-        archived: true,
-        paused: false,
-        last_activity_ms: 9_000,
-        msg_count: 4,
-    }));
+    snapshot.roster.push(
+        RosterEntry::builder("T7", "carried", ThreadTurn::MyTurn)
+            .archived(true)
+            .last_activity_ms(9_000)
+            .msg_count(4)
+            .build(),
+    );
     view.apply("a1", &entry(5, OpEntryKind::Checkpoint { snapshot }));
 
     let agent = view.get("a1").expect("agent present");
@@ -99,15 +97,9 @@ fn roster_survives_compaction_via_checkpoint_then_folds_tail() {
     // post-checkpoint delta tail (a new thread + a message) folds on top.
     let mut view = MaterializedView::new();
     let mut snapshot = Snapshot::default();
-    snapshot.roster.push(RosterEntry::new(RosterEntryInit {
-        thread_id: "T1".into(),
-        name: "carried".into(),
-        status: ThreadTurn::TheirTurn,
-        archived: false,
-        paused: false,
-        last_activity_ms: 100,
-        msg_count: 2,
-    }));
+    snapshot
+        .roster
+        .push(RosterEntry::builder("T1", "carried", ThreadTurn::TheirTurn).last_activity_ms(100).msg_count(2).build());
     view.apply("a1", &entry(10, OpEntryKind::Checkpoint { snapshot }));
     view.apply(
         "a1",

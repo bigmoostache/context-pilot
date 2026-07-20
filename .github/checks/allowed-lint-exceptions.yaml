@@ -371,14 +371,3 @@ exceptions:
       grouping, so #[non_exhaustive] is impossible.
     strategy: >
       Irreducible — a 6-arg constructor trips too_many_arguments; the exhaustive literal is honest.
-
-  - path: "crates/cp-wire/src/types/snapshot/mod.rs"
-    match: "roster-entry init bundle: a flat 7-field carrier built by literal cross-crate"
-    reason: >
-      RosterEntryInit is a flat 7-field parameter carrier fed to RosterThread::new. Cross-crate
-      builders (backend test fixtures) construct it by literal, so it must stay exhaustive —
-      #[non_exhaustive] would forbid that literal (the exact E0639 the bundle exists to route
-      around), and a 7-arg RosterThread::new trips too_many_arguments (threshold 4).
-    strategy: >
-      Irreducible — the bundle must be literal-constructible cross-crate; a 7-arg constructor
-      trips too_many_arguments. The exhaustive carrier is the honest shape.
