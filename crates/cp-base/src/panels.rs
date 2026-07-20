@@ -282,8 +282,8 @@ pub fn paginate_content(
         return full_content.to_owned();
     }
 
-    let chars_per_page = PANEL_PAGE_TOKENS.to_f32() * CHARS_PER_TOKEN;
-    let start_char = (current_page.to_f32() * chars_per_page).to_usize();
+    let chars_per_page = crate::cast::float_math::scale(PANEL_PAGE_TOKENS, CHARS_PER_TOKEN);
+    let start_char = crate::cast::float_math::scale_to_usize(current_page, chars_per_page);
 
     // Snap start to next line boundary
     let start = if start_char == 0 {

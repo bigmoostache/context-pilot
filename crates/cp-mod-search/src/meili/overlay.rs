@@ -101,7 +101,11 @@ fn current_ms() -> u64 {
 ///
 /// `prev` is `(previous cpu ticks, previous fetched-at ms)`. Ticks are
 /// centiseconds (100/sec). Returns 0.0 on the first sample or a zero interval.
+///
+/// Float math routes through the `float_math` chokepoint (CPU% is a ratio of
+/// two time deltas — inherently fractional).
 fn compute_cpu_pct(prev: Option<(u64, u64)>, cur_ticks: u64) -> f32 {
+    use cp_base::cast::float_math;
     let Some((prev_t, prev_ms)) = prev else {
         return 0.0;
     };
@@ -110,9 +114,9 @@ fn compute_cpu_pct(prev: Option<(u64, u64)>, cur_ticks: u64) -> f32 {
     if ms_delta == 0 || prev_t == 0 {
         return 0.0;
     }
-    let cpu_secs = tick_delta.to_f32() / 100.0;
-    let wall_secs = ms_delta.to_f32() / 1000.0;
-    (cpu_secs / wall_secs) * 100.0
+    let cpu_secs = float_math::div_u64(tick_delta, 100.0);
+    let wall_secs = float_math::div_u64(ms_delta, 1000.0);
+    float_math::percent(cpu_secs, wall_secs).to_f32()
 }
 
 /// Refresh cached live stats from Meilisearch if stale (>2s old).

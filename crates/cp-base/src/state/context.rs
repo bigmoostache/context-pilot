@@ -424,7 +424,7 @@ impl Entry {
 /// Estimate tokens from text (uses `CHARS_PER_TOKEN` constant)
 #[must_use]
 pub fn estimate_tokens(text: &str) -> usize {
-    (text.len().to_f32() / CHARS_PER_TOKEN).ceil().to_usize()
+    crate::cast::float_math::ceil_ratio(text.len(), CHARS_PER_TOKEN)
 }
 
 /// Compute total pages for a given token count using `PANEL_PAGE_TOKENS`

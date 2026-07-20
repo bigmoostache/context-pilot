@@ -69,11 +69,10 @@ pub(crate) struct ScoredResult {
 /// Decays from 1.0 (age = 0) down to a floor of 0.5 (age → ∞).
 /// Old logs always retain at least half their relevance weight,
 /// preventing semantically relevant older entries from vanishing.
+///
+/// Delegates to the `float_math` chokepoint (transcendental decay curve).
 fn decay(age_ms: f64, half_life_ms: f64) -> f64 {
-    if half_life_ms <= 0.0f64 {
-        return 1.0;
-    }
-    0.5f64.mul_add((-f64::ln(2.0) * age_ms / half_life_ms).exp(), 0.5)
+    cp_base::cast::float_math::exp_decay(age_ms, half_life_ms)
 }
 
 /// Read the cached radar YAML from state, with fallback messages.
@@ -265,7 +264,8 @@ fn query_signal_results(
     signal: &crate::types::TaskSignal,
     current_log_count_f: f64,
 ) -> Vec<ScoredResult> {
-    let q_distance = current_log_count_f - signal.log_count as f64;
+    use cp_base::cast::float_math;
+    let q_distance = float_math::sub(current_log_count_f, signal.log_count as f64);
     let q_decay = decay(q_distance, HALF_LIFE_LOGS);
 
     let Ok(json) = client.search(&SearchParams {
@@ -294,7 +294,7 @@ fn query_signal_results(
                 .and_then(|id| id.strip_prefix('L'))
                 .and_then(|n| n.parse::<u64>().ok())
                 .unwrap_or(0);
-            let r_distance = current_log_count_f - log_number as f64;
+            let r_distance = float_math::sub(current_log_count_f, log_number as f64);
             let r_decay = decay(r_distance, HALF_LIFE_LOGS);
 
             ScoredResult {
@@ -302,7 +302,7 @@ fn query_signal_results(
                 datetime: hit.get("datetime").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
                 importance: hit.get("importance").and_then(serde_json::Value::as_str).unwrap_or("medium").to_owned(),
                 content: hit.get("content").and_then(serde_json::Value::as_str).unwrap_or("").to_owned(),
-                score: relevance * q_decay * r_decay,
+                score: float_math::mul(float_math::mul(relevance, q_decay), r_decay),
             }
         })
         .collect()

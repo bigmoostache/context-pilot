@@ -1,4 +1,5 @@
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 use cp_render::{Semantic, Span};
 use unicode_width::UnicodeWidthChar as _;
 
@@ -236,7 +237,9 @@ fn fit_col_widths(col_widths: Vec<usize>, num_cols: usize, max_width: usize) -> 
     let mut new_widths: Vec<usize> = col_widths
         .iter()
         .map(|&w| {
-            let proportional = (w.to_f64() / total_content_width.to_f64() * available.to_f64()).to_usize();
+            let proportional =
+                float_math::mul(float_math::div(w.to_f64(), total_content_width.to_f64()), available.to_f64())
+                    .to_usize();
             proportional.max(3)
         })
         .collect();

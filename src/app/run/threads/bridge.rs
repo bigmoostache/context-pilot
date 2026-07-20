@@ -217,9 +217,12 @@ pub(in crate::app::run) fn emit_vitals(app: &mut App) {
     }
 
     // Cost — cumulative-since-boot; emit when the dollar total moves.
-    let cost_usd = app.state.cost_hit_usd + app.state.cost_miss_usd + app.state.cost_output_usd;
-    let cost_changed =
-        app.state.get_ext::<BridgeState>().is_some_and(|bs| (bs.last_cost_usd - cost_usd).abs() > f64::EPSILON);
+    let cost_usd =
+        cp_base::cast::float_math::sum3(app.state.cost_hit_usd, app.state.cost_miss_usd, app.state.cost_output_usd);
+    let cost_changed = app
+        .state
+        .get_ext::<BridgeState>()
+        .is_some_and(|bs| cp_base::cast::float_math::abs_diff(bs.last_cost_usd, cost_usd) > f64::EPSILON);
     if cost_changed {
         let input_tokens = app.state.cache_hit_tokens.to_u64().saturating_add(app.state.cache_miss_tokens.to_u64());
         let output_tokens = app.state.total_output_tokens.to_u64();

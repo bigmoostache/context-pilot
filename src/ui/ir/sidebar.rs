@@ -9,6 +9,7 @@ use cp_render::{ProgressSegment, Semantic};
 use crate::state::{Kind, State};
 use crate::ui::helpers::spinner;
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 
 /// Returns a count badge for fixed panels, replacing the panel ID (P1, P2, etc.)
 /// with a meaningful number that reflects the panel's content.
@@ -176,8 +177,8 @@ fn build_token_bar(state: &State) -> TokenBar {
     // re-derivation that could drift).
     let (hit, miss) = crate::modules::overview::context::context_hit_miss(state);
 
-    let hit_pct = if budget > 0 { (hit.to_f64() / budget.to_f64() * 100.0f64).to_u8() } else { 0 };
-    let miss_pct = if budget > 0 { (miss.to_f64() / budget.to_f64() * 100.0f64).to_u8() } else { 0 };
+    let hit_pct = if budget > 0 { float_math::percent(hit.to_f64(), budget.to_f64()).to_u8() } else { 0 };
+    let miss_pct = if budget > 0 { float_math::percent(miss.to_f64(), budget.to_f64()).to_u8() } else { 0 };
 
     TokenBar {
         segments: vec![
@@ -244,7 +245,7 @@ fn build_token_stats(state: &State) -> Option<TokenStats> {
     }
 
     // Total cost (sum of frozen legs)
-    let total_cost = state.cost_hit_usd + state.cost_miss_usd + state.cost_output_usd;
+    let total_cost = float_math::sum3(state.cost_hit_usd, state.cost_miss_usd, state.cost_output_usd);
     let total_cost_opt = (total_cost >= 0.001f64).then_some(total_cost);
 
     Some(TokenStats {

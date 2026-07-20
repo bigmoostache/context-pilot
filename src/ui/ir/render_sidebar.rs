@@ -9,6 +9,7 @@ use ratatui::widgets::Paragraph;
 
 use crate::ui::{chars, helpers::format_number, theme};
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 
 use crate::infra::constants::SIDEBAR_HELP_HEIGHT;
 
@@ -275,9 +276,9 @@ fn build_bar_spans(
     let bar_width_f = bar_width.to_f64();
 
     // Fractional fill positions for smooth animation
-    let hit_filled_f = anim.hit_pct * bar_width_f / 100.0f64;
-    let miss_filled_f = anim.miss_pct * bar_width_f / 100.0f64;
-    let total_filled_f = (hit_filled_f + miss_filled_f).min(bar_width_f);
+    let hit_filled_f = float_math::div(float_math::mul(anim.hit_pct, bar_width_f), 100.0f64);
+    let miss_filled_f = float_math::div(float_math::mul(anim.miss_pct, bar_width_f), 100.0f64);
+    let total_filled_f = float_math::add(hit_filled_f, miss_filled_f).min(bar_width_f);
 
     let hit_filled = hit_filled_f.floor().to_usize().min(bar_width);
     let total_filled = total_filled_f.floor().to_usize().min(bar_width);

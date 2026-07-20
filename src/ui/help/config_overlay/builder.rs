@@ -8,6 +8,7 @@ use cp_render::conversation::{ConfigBudgetBar, ConfigModel, ConfigOverlay, Confi
 
 use crate::state::State;
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 
 /// Type alias for the model-entry builder closure (`clippy::type_complexity`).
 type ModelEntryFn = dyn Fn(bool, &str, &dyn crate::llms::ModelInfo) -> ConfigModel;
@@ -138,14 +139,14 @@ fn build_budget_bars(state: &State) -> Vec<ConfigBudgetBar> {
     let effective_budget = state.effective_context_budget();
     let fmt = crate::ui::helpers::format_number;
 
-    let budget_pct = (effective_budget.to_f64() / max_budget.to_f64() * 100.0f64).to_usize();
-    let threshold_pct = (state.cleaning_threshold * 100.0).to_usize();
+    let budget_pct = float_math::percent(effective_budget.to_f64(), max_budget.to_f64()).to_usize();
+    let threshold_pct = float_math::mul_f32(state.cleaning_threshold, 100.0).to_usize();
 
     vec![
         ConfigBudgetBar {
             label: "Context Budget".into(),
             percent: budget_pct,
-            fill_ratio: effective_budget.to_f64() / max_budget.to_f64(),
+            fill_ratio: float_math::ratio(effective_budget.to_f64(), max_budget.to_f64()),
             value_display: format!("{}% {} tok", budget_pct, fmt(effective_budget)),
             extra: None,
             semantic: Semantic::Success,

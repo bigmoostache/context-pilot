@@ -9,6 +9,7 @@ pub(crate) use overlay::render_perf_overlay_from_ir;
 
 use crate::infra::constants::PERF_STATS_REFRESH_MS;
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
@@ -295,9 +296,9 @@ impl PerfMetrics {
                 let pct = if elapsed > 0.0 {
                     let tick_delta = cpu_ticks.saturating_sub(frame_st.last_cpu_measure.1);
                     // Convert ticks to seconds (usually 100 ticks/sec on Linux)
-                    let cpu_seconds = tick_delta.to_f32() / 100.0;
+                    let cpu_seconds = float_math::div_u64(tick_delta, 100.0).to_f32();
                     // CPU percentage = (cpu_time / wall_time) * 100
-                    (cpu_seconds / elapsed) * 100.0
+                    float_math::percent(cpu_seconds.to_f64(), elapsed.to_f64()).to_f32()
                 } else {
                     0.0
                 };
@@ -323,7 +324,7 @@ impl PerfMetrics {
         // Extract frame data and release lock before processing ops
         let frame_samples: Vec<f64> = {
             let frame_times = self.frame_times.read().unwrap_or_else(std::sync::PoisonError::into_inner);
-            frame_times.recent(40).iter().map(|&us| us.to_f64() / 1_000.0f64).collect()
+            frame_times.recent(40).iter().map(|&us| float_math::div_u64(us, 1_000.0f64)).collect()
         };
 
         // Extract op data under lock, then process without holding it
@@ -347,18 +348,21 @@ impl PerfMetrics {
                 let count = recent.len();
 
                 // Calculate mean
-                let mean_us = if count > 0 { recent.iter().sum::<u64>().to_f64() / count.to_f64() } else { 0.0f64 };
+                let mean_us = if count > 0 {
+                    float_math::div(recent.iter().sum::<u64>().to_f64(), count.to_f64())
+                } else {
+                    0.0f64
+                };
 
                 // Calculate standard deviation
                 let std_us = if count > 1 {
-                    let variance = recent
-                        .iter()
-                        .map(|&x| {
-                            let diff = x.to_f64() - mean_us;
-                            diff * diff
-                        })
-                        .sum::<f64>()
-                        / count.saturating_sub(1).to_f64();
+                    let variance = float_math::div(
+                        float_math::sum_iter(recent.iter().map(|&x| {
+                            let diff = float_math::sub(x.to_f64(), mean_us);
+                            float_math::mul(diff, diff)
+                        })),
+                        count.saturating_sub(1).to_f64(),
+                    );
                     variance.sqrt()
                 } else {
                     0.0f64
@@ -366,9 +370,9 @@ impl PerfMetrics {
 
                 OpSnapshot {
                     name,
-                    total_ms: total_us.to_f64() / 1000.0,
-                    mean_ms: mean_us / 1000.0,
-                    std_ms: std_us / 1000.0,
+                    total_ms: float_math::div_u64(*total_us, 1000.0f64),
+                    mean_ms: float_math::div(mean_us, 1000.0f64),
+                    std_ms: float_math::div(std_us, 1000.0f64),
                 }
             })
             .collect();
@@ -376,11 +380,7 @@ impl PerfMetrics {
         // Sort by total time descending (hotspots first)
         op_snapshots.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
 
-        let frame_avg_ms = if frame_samples.is_empty() {
-            0.0f64
-        } else {
-            frame_samples.iter().sum::<f64>() / frame_samples.len().to_f64()
-        };
+        let frame_avg_ms = if frame_samples.is_empty() { 0.0f64 } else { float_math::mean(&frame_samples) };
         let frame_max_ms = frame_samples.iter().copied().fold(0.0f64, f64::max);
 
         PerfSnapshot {
@@ -389,7 +389,7 @@ impl PerfMetrics {
             frame_avg_ms,
             frame_max_ms,
             cpu_usage: f32::from_bits(self.cpu_usage.load(Ordering::Relaxed)),
-            memory_mb: self.memory_bytes.load(Ordering::Relaxed).to_f64() / (1024.0 * 1024.0),
+            memory_mb: float_math::div_u64(self.memory_bytes.load(Ordering::Relaxed), 1_048_576.0f64),
             open_fds: self.open_fds.load(Ordering::Relaxed),
             fd_limit_soft: self.fd_limit_soft.load(Ordering::Relaxed),
         }

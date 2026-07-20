@@ -401,20 +401,21 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'A5-A13 DIRECTIVE (T588): lints are BEACONS. Max 5 #[expect] per step. No blanket-suppress — fix code properly. Report bucket counts BEFORE editing.'
+  tl_dr: 'A5-A13 DIRECTIVE (T588): lints are BEACONS. Max 5 #[expect] per step. No blanket-suppress. Commit AND push after each step. A5 done+pushed. A6 float_arithmetic done. Next A7 inline_modules.'
   contents: |-
     T588 user directive, valid A5 through A13:
 
-    Lints are beacons toward better code, NOT nuisances to suppress. Hard cap: 5 #[expect] per step.
+    Lints are beacons toward better code, NOT nuisances to suppress. Hard cap: 5 #[expect] per step. Commit AND push after each step (CI runs in background).
 
-    Per-site buckets:
-    1. #[non_exhaustive] + constructor — struct built only in-crate (external via helper like make_default_entry, Message::new_*). Takes non_exhaustive cleanly.
-    2. Add ::new()/builder THEN #[non_exhaustive] — cross-crate literal construction that SHOULD funnel through a constructor. The real code improvement.
-    3. #[expect] last-resort only (cap 5) — cross-crate literal unavoidable, constructor pure ceremony (fixed wire-layout records). Justify each.
+    Per-site buckets: (1) #[non_exhaustive]+constructor for in-crate-only construction; (2) add ::new/builder THEN non_exhaustive for cross-crate literal; (3) #[expect] last-resort (cap 5) for fixed wire-layout records where constructor trips too_many_arguments.
 
-    Always audit sites into buckets + report real numbers BEFORE editing so user approves the expect count.
+    A5 DONE + pushed f2fce464 (branch we-dev). exhaustive_structs=deny. Exactly 5 expects.
 
-    A5 dropped 2026-07-19: ~75 struct expects reverted via git checkout, tree back to A4-clean HEAD 9fd7b839.
+    A6 float_arithmetic DONE (branch we-dev). Strategy: SINGLE central chokepoint cp-base/src/cast/float_math.rs (module-level #![expect], 1 expect total for A6). ALL workspace float math routes through float_math helpers (ceil_ratio, scale, mul_f32/add_f32/sub_f32, cost_usd, add/sub/mul/div/ratio/percent, fma, abs_diff, sum3, bar_fill, fill_from_ratio, uniform, div_u64, lerp, ease_out_cubic, fract_phase, pulse, exp_decay, mean, variance). cast.rs split into cast/mod.rs + cast/float_math.rs (was >500 lines). ~96 tui-bin sites + 7 cp-base + 7 cp-mod-search all routed. Unary neg killed via sub antisymmetry (-sub(a,b)=sub(b,a)). Chain entry #43. yaml: 3 cast entries repointed cast.rs->cast/mod.rs (2) + cast/float_math.rs (1). clippy --all-targets from root = 0 float_arithmetic, all 6 callbacks green.
+
+    Now A7 inline_modules (X1197): split inline mod{} into files, ~31 sites.
+
+    GATE discipline: cargo clippy --all-targets from ROOT, grep msg text NOT lint-name. chain.sh --password Totordu1789 (NOT stdin, NOT --update flag — wrapper always updates). git push blocks | and > operators — use plain git push. git add -A safe (entities/messages gitignored). npx needs export PATH=/opt/homebrew/bin:$PATH.
   importance: critical
   labels:
   - T588
@@ -422,7 +423,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784497797633
+  last_edited_ms: 1784534539362
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high

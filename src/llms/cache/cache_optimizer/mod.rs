@@ -34,6 +34,7 @@
 //! Total: **O(N² · K)** time, **O(N · K)** space.
 
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 
 /// Per-super-block forward DP (split out for the 500-line structure limit).
 mod superblock_dp;
@@ -80,15 +81,15 @@ impl PrefixSums {
             let prev_sp = s_p.get(idx.saturating_sub(1)).copied().unwrap_or(0.0f64);
             let prev_spt = s_pt.get(idx.saturating_sub(1)).copied().unwrap_or(0.0f64);
 
-            let cur_t = prev_t + tok.to_f64();
+            let cur_t = float_math::add(prev_t, tok.to_f64());
             if let Some(slot) = big_t.get_mut(idx) {
                 *slot = cur_t;
             }
             if let Some(slot) = s_p.get_mut(idx) {
-                *slot = prev_sp + p_val;
+                *slot = float_math::add(prev_sp, p_val);
             }
             if let Some(slot) = s_pt.get_mut(idx) {
-                *slot = prev_spt.mul_add(1.0, p_val * cur_t);
+                *slot = prev_spt.mul_add(1.0, float_math::mul(p_val, cur_t));
             }
         }
 
@@ -108,7 +109,7 @@ impl PrefixSums {
         let cum_prob_right = self.s_p.get(right).copied().unwrap_or(0.0f64);
         let cum_prob_left = self.s_p.get(left).copied().unwrap_or(0.0f64);
 
-        tok_left.mul_add(-(cum_prob_right - cum_prob_left), cum_pt_right - cum_pt_left)
+        tok_left.mul_add(float_math::sub(cum_prob_left, cum_prob_right), float_math::sub(cum_pt_right, cum_pt_left))
     }
 }
 
@@ -194,7 +195,7 @@ fn knapsack_across(sb_costs: &[Vec<f64>], budget: usize) -> KnapsackTables {
                 relax_knapsack_cell(
                     &mut dp_table,
                     &mut choice,
-                    &KnapCell { blk, total_j, jk, candidate: prev_cost + sb_cost },
+                    &KnapCell { blk, total_j, jk, candidate: float_math::add(prev_cost, sb_cost) },
                 );
             }
         }

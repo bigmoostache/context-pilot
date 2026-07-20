@@ -7,7 +7,7 @@ use ratatui::prelude::{Line, Span, Style};
 
 use crate::infra::constants::chars;
 use crate::ui::ir::semantic_to_style;
-use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 
 /// Bar width in cells (shared for all budget bars).
 const BAR_WIDTH: usize = 24;
@@ -32,7 +32,7 @@ fn render_bar(lines: &mut Vec<Line<'_>>, budget_bar: &cp_render::conversation::C
     };
     let arrow_color = if is_selected { theme::accent() } else { theme::text_muted() };
 
-    let filled = (budget_bar.fill_ratio * BAR_WIDTH.to_f64()).to_usize().min(BAR_WIDTH);
+    let filled = float_math::fill_from_ratio(budget_bar.fill_ratio, BAR_WIDTH).min(BAR_WIDTH);
 
     lines.push(Line::from(vec![
         Span::styled(format!(" {indicator} "), Style::default().fg(theme::accent())),

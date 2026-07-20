@@ -13,6 +13,7 @@ use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
 use crate::ui::ir::semantic_to_style;
 use crate::ui::{chars, theme};
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 
 /// Render the performance overlay from its IR snapshot.
 pub(crate) fn render_perf_overlay_from_ir(frame: &mut Frame<'_>, area: Rect, perf: &PerfOverlay) {
@@ -96,7 +97,7 @@ pub(crate) fn render_perf_overlay_from_ir(frame: &mut Frame<'_>, area: Rect, per
 /// Render a budget bar from IR data.
 fn render_budget_bar(budget_bar: &cp_render::conversation::PerfBudgetBar) -> Line<'static> {
     let bar_width = 30usize;
-    let filled = ((budget_bar.percent / 100.0f64) * bar_width.to_f64()).to_usize();
+    let filled = float_math::mul(float_math::div(budget_bar.percent, 100.0f64), bar_width.to_f64()).to_usize();
 
     Line::from(vec![
         Span::styled(format!(" {:<6}", budget_bar.label), semantic_to_style(Semantic::Muted)),
@@ -124,7 +125,8 @@ fn render_sparkline(values: &[f64]) -> Line<'static> {
     let sparkline: String = values
         .iter()
         .map(|&v| {
-            let idx = ((v / max_val) * SPARK_CHARS.len().saturating_sub(1).to_f64()).to_usize();
+            let idx =
+                float_math::mul(float_math::div(v, max_val), SPARK_CHARS.len().saturating_sub(1).to_f64()).to_usize();
             let clamped = idx.min(SPARK_CHARS.len().saturating_sub(1));
             SPARK_CHARS.get(clamped).copied().unwrap_or('▁')
         })

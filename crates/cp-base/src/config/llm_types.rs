@@ -98,11 +98,11 @@ pub trait ModelInfo {
     fn output_price_per_mtok(&self) -> f32;
     /// Cache hit price per million tokens in USD (default: same as input)
     fn cache_hit_price_per_mtok(&self) -> f32 {
-        self.input_price_per_mtok() * 0.1
+        crate::cast::float_math::mul_f32(self.input_price_per_mtok(), 0.1)
     }
     /// Cache write/miss price per million tokens in USD (default: 1.25x input)
     fn cache_miss_price_per_mtok(&self) -> f32 {
-        self.input_price_per_mtok() * 1.25
+        crate::cast::float_math::mul_f32(self.input_price_per_mtok(), 1.25)
     }
     /// Maximum output tokens the model can produce in a single response
     fn max_output_tokens(&self) -> u32;

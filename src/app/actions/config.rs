@@ -44,7 +44,7 @@ pub(crate) fn handle_config_increase_bar(state: &mut State) -> ActionResult {
         }
         1 => {
             // Cleaning threshold
-            state.cleaning_threshold = (state.cleaning_threshold + 0.05).min(0.95);
+            state.cleaning_threshold = cp_base::cast::float_math::add_f32(state.cleaning_threshold, 0.05).min(0.95);
         }
         _ => {}
     }
@@ -65,7 +65,7 @@ pub(crate) fn handle_config_decrease_bar(state: &mut State) -> ActionResult {
         }
         1 => {
             // Cleaning threshold
-            state.cleaning_threshold = (state.cleaning_threshold - 0.05).max(0.30);
+            state.cleaning_threshold = cp_base::cast::float_math::sub_f32(state.cleaning_threshold, 0.05).max(0.30);
         }
         _ => {}
     }

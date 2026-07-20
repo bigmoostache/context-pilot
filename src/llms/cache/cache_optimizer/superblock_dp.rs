@@ -5,7 +5,7 @@
 //! structure limit. Operates on the parent's [`PrefixSums`] for O(1) block-cost
 //! queries.
 
-use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 
 use super::PrefixSums;
 
@@ -18,10 +18,10 @@ pub(super) fn normalize_density(weights: &[f64]) -> Vec<f64> {
         if len == 0 {
             return vec![];
         }
-        let uniform = 1.0f64 / len.to_f64();
-        return vec![uniform; len];
+        let weight = float_math::uniform(len);
+        return vec![weight; len];
     }
-    weights.iter().map(|&w| w.max(0.0) / total).collect()
+    weights.iter().map(|&w| float_math::div(w.max(0.0), total)).collect()
 }
 
 /// Forward DP tables over candidate cut positions within a super-block.
@@ -94,7 +94,11 @@ fn fill_h_table(candidates: &[usize], left_bound: usize, max_cuts: usize, ps: &P
                     .and_then(|row| row.get(prev_idx))
                     .copied()
                     .unwrap_or(f64::INFINITY);
-                relax_h_cell(&mut table, &HCell { cut_count, c_idx, prev_idx }, prev_h + ps.block_cost(prev_pos, pos));
+                relax_h_cell(
+                    &mut table,
+                    &HCell { cut_count, c_idx, prev_idx },
+                    float_math::add(prev_h, ps.block_cost(prev_pos, pos)),
+                );
             }
         }
     }
@@ -149,7 +153,7 @@ fn collect_best_cuts(scan: &CutScan<'_>, out: &mut SuperblockOut) {
         for c_idx in min_c..nc {
             let pos = candidates.get(c_idx).copied().unwrap_or(0);
             let prefix_cost = table.h.get(cut_count).and_then(|row| row.get(c_idx)).copied().unwrap_or(f64::INFINITY);
-            let total = prefix_cost + ps.block_cost(pos, right_bound);
+            let total = float_math::add(prefix_cost, ps.block_cost(pos, right_bound));
             let current_best = out.costs.get(cut_count).copied().unwrap_or(f64::INFINITY);
             if total < current_best {
                 if let Some(slot) = out.costs.get_mut(cut_count) {

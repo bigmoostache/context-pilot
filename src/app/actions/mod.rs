@@ -26,6 +26,7 @@ pub(crate) use helpers::{clean_llm_id_prefix, find_context_by_id, parse_context_
 
 use crate::infra::constants::{SCROLL_ACCEL_INCREMENT, SCROLL_ACCEL_MAX};
 use crate::state::{Kind, State, StreamPhase};
+use cp_base::cast::float_math;
 
 // Re-export Action/ActionResult from cp-base (shared with module crates)
 pub(crate) use cp_base::state::actions::{Action, ActionResult};
@@ -265,16 +266,16 @@ pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
         Action::StreamError(e) => streaming::handle_stream_error(state, &e),
 
         Action::ScrollUp(amount) => {
-            let accel_amount = amount * state.scroll_accel;
-            state.scroll_offset = (state.scroll_offset - accel_amount).max(0.0);
+            let accel_amount = float_math::mul_f32(amount, state.scroll_accel);
+            state.scroll_offset = float_math::sub_f32(state.scroll_offset, accel_amount).max(0.0);
             state.flags.stream.user_scrolled = true;
-            state.scroll_accel = (state.scroll_accel + SCROLL_ACCEL_INCREMENT).min(SCROLL_ACCEL_MAX);
+            state.scroll_accel = float_math::add_f32(state.scroll_accel, SCROLL_ACCEL_INCREMENT).min(SCROLL_ACCEL_MAX);
             ActionResult::Nothing
         }
         Action::ScrollDown(amount) => {
-            let accel_amount = amount * state.scroll_accel;
-            state.scroll_offset += accel_amount;
-            state.scroll_accel = (state.scroll_accel + SCROLL_ACCEL_INCREMENT).min(SCROLL_ACCEL_MAX);
+            let accel_amount = float_math::mul_f32(amount, state.scroll_accel);
+            state.scroll_offset = float_math::add_f32(state.scroll_offset, accel_amount);
+            state.scroll_accel = float_math::add_f32(state.scroll_accel, SCROLL_ACCEL_INCREMENT).min(SCROLL_ACCEL_MAX);
             ActionResult::Nothing
         }
         Action::StopStreaming => handle_stop_streaming(state),

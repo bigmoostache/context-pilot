@@ -17,7 +17,7 @@
 exceptions:
   # ── cast.rs: Safe numeric casting infrastructure ─────────────────
 
-  - path: "crates/cp-base/src/cast.rs"
+  - path: "crates/cp-base/src/cast/mod.rs"
     match: "lossy int→float: mantissa too narrow — inherent floating-point limitation"
     reason: >
       Module-level #[expect] on mod lossy_float covers all 12 lossy
@@ -27,7 +27,7 @@ exceptions:
     strategy: >
       Irreducible — fundamental floating-point limitation.
 
-  - path: "crates/cp-base/src/cast.rs"
+  - path: "crates/cp-base/src/cast/mod.rs"
     match: "saturating float→int: no TryFrom<float> for integers in std"
     reason: >
       Module-level #[expect] on mod float_to_int covers f64 and f32
@@ -35,6 +35,19 @@ exceptions:
       so raw `as` with manual bounds checking is the only path.
     strategy: >
       Irreducible until std provides TryFrom<f64> for integers.
+
+  - path: "crates/cp-base/src/cast/float_math.rs"
+    match: "sole chokepoint for irreducible f32/f64 arithmetic — token/char/page conversion, USD cost, bar fills, easing, and telemetry statistics"
+    reason: >
+      Module-level #![expect] on mod float_math: the sole audited site for
+      float arithmetic once clippy::float_arithmetic is deny workspace-wide.
+      Domain-named helpers (token/char/page conversion, USD cost, bar fills,
+      easing curves, telemetry statistics) carry no domain constants —
+      divisors/factors are parameters. The arithmetic is irreducible —
+      floating-point IS the domain (ratios, prices, decay).
+    strategy: >
+      Fundamentally irreducible — float ratio/price/decay math has no integer
+      equivalent. Chokepoint mirrors the time_arith integer-division module.
 
   # ── config/mod.rs: invariant_panic ──────────────────────────────────
 

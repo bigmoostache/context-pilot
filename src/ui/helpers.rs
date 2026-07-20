@@ -1,4 +1,5 @@
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 use unicode_width::UnicodeWidthStr as _;
 
 /// Truncate a string to fit within `max_width` display columns, appending '…' if truncated.
@@ -24,11 +25,11 @@ pub(crate) fn truncate_string(s: &str, max_width: usize) -> String {
 /// Format a number with K/M suffix for compact display.
 pub(crate) fn format_number(n: usize) -> String {
     if n >= 1_000_000_000 {
-        format!("{:.1}B", n.to_f64() / 1_000_000_000.0)
+        format!("{:.1}B", float_math::div_u64(n.to_u64(), 1_000_000_000.0f64))
     } else if n >= 1_000_000 {
-        format!("{:.1}M", n.to_f64() / 1_000_000.0)
+        format!("{:.1}M", float_math::div_u64(n.to_u64(), 1_000_000.0f64))
     } else if n >= 1_000 {
-        format!("{:.1}K", n.to_f64() / 1_000.0)
+        format!("{:.1}K", float_math::div_u64(n.to_u64(), 1_000.0f64))
     } else {
         n.to_string()
     }
@@ -271,7 +272,7 @@ impl TypewriterBuffer {
             chunk_sizes: VecDeque::new(),
             last_chunk_time: None,
             last_char_time: Instant::now(),
-            chars_per_ms: 1.0 / TYPEWRITER_DEFAULT_DELAY_MS,
+            chars_per_ms: float_math::div(1.0, TYPEWRITER_DEFAULT_DELAY_MS),
             stream_done: false,
         }
     }
@@ -283,7 +284,7 @@ impl TypewriterBuffer {
         self.chunk_sizes.clear();
         self.last_chunk_time = None;
         self.last_char_time = Instant::now();
-        self.chars_per_ms = 1.0f64 / TYPEWRITER_DEFAULT_DELAY_MS;
+        self.chars_per_ms = float_math::div(1.0, TYPEWRITER_DEFAULT_DELAY_MS);
         self.stream_done = false;
     }
 
@@ -319,16 +320,17 @@ impl TypewriterBuffer {
             return;
         }
 
-        let total_interval_ms: f64 = self.chunk_intervals.iter().map(|d| d.as_secs_f64() * 1_000.0f64).sum();
-        let avg_interval_ms = total_interval_ms / self.chunk_intervals.len().to_f64();
+        let total_interval_ms: f64 =
+            self.chunk_intervals.iter().map(|d| float_math::mul(d.as_secs_f64(), 1_000.0f64)).sum();
+        let avg_interval_ms = float_math::div(total_interval_ms, self.chunk_intervals.len().to_f64());
 
         let total_chars: usize = self.chunk_sizes.iter().sum();
-        let avg_chunk_size = total_chars.to_f64() / self.chunk_sizes.len().to_f64();
+        let avg_chunk_size = float_math::div(total_chars.to_f64(), self.chunk_sizes.len().to_f64());
 
         if avg_interval_ms > 0.0f64 && avg_chunk_size > 0.0f64 {
-            let calculated_delay = avg_interval_ms / avg_chunk_size;
+            let calculated_delay = float_math::div(avg_interval_ms, avg_chunk_size);
             let clamped_delay = calculated_delay.clamp(TYPEWRITER_MIN_DELAY_MS, TYPEWRITER_MAX_DELAY_MS);
-            self.chars_per_ms = 1.0f64 / clamped_delay;
+            self.chars_per_ms = float_math::div(1.0, clamped_delay);
         }
     }
 
@@ -345,8 +347,8 @@ impl TypewriterBuffer {
         }
 
         let now = Instant::now();
-        let elapsed_ms = now.duration_since(self.last_char_time).as_secs_f64() * 1_000.0f64;
-        let chars_to_release = (elapsed_ms * self.chars_per_ms).floor().to_usize();
+        let elapsed_ms = float_math::mul(now.duration_since(self.last_char_time).as_secs_f64(), 1_000.0f64);
+        let chars_to_release = float_math::mul(elapsed_ms, self.chars_per_ms).floor().to_usize();
 
         if chars_to_release == 0 {
             return None;

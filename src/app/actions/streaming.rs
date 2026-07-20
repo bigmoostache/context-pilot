@@ -1,5 +1,6 @@
 use crate::state::persistence::log_error;
 use crate::state::{Kind, State, StreamPhase, estimate_tokens};
+use cp_base::cast::float_math;
 use cp_base::state::data::model_helpers::{ModelPricing as _, token_cost};
 
 use super::ActionResult;
@@ -85,8 +86,10 @@ pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>)
     // spend stable when the user switches models afterwards.
     let cost = StreamCost {
         hit: token_cost(usage.cache_hit, state.cache_hit_price_per_mtok()),
-        miss: token_cost(event.cache_miss, state.cache_miss_price_per_mtok())
-            + token_cost(event.input_tokens, state.input_price_per_mtok()),
+        miss: float_math::add(
+            token_cost(event.cache_miss, state.cache_miss_price_per_mtok()),
+            token_cost(event.input_tokens, state.input_price_per_mtok()),
+        ),
         output: token_cost(usage.output, state.output_price_per_mtok()),
     };
     apply_token_usage(state, &usage, &cost);
@@ -118,7 +121,7 @@ pub(crate) fn handle_stream_done(state: &mut State, event: &StreamDoneEvent<'_>)
 }
 
 /// Apply token usage and frozen per-stream cost to state counters.
-fn apply_token_usage(app_state: &mut State, usage: &TokenUsage, cost: &StreamCost) {
+const fn apply_token_usage(app_state: &mut State, usage: &TokenUsage, cost: &StreamCost) {
     // Set tick usage (this tick only)
     app_state.tick_cache_hit_tokens = usage.cache_hit;
     app_state.tick_cache_miss_tokens = usage.cache_miss;
@@ -134,18 +137,18 @@ fn apply_token_usage(app_state: &mut State, usage: &TokenUsage, cost: &StreamCos
     app_state.stream_output_tokens = app_state.stream_output_tokens.saturating_add(usage.output);
     app_state.stream_uncached_input_tokens =
         app_state.stream_uncached_input_tokens.saturating_add(usage.uncached_input);
-    app_state.stream_cost_hit_usd += cost.hit;
-    app_state.stream_cost_miss_usd += cost.miss;
-    app_state.stream_cost_output_usd += cost.output;
+    app_state.stream_cost_hit_usd = float_math::add(app_state.stream_cost_hit_usd, cost.hit);
+    app_state.stream_cost_miss_usd = float_math::add(app_state.stream_cost_miss_usd, cost.miss);
+    app_state.stream_cost_output_usd = float_math::add(app_state.stream_cost_output_usd, cost.output);
 
     // Accumulate total usage
     app_state.cache_hit_tokens = app_state.cache_hit_tokens.saturating_add(usage.cache_hit);
     app_state.cache_miss_tokens = app_state.cache_miss_tokens.saturating_add(usage.cache_miss);
     app_state.total_output_tokens = app_state.total_output_tokens.saturating_add(usage.output);
     app_state.uncached_input_tokens = app_state.uncached_input_tokens.saturating_add(usage.uncached_input);
-    app_state.cost_hit_usd += cost.hit;
-    app_state.cost_miss_usd += cost.miss;
-    app_state.cost_output_usd += cost.output;
+    app_state.cost_hit_usd = float_math::add(app_state.cost_hit_usd, cost.hit);
+    app_state.cost_miss_usd = float_math::add(app_state.cost_miss_usd, cost.miss);
+    app_state.cost_output_usd = float_math::add(app_state.cost_output_usd, cost.output);
 }
 
 /// Handle `StreamError` action — clean up streaming state, log error.

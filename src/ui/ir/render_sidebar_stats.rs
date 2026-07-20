@@ -10,6 +10,7 @@ use unicode_width::UnicodeWidthStr as _;
 
 use crate::ui::{chars, helpers::format_number, theme};
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 
 use super::render_sidebar::padded;
 
@@ -18,7 +19,7 @@ use super::render_sidebar::padded;
 fn format_cost(cost: Option<f64>) -> String {
     cost.map_or(String::new(), |c| {
         if c >= 1_000.0f64 {
-            format!("${:.1}K", c / 1_000.0f64)
+            format!("${:.1}K", float_math::div(c, 1_000.0f64))
         } else if c < 0.01f64 {
             format!("${c:.3}")
         } else if c < 1.0f64 {
@@ -32,7 +33,7 @@ fn format_cost(cost: Option<f64>) -> String {
 /// Format the total-cost figure (`$K` tier ≥1000, 3dp <0.01, else 2dp).
 fn format_total_cost(total: f64) -> String {
     if total >= 1_000.0f64 {
-        format!("${:.1}K", total / 1_000.0f64)
+        format!("${:.1}K", float_math::div(total, 1_000.0f64))
     } else if total < 0.01f64 {
         format!("${total:.3}")
     } else {

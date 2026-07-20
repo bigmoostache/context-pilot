@@ -20,6 +20,8 @@ use super::super::ApiMessage;
 
 #[cfg(test)]
 use cp_base::cast::Safe as _;
+#[cfg(test)]
+use cp_base::cast::float_math;
 
 // ─── Trait ──────────────────────────────────────────────────────────────────
 
@@ -72,7 +74,7 @@ impl DivergenceDensity for QuadraticDensity {
         (1..=num_blocks)
             .map(|i| {
                 let val = i.to_f64();
-                val * val
+                float_math::mul(val, val)
             })
             .collect()
     }
@@ -226,7 +228,7 @@ impl DivergenceDensity for EmpiricalDensity {
         (0..num_blocks)
             .map(|idx| {
                 let count = self.counts.get(idx).copied().unwrap_or(0);
-                count.to_f64() + epsilon
+                float_math::add(count.to_f64(), epsilon)
             })
             .collect()
     }
@@ -292,8 +294,8 @@ mod tests {
     fn assert_weights_normalizable(density: &dyn DivergenceDensity, weights: &[f64]) {
         let total: f64 = weights.iter().sum();
         assert!(total > 0.0f64, "{density:?}: total weight {total} is not positive");
-        let norm_sum: f64 = weights.iter().map(|&w_val| w_val / total).sum();
-        assert!((norm_sum - 1.0).abs() < 1e-10f64, "{density:?}: normalized sum {norm_sum} != 1.0");
+        let norm_sum: f64 = weights.iter().map(|&w_val| float_math::div(w_val, total)).sum();
+        assert!(float_math::sub(norm_sum, 1.0).abs() < 1e-10f64, "{density:?}: normalized sum {norm_sum} != 1.0");
     }
 
     /// Validate fundamental properties that ALL densities must satisfy.

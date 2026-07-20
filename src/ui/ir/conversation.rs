@@ -11,7 +11,7 @@ use cp_render::conversation::{
 use cp_render::{Block, Semantic};
 
 use crate::state::{Kind, MsgKind, MsgStatus, State, ToolResultRecord, ToolUseRecord};
-use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 
 /// Build the conversation region from application state.
 #[must_use]
@@ -240,7 +240,7 @@ fn fd_semantic(open: u32, limit: u64) -> Semantic {
     if limit == 0 {
         return Semantic::Muted;
     }
-    let pct = f64::from(open) / f64::from(u32::try_from(limit).unwrap_or(u32::MAX)) * 100.0f64;
+    let pct = float_math::percent(f64::from(open), f64::from(u32::try_from(limit).unwrap_or(u32::MAX)));
     if pct < 50.0 {
         Semantic::Success
     } else if pct < 80.0 {
@@ -256,14 +256,14 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
 
     let snapshot = PERF.snapshot();
 
-    let fps = if snapshot.frame_avg_ms > 0.0f64 { 1_000.0f64 / snapshot.frame_avg_ms } else { 0.0f64 };
+    let fps = if snapshot.frame_avg_ms > 0.0f64 { float_math::div(1_000.0f64, snapshot.frame_avg_ms) } else { 0.0f64 };
 
     // Meilisearch stats
     let meili = cp_mod_search::overlay_info(state).and_then(|info| {
         if info.meili_memory_bytes == 0 && info.meili_cpu_pct <= 0.0 {
             return None;
         }
-        let mb = info.meili_memory_bytes.to_f64() / (1_024.0f64 * 1_024.0f64);
+        let mb = float_math::div_u64(info.meili_memory_bytes, 1_048_576.0f64);
         Some(PerfMeiliStats {
             cpu_pct: f64::from(info.meili_cpu_pct),
             cpu_semantic: cpu_semantic(f64::from(info.meili_cpu_pct)),
@@ -273,7 +273,7 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
 
     // Budget bars
     let build_bar = |label: &str, budget_ms: f64| -> PerfBudgetBar {
-        let pct = (snapshot.frame_avg_ms / budget_ms * 100.0).min(150.0);
+        let pct = float_math::percent(snapshot.frame_avg_ms, budget_ms).min(150.0);
         let semantic = if pct <= 80.0f64 {
             Semantic::Success
         } else if pct <= 100.0f64 {
@@ -294,7 +294,7 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
         .iter()
         .take(10)
         .map(|op| {
-            let pct = if total_time > 0.0f64 { op.total_ms / total_time * 100.0f64 } else { 0.0f64 };
+            let pct = if total_time > 0.0f64 { float_math::percent(op.total_ms, total_time) } else { 0.0f64 };
             let is_hotspot = pct > 30.0f64;
 
             let name = if op.name.len() <= 24 {
@@ -305,7 +305,7 @@ fn build_perf_overlay(state: &State) -> PerfOverlay {
             };
 
             let total_display = if op.total_ms >= 1_000.0f64 {
-                format!("{:.1}s", op.total_ms / 1_000.0f64)
+                format!("{:.1}s", float_math::div(op.total_ms, 1_000.0f64))
             } else {
                 format!("{:.0}ms", op.total_ms)
             };

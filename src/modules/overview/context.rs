@@ -1,4 +1,5 @@
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 use cp_base::state::data::model_helpers::ModelPricing as _;
 
 use crate::modules::all_modules;
@@ -149,7 +150,7 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     // token bar and the web-HUD `ContextUsage` delta), so the figure never
     // drifts between surfaces (T297).
     let (total_tokens, threshold, budget) = context_usage(state);
-    let usage_pct = (total_tokens.to_f64() / budget.to_f64() * 100.0).min(100.0);
+    let usage_pct = float_math::percent(total_tokens.to_f64(), budget.to_f64()).min(100.0);
 
     let mut output =
         format!("Context Usage: {total_tokens} / {threshold} threshold / {budget} budget ({usage_pct:.1}%)\n\n");

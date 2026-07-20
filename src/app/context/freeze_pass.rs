@@ -7,7 +7,6 @@
 use crate::app::panels::ContextItem;
 use crate::state::State;
 use crate::state::cache::hash_content;
-use cp_base::cast::Safe as _;
 use cp_base::state::data::model_helpers::ModelPricing as _;
 use cp_base::state::data::{CacheBreakKind, TickTelemetry};
 
@@ -213,9 +212,9 @@ fn apply_panel_cache_costs(state: &mut State, new_hash_list: &[String], hit_pric
         let is_hit = i < prefix_len;
         let price = if is_hit { hit_price } else { miss_price };
         if let Some(ctx) = state.context.iter_mut().find(|c| c.id == panel_id) {
-            let cost = ctx.token_count.to_f64() * f64::from(price) / 1_000_000.0f64;
+            let cost = cp_base::cast::float_math::cost_usd(ctx.token_count, price);
             ctx.panel_cache_hit = is_hit;
-            ctx.panel_total_cost += cost;
+            ctx.panel_total_cost = cp_base::cast::float_math::add(ctx.panel_total_cost, cost);
         }
     }
 }

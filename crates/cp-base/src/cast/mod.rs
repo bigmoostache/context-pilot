@@ -5,6 +5,12 @@
 //! values that don't fit clamp to the target type's MIN/MAX.
 //!
 //! Usage: `use cp_base::cast::Safe;` then `value.to_u16()`, etc.
+//!
+//! Float arithmetic lives in the [`float_math`] sibling module — the sole
+//! audited chokepoint for `clippy::float_arithmetic` (deny workspace-wide).
+
+/// Float arithmetic chokepoint (ratios, cost, bar fills, easing, statistics).
+pub mod float_math;
 
 /// Trait for safe saturating casts between numeric types.
 pub trait Safe {

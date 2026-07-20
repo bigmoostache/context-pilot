@@ -10,6 +10,7 @@ use crate::modules::{Module, all_modules};
 use crate::state::{State, get_context_type_meta};
 use crate::ui::helpers::format_number as fmt_num;
 use cp_base::cast::Safe as _;
+use cp_base::cast::float_math;
 use cp_mod_git::types::GitChangeType;
 
 /// Progress-bar color for current occupancy relative to the cleaning threshold:
@@ -17,7 +18,7 @@ use cp_mod_git::types::GitChangeType;
 fn token_bar_semantic(total_tokens: usize, threshold: usize) -> Semantic {
     if total_tokens >= threshold {
         Semantic::Error
-    } else if total_tokens.to_f64() >= threshold.to_f64() * 0.9f64 {
+    } else if total_tokens.to_f64() >= float_math::mul(threshold.to_f64(), 0.9f64) {
         Semantic::Warning
     } else {
         Semantic::Accent
@@ -35,7 +36,7 @@ pub(super) fn token_usage_blocks(state: &State) -> Vec<Block> {
     let total_tokens = system_prompt_tokens.saturating_add(tool_def_tokens).saturating_add(panel_tokens);
     let budget = state.effective_context_budget();
     let threshold = state.cleaning_threshold_tokens();
-    let usage_pct = (total_tokens.to_f64() / budget.to_f64() * 100.0).min(100.0);
+    let usage_pct = float_math::percent(total_tokens.to_f64(), budget.to_f64()).min(100.0);
 
     out.push(Block::Header(vec![Span::styled("TOKEN USAGE".to_owned(), Semantic::Muted)]));
     out.push(Block::Empty);
@@ -52,7 +53,7 @@ pub(super) fn token_usage_blocks(state: &State) -> Vec<Block> {
 
     let used_pct = usage_pct.round().to_u8();
     let bar_semantic = token_bar_semantic(total_tokens, threshold);
-    let threshold_pct = (state.cleaning_threshold * 100.0).round().to_u8();
+    let threshold_pct = float_math::mul_f32(state.cleaning_threshold, 100.0).round().to_u8();
     let label = format!("│ threshold {threshold_pct}%");
 
     out.push(Block::ProgressBar {
