@@ -114,12 +114,12 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return err_result(tool, e),
     };
 
-    let Some(url) = tool.input.get("url").and_then(|v| v.as_str()) else {
+    let Some(url_ref) = tool.input.get("url").and_then(|v| v.as_str()) else {
         return err_result(tool, "Missing required parameter 'url'".to_owned());
     };
 
     // Extract all params to owned types for the closure
-    let url = url.to_owned();
+    let url = url_ref.to_owned();
     let formats_val: Vec<String> = tool.input.get("formats").and_then(|v| v.as_array()).map_or_else(
         || vec!["markdown".to_owned(), "links".to_owned()],
         |arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
@@ -213,12 +213,12 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return err_result(tool, e),
     };
 
-    let Some(query) = tool.input.get("query").and_then(|v| v.as_str()) else {
+    let Some(query_ref) = tool.input.get("query").and_then(|v| v.as_str()) else {
         return err_result(tool, "Missing required parameter 'query'".to_owned());
     };
 
     // Extract all params to owned types for the closure
-    let query = query.to_owned();
+    let query = query_ref.to_owned();
     let limit = tool.input.get("limit").and_then(serde_json::Value::as_u64).unwrap_or(3).to_u32();
     let sources_val: Vec<String> = tool.input.get("sources").and_then(|v| v.as_array()).map_or_else(
         || vec!["web".to_owned()],
@@ -308,12 +308,12 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return err_result(tool, e),
     };
 
-    let Some(url) = tool.input.get("url").and_then(|v| v.as_str()) else {
+    let Some(url_ref) = tool.input.get("url").and_then(|v| v.as_str()) else {
         return err_result(tool, "Missing required parameter 'url'".to_owned());
     };
 
     // Extract all params to owned types for the closure
-    let url = url.to_owned();
+    let url = url_ref.to_owned();
     let limit = tool.input.get("limit").and_then(serde_json::Value::as_u64).unwrap_or(50).to_u32();
     let search_val = tool.input.get("search").and_then(|v| v.as_str()).map(String::from);
     let include_subdomains = tool.input.get("include_subdomains").and_then(serde_json::Value::as_bool).unwrap_or(false);

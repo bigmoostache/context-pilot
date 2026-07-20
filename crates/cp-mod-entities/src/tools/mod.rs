@@ -265,11 +265,11 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // ── Resolve SQL source ──────────────────────────────────────────────
-    let sql = match resolve_sql_text(has_request, request_path, sql_param) {
+    let sql_text = match resolve_sql_text(has_request, request_path, sql_param) {
         Ok(s) => s,
         Err(e) => return err(tool, &e),
     };
-    let sql = sql.as_str();
+    let sql = sql_text.as_str();
 
     // Split statements early for classification and empty-input detection.
     let stmts = split_statements(sql);

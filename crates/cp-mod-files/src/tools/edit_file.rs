@@ -158,8 +158,8 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Try normalized matching (handles trailing whitespace differences).
     // Clone the match to break the borrow on `content`, allowing mutation below.
-    let actual_match = find_normalized_match(&content, old_string).map(str::to_owned);
-    let Some(actual_match) = actual_match else {
+    let actual_match_opt = find_normalized_match(&content, old_string).map(str::to_owned);
+    let Some(actual_match) = actual_match_opt else {
         return no_match_result(tool, &content, old_string);
     };
     content = content.replacen(actual_match.as_str(), new_string, 1);

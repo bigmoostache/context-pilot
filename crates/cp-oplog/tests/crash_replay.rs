@@ -83,10 +83,10 @@ const COMMAND_TOKEN: &str = "deadman-command-token";
 /// mode (a clean exit would defeat the "killed mid-flight" premise).
 #[test]
 fn crash_child_entrypoint() {
-    let Ok(dir) = env::var(CHILD_DIR_ENV) else {
+    let Ok(dir_var) = env::var(CHILD_DIR_ENV) else {
         return; // Parent role: nothing to do here.
     };
-    let dir = PathBuf::from(dir);
+    let dir = PathBuf::from(dir_var);
     let mode = env::var(CHILD_MODE_ENV).unwrap_or_else(|_unset| "spam".to_owned());
 
     match mode.as_str() {

@@ -48,8 +48,8 @@ pub(crate) fn clean_llm_id_prefix(content: &str) -> String {
 
 /// Parse context selection patterns like p1, p-1, `p_1`, P1, P-1, `P_1`.
 /// Returns the context ID (e.g., "P1", "P28") if matched.
-pub(crate) fn parse_context_pattern(input: &str) -> Option<String> {
-    let input = input.trim();
+pub(crate) fn parse_context_pattern(raw: &str) -> Option<String> {
+    let input = raw.trim();
     if input.is_empty() {
         return None;
     }

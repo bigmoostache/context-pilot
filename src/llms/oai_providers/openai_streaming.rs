@@ -265,8 +265,8 @@ where
     R: std::io::Read,
 {
     let mut acc = SseAccum::default();
-    for line in reader.lines() {
-        let line = line.map_err(|e| LlmError::StreamRead(e.to_string()))?;
+    for raw_line in reader.lines() {
+        let line = raw_line.map_err(|e| LlmError::StreamRead(e.to_string()))?;
         if let Some(resp) = parse_sse_line(&line) {
             process_response(resp, tx, tool_acc, &mut acc);
         }

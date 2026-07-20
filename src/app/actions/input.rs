@@ -31,9 +31,9 @@ pub(crate) fn handle_input_submit(state: &mut State) -> ActionResult {
     }
 
     let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
-    let content = replace_commands(&state.input, &commands);
+    let commanded = replace_commands(&state.input, &commands);
     // Expand paste sentinels: replace \x00{idx}\x00 with actual paste buffer content
-    let content = expand_paste_sentinels(&content, &state.paste_buffers);
+    let content = expand_paste_sentinels(&commanded, &state.paste_buffers);
     state.input.clear();
     state.input_cursor = 0;
     state.input_selection_anchor = None;
@@ -167,8 +167,8 @@ fn handle_thread_input_submit(state: &mut State) -> ActionResult {
     };
 
     let commands = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Command);
-    let content = replace_commands(&state.input, &commands);
-    let content = expand_paste_sentinels(&content, &state.paste_buffers);
+    let commanded = replace_commands(&state.input, &commands);
+    let content = expand_paste_sentinels(&commanded, &state.paste_buffers);
 
     // Clear input state
     state.input.clear();
@@ -213,22 +213,22 @@ fn handle_thread_create(state: &mut State) -> ActionResult {
     /// Maximum thread name length to prevent state bloat.
     const MAX_THREAD_NAME_LEN: usize = 200;
 
-    let name = state.input.trim().to_owned();
+    let raw_name = state.input.trim().to_owned();
 
     // Clear input regardless of outcome
     state.input.clear();
     state.input_cursor = 0;
     state.input_selection_anchor = None;
 
-    if name.is_empty() {
+    if raw_name.is_empty() {
         return ActionResult::Nothing;
     }
 
     // Cap thread name length
-    let name = if name.len() > MAX_THREAD_NAME_LEN {
-        name.get(..name.floor_char_boundary(MAX_THREAD_NAME_LEN)).unwrap_or(&name).to_owned()
+    let name = if raw_name.len() > MAX_THREAD_NAME_LEN {
+        raw_name.get(..raw_name.floor_char_boundary(MAX_THREAD_NAME_LEN)).unwrap_or(&raw_name).to_owned()
     } else {
-        name
+        raw_name
     };
 
     // Generate thread ID and create the thread

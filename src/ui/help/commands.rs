@@ -15,8 +15,8 @@ pub(crate) struct PaletteCommand {
 
 impl PaletteCommand {
     /// Create a new palette command with the given id, label, and description.
-    pub(crate) fn new(id: impl Into<String>, label: impl Into<String>, description: impl Into<String>) -> Self {
-        let label = label.into();
+    pub(crate) fn new(id: impl Into<String>, label_in: impl Into<String>, description: impl Into<String>) -> Self {
+        let label = label_in.into();
         let keywords = vec![label.to_lowercase()];
         Self { id: id.into(), label, description: description.into(), keywords }
     }

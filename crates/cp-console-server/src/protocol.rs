@@ -110,9 +110,9 @@ pub(crate) fn interpret_escapes(input: &str) -> Vec<u8> {
                     i = i.saturating_add(2);
                 }
                 Some(b'x') => {
-                    let hi = i.checked_add(2).and_then(|j| bytes.get(j)).copied();
-                    let lo = i.checked_add(3).and_then(|j| bytes.get(j)).copied();
-                    match (hi, lo) {
+                    let hi_opt = i.checked_add(2).and_then(|j| bytes.get(j)).copied();
+                    let lo_opt = i.checked_add(3).and_then(|j| bytes.get(j)).copied();
+                    match (hi_opt, lo_opt) {
                         (Some(hi), Some(lo)) if i.saturating_add(3) < bytes.len() => {
                             if let (Some(h), Some(l)) = (hex_digit(hi), hex_digit(lo)) {
                                 out.push((h << 4) | l);

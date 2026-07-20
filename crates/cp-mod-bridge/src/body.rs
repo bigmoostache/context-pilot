@@ -223,10 +223,10 @@ impl Store {
             Err(e) => return Err(Error::io(format!("list bodies {}", self.dir.display()), e)),
         };
 
-        for entry in read_dir {
-            let entry = entry.map_err(|e| Error::io("read body dir entry", e))?;
-            let name = entry.file_name();
-            let Some(name) = name.to_str() else { continue };
+        for dirent in read_dir {
+            let entry = dirent.map_err(|e| Error::io("read body dir entry", e))?;
+            let name_os = entry.file_name();
+            let Some(name) = name_os.to_str() else { continue };
             // Only 64-char lowercase-hex names are bodies; skip tmp files and
             // anything else.
             if name.len() != 64 || !name.bytes().all(|b| b.is_ascii_hexdigit()) {

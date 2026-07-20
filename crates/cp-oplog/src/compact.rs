@@ -96,11 +96,11 @@ pub struct Report {
 ///
 /// Returns [`Error::Io`](crate::error::Error::Io) if a segment
 /// cannot be listed, read, removed, or if the directory cannot be `fsync`'d.
-pub fn compact<P>(dir: P) -> OplogResult<Report>
+pub fn compact<P>(path: P) -> OplogResult<Report>
 where
     P: AsRef<Path>,
 {
-    let dir = dir.as_ref();
+    let dir = path.as_ref();
     let indices = segment::indices(dir)?;
 
     let Some(cut) = newest_checkpoint_index(dir, &indices)? else {
@@ -150,11 +150,11 @@ fn sync_dir(dir: &Path) -> OplogResult<()> {
 ///
 /// Returns [`Error::Io`](crate::error::Error::Io) if the directory
 /// cannot be listed or a segment's metadata cannot be read.
-pub fn total_bytes<P>(dir: P) -> OplogResult<u64>
+pub fn total_bytes<P>(path: P) -> OplogResult<u64>
 where
     P: AsRef<Path>,
 {
-    let dir = dir.as_ref();
+    let dir = path.as_ref();
     let mut total: u64 = 0;
     for index in segment::indices(dir)? {
         let meta = fs::metadata(segment::path(dir, index))?;

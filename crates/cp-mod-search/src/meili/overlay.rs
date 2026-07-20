@@ -297,8 +297,8 @@ fn read_process_stats(pid: u32) -> Option<(u64, u64)> {
     if !output.status.success() {
         return None;
     }
-    let text = String::from_utf8(output.stdout).ok()?;
-    let text = text.trim();
+    let raw = String::from_utf8(output.stdout).ok()?;
+    let text = raw.trim();
     let mut parts = text.split_whitespace();
     let rss_kb: u64 = parts.next()?.parse().ok()?;
     let cputime_str = parts.next()?;
@@ -360,8 +360,8 @@ fn humanize_duration(iso: &str) -> String {
     }
 
     // Strip "PT" prefix and "S" suffix: "PT0.254092S" → "0.254092"
-    let stripped = iso.strip_prefix("PT").unwrap_or(iso);
-    let stripped = stripped.strip_suffix('S').unwrap_or(stripped);
+    let no_prefix = iso.strip_prefix("PT").unwrap_or(iso);
+    let stripped = no_prefix.strip_suffix('S').unwrap_or(no_prefix);
 
     // Truncate to 2 decimal places for display
     if let Some((whole, frac)) = stripped.split_once('.') {

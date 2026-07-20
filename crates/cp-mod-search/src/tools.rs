@@ -310,11 +310,11 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // --- Extract parameters (sync, needs State) ------------------------------
 
-    let Some(query) = tool.input.get("query").and_then(serde_json::Value::as_str) else {
+    let Some(query_ref) = tool.input.get("query").and_then(serde_json::Value::as_str) else {
         return err_result(tool, "Missing required parameter 'query'".to_owned());
     };
 
-    let Some(semantic_query) =
+    let Some(semantic_query_ref) =
         tool.input.get("semantic_query").and_then(serde_json::Value::as_str).filter(|s| !s.trim().is_empty())
     else {
         return err_result(
@@ -348,8 +348,8 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // --- Extract owned values for the closure --------------------------------
 
-    let query = query.to_owned();
-    let semantic_query = semantic_query.to_owned();
+    let query = query_ref.to_owned();
+    let semantic_query = semantic_query_ref.to_owned();
     let effective_query = path_prefix.map_or_else(|| query.clone(), |prefix| format!("{prefix} {query}"));
     let search_files = scope == "all" || scope == "project";
     let search_logs = scope == "all" || scope == "logs";

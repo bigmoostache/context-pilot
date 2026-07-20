@@ -101,9 +101,10 @@ impl Panel for Results {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
 
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(BRAVE_PANEL_TYPE));
+        let ctx_opt =
+            state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(BRAVE_PANEL_TYPE));
 
-        let Some(ctx) = ctx else {
+        let Some(ctx) = ctx_opt else {
             return vec![Block::styled_text(" No brave result panel".into(), Semantic::Muted)];
         };
 

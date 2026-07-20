@@ -387,9 +387,9 @@ fn render_param_blocks(blocks: &mut Vec<Block>, ctx: &ParamCtx<'_>, key: &str, v
     let mut is_first = true;
 
     for source_line in val.lines() {
-        let wrapped = wrap_text(source_line, val_width);
+        let wrapped_raw = wrap_text(source_line, val_width);
         // wrap_text returns empty vec for empty lines
-        let wrapped = if wrapped.is_empty() { vec![String::new()] } else { wrapped };
+        let wrapped = if wrapped_raw.is_empty() { vec![String::new()] } else { wrapped_raw };
         for wrapped_line in &wrapped {
             if is_first {
                 blocks.push(Block::line(vec![

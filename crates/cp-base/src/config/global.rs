@@ -108,9 +108,9 @@ pub fn resolve_api_key(name: &str) -> Option<String> {
     if let Some(env_var) = KEY_ENV_MAP.iter().find(|entry| entry.0 == name).map(|entry| entry.1)
         && let Ok(val) = std::env::var(env_var)
     {
-        let val = val.trim().to_owned();
-        if !val.is_empty() {
-            return Some(val);
+        let trimmed = val.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_owned());
         }
     }
 

@@ -167,12 +167,12 @@ fn handle_create(sessions: &Sessions, params: &CreateParams<'_>) -> Response {
 
     // Spawn a thread to wait for the child so we get proper exit status
     {
-        let sessions = Arc::clone(sessions);
-        let key = key.to_string();
+        let task_sessions = Arc::clone(sessions);
+        let task_key = key.to_string();
         drop(std::thread::spawn(move || {
             let code = child.wait().map_or(-1, |status| status.code().unwrap_or(-1));
-            if let Ok(mut map) = sessions.lock()
-                && let Some(session) = map.get_mut(&key)
+            if let Ok(mut map) = task_sessions.lock()
+                && let Some(session) = map.get_mut(&task_key)
             {
                 session.status = SessionStatus::Exited(code);
             }
@@ -335,8 +335,8 @@ impl ConnectionHandler {
         let reader = BufReader::new(cloned);
         let mut writer = stream;
 
-        for line in reader.lines() {
-            let Ok(line) = line else {
+        for line_result in reader.lines() {
+            let Ok(line) = line_result else {
                 break; // Connection closed
             };
             if line.is_empty() {
@@ -442,17 +442,17 @@ fn main() {
     // Without this, sessions that exit but are never explicitly killed accumulate
     // forever — each holding a stdin pipe FD — until FD exhaustion.
     {
-        let sessions = Arc::clone(&sessions);
-        drop(std::thread::spawn(move || cleanup::reaper_loop(&sessions)));
+        let reaper_sessions = Arc::clone(&sessions);
+        drop(std::thread::spawn(move || cleanup::reaper_loop(&reaper_sessions)));
     }
 
     // Accept connections (one thread per connection)
     loop {
         match listener.accept() {
             Ok((stream, _)) => {
-                let sessions = Arc::clone(&sessions);
+                let conn_sessions = Arc::clone(&sessions);
                 drop(std::thread::spawn(move || {
-                    ConnectionHandler { stream, sessions }.run();
+                    ConnectionHandler { stream, sessions: conn_sessions }.run();
                 }));
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {

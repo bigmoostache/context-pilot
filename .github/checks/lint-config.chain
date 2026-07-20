@@ -5983,3 +5983,18 @@ index 2efa8642..c92accd0 100644
  redundant_static_lifetimes = "forbid"
  redundant_test_prefix = "forbid"
 # --- End entry #48 ---
+49:1888a68cbdc6ed6bbdeee313eb6d5e43e3139a5c13e675c8b9a5aa68bbe966f1:a552fda21e909f4fb5e26c70be7e8f84dd860f4394a08f6cc137a8da9053b0e6:3a4e936123c79a1f2e16303c19e1f11c3300280c3f0d6b19fd33e14e58957574
+# --- Diff for entry #49 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index c92accd0..5368b744 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -898,6 +898,7 @@ semicolon_inside_block = "forbid"
+ separated_literal_suffix = "forbid"
+ serde_api_misuse = "forbid"
+ set_contains_or_insert = "forbid"
++shadow_reuse = "deny"
+ shadow_same = "forbid"
+ shadow_unrelated = "forbid"
+ short_circuit_statement = "forbid"
+# --- End entry #49 ---

@@ -233,8 +233,8 @@ pub(crate) fn check_watchers(app: &mut App, tx: &Sender<StreamEvent>) {
     let mut registry = match app.state.module_data.remove(&std::any::TypeId::of::<WatcherRegistry>()) {
         Some(boxed) => match boxed.downcast::<WatcherRegistry>() {
             Ok(r) => *r,
-            Err(boxed) => {
-                let _r = app.state.module_data.insert(std::any::TypeId::of::<WatcherRegistry>(), boxed);
+            Err(returned) => {
+                let _r = app.state.module_data.insert(std::any::TypeId::of::<WatcherRegistry>(), returned);
                 return;
             }
         },

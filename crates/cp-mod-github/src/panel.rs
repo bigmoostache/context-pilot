@@ -80,7 +80,7 @@ impl Panel for GithubResultPanel {
             Ok(out) => {
                 let stdout = String::from_utf8_lossy(&out.stdout);
                 let stderr = String::from_utf8_lossy(&out.stderr);
-                let content = if stderr.trim().is_empty() {
+                let raw = if stderr.trim().is_empty() {
                     stdout.to_string()
                 } else if stdout.trim().is_empty() {
                     stderr.to_string()
@@ -88,12 +88,12 @@ impl Panel for GithubResultPanel {
                     format!("{stdout}\n{stderr}")
                 };
                 // Redact token if accidentally in output
-                let content = if req.github_token.len() >= 8 && content.contains(&req.github_token) {
-                    content.replace(&req.github_token, "[REDACTED]")
+                let redacted = if req.github_token.len() >= 8 && raw.contains(&req.github_token) {
+                    raw.replace(&req.github_token, "[REDACTED]")
                 } else {
-                    content
+                    raw
                 };
-                let content = truncate_output(&content, constants::MAX_RESULT_CONTENT_BYTES);
+                let content = truncate_output(&redacted, constants::MAX_RESULT_CONTENT_BYTES);
                 let token_count = estimate_tokens(&content);
                 Some(CacheUpdate::Content { context_id: req.context_id, content, token_count })
             }
@@ -118,9 +118,10 @@ impl Panel for GithubResultPanel {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
 
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GITHUB_RESULT);
+        let ctx_opt =
+            state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GITHUB_RESULT);
 
-        let Some(ctx) = ctx else {
+        let Some(ctx) = ctx_opt else {
             return vec![Block::styled_text(" No GitHub result panel".into(), Semantic::Muted)];
         };
 

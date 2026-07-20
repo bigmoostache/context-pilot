@@ -55,9 +55,9 @@ fn build_virtual_content(disk_content: &str, canonical_path: &str, state: &State
                 let new = call.input.get("new_string").and_then(|v| v.as_str()).unwrap_or("");
 
                 if let Some(actual) = tools::edit_file::find_normalized_match(base, old) {
-                    let actual = actual.to_owned();
+                    let actual_owned = actual.to_owned();
                     let mut buf = base.to_owned();
-                    buf = buf.replacen(&actual, new, 1);
+                    buf = buf.replacen(&actual_owned, new, 1);
                     virtual_content = Some(buf);
                 }
                 // If the queued edit doesn't match, skip it — it may fail at flush time

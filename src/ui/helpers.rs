@@ -227,8 +227,8 @@ fn do_highlight_ir(path: &str, content: &str) -> IrHighlightResult {
         let spans: Vec<cp_render::Span> = ranges
             .into_iter()
             .map(|(style, text)| {
-                let text = text.trim_end_matches('\n').to_owned();
-                cp_render::Span::rgb(text, style.foreground.r, style.foreground.g, style.foreground.b)
+                let trimmed = text.trim_end_matches('\n').to_owned();
+                cp_render::Span::rgb(trimmed, style.foreground.r, style.foreground.g, style.foreground.b)
             })
             .collect();
 

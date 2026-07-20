@@ -279,7 +279,7 @@ impl Module for PromptModule {
 fn preflight_behaviour_create(tool: &ToolUse) -> Verdict {
     let mut pf = Verdict::new();
     let type_str = tool.input.get("type").and_then(|v| v.as_str()).unwrap_or("");
-    let pt = match type_str {
+    let pt_opt = match type_str {
         "agent" => Some(PromptType::Agent),
         "skill" => Some(PromptType::Skill),
         "command" => Some(PromptType::Command),
@@ -289,7 +289,7 @@ fn preflight_behaviour_create(tool: &ToolUse) -> Verdict {
         }
     };
     if let Some(name) = tool.input.get("name").and_then(|v| v.as_str())
-        && let Some(pt) = pt
+        && let Some(pt) = pt_opt
     {
         let id = storage::slugify(name);
         if !id.is_empty() {
@@ -335,15 +335,15 @@ fn preflight_skill_load(tool: &ToolUse, state: &State) -> Verdict {
 /// Check if a file path is inside one of the three prompt directories.
 /// Handles both absolute and relative paths by canonicalizing comparison.
 fn is_prompt_file(path: &str) -> bool {
-    let path = std::path::Path::new(path);
+    let p = std::path::Path::new(path);
     [PromptType::Agent, PromptType::Skill, PromptType::Command].iter().any(|pt| {
         let dir = storage::dir_for(*pt);
         // Try canonical comparison first (handles absolute vs relative)
-        if let (Ok(canon_path), Ok(canon_dir)) = (path.canonicalize(), dir.canonicalize()) {
+        if let (Ok(canon_path), Ok(canon_dir)) = (p.canonicalize(), dir.canonicalize()) {
             canon_path.starts_with(canon_dir)
         } else {
             // Fallback: check if path contains the relative dir segment
-            path.starts_with(&dir)
+            p.starts_with(&dir)
         }
     })
 }

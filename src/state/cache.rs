@@ -22,8 +22,8 @@ pub(crate) struct CachePool {
 impl CachePool {
     /// Create a new pool with `CACHE_POOL_SIZE` worker threads.
     pub(crate) fn new() -> Self {
-        let (job_tx, job_rx) = mpsc::channel::<(CacheRequest, Sender<CacheUpdate>)>();
-        let job_rx = std::sync::Arc::new(std::sync::Mutex::new(job_rx));
+        let (job_tx, job_rx_raw) = mpsc::channel::<(CacheRequest, Sender<CacheUpdate>)>();
+        let job_rx = std::sync::Arc::new(std::sync::Mutex::new(job_rx_raw));
 
         for i in 0..CACHE_POOL_SIZE {
             let rx = std::sync::Arc::clone(&job_rx);

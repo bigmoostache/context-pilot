@@ -86,10 +86,10 @@ pub(crate) fn collect_pending_coucous(state: &State) -> Vec<CoucouData> {
 /// Parse a human-friendly duration string into milliseconds.
 /// Supports: "30s", "5m", "1h", "1h30m", "2h15m30s", "90s", "120"
 fn parse_duration_ms(s: &str) -> Result<u64, String> {
-    let s = s.trim();
+    let trimmed = s.trim();
 
     // Pure numeric → treat as seconds
-    if let Ok(secs) = s.parse::<u64>() {
+    if let Ok(secs) = trimmed.parse::<u64>() {
         if secs == 0 {
             return Err("Duration must be greater than 0".to_owned());
         }
@@ -99,11 +99,11 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
     let mut total_ms: u64 = 0;
     let mut current_num = String::new();
 
-    for ch in s.chars() {
+    for ch in trimmed.chars() {
         if ch.is_ascii_digit() {
             current_num.push(ch);
         } else {
-            let val: u64 = current_num.parse().map_err(|_e| format!("Invalid number in duration: '{s}'"))?;
+            let val: u64 = current_num.parse().map_err(|_e| format!("Invalid number in duration: '{trimmed}'"))?;
             current_num.clear();
             match ch {
                 'h' | 'H' => total_ms = total_ms.saturating_add(val.saturating_mul(3_600_000)),
@@ -116,7 +116,7 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
 
     // Trailing number without unit → seconds
     if !current_num.is_empty() {
-        let val: u64 = current_num.parse().map_err(|_e| format!("Invalid number in duration: '{s}'"))?;
+        let val: u64 = current_num.parse().map_err(|_e| format!("Invalid number in duration: '{trimmed}'"))?;
         total_ms = total_ms.saturating_add(val.saturating_mul(1_000));
     }
 
@@ -130,12 +130,12 @@ fn parse_duration_ms(s: &str) -> Result<u64, String> {
 /// Parse an ISO 8601 datetime string into milliseconds since epoch.
 /// Supports: "2026-02-20T08:00:00", "2026-02-20 08:00:00", "2026-02-20T08:00"
 fn parse_datetime_ms(s: &str) -> Result<u64, String> {
-    let s = s.trim().replace(' ', "T");
+    let joined = s.trim().replace(' ', "T");
 
     // Pad missing seconds: "2026-02-20T08:00" → "2026-02-20T08:00:00"
-    let normalized = if s.matches(':').count() == 1 { format!("{s}:00") } else { s };
+    let padded = if joined.matches(':').count() == 1 { format!("{joined}:00") } else { joined };
     // Strip trailing Z if present
-    let normalized = normalized.trim_end_matches('Z');
+    let normalized = padded.trim_end_matches('Z');
 
     // Treat as UTC by appending 'Z', matching the original behavior
     let rfc3339 = format!("{normalized}Z");

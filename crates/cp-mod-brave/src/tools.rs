@@ -58,12 +58,12 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return err_result(tool, e),
     };
 
-    let Some(query) = tool.input.get("query").and_then(|v| v.as_str()) else {
+    let Some(query_ref) = tool.input.get("query").and_then(|v| v.as_str()) else {
         return err_result(tool, "Missing required parameter 'query'".to_owned());
     };
 
     // Extract all params to owned types for the closure
-    let query = query.to_owned();
+    let query = query_ref.to_owned();
     let count = tool.input.get("count").and_then(serde_json::Value::as_u64).unwrap_or(5).to_u32();
     let freshness = tool.input.get("freshness").and_then(|v| v.as_str()).map(String::from);
     let country = tool.input.get("country").and_then(|v| v.as_str()).unwrap_or("US").to_owned();
@@ -129,12 +129,12 @@ fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return err_result(tool, e),
     };
 
-    let Some(query) = tool.input.get("query").and_then(|v| v.as_str()) else {
+    let Some(query_ref) = tool.input.get("query").and_then(|v| v.as_str()) else {
         return err_result(tool, "Missing required parameter 'query'".to_owned());
     };
 
     // Extract all params to owned types for the closure
-    let query = query.to_owned();
+    let query = query_ref.to_owned();
     let max_tokens =
         tool.input.get("maximum_number_of_tokens").and_then(serde_json::Value::as_u64).unwrap_or(8192).to_u32();
     let count = tool.input.get("count").and_then(serde_json::Value::as_u64).unwrap_or(20).to_u32();

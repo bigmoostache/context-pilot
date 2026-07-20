@@ -138,7 +138,7 @@ fn format_git_output(output: &std::process::Output, command: &str, elapsed_ms: u
     }
 
     // Long or slow → static panel.
-    let combined = truncate_output(&combined, constants::MAX_RESULT_CONTENT_BYTES);
+    let display_content = truncate_output(&combined, constants::MAX_RESULT_CONTENT_BYTES);
     let display_name = if command.len() > 40 {
         format!("{}...", command.get(..command.floor_char_boundary(37)).unwrap_or(""))
     } else {
@@ -150,7 +150,7 @@ fn format_git_output(output: &std::process::Output, command: &str, elapsed_ms: u
         Some(
             DynPanel::new(Kind::GIT_RESULT.to_owned(), display_name)
                 .metadata(vec![("result_command".to_owned(), command.to_owned())])
-                .content(combined),
+                .content(display_content),
         ),
         false,
     )

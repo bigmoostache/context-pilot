@@ -143,8 +143,8 @@ fn render_help_hints(frame: &mut Frame<'_>, sidebar: &Sidebar, base_style: Style
     }));
 
     let help_paragraph = Paragraph::new(help_lines).style(base_style);
-    let Some(help_area) = help_area else { return };
-    frame.render_widget(help_paragraph, help_area);
+    let Some(area) = help_area else { return };
+    frame.render_widget(help_paragraph, area);
 }
 
 /// Render a single entry line in the full sidebar.

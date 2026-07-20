@@ -82,9 +82,9 @@ fn behaviour_create(tool: &ToolUse, state: &mut State) -> ToolResult {
 
 /// Set the active agent by ID, or revert to the default agent.
 fn agent_load(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let id = tool.input.get("id").and_then(|v| v.as_str());
+    let id_opt = tool.input.get("id").and_then(|v| v.as_str());
 
-    let Some(id) = id.filter(|s| !s.is_empty()) else {
+    let Some(id) = id_opt.filter(|s| !s.is_empty()) else {
         PromptState::get_mut(state).active_agent_id = Some(library::default_agent_id().to_owned());
         state.touch_panel(Kind::SYSTEM);
         state.touch_panel(Kind::LIBRARY);

@@ -382,15 +382,15 @@ pub(crate) fn execute_update(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), "Empty 'updates' array".to_owned(), true);
     }
 
-    let updates = updates.clone();
-    let delete_ids = collect_delete_ids(&updates);
+    let owned_updates = updates.clone();
+    let delete_ids = collect_delete_ids(&owned_updates);
     let mut tally = UpdateTally::default();
 
-    for update_value in &updates {
+    for update_value in &owned_updates {
         apply_one_update(update_value, &delete_ids, &mut tally, state);
     }
 
-    tally.propagated = propagate_in_progress(&updates, state);
+    tally.propagated = propagate_in_progress(&owned_updates, state);
 
     if !tally.modified.is_empty() || !tally.deleted.is_empty() || !tally.propagated.is_empty() {
         state.touch_panel(Kind::TODO);

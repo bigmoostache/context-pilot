@@ -167,9 +167,9 @@ pub(crate) fn tick(token_bar: &TokenBar) -> AnimatedBar {
 /// `t` = 0.0 → returns `a`, `t` = 1.0 → returns `b`.
 /// Falls back to `a` or `b` if either is not `Color::Rgb`.
 pub(crate) fn lerp_color(from: Color, to: Color, progress: f64) -> Color {
-    let progress = progress.clamp(0.0, 1.0);
+    let clamped = progress.clamp(0.0, 1.0);
     if let (Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2)) = (from, to) {
-        Color::Rgb(lerp_u8(r1, r2, progress), lerp_u8(g1, g2, progress), lerp_u8(b1, b2, progress))
+        Color::Rgb(lerp_u8(r1, r2, clamped), lerp_u8(g1, g2, clamped), lerp_u8(b1, b2, clamped))
     } else if progress < 0.5 {
         from
     } else {

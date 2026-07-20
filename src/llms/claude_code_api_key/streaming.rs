@@ -268,8 +268,8 @@ pub(crate) fn parse_sse_stream(
     let mut last_lines: Vec<String> = Vec::new();
 
     loop {
-        let mut line = String::new();
-        match reader.read_line(&mut line) {
+        let mut raw_line = String::new();
+        match reader.read_line(&mut raw_line) {
             Ok(0) => break,
             Ok(n) => {
                 total_bytes = total_bytes.saturating_add(n);
@@ -289,7 +289,7 @@ pub(crate) fn parse_sse_stream(
                 return Err(LlmError::StreamRead(verbose));
             }
         }
-        let line = line.trim_end_matches('\n').trim_end_matches('\r');
+        let line = raw_line.trim_end_matches('\n').trim_end_matches('\r');
 
         if !line.starts_with("data: ") {
             continue;

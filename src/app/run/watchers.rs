@@ -93,8 +93,8 @@ fn process_cache_updates_static(state: &mut State, cache_rx: &Receiver<CacheUpda
         if apply_unchanged_update(state, &update) {
             continue;
         }
-        if let Err(update) = apply_module_specific_update(state, update) {
-            apply_content_update(state, update);
+        if let Err(leftover) = apply_module_specific_update(state, update) {
+            apply_content_update(state, leftover);
         }
     }
 }
@@ -149,8 +149,8 @@ fn dispatch_refresh_requests(app: &mut App, mut refresh_indices: Vec<usize>) {
             continue;
         }
         let panel = crate::app::panels::get_panel(&ctx.context_type);
-        let request = panel.build_cache_request(ctx, &app.state);
-        if let Some(request) = request {
+        let built = panel.build_cache_request(ctx, &app.state);
+        if let Some(request) = built {
             process_cache_request(request, app.cache_tx.clone());
             if let Some(ctx_mut) = app.state.context.get_mut(i) {
                 ctx_mut.cache_in_flight = true;

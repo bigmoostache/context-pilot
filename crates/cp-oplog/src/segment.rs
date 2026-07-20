@@ -76,8 +76,8 @@ pub fn indices(dir: &Path) -> io::Result<Vec<u64>> {
     };
 
     let mut found = Vec::new();
-    for entry in read_dir {
-        let entry = entry?;
+    for dirent in read_dir {
+        let entry = dirent?;
         if let Some(name) = entry.file_name().to_str()
             && let Some(index) = parse_index(name)
         {

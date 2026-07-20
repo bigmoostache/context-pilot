@@ -119,8 +119,8 @@ pub(super) fn prepare_stream_context(
 
     if let (true, Some(snapshot)) = (full_freeze, state.frozen_context_snapshot.as_ref()) {
         // ═══ FULL FREEZE: replay exact previous prompt ═══════════════════════
-        let snapshot = snapshot.clone();
-        freeze_pass::apply_full_freeze(state, &mut context_items, &snapshot, meta);
+        let snap = snapshot.clone();
+        freeze_pass::apply_full_freeze(state, &mut context_items, &snap, meta);
     } else {
         // ═══ Normal path: per-panel freeze decisions ═════════════════════════
         freeze_pass::run_panel_freeze_pass(state, &mut context_items, meta);

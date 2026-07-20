@@ -362,9 +362,9 @@ fn render_progress_bar(segments: &[cp_render::ProgressSegment], label: Option<&s
 
     let mut filled: usize = 0;
     for seg in segments {
-        let seg_chars =
+        let seg_chars_raw =
             cp_base::panels::time_arith::div_const::<100>(usize::from(seg.percent).saturating_mul(BAR_WIDTH));
-        let seg_chars = seg_chars.min(BAR_WIDTH.saturating_sub(filled));
+        let seg_chars = seg_chars_raw.min(BAR_WIDTH.saturating_sub(filled));
         if seg_chars > 0 {
             spans.push(Span::styled("\u{2588}".repeat(seg_chars), semantic_to_style(seg.semantic)));
             filled = filled.saturating_add(seg_chars);

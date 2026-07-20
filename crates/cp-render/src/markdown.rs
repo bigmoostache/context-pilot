@@ -270,8 +270,8 @@ pub fn parse_inline(text: &str) -> Vec<Span> {
 fn split_table_row(line: &str) -> Vec<&str> {
     let trimmed = line.trim();
     // Strip leading/trailing pipes, then split by |
-    let inner = trimmed.strip_prefix('|').unwrap_or(trimmed);
-    let inner = inner.strip_suffix('|').unwrap_or(inner);
+    let no_lead = trimmed.strip_prefix('|').unwrap_or(trimmed);
+    let inner = no_lead.strip_suffix('|').unwrap_or(no_lead);
     inner.split('|').map(str::trim).collect()
 }
 
@@ -279,13 +279,13 @@ fn split_table_row(line: &str) -> Vec<&str> {
 fn is_separator_row(cells: &[&str]) -> bool {
     !cells.is_empty()
         && cells.iter().all(|c| {
-            let s = c.trim();
-            if s.is_empty() {
+            let trimmed = c.trim();
+            if trimmed.is_empty() {
                 return false;
             }
-            let s = s.strip_prefix(':').unwrap_or(s);
-            let s = s.strip_suffix(':').unwrap_or(s);
-            !s.is_empty() && s.chars().all(|ch| ch == '-')
+            let no_lead = trimmed.strip_prefix(':').unwrap_or(trimmed);
+            let core = no_lead.strip_suffix(':').unwrap_or(no_lead);
+            !core.is_empty() && core.chars().all(|ch| ch == '-')
         })
 }
 

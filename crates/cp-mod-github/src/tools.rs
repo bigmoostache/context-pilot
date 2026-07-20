@@ -116,7 +116,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
 fn format_gh_output(output: &std::process::Output, command: &str, token: &str, elapsed_ms: u128) -> ToolOutput {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let combined = if stderr.trim().is_empty() {
+    let raw = if stderr.trim().is_empty() {
         stdout.trim().to_owned()
     } else if stdout.trim().is_empty() {
         stderr.trim().to_owned()
@@ -124,7 +124,7 @@ fn format_gh_output(output: &std::process::Output, command: &str, token: &str, e
         format!("{}\n{}", stdout.trim(), stderr.trim())
     };
     let is_error = !output.status.success();
-    let combined = redact_token(&combined, token);
+    let combined = redact_token(&raw, token);
 
     // Empty output — always inline.
     if combined.is_empty() {
@@ -143,7 +143,7 @@ fn format_gh_output(output: &std::process::Output, command: &str, token: &str, e
     }
 
     // Long or slow → static panel.
-    let combined = truncate_output(&combined, constants::MAX_RESULT_CONTENT_BYTES);
+    let display_content = truncate_output(&combined, constants::MAX_RESULT_CONTENT_BYTES);
     let display_name = if command.len() > 40 {
         format!("{}...", command.get(..command.floor_char_boundary(37)).unwrap_or(""))
     } else {
@@ -151,6 +151,6 @@ fn format_gh_output(output: &std::process::Output, command: &str, token: &str, e
     };
     let dyn_panel = DynPanel::new(Kind::GITHUB_RESULT.to_owned(), display_name)
         .metadata(vec![("result_command".to_owned(), command.to_owned())])
-        .content(combined);
+        .content(display_content);
     ToolOutput::new(format!("Panel created: {DYN_PANEL_ID_PLACEHOLDER}"), is_error, None, false).with_panel(dyn_panel)
 }

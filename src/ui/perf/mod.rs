@@ -54,10 +54,10 @@ impl<T: Copy + Default + Ord> RingBuffer<T> {
         if self.len == 0 {
             return Vec::new();
         }
-        let count = count.min(self.len);
-        let mut result = Vec::with_capacity(count);
+        let take = count.min(self.len);
+        let mut result = Vec::with_capacity(take);
         let start = if self.len < SAMPLE_RING_SIZE { 0 } else { self.write_pos };
-        for i in 0..count {
+        for i in 0..take {
             let idx = start.saturating_add(self.len).saturating_sub(count).saturating_add(i) & RING_MASK;
             if let Some(&val) = self.data.get(idx) {
                 result.push(val);
@@ -176,8 +176,8 @@ fn read_proc_stat() -> Option<(u64, u64)> {
         return None;
     }
     let text = String::from_utf8(output.stdout).ok()?;
-    let text = text.trim();
-    let mut parts = text.split_whitespace();
+    let trimmed = text.trim();
+    let mut parts = trimmed.split_whitespace();
     let rss_kb: u64 = parts.next()?.parse().ok()?;
     let mem_bytes = rss_kb.saturating_mul(1024);
     let cpu_centisecs = parse_ps_cputime(parts.next()?)?;

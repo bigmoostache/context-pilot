@@ -74,14 +74,14 @@ impl Panel for GitResultPanel {
             Ok(out) => {
                 let stdout = String::from_utf8_lossy(&out.stdout);
                 let stderr = String::from_utf8_lossy(&out.stderr);
-                let content = if stderr.trim().is_empty() {
+                let raw = if stderr.trim().is_empty() {
                     stdout.to_string()
                 } else if stdout.trim().is_empty() {
                     stderr.to_string()
                 } else {
                     format!("{stdout}\n{stderr}")
                 };
-                let content = truncate_output(&content, constants::MAX_RESULT_CONTENT_BYTES);
+                let content = truncate_output(&raw, constants::MAX_RESULT_CONTENT_BYTES);
                 let token_count = estimate_tokens(&content);
                 Some(CacheUpdate::Content { context_id, content, token_count })
             }
@@ -100,9 +100,9 @@ impl Panel for GitResultPanel {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
 
-        let ctx = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GIT_RESULT);
+        let ctx_opt = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GIT_RESULT);
 
-        let Some(ctx) = ctx else {
+        let Some(ctx) = ctx_opt else {
             return vec![Block::styled_text(" No git result panel".into(), Semantic::Muted)];
         };
 

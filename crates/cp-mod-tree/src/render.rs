@@ -26,9 +26,9 @@ pub(crate) fn generate_tree_string(
     // Build gitignore matcher from filter
     let mut builder = GitignoreBuilder::new(&root);
     for line in tree_filter.lines() {
-        let line = line.trim();
-        if !line.is_empty() && !line.starts_with('#') {
-            let _: Option<&mut GitignoreBuilder> = builder.add_line(None, line).ok();
+        let trimmed = line.trim();
+        if !trimmed.is_empty() && !trimmed.starts_with('#') {
+            let _: Option<&mut GitignoreBuilder> = builder.add_line(None, trimmed).ok();
         }
     }
     let gitignore = builder.build().ok();

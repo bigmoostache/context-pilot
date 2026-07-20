@@ -21,15 +21,15 @@ pub(crate) fn exec_crawl(tool: &ToolUse, state: &mut State) -> ToolResult {
         Err(e) => return err_result(tool, e),
     };
 
-    let Some(url) = tool.input.get("url").and_then(|v| v.as_str()) else {
+    let Some(url_ref) = tool.input.get("url").and_then(|v| v.as_str()) else {
         return err_result(tool, "Missing required parameter 'url'".to_owned());
     };
-    let Some(output) = tool.input.get("output").and_then(|v| v.as_str()) else {
+    let Some(output_ref) = tool.input.get("output").and_then(|v| v.as_str()) else {
         return err_result(tool, "Missing required parameter 'output'".to_owned());
     };
 
-    let url = url.to_owned();
-    let output = std::path::PathBuf::from(output);
+    let url = url_ref.to_owned();
+    let output = std::path::PathBuf::from(output_ref);
     let limit = tool.input.get("limit").and_then(serde_json::Value::as_u64).unwrap_or(10).min(100).to_u32();
     let max_depth = tool.input.get("max_depth").and_then(serde_json::Value::as_u64).map(Safe::to_u32);
     let include_paths: Option<Vec<String>> = tool

@@ -303,8 +303,11 @@ fn cpu_busy_pct() -> Option<f64> {
     let t1 = ticks()?;
     let delta = u32::try_from(t1.saturating_sub(t0)).unwrap_or(u32::MAX);
     let dticks = f64::from(delta);
-    let secs = f64::from(CPU_SAMPLE_MS) / 1000.0f64;
-    Some((dticks / CLK_TCK / secs) * 100.0)
+    let secs = cp_base::cast::float_math::div(f64::from(CPU_SAMPLE_MS), 1000.0f64);
+    Some(cp_base::cast::float_math::mul(
+        cp_base::cast::float_math::div(cp_base::cast::float_math::div(dticks, CLK_TCK), secs),
+        100.0f64,
+    ))
 }
 
 /// macOS CPU sample via `ps %cpu` (a recent decaying average — ample to

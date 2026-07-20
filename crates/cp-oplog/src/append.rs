@@ -114,11 +114,11 @@ impl OplogWriter {
     ///
     /// Returns [`OplogError::Io`] for any filesystem failure during open,
     /// scan, torn-tail truncation, or initial-segment creation.
-    pub fn open_with_segment_limit<P>(dir: P, segment_limit: u64) -> OplogResult<Self>
+    pub fn open_with_segment_limit<P>(path: P, segment_limit: u64) -> OplogResult<Self>
     where
         P: AsRef<Path>,
     {
-        let dir = dir.as_ref().to_path_buf();
+        let dir = path.as_ref().to_path_buf();
         fs::create_dir_all(&dir)?;
 
         let indices = segment::indices(&dir)?;
@@ -127,11 +127,11 @@ impl OplogWriter {
         let next_rev = recovered.rev_head.map_or(0, |rev| rev.wrapping_add(1));
 
         if let Some(index) = indices.last().copied() {
-            let path = segment::path(&dir, index);
-            let scan = segment::read(&path)?;
+            let seg_path = segment::path(&dir, index);
+            let scan = segment::read(&seg_path)?;
             let segment_has_record =
                 scan.entries.iter().any(|entry| !matches!(entry.kind, OpEntryKind::Checkpoint { .. }));
-            let mut file = OpenOptions::new().read(true).write(true).open(&path)?;
+            let mut file = OpenOptions::new().read(true).write(true).open(&seg_path)?;
             if scan.torn_tail {
                 file.set_len(scan.valid_len)?;
                 file.sync_data()?;

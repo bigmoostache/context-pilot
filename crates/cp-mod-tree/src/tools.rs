@@ -218,8 +218,8 @@ fn try_delete_description(
 
 /// Close the open FILE panel for `normalized`, if any; returns its `"id (path)"` tag.
 fn auto_close_file_panel(state: &mut State, normalized: &str, cwd: Option<&PathBuf>) -> Option<String> {
-    let cwd = cwd?;
-    let abs_path = cwd.join(normalized).to_string_lossy().to_string();
+    let cwd_path = cwd?;
+    let abs_path = cwd_path.join(normalized).to_string_lossy().to_string();
     let pos = state
         .context
         .iter()
@@ -280,9 +280,9 @@ fn sync_descriptions_to_yaml(state: &State, added: &[String], updated: &[String]
 /// Execute `tree_describe_files` tool - add/update/remove file descriptions
 pub(crate) fn execute_describe_files(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("tree_describe");
-    let descriptions = tool.input.get("descriptions").and_then(|v| v.as_array());
+    let descriptions_arr = tool.input.get("descriptions").and_then(|v| v.as_array());
 
-    let Some(descriptions) = descriptions else {
+    let Some(descriptions) = descriptions_arr else {
         return ToolResult::new(tool.id.clone(), "Missing 'descriptions' parameter".to_owned(), true);
     };
 
@@ -349,9 +349,9 @@ pub fn list_dir_entries(
     // Build gitignore matcher from filter
     let mut builder = GitignoreBuilder::new(&root);
     for line in tree_filter.lines() {
-        let line = line.trim();
-        if !line.is_empty() && !line.starts_with('#') {
-            let _: Option<&mut GitignoreBuilder> = builder.add_line(None, line).ok();
+        let trimmed = line.trim();
+        if !trimmed.is_empty() && !trimmed.starts_with('#') {
+            let _: Option<&mut GitignoreBuilder> = builder.add_line(None, trimmed).ok();
         }
     }
     let gitignore = builder.build().ok();
