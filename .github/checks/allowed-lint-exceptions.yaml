@@ -377,14 +377,6 @@ exceptions:
   # contracts by design.
 
   - path: "crates/cp-base/src/config/llm_types.rs"
-    match: "stream-event contract"
-    reason: >
-      StreamEvent is constructed by every LLM provider and matched exhaustively by the
-      streaming pipeline; non_exhaustive would forbid that cross-crate construction.
-    strategy: >
-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
-
-  - path: "crates/cp-base/src/config/llm_types.rs"
     match: "provider-roster contract"
     reason: >
       LlmProvider is a closed set constructed cross-crate by config/dispatch and matched

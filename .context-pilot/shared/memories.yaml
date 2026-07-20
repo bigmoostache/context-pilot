@@ -401,7 +401,7 @@ b14e6817a83938b5:
   - operational
   last_edited_ms: 1784203006419
 b5af3513e41563ec:
-  tl_dr: 'BOSS-HUNT (T595-T603): 39 total lint kills. Registry 81->42. r1=2 clippy::panic. r2/r3/r9 exhaustive_enums. r8=1 ViewMode. r10=10. r11=2. r12=2. r13=3. r14=2. r15=1 CacheUpdate. r16=1 WatchSpec. Details in body.'
+  tl_dr: 'BOSS-HUNT (T595-T603): 40 total lint kills. Registry 81->41. r1=2 clippy::panic. r2/r3/r9 exhaustive_enums. r8=1 ViewMode. r10=10. r11=2. r12=2. r13=3. r14=2. r15=1 CacheUpdate. r16=1 WatchSpec. r17=1 StreamEvent. Details in body.'
   contents: |-
     T588 A5-A13 lints-as-beacons directive still governs. BOSS-HUNT rounds T595-T603:
 
@@ -416,12 +416,13 @@ b5af3513e41563ec:
     r13: cp-base Align + NotificationType (in-crate, free) + cp-render Align (2 downstream matches rewritten). 49->46. c079d3f9. Chain #61.
     r14: cp-oplog Error (bridge ref = doc comment only) + cp-vault VaultError (zero downstream refs). 46->44. a2dccd05. Chain #62.
     r15: cp-base CacheUpdate (panels.rs). Sole 2 downstream matches = cp-mod-git/result_panel.rs + cp-mod-github/panel.rs apply_cache_update, both Content{..}=>..; Unchanged|ModuleSpecific=>false rewritten to if-let. 44->43. dcc88a5a. Chain #63.
-    r16: cp-base WatchSpec (panels.rs). 3 variants File/Dir/DirRecursive. 2 downstream matches in src/app/run/watchers.rs (collect_wanted_paths ~316 File vs Dir|DirRecursive; add_dir_watches ~366 Dir vs DirRecursive) rewritten to if-let chains. GOTCHA HIT: else-if-let needs trailing else{} (else_if_without_else forbid); nested if inside else-if-let branch collapses via && (collapsible_if forbid) — merge condition into if-let with &&. 43->42. Chain #64.
+    r16: cp-base WatchSpec (panels.rs). 3 variants File/Dir/DirRecursive. 2 downstream matches in src/app/run/watchers.rs rewritten to if-let chains. GOTCHA: else-if-let needs trailing else{}; nested if inside else-if-let branch collapses via &&. 43->42. de7f4cc0. Chain #64.
+    r17: cp-base StreamEvent (config/llm_types.rs). 5 variants Chunk/ToolProgress/ToolUse/Done/Error. 2 downstream exhaustive matches: process_stream_events (src/app/run/streaming.rs) + apply_reverie_event (src/app/run/reverie.rs), both rewritten to if-let chains. GOTCHAS HIT: (1) streaming.rs chain of 5 arms + 3 module-broadcast for-loops = cognitive_complexity 11/7 forbid — extracted chain into apply_stream_event + broadcast_chunk/tool_progress/tool_use helpers. (2) reverie.rs ToolUse(tool) arm as `&& let Some(stream)=get_mut` let-chain = E0382 partial-move: `tool` moved out of evt when ToolUse matches but get_mut fails, poisoning later `= evt` arms. FIX: ToolUse stays NESTED if-let (not && chain); Done{..} binds nothing so && chain safe. 42->41. 3a0fc761. Chain #65.
 
-    KEY INSIGHT: non_exhaustive on ENUM only forbids downstream exhaustive-match (E0004); known-variant CONSTRUCTION always stays legal (no E0639 for enums, only structs). In-crate exhaustive match ALWAYS safe (non_exhaustive only affects downstream crates). So enum loses ONLY if a DOWNSTREAM (out-of-crate) exhaustive match exists AND can't be rewritten to if/matches!/if-let. MANY yaml reasons were CATEGORICALLY FALSE. Probe method: grep -rln ENUM outside defining crate; if zero refs OR only doc/From/construction = free win; if downstream match, rewrite to if-let (add trailing else{} + collapse nested if via &&).
-    GOTCHAS: const fn can't == enum (matches!); else{if} collapsible_else_if forbid; else-if-let chain needs trailing else{}; nested if in else-if-let branch trips collapsible_if — merge via &&; removing downstream match orphans import; clippy::pub-use forbids re-export (split inherent impl to sibling); after batch-flip, orphan yaml with SLIGHTLY-DIFFERENT reason wording than constructed old_string fails Edit — read exact block via sed first; VaultError Display uses deref_match! (own ref_patterns expect, leave it).
+    KEY INSIGHT: non_exhaustive on ENUM only forbids downstream exhaustive-match (E0004); known-variant CONSTRUCTION always stays legal (no E0639 for enums, only structs). In-crate exhaustive match ALWAYS safe. So enum loses ONLY if a DOWNSTREAM (out-of-crate) exhaustive match exists AND can't be rewritten to if/matches!/if-let. MANY yaml reasons were CATEGORICALLY FALSE. Probe: grep -rln ENUM outside defining crate; zero refs OR only doc/From/construction = free win; downstream match = rewrite to if-let.
+    GOTCHAS: const fn can't == enum (matches!); else{if} collapsible_else_if forbid; else-if-let chain needs trailing else{}; nested if in else-if-let branch trips collapsible_if — merge via &&; BUT a value-BINDING pattern (Variant(x)) in a && let-chain partial-moves the scrutinee on a later-clause failure (E0382) — keep such arms as NESTED if-let, only no-binding patterns (Variant{..}/Variant(_)) are && safe; long if-let chain (5 arms + inner loops) trips cognitive_complexity — extract chain + loop bodies to helpers; removing downstream match orphans import; clippy::pub-use forbids re-export (split inherent impl to sibling); orphan yaml with SLIGHTLY-DIFFERENT reason wording than constructed old_string fails Edit — read exact block via sed first; VaultError Display uses deref_match! (own ref_patterns expect, leave it).
 
-    REMAINING (42): wire enums (Phase/LifecycleState/Kind×3/Ack Status/AgentStatus/FrameError/heartbeat Error) all cross-crate CONSTRUCTED by orchestrator/agent — real blocker is downstream exhaustive match in orchestrator/tui. cp-base foundation (StreamEvent 5-variant 2 match sites streaming.rs+reverie.rs, LlmProvider, Action, ActionResult 5-variant streaming.rs+lifecycle.rs, reverie Kind) matched exhaustively by tui bin (downstream) — heavier multi-arm if-let rewrites but likely winnable. Exhaustive_structs remainder (ToolResult 116 sites, TypeMeta 25, cp-render crate-level, wire Entry/Frame/RosterEntryInit) = genuinely irreducible (too_many_arguments blocks constructor).
+    REMAINING (41): wire enums (Phase/LifecycleState/Kind×3/Ack Status/AgentStatus/FrameError/heartbeat Error) all cross-crate CONSTRUCTED by orchestrator/agent — real blocker is downstream exhaustive match in orchestrator/tui. cp-base foundation remaining: LlmProvider, Action, ActionResult (5-variant, matched in streaming.rs lifecycle.rs), reverie Kind — matched exhaustively by tui bin (downstream), winnable via if-let. Exhaustive_structs remainder (ToolResult 116 sites, TypeMeta 25, cp-render crate-level, wire Entry/Frame/RosterEntryInit) = genuinely irreducible (too_many_arguments blocks constructor).
   importance: critical
   labels:
   - T588
@@ -429,7 +430,7 @@ b5af3513e41563ec:
   - A5-A13
   - workflow
   - philosophy
-  last_edited_ms: 1784564418127
+  last_edited_ms: 1784564791570
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high

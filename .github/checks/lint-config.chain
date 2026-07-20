@@ -6746,3 +6746,25 @@ index eb67cc06..2dc047a6 100644
      match: "central Elm action enum"
      reason: >
 # --- End entry #64 ---
+65:4cf3d60b3bf5dd2849bae6b2ccd1ed802cffec23fe65477c3f736bfc4bec1b49:a2c9521e74fa7148590eb0e10bfe9990675cb363b217fe0c90e7065f588fa44b:aa8292c62cd891abeca7db28cc9f7f91d628cdf949197ee068101091c5ea1266
+# --- Diff for entry #65 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 2dc047a6..6892f601 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -376,14 +376,6 @@ exceptions:
+   # construction, wildcard_enum_match_arm on the matches). They are closed
+   # contracts by design.
+ 
+-  - path: "crates/cp-base/src/config/llm_types.rs"
+-    match: "stream-event contract"
+-    reason: >
+-      StreamEvent is constructed by every LLM provider and matched exhaustively by the
+-      streaming pipeline; non_exhaustive would forbid that cross-crate construction.
+-    strategy: >
+-      Irreducible — non_exhaustive would forbid the required cross-crate construction.
+-
+   - path: "crates/cp-base/src/config/llm_types.rs"
+     match: "provider-roster contract"
+     reason: >
+# --- End entry #65 ---

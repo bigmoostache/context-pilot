@@ -7,10 +7,7 @@ use crate::tools::ToolUse;
 
 /// Events emitted by the LLM during streaming.
 #[derive(Debug)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "stream-event contract: StreamEvent is constructed by every LLM provider and matched exhaustively by the streaming pipeline; the variant set is closed and #[non_exhaustive] would forbid that cross-crate construction"
-)]
+#[non_exhaustive]
 pub enum StreamEvent {
     /// Text chunk from the response.
     Chunk(String),

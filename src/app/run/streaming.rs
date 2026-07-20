@@ -19,58 +19,81 @@ pub(super) fn process_stream_events(app: &mut App, rx: &Receiver<StreamEvent>) {
             continue;
         }
         app.state.flags.ui.dirty = true;
-        match evt {
-            StreamEvent::Chunk(text) => {
-                for module in crate::modules::all_modules() {
-                    module.on_stream_chunk(&text, &mut app.state);
-                }
-                app.typewriter.add_chunk(&text);
-            }
-            StreamEvent::ToolProgress { name, input_so_far } => {
-                // Notify modules of streaming tool progress (e.g. typing indicators)
-                for module in crate::modules::all_modules() {
-                    module.on_tool_progress(&name, &input_so_far, &mut app.state);
-                }
-                app.state.streaming_tool = Some(crate::state::StreamingTool::new(name, input_so_far));
-            }
-            StreamEvent::ToolUse(tool) => {
-                // Notify modules that a tool call completed (e.g. clear typing)
-                for module in crate::modules::all_modules() {
-                    module.on_tool_complete(&tool.name, &mut app.state);
-                }
-                app.state.streaming_tool = None;
-                app.pending_tools.push(tool);
-            }
-            StreamEvent::Done {
-                input_tokens,
-                output_tokens,
-                cache_hit_tokens,
-                cache_miss_tokens,
-                stop_reason,
-                bp_hashes,
-                bp_panel_ids,
-                alive_count,
-                alive_positions_permille,
-            } => {
-                app.typewriter.mark_done();
-                app.state.streaming_tool = None;
-                app.pending_done = Some((
-                    input_tokens,
-                    output_tokens,
-                    cache_hit_tokens,
-                    cache_miss_tokens,
-                    stop_reason,
-                    bp_hashes,
-                    bp_panel_ids,
-                    alive_count,
-                    alive_positions_permille,
-                ));
-                // API call succeeded — reset retry counter immediately at tick level
-                app.state.api_retry_count = 0;
-            }
-            StreamEvent::Error(e) => handle_stream_error_event(app, e),
-        }
+        apply_stream_event(app, evt);
     }
+}
+
+/// Apply one drained [`StreamEvent`] to app state.
+///
+/// An `if let` chain (not an exhaustive match) so `StreamEvent` stays
+/// `#[non_exhaustive]`; the loop-bearing arms delegate to `broadcast_*` helpers
+/// to keep this dispatcher's cognitive complexity under the cap.
+fn apply_stream_event(app: &mut App, evt: StreamEvent) {
+    if let StreamEvent::Chunk(text) = evt {
+        broadcast_chunk(app, &text);
+    } else if let StreamEvent::ToolProgress { name, input_so_far } = evt {
+        broadcast_tool_progress(app, name, input_so_far);
+    } else if let StreamEvent::ToolUse(tool) = evt {
+        broadcast_tool_use(app, tool);
+    } else if let StreamEvent::Done {
+        input_tokens,
+        output_tokens,
+        cache_hit_tokens,
+        cache_miss_tokens,
+        stop_reason,
+        bp_hashes,
+        bp_panel_ids,
+        alive_count,
+        alive_positions_permille,
+    } = evt
+    {
+        app.typewriter.mark_done();
+        app.state.streaming_tool = None;
+        app.pending_done = Some((
+            input_tokens,
+            output_tokens,
+            cache_hit_tokens,
+            cache_miss_tokens,
+            stop_reason,
+            bp_hashes,
+            bp_panel_ids,
+            alive_count,
+            alive_positions_permille,
+        ));
+        // API call succeeded — reset retry counter immediately at tick level
+        app.state.api_retry_count = 0;
+    } else if let StreamEvent::Error(e) = evt {
+        handle_stream_error_event(app, e);
+    } else {
+        // Future non_exhaustive variants: ignored by the streaming pipeline.
+    }
+}
+
+/// Broadcast a text chunk to every module, then feed the typewriter.
+fn broadcast_chunk(app: &mut App, text: &str) {
+    for module in crate::modules::all_modules() {
+        module.on_stream_chunk(text, &mut app.state);
+    }
+    app.typewriter.add_chunk(text);
+}
+
+/// Notify modules of streaming tool progress (e.g. typing indicators) and stash
+/// the advisory streaming-tool preview.
+fn broadcast_tool_progress(app: &mut App, name: String, input_so_far: String) {
+    for module in crate::modules::all_modules() {
+        module.on_tool_progress(&name, &input_so_far, &mut app.state);
+    }
+    app.state.streaming_tool = Some(crate::state::StreamingTool::new(name, input_so_far));
+}
+
+/// Notify modules a tool call completed (e.g. clear typing), clear the preview,
+/// and queue the tool for execution.
+fn broadcast_tool_use(app: &mut App, tool: cp_base::tools::ToolUse) {
+    for module in crate::modules::all_modules() {
+        module.on_tool_complete(&tool.name, &mut app.state);
+    }
+    app.state.streaming_tool = None;
+    app.pending_tools.push(tool);
 }
 
 /// Handle a `StreamEvent::Error`: log to disk, then either flag a retry (under

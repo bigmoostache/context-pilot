@@ -56,26 +56,29 @@ pub(super) fn process_reverie_events(app: &mut App) {
 /// Apply one drained reverie stream event to `agent_id`'s state. Returns `true`
 /// when the agent's session was destroyed (caller must stop draining it).
 fn apply_reverie_event(app: &mut App, agent_id: &str, evt: StreamEvent) -> bool {
-    match evt {
-        StreamEvent::ToolProgress { .. } => {} // Reveries run in background — no UI preview
-        StreamEvent::Chunk(text) => append_reverie_chunk(app, agent_id, &text),
-        StreamEvent::ToolUse(tool) => {
-            if let Some(stream) = app.reverie_streams.get_mut(agent_id) {
-                stream.pending_tools.push(tool);
-            }
+    // `if let` chain (not an exhaustive match) so StreamEvent stays #[non_exhaustive].
+    // Reveries run in the background — a ToolProgress event has no UI preview, so it
+    // falls through to the trailing no-op else with every future variant.
+    if let StreamEvent::Chunk(text) = evt {
+        append_reverie_chunk(app, agent_id, &text);
+    } else if let StreamEvent::ToolUse(tool) = evt {
+        // Nested (not a `&&` let-chain): a chain would partially move `tool` out of
+        // `evt` even when `get_mut` fails, poisoning the later `= evt` arms (E0382).
+        if let Some(stream) = app.reverie_streams.get_mut(agent_id) {
+            stream.pending_tools.push(tool);
         }
-        StreamEvent::Done { .. } => {
-            if let Some(rev) = app.state.reveries.get_mut(agent_id) {
-                if let Some(msg) = rev.messages.last_mut() {
-                    msg.status = crate::state::MsgStatus::Full;
-                }
-                rev.is_streaming = false;
-            }
+    } else if let StreamEvent::Done { .. } = evt
+        && let Some(rev) = app.state.reveries.get_mut(agent_id)
+    {
+        if let Some(msg) = rev.messages.last_mut() {
+            msg.status = crate::state::MsgStatus::Full;
         }
-        StreamEvent::Error(e) => {
-            destroy_reverie_on_error(app, agent_id, &e);
-            return true;
-        }
+        rev.is_streaming = false;
+    } else if let StreamEvent::Error(e) = evt {
+        destroy_reverie_on_error(app, agent_id, &e);
+        return true;
+    } else {
+        // ToolProgress (no background preview) + future non_exhaustive variants.
     }
     false
 }
