@@ -19,10 +19,7 @@ use cp_wire::framing::FrameError;
 
 /// An error from oplog operations.
 #[derive(Debug)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "oplog error taxonomy is a closed two-variant set (Io/Frame) constructed within cp-oplog and matched exhaustively by callers; #[non_exhaustive] would force cross-crate wildcard arms that the forbidden wildcard_enum_match_arm lint rejects"
-)]
+#[non_exhaustive]
 pub enum Error {
     /// An underlying filesystem operation failed (open, write, sync, …).
     Io(io::Error),

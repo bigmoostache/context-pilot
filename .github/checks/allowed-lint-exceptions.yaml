@@ -367,13 +367,7 @@ exceptions:
     strategy: >
       Irreducible — closed error taxonomy, wildcard arms are forbidden.
 
-  - path: "crates/cp-vault/src/types.rs"
-    match: "vault error taxonomy is a closed set"
-    reason: >
-      VaultError is a closed MissingKey/Io/Network set constructed within cp-vault and
-      matched exhaustively by callers; non_exhaustive would force forbidden wildcard arms.
-    strategy: >
-      Irreducible — closed error taxonomy, wildcard arms are forbidden.
+
 
   # ── exhaustive_enums: cp-base foundation contracts ───────────────────
   # cp-base is the foundation crate every other crate depends on. Its public
@@ -440,13 +434,7 @@ exceptions:
 
   # ── exhaustive_enums: cp-oplog service/error contracts ───────────────
 
-  - path: "crates/cp-oplog/src/error.rs"
-    match: "oplog error taxonomy is a closed two-variant set"
-    reason: >
-      Oplog Error is a closed Io/Frame set constructed within cp-oplog and matched
-      exhaustively by callers; non_exhaustive would force forbidden wildcard arms.
-    strategy: >
-      Irreducible — closed error taxonomy, wildcard arms are forbidden.
+
 
   # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
 

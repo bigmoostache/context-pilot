@@ -6665,3 +6665,40 @@ index a404dff5..c49a623f 100644
    # These public structs are legitimately exhaustive: each is a fixed-layout
    # wire record built cross-crate at a single site, and a constructor would take
 # --- End entry #61 ---
+62:919da9bea5caccd9ce3afb494fd103ef116790ba1420be86642085cbd6d163c2:34c7e3293921e3c4e9ff32b4eac904f69357c7daa6882082a31859c3c27773c1:8da63e393e76d5eba22b1b0558a88fb6d270eee817fe403d6d1cd0e2b64c3983
+# --- Diff for entry #62 ---
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index c49a623f..ab58762d 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -367,13 +367,7 @@ exceptions:
+     strategy: >
+       Irreducible — closed error taxonomy, wildcard arms are forbidden.
+ 
+-  - path: "crates/cp-vault/src/types.rs"
+-    match: "vault error taxonomy is a closed set"
+-    reason: >
+-      VaultError is a closed MissingKey/Io/Network set constructed within cp-vault and
+-      matched exhaustively by callers; non_exhaustive would force forbidden wildcard arms.
+-    strategy: >
+-      Irreducible — closed error taxonomy, wildcard arms are forbidden.
++
+ 
+   # ── exhaustive_enums: cp-base foundation contracts ───────────────────
+   # cp-base is the foundation crate every other crate depends on. Its public
+@@ -440,13 +434,7 @@ exceptions:
+ 
+   # ── exhaustive_enums: cp-oplog service/error contracts ───────────────
+ 
+-  - path: "crates/cp-oplog/src/error.rs"
+-    match: "oplog error taxonomy is a closed two-variant set"
+-    reason: >
+-      Oplog Error is a closed Io/Frame set constructed within cp-oplog and matched
+-      exhaustively by callers; non_exhaustive would force forbidden wildcard arms.
+-    strategy: >
+-      Irreducible — closed error taxonomy, wildcard arms are forbidden.
++
+ 
+   # ── exhaustive_enums: cp-mod-* leaf module contracts ─────────────────
+ 
+# --- End entry #62 ---
