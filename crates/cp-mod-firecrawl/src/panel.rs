@@ -36,6 +36,7 @@ pub fn create(state: &mut State, title: &str, content: &str) -> String {
 
 /// Panel renderer for Firecrawl scraped content panels.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct Results;
 
 /// Cache request for restoring content from metadata after reload
@@ -57,10 +58,10 @@ impl Panel for Results {
             return None;
         }
         let content = ctx.metadata.get(META_CONTENT)?.as_str()?;
-        Some(CacheRequest {
-            context_type: Kind::new(FIRECRAWL_PANEL_TYPE),
-            data: Box::new(FirecrawlRestoreRequest { context_id: ctx.id.clone(), content: content.to_owned() }),
-        })
+        Some(CacheRequest::new(
+            Kind::new(FIRECRAWL_PANEL_TYPE),
+            Box::new(FirecrawlRestoreRequest { context_id: ctx.id.clone(), content: content.to_owned() }),
+        ))
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {

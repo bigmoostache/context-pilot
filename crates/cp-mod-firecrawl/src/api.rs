@@ -10,6 +10,7 @@ const TIMEOUT_SECS: u64 = 30;
 
 /// Parameters for `firecrawl_scrape`.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct ScrapeParams<'req> {
     /// Target URL to scrape.
     pub url: &'req str,
@@ -23,6 +24,7 @@ pub struct ScrapeParams<'req> {
 
 /// Parameters for `firecrawl_search`.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct SearchParams<'req> {
     /// Search query string.
     pub query: &'req str,
@@ -40,6 +42,7 @@ pub struct SearchParams<'req> {
 
 /// Parameters for `firecrawl_map`.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct MapParams<'req> {
     /// Root domain or subdomain to map.
     pub url: &'req str,
@@ -57,6 +60,7 @@ pub struct MapParams<'req> {
 
 /// Parameters for `firecrawl_crawl`.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct CrawlParams<'req> {
     /// Starting URL to crawl from.
     pub url: &'req str,
@@ -74,6 +78,7 @@ pub struct CrawlParams<'req> {
 
 /// HTTP client for the Firecrawl API (v2).
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct FirecrawlClient {
     /// Reusable reqwest HTTP client with 30s timeout.
     client: Client,

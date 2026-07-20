@@ -8,7 +8,7 @@ use crate::infra::constants::{
 };
 use crate::modules::conversation::refresh::estimate_message_tokens;
 use crate::state::cache::hash_content;
-use crate::state::{Entry, Kind, Message, MsgKind, MsgStatus, compute_total_pages, estimate_tokens};
+use crate::state::{Kind, Message, MsgKind, MsgStatus, compute_total_pages, estimate_tokens};
 use cp_base::panels::time_arith;
 
 /// Check if `idx` is a turn boundary — a safe place to split the conversation.
@@ -140,32 +140,16 @@ fn push_history_chunk(state: &mut crate::state::State, boundary: usize) -> bool 
     let panel_global_uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-    state.context.push(Entry {
-        id: panel_id,
-        uid: Some(panel_global_uid),
-        context_type: Kind::new(Kind::CONVERSATION_HISTORY),
-        name,
-        token_count,
-        metadata: std::collections::HashMap::new(),
-        cached_content: Some(content.clone()),
-        history_messages: Some(history_msgs),
-        cache_deprecated: false,
-        cache_in_flight: false,
-        last_refresh_ms: chunk_timestamp,
-        content_hash: None,
-        source_hash: None,
-        current_page: 0,
-        total_pages,
-        page_descriptions: std::collections::BTreeMap::new(),
-        full_token_count: token_count,
-        scroll_state: cp_base::state::context::ScrollState::default(),
-        panel_cache_hit: false,
-        panel_total_cost: 0.0,
-        freeze_count: 0,
-        total_freezes: 0,
-        total_cache_misses: 0,
-        emitted: cp_base::state::context::EmittedState { hash: Some(hash_content(&content)), context: None },
-    });
+    state.context.push(
+        cp_base::state::context::make_default_entry(&panel_id, Kind::new(Kind::CONVERSATION_HISTORY), &name, false)
+            .with_uid(panel_global_uid)
+            .with_token_count(token_count)
+            .with_cached_content(Some(content.clone()))
+            .with_history_messages(Some(history_msgs))
+            .with_last_refresh_ms(chunk_timestamp)
+            .with_pages(total_pages, token_count)
+            .with_emitted(cp_base::state::context::EmittedState::new(None, Some(hash_content(&content)))),
+    );
 
     // Remove detached messages from state and disk.
     let removed: Vec<Message> = state.messages.drain(..boundary).collect();

@@ -67,15 +67,15 @@ impl Panel for ConsolePanel {
         let handle = cs.sessions.get(session_name)?;
         let (buffer_content, total_written) = handle.buffer.read_all();
 
-        Some(CacheRequest {
-            context_type: Kind::new(Kind::CONSOLE),
-            data: Box::new(ConsoleCacheRequest {
+        Some(CacheRequest::new(
+            Kind::new(Kind::CONSOLE),
+            Box::new(ConsoleCacheRequest {
                 context_id: ctx.id.clone(),
                 buffer_content,
                 total_written,
                 current_source_hash: ctx.source_hash.clone(),
             }),
-        })
+        ))
     }
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {

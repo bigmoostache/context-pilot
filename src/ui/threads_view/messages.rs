@@ -11,7 +11,7 @@ use cp_render::{Block as IrBlock, Semantic, Span as S};
 
 use crate::modules::conversation::render_blocks::{MessageBlockOpts, render_message_blocks};
 use crate::modules::conversation::render_input_blocks::{InputBlockCtx, render_input_blocks};
-use crate::state::{Message, MsgKind, MsgStatus, State};
+use crate::state::{Message, State};
 use crate::ui::{ir, theme};
 use cp_base::cast::Safe as _;
 use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadStatus, ThreadsState};
@@ -189,19 +189,7 @@ fn thread_message_to_message(msg: &cp_mod_threads::types::ThreadMessage) -> Mess
     };
     let content = msg.content.clone().unwrap_or_default();
 
-    Message {
-        id: String::new(),
-        uid: None,
-        role: role.to_owned(),
-        content,
-        msg_type: MsgKind::TextMessage,
-        status: MsgStatus::Full,
-        tool_uses: vec![],
-        tool_results: vec![],
-        input_tokens: 0,
-        content_token_count: 0,
-        timestamp_ms: msg.timestamp,
-    }
+    Message::new_text(String::new(), role, content).at(msg.timestamp)
 }
 
 /// Calculate input area height based on current input content.

@@ -25,7 +25,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Brave Search module: web search and LLM context API integration.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct BraveModule;
+
+impl Default for BraveModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BraveModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for BraveModule {
     fn id(&self) -> &'static str {

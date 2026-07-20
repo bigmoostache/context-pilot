@@ -184,7 +184,23 @@ fn preflight_write(tool: &ToolUse) -> Verdict {
 
 /// Files module: Open, Edit, Write tools for file manipulation.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct FilesModule;
+
+impl Default for FilesModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FilesModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for FilesModule {
     fn id(&self) -> &'static str {

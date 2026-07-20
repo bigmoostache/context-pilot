@@ -36,7 +36,12 @@ pub enum AuthMechanism {
 }
 
 /// Definition of a well-known credential.
+///
+/// `#[non_exhaustive]`: constructed only in-crate (the `ALL_KEYS` table);
+/// external code reads fields via `resolve_definition`, so adding a field
+/// is not a breaking change.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct KeyDefinition {
     /// Short canonical name used in vault API calls (e.g. `"anthropic"`).
     pub canonical: &'static str,

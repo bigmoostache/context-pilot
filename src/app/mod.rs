@@ -93,7 +93,7 @@ pub(crate) struct App {
     /// Pending tool results when a console blocking wait is active
     pub pending_console_wait_tool_results: Option<Vec<ToolResult>>,
     /// Accumulated blocking watcher results — collects partial results until ALL blocking watchers complete
-    pub accumulated_blocking_results: Vec<cp_base::state::watchers::WatcherResult>,
+    pub accumulated_blocking_results: Vec<cp_base::state::watchers::carriers::WatcherResult>,
     /// Active reverie streams keyed by `agent_id` (one per agent type)
     pub reverie_streams: std::collections::HashMap<String, ReverieStream>,
 }

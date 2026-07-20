@@ -18,10 +18,9 @@ pub(super) use paused::emit_thread_paused;
 
 use crate::app::App;
 use crate::app::PendingDone;
-use crate::app::panels::now_ms;
 use cp_base::tools::ToolUse;
 use cp_mod_spine::types::{NotificationType, SpineState};
-use cp_mod_threads::types::{FocusState, ThreadAuthor, ThreadMessage, ThreadStatus, ThreadsState};
+use cp_mod_threads::types::{FocusState, ThreadMessage, ThreadStatus, ThreadsState};
 
 /// Inject a synthetic `Read` tool call when auto-continuation fires for a
 /// thread notification while the AI is unfocused.
@@ -95,15 +94,15 @@ pub(super) fn maybe_inject_auto_read(app: &mut App) -> bool {
     // Build the Read ToolUse exactly as the LLM would, then hand it to the
     // normal pipeline. The pipeline does ALL the rest (focus, panel refresh,
     // tempo break, message pairing, follow-up stream) — see `inject_tool_call`.
-    let tool_use = ToolUse {
-        id: format!("auto_read_{tid}"),
-        name: "Read".into(),
-        input: serde_json::json!({
+    let tool_use = ToolUse::new(
+        format!("auto_read_{tid}"),
+        "Read".into(),
+        serde_json::json!({
             "thread_id": tid,
             "intent": "Focus on thread",
             "verb": "Reading",
         }),
-    };
+    );
 
     inject_tool_call(app, tool_use);
     true
@@ -262,13 +261,6 @@ pub(in crate::app::run) fn maybe_append_tool_activity(state: &mut cp_base::state
 
     let ts = ThreadsState::get_mut(state);
     if let Some(thread) = ts.threads.iter_mut().find(|t| t.id == tid) {
-        thread.messages.push(ThreadMessage {
-            author: ThreadAuthor::Assistant,
-            content: Some(line),
-            file_path: None,
-            timestamp: now_ms(),
-            acknowledged: true,
-            auto: true,
-        });
+        thread.messages.push(ThreadMessage::auto_trace(line));
     }
 }

@@ -7,7 +7,8 @@ use cp_base::config::constants;
 use cp_base::panels::now_ms;
 use cp_base::panels::time_arith::ms_to_secs;
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{DeferredPanel, Watcher, WatcherRegistry, WatcherResult};
+use cp_base::state::watchers::carriers::{DeferredPanel, WatcherResult};
+use cp_base::state::watchers::{Watcher, WatcherRegistry};
 
 use cp_mod_console::manager::SessionHandle;
 use cp_mod_console::types::ConsoleState;
@@ -17,6 +18,7 @@ use crate::types::CallbackState;
 
 /// Result of firing a callback, including dedup info.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct FireResult {
     /// Console session key for the spawned script.
     pub session_key: String,
@@ -158,15 +160,14 @@ pub fn fire_callback(
         deadline_ms,
         desc: watcher_desc,
         matched_files: matched.matched_files.clone(),
-        deferred_panel: DeferredPanel {
-            session_key: session_key.clone(),
-            display_name: format!("CB: {}", def.name),
+        deferred_panel: DeferredPanel::new(
+            session_key.clone(),
+            format!("CB: {}", def.name),
             command,
-            description: format!("Callback: {}", def.name),
-            cwd: def.cwd.clone(),
-            callback_id: def.id.clone(),
-            callback_name: def.name.clone(),
-        },
+            format!("Callback: {}", def.name),
+        )
+        .cwd(def.cwd.clone())
+        .callback(def.id.clone(), def.name.clone()),
     };
 
     let registry = WatcherRegistry::get_mut(state);
@@ -253,6 +254,7 @@ fn shell_escape(s: &str) -> String {
 /// On exit 0: returns `success_message` + log file path, kills session.
 /// On exit != 0: returns error output + deferred panel info for `tool_cleanup` to create.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct CallbackWatcher {
     /// Unique watcher ID (e.g., "`callback_CB3_cb_42`").
     pub watcher_id: String,
@@ -311,17 +313,12 @@ impl Watcher for CallbackWatcher {
         // Used by callbacks that fire broadly (e.g., pattern "*") but often have nothing to do.
         // Returning None consumes the watcher without producing any visible result.
         if exit_code == 7i32 {
-            return Some(WatcherResult {
-                description: String::new(),
-                panel_id: None,
-                tool_use_id: self.tool_use_id.clone(),
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: true,
-                kill_session: Some(self.session_name.clone()),
-                preserves_tempo: false,
-            });
+            return Some(
+                WatcherResult::new(String::new())
+                    .tool_use_id_opt(self.tool_use_id.clone())
+                    .processed_already()
+                    .kill_session(self.session_name.clone()),
+            );
         }
 
         if exit_code == 0 {
@@ -329,39 +326,27 @@ impl Watcher for CallbackWatcher {
                 || format!("· {} passed", self.callback_name),
                 |sm| format!("· {} passed ({})", self.callback_name, sm),
             );
-            Some(WatcherResult {
-                description: msg,
-                panel_id: None,
-                tool_use_id: self.tool_use_id.clone(),
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: true,
-                kill_session: Some(self.session_name.clone()),
-                preserves_tempo: false,
-            })
+            Some(
+                WatcherResult::new(msg)
+                    .tool_use_id_opt(self.tool_use_id.clone())
+                    .processed_already()
+                    .kill_session(self.session_name.clone()),
+            )
         } else {
             // Panel content is already final — the pipeline waited for process exit before resuming
             let msg = format!("· {} FAILED (exit {})", self.callback_name, exit_code);
-            Some(WatcherResult {
-                description: msg,
-                panel_id: None,
-                tool_use_id: self.tool_use_id.clone(),
-                close_panel: false,
-                create_panel: Some(DeferredPanel {
-                    session_key: self.deferred_panel.session_key.clone(),
-                    display_name: self.deferred_panel.display_name.clone(),
-                    command: self.deferred_panel.command.clone(),
-                    description: self.deferred_panel.description.clone(),
-                    cwd: self.deferred_panel.cwd.clone(),
-                    callback_id: self.deferred_panel.callback_id.clone(),
-                    callback_name: self.deferred_panel.callback_name.clone(),
-                }),
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            })
+            Some(
+                WatcherResult::new(msg).tool_use_id_opt(self.tool_use_id.clone()).create_panel(
+                    DeferredPanel::new(
+                        self.deferred_panel.session_key.clone(),
+                        self.deferred_panel.display_name.clone(),
+                        self.deferred_panel.command.clone(),
+                        self.deferred_panel.description.clone(),
+                    )
+                    .cwd(self.deferred_panel.cwd.clone())
+                    .callback(self.deferred_panel.callback_id.clone(), self.deferred_panel.callback_name.clone()),
+                ),
+            )
         }
     }
 
@@ -372,25 +357,20 @@ impl Watcher for CallbackWatcher {
             return None;
         }
         let elapsed_s = ms_to_secs(now.saturating_sub(self.registered_at_ms));
-        Some(WatcherResult {
-            description: format!("· {} TIMED OUT ({}s)", self.callback_name, elapsed_s),
-            panel_id: None,
-            tool_use_id: self.tool_use_id.clone(),
-            close_panel: false,
-            create_panel: Some(DeferredPanel {
-                session_key: self.deferred_panel.session_key.clone(),
-                display_name: self.deferred_panel.display_name.clone(),
-                command: self.deferred_panel.command.clone(),
-                description: self.deferred_panel.description.clone(),
-                cwd: self.deferred_panel.cwd.clone(),
-                callback_id: self.deferred_panel.callback_id.clone(),
-                callback_name: self.deferred_panel.callback_name.clone(),
-            }),
-            create_dyn_panel: None,
-            processed_already: false,
-            kill_session: None,
-            preserves_tempo: false,
-        })
+        Some(
+            WatcherResult::new(format!("· {} TIMED OUT ({}s)", self.callback_name, elapsed_s))
+                .tool_use_id_opt(self.tool_use_id.clone())
+                .create_panel(
+                    DeferredPanel::new(
+                        self.deferred_panel.session_key.clone(),
+                        self.deferred_panel.display_name.clone(),
+                        self.deferred_panel.command.clone(),
+                        self.deferred_panel.description.clone(),
+                    )
+                    .cwd(self.deferred_panel.cwd.clone())
+                    .callback(self.deferred_panel.callback_id.clone(), self.deferred_panel.callback_name.clone()),
+                ),
+        )
     }
 
     fn registered_ms(&self) -> u64 {

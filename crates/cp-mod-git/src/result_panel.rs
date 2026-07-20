@@ -26,10 +26,10 @@ impl Panel for GitResultPanel {
 
     fn build_cache_request(&self, ctx: &Entry, _state: &State) -> Option<CacheRequest> {
         let command = ctx.get_meta_str("result_command")?;
-        Some(CacheRequest {
-            context_type: Kind::new(Kind::GIT_RESULT),
-            data: Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.to_owned() }),
-        })
+        Some(CacheRequest::new(
+            Kind::new(Kind::GIT_RESULT),
+            Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.to_owned() }),
+        ))
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {

@@ -206,12 +206,7 @@ impl ClaudeCodeV2Client {
         let access_token = match self.access_token.as_ref() {
             Some(t) => t.expose_secret(),
             None => {
-                return ApiCheckResult {
-                    auth_ok: false,
-                    streaming_ok: false,
-                    tools_ok: false,
-                    error: Some("OAuth token not found or expired".to_owned()),
-                };
+                return ApiCheckResult::failure(Some("OAuth token not found or expired".to_owned()));
             }
         };
 
@@ -241,7 +236,7 @@ impl ClaudeCodeV2Client {
         let auth_ok = auth_result.as_ref().is_ok_and(|r| r.status().is_success());
         if !auth_ok {
             let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_owned()));
-            return ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
+            return ApiCheckResult::failure(error);
         }
 
         // Test 2: Streaming
@@ -281,7 +276,13 @@ impl ClaudeCodeV2Client {
             .send();
         let tools_ok = tools_result.as_ref().is_ok_and(|r| r.status().is_success());
 
-        ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
+        {
+            let mut r = ApiCheckResult::default();
+            r.auth_ok = auth_ok;
+            r.streaming_ok = streaming_ok;
+            r.tools_ok = tools_ok;
+            r
+        }
     }
 }
 

@@ -55,6 +55,8 @@ pub(crate) fn render_threads_view(frame: &mut Frame<'_>, state: &State, area: Re
             render_new_thread_prompt(frame, state, msg_area);
         } else if let Some(&real_idx) = visible.get(selected_idx) {
             messages::render_message_area_with_input(frame, state, real_idx, msg_area);
+        } else {
+            // No thread selected — leave the message area blank.
         }
     } else {
         // Narrow terminal — show thread list only

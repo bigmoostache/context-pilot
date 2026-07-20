@@ -47,12 +47,7 @@ impl ClaudeCodeApiKeyClient {
         let api_key = match self.api_key.as_ref() {
             Some(t) => t.expose_secret(),
             None => {
-                return ApiCheckResult {
-                    auth_ok: false,
-                    streaming_ok: false,
-                    tools_ok: false,
-                    error: Some("ANTHROPIC_API_KEY not found in environment".to_owned()),
-                };
+                return ApiCheckResult::failure(Some("ANTHROPIC_API_KEY not found in environment".to_owned()));
             }
         };
 
@@ -86,7 +81,7 @@ impl ClaudeCodeApiKeyClient {
 
         if !auth_ok {
             let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_owned()));
-            return ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
+            return ApiCheckResult::failure(error);
         }
 
         // Test 2: Streaming
@@ -137,7 +132,13 @@ impl ClaudeCodeApiKeyClient {
 
         let tools_ok = tools_result.as_ref().is_ok_and(|r| r.status().is_success());
 
-        ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
+        {
+            let mut r = ApiCheckResult::default();
+            r.auth_ok = auth_ok;
+            r.streaming_ok = streaming_ok;
+            r.tools_ok = tools_ok;
+            r
+        }
     }
 }
 

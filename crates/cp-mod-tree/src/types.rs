@@ -4,6 +4,7 @@ use cp_base::state::runtime::State;
 
 /// A file description in the tree
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct TreeFileDescription {
     /// Relative file/folder path.
     pub path: String,
@@ -30,6 +31,7 @@ build/
 
 /// Module-owned state for the Tree module
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct TreeState {
     /// Gitignore-style filter patterns controlling which files/folders are shown.
     pub filter: String,

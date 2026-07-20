@@ -154,12 +154,7 @@ impl LlmClient for GroqClient {
 
     fn check_api(&self, model: &str) -> super::super::ApiCheckResult {
         let Some(api_key) = self.api_key.as_ref() else {
-            return super::super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error: Some("GROQ_API_KEY not set".to_owned()),
-            };
+            return super::super::ApiCheckResult::failure(Some("GROQ_API_KEY not set".to_owned()));
         };
 
         let client = Client::new();
@@ -180,7 +175,7 @@ impl LlmClient for GroqClient {
 
         if !auth_ok {
             let error = auth_result.err().map(|e| e.to_string()).or_else(|| Some("Auth failed".to_owned()));
-            return super::super::ApiCheckResult { auth_ok: false, streaming_ok: false, tools_ok: false, error };
+            return super::super::ApiCheckResult::failure(error);
         }
 
         // Test 2: Streaming
@@ -224,7 +219,13 @@ impl LlmClient for GroqClient {
 
         let tools_ok = tools_result.as_ref().is_ok_and(|r| r.status().is_success());
 
-        super::super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
+        {
+            let mut r = super::super::ApiCheckResult::default();
+            r.auth_ok = auth_ok;
+            r.streaming_ok = streaming_ok;
+            r.tools_ok = tools_ok;
+            r
+        }
     }
 }
 

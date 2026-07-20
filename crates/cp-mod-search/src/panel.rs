@@ -49,10 +49,10 @@ impl Panel for SearchResultPanel {
             return None;
         }
         let content = ctx.metadata.get(META_CONTENT)?.as_str()?;
-        Some(CacheRequest {
-            context_type: Kind::new(SEARCH_PANEL_TYPE),
-            data: Box::new(RestoreRequest { context_id: ctx.id.clone(), content: content.to_owned() }),
-        })
+        Some(CacheRequest::new(
+            Kind::new(SEARCH_PANEL_TYPE),
+            Box::new(RestoreRequest { context_id: ctx.id.clone(), content: content.to_owned() }),
+        ))
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {

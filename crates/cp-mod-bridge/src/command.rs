@@ -58,9 +58,6 @@ use cp_wire::types::snapshot::SeenSet;
 
 use crate::error::{BootResult, Error};
 
-/// Schema version stamped onto the [`Ack`]s this intake emits.
-const ACK_SCHEMA_VERSION: u32 = 1;
-
 /// Largest accumulated read (per connection) before a frame is abandoned as
 /// junk — bounds memory against a peer that sends an endless un-decodable
 /// stream. 32 MiB comfortably fits any realistic command frame (a `SendMessage`
@@ -214,17 +211,12 @@ fn take_frame(buf: &[u8]) -> Option<(usize, CommandFrame)> {
 
 /// Build an `Accepted` ack for `cmd_id` at `rev`.
 fn accept(cmd_id: &str, rev: Option<u64>) -> Ack {
-    Ack { schema_version: ACK_SCHEMA_VERSION, cmd_id: cmd_id.to_owned(), status: Status::Accepted, rev }
+    Ack::new(cmd_id.to_owned(), Status::Accepted, rev)
 }
 
 /// Build a `Rejected` ack for `cmd_id` with `reason`.
 fn reject(cmd_id: &str, reason: &str) -> Ack {
-    Ack {
-        schema_version: ACK_SCHEMA_VERSION,
-        cmd_id: cmd_id.to_owned(),
-        status: Status::Rejected { reason: reason.to_owned() },
-        rev: None,
-    }
+    Ack::new(cmd_id.to_owned(), Status::Rejected { reason: reason.to_owned() }, None)
 }
 
 /// Serialise an [`Ack`] and wrap it in the shared length+CRC framing.

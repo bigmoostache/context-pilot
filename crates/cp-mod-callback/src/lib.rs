@@ -40,7 +40,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Callback module: auto-fire bash scripts on file edits matching glob patterns.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct CallbackModule;
+
+impl Default for CallbackModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CallbackModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for CallbackModule {
     fn id(&self) -> &'static str {

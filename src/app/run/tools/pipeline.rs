@@ -6,7 +6,7 @@ use crate::infra::api::StreamEvent;
 use crate::infra::tools::execute_tool;
 use crate::modules::pre_flight::pre_flight_tool;
 use crate::state::persistence::build_message_op;
-use crate::state::{Message, MsgKind, MsgStatus, StreamPhase, ToolResultRecord, ToolUseRecord};
+use crate::state::{Message, StreamPhase, ToolResultRecord, ToolUseRecord};
 
 use crate::app::run::streaming::{has_dirty_file_panels, trigger_dirty_panel_refresh};
 use cp_base::state::data::model_helpers::{ModelPricing as _, token_cost};
@@ -71,19 +71,11 @@ fn save_tool_call_message(app: &mut App, tool: &cp_base::tools::ToolUse) {
     app.state.next_tool_id = app.state.next_tool_id.saturating_add(1);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
 
-    let tool_msg = Message {
-        id: tool_id,
-        uid: Some(tool_global_uid),
-        role: "assistant".to_owned(),
-        msg_type: MsgKind::ToolCall,
-        content: String::new(),
-        content_token_count: 0,
-        status: MsgStatus::Full,
-        tool_uses: vec![ToolUseRecord { id: tool.id.clone(), name: tool.name.clone(), input: tool.input.clone() }],
-        tool_results: Vec::new(),
-        input_tokens: 0,
-        timestamp_ms: now_ms(),
-    };
+    let tool_msg = Message::new_tool_call(
+        tool_id,
+        Some(tool_global_uid),
+        vec![ToolUseRecord::new(tool.id.clone(), tool.name.clone(), tool.input.clone())],
+    );
     app.save_message_async(&tool_msg);
     app.state.messages.push(tool_msg);
 }
@@ -168,13 +160,8 @@ fn enqueue_tool(
     flushed_tools: &mut Vec<super::queue_flush::FlushedTool>,
 ) -> crate::infra::tools::ToolResult {
     let qs = QueueState::get_mut(&mut app.state);
-    let idx = qs.enqueue(cp_mod_queue::types::QueuedToolCall {
-        index: 0,
-        tool_name: tool.name.clone(),
-        tool_use_id: tool.id.clone(),
-        input: tool.input.clone(),
-        queued_at: now_ms(),
-    });
+    let idx =
+        qs.enqueue(cp_mod_queue::types::QueuedToolCall::new(tool.name.clone(), tool.id.clone(), tool.input.clone()));
     let mut msg = format!("Queued as #{idx}");
     if pf.has_warnings() {
         let _r = write!(msg, "\n{}", pf.format_errors());
@@ -407,28 +394,14 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     let tool_result_records: Vec<ToolResultRecord> = tool_results
         .iter()
         .zip(tools.iter())
-        .map(|(r, t)| ToolResultRecord {
-            tool_use_id: r.tool_use_id.clone(),
-            content: r.content.clone(),
-            display: r.display.clone(),
-            tldr: r.tldr.clone(),
-            is_error: r.is_error,
-            tool_name: t.name.clone(),
+        .map(|(r, t)| {
+            ToolResultRecord::new(r.tool_use_id.clone(), r.content.clone(), r.is_error)
+                .display(r.display.clone())
+                .tldr(r.tldr.clone())
+                .tool_name(t.name.clone())
         })
         .collect();
-    let result_msg = Message {
-        id: result_id,
-        uid: Some(result_global_uid),
-        role: "user".to_owned(),
-        msg_type: MsgKind::ToolResult,
-        content: String::new(),
-        content_token_count: 0,
-        status: MsgStatus::Full,
-        tool_uses: Vec::new(),
-        tool_results: tool_result_records,
-        input_tokens: 0,
-        timestamp_ms: now_ms(),
-    };
+    let result_msg = Message::new_tool_result(result_id, Some(result_global_uid), tool_result_records);
     app.save_message_async(&result_msg);
     app.state.messages.push(result_msg);
 
@@ -480,19 +453,7 @@ fn push_new_assistant_message(app: &mut App) {
     let assistant_global_uid = format!("UID_{}_A", app.state.global_next_uid);
     app.state.next_assistant_id = app.state.next_assistant_id.saturating_add(1);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
-    let new_assistant_msg = Message {
-        id: assistant_id,
-        uid: Some(assistant_global_uid),
-        role: "assistant".to_owned(),
-        msg_type: MsgKind::TextMessage,
-        content: String::new(),
-        content_token_count: 0,
-        status: MsgStatus::Full,
-        tool_uses: Vec::new(),
-        tool_results: Vec::new(),
-        input_tokens: 0,
-        timestamp_ms: now_ms(),
-    };
+    let new_assistant_msg = Message::new_assistant(assistant_id, assistant_global_uid);
     app.state.messages.push(new_assistant_msg);
 }
 

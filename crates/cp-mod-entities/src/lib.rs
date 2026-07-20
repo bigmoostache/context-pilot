@@ -37,7 +37,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Entities module: persistent relational entity database.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct EntitiesModule;
+
+impl Default for EntitiesModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl EntitiesModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for EntitiesModule {
     fn id(&self) -> &'static str {

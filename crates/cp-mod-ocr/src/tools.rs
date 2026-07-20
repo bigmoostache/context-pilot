@@ -11,7 +11,8 @@ use std::sync::mpsc::{self, Receiver, TryRecvError};
 
 use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{Watcher, WatcherRegistry, WatcherResult};
+use cp_base::state::watchers::carriers::WatcherResult;
+use cp_base::state::watchers::{Watcher, WatcherRegistry};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::client::{DatalabClient, OcrMode, api_key_from_env, is_ocr_extension};
@@ -224,41 +225,11 @@ impl Watcher for OcrWatcher {
 
     fn check(&self, _state: &State) -> Option<WatcherResult> {
         let Ok(rx) = self.rx.lock() else {
-            return Some(WatcherResult {
-                description: "❌ OCR watcher failed (lock poisoned)".to_owned(),
-                panel_id: None,
-                tool_use_id: None,
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            });
+            return Some(WatcherResult::new("❌ OCR watcher failed (lock poisoned)"));
         };
         match rx.try_recv() {
-            Ok(message) => Some(WatcherResult {
-                description: message,
-                panel_id: None,
-                tool_use_id: None,
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            }),
-            Err(TryRecvError::Disconnected) => Some(WatcherResult {
-                description: "❌ OCR worker thread died unexpectedly".to_owned(),
-                panel_id: None,
-                tool_use_id: None,
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            }),
+            Ok(message) => Some(WatcherResult::new(message)),
+            Err(TryRecvError::Disconnected) => Some(WatcherResult::new("❌ OCR worker thread died unexpectedly")),
             Err(TryRecvError::Empty) => None,
         }
     }
@@ -267,17 +238,7 @@ impl Watcher for OcrWatcher {
         (now_ms() >= self.deadline_ms).then(|| {
             let elapsed_secs =
                 cp_base::panels::time_arith::ms_to_secs(self.deadline_ms.saturating_sub(self.registered_at_ms));
-            WatcherResult {
-                description: format!("❌ OCR timed out after {elapsed_secs}s"),
-                panel_id: None,
-                tool_use_id: None,
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            }
+            WatcherResult::new(format!("❌ OCR timed out after {elapsed_secs}s"))
         })
     }
 

@@ -253,6 +253,8 @@ fn remove_suicided_panels(app: &mut App, suicide_indices: &[usize]) {
             app.state.selected_context = app.state.context.len().saturating_sub(2);
         } else if app.state.selected_context > i {
             app.state.selected_context = app.state.selected_context.saturating_sub(1);
+        } else {
+            // Selection is before the removed panel — index unaffected.
         }
         drop(app.state.context.remove(i));
     }

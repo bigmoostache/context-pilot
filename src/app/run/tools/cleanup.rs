@@ -2,7 +2,7 @@ use std::sync::mpsc::Sender;
 
 use crate::app::panels::now_ms;
 use crate::infra::api::StreamEvent;
-use crate::state::{Message, MsgKind, MsgStatus, ToolResultRecord};
+use crate::state::{Message, ToolResultRecord};
 
 use cp_base::state::watchers::{ASYNC_ERROR_PREFIX, WatcherRegistry};
 use cp_mod_console::tools::CONSOLE_WAIT_BLOCKING_SENTINEL;
@@ -12,7 +12,7 @@ use crate::app::App;
 
 /// Create a console panel for a watcher result's deferred `create_panel`, and
 /// append a "→ see {panel}" pointer to the result description. No-op when absent.
-fn create_console_panel_for(app: &mut App, result: &mut cp_base::state::watchers::WatcherResult) {
+fn create_console_panel_for(app: &mut App, result: &mut cp_base::state::watchers::carriers::WatcherResult) {
     let Some(dp) = &(result.create_panel) else { return };
     let panel_id = app.state.next_available_context_id();
     let uid = format!("UID_{}_P", app.state.global_next_uid);
@@ -42,7 +42,7 @@ fn create_console_panel_for(app: &mut App, result: &mut cp_base::state::watchers
 
 /// Create a generic dyn panel for a watcher result's deferred `create_dyn_panel`,
 /// substituting the panel-ID placeholder in the description. No-op when absent.
-fn create_dyn_panel_for(app: &mut App, result: &mut cp_base::state::watchers::WatcherResult) {
+fn create_dyn_panel_for(app: &mut App, result: &mut cp_base::state::watchers::carriers::WatcherResult) {
     let Some(dp) = &(result.create_dyn_panel) else { return };
     let panel_id = app.state.next_available_context_id();
     let uid = format!("UID_{}_P", app.state.global_next_uid);
@@ -73,8 +73,8 @@ fn create_dyn_panel_for(app: &mut App, result: &mut cp_base::state::watchers::Wa
 /// their log files. Runs over both blocking and async result sets.
 fn cleanup_inline_sessions(
     app: &mut App,
-    blocking: &[cp_base::state::watchers::WatcherResult],
-    async_res: &[cp_base::state::watchers::WatcherResult],
+    blocking: &[cp_base::state::watchers::carriers::WatcherResult],
+    async_res: &[cp_base::state::watchers::carriers::WatcherResult],
 ) {
     for result in blocking.iter().chain(async_res.iter()) {
         let Some(name) = &(result.kill_session) else { continue };
@@ -95,7 +95,7 @@ fn cleanup_inline_sessions(
 
 /// Process async (non-blocking) watcher completions: create their panels, then
 /// emit spine notifications (after panel creation so descriptions carry refs).
-fn process_async_completions(app: &mut App, async_results: &mut [cp_base::state::watchers::WatcherResult]) {
+fn process_async_completions(app: &mut App, async_results: &mut [cp_base::state::watchers::carriers::WatcherResult]) {
     for result in async_results.iter_mut() {
         create_console_panel_for(app, result);
         create_dyn_panel_for(app, result);
@@ -132,7 +132,7 @@ fn process_async_completions(app: &mut App, async_results: &mut [cp_base::state:
 /// (`WatcherResult` can't carry `is_error` due to `struct_excessive_bools` forbid).
 fn apply_console_wait_result(
     tr: &mut crate::infra::tools::ToolResult,
-    merged_blocking: &[cp_base::state::watchers::WatcherResult],
+    merged_blocking: &[cp_base::state::watchers::carriers::WatcherResult],
 ) {
     if let Some(result) = merged_blocking.iter().find(|r| r.tool_use_id.as_deref() == Some(&tr.tool_use_id)) {
         if let Some(stripped) = result.description.strip_prefix(ASYNC_ERROR_PREFIX) {
@@ -148,7 +148,7 @@ fn apply_console_wait_result(
 /// matching callback watcher results, appending a "Callbacks:" block.
 fn apply_callback_result(
     tr: &mut crate::infra::tools::ToolResult,
-    merged_blocking: &[cp_base::state::watchers::WatcherResult],
+    merged_blocking: &[cp_base::state::watchers::carriers::WatcherResult],
 ) {
     let after_sentinel = &tr.content.get(CONSOLE_WAIT_BLOCKING_SENTINEL.len()..).unwrap_or("");
     let matched_result = merged_blocking
@@ -185,6 +185,8 @@ fn force_resolve_stragglers(tool_results: &mut [crate::infra::tools::ToolResult]
         } else if tr.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
             let after = &tr.content.get(CONSOLE_WAIT_BLOCKING_SENTINEL.len()..).unwrap_or("");
             tr.content = format!("Callback result unavailable (timeout). Original: {after}");
+        } else {
+            // Not a sentinel — already a real result, leave untouched.
         }
     }
 }
@@ -195,13 +197,15 @@ fn force_resolve_stragglers(tool_results: &mut [crate::infra::tools::ToolResult]
 fn replace_blocking_sentinels(
     app: &mut App,
     tool_results: &mut Vec<crate::infra::tools::ToolResult>,
-    merged_blocking: &[cp_base::state::watchers::WatcherResult],
+    merged_blocking: &[cp_base::state::watchers::carriers::WatcherResult],
 ) -> bool {
     for tr in tool_results.iter_mut() {
         if tr.content == CONSOLE_WAIT_BLOCKING_SENTINEL {
             apply_console_wait_result(tr, merged_blocking);
         } else if tr.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL) {
             apply_callback_result(tr, merged_blocking);
+        } else {
+            // Non-sentinel result — nothing to replace.
         }
     }
 
@@ -311,7 +315,7 @@ fn resume_pipeline_after_blocking(
     app: &mut App,
     tx: &Sender<StreamEvent>,
     tool_results: &[crate::infra::tools::ToolResult],
-    merged_blocking: &[cp_base::state::watchers::WatcherResult],
+    merged_blocking: &[cp_base::state::watchers::carriers::WatcherResult],
 ) {
     // === DEFERRED TEMPO BREAK ===
     // Blocking watchers deferred their tempo decision from pipeline.rs.
@@ -330,29 +334,14 @@ fn resume_pipeline_after_blocking(
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
     let tool_result_records: Vec<ToolResultRecord> = tool_results
         .iter()
-        .map(|r| ToolResultRecord {
-            tool_use_id: r.tool_use_id.clone(),
-            content: r.content.clone(),
-            display: r.display.clone(),
-            tldr: r.tldr.clone(),
-            is_error: r.is_error,
-            tool_name: r.tool_name.clone(),
+        .map(|r| {
+            ToolResultRecord::new(r.tool_use_id.clone(), r.content.clone(), r.is_error)
+                .display(r.display.clone())
+                .tldr(r.tldr.clone())
+                .tool_name(r.tool_name.clone())
         })
         .collect();
-    let result_msg = Message {
-        id: result_id,
-        uid: Some(result_global_uid),
-        role: "user".to_owned(),
-        msg_type: MsgKind::ToolResult,
-        content: String::new(),
-        content_token_count: 0,
-
-        status: MsgStatus::Full,
-        tool_uses: Vec::new(),
-        tool_results: tool_result_records,
-        input_tokens: 0,
-        timestamp_ms: now_ms(),
-    };
+    let result_msg = Message::new_tool_result(result_id, Some(result_global_uid), tool_result_records);
     app.save_message_async(&result_msg);
     app.state.messages.push(result_msg);
 
@@ -365,20 +354,7 @@ fn resume_pipeline_after_blocking(
     let assistant_global_uid = format!("UID_{}_A", app.state.global_next_uid);
     app.state.next_assistant_id = app.state.next_assistant_id.saturating_add(1);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
-    let new_assistant_msg = Message {
-        id: assistant_id,
-        uid: Some(assistant_global_uid),
-        role: "assistant".to_owned(),
-        msg_type: MsgKind::TextMessage,
-        content: String::new(),
-        content_token_count: 0,
-
-        status: MsgStatus::Full,
-        tool_uses: Vec::new(),
-        tool_results: Vec::new(),
-        input_tokens: 0,
-        timestamp_ms: now_ms(),
-    };
+    let new_assistant_msg = Message::new_assistant(assistant_id, assistant_global_uid);
     app.state.messages.push(new_assistant_msg);
 
     app.state.streaming_estimated_tokens = 0;
@@ -451,32 +427,12 @@ pub(crate) fn flush_pending_tool_results_as_interrupted(app: &mut App) {
         .iter()
         .map(|r| {
             // Strip any callback blocking sentinel prefix from content
-            let content = interrupted_msg.to_owned();
-            ToolResultRecord {
-                tool_use_id: r.tool_use_id.clone(),
-                content,
-                display: None,
-                tldr: None,
-                is_error: true,
-                tool_name: r.tool_name.clone(),
-            }
+            ToolResultRecord::new(r.tool_use_id.clone(), interrupted_msg.to_owned(), true)
+                .tool_name(r.tool_name.clone())
         })
         .collect();
 
-    let result_msg = Message {
-        id: result_id,
-        uid: Some(result_global_uid),
-        role: "user".to_owned(),
-        msg_type: MsgKind::ToolResult,
-        content: String::new(),
-        content_token_count: 0,
-
-        status: MsgStatus::Full,
-        tool_uses: Vec::new(),
-        tool_results: tool_result_records,
-        input_tokens: 0,
-        timestamp_ms: now_ms(),
-    };
+    let result_msg = Message::new_tool_result(result_id, Some(result_global_uid), tool_result_records);
     app.save_message_async(&result_msg);
     app.state.messages.push(result_msg);
 }

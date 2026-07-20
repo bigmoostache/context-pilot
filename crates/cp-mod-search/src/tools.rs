@@ -4,7 +4,8 @@
 //! dynamic result panels.
 
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{DYN_PANEL_ID_PLACEHOLDER, DynPanel};
+use cp_base::state::watchers::DYN_PANEL_ID_PLACEHOLDER;
+use cp_base::state::watchers::carriers::DynPanel;
 use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -413,24 +414,17 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
         let panel_content = format_results(&query, &search_output, hide_contents);
 
         if hide_contents {
-            return ToolOutput { content: panel_content, is_error: false, create_panel: None, preserves_tempo: true };
+            return ToolOutput::new(panel_content, false, None, true);
         }
 
-        let dyn_panel = DynPanel {
-            context_type: crate::panel::SEARCH_PANEL_TYPE.to_owned(),
-            display_name: format!("search: {query}"),
-            metadata: vec![("result_content".to_owned(), panel_content.clone())],
-            content: Some(panel_content),
-        };
+        let dyn_panel = DynPanel::new(crate::panel::SEARCH_PANEL_TYPE.to_owned(), format!("search: {query}"))
+            .metadata(vec![("result_content".to_owned(), panel_content.clone())])
+            .content(panel_content);
 
-        ToolOutput {
-            content: format!(
-                "Created panel {DYN_PANEL_ID_PLACEHOLDER}: \
-                 {file_count} file chunks, {log_count} logs, {entity_count} entities for \"{query}\"{PANEL_WARNING}",
-            ),
-            is_error: false,
-            create_panel: Some(dyn_panel),
-            preserves_tempo: false,
-        }
+        ToolOutput::ok(format!(
+            "Created panel {DYN_PANEL_ID_PLACEHOLDER}: \
+             {file_count} file chunks, {log_count} logs, {entity_count} entities for \"{query}\"{PANEL_WARNING}",
+        ))
+        .with_panel(dyn_panel)
     })
 }

@@ -32,7 +32,7 @@ use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use cp_wire::heartbeat::{HEARTBEAT_SCHEMA_VERSION, Heartbeat};
+use cp_wire::heartbeat::Heartbeat;
 
 /// The unchanging parameters of every beat: the identity stamped into each
 /// record plus the loop's wake cadence. Bundled so the beat loop and the
@@ -141,13 +141,7 @@ fn beat_loop(mut file: File, beat: &Beat, rx: &mpsc::Receiver<()>) {
 /// `sync_data`). The record is fixed-size, so the file never grows and no stale
 /// tail can survive.
 fn write_beat(file: &mut File, beat: &Beat, sequence: u64) -> io::Result<()> {
-    let record = Heartbeat {
-        schema_version: HEARTBEAT_SCHEMA_VERSION,
-        timestamp_ms: now_ms(),
-        sequence,
-        pid: beat.pid,
-        boot_id: beat.boot_id.clone(),
-    };
+    let record = Heartbeat::new(now_ms(), sequence, beat.pid, beat.boot_id.clone());
     let bytes = record.encode().map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?;
 
     let _pos = file.seek(SeekFrom::Start(0))?;

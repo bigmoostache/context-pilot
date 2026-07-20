@@ -85,15 +85,15 @@ impl Panel for TreePanel {
 
     fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
         let ts = TreeState::get(state);
-        Some(CacheRequest {
-            context_type: Kind::new(Kind::TREE),
-            data: Box::new(TreeCacheRequest {
+        Some(CacheRequest::new(
+            Kind::new(Kind::TREE),
+            Box::new(TreeCacheRequest {
                 context_id: ctx.id.clone(),
                 tree_filter: ts.filter.clone(),
                 tree_open_folders: ts.open_folders.clone(),
                 tree_descriptions: ts.descriptions.clone(),
             }),
-        })
+        ))
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, state: &mut State) -> bool {

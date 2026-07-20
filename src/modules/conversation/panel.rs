@@ -149,10 +149,9 @@ impl ConversationPanel {
                 },
             );
             if !is_streaming_this {
-                let _r = state.message_cache.insert(
-                    msg.id.clone(),
-                    MessageCache { blocks: Rc::from(rendered.as_slice()), content_hash: hash, viewport_width },
-                );
+                let _r = state
+                    .message_cache
+                    .insert(msg.id.clone(), MessageCache::new(Rc::from(rendered.as_slice()), hash, viewport_width));
             }
             blocks.extend(rendered);
         }
@@ -176,7 +175,7 @@ impl ConversationPanel {
                 viewport_width,
             },
         );
-        state.input_cache = Some(InputCache { blocks: Rc::from(input_blocks.as_slice()), input_hash, viewport_width });
+        state.input_cache = Some(InputCache::new(Rc::from(input_blocks.as_slice()), input_hash, viewport_width));
         input_blocks
     }
 
@@ -266,7 +265,7 @@ impl ConversationPanel {
         }
 
         // Store in full content cache
-        state.full_content_cache = Some(FullCache { blocks: Rc::from(blocks.as_slice()), content_hash: full_hash });
+        state.full_content_cache = Some(FullCache::new(Rc::from(blocks.as_slice()), full_hash));
 
         blocks
     }

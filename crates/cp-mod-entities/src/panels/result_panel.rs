@@ -150,25 +150,25 @@ impl Panel for EntityResultPanel {
             // Live panel — re-execute SQL on every cache cycle
             let sql = ctx.metadata.get(META_SQL)?.as_str()?;
             let db_path = ctx.metadata.get(META_DB_PATH)?.as_str()?;
-            Some(CacheRequest {
-                context_type: Kind::new(ENTITY_RESULT_TYPE),
-                data: Box::new(LiveQueryRequest {
+            Some(CacheRequest::new(
+                Kind::new(ENTITY_RESULT_TYPE),
+                Box::new(LiveQueryRequest {
                     context_id: ctx.id.clone(),
                     sql: sql.to_owned(),
                     db_path: db_path.to_owned(),
                     current_source_hash: ctx.source_hash.clone(),
                 }),
-            })
+            ))
         } else {
             // Static panel — only restore if content missing (post-reload)
             if ctx.cached_content.is_some() {
                 return None;
             }
             let content = ctx.metadata.get(META_CONTENT)?.as_str()?;
-            Some(CacheRequest {
-                context_type: Kind::new(ENTITY_RESULT_TYPE),
-                data: Box::new(EntityRestoreRequest { context_id: ctx.id.clone(), content: content.to_owned() }),
-            })
+            Some(CacheRequest::new(
+                Kind::new(ENTITY_RESULT_TYPE),
+                Box::new(EntityRestoreRequest { context_id: ctx.id.clone(), content: content.to_owned() }),
+            ))
         }
     }
 

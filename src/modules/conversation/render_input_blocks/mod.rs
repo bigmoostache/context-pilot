@@ -439,6 +439,8 @@ fn push_with_cursor_ir(spans: &mut Vec<Span>, text: &str, cursor_char: &str, sem
         }
     } else if !text.is_empty() {
         spans.push(Span::styled(text.to_owned(), semantic));
+    } else {
+        // Empty text with no cursor — nothing to push.
     }
 }
 

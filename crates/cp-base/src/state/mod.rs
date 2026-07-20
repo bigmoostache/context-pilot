@@ -37,6 +37,7 @@ pub mod reverie {
     /// Lives as `Option<reverie::Session>` on the main `State` struct.
     /// Not persisted — discarded after each run (fresh start every time).
     #[derive(Debug, Clone)]
+    #[non_exhaustive]
     pub struct Session {
         /// What kind of reverie this is.
         pub kind: Kind,

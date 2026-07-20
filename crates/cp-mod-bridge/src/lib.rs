@@ -149,6 +149,7 @@ impl MemoSeeds {
 /// oplog commit thread, heartbeat beacon) that are created fresh each session.
 /// `save_module_data` / `load_module_data` return `Null`.
 #[derive(Debug, Default)]
+#[non_exhaustive]
 pub struct BridgeState {
     /// The held boot resources, or `None` when the bridge is OFF or boot failed.
     pub boot: Option<Boot>,
@@ -259,7 +260,23 @@ pub struct BridgeState {
 ///
 /// [`init_state`]: Module::init_state
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
 pub struct BridgeModule;
+
+impl Default for BridgeModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BridgeModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for BridgeModule {
     fn id(&self) -> &'static str {

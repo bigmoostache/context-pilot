@@ -28,10 +28,10 @@ impl Panel for GithubResultPanel {
     fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
         let command = ctx.get_meta_str("result_command")?.to_owned();
         let token = GithubState::get(state).github_token.as_ref()?;
-        Some(CacheRequest {
-            context_type: Kind::new(Kind::GITHUB_RESULT),
-            data: Box::new(GithubResultRequest { context_id: ctx.id.clone(), command, github_token: token.clone() }),
-        })
+        Some(CacheRequest::new(
+            Kind::new(Kind::GITHUB_RESULT),
+            Box::new(GithubResultRequest { context_id: ctx.id.clone(), command, github_token: token.clone() }),
+        ))
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {

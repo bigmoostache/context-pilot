@@ -78,19 +78,15 @@ fn build_panel_write_ops(
         }
         let Some(uid) = &ctx.uid else { continue };
         let _r = known_uids.insert(String::clone(uid));
-        let panel_data = PanelData {
-            uid: uid.clone(),
-            panel_type: ctx.context_type.clone(),
-            name: ctx.name.clone(),
-            token_count: ctx.token_count,
-            last_refresh_ms: ctx.last_refresh_ms,
-            message_uids: panel_message_uids(ctx, state),
-            metadata: ctx.metadata.clone(),
-            content_hash: ctx.content_hash.clone(),
-            panel_total_cost: (ctx.panel_total_cost > 0.0f64).then_some(ctx.panel_total_cost),
-            total_freezes: ctx.total_freezes,
-            total_cache_misses: ctx.total_cache_misses,
-        };
+        let panel_data = PanelData::new(uid.clone(), ctx.context_type.clone(), ctx.name.clone())
+            .with_metrics(ctx.token_count, ctx.last_refresh_ms)
+            .with_message_uids(panel_message_uids(ctx, state))
+            .with_metadata(ctx.metadata.clone(), ctx.content_hash.clone())
+            .with_stats(
+                (ctx.panel_total_cost > 0.0f64).then_some(ctx.panel_total_cost),
+                ctx.total_freezes,
+                ctx.total_cache_misses,
+            );
         if let Ok(json) = serde_json::to_string_pretty(&panel_data) {
             writes.push(WriteOp { path: panels_dir.join(format!("{uid}.json")), content: json.into_bytes() });
         }
@@ -181,17 +177,12 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     let (global_modules, worker_modules) = build_module_data_maps(state);
 
     // Shared config
-    let shared_config = SharedConfig {
-        schema_version: crate::state::config::SCHEMA_VERSION,
-        reload_requested: false,
-        active_theme: state.active_theme.clone(),
-        owner_pid: Some(current_pid()),
-        selected_context: state.selected_context,
-        draft_input: state.input.clone(),
-        draft_cursor: state.input_cursor,
-        view_mode: state.view_mode,
-        modules: global_modules,
-    };
+    let shared_config = SharedConfig::default()
+        .with_active_theme(state.active_theme.clone())
+        .with_owner_pid(Some(current_pid()))
+        .with_ui(state.selected_context, state.input.clone(), state.input_cursor)
+        .with_view_mode(state.view_mode)
+        .with_modules(global_modules);
     if let Ok(json) = serde_json::to_string_pretty(&shared_config) {
         writes.push(WriteOp { path: dir.join(CONFIG_FILE), content: json.into_bytes() });
     }
@@ -207,15 +198,11 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     let (important_uids, panel_uid_to_local_id) = build_panel_uid_maps(state);
 
     // WorkerState
-    let worker_state = WorkerState {
-        schema_version: crate::state::config::SCHEMA_VERSION,
-        worker_id: DEFAULT_WORKER_ID.to_owned(),
-        important_panel_uids: important_uids,
-        panel_uid_to_local_id,
-        next_tool_id: state.next_tool_id,
-        next_result_id: state.next_result_id,
-        modules: worker_modules,
-    };
+    let worker_state = WorkerState::default()
+        .with_worker_id(DEFAULT_WORKER_ID.to_owned())
+        .with_panel_uids(important_uids, panel_uid_to_local_id)
+        .with_id_counters(state.next_tool_id, state.next_result_id)
+        .with_modules(worker_modules);
     if let Ok(json) = serde_json::to_string_pretty(&worker_state) {
         writes.push(WriteOp {
             path: dir.join(crate::infra::constants::STATES_DIR).join(format!("{DEFAULT_WORKER_ID}.json")),

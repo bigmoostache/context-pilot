@@ -51,6 +51,7 @@ impl MemoryImportance {
 
 /// A memory item
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct MemoryItem {
     /// Memory ID (M1, M2, ...)
     pub id: String,
@@ -79,6 +80,7 @@ pub struct MemoryItem {
 
 /// Module-owned state for the Memory module
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct MemoryState {
     /// All memory items, ordered by creation.
     pub memories: Vec<MemoryItem>,

@@ -31,9 +31,6 @@ use cp_wire::types::registry::Entry;
 /// unchanged by the split).
 pub use crate::registry::tailer::Tailer;
 
-/// Schema version stamped onto command frames this channel sends.
-const FRAME_SCHEMA_VERSION: u32 = 1;
-
 /// Subdirectory of the oplog directory holding spilled body files.
 const BODIES_DIR: &str = "bodies";
 
@@ -121,7 +118,7 @@ impl AgentChannel {
     /// the socket write fails, the ack is not received within
     /// [`ACK_READ_TIMEOUT`], or the response cannot be decoded.
     pub fn send(&self, command: Command) -> io::Result<Ack> {
-        let frame = CommandFrame { schema_version: FRAME_SCHEMA_VERSION, auth: self.cap_token.clone(), command };
+        let frame = CommandFrame::new(self.cap_token.clone(), command);
         let payload =
             serde_json::to_vec(&frame).map_err(|e| io::Error::other(format!("serialize command frame: {e}")))?;
         let frame_bytes = framing::encode_raw(&payload).map_err(|e| io::Error::other(format!("frame command: {e}")))?;

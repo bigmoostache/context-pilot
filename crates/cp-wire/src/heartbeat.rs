@@ -132,6 +132,7 @@ impl fmt::Display for Error {
 
 /// One decoded heartbeat beat.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Heartbeat {
     /// Schema revision of this record.
     pub schema_version: u32,
@@ -150,6 +151,15 @@ pub struct Heartbeat {
 }
 
 impl Heartbeat {
+    /// Build a heartbeat beat from its live fields.
+    ///
+    /// A constructor keeps [`Heartbeat`] `#[non_exhaustive]` across the
+    /// agent-side writer thread; `schema_version` is stamped here.
+    #[must_use]
+    pub const fn new(timestamp_ms: u64, sequence: u64, pid: u32, boot_id: String) -> Self {
+        Self { schema_version: HEARTBEAT_SCHEMA_VERSION, timestamp_ms, sequence, pid, boot_id }
+    }
+
     /// Encode into a fixed [`HEARTBEAT_LEN`]-byte array.
     ///
     /// # Errors

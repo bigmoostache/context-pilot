@@ -60,24 +60,14 @@ pub(crate) fn exec_crawl(tool: &ToolUse, state: &mut State) -> ToolResult {
         // 1. Start the crawl job
         let start = match client.start_crawl(&params) {
             Ok(r) => r,
-            Err(e) => return ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
+            Err(e) => return ToolOutput::error(e),
         };
         if !start.success {
             let msg = start.error.unwrap_or_else(|| "Unknown error".to_owned());
-            return ToolOutput {
-                content: format!("Crawl failed to start: {msg}"),
-                is_error: true,
-                create_panel: None,
-                preserves_tempo: false,
-            };
+            return ToolOutput::error(format!("Crawl failed to start: {msg}"));
         }
         let Some(job_id) = start.id else {
-            return ToolOutput {
-                content: "Crawl started but no job ID returned".to_owned(),
-                is_error: true,
-                create_panel: None,
-                preserves_tempo: false,
-            };
+            return ToolOutput::error("Crawl started but no job ID returned".to_owned());
         };
 
         // 2. Poll until complete
@@ -87,12 +77,7 @@ pub(crate) fn exec_crawl(tool: &ToolUse, state: &mut State) -> ToolResult {
             let status = match client.poll_crawl(&job_id) {
                 Ok(s) => s,
                 Err(e) => {
-                    return ToolOutput {
-                        content: format!("Crawl poll failed: {e}"),
-                        is_error: true,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::error(format!("Crawl poll failed: {e}"));
                 }
             };
             last_completed = status.completed.unwrap_or(0);
@@ -103,27 +88,17 @@ pub(crate) fn exec_crawl(tool: &ToolUse, state: &mut State) -> ToolResult {
                 }
                 "failed" => {
                     let msg = status.error.unwrap_or_else(|| "Unknown error".to_owned());
-                    return ToolOutput {
-                        content: format!("Crawl failed: {msg}"),
-                        is_error: true,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::error(format!("Crawl failed: {msg}"));
                 }
                 _ => {} // still scraping, keep polling
             }
         }
 
         let timeout_secs = CRAWL_MAX_POLLS.saturating_mul(CRAWL_POLL_INTERVAL.as_secs().to_u32());
-        ToolOutput {
-            content: format!(
-                "Crawl timed out after {timeout_secs}s ({last_completed} pages scraped). \
+        ToolOutput::error(format!(
+            "Crawl timed out after {timeout_secs}s ({last_completed} pages scraped). \
                  Job '{job_id}' may still be running on Firecrawl servers.",
-            ),
-            is_error: true,
-            create_panel: None,
-            preserves_tempo: false,
-        }
+        ))
     })
 }
 
@@ -134,12 +109,7 @@ fn write_crawl_output(url: &str, output: &std::path::Path, status: crate::types:
     let credits = status.credits_used.unwrap_or(0);
 
     if count == 0 {
-        return ToolOutput {
-            content: format!("Crawl of '{url}' completed but returned 0 pages."),
-            is_error: false,
-            create_panel: None,
-            preserves_tempo: false,
-        };
+        return ToolOutput::ok(format!("Crawl of '{url}' completed but returned 0 pages."));
     }
 
     let mut md = String::new();
@@ -163,22 +133,12 @@ fn write_crawl_output(url: &str, output: &std::path::Path, status: crate::types:
         drop(std::fs::create_dir_all(parent));
     }
     if let Err(e) = std::fs::write(output, &md) {
-        return ToolOutput {
-            content: format!("Crawl completed ({count} pages) but failed to write output: {e}"),
-            is_error: true,
-            create_panel: None,
-            preserves_tempo: false,
-        };
+        return ToolOutput::error(format!("Crawl completed ({count} pages) but failed to write output: {e}"));
     }
 
-    ToolOutput {
-        content: format!(
-            "Crawl of '{url}' completed: {count} pages, {credits} credits. \
+    ToolOutput::ok(format!(
+        "Crawl of '{url}' completed: {count} pages, {credits} credits. \
              Results written to '{}'.",
-            output.display(),
-        ),
-        is_error: false,
-        create_panel: None,
-        preserves_tempo: false,
-    }
+        output.display(),
+    ))
 }

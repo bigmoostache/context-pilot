@@ -119,11 +119,20 @@ impl fmt::Debug for CacheUpdate {
 
 /// Generic request for background cache operations.
 /// Each module defines its own request data struct and wraps it in `data`.
+#[non_exhaustive]
 pub struct CacheRequest {
     /// Panel type that originated this request.
     pub context_type: Kind,
     /// Type-erased request payload (downcast by the module's `refresh_cache`).
     pub data: Box<dyn Any + Send>,
+}
+
+impl CacheRequest {
+    /// Build a cache request for a panel type, boxing the module-specific payload.
+    #[must_use]
+    pub fn new(context_type: Kind, data: Box<dyn Any + Send>) -> Self {
+        Self { context_type, data }
+    }
 }
 
 impl fmt::Debug for CacheRequest {
@@ -330,6 +339,7 @@ you need NOW; prefer searching/opening a specific range over walking pages.]\n{p
 
 /// A single context item to be sent to the LLM
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ContextItem {
     /// Context element ID (e.g., "P7", "P8") for LLM reference
     pub id: String,

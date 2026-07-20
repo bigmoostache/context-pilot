@@ -39,7 +39,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Prompt library module: agents, skills, commands — the ship's charter.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct PromptModule;
+
+impl Default for PromptModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PromptModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for PromptModule {
     fn id(&self) -> &'static str {

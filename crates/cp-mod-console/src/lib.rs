@@ -45,7 +45,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Console module: spawns child processes, manages sessions, provides interactive I/O.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct ConsoleModule;
+
+impl Default for ConsoleModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ConsoleModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for ConsoleModule {
     fn id(&self) -> &'static str {

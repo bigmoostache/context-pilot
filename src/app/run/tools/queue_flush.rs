@@ -3,9 +3,8 @@
 //! Extracted from `cleanup.rs` to keep that module under the 500-line limit.
 
 use crate::app::App;
-use crate::app::panels::now_ms;
 use crate::infra::tools::execute_tool;
-use crate::state::{Message, MsgKind, MsgStatus, State, ToolUseRecord};
+use crate::state::{Message, State, ToolUseRecord};
 
 use cp_base::state::context::Kind;
 use cp_mod_queue::types::QueueState;
@@ -48,8 +47,7 @@ pub(crate) fn execute_queue_flush(
         // Generate a fresh tool_use_id to avoid collision with the intercept-time message.
         // The original id was already used in the "Queued as #N" tool_result at intercept time.
         let fresh_id = format!("flush_{}_{}", call.index, call.tool_use_id);
-        let queued_tool =
-            cp_base::tools::ToolUse { id: fresh_id, name: call.tool_name.clone(), input: call.input.clone() };
+        let queued_tool = cp_base::tools::ToolUse::new(fresh_id, call.tool_name.clone(), call.input.clone());
         let result = execute_tool(&queued_tool, state);
         flushed.push(FlushedTool { tool: queued_tool, result, queue_index: call.index });
     }
@@ -82,19 +80,11 @@ pub(crate) fn save_flushed_tool_call_message(app: &mut App, tool: &cp_base::tool
         "tool_parameters_size": params_size,
     });
 
-    let tool_msg = Message {
-        id: tool_id,
-        uid: Some(tool_global_uid),
-        role: "assistant".to_owned(),
-        msg_type: MsgKind::ToolCall,
-        content: String::new(),
-        content_token_count: 0,
-        status: MsgStatus::Full,
-        tool_uses: vec![ToolUseRecord { id: tool.id.clone(), name: "Tool_execution".to_owned(), input: compact_input }],
-        tool_results: Vec::new(),
-        input_tokens: 0,
-        timestamp_ms: now_ms(),
-    };
+    let tool_msg = Message::new_tool_call(
+        tool_id,
+        Some(tool_global_uid),
+        vec![ToolUseRecord::new(tool.id.clone(), "Tool_execution".to_owned(), compact_input)],
+    );
     app.save_message_async(&tool_msg);
     app.state.messages.push(tool_msg);
 }

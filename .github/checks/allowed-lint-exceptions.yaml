@@ -620,5 +620,97 @@ exceptions:
     strategy: >
       Irreducible — non_exhaustive would forbid the required cross-crate construction.
 
+  - path: "crates/cp-mod-threads/src/types.rs"
+    match: "thread-turn contract: ThreadStatus is a closed MyTurn/TheirTurn set"
+    reason: >
+      ThreadStatus is a closed MyTurn/TheirTurn set constructed cross-crate and matched exhaustively
+      by the bridge and threads view; non_exhaustive would force cross-crate wildcard arms the
+      forbidden wildcard_enum_match_arm lint rejects.
+    strategy: >
+      Irreducible — closed two-outcome set, wildcard arms are forbidden.
+
+  - path: "crates/cp-mod-threads/src/types.rs"
+    match: "thread-author contract: ThreadAuthor is a closed User/Assistant set"
+    reason: >
+      ThreadAuthor is a closed User/Assistant set constructed cross-crate and matched exhaustively
+      by the message renderer; non_exhaustive would force cross-crate wildcard arms the forbidden
+      wildcard_enum_match_arm lint rejects.
+    strategy: >
+      Irreducible — closed two-outcome set, wildcard arms are forbidden.
+
+  # ── exhaustive_structs: wide wire records where a constructor is worse ──
+  # These public structs are legitimately exhaustive: each is a fixed-layout
+  # wire record built cross-crate at a single site, and a constructor would take
+  # so many positional arguments it trips the forbidden too_many_arguments lint
+  # (max 4) with no natural field grouping. #[non_exhaustive] is impossible
+  # (E0639 on the cross-crate construction), so the exhaustive literal + a
+  # registered #[expect] is the honest shape. Every OTHER exhaustive struct in
+  # the wire/IR layers took #[non_exhaustive] + an in-crate constructor instead;
+  # these two are the irreducible remainder.
+
+  - path: "crates/cp-wire/src/types/registry.rs"
+    match: "registry-record contract: Entry is a 14-field agent discovery record"
+    reason: >
+      Entry is a 14-field agent discovery record written cross-crate by the bridge boot path and
+      read field-by-field by the backend; a constructor would take 13 positional arguments
+      (tripping too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible.
+    strategy: >
+      Irreducible — a 13-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+
+  - path: "crates/cp-wire/src/types/stream.rs"
+    match: "stream-frame contract: Frame is a 7-field ephemeral routing record"
+    reason: >
+      Frame is a 7-field ephemeral routing record built cross-crate by the agent's tee path; a
+      constructor would take 6 positional arguments (tripping too_many_arguments) with no natural
+      grouping, so #[non_exhaustive] is impossible.
+    strategy: >
+      Irreducible — a 6-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+
+  # ── exhaustive_structs: cp-render IR data-carrier layer (crate-level) ──
+  # One crate-level #![expect] covers every IR type in cp-render. They are
+  # all built by struct literal cross-crate by the tui adapter (src/ui/ir,
+  # src/ui/search_overlay) and read field-by-field by the renderer, so
+  # #[non_exhaustive] forbids the construction (E0639); the wide records
+  # (Message, SearchIndex, SearchEmbeddings, StatusBar, …) would trip the
+  # forbidden too_many_arguments under any flat constructor. The IR is a
+  # single closed builder↔adapter contract — one reviewed decision, not 56.
+
+  - path: "crates/cp-render/src/lib.rs"
+    match: "IR data-carrier layer: every type is built by struct literal cross-crate"
+    reason: >
+      Crate-level #![expect] for all cp-render IR structs: each is adapter-built by struct literal
+      cross-crate and read field-by-field by the renderer; #[non_exhaustive] forbids that (E0639)
+      and wide records trip too_many_arguments under a flat constructor.
+    strategy: >
+      Irreducible — closed builder↔adapter IR contract; non_exhaustive+constructor is impossible
+      for the wide records.
+
+  # ── exhaustive_structs: cp-base wide cross-crate records ─────────────
+  # Two cp-base structs are built by struct literal at many sites across every
+  # module crate. Both are flat, wide records where a constructor would take so
+  # many positional arguments it trips the forbidden too_many_arguments lint
+  # (max 4). #[non_exhaustive] is impossible (E0639 on the cross-crate
+  # construction). Every OTHER cross-crate cp-base struct took a constructor or
+  # builder (ToolOutput::ok/error, CacheRequest::new, WatcherResult::new+setters)
+  # instead; these two are the irreducible remainder.
+
+  - path: "crates/cp-base/src/tools/mod.rs"
+    match: "tool-return contract: ToolResult is the closed struct every tool fills"
+    reason: >
+      ToolResult is the closed tool-return contract built by struct literal at 116 sites across
+      every module crate; the new/with_name constructors can't cover the display/tldr/preserves_tempo
+      field combinations each site sets, and a 7-arg constructor would trip too_many_arguments.
+    strategy: >
+      Irreducible — a 7-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+
+  - path: "crates/cp-base/src/state/context.rs"
+    match: "module-metadata registry record: TypeMeta is a flat 9-field descriptor"
+    reason: >
+      TypeMeta is a flat 9-field module-metadata descriptor built by struct literal at 25 sites —
+      one per module's context_type_metadata() — cross-crate; a 9-arg constructor would trip
+      too_many_arguments and every module fills all fields.
+    strategy: >
+      Irreducible — a 9-arg constructor trips too_many_arguments; the exhaustive literal is honest.
+
 
 

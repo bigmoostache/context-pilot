@@ -36,6 +36,7 @@ pub enum MsgStatus {
 
 /// Record of a single tool invocation inside a [`Message`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ToolUseRecord {
     /// Unique tool-use ID assigned by the LLM.
     pub id: String,
@@ -45,8 +46,17 @@ pub struct ToolUseRecord {
     pub input: serde_json::Value,
 }
 
+impl ToolUseRecord {
+    /// Build a tool-use record from its ID, tool name, and JSON input.
+    #[must_use]
+    pub const fn new(id: String, name: String, input: serde_json::Value) -> Self {
+        Self { id, name, input }
+    }
+}
+
 /// Record of a tool execution result inside a [`Message`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ToolResultRecord {
     /// Correlates with [`ToolUseRecord::id`].
     pub tool_use_id: String,
@@ -70,9 +80,41 @@ pub struct ToolResultRecord {
     pub tool_name: String,
 }
 
+impl ToolResultRecord {
+    /// Build a result record from its correlated ID, LLM-facing content, and
+    /// error flag. `display`/`tldr` default to `None` and `tool_name` to empty;
+    /// use the builder setters for the richer variants.
+    #[must_use]
+    pub const fn new(tool_use_id: String, content: String, is_error: bool) -> Self {
+        Self { tool_use_id, content, display: None, tldr: None, is_error, tool_name: String::new() }
+    }
+
+    /// Set the user-facing display string (builder).
+    #[must_use]
+    pub fn display(mut self, display: Option<String>) -> Self {
+        self.display = display;
+        self
+    }
+
+    /// Set the compact TL;DR summary (builder).
+    #[must_use]
+    pub fn tldr(mut self, tldr: Option<String>) -> Self {
+        self.tldr = tldr;
+        self
+    }
+
+    /// Set the producing tool's name (builder).
+    #[must_use]
+    pub fn tool_name(mut self, tool_name: String) -> Self {
+        self.tool_name = tool_name;
+        self
+    }
+}
+
 /// A single message in the conversation — user text, assistant text,
 /// tool call, or tool result. The atomic unit of the message history.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Message {
     /// Display ID (e.g., U1, A1, T1 - for UI/LLM)
     pub id: String,
@@ -141,6 +183,68 @@ impl Message {
             input_tokens: 0,
             timestamp_ms: crate::panels::now_ms(),
         }
+    }
+
+    /// Create an assistant `ToolCall` message carrying the given tool-use records.
+    #[must_use]
+    pub fn new_tool_call(id: String, uid: Option<String>, tool_uses: Vec<ToolUseRecord>) -> Self {
+        Self {
+            id,
+            uid,
+            role: "assistant".to_owned(),
+            msg_type: MsgKind::ToolCall,
+            content: String::new(),
+            content_token_count: 0,
+            status: MsgStatus::Full,
+            tool_uses,
+            tool_results: Vec::new(),
+            input_tokens: 0,
+            timestamp_ms: crate::panels::now_ms(),
+        }
+    }
+
+    /// Create a user `ToolResult` message carrying the given result records.
+    #[must_use]
+    pub fn new_tool_result(id: String, uid: Option<String>, tool_results: Vec<ToolResultRecord>) -> Self {
+        Self {
+            id,
+            uid,
+            role: "user".to_owned(),
+            msg_type: MsgKind::ToolResult,
+            content: String::new(),
+            content_token_count: 0,
+            status: MsgStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results,
+            input_tokens: 0,
+            timestamp_ms: crate::panels::now_ms(),
+        }
+    }
+
+    /// Create a plain text message for the given role and content. `id`/`uid`
+    /// default empty, timestamp stamped now — override via the setters.
+    #[must_use]
+    pub fn new_text(id: String, role: &str, content: String) -> Self {
+        Self {
+            id,
+            uid: None,
+            role: role.to_owned(),
+            msg_type: MsgKind::TextMessage,
+            content,
+            content_token_count: 0,
+            status: MsgStatus::Full,
+            tool_uses: Vec::new(),
+            tool_results: Vec::new(),
+            input_tokens: 0,
+            timestamp_ms: crate::panels::now_ms(),
+        }
+    }
+
+    /// Override the creation timestamp (epoch ms) (builder).
+    #[must_use]
+    pub const fn at(mut self, timestamp_ms: u64) -> Self {
+        self.timestamp_ms = timestamp_ms;
+        self
     }
 }
 

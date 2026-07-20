@@ -14,9 +14,6 @@ pub(crate) use cp_base::state::flags::{StreamPhase, StreamingTool};
 pub(crate) use cp_base::state::runtime::State;
 pub(crate) use cp_base::ui::render_cache::{FullCache, InputCache, MessageCache, hash_values};
 
-// ── Submodule re-exports (accessed via path, e.g. crate::state::config::SCHEMA_VERSION) ──
-pub(crate) use cp_base::state::data::config;
-
 // Records re-export (used by conversation panel and persistence)
 pub(crate) use cp_base::state::data::message::{ToolResultRecord, ToolUseRecord};
 

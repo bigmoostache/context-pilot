@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Top-level search response from Brave Web Search API.
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct BraveSearchResponse {
     /// Response type identifier.
     #[serde(rename = "type")]
@@ -18,6 +19,7 @@ pub struct BraveSearchResponse {
 
 /// Query metadata returned by the API.
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct QueryInfo {
     /// Original query string as submitted.
     pub original: Option<String>,
@@ -25,6 +27,7 @@ pub struct QueryInfo {
 
 /// Container for organic web search results.
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct WebResults {
     /// List of individual web results.
     pub results: Vec<WebResult>,
@@ -32,6 +35,7 @@ pub struct WebResults {
 
 /// A single organic web search result.
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct WebResult {
     /// Page title.
     pub title: Option<String>,
@@ -47,6 +51,7 @@ pub struct WebResult {
 
 /// Rich results section (knowledge panels, calculators, etc.).
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct RichResults {
     /// Hint for fetching rich callback data.
     pub hint: Option<RichHint>,
@@ -54,6 +59,7 @@ pub struct RichResults {
 
 /// Callback key for fetching rich result details.
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct RichHint {
     /// Opaque key passed to the `/web/rich` endpoint.
     pub callback_key: Option<String>,
@@ -61,6 +67,7 @@ pub struct RichHint {
 
 /// Rich callback response — flexible JSON since it varies by type
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct RichCallbackResponse {
     /// Unstructured rich data (stocks, weather, calculator, crypto, sports, etc.).
     #[serde(flatten)]
@@ -71,6 +78,7 @@ pub struct RichCallbackResponse {
 
 /// Response from Brave's LLM Context API (pre-extracted web content for LLMs).
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct LLMContextResponse {
     /// Grounding data: relevance-scored text chunks from top results.
     pub grounding: Option<Grounding>,
@@ -80,6 +88,7 @@ pub struct LLMContextResponse {
 
 /// Grounding section containing extracted content items.
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct Grounding {
     /// Generic grounding items (paragraphs, tables, code blocks).
     pub generic: Option<Vec<GroundingItem>>,
@@ -87,6 +96,7 @@ pub struct Grounding {
 
 /// A single grounding item: extracted content from one source page.
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct GroundingItem {
     /// Source page URL.
     pub url: Option<String>,

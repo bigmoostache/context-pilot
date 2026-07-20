@@ -48,6 +48,7 @@ pub enum NotificationStatus {
 
 /// A notification in the spine system -- the universal trigger mechanism
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Notification {
     /// Notification ID (e.g., "N1", "N2")
     pub id: String,
@@ -107,6 +108,7 @@ pub enum ContinuationAction {
 
 /// Configuration for spine module (per-worker, persisted)
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SpineConfig {
     /// Whether to continue until all todos are done
     #[serde(default)]
@@ -151,6 +153,7 @@ pub struct SpineConfig {
 
 /// Module-owned state for the Spine module
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct SpineState {
     /// All notifications (unprocessed, blocked, and processed).
     pub notifications: Vec<Notification>,

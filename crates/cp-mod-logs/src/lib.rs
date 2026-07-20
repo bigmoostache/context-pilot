@@ -177,7 +177,23 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
 
 /// Logs module: timestamped entries and conversation history management.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct LogsModule;
+
+impl Default for LogsModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LogsModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for LogsModule {
     fn id(&self) -> &'static str {

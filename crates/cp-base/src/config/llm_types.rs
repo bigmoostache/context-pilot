@@ -57,7 +57,8 @@ pub enum StreamEvent {
 }
 
 /// Result of an LLM provider API connectivity check.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct ApiCheckResult {
     /// Whether authentication (API key / OAuth) succeeded.
     pub auth_ok: bool,
@@ -70,6 +71,12 @@ pub struct ApiCheckResult {
 }
 
 impl ApiCheckResult {
+    /// Total failure: no check passed, carrying the given error message.
+    #[must_use]
+    pub const fn failure(error: Option<String>) -> Self {
+        Self { auth_ok: false, streaming_ok: false, tools_ok: false, error }
+    }
+
     /// `true` only when auth, streaming, and tool-use all passed.
     #[must_use]
     pub const fn all_ok(&self) -> bool {

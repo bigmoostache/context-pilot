@@ -36,7 +36,23 @@ use self::panel::ThreadsPanel;
 
 /// Threads module: parallel discussion and work topics with turn-based focus.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct ThreadsModule;
+
+impl Default for ThreadsModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ThreadsModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for ThreadsModule {
     fn id(&self) -> &'static str {

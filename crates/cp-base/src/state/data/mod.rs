@@ -52,6 +52,7 @@ impl CacheBreakKind {
 /// token layout, recent tools). Consumed by cost-tracking append once the stream
 /// finalizes and token costs are known.
 #[derive(Debug, Default)]
+#[non_exhaustive]
 pub struct TickTelemetry {
     /// Epoch milliseconds when the tick started.
     pub tick_start_ms: u64,
@@ -73,4 +74,44 @@ pub struct TickTelemetry {
     pub break_kind: CacheBreakKind,
     /// Configured `max_freezes` for the culprit panel (0 when no culprit).
     pub culprit_max_freezes: u8,
+}
+
+impl TickTelemetry {
+    /// Start a telemetry record for a tick, capturing the fields known at tick
+    /// start (timestamp, recent tools, queue/tempo conditions). Culprit fields
+    /// default to inert (`"none"`, zero, `NoBreak`) — fill them via the setters
+    /// once cache-break analysis runs.
+    #[must_use]
+    pub fn start(tick_start_ms: u64, three_last_tools: String, queue_is_active: bool, tempo_is_active: bool) -> Self {
+        Self {
+            tick_start_ms,
+            three_last_tools,
+            culprit_type: "none".to_owned(),
+            tokens_before_culprit: 0,
+            tokens_culprit: 0,
+            tokens_after_culprit: 0,
+            queue_is_active,
+            tempo_is_active,
+            break_kind: CacheBreakKind::NoBreak,
+            culprit_max_freezes: 0,
+        }
+    }
+
+    /// Set the token layout around the cache-break culprit (builder).
+    #[must_use]
+    pub const fn token_layout(mut self, before: usize, culprit: usize, after: usize) -> Self {
+        self.tokens_before_culprit = before;
+        self.tokens_culprit = culprit;
+        self.tokens_after_culprit = after;
+        self
+    }
+
+    /// Set the culprit panel's type, break kind, and `max_freezes` (builder).
+    #[must_use]
+    pub fn culprit(mut self, culprit_type: String, break_kind: CacheBreakKind, max_freezes: u8) -> Self {
+        self.culprit_type = culprit_type;
+        self.break_kind = break_kind;
+        self.culprit_max_freezes = max_freezes;
+        self
+    }
 }

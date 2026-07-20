@@ -166,19 +166,19 @@ fn build_reverie_stream_context(
             .cloned()
             .collect::<Vec<_>>(),
     );
-    context_items.push(ContextItem {
-        id: "P-main-conv".to_owned(),
-        header: "Main Agent Conversation (read-only)".to_owned(),
-        content: main_conv_content,
-        last_refresh_ms: crate::app::panels::now_ms(),
-    });
+    context_items.push(ContextItem::new(
+        "P-main-conv",
+        "Main Agent Conversation (read-only)",
+        main_conv_content,
+        crate::app::panels::now_ms(),
+    ));
 
-    context_items.push(ContextItem {
-        id: "P-reverie".to_owned(),
-        header: "Reverie Context (tool restrictions + conversation)".to_owned(),
-        content: build_reverie_panel_content(state, &rev),
-        last_refresh_ms: crate::app::panels::now_ms(),
-    });
+    context_items.push(ContextItem::new(
+        "P-reverie",
+        "Reverie Context (tool restrictions + conversation)",
+        build_reverie_panel_content(state, &rev),
+        crate::app::panels::now_ms(),
+    ));
 
     // The reverie's messages ARE the conversation (may be empty on first run).
     // Tools are IDENTICAL to the main worker for prompt cache hits.

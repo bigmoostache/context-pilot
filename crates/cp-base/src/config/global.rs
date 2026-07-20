@@ -40,6 +40,7 @@ const KEY_ENV_MAP: &[(&str, &str)] = &[
 
 /// Serialized form of `~/.config/context-pilot/config.json`.
 #[derive(Debug, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Config {
     /// API keys and tokens, keyed by canonical name (e.g. `"anthropic"`,
     /// `"telegram_bot"`).

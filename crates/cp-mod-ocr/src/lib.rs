@@ -22,7 +22,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// OCR module: document conversion via the Datalab cloud API.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct OcrModule;
+
+impl Default for OcrModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl OcrModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for OcrModule {
     fn id(&self) -> &'static str {

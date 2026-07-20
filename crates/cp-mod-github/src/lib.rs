@@ -38,7 +38,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// GitHub module: PR/issue management via `gh` CLI.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct GithubModule;
+
+impl Default for GithubModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl GithubModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for GithubModule {
     fn id(&self) -> &'static str {

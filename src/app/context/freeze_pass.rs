@@ -44,18 +44,15 @@ pub(super) fn apply_full_freeze(
     let conversation_tokens: usize =
         context_items.iter().find(|i| i.id == "chat").map_or(0, |i| crate::state::estimate_tokens(&i.content));
 
-    state.tick_telemetry = Some(TickTelemetry {
-        tick_start_ms: crate::app::panels::now_ms(),
-        three_last_tools: recent_tool_names(state),
-        culprit_type: "none".to_owned(),
-        tokens_before_culprit: meta.prompt_prefix_tokens.saturating_add(total_panel_tokens),
-        tokens_culprit: 0,
-        tokens_after_culprit: conversation_tokens,
-        queue_is_active: meta.cond.queue_active,
-        tempo_is_active: meta.cond.tempo,
-        break_kind: CacheBreakKind::NoBreak,
-        culprit_max_freezes: 0,
-    });
+    state.tick_telemetry = Some(
+        TickTelemetry::start(
+            crate::app::panels::now_ms(),
+            recent_tool_names(state),
+            meta.cond.queue_active,
+            meta.cond.tempo,
+        )
+        .token_layout(meta.prompt_prefix_tokens.saturating_add(total_panel_tokens), 0, conversation_tokens),
+    );
 }
 
 /// The last 3 real tool names (skipping synthetic `Tool_execution` stubs),
@@ -293,16 +290,18 @@ fn record_freeze_telemetry(
             (before, c, after)
         },
     );
-    state.tick_telemetry = Some(TickTelemetry {
-        tick_start_ms: crate::app::panels::now_ms(),
-        three_last_tools: recent_tool_names(state),
-        culprit_type: culprit.kind.clone().unwrap_or_else(|| "none".to_owned()),
-        tokens_before_culprit: meta.prompt_prefix_tokens.saturating_add(tokens_before),
-        tokens_culprit: tok_culprit,
-        tokens_after_culprit: tokens_after.saturating_add(conversation_tokens),
-        queue_is_active: meta.cond.queue_active,
-        tempo_is_active: meta.cond.tempo,
-        break_kind,
-        culprit_max_freezes: culprit.max_freezes,
-    });
+    state.tick_telemetry = Some(
+        TickTelemetry::start(
+            crate::app::panels::now_ms(),
+            recent_tool_names(state),
+            meta.cond.queue_active,
+            meta.cond.tempo,
+        )
+        .token_layout(
+            meta.prompt_prefix_tokens.saturating_add(tokens_before),
+            tok_culprit,
+            tokens_after.saturating_add(conversation_tokens),
+        )
+        .culprit(culprit.kind.clone().unwrap_or_else(|| "none".to_owned()), break_kind, culprit.max_freezes),
+    );
 }

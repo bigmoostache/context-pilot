@@ -126,7 +126,7 @@ fn handle_sse_event(
             if let Some((id, name, input_json)) = st.current_tool.take() {
                 let input: Value =
                     serde_json::from_str(&input_json).unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
-                let _r = tx.send(StreamEvent::ToolUse(ToolUse { id, name, input }));
+                let _r = tx.send(StreamEvent::ToolUse(ToolUse::new(id, name, input)));
             }
             false
         }

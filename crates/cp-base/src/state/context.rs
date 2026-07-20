@@ -16,6 +16,10 @@ use crate::panels::ContextItem;
 
 /// Metadata for a context type, provided by the owning module.
 #[derive(Debug, Clone, Copy)]
+#[expect(
+    clippy::exhaustive_structs,
+    reason = "module-metadata registry record: TypeMeta is a flat 9-field descriptor built by struct literal at 25 sites — one per module's context_type_metadata() — cross-crate; a 9-arg constructor would trip too_many_arguments and every module fills all fields, so the exhaustive literal is the honest shape"
+)]
 pub struct TypeMeta {
     /// The context type string (e.g., "todo", "`git_result`")
     pub context_type: &'static str,
@@ -72,7 +76,7 @@ pub fn fixed_panel_order() -> Vec<&'static str> {
 /// Serialized transparently as a plain string (e.g., `"todo"`, `"git_result"`),
 /// which is backwards-compatible with the old `#[serde(rename_all = "snake_case")]`
 /// enum serialization.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Kind(String);
 
@@ -187,11 +191,21 @@ impl std::fmt::Display for Kind {
 /// the old snapshot is reused as-is. Downstream logic never needs to
 /// know which path was taken — it just reads `emitted.context`.
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct EmittedState {
     /// Full `ContextItem` last sent to the LLM (id, header, content, timestamp).
     pub context: Option<ContextItem>,
     /// SHA-256 of the content that was emitted (for change detection).
     pub hash: Option<String>,
+}
+
+impl EmittedState {
+    /// A snapshot of what the LLM last received: the emitted context item and
+    /// its content hash.
+    #[must_use]
+    pub const fn new(context: Option<ContextItem>, hash: Option<String>) -> Self {
+        Self { context, hash }
+    }
 }
 
 // =============================================================================
@@ -200,6 +214,7 @@ pub struct EmittedState {
 
 /// Per-panel scroll state, saved when switching away and restored when switching back.
 #[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
 pub struct ScrollState {
     /// Vertical scroll offset (lines from top).
     pub offset: f32,
@@ -214,6 +229,7 @@ pub struct ScrollState {
 /// A single context panel in the LLM prompt — the core unit of the context window.
 /// Fixed panels (P1–P7) are always present; dynamic panels (P8+) are created by tools.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Entry {
     /// Display ID (e.g., P1, P2, ... for UI/LLM)
     pub id: String,
@@ -300,6 +316,77 @@ pub struct Entry {
 
 // === Entry metadata helpers ===
 impl Entry {
+    /// Set the dynamic-panel UID (builder).
+    #[must_use]
+    pub fn with_uid(mut self, uid: String) -> Self {
+        self.uid = Some(uid);
+        self
+    }
+
+    /// Set the token count (current page) (builder).
+    #[must_use]
+    pub const fn with_token_count(mut self, token_count: usize) -> Self {
+        self.token_count = token_count;
+        self
+    }
+
+    /// Set the metadata bag (builder).
+    #[must_use]
+    pub fn with_metadata(mut self, metadata: HashMap<String, serde_json::Value>) -> Self {
+        self.metadata = metadata;
+        self
+    }
+
+    /// Set the cached content string (builder).
+    #[must_use]
+    pub fn with_cached_content(mut self, cached_content: Option<String>) -> Self {
+        self.cached_content = cached_content;
+        self
+    }
+
+    /// Set the frozen history messages for a `ConversationHistory` panel (builder).
+    #[must_use]
+    pub fn with_history_messages(mut self, msgs: Option<Vec<super::data::message::Message>>) -> Self {
+        self.history_messages = msgs;
+        self
+    }
+
+    /// Override the last-refresh timestamp (epoch ms) (builder).
+    #[must_use]
+    pub const fn with_last_refresh_ms(mut self, ms: u64) -> Self {
+        self.last_refresh_ms = ms;
+        self
+    }
+
+    /// Set the content hash (builder).
+    #[must_use]
+    pub fn with_content_hash(mut self, hash: Option<String>) -> Self {
+        self.content_hash = hash;
+        self
+    }
+
+    /// Set the accumulated panel cost in USD (builder).
+    #[must_use]
+    pub const fn with_panel_total_cost(mut self, cost: f64) -> Self {
+        self.panel_total_cost = cost;
+        self
+    }
+
+    /// Set pagination counts: total pages and full (pre-pagination) token count (builder).
+    #[must_use]
+    pub const fn with_pages(mut self, total_pages: usize, full_token_count: usize) -> Self {
+        self.total_pages = total_pages;
+        self.full_token_count = full_token_count;
+        self
+    }
+
+    /// Set the frozen emitted snapshot (builder).
+    #[must_use]
+    pub fn with_emitted(mut self, emitted: EmittedState) -> Self {
+        self.emitted = emitted;
+        self
+    }
+
     /// Get a typed value from the metadata bag.
     #[must_use]
     pub fn get_meta<T>(&self, key: &str) -> Option<T>

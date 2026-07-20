@@ -13,6 +13,7 @@ const MAX_VISIBLE: usize = 10;
 
 /// A single entry in the autocomplete list.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Completion {
     /// Display name (just the file/folder name, not the full path).
     pub name: String,
@@ -20,8 +21,20 @@ pub struct Completion {
     pub is_dir: bool,
 }
 
+impl Completion {
+    /// Build a completion entry from a display name and directory flag.
+    #[must_use]
+    pub fn new<S>(name: S, is_dir: bool) -> Self
+    where
+        S: Into<String>,
+    {
+        Self { name: name.into(), is_dir }
+    }
+}
+
 /// State for the @-triggered file path autocomplete popup.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Suggestions {
     /// Whether the autocomplete popup is currently visible.
     pub active: bool,

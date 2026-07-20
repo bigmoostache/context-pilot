@@ -38,7 +38,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Spine module: auto-continuation, notifications, guard rails, coucou timers.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct SpineModule;
+
+impl Default for SpineModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SpineModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for SpineModule {
     fn dependencies(&self) -> &[&'static str] {

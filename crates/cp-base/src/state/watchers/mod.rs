@@ -22,73 +22,14 @@ pub const DYN_PANEL_ID_PLACEHOLDER: &str = "__PANEL_ID__";
 /// replacement while setting `ToolResult::is_error = true`.
 pub const ASYNC_ERROR_PREFIX: &str = "__ASYNC_ERR__";
 
-/// Result of a satisfied watcher condition.
-#[derive(Debug)]
-pub struct WatcherResult {
-    /// Human-readable description of what happened.
-    pub description: String,
-    /// Panel ID associated with this watcher (if any).
-    pub panel_id: Option<String>,
-    /// Tool use ID for blocking watchers that need sentinel replacement.
-    pub tool_use_id: Option<String>,
-    /// If true, the panel should be auto-closed (removed from context).
-    /// Used by callback watchers to clean up console panels on success.
-    pub close_panel: bool,
-    /// If set, `tool_cleanup` should create a console panel for this session.
-    /// Used by callback watchers that defer panel creation until failure.
-    /// Contains (`session_key`, `display_name`, command, description, cwd).
-    pub create_panel: Option<DeferredPanel>,
-    /// If true, the spine notification is created already processed (no auto-continuation).
-    /// Used for success notifications that don't need attention.
-    pub processed_already: bool,
-    /// If set, kill and remove this console session after processing.
-    /// Used by `easy_bash` inline path to clean up sessions that have no panel.
-    pub kill_session: Option<String>,
-    /// When `true`, the cleanup code does NOT break tempo for this watcher result.
-    /// Used by blocking watchers whose resolution did not create or modify any panel
-    /// (e.g., `easy_bash` inline path with short output).
-    pub preserves_tempo: bool,
-    /// If set, create a generic dynamic panel when this watcher fires.
-    /// Unlike `create_panel` (console-specific), this works for any panel type.
-    pub create_dyn_panel: Option<DynPanel>,
-}
-
-/// Info needed to create a console panel after a watcher fires.
-#[derive(Debug)]
-pub struct DeferredPanel {
-    /// Console session key for reconnection.
-    pub session_key: String,
-    /// Human-readable name for the panel tab.
-    pub display_name: String,
-    /// Shell command that was executed.
-    pub command: String,
-    /// Short description for the panel header.
-    pub description: String,
-    /// Working directory (None = project root).
-    pub cwd: Option<String>,
-    /// ID of the callback that created this panel.
-    pub callback_id: String,
-    /// Display name of the callback.
-    pub callback_name: String,
-}
-
-/// Info needed to create a generic dynamic panel when a watcher fires.
+/// Watcher result carriers (extracted for the 500-line cap).
 ///
-/// Unlike [`DeferredPanel`] (console-specific), this works for any panel type
-/// (brave results, firecrawl results, search results, etc.).
-/// Used by async tool execution to create panels after HTTP/subprocess completion.
-#[derive(Debug)]
-pub struct DynPanel {
-    /// Context type string (e.g., `"brave_result"`, `"firecrawl_result"`).
-    pub context_type: String,
-    /// Human-readable panel title.
-    pub display_name: String,
-    /// Key-value metadata to set via `Entry::set_meta`.
-    pub metadata: Vec<(String, String)>,
-    /// Panel content to set as `cached_content` immediately.
-    /// When set, the panel displays content without waiting for a cache restore cycle.
-    pub content: Option<String>,
-}
+/// Public module: consumers import the carriers from here directly
+/// (`watchers::carriers::WatcherResult`) — a `pub use` re-export at
+/// this level is forbidden by the `pub_use` lint.
+pub mod carriers;
+
+use carriers::WatcherResult;
 
 /// A watcher monitors a condition and reports when it's satisfied.
 ///
@@ -184,6 +125,7 @@ pub trait Watcher: Send + Sync {
 /// Registry holding active watchers. Stored in State via `TypeMap`.
 /// Initialized by the spine module, accessed by any module that
 /// registers watchers.
+#[non_exhaustive]
 pub struct WatcherRegistry {
     /// Active watchers, polled each tick by the event loop.
     pub watchers: Vec<Box<dyn Watcher>>,
@@ -394,31 +336,16 @@ impl Watcher for ChannelWatcher {
 
     fn check(&self, _state: &State) -> Option<WatcherResult> {
         let Ok(rx) = self.rx.lock() else {
-            return Some(WatcherResult {
-                description: "Async tool watcher failed (lock poisoned)".to_owned(),
-                panel_id: None,
-                tool_use_id: Some(self.tuid.clone()),
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            });
+            return Some(
+                WatcherResult::new("Async tool watcher failed (lock poisoned)").tool_use_id(self.tuid.clone()),
+            );
         };
         match rx.try_recv() {
             Ok(result) => Some(result),
-            Err(TryRecvError::Disconnected) => Some(WatcherResult {
-                description: "Async tool execution failed (worker thread panicked or dropped)".to_owned(),
-                panel_id: None,
-                tool_use_id: Some(self.tuid.clone()),
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            }),
+            Err(TryRecvError::Disconnected) => Some(
+                WatcherResult::new("Async tool execution failed (worker thread panicked or dropped)")
+                    .tool_use_id(self.tuid.clone()),
+            ),
             Err(TryRecvError::Empty) => None,
         }
     }
@@ -427,17 +354,7 @@ impl Watcher for ChannelWatcher {
         (crate::panels::now_ms() >= self.deadline_ms).then(|| {
             let elapsed_secs =
                 crate::panels::time_arith::ms_to_secs(self.deadline_ms.saturating_sub(self.registered_at_ms));
-            WatcherResult {
-                description: format!("Async tool timed out after {elapsed_secs}s"),
-                panel_id: None,
-                tool_use_id: Some(self.tuid.clone()),
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            }
+            WatcherResult::new(format!("Async tool timed out after {elapsed_secs}s")).tool_use_id(self.tuid.clone())
         })
     }
 

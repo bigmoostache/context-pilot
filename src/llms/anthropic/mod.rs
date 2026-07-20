@@ -150,12 +150,7 @@ impl LlmClient for AnthropicClient {
 
     fn check_api(&self, model: &str) -> super::ApiCheckResult {
         let Some(api_key) = self.api_key.as_ref() else {
-            return super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error: Some("ANTHROPIC_API_KEY not set".to_owned()),
-            };
+            return super::ApiCheckResult::failure(Some("ANTHROPIC_API_KEY not set".to_owned()));
         };
 
         let client = Client::new();
@@ -177,12 +172,7 @@ impl LlmClient for AnthropicClient {
             .is_ok_and(|r| r.status().is_success());
 
         if !auth_ok {
-            return super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error: Some("Auth failed".to_owned()),
-            };
+            return super::ApiCheckResult::failure(Some("Auth failed".to_owned()));
         }
 
         // Test 2: Streaming
@@ -205,6 +195,12 @@ impl LlmClient for AnthropicClient {
             .send()
             .is_ok_and(|r| r.status().is_success());
 
-        super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
+        {
+            let mut r = super::ApiCheckResult::default();
+            r.auth_ok = auth_ok;
+            r.streaming_ok = streaming_ok;
+            r.tools_ok = tools_ok;
+            r
+        }
     }
 }

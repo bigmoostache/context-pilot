@@ -30,6 +30,7 @@ impl std::fmt::Display for PromptType {
 
 /// A prompt library entry (agent, skill, or command).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct PromptItem {
     /// Unique identifier (e.g., "pirate-coder", "brave-goggles").
     pub id: String,
@@ -49,6 +50,7 @@ pub struct PromptItem {
 /// Prompt content is loaded dynamically from disk — this only tracks
 /// active selections and loaded panels.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct PromptState {
     /// Currently active agent ID (None = default).
     pub active_agent_id: Option<String>,

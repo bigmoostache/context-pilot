@@ -149,6 +149,8 @@ fn render_toggles_section(lines: &mut Vec<Line<'_>>, config: &ConfigOverlay) {
             spans.push(Span::styled("  (press ", Style::default().fg(theme::text_muted())));
             spans.push(Span::styled(toggle.key_hint.clone(), Style::default().fg(theme::warning())));
             spans.push(Span::styled(" to toggle)", Style::default().fg(theme::text_muted())));
+        } else {
+            // No adjust keys and no key hint — value shown without a hint.
         }
 
         lines.push(Line::from(spans));

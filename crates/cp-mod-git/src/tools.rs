@@ -6,7 +6,8 @@ use cp_base::config::constants;
 use cp_base::modules::{run_with_timeout, truncate_output};
 use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{DYN_PANEL_ID_PLACEHOLDER, DynPanel};
+use cp_base::state::watchers::DYN_PANEL_ID_PLACEHOLDER;
+use cp_base::state::watchers::carriers::DynPanel;
 use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -101,7 +102,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
                 } else {
                     format!("Error running git: {e}")
                 };
-                ToolOutput { content, is_error: true, create_panel: None, preserves_tempo: false }
+                ToolOutput::error(content)
             }
         }
     })
@@ -127,13 +128,13 @@ fn format_git_output(output: &std::process::Output, command: &str, elapsed_ms: u
         } else {
             "Command completed successfully".to_owned()
         };
-        return ToolOutput { content, is_error, create_panel: None, preserves_tempo: !is_error };
+        return ToolOutput::new(content, is_error, None, !is_error);
     }
 
     // Short + fast → inline, preserve tempo.
     let line_count = combined.lines().count();
     if line_count <= INLINE_MAX_LINES && combined.len() <= INLINE_MAX_BYTES && elapsed_ms <= INLINE_MAX_DURATION_MS {
-        return ToolOutput { content: combined, is_error, create_panel: None, preserves_tempo: !is_error };
+        return ToolOutput::new(combined, is_error, None, !is_error);
     }
 
     // Long or slow → static panel.
@@ -143,15 +144,14 @@ fn format_git_output(output: &std::process::Output, command: &str, elapsed_ms: u
     } else {
         command.to_owned()
     };
-    ToolOutput {
-        content: format!("Panel created: {DYN_PANEL_ID_PLACEHOLDER}"),
+    ToolOutput::new(
+        format!("Panel created: {DYN_PANEL_ID_PLACEHOLDER}"),
         is_error,
-        create_panel: Some(DynPanel {
-            context_type: Kind::GIT_RESULT.to_owned(),
-            display_name,
-            metadata: vec![("result_command".to_owned(), command.to_owned())],
-            content: Some(combined),
-        }),
-        preserves_tempo: false,
-    }
+        Some(
+            DynPanel::new(Kind::GIT_RESULT.to_owned(), display_name)
+                .metadata(vec![("result_command".to_owned(), command.to_owned())])
+                .content(combined),
+        ),
+        false,
+    )
 }

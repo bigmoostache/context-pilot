@@ -144,12 +144,7 @@ impl LlmClient for MiniMaxClient {
 
     fn check_api(&self, model: &str) -> super::ApiCheckResult {
         let Some(api_key) = self.api_key.as_ref() else {
-            return super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error: Some("MINIMAX_API_KEY not set".to_owned()),
-            };
+            return super::ApiCheckResult::failure(Some("MINIMAX_API_KEY not set".to_owned()));
         };
 
         let client = Client::new();
@@ -171,12 +166,7 @@ impl LlmClient for MiniMaxClient {
             .is_ok_and(|r| r.status().is_success());
 
         if !auth_ok {
-            return super::ApiCheckResult {
-                auth_ok: false,
-                streaming_ok: false,
-                tools_ok: false,
-                error: Some("Auth failed — check MINIMAX_API_KEY".to_owned()),
-            };
+            return super::ApiCheckResult::failure(Some("Auth failed — check MINIMAX_API_KEY".to_owned()));
         }
 
         // Test 2: Streaming
@@ -199,6 +189,12 @@ impl LlmClient for MiniMaxClient {
             .send()
             .is_ok_and(|r| r.status().is_success());
 
-        super::ApiCheckResult { auth_ok, streaming_ok, tools_ok, error: None }
+        {
+            let mut r = super::ApiCheckResult::default();
+            r.auth_ok = auth_ok;
+            r.streaming_ok = streaming_ok;
+            r.tools_ok = tools_ok;
+            r
+        }
     }
 }

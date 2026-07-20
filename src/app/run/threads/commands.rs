@@ -75,14 +75,7 @@ fn apply_send_message(state: &mut State, thread_id: &str, content: &str) {
         return;
     };
 
-    thread.messages.push(ThreadMessage {
-        author: ThreadAuthor::User,
-        content: Some(content.to_owned()),
-        file_path: None,
-        timestamp: now_ms(),
-        acknowledged: false,
-        auto: false,
-    });
+    thread.messages.push(ThreadMessage::user(content.to_owned()));
     thread.status = ThreadStatus::MyTurn;
     let thread_name = thread.name.clone();
 
@@ -122,15 +115,7 @@ fn apply_create_thread(state: &mut State, name: &str) {
     let id = format!("T{}", ts.next_id);
     ts.next_id = ts.next_id.saturating_add(1);
 
-    ts.threads.push(cp_mod_threads::types::Thread {
-        id: id.clone(),
-        name: name.to_owned(),
-        status: ThreadStatus::TheirTurn,
-        messages: vec![],
-        created_at: now_ms(),
-        archived: false,
-        paused: false,
-    });
+    ts.threads.push(cp_mod_threads::types::Thread::new(id.clone(), name.to_owned()));
 
     // Emit the durable roster delta so the backend view reflects the new
     // thread in ms (Leg 0 keystone) — a fresh, empty thread is the user's turn

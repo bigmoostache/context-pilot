@@ -23,6 +23,7 @@ pub enum GitChangeType {
 
 /// A single file change with diff stats.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct GitFileChange {
     /// Relative file path.
     pub path: String,
@@ -38,6 +39,7 @@ pub struct GitFileChange {
 
 /// Live git repository state, refreshed on every cache tick.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct GitState {
     /// Current branch name (None if detached HEAD).
     pub branch: Option<String>,
@@ -84,6 +86,7 @@ impl GitState {
 
 /// Payload for a git result panel cache refresh request.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct GitResultRequest {
     /// Context element ID (e.g., "P12").
     pub context_id: String,

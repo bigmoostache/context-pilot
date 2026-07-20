@@ -104,14 +104,14 @@ impl Panel for FilePanel {
 
     fn build_cache_request(&self, ctx: &Entry, _state: &State) -> Option<CacheRequest> {
         let path = ctx.get_meta_str("file_path")?;
-        Some(CacheRequest {
-            context_type: Kind::new(Kind::FILE),
-            data: Box::new(FileCacheRequest {
+        Some(CacheRequest::new(
+            Kind::new(Kind::FILE),
+            Box::new(FileCacheRequest {
                 context_id: ctx.id.clone(),
                 file_path: path.to_owned(),
                 current_source_hash: ctx.source_hash.clone(),
             }),
-        })
+        ))
     }
 
     fn apply_cache_update(&self, update: CacheUpdate, ctx: &mut Entry, _state: &mut State) -> bool {

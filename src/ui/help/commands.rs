@@ -82,6 +82,8 @@ impl PaletteCommand {
                 score = score.saturating_add(30);
             } else if keyword.contains(q) {
                 score = score.saturating_add(10);
+            } else {
+                // No match for this keyword — contributes nothing.
             }
         }
         score

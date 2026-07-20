@@ -1,5 +1,6 @@
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{DYN_PANEL_ID_PLACEHOLDER, DynPanel};
+use cp_base::state::watchers::DYN_PANEL_ID_PLACEHOLDER;
+use cp_base::state::watchers::carriers::DynPanel;
 use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -148,43 +149,27 @@ fn exec_scrape(tool: &ToolUse, state: &mut State) -> ToolResult {
             Ok(resp) => {
                 if !resp.success {
                     let msg = resp.error.unwrap_or_else(|| "Unknown error".to_owned());
-                    return ToolOutput {
-                        content: format!("Firecrawl scrape failed: {msg}"),
-                        is_error: true,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::error(format!("Firecrawl scrape failed: {msg}"));
                 }
 
                 let Some(data) = resp.data else {
-                    return ToolOutput {
-                        content: "Scrape returned no data".to_owned(),
-                        is_error: true,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::error("Scrape returned no data".to_owned());
                 };
 
                 let title = data.metadata.as_ref().and_then(|m| m.title.as_deref()).unwrap_or("untitled").to_owned();
                 let content = build_scrape_panel_content(&data);
 
-                let dyn_panel = DynPanel {
-                    context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(),
-                    display_name: format!("firecrawl_scrape: {url}"),
-                    metadata: vec![("result_content".to_owned(), content.clone())],
-                    content: Some(content),
-                };
+                let dyn_panel =
+                    DynPanel::new(crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(), format!("firecrawl_scrape: {url}"))
+                        .metadata(vec![("result_content".to_owned(), content.clone())])
+                        .content(content);
 
-                ToolOutput {
-                    content: format!(
-                        "Created panel {DYN_PANEL_ID_PLACEHOLDER}: scraped {url} ({title}){PANEL_WARNING}",
-                    ),
-                    is_error: false,
-                    create_panel: Some(dyn_panel),
-                    preserves_tempo: false,
-                }
+                ToolOutput::ok(format!(
+                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: scraped {url} ({title}){PANEL_WARNING}",
+                ))
+                .with_panel(dyn_panel)
             }
-            Err(e) => ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
+            Err(e) => ToolOutput::error(e),
         }
     })
 }
@@ -264,21 +249,11 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
             Ok(resp) => {
                 if !resp.success {
                     let msg = resp.error.unwrap_or_else(|| "Unknown error".to_owned());
-                    return ToolOutput {
-                        content: format!("Firecrawl search failed: {msg}"),
-                        is_error: true,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::error(format!("Firecrawl search failed: {msg}"));
                 }
 
                 let Some(data) = resp.data else {
-                    return ToolOutput {
-                        content: format!("No results found for '{query}'"),
-                        is_error: false,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::ok(format!("No results found for '{query}'"));
                 };
 
                 // Parse data — can be array (scraped results) or object (web/news/images dict)
@@ -289,52 +264,37 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 } else {
                     // Fallback: dump as YAML
                     let panel_content = serde_yaml::to_string(&data).unwrap_or_else(|_| format!("{data:#}"));
-                    let dyn_panel = DynPanel {
-                        context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(),
-                        display_name: format!("firecrawl_search: {query}"),
-                        metadata: vec![("result_content".to_owned(), panel_content.clone())],
-                        content: Some(panel_content),
-                    };
-                    return ToolOutput {
-                        content: format!(
-                            "Created panel {DYN_PANEL_ID_PLACEHOLDER}: results for '{query}'{PANEL_WARNING}",
-                        ),
-                        is_error: false,
-                        create_panel: Some(dyn_panel),
-                        preserves_tempo: false,
-                    };
+                    let dyn_panel = DynPanel::new(
+                        crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(),
+                        format!("firecrawl_search: {query}"),
+                    )
+                    .metadata(vec![("result_content".to_owned(), panel_content.clone())])
+                    .content(panel_content);
+                    return ToolOutput::ok(format!(
+                        "Created panel {DYN_PANEL_ID_PLACEHOLDER}: results for '{query}'{PANEL_WARNING}",
+                    ))
+                    .with_panel(dyn_panel);
                 };
 
                 let count = results.len();
                 if count == 0 {
-                    return ToolOutput {
-                        content: format!("No results found for '{query}'"),
-                        is_error: false,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::ok(format!("No results found for '{query}'"));
                 }
 
                 // Build panel: concatenated markdown per page
                 let content = build_search_results_content(&results);
 
-                let dyn_panel = DynPanel {
-                    context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(),
-                    display_name: format!("firecrawl_search: {query}"),
-                    metadata: vec![("result_content".to_owned(), content.clone())],
-                    content: Some(content),
-                };
+                let dyn_panel =
+                    DynPanel::new(crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(), format!("firecrawl_search: {query}"))
+                        .metadata(vec![("result_content".to_owned(), content.clone())])
+                        .content(content);
 
-                ToolOutput {
-                    content: format!(
-                        "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {count} results for '{query}'{PANEL_WARNING}",
-                    ),
-                    is_error: false,
-                    create_panel: Some(dyn_panel),
-                    preserves_tempo: false,
-                }
+                ToolOutput::ok(format!(
+                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {count} results for '{query}'{PANEL_WARNING}",
+                ))
+                .with_panel(dyn_panel)
             }
-            Err(e) => ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
+            Err(e) => ToolOutput::error(e),
         }
     })
 }
@@ -388,58 +348,37 @@ fn exec_map(tool: &ToolUse, state: &mut State) -> ToolResult {
             Ok(resp) => {
                 if !resp.success {
                     let msg = resp.error.unwrap_or_else(|| "Unknown error".to_owned());
-                    return ToolOutput {
-                        content: format!("Firecrawl map failed: {msg}"),
-                        is_error: true,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::error(format!("Firecrawl map failed: {msg}"));
                 }
 
                 let links = resp.links.unwrap_or_default();
                 let count = links.len();
 
                 if count == 0 {
-                    return ToolOutput {
-                        content: format!("No URLs discovered on '{url}'"),
-                        is_error: false,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::ok(format!("No URLs discovered on '{url}'"));
                 }
 
                 let panel_content = match serde_yaml::to_string(&links) {
                     Ok(yaml) => yaml,
                     Err(e) => {
-                        return ToolOutput {
-                            content: format!("Failed to serialize response: {e}"),
-                            is_error: true,
-                            create_panel: None,
-                            preserves_tempo: false,
-                        };
+                        return ToolOutput::error(format!("Failed to serialize response: {e}"));
                     }
                 };
 
                 let domain =
                     url.trim_start_matches("https://").trim_start_matches("http://").split('/').next().unwrap_or(&url);
 
-                let dyn_panel = DynPanel {
-                    context_type: crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(),
-                    display_name: format!("firecrawl_map: {domain}"),
-                    metadata: vec![("result_content".to_owned(), panel_content.clone())],
-                    content: Some(panel_content),
-                };
+                let dyn_panel =
+                    DynPanel::new(crate::panel::FIRECRAWL_PANEL_TYPE.to_owned(), format!("firecrawl_map: {domain}"))
+                        .metadata(vec![("result_content".to_owned(), panel_content.clone())])
+                        .content(panel_content);
 
-                ToolOutput {
-                    content: format!(
-                        "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {count} URLs discovered on '{domain}'{PANEL_WARNING}",
-                    ),
-                    is_error: false,
-                    create_panel: Some(dyn_panel),
-                    preserves_tempo: false,
-                }
+                ToolOutput::ok(format!(
+                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {count} URLs discovered on '{domain}'{PANEL_WARNING}",
+                ))
+                .with_panel(dyn_panel)
             }
-            Err(e) => ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
+            Err(e) => ToolOutput::error(e),
         }
     })
 }

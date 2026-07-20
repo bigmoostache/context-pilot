@@ -389,7 +389,7 @@ pub fn list_dir_entries(
                 return None;
             }
 
-            Some(cp_base::state::autocomplete::Completion { name, is_dir })
+            Some(cp_base::state::autocomplete::Completion::new(name, is_dir))
         })
         .collect();
 

@@ -14,6 +14,24 @@
 //!   [`Block`] variants, not pre-formatted text.
 //! - **Serializable** — every type derives [`Serialize`](serde::Serialize)
 //!   so the frame can be shipped over the wire to a web frontend.
+//!
+//! # `exhaustive_structs`
+//!
+//! Every IR type in this crate is a plain data carrier that the platform
+//! adapter (`src/ui/ir/*`, `src/ui/search_overlay/*` in the `tui` crate)
+//! builds by struct literal from the extracted panel state, then consumes
+//! field-by-field to draw. `#[non_exhaustive]` would forbid that cross-crate
+//! literal construction (E0639); the flat-constructor escape is unavailable
+//! because the wide records (`Message`, `SearchIndex`, `SearchEmbeddings`,
+//! `StatusBar`, …) carry far more than four fields with no natural grouping,
+//! so a constructor would itself trip the forbidden `too_many_arguments`.
+//! The IR is therefore legitimately exhaustive: it is one closed contract
+//! between the frame builder and its sole in-repo adapter, where adding a
+//! field is a deliberate change both sides update together.
+#![expect(
+    clippy::exhaustive_structs,
+    reason = "IR data-carrier layer: every type is built by struct literal cross-crate by the tui adapter and read field-by-field by the renderer; #[non_exhaustive] forbids that construction (E0639) and the wide records trip too_many_arguments under a flat constructor, so the exhaustive literal is the honest shape for this closed builder↔adapter contract"
+)]
 
 use serde::Serialize;
 

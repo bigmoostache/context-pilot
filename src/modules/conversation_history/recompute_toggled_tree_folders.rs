@@ -124,22 +124,14 @@ fn collect_opened_folders_from_messages(messages: &[Message], folders: &mut Hash
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cp_base::state::data::message::{MsgStatus, ToolUseRecord};
+    use cp_base::state::data::message::ToolUseRecord;
 
     fn make_tool_call(name: &str, input: serde_json::Value) -> Message {
-        Message {
-            id: "T1".to_owned(),
-            uid: None,
-            role: "assistant".to_owned(),
-            msg_type: MsgKind::ToolCall,
-            content: String::new(),
-            content_token_count: 0,
-            status: MsgStatus::Full,
-            tool_uses: vec![ToolUseRecord { id: "tu1".to_owned(), name: name.to_owned(), input }],
-            tool_results: Vec::new(),
-            input_tokens: 0,
-            timestamp_ms: 0,
-        }
+        Message::new_tool_call(
+            "T1".to_owned(),
+            None,
+            vec![ToolUseRecord::new("tu1".to_owned(), name.to_owned(), input)],
+        )
     }
 
     #[test]

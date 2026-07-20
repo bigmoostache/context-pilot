@@ -15,6 +15,10 @@ use super::Phase;
 /// I10).  The backend fans these out to N frontend WebSocket subscribers
 /// without touching the agent.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[expect(
+    clippy::exhaustive_structs,
+    reason = "stream-frame contract: Frame is a 7-field ephemeral routing record built cross-crate by the agent's tee path; a constructor would take 6 positional arguments (tripping too_many_arguments) with no natural grouping, so #[non_exhaustive] is impossible and the exhaustive literal is the honest shape"
+)]
 pub struct Frame {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,

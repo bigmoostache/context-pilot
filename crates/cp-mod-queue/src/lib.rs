@@ -32,7 +32,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Queue module: batch tool calls and flush them atomically.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct QueueModule;
+
+impl Default for QueueModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl QueueModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for QueueModule {
     fn id(&self) -> &'static str {

@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{Watcher, WatcherRegistry, WatcherResult};
+use cp_base::state::watchers::carriers::WatcherResult;
+use cp_base::state::watchers::{Watcher, WatcherRegistry};
 use cp_base::tools::{ToolResult, ToolUse};
 
 // ============================================================
@@ -233,17 +234,7 @@ impl Watcher for CoucouWatcher {
                 || format!("⏰ Coucou! {}", self.message),
                 |tid| format!("⏰ Coucou (thread {tid})! {}", self.message),
             );
-            WatcherResult {
-                description: desc,
-                panel_id: None,
-                tool_use_id: None,
-                close_panel: false,
-                create_panel: None,
-                create_dyn_panel: None,
-                processed_already: false,
-                kill_session: None,
-                preserves_tempo: false,
-            }
+            WatcherResult::new(desc)
         })
     }
 

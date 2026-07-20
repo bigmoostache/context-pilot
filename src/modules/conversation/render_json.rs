@@ -113,6 +113,8 @@ fn read_nested_structure(chars: &mut std::iter::Peekable<std::str::CharIndices<'
                 end = byte_idx.saturating_add(nested_ch.len_utf8());
                 break;
             }
+        } else {
+            // Interior char — part of the nested structure, keep scanning.
         }
     }
     full.get(start..end).unwrap_or("").to_owned()

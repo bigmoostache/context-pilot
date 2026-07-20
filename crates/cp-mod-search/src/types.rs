@@ -274,6 +274,7 @@ pub(crate) enum IndexerCmd {
 ///
 /// Constructed by [`crate::overlay_info`] from internal state.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct SearchOverlayInfo {
     /// TCP port the Meilisearch server is listening on.
     pub port: u16,
@@ -335,6 +336,7 @@ pub struct SearchOverlayInfo {
 
 /// A recent Meilisearch task exposed to the overlay renderer.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct MeiliTaskInfo {
     /// Task UID.
     pub uid: u64,

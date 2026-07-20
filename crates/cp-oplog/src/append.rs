@@ -216,8 +216,7 @@ impl OplogWriter {
         // Probe the framed size to decide whether this record would overflow
         // the segment. (The probe re-encodes; `rev`/timestamp do not affect the
         // decision, so a zeroed placeholder is fine.)
-        let probe =
-            OpEntry { schema_version: WRITER_SCHEMA_VERSION, rev: self.next_rev, timestamp_ms: 0, kind: kind.clone() };
+        let probe = OpEntry::new(WRITER_SCHEMA_VERSION, self.next_rev, 0, kind.clone());
         let frame_len = u64::try_from(framing::encode_entry(&probe)?.len()).unwrap_or(u64::MAX);
 
         if self.segment_has_record && self.segment_bytes.wrapping_add(frame_len) > self.segment_limit {
@@ -285,7 +284,7 @@ impl OplogWriter {
     /// is assigned.
     fn write_record(&mut self, kind: OpEntryKind, is_record: bool) -> OplogResult<u64> {
         let rev = self.next_rev;
-        let entry = OpEntry { schema_version: WRITER_SCHEMA_VERSION, rev, timestamp_ms: now_ms(), kind };
+        let entry = OpEntry::new(WRITER_SCHEMA_VERSION, rev, now_ms(), kind);
         let frame = framing::encode_entry(&entry)?;
 
         self.file.write_all(&frame)?;
@@ -327,7 +326,7 @@ impl OplogWriter {
     /// written into a checkpoint record.
     #[must_use]
     pub fn snapshot(&self) -> Snapshot {
-        Snapshot { heads: self.state.heads.clone(), seen: self.state.seen.clone(), roster: self.state.roster.clone() }
+        Snapshot::new(self.state.heads.clone(), self.state.seen.clone(), self.state.roster.clone())
     }
 }
 

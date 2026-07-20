@@ -34,6 +34,7 @@ use std::path::Path;
 /// The recovered state of an oplog: its highest durable `rev` and the bounded
 /// snapshot (heads + seen-set + roster) as of that `rev`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Recovered {
     /// The highest durable `rev` in the log, or `None` if the log is empty.
     pub rev_head: Option<u64>,
@@ -84,12 +85,7 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
         OpEntryKind::ThreadCreated { thread_id, name, status, timestamp_ms } => {
             RosterThread::fold_created(
                 &mut state.roster,
-                cp_wire::types::snapshot::ThreadCreation {
-                    thread_id,
-                    name,
-                    status: *status,
-                    timestamp_ms: *timestamp_ms,
-                },
+                cp_wire::types::snapshot::ThreadCreation::new(thread_id, name, *status, *timestamp_ms),
             );
         }
         OpEntryKind::ThreadArchived { thread_id } => {

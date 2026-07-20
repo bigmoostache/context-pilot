@@ -142,12 +142,7 @@ impl AgentView {
             OpEntryKind::ThreadCreated { thread_id, name, status, timestamp_ms } => {
                 RosterThread::fold_created(
                     &mut self.roster,
-                    cp_wire::types::snapshot::ThreadCreation {
-                        thread_id,
-                        name,
-                        status: *status,
-                        timestamp_ms: *timestamp_ms,
-                    },
+                    cp_wire::types::snapshot::ThreadCreation::new(thread_id, name, *status, *timestamp_ms),
                 );
             }
             OpEntryKind::ThreadArchived { thread_id } => {

@@ -68,7 +68,11 @@ impl fmt::Display for VaultError {
 // ─── KeyStatus ──────────────────────────────────────────────────────────────
 
 /// Status of a single key as reported by [`Vault::list()`].
+///
+/// `#[non_exhaustive]`: constructed only in-crate by vault backends;
+/// callers read `definition`/`available`, so a new field is not breaking.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct KeyStatus {
     /// The key's static definition from the registry.
     pub definition: &'static KeyDefinition,

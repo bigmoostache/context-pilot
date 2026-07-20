@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 /// oplog before this ack is sent (I11).  A deadman re-exec replays it
 /// exactly once (I4/K2).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Ack {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,
@@ -24,6 +25,17 @@ pub struct Ack {
 
     /// The oplog `rev` at which the effect landed (only present on accept).
     pub rev: Option<u64>,
+}
+
+impl Ack {
+    /// Build an acknowledgment for `cmd_id` with the given outcome.
+    ///
+    /// A constructor keeps [`Ack`] `#[non_exhaustive]` across the orchestrator
+    /// and agent, which both build acks; `schema_version` is stamped here.
+    #[must_use]
+    pub const fn new(cmd_id: String, status: Status, rev: Option<u64>) -> Self {
+        Self { schema_version: 1, cmd_id, status, rev }
+    }
 }
 
 /// Outcome of command processing.

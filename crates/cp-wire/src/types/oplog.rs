@@ -15,6 +15,7 @@ use super::{ContentHash, LifecycleState, Phase, ThreadTurn};
 /// Framed with a length prefix + CRC on the wire (design doc §21 Open-Q1,
 /// locked v6); this struct is the *payload* inside that frame.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct OpEntry {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,
@@ -29,6 +30,17 @@ pub struct OpEntry {
 
     /// What happened.
     pub kind: OpEntryKind,
+}
+
+impl OpEntry {
+    /// Assemble an oplog record from its parts.
+    ///
+    /// The writer funnels every entry through this so the wire struct stays
+    /// `#[non_exhaustive]` (a future field is a non-breaking addition here).
+    #[must_use]
+    pub const fn new(schema_version: u32, rev: u64, timestamp_ms: u64, kind: OpEntryKind) -> Self {
+        Self { schema_version, rev, timestamp_ms, kind }
+    }
 }
 
 /// The event an [`OpEntry`] records.

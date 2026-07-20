@@ -141,7 +141,7 @@ impl ToolCallAccumulator {
                 }
                 let input: Value =
                     serde_json::from_str(&arguments).unwrap_or_else(|_| Value::Object(serde_json::Map::new()));
-                Some(crate::infra::tools::ToolUse { id, name, input })
+                Some(crate::infra::tools::ToolUse::new(id, name, input))
             })
             .collect()
     }

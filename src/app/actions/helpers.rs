@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use crate::state::{Entry, Kind, State};
+use crate::state::{Kind, State};
 
 use super::ActionResult;
 use super::config;
@@ -113,32 +113,13 @@ pub(crate) fn eject_cursor_from_sentinel(input: &str, cursor: usize) -> usize {
 /// Create a new conversation context panel.
 pub(super) fn create_new_context(state: &mut State) -> ActionResult {
     let context_id = state.next_available_context_id();
-    state.context.push(Entry {
-        id: context_id,
-        uid: None,
-        context_type: Kind::new(Kind::CONVERSATION),
-        name: format!("Conv {}", state.context.len()),
-        token_count: 0,
-        metadata: std::collections::HashMap::new(),
-        cached_content: None,
-        history_messages: None,
-        cache_deprecated: false,
-        cache_in_flight: false,
-        last_refresh_ms: crate::app::panels::now_ms(),
-        content_hash: None,
-        source_hash: None,
-        current_page: 0,
-        total_pages: 1,
-        page_descriptions: std::collections::BTreeMap::new(),
-        full_token_count: 0,
-        scroll_state: cp_base::state::context::ScrollState::default(),
-        panel_cache_hit: false,
-        panel_total_cost: 0.0,
-        freeze_count: 0,
-        total_freezes: 0,
-        total_cache_misses: 0,
-        emitted: cp_base::state::context::EmittedState::default(),
-    });
+    let name = format!("Conv {}", state.context.len());
+    state.context.push(cp_base::state::context::make_default_entry(
+        &context_id,
+        Kind::new(Kind::CONVERSATION),
+        &name,
+        false,
+    ));
     ActionResult::Save
 }
 

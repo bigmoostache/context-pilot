@@ -76,6 +76,8 @@ fn check_tree_description_gate(pf: &mut Verdict, state: &State, id: &str) {
             "Panel '{id}' ({rel_str}) has no tree description — \
              will be skipped. Add one with tree_describe first."
         ));
+    } else {
+        // Description present or a tree_describe is already queued — no gate.
     }
 }
 
@@ -90,6 +92,8 @@ fn preflight_tool_manage(tool: &ToolUse, state: &State) -> Verdict {
             pf.errors.push(format!("Tool '{tool_id}' not found"));
         } else if tool_id == "tool_manage" {
             pf.errors.push("Cannot disable 'tool_manage' — it protects itself".to_owned());
+        } else {
+            // Known, non-self-protecting tool — valid change.
         }
     }
     pf

@@ -63,6 +63,8 @@ pub(crate) fn inject_system_reminder(messages: &mut Vec<Value>) {
             && let Some(arr) = msg.get_mut("content").and_then(Value::as_array_mut)
         {
             arr.insert(0, reminder);
+        } else {
+            // Neither string nor array (unexpected shape) — leave content untouched.
         }
         return; // Only inject into first eligible user message
     }

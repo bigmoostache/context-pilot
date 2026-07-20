@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use cp_base::state::context::{Entry, Kind};
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -58,34 +58,10 @@ fn open_single_file(path: &str, state: &mut State) -> String {
     let uid = format!("UID_{}_P", state.global_next_uid);
     state.global_next_uid = state.global_next_uid.saturating_add(1);
 
-    // Create context element WITHOUT reading file content
-    // Background cache system will populate it
-    let mut elem = Entry {
-        id: context_id.clone(),
-        uid: Some(uid),
-        context_type: Kind::new(Kind::FILE),
-        name: file_name,
-        token_count: 0, // Will be updated by cache
-        metadata: std::collections::HashMap::new(),
-        cached_content: None, // Background will populate
-        history_messages: None,
-        cache_deprecated: true, // Trigger background refresh
-        cache_in_flight: false,
-        last_refresh_ms: cp_base::panels::now_ms(),
-        content_hash: None,
-        source_hash: None,
-        current_page: 0,
-        total_pages: 1,
-        page_descriptions: std::collections::BTreeMap::new(),
-        full_token_count: 0,
-        scroll_state: cp_base::state::context::ScrollState::default(),
-        panel_cache_hit: false,
-        panel_total_cost: 0.0,
-        freeze_count: 0,
-        total_freezes: 0,
-        total_cache_misses: 0,
-        emitted: cp_base::state::context::EmittedState::default(),
-    };
+    // Create context element WITHOUT reading file content.
+    // cache_deprecated=true triggers the background cache system to populate it.
+    let mut elem = cp_base::state::context::make_default_entry(&context_id, Kind::new(Kind::FILE), &file_name, true);
+    elem.uid = Some(uid);
     elem.set_meta("file_path", &canonical);
     state.context.push(elem);
 

@@ -85,19 +85,11 @@ fn apply_reverie_event(app: &mut App, agent_id: &str, evt: StreamEvent) -> bool 
 fn append_reverie_chunk(app: &mut App, agent_id: &str, text: &str) {
     let Some(rev) = app.state.reveries.get_mut(agent_id) else { return };
     if rev.messages.last().is_none_or(|m| m.role != "assistant") {
-        rev.messages.push(crate::state::Message {
-            id: format!("rev-{}", rev.messages.len()),
-            uid: None,
-            role: "assistant".to_owned(),
-            content: String::new(),
-            msg_type: crate::state::MsgKind::TextMessage,
-            status: crate::state::MsgStatus::Full,
-            content_token_count: 0,
-            input_tokens: 0,
-            timestamp_ms: crate::app::panels::now_ms(),
-            tool_uses: Vec::new(),
-            tool_results: Vec::new(),
-        });
+        rev.messages.push(crate::state::Message::new_text(
+            format!("rev-{}", rev.messages.len()),
+            "assistant",
+            String::new(),
+        ));
     }
     if let Some(msg) = rev.messages.last_mut() {
         msg.content.push_str(text);
@@ -210,13 +202,11 @@ fn dispatch_one_reverie_tool(
         app.state.reveries.get(agent_id).is_some_and(|r| r.queue_active) && !QueueState::is_queue_tool(&tool.name);
     if should_queue {
         let qs = QueueState::get_mut(&mut app.state);
-        let idx = qs.enqueue(cp_mod_queue::types::QueuedToolCall {
-            index: 0,
-            tool_name: tool.name.clone(),
-            tool_use_id: tool.id.clone(),
-            input: tool.input.clone(),
-            queued_at: crate::app::panels::now_ms(),
-        });
+        let idx = qs.enqueue(cp_mod_queue::types::QueuedToolCall::new(
+            tool.name.clone(),
+            tool.id.clone(),
+            tool.input.clone(),
+        ));
         return Some(crate::infra::tools::ToolResult::new(tool.id.clone(), format!("Queued as #{idx}"), false));
     }
     // Execute normally through module dispatch
@@ -253,43 +243,21 @@ fn record_reverie_tool_exchange(
     result: &crate::infra::tools::ToolResult,
 ) {
     let Some(rev) = app.state.reveries.get_mut(agent_id) else { return };
-    rev.messages.push(crate::state::Message {
-        id: format!("rev-tc-{}", rev.messages.len()),
-        uid: None,
-        role: "assistant".to_owned(),
-        content: String::new(),
-        msg_type: crate::state::MsgKind::ToolCall,
-        status: crate::state::MsgStatus::Full,
-        content_token_count: 0,
-        input_tokens: 0,
-        timestamp_ms: crate::app::panels::now_ms(),
-        tool_uses: vec![crate::state::ToolUseRecord {
-            id: tool.id.clone(),
-            name: tool.name.clone(),
-            input: tool.input.clone(),
-        }],
-        tool_results: Vec::new(),
-    });
-    rev.messages.push(crate::state::Message {
-        id: format!("rev-tr-{}", rev.messages.len()),
-        uid: None,
-        role: "user".to_owned(),
-        content: String::new(),
-        msg_type: crate::state::MsgKind::ToolResult,
-        status: crate::state::MsgStatus::Full,
-        content_token_count: 0,
-        input_tokens: 0,
-        timestamp_ms: crate::app::panels::now_ms(),
-        tool_uses: Vec::new(),
-        tool_results: vec![crate::state::ToolResultRecord {
-            tool_use_id: result.tool_use_id.clone(),
-            tool_name: result.tool_name.clone(),
-            content: result.content.clone(),
-            display: result.display.clone(),
-            tldr: result.tldr.clone(),
-            is_error: result.is_error,
-        }],
-    });
+    rev.messages.push(crate::state::Message::new_tool_call(
+        format!("rev-tc-{}", rev.messages.len()),
+        None,
+        vec![crate::state::ToolUseRecord::new(tool.id.clone(), tool.name.clone(), tool.input.clone())],
+    ));
+    rev.messages.push(crate::state::Message::new_tool_result(
+        format!("rev-tr-{}", rev.messages.len()),
+        None,
+        vec![
+            crate::state::ToolResultRecord::new(result.tool_use_id.clone(), result.content.clone(), result.is_error)
+                .display(result.display.clone())
+                .tldr(result.tldr.clone())
+                .tool_name(result.tool_name.clone()),
+        ],
+    ));
 }
 
 /// After executing a batch of reverie tools, re-stream the agent if it's still
@@ -355,19 +323,11 @@ pub(super) fn check_reverie_end_turn(app: &mut App) {
                 }
             }
 
-            rev.messages.push(crate::state::Message {
-                id: format!("rev-nudge-{}", rev.messages.len()),
-                uid: None,
-                role: "user".to_owned(),
-                content: REVERIE.report_nudge.trim_end().to_owned(),
-                msg_type: crate::state::MsgKind::TextMessage,
-                status: crate::state::MsgStatus::Full,
-                content_token_count: 0,
-                input_tokens: 0,
-                timestamp_ms: crate::app::panels::now_ms(),
-                tool_uses: Vec::new(),
-                tool_results: Vec::new(),
-            });
+            rev.messages.push(crate::state::Message::new_text(
+                format!("rev-nudge-{}", rev.messages.len()),
+                "user",
+                REVERIE.report_nudge.trim_end().to_owned(),
+            ));
         }
 
         let (tx, rx) = mpsc::channel();

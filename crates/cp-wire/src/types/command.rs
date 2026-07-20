@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 /// Authn is handled at the transport layer (v1: bearer `cap_token` checked
 /// before deserialisation reaches this struct — design doc I9).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Command {
     /// Wire-schema revision for this struct (always `1` today).
     pub schema_version: u32,
@@ -137,6 +138,7 @@ pub enum Kind {
 /// remote-transport seam (G7) later wraps this same envelope in an HMAC/nonce
 /// without changing the shape.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Frame {
     /// Wire-schema revision for this struct.
     pub schema_version: u32,
@@ -147,6 +149,17 @@ pub struct Frame {
 
     /// The command to apply once the bearer is verified.
     pub command: Command,
+}
+
+impl Frame {
+    /// Wrap a [`Command`] with its bearer credential.
+    ///
+    /// A constructor keeps [`Frame`] `#[non_exhaustive]` across the orchestrator
+    /// (which builds command frames); `schema_version` is stamped here.
+    #[must_use]
+    pub const fn new(auth: String, command: Command) -> Self {
+        Self { schema_version: 1, auth, command }
+    }
 }
 
 #[cfg(test)]

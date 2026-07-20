@@ -39,7 +39,23 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 /// Tree module: directory tree view with filtering, descriptions, and auto-refresh.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct TreeModule;
+
+impl Default for TreeModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TreeModule {
+    /// Construct the module marker (funnels cross-crate construction of this
+    /// `non_exhaustive` unit struct through an associated fn).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Module for TreeModule {
     fn id(&self) -> &'static str {

@@ -400,6 +400,29 @@ b14e6817a83938b5:
   - search
   - operational
   last_edited_ms: 1784203006419
+b5af3513e41563ec:
+  tl_dr: 'A5-A13 DIRECTIVE (T588): lints are BEACONS. Max 5 #[expect] per step. No blanket-suppress — fix code properly. Report bucket counts BEFORE editing.'
+  contents: |-
+    T588 user directive, valid A5 through A13:
+
+    Lints are beacons toward better code, NOT nuisances to suppress. Hard cap: 5 #[expect] per step.
+
+    Per-site buckets:
+    1. #[non_exhaustive] + constructor — struct built only in-crate (external via helper like make_default_entry, Message::new_*). Takes non_exhaustive cleanly.
+    2. Add ::new()/builder THEN #[non_exhaustive] — cross-crate literal construction that SHOULD funnel through a constructor. The real code improvement.
+    3. #[expect] last-resort only (cap 5) — cross-crate literal unavoidable, constructor pure ceremony (fixed wire-layout records). Justify each.
+
+    Always audit sites into buckets + report real numbers BEFORE editing so user approves the expect count.
+
+    A5 dropped 2026-07-19: ~75 struct expects reverted via git checkout, tree back to A4-clean HEAD 9fd7b839.
+  importance: critical
+  labels:
+  - T588
+  - lints
+  - A5-A13
+  - workflow
+  - philosophy
+  last_edited_ms: 1784497797633
 bc38d2fd0bcf015a:
   tl_dr: 'UnixStream::pair() test hang: shutdown(Write) does NOT reliably give the peer EOF — server blocked on read-until-EOF hangs. FIX: read exactly N acks then drop(client) for real EOF.'
   importance: high
@@ -569,10 +592,10 @@ fe4cc25edbfbea1f:
   importance: medium
   last_edited_ms: 0
 ffb84e0bd397cc96:
-  tl_dr: 'TEMPORARY: Do not push to remote unless user explicitly asks. Commit locally only until told otherwise.'
-  importance: critical
+  tl_dr: 'SUPERSEDED (T588): user now wants commit AND push after each A1-A13 lint step so CI runs in background. Push we-dev after every step. (Was: commit local only, no push.)'
+  importance: high
   labels:
   - workflow
   - temporary
   - git
-  last_edited_ms: 1784192485572
+  last_edited_ms: 1784496766882

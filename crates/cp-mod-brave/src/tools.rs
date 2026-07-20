@@ -1,5 +1,6 @@
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::{DYN_PANEL_ID_PLACEHOLDER, DynPanel};
+use cp_base::state::watchers::DYN_PANEL_ID_PLACEHOLDER;
+use cp_base::state::watchers::carriers::DynPanel;
 use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -86,12 +87,7 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let result_count = search_resp.web.as_ref().map_or(0, |w| w.results.len());
 
                 if result_count == 0 && rich_data.is_none() {
-                    return ToolOutput {
-                        content: format!("No results found for '{query}'"),
-                        is_error: false,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::ok(format!("No results found for '{query}'"));
                 }
 
                 // Build panel content as YAML
@@ -108,23 +104,17 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
                     panel_content.push_str(&yaml);
                 }
 
-                let dyn_panel = DynPanel {
-                    context_type: crate::panel::BRAVE_PANEL_TYPE.to_owned(),
-                    display_name: format!("brave_search: {query}"),
-                    metadata: vec![("result_content".to_owned(), panel_content.clone())],
-                    content: Some(panel_content),
-                };
+                let dyn_panel =
+                    DynPanel::new(crate::panel::BRAVE_PANEL_TYPE.to_owned(), format!("brave_search: {query}"))
+                        .metadata(vec![("result_content".to_owned(), panel_content.clone())])
+                        .content(panel_content);
 
-                ToolOutput {
-                    content: format!(
-                        "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {result_count} results for '{query}'{PANEL_WARNING}",
-                    ),
-                    is_error: false,
-                    create_panel: Some(dyn_panel),
-                    preserves_tempo: false,
-                }
+                ToolOutput::ok(format!(
+                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {result_count} results for '{query}'{PANEL_WARNING}",
+                ))
+                .with_panel(dyn_panel)
             }
-            Err(e) => ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
+            Err(e) => ToolOutput::error(e),
         }
     })
 }
@@ -170,43 +160,27 @@ fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
                 let url_count = resp.grounding.as_ref().and_then(|g| g.generic.as_ref()).map_or(0, Vec::len);
 
                 if url_count == 0 {
-                    return ToolOutput {
-                        content: format!("No context found for '{query}'"),
-                        is_error: false,
-                        create_panel: None,
-                        preserves_tempo: false,
-                    };
+                    return ToolOutput::ok(format!("No context found for '{query}'"));
                 }
 
                 let panel_content = match serde_yaml::to_string(&resp) {
                     Ok(yaml) => yaml,
                     Err(e) => {
-                        return ToolOutput {
-                            content: format!("Failed to serialize response: {e}"),
-                            is_error: true,
-                            create_panel: None,
-                            preserves_tempo: false,
-                        };
+                        return ToolOutput::error(format!("Failed to serialize response: {e}"));
                     }
                 };
 
-                let dyn_panel = DynPanel {
-                    context_type: crate::panel::BRAVE_PANEL_TYPE.to_owned(),
-                    display_name: format!("brave_llm_context: {query}"),
-                    metadata: vec![("result_content".to_owned(), panel_content.clone())],
-                    content: Some(panel_content),
-                };
+                let dyn_panel =
+                    DynPanel::new(crate::panel::BRAVE_PANEL_TYPE.to_owned(), format!("brave_llm_context: {query}"))
+                        .metadata(vec![("result_content".to_owned(), panel_content.clone())])
+                        .content(panel_content);
 
-                ToolOutput {
-                    content: format!(
-                        "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {url_count} URLs, ~{max_tokens} tokens for '{query}'{PANEL_WARNING}",
-                    ),
-                    is_error: false,
-                    create_panel: Some(dyn_panel),
-                    preserves_tempo: false,
-                }
+                ToolOutput::ok(format!(
+                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {url_count} URLs, ~{max_tokens} tokens for '{query}'{PANEL_WARNING}",
+                ))
+                .with_panel(dyn_panel)
             }
-            Err(e) => ToolOutput { content: e, is_error: true, create_panel: None, preserves_tempo: false },
+            Err(e) => ToolOutput::error(e),
         }
     })
 }
